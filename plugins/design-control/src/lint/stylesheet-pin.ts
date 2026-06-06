@@ -22,12 +22,21 @@ import { createHash } from 'node:crypto';
 import { parse, defaultTreeAdapter as ta } from 'parse5';
 import type { DefaultTreeAdapterMap } from 'parse5';
 import type { LintFinding } from '@/lint/types';
+import { isStylesheetRel } from '@/lint/allowlist';
 import { SKETCH_KIT_CSS_PATH, SKETCH_KIT_STYLESHEET_FILENAME } from '@/wireframe-kit/sketch-kit';
 
 type AnyNode = DefaultTreeAdapterMap['node'];
 
 export interface StylesheetPin {
-  /** Absolute path the single stylesheet `<link>` href must resolve to. */
+  /**
+   * Absolute path the single stylesheet `<link>` href must LEXICALLY resolve to
+   * (via `path.resolve(baseDir, href)` — no `realpathSync`/symlink
+   * normalization). With the default {@link buildSketchKitPin} this is derived
+   * from the same `baseDir` the href resolves against, so a symlinked layout
+   * (worktrees, `/var`→`/private/var`) can't produce a spurious mismatch; pass
+   * an explicit `canonicalPath` only when you've matched its symlink form to
+   * `baseDir`'s. Content identity is anchored by the hash regardless.
+   */
   readonly canonicalPath: string;
   /** Expected SRI-format content hash (`sha256-<base64>`) of that stylesheet. */
   readonly expectedHash: string;
@@ -61,11 +70,11 @@ interface StylesheetLink {
 function collectStylesheetLinks(node: AnyNode, out: StylesheetLink[]): void {
   if (ta.isElementNode(node) && ta.getTagName(node).toLowerCase() === 'link') {
     const attrs = ta.getAttrList(node);
-    const rel = (attrs.find((a) => a.name.toLowerCase() === 'rel')?.value ?? '')
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(Boolean);
-    if (rel.includes('stylesheet')) {
+    // Same EXACT-`['stylesheet']` predicate axis-1 uses, so the two axes can't
+    // disagree on what counts as a stylesheet link (AUDIT-20260606-08): a mixed
+    // rel="stylesheet icon" is not a clean stylesheet and is not collected.
+    const relValue = attrs.find((a) => a.name.toLowerCase() === 'rel')?.value ?? '';
+    if (isStylesheetRel(relValue)) {
       out.push({
         href: attrs.find((a) => a.name.toLowerCase() === 'href')?.value ?? '',
         integrity: attrs.find((a) => a.name.toLowerCase() === 'integrity')?.value,
@@ -98,12 +107,15 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
   const findings: LintFinding[] = [];
   const link = links[0];
   const resolved = resolve(pin.baseDir, link.href);
+  // If the href resolves off the pinned path, the link is already known-wrong;
+  // report and STOP without reading. Reading first would let an absolute or
+  // `../`-escaping href pull arbitrary files off disk (AUDIT-20260606-10).
   if (resolved !== pin.canonicalPath) {
-    findings.push({
+    return [{
       rule: 'stylesheet-path-mismatch',
       attr: 'href',
       message: `stylesheet href resolves to ${resolved}, not the pinned ${pin.canonicalPath}`,
-    });
+    }];
   }
 
   let content: Buffer;
@@ -125,12 +137,19 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
       message: `stylesheet content hash ${actualHash} does not match the pinned ${pin.expectedHash}`,
     });
   }
-  if (link.integrity !== undefined && link.integrity !== pin.expectedHash) {
-    findings.push({
-      rule: 'stylesheet-sri-mismatch',
-      attr: 'integrity',
-      message: `SRI integrity ${link.integrity} does not match the pinned ${pin.expectedHash}`,
-    });
+  // SRI permits a whitespace-separated list of digests; the resource is accepted
+  // if ANY listed digest matches. Tokenize + test membership rather than exact
+  // string equality so a spec-valid multi-hash integrity isn't falsely rejected
+  // (AUDIT-20260606-12).
+  if (link.integrity !== undefined) {
+    const tokens = link.integrity.split(/\s+/).filter(Boolean);
+    if (!tokens.includes(pin.expectedHash)) {
+      findings.push({
+        rule: 'stylesheet-sri-mismatch',
+        attr: 'integrity',
+        message: `SRI integrity "${link.integrity}" does not assert the pinned ${pin.expectedHash}`,
+      });
+    }
   }
   return findings;
 }

@@ -68,14 +68,17 @@ export const PRESENTATIONAL_ATTRS: ReadonlySet<string> = new Set([
  * URL-bearing attr here automatically extends scheme coverage to it
  * (AUDIT-20260606-04).
  *
- * Coupling caveat (AUDIT-20260606-07): the test-enforced invariant only covers
- * the RESOURCE direction — every attr in {@link RESOURCE_URL_ATTRS} must appear
- * here. A non-resource URL attr added to the allowlist ({@link TAG_ATTRS} /
- * {@link GLOBAL_ATTRS}) — e.g. `a ping`, `form action`, `q cite` — must ALSO be
- * added here by hand, or its values ship UNSCANNED with no failing test. Today
- * the allowlist's only URL attr is `href` (covered), so this is a latent
- * coupling, not a current gap; the robust fix (derive URL_ATTRS from URL-tagged
- * allowlist entries) is warranted the moment the allowlist grows such an attr.
+ * INVARIANT (AUDIT-20260606-07): every URL-bearing attribute in the allowlist
+ * ({@link TAG_ATTRS} / {@link GLOBAL_ATTRS}) is a member of this set, so its
+ * values are scheme/control-scanned. Today that holds because the allowlist's
+ * only URL attr is `href`, which is present here. The test-enforced half covers
+ * the RESOURCE direction (every {@link RESOURCE_URL_ATTRS} attr is here); the
+ * non-resource direction (a navigation-URL attr such as `a ping` / `form action`
+ * / `q cite`) is currently vacuous — no such attr is in the allowlist. The patch
+ * that first adds a non-resource URL attr to the allowlist adds it here in the
+ * same change AND replaces this hand-maintained coupling with URL-tagged
+ * allowlist entries that derive this set; until such an attr exists the
+ * invariant is complete as stated.
  */
 export const URL_ATTRS: ReadonlySet<string> = new Set(['href']);
 
@@ -87,6 +90,18 @@ export const URL_ATTRS: ReadonlySet<string> = new Set(['href']);
 export const RESOURCE_URL_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
   link: new Set(['href']),
 };
+
+/**
+ * A `rel` attribute value names EXACTLY a stylesheet — the normalized token set
+ * is `['stylesheet']`, nothing more. A mixed `rel="stylesheet icon"` /
+ * `"stylesheet preload"` still pulls a non-CSS resource, so it is NOT a clean
+ * stylesheet link. Shared by axis-1's link-rel gate and the identity-pin's link
+ * collector so the two cannot disagree (AUDIT-20260606-08).
+ */
+export function isStylesheetRel(relValue: string): boolean {
+  const tokens = relValue.toLowerCase().split(/\s+/).filter(Boolean);
+  return tokens.length === 1 && tokens[0] === 'stylesheet';
+}
 
 /** A value carries a `data:` URI scheme (delimiter-anchored to avoid "metadata"). */
 export const DATA_URI_RE = /(?:^|[\s"'(;,])data:/i;

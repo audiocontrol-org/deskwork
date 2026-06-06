@@ -24,6 +24,7 @@ import {
   RESOURCE_URL_ATTRS,
   DATA_URI_RE,
   EXTERNAL_URL_RE,
+  isStylesheetRel,
 } from '@/lint/allowlist';
 
 export { ALLOWED_TAGS } from '@/lint/allowlist';
@@ -125,12 +126,9 @@ function checkElement(el: Element, findings: LintFinding[]): void {
   // pulls a non-CSS resource (AUDIT-20260606-02/codex-01). The exact path+hash
   // identity-pin is task 4.
   if (tag === 'link') {
-    const rel = (ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'rel')?.value ?? '')
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(Boolean);
-    if (rel.length !== 1 || rel[0] !== 'stylesheet') {
-      findings.push({ rule: 'disallowed-link-rel', tag, message: `only rel="stylesheet" <link> is permitted; got rel="${rel.join(' ')}"` });
+    const relValue = ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'rel')?.value ?? '';
+    if (!isStylesheetRel(relValue)) {
+      findings.push({ rule: 'disallowed-link-rel', tag, message: `only rel="stylesheet" <link> is permitted; got rel="${relValue}"` });
     }
   }
 }

@@ -99,6 +99,38 @@ describe('checkStylesheetIdentity', () => {
     const bad = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="sha256-WRONG">`);
     expect(rules(checkStylesheetIdentity(bad, pin))).toContain('stylesheet-sri-mismatch');
   });
+
+  // AUDIT-20260606-08 (claude-01 + codex-01): standalone, a mixed rel must NOT
+  // pass as a clean stylesheet (the favicon channel axis-1 already closes).
+  it('does NOT treat a mixed rel="stylesheet icon" as a clean stylesheet link', () => {
+    const dir = freshDir();
+    const findings = checkStylesheetIdentity(
+      page(`<link rel="stylesheet icon" href="sketch-kit.css">`),
+      buildSketchKitPin(dir),
+    );
+    expect(findings).not.toEqual([]);
+    expect(rules(findings)).toContain('stylesheet-missing');
+  });
+
+  // AUDIT-20260606-10 (claude-02): a path-escaping href is reported WITHOUT
+  // reading anything off disk (no arbitrary file read).
+  it('reports path-mismatch for an escaping href and does not read other findings', () => {
+    const dir = freshDir();
+    const findings = checkStylesheetIdentity(
+      page(`<link rel="stylesheet" href="../../../../etc/passwd">`),
+      buildSketchKitPin(dir),
+    );
+    expect(rules(findings)).toEqual(['stylesheet-path-mismatch']); // short-circuited, no read
+  });
+
+  // AUDIT-20260606-12 (claude-04): a spec-valid multi-hash integrity containing
+  // the pinned digest must pass.
+  it('accepts a whitespace-separated multi-hash integrity that includes the pinned digest', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="sha384-other ${pin.expectedHash}">`);
+    expect(checkStylesheetIdentity(html, pin)).toEqual([]);
+  });
 });
 
 describe('lintWireframe with stylesheetPin — inert-class invariant', () => {

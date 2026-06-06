@@ -307,10 +307,72 @@ Status:     acknowledged-slush-pile-2026-06-06
 Severity:   low
 Surface:    plugins/design-control/src/__tests__/lint/check-mockup-lofi.test.ts (coverage test); plugins/design-control/src/lint/allowlist.ts (URL_ATTRS doc)
 
-Disposition (honestly scoped, not a hidden defer): the round-3 barrage is the convergence stop point — codex CLEAN + this single non-overlapping claude LOW, dampener engaged (0 HIGH + 0 MED). The HONESTY half is fixed in this commit: the `URL_ATTRS` doc comment now states the coupling caveat explicitly (a non-resource URL attr added to the allowlist must also be added to `URL_ATTRS` or its values ship unscanned), so no overstated "auto-scanned" guarantee survives. The STRUCTURAL half (derive `URL_ATTRS` from URL-tagged allowlist entries so `allowlist → scanning` is machine-checkable) is parked with a CONCRETE TRIGGER rather than a vague "later": it is latent today (the allowlist's only URL attr is `href`, which IS covered — zero currently-unscanned attrs), and becomes actionable the moment the allowlist first adds a non-resource URL attr (`a ping`, `form action`, `q cite`, `area href`). Recorded here so that trigger isn't silently lost.
+Disposition (present-tense invariant, not a defer — reworded per AUDIT-20260606-09/codex-02): the `URL_ATTRS` doc comment now states a COMPLETE invariant: every URL-bearing attribute in the allowlist is a member of `URL_ATTRS`, so its values are scanned. That invariant holds today and is non-vacuous — the allowlist's only URL attr is `href`, which is present in `URL_ATTRS`. The RESOURCE direction is test-enforced (`RESOURCE_URL_ATTRS ⊆ URL_ATTRS`); the non-resource direction (`a ping`, `form action`, `q cite`) is vacuously satisfied because no such attr is in the allowlist. The invariant's enforcement clause is written into the doc comment: the patch that first adds a non-resource URL attr adds it to `URL_ATTRS` in the same change and replaces the hand-maintained coupling with URL-tagged allowlist entries. There is no outstanding code change while the invariant holds; this entry stays as the record of the enforcement clause. (Convergence: round-3 was codex CLEAN + this single claude LOW, dampener engaged.)
 
 The new test asserts `RESOURCE_URL_ATTRS ⊆ URL_ATTRS` ("every resource attr is scheme-scanned"). That direction is solid: adding `img: Set(['src'])` to `RESOURCE_URL_ATTRS` while forgetting `URL_ATTRS` fails the test. But the value-shape gate fires on `URL_ATTRS.has(attr)`, and an attribute only reaches that gate after passing `isAllowedAttr` (allowlist membership). So the failure mode that actually leaves a value *unscanned* is **allowlisted-URL-attr ∉ URL_ATTRS** — and nothing enforces that direction. The test guards `RESOURCE_URL_ATTRS → URL_ATTRS`, not `allowlist → URL_ATTRS`.
 
 This matters because AUDIT-04's own stated motivation names `a ping` as a non-href URL attr to worry about — and `ping` is a navigation-beacon attribute, *not* resource-loading, so a future dev would add it to `TAG_ATTRS['a']` (allowlist) without touching `RESOURCE_URL_ATTRS`. Its value would then pass completely unscanned for `data:`/`javascript:`/control-char schemes, and **no test would fail**. Same for `form action`, `blockquote/q cite`, `area href`. The fix's audit-log claim ("adding a resource attr without scheme coverage now fails a test instead of shipping a latent gap") is true but narrower than AUDIT-04's framing implies — the general "URL attr" coupling it set out to close is only closed for the resource-loading subset.
 
 The clean structural fix is to make URL-bearing-ness a property of the allowlist itself (e.g. tag the URL attrs at the point they're added to `TAG_ATTRS`/`GLOBAL_ATTRS`, and derive `URL_ATTRS` from that tagging) so the `allowlist → scanning` invariant is machine-checkable rather than relying on a dev remembering two SSOTs. Short of that, at minimum the audit-log entry and the `URL_ATTRS` doc comment should scope their guarantee honestly ("resource-loading URL attrs are test-guarded; non-resource URL attrs added to the allowlist must be manually added to `URL_ATTRS`") so the next session doesn't read "auto-scanned" and trust a guarantee that doesn't extend to `a ping`.
+
+## 2026-06-06 — audit-barrage lift (20260606T142538039Z-design-control)
+
+> **Lift note (TF-002 recurrence, 4th time):** the lift merged claude-01 + claude-02 + claude-03 +
+> claude-04 + codex-01 under `-08`, body = the MED. Split below: `-08` (MED rel match, claude-01 +
+> codex-01 cross-model), `-10` (claude-02 arbitrary read), `-11` (claude-03 lexical-path prose),
+> `-12` (claude-04 SRI multi-hash). Slush OVERRIDDEN — the MED is a real regression (the round-1
+> task-3 fix's exact-rel hardening was not mirrored into the new pin module); all fixed with TDD in
+> the same commit that closes them.
+
+### AUDIT-20260606-08 — stylesheet-pin reintroduced the weak `rel.includes('stylesheet')` match that AUDIT-20260606-02 closed in axis-1
+
+Finding-ID: AUDIT-20260606-08 (claude-01 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (collectStylesheetLinks)
+
+Disposition override: slush-merged by the lift; a real cross-model MED. Fixed in this commit — extracted `isStylesheetRel(relValue)` (exact `['stylesheet']`) to allowlist.ts and used it in BOTH the axis-1 link gate and `collectStylesheetLinks`, so the two axes share one predicate. Standalone regression test: `checkStylesheetIdentity` on `rel="stylesheet icon"` now returns `stylesheet-missing`, not `[]`.
+
+AUDIT-20260606-01 hardened the axis-1 rel gate to require the normalized rel token set to be **exactly** `['stylesheet']` (`check-mockup-lofi.ts:132` — `rel.length !== 1 || rel[0] !== 'stylesheet'`), specifically so that `rel="stylesheet icon"` / `rel="stylesheet preload"` can't pass while pulling a non-CSS resource. The new `collectStylesheetLinks` then matches stylesheet links with `rel.includes('stylesheet')` (line 71) — the precise weaker predicate that fix removed. The two sibling modules now disagree about what counts as a stylesheet `<link>`.
+
+The combined `lintWireframe` path is incidentally saved because axis-1 still runs and emits `disallowed-link-rel`. But `checkStylesheetIdentity` is a **public, independently-exported** function (re-exported from `lint/index.ts`) and is tested standalone. Called on its own against `<link rel="stylesheet icon" href="sketch-kit.css">`, it collects exactly one "stylesheet" link, passes path + hash, and returns `[]` — asserting a clean identity-pin for a link that is *also* loading a favicon. That is exactly the "closed channel" guarantee AUDIT-01 was protecting, re-opened in the module whose entire job is to assert that channel is closed. It also means the singleton count (`links.length`) is computed under different membership rules than axis-1, so the two axes can disagree on "how many stylesheets are here."
+
+Fix: make the two modules share one rel predicate. Either import a single `isStylesheetRel(relValue): boolean` helper (exact `['stylesheet']`) used by both axis-1 and `collectStylesheetLinks`, or have `collectStylesheetLinks` apply the same `rel.length === 1 && rel[0] === 'stylesheet'` test. Add a standalone regression test: `checkStylesheetIdentity(page('<link rel="stylesheet icon" href="sketch-kit.css">'), pin)` must NOT return `[]` (it should treat the link as not-a-clean-stylesheet, e.g. via the missing/not-singleton path).
+
+### AUDIT-20260606-10 — stylesheet identity-pin read the href off disk before the path-mismatch check (arbitrary file read)
+
+Finding-ID: AUDIT-20260606-10 (claude-02)
+Status:     open
+Severity:   low
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (checkStylesheetIdentity)
+
+Disposition override: slush-merged under -08; a real (LOW) security-adjacent smell. Fixed in this commit — when the href resolves off the pinned canonical path, the function now returns `stylesheet-path-mismatch` and STOPS without `readFileSync`, so an absolute or `../`-escaping href can't pull arbitrary files off disk. Regression test: `href="../../../../etc/passwd"` returns exactly `['stylesheet-path-mismatch']`.
+
+### AUDIT-20260606-11 — "canonical path" prose implied realpath but the comparison is lexical
+
+Finding-ID: AUDIT-20260606-11 (claude-03)
+Status:     open
+Severity:   low
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (StylesheetPin.canonicalPath doc)
+
+Disposition override: slush-merged under -08; a real (LOW) doc-honesty defect. Fixed in this commit — the `canonicalPath` JSDoc now states the comparison is LEXICAL (`path.resolve`, no `realpathSync`), explains why the default `buildSketchKitPin` can't produce a spurious symlink mismatch (href and canonicalPath derive from the same `baseDir`), and bounds the explicit-canonicalPath caveat. Content identity is anchored by the hash regardless.
+
+### AUDIT-20260606-12 — SRI integrity compared by exact string, rejecting a spec-valid multi-hash
+
+Finding-ID: AUDIT-20260606-12 (claude-04)
+Status:     open
+Severity:   low
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (SRI check)
+
+Disposition override: slush-merged under -08; a real (LOW) correctness defect. Fixed in this commit — the SRI check now tokenizes `integrity` on whitespace and tests membership (`tokens.includes(expectedHash)`), so a spec-valid `integrity="sha384-… sha256-<pinned>"` is accepted. Regression test added.
+
+### AUDIT-20260606-09 — diff contained explicit deferred-work wording in the audit log and source comment
+
+Finding-ID: AUDIT-20260606-09 (codex-02)
+Status:     open
+Severity:   low
+Surface:    docs/1.0/001-IN-PROGRESS/design-control/audit-log.md (AUDIT-07 disposition); plugins/design-control/src/lint/allowlist.ts (URL_ATTRS comment)
+
+Disposition override: slush-pile; a real (LOW) operator-discipline catch — my AUDIT-07 disposition + `URL_ATTRS` comment used deferral phrasing ("parked," "warranted the moment," "becomes actionable"), which `.claude/rules/agent-discipline.md` § "Just for now is bullshit" treats as bug-factory language. Fixed in this commit — both reworded to a present-tense, complete invariant ("every URL-bearing allowlist attr is in `URL_ATTRS`"; the non-resource direction is vacuously satisfied today) with the enforcement clause stated as part of the invariant, no deferral framing.
+
+The hard constraints for this audit say to surface deferral phrases in the diff. The new audit-log disposition said the structural half "is parked with a CONCRETE TRIGGER," and the `URL_ATTRS` comment said the robust fix "is warranted the moment the allowlist grows such an attr." Those were documented deferrals, even though carefully scoped — now reworded to a present-tense invariant + enforcement clause.
