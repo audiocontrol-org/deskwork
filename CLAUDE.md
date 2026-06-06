@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/002-parallel-execution-engine/spec.md
+specs/004-spec-governance/spec.md
 <!-- SPECKIT END -->
