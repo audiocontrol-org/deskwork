@@ -16,11 +16,11 @@ Build **`stack-control`** (CLI `stackctl`) — a new plugin, the **successor to 
 
 **Pivoted 2026-06-04 → integration-first, and reframed as the `stack-control` plugin.** Rather than building the manifest/port abstraction up front, we adopted Spec Kit as a real management layer and let the bridge's shape emerge from concrete integration. The work is being built as `stack-control`, a new in-monorepo plugin that succeeds `dw-lifecycle` via absorb-then-retire (isolation so `dw-lifecycle` keeps doing real work undisturbed).
 
-**Resequenced 2026-06-04 around a self-hosting strategy.** The foundational docs were realigned to the stack-control architecture and the feature order was set: build the minimum control plane first, then use it to build the rest. The **canonical sequence (with scope + status) lives in [`stack-control-roadmap.md`](./stack-control-roadmap.md) § Feature sequence** — this README does not duplicate it (drift-avoidance). In short:
+**Resequenced 2026-06-04 (self-hosting) then again 2026-06-06 (design-phase first).** The foundational docs were realigned to the stack-control architecture; the control plane is built first, then used to build the rest, with the up-front **design surfaces pulled ahead of the execution engine**. Features are named by **`<phase>/<slug>` codename** (not `F<n>` — the numbers no longer imply order). The **canonical sequence (with scope + status) lives in [`stack-control-roadmap.md`](./stack-control-roadmap.md) § Feature sequence** — this README does not duplicate it (drift-avoidance). In short:
 
-1. **Feature 1 (next)** — stack-control front door: stand up the plugin (minimal scaffolding folded in) + `stackctl` + a thin control plane that can **curate a spec** and **run it via native Spec Kit execution** (`/speckit-implement`, governance firing). The founding governance extension rehomes here. The self-hosting bootstrap — used to build everything after.
-2. **The rest, built *through* the front door** — parallel multi-backend execution engine (`specs/002-parallel-execution-engine/`), the dw-lifecycle migrations (scope-discovery, audit-barrage, session), the fuller frontend.
-3. **Retire `dw-lifecycle`** at parity. (Substrate / provider abstraction deferred until a 2nd provider arrives.)
+1. **`multi/front-door` — COMPLETE** (35/35, governed, pushed; `plugins/stack-control/` live). The thin control plane that can **curate a spec** and **run it via native Spec Kit execution** (`/speckit-implement`, governance firing); the founding governance extension (`impl/governance`) rehomed here. The self-hosting bootstrap — used to build everything after.
+2. **Design-phase block (next), built *through* the front door** — `design/insight-capture` → `design/spec-governance` → `multi/control-plane-frontend` design surfaces.
+3. **Then** `impl/execution-engine` (parallel multi-backend engine, `specs/002-parallel-execution-engine/`; spec hardened, parked at plan) → the `dw-lifecycle` migrations → `multi/retire-dw-lifecycle` at parity. (Substrate / provider abstraction deferred until a 2nd provider arrives.)
 
 ## Key Links
 
