@@ -15,6 +15,7 @@ Read the following and report a concise summary. **Do NOT start work until the o
    - If NOT on this branch, stop and say so — this bootstrap is branch-specific.
 
 2. **Read the program orientation — the durable "why" + settled decisions.**
+   - `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-thesis.md` — **READ FIRST. The thesis + hard-won principles + the motivating blog post.** Grounds everything: *invest heavily in up-front design and tooling, industrialize execution*; agents are "hyperintelligent toddlers" fixed by environmental design + stochastic correctness, not by rules. If work doesn't trace back to the thesis, stop and reconsider.
    - `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/README.md` — feature overview + key links.
    - `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md` — the **canonical feature sequence** (scope + status; don't look for it elsewhere).
    - `.claude/rules/stack-control-succession.md` — **settled decisions; do NOT relitigate** (stack-control succeeds dw-lifecycle via absorb-then-retire; isolation invariant; naming; the two pluggability axes).

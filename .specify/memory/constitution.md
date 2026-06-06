@@ -1,9 +1,12 @@
 <!--
 Sync Impact Report
+- Version change: 1.1.1 → 1.2.0 (MINOR — new "Thesis & Motivating Context" section grounding all
+  principles in the stack-control thesis + the motivating blog post; foundational-doc grounding pass,
+  operator decision 2026-06-06. No principle added/removed; no template impact.)
 - Version change: 1.1.0 → 1.1.1 (PATCH — version-line constraint reversed: stack-control shares the
   repo's single lockstep version, no longer "its own version line"; operator decision 2026-06-05)
 - Version change: 1.0.0 → 1.1.0 (MINOR — new principle IX + reframe to the stack-control program)
-- Ratification: initial adoption 2026-06-04; amended 2026-06-04, 2026-06-05
+- Ratification: initial adoption 2026-06-04; amended 2026-06-04, 2026-06-05, 2026-06-06
 - Amendment 1.1.0 (2026-06-04): reframed preamble + title around the stack-control program
   (successor to dw-lifecycle); added Principle IX (Execution-Backend Pluggability); qualified the
   Additional Constraints (manifest port DEFERRED to substrate; plan source is Spec Kit tasks.md;
@@ -40,6 +43,26 @@ directives set during the integration-first dogfood of GitHub Spec Kit. Where th
 deskwork's repo-level rules overlap, they are intended to agree; deskwork's rules remain authoritative
 for the wider repo. (The earlier `design.md` is superseded-as-spine — it now describes the deferred
 substrate feature, not the current path.)
+
+## Thesis & Motivating Context
+
+> **Invest heavily in up-front design and tooling; industrialize execution.**
+
+stack-control is a **barbell**: disproportionate investment in the up-front half (design, scoping, spec
+authoring, insight capture, cross-model spec governance, scope discovery), so execution can be
+**industrialized** — parallel, multi-backend, worktree-isolated, unattended, and independent of operator
+mood. The principles below are not arbitrary; each is a hard-won response to how coding agents actually
+fail — *"insane, hyperintelligent toddlers"* that lie with confidence and drift off the boring middle of
+a task. You do not fix them by yelling (a rule in a big document goes unfollowed); you fix them by
+**environmental/process design that makes failure states mechanically impossible**, with **stochastic
+correctness** (cross-model audit-barrage) as the teeth. Principle I (Test-First), Principle V (No
+Fallbacks / fail-loud), and the governance gates are direct expressions of *detection over instruction*.
+When two readings of a principle compete, prefer the one that adds a mechanical interlock over the one
+that adds advice.
+
+Full grounding — the thesis, the hard-won principles, and the motivating blog post — lives in
+`docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-thesis.md`. Read it before applying
+these principles.
 
 ## Core Principles
 
@@ -154,4 +177,4 @@ Versioning policy (semantic):
 - MINOR: a new principle/section added or materially expanded guidance.
 - PATCH: clarifications, wording, non-semantic refinements.
 
-**Version**: 1.1.1 | **Ratified**: 2026-06-04 | **Last Amended**: 2026-06-05
+**Version**: 1.2.0 | **Ratified**: 2026-06-04 | **Last Amended**: 2026-06-06

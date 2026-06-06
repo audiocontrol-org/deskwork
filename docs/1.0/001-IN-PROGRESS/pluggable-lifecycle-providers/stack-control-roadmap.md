@@ -10,6 +10,8 @@
 
 stack-control is a **barbell**. The up-front half — design, scoping, spec authoring, insight capture, cross-model spec governance, scope discovery — is where human judgment and *all* the leverage live, so the control plane invests **disproportionately** there: rich, rigorous, low-friction, well-tooled. The back half — execution — is then **industrialized**: parallel, worktree-isolated, multi-backend, unattended, cheap to run. Execution is the commodity end; design is where value is created.
 
+> **Full grounding** — the thesis, the hard-won principles, and the motivating blog post — lives in **[`stack-control-thesis.md`](./stack-control-thesis.md)**. Read it first.
+
 **What this dictates:** the answer to *"how much should stack-control help with the up-front design and tooling part of product development?"* is **a great deal** — that is the point of the product, not a side quest. Features that make design richer, more rigorous, and lower-friction (insight capture, governing the spec, scope discovery, exploration of alternatives, rigorous iteration) are **first-class, heavily-resourced** work — at least equal to, and the source of leverage over, the execution engine. When weighing investment between a design-phase capability and an execution-phase one, the thesis tilts toward the design phase.
 
 ### The two halves of the thesis

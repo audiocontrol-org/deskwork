@@ -2,6 +2,14 @@
 
 `stack-control` (CLI `stackctl`; brand: stackcontrol.org) is a new plugin being built as the **successor to `dw-lifecycle`**. This is an operator decision (2026-06-04 session), captured here so future sessions treat it as settled rather than re-deriving or re-debating it. The program detail lives in `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md`; this rule is the durable operational summary.
 
+## Thesis (read this first — it grounds everything)
+
+> **Invest heavily in up-front design and tooling; industrialize execution.**
+
+stack-control is a **barbell**: disproportionate investment in the up-front half (design, scoping, spec authoring, insight capture, cross-model spec governance, scope discovery — where the leverage is), so the back half (execution) can be **industrialized** — parallel, multi-backend, worktree-isolated, unattended, and **independent of operator mood or attention**. The arc is craftsman → industrialist. Coding agents are *"insane, hyperintelligent toddlers"* — you don't fix them by yelling (rules), you fix them by **environmental/process design that makes failure states mechanically impossible**, with **stochastic correctness** (cross-model audit-barrage) as the teeth.
+
+**Every new developer and every fresh agent session must read the full grounding before working here:** [`docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-thesis.md`](../../docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-thesis.md) (thesis + hard-won principles + the motivating blog post, [stackcontrol.org/blog](https://stackcontrol.org/blog/the-lifecycle-and-why-agents-need-one/)). If a design choice or piece of work doesn't trace back to the thesis, stop and reconsider.
+
 ## The settled decisions
 
 1. **`stack-control` is a new plugin, in this monorepo**, **sharing the repository's single lockstep version** with every other plugin (operator decision 2026-06-05 — independent versions are harder to manage and the Claude marketplace update is monolithic; it does NOT get its own version line). Layout: a self-contained plugin under `plugins/stack-control/` mirroring `dw-lifecycle`'s real shape — in-tree TypeScript run via `tsx`, not a thin shell over a `packages/` package (Feature-1 plan R1, `specs/003-stack-control-front-door/research.md`). NOT a separate repo (the migration is an in-tree code move; a spin-out can happen after parity, never mid-migration).

@@ -2,6 +2,8 @@
 
 Provider-agnostic **control plane** for spec-driven development, built as a plugin for [Claude Code](https://claude.com/claude-code). It takes a dependency-annotated spec from an authoring provider (today: GitHub [Spec Kit](https://github.com/github/spec-kit)) and both **governs** it (cross-model audit-barrage + finding lift, firing automatically after execution) and **runs** it — branching only on capabilities, never on which tool authored or executed the plan.
 
+> **Thesis:** *invest heavily in up-front design and tooling; industrialize execution.* The full grounding — hard-won principles + the origin story — is the devlog: [stackcontrol.org/blog](https://stackcontrol.org/blog/the-lifecycle-and-why-agents-need-one/) (and, in-repo for contributors, [`stack-control-thesis.md`](../../docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-thesis.md)).
+
 `stack-control` (CLI `stackctl`; brand: stackcontrol.org) is the **successor to `dw-lifecycle`**, built alongside it via absorb-then-retire: keepers move out of `dw-lifecycle` into `stack-control` over successive features, and `dw-lifecycle` is retired once `stack-control` reaches parity. It is developed without destabilizing `dw-lifecycle`, which stays in active use until then.
 
 ## Status
