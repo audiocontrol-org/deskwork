@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -32,8 +32,8 @@
 ## Notes
 
 - **FR-001 — RESOLVED 2026-06-04 (operator):** plan source is Spec Kit `tasks.md` read concretely; provider generalization deferred to a later slice. (Note: the *execution-backend* port stays in scope — distinct axis.)
-- **2 [NEEDS CLARIFICATION] markers remain** (intentional, within the max-3 limit), both on scope-determining decisions, under discussion with the operator:
-  1. FR-007 — reconcile/merge policy (sequential-merge-with-halt vs. per-task PRs vs. auto-rebase-then-halt).
-  2. FR-015 — v1 backend roster (in-session + one distinct batch CLI vs. in-session + two distinct batch CLIs, the latter fully demonstrating the US3 cross-backend differentiator).
-- These two will be resolved either inline or via the dedicated `/speckit-clarify` pass before `/speckit-plan`.
-- Other open design questions (concurrency bound, task→backend assignment policy, single-task-failure disposition, mid-run backend-loss disposition) are captured in the spec's **Assumptions** with reasonable starting defaults rather than as clarification markers, per Constitution Principle II (capture-then-scope) and the skill's max-3 limit.
+- **All [NEEDS CLARIFICATION] markers RESOLVED in the 2026-06-06 `/speckit-clarify` session:**
+  1. FR-007 — reconcile/merge policy → **isolated per-run integration branch + per-task auto-merge; conflict → quarantine-and-continue; preserved per-task branches; governance after (one-way, non-blocking); operator promotes off the critical path.** Driven by the unattended-operation directive (FR-021).
+  2. FR-015 — v1 backend roster → **in-session + two distinct batch CLIs (three backends)**, fully demonstrating the US3 cross-backend differentiator.
+- **Overarching operator directive (2026-06-06):** fully unattended — "a system that can run all night with no operator input" → captured as **FR-021** + **SC-010/SC-011**; governs the FR-007 and FR-019 resolutions.
+- Other design questions resolved/dispositioned in the same session: task→backend assignment policy (**capability-match then round-robin**, FR-010); single-task-failure disposition (**retry once, then skip-dependents-and-continue**, FR-019; richer retry/circuit-breaker layer captured-and-deferred as FR-020). Concurrency bound and mid-run backend-loss disposition deferred to `/speckit-plan` with low-risk defaults (Assumptions).

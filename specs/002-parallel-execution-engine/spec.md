@@ -16,6 +16,16 @@
 
 > **Two distinct pluggability axes — keep them straight.** (1) The **provider / plan-source port** (where the plan comes from) is **deferred** in this slice: it is built **concretely against Spec Kit's `tasks.md`**; provider generalization comes in a later slice (operator decision 2026-06-04 — build against one real provider first, generalize once it works). (2) The **execution-backend port** (how each task is run — in-session sub-agent vs. batch CLI) is **fully in scope** here — it is the heart of the slice and carries the operator's batch-CLI-resilience constraint. "Build against Spec Kit first" applies to axis (1) only; axis (2) stays pluggable.
 
+## Clarifications
+
+### Session 2026-06-06
+
+- Q: v1 backend roster (FR-015) → A: in-session sub-agent dispatch + **two distinct batch-CLI backends** (three backends total) — chosen so cross-backend fan-out across distinct coding agents (US3) is demonstrated, not merely asserted.
+- Q: Single-task-failure disposition (FR-019) → A: v1 is conservative — **retry the failed task once**; on a second failure, record it, skip its dependents, and **continue the run** (reconciled with the unattended directive below — "halt" applies to the task's lineage, not the whole run). A richer resilience layer (configurable retry policies + per-backend circuit breakers, drawing on established microservices practice) is captured as **required future work**, explicitly NOT built in this slice (operator decision — capture, don't build; Principle II). See FR-019, FR-020.
+- Q: Task → backend assignment policy (FR-010/FR-015) → A: **capability-match first, then round-robin** across the eligible backends.
+- Q: Overarching operational mode → A: **fully unattended — "a system that can run all night with no operator input"** (operator directive 2026-06-06). The engine never blocks on a prompt; every decision point auto-resolves or quarantines-and-continues; a run always ends with a report. This directive governs the FR-007 and FR-019 resolutions. See FR-021, SC-010/SC-011.
+- Q: Reconcile/merge policy (FR-007) → A: **isolated per-run integration branch + per-task auto-merge (no operator gate); on conflict, quarantine the task and continue; preserved per-task branches; governance runs after, one-way non-blocking; operator promotes the run branch off the critical path.** See FR-007.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Execute an independent-task tranche in parallel, each isolated, then reconcile (Priority: P1) 🎯 MVP
@@ -100,9 +110,9 @@ When a run (or tranche) completes, the engine produces a well-defined handoff th
 ### Edge Cases
 
 - **No backend can run an eligible task** (every backend declaring the required capability is unavailable): the engine fails loudly with a descriptive error naming the missing capability — it does NOT silently skip the task or fall back to mock output (Principle V).
-- **Reconcile conflict** between two parallel tasks' changes: the engine surfaces the conflict with an actionable report and halts that reconciliation — it does NOT auto-resolve or silently pick a winner.
+- **Reconcile conflict** between two parallel tasks' changes: the engine surfaces the conflict with an actionable report, **quarantines that task** (preserves its branch, marks it blocked, skips its dependents) and **continues the run** — it does NOT auto-resolve, silently pick a winner, halt the whole run, or wait for the operator (FR-007 / FR-021).
 - **Empty eligible tranche but unfinished plan** (dependency cycle or unsatisfiable edge): surfaced as an error, not an infinite wait or false "done."
-- **A single task fails inside its backend**: the run records the failure against that task; behavior for the rest of the tranche/plan (halt-all vs. continue-independent) is an open policy question (see Assumptions / clarify).
+- **A single task fails inside its backend**: the engine retries once; on a second failure it records the failure, does not start that task's dependents, and continues independent work (FR-019) — the run is not halted and does not wait for the operator (FR-021).
 - **Worktree creation fails** (dirty tree, disk, name collision): surfaced as an error before dispatch; no partial silent execution.
 - **Provider's source plan artifact**: never written to by the engine (one-way authority, Principle IV) — progress/state lives in deskwork's substrate, not the provider's `tasks.md`.
 - **Mid-run loss of a backend's batch mode**: in-flight tasks on that backend are handled per the fail-over rule (route remaining eligible work to an available backend); already-started work's disposition is an open policy question (see clarify).
@@ -122,18 +132,18 @@ When a run (or tranche) completes, the engine produces a well-defined handoff th
 
 - **FR-005**: The engine MUST execute each concurrently-running task in its own isolated git worktree so parallel tasks' file writes cannot collide.
 - **FR-006**: The engine MUST reconcile each completed task's changes back toward the integration branch.
-- **FR-007**: On a reconcile conflict, the engine MUST surface the conflict with an actionable report and MUST NOT auto-resolve or silently choose a winner. [NEEDS CLARIFICATION: reconcile/merge policy — sequential merge into the integration branch with conflict-halt, per-task branches/PRs the operator merges, or auto-rebase-then-halt-on-conflict? Determines operator workflow and blast radius.]
+- **FR-007**: On a reconcile conflict, the engine MUST surface the conflict with an actionable report and MUST NOT auto-resolve or silently choose a winner. **Reconcile policy (resolved 2026-06-06 — unattended operation):** each task runs on its own **preserved per-task branch**; the engine creates an **isolated per-run integration branch** off the feature-branch tip and **sequentially auto-merges** completed task branches into it, with **no operator gate**. On conflict, the engine **quarantines** that task (its branch preserved, marked blocked in the run record), does NOT start its dependents, and **continues** merging and scheduling other independent work — it does NOT halt the whole run and never waits for operator input. Governance runs afterward over the run branch, one-way and non-blocking (FR-017/FR-018). The operator promotes the completed run branch into the feature branch at their discretion; **promotion is never on the run's critical path** (the run completes fully without it).
 - **FR-008**: The engine MUST NOT write to the provider's source plan artifact; execution progress/state is recorded in deskwork's own substrate, one-way (Principle IV).
 
 **Backend port & capabilities (the durability constraint)**
 
 - **FR-009**: The engine MUST talk to execution backends only through a capability port; it MUST NOT branch on a vendor/tool identity anywhere in backend selection or dispatch (Principle III).
-- **FR-010**: Each backend MUST declare its capabilities (at minimum: which dispatch mechanism it provides and whether it is currently available); the engine MUST select and fail-over among backends using these declarations only.
+- **FR-010**: Each backend MUST declare its capabilities (at minimum: which dispatch mechanism it provides and whether it is currently available); the engine MUST select and fail-over among backends using these declarations only. **Assignment policy: capability-match first (filter to backends declaring the required capability), then round-robin across the eligible set** — fair, fully capability-driven (Principle III), and naturally produces cross-backend fan-out (US3).
 - **FR-011**: The engine MUST support at least two backend kinds: (a) **in-session sub-agent dispatch** via the host session's sub-agent mechanism, and (b) **batch CLI shell-out** to an external coding CLI.
 - **FR-012**: The engine MUST run a plan to completion when only the in-session backend is available AND when only a batch-CLI backend is available — i.e. it MUST NOT hard-depend on any batch/headless CLI being present.
 - **FR-013**: When a backend assigned a task becomes unavailable (e.g. its batch mode is withdrawn), the engine MUST route the task to another backend that declares the required capability.
 - **FR-014**: When no available backend declares the capability an eligible task requires, the engine MUST fail loudly with a descriptive error naming the missing capability — no silent skip, no mock output (Principle V).
-- **FR-015**: In a single run, the engine MUST be able to distribute tasks across two or more distinct backends concurrently (cross-backend fan-out). [NEEDS CLARIFICATION: v1 backend roster — which concrete backends must ship in this slice? Minimum is "≥1 in-session + ≥1 batch CLI", but the cross-backend differentiator (US3) needs ≥2 distinct batch backends to be meaningfully demonstrated — is the roster (in-session + one batch CLI) for v1, or (in-session + two batch CLIs e.g. two distinct coding agents)?]
+- **FR-015**: In a single run, the engine MUST be able to distribute tasks across two or more distinct backends concurrently (cross-backend fan-out). **v1 roster: in-session sub-agent dispatch + two distinct batch-CLI backends (three backends total)** (operator decision 2026-06-06). The two distinct batch CLIs make the cross-backend, distinct-coding-agent differentiator (US3) demonstrable rather than merely asserted. *(The specific external CLIs are an availability/research detail for `/speckit-plan`; the engine still selects among all three by declared capability only — Principle III — never by their identity.)*
 
 **Run record & governance seam**
 
@@ -143,7 +153,12 @@ When a run (or tranche) completes, the engine produces a well-defined handoff th
 
 **Failure semantics**
 
-- **FR-019**: When an individual task fails inside its backend, the engine MUST record the failure against that task in the run artifact. [Tranche/plan disposition on single-task failure — halt-all vs. continue-independent — is an open policy question; see Assumptions.]
+- **FR-019**: When an individual task fails inside its backend, the engine MUST **retry it once**; if the retry also fails, the engine MUST record the failure against that task in the run artifact, **NOT start the failed task's dependents**, and **continue executing independent tasks** — the run proceeds unattended and terminates (with a report) only when no eligible work remains. *(Reconciled 2026-06-06 with the unattended-operation directive, FR-021: the operator's "retry once, then halt" applies to the failed task's **lineage** — its dependents do not start — not to the whole run; a single double-failure must not end an overnight run. The richer retry/circuit-breaker policy remains captured-and-deferred, FR-020.)*
+- **FR-020** *(captured, deferred — NOT built in this slice)*: A richer execution-resilience layer is **required future work**: configurable retry policies (backoff, max-attempts) and per-backend **circuit breakers**, drawing on established microservices practice (where there is substantial prior art). v1 deliberately ships only the minimal retry-once-then-continue of FR-019; the fuller policy is its own future slice. Captured per operator decision (Principle II — capture, don't build); recorded here so the need is not lost, with no v1 implementation obligation.
+
+**Unattended operation (the load-bearing operator directive)**
+
+- **FR-021**: The engine MUST run a plan to completion **fully unattended** — it MUST NOT block on, or wait for, operator input at any point during a run. Every decision point either resolves automatically and safely or **quarantines** the affected task (preserving its artifacts and recording it for later review) and continues. A run ALWAYS terminates with a written report; it NEVER pauses awaiting a prompt, a merge approval, or a conflict resolution. *(Operator directive 2026-06-06: "a system that can run all night with no operator input." This requirement governs the resolution of FR-007 reconcile-conflict handling and FR-019 task-failure handling — both quarantine-and-continue rather than block-or-halt-the-run.)*
 
 ### Key Entities *(include if feature involves data)*
 
@@ -154,8 +169,10 @@ When a run (or tranche) completes, the engine produces a well-defined handoff th
 - **Execution backend**: a pluggable adapter that runs a task. Two kinds in scope: in-session sub-agent dispatch; batch CLI shell-out.
 - **Backend capability**: a declared property of a backend (dispatch mechanism, current availability, …) — the only thing the engine branches on.
 - **Worktree**: an isolated git working tree in which a single concurrent task executes.
-- **Reconcile/integration result**: the outcome of merging a task's worktree changes toward the integration branch (clean, or conflict-with-report).
-- **Run record**: the per-run artifact (per-task backend attribution, status, output location).
+- **Per-task branch**: the branch a task's worktree commits to — **preserved** after the run as a durable artifact (audit trail, rollback point, the concrete "where output landed" the run record references).
+- **Run integration branch**: an isolated branch created per run off the feature-branch tip, into which completed per-task branches are auto-merged; the assembled run result the operator later promotes (FR-007).
+- **Reconcile/integration result**: the outcome of merging a task's per-task branch into the run integration branch (clean-merged, or conflict → quarantined-with-report).
+- **Run record**: the per-run artifact (per-task backend attribution, status incl. retried/failed/quarantined, output location / branch ref).
 - **Governance handoff**: the one-way seam describing the produced work for slice-001 governance to audit.
 
 ## Success Criteria *(mandatory)*
@@ -171,16 +188,18 @@ When a run (or tranche) completes, the engine produces a well-defined handoff th
 - **SC-007**: The provider's source plan artifact is **byte-unchanged** before vs. after a run (one-way authority).
 - **SC-008**: A completed run produces a governance handoff that slice-001 governance consumes with **no** manually-assembled inputs.
 - **SC-009**: For a plan with a dependency chain, **100%** of dependent tasks start only after their dependencies complete (no early starts observed across the test plan).
+- **SC-010**: A run started with no terminal/operator attached completes with **0** prompts and **0** blocking waits — every reconcile conflict and retry-exhausted task failure is quarantined and recorded, and the run terminates with a written report rather than waiting for input (unattended operation, FR-021).
+- **SC-011**: After a run, the feature/integration branch the operator works from is **unchanged** unless the operator explicitly promotes the run branch — the engine assembles onto an isolated per-run integration branch, so an unattended run never mutates the operator's working branch on its own (FR-007).
 
 ## Assumptions
 
 These are reasonable defaults chosen where the description did not fix a detail. They are **starting positions to confirm in `/speckit-clarify`**, not scope cuts (Constitution Principle II — capture, then scope):
 
-- **Concurrency bound** (FR-002): default to a host-derived bound (e.g. roughly available cores minus a headroom margin, capped by tranche width). To confirm in clarify.
-- **Task → backend assignment policy** (FR-010/FR-015): default to capability-match first, then round-robin across eligible backends. To confirm in clarify (alternatives: cost-aware, latency-aware, operator-pinned).
-- **Single-task-failure disposition** (FR-019): default to "continue independent tasks in the tranche; do not start dependents of the failed task; report at run end." To confirm in clarify (alternative: halt-all-on-first-failure).
+- **Concurrency bound** (FR-002): default to a host-derived bound (e.g. roughly available cores minus a headroom margin, capped by tranche width). *Deferred from the 2026-06-06 clarify session to `/speckit-plan`* — the default is low-risk; confirm the exact formula at planning.
+- **Task → backend assignment policy** (FR-010/FR-015): **RESOLVED (2026-06-06)** — capability-match first, then round-robin across eligible backends. See FR-010.
+- **Single-task-failure disposition** (FR-019): **RESOLVED (2026-06-06)** — retry the failed task once, then halt the run. See FR-019; the richer retry/circuit-breaker policy is captured-and-deferred in FR-020.
 - **Plan source is Spec Kit `tasks.md`, concretely** (operator decision 2026-06-04 — no provider abstraction in this slice; generalize after it demonstrably works). The engine's internal task/dependency model is a private engine detail, NOT a published provider port.
 - **Integration target** is the feature's integration branch in the same repository; worktrees are git worktrees under that repo.
 - **Governance** (slice 001) already exists and is the consumer of the execution→governance seam; this slice defines the seam and does not modify governance internals.
-- **Mid-run already-started-work disposition** on backend loss: default to letting in-flight work finish where possible and routing only not-yet-started eligible work; to confirm in clarify.
+- **Mid-run already-started-work disposition** on backend loss: default to letting in-flight work finish where possible and routing only not-yet-started eligible work. *Deferred from the 2026-06-06 clarify session to `/speckit-plan`* (edge policy; default is low-risk).
 - **Dual driver (forward design).** The execution capability must be drivable by BOTH `stackctl` (CLI) and a future `stack-control` control-plane frontend. The engine's entry point, run record, and governance handoff are therefore **interface artifacts, not CLI-private** — no CLI-only coupling (e.g. progress/state is a readable artifact, not just terminal output). The control-plane frontend itself (spec-creation UI, spec→implementation negotiation, scope-discovery + audit-barrage surfaces) is a separate future feature, OUT OF SCOPE here.
