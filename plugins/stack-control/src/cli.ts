@@ -12,6 +12,7 @@ import { runVersion } from './subcommands/version.js';
 import { runExecuteCheck } from './subcommands/execute-check.js';
 import { runSpecCheck } from './subcommands/spec-check.js';
 import { runSpecGovernanceGate } from './subcommands/spec-governance-gate.js';
+import { runSlushFindings } from './subcommands/slush-findings.js';
 import { auditBarrage } from './subcommands/audit-barrage.js';
 import { auditBarrageRender } from './subcommands/audit-barrage-render.js';
 import { auditBarrageLiftCli } from './subcommands/audit-barrage-lift.js';
@@ -23,6 +24,7 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   'execute-check': runExecuteCheck,
   'spec-check': runSpecCheck,
   'spec-governance-gate': runSpecGovernanceGate,
+  'slush-findings': runSlushFindings,
   // Vendored from dw-lifecycle (multi/migrate-audit-barrage) — stack-control's
   // own audit-barrage; no dw-lifecycle dependency.
   'audit-barrage-render': auditBarrageRender,

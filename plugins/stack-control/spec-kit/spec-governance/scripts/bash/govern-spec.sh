@@ -201,6 +201,16 @@ echo "govern-spec.sh: barrage run-dir = ${RUN_DIR}" >&2
 # end-to-end by the lift verb (T011 / US2) — compose it, do not reimplement.
 "${BARRAGE_BIN}" audit-barrage-lift --feature "${SLUG}" --run-dir "${RUN_DIR}" --apply
 
+# --- slush the tail (ported slush-pile; AUDIT-20260607-03) ---
+# Once the dampener is engaged for this checkpoint (2 consecutive 0-HIGH runs, or
+# 0 HIGH + 0 MEDIUM), bin the residual MEDIUM/LOW of this run to
+# acknowledged-slush-pile so the convergence loop terminates — not fixed, not
+# open, burn-down-able later. No-op until the dampener engages; HIGHs are NEVER
+# slushed. GOVERN_NO_SLUSH=1 disables (address every finding manually instead).
+if [ "${GOVERN_NO_SLUSH:-0}" != "1" ]; then
+  "${STACKCTL}" slush-findings --feature "${SLUG}" --repo-root "${REPO_ROOT}" --checkpoint "${CHECKPOINT}" --apply || true
+fi
+
 # --- convergence gate (T019 / FR-010 / SC-007), scoped to this checkpoint ---
 _gate_flags=(--feature "${SLUG}" --repo-root "${REPO_ROOT}" --checkpoint "${CHECKPOINT}")
 [ -n "${GOVERN_CEILING:-}" ] && _gate_flags+=(--ceiling "${GOVERN_CEILING}")

@@ -32,6 +32,13 @@ extension, and a feature of the `pluggable-lifecycle-providers` north star
   convergence the verdict is `non-converged` (escalate — never an infinite
   loop). An explicit `--override "<reason>"` records an accepted residual and
   permits graduation.
+- **Slush pile** (`stackctl slush-findings`): once the dampener is engaged
+  (2 consecutive 0-HIGH runs, or 0 HIGH + 0 MED), the residual MEDIUM/LOW findings
+  of the run are flipped to `acknowledged-slush-pile-<date>` — **not fixed, not
+  open** — so the loop terminates instead of grinding on residual MEDIUMs.
+  HIGHs are **never** slushed; `govern-spec.sh` slushes automatically per
+  checkpoint (disable with `GOVERN_NO_SLUSH=1`). `slush-findings --burn-down`
+  re-opens the pile for a later fix pass.
 - **Cross-model agreement** (≥2 model families on the same root cause) is lifted
   as a HIGH-confidence, annotated finding with a disposition slot, into the same
   per-feature `audit-log.md` the implementation phase uses — one format, one

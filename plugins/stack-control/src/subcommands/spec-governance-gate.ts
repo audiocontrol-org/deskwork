@@ -20,14 +20,15 @@ import { isAbsolute, join, resolve } from 'node:path';
 // in-package (multi/migrate-audit-barrage) — no dw-lifecycle dependency.
 import { checkBarrageDampener } from '../scope-discovery/promote-findings/check-barrage-dampener.js';
 import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
+import {
+  countIterations,
+  filterByCheckpoint,
+} from '../scope-discovery/promote-findings/checkpoint-filter.js';
 
 const DEFAULT_CEILING = 5;
 // Audit-protocol threshold (FR-010): Rule A = last 2 consecutive runs each 0
 // HIGH. Fixed by the protocol, not a tunable here.
 const PROTOCOL_THRESHOLD = 2;
-// Same shape the dampener counts; used ONLY to tally total iterations (metadata).
-// The convergence DECISION is delegated to checkBarrageDampener — not recomputed.
-const BARRAGE_HEADER_RE = /^##\s+\d{4}-\d{2}-\d{2}\s+—\s+audit-barrage\s+lift\s+\(/i;
 
 type ConvergenceState = 'converged' | 'blocked' | 'non-converged' | 'overridden';
 type ConvergenceRule = 'single-run-clean' | 'n-consecutive-quiet' | 'none';
@@ -130,38 +131,6 @@ function parseArgs(args: string[]): GateOptions {
     ...(repoRoot !== undefined ? { repoRoot } : {}),
     ...(checkpoint !== undefined ? { checkpoint } : {}),
   };
-}
-
-function countIterations(auditLogText: string): number {
-  let n = 0;
-  for (const line of auditLogText.split(/\r?\n/)) {
-    if (BARRAGE_HEADER_RE.test(line)) n += 1;
-  }
-  return n;
-}
-
-// Per-checkpoint scoping (AUDIT-20260607-05): keep ONLY the audit-barrage lift
-// sections whose run-dir basename is tagged with `-<checkpoint>` (govern-spec.sh
-// tags each run via the barrage's run-dir label). Returns an audit-log text
-// containing just those sections, so the dampener + iteration tally evaluate one
-// checkpoint's independent loop. Non-matching + non-barrage sections are dropped
-// (the dampener only reads barrage sections anyway).
-function filterByCheckpoint(auditLogText: string, checkpoint: string): string {
-  const lines = auditLogText.split(/\r?\n/);
-  const SECTION_HEADER_RE = /^##\s+/;
-  const out: string[] = [];
-  let keep = false;
-  for (const line of lines) {
-    if (SECTION_HEADER_RE.test(line)) {
-      const m = BARRAGE_HEADER_RE.exec(line);
-      // A barrage section's run-dir basename is the `(...)` capture; keep it when
-      // it ends with the checkpoint tag. Any other `## ` header ends the keep window.
-      const basename = m !== null ? /\(([^)]+)\)/.exec(line)?.[1] ?? '' : '';
-      keep = m !== null && basename.endsWith(`-${checkpoint}`);
-    }
-    if (keep) out.push(line);
-  }
-  return out.join('\n');
 }
 
 export async function runSpecGovernanceGate(args: string[]): Promise<void> {
