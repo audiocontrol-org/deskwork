@@ -21,6 +21,16 @@ Optional environment overrides:
 
 The script gathers the diff of the implemented work, fires `dw-lifecycle audit-barrage` (multiple LLM CLIs in parallel), and lifts findings into the feature `audit-log.md`. It branches only on the diff + feature slug — never on which tool authored or executed the plan.
 
+## Fixing findings — fresh-context sub-agent dispatch
+
+When the barrage lifts open findings, **do NOT author the fixes in this orchestrating context.** Fix quality degrades under accumulated context — expansive edits made in a fatigued context become the next round's findings. The fix step runs in a fresh, minimal context instead. For each open finding:
+
+1. Dispatch a **fresh sub-agent** (Agent tool) with a **focused context**: give it *only* the finding text + the cited code span (the file + lines it references), and instruct it to fix exactly that finding, **TDD-first** — write a failing test that exercises the defect, watch it fail for the expected reason, then make the **minimal** change to pass (Constitution Principle I; the project's scope-don't-defer + TDD discipline). Change nothing unrelated; add no speculative scope.
+2. Dispatch **one finding at a time** (sequential) so concurrent edits don't collide. Each sub-agent gets its own clean context regardless of ordering; serialization is for write-safety.
+3. After the open findings are addressed, **re-run the governance pass** (re-diff → re-barrage) and repeat until the barrage is clean (or findings are dispositioned per the audit protocol). Always instruct each sub-agent to **use the Write/Edit tool to persist its changes to disk.**
+
+The orchestrator's only jobs in the loop are **dispatch → apply → re-barrage** — never hand-authoring the fix.
+
 ## Result
 
 Report the printed run-dir path and summarize: how many model lanes produced output, and how many findings were lifted into `audit-log.md`. If the script exits non-zero (e.g. `dw-lifecycle` absent), surface the failure — do not treat governance as optional.
