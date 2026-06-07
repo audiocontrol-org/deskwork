@@ -859,3 +859,20 @@ Surface:    specs/004-spec-governance/spec.md — FR-007 vs SC-004, User Story 2
 - **Edge Cases / "Spec re-revised after triage"**: *"the new run **re-surfaces still-open findings** and any new ones."*
 
 Under no-matching, a re-barrage re-lifts *every* finding as a brand-new `open` entry. A persisting defect therefore exists simultaneously as (a) a dispositioned entry in run N's section AND (b) a fresh `open` entry in run N+1's section — it is at once "already-dispositioned" and "still-open." SC-004 and US2-AS3 assume those two sets are disjoint and that the *re-run itself* partitions them; the corrected model makes them overlapping and gives the re-run no way to know which new `open` entries are persisting-vs-genuinely-new. Likewise "re-surfaces *still-open* findings" is impossible: the run cannot selectively re-surface still-open ones because it has no link back to prior dispositions. This is precisely the kind of author-introduced internal contradiction the feature exists to catch, now sitting inside its own spec. Fix: rewrite SC-004, US2-AS3, and the re-revise edge-case bullet to the no-matching reality — e.g. "dispositions of prior runs are preserved in their own lift sections; a re-run produces a fresh all-`open` section and does NOT attempt to correlate entries across runs" — and drop the "distinguishes still-open from already-dispositioned" framing entirely, since it describes the deleted mechanism.
+
+## 2026-06-07 — audit-barrage lift (20260607T054607983Z-pluggable-lifecycle-providers-after_clarify)
+
+### AUDIT-20260607-42 — FR-008 health predicate excludes non-zero exit codes — a crashed-after-output family is counted "healthy," which can mask a zero-coverage outage as a governed clean run
+
+Finding-ID: AUDIT-20260607-42 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + claude-07 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Surface:    specs/004-spec-governance/spec.md — FR-008 ("healthy ... emitted ≥1 byte of stdout and incurred no spawn/timeout error") in conjunction with FR-005/US3/SC-003 (fail-loud, zero silent skips)
+
+FR-008 fixes the health predicate as **byte-presence + no spawn/timeout error** and explicitly disclaims any parseability requirement: *"an exit-0 family that emits a non-finding blob is counted healthy, and the lift simply extracts 0 findings from it, treated as a clean contribution."* The enumerated failure modes are only **spawn** and **timeout** — a **non-zero exit code is not in the predicate**. A CLI model family that prints a startup banner or a partial response and then dies with `exit 1` (rate-limit, auth expiry, mid-stream network drop — all common for these tools) satisfies "≥1 byte of stdout and no spawn/timeout error" and is therefore counted **healthy**, contributing **0 findings** as a "clean contribution."
+
+This punches a hole in the feature's core safety guarantee. FR-005/US3/SC-003 promise the flow **fails loud** when there is no real coverage, with "zero silent skips." But the zero-healthy outage (FR-005, Edge Cases "ALL available families fail at runtime") is defined in terms of the FR-008 health count. If the only configured family crashes after emitting one byte, the run records **1 healthy family / 0 findings** — indistinguishable in the record from FR-009's legitimate "≥1 family ran and found nothing" clean run. The spec it is governing graduates as **governed-clean** when in fact nothing audited it. That is precisely the false-assurance failure mode US3 exists to prevent, reintroduced through the predicate's own definition.
+
+A reasonable fix: extend the unhealthy set to include **non-zero process exit** (not just spawn/timeout), so a family that exits abnormally is excluded from the healthy count regardless of whether it emitted bytes; or, at minimum, require the spec to state explicitly how a non-zero-exit-with-output family is classified and why counting it healthy does not undermine FR-005. As written the predicate is under-specified in exactly the direction that converts an outage into a silent pass.
+
+---
