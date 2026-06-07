@@ -310,3 +310,29 @@ Surface:    specs/005-document-primitives/spec.md:90, specs/005-document-primiti
 The edge cases say a corrupt archive or hand-edited archived identifier is surfaced by the coherence check, and FR-006/FR-008 make that check a `curate` NOTICE rather than a fail-loud failure. But FR-006 also says “After any archive run, a coherence check holds,” meaning the ledger must match archive contents after `archive --apply`. If the archive is already incoherent before a new archive run, the spec does not say whether `archive --apply` refuses to write, writes and leaves the old mismatch in place, or repairs the archive despite saying manual edits are not auto-repaired.
 
 Blast radius is high: this affects the next state-changing archive operation after any manual archive edit, exactly the kind of drift the spec acknowledges. Different unattended implementations can make opposite choices about mutating a known-stale archive. Reasonable fix: add a precondition for `archive --apply` and `unarchive --apply` when coherence is already broken, or explicitly allow append-only writes while reporting that prior mismatches remain outside the operation’s coherence guarantee.
+
+## 2026-06-07 — audit-barrage lift (20260607T232301463Z-document-primitives-after_plan)
+
+### AUDIT-20260607-27 — Document preamble (title heading + intro prose) and shallower-than-reserved headings have no defined home
+
+Finding-ID: AUDIT-20260607-27 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-02; cross-model)
+Status:     fixed-f5f35216
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md FR-002 (document model + Unit boundary rule)
+
+```
+
+FR-002 defines chrome as exactly two things — the `doc-grammar:` comment and the frontmatter — and says "a block the grammar does not account for, after chrome excision, is a parse failure." The Unit boundary rule then covers only two heading positions for a heading-keyed grammar: a heading **at** the reserved level (starts a new Unit) and headings **strictly deeper** than reserved (opaque body). It says nothing about a heading **shallower** than the reserved level, nor about content that precedes the first Unit.
+
+Real living documents open with a document title and intro prose. The two proof documents are exactly this shape: `ROADMAP.md` and `DESIGN-INBOX.md` will each begin with an `# Title` (h1) and one or more intro paragraphs before the first row/`### Title`. For an inbox whose reserved Unit level is `### ` (h3), that leading `# Title` is h1 — shallower than reserved, not chrome, and not inside any Unit's body (no Unit exists yet). Under the literal rule it is "a block the grammar does not account for" → **parse failure on the very documents the feature ships to prove generality**. An unattended implementer following FR-002 verbatim either (a) fails the proof documents, or (b) silently invents a preamble region the spec never authorized — opposite readings, both buildable. The spec needs an explicit "preamble / leading non-Unit region" concept (where the title + intro live) and an explicit rule for shallower-than-reserved headings.
+
+### AUDIT-20260607-28 — Plan summary still omits the unarchive primitive
+
+Finding-ID: AUDIT-20260607-28
+Status:     fixed-f5f35216
+Severity:   medium
+Surface:    specs/005-document-primitives/plan.md:1; specs/005-document-primitives/plan.md:9; specs/005-document-primitives/plan.md:23; specs/005-document-primitives/plan.md:51
+
+The plan title and Summary still describe shipping two primitives, `archive` and `curate`, even though the plan later requires three CLI verbs and three skills: `archive`, `unarchive`, and `curate`. This is a lingering scope drift after adding the P1 recovery half.
+
+Blast radius is medium: the detailed project structure includes unarchive, so a careful implementer will probably build it, but planning summaries are commonly used to scope task generation and review checklists. Update the title/summary to say three primitives or explicitly describe unarchive as part of the shipped primitive set.
