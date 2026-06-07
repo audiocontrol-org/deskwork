@@ -655,7 +655,7 @@ This is a design gap because the feature’s blocking gate depends on repeated r
 ### AUDIT-20260607-24 — The `healthy` family predicate claims "parseable output" but operationalizes it as a raw byte count — the two are not equivalent
 
 Finding-ID: AUDIT-20260607-24
-Status:     open
+Status:     fixed-5cfdb6a7 (the internal contradiction is removed: FR-008 + Audit-capability entity now define healthy purely as the as-built predicate — >=1 byte stdout + no spawn/timeout error, NO parseability claim — and explicitly note the residual (an exit-0 non-finding blob counts healthy; the lift extracts 0 findings) + that parse-validation is an available refinement. Spec now matches isModelRunHealthy; no overclaim.)
 Severity:   high
 Surface:    spec.md FR-008 ("A model family is **healthy** … when it ran to completion and emitted parseable output (**≥1 byte of stdout and no spawn/timeout error**)"); also Edge Cases ("A model family times out or errors mid-run"), Key Entities "Audit capability"
 
@@ -666,7 +666,7 @@ The fix is to make the operationalization match the prose: "healthy" must requir
 ### AUDIT-20260607-25 — FR-003's "shared repo-relative path token" clustering rule trivially yields false cross-model agreement when findings cite the same file
 
 Finding-ID: AUDIT-20260607-25 (claude-02 + claude-03 + codex-01; cross-model)
-Status:     open
+Status:     fixed-5cfdb6a7 (FR-003 adds the single-artifact caveat honestly: the as-built path-token branch over-clusters when every finding cites the one spec.md, so for single-file specs the heading-substring branch is the reliable agreement signal; excluding the artifact path / requiring a finer locator is named as an available (not-yet-implemented) refinement — no overclaim of unimplemented behavior.)
 Severity:   medium
 Surface:    spec.md FR-003 ("two findings cluster when … they cite a **shared repo-relative path token**; clustering is transitive, and a cluster spanning ≥2 families is `cross-model-agreed`"); Key Entities "Finding"; SC-002
 
@@ -677,7 +677,7 @@ A reasonable fix narrows the path-token rule so a bare top-level spec path does 
 ### AUDIT-20260607-26 — The non-converged terminal state has no defined forward path — the loop's only documented exit may be a dead end
 
 Finding-ID: AUDIT-20260607-26
-Status:     open
+Status:     fixed-5cfdb6a7 (FR-014 defines the forward path from non-converged: no auto-graduate; (a) operator override at the ceiling — same mandatory-reason scoped discipline — graduates, or (b) fix + fresh attempt resets the per-attempt ceiling. Absent an override, non-converged does not graduate.)
 Severity:   medium
 Surface:    spec.md FR-014 ("if convergence is not reached after a configured iteration ceiling, the system MUST surface **non-convergence** … rather than loop forever"); FR-010 (override); SC-008; Edge Cases ("Governance never converges")
 
@@ -688,7 +688,7 @@ The spec should state explicitly whether `override` applies to the non-converged
 ### AUDIT-20260607-27 — No configuration surface is named for *enabling* the `after_plan` checkpoint
 
 Finding-ID: AUDIT-20260607-27
-Status:     open
+Status:     fixed-5cfdb6a7 (FR-011 names the after_plan enablement surface: off by default — after_clarify only — enabled per project via the extension.yml hooks.after_plan + fed by GOVERN_PLAN_PATH at fire time. Parallels the --ceiling/--override surfaces named in round 2.)
 Severity:   low
 Surface:    spec.md FR-011 ("MUST be **configurable to also fire at `after_plan`**"); FR-014 (which does name `--ceiling`/`GOVERN_CEILING`); FR-010 (which names `--override`/`GOVERN_OVERRIDE`)
 
@@ -697,7 +697,7 @@ Round 2 closed AUDIT-21 by naming the ceiling's config surface (`--ceiling` / `G
 ### AUDIT-20260607-28 — SC-006 is filed under "Measurable Outcomes" but its predicate ("with high probability") is not measurable as worded
 
 Finding-ID: AUDIT-20260607-28
-Status:     open
+Status:     fixed-5cfdb6a7 (SC-006 reframed to its checkable, DETERMINISTIC form: the gate does not graduate a seeded-contradiction spec until it is dispositioned (gate behavior is deterministic even though the barrage is stochastic). The probabilistic detection is noted but the guarantee is the gate-behavior one.)
 Severity:   low
 Surface:    spec.md SC-006 ("On a spec seeded with a known self-contradiction, the automatic barrage surfaces that contradiction **with high probability across the model battery** … not a per-run determinism guarantee")
 
@@ -706,7 +706,7 @@ The round-2 resolution of AUDIT-22 correctly removed the false determinism claim
 ### AUDIT-20260607-29 — The edge-case section still contradicts the no-auto-edit contract
 
 Finding-ID: AUDIT-20260607-29
-Status:     open
+Status:     fixed-5cfdb6a7 (the unattended edge case reworded to match FR-014 no-auto-edit: unattended = the GATE evaluates/slushes/bounds without an operator; remediation is the authoring agent/operator act under the normal spec-editing contract. The contradictory fix-and-re-barrage-without-operator phrasing is gone.)
 Severity:   medium
 Surface:    specs/004-spec-governance/spec.md:109, specs/004-spec-governance/spec.md:130
 
@@ -717,7 +717,7 @@ This matters because the spec is the contract implementers will follow, and thes
 ### AUDIT-20260607-30 — A persistent override environment variable can silently override later gates
 
 Finding-ID: AUDIT-20260607-30
-Status:     open
+Status:     fixed-5cfdb6a7 (FR-010 scopes the override: the verdict records the spec (feature) + checkpoint it applied to; the --override flag is preferred for a real bypass; a persistent exported GOVERN_OVERRIDE applying to later runs is named a known hazard with one-shot-consumption as the available hardening — honest about as-built, not overclaimed.)
 Severity:   medium
 Surface:    specs/004-spec-governance/spec.md:126, specs/004-spec-governance/spec.md:130
 
