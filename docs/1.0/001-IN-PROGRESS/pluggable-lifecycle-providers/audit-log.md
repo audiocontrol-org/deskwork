@@ -730,7 +730,7 @@ That weakens the gate’s integrity even though a reason string exists. A reason
 ### AUDIT-20260607-31 — Cross-run finding reconciliation (how a finding in run N is matched to one in run N+1) is never defined — yet "distinguish still-open from dispositioned" depends on it
 
 Finding-ID: AUDIT-20260607-31
-Status:     fixed-cb29ab7f (fresh-context sub-agent dispatch; cross-run finding reconciliation defined in FR-007 — reuses the FR-003 clustering predicate per-checkpoint, inherit-on-match, non-resurfacing-open stays open)
+Status:     acknowledged-5791b346 (FALSE PREMISE — superseded by protocol-alignment 5791b346. The round-4 fix added a cross-run matcher; reading the code (check-barrage-dampener/spec-governance-gate/slush-remaining) showed the protocol is per-run by design and needs NO cross-run matcher: disposition is the per-entry Status on an append-only log; the gate/slush evaluate the most-recent run. SC-004 is satisfied by the literal Status line. FR-007 corrected to state this; the matcher fiction was removed.)
 Severity:   high
 Surface:    spec.md FR-004, FR-007, FR-010 ("counting open-finding severity"), SC-004; Key Entities "Finding"
 
@@ -752,7 +752,7 @@ This is the same defect-shape the round-2 pass closed for "healthy family" (AUDI
 ### AUDIT-20260607-33 — The boundary between an "inter-iteration edit" (does not reset the count) and a "fresh governance attempt" (resets the ceiling) has no mechanical marker
 
 Finding-ID: AUDIT-20260607-33
-Status:     fixed-cb29ab7f (fresh-context sub-agent dispatch; fresh-attempt boundary named in FR-014 — explicit recorded GOVERN_NEW_ATTEMPT/--new-attempt resets both ceiling + 0-HIGH window; plain re-run is non-resetting)
+Status:     fixed-5791b346 (round-4 fix added a fictional GOVERN_NEW_ATTEMPT/--new-attempt flag (not in code); superseded by protocol-alignment 5791b346. The concern (ceiling trivially defeatable) is resolved by the REAL mechanism: the ceiling counts the checkpoint's recorded runs; continuing past it requires an explicit recorded --ceiling/GOVERN_CEILING raise (bounded + auditable, not a silent re-run). FR-014 corrected.)
 Severity:   medium
 Surface:    spec.md FR-010 ("an inter-iteration edit does NOT reset the count"), FR-014 forward-path (b) ("starts a **fresh governance attempt**, which resets the per-checkpoint ceiling … the ceiling is per-graduation-attempt, not lifetime")
 
@@ -763,7 +763,7 @@ This is exploitable/ambiguous in the unattended flow the feature targets: if "fr
 ### AUDIT-20260607-34 — Whether after_clarify dispositions (slushed/acknowledged) are honored when after_plan re-audits the spec is unspecified
 
 Finding-ID: AUDIT-20260607-34
-Status:     fixed-cb29ab7f (fresh-context sub-agent dispatch; FR-011 — after_clarify dispositions inherited forward to after_plan for matched spec-level findings; open-set counting stays per-checkpoint)
+Status:     fixed-5791b346 (round-4 fix added cross-checkpoint disposition inheritance (not in code); superseded by protocol-alignment 5791b346. The concern (honored or re-opened at after_plan?) is answered by the REAL mechanism: independent per-checkpoint loops, gate scoped per-checkpoint; NO inheritance — a spec issue re-surfacing at after_plan is new open work in after_plan's own loop. FR-011 corrected.)
 Severity:   medium
 Surface:    spec.md FR-011 ("passing the after_clarify gate is durable and MUST NOT be re-opened by findings surfaced at after_plan"), FR-013 (after_plan artifact set = "spec + plan"), FR-007 (single durable store, "survives across spec revisions")
 
@@ -820,7 +820,7 @@ A reasonable fix is to either make these current requirements or move them into 
 ### AUDIT-20260607-39 — Disposition inheritance can silently slush a re-surfaced HIGH, defeating the never-slush-HIGH invariant
 
 Finding-ID: AUDIT-20260607-39 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + claude-07 + codex-01 + codex-02 + codex-03; cross-model)
-Status:     fixed-59e08262 (fresh-context sub-agent dispatch; FR-007 inheritance made severity-aware — a re-surfaced HIGH/BLOCKING re-opens, never inherits a non-open disposition; FR-011 cross-ref added)
+Status:     acknowledged-5791b346 (MOOT — superseded by protocol-alignment 5791b346. This patched the disposition-inheritance mechanism added by AUDIT-31's fix; that mechanism does not exist in the code and was removed as fiction (FR-007 corrected). With no inheritance path there is nothing to make severity-aware — a re-surfaced HIGH is simply a new open entry in the most-recent run, which the gate counts.)
 Severity:   high
 Surface:    specs/004-spec-governance/spec.md FR-007 ("A later-run finding that matches a recorded finding inherits that finding's disposition") vs FR-010/FR-015 ("HIGH-severity findings are NEVER slushed")
 
@@ -833,7 +833,7 @@ This directly contradicts two load-bearing invariants. FR-015: *"MUST NEVER slus
 ### AUDIT-20260607-40 — Cross-run path-token over-clustering silently slushes genuinely-new MEDIUM findings, defeating the single-iteration 0-MEDIUM gate
 
 Finding-ID: AUDIT-20260607-40 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + claude-07 + codex-01 + codex-02 + codex-03; cross-model)
-Status:     open
+Status:     acknowledged-5791b346 (MOOT — superseded by protocol-alignment 5791b346. This attacked the cross-run path-token matcher added by AUDIT-31's fix; that matcher does not exist in the code and was removed. The real slush (slush-remaining.ts) operates only on the most-recent run's own findings and is severity-guarded — it cannot auto-slush a genuinely-new MEDIUM by matching it against an older slushed entry. FR-007/FR-015 corrected.)
 Severity:   high
 Surface:    specs/004-spec-governance/spec.md — FR-007 (cross-run reconciliation) in conjunction with FR-003 (path-token over-cluster caveat) and FR-010 (single-iteration "0 open MEDIUM" branch)
 
