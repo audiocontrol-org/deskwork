@@ -1,0 +1,34 @@
+# Contract: `stackctl unarchive`
+
+The symmetric reversal of `archive` (FR-007): return a named archived Unit to the live document. Default **dry-run** (FR-009).
+
+## Invocation
+
+```
+stackctl unarchive --doc <path> --id <identifier> [--apply]
+```
+
+| Flag | Required | Purpose |
+|---|---|---|
+| `--doc <path>` | yes | The governable document. |
+| `--id <identifier>` | yes | Identifier of the archived Unit to restore. |
+| `--apply` | no | Perform the move. Default is dry-run. |
+
+## Behavior
+
+1. Resolve grammar; fail loud if ungovernable (FR-001).
+2. Locate `--id` in the archive file; fail loud if absent (FR-010).
+3. **Collision guard**: if `--id` already exists in the live document, **fail loud** (FR-005 uniqueness, FR-007). Zero writes.
+4. **Dry-run** (default): report the planned restore (identifier, target position). **Zero writes.**
+5. **`--apply`**: move the Unit from the archive file back into the live document; remove its ledger entry; re-assert coherence (FR-006).
+
+## Exit codes
+
+- `0` — complete (dry-run or apply).
+- `1` — write failure / coherence violation.
+- `2` — usage/config error (missing flag, ungovernable, `--id` not in archive, **identity collision**).
+
+## Outcomes verified
+
+- An archive→unarchive round-trip restores the document's original content (SC-007).
+- Identity is unchanged by the round-trip (SC-004).
