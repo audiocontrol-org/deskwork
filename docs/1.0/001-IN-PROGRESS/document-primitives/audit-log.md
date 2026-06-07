@@ -137,3 +137,141 @@ Surface:    specs/005-document-primitives/plan.md:15-17
 The plan chooses `peggy.generate(grammarText)` at runtime for grammars that can come from embedded document text or project override files, and line 37 even describes grammar input as untrusted. Peggy grammars can include semantic actions, so compiling and running arbitrary `.peg` text is not merely parsing declarative data unless the design constrains the grammar subset or isolates execution.
 
 Blast radius is high because an adopter running `archive` or `curate` in a repository could execute code from that repository’s grammar override. A reasonable fix is to specify a safe grammar profile with no semantic actions, precompiled built-ins plus validation for overrides, or another isolation strategy before implementation.
+
+## 2026-06-07 — audit-barrage lift (20260607T225224616Z-document-primitives-after_plan)
+
+### AUDIT-20260607-12 — Bare `unarchive` is a write in US1 but a dry-run under FR-009 — direct contradiction
+
+Finding-ID: AUDIT-20260607-12
+Status:     fixed-fe21384c
+Severity:   high
+Surface:    spec.md — FR-009 vs US1 Acceptance Scenario 3 + US1 Independent Test (d)
+
+FR-009 states: "`archive`, `unarchive`, and `curate` default to **dry-run** (report planned changes, write nothing); writing requires an explicit `--apply`." But US1 Acceptance Scenario 3 reads: "**When** the operator runs `unarchive` for that item, **Then** the item returns to the live document at its declared-order position and the ledger entry is removed" — a bare `unarchive` (no `--apply`) producing writes. US1's Independent Test (d) repeats this: "`unarchive` returns the unit to its declared-order position." Compare the carefully-written archive scenarios: Scenario 1 uses `archive --apply` and Scenario 2 uses bare `archive` and explicitly says "nothing is written." The `unarchive` scenario was not given the same `--apply` discipline.
+
+Blast radius is high because the two readings produce opposite behavior and both are anchored in mandatory sections. An agent that anchors on the acceptance scenario builds bare `unarchive` to mutate both files, violating the FR-009 dry-run-default invariant (and FR-010's zero-writes-without-`--apply` posture); an agent that anchors on FR-009 builds it dry-run and the US1 scenario test fails. A reasonable fix is to rewrite Scenario 3 and Independent Test (d) to invoke `unarchive --apply` for the write, mirroring Scenario 1.
+
+### AUDIT-20260607-13 — Heading-scan for the uniqueness union cannot distinguish Unit-identifier headings from body headings without the parse it is forbidden to run
+
+Finding-ID: AUDIT-20260607-13
+Status:     fixed-fe21384c
+Severity:   high
+Surface:    spec.md — FR-005 (uniqueness union) + FR-006 (archived Units keep identifier as heading)
+
+FR-005 obtains archived identifiers for the uniqueness union via "a **lightweight heading/ledger scan** of the archive file ... **not** by parsing the archive against the live grammar," resting on "archived Units keep their identifiers as headings (FR-006)." But an archived Unit's *opaque body* can itself contain markdown headings (a roadmap row's `## Notes`, an inbox entry's `### Sub-point`). A heading scan that does not parse against the grammar has no way to tell a Unit-identifier heading from a body heading — exactly the disambiguation FR-005 forbids itself from doing via grammar parse. The result is false identifiers in the union → spurious FR-005 uniqueness collisions that block legitimate new items or unarchive operations.
+
+Compounding this, FR-005 names a *dual* source ("heading/ledger scan") without saying which is authoritative when they disagree — and they will disagree precisely in the manual-edit-staleness case FR-006 calls out (ledger says `X`, heading says `Y`). The ledger is keyed by identifier (FR-006) and is the clean source; the heading scan adds ambiguity without adding information. Blast radius is high: an unattended agent will implement a naive heading regex, and the first archived Unit with a heading in its body produces a false collision that fails-loud and blocks the operator. A reasonable fix: make the **ledger** the sole source of archived identifiers for the union (it is already keyed by identifier), and use the heading scan only as the coherence-check cross-reference (FR-006), not as a union input.
+
+### AUDIT-20260607-14 — "Bodies are opaque" contradicts "headings are unit-structural" — no rule for where a Unit ends
+
+Finding-ID: AUDIT-20260607-14
+Status:     fixed-fe21384c
+Severity:   high
+Surface:    spec.md — FR-002 (document model; "each grammar decides which block kinds are unit-structural versus part of an opaque `body`")
+
+FR-002 says the grammar treats "prose bodies as **opaque**" yet also that "each grammar decides which block kinds are **unit-structural** versus part of an opaque `body`," recognizing headings (ATX and Setext) among the block kinds. For a heading-keyed grammar (the inbox proof document — FR-013(a), where a Unit *is* a `## Title`), these two statements collide: if a Unit body is opaque (may contain arbitrary blocks, including a `##` heading), the engine cannot know whether a `##` token starts a new Unit or sits inside the previous Unit's body. The spec gives the grammar the *responsibility* to decide ("each grammar decides") but no *mechanism* — there is no stated constraint that bodies may not contain Unit-level headings, and "opaque" affirmatively suggests they can.
+
+This is load-bearing because it determines the most basic operation — segmenting the block stream into Units — and the two proof grammars exercise it differently (the roadmap is table-row-keyed and largely immune; the inbox is heading-keyed and hits it immediately). Blast radius is high: the natural default ("split on every heading of the Unit level") silently mis-Units any inbox entry whose body contains a same-level heading, and nothing in the spec flags the misparse. A reasonable fix is to state the boundary rule explicitly — e.g., a heading-keyed grammar reserves its Unit-heading level and bodies may only contain strictly deeper levels — or to require Units to be delimited by a structural marker the body provably cannot contain.
+
+### AUDIT-20260607-15 — Engine has no stated rule for recognizing *which* HTML comment is the grammar declaration
+
+Finding-ID: AUDIT-20260607-15 (claude-04 + codex-03; cross-model)
+Status:     fixed-fe21384c
+Severity:   high
+Surface:    spec.md — FR-001 ("an embedded grammar block (an HTML comment...)") + FR-002 (pre-parse excision of "the embedded grammar-declaration comment")
+
+FR-001 declares the embedded grammar as "an HTML comment, invisible in rendered markdown," and FR-002's pre-parse step excises "the embedded grammar-declaration comment (FR-001), when present." Both presuppose the engine can identify the grammar-declaration comment, but neither states *how* it is recognized among a document's possibly-many HTML comments (editorial notes, other tooling markers, license headers). Without a recognition rule (a sentinel such as `<!-- stack-control:grammar … -->`, or "the first HTML-comment block," or a fenced marker), the excision step and the grammar resolver have no deterministic anchor.
+
+The recognition contract presumably lives in `contracts/grammar-declaration.md` (Phase 1, not in this diff), but the spec is the artifact an agent reads first and it leaves the rule unstated. Blast radius is medium: an agent will invent a recognition heuristic; if it picks "first HTML comment" and a document opens with an unrelated comment, grammar resolution fails-loud (or worse, treats prose as grammar text). A reasonable fix is to name the recognition marker inline in FR-001 (or explicitly forward-reference the grammar-declaration contract as normative for the marker).
+
+### AUDIT-20260607-16 — FR-011 anti-coupling gate's match strings are never enumerated
+
+Finding-ID: AUDIT-20260607-16
+Status:     fixed-fe21384c
+Severity:   medium
+Surface:    spec.md — FR-011 ("Match pattern (case-insensitive) — the predecessor plugin name, its CLI binary name, and its skill namespace") + plan.md (`scripts/check-no-predecessor-refs.sh`)
+
+FR-011 makes the anti-coupling scan release-blocking ("non-zero exit fails the gate") and defines the match pattern as "the predecessor plugin name, its CLI binary name, and its skill namespace" — but never gives the literal strings. The reader must infer them (plugin name `dw-lifecycle`, skill namespace `dw-lifecycle`, CLI binary = ?). The CLI binary name in particular is not derivable from the spec, and the project's own thesis text uses the word "lifecycle" pervasively (`pluggable-lifecycle-providers`, `stack-control` succeeds `dw-lifecycle`), so an over-broad pattern would false-positive on legitimate stack-control prose.
+
+Because this gate is release-blocking, getting the strings wrong has direct consequences: too-broad → the gate blocks legitimate commits; too-narrow → predecessor coupling slips through the gate that exists to catch it. Blast radius is medium because an agent building `check-no-predecessor-refs.sh` must hardcode exact strings and the spec gives it nothing authoritative to copy. A reasonable fix is to enumerate the exact literal match strings (and any word-boundary constraints) in FR-011, the same way FR-005's denylist was made a closed enumerated set.
+
+### AUDIT-20260607-17 — `unarchive` is a P1 operator command but the plan ships no skill for it
+
+Finding-ID: AUDIT-20260607-17
+Status:     fixed-fe21384c
+Severity:   medium
+Surface:    plan.md — `skills/{archive,curate}/SKILL.md` (two skills) vs spec.md US1 Scenario 3 / Independent Test (d) / SC-007 (unarchive as operator workflow)
+
+The plan repeatedly describes the deliverable as "three CLI verbs + **two** thin skills" and lists only `skills/archive/SKILL.md` and `skills/curate/SKILL.md`. But `unarchive` is the reversibility half of the headline P1 story: US1's Independent Test gates on "`unarchive` returns the unit," Scenario 3 is an `unarchive` workflow, and SC-007 verifies the archive→unarchive round-trip. The operator-facing surface for verbs in this project is the `/stack-control:*` skill (naming convention), yet the one verb that closes the P1 loop has only a raw `stackctl unarchive` entry point and no skill.
+
+This may be deliberate (unarchive as an occasional recovery verb), but the asymmetry is unstated and conflicts with the P1 weight US1 places on reversibility. Blast radius is medium: an agent following the plan ships archive+curate skills and no unarchive skill, leaving the documented P1 recovery path discoverable only via the bare CLI — a UX gap the spec's own acceptance scenarios assume away. A reasonable fix is to either add `skills/unarchive/SKILL.md` to the plan or state explicitly why unarchive is verb-only.
+
+### AUDIT-20260607-18 — FR-013 migration "records the rename" but names no surface to record it in
+
+Finding-ID: AUDIT-20260607-18
+Status:     fixed-fe21384c
+Severity:   medium
+Surface:    spec.md — FR-013 ("migration MAY normalize a nonconforming identifier ... recording the rename so identity provenance isn't lost")
+
+FR-013 permits migration to normalize a nonconforming identifier (a leading number, `#<n>`) to satisfy FR-005 and requires "**recording the rename** so identity provenance isn't lost" — but specifies no location for that record. The provenance ledger (FR-006) is scoped to *archive moves* keyed by identifier and lives in the archive file; a migration rename is not an archive move and may happen to a still-active Unit that is never archived. The clarification that "the live document carries **zero** bookkeeping" (FR-006) actively forecloses recording the rename in the live document. So the spec mandates a record with no home.
+
+Blast radius is medium because an unattended migration agent must put the rename record *somewhere* and the spec contradicts the obvious candidates: it can't go in the live doc (zero-bookkeeping rule) and doesn't fit the ledger's archive-move schema. The agent will either invent an undocumented location (drift) or silently drop the provenance the requirement exists to preserve. A reasonable fix: name the rename-record surface explicitly (a migration report artifact, or an extension to the ledger schema with a `renamed-from` field), or relax "records the rename" to "reports the rename at migration time."
+
+### AUDIT-20260607-19 — Coherence-violation reporting has no owning command or output surface
+
+Finding-ID: AUDIT-20260607-19
+Status:     fixed-fe21384c
+Severity:   medium
+Surface:    spec.md — FR-006 (coherence check "surfaces the resulting ledger staleness") + Edge Cases (manual identifier edit) + SC-007
+
+FR-006 says the coherence check "**surfaces** the resulting ledger staleness, but the engine does not refuse or auto-repair manual edits," and the Edge Cases section says "the coherence check surfaces the ledger staleness on the **next run**." But "next run" of *what* — `archive`, `curate`, or both? — is never pinned, and the *form* of the surfacing (a `curate` report line, an `archive` warning, a non-zero exit) is unspecified. SC-007 asserts "after every archive run the provenance ledger matches the archive file's contents," which reads as an invariant that *holds*, not as a *report* an operator sees when it's violated by a manual edit.
+
+Blast radius is medium: an agent has to decide which command performs the coherence check and how it reports a violation, with no spec anchor — so two agents (or the spec's own SC-007 vs FR-006) could disagree on whether a stale ledger is a silent state, a warning, or a fail-loud. Given the project's fail-loud-no-fallback posture, the ambiguity between "surface as a notice" and "fail loud" is material. A reasonable fix is to state which verb(s) run the coherence check, the exact report shape, and whether a coherence violation is a notice or a loud failure.
+
+### AUDIT-20260607-20 — Empty / zero-Unit governable document behavior is unspecified across all three verbs
+
+Finding-ID: AUDIT-20260607-20
+Status:     fixed-fe21384c
+Severity:   low
+Surface:    spec.md — FR-002/FR-006/FR-008 (no zero-Unit case); Edge Cases (absent)
+
+The Edge Cases section enumerates no-grammar, dual-grammar, parse-failure, missing-archive, corrupt-archive, collision, and partial-write cases, but never the empty document: a governable document that declares a valid grammar and parses to **zero Units** (a freshly-created roadmap with a grammar comment and frontmatter but no rows yet, or a document all of whose Units were already archived). FR-006 (`archive` selects archivable Units), FR-008 (`curate` checks ordering of an empty sequence), and the SC-001 post-condition ("zero archivable Units") all have a trivial-but-unstated answer here.
+
+Blast radius is low because the natural behavior (no-op success, well-formed by vacuous truth, well-ordered by vacuous truth) is what most agents would land on. But it is worth a one-line edge-case entry because "a document with no Units" is exactly the fresh-install state of the two proof documents before migration content lands, and an agent that treats "no Units" as a parse failure (FR-003) rather than a valid empty parse would fail-loud on an empty roadmap. A reasonable fix is to add an Edge Case stating an empty-but-grammar-conformant document is well-formed and all three verbs no-op cleanly.
+
+---
+
+That's nine findings. The two I'd weight most for an unattended build are **claude-01** (the bare-`unarchive` dry-run contradiction, because both readings are anchored in mandatory sections and produce opposite write behavior) and **claude-03** (Unit/body heading boundary, because it blocks the most basic parse operation for the heading-keyed proof document). **claude-02** is the subtlest — the heading-scan resolution that closed the prior AUDIT-04 introduced a new false-collision path that the "no live-grammar parse" constraint makes unsolvable as written.
+
+### AUDIT-20260607-21 — Dry-run default conflicts with the US1 independent test
+
+Finding-ID: AUDIT-20260607-21
+Status:     fixed-fe21384c
+Severity:   medium
+Surface:    specs/005-document-primitives/spec.md:34, specs/005-document-primitives/spec.md:111
+
+US1’s Independent Test says to run `archive` and confirm settled items now live in the sibling archive, but FR-009 says `archive`, `unarchive`, and `curate` default to dry-run and only write with `--apply`. The acceptance scenarios below US1 use `archive --apply` for mutation, so the intended behavior is recoverable, but the mandatory Independent Test still points at the non-mutating command.
+
+Blast radius is medium: a reasonable implementer will probably resolve this from FR-009 and the acceptance scenarios, but an unattended test writer could encode the independent test literally and either expect default mutation or treat dry-run as failing the P1 workflow. Make the Independent Test use `archive --apply` and `unarchive --apply` for state-changing assertions, reserving bare commands for planned-change reporting.
+
+### AUDIT-20260607-22 — Archive file format is not specified enough for unarchive to extract the unit safely
+
+Finding-ID: AUDIT-20260607-22
+Status:     fixed-fe21384c
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md:104, specs/005-document-primitives/spec.md:108-109
+
+FR-005 says archived identifiers come from a lightweight heading/ledger scan, and FR-006 says each archived Unit keeps its identifier as a heading, but FR-007 requires `unarchive` to return a named archived Unit with body and identity intact. The spec never defines the archive document structure, the heading level used for archived Unit boundaries, how nested headings inside an opaque body are distinguished from the next archived Unit, or whether the ledger records an archive span/delimiter for extraction.
+
+Blast radius is high because multiple plausible implementations follow from the text: scan from the identifier heading until the next same-level heading, until any heading, or use ledger entries only. Those produce different behavior once a Unit body contains headings, tables, or copied markdown sections. A reasonable fix is to specify an archive file contract: exact Unit boundary marker or heading level, allowed nested heading handling, and what ledger fields are required to locate and remove the archived Unit.
+
+### AUDIT-20260607-23 — Plan still calls for an untrusted-grammar failure path after accepting trusted grammar execution
+
+Finding-ID: AUDIT-20260607-23
+Status:     fixed-fe21384c
+Severity:   medium
+Surface:    specs/005-document-primitives/plan.md:15, specs/005-document-primitives/plan.md:37, specs/005-document-primitives/spec.md:152
+
+The spec explicitly accepts Peggy grammars as trusted local config that run in-process, including semantic actions. The plan’s Technical Context matches that at line 15, but the Constitution Check still says “grammar-as-untrusted-input failure path tested RED” at line 37. That phrase points at the rejected security model from the prior audit rather than the current accepted trust model.
+
+Blast radius is medium: the surrounding text strongly indicates trusted execution is intended, but this row can cause test churn or a misleading implementation requirement for sandboxing/rejection. Rewrite the test obligation to match the accepted contract, such as tests for grammar compile failures, parse failures, and actionable errors from malformed trusted config.
