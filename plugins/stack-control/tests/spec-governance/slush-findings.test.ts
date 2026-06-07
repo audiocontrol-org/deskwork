@@ -62,6 +62,28 @@ describe('slush-findings (ported slush pile)', () => {
     }
   });
 
+  it('--scope all slushes EARLIER-run open MED/LOW too, leaving 0 open MEDIUM anywhere (AUDIT-20260607-47, library-level)', () => {
+    // Direct CLI coverage of the `all` scope the protocol convergence slush
+    // now uses. Branch (b): two consecutive 0-HIGH runs engage the dampener;
+    // the FIRST run's open MEDIUM (never slushed when it ran) must now be
+    // binned too. (Protocol-level wiring is covered in govern-orchestration.)
+    const repo = makeRepo('s', [
+      section('20260607T100000000Z-s-after_clarify', [entry('01', 'medium'), entry('02', 'low')]),
+      section('20260607T110000000Z-s-after_clarify', [entry('03', 'medium')]),
+    ]);
+    try {
+      const r = runCli(['slush-findings', '--feature', 's', '--repo-root', repo, '--checkpoint', 'after_clarify', '--scope', 'all', '--slush-date', '2026-06-07', '--apply']);
+      expect(r.status).toBe(0);
+      const t = logText(repo, 's');
+      expect(t).toMatch(/AUDIT-20260607-01[\s\S]*?Status:\s+acknowledged-slush-pile-2026-06-07/);
+      expect(t).toMatch(/AUDIT-20260607-02[\s\S]*?Status:\s+acknowledged-slush-pile-2026-06-07/);
+      expect(t).toMatch(/AUDIT-20260607-03[\s\S]*?Status:\s+acknowledged-slush-pile-2026-06-07/);
+      expect(t).not.toMatch(/Status:\s+open/);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it('dry-run (no --apply) reports but does not write', () => {
     const repo = makeRepo('s', [
       section('20260607T100000000Z-s-after_clarify', [entry('01', 'low')]),

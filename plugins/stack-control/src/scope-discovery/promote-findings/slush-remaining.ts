@@ -74,6 +74,15 @@ export interface SlushRemainingArgs {
    * severity filter.
    */
   readonly scope?: 'latest' | 'all';
+  /**
+   * When set, restrict the FLIP to barrage sections whose run-dir basename ends
+   * with `-<checkpoint>` — keeping the slush within one checkpoint's independent
+   * loop (FR-011). Load-bearing for `scope: 'all'` at convergence: without it,
+   * an all-scope slush would cross checkpoint boundaries and bin another
+   * checkpoint's findings. With `scope: 'latest'` the most-recent section is
+   * already this checkpoint's run, so the filter is a harmless refinement.
+   */
+  readonly flipCheckpoint?: string;
 }
 
 export interface SlushRemainingResult {
@@ -101,6 +110,8 @@ function canonicalAuditId(value: string): string {
 interface RawSection {
   readonly headerIndex: number;
   readonly endIndex: number;
+  /** The run-dir basename captured from the lift header (for checkpoint scoping). */
+  readonly runDirBasename: string;
 }
 
 /**
@@ -112,22 +123,22 @@ interface RawSection {
  * barrage," not "wipe every prior barrage's findings."
  */
 export function findBarrageSections(lines: ReadonlyArray<string>): RawSection[] {
-  const headerIndices: number[] = [];
+  const headers: { headerIndex: number; runDirBasename: string }[] = [];
   for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i] ?? '';
-    if (BARRAGE_HEADER_RE.test(line)) headerIndices.push(i);
+    const m = BARRAGE_HEADER_RE.exec(lines[i] ?? '');
+    if (m !== null) headers.push({ headerIndex: i, runDirBasename: m[1] ?? '' });
   }
-  return headerIndices.map((headerIndex, idx) => {
+  return headers.map((h, idx) => {
     let endIndex = lines.length;
-    for (let j = headerIndex + 1; j < lines.length; j += 1) {
+    for (let j = h.headerIndex + 1; j < lines.length; j += 1) {
       if (TOP_HEADER_RE.test(lines[j] ?? '')) {
         endIndex = j;
         break;
       }
     }
-    const nextHeader = idx + 1 < headerIndices.length ? headerIndices[idx + 1]! : lines.length;
+    const nextHeader = idx + 1 < headers.length ? headers[idx + 1]!.headerIndex : lines.length;
     if (nextHeader < endIndex) endIndex = nextHeader;
-    return { headerIndex, endIndex };
+    return { headerIndex: h.headerIndex, endIndex, runDirBasename: h.runDirBasename };
   });
 }
 
@@ -252,12 +263,23 @@ export function slushRemaining(args: SlushRemainingArgs): SlushRemainingResult {
   // this dampener engagement; if they need slushing they'll re-
   // surface in a future barrage. Caller can opt into legacy
   // all-section walking via `scope: 'all'`.
+  //
+  // AUDIT-20260607-47: the CONVERGENCE slush (protocol call site) uses
+  // `scope: 'all'` so that an EARLIER 0-HIGH run's still-open MED/LOW — which
+  // were never slushed when that run fired (the dampener was not yet engaged
+  // then) — are binned too. "Slush any remaining" is then literally true: 0
+  // open MEDIUM anywhere in the checkpoint at graduation. `flipCheckpoint`
+  // keeps that all-scope flip from crossing checkpoint boundaries (FR-011).
   const scope: 'latest' | 'all' = args.scope ?? 'latest';
+  const checkpointScoped =
+    args.flipCheckpoint !== undefined
+      ? allSections.filter((s) => s.runDirBasename.endsWith(`-${args.flipCheckpoint!}`))
+      : allSections;
   const scopedSections =
     scope === 'all'
-      ? allSections
-      : allSections.length > 0
-        ? [allSections[allSections.length - 1]!]
+      ? checkpointScoped
+      : checkpointScoped.length > 0
+        ? [checkpointScoped[checkpointScoped.length - 1]!]
         : [];
   const openFindings = findOpenFindingsInSections(auditLines, scopedSections);
   const flips: SlushFlip[] = [];

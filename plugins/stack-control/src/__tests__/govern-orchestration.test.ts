@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveTsx, CLI } from './_run-helpers.js';
@@ -120,6 +120,57 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
       );
       expect(`${r.stdout}${r.stderr}`).toMatch(/converged/);
       expect(r.status).toBe(0);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
+
+  it('convergence slush bins an EARLIER run\'s open MEDIUM too (AUDIT-20260607-47)', () => {
+    // Branch (b) convergence at the protocol level. Pre-seed an earlier 0-HIGH
+    // run that carried an open MEDIUM (never slushed when it fired — the
+    // dampener was not yet engaged). The stub lift appends a SECOND 0-HIGH run
+    // (a `low` finding), so two-consecutive-0-HIGH engages the dampener and the
+    // convergence slush fires. With a latest-only slush, the earlier MEDIUM
+    // would stay `open` at graduation — contradicting "no open MEDIUM at
+    // graduation". The convergence slush must use scope=all and bin it.
+    const repo = makeRepo('feat');
+    const log = join(repo, 'docs', '1.0', '001-IN-PROGRESS', 'feat', 'audit-log.md');
+    writeFileSync(
+      log,
+      [
+        '# Audit Log — feat',
+        '',
+        '## 2026-06-07 — audit-barrage lift (earlier-run-after_clarify)',
+        '',
+        '### Earlier residual',
+        '',
+        'Finding-ID: AUDIT-20260607-01',
+        'Status:     open',
+        'Severity:   medium',
+        'Surface:    spec.md:1',
+        '',
+        'Body.',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    const fx = mkdtempSync(join(tmpdir(), 'gov-stub-'));
+    const stub = writeStubBarrage(fx);
+    const spec = join(repo, 'spec.md');
+    writeFileSync(spec, 'A spec under audit.\n');
+    try {
+      const r = runGovern(
+        ['--mode', 'spec', '--feature', 'feat', '--repo-root', repo, '--spec-path', spec],
+        { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-slush') },
+      );
+      expect(r.status).toBe(0);
+      const t = readFileSync(log, 'utf8');
+      // the earlier run's MEDIUM must be slushed by the convergence (scope=all) slush
+      expect(t).toMatch(/AUDIT-20260607-01[\s\S]*?Status:\s+acknowledged-slush-pile-/);
+      // 0 open MEDIUM anywhere in the checkpoint at graduation (SC-007 absolute)
+      expect(t).not.toMatch(/Severity:\s+medium[\s\S]*?Status:\s+open/i);
+      expect(t).not.toMatch(/Status:\s+open[\s\S]*?Severity:\s+medium/i);
     } finally {
       rmSync(repo, { recursive: true, force: true });
       rmSync(fx, { recursive: true, force: true });

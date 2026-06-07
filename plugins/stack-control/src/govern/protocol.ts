@@ -224,7 +224,16 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       );
     }
 
-    // --- slush the tail (real stackctl), per-checkpoint (AUDIT-20260607-03) ---
+    // --- slush ALL remaining MED/LOW (real stackctl), per-checkpoint
+    // (AUDIT-20260607-03 scoping + AUDIT-20260607-47 all-remaining). At
+    // convergence the slush must bin EVERY still-open MED/LOW across this
+    // checkpoint's runs — not just the most-recent — so an EARLIER 0-HIGH run's
+    // residual MEDIUM (never slushed when it fired, the dampener not yet engaged
+    // then) does not linger open at graduation. `--scope all` + the
+    // checkpoint-confined flip makes "no open MEDIUM at graduation" literally
+    // true (SC-007 clean absolute). Slush only ever runs when the dampener is
+    // engaged (it is a no-op otherwise), so slushing 'all' here is never
+    // premature. HIGH/BLOCKING are NEVER slushed. ---
     if (!args.noSlush) {
       const slush = spawnText(args.stackctl, [
         'slush-findings',
@@ -234,6 +243,8 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
         args.repoRoot,
         '--checkpoint',
         args.checkpoint,
+        '--scope',
+        'all',
         '--apply',
       ]);
       // Mirror the bash `|| true`: slush is best-effort (no-op until the

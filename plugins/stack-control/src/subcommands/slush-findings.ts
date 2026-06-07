@@ -156,6 +156,10 @@ export async function runSlushFindings(args: string[]): Promise<void> {
     slushDate: opts.slushDate ?? todayUTC(),
     scope: opts.scope,
     ...(decisionAuditLogText !== undefined ? { decisionAuditLogText } : {}),
+    // AUDIT-20260607-47: when scoping the dampener decision to a checkpoint,
+    // also confine the FLIP to that checkpoint's runs so an `--scope all`
+    // convergence slush never bins another checkpoint's findings (FR-011).
+    ...(opts.checkpoint !== undefined ? { flipCheckpoint: opts.checkpoint } : {}),
   });
 
   if (!res.dampenerEngaged) {
