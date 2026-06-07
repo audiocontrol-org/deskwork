@@ -557,3 +557,95 @@ Surface:    plugins/stack-control/spec-kit/spec-governance/scripts/bash/govern-s
 When `GOVERN_PLAN_PATH` is set, the command contract says the plan is folded alongside the spec. But `fold_artifact` returns 0 for any missing path, so a typo, stale plan path, or hook wiring bug produces a spec-only audit while the `after_plan` checkpoint appears to have run normally.
 
 That weakens FR-013 because plan coverage becomes optional by accident. If `GOVERN_PLAN_PATH` is non-empty, the script should require that file to exist and be folded, with a fatal error when it cannot be included.
+
+## 2026-06-07 — audit-barrage lift (20260607T033433112Z-pluggable-lifecycle-providers-after_clarify)
+
+### AUDIT-20260607-16 — `after_specify` is a valid checkpoint in Key Entities but is wired by no FR — its artifact set is undefined
+
+Finding-ID: AUDIT-20260607-16 (claude-01 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Surface:    spec.md FR-011 + FR-013 vs. Key Entities "Checkpoint (hook point)"
+
+The **Checkpoint** entity states the barrage fires at "one or more of `after_specify` / `after_clarify` / `after_plan`," explicitly admitting `after_specify` as a selectable checkpoint. But FR-011 only wires two: `after_clarify` (mandatory default) and `after_plan` (configurable add-on), and describes `after_specify` purely as "intentionally NOT the default." FR-013 then defines artifact sets for only the spec (after_clarify) and the plan (after_plan) — `after_specify`'s artifact set is never specified. This is an internal contradiction: either `after_specify` is a supported-but-disabled checkpoint (in which case FR-011/FR-013 must define how it is enabled and what it audits) or it is not a checkpoint at all (in which case the Key Entities list should drop it). As written, an implementer reading the entity model would build a three-checkpoint surface while an implementer reading the FRs would build two. A reasonable fix: either delete `after_specify` from the Checkpoint entity, or add an FR clause that defines its enable path and artifact set (the spec-with-unresolved-placeholders), matching the FR-011 rationale for why it's off by default.
+
+---
+
+### AUDIT-20260607-17 — "Healthy family" is the load-bearing predicate for fail-loud vs. clean-run, yet it is never defined
+
+Finding-ID: AUDIT-20260607-17
+Status:     open
+Severity:   medium
+Surface:    spec.md FR-002, FR-005, FR-008, Edge Cases ("ALL available families fail at runtime (zero healthy)")
+
+The entire fail-loud-vs-valid-run distinction pivots on counting *healthy* families: "≥1 healthy family is a valid, successful audit" (FR-002); "zero healthy families is an outage — fail loud" (FR-005, AUDIT-07). The policy is settled, but the predicate it depends on — what makes a family "healthy" — is never defined anywhere in the spec. The hard cases are exactly the ambiguous ones: a family that returns HTTP 200 with an empty body; a family that returns malformed/unparseable output; a family that returns a refusal ("I can't review this"); a family that returns *after* a soft timeout. Each of these must resolve to either "healthy, contributed a clean zero-finding result" (FR-009 — run is governed) or "unhealthy, did not run" (FR-005 — fail loud, spec not governed). Those two outcomes are opposite, so the classification is not a detail — it decides whether an ungoverned spec graduates. The spec should define "healthy" as a checkable predicate (e.g., "returned a well-formed findings document — including an explicit zero-findings document — within the configured deadline; any other terminal state, including empty/malformed/timeout/refusal, is unhealthy"), so the FR-002/FR-005 boundary is mechanically decidable rather than left to the implementer.
+
+---
+
+### AUDIT-20260607-18 — "Same root cause" — the basis for the HIGH-confidence signal — has no defined matching rule
+
+Finding-ID: AUDIT-20260607-18 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Surface:    spec.md FR-003, SC-002, Key Entities "Finding" (confidence label)
+
+`cross-model-agreed` is the feature's headline signal — "the strongest signal that the finding is real" (US2) — and the gate-orthogonal confidence axis (FR-003). The label is assigned when "two or more model families flag the same root cause." But the spec never defines how two independently-authored findings from two model families are determined to be "the same root cause." This is a genuinely hard dedup/matching problem: the models emit free-text findings with their own headings, their own severity calls, and possibly different cited line ranges for the same underlying defect. Is agreement decided by overlapping `Surface:` line ranges? By semantic similarity of the body? By a human triage step? By the lift verb mechanically? Without a defined rule, two implementers (or two runs) will compute different cross-model-agreement sets from the same raw findings, making SC-002 ("when ≥2 families flag the same root cause, that finding is labeled `cross-model-agreed`") non-reproducible. A capture-complete spec should state the matching contract — even if the answer is "agreement is assigned during the triage/lift pass by the maintainer, not computed automatically," that disposition is itself a requirement that's currently missing.
+
+---
+
+### AUDIT-20260607-19 — The "override" referenced by FR-010/SC-007 has no defined surface, authorization, or recorded format
+
+Finding-ID: AUDIT-20260607-19
+Status:     open
+Severity:   medium
+Surface:    spec.md FR-010 ("an explicit override (if used) MUST be recorded"), SC-007, FR-014 (non-converged terminal state)
+
+FR-010 and SC-007 both make the override load-bearing: a spec may graduate carrying open HIGH-severity findings **only** via "a recorded override," and a non-converged loop (FR-014) escalates to the operator — whose only path forward past a blocking finding is, presumably, this override. Yet no requirement defines the override at all: who is authorized to issue it (operator-only? any caller?), through what surface (a CLI verb? a sidecar field? a flag on the graduation command?), what must be recorded (reason? identity? finding IDs being overridden?), and whether an override is scoped to a single finding or blanket-clears the gate. This is the same shape as the project's own anti-pattern rule that a `--no-verify` bypass must be a deliberate, recorded, reshaped decision — but here the bypass mechanism that the gate's integrity depends on is entirely unspecified. Without it, "an override MUST be recorded" is unverifiable (SC-007 claims it's "verifiable in the run record," but there is no defined record shape to verify against). Add an FR defining the override's surface, authorization, required recorded fields, and scope.
+
+---
+
+### AUDIT-20260607-20 — The `acknowledged` disposition can silently clear a blocking finding from the gate, bypassing the "recorded override" requirement
+
+Finding-ID: AUDIT-20260607-20
+Status:     open
+Severity:   medium
+Surface:    spec.md FR-007 + Key Entities "Finding" (disposition: open / fixed / acknowledged) vs. FR-010 / SC-007 (gate counts "open" findings)
+
+The gate counts **open** HIGH/MEDIUM findings (FR-010); findings carry a disposition of `open / fixed / acknowledged` (FR-007, Finding entity). Nothing in the spec states whether `acknowledged` removes a finding from the "open" count the gate evaluates. If it does — the natural reading, since `acknowledged ≠ open` — then dispositioning a blocking HIGH finding to `acknowledged` opens the gate, and SC-007's guarantee ("no spec graduates carrying open HIGH-severity findings without a recorded override") is satisfied *trivially* because the finding is no longer "open." That creates two distinct, unreconciled mechanisms for clearing a blocking finding: (a) the FR-010 "recorded override" path, and (b) dispositioning to `acknowledged`. Either they are the same thing (then the spec should say acknowledgment IS the override and inherit its recording requirements) or they differ (then the spec must say which findings may be acknowledged, whether acknowledging a HIGH finding requires the same recorded justification as an override, and why two paths exist). As written, `acknowledged` is an un-gated escape hatch around the override discipline — exactly the kind of quiet-bypass the no-fallbacks principle exists to prevent. This is adjacent to AUDIT-03 (which settled *carried-open MEDIUM* under the two-consecutive branch) but distinct: AUDIT-03 left MEDIUMs `open`; this is about a disposition transition that makes a HIGH finding stop counting.
+
+---
+
+### AUDIT-20260607-21 — The per-checkpoint iteration ceiling (FR-014) names no default and no configuration surface
+
+Finding-ID: AUDIT-20260607-21
+Status:     open
+Severity:   low
+Surface:    spec.md FR-014, Edge Cases ("Governance never converges")
+
+FR-014 mandates a bounded loop terminating at "a configured iteration ceiling," per-checkpoint. But the spec never states the default ceiling value, nor where/how it is configured (extension manifest? CLI flag? per-feature config?). For a capture-complete spec this is an unstated assumption with real behavioral consequences: too low a ceiling under the "unattended/all-night" directive (FR-014's own justification) will escalate genuinely-improving specs as non-converged prematurely; too high wastes barrage budget. It need not pin a number, but it should name the configuration surface and state whether a default exists, so the implementation isn't free to hardcode an arbitrary magic number (the project's own guidance flags "hardcoded for now" magic numbers as a bug-factory). Pairs with the override gap (claude-04): the non-converged terminal state's only forward path is the override, so both halves of the escape need definition.
+
+---
+
+### AUDIT-20260607-22 — SC-006 is stated as a measurable outcome but is non-deterministically verifiable
+
+Finding-ID: AUDIT-20260607-22
+Status:     open
+Severity:   low
+Surface:    spec.md SC-006 (and the spec's own framing of the barrage as "non-deterministic," AUDIT-04)
+
+SC-006 — "On a spec seeded with a known self-contradiction, the automatic barrage surfaces that contradiction" — is the success criterion that ties the feature back to its motivating `specs/002` "author introduced 3 contradictions" failure. But the spec elsewhere explicitly characterizes the barrage as non-deterministic (AUDIT-04: "two-consecutive-quiet is a stability heuristic, not a determinism proof"). A single barrage run over a seeded contradiction may, on any given run, fail to surface it — model output is stochastic. As written, SC-006 is a probabilistic claim presented as a binary measurable outcome, so a conformance test for it is itself flaky and could go red for a reason unrelated to the code. Either qualify SC-006 to something deterministically checkable (e.g., "across N runs the seeded contradiction is surfaced in at least one," or "the convergence loop does not graduate the seeded spec until the contradiction is dispositioned"), or move it to a non-binding illustrative scenario. The current phrasing invites a test that asserts a non-deterministic event with `expect(...).toBe(true)`.
+
+---
+
+That's seven findings — all anchored to spec text, none re-litigating an already-dispositioned finding. The two I weighed hardest and chose to surface anyway because the prior dispositions don't actually cover them: **claude-02** ("healthy" predicate — AUDIT-07/-08 settled the *policy* but never defined the predicate the policy counts) and **claude-05** (`acknowledged`-vs-`open` — AUDIT-03 settled carried-open MEDIUMs but not the disposition transition that de-counts a HIGH). If your siblings converge on claude-03 (cross-model-agreement matching) or claude-04 (override surface), treat that agreement as the HIGH-confidence signal — both are core mechanisms the spec leans on without defining.
+
+### AUDIT-20260607-23 — The unattended convergence loop implies automated spec fixing without specifying the actor or contract
+
+Finding-ID: AUDIT-20260607-23
+Status:     open
+Severity:   medium
+Surface:    specs/004-spec-governance/spec.md:95-97, specs/004-spec-governance/spec.md:107, specs/004-spec-governance/spec.md:113, specs/004-spec-governance/spec.md:145
+
+The edge case says the loop “must run unattended (fix-and-re-barrage without operator presence),” and FR-010 describes “barrage → triage/fix the spec → re-barrage.” But FR-004 requires findings to be routed into triage where each gets an explicit durable disposition, and the spec never defines who or what performs unattended fixes, how dispositions are assigned, or what guardrails prevent automated edits from changing spec intent.
+
+This is a design gap because the feature’s blocking gate depends on repeated remediation, not just repeated audit runs. A reasonable fix is to define the unattended actor and limits: for example, whether only an agent-driven flow can auto-edit, whether raw hooks merely stop and report, and whether automated dispositions require explicit metadata distinct from maintainer triage.
