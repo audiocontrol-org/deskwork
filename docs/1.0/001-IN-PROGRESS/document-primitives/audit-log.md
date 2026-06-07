@@ -275,3 +275,38 @@ Surface:    specs/005-document-primitives/plan.md:15, specs/005-document-primiti
 The spec explicitly accepts Peggy grammars as trusted local config that run in-process, including semantic actions. The plan’s Technical Context matches that at line 15, but the Constitution Check still says “grammar-as-untrusted-input failure path tested RED” at line 37. That phrase points at the rejected security model from the prior audit rather than the current accepted trust model.
 
 Blast radius is medium: the surrounding text strongly indicates trusted execution is intended, but this row can cause test churn or a misleading implementation requirement for sandboxing/rejection. Rewrite the test obligation to match the accepted contract, such as tests for grammar compile failures, parse failures, and actionable errors from malformed trusted config.
+
+## 2026-06-07 — audit-barrage lift (20260607T230606974Z-document-primitives-after_plan)
+
+### AUDIT-20260607-24 — Anti-coupling scan omits the new unarchive skill
+
+Finding-ID: AUDIT-20260607-24
+Status:     fixed-e3b641c4
+Severity:   medium
+Surface:    specs/005-document-primitives/spec.md:120-121; specs/005-document-primitives/plan.md:95-98
+
+FR-011 says the shipped product mechanism must be machine-checked for zero predecessor-plugin references, but its concrete scan scope only includes `plugins/stack-control/skills/{archive,curate}/**`. The plan now requires a third thin skill at `plugins/stack-control/skills/unarchive/SKILL.md`, so the recovery half of the P1 workflow is part of the product mechanism but is not actually covered by the release-blocking scan.
+
+Blast radius is medium: most implementers will probably notice the “three verb modules” wording, but an unattended implementation of the scan can follow the literal brace pattern and leave `unarchive` unguarded. Reasonable fix: update FR-011’s scan scope to include `plugins/stack-control/skills/{archive,unarchive,curate}/**` or a broader `plugins/stack-control/skills/**` scope with explicit exclusions if needed.
+
+### AUDIT-20260607-25 — Row-keyed archive format lacks a table container contract
+
+Finding-ID: AUDIT-20260607-25
+Status:     fixed-e3b641c4
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md:106, specs/005-document-primitives/spec.md:114-116; specs/005-document-primitives/plan.md:92-94
+
+The spec says a non-heading-keyed grammar like the roadmap delimits Units by “the table row,” and FR-006 says archived Units are appended to a sibling archive file created with frontmatter. It never specifies how a row-keyed archive preserves the markdown table container: required header row, separator row, column schema, ledger placement relative to the table, or how a scanner distinguishes archived Unit rows from any ledger rows or other tables in the archive.
+
+Blast radius is high because the roadmap proof document is one of the two required real instances. A natural implementation could append raw table rows after frontmatter/ledger, producing an archive that is not a valid markdown table and making unarchive extraction ambiguous. Reasonable fix: define the row-keyed archive envelope explicitly, including table header/schema, where the ledger lives, and which table is the Unit table.
+
+### AUDIT-20260607-26 — Archive coherence has no defined behavior when the archive is already stale
+
+Finding-ID: AUDIT-20260607-26
+Status:     fixed-e3b641c4
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md:90, specs/005-document-primitives/spec.md:95, specs/005-document-primitives/spec.md:115-117
+
+The edge cases say a corrupt archive or hand-edited archived identifier is surfaced by the coherence check, and FR-006/FR-008 make that check a `curate` NOTICE rather than a fail-loud failure. But FR-006 also says “After any archive run, a coherence check holds,” meaning the ledger must match archive contents after `archive --apply`. If the archive is already incoherent before a new archive run, the spec does not say whether `archive --apply` refuses to write, writes and leaves the old mismatch in place, or repairs the archive despite saying manual edits are not auto-repaired.
+
+Blast radius is high: this affects the next state-changing archive operation after any manual archive edit, exactly the kind of drift the spec acknowledges. Different unattended implementations can make opposite choices about mutating a known-stale archive. Reasonable fix: add a precondition for `archive --apply` and `unarchive --apply` when coherence is already broken, or explicitly allow append-only writes while reporting that prior mismatches remain outside the operation’s coherence guarantee.
