@@ -814,3 +814,16 @@ Surface:    specs/004-spec-governance/spec.md:119, specs/004-spec-governance/spe
 The spec includes explicit deferred-work language inside functional requirements: “Available refinement (not yet implemented)” in FR-003 and “known available refinement” in FR-008. The audit prompt’s hard constraints reject deferral phrasing because it tends to become an untracked implementation gap, and here both deferred items are tied to contract-critical behavior: over-clustering agreement signals and counting non-parseable output as healthy coverage.
 
 A reasonable fix is to either make these current requirements or move them into a tracked out-of-scope/non-goal section with a clear present-tense contract. The FRs themselves should state only what the implementation must do now, without embedding “not yet implemented” escape hatches in the normative path.
+
+## 2026-06-07 — audit-barrage lift (20260607T051122270Z-pluggable-lifecycle-providers-after_clarify)
+
+### AUDIT-20260607-39 — Disposition inheritance can silently slush a re-surfaced HIGH, defeating the never-slush-HIGH invariant
+
+Finding-ID: AUDIT-20260607-39 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + claude-07 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     fixed-59e08262 (fresh-context sub-agent dispatch; FR-007 inheritance made severity-aware — a re-surfaced HIGH/BLOCKING re-opens, never inherits a non-open disposition; FR-011 cross-ref added)
+Severity:   high
+Surface:    specs/004-spec-governance/spec.md FR-007 ("A later-run finding that matches a recorded finding inherits that finding's disposition") vs FR-010/FR-015 ("HIGH-severity findings are NEVER slushed")
+
+FR-007 makes disposition inheritance unconditional on severity: *"A later-run finding that matches a recorded finding inherits that finding's disposition (`open` / `fixed-<sha>` / `acknowledged-<reason>` / `acknowledged-slush-pile-<date>`)."* The matching predicate (FR-003 clustering) is severity-blind. Now consider: at run N a MEDIUM finding M1 is slushed (`acknowledged-slush-pile-<date>`). At run N+1 the same root cause re-surfaces, but a model rates it HIGH (severity ratings are per-run, per-model, and the barrage is stochastic). Under FR-007 the run-N+1 finding matches M1 and **inherits the slush disposition** — yielding a HIGH-severity finding sitting in `acknowledged-slush-pile`.
+
+This directly contradicts two load-bearing invariants. FR-015: *"MUST NEVER slush HIGH/BLOCKING findings."* FR-010: a HIGH resets the dampener because *"a recorded run that surfaces an **open** HIGH/BLOCKING finding breaks the consecutive-0-HIGH window."* But the inherited-slush HIGH is never `open` — inheritance set it to slush — so it never "surfaces as open," the dampener never resets, the gate stays satisfied, and a genuine HIGH graduates silently. That is precisely the "seeded contradiction graduates undetected" failure mode the feature exists to prevent, reintroduced through the reconciliation path. A reasonable fix: make inheritance severity-aware — a later-run finding that matches a slushed/acknowledged record but carries HIGH/BLOCKING severity MUST re-open as `open` HIGH work (severity escalation overrides inherited non-open dispositions), and the cross-run/cross-checkpoint matcher must re-check severity before inheriting any non-`open` disposition.
