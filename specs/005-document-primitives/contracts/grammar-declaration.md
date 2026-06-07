@@ -37,5 +37,5 @@ A grammar (`.peg` text) MUST declare, in a form the engine can extract:
 
 ## Built-in grammars shipped this feature
 
-- `roadmap.peg` — `<phase>/<slug>` identifiers; statuses include terminal `shipped`/`cancelled`/`retired` (proof instance #2, FR-013).
-- `design-inbox.peg` — title identifiers; statuses include terminal `promoted`/`dropped` (proof instance #1, FR-013).
+- `roadmap.peg` — `<phase>/<slug>` identifiers; full status vocabulary `planned`, `in-flight` (active), `shipped`, `cancelled`, `retired` (terminal) (proof instance #2, FR-013).
+- `design-inbox.peg` — title identifiers; full status vocabulary `captured` (active), `promoted`, `dropped` (terminal) (proof instance #1, FR-013).
