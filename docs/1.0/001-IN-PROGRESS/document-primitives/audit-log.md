@@ -336,3 +336,86 @@ Surface:    specs/005-document-primitives/plan.md:1; specs/005-document-primitiv
 The plan title and Summary still describe shipping two primitives, `archive` and `curate`, even though the plan later requires three CLI verbs and three skills: `archive`, `unarchive`, and `curate`. This is a lingering scope drift after adding the P1 recovery half.
 
 Blast radius is medium: the detailed project structure includes unarchive, so a careful implementer will probably build it, but planning summaries are commonly used to scope task generation and review checklists. Update the title/summary to say three primitives or explicitly describe unarchive as part of the shipped primitive set.
+
+## 2026-06-07 — audit-barrage lift (20260607T232709802Z-document-primitives-after_plan)
+
+### AUDIT-20260607-29 — Two-file "atomic all-or-nothing" guarantee is not mechanically achievable as specified — crash window leaves the exact partial state SC-003 forbids
+
+Finding-ID: AUDIT-20260607-29
+Status:     fixed-ce82d9e5
+Severity:   high
+Surface:    spec.md FR-006 (archive — `--apply` atomic across both files), FR-010 ("zero writes is absolute and spans both files"), SC-003
+
+FR-006 requires `--apply` to be "atomic (all-or-nothing) across both files — the live document and the sibling archive file: either both update … or neither does, with no partial state across the two files (e.g. staged writes + atomic rename; mechanism left to implementation)." FR-010 reinforces this as absolute, and SC-003 makes "mid-`--apply` write failure produces … no partial document mutation" a measurable success criterion. The suggested mechanism — "staged writes + atomic rename" — gives **per-file** atomicity, but there is no single POSIX operation that atomically renames two files. The natural implementation is two sequential `rename()` calls; a crash/interrupt (operator Ctrl-C, OOM, power loss) **between** them leaves file A swapped and file B not — precisely the cross-file partial state the spec declares impossible.
+
+Blast radius is high: an unattended implementer reads "atomic rename" and ships two sequential renames, believing the contract is met, while the failure window silently violates SC-003. Worse, the failure leaves the ledger and archive contents inconsistent — the same drift the coherence NOTICE is meant to catch — but FR-006 says coherence is "guaranteed for the Units that operation moves," which a half-applied op did not actually achieve. A reasonable fix: specify crash/recovery semantics (a write-ahead journal or a single combined staging area replayed on next run, or define that one file is the commit point and the other is reconstructible), rather than asserting an unconditional two-file atomicity the suggested mechanism can't deliver.
+
+### AUDIT-20260607-30 — Inbox title-as-identifier collides head-on with the non-ordinal denylist — a legitimate human title starting with a number is rejected on the low-friction-capture proof document
+
+Finding-ID: AUDIT-20260607-30 (claude-02 + claude-04 + claude-05 + claude-06 + codex-03; cross-model)
+Status:     fixed-ce82d9e5
+Severity:   high
+Surface:    spec.md FR-005 (non-ordinal denylist + per-grammar production), FR-013(a) (title-keyed inbox)
+
+FR-005 makes the identifier "a single visible name," and FR-013(a) declares the design-inbox **title-keyed** — the entry's title *is* its identifier. The same FR-005 denylist rejects "a bare-integer segment" and "leading `<n>` numbering." These two rules conflict on exactly the document the feature ships to prove generality: a real inbox idea captured as *"3 ways to industrialize execution"* or *"5 hard problems in scope discovery"* produces the identifier `3 ways…` / `5 hard problems…`, whose leading number trips the ordinal denylist → **fail-loud rejection** of a legitimately-titled capture.
+
+Blast radius is high because the inbox's entire purpose (per the project's own `design-inbox.md` rule) is instant low-friction capture; a denylist that refuses any title beginning with a digit makes the proof document hostile to ordinary use, and an agent building from the spec verbatim would emit a confusing fail-loud error for a title that has nothing ordinal about it. The denylist was designed against `F3`/`phase-2` slug-style IDs, but it was never reconciled with the title-keyed production FR-013(a) introduces. A reasonable fix: scope the leading-number / bare-integer patterns to slug-style productions only, or define the rejection as "looks like a *positional sequence* index" (the actual harm in FR-004) rather than "contains a leading digit," so prose titles aren't false-positived.
+
+### AUDIT-20260607-31 — Shallower-than-reserved headings appearing *after* the first Unit are classified as "preamble" but their interleaved position and behavior under `curate` reorder is undefined
+
+Finding-ID: AUDIT-20260607-31
+Status:     fixed-ce82d9e5
+Severity:   high
+Surface:    spec.md FR-002 (Document preamble + Unit boundary rule)
+
+The AUDIT-27 fix defines preamble as "**All content before the first Unit marker, AND any content at heading levels shallower than the reserved Unit level**," and calls preamble/Unit/Unit-body "the three exhaustive regions." But the second clause has no positional bound: for a heading-keyed inbox reserving `###`, a `## Captured` / `## Promoted` section divider sitting **between** two `###` units is shallower-than-reserved → "preamble" by the literal rule, yet it appears mid-document, interleaved with Units. The spec frames preamble as leading front matter ("title heading, intro prose … before the first Unit"), so an implementer's mental model (preamble = a contiguous leading region) contradicts the rule's literal text (preamble = any-position shallower heading).
+
+This is high blast-radius because it directly governs `curate --apply` reordering on a proof document. When `curate` reorders Units, does an interleaved `## divider` move, stay, or anchor a Unit group? The spec is silent. Two implementers will make opposite choices: one treats the divider as a fixed anchor that partitions Units into ordered groups; another sweeps all Units past it into one declared order, scrambling a deliberately-grouped inbox. The Unit-boundary rule also needs to state explicitly that a shallower heading *terminates the current Unit's body* (the body rule only says bodies contain "strictly deeper" headings — it never says a shallower heading ends the span). Fix: bound preamble to the leading region only and define a distinct rule (or an explicit prohibition) for shallower headings that appear after Units begin.
+
+### AUDIT-20260607-32 — Multiple `doc-grammar:` comments are excised but the spec never says which one is the grammar declaration
+
+Finding-ID: AUDIT-20260607-32
+Status:     fixed-ce82d9e5
+Severity:   low
+Surface:    spec.md FR-001, FR-002 (chrome excision — "the HTML comment(s) beginning with the `doc-grammar:` sentinel")
+
+FR-002's chrome-excision step refers to "the embedded grammar-declaration comment — the HTML comment(**s**) beginning with the `doc-grammar:` sentinel," explicitly plural, and excises all of them. FR-001's precedence rules cover only embedded-block-vs-frontmatter-reference; they say nothing about **two embedded `doc-grammar:` comments** in the same document. If a document (or a sloppy migration) ends up with two such comments declaring different grammars, the spec gives no resolution: both are excised as chrome, but which one's grammar governs parsing is undefined.
+
+Blast radius is low because it requires an unusual authoring mistake, and the document is operator-authored trusted config. But "the engine recognizes/excises exactly those" combined with the plural wording invites an implementer to silently use the first, the last, or to concatenate — three different behaviors with no spec basis. A one-sentence fix (e.g. "more than one `doc-grammar:` comment is a fail-loud configuration error" or "the first wins") removes the ambiguity cheaply.
+
+---
+
+I walked the spec's parse pipeline (FR-001/002/003), identity invariants (FR-004/005), the archive/unarchive/curate contracts (FR-006/007/008), atomicity (FR-010), and the two proof documents (FR-013), cross-checking each FR against the others and against the success criteria. The clean areas: the ledger-as-sole-union-source decision (FR-005/006) is now internally consistent, the seam-only reconciliation scope (FR-008) is unambiguous, and the anti-coupling closed-token match (FR-011) is well-bounded. The seven findings above are where an unattended build would most plausibly diverge — the two-file atomicity guarantee and the title-vs-denylist collision being the ones I'd fix before task generation.
+
+### AUDIT-20260607-33 — `unarchive` is described as append-only even though it must remove from the archive
+
+Finding-ID: AUDIT-20260607-33
+Status:     fixed-ce82d9e5
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md:121-122
+
+FR-006 says ``archive --apply` / `unarchive --apply` write **append-only**`, but FR-007 defines `unarchive` as lifting the Unit from the archive file and removing its ledger entry. Those are not append-only operations: the archived Unit must be deleted from the archive container and the ledger must be mutated, or the same identifier remains in the archive ledger and continues to poison the document ∪ archive uniqueness union.
+
+Blast radius is high because an unattended implementer can reasonably follow the explicit “append-only” sentence and implement unarchive as “copy back to live + append/update nothing destructive,” leaving duplicate state behind. A reasonable fix is to scope append-only to `archive --apply` only, and define `unarchive --apply` as an atomic removal from archive contents plus ledger, paired with insertion into the live document.
+
+### AUDIT-20260607-34 — Shallower headings after a Unit are both preamble and impossible body
+
+Finding-ID: AUDIT-20260607-34
+Status:     fixed-ce82d9e5
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md:107-109
+
+The preamble rule says “any content at heading levels shallower than the reserved Unit level” is document preamble, while the heading-keyed Unit rule says a Unit spans from its reserved-level heading to the next reserved-level heading or end of document, and that Unit bodies may contain only strictly deeper heading levels. For an h3-keyed inbox, an h2 appearing after the first `### Unit` is therefore simultaneously inside the previous Unit span until the next h3, forbidden as Unit body, and classified as preamble even though it is no longer before the first Unit.
+
+Blast radius is high because real markdown authors commonly insert h2 grouping or notes between h3 entries. The spec does not say whether this should end the previous Unit, be preserved as inter-Unit preamble, fail loud, or be archived with the previous Unit. A reasonable fix is to define “preamble” as leading-only unless the grammar explicitly supports inter-Unit non-Unit regions, and state the exact behavior for shallower-than-reserved headings encountered after the first Unit.
+
+### AUDIT-20260607-35 — Missing-ledger `unarchive` behavior is not specified as a fail-loud case
+
+Finding-ID: AUDIT-20260607-35
+Status:     fixed-ce82d9e5
+Severity:   medium
+Surface:    specs/005-document-primitives/spec.md:93, specs/005-document-primitives/spec.md:98, specs/005-document-primitives/spec.md:122, specs/005-document-primitives/spec.md:125
+
+The spec defines an unarchive collision as fail-loud, and the empty-document edge case says `unarchive <id>` follows the “normal not-found path,” but FR-007 does not define what happens when the named id has no ledger entry. FR-010’s enumerated failure modes also omit unarchive-not-found.
+
+Blast radius is medium because the intended behavior is likely fail-loud with zero writes, but “normal not-found path” could also be read as a dry-run-style no-op report. That divergence matters for automation: a missing recovery target should not silently succeed. A reasonable fix is to add “unarchive target absent from ledger/archive” to FR-007 and FR-010 with the exact status: fail loud, actionable message naming the missing identifier, zero writes.
