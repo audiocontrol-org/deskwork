@@ -34,7 +34,7 @@ import {
 } from './run-artifacts.js';
 import { spawnCliAgainstModel, type SpawnInput } from './spawn-cli.js';
 import {
-  isModelRunHealthy,
+  isModelRunCovering,
   type BarrageInput,
   type BarrageRun,
   type ModelRunResult,
@@ -112,19 +112,23 @@ export async function orchestrateBarrage(
   );
 
   // Per AUDIT-20260531-claude-03 + codex-02: only write tip.sha when
-  // the barrage actually produced audit coverage (at least one model
-  // emitted bytes). An all-models-failed (outage) run intentionally
-  // omits tip.sha; the next iteration's check-barrage-tip then sees
-  // missing → fail-safes to fire (per AUDIT-20260531-fail-safe-rule).
-  // Write is wrapped so a filesystem failure (disk full, race) degrades
-  // to "no tip recorded" rather than aborting the run.
+  // the barrage actually produced audit COVERAGE. An all-crashed
+  // (zero-coverage) run intentionally omits tip.sha; the next
+  // iteration's check-barrage-tip then sees missing → fail-safes to
+  // fire (per AUDIT-20260531-fail-safe-rule). Write is wrapped so a
+  // filesystem failure (disk full, race) degrades to "no tip recorded"
+  // rather than aborting the run.
   if (fireTimeTipSha !== null) {
-    // Per AUDIT-20260601-08: same predicate as the CLI's exit-code
-    // derivation (isModelRunHealthy in types.ts) — sourced from the
-    // single shared helper so the orchestrator's tip.sha gate and
-    // the audit-barrage CLI's healthy-count can't silently drift.
-    const anyModelEmitted = results.some(isModelRunHealthy);
-    if (anyModelEmitted) {
+    // Per AUDIT-20260607-42: gate on COVERAGE (isModelRunCovering),
+    // matching the CLI's exit-code derivation. A run where every family
+    // is non-zero-exit / timed-out / spawn-failed is a zero-coverage
+    // OUTAGE — omit tip.sha so the next iteration fail-safes to fire,
+    // instead of marking the OUTAGE's HEAD as covered. (Liftability is
+    // NOT enough here: a crash-after-banner family emitted bytes but did
+    // not cover the commit; treating it as coverage would re-open the
+    // outage-masquerades-as-clean hole.)
+    const anyCovering = results.some(isModelRunCovering);
+    if (anyCovering) {
       try {
         await writeFile(join(runDir, 'tip.sha'), `${fireTimeTipSha}\n`, 'utf8');
       } catch {

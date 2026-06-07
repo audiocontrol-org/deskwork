@@ -77,26 +77,64 @@ export interface BarrageInput {
 }
 
 /**
- * Per AUDIT-20260601-08 (claude-03): the "model produced liftable
- * output" contract was duplicated between `isHealthyModelRun`
- * (audit-barrage.ts CLI exit-code derivation) and the inline
- * `anyModelEmitted` check in `orchestrateBarrage` (tip.sha gate).
- * Same logic, two call sites — drift risk. Centralizing here makes
- * the contract structural rather than accidental: both the CLI's
- * exit-code derivation AND the orchestrator's tip.sha gate use this
- * single predicate.
+ * LIFTABILITY predicate — "did this model produce output worth lifting?"
  *
- * Contract: a model produced liftable output iff stdoutBytes > 0
- * AND no spawn failure. Rationale:
+ * Contract: a model produced liftable output iff stdoutBytes > 0 AND no
+ * spawn failure. This governs ONLY what the lift step extracts; it does
+ * NOT decide whether the run as a whole is governed-clean. We NEVER
+ * discard liftable output — a non-zero-exit family that emitted real
+ * findings is still lifted when the run has coverage.
+ *
+ * Per AUDIT-20260601-08 (claude-03): the liftability contract was
+ * duplicated between the CLI's exit-code derivation and the inline
+ * `anyModelEmitted` tip.sha gate in `orchestrateBarrage` — same logic,
+ * two call sites, drift risk. Centralizing here makes the contract
+ * structural. Rationale:
  *   - The audit-barrage-lift reads stdout (each model's `.md` file).
  *     Findings live there.
  *   - stderr is diagnostic / progress info, NOT findings. Not lifted.
  *   - A non-zero CLI exit with positive stdout is still triagable
- *     content (operator may want to lift); kept healthy.
- *   - A spawn error has zero captured content by definition; unhealthy.
+ *     content — the operator may want to lift it; kept LIFTABLE.
+ *   - A spawn error has zero captured content by definition; not liftable.
+ *
+ * Per AUDIT-20260607-42: liftability is deliberately the LOOSER of the
+ * two predicates. It is split from COVERAGE (`isModelRunCovering`) so
+ * that a crash-after-emitting-bytes family's findings still get lifted
+ * (liftability) WITHOUT that family counting as a covering run that
+ * could mask an outage as governed-clean (coverage).
  */
 export function isModelRunHealthy(result: ModelRunResult): boolean {
   return result.stdoutBytes > 0 && result.spawnError === undefined;
+}
+
+/**
+ * COVERAGE predicate — "did this model run to completion and count as a
+ * covering family?" (AUDIT-20260607-42).
+ *
+ * Contract: liftability AND `exitCode === 0` (ran to completion). The
+ * `exitCode === 0` clause also correctly excludes the timeout sentinel
+ * (`-1`) and the spawn-failure sentinel (`-2`), closing a latent gap
+ * where FR-008's prose said "no spawn/timeout error" but the code only
+ * checked `spawnError`.
+ *
+ * Coverage — NOT liftability — governs: the FR-008 healthy-coverage
+ * count, the FR-005 zero-coverage OUTAGE determination, the clean-run
+ * claim, the stderr summary line, and the tip.sha gate.
+ *
+ * Why the split is load-bearing: for the LLM CLIs this barrage drives
+ * (claude/codex/gemini headless), a non-zero exit usually means
+ * something went wrong (rate-limit, auth expiry, mid-stream drop). A
+ * family that prints a banner then dies `exit 1` satisfies liftability
+ * (bytes>0, no spawnError) — but under the OLD single predicate it was
+ * counted a HEALTHY family contributing a "clean" 0 findings. In the
+ * single-family floor that was INDISTINGUISHABLE from a legitimate
+ * clean run — an outage masquerading as governed-clean, defeating the
+ * fail-loud guarantee (FR-005/US3/SC-003). Requiring `exitCode === 0`
+ * for coverage closes that hole; the family's bytes are still lifted
+ * (liftability) when the run has coverage from some other family.
+ */
+export function isModelRunCovering(result: ModelRunResult): boolean {
+  return isModelRunHealthy(result) && result.exitCode === 0;
 }
 
 /**
@@ -142,14 +180,16 @@ export interface BarrageRun {
 
 /**
  * Result returned by the CLI shim. `exitCode` maps the run outcome
- * onto the verb's overall exit code:
+ * onto the verb's overall exit code (per AUDIT-20260607-42, gated on
+ * COVERAGE — `isModelRunCovering` — not liftability):
  *
- *   - `0` — at least one model produced positive-byte stdout AND was
- *     not a spawn failure. Non-zero CLI exit codes and timeouts fall
- *     on this side of the boundary because the captured stdout is
- *     still triagable content; the operator sees the metadata in
- *     INDEX.md and walks the per-model `.md` files either way.
- *   - `1` — every model failed (spawn error OR zero stdout bytes).
+ *   - `0` — at least one COVERING family (positive-byte stdout, no
+ *     spawn failure, AND exit 0). Non-zero-exit / timed-out families
+ *     are still LIFTED for findings when the run has coverage, but they
+ *     do not by themselves make the run governed-clean.
+ *   - `1` — OUTAGE: zero covering families (every family was a spawn
+ *     error, a timeout, a non-zero exit, or emitted zero bytes). The
+ *     run-dir `.md` artifacts remain on disk for manual triage.
  *   - `2` — usage error (caller's flag parsing rejected, `--prompt-file`
  *     unreadable, malformed config). The shim guards on these before
  *     invoking the orchestrator.

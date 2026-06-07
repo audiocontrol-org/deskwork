@@ -8,10 +8,15 @@
  *     skill's triage walk).
  *   - stderr: one-line summary unless `--quiet`.
  *
- * Exit code contract (per the audit-barrage PRD acceptance criteria):
+ * Exit code contract (per the audit-barrage PRD acceptance criteria;
+ * gated on COVERAGE — AUDIT-20260607-42):
  *
- *   0 — at least one model produced positive-byte stdout AND exit 0.
- *   1 — every model failed (spawn error, non-zero exit, OR zero bytes).
+ *   0 — at least one COVERING family (positive-byte stdout, no spawn
+ *       failure, AND exit 0). Non-zero-exit / timed-out families are
+ *       still lifted for findings when coverage exists; they are just
+ *       not themselves covering.
+ *   1 — OUTAGE: zero covering families (every family was a spawn error,
+ *       a timeout, a non-zero exit, OR emitted zero bytes).
  *   2 — usage error (missing required flag, mutually-exclusive flags,
  *       unknown flag).
  *
@@ -30,7 +35,7 @@ import { resolve } from 'node:path';
 import { loadAuditBarrageConfig } from '../scope-discovery/audit-barrage/config-loader.js';
 import { orchestrateBarrage } from '../scope-discovery/audit-barrage/orchestrate-barrage.js';
 import {
-  isModelRunHealthy,
+  isModelRunCovering,
   type BarrageInput,
   type BarrageResult,
   type BarrageRun,
@@ -257,50 +262,55 @@ export function resolveModels(
  * Map a BarrageRun's per-model results onto the verb's exit code.
  * Exported for tests; the shim also calls it before exit.
  *
- * Contract (aligned with PRD):
- *   - `0` if AT LEAST ONE model produced positive-byte stdout AND
- *     wasn't a spawn failure.
- *   - `1` if every model failed (spawn error or zero stdout bytes).
+ * Contract (gated on COVERAGE — AUDIT-20260607-42):
+ *   - `0` if AT LEAST ONE COVERING family exists (positive-byte stdout,
+ *     no spawn failure, AND exit 0).
+ *   - `1` (OUTAGE) if zero families cover — every family was a spawn
+ *     error, a timeout, a non-zero exit, OR emitted zero bytes.
  *
- * Non-zero CLI exit + timeout are recorded in INDEX.md as triage
- * metadata; neither precludes the captured stdout from being valuable
- * to the operator's review. A model that emits a complete useful
- * audit response but exits non-zero (rate-limit warnings, partial-
- * completion conventions, lint-style non-zero-on-findings) IS healthy
- * for the purposes of the verb's exit code — the operator gets to see
- * the captured findings either way.
+ * Coverage, not liftability, is the gate. A non-zero-exit family that
+ * emitted bytes is still LIFTED for findings (the lift reads each
+ * model's `.md` by file presence) whenever the run has coverage from
+ * some other family — so its findings are never discarded. But it does
+ * NOT itself count as a covering family: for the LLM CLIs this barrage
+ * drives, a non-zero exit usually signals a failure (rate-limit, auth
+ * expiry, mid-stream drop). Counting a crash-after-banner family as
+ * "clean" would let an OUTAGE masquerade as governed-clean in the
+ * single-family floor case (FR-005/US3/SC-003) — the exact hole this
+ * split closes. Only when EVERY family is non-covering does the run
+ * become an OUTAGE (exit 1) → `protocol.ts` fails loud and does NOT
+ * auto-lift; the run-dir `.md` artifacts remain for manual triage.
  */
 export function deriveBarrageExitCode(run: BarrageRun): 0 | 1 {
-  const anyHealthy = run.results.some(isHealthyModelRun);
-  return anyHealthy ? 0 : 1;
+  const anyCovering = run.results.some(isModelRunCovering);
+  return anyCovering ? 0 : 1;
 }
-
-// Per AUDIT-20260601-08: the "model produced liftable output"
-// contract is centralized in `isModelRunHealthy` (types.ts). Same
-// predicate used by the orchestrator's tip.sha gate — drift-proof
-// by construction.
-const isHealthyModelRun = isModelRunHealthy;
 
 /**
  * Render the one-line stderr summary describing the run outcome.
  *
- * Per Phase 18 Task 5 (operator directive 2026-06-01): a 1-healthy-
- * model barrage IS a successful audit, not degraded. The audit-
- * barrage is stochastic — auditing as a PRACTICE statistically
- * yields better code, not zero-defect-per-run. Frame partial
- * coverage as success when ≥1 model emitted; only frame the all-
- * models-failed case as outage.
+ * Per Phase 18 Task 5 (operator directive 2026-06-01): a 1-covering-
+ * family barrage IS a successful audit, not degraded. The audit-
+ * barrage is stochastic — auditing as a PRACTICE statistically yields
+ * better code, not zero-defect-per-run. Frame partial coverage as
+ * success when ≥1 family COVERS; only frame the zero-coverage case as
+ * outage.
+ *
+ * Per AUDIT-20260607-42 the count is COVERAGE (`isModelRunCovering`),
+ * not liftability. A non-zero-exit-with-bytes family is lifted but does
+ * not increment the covering count — so the summary can never report a
+ * crash-after-banner run as "successful — 1/1 models emitted findings."
  */
 export function renderSummaryLine(run: BarrageRun): string {
   const total = run.results.length;
-  const healthy = run.results.filter(isHealthyModelRun).length;
-  if (healthy === 0) {
+  const covering = run.results.filter(isModelRunCovering).length;
+  if (covering === 0) {
     return `audit-barrage: OUTAGE — 0/${total} models emitted findings (run dir: ${run.runDir})`;
   }
-  if (healthy === total) {
-    return `audit-barrage: barrage successful — ${healthy}/${total} models emitted findings (run dir: ${run.runDir})`;
+  if (covering === total) {
+    return `audit-barrage: barrage successful — ${covering}/${total} models emitted findings (run dir: ${run.runDir})`;
   }
-  return `audit-barrage: barrage successful — ${healthy} of ${total} models emitted findings; auditing as a practice statistically yields better code (run dir: ${run.runDir})`;
+  return `audit-barrage: barrage successful — ${covering} of ${total} models emitted findings; auditing as a practice statistically yields better code (run dir: ${run.runDir})`;
 }
 
 /**
