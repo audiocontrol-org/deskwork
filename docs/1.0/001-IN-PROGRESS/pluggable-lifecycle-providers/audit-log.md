@@ -438,7 +438,7 @@ The spec ports "the convergence criterion + finding state machine" from dw-lifec
 ### AUDIT-20260607-05 — Dual checkpoints (after_clarify + after_plan): unspecified whether the gate/loop runs once or twice, and whether the iteration ceiling is per-checkpoint or global
 
 Finding-ID: AUDIT-20260607-05 (claude-05 + claude-08 + codex-04; cross-model)
-Status:     scoped-code-task (spec clarified — FR-011/FR-013/FR-014 + Checkpoint entity now specify INDEPENDENT per-checkpoint loops with per-checkpoint ceilings and a durable after_clarify gate — but the as-built gate counts iterations globally over the whole audit-log. Per-checkpoint scoping is a CODE change (tag runs with their checkpoint; --checkpoint filter in spec-governance-gate; thread it through govern-spec.sh) landing this session, TDD-first. Will move to fixed-<sha> when the code lands; remains open until then.)
+Status:     fixed-701fad25 (spec clarified @1a2f258c — independent per-checkpoint loops, FR-011/FR-013/FR-014 + Checkpoint entity — AND the code now enforces it: spec-governance-gate gains --checkpoint <name> (filters the audit-log to that checkpoint's runs before convergence + iteration counting; verdict carries checkpoint; no --checkpoint = global back-compat), and govern-spec.sh tags each barrage run-dir with its checkpoint and passes --checkpoint to the gate so a passed after_clarify gate is durable. RED-first gate-per-checkpoint.test.ts (3 cases) green; deterministic + live smokes pass.) landing this session, TDD-first. Will move to fixed-<sha> when the code lands; remains open until then.)
 Severity:   medium
 Surface:    FR-011, FR-013, FR-014, and the **Checkpoint** key-entity
 
