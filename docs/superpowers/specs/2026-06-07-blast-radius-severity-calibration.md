@@ -4,32 +4,47 @@ date: 2026-06-07
 status: accepted (field-test in progress)
 feature: pluggable-lifecycle-providers / multi/migrate-audit-barrage (audit protocol)
 supersedes-open-question: "severity calibration — what IS a HIGH" (DEVELOPMENT-NOTES, 2026-06-07)
+governed-by: cross-model barrage over this doc, run 20260607T134646173Z-design-blast-radius-calibration
+  (claude + codex); findings folded in (see § Design review).
 ---
 
 # Blast-radius severity calibration (Approach A — rubric rewrite)
 
 ## Problem
 
-Finding severity in the audit-barrage is each auditor model's free-text self-rating
-(`Severity: high|medium|...`), parsed by the lift; a cross-model cluster inherits the
-**max** severity across its members. The rubric the models are given (in
-`plugins/stack-control/templates/audit-barrage-prompt.md`) is:
+The defect this increment fixes: **finding severity is an uncalibrated, free-text
+self-rating with no shared definition of what each level means.** Each auditor model
+emits a `Severity: high|medium|...` line on its own judgment; the lift parses it; a
+cross-model cluster inherits the **max** severity across its members. The only guidance
+the models get is one line in `plugins/stack-control/templates/audit-barrage-prompt.md:56`:
 
 > `high` for correctness bugs adopters will hit; `medium` for design issues that compound;
 > `low` for hygiene …
 
-Two defects:
+That rubric gives the models nowhere to record *"real issue, but a reader would obviously
+resolve it right"* vs *"looks minor, but an agent would build it wrong."* So models rate by
+**how alarming a finding feels**, not by its consequence. The symptom that surfaced the gap:
+the 004 convergence loop kept producing one HIGH per round on an exhaustively-detailed spec,
+which prompted the operator's question — *"what IS a HIGH?"* Without a shared, consequence-based
+definition, the severity axis the gate depends on is not reliable.
 
-1. **It is code-oriented** ("correctness bugs," "the diff," "adopters will hit") — yet the
-   spec-phase barrage feeds a **spec** into the same `{{diff}}` slot using this same prompt.
-   When auditing a spec the models have no fit-for-purpose rubric and improvise.
-2. **It has no slot for blast-radius.** A self-contradiction in a governance spec has no
-   *direct* runtime cost, so a model reaches for HIGH because it *feels* serious — there is
-   nowhere to record "real inconsistency, but a reader would obviously resolve it right."
+**A separate, real issue we are NOT fixing in this increment:** the same prompt is
+code-oriented ("the diff," "cite line numbers," "correctness bugs adopters will hit") and is
+reused verbatim to audit *specs* (the spec goes into the `{{diff}}` slot). That framing
+mismatch is genuine but is a distinct lever from severity calibration; see § Scope boundary
+and § Follow-ups. We name it here so it is not mistaken for in-scope.
 
-Evidence: in the 004 convergence loop, AUDIT-42 (a real behavioral safety hole) and AUDIT-43
-(a spec contradiction) both came back HIGH, even though their downstream costs differ by an
-order of magnitude. The protocol treating all HIGHs identically is the gap.
+### Why AUDIT-42/43 are NOT the motivating evidence (and what they actually show)
+
+Earlier discussion used AUDIT-42 (a coverage safety-hole) and AUDIT-43 (an FR-010 spec
+contradiction) — both rated HIGH — as if they proved miscalibration. They do **not**, and the
+honesty matters: under the blast-radius lens below, **both are legitimately HIGH** (42 is a
+safety hole; 43 was a high-divergence contradiction an agent could build wrong). They are not
+an order of magnitude apart, and the new rubric does **not** demote either. So 42/43 are not
+evidence the protocol *miscalibrates* — they are the worked example the rubric must **not
+break** (a correct rubric keeps both at HIGH). We do not yet have a captured instance of the
+old rubric inflating a genuinely-low-blast-radius finding to HIGH; surfacing whether that
+happens is precisely what the field test (below) is for.
 
 ## The calibration axis: downstream blast-radius
 
@@ -43,31 +58,49 @@ Critically, this is **not** "behavioral vs documentation-only." A spec contradic
 contradiction encountered *before* implementation can drive an agent to build the wrong branch,
 produce divergent implementations across a parallel build, or propagate as an editing cascade
 (cf. AUDIT-41). In spec-governance specifically, the spec **is** the deliverable — internal
-consistency is behaviorally load-bearing downstream. So a high-divergence, non-disambiguated
-contradiction is genuinely HIGH; a contradiction a reader would obviously resolve correctly is
-not. The axis ranks by downstream consequence, not by how alarming a finding feels.
+consistency is behaviorally load-bearing downstream. The axis ranks by downstream consequence,
+not by how alarming a finding feels.
 
 ## Decision
 
 **Approach A only** (operator decision 2026-06-07): rewrite the rubric at the source; field-test
-in this project; add machinery (a calibration pass, a second axis) only if A proves insufficient.
-Do not change too much at once without real-world evidence.
+in this project; add machinery (a calibration pass, a second axis) only if A proves insufficient
+*by the criterion defined below*. Do not change too much at once without real-world evidence.
 
-### Where it lives
+### Where it lives — the plugin default (path verified)
 
 Edit the **plugin default** `plugins/stack-control/templates/audit-barrage-prompt.md` directly,
 on the `feature/pluggable-lifecycle-providers` branch. NOT a project-local override.
 
-Rationale: the calibrated rubric is a **general** improvement (the old rubric was wrong for
-everyone), not a project-specific preference, so it belongs in the default. A `.stack-control/`
-override would (a) copy the whole prompt → silent drift the moment the default's other sections
-change (the install-drift failure class from 2026-06-07), and (b) park a general fix where
-adopters never receive it. The feature branch already provides all the isolation needed —
-this repo is the monorepo, so the worktree barrage reads the source template immediately
-(field test works on-branch), and nothing reaches adopters until we choose to merge + release,
-which is far off.
+Rationale: the calibrated rubric is a **general** improvement (the old rubric had no
+blast-radius definition for anyone), not a project-specific preference, so it belongs in the
+default. A `.stack-control/` override would (a) copy the whole prompt → silent drift the moment
+the default's other sections change (the install-drift failure class from 2026-06-07), and
+(b) park a general fix where adopters never receive it. The feature branch already isolates it
+from adopters until we choose to merge + release, which is far off.
 
-### The rubric (replaces the `blocking/high/medium/low/informational` scale)
+**Field-test-path verification (do not assume — verified 2026-06-07):** the live barrage *does*
+load this exact file. Evidence: (a) the real 004 run `20260607T101208624Z`'s `PROMPT.md` contains
+this template's line-56 rubric text verbatim; (b) `spec-governance/scripts/bash/govern-spec.sh`
+resolves stackctl from `git rev-parse --show-toplevel/plugins/stack-control/bin/stackctl` — the
+source bin → source renderer → `DEFAULT_PROMPT_TEMPLATE_PATH` = source `templates/`; (c)
+`.specify/extensions/` carries **no** `spec-governance` install and **no** prompt-template copy
+to shadow the source. So editing the source template changes the next 004 run. (Residual note:
+if the loop were ever resumed via an auto-firing *installed* `.specify` hook rather than the
+manual source-bin invocation, the install-drift class could reappear — but that path is not
+installed and not how we drive the loop.)
+
+### The exact edit (one location; parser untouched)
+
+Replace **exactly the severity-criteria sentence at `audit-barrage-prompt.md:56`** with the
+rubric block below. The `Severity: <blocking | high | medium | low | informational>` **format
+placeholder at line 50 stays** (it is the field shape, not criteria). There is exactly **one**
+criteria location — do not add a second copy elsewhere, or the model anchors on whichever it
+reads last. The five-level **vocabulary and the lift parser are deliberately UNCHANGED** — this
+edit changes the *criteria* for assigning each level, not the levels themselves. No parser,
+gate, or severity-string change is implied; an implementer must not rename a level.
+
+### The rubric (replaces the *criteria* for the existing five-level scale)
 
 > **Rate each finding by downstream blast-radius — the consequence if a downstream consumer
 > acts on the audited surface *as written*.** The consumer may be an adopter running the code,
@@ -75,12 +108,12 @@ which is far off.
 > catch a wrong reading. Rate by what would actually happen if this shipped as-is, **not by how
 > alarming the finding feels.**
 >
-> - `blocking` — acting on it as-written breaks the feature's stated goals; OR (spec) it forces
->   an agent to a wrong implementation and nothing in the artifact signals which reading is
->   intended.
+> - `blocking` — acting on it as-written breaks the feature's stated goals; OR (spec) the **more
+>   natural reading an agent reaches first is the wrong one**, so it will likely be built wrong
+>   by default and nothing in the artifact corrects it.
 > - `high` — a correctness/safety defect a consumer will hit; OR a spec contradiction/ambiguity
->   where the plausible readings **diverge materially** in what gets built **and** the artifact
->   doesn't disambiguate — an agent would plausibly build the wrong one.
+>   where the readings are **roughly equally plausible** and the artifact doesn't disambiguate —
+>   an agent might build either, including the wrong one.
 > - `medium` — a design issue that compounds; OR a spec inconsistency a reasonable consumer
 >   would **resolve correctly** anyway (readings barely diverge, or context makes the intended
 >   one obvious).
@@ -94,32 +127,91 @@ which is far off.
 
 ### Scope boundary (deliberate)
 
-Rewrite the **rubric** + the minimal spec-aware framing it needs. **Leave** the rest of the
-template's code-ish phrasing ("the diff," "cite line numbers") as-is. A full code-vs-spec prompt
-fork is beyond Approach A; add it only if the field test shows the code-framing is hurting spec
-audits.
+Rewrite **only the severity-criteria sentence** + the minimal spec-aware framing the rubric
+itself carries. **Leave** the rest of the template's code-ish phrasing ("the diff," "cite line
+numbers") as-is. This is a deliberate deferral, not an oversight: the code-framing mismatch
+(§ Problem) is a *separate* lever, and changing it now would be two changes at once against one
+field test. If the field test shows the residual code-framing is degrading spec audits, fix it
+as a follow-up (§ Follow-ups).
 
-## Field test (no unit test)
+## Known limitation: max-severity aggregation bounds A's effect
+
+The lift assigns a cluster the **max** severity across its member models. So a per-model rubric
+*amplifies* miscalibration rather than averaging it: if every model but one rates a
+trivially-resolvable contradiction `medium` and a single model panic-rates it `high`, the
+cluster still inherits `high`. **A's calibration therefore only takes full effect when all
+models calibrate consistently** — a stronger condition than "the rubric is clearer." This bounds
+A's expected effect size, and it is *why* a split-severity observation (below) is itself the
+trigger for Approach B: a single calibrated re-rater (B) is immune to the panic-vote problem,
+whereas instruction-only A is not. This is the central reason B remains on the table.
+
+## Field test + evaluation contract (no unit test)
 
 You cannot unit-test an LLM's rating, and the project rule is "don't test the model's response
-to a prompt." The test is **observation on live runs**: the next 004 re-barrage uses the new
-rubric, and we watch whether HIGH ratings now track blast-radius. That run conveniently *is* the
-004 loop resume — one action does both. Adjust the rubric on evidence.
+to a prompt." The test is **observation across live runs** (the 004 re-barrages + future
+barrages — *not* a single N=1 run; one run is too thin, and we already predict 42/43 won't
+change). Before reading a run, the contract is:
+
+**A is working if, across runs:**
+- no genuine high-blast-radius finding (a safety hole, or a high-divergence non-disambiguated
+  contradiction) is rated **below** HIGH; AND
+- at least one finding the old rubric would have inflated lands at `medium`/`low` **with a
+  blast-radius rationale** in its body (the calibration is observably *doing* something); AND
+- the two models rate the **same** clustered finding within **one** severity level of each other
+  (consistency — see the max-aggregation limitation).
+
+**A is insufficient → escalate to Approach B if, across runs:**
+- the same finding is rated **2+ severity levels apart** across models on the same run (the
+  panic-vote / max-aggregation failure the rubric cannot fix from the prompt alone); OR
+- a genuinely-cosmetic finding keeps landing at HIGH with no blast-radius justification.
+
+**Who evaluates:** the operator/agent reads each run's findings, severities, and the
+blast-radius rationale in each body, and compares against this contract. The judgment is
+qualitative but the contract is falsifiable — it names the observable that fires the B gate.
+
+## Generality claim — honest scope of the evidence
+
+Editing the default changes calibration for **both** spec and code audits, for this project (and
+eventually adopters). But the field test exercises **only the spec path** (the 004 re-barrages).
+So: the rubric is **validated on spec audits**; its effect on **code-audit** calibration is
+**assumed neutral, pending observation** when a code-phase (`govern --mode implement`) barrage
+next runs. We still edit the default (correct home), but we do **not** claim proven-general on
+spec-only evidence — that would be the unverified-scope claim the project's own discipline flags.
+Re-confirm on the first code-phase barrage.
 
 ## What this does and does not do
 
-- **Does:** make severity *honest* — the gate blocks on real downstream consequence, and a
-  genuinely cosmetic finding a model panic-rated HIGH drops to medium/low, so a later override
-  decision becomes clear-cut when only low-blast-radius findings survive.
-- **Does NOT:** promise faster 004 convergence. Both AUDIT-42 and AUDIT-43 would still rate HIGH
-  under this rubric (42 is a safety hole; 43 was high-divergence with no disambiguation). If the
-  spec genuinely has more high-blast-radius issues, the loop *should* keep finding them.
+- **Does:** give severity a shared, consequence-based definition so the rating is consistent and
+  honest — and so a genuinely-cosmetic finding a model would panic-rate HIGH drops to its true
+  level *with a stated rationale*, making a later override decision clear-cut.
+- **Does NOT:** promise faster 004 convergence, and does NOT reduce AUDIT-42/43 (both legitimately
+  HIGH). If the spec genuinely has more high-blast-radius issues, the loop *should* keep finding
+  them. Per the max-aggregation limitation, A's effect is also bounded by the least-calibrated
+  model on each finding.
 
 ## Follow-ups (not in this increment)
 
-- If A proves inconsistent across stochastic models, escalate to a **calibration pass**
-  (Approach B): a post-barrage step, ideally multi-model, that re-rates each clustered finding's
-  severity against this rubric before the gate counts it. More thesis-aligned (mechanism, not
-  instruction) but earns its cost only if A is insufficient.
-- Promote the rubric to all phases / reconcile any code-vs-spec prompt split if the field test
-  shows the residual code-framing matters for spec audits.
+- **Approach B — a calibration pass.** If the field-test contract fires the B gate, add a
+  post-barrage step (ideally multi-model, or a single focused re-rater) that re-rates each
+  *clustered* finding's severity against this rubric before the gate counts it. B is the natural
+  home for calibration precisely because it is immune to the max-aggregation panic-vote problem;
+  it is a *mechanism* (thesis-aligned), where A is *instruction*. B earns its cost only once A's
+  insufficiency is demonstrated by the contract above.
+- **Code-vs-spec prompt framing.** If the field test shows the residual code-framing degrades
+  spec audits, split or generalize the prompt's non-rubric framing (the deferred half of
+  § Problem).
+- **Re-confirm code-audit calibration** on the first `govern --mode implement` barrage (the
+  generality claim).
+
+## Design review (this doc was governed before implementation)
+
+This design was itself put through a cross-model barrage (run
+`20260607T134646173Z-design-blast-radius-calibration`, claude + codex) before any code. Folded
+in: claude-03 (max-aggregation limitation), claude-04 (the 42/43-motivation honesty fix),
+claude-05 + codex-02 (the field-test evaluation contract), claude-06 + codex-01 (narrowed
+problem + generality scope), claude-07 (sharper blocking/high boundary), claude-08 (criteria-not-
+scale heading + parser-untouched note). Two findings were rated HIGH by the barrage; on
+verify-premise: claude-01 ("rubric appears twice") was factually wrong (criteria appear once, at
+line 56; line 50 is the format placeholder) — addressed by the exact-edit precision above;
+claude-02 (field-test-path unverified) was a valid demand — verified and recorded in § Where it
+lives.
