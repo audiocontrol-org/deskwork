@@ -63,8 +63,8 @@ The sibling document receiving archived Units (FR-006).
 | Field | Type | Notes |
 |---|---|---|
 | `path` | string | `<doc>-archive.md`; created with frontmatter if absent. |
-| `archivedUnits` | Unit[] | Appended archived Units; each delimited by the **same reserved-level structural marker** as the live document (FR-002 boundary rule), so a Unit spans from its identifier marker to the next same-level marker — unambiguous because bodies cannot contain that marker. |
-| `ledger` | ProvenanceLedger | Lives **in this file**, not the live document (clarification 2026-06-07). |
+| `archivedUnits` | Unit[] | Appended archived Units; each delimited by the **same reserved-level structural marker** as the live document (FR-002 boundary rule) — reserved-level sections for a heading-keyed grammar, or rows in a **single archived-Unit table reproducing the live document's header + separator + column schema** for a row-keyed grammar — so a Unit spans from its identifier marker to the next same-level marker, unambiguous because bodies cannot contain that marker. |
+| `ledger` | ProvenanceLedger | Lives **in this file**, not the live document (clarification 2026-06-07), in its **own distinct section** (HTML-comment block or heading) **separate from the Unit table/sections** so a scanner never confuses ledger rows with Unit rows (FR-006). |
 
 - **Rule (coherence — FR-006, SC-007)**: `ledger` entries match `archivedUnits` exactly (one ledger entry per archived Unit, keyed by identifier). The coherence check cross-references each ledger identifier against the archive file's identifier markers — this is the **only** use of the archive heading scan.
 - **Rule (uniqueness union source — FR-005)**: archived identifiers feeding the document ∪ archive uniqueness union come from the **`ledger` only** (keyed by identifier), **not** from a heading scan and **not** by parsing the archive against the live grammar. An empty ledger contributes nothing to the union; a corrupt archive is surfaced via the coherence check rather than failing the live parse.

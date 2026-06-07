@@ -103,7 +103,7 @@ plugins/stack-control/
     └── fixtures/                         # tmp fixture document trees
 
 scripts/
-└── check-no-predecessor-refs.sh          # FR-011 anti-coupling gate over the product mechanism (engine/verbs/skills/grammars; proof docs excluded)
+└── check-no-predecessor-refs.sh          # FR-011 anti-coupling gate over the product mechanism (engine/verbs/skills/** (all three: archive/unarchive/curate)/grammars; proof docs excluded)
 ```
 
 **Structure Decision**: A single shared `document-model/` library (the engine) consumed by three thin verb modules and three thin skills (archive, unarchive, curate), all inside `plugins/stack-control/` (succession rule: new capability lives in the successor, never the predecessor). The two proof documents are first-class files at the plugin root. Built-in grammars ship under `plugins/stack-control/grammars/`; adopting projects override at `.stack-control/grammars/<id>.peg` (FR-012). The anti-coupling gate (FR-011) is a standalone script a Vitest test also invokes; it scans the product mechanism (engine/verbs/skills/grammars), excluding the two proof documents as governed content.
