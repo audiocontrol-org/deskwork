@@ -34,7 +34,11 @@ Read the following and report a concise summary. **Do NOT start work until the o
 
 6. **Check open GitHub issues:** `gh issue list --state open` (add `--search <term>` if a focus area is known).
 
-7. **Report to the operator:**
+7. **Advisory clone snapshot (standing duplication baseline):**
+   - Run `bash .dw-lifecycle/scope-discovery/clone-snapshot.sh` (per-codebase — scoped to `plugins/stack-control` by default so the intentional cross-plugin vendored copies are excluded; covers `ts/tsx/sh/bash`).
+   - Surfaces duplication inherited from prior work; note any standing clone groups in the report (advisory, not a blocker). This boot snapshot is the baseline; the **session-END** snapshot is what catches the duplication written *this* session (incl. quick fixes / donkey work outside `/speckit-implement`).
+
+8. **Report to the operator:**
    - Branch + feature + **where we are in the Spec Kit chain** (artifacts present → next `/speckit-*` step).
    - Last session's key accomplishments / failures / open decisions.
    - Proposed goal for this session.
