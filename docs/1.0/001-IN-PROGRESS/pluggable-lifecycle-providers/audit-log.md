@@ -563,7 +563,7 @@ That weakens FR-013 because plan coverage becomes optional by accident. If `GOVE
 ### AUDIT-20260607-16 — `after_specify` is a valid checkpoint in Key Entities but is wired by no FR — its artifact set is undefined
 
 Finding-ID: AUDIT-20260607-16 (claude-01 + codex-02; cross-model)
-Status:     open
+Status:     fixed-8da8219c (after_specify is out of scope: only after_clarify + after_plan are wired checkpoints with defined artifact sets — FR-011 + Checkpoint entity narrowed.)
 Severity:   medium
 Surface:    spec.md FR-011 + FR-013 vs. Key Entities "Checkpoint (hook point)"
 
@@ -574,7 +574,7 @@ The **Checkpoint** entity states the barrage fires at "one or more of `after_spe
 ### AUDIT-20260607-17 — "Healthy family" is the load-bearing predicate for fail-loud vs. clean-run, yet it is never defined
 
 Finding-ID: AUDIT-20260607-17
-Status:     open
+Status:     fixed-8da8219c (healthy family defined: ran to completion + emitted parseable output = >=1 byte stdout and no spawn/timeout error — matches as-built isModelRunHealthy. FR-008 + Audit-capability entity.)
 Severity:   medium
 Surface:    spec.md FR-002, FR-005, FR-008, Edge Cases ("ALL available families fail at runtime (zero healthy)")
 
@@ -585,7 +585,7 @@ The entire fail-loud-vs-valid-run distinction pivots on counting *healthy* famil
 ### AUDIT-20260607-18 — "Same root cause" — the basis for the HIGH-confidence signal — has no defined matching rule
 
 Finding-ID: AUDIT-20260607-18 (claude-03 + codex-01; cross-model)
-Status:     open
+Status:     fixed-8da8219c (same-root-cause matching defined: cluster on >=12-char heading substring overlap (case-insensitive, punctuation-stripped) OR shared repo-relative path token, transitive — matches as-built extract-barrage-findings. FR-003 + Finding entity.)
 Severity:   medium
 Surface:    spec.md FR-003, SC-002, Key Entities "Finding" (confidence label)
 
@@ -596,7 +596,7 @@ Surface:    spec.md FR-003, SC-002, Key Entities "Finding" (confidence label)
 ### AUDIT-20260607-19 — The "override" referenced by FR-010/SC-007 has no defined surface, authorization, or recorded format
 
 Finding-ID: AUDIT-20260607-19
-Status:     open
+Status:     fixed-8da8219c (override surface defined: operator action with a mandatory recorded reason via GOVERN_OVERRIDE / --override, recorded in the verdict — matches as-built. FR-010.)
 Severity:   medium
 Surface:    spec.md FR-010 ("an explicit override (if used) MUST be recorded"), SC-007, FR-014 (non-converged terminal state)
 
@@ -607,7 +607,7 @@ FR-010 and SC-007 both make the override load-bearing: a spec may graduate carry
 ### AUDIT-20260607-20 — The `acknowledged` disposition can silently clear a blocking finding from the gate, bypassing the "recorded override" requirement
 
 Finding-ID: AUDIT-20260607-20
-Status:     open
+Status:     fixed-8da8219c (gate integrity: clearing an open HIGH-severity finding requires a recorded fix-<sha> OR an acknowledgment with a substantive recorded reason — same bar as an override, never silent; the finding state machine enforces the reason. FR-010.)
 Severity:   medium
 Surface:    spec.md FR-007 + Key Entities "Finding" (disposition: open / fixed / acknowledged) vs. FR-010 / SC-007 (gate counts "open" findings)
 
@@ -618,7 +618,7 @@ The gate counts **open** HIGH/MEDIUM findings (FR-010); findings carry a disposi
 ### AUDIT-20260607-21 — The per-checkpoint iteration ceiling (FR-014) names no default and no configuration surface
 
 Finding-ID: AUDIT-20260607-21
-Status:     open
+Status:     fixed-8da8219c (per-checkpoint ceiling: default 5, configurable via --ceiling / GOVERN_CEILING — matches as-built gate. FR-014.)
 Severity:   low
 Surface:    spec.md FR-014, Edge Cases ("Governance never converges")
 
@@ -629,7 +629,7 @@ FR-014 mandates a bounded loop terminating at "a configured iteration ceiling," 
 ### AUDIT-20260607-22 — SC-006 is stated as a measurable outcome but is non-deterministically verifiable
 
 Finding-ID: AUDIT-20260607-22
-Status:     open
+Status:     fixed-8da8219c (SC-006 reframed as probabilistic: a seeded contradiction is surfaced with high probability across the model battery, not a per-run determinism guarantee.)
 Severity:   low
 Surface:    spec.md SC-006 (and the spec's own framing of the barrage as "non-deterministic," AUDIT-04)
 
@@ -642,7 +642,7 @@ That's seven findings — all anchored to spec text, none re-litigating an alrea
 ### AUDIT-20260607-23 — The unattended convergence loop implies automated spec fixing without specifying the actor or contract
 
 Finding-ID: AUDIT-20260607-23
-Status:     open
+Status:     fixed-8da8219c (actor/contract: spec-governance governs (detects + gates), it does NOT auto-edit the spec; the fix step is the author/agent act; unattended means the GATE bounds the loop without an operator present, not machine spec-editing. FR-014.)
 Severity:   medium
 Surface:    specs/004-spec-governance/spec.md:95-97, specs/004-spec-governance/spec.md:107, specs/004-spec-governance/spec.md:113, specs/004-spec-governance/spec.md:145
 
