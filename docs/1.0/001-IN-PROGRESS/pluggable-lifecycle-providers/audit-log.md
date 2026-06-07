@@ -416,7 +416,7 @@ That is precisely the silent-weakening FR-005/FR-008/US3 exist to prevent: FR-00
 ### AUDIT-20260607-03 — Two-consecutive-iteration path lets a spec graduate with open MEDIUM findings, and nothing requires those to be dispositioned
 
 Finding-ID: AUDIT-20260607-03
-Status:     fixed-1a2f258c (spec states the two-consecutive branch's 0-HIGH-only asymmetry is intentional — it is the ported protocol — and that open MEDIUMs at two-consecutive convergence are carried open per FR-007, never silently dropped or auto-accepted. FR-010/SC-007.)
+Status:     fixed-37642683 (CORRECTED: the earlier fix-1a2f258c said residual MEDIUMs are "carried open" — that was NOT faithful to the dw-lifecycle protocol. The protocol SLUSHES them: once the dampener engages, residual MEDIUM/LOW are flipped to acknowledged-slush-pile-<date> (not fixed, not open) by the now-ported slush-remaining mechanism (stackctl slush-findings), so the loop terminates; HIGHs are never slushed; burn-down re-opens. Spec FR-015 + FR-007/FR-010/SC-007 + the AUDIT-03 clarification updated. Operator caught the gap: the port had the dampener but not the slush action.)
 Severity:   medium
 Surface:    FR-010 (two convergence branches) and SC-007
 
