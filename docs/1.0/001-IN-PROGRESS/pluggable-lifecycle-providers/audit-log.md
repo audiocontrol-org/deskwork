@@ -730,7 +730,7 @@ That weakens the gate’s integrity even though a reason string exists. A reason
 ### AUDIT-20260607-31 — Cross-run finding reconciliation (how a finding in run N is matched to one in run N+1) is never defined — yet "distinguish still-open from dispositioned" depends on it
 
 Finding-ID: AUDIT-20260607-31
-Status:     open
+Status:     fixed-cb29ab7f (fresh-context sub-agent dispatch; cross-run finding reconciliation defined in FR-007 — reuses the FR-003 clustering predicate per-checkpoint, inherit-on-match, non-resurfacing-open stays open)
 Severity:   high
 Surface:    spec.md FR-004, FR-007, FR-010 ("counting open-finding severity"), SC-004; Key Entities "Finding"
 
@@ -741,7 +741,7 @@ Without a defined reconciliation rule, the central contracts are unimplementable
 ### AUDIT-20260607-32 — "Dampener" is load-bearing across FR-010 and FR-015 but its engage/disengage condition is never defined
 
 Finding-ID: AUDIT-20260607-32
-Status:     open
+Status:     fixed-cb29ab7f (fresh-context sub-agent dispatch; "dampener engaged" defined in FR-010 — most-recent-2 runs each 0 open HIGH/BLOCKING; HIGH breaks the window)
 Severity:   medium
 Surface:    spec.md FR-010 ("When the dampener is engaged …", "a HIGH resets the dampener"), FR-015 ("When the dampener is engaged (FR-010)", "MUST refuse while the dampener is not engaged"), Key Entities "Audit protocol"
 
@@ -752,7 +752,7 @@ This is the same defect-shape the round-2 pass closed for "healthy family" (AUDI
 ### AUDIT-20260607-33 — The boundary between an "inter-iteration edit" (does not reset the count) and a "fresh governance attempt" (resets the ceiling) has no mechanical marker
 
 Finding-ID: AUDIT-20260607-33
-Status:     open
+Status:     fixed-cb29ab7f (fresh-context sub-agent dispatch; fresh-attempt boundary named in FR-014 — explicit recorded GOVERN_NEW_ATTEMPT/--new-attempt resets both ceiling + 0-HIGH window; plain re-run is non-resetting)
 Severity:   medium
 Surface:    spec.md FR-010 ("an inter-iteration edit does NOT reset the count"), FR-014 forward-path (b) ("starts a **fresh governance attempt**, which resets the per-checkpoint ceiling … the ceiling is per-graduation-attempt, not lifetime")
 
@@ -763,7 +763,7 @@ This is exploitable/ambiguous in the unattended flow the feature targets: if "fr
 ### AUDIT-20260607-34 — Whether after_clarify dispositions (slushed/acknowledged) are honored when after_plan re-audits the spec is unspecified
 
 Finding-ID: AUDIT-20260607-34
-Status:     open
+Status:     fixed-cb29ab7f (fresh-context sub-agent dispatch; FR-011 — after_clarify dispositions inherited forward to after_plan for matched spec-level findings; open-set counting stays per-checkpoint)
 Severity:   medium
 Surface:    spec.md FR-011 ("passing the after_clarify gate is durable and MUST NOT be re-opened by findings surfaced at after_plan"), FR-013 (after_plan artifact set = "spec + plan"), FR-007 (single durable store, "survives across spec revisions")
 
@@ -774,7 +774,7 @@ The two readings produce materially different behavior: under "checkpoint-scoped
 ### AUDIT-20260607-35 — For single-file specs, the heading-substring branch is asserted as "the reliable agreement signal" without addressing its under-clustering (false-negative) failure mode
 
 Finding-ID: AUDIT-20260607-35
-Status:     open
+Status:     fixed-cb29ab7f (fresh-context sub-agent dispatch; FR-003 — heading-substring under-clustering acknowledged; single-model HIGH must not be deprioritized)
 Severity:   low
 Surface:    spec.md FR-003 ("For single-file specs, therefore, the **heading-substring** branch is the reliable agreement signal …")
 
@@ -785,7 +785,7 @@ The spec asserts heading-substring is "reliable" without basis and offers refine
 ### AUDIT-20260607-36 — SC-006 still overclaims deterministic protection against undetected contradictions
 
 Finding-ID: AUDIT-20260607-36
-Status:     open
+Status:     fixed-cb29ab7f (fresh-context sub-agent dispatch; SC-006 scoped to detected contradictions — deterministic gate-on-detected; detection demoted to non-guaranteed cross-model evidence)
 Severity:   medium
 Surface:    specs/004-spec-governance/spec.md:151
 
@@ -796,7 +796,7 @@ This matters because SC-006 is now framed as a measurable guarantee, but its gua
 ### AUDIT-20260607-37 — Assumptions still describe an unattended “fix-and-re-barrage” loop
 
 Finding-ID: AUDIT-20260607-37
-Status:     open
+Status:     fixed-cb29ab7f (fresh-context sub-agent dispatch; Assumptions — unattended applies to the gate, not the fix; gate never auto-edits)
 Severity:   medium
 Surface:    specs/004-spec-governance/spec.md:159
 
@@ -807,7 +807,7 @@ This is not just wording polish because Assumptions are part of the design contr
 ### AUDIT-20260607-38 — Deferred refinements are embedded in normative requirements
 
 Finding-ID: AUDIT-20260607-38
-Status:     open
+Status:     fixed-cb29ab7f (fresh-context sub-agent dispatch; FR-003 + FR-008 — "(not yet implemented)" deferral escape-hatches removed; present-tense contract only)
 Severity:   low
 Surface:    specs/004-spec-governance/spec.md:119, specs/004-spec-governance/spec.md:124
 
