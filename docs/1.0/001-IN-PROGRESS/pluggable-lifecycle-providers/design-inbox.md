@@ -69,3 +69,43 @@ Entry format (keep it minimal — appending must stay a one-move act):
 - **Idea:** A `stack-control` DEFINE-phase **spec-authoring skill** consolidating how to write a spec, encoding (at least): (1) **DRY for prose** — state each requirement/rule/mechanic exactly ONCE (the canonical FR); every other section (other FRs, Success Criteria, Key Entities, clarifications) *references* it, never re-derives it. State-machine / protocol mechanics are the highest-risk duplication surface. (2) **Promises before mechanism** — lead with the plain-language guarantees the feature must keep; describe mechanism second, and prefer pointing at the code/`contracts/` as the authority on precise mechanics rather than restating a state machine in FRs. (3) **Verify-premise against code** when the spec describes already-built behavior (don't spec fiction the code doesn't have — the AUDIT-31→39→40 cross-run-reconciliation cascade). (4) **Capture-mode vs scope-mode** (composes the existing `.claude/rules/agent-discipline.md` discipline — specs capture everything; scoping is a later explicit pass). (5) structural conventions: FRs own their requirement; SCs state guarantees + reference FRs; Key Entities reference, don't re-derive. **Mechanical-interlock candidate (thesis):** the same DRY/single-source rules could become **audit criteria in the spec-governance barrage prompt** ("flag any rule defined in more than one location") — so the authoring skill *advises* and the governance barrage *enforces*, closing the loop. Relationship to Spec Kit: composes with / layers on top of `/speckit-specify` (a "write it well" layer over the scaffold), not a replacement.
 - **Provisional home:** stack-control DEFINE-phase capability — sibling of `design/spec-governance` and `design/insight-capture`. Candidate roadmap feature (`design/spec-authoring`?). The barrage-enforcement sub-idea belongs with `design/spec-governance` / the audit-barrage prompt.
 - **Status:** **captured** (awaiting triage — promote to a `stack-control-roadmap.md` row or fold into `design/spec-governance` enforcement, operator's call).
+
+### Archive skill to keep live documents lean (port dw-lifecycle's workplan-archive capability)
+
+- **Surfaced:** 2026-06-07, idea-capture pass.
+- **Context:** dw-lifecycle already has `/dw-lifecycle:archive-phases` / `:unarchive-phases` — they move completed phase sections from a feature's `workplan.md` into `workplan-archive.md` and maintain a ledger comment so the auto-positioner doesn't collide with archived fix-task IDs. The principle generalizes: living documents (specs, roadmaps, workplans) accrete completed/settled material and get heavy; a lean live doc + an append-only archive keeps the live surface crisp. Aligns with the thesis (DEFINE-phase tooling; durable written artifacts that survive context boundaries without bloating the working surface).
+- **Idea:** A `stack-control` archive skill that keeps live documents lean by relocating completed/settled sections into a companion archive while preserving an auditable pointer back — generalizing dw-lifecycle's workplan-archive mechanism beyond workplans (to specs, roadmaps, and any living design doc). Candidate to absorb-then-retire the dw-lifecycle `archive-phases`/`unarchive-phases` pair under the succession plan.
+- **Provisional home:** stack-control hygiene / document-lifecycle capability. Candidate roadmap feature. Relates to the roadmap-protocol cluster below (a live roadmap needs an archive for shipped rows).
+- **Status:** **captured** (awaiting triage).
+
+### Plugin-local roadmap with a live queue of in-flight and planned features
+
+- **Surfaced:** 2026-06-07, idea-capture pass.
+- **Context:** The program roadmap today is `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md` — a doc buried in the feature tree, not a first-class plugin surface. A plugin-local roadmap would make the in-flight/planned queue a native, discoverable artifact of the plugin itself.
+- **Idea:** A plugin-local roadmap surface carrying a **live queue** of in-flight and planned features (status, sequence, codename per the `<phase>/<slug>` convention). The roadmap as a maintained queue, not a prose doc that drifts.
+- **Provisional home:** stack-control DEFINE/program-management capability. Candidate roadmap feature. Tightly coupled with the roadmap-protocol + roadmap-skill entries below and the idea-bucket↔roadmap relationship entry.
+- **Status:** **captured** (awaiting triage).
+
+### Roadmap protocol — keep the roadmap live, crisp, and up-to-date
+
+- **Surfaced:** 2026-06-07, idea-capture pass.
+- **Context:** A roadmap only earns trust if it stays current; an out-of-date roadmap is worse than none (false precision). Needs a defined discipline for when/how rows are added, advanced, archived, and reconciled against actual feature state — the same "mechanism that actually fires" concern as the clone-coverage and install-drift entries above.
+- **Idea:** A **roadmap protocol** defining how the roadmap is kept live, crisp, and up-to-date: row lifecycle (planned → in-flight → shipped/archived), what triggers an update (feature setup/ship/complete), and reconciliation against on-disk feature state. Pairs with an archive mechanism (shipped rows leave the live queue) and a skill that canonizes the protocol (below).
+- **Provisional home:** stack-control program-management capability. Candidate roadmap feature. Cluster: roadmap-queue + roadmap-skill + idea-bucket↔roadmap relationship.
+- **Status:** **captured** (awaiting triage).
+
+### Relationship between the idea bucket (design-inbox) and the roadmap
+
+- **Surfaced:** 2026-06-07, idea-capture pass.
+- **Context:** This very file's header already asserts a distinction — the inbox is the *pre-triage parking lot*; the roadmap is the *curated, scoped, sequenced* plan; triage promotes inbox → roadmap. But the relationship is currently only prose convention (and the inbox itself sunsets at `design/insight-capture`, when capture becomes a native `stackctl` surface). The interaction between the future native capture surface and the future plugin-local roadmap queue is undefined.
+- **Idea:** Figure out and codify the relationship between the idea bucket (capture surface; today the design-inbox, future the native `design/insight-capture` mechanism) and the roadmap (curated queue): the promotion path, what state each owns, how a captured idea graduates into a roadmap row, and whether they're two surfaces or two views of one store. Decision input for both `design/insight-capture` and the roadmap-queue feature.
+- **Provisional home:** spans `design/insight-capture` + the roadmap-queue/protocol cluster. Candidate roadmap feature or a design decision that constrains both.
+- **Status:** **captured** (awaiting triage).
+
+### Roadmap skill to canonize the roadmap protocol
+
+- **Surfaced:** 2026-06-07, idea-capture pass.
+- **Context:** Per the thesis, a protocol that lives only as prose is "a rule the agent doesn't follow"; disciplines stick when they're context-scoped skills / CLI verbs (cf. `.claude/rules/enforcement-lives-in-skills.md`). The roadmap protocol above needs a mechanical home to fire reliably.
+- **Idea:** A `stack-control` **roadmap skill** that canonizes the roadmap protocol — the surface through which rows are added/advanced/archived and the roadmap is reconciled, so the protocol is enforced by invocation rather than relying on memory. Composes with the archive skill (shipped rows → archive) and the plugin-local roadmap queue.
+- **Provisional home:** stack-control program-management capability. Candidate roadmap feature. Cluster: roadmap-queue + roadmap-protocol + archive-skill.
+- **Status:** **captured** (awaiting triage).
