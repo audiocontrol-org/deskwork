@@ -6,7 +6,8 @@
     "**/dist/**",
     "**/node_modules/**",
     "**/.runtime-cache/**",
-    "**/coverage/**"
+    "**/coverage/**",
+    ".specify/**"
   ],
   "minTokens": 50,
   "gitignore": true,
