@@ -724,3 +724,93 @@ Surface:    specs/004-spec-governance/spec.md:126, specs/004-spec-governance/spe
 FR-010 allows overrides via `GOVERN_OVERRIDE` or `--override "<reason>"`, and FR-014 applies that escape to the bounded convergence loop. The spec does not scope the environment-variable override to a specific spec, checkpoint, run, or invocation. In an unattended flow, a leftover `GOVERN_OVERRIDE` in the shell environment could satisfy “an override is recorded” for later checkpoints or specs without a fresh operator decision.
 
 That weakens the gate’s integrity even though a reason string exists. A reasonable fix is to make env-based overrides one-shot and scoped in the recorded verdict, for example requiring spec/checkpoint/run identity or preferring an explicit CLI flag for actual gate bypasses.
+
+## 2026-06-07 — audit-barrage lift (20260607T042455611Z-pluggable-lifecycle-providers-after_clarify)
+
+### AUDIT-20260607-31 — Cross-run finding reconciliation (how a finding in run N is matched to one in run N+1) is never defined — yet "distinguish still-open from dispositioned" depends on it
+
+Finding-ID: AUDIT-20260607-31
+Status:     open
+Severity:   high
+Surface:    spec.md FR-004, FR-007, FR-010 ("counting open-finding severity"), SC-004; Key Entities "Finding"
+
+FR-007/SC-004 require that "a re-run can distinguish still-open findings from already-dispositioned (incl. slushed) ones," and FR-010's entire gate is "counting **open** findings." Both presuppose a mechanism that takes a finding produced by barrage run N+1 and decides whether it is *the same finding* as one already recorded (and therefore inherits its `open`/`fixed`/`acknowledged`/`slush` disposition) or is genuinely new. That cross-run identity rule is never specified. The clustering rule in FR-003 (≥12-char heading substring OR shared path token, transitive) is explicitly scoped to **intra-run cross-model agreement** ("a cluster spanning ≥2 families") — it is a within-one-barrage operation, not a run-to-run matcher.
+
+Without a defined reconciliation rule, the central contracts are unimplementable as written: an implementer cannot compute "open findings" (FR-010), cannot preserve dispositions across revisions (SC-004), and cannot tell whether the "two consecutive 0-HIGH" runs are quiet because the spec improved or because the (non-deterministic) barrage simply phrased the same HIGH differently and the system failed to match it. Two reasonable implementers will build incompatible matchers and get different gate verdicts on the same spec. A fix: state the cross-run matching rule explicitly (e.g. reuse the FR-003 clustering predicate as the cross-run identity predicate, or assign a stable finding key from {checkpoint, cited locator, normalized heading}), and define what happens to a recorded `open` finding that does **not** re-surface in a later run (auto-resolved? still open?).
+
+### AUDIT-20260607-32 — "Dampener" is load-bearing across FR-010 and FR-015 but its engage/disengage condition is never defined
+
+Finding-ID: AUDIT-20260607-32
+Status:     open
+Severity:   medium
+Surface:    spec.md FR-010 ("When the dampener is engaged …", "a HIGH resets the dampener"), FR-015 ("When the dampener is engaged (FR-010)", "MUST refuse while the dampener is not engaged"), Key Entities "Audit protocol"
+
+The word "dampener" carries the entire slush/termination contract: slushing MUST refuse while the dampener is *not* engaged (FR-015), residual MEDIUM/LOW are slushed *when* it is engaged (FR-010/FR-015), and "a HIGH resets the dampener" (FR-010). But the spec never defines the predicate that *engages* the dampener. The only hint is a parenthetical operator-quote in FR-015 ("once two consecutive audits had 0 HIGH"), which is illustrative prose, not a definition, and it isn't tied back to FR-010's "two consecutive iterations each produce 0 open HIGH" with the same per-checkpoint scoping language.
+
+This is the same defect-shape the round-2 pass closed for "healthy family" (AUDIT-17) and "same root cause" (AUDIT-18): a term ported from the dw-lifecycle protocol whose definition was not ported alongside it. Because slushing is what lets the loop terminate (FR-015), an implementer who guesses the engage condition wrong either bins MEDIUMs too early (real defects buried) or never terminates. Define "dampener engaged" explicitly — presumably: the most recent N (=2) recorded runs for this checkpoint each had 0 open HIGH/BLOCKING — and state exactly what "a HIGH resets the dampener" means in terms of the recorded-run window.
+
+### AUDIT-20260607-33 — The boundary between an "inter-iteration edit" (does not reset the count) and a "fresh governance attempt" (resets the ceiling) has no mechanical marker
+
+Finding-ID: AUDIT-20260607-33
+Status:     open
+Severity:   medium
+Surface:    spec.md FR-010 ("an inter-iteration edit does NOT reset the count"), FR-014 forward-path (b) ("starts a **fresh governance attempt**, which resets the per-checkpoint ceiling … the ceiling is per-graduation-attempt, not lifetime")
+
+FR-010 says editing the spec between barrages does **not** reset the consecutive-run count ("regardless of whether the spec text changed between them"). FR-014 says the operator can fix findings and start a "fresh governance attempt" that **resets** the per-checkpoint ceiling. Both scenarios are, mechanically, "the operator edited the spec and re-ran the barrage at the same checkpoint." The spec gives no observable marker that distinguishes the two, yet the distinction controls whether the ceiling (and, by implication, possibly the consecutive count) resets.
+
+This is exploitable/ambiguous in the unattended flow the feature targets: if "fresh attempt" is just "the operator re-ran after the ceiling was hit," then the ceiling is trivially defeatable (every re-run is a fresh attempt → unbounded, contradicting FR-014's "never loop forever"); if it requires an explicit operator gesture, that gesture is unnamed (no flag/verb/state transition is specified, unlike `--ceiling`/`--override` which were named in round 2). Additionally, FR-014 does not say whether a fresh attempt also resets the FR-010 consecutive-0-HIGH window — if stale 0-HIGH runs from the prior (non-converged) attempt carry over, a fresh attempt could graduate immediately off pre-fix runs. Name the explicit boundary (a recorded "new attempt" transition) and state its effect on both the ceiling counter and the consecutive-quiet window.
+
+### AUDIT-20260607-34 — Whether after_clarify dispositions (slushed/acknowledged) are honored when after_plan re-audits the spec is unspecified
+
+Finding-ID: AUDIT-20260607-34
+Status:     open
+Severity:   medium
+Surface:    spec.md FR-011 ("passing the after_clarify gate is durable and MUST NOT be re-opened by findings surfaced at after_plan"), FR-013 (after_plan artifact set = "spec + plan"), FR-007 (single durable store, "survives across spec revisions")
+
+FR-013 makes the after_plan checkpoint audit the **spec plus the plan** (additive), so the after_plan barrage re-examines the same spec.md that after_clarify already governed. FR-011 protects the after_clarify *gate verdict* from being re-opened, but says nothing about the *findings*: when after_plan re-surfaces a spec-level issue that was slushed (`acknowledged-slush-pile-<date>`) or acknowledged at after_clarify, is that disposition honored (the finding stays disposed) or does it re-appear as `open` under after_plan's independent loop? FR-007 describes "across spec revisions" persistence but not across **checkpoints**, and FR-011/FR-014's "independent per-checkpoint loops" language pulls the other way (separate loops imply separate open-sets).
+
+The two readings produce materially different behavior: under "checkpoint-scoped dispositions," every spec-level MEDIUM slushed at after_clarify re-blocks (or re-noises) the after_plan loop, defeating the durability intent; under "global dispositions," a finding the operator slushed before the plan existed silently stays slushed even though the plan may have changed its relevance. State whether dispositions are checkpoint-scoped or store-global, and if global, how a finding's checkpoint provenance is tracked so the gate counts the right open-set per checkpoint.
+
+### AUDIT-20260607-35 — For single-file specs, the heading-substring branch is asserted as "the reliable agreement signal" without addressing its under-clustering (false-negative) failure mode
+
+Finding-ID: AUDIT-20260607-35
+Status:     open
+Severity:   low
+Surface:    spec.md FR-003 ("For single-file specs, therefore, the **heading-substring** branch is the reliable agreement signal …")
+
+Round 3 (5cfdb6a7) correctly documented that the path-token branch **over-clusters** on single-file specs (every finding cites the same `spec.md`) and concluded that heading-substring is therefore the reliable signal for the primary use case. But the heading-substring branch has the complementary failure mode that goes unmentioned: model-authored headings are free text, so two families flagging the same contradiction with differently-worded headings (no ≥12-char case-insensitive shared substring) will **not** cluster — a false negative that silently downgrades a real cross-model agreement to two `single-model` findings. Since the single-file case is "the usual spec-governance case," this means the headline US2/SC-002 signal (cross-model agreement = HIGH confidence) is unreliable in *both* directions for the main use case: path-token over-clusters, heading-substring under-clusters.
+
+The spec asserts heading-substring is "reliable" without basis and offers refinements (line range, FR-id, section anchor) only for the path-token side. A more honest framing would acknowledge the under-clustering risk and note that on single-file specs cross-model agreement is best-effort, so a `single-model` HIGH must never be treated as lower-priority on the assumption that "real issues would have clustered." (Note this is a refinement of the disposition recorded for the round-3 single-file edit, surfacing the unaddressed direction — not a re-litigation of the over-clustering fix itself.)
+
+### AUDIT-20260607-36 — SC-006 still overclaims deterministic protection against undetected contradictions
+
+Finding-ID: AUDIT-20260607-36
+Status:     open
+Severity:   medium
+Surface:    specs/004-spec-governance/spec.md:151
+
+SC-006 says the deterministic guarantee is that “a seeded-contradiction spec cannot silently graduate,” while also admitting the underlying detection is probabilistic. The gate can only block on recorded/open findings; if the stochastic barrage does not surface the seeded contradiction in the recorded run(s), the gate has no contradiction finding to require dispositioning, and the spec can graduate as a clean run under FR-010/FR-009.
+
+This matters because SC-006 is now framed as a measurable guarantee, but its guarantee still depends on an unguaranteed detection event. A reasonable fix is to scope the success criterion to detected seeded contradictions: e.g. “once the contradiction is surfaced as an open HIGH/BLOCKING finding, the gate does not graduate until it is fixed or overridden,” and keep separate any probabilistic detection claim as non-deterministic evidence rather than the gate guarantee.
+
+### AUDIT-20260607-37 — Assumptions still describe an unattended “fix-and-re-barrage” loop
+
+Finding-ID: AUDIT-20260607-37
+Status:     open
+Severity:   medium
+Surface:    specs/004-spec-governance/spec.md:159
+
+FR-014 and the Edge Cases section now correctly say spec-governance does not auto-edit the spec, and that remediation is the authoring agent/operator’s act. But the Assumptions section still says “The loop itself can run unattended (fix-and-re-barrage),” which reintroduces the same automation-boundary ambiguity: it reads as though the loop may both fix and re-run without the author/operator actor.
+
+This is not just wording polish because Assumptions are part of the design contract implementers will reconcile with FR-014. Replace this with the clarified boundary: the gate can run and record bounded non-convergence unattended; fixes are authored by the agent/operator under the normal spec-editing contract before a fresh run.
+
+### AUDIT-20260607-38 — Deferred refinements are embedded in normative requirements
+
+Finding-ID: AUDIT-20260607-38
+Status:     open
+Severity:   low
+Surface:    specs/004-spec-governance/spec.md:119, specs/004-spec-governance/spec.md:124
+
+The spec includes explicit deferred-work language inside functional requirements: “Available refinement (not yet implemented)” in FR-003 and “known available refinement” in FR-008. The audit prompt’s hard constraints reject deferral phrasing because it tends to become an untracked implementation gap, and here both deferred items are tied to contract-critical behavior: over-clustering agreement signals and counting non-parseable output as healthy coverage.
+
+A reasonable fix is to either make these current requirements or move them into a tracked out-of-scope/non-goal section with a clear present-tense contract. The FRs themselves should state only what the implementation must do now, without embedding “not yet implemented” escape hatches in the normative path.
