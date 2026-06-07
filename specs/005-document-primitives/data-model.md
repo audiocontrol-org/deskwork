@@ -52,7 +52,7 @@ A single parsed item — the thing that is ordered, archived, and referenced (FR
 
 - **Unique** across the document ∪ its archive (so unarchive cannot collide — FR-007). Archived identifiers for the union come from the **`ProvenanceLedger` only** (keyed by identifier), never from a heading scan of the `ArchiveFile` (a Unit body may contain headings, so a scan can't tell a Unit-identifier marker from a body heading without a forbidden archive parse → false collisions). An empty ledger / absent archive means the union is just the live document; a corrupt archive is surfaced via the coherence check, not a live parse (FR-005, FR-006).
 - **Human-readable**: a single visible name, no parallel opaque token.
-- **Non-ordinal**: rejected if it matches the denylist (bare-integer segment; `F<n>`; `phase-<n>`; `step-<n>`; `#<n>`; leading `<n>` numbering). Refinable.
+- **Non-ordinal**: rejected if it **is a positional/sequence index** (not merely if it begins with a digit). Closed v1 denylist: `F<n>`; `phase-<n>`; `step-<n>`; `#<n>`; a bare integer that is the entire identifier (e.g. `2`); a leading enumeration marker (`1.`, `3)`). A prose title that starts with a number (e.g. `3 ways to industrialize execution`) is allowed. Refinable (FR-005).
 - **Per-grammar shape**: the engine enforces the *properties*; `grammar.identifierProduction` declares the concrete shape (strict slug like `<phase>/<slug>`, or a title). Slug recommended, not mandated (clarification 2026-06-07).
 - Any violation → fail loud, zero writes (FR-010).
 
