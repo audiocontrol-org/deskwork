@@ -42,24 +42,45 @@ When the gate verdict is `blocked` (open HIGH/MEDIUM findings), **do NOT author
 the fixes in this orchestrating context.** Fix quality degrades under
 accumulated context — each round's expansive edits become the next round's
 findings (observed directly in the 004 self-hosted dogfood: a fresh HIGH landed
-on the *new fix text* every round). The fix step runs in a fresh, minimal
-context instead. For each open finding:
+on the *new fix text* every round). The fix step runs in a fresh context
+instead. For each open finding:
 
-1. Dispatch a **fresh sub-agent** (Agent tool) with a **focused context**: give
-   it *only* the finding text + the cited spec span (the relevant `spec.md`
-   section it references), and instruct it to make the **minimal** edit that
-   resolves exactly that finding — write to disk with the Edit tool, change
-   nothing else, add no caveats, hedges, or elaboration. (A sub-agent holding
-   one finding and one paragraph structurally cannot over-elaborate; that is the
-   point.)
-2. Dispatch **one finding at a time** (sequential) so concurrent edits never
+1. **Dispatch a fresh sub-agent (Agent tool) with the WHOLE artifact in scope.**
+   Give it the finding text AND access to the entire spec (tell it to read
+   `spec.md` in full), and scope it to **resolve the finding completely and leave
+   the spec internally consistent** — it MUST update *every* location the fix
+   ripples to (the cited FR plus any SC, acceptance scenario, edge case, Key
+   Entity, or clarification that would otherwise contradict the change), not just
+   the one cited span. Scoping a sub-agent to a single span is what produced
+   AUDIT-41 in the 004 dogfood: FR-007 was corrected but SC-004 / a scenario / an
+   edge case were left asserting the old behavior — an author-introduced
+   contradiction the next barrage caught. Keep each *individual* edit minimal (no
+   verbosity bloat, no caveats/hedges, no "not yet implemented" / deferral
+   phrasing) — **minimal-per-edit and consistent-across-the-whole-spec are not in
+   tension**: cover every affected surface, but change each one no more than the
+   fix requires.
+2. **Verify the finding's premise against the implementation before specifying
+   any mechanism.** If a finding demands that some mechanism be specified, first
+   confirm that mechanism exists in the code (`plugins/stack-control/src/…`). Do
+   NOT write machinery into the spec that the code does not implement — that
+   fiction becomes the next round's findings (the 004 dogfood's
+   cross-run-reconciliation cascade, AUDIT-31 → 39 → 40, all attacked a matcher
+   the code never had). When a finding says "X is unspecified" but X does not
+   exist and is not needed, the correct fix is to **align the spec to the
+   as-built behavior** (and record the finding as a false-premise acknowledgment),
+   not to invent X.
+3. **Dispatch one finding at a time** (sequential) so concurrent edits never
    collide on the single `spec.md`. Each sub-agent gets its own clean context
    regardless of ordering; serialization is purely for write-safety.
-3. After all open findings are addressed, **re-run `govern-spec.sh`** (re-barrage
+4. After all open findings are addressed, **re-run `govern-spec.sh`** (re-barrage
    → re-gate) and repeat until the gate reports `converged`, the per-checkpoint
    ceiling is hit (`non-converged`), or a substantive `GOVERN_OVERRIDE` is
    recorded. Residual MEDIUM/LOW are slushed automatically once the dampener
-   engages.
+   engages. When several findings stem from one root change, run a **whole-spec
+   consistency sweep** first (one sub-agent, full spec in context, tasked to find
+   and fix *every* surface that contradicts the corrected model) before
+   re-barraging — rather than letting the barrage surface the leftovers one at a
+   time.
 
 The orchestrator's only jobs in the loop are **dispatch → apply → re-barrage** —
 never hand-authoring spec prose.
