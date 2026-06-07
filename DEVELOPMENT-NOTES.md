@@ -5057,3 +5057,58 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - A test that passed at commit time (91/91) failing at the next session-start is a reminder that **commit-time green ≠ environment-independent green** — the machine state (post-cleanup) is part of the test contract for git-fixture tests.
 
 **Next step:** Field-test the blast-radius rubric for real — **run `stackctl govern --mode spec` on 004** (first live exercise of the consolidated path + the rubric's first field-test + the next 004 convergence iteration), read findings against the design doc's evaluation contract, drive toward 2-consecutive-0-HIGH → slush auto-fires → graduate, or record a `GOVERN_OVERRIDE`. **Before/alongside:** triage the `govern-payload-implement` 90/91 failure (confirm environmental vs real). Then reconcile the stale `feature/pluggable-lifecycle-providers` branch strings → `feature/stack-control`. `impl/execution-engine` (`specs/002`) stays parked at `/speckit-plan`. Bootstrap with `/session-start`.
+
+## 2026-06-07 (cont. 2): 004 convergence loop — blast-radius rubric field-tested (5/5 genuine, 0 phantom); 4 HIGHs fixed; DRY-collapse was the real convergence fix
+
+### Feature: pluggable-lifecycle-providers
+### Worktree: stack-control (branch `feature/stack-control` — renamed from `feature/pluggable-lifecycle-providers` this session)
+
+> **Session continuity:** opened by backfilling the prior (disk-cleanup-lost) session's journal, then resumed the 004 convergence loop per that entry's "next step." The operator renamed the worktree + branch to `stack-control`/`feature/stack-control` mid-session to match the work.
+
+**Goal:** Backfill the lost session's journal, then resume the `design/spec-governance` (004) convergence loop — run `stackctl govern --mode spec`, field-test the new blast-radius severity rubric, and drive toward convergence.
+
+**Accomplished:**
+- **Backfilled the lost session's journal** (`c2f70f76`) — reconstructed from commits `84c56988..c1cf8de1` (AUDIT-42 fork decided, AUDIT-43 fixed, blast-radius rubric design-governed). Also: cleared a stale `~/.gnupg/public-keys.d/pubring.db.lock` (orphaned by the disk cleanup, pid 5348 dead) that was blocking all signed commits.
+- **Verified the blast-radius rubric is LIVE** — rendered the prompt through the real `stackctl audit-barrage-render` path; the rubric text is present, no project override shadows it, template read from disk at runtime (not bundled). Future barrages use the updated protocol.
+- **Field-tested the rubric across 5 live barrages (iters 9–13): 5/5 genuine cross-model HIGHs, ZERO phantom.** The exact failure mode the rubric targeted — a phantom precision-nit HIGH every round — did NOT recur once. Every HIGH was a real structural defect; MEDs consistently stayed MEDs (not inflated). The design doc's field-test contract passed decisively; no Approach-B trigger fired.
+- **Fixed 4 genuine HIGHs (all fresh-context sub-agent dispatch, verify-premise-against-code, whole-artifact scope):**
+  - **AUDIT-44** (`d4cad0e9`): burn-down reframed as an out-of-loop manual remediation pass (it was a structural no-op inside the auto-slush loop). Spec-only. *Operator fork decision: out-of-loop.*
+  - **AUDIT-45** (`5f649ceb`): gate now blocks on the cross-run union of un-dispositioned HIGH/BLOCKING across all the checkpoint's runs (was most-recent-run-only, letting a stochastically-missed prior HIGH slip through). Code + spec + RED test. *Operator fork decision: strengthen the gate.*
+  - **AUDIT-46** (`381d1267`): "the dampener is engaged" disambiguated to (branch a OR branch b) uniformly — it was overloaded with a two-consecutive-only definition that made branch (a) single-run graduation unreachable. Self-inflicted by the AUDIT-45 fix; **my first fix instruction was BACKWARDS and the sub-agent's verify-premise caught it** (the slush trigger is (a OR b), not two-consecutive-only). Spec-only.
+  - **AUDIT-47** (`65e2936d`): the root-cause fix. Slush now bins ALL remaining MED/LOW at convergence (was most-recent-run-only per Issue #380), so "no open MEDIUM at graduation" is literally true; SC-007 restored to a clean absolute. Code + RED test. **AND DRY-collapsed the convergence rule to a single canonical FR-010** — every other site now references it instead of re-deriving it.
+- **Captured the spec-authoring-skill idea** (`07855c8c`) in the design-inbox — a DEFINE-phase "how to write a spec" skill (DRY-for-prose, promises-before-mechanism, verify-premise, barrage-enforced single-source). Operator: *"we clearly need a spec authoring skill."*
+- **Confirmed the DRY collapse worked:** iteration 13 produced **zero** convergence-rule drift (the 44/46/47 generator is gone); AUDIT-48 is a genuinely *different* mechanism.
+
+**Didn't Work / unresolved:**
+- **004 did NOT converge — paused at iteration 13 with AUDIT-48 OPEN** (1 genuine cross-model HIGH): the override is described as "scoped" but the `GOVERN_OVERRIDE` env channel is unenforced — a left-set env var silently graduates every spec in unattended mode (verify-premise confirmed the gate consumes `opts.override` with no feature+checkpoint scope check, `spec-governance-gate.ts:211`). **Awaiting operator decision: (B) enforce override scope [code+spec+test] vs (A) document the hazard [spec-only].** I lean B.
+- **The loop ran 5 fixes without reaching a 0-HIGH run** — but for a non-obvious reason: findings 44/46/47 were all the SAME defect (the convergence rule restated in ~6 prose locations, drifting). The per-finding patching was treating instances of one root cause. The DRY collapse (AUDIT-47) was the actual fix; the earlier three were partly chasing the generator's output.
+- **0 findings live-slushed** — every live run carried a HIGH, so the dampener never engaged on a live run; the slush mechanism (now slush-all) remains unproven on a live convergence.
+- **Two spec-authoring questions still open:** (1) promote `design/spec-authoring` to a roadmap row vs fold the enforcement half into `design/spec-governance`; (2) fold the DRY/single-source criterion into the barrage prompt now vs scope to the future feature.
+
+**Course Corrections:**
+- [COMPLEXITY][PROCESS] **The big one — DRY applies to prose.** After I'd answered three forks (44/45/47) and was about to answer a fourth, the operator stopped me: *"If you've written the spec in a way that describes the same thing in different words in multiple locations, you've made a super dumb mistake. Don't repeat yourself — DRY principles apply to prose as well as code, especially highly-structured specification documents."* I had been patching individual drift instances instead of seeing that the convergence rule was duplicated 6× and collapsing it. The collapse (AUDIT-47) is what actually stopped the finding stream.
+- [PROCESS] **"What are we actually trying to get correct? Plain language."** Mid-loop the operator pulled me out of mechanism-debate to restate the feature's three plain promises (nothing serious slips through; the loop ends; it can't hang). Reframed the AUDIT-47 fork from a wiring argument to "slush any remaining at convergence."
+- [PROCESS] **My AUDIT-46 fix instruction was backwards** — I told the sub-agent to make "dampener engaged" = two-consecutive-only; the sub-agent verified against code, found the slush trigger is (a OR b), and STOPPED rather than write spec that contradicts code. The verify-premise discipline (installed after the prior session's fiction cascade) worked exactly as intended.
+- [PROCESS] **dampened decisions are the operator's** — AUDIT-44 (out-of-loop) and AUDIT-45 (strengthen gate) were presented as forks and decided by the operator, not unilaterally.
+
+**Quantitative** (re-derived from `git log c1cf8de1..1eb0d244`):
+- Commits: **11** (`c2f70f76..1eb0d244`). Files changed: **12** (+549 / −27).
+- Live multi-model barrages fired: **5** (004 iterations 9–13; claude + codex, gemini disabled per config).
+- Findings: **4 dispositioned `fixed-<sha>`** this session (AUDIT-44/45/46/47, all genuine cross-model HIGH); **AUDIT-48 OPEN** at session end (1 genuine cross-model HIGH, awaiting operator fork decision). **0 acknowledged-slush-pile this session** (no live run reached 0-HIGH, so the dampener never engaged live).
+- Vitest: **91 → 99** (+6 `gate-crossrun-open-high.test.ts` from AUDIT-45; +2 govern-orchestration + slush-findings from AUDIT-47). tsc clean. The session-start 90/91 `govern-payload-implement` "committed diff" failure was **environmental** — it passed in every later run (the gpg/disk cleanup was the likely cause).
+- Sub-agent dispatches: **5** (one per HIGH fix + the AUDIT-46 verify-premise STOP that corrected my direction).
+- Clone snapshot (session-end): **3 groups, all pre-existing** (identical to session-start) — no new duplication introduced despite the gate/slush code changes.
+- Corrections: **2** substantive [PROCESS]/[COMPLEXITY] operator redirects (DRY-prose; plain-language reframe) + 2 operator fork decisions + 1 verify-premise self-correction.
+
+**Insights:**
+- **The blast-radius rubric is validated.** 5/5 genuine, 0 phantom across a full session is strong evidence the consequence-not-alarm framing fixed the "phantom HIGH every round" pathology. The rubric did its job; the loop's non-convergence was a spec-authoring problem, not an auditor problem.
+- **The real convergence blocker was a DRY violation in spec prose.** A spec that re-derives the same state machine in six paragraphs is an infinite finding generator under an aggressive cross-model barrage — every drifted restatement is a real, correctly-flagged self-contradiction. The fix is single-source-of-truth authoring, not more patching. This is the motivating evidence for the captured spec-authoring skill (+ a barrage-enforced "rule defined in >1 place" criterion).
+- **verify-premise-against-code earned its keep twice** — caught my backwards AUDIT-46 direction; confirmed AUDIT-48's hole is real in code (not fiction). The discipline installed after the prior session's fiction cascade is paying compounding returns.
+- **Each fix can spawn the next finding** (45→46, 45→47) when the fix touches a duplicated mechanic — which is itself the DRY argument: a single-source spec would have made each fix a one-site edit with no ripple.
+
+**Next step (resume here):**
+1. **Decide AUDIT-48:** (B, recommended) enforce override scope — the gate honors an override only when it matches the current feature+checkpoint, and ignores an unscoped `GOVERN_OVERRIDE` env var (code + spec + RED test); vs (A) document the env hazard honestly (spec-only). The `--override` flag is already per-invocation/scoped; the env var is the leak.
+2. **Apply the choice** (fresh-context dispatch, verify-premise, whole-artifact), disposition AUDIT-48, **re-barrage** → toward 2-consecutive-0-HIGH → slush auto-fires (first live slush) → graduate, or recorded `GOVERN_OVERRIDE`.
+3. **Spec-authoring skill:** answer the two open questions (promote vs fold; barrage-DRY-criterion now vs later); the barrage-enforced single-source criterion would immediately help 004's remaining iterations.
+4. Reconcile stale `feature/pluggable-lifecycle-providers` branch strings → `feature/stack-control` (now also in `specs/004-*/{spec,plan}.md`).
+5. `impl/execution-engine` (`specs/002`) stays parked at `/speckit-plan` (its `plan.md` is still the empty template stub, untracked). Bootstrap with `/session-start`.
