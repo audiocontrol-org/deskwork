@@ -85,28 +85,44 @@ fi
 AUDIT_LOG="docs/1.0/001-IN-PROGRESS/${SLUG}/audit-log.md"
 
 # --- gather the audit unit: spec (+ plan when after_plan), bounded (T009/R2/R7) ---
-# 256 KB soft budget; drops are logged to stderr (no silent cap). Specs are
-# small, so this is a guard, not a hot path.
-PAYLOAD_BUDGET=$((256 * 1024))
+# 256 KB soft budget (override GOVERN_PAYLOAD_BUDGET for tests); drops are logged
+# to stderr (no silent cap). Specs are small, so this is a guard, not a hot path.
+PAYLOAD_BUDGET="${GOVERN_PAYLOAD_BUDGET:-$((256 * 1024))}"
 DIFF=""
 _payload_bytes=0
 
+# fold_artifact returns: 0 folded; 1 missing file; 2 over budget. The CALLER
+# decides fatality — an artifact the audit REQUIRES (the spec; a plan when
+# after_plan) must NOT be silently dropped (AUDIT-20260607-14/-15 / FR-005).
 fold_artifact() {
   local path="$1" label="$2"
-  [ -f "${path}" ] || return 0
+  [ -f "${path}" ] || return 1
   local sz
   sz="$(wc -c < "${path}" 2>/dev/null || echo 0)"
   if [ "$((_payload_bytes + sz))" -gt "${PAYLOAD_BUDGET}" ]; then
-    echo "govern-spec.sh: ${label} ${path} (${sz} bytes) would exceed the ${PAYLOAD_BUDGET}-byte payload budget; skipping it (not silently — split the artifact or raise the budget)." >&2
-    return 0
+    echo "govern-spec.sh: ${label} ${path} (${sz} bytes) would exceed the ${PAYLOAD_BUDGET}-byte payload budget." >&2
+    return 2
   fi
   DIFF="${DIFF}"$'\n'"===== ${label}: ${path} ====="$'\n'"$(cat "${path}")"
   _payload_bytes="$((_payload_bytes + sz))"
 }
 
-fold_artifact "${SPEC_PATH}" "SPEC"
+# The SPEC is the primary audit unit — if it cannot be folded (missing or over
+# budget) the run is fatal, never silently degraded to a plan-only audit
+# (AUDIT-20260607-14).
+if ! fold_artifact "${SPEC_PATH}" "SPEC"; then
+  echo "govern-spec.sh: FATAL — the spec '${SPEC_PATH}' could not be folded into the audit payload (missing or exceeds the ${PAYLOAD_BUDGET}-byte budget). The spec is the primary audit unit; split it or raise GOVERN_PAYLOAD_BUDGET." >&2
+  exit 2
+fi
+
+# When GOVERN_PLAN_PATH is set (the after_plan checkpoint), the plan is REQUIRED
+# (FR-013) — a typo / stale path must fail loud, not silently degrade to
+# spec-only (AUDIT-20260607-15).
 if [ -n "${GOVERN_PLAN_PATH:-}" ]; then
-  fold_artifact "${GOVERN_PLAN_PATH}" "PLAN"
+  if ! fold_artifact "${GOVERN_PLAN_PATH}" "PLAN"; then
+    echo "govern-spec.sh: FATAL — GOVERN_PLAN_PATH='${GOVERN_PLAN_PATH}' is set but could not be folded (missing or over budget); after_plan requires the plan (FR-013) — no silent degrade to spec-only." >&2
+    exit 2
+  fi
 fi
 
 [ -n "${DIFF}" ] || {

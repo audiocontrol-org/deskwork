@@ -18,7 +18,7 @@ interface HookEntry {
   optional?: boolean;
 }
 interface ExtensionManifest {
-  extension?: { id?: string };
+  extension?: { id?: string; version?: string };
   requires?: { tools?: Array<{ name?: string; required?: boolean }> };
   provides?: { commands?: Array<{ name?: string; file?: string }> };
   hooks?: Record<string, HookEntry>;
@@ -61,5 +61,16 @@ describe('spec-governance extension wiring (T005 / US1)', () => {
     );
     expect(cmd?.file).toBeDefined();
     expect(existsSync(join(EXT_DIR, cmd!.file!))).toBe(true);
+  });
+
+  it('extension version is lockstep with the stack-control plugin.json (AUDIT-20260607-13)', () => {
+    // The manifest version must NOT drift from the monorepo lockstep version.
+    // bump-version.ts now bumps this extension.yml; this assertion turns any
+    // future drift (a bump that skips it) into a red test, not silent rot.
+    const pluginJson = JSON.parse(
+      readFileSync(resolve(EXT_DIR, '..', '..', '.claude-plugin', 'plugin.json'), 'utf8'),
+    ) as { version?: string };
+    expect(load().extension?.version).toBeDefined();
+    expect(load().extension?.version).toBe(pluginJson.version);
   });
 });

@@ -50,6 +50,37 @@ grep -Eqi 'governed' "${work}/out.txt" 2>/dev/null \
   && fail "T012 emitted a 'governed' claim despite capability absence"
 echo "smoke-fail-loud: T012 OK — exit 2, actionable message, audit-log untouched, no governed claim" >&2
 
+# ---- AUDIT-20260607-15: a bad GOVERN_PLAN_PATH fails loud (no silent degrade) ----
+# These fold-fatal cases require dw-lifecycle on PATH (capability guard passes),
+# then exit 2 at the fold step BEFORE any barrage fires — fast + deterministic.
+if command -v dw-lifecycle >/dev/null 2>&1; then
+  before_hash="$(shasum "${audit_log}" | awk '{print $1}')"
+  set +e
+  GOVERN_REPO_ROOT="${work}" GOVERN_FEATURE_SLUG="${slug}" GOVERN_SPEC_PATH="${work}/spec.md" \
+  GOVERN_PLAN_PATH="${work}/does-not-exist-plan.md" \
+    bash "${GOVERN_SPEC_SH}" >"${work}/out2.txt" 2>"${work}/err2.txt"
+  rc=$?
+  set -e
+  [ "${rc}" -eq 2 ] || fail "AUDIT-15 expected exit 2 on a bad GOVERN_PLAN_PATH, got ${rc}"
+  grep -Eq 'GOVERN_PLAN_PATH|could not be folded' "${work}/err2.txt" \
+    || fail "AUDIT-15 stderr lacks an actionable plan-path message"
+  [ "${before_hash}" = "$(shasum "${audit_log}" | awk '{print $1}')" ] \
+    || fail "AUDIT-15 audit-log mutated despite fail-loud"
+  echo "smoke-fail-loud: AUDIT-15 OK — bad GOVERN_PLAN_PATH exits 2, audit-log untouched" >&2
+
+  # ---- AUDIT-20260607-14: an over-budget SPEC fails loud (not plan-only) ----
+  set +e
+  GOVERN_REPO_ROOT="${work}" GOVERN_FEATURE_SLUG="${slug}" GOVERN_SPEC_PATH="${work}/spec.md" \
+  GOVERN_PAYLOAD_BUDGET="5" \
+    bash "${GOVERN_SPEC_SH}" >"${work}/out3.txt" 2>"${work}/err3.txt"
+  rc=$?
+  set -e
+  [ "${rc}" -eq 2 ] || fail "AUDIT-14 expected exit 2 when the spec exceeds the payload budget, got ${rc}"
+  grep -Eq 'primary audit unit|could not be folded' "${work}/err3.txt" \
+    || fail "AUDIT-14 stderr lacks an actionable over-budget-spec message"
+  echo "smoke-fail-loud: AUDIT-14 OK — over-budget spec exits 2 (never plan-only)" >&2
+fi
+
 # ---- T013: reduced coverage is recorded, not presented as full ----
 PINNED_MODEL=""
 for c in claude codex gemini; do command -v "$c" >/dev/null 2>&1 && { PINNED_MODEL="$c"; break; }; done

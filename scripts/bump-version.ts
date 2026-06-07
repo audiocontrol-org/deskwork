@@ -45,7 +45,12 @@ interface VersionedManifest {
    * must move together to avoid the wildcard-resolution failure mode
    * documented in #101). For everything else, just `version`.
    */
-  readonly kind: 'package-json' | 'lockstep-package-json' | 'plugin-json' | 'marketplace-json';
+  readonly kind:
+    | 'package-json'
+    | 'lockstep-package-json'
+    | 'plugin-json'
+    | 'marketplace-json'
+    | 'extension-yml';
 }
 
 const MANIFESTS: readonly VersionedManifest[] = [
@@ -61,6 +66,10 @@ const MANIFESTS: readonly VersionedManifest[] = [
   { path: 'plugins/deskwork-studio/.claude-plugin/plugin.json', label: 'deskwork-studio plugin.json', kind: 'plugin-json' },
   { path: 'plugins/dw-lifecycle/.claude-plugin/plugin.json', label: 'dw-lifecycle plugin.json', kind: 'plugin-json' },
   { path: 'plugins/stack-control/.claude-plugin/plugin.json', label: 'stack-control plugin.json', kind: 'plugin-json' },
+  // Spec Kit extension manifest — lockstep with the monorepo. Wired here so the
+  // next bump doesn't freeze it (AUDIT-20260607-13). A Vitest assertion
+  // (hook-wiring.test.ts) turns any future drift into a red test, not silent rot.
+  { path: 'plugins/stack-control/spec-kit/spec-governance/extension.yml', label: 'spec-governance extension.yml', kind: 'extension-yml' },
   { path: '.claude-plugin/marketplace.json', label: 'marketplace manifest', kind: 'marketplace-json' },
 ];
 
@@ -83,8 +92,33 @@ async function writeJson(path: string, value: Record<string, unknown>): Promise<
   await writeFile(path, text, 'utf-8');
 }
 
+// Targeted line-replace on the `extension.version` field of a YAML manifest.
+// Anchored to a whitespace-indented `version:` so it never matches the
+// top-level `schema_version:` or the nested `requires.speckit_version:` (both
+// have a `_` before `version`, not whitespace). Regex-based, not a YAML
+// round-trip, so comments + formatting are preserved.
+async function bumpExtensionYml(
+  abs: string,
+  manifest: VersionedManifest,
+  version: string,
+): Promise<string> {
+  const raw = await readFile(abs, 'utf-8');
+  const re = /(\n[ \t]+)version:([ \t]*)"([^"]*)"/;
+  const m = re.exec(raw);
+  if (m === null) {
+    fail(`${manifest.path}: could not find an indented \`version: "..."\` line to bump`);
+  }
+  const before = m![3];
+  const next = raw.replace(re, `$1version:$2"${version}"`);
+  await writeFile(abs, next, 'utf-8');
+  return `  ${manifest.label.padEnd(36)} ${String(before)} -> ${version}`;
+}
+
 async function bumpFile(manifest: VersionedManifest, version: string): Promise<string> {
   const abs = join(REPO_ROOT, manifest.path);
+  if (manifest.kind === 'extension-yml') {
+    return bumpExtensionYml(abs, manifest, version);
+  }
   const data = await readJson(abs);
 
   switch (manifest.kind) {

@@ -58,9 +58,30 @@ The gate verb may also be run directly:
 stackctl spec-governance-gate --feature <slug> [--ceiling N] [--override "<reason>"] [--json]
 ```
 
-## Isolation
+## Isolation & the dw-lifecycle dependency
 
-Composes dw-lifecycle's **public verbs** plus a read-only share of the
-`check-barrage-dampener` convergence logic — **no edits to dw-lifecycle
-internals** (the isolation invariant). Versions are lockstep with the monorepo;
-see the [releases page](https://github.com/audiocontrol-org/deskwork/releases).
+Two distinct couplings to dw-lifecycle, both one-way (stack-control → dw-lifecycle)
+and neither editing dw-lifecycle:
+
+1. **Public CLI verbs** — `govern-spec.sh` shells to the dw-lifecycle **binary**
+   (`audit-barrage-render` → `audit-barrage` → `audit-barrage-lift`), declared in
+   `extension.yml` `requires.tools` and guarded at runtime (`command -v`).
+2. **Shared source modules (deep import)** — `spec-governance-gate.ts` imports two
+   **internal** dw-lifecycle functions by relative path —
+   `checkBarrageDampener` (the ported convergence criterion) and
+   `resolveFeatureRoot`. These are NOT a published entry point; this is the
+   deliberate *faithful-port* surface the tasks chose (share the real logic,
+   never hand-retype it — Principle VIII / convergence-gate assertion #7), and it
+   carries a **hard source-colocation invariant**: the gate requires the
+   `plugins/dw-lifecycle/src/` tree to sit at its fixed sibling path. An adopter
+   with the `dw-lifecycle` binary on PATH but the two plugins NOT co-located under
+   a shared `plugins/` root will pass the `command -v` guard and the lift, then
+   the gate will fail at module resolution. This coupling is intentional and
+   **temporary**: at `multi/migrate-audit-barrage` the barrage + protocol rehome
+   into stack-control and the deep import collapses to an in-package import.
+
+The isolation invariant is *no edits to dw-lifecycle internals and no inbound
+coupling from dw-lifecycle to stack-control* — both hold (a CI test enforces the
+latter). It is NOT "public-API only": the gate reuses internal modules by design,
+documented here so the claim is accurate. Versions are lockstep with the
+monorepo; see the [releases page](https://github.com/audiocontrol-org/deskwork/releases).
