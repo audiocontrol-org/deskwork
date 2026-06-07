@@ -1,6 +1,6 @@
 {
-  "languages": ["typescript"],
-  "pattern": "**/*.ts",
+  "format": ["typescript", "tsx", "bash"],
+  "pattern": "**/*.{ts,tsx,sh,bash}",
   "ignore": [
     "**/*.test.ts",
     "**/dist/**",
