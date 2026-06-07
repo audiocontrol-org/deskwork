@@ -56,7 +56,7 @@
     "deskwork-governance": {
       "version": "0.1.0",
       "source": "local",
-      "manifest_hash": "sha256:395fdbd7e62b717b960ff3f45db5813873b3ca516c689bf87e13a510215882ac",
+      "manifest_hash": "sha256:4e08f5dfa5fac0d23de1f310a5b88d7bec4e7a21cdf477dca6f509faa3e803f0",
       "enabled": true,
       "priority": 10,
       "registered_commands": {
@@ -71,7 +71,7 @@
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-06-05T23:54:05.869410+00:00"
+      "installed_at": "2026-06-07T06:46:44.931245+00:00"
     }
   }
 }

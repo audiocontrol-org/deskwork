@@ -17,12 +17,13 @@
 #   GOVERN_BARRAGE_BIN   (optional; the barrage entrypoint; default: bundled stackctl) — test seam
 set -euo pipefail
 
-# Resolve the script dir + the bundled stackctl BEFORE any `cd`, so the relative
-# BASH_SOURCE stays valid. scripts/bash -> deskwork-governance -> spec-kit ->
-# stack-control.
-_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# GOVERN_BARRAGE_BIN overrides the dispatched barrage entrypoint (tests). The TS
-# side reads it directly; the shim resolves the bundled stackctl as the verb host.
-STACKCTL="$(cd "${_SCRIPT_DIR}/../../../.." && pwd)/bin/stackctl"
+# Resolve the bundled stackctl from the repo root so this shim works BOTH in the
+# plugin tree AND when copied into .specify/extensions/ by the Spec Kit installer
+# (the two sit at different depths, so a BASH_SOURCE-relative path breaks in the
+# install copy). GOVERN_STACKCTL overrides (tests / non-standard layout).
+# (Adopter packaging — locating an npm-installed stackctl from an installed
+# extension — is tracked under design/migrate-scope-discovery.)
+STACKCTL="${GOVERN_STACKCTL:-$(git rev-parse --show-toplevel 2>/dev/null)/plugins/stack-control/bin/stackctl}"
+[ -x "${STACKCTL}" ] || { echo "govern shim: FATAL — bundled stackctl not found at '${STACKCTL}' (set GOVERN_STACKCTL)." >&2; exit 2; }
 
 exec "${STACKCTL}" govern --mode implement "$@"

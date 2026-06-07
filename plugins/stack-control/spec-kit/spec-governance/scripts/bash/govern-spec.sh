@@ -25,10 +25,12 @@
 #   GOVERN_BARRAGE_BIN   (optional; the barrage entrypoint; default: bundled stackctl) — test seam
 set -euo pipefail
 
-# Resolve the script's own dir + the bundled stackctl BEFORE any `cd` — the
-# relative BASH_SOURCE is only valid in the original cwd.
-# scripts/bash -> spec-governance -> spec-kit -> stack-control
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STACKCTL="$(cd "${SCRIPT_DIR}/../../../.." && pwd)/bin/stackctl"
+# Resolve the bundled stackctl from the repo root so this shim works BOTH in the
+# plugin tree AND when copied into .specify/extensions/ by the Spec Kit installer
+# (different depths; a BASH_SOURCE-relative path breaks in the install copy).
+# GOVERN_STACKCTL overrides (tests / non-standard layout). Adopter packaging is
+# tracked under design/migrate-scope-discovery.
+STACKCTL="${GOVERN_STACKCTL:-$(git rev-parse --show-toplevel 2>/dev/null)/plugins/stack-control/bin/stackctl}"
+[ -x "${STACKCTL}" ] || { echo "govern shim: FATAL — bundled stackctl not found at '${STACKCTL}' (set GOVERN_STACKCTL)." >&2; exit 2; }
 
 exec "${STACKCTL}" govern --mode spec "$@"

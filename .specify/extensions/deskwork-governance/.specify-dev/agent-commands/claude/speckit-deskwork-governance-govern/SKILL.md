@@ -25,6 +25,17 @@ Optional environment overrides:
 
 The script gathers the diff of the implemented work, fires `dw-lifecycle audit-barrage` (multiple LLM CLIs in parallel), and lifts findings into the feature `audit-log.md`. It branches only on the diff + feature slug — never on which tool authored or executed the plan.
 
+## Fixing findings — fresh-context sub-agent dispatch
+
+When the barrage lifts open findings, **do NOT author the fixes in this orchestrating context.** Fix quality degrades under accumulated context — expansive edits made in a fatigued context become the next round's findings. The fix step runs in a fresh, minimal context instead. For each open finding:
+
+1. **Dispatch a fresh sub-agent (Agent tool) scoped to resolve the finding CONSISTENTLY.** Give it the finding text + the cited code span, and scope it to **fix the finding and leave the codebase consistent** — it MUST update every site the fix ripples to (call-sites, sibling implementations, types, and the docs/spec the change affects), not only the one cited span, so the fix does not leave a contradiction elsewhere for the next barrage to catch. Fix **TDD-first** — write a failing test that exercises the defect, watch it fail for the expected reason, then make the **minimal** change to pass (Constitution Principle I; the project's scope-don't-defer + TDD discipline). Keep each individual edit minimal (no speculative scope, no unrelated churn) — minimal-per-edit and consistent-across-the-change-surface are not in tension.
+2. **Verify the finding's premise against the actual code before adding any mechanism.** Do NOT add code or spec text for a capability that isn't real or needed — a fix that invents machinery becomes the next round's findings. When a finding's premise is false (the concern can't occur in the code as written), the correct disposition is a recorded acknowledgment of the false premise, not invented code.
+3. Dispatch **one finding at a time** (sequential) so concurrent edits don't collide. Each sub-agent gets its own clean context regardless of ordering; serialization is for write-safety.
+4. After the open findings are addressed, **re-run the governance pass** (re-diff → re-barrage) and repeat until the barrage is clean (or findings are dispositioned per the audit protocol). When several findings stem from one root change, run a consistency sweep over the whole change surface first. Always instruct each sub-agent to **use the Write/Edit tool to persist its changes to disk.**
+
+The orchestrator's only jobs in the loop are **dispatch → apply → re-barrage** — never hand-authoring the fix.
+
 ## Result
 
 Report the printed run-dir path and summarize: how many model lanes produced output, and how many findings were lifted into `audit-log.md`. If the script exits non-zero (e.g. `dw-lifecycle` absent), surface the failure — do not treat governance as optional.
