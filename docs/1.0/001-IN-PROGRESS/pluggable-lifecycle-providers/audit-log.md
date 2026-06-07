@@ -489,3 +489,71 @@ Surface:    specs/004-spec-governance/spec.md:100-101, specs/004-spec-governance
 FR-012 is explicit that spec-governance MUST be delivered as a Spec Kit governance extension with hooks and MUST NOT be folded into the front-door skills only. The dependency section weakens that by saying the delivery surface is “the Spec Kit extension/hook mechanism and/or the front-door define/extend skills.”
 
 That “and/or” creates an implementation escape hatch where front-door skills alone could be treated as satisfying the delivery dependency, even though raw `/speckit-*` commands would bypass governance. The dependency should be narrowed to the hook mechanism as mandatory, with front-door skills listed only as callers that benefit from the universal hook.
+
+## 2026-06-07 — audit-barrage lift (20260607T001123519Z-pluggable-lifecycle-providers)
+
+### AUDIT-20260607-10 — Cross-plugin deep import into `dw-lifecycle/src/` contradicts the README's "public verbs / isolation" claim and the succession rule
+
+Finding-ID: AUDIT-20260607-10 (claude-01 + claude-02 + claude-06 + codex-01 + codex-02; cross-model)
+Status:     fixed-e8fa3139 (doc-accuracy half fixed: README Isolation section rewritten to describe BOTH couplings precisely — public CLI verbs via the binary AND the deliberate deep-import of two internal dw-lifecycle modules as the faithful-port surface — plus the hard source-colocation invariant + its collapse at multi/migrate-audit-barrage. README no longer claims "public-API only." The architectural alternative — promote the shared criterion to a genuinely exported surface / public stackctl verb — is operator-owned: T017 + research R3 explicitly chose share-the-logic over hand-retype and assertion #7 requires the same function; surfaced, not re-architected unilaterally.)
+Severity:   high
+Surface:    plugins/stack-control/src/subcommands/spec-governance-gate.ts:21-23 (the two `../../../dw-lifecycle/src/...` imports) vs. plugins/stack-control/spec-kit/spec-governance/README.md:60-66 (Isolation section)
+
+The gate reaches directly into dw-lifecycle's internal source tree by relative path: `import { checkBarrageDampener } from '../../../dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-dampener.js'` and `import { resolveFeatureRoot } from '../../../dw-lifecycle/src/scope-discovery/util/feature-root.js'`. These are *internal* modules (buried under `scope-discovery/promote-findings/` and `scope-discovery/util/`), not a published/public entry point. The README's Isolation section claims the gate "Composes dw-lifecycle's **public verbs** plus a read-only share of the `check-barrage-dampener` convergence logic — **no edits to dw-lifecycle internals**." Importing an un-exported internal file by deep relative path *is* coupling to internals — the README's "public verbs" framing is inaccurate, and `stack-control-succession.md` explicitly lists "Coupling `stack-control` to `dw-lifecycle` internals" as an anti-pattern to refuse. It also violates the project's `@/`-import guideline (CLAUDE.md) by crossing a plugin boundary with `../../../`.
+
+The deeper risk is distribution: the extension manifest (`extension.yml:14-21`) only declares the dw-lifecycle **binary** as a required tool (`command -v dw-lifecycle` on PATH), but the gate's real runtime requirement is the dw-lifecycle **source tree** sitting at a fixed `plugins/dw-lifecycle/src/...` sibling path. Those are different guarantees: an adopter with the `dw-lifecycle` CLI installed but the two plugins not co-located under a shared `plugins/` root would pass `govern-spec.sh`'s `command -v` guard, run the lift (binary path) successfully, then have `stackctl spec-governance-gate` fail at module resolution. A reasonable fix is to make the shared criterion a genuinely exported surface (a package entry / a public `stackctl`-callable verb), declare the real dependency the manifest promises, and correct the README so it doesn't claim public-API isolation while importing internals — or explicitly document the source-colocation invariant as a hard requirement until `multi/migrate-audit-barrage` rehomes the code.
+
+### AUDIT-20260607-11 — Stray unfilled Spec Kit plan template committed for an unrelated feature
+
+Finding-ID: AUDIT-20260607-11
+Status:     acknowledged-out-of-scope (NOT this feature's artifact: specs/002-parallel-execution-engine/plan.md was an untracked placeholder present at session start — `?? specs/002-parallel-execution-engine/plan.md` in the session-start git status — created by a prior session for feature 002 (impl/execution-engine), which is deferred behind the design block per stack-control-succession.md. It was deliberately EXCLUDED from every commit in this feature's range; the barrage flagged it only because govern.sh folds untracked files. Disposition is the operator's: fill it (if 002 planning resumes) or remove it. Not in scope for design/spec-governance and not committed by this work.)
+Severity:   medium
+Surface:    specs/002-parallel-execution-engine/plan.md (entire new file)
+
+This new file is a raw, unfilled Spec Kit plan template — every field is still a placeholder: `# Implementation Plan: [FEATURE]`, `**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]`, `NEEDS CLARIFICATION` markers throughout the Technical Context, and `[REMOVE IF UNUSED] Option 1/2/3` scaffolding in the source-tree block. It carries no real content. It is also for feature **002** (parallel-execution-engine), which per `stack-control-succession.md` is "a later feature, not the founding one" — the audited range is entirely feature **004** commits.
+
+Committing a placeholder-only template is exactly the operator-discipline trap the project guidelines call out (placeholder comments / unfilled scaffolding shipped as if it were work). At minimum it pollutes `specs/002-…` with a file that reads as "planning started" when nothing was planned, and the `[FEATURE]`/`[DATE]`/`NEEDS CLARIFICATION` strings will trip any later doctor/grep that scans for unfilled markers. If this was an accidental `git add` of a scaffolded template, it should be removed from this commit; if 002 planning is genuinely starting, the template should be filled (or left untracked) rather than committed empty.
+
+### AUDIT-20260607-12 — New Vitest suites hard-depend on a globally-resolvable `dw-lifecycle` binary and will fail (not skip) when it is absent
+
+Finding-ID: AUDIT-20260607-12
+Status:     acknowledged-by-design (the lift-composition tests deliberately exercise the REAL dw-lifecycle audit-barrage-lift verb — Constitution Principle II integration-first — because the feature's value IS the composition; a mock would test nothing. dw-lifecycle is a HARD declared dependency (extension.yml requires.tools, required:true; FR-006) and is guaranteed present in the monorepo and any adopter install. A skip-on-absent would silently NOT test the composition and mask a real misconfiguration, which the no-fallbacks principle forbids. The gate-only suites correctly use in-process imports; the lift suites cannot, as the lift is a separate verb. Accepted residual: the failure message when dw-lifecycle is genuinely absent could be more actionable — a diagnostics-only follow-up, not a skip.)
+Severity:   medium
+Surface:    plugins/stack-control/tests/spec-governance/cross-model-lift.test.ts (the `spawnSync('dw-lifecycle', …)` in `lift`), plugins/stack-control/tests/spec-governance/disposition-persistence.test.ts (same), and plugins/stack-control/vitest.config.ts:5 (the `tests/**/*.test.ts` include)
+
+`vitest.config.ts` now collects `tests/**/*.test.ts` into the default run. Two of those suites invoke the dw-lifecycle CLI as an external process: `spawnSync('dw-lifecycle', ['audit-barrage-lift', …], { encoding: 'utf8' })`, then assert `expect(r.status).toBe(0)`. If `dw-lifecycle` is not on `PATH` — a fresh clone, a contributor who only built the `stack-control` workspace, or any environment where the dw-lifecycle bin isn't globally installed — `spawnSync` returns `status: null` (with `error: ENOENT`), so `expect(status).toBe(0)` fails rather than skips. `npm --workspace @stack-control test` would then go red for an environmental reason unrelated to the code under test.
+
+This is a hidden environment coupling masquerading as a unit test: the suite's green/red depends on a binary it never declares as a prerequisite and never guards for. The gate-only suites (`gate.test.ts`, `gate-port-fidelity.test.ts`) avoid this by importing `checkBarrageDampener` directly and using the in-process `runCli`, which is the right pattern. The lift-composition tests should either resolve the dw-lifecycle entrypoint the same way production does (an explicit resolved path, not a bare PATH lookup) and skip-with-a-clear-message when it's genuinely unavailable, or assert against a faithful in-repo invocation rather than a global binary.
+
+### AUDIT-20260607-13 — `extension.yml` hardcodes `version: "0.37.0"` — a lockstep-version rot vector unless wired into the atomic bump
+
+Finding-ID: AUDIT-20260607-13
+Status:     fixed-e8fa3139 (bump-version.ts now enumerates plugins/stack-control/spec-kit/spec-governance/extension.yml with a new `extension-yml` kind — a regex-anchored YAML field replace that touches ONLY the indented `extension.version` line, never schema_version / speckit_version (verified via a 0.99.0 dry-run, then reverted). A hook-wiring.test.ts assertion pins extension.version === stack-control plugin.json version, so any future bump that skips it is a red test, not silent rot. Note: the sibling deskwork-governance extension.yml has the same latent pattern (version 0.1.0, not wired) — pre-existing, out of this feature's scope; flagged for the operator.)
+Severity:   low
+Surface:    plugins/stack-control/spec-kit/spec-governance/extension.yml:6 vs. README.md:65 ("Versions are lockstep with the monorepo")
+
+The new manifest pins `version: "0.37.0"` literally, and the README asserts versions are "lockstep with the monorepo." The repo's stated mechanism for that lockstep is `scripts/bump-version.ts` ("Atomic version bump across all manifests" per the layout doc). This new `extension.yml` is a brand-new manifest surface; if `bump-version.ts`'s manifest glob doesn't already include `plugins/stack-control/spec-kit/**/extension.yml`, the next release will bump every other manifest and leave this one frozen at `0.37.0` — silent version drift, the exact rot the `documentation.md` rule warns against (hardcoded versions that won't get bumped every release).
+
+This isn't verifiable from the diff alone (the bump script isn't in range), so it's a low-severity flag rather than a confirmed defect: confirm `scripts/bump-version.ts` enumerates this file (add a test/assertion that the extension manifest's version equals the monorepo version), or drop the hardcoded version in favor of whatever the bump tooling injects. The same check applies to the `requires.speckit_version: ">=0.9.0"` floor, which is a different (external) version and is fine to pin.
+
+### AUDIT-20260607-14 — An oversized spec can be silently excluded when a plan is present
+
+Finding-ID: AUDIT-20260607-14
+Status:     fixed-e8fa3139 (govern-spec.sh fold_artifact now returns distinct codes — 0 folded / 1 missing / 2 over-budget — and the SPEC fold is fatal (exit 2) when it cannot be included: the spec is the primary audit unit and is never silently dropped to a plan-only audit. GOVERN_PAYLOAD_BUDGET override added for testability; deterministic regression assertion in smoke-govern-spec-fail-loud.sh fires the script with a 5-byte budget and asserts exit 2 + actionable message.)
+Severity:   medium
+Surface:    plugins/stack-control/spec-kit/spec-governance/scripts/bash/govern-spec.sh:94-113
+
+`fold_artifact` skips any artifact that would exceed the payload budget and returns success. The empty-payload guard only checks whether `DIFF` is non-empty after all folds. In `after_plan`, if the spec exceeds 256KB but the plan fits, the script audits only the plan and can still record/govern the run even though the required spec artifact was dropped.
+
+The spec is the primary audit unit; skipping it should be fatal, not just a stderr note, especially when another artifact keeps the payload non-empty. Track whether the SPEC fold succeeded and exit 2 if it was absent or skipped.
+
+### AUDIT-20260607-15 — A bad `GOVERN_PLAN_PATH` degrades after_plan to spec-only without failing
+
+Finding-ID: AUDIT-20260607-15
+Status:     fixed-e8fa3139 (govern-spec.sh now treats a set-but-unfoldable GOVERN_PLAN_PATH as fatal (exit 2): when after_plan requests the plan (FR-013), a missing/typo/over-budget plan path fails loud instead of silently degrading to a spec-only audit. Deterministic regression assertion in smoke-govern-spec-fail-loud.sh sets GOVERN_PLAN_PATH to a nonexistent file and asserts exit 2 + audit-log untouched.)
+Severity:   medium
+Surface:    plugins/stack-control/spec-kit/spec-governance/scripts/bash/govern-spec.sh:94-110
+
+When `GOVERN_PLAN_PATH` is set, the command contract says the plan is folded alongside the spec. But `fold_artifact` returns 0 for any missing path, so a typo, stale plan path, or hook wiring bug produces a spec-only audit while the `after_plan` checkpoint appears to have run normally.
+
+That weakens FR-013 because plan coverage becomes optional by accident. If `GOVERN_PLAN_PATH` is non-empty, the script should require that file to exist and be folded, with a fatal error when it cannot be included.
