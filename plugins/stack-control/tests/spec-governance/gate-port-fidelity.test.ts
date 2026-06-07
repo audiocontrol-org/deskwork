@@ -8,7 +8,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCli } from '../../src/__tests__/_run-helpers.js';
-import { checkBarrageDampener } from '../../../dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-dampener.js';
+// Vendored in-package (multi/migrate-audit-barrage) — no dw-lifecycle dependency.
+import { checkBarrageDampener } from '../../src/scope-discovery/promote-findings/check-barrage-dampener.js';
 
 function section(runId: string, sev: string, status = 'open'): string {
   return (

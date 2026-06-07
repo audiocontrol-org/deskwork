@@ -6,10 +6,10 @@
 // do not reimplement it (FR-006).
 
 import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { runCli } from '../../src/__tests__/_run-helpers.js';
 
 function findingBlock(model: string, nn: string, heading: string, surface: string, sev = 'high'): string {
   return [
@@ -45,11 +45,20 @@ function makeRepoWithRun(
 }
 
 function lift(repo: string, slug: string, runDir: string) {
-  return spawnSync(
-    'dw-lifecycle',
-    ['audit-barrage-lift', '--feature', slug, '--run-dir', runDir, '--repo-root', repo, '--date', '20260606', '--apply'],
-    { encoding: 'utf8' },
-  );
+  // Composes stack-control's OWN audit-barrage-lift verb (vendored) via the
+  // stackctl dispatcher — no dw-lifecycle dependency.
+  return runCli([
+    'audit-barrage-lift',
+    '--feature',
+    slug,
+    '--run-dir',
+    runDir,
+    '--repo-root',
+    repo,
+    '--date',
+    '20260606',
+    '--apply',
+  ]);
 }
 
 describe('cross-model lift composition (T010 / US2)', () => {

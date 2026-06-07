@@ -10,8 +10,8 @@ extension:
 requires:
   speckit_version: ">=0.9.0"
   tools:
-    - name: dw-lifecycle
-      required: true
+    # Audit-barrage is stack-control's own (vendored via multi/migrate-audit-barrage)
+    # — no dw-lifecycle dependency; the barrage verbs dispatch through stackctl.
     - name: git
       required: true
 

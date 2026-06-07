@@ -10,12 +10,10 @@ extension:
 requires:
   speckit_version: ">=0.9.0"
   tools:
-    # In-house composition of the barrage + protocol (FR-006) until
-    # multi/migrate-audit-barrage rehomes the verbs. dw-lifecycle supplies
-    # audit-barrage-render / audit-barrage / audit-barrage-lift + the
-    # check-barrage-dampener convergence logic the gate ports.
-    - name: dw-lifecycle
-      required: true
+    # The audit-barrage + convergence protocol are stack-control's OWN
+    # (vendored via multi/migrate-audit-barrage) — NO dw-lifecycle dependency.
+    # The barrage verbs dispatch through the plugin's bundled stackctl. The only
+    # hard external tool is git; model-family CLIs are configured + degradable.
     - name: git
       required: true
 

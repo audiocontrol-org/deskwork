@@ -6,7 +6,6 @@
 // acknowledged HIGH neither vanishes from the record nor re-blocks graduation.
 
 import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -60,12 +59,19 @@ describe('disposition persistence across revisions (T026 / SC-004)', () => {
     );
 
     try {
-      // Revision N+1 lift (additive).
-      const lift = spawnSync(
-        'dw-lifecycle',
-        ['audit-barrage-lift', '--feature', slug, '--run-dir', runDir, '--repo-root', repo, '--date', '20260606', '--apply'],
-        { encoding: 'utf8' },
-      );
+      // Revision N+1 lift (additive) via stack-control's OWN verb (vendored).
+      const lift = runCli([
+        'audit-barrage-lift',
+        '--feature',
+        slug,
+        '--run-dir',
+        runDir,
+        '--repo-root',
+        repo,
+        '--date',
+        '20260606',
+        '--apply',
+      ]);
       expect(lift.status).toBe(0);
 
       const written = readFileSync(auditLogPath, 'utf8');

@@ -21,9 +21,9 @@ extension, and a feature of the `pluggable-lifecycle-providers` north star
   FR-013). `after_specify` is intentionally **not** declared — a just-specified
   spec may still carry intentional unresolved-clarification placeholders that
   generate barrage noise (research R5).
-- Composes existing dw-lifecycle verbs in-house (FR-006, until
-  `multi/migrate-audit-barrage` rehomes them):
-  `dw-lifecycle audit-barrage-render` → `audit-barrage` → `audit-barrage-lift`.
+- Runs stack-control's **own** audit-barrage (no dw-lifecycle dependency — the
+  barrage + protocol are vendored in-package via `multi/migrate-audit-barrage`):
+  `stackctl audit-barrage-render` → `audit-barrage` → `audit-barrage-lift`.
 - **Convergence gate** (`stackctl spec-governance-gate`): the spec may graduate
   only when the **ported** `check-barrage-dampener` criterion is met —
   **0 open HIGH + 0 open MEDIUM in the latest run** (single-run-clean), **or
@@ -58,30 +58,18 @@ The gate verb may also be run directly:
 stackctl spec-governance-gate --feature <slug> [--ceiling N] [--override "<reason>"] [--json]
 ```
 
-## Isolation & the dw-lifecycle dependency
+## No dw-lifecycle dependency
 
-Two distinct couplings to dw-lifecycle, both one-way (stack-control → dw-lifecycle)
-and neither editing dw-lifecycle:
+The audit-barrage runner, the finding lift, and the convergence protocol
+(`check-barrage-dampener`) are stack-control's **own**, vendored in-package under
+`plugins/stack-control/src/` (the `multi/migrate-audit-barrage` migration). The
+barrage verbs dispatch through the plugin's bundled `stackctl`; the gate imports
+the convergence criterion + feature-root resolver from the in-package
+`scope-discovery/` tree. There is **no import of, shell-out to, or `requires`
+declaration on dw-lifecycle** — `git` is the one hard external tool, plus the
+configured model-family CLIs.
 
-1. **Public CLI verbs** — `govern-spec.sh` shells to the dw-lifecycle **binary**
-   (`audit-barrage-render` → `audit-barrage` → `audit-barrage-lift`), declared in
-   `extension.yml` `requires.tools` and guarded at runtime (`command -v`).
-2. **Shared source modules (deep import)** — `spec-governance-gate.ts` imports two
-   **internal** dw-lifecycle functions by relative path —
-   `checkBarrageDampener` (the ported convergence criterion) and
-   `resolveFeatureRoot`. These are NOT a published entry point; this is the
-   deliberate *faithful-port* surface the tasks chose (share the real logic,
-   never hand-retype it — Principle VIII / convergence-gate assertion #7), and it
-   carries a **hard source-colocation invariant**: the gate requires the
-   `plugins/dw-lifecycle/src/` tree to sit at its fixed sibling path. An adopter
-   with the `dw-lifecycle` binary on PATH but the two plugins NOT co-located under
-   a shared `plugins/` root will pass the `command -v` guard and the lift, then
-   the gate will fail at module resolution. This coupling is intentional and
-   **temporary**: at `multi/migrate-audit-barrage` the barrage + protocol rehome
-   into stack-control and the deep import collapses to an in-package import.
-
-The isolation invariant is *no edits to dw-lifecycle internals and no inbound
-coupling from dw-lifecycle to stack-control* — both hold (a CI test enforces the
-latter). It is NOT "public-API only": the gate reuses internal modules by design,
-documented here so the claim is accurate. Versions are lockstep with the
-monorepo; see the [releases page](https://github.com/audiocontrol-org/deskwork/releases).
+Project-local overrides live under `.stack-control/` (`audit-barrage-config.yaml`,
+`audit-barrage-prompt.md`); barrage run-dirs land under `.stack-control/audit-runs/`
+(gitignored). Versions are lockstep with the monorepo; see the
+[releases page](https://github.com/audiocontrol-org/deskwork/releases).

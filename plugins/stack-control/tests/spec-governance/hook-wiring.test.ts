@@ -49,10 +49,11 @@ describe('spec-governance extension wiring (T005 / US1)', () => {
     expect(load().hooks?.after_specify).toBeUndefined();
   });
 
-  it('declares dw-lifecycle as a required tool (in-house composition, FR-006)', () => {
+  it('does NOT depend on dw-lifecycle — the barrage is vendored in-package (multi/migrate-audit-barrage)', () => {
     const tools = load().requires?.tools ?? [];
-    const dw = tools.find((t) => t.name === 'dw-lifecycle');
-    expect(dw?.required).toBe(true);
+    expect(tools.find((t) => t.name === 'dw-lifecycle')).toBeUndefined();
+    // git stays the one hard external tool.
+    expect(tools.find((t) => t.name === 'git')?.required).toBe(true);
   });
 
   it('the provided command points at a command file that exists on disk', () => {

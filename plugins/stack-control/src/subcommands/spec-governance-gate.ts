@@ -16,11 +16,10 @@
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
-// In-house share of the ported criterion + the feature-root resolver. Importing
-// the real dw-lifecycle functions (read-only composition) is the faithful port
-// surface — at multi/migrate-audit-barrage time these move wholesale.
-import { checkBarrageDampener } from '../../../dw-lifecycle/src/scope-discovery/promote-findings/check-barrage-dampener.js';
-import { resolveFeatureRoot } from '../../../dw-lifecycle/src/scope-discovery/util/feature-root.js';
+// The ported convergence criterion + the feature-root resolver, now VENDORED
+// in-package (multi/migrate-audit-barrage) — no dw-lifecycle dependency.
+import { checkBarrageDampener } from '../scope-discovery/promote-findings/check-barrage-dampener.js';
+import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
 
 const DEFAULT_CEILING = 5;
 // Audit-protocol threshold (FR-010): Rule A = last 2 consecutive runs each 0

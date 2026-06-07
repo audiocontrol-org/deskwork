@@ -17,35 +17,34 @@ const GOVERN_SH = resolve(
   'govern.sh',
 );
 
-// A PATH that retains git/jq/coreutils (so the script preamble + feature-slug
-// derivation run) but NOT the dw-lifecycle plugin bin (it lives under
-// ~/.claude/plugins/cache/...). This simulates the cross-plugin seam
-// dependency being absent — the exact "governance dependency at rehome" edge.
-const STRIPPED_PATH = '/usr/bin:/bin';
-
-function runGovern(script: string) {
+// The barrage capability is now stack-control's OWN (vendored via
+// multi/migrate-audit-barrage) and dispatched through the bundled stackctl by
+// absolute path — there is no longer a cross-PLUGIN seam. The fail-loud
+// PRINCIPLE (Principle V — no silent skip when the barrage entrypoint is
+// absent) still holds: GOVERN_BARRAGE_BIN points the dispatcher at a bogus path
+// to simulate the capability being unavailable.
+function runGovern(script: string, barrageBin = '/nonexistent/stackctl-missing') {
   return spawnSync('bash', [script], {
     encoding: 'utf8',
     // Pin GOVERN_FEATURE_SLUG (AUDIT-20260605-02): govern.sh derives the slug
-    // from the `feature/<slug>` branch BEFORE the dw-lifecycle PATH check. On a
-    // detached HEAD or non-feature branch (e.g. CI checkout at a SHA/tag) that
-    // derivation FATALs first, so without this override the seam assertion would
-    // be a false RED about slug derivation, not the dependency it claims to
-    // guard. The override is the path the command body documents.
-    env: { ...process.env, PATH: STRIPPED_PATH, GOVERN_FEATURE_SLUG: 'seam-test' },
+    // from the `feature/<slug>` branch BEFORE the capability check; pinning it
+    // keeps this a fail-loud assertion, not a false RED about slug derivation.
+    env: {
+      ...process.env,
+      GOVERN_FEATURE_SLUG: 'seam-test',
+      GOVERN_BARRAGE_BIN: barrageBin,
+    },
   });
 }
 
-// T023 / governance-extension.md "Cross-plugin seam intact" / Edge "Governance
-// dependency at rehome" / Principle V (no silent skip). govern.sh content is
-// unchanged by the move, so this preserved-behavior guard passes once the
-// rehome lands — and flips RED the moment govern.sh starts swallowing a
-// missing dependency.
-describe('governance cross-plugin seam fails loud (T023)', () => {
-  it('the real govern.sh exits non-zero naming dw-lifecycle when it is absent from PATH', () => {
+// Principle V (no silent skip): govern.sh content fails loud the moment its
+// barrage entrypoint is unavailable — and flips RED if it ever starts
+// swallowing a missing capability.
+describe('governance barrage capability fails loud (T023 / Principle V)', () => {
+  it('the real govern.sh exits non-zero naming stackctl when the barrage entrypoint is absent', () => {
     const r = runGovern(GOVERN_SH);
     expect(r.status).not.toBe(0);
-    expect(`${r.stderr}${r.stdout}`).toMatch(/dw-lifecycle\b.*not on PATH/i);
+    expect(`${r.stderr}${r.stdout}`).toMatch(/stackctl\b.*not found/i);
   });
 
   // Positive control — the "watch it fail first" contrast: a govern that
@@ -57,7 +56,7 @@ describe('governance cross-plugin seam fails loud (T023)', () => {
     const stub = join(fx, 'swallow-govern.sh');
     writeFileSync(
       stub,
-      '#!/usr/bin/env bash\ncommand -v dw-lifecycle >/dev/null 2>&1 || true\necho "ran anyway"\nexit 0\n',
+      '#!/usr/bin/env bash\ncommand -v stackctl >/dev/null 2>&1 || true\necho "ran anyway"\nexit 0\n',
     );
     chmodSync(stub, 0o755);
     const r = runGovern(stub);

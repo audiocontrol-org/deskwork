@@ -12,6 +12,9 @@ import { runVersion } from './subcommands/version.js';
 import { runExecuteCheck } from './subcommands/execute-check.js';
 import { runSpecCheck } from './subcommands/spec-check.js';
 import { runSpecGovernanceGate } from './subcommands/spec-governance-gate.js';
+import { auditBarrage } from './subcommands/audit-barrage.js';
+import { auditBarrageRender } from './subcommands/audit-barrage-render.js';
+import { auditBarrageLiftCli } from './subcommands/audit-barrage-lift.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -20,6 +23,11 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   'execute-check': runExecuteCheck,
   'spec-check': runSpecCheck,
   'spec-governance-gate': runSpecGovernanceGate,
+  // Vendored from dw-lifecycle (multi/migrate-audit-barrage) — stack-control's
+  // own audit-barrage; no dw-lifecycle dependency.
+  'audit-barrage-render': auditBarrageRender,
+  'audit-barrage': auditBarrage,
+  'audit-barrage-lift': auditBarrageLiftCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

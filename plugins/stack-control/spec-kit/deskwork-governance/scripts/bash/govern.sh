@@ -15,6 +15,15 @@
 #   GOVERN_DIFF_BASE     (default: HEAD~1) — git ref the implemented work is diffed against
 set -euo pipefail
 
+# The audit-barrage capability is stack-control's OWN (vendored via
+# multi/migrate-audit-barrage) — no dw-lifecycle dependency. Dispatch the barrage
+# verbs through stackctl. Resolve the script dir + stackctl BEFORE any `cd`, so
+# the relative BASH_SOURCE stays valid. scripts/bash -> deskwork-governance ->
+# spec-kit -> stack-control.
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# GOVERN_BARRAGE_BIN overrides the dispatched barrage entrypoint (tests).
+STACKCTL="${GOVERN_BARRAGE_BIN:-$(cd "${_SCRIPT_DIR}/../../../.." && pwd)/bin/stackctl}"
+
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
@@ -44,8 +53,8 @@ BASE="${GOVERN_DIFF_BASE:-HEAD~1}"
 FEATURE_DOCS="docs/1.0/001-IN-PROGRESS/${SLUG}"
 AUDIT_LOG="${FEATURE_DOCS}/audit-log.md"
 
-command -v dw-lifecycle >/dev/null 2>&1 || {
-  echo "govern.sh: FATAL — dw-lifecycle not on PATH; cannot govern (no silent skip)." >&2
+command -v "${STACKCTL}" >/dev/null 2>&1 || {
+  echo "govern.sh: FATAL — stackctl not found at ${STACKCTL}; cannot govern (no silent skip)." >&2
   exit 2
 }
 command -v jq >/dev/null 2>&1 || {
@@ -122,11 +131,11 @@ jq -n \
   > "${VARS}"
 
 # --- render -> barrage -> lift (existing verbs) ---
-dw-lifecycle audit-barrage-render --feature "${SLUG}" --vars-file "${VARS}" --output "${PROMPT}"
+"${STACKCTL}" audit-barrage-render --feature "${SLUG}" --vars-file "${VARS}" --output "${PROMPT}"
 
-RUN_DIR="$(dw-lifecycle audit-barrage --feature "${SLUG}" --prompt-file "${PROMPT}" --output-run-dir)"
+RUN_DIR="$("${STACKCTL}" audit-barrage --feature "${SLUG}" --prompt-file "${PROMPT}" --output-run-dir)"
 echo "govern.sh: barrage run-dir = ${RUN_DIR}" >&2
 
-dw-lifecycle audit-barrage-lift --feature "${SLUG}" --run-dir "${RUN_DIR}" --apply
+"${STACKCTL}" audit-barrage-lift --feature "${SLUG}" --run-dir "${RUN_DIR}" --apply
 
 echo "${RUN_DIR}"

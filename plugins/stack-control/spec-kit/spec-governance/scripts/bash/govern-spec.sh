@@ -22,8 +22,20 @@
 #   GOVERN_MODELS        (optional; comma-list passed to audit-barrage --models)
 #   GOVERN_CEILING       (optional; convergence iteration ceiling, FR-014)
 #   GOVERN_OVERRIDE      (optional; recorded override reason, FR-010)
-#   GOVERN_BARRAGE_BIN   (optional; the dw-lifecycle entrypoint; default `dw-lifecycle`)
+#   GOVERN_BARRAGE_BIN   (optional; the barrage entrypoint; default: bundled stackctl)
 set -euo pipefail
+
+# Resolve the script's own dir + the bundled stackctl BEFORE any `cd` — the
+# relative BASH_SOURCE is only valid in the original cwd, so a later
+# `cd "${REPO_ROOT}"` (when GOVERN_REPO_ROOT differs) must not break it.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# scripts/bash -> spec-governance -> spec-kit -> stack-control
+STACKCTL="$(cd "${SCRIPT_DIR}/../../../.." && pwd)/bin/stackctl"
+# The audit-barrage capability is now stack-control's OWN (vendored in via
+# multi/migrate-audit-barrage) — no dw-lifecycle dependency. The barrage verbs
+# (audit-barrage-render/-barrage/-lift) dispatch through stackctl. GOVERN_BARRAGE_BIN
+# overrides for tests (stub / fail-loud).
+BARRAGE_BIN="${GOVERN_BARRAGE_BIN:-${STACKCTL}}"
 
 REPO_ROOT="${GOVERN_REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
 [ -n "${REPO_ROOT}" ] || {
@@ -31,11 +43,6 @@ REPO_ROOT="${GOVERN_REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || tr
   exit 2
 }
 cd "${REPO_ROOT}"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# scripts/bash -> spec-governance -> spec-kit -> stack-control
-STACKCTL="$(cd "${SCRIPT_DIR}/../../../.." && pwd)/bin/stackctl"
-BARRAGE_BIN="${GOVERN_BARRAGE_BIN:-dw-lifecycle}"
 
 # --- derive the feature slug (mirror govern.sh lines 25-42) ---
 if [ -n "${GOVERN_FEATURE_SLUG:-}" ]; then

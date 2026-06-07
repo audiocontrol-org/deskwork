@@ -33,7 +33,11 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/smoke-govern-spec.XXXXXX")"
 trap 'rm -rf "${WORK}"' EXIT
 
 # --- stub barrage entrypoint: fakes render+barrage, delegates lift to the real verb ---
-STUB="${WORK}/stub-dw-lifecycle"
+# stackctl path — the stub delegates the lift to stack-control's OWN verb.
+STACKCTL_BIN="${REPO_ROOT}/plugins/stack-control/bin/stackctl"
+export STACKCTL_BIN
+
+STUB="${WORK}/stub-barrage"
 cat > "${STUB}" <<'STUBEOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -46,7 +50,7 @@ case "${verb}" in
   audit-barrage)
     feat=""
     while [ $# -gt 0 ]; do case "$1" in --feature) feat="$2"; shift ;; esac; shift; done
-    rundir="$(pwd)/.dw-lifecycle/scope-discovery/audit-runs/20260606T000000000Z-${feat}"
+    rundir="$(pwd)/.stack-control/audit-runs/20260606T000000000Z-${feat}"
     mkdir -p "${rundir}"
     cat > "${rundir}/claude.md" <<'MODEL'
 ### Stubbed low-severity finding from the deterministic smoke
@@ -60,7 +64,7 @@ A stubbed low finding so the lift + convergence gate run deterministically.
 MODEL
     printf '%s\n' "${rundir}" ;;
   audit-barrage-lift)
-    exec dw-lifecycle audit-barrage-lift "$@" ;;
+    exec "${STACKCTL_BIN}" audit-barrage-lift "$@" ;;
   *) echo "stub: unsupported verb '${verb}'" >&2; exit 2 ;;
 esac
 STUBEOF
@@ -78,7 +82,7 @@ run_case() {
   git -C "${repo}" init -q
 
   local barrage_bin="${STUB}"
-  [ "${SMOKE_LIVE:-0}" = "1" ] && barrage_bin="dw-lifecycle"
+  [ "${SMOKE_LIVE:-0}" = "1" ] && barrage_bin="${STACKCTL_BIN}"
 
   echo "smoke-govern-spec: [${label}] running govern-spec.sh (GOVERN_MODELS='${models_env}', bin=$(basename "${barrage_bin}")) ..." >&2
   GOVERN_REPO_ROOT="${repo}" \
@@ -91,7 +95,7 @@ run_case() {
   grep -q 'unbound variable' "${repo}/err.txt" \
     && fail "[${label}] govern-spec.sh hit an unbound-variable error:\n$(cat "${repo}/err.txt")"
 
-  local runs_dir="${repo}/.dw-lifecycle/scope-discovery/audit-runs"
+  local runs_dir="${repo}/.stack-control/audit-runs"
   [ -d "${runs_dir}" ] || fail "[${label}] no audit-runs dir under ${runs_dir}"
   local n_runs
   n_runs="$(find "${runs_dir}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
