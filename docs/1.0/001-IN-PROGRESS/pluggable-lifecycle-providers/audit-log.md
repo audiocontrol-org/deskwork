@@ -865,7 +865,7 @@ Under no-matching, a re-barrage re-lifts *every* finding as a brand-new `open` e
 ### AUDIT-20260607-42 — FR-008 health predicate excludes non-zero exit codes — a crashed-after-output family is counted "healthy," which can mask a zero-coverage outage as a governed clean run
 
 Finding-ID: AUDIT-20260607-42 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + claude-06 + claude-07 + codex-01 + codex-02; cross-model)
-Status:     open
+Status:     fixed-ce223ce5 (operator-approved option 1: split the conflated predicate. `isModelRunHealthy` stays LIFTABILITY (bytes>0 + no spawnError) and still governs what the lift extracts; new `isModelRunCovering` = liftability AND exitCode===0 now governs the FR-008 coverage count, the FR-005 zero-coverage OUTAGE, the clean-run claim, the summary line, and the tip.sha gate. A crash-after-banner family is liftable but not covering, so it can no longer make a run governed-clean; its bytes are still lifted in a mixed run. exitCode===0 also excludes timeout(-1)/spawn(-2), closing the FR-008 prose-vs-code gap. Spec 004 reconciled whole-artifact; RED-first barrage-coverage-predicate.test.ts (12); 91/91 + tsc clean.)
 Severity:   high
 Surface:    specs/004-spec-governance/spec.md — FR-008 ("healthy ... emitted ≥1 byte of stdout and incurred no spawn/timeout error") in conjunction with FR-005/US3/SC-003 (fail-loud, zero silent skips)
 
