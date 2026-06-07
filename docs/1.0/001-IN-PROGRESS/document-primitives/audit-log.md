@@ -11,7 +11,7 @@ Cross-model agreement (both `claude` and `codex` flag the same root cause indepe
 ### AUDIT-20260607-01 — FR-004 order-key constraint is unsatisfiable for both proof grammars — the only natural ordering field is the identifier itself
 
 Finding-ID: AUDIT-20260607-01
-Status:     open
+Status:     fixed-cf732454
 Severity:   high
 Surface:    spec.md FR-004, FR-005 (`<phase>/<slug>` production), FR-013 (proof grammars)
 
@@ -25,7 +25,7 @@ An agent building the roadmap grammar will hit a contradiction: the recommended 
 ### AUDIT-20260607-02 — Anti-coupling scan (FR-011) over the proof documents collides with lossless migration (FR-013) of a roadmap that is *about* succeeding dw-lifecycle
 
 Finding-ID: AUDIT-20260607-02
-Status:     open
+Status:     fixed-cf732454
 Severity:   high
 Surface:    spec.md FR-011 (scan scope incl. "the two proof documents"), FR-013 (lossless migration); plan.md `ROADMAP.md`/`DESIGN-INBOX.md`
 
@@ -38,7 +38,7 @@ The plan compounds the ambiguity — it labels `ROADMAP.md` as a *"NEW plugin-lo
 ### AUDIT-20260607-03 — Curate `--apply` is ambiguous about whether it actually archives, or only reports archivable units
 
 Finding-ID: AUDIT-20260607-03 (claude-03 + codex-02; cross-model)
-Status:     open
+Status:     fixed-cf732454
 Severity:   high
 Surface:    spec.md FR-008, US2 AS1/AS2, SC-002
 
@@ -49,7 +49,7 @@ So it is genuinely unclear whether `curate --apply` *moves* archivable units (in
 ### AUDIT-20260607-04 — Uniqueness "within document ∪ its archive" (FR-005) leaves archive parsing/availability unspecified
 
 Finding-ID: AUDIT-20260607-04
-Status:     open
+Status:     fixed-cf732454
 Severity:   high
 Surface:    spec.md FR-005 (uniqueness), FR-003 (well-formedness includes FR-005), FR-006 (archive file)
 
@@ -64,7 +64,7 @@ Without a defined archive-identifier extraction path, an agent will either skip 
 ### AUDIT-20260607-05 — Cross-file atomicity (FR-006/FR-010 "zero writes is absolute") asserted but mechanism unconstrained; archive mutates two files
 
 Finding-ID: AUDIT-20260607-05
-Status:     open
+Status:     fixed-cf732454
 Severity:   medium
 Surface:    spec.md FR-006 ("`--apply` is atomic all-or-nothing"), FR-010 ("zero writes is absolute"), SC-003 (mid-`--apply` write failure)
 
@@ -75,7 +75,7 @@ The spec asserts the property without constraining the mechanism (e.g., write bo
 ### AUDIT-20260607-06 — Unarchive reinsertion position is unspecified; "restores prior content" assumes no intervening edits and a known insertion point
 
 Finding-ID: AUDIT-20260607-06
-Status:     open
+Status:     fixed-cf732454
 Severity:   medium
 Surface:    spec.md FR-007, US1 AS3, SC-007
 
@@ -86,7 +86,7 @@ FR-007/US1 AS3 say unarchive "returns the item to the live document" and "restor
 ### AUDIT-20260607-07 — Lossless migration (FR-013) collides with strict fail-loud grammar validation (FR-003/FR-005) for pre-existing nonconforming content
 
 Finding-ID: AUDIT-20260607-07
-Status:     open
+Status:     fixed-cf732454
 Severity:   medium
 Surface:    spec.md FR-013 (lossless), FR-003 (parse-or-fail), FR-005 (identifier invariants)
 
@@ -97,7 +97,7 @@ If any pre-existing entry violates an invariant or fails to parse, you cannot ac
 ### AUDIT-20260607-08 — Embedded grammar block and document frontmatter appear in the block stream but their handling is unspecified (FR-002 "unaccounted block = parse failure")
 
 Finding-ID: AUDIT-20260607-08
-Status:     open
+Status:     fixed-cf732454
 Severity:   medium
 Surface:    spec.md FR-001 (embedded grammar = HTML comment), FR-002 (HTML blocks recognized; unaccounted block = parse failure); plan.md block-stream pipeline
 
@@ -108,7 +108,7 @@ The spec/plan never states this pre-processing step. Document frontmatter (the r
 ### AUDIT-20260607-09 — Curate’s reconciliation test still expects drift that the spec says cannot be computed
 
 Finding-ID: AUDIT-20260607-09
-Status:     open
+Status:     fixed-cf732454
 Severity:   high
 Surface:    specs/005-document-primitives/spec.md:47-55
 
@@ -119,7 +119,7 @@ Blast radius is high because an unattended implementer could reasonably build dr
 ### AUDIT-20260607-10 — Round-trip restoration requires provenance the ledger does not specify
 
 Finding-ID: AUDIT-20260607-10
-Status:     open
+Status:     fixed-cf732454
 Severity:   high
 Surface:    specs/005-document-primitives/spec.md:103-104
 
@@ -130,7 +130,7 @@ Blast radius is high because an implementation that follows the ledger descripti
 ### AUDIT-20260607-11 — Runtime Peggy grammars make project overrides executable code
 
 Finding-ID: AUDIT-20260607-11
-Status:     open
+Status:     fixed-cf732454
 Severity:   high
 Surface:    specs/005-document-primitives/plan.md:15-17
 
