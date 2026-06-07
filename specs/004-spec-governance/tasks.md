@@ -123,7 +123,7 @@ description: "Task list for design/spec-governance implementation"
 - [x] T021 [P] Verify Principle VI: every new file (`govern-spec.sh`, `spec-governance-gate.ts`) is < 500 lines; refactor if not.
 - [x] T022 Verify the isolation invariant: run the dw-lifecycle suite (`npm --workspace ... test`) — still green; confirm no dw-lifecycle internals were edited (only public verbs composed + the dampener logic shared).
 - [x] T023 Run all six `quickstart.md` scenarios end-to-end on a real feature tree.
-- [ ] T024 Dogfood (self-hosting): govern THIS spec (`specs/004-spec-governance/spec.md`) and the `impl/execution-engine` spec via the new extension; record findings in the feature audit-log (closes the loop the thesis describes).
+- [x] T024 Dogfood (self-hosting): govern THIS spec (`specs/004-spec-governance/spec.md`) and the `impl/execution-engine` spec via the new extension; record findings in the feature audit-log (closes the loop the thesis describes).
 
 ---
 

@@ -388,3 +388,104 @@ Surface:    `.specify/extensions/deskwork-governance/scripts/bash/govern.sh:80-8
 This is not a re-litigation of the AUDIT-06 cap (the 256KB budget + binary-skip + stderr logging are the accepted residual) — it flags one mechanism choice inside that cap. When `_folded_bytes + _sz` exceeds `UNTRACKED_FOLD_BUDGET`, the loop `break`s, abandoning *all remaining* untracked files. Because `git ls-files --others --exclude-standard` emits paths in sorted order, a single large untracked file early in the sort (e.g. a scratch log under `a-scratch.txt`) suppresses folding of the feature's actual new source/test files that sort later (`plugins/stack-control/...`, `specs/...`) — exactly the surfaces the fold exists to audit on a dirty manual run.
 
 A `continue` (skip only the oversized file, keep packing smaller ones — `_folded_bytes` isn't incremented for the skipped file, so later small files still fit) would preserve coverage of the relevant files while still honoring the cap and logging the per-file skip. The drop is logged (no silent cap), and the real `after_implement` flow commits first so this only bites manual govern-on-dirty-tree runs, hence informational — but `continue` is the strictly-better shape for the stated goal of "audit the newly-added work." Separately, the budget accounts the raw file byte count (`wc -c`) while folding the larger `git diff --no-index` output (per-line `+` prefixes + headers), so the actual off-box payload runs modestly above the stated 256KB — worth a one-line acknowledgment if the cap is meant as a hard transmission ceiling.
+
+## 2026-06-07 — audit-barrage lift (20260607T000706704Z-pluggable-lifecycle-providers)
+
+### AUDIT-20260607-01 — "HIGH" / "MEDIUM" are overloaded across two orthogonal axes (confidence vs. severity), and the convergence gate is defined in the conflated terms
+
+Finding-ID: AUDIT-20260607-01 (claude-01 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Surface:    FR-010, FR-003, the **Finding** key-entity, and the output-format severity scale
+
+The spec uses "HIGH" to mean two different, independent things and then writes the load-bearing gate criterion in the ambiguous term. FR-003 and the **Finding** entity define HIGH as a **confidence** label: *"a confidence label (HIGH when cross-model agreement)."* The output-format section defines an orthogonal **severity** axis: `blocking | high | medium | low | informational`. FR-010 then states the convergence gate as *"0 HIGH and 0 MEDIUM findings"* / *"0 HIGH findings"* — but never says whether HIGH/MEDIUM here mean **confidence** or **severity**. These are not the same set: a finding can be HIGH-confidence (two models agree) but low-severity (a typo both flagged), or HIGH-severity but single-model (low confidence). "0 HIGH" is a different gate under each reading.
+
+This matters because every downstream criterion inherits the ambiguity: SC-002 and SC-007 both say "HIGH-confidence," while the dw-lifecycle audit protocol being ported (FR-006) uses HIGH/MEDIUM **severity**. An implementer cannot build a machine-checkable gate (FR-010 claims it is "machine-checkable") without knowing which axis it counts. The fix is to pick one axis explicitly for the gate — almost certainly severity, to match the ported protocol — and rename the confidence label so the two never collide (e.g. confidence ∈ {cross-model-agreed, single-model}; severity ∈ {blocking…informational}; gate counts severity).
+
+### AUDIT-20260607-02 — Single-model coverage makes the "0 HIGH" gate trivially pass if HIGH means cross-model agreement — directly weakening FR-008's "degraded but honest"
+
+Finding-ID: AUDIT-20260607-02
+Status:     open
+Severity:   high
+Surface:    FR-010 vs. FR-003 / FR-008 / the "One model family available" edge case
+
+This is the concrete failure that Finding-01's ambiguity produces. The "One model family available" edge case states: *"the barrage runs but cannot produce cross-model agreement … no finding can be labeled HIGH-confidence by agreement."* If FR-010's "0 HIGH" is read as HIGH-**confidence** (per FR-003), then in single-model mode **no finding can ever be HIGH by construction**, so "0 HIGH" is satisfied unconditionally on iteration one. A degraded, single-model run therefore **auto-passes the convergence gate immediately** — the spec graduates with whatever single-model findings exist, fully ungoverned by the gate.
+
+That is precisely the silent-weakening FR-005/FR-008/US3 exist to prevent: FR-008 says reduced coverage *"must never be presented as full coverage,"* yet the gate would report "converged" for a run that structurally cannot meet the gate's intent. Either the gate must count **severity** (so single-model HIGH-severity findings still block), or the spec must state that the convergence gate cannot be satisfied under reduced coverage without a recorded override (FR-010's override path). As written, the two requirements contradict in the single-model case.
+
+### AUDIT-20260607-03 — Two-consecutive-iteration path lets a spec graduate with open MEDIUM findings, and nothing requires those to be dispositioned
+
+Finding-ID: AUDIT-20260607-03
+Status:     open
+Severity:   medium
+Surface:    FR-010 (two convergence branches) and SC-007
+
+FR-010's two branches are asymmetric: the single-iteration branch requires **0 HIGH and 0 MEDIUM**, but the two-consecutive branch requires only **0 HIGH** (MEDIUM unconstrained). SC-007 confirms the gate only guards HIGH: *"no spec graduates carrying open HIGH findings without a recorded override."* So a spec with persistent MEDIUM findings can graduate simply by running the barrage twice — patience bypasses the MEDIUM bar that the single-iteration path enforces. The spec never says what becomes of those still-open MEDIUM findings at graduation: are they auto-accepted, carried forward as open (FR-007), or do they require an explicit disposition?
+
+This is a gameable gate and an unstated state-transition. If the asymmetry is intentional (it mirrors a real convergence protocol where a stable 0-HIGH signal across two passes is "good enough"), the spec should say explicitly that open MEDIUM findings at two-pass convergence are recorded as `acknowledged`/carried-open and never silently dropped — otherwise FR-007's "survives across revisions" and this graduation path conflict on what "open" means at the moment of graduation.
+
+### AUDIT-20260607-04 — Cross-model non-determinism vs. "two consecutive iterations" — "consecutive" is undefined across spec mutations
+
+Finding-ID: AUDIT-20260607-04
+Status:     open
+Severity:   medium
+Surface:    FR-010 / FR-014 ("two consecutive iterations," "iteration") and the convergence-loop description
+
+The barrage is explicitly non-deterministic — FR-002/FR-003 run *multiple model families in parallel for genetic diversity in failure modes*, and the whole point is that different models surface different findings. Yet FR-010 makes graduation depend on *"two consecutive iterations each produce 0 HIGH."* Two unresolved questions: (1) Are the two "consecutive" iterations over the **same** spec text or different text? The loop is "barrage → fix → re-barrage," which implies the spec changes between iterations — but then a fix that resolves the last HIGH produces a *new* spec, and a non-deterministic re-run could surface a *different* HIGH, so the count never stabilizes. (2) If they're over the same text (you stop editing and just re-run to confirm), a non-deterministic second pass can flip 0-HIGH back to 1-HIGH on identical input, making convergence luck-dependent.
+
+The spec ports "the convergence criterion + finding state machine" from dw-lifecycle (FR-006) but does not port the precise definition of "iteration" and "consecutive" into the spec text, so an implementer has to invent it. Pin it down: does "consecutive" require the spec to be byte-identical between the two passes, and does an inter-iteration edit reset the consecutive counter? Without that, FR-014's bounded-termination guarantee is also undefined (you can't count toward a ceiling if you can't define an iteration boundary).
+
+### AUDIT-20260607-05 — Dual checkpoints (after_clarify + after_plan): unspecified whether the gate/loop runs once or twice, and whether the iteration ceiling is per-checkpoint or global
+
+Finding-ID: AUDIT-20260607-05 (claude-05 + claude-08 + codex-04; cross-model)
+Status:     open
+Severity:   medium
+Surface:    FR-011, FR-013, FR-014, and the **Checkpoint** key-entity
+
+FR-011 fires at `after_clarify` by default and is *"configurable to also fire `after_plan`."* FR-013 says the plan is covered only when `after_plan` is enabled. The **Checkpoint** entity allows *"one or more of after_specify / after_clarify / after_plan."* But the spec never resolves the interaction with the convergence loop (FR-010/FR-014): when both checkpoints are enabled, does the barrage-and-gate run as **two independent convergence loops** (one at after_clarify over the spec, a second at after_plan over the plan)? Is the FR-014 iteration ceiling **per-checkpoint or global** across both? Does a converged after_clarify gate get **re-opened** if after_plan surfaces new HIGH findings on the plan? Does the after_plan run re-audit the spec too, or only the plan (FR-013 says "also covers the plan," implying additive)?
+
+These aren't hypothetical — an adopter who enables after_plan needs to know whether they're committing to potentially 2× the iteration budget and whether passing the first gate is durable. The spec should state the checkpoint composition model explicitly (independent loops with independent ceilings is the natural reading, but it's currently inferred, not specified).
+
+### AUDIT-20260607-06 — SC-005's "one governance surface" may be precluded by the stack-control ↔ dw-lifecycle isolation rule
+
+Finding-ID: AUDIT-20260607-06
+Status:     open
+Severity:   medium
+Surface:    SC-005, FR-007, the "Findings home" assumption vs. FR-006 / the succession constraint
+
+SC-005 promises *"Spec-phase findings and implementation-phase findings appear in the **same** format and triage workflow … one governance surface."* The Findings-home assumption operationalizes this as *"the existing audit-log-style durable store already used by the implementation-phase governance."* But implementation-phase governance currently lives in **dw-lifecycle** (FR-006: both barrage and protocol are *"composed in-house today (in dw-lifecycle)"*), while this feature is built in **stack-control** as a Spec Kit extension (FR-012). The project's settled succession rule requires the two plugins stay **decoupled** ("Keep dw-lifecycle working… do not make changes that couple them"). A literally-shared audit-log store across the two plugins is exactly the coupling that rule forbids.
+
+So SC-005 as written ("the same … workflow," "one surface") is in tension with the isolation constraint: either the spec means a shared **format** (two stores, same schema, identical triage UX) — which it should say, because "one surface" overclaims — or it means a shared **store**, which the succession rule appears to preclude until `multi/migrate-audit-barrage` rehomes both into stack-control. Clarify whether SC-005 is a format-compatibility claim or a single-store claim; the former is achievable under isolation, the latter is not.
+
+### AUDIT-20260607-07 — "All available families fail mid-run" (zero succeed) is not mapped to the same fail-loud guarantee as "none available at start"
+
+Finding-ID: AUDIT-20260607-07
+Status:     open
+Severity:   low
+Surface:    The "model family times out or errors mid-run" edge case vs. US3 / FR-005
+
+US3 and FR-005 guarantee fail-loud when *"no audit capability is available."* The mid-run edge case covers partial failure: *"does not abort the whole barrage if at least one family succeeded."* The complement — **every** family was available at start but **all** errored/timed out mid-run (zero successes) — is left implicit. Read literally, "does not abort if at least one succeeded" implies it *does* abort when zero succeed, but the spec never says that zero-success path inherits the FR-005 fail-loud contract (actionable message, spec NOT recorded as governed). It could instead be (mis)implemented as "recorded a run with zero coverage," which would satisfy FR-009's "a run is recorded even with zero findings" while silently producing an ungoverned spec — the exact false-assurance US3 forbids.
+
+Add an explicit edge case: "all available families fail at runtime → treat identically to no-capability-available (fail loud, FR-005), not as a clean zero-finding run (FR-009)." The distinction between "zero findings because the spec is clean" and "zero findings because nothing ran" is the safety-critical one.
+
+### AUDIT-20260607-08 — Degraded one-model mode contradicts the multiple-family requirement
+
+Finding-ID: AUDIT-20260607-08
+Status:     open
+Severity:   medium
+Surface:    specs/004-spec-governance/spec.md:72-80, specs/004-spec-governance/spec.md:90-97
+
+FR-002 says the barrage MUST run multiple model families in parallel. But the edge cases explicitly allow one model family to run, and US3 allows “some but not all” model families to proceed with reduced coverage. The spec never defines the minimum quorum that separates “available audit capability” from “no usable barrage.”
+
+This matters because one-family mode cannot satisfy the stated reason for the feature: cross-model agreement and genetic diversity. If one family is acceptable, FR-002 should be softened to “attempt configured model families and record coverage,” with a clear minimum of one. If multiple families are mandatory, the one-family edge case should fail loud as insufficient coverage.
+
+### AUDIT-20260607-09 — Dependencies reopen the front-door-only path that FR-012 forbids
+
+Finding-ID: AUDIT-20260607-09
+Status:     open
+Severity:   medium
+Surface:    specs/004-spec-governance/spec.md:100-101, specs/004-spec-governance/spec.md:138-139
+
+FR-012 is explicit that spec-governance MUST be delivered as a Spec Kit governance extension with hooks and MUST NOT be folded into the front-door skills only. The dependency section weakens that by saying the delivery surface is “the Spec Kit extension/hook mechanism and/or the front-door define/extend skills.”
+
+That “and/or” creates an implementation escape hatch where front-door skills alone could be treated as satisfying the delivery dependency, even though raw `/speckit-*` commands would bypass governance. The dependency should be narrowed to the hook mechanism as mandatory, with front-door skills listed only as callers that benefit from the universal hook.
