@@ -1,64 +1,102 @@
 #!/usr/bin/env bash
 #
-# smoke-govern-spec.sh — RED-first local smoke for the spec-governance
-# orchestration script (T004 / T025, US1).
+# smoke-govern-spec.sh — deterministic local smoke for the spec-governance
+# orchestration script (T004 / T025, US1) + regression for the empty-models
+# array bug the T024 dogfood caught.
 #
 # Drives plugins/stack-control/spec-kit/spec-governance/scripts/bash/govern-spec.sh
-# against a throwaway feature tree in a tmp dir, firing the REAL dw-lifecycle
-# audit-barrage (one model lane by default to keep it cheap), and asserts:
+# end-to-end against a throwaway feature tree, with a STUB barrage entrypoint that
+# fakes the expensive model-firing step (render + barrage) but DELEGATES the lift
+# to the REAL `dw-lifecycle audit-barrage-lift` — so the orchestration control
+# flow, the audit-log lift format, and the convergence gate are exercised
+# faithfully without live model CLIs. Asserts:
 #
-#   T004  over the high-finding fixture: a run-dir appears under the tmp
-#         repo's .dw-lifecycle/scope-discovery/audit-runs/ AND the feature
+#   T004  a run-dir appears under the tmp repo's audit-runs/ AND the feature
 #         audit-log.md gains a dated `audit-barrage lift (...)` section.
-#   T025  over the CLEAN fixture (0 findings): govern-spec.sh STILL records a
-#         run-dir + a dated audit-log section — a clean run is recorded, never
-#         pre-emptively skipped (empty revisions beat missed changes). Unlike
-#         dw-lifecycle implement-hook's no-new-diff guard, govern-spec.sh
-#         (mirroring govern.sh) always runs.
+#   T025  the CLEAN fixture (0 HIGH) STILL records a run-dir + a dated audit-log
+#         section — a clean run is recorded, never pre-emptively skipped.
+#   REG   the run with GOVERN_MODELS UNSET (the default, all-models path) does
+#         NOT die with `_models_flag[@]: unbound variable` on bash 3.2 — the
+#         exact failure the dogfood surfaced.
 #
-# Local-only (project rule: no barrage in CI). Requires dw-lifecycle on PATH,
-# jq, git, and at least one model-family CLI. Override the lane(s) with
-# SMOKE_MODELS (default: claude).
+# Live mode (SMOKE_LIVE=1) fires the REAL multi-model barrage instead of the stub
+# (slow; needs model CLIs). Local-only (project rule: no barrage in CI).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GOVERN_SPEC_SH="${REPO_ROOT}/plugins/stack-control/spec-kit/spec-governance/scripts/bash/govern-spec.sh"
 FIXTURES="${REPO_ROOT}/plugins/stack-control/tests/fixtures/spec-governance"
-SMOKE_MODELS="${SMOKE_MODELS:-claude}"
-
-if [ ! -f "${GOVERN_SPEC_SH}" ]; then
-  echo "smoke-govern-spec: FAIL — orchestration script not found at ${GOVERN_SPEC_SH}" >&2
-  exit 1
-fi
-
+[ -f "${GOVERN_SPEC_SH}" ] || { echo "smoke-govern-spec: FAIL — script not found at ${GOVERN_SPEC_SH}" >&2; exit 1; }
 fail() { echo "smoke-govern-spec: FAIL — $1" >&2; exit 1; }
 
-run_one() {
-  local label="$1" fixture_spec="$2" slug="$3"
-  local work
-  work="$(mktemp -d "${TMPDIR:-/tmp}/smoke-govern-spec.XXXXXX")"
-  trap 'rm -rf "${work}"' RETURN
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/smoke-govern-spec.XXXXXX")"
+trap 'rm -rf "${WORK}"' EXIT
 
-  local feature_dir="${work}/docs/1.0/001-IN-PROGRESS/${slug}"
+# --- stub barrage entrypoint: fakes render+barrage, delegates lift to the real verb ---
+STUB="${WORK}/stub-dw-lifecycle"
+cat > "${STUB}" <<'STUBEOF'
+#!/usr/bin/env bash
+set -euo pipefail
+verb="${1:-}"; shift || true
+case "${verb}" in
+  audit-barrage-render)
+    out=""
+    while [ $# -gt 0 ]; do [ "$1" = "--output" ] && { out="$2"; shift; }; shift; done
+    printf 'STUB PROMPT\n' > "${out}" ;;
+  audit-barrage)
+    feat=""
+    while [ $# -gt 0 ]; do case "$1" in --feature) feat="$2"; shift ;; esac; shift; done
+    rundir="$(pwd)/.dw-lifecycle/scope-discovery/audit-runs/20260606T000000000Z-${feat}"
+    mkdir -p "${rundir}"
+    cat > "${rundir}/claude.md" <<'MODEL'
+### Stubbed low-severity finding from the deterministic smoke
+
+Finding-ID: AUDIT-BARRAGE-claude-01
+Status:     open
+Severity:   low
+Surface:    fixtures/spec.md:1
+
+A stubbed low finding so the lift + convergence gate run deterministically.
+MODEL
+    printf '%s\n' "${rundir}" ;;
+  audit-barrage-lift)
+    exec dw-lifecycle audit-barrage-lift "$@" ;;
+  *) echo "stub: unsupported verb '${verb}'" >&2; exit 2 ;;
+esac
+STUBEOF
+chmod +x "${STUB}"
+
+run_case() {
+  local label="$1" fixture_spec="$2" slug="$3" models_env="$4"
+  local repo="${WORK}/${slug}"
+  local feature_dir="${repo}/docs/1.0/001-IN-PROGRESS/${slug}"
   mkdir -p "${feature_dir}"
   printf '# Audit Log — %s\n' "${slug}" > "${feature_dir}/audit-log.md"
-  cp "${fixture_spec}" "${work}/spec.md"
+  cp "${fixture_spec}" "${repo}/spec.md"
+  # The lift verb resolves the feature root via `git rev-parse --show-toplevel`
+  # (repo.ts), so the tmp tree must be a git repo — production always is.
+  git -C "${repo}" init -q
 
-  echo "smoke-govern-spec: [${label}] firing govern-spec.sh (models=${SMOKE_MODELS}) over ${slug} ..." >&2
-  GOVERN_REPO_ROOT="${work}" \
+  local barrage_bin="${STUB}"
+  [ "${SMOKE_LIVE:-0}" = "1" ] && barrage_bin="dw-lifecycle"
+
+  echo "smoke-govern-spec: [${label}] running govern-spec.sh (GOVERN_MODELS='${models_env}', bin=$(basename "${barrage_bin}")) ..." >&2
+  GOVERN_REPO_ROOT="${repo}" \
   GOVERN_FEATURE_SLUG="${slug}" \
-  GOVERN_SPEC_PATH="${work}/spec.md" \
-  GOVERN_MODELS="${SMOKE_MODELS}" \
-    bash "${GOVERN_SPEC_SH}" || true   # gate may exit 1 (blocked) — assert artifacts, not exit
+  GOVERN_SPEC_PATH="${repo}/spec.md" \
+  GOVERN_MODELS="${models_env}" \
+  GOVERN_BARRAGE_BIN="${barrage_bin}" \
+    bash "${GOVERN_SPEC_SH}" >"${repo}/out.txt" 2>"${repo}/err.txt" || true
 
-  # Assertion 1: a run-dir was recorded under the tmp repo.
-  local runs_dir="${work}/.dw-lifecycle/scope-discovery/audit-runs"
+  grep -q 'unbound variable' "${repo}/err.txt" \
+    && fail "[${label}] govern-spec.sh hit an unbound-variable error:\n$(cat "${repo}/err.txt")"
+
+  local runs_dir="${repo}/.dw-lifecycle/scope-discovery/audit-runs"
   [ -d "${runs_dir}" ] || fail "[${label}] no audit-runs dir under ${runs_dir}"
   local n_runs
   n_runs="$(find "${runs_dir}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
   [ "${n_runs}" -ge 1 ] || fail "[${label}] expected >=1 run-dir, found ${n_runs}"
 
-  # Assertion 2: the audit-log gained a dated lift section (recorded, never skipped).
   grep -Eq '^##[[:space:]]+[0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]]+—[[:space:]]+audit-barrage[[:space:]]+lift[[:space:]]+\(' \
     "${feature_dir}/audit-log.md" \
     || fail "[${label}] audit-log gained no dated 'audit-barrage lift (...)' section"
@@ -66,10 +104,12 @@ run_one() {
   echo "smoke-govern-spec: [${label}] OK — ${n_runs} run-dir(s) + dated lift section recorded" >&2
 }
 
-# T004 — high-finding fixture: must record run-dir + lift section.
-run_one "high-finding" "${FIXTURES}/high-finding/spec.md" "spec-gov-smoke-high"
-
-# T025 — clean fixture: a clean run is STILL recorded (never pre-emptively skipped).
-run_one "clean" "${FIXTURES}/clean/spec.md" "spec-gov-smoke-clean"
+# T004 — high-finding fixture, GOVERN_MODELS pinned.
+run_case "high-finding" "${FIXTURES}/high-finding/spec.md" "spec-gov-smoke-high" "claude"
+# T025 — clean fixture: a clean run is STILL recorded.
+run_case "clean" "${FIXTURES}/clean/spec.md" "spec-gov-smoke-clean" "claude"
+# REG — GOVERN_MODELS UNSET (empty): the default all-models path must not crash
+# on the empty-array expansion (the T024 dogfood regression).
+run_case "models-unset" "${FIXTURES}/clean/spec.md" "spec-gov-smoke-default" ""
 
 echo "smoke-govern-spec: PASS"

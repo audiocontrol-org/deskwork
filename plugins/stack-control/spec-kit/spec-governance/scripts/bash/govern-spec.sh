@@ -139,7 +139,11 @@ jq -n \
 
 _models_flag=()
 [ -n "${GOVERN_MODELS:-}" ] && _models_flag=(--models "${GOVERN_MODELS}")
-RUN_DIR="$("${BARRAGE_BIN}" audit-barrage --feature "${SLUG}" --prompt-file "${PROMPT}" "${_models_flag[@]}" --output-run-dir)"
+# bash 3.2 (macOS default) errors on `"${arr[@]}"` for an EMPTY array under
+# `set -u` ("unbound variable") — caught by the T024 dogfood when GOVERN_MODELS
+# was unset (the default, all-models path). The `${arr[@]+...}` form expands to
+# nothing when empty and is safe on bash 3.2+.
+RUN_DIR="$("${BARRAGE_BIN}" audit-barrage --feature "${SLUG}" --prompt-file "${PROMPT}" ${_models_flag[@]+"${_models_flag[@]}"} --output-run-dir)"
 echo "govern-spec.sh: barrage run-dir = ${RUN_DIR}" >&2
 
 # Cross-model agreement annotation + disposition slots are produced + preserved

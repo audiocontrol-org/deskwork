@@ -43,9 +43,9 @@ description: "Task list for design/spec-governance implementation"
 
 ### Tests for User Story 1 (RED first) ⚠️
 
-- [ ] T004 [P] [US1] RED Bash smoke `scripts/smoke-govern-spec.sh` asserting `govern-spec.sh` over fixture `high-finding/` renders → fires → lifts: a run-dir appears under `.dw-lifecycle/scope-discovery/audit-runs/` and the feature `audit-log.md` gains a dated lift section. Must FAIL (script absent).
+- [x] T004 [P] [US1] RED Bash smoke `scripts/smoke-govern-spec.sh` asserting `govern-spec.sh` over fixture `high-finding/` renders → fires → lifts: a run-dir appears under `.dw-lifecycle/scope-discovery/audit-runs/` and the feature `audit-log.md` gains a dated lift section. Must FAIL (script absent).
 - [x] T005 [P] [US1] RED Vitest in `plugins/stack-control/tests/spec-governance/hook-wiring.test.ts` asserting the `after_clarify` hook in `extension.yml` resolves to the `speckit.spec-governance.govern-spec` command. Must FAIL.
-- [ ] T025 [P] [US1] RED assertion (coverage remediation — FR-009 / analyze C2) in `scripts/smoke-govern-spec.sh` (or a sibling smoke): `govern-spec.sh` over fixture `clean/` (0 findings) STILL produces a recorded run-dir + a dated `audit-log.md` section — a clean re-run is recorded, never pre-emptively skipped (empty revisions beat missed changes). Must FAIL until T007. NOTE: unlike dw-lifecycle `implement-hook`'s no-new-diff guard, `govern-spec.sh` (mirroring `govern.sh`) always runs — assert that.
+- [x] T025 [P] [US1] RED assertion (coverage remediation — FR-009 / analyze C2) in `scripts/smoke-govern-spec.sh` (or a sibling smoke): `govern-spec.sh` over fixture `clean/` (0 findings) STILL produces a recorded run-dir + a dated `audit-log.md` section — a clean re-run is recorded, never pre-emptively skipped (empty revisions beat missed changes). Must FAIL until T007. NOTE: unlike dw-lifecycle `implement-hook`'s no-new-diff guard, `govern-spec.sh` (mirroring `govern.sh`) always runs — assert that.
 
 ### Implementation for User Story 1
 
@@ -119,10 +119,10 @@ description: "Task list for design/spec-governance implementation"
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T020 [P] Author `plugins/stack-control/spec-kit/spec-governance/README.md` (mirror the deskwork-governance README; no rot-prone version strings — link the releases page).
+- [x] T020 [P] Author `plugins/stack-control/spec-kit/spec-governance/README.md` (mirror the deskwork-governance README; no rot-prone version strings — link the releases page).
 - [x] T021 [P] Verify Principle VI: every new file (`govern-spec.sh`, `spec-governance-gate.ts`) is < 500 lines; refactor if not.
-- [ ] T022 Verify the isolation invariant: run the dw-lifecycle suite (`npm --workspace ... test`) — still green; confirm no dw-lifecycle internals were edited (only public verbs composed + the dampener logic shared).
-- [ ] T023 Run all six `quickstart.md` scenarios end-to-end on a real feature tree.
+- [x] T022 Verify the isolation invariant: run the dw-lifecycle suite (`npm --workspace ... test`) — still green; confirm no dw-lifecycle internals were edited (only public verbs composed + the dampener logic shared).
+- [x] T023 Run all six `quickstart.md` scenarios end-to-end on a real feature tree.
 - [ ] T024 Dogfood (self-hosting): govern THIS spec (`specs/004-spec-governance/spec.md`) and the `impl/execution-engine` spec via the new extension; record findings in the feature audit-log (closes the loop the thesis describes).
 
 ---
