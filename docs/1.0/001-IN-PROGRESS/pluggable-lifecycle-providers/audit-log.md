@@ -394,7 +394,7 @@ A `continue` (skip only the oversized file, keep packing smaller ones — `_fold
 ### AUDIT-20260607-01 — "HIGH" / "MEDIUM" are overloaded across two orthogonal axes (confidence vs. severity), and the convergence gate is defined in the conflated terms
 
 Finding-ID: AUDIT-20260607-01 (claude-01 + codex-01; cross-model)
-Status:     open
+Status:     fixed-1a2f258c (spec disambiguates confidence vs severity: the gate counts SEVERITY (blocking/high/medium) — matching the as-built checkBarrageDampener — and confidence is a separate annotation renamed cross-model-agreed | single-model. FR-003/FR-010/SC-002/SC-007 + Finding entity updated. No code change; the implementation already counts severity.)
 Severity:   high
 Surface:    FR-010, FR-003, the **Finding** key-entity, and the output-format severity scale
 
@@ -405,7 +405,7 @@ This matters because every downstream criterion inherits the ambiguity: SC-002 a
 ### AUDIT-20260607-02 — Single-model coverage makes the "0 HIGH" gate trivially pass if HIGH means cross-model agreement — directly weakening FR-008's "degraded but honest"
 
 Finding-ID: AUDIT-20260607-02
-Status:     open
+Status:     fixed-1a2f258c (dissolved by AUDIT-01: because the gate counts SEVERITY not confidence, a single-model HIGH-severity finding still blocks — the single-model-auto-pass failure cannot occur. Edge case + FR-002 clarified.)
 Severity:   high
 Surface:    FR-010 vs. FR-003 / FR-008 / the "One model family available" edge case
 
@@ -416,7 +416,7 @@ That is precisely the silent-weakening FR-005/FR-008/US3 exist to prevent: FR-00
 ### AUDIT-20260607-03 — Two-consecutive-iteration path lets a spec graduate with open MEDIUM findings, and nothing requires those to be dispositioned
 
 Finding-ID: AUDIT-20260607-03
-Status:     open
+Status:     fixed-1a2f258c (spec states the two-consecutive branch's 0-HIGH-only asymmetry is intentional — it is the ported protocol — and that open MEDIUMs at two-consecutive convergence are carried open per FR-007, never silently dropped or auto-accepted. FR-010/SC-007.)
 Severity:   medium
 Surface:    FR-010 (two convergence branches) and SC-007
 
@@ -427,7 +427,7 @@ This is a gameable gate and an unstated state-transition. If the asymmetry is in
 ### AUDIT-20260607-04 — Cross-model non-determinism vs. "two consecutive iterations" — "consecutive" is undefined across spec mutations
 
 Finding-ID: AUDIT-20260607-04
-Status:     open
+Status:     fixed-1a2f258c (spec defines an iteration as one recorded barrage run and "consecutive" as the last runs FOR THE SAME CHECKPOINT; an inter-iteration edit does not reset the count; two-consecutive-quiet is a stability heuristic, not a determinism proof; the FR-014 ceiling counts recorded runs. FR-010/FR-014.)
 Severity:   medium
 Surface:    FR-010 / FR-014 ("two consecutive iterations," "iteration") and the convergence-loop description
 
@@ -438,7 +438,7 @@ The spec ports "the convergence criterion + finding state machine" from dw-lifec
 ### AUDIT-20260607-05 — Dual checkpoints (after_clarify + after_plan): unspecified whether the gate/loop runs once or twice, and whether the iteration ceiling is per-checkpoint or global
 
 Finding-ID: AUDIT-20260607-05 (claude-05 + claude-08 + codex-04; cross-model)
-Status:     open
+Status:     scoped-code-task (spec clarified — FR-011/FR-013/FR-014 + Checkpoint entity now specify INDEPENDENT per-checkpoint loops with per-checkpoint ceilings and a durable after_clarify gate — but the as-built gate counts iterations globally over the whole audit-log. Per-checkpoint scoping is a CODE change (tag runs with their checkpoint; --checkpoint filter in spec-governance-gate; thread it through govern-spec.sh) landing this session, TDD-first. Will move to fixed-<sha> when the code lands; remains open until then.)
 Severity:   medium
 Surface:    FR-011, FR-013, FR-014, and the **Checkpoint** key-entity
 
@@ -449,7 +449,7 @@ These aren't hypothetical — an adopter who enables after_plan needs to know wh
 ### AUDIT-20260607-06 — SC-005's "one governance surface" may be precluded by the stack-control ↔ dw-lifecycle isolation rule
 
 Finding-ID: AUDIT-20260607-06
-Status:     open
+Status:     fixed-d003312e (resolved by the multi/migrate-audit-barrage migration: governance is now a single in-stack-control store shared by both phases — no cross-plugin store, no dw-lifecycle coupling — so SC-005 one-surface is literally true. Spec SC-005/Assumptions/Dependencies updated 1a2f258c.)
 Severity:   medium
 Surface:    SC-005, FR-007, the "Findings home" assumption vs. FR-006 / the succession constraint
 
@@ -460,7 +460,7 @@ So SC-005 as written ("the same … workflow," "one surface") is in tension with
 ### AUDIT-20260607-07 — "All available families fail mid-run" (zero succeed) is not mapped to the same fail-loud guarantee as "none available at start"
 
 Finding-ID: AUDIT-20260607-07
-Status:     open
+Status:     fixed-1a2f258c (spec adds the zero-healthy edge case: ALL configured families failing mid-run is an OUTAGE -> fail loud (FR-005), spec NOT recorded as governed, distinct from a clean zero-finding run. The safety property already holds at runtime — verified: deriveBarrageExitCode returns 1 on zero healthy, audit-barrage exits 1, and govern-spec.sh aborts under set -e before the lift, so an all-fail run is never scored converged. A clearer govern-spec.sh outage message lands with the AUDIT-05 code commit.)
 Severity:   low
 Surface:    The "model family times out or errors mid-run" edge case vs. US3 / FR-005
 
@@ -471,7 +471,7 @@ Add an explicit edge case: "all available families fail at runtime → treat ide
 ### AUDIT-20260607-08 — Degraded one-model mode contradicts the multiple-family requirement
 
 Finding-ID: AUDIT-20260607-08
-Status:     open
+Status:     fixed-1a2f258c (FR-002 softened: the barrage MUST attempt all configured families in parallel; a run with >=1 healthy family is a valid, successful audit recorded with honest reduced coverage (FR-008); one healthy family is the floor. Matches the as-built barrage + the 2026-06-01 "1 healthy model IS a successful audit" directive. No code change.)
 Severity:   medium
 Surface:    specs/004-spec-governance/spec.md:72-80, specs/004-spec-governance/spec.md:90-97
 
@@ -482,7 +482,7 @@ This matters because one-family mode cannot satisfy the stated reason for the fe
 ### AUDIT-20260607-09 — Dependencies reopen the front-door-only path that FR-012 forbids
 
 Finding-ID: AUDIT-20260607-09
-Status:     open
+Status:     fixed-1a2f258c (FR-012 + Dependencies narrowed: the Spec Kit hook mechanism is the MANDATORY delivery surface; the front-door define/extend skills are callers that benefit from the universal hook, never an alternative path. The implementation is the hook (extension.yml).)
 Severity:   medium
 Surface:    specs/004-spec-governance/spec.md:100-101, specs/004-spec-governance/spec.md:138-139
 
