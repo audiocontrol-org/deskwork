@@ -18,7 +18,10 @@ import { readFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 // The ported convergence criterion + the feature-root resolver, now VENDORED
 // in-package (multi/migrate-audit-barrage) — no dw-lifecycle dependency.
-import { checkBarrageDampener } from '../scope-discovery/promote-findings/check-barrage-dampener.js';
+import {
+  checkBarrageDampener,
+  countOpenFindingsUnion,
+} from '../scope-discovery/promote-findings/check-barrage-dampener.js';
 import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
 import {
   countIterations,
@@ -163,25 +166,46 @@ export async function runSpecGovernanceGate(args: string[]): Promise<void> {
       : auditLogTextRaw;
 
   // --- the PORTED criterion (the load-bearing reuse) ---
+  // The dampener's consecutive-0-HIGH VERDICT stays PER-RUN (the stability
+  // heuristic over the most-recent window) — unchanged.
   const dampener = checkBarrageDampener({ auditLogText, threshold: PROTOCOL_THRESHOLD });
   const mostRecent = dampener.recentRunCounts[0];
-  const openHigh = mostRecent?.highPlusCount ?? 0;
-  const openMedium = mostRecent?.mediumCount ?? 0;
+
+  // AUDIT-20260607-45: the BLOCKING open-set is the checkpoint-wide UNION of
+  // un-dispositioned HIGH/BLOCKING (and MEDIUM) findings across ALL recorded
+  // runs — a literal `Status:`-line scan via the SAME parser, NOT a similarity
+  // heuristic. A HIGH surfaced `open` in an earlier run, then stochastically not
+  // re-flagged in later runs, must still block graduation until it is
+  // dispositioned (SC-006 absolute). The reported `openHigh`/`openMedium` are
+  // the union; `auditLogText` is already checkpoint-scoped by the caller, so the
+  // union is naturally per-checkpoint (FR-011).
+  const union = countOpenFindingsUnion(auditLogText);
+  const openHigh = union.openHighPlus;
+  const openMedium = union.openMedium;
   const iterations = countIterations(auditLogText);
 
   // Which rule engaged — derived from the SAME recentRunCounts the dampener
-  // produced (so converged iff dampener.dampened; assertion #7 holds).
+  // produced (so the consecutive VERDICT is per-run; assertion #7 holds).
   const singleRunClean =
     mostRecent !== undefined && mostRecent.highPlusCount === 0 && mostRecent.mediumCount === 0;
   const nConsecutiveQuiet =
     dampener.recentRunCounts.length >= PROTOCOL_THRESHOLD &&
     dampener.recentRunCounts.every((r) => r.highPlusCount === 0);
 
+  // Graduation requires BOTH the per-run dampener engaging AND the cross-run
+  // union of open HIGH/BLOCKING being empty. The union gate is what makes SC-006
+  // literally true: a prior-run un-dispositioned HIGH blocks even when the
+  // most-recent window is clean. (MEDIUMs are slushed before the gate on the
+  // dampener's own predicate — FR-015 — so an engaged dampener implies the
+  // most-recent residual MEDIUMs are already out of the open set; the union's
+  // MEDIUM count is reported for transparency but does not itself block.)
+  const unionClearOfHighPlus = openHigh === 0;
+
   let state: ConvergenceState;
   let rule: ConvergenceRule = 'none';
   let overrideRecorded = false;
 
-  if (dampener.dampened) {
+  if (dampener.dampened && unionClearOfHighPlus) {
     state = 'converged';
     rule = singleRunClean ? 'single-run-clean' : nConsecutiveQuiet ? 'n-consecutive-quiet' : 'none';
   } else if (opts.override !== undefined) {

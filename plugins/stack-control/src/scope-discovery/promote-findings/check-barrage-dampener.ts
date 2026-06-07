@@ -136,6 +136,43 @@ function countHighPlusInSection(
   };
 }
 
+/**
+ * Count un-dispositioned HIGH/BLOCKING and MEDIUM open findings across ALL
+ * barrage lift sections in the supplied audit-log text — the checkpoint-wide
+ * UNION (AUDIT-20260607-45). When the gate is run with `--checkpoint`, the
+ * caller has already filtered the text to one checkpoint's runs, so this union
+ * is naturally scoped to that checkpoint.
+ *
+ * This reuses the EXACT same literal-`Status:` parser the dampener uses per-run
+ * (`findBarrageSections` + `countHighPlusInSection`). It is a literal Status
+ * scan — NOT a similarity / cross-run matching heuristic — so a HIGH recorded
+ * `open` in an earlier run still counts until its `Status:` line is flipped to a
+ * disposition (`fixed-<sha>` / `acknowledged-<reason>` / `acknowledged-slush-pile-<date>`).
+ *
+ * Rationale: the dampener's consecutive-0-HIGH VERDICT is per-run (a stability
+ * heuristic over the most-recent window). But SC-006 promises absolutely that
+ * once a contradiction is surfaced as an open HIGH/BLOCKING finding the gate
+ * does NOT graduate until that finding is dispositioned. A HIGH surfaced in run
+ * N then stochastically not re-flagged in runs N+1/N+2 must still block. The
+ * blocking open-set is therefore the cross-run union; only the consecutive-quiet
+ * verdict stays per-run.
+ */
+export function countOpenFindingsUnion(auditLogText: string): {
+  readonly openHighPlus: number;
+  readonly openMedium: number;
+} {
+  const lines = auditLogText.split(/\r?\n/);
+  const sections = findBarrageSections(lines);
+  let openHighPlus = 0;
+  let openMedium = 0;
+  for (const section of sections) {
+    const counts = countHighPlusInSection(lines, section);
+    openHighPlus += counts.highPlusCount;
+    openMedium += counts.mediumCount;
+  }
+  return { openHighPlus, openMedium };
+}
+
 export function checkBarrageDampener(
   args: BarrageDampenerCheckArgs,
 ): BarrageDampenerCheckResult {
