@@ -4935,3 +4935,44 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 - TF-14 + TF-15 are the same root cause (branch-name feature detection vs. the `feature.json` pointer) — both fold into a future `stackctl feature use` verb.
 
 **Next step:** `design/spec-governance` is at **IMPLEMENT** — the chain is complete through analyze with 0 CRITICAL. NEXT: run **`/speckit-implement`** — operator to choose **full task list vs MVP-first (US1 only: auto-governance at `after_clarify`)**. Implement writes the extension + `govern-spec.sh` + `spec-governance-gate.ts` (porting `check-barrage-dampener`) + RED-first tests, then fires the mandatory `after_implement` governance barrage (`impl/governance` dogfooding itself). `impl/execution-engine` (`specs/002`) remains parked at `/speckit-plan` behind the design block. Bootstrap next session with `/session-start`.
+
+## 2026-06-07: design/spec-governance — /speckit-implement → dogfood → dw-lifecycle removal → convergence-loop + slush pile
+
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers
+
+**Goal:** Run `/speckit-implement` on `design/spec-governance` (full task list), then drive the feature's self-hosting dogfood to wherever it led.
+
+**Accomplished:**
+- **`/speckit-implement` — full 26 tasks, TDD-first** (`9ce058c2`): the `spec-governance` Spec Kit extension (`extension.yml` after_clarify/after_plan hooks), `govern-spec.sh` (barrage over the SPEC), `spec-governance-gate.ts` (the protocol port — reuses `check-barrage-dampener`), RED-first tests. Mandatory `after_implement` governance fired.
+- **Self-hosting dogfood (T024) genuinely worked** (`0a6465c5`): the extension governed its OWN spec — 2/2 models, cross-model agreement rendered, gate evaluated. Caught real bugs immediately (empty-models bash-3.2 crash `dcebffe6`; 6 code findings AUDIT-10..15, fixed/acked `e8fa3139`/`45c10f90`).
+- **Removed dw-lifecycle as a dependency (operator directive)** — pulled `multi/migrate-audit-barrage` forward (`d003312e`): vendored the whole audit-barrage subsystem (render/fire/lift + dampener + protocol + extract + util) into `plugins/stack-control/src/`, re-namespaced `.dw-lifecycle/*` → `.stack-control/*`, repointed shells to bundled `stackctl`, dropped `requires: dw-lifecycle`. Proven by a **live native barrage** (zero dw-lifecycle involvement). dw-lifecycle untouched (its copy stays; retire later).
+- **Resolved the 9 dogfood spec-design findings** (round-1 clarifications `1a2f258c`) + **AUDIT-05 per-checkpoint independent loops** (code: gate `--checkpoint` filter + run tagging, `701fad25`) + **AUDIT-07 zero-healthy outage** fail-loud.
+- **Convergence-loop dogfood** (re-govern iterations 1→2→3): HIGH count went 2→0→1→1. The loop drove the spec from genuinely-flawed to exhaustively-precise; iter-1 fixes were clean (0 HIGH).
+- **Ported the slush pile (operator caught the gap)** (`37642683`): the port had the dampener (decision) but not `slush-remaining` (action). Vendored it + new `stackctl slush-findings` verb (slush residual MED/LOW → `acknowledged-slush-pile-<date>` when the dampener engages; never slushes HIGH; `--burn-down` re-opens) + auto-wired into `govern-spec.sh`. Corrected the spec (FR-015 + the "carried open" → "slushed" fidelity fix). 58/58 vitest.
+- **Captured the fresh-context-fix-dispatch insight** in the design inbox (`d2fa2c1e`).
+
+**Didn't Work / unresolved:**
+- The 004 convergence loop did **NOT converge** — paused at **iteration 3/5**: 8 open findings (1 HIGH = AUDIT-31 cross-run reconciliation; 5 MED; 2 LOW), gate `blocked`. **0 findings actually slushed live** (the dampener never engaged on a live run — a HIGH appeared every round, and the slush correctly refuses while a HIGH is present). The slush mechanism is built + wired + unit-tested but has not yet fired on the live loop.
+
+**Course Corrections:**
+- [PROCESS] **dw-lifecycle is not an allowed dependency.** I'd built spec-governance composing dw-lifecycle per FR-006/the tasks (incl. a deep internal-module import the succession rule's own anti-pattern forbids). Operator directive superseded it → migrated the barrage in-house (pulled `multi/migrate-audit-barrage` forward).
+- [PROCESS] **"duplication detection shouldn't run across codebases."** I flagged cross-plugin clone risk from the vendored copy as a concern; operator corrected — separate codebases, clone detection shouldn't span them. Captured per-codebase scoping into `design/migrate-scope-discovery` (`2d8ffc22`).
+- [PROCESS] **Incomplete port — missing the slush pile.** Operator asked "does the port do the slush pile?" — it didn't. Real fidelity gap (had the dampener, not the slush action). Also surfaced that my AUDIT-03 spec clarification ("carried open") was unfaithful — the protocol slushes.
+- [COMPLEXITY] [PROCESS] **Mis-diagnosed the "fresh HIGH each round."** I blamed the protocol/auditors and proposed building compensating machinery (delta-audit, severity rubric, cross-run reconciliation). Operator corrected: the HIGHs land on the **new fix text** — the problem is **fix quality degrading under context fatigue**, not what the auditors look at. Wrong target. The structural fix (author each fix in a fresh, isolated, minimal context — per-finding sub-agent dispatch) is captured in the design inbox for next session.
+- [DOCUMENTATION] Self-inflicted spec contradictions: AUDIT-24 (my FR-008 said "parseable output" while the as-built `isModelRunHealthy` does byte-count); round-3 MEDs 36/37/38 critiqued my own round-3 wording (the "available refinement" caveats were new audit surface). Both corrected, but they ARE the evidence for the context-fatigue diagnosis above.
+
+**Quantitative** (re-derived from `git log 8d23ebaf..HEAD`):
+- Commits: **22** (`9ce058c2..d2fa2c1e`)
+- Files changed: **52** (+5945 / −84)
+- Vitest: **58/58 passing** (new suites: hook-wiring, gate, gate-port-fidelity, gate-per-checkpoint, cross-model-lift, disposition-persistence, slush-findings). Local smokes (deterministic + fail-loud incl. AUDIT-07/14/15) PASS.
+- **Open findings at session end: 8** (1 HIGH: AUDIT-31; 5 MED; 2 LOW) — all from the iteration-3 `after_clarify` barrage, gate `blocked`. **acknowledged-slush-pile: 0 live** (mechanism built/tested, never fired on the live loop because a HIGH was present every round). 30 findings dispositioned `fixed-<sha>` across the session (AUDIT-01..30).
+- Live multi-model barrages fired: ~5 (dogfood + after_implement + 3 convergence iterations).
+- Corrections: **4** substantive (2 [PROCESS] operator-directive redirects, 1 [PROCESS]+[COMPLEXITY] mis-diagnosis, 1 [PROCESS] incomplete-port) + self-inflicted-fix [DOCUMENTATION].
+
+**Insights:**
+- The dogfood **validated the feature for real**: it caught genuine contradictions, drove HIGH 2→0, and then caught *my own* fix-round errors — exactly the "detection over instruction" thesis, turned on its author.
+- The convergence loop's quality is bounded by **FIX quality**, which degrades under context fatigue. The captured **fresh-context-fix-dispatch** (per-finding clean sub-agent → minimal edit) is the environmental-design answer (aligns with #408, thesis "industrialize execution").
+- The slush pile is the loop's natural terminator, but only once HIGH goes quiet — and an aggressive auditor on an exhaustively-detailed spec keeps finding a HIGH-framed precision item each round. The unresolved tension (severity calibration — what *is* a HIGH) is the open protocol question; the override + bounded ceiling are the designed escape hatches.
+
+**Next step:** Resume the 004 convergence loop in a **fresh session**, applying the captured mechanism — dispatch each open finding (AUDIT-31..38) to a **clean per-finding sub-agent** for the minimal edit (do NOT hand-author fixes in an accumulated context), then re-barrage toward 2-consecutive-0-HIGH → slush auto-fires → converge; fall back to a recorded `GOVERN_OVERRIDE` if only severity-inflated precision nits survive. The slush is built/wired/tested but unproven on the live loop. `impl/execution-engine` (`specs/002`) remains parked at `/speckit-plan`. Bootstrap with `/session-start`.
