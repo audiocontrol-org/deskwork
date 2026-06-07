@@ -22,6 +22,8 @@ stackctl curate --doc <path> [--apply]
 On `--apply`, curate **reorders first, then archives**, and the whole operation is **atomic — all-or-nothing** (FR-010): both steps succeed together or nothing is written.
 4. **Up-to-date** (FR-008, seam only): if the grammar declares a reconciliation hook, report it as `declared, not yet executed`; **never run it**. If undeclared, the check is silent. Either way the other three checks still run.
 
+**Coherence (FR-006):** `curate` **owns the coherence check** — it cross-references the provenance ledger against the archive file's identifier markers and reports any mismatch (e.g. ledger/marker staleness from a manual identifier edit) as a **report-line NOTICE, not a fail-loud failure** (manual identifier edits are the operator's responsibility — FR-006). This is the surface that asserts SC-007's "ledger matches archive contents" invariant.
+
 ## Exit codes
 
 - `0` — curate complete (clean, or dry-run report, or apply succeeded).

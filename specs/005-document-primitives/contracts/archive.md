@@ -17,11 +17,11 @@ stackctl archive --doc <path> [--apply]
 
 1. Resolve grammar (grammar-declaration contract); fail loud if ungovernable (FR-001).
 2. Parse → Units; fail loud on parse failure with offending span (FR-003).
-3. Validate identifier invariants across document ∪ archive; fail loud on violation (FR-005).
+3. Validate identifier invariants across document ∪ archive; the archived side of the union comes from the **provenance ledger only** (keyed by identifier — FR-005/FR-006), never a heading scan; fail loud on violation (FR-005).
 4. Select Units with `status ∈ terminalStatuses` (FR-004).
 5. **Dry-run** (default): report the selected Units (identifier, status, line span) and the planned archive target. **Zero writes.**
-6. **`--apply`** (**atomic — all-or-nothing across both files**, FR-006/FR-010): cut selected Units by span from the live document; append to `<doc>-archive.md` (create with frontmatter if absent), each keeping its identifier as heading; add one ledger entry per moved Unit **in the archive file**. The live-document edit and the archive-file write either both land or neither does — a failure partway leaves nothing written in either file.
-7. Assert **coherence**: ledger entries match archived Units exactly (FR-006, SC-007).
+6. **`--apply`** (**atomic — all-or-nothing across both files**, FR-006/FR-010): cut selected Units by span from the live document; append to `<doc>-archive.md` (create with frontmatter if absent), each delimited by the **same reserved-level structural marker** as the live document (FR-002 boundary rule) so its span stays unambiguous on later extraction (FR-007); add one ledger entry per moved Unit **in the archive file** (keyed by identifier — no span/position recorded; the boundary is structural). The live-document edit and the archive-file write either both land or neither does — a failure partway leaves nothing written in either file.
+7. Assert **coherence**: ledger entries match the archive file's identifier markers exactly — cross-referencing the ledger against the archive contents (the only use of the heading scan; not a uniqueness-union input) (FR-006, SC-007).
 
 ## Exit codes
 

@@ -45,12 +45,12 @@ A single parsed item — the thing that is ordered, archived, and referenced (FR
 | `identifier` | string | Stable identity; validated by the invariants below (FR-005). |
 | `status` | string | One of `grammar.statusVocabulary` (FR-004). |
 | `orderKey` | string \| number \| tuple | Derived per `grammar.orderKey`; never a positional/sequence ordinal (FR-004). |
-| `span` | `{ startLine, endLine }` | Original markdown line range (FR-002); what archive/curate cut/move. |
-| `body` | string (opaque) | The Unit's raw block content; never interpreted by the engine. |
+| `span` | `{ startLine, endLine }` | Original markdown line range (FR-002); what archive/curate cut/move. Bounded by the grammar's **reserved structural marker** — a Unit runs from its marker to the next same-level marker (FR-002 Unit boundary rule). |
+| `body` | string (opaque) | The Unit's raw block content; never interpreted by the engine. Provably cannot contain the grammar's reserved Unit marker (reserved heading level / row), which is what makes the boundary unambiguous (FR-002). |
 
 **Identifier invariants (FR-005, enforced as part of well-formedness — FR-003):**
 
-- **Unique** across the document ∪ its archive (so unarchive cannot collide — FR-007). Archived identifiers for the union come from a heading/ledger scan of the `ArchiveFile`, not a live-grammar parse; an absent archive means the union is just the live document, and a corrupt archive is surfaced via the coherence check (FR-005, FR-006).
+- **Unique** across the document ∪ its archive (so unarchive cannot collide — FR-007). Archived identifiers for the union come from the **`ProvenanceLedger` only** (keyed by identifier), never from a heading scan of the `ArchiveFile` (a Unit body may contain headings, so a scan can't tell a Unit-identifier marker from a body heading without a forbidden archive parse → false collisions). An empty ledger / absent archive means the union is just the live document; a corrupt archive is surfaced via the coherence check, not a live parse (FR-005, FR-006).
 - **Human-readable**: a single visible name, no parallel opaque token.
 - **Non-ordinal**: rejected if it matches the denylist (bare-integer segment; `F<n>`; `phase-<n>`; `step-<n>`; `#<n>`; leading `<n>` numbering). Refinable.
 - **Per-grammar shape**: the engine enforces the *properties*; `grammar.identifierProduction` declares the concrete shape (strict slug like `<phase>/<slug>`, or a title). Slug recommended, not mandated (clarification 2026-06-07).
@@ -63,11 +63,12 @@ The sibling document receiving archived Units (FR-006).
 | Field | Type | Notes |
 |---|---|---|
 | `path` | string | `<doc>-archive.md`; created with frontmatter if absent. |
-| `archivedUnits` | Unit[] | Appended archived Units; each keeps its identifier as its heading. |
+| `archivedUnits` | Unit[] | Appended archived Units; each delimited by the **same reserved-level structural marker** as the live document (FR-002 boundary rule), so a Unit spans from its identifier marker to the next same-level marker — unambiguous because bodies cannot contain that marker. |
 | `ledger` | ProvenanceLedger | Lives **in this file**, not the live document (clarification 2026-06-07). |
 
-- **Rule (coherence — FR-006, SC-007)**: `ledger` entries match `archivedUnits` exactly (one ledger entry per archived Unit, keyed by identifier).
-- **Rule (uniqueness scan — FR-005)**: archived identifiers feeding the document ∪ archive uniqueness union are read via a lightweight heading/ledger scan of this file, **not** by parsing it against the live grammar; an absent archive contributes nothing to the union, and a corrupt archive is surfaced via the coherence check rather than failing the live parse.
+- **Rule (coherence — FR-006, SC-007)**: `ledger` entries match `archivedUnits` exactly (one ledger entry per archived Unit, keyed by identifier). The coherence check cross-references each ledger identifier against the archive file's identifier markers — this is the **only** use of the archive heading scan.
+- **Rule (uniqueness union source — FR-005)**: archived identifiers feeding the document ∪ archive uniqueness union come from the **`ledger` only** (keyed by identifier), **not** from a heading scan and **not** by parsing the archive against the live grammar. An empty ledger contributes nothing to the union; a corrupt archive is surfaced via the coherence check rather than failing the live parse.
+- **Rule (extraction — FR-007)**: a ledger entry (keyed by identifier) is sufficient to locate a Unit for unarchive — the engine scans the archive file for the matching identifier marker and reads to the next same-level marker. **No span/position is stored**; the boundary is structural.
 
 ## ProvenanceLedger
 

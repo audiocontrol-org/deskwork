@@ -22,7 +22,7 @@ description: "Task list for design/document-primitives implementation"
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-- [ ] T001 Create feature dirs: `plugins/stack-control/src/document-model/`, `plugins/stack-control/grammars/`, `plugins/stack-control/skills/{archive,curate}/`, `plugins/stack-control/tests/document-primitives/fixtures/`.
+- [ ] T001 Create feature dirs: `plugins/stack-control/src/document-model/`, `plugins/stack-control/grammars/`, `plugins/stack-control/skills/{archive,unarchive,curate}/`, `plugins/stack-control/tests/document-primitives/fixtures/`.
 - [ ] T002 Add runtime deps `peggy` + `markdown-it` (and `@types/markdown-it`) to the `plugins/stack-control` package manifest (research.md decision).
 - [ ] T003 [P] Author fixture documents in `plugins/stack-control/tests/document-primitives/fixtures/`: a governable doc, an ungovernable doc (no grammar), a parse-failing doc, and one with an ordinal-looking identifier.
 - [ ] T004 [P] RED: write `scripts/check-no-predecessor-refs.sh` (FR-011 anti-coupling gate — scope globs over the product mechanism (engine/verbs/skills/grammars/fixtures) + case-insensitive match pattern + exclusions for `specs/`, design docs, and the two proof documents `ROADMAP.md`/`DESIGN-INBOX.md` per spec) plus a Vitest wrapper in `plugins/stack-control/tests/document-primitives/anti-coupling.test.ts` asserting it FAILS on a planted predecessor reference in the mechanism and PASSES when absent (and that a predecessor reference inside a proof document does NOT fail the gate). Must FAIL initially.
@@ -69,6 +69,7 @@ description: "Task list for design/document-primitives implementation"
 - [ ] T022 [US1] Implement verb `plugins/stack-control/src/subcommands/unarchive.ts` (`--doc`, `--id`, `--apply`) per `contracts/unarchive.md`.
 - [ ] T023 [US1] Register `archive` + `unarchive` in the `stackctl` dispatcher.
 - [ ] T024 [P] [US1] Author skill `plugins/stack-control/skills/archive/SKILL.md` (thin: dry-run → confirm → apply).
+- [ ] T043 [P] [US1] Author skill `plugins/stack-control/skills/unarchive/SKILL.md` (thin: dry-run → confirm → apply) — the P1 reversibility half (FR-007/US1 Scenario 3/SC-007); a first-class `/stack-control:*` skill parallel to archive, wrapping the `unarchive` verb (T022).
 
 **Checkpoint**: archive/unarchive MVP works end-to-end against a real grammar.
 
@@ -154,6 +155,7 @@ description: "Task list for design/document-primitives implementation"
 - T003 ∥ T004 (setup).
 - RED tests across modules/stories are `[P]` (distinct files): T006, T008, T010, T012; T015–T018; T025–T028; T032–T033.
 - T014 (grammars) ∥ engine implementation.
+- T024 ∥ T043 (US1 archive + unarchive skills, distinct files).
 - T035 ∥ T036 (proof docs); T040 ∥ T041 (polish).
 
 ---

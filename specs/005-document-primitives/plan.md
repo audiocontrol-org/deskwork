@@ -20,7 +20,7 @@ Ship two generalized, document-agnostic primitives — `archive` (move terminal-
 
 **Target Platform**: Node (Claude Code plugin), invoked via `stackctl` + skills.
 
-**Project Type**: a shared engine library + three CLI verbs + two thin skills + two built-in grammars, all in `plugins/stack-control/`.
+**Project Type**: a shared engine library + three CLI verbs + three thin skills (archive, unarchive, curate) + two built-in grammars, all in `plugins/stack-control/`.
 
 **Performance Goals**: documents are small (tens–hundreds of Units); wall-clock is dominated by a single markdown parse + a single grammar parse. No latency target beyond "interactive."
 
@@ -34,7 +34,7 @@ Ship two generalized, document-agnostic primitives — `archive` (move terminal-
 
 | Principle | Verdict | How this plan satisfies it |
 |---|---|---|
-| I. Test-First | PASS (planned) | Engine + verbs built RED-first under Vitest. The load-bearing block→line-range round-trip (research risk #1) gets its failing test first; grammar-as-untrusted-input failure path tested RED. No spike kept as production. |
+| I. Test-First | PASS (planned) | Engine + verbs built RED-first under Vitest. The load-bearing block→line-range round-trip (research risk #1) gets its failing test first; the grammar **compile-failure / parse-failure / malformed-config actionable-error** path tested RED (trusted config per AUDIT-11, but compile/parse failures still fail loud with a located error). No spike kept as production. |
 | II. Integration-First | PASS | The engine abstraction is derived from **two concrete grammars** (inbox + roadmap), not one imagined shape — the port is trusted only once both real documents flow through it (SC-005). No speculative provider abstraction; scope captured, cuts only where the operator drew them. |
 | III. Branch on Capabilities | N/A | No provider plans here; this is document tooling, not the execution/governance back half. |
 | IV. Division of Labor | PASS | The document is the operator's authoring artifact; the engine mutates it only on explicit `--apply` (the operator's act), and confines all bookkeeping (the provenance ledger) to the **archive file** — it never injects governance state into the live document. |
@@ -48,7 +48,7 @@ Ship two generalized, document-agnostic primitives — `archive` (move terminal-
 
 **Result: no violations.** Complexity Tracking is empty.
 
-**Post-design re-check (after Phase 1)**: PASS — the design is a single shared library + three verbs + two skills + two declarative grammars. It introduces one new abstraction (the document grammar) which is immediately validated against two concrete instances (Principle II). No new vendor coupling; no fallbacks. No principle moved from PASS.
+**Post-design re-check (after Phase 1)**: PASS — the design is a single shared library + three verbs + three skills (archive, unarchive, curate) + two declarative grammars. It introduces one new abstraction (the document grammar) which is immediately validated against two concrete instances (Principle II). No new vendor coupling; no fallbacks. No principle moved from PASS.
 
 ## Project Structure
 
@@ -94,6 +94,7 @@ plugins/stack-control/
 │   └── design-inbox.peg
 ├── skills/
 │   ├── archive/SKILL.md                 # thin: dry-run → confirm → apply
+│   ├── unarchive/SKILL.md               # thin: dry-run → confirm → apply (P1 recovery half — FR-007/US1)
 │   └── curate/SKILL.md
 ├── ROADMAP.md                           # NEW plugin-local roadmap (proof instance #2; declares roadmap grammar)
 ├── DESIGN-INBOX.md                      # design-inbox lifted to plugin level (proof instance #1)
@@ -105,7 +106,7 @@ scripts/
 └── check-no-predecessor-refs.sh          # FR-011 anti-coupling gate over the product mechanism (engine/verbs/skills/grammars; proof docs excluded)
 ```
 
-**Structure Decision**: A single shared `document-model/` library (the engine) consumed by three thin verb modules and two thin skills, all inside `plugins/stack-control/` (succession rule: new capability lives in the successor, never the predecessor). The two proof documents are first-class files at the plugin root. Built-in grammars ship under `plugins/stack-control/grammars/`; adopting projects override at `.stack-control/grammars/<id>.peg` (FR-012). The anti-coupling gate (FR-011) is a standalone script a Vitest test also invokes; it scans the product mechanism (engine/verbs/skills/grammars), excluding the two proof documents as governed content.
+**Structure Decision**: A single shared `document-model/` library (the engine) consumed by three thin verb modules and three thin skills (archive, unarchive, curate), all inside `plugins/stack-control/` (succession rule: new capability lives in the successor, never the predecessor). The two proof documents are first-class files at the plugin root. Built-in grammars ship under `plugins/stack-control/grammars/`; adopting projects override at `.stack-control/grammars/<id>.peg` (FR-012). The anti-coupling gate (FR-011) is a standalone script a Vitest test also invokes; it scans the product mechanism (engine/verbs/skills/grammars), excluding the two proof documents as governed content.
 
 ## Complexity Tracking
 
