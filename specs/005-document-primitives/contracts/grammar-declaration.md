@@ -21,17 +21,18 @@ When both an embedded block and a frontmatter reference exist, **embedded wins**
 
 ## Grammar obligations
 
-A grammar (`.peg` text) MUST declare, in a form the engine can extract:
+A grammar (`.peg` text) is **trusted local config** compiled and run in-process (spec Assumptions — grammar trust model; same model as `.deskwork/*.ts` overrides). It MUST declare, in a form the engine can extract:
 
 - the **Unit production** (what a unit is + its boundaries over the block stream);
 - the **status vocabulary** and the **terminal (archivable) subset** (FR-004);
-- the **order key** — expressible over status + human-readable fields, **never** the identifier (FR-004);
+- the **order key** — expressible over status + human-readable fields, **never** a positional/sequence ordinal (ordering by a category/attribute that also appears in a structured identifier, e.g. roadmap by `phase`, is allowed) (FR-004);
 - the **identifier production** — a strict slug (`<phase>/<slug>`, recommended) or a title; the engine enforces the FR-005 properties regardless of shape;
 - optionally, a **reconciliation hook** (`kind: command|glob`, `source`) — recorded, not executed (FR-008).
 
 ## Engine guarantees to the grammar author
 
 - A malformed grammar produces a **clean, located error** (never a crash) — FR-003/FR-010 (research risk #3).
+- The engine **excises its own chrome before the grammar runs** — the embedded grammar-declaration comment and the document frontmatter are stripped from the block stream by a pre-parse step (FR-002), so the grammar never sees and never has to account for them.
 - Prose bodies are **opaque** — the grammar matches block structure, not body prose (FR-002).
 - Identifier-invariant violations are reported against the offending Unit (FR-005).
 

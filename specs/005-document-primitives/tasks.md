@@ -25,7 +25,7 @@ description: "Task list for design/document-primitives implementation"
 - [ ] T001 Create feature dirs: `plugins/stack-control/src/document-model/`, `plugins/stack-control/grammars/`, `plugins/stack-control/skills/{archive,curate}/`, `plugins/stack-control/tests/document-primitives/fixtures/`.
 - [ ] T002 Add runtime deps `peggy` + `markdown-it` (and `@types/markdown-it`) to the `plugins/stack-control` package manifest (research.md decision).
 - [ ] T003 [P] Author fixture documents in `plugins/stack-control/tests/document-primitives/fixtures/`: a governable doc, an ungovernable doc (no grammar), a parse-failing doc, and one with an ordinal-looking identifier.
-- [ ] T004 [P] RED: write `scripts/check-no-predecessor-refs.sh` (FR-011 anti-coupling gate — scope globs + case-insensitive match pattern + `specs/`/design-doc exclusions per spec) plus a Vitest wrapper in `plugins/stack-control/tests/document-primitives/anti-coupling.test.ts` asserting it FAILS on a planted predecessor reference and PASSES when absent. Must FAIL initially.
+- [ ] T004 [P] RED: write `scripts/check-no-predecessor-refs.sh` (FR-011 anti-coupling gate — scope globs over the product mechanism (engine/verbs/skills/grammars/fixtures) + case-insensitive match pattern + exclusions for `specs/`, design docs, and the two proof documents `ROADMAP.md`/`DESIGN-INBOX.md` per spec) plus a Vitest wrapper in `plugins/stack-control/tests/document-primitives/anti-coupling.test.ts` asserting it FAILS on a planted predecessor reference in the mechanism and PASSES when absent (and that a predecessor reference inside a proof document does NOT fail the gate). Must FAIL initially.
 
 ---
 
@@ -118,10 +118,10 @@ description: "Task list for design/document-primitives implementation"
 
 ## Phase 6: Proof documents & generality (FR-013 / SC-005)
 
-- [ ] T035 [P] Establish `plugins/stack-control/DESIGN-INBOX.md` by lifting the current project design-inbox content (declares the design-inbox grammar; **lossless** migration — every existing entry preserved).
+- [ ] T035 [P] Establish `plugins/stack-control/DESIGN-INBOX.md` by lifting the current project design-inbox content (declares the design-inbox grammar; **lossless** migration over **content bodies** — every existing entry's body preserved; a nonconforming identifier MAY be normalized to satisfy FR-005, recording the rename; the result must pass `curate`).
 - [ ] T036 [P] Establish `plugins/stack-control/ROADMAP.md` (new plugin-local roadmap; declares the roadmap grammar; `<phase>/<slug>` rows).
 - [ ] T037 RED→green: generality integration test in `.../generality.test.ts` — BOTH proof documents are governed by the SAME engine code path, differing only in grammar (SC-005).
-- [ ] T038 RED→green: lossless-migration test — every pre-existing inbox entry appears in `DESIGN-INBOX.md` (FR-013 no-content-loss).
+- [ ] T038 RED→green: lossless-migration test — every pre-existing inbox entry's **body** appears in `DESIGN-INBOX.md` with no content dropped; any normalized identifier has its rename recorded; the migrated document passes `curate` (FR-013 lossless-over-content-bodies).
 
 **Checkpoint**: one engine, two real document shapes, no content lost.
 
@@ -129,7 +129,7 @@ description: "Task list for design/document-primitives implementation"
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T039 Run `scripts/check-no-predecessor-refs.sh` over the full new surface → **zero** predecessor references; the gate is green (FR-011/SC-006). Makes T004 fully green.
+- [ ] T039 Run `scripts/check-no-predecessor-refs.sh` over the product mechanism (engine/verbs/skills/grammars/fixtures; proof documents excluded) → **zero** predecessor references; the gate is green (FR-011/SC-006). Makes T004 fully green.
 - [ ] T040 [P] Verify Principle VI: every new file < 500 lines; refactor any that exceed it.
 - [ ] T041 [P] Author `plugins/stack-control` README/usage docs for `archive` + `curate` (no rot-prone version strings — link the releases page).
 - [ ] T042 Run all six `quickstart.md` scenarios end-to-end against the two proof documents.

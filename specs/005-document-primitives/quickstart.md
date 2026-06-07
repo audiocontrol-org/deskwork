@@ -45,5 +45,5 @@ Each of these MUST exit non-zero with an actionable message and **write nothing*
 
 ## Scenario 6 — Anti-coupling gate is clean (SC-006, FR-011)
 
-1. Run `scripts/check-no-predecessor-refs.sh` over the new surface (engine, verbs, skills, grammars, fixtures, READMEs).
+1. Run `scripts/check-no-predecessor-refs.sh` over the product mechanism (engine, verbs, skills, grammars, fixtures). The two proof documents (`ROADMAP.md`, `DESIGN-INBOX.md`) are **excluded** — governed content that legitimately names the predecessor as lineage (FR-011).
 2. **Assert**: **zero** predecessor-plugin references; exit 0. (A Vitest test also invokes this; a non-zero exit blocks the feature.)

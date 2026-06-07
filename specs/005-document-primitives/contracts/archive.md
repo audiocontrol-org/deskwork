@@ -20,7 +20,7 @@ stackctl archive --doc <path> [--apply]
 3. Validate identifier invariants across document ∪ archive; fail loud on violation (FR-005).
 4. Select Units with `status ∈ terminalStatuses` (FR-004).
 5. **Dry-run** (default): report the selected Units (identifier, status, line span) and the planned archive target. **Zero writes.**
-6. **`--apply`** (**atomic — all-or-nothing**, FR-006/FR-010): cut selected Units by span; append to `<doc>-archive.md` (create with frontmatter if absent), each keeping its identifier as heading; add one ledger entry per moved Unit **in the archive file**. A failure partway leaves nothing written.
+6. **`--apply`** (**atomic — all-or-nothing across both files**, FR-006/FR-010): cut selected Units by span from the live document; append to `<doc>-archive.md` (create with frontmatter if absent), each keeping its identifier as heading; add one ledger entry per moved Unit **in the archive file**. The live-document edit and the archive-file write either both land or neither does — a failure partway leaves nothing written in either file.
 7. Assert **coherence**: ledger entries match archived Units exactly (FR-006, SC-007).
 
 ## Exit codes

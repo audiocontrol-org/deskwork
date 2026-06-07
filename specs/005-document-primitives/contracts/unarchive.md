@@ -19,8 +19,8 @@ stackctl unarchive --doc <path> --id <identifier> [--apply]
 1. Resolve grammar; fail loud if ungovernable (FR-001).
 2. Locate `--id` in the archive file; fail loud if absent (FR-010).
 3. **Collision guard**: if `--id` already exists in the live document, **fail loud** (FR-005 uniqueness, FR-007). Zero writes.
-4. **Dry-run** (default): report the planned restore (identifier, target position). **Zero writes.**
-5. **`--apply`**: move the Unit from the archive file back into the live document; remove its ledger entry; re-assert coherence (FR-006).
+4. **Dry-run** (default): report the planned restore (identifier, declared-order reinsertion position derived from the grammar). **Zero writes.**
+5. **`--apply`**: move the Unit from the archive file back into the live document at its **declared-order position** (FR-004); remove its ledger entry; re-assert coherence (FR-006).
 
 ## Exit codes
 
@@ -30,5 +30,5 @@ stackctl unarchive --doc <path> --id <identifier> [--apply]
 
 ## Outcomes verified
 
-- An archive→unarchive round-trip restores the document's original content (SC-007).
+- An archive→unarchive round-trip leaves the document content-equivalent and well-ordered — the Unit returns at its declared-order position with body and identity intact, not byte-identical (SC-007).
 - Identity is unchanged by the round-trip (SC-004).

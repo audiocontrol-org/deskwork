@@ -15,7 +15,7 @@ The compiled, declared description of a document's structure. Resolved per FR-00
 | `pegText` | string | The declarative `.peg` grammar text compiled by peggy at runtime. |
 | `statusVocabulary` | string[] | All legal statuses (FR-004). |
 | `terminalStatuses` | string[] | Subset of `statusVocabulary` that is archivable (FR-004). |
-| `orderKey` | OrderKey | Declared ordering; MUST NOT reference the identifier (FR-004). |
+| `orderKey` | OrderKey | Declared ordering; MUST NOT be a positional/sequence ordinal (a category/attribute that also appears in a structured identifier is allowed) (FR-004). |
 | `identifierProduction` | IdentifierRule | The grammar's concrete identifier shape — strict slug or title (FR-005, clarification: per-grammar). |
 | `reconciliationHook` | ReconciliationHook \| null | Optional seam (FR-008); null when undeclared. |
 
@@ -44,13 +44,13 @@ A single parsed item — the thing that is ordered, archived, and referenced (FR
 |---|---|---|
 | `identifier` | string | Stable identity; validated by the invariants below (FR-005). |
 | `status` | string | One of `grammar.statusVocabulary` (FR-004). |
-| `orderKey` | string \| number \| tuple | Derived per `grammar.orderKey`; never the identifier (FR-004). |
+| `orderKey` | string \| number \| tuple | Derived per `grammar.orderKey`; never a positional/sequence ordinal (FR-004). |
 | `span` | `{ startLine, endLine }` | Original markdown line range (FR-002); what archive/curate cut/move. |
 | `body` | string (opaque) | The Unit's raw block content; never interpreted by the engine. |
 
 **Identifier invariants (FR-005, enforced as part of well-formedness — FR-003):**
 
-- **Unique** across the document ∪ its archive (so unarchive cannot collide — FR-007).
+- **Unique** across the document ∪ its archive (so unarchive cannot collide — FR-007). Archived identifiers for the union come from a heading/ledger scan of the `ArchiveFile`, not a live-grammar parse; an absent archive means the union is just the live document, and a corrupt archive is surfaced via the coherence check (FR-005, FR-006).
 - **Human-readable**: a single visible name, no parallel opaque token.
 - **Non-ordinal**: rejected if it matches the denylist (bare-integer segment; `F<n>`; `phase-<n>`; `step-<n>`; `#<n>`; leading `<n>` numbering). Refinable.
 - **Per-grammar shape**: the engine enforces the *properties*; `grammar.identifierProduction` declares the concrete shape (strict slug like `<phase>/<slug>`, or a title). Slug recommended, not mandated (clarification 2026-06-07).
@@ -67,6 +67,7 @@ The sibling document receiving archived Units (FR-006).
 | `ledger` | ProvenanceLedger | Lives **in this file**, not the live document (clarification 2026-06-07). |
 
 - **Rule (coherence — FR-006, SC-007)**: `ledger` entries match `archivedUnits` exactly (one ledger entry per archived Unit, keyed by identifier).
+- **Rule (uniqueness scan — FR-005)**: archived identifiers feeding the document ∪ archive uniqueness union are read via a lightweight heading/ledger scan of this file, **not** by parsing it against the live grammar; an absent archive contributes nothing to the union, and a corrupt archive is surfaced via the coherence check rather than failing the live parse.
 
 ## ProvenanceLedger
 
@@ -103,4 +104,4 @@ status ∈ terminalStatuses ?
    └─ no  → stays in the live document; curate keeps it well-ordered
 ```
 
-Archive and unarchive are inverse operations; an archive→unarchive round-trip restores prior content (FR-007, SC-007). Identity (`identifier`) is invariant across every transition and every reorder (FR-005, SC-004).
+Archive and unarchive are inverse operations; an archive→unarchive round-trip is content-equivalent and well-ordered — the Unit returns with body and identity intact, reinserted at its declared-order position, not byte-identical (FR-007, SC-007). Identity (`identifier`) is invariant across every transition and every reorder (FR-005, SC-004).

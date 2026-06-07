@@ -12,7 +12,7 @@ Ship two generalized, document-agnostic primitives — `archive` (move terminal-
 
 **Language/Version**: TypeScript (strict) run via `tsx`, mirroring the existing in-tree `stack-control` shape. No `any` / `as Type` / `@ts-ignore`.
 
-**Primary Dependencies** (resolved in [research.md](./research.md)): **peggy** (v5.x — maintained PEG.js successor; declarative `.peg` grammar text compiled at runtime; line-native `location()` spans) as the grammar→parser; **markdown-it** (`md.parse()` block tokens carry `token.map = [startLine, endLine]`) as the markdown block parser. Integration pattern: markdown-it block tokens → a **normalized one-token-per-line** representation + a parallel line-range map → the declared `.peg` grammar parses that normalized text → Unit spans map back to original markdown line ranges.
+**Primary Dependencies** (resolved in [research.md](./research.md)): **peggy** (v5.x — maintained PEG.js successor; declarative `.peg` grammar text compiled at runtime; line-native `location()` spans) as the grammar→parser; **markdown-it** (`md.parse()` block tokens carry `token.map = [startLine, endLine]`) as the markdown block parser. Integration pattern: markdown-it block tokens → a **pre-parse excision step** that strips engine-level document chrome (the embedded grammar-declaration comment + the frontmatter, FR-002) so the grammar never sees its own declaration → a **normalized one-token-per-line** representation + a parallel line-range map → the declared `.peg` grammar parses that normalized text → Unit spans map back to original markdown line ranges. Peggy compiles + runs operator-authored grammar text **in-process at runtime**; per spec Assumptions (grammar trust model) this is accepted as trusted local config (same model as `.deskwork/*.ts` overrides), not restricted to an action-free subset.
 
 **Storage**: files only — the live markdown document, its sibling `<doc>-archive.md`, and grammar files (`.peg`) either embedded in the document or under a grammar directory. The **provenance ledger lives in the archive file** (clarification 2026-06-07), never the live document. No database.
 
@@ -44,7 +44,7 @@ Ship two generalized, document-agnostic primitives — `archive` (move terminal-
 | VIII. Faithful Tool Adoption | PASS | Reached this step via Spec Kit order (constitution → specify → clarify → plan); hooks honored. |
 | IX. Execution-Backend Pluggability | N/A | Not the execution engine. |
 
-**Project-specific gate — anti-coupling (FR-011):** a machine-checked scan asserts zero predecessor-plugin references across the new surface. Treated as a release-blocking quality gate, not advice (thesis: mechanical interlock over instruction).
+**Project-specific gate — anti-coupling (FR-011):** a machine-checked scan asserts zero predecessor-plugin references across the new product **mechanism** (engine/verbs/skills/grammars). The two proof documents (`ROADMAP.md`, `DESIGN-INBOX.md`) are **excluded** — governed content that legitimately names the predecessor as lineage (FR-011). Treated as a release-blocking quality gate, not advice (thesis: mechanical interlock over instruction).
 
 **Result: no violations.** Complexity Tracking is empty.
 
@@ -78,7 +78,7 @@ plugins/stack-control/
 │   ├── document-model/                  # NEW shared engine library (one module per concern, all < 500 lines)
 │   │   ├── types.ts                      # Unit, GovernableDocument, GrammarSpec, ArchiveResult, CurateReport
 │   │   ├── grammar-resolver.ts           # FR-001/FR-012: embedded → project override → built-in default → fail loud
-│   │   ├── block-stream.ts               # markdown-it parse → normalized token-line stream + parallel line-range map
+│   │   ├── block-stream.ts               # markdown-it parse → excise chrome (grammar comment + frontmatter, FR-002) → normalized token-line stream + parallel line-range map
 │   │   ├── grammar-parse.ts              # peggy.generate(grammarText) + parse → Unit tree (+ span back-mapping)
 │   │   ├── identifier-validator.ts       # FR-005 invariants (unique / non-ordinal / human-readable)
 │   │   ├── archive-engine.ts             # FR-006: select terminal → cut by span → append → ledger → coherence
@@ -102,10 +102,10 @@ plugins/stack-control/
     └── fixtures/                         # tmp fixture document trees
 
 scripts/
-└── check-no-predecessor-refs.sh          # FR-011 machine-checked anti-coupling gate over the new surface
+└── check-no-predecessor-refs.sh          # FR-011 anti-coupling gate over the product mechanism (engine/verbs/skills/grammars; proof docs excluded)
 ```
 
-**Structure Decision**: A single shared `document-model/` library (the engine) consumed by three thin verb modules and two thin skills, all inside `plugins/stack-control/` (succession rule: new capability lives in the successor, never the predecessor). The two proof documents are first-class files at the plugin root. Built-in grammars ship under `plugins/stack-control/grammars/`; adopting projects override at `.stack-control/grammars/<id>.peg` (FR-012). The anti-coupling gate (FR-011) is a standalone script a Vitest test also invokes.
+**Structure Decision**: A single shared `document-model/` library (the engine) consumed by three thin verb modules and two thin skills, all inside `plugins/stack-control/` (succession rule: new capability lives in the successor, never the predecessor). The two proof documents are first-class files at the plugin root. Built-in grammars ship under `plugins/stack-control/grammars/`; adopting projects override at `.stack-control/grammars/<id>.peg` (FR-012). The anti-coupling gate (FR-011) is a standalone script a Vitest test also invokes; it scans the product mechanism (engine/verbs/skills/grammars), excluding the two proof documents as governed content.
 
 ## Complexity Tracking
 
