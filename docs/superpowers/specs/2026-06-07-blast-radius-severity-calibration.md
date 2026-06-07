@@ -32,7 +32,7 @@ definition, the severity axis the gate depends on is not reliable.
 code-oriented ("the diff," "cite line numbers," "correctness bugs adopters will hit") and is
 reused verbatim to audit *specs* (the spec goes into the `{{diff}}` slot). That framing
 mismatch is genuine but is a distinct lever from severity calibration; see § Scope boundary
-and § Follow-ups. We name it here so it is not mistaken for in-scope.
+and § Bounded non-goals. We name it here so it is not mistaken for in-scope.
 
 ### Why AUDIT-42/43 are NOT the motivating evidence (and what they actually show)
 
@@ -129,10 +129,10 @@ gate, or severity-string change is implied; an implementer must not rename a lev
 
 Rewrite **only the severity-criteria sentence** + the minimal spec-aware framing the rubric
 itself carries. **Leave** the rest of the template's code-ish phrasing ("the diff," "cite line
-numbers") as-is. This is a deliberate deferral, not an oversight: the code-framing mismatch
-(§ Problem) is a *separate* lever, and changing it now would be two changes at once against one
-field test. If the field test shows the residual code-framing is degrading spec audits, fix it
-as a follow-up (§ Follow-ups).
+numbers") as-is. This is a **bounded non-goal**, not an oversight or an open-ended "later": the
+code-framing mismatch (§ Problem) is a *separate* lever, and changing it now would be two changes
+at once against one field test. **Entry-into-scope trigger:** it becomes in-scope work the moment
+a field-test run shows the residual code-framing is degrading spec audits (§ Bounded non-goals).
 
 ## Known limitation: max-severity aggregation bounds A's effect
 
@@ -152,13 +152,20 @@ to a prompt." The test is **observation across live runs** (the 004 re-barrages 
 barrages — *not* a single N=1 run; one run is too thin, and we already predict 42/43 won't
 change). Before reading a run, the contract is:
 
-**A is working if, across runs:**
+**A is working if, across runs (each criterion is a DIRECT observable, not a counterfactual guess):**
 - no genuine high-blast-radius finding (a safety hole, or a high-divergence non-disambiguated
   contradiction) is rated **below** HIGH; AND
-- at least one finding the old rubric would have inflated lands at `medium`/`low` **with a
-  blast-radius rationale** in its body (the calibration is observably *doing* something); AND
+- every `medium`/`low` finding carries an explicit **blast-radius rationale** in its body — the
+  rating visibly reasons by *consequence if acted on*, not by alarm; AND
 - the two models rate the **same** clustered finding within **one** severity level of each other
   (consistency — see the max-aggregation limitation).
+
+(The earlier draft phrased the second criterion as "a finding the old rubric *would have* inflated
+now lands lower" — that is a counterfactual the evaluator cannot observe without a control run, so it
+was replaced with the direct observable above. A natural paired baseline *is* nonetheless available
+for optional corroboration: the pre-change runs of a given artifact ran under the OLD rubric — e.g.
+004 iteration 8, design-doc iterations 1–2 — and post-change runs under the NEW rubric on the **same**
+artifact, so a same-artifact old-vs-new severity comparison is observable if a sharper signal is wanted.)
 
 **A is insufficient → escalate to Approach B if, across runs:**
 - the same finding is rated **2+ severity levels apart** across models on the same run (the
@@ -189,7 +196,11 @@ Re-confirm on the first code-phase barrage.
   them. Per the max-aggregation limitation, A's effect is also bounded by the least-calibrated
   model on each finding.
 
-## Follow-ups (not in this increment)
+## Bounded non-goals (each with an entry-into-scope trigger)
+
+These are **not** open-ended deferrals — each names the concrete condition under which it enters
+scope (per the project's no-"just-for-now" discipline). They are out of *this* increment by design,
+not forgotten:
 
 - **Approach B — a calibration pass.** If the field-test contract fires the B gate, add a
   post-barrage step (ideally multi-model, or a single focused re-rater) that re-rates each
@@ -198,8 +209,8 @@ Re-confirm on the first code-phase barrage.
   it is a *mechanism* (thesis-aligned), where A is *instruction*. B earns its cost only once A's
   insufficiency is demonstrated by the contract above.
 - **Code-vs-spec prompt framing.** If the field test shows the residual code-framing degrades
-  spec audits, split or generalize the prompt's non-rubric framing (the deferred half of
-  § Problem).
+  spec audits, split or generalize the prompt's non-rubric framing (the separate code-framing
+  lever noted in § Problem).
 - **Re-confirm code-audit calibration** on the first `govern --mode implement` barrage (the
   generality claim).
 
