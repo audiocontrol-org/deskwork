@@ -137,6 +137,18 @@ fi
   exit 2
 }
 
+# Checkpoint scoping (AUDIT-20260607-05 / FR-011): each enabled checkpoint runs
+# an INDEPENDENT convergence loop with its own ceiling. Default after_clarify;
+# after_plan when a plan is folded. The checkpoint tags the barrage run-dir and
+# scopes the gate so a passed after_clarify gate is durable.
+if [ -n "${GOVERN_CHECKPOINT:-}" ]; then
+  CHECKPOINT="${GOVERN_CHECKPOINT}"
+elif [ -n "${GOVERN_PLAN_PATH:-}" ]; then
+  CHECKPOINT="after_plan"
+else
+  CHECKPOINT="after_clarify"
+fi
+
 COMMIT_SUBJECTS="$(git log -n 20 --oneline 2>/dev/null || true)"
 AUDIT_EXCERPT="$(tail -n 40 "${AUDIT_LOG}" 2>/dev/null || true)"
 _plan_note=""
@@ -166,15 +178,31 @@ _models_flag=()
 # `set -u` ("unbound variable") — caught by the T024 dogfood when GOVERN_MODELS
 # was unset (the default, all-models path). The `${arr[@]+...}` form expands to
 # nothing when empty and is safe on bash 3.2+.
-RUN_DIR="$("${BARRAGE_BIN}" audit-barrage --feature "${SLUG}" --prompt-file "${PROMPT}" ${_models_flag[@]+"${_models_flag[@]}"} --output-run-dir)"
+#
+# The barrage's --feature is the run-dir LABEL: tag it with the checkpoint
+# (`<slug>-<checkpoint>`) so the lift section header carries the checkpoint and
+# the gate can scope per-checkpoint (AUDIT-20260607-05). The LIFT + GATE keep the
+# bare slug for audit-log resolution.
+set +e
+RUN_DIR="$("${BARRAGE_BIN}" audit-barrage --feature "${SLUG}-${CHECKPOINT}" --prompt-file "${PROMPT}" ${_models_flag[@]+"${_models_flag[@]}"} --output-run-dir)"
+_barrage_exit=$?
+set -e
+# AUDIT-20260607-07: a non-zero barrage exit means zero model families were
+# healthy (an OUTAGE) — fail loud with an actionable message and do NOT lift
+# (an empty run must never be scored as a clean/converged result). Distinct from
+# a clean zero-FINDING run, where >=1 family ran and the barrage exits 0.
+if [ "${_barrage_exit}" -ne 0 ]; then
+  echo "govern-spec.sh: FATAL — audit-barrage OUTAGE (exit ${_barrage_exit}): zero model families were healthy. The spec is NOT recorded as governed (FR-005). Check that the configured model-family CLIs are installed and reachable." >&2
+  exit 2
+fi
 echo "govern-spec.sh: barrage run-dir = ${RUN_DIR}" >&2
 
 # Cross-model agreement annotation + disposition slots are produced + preserved
 # end-to-end by the lift verb (T011 / US2) — compose it, do not reimplement.
 "${BARRAGE_BIN}" audit-barrage-lift --feature "${SLUG}" --run-dir "${RUN_DIR}" --apply
 
-# --- convergence gate (T019 / FR-010 / SC-007) ---
-_gate_flags=(--feature "${SLUG}" --repo-root "${REPO_ROOT}")
+# --- convergence gate (T019 / FR-010 / SC-007), scoped to this checkpoint ---
+_gate_flags=(--feature "${SLUG}" --repo-root "${REPO_ROOT}" --checkpoint "${CHECKPOINT}")
 [ -n "${GOVERN_CEILING:-}" ] && _gate_flags+=(--ceiling "${GOVERN_CEILING}")
 [ -n "${GOVERN_OVERRIDE:-}" ] && _gate_flags+=(--override "${GOVERN_OVERRIDE}")
 

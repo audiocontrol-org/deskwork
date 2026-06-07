@@ -34,6 +34,8 @@ type ConvergenceRule = 'single-run-clean' | 'n-consecutive-quiet' | 'none';
 
 interface ConvergenceVerdict {
   readonly feature: string;
+  /** The checkpoint this verdict is scoped to, or null for the whole audit-log. */
+  readonly checkpoint: string | null;
   readonly state: ConvergenceState;
   readonly rule: ConvergenceRule;
   readonly iterations: number;
@@ -48,6 +50,8 @@ interface GateOptions {
   readonly ceiling: number;
   readonly override?: string;
   readonly repoRoot?: string;
+  /** Scope convergence to runs tagged with this checkpoint (AUDIT-20260607-05). */
+  readonly checkpoint?: string;
   readonly json: boolean;
 }
 
@@ -56,6 +60,8 @@ const USAGE = [
   '    --feature <slug>          Required. Evaluates the feature audit-log + run history.',
   '    [--ceiling <N>]           Max iterations before non-converged (default 5).',
   '    [--override "<reason>"]    Record an explicit override (reason mandatory).',
+  '    [--checkpoint <name>]     Scope convergence to runs for this checkpoint only',
+  '                              (per-checkpoint independent loops, FR-011/FR-014).',
   '    [--repo-root <path>]      Project root (default: cwd).',
   '    [--json]                  Emit the ConvergenceVerdict as JSON only.',
   '',
@@ -68,6 +74,7 @@ function parseArgs(args: string[]): GateOptions {
   let ceiling = DEFAULT_CEILING;
   let override: string | undefined;
   let repoRoot: string | undefined;
+  let checkpoint: string | undefined;
   let json = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -81,7 +88,13 @@ function parseArgs(args: string[]): GateOptions {
       process.stdout.write(`${USAGE}\n`);
       process.exit(0);
     }
-    if (token === '--feature' || token === '--ceiling' || token === '--override' || token === '--repo-root') {
+    if (
+      token === '--feature' ||
+      token === '--ceiling' ||
+      token === '--override' ||
+      token === '--repo-root' ||
+      token === '--checkpoint'
+    ) {
       const value = args[i + 1];
       if (value === undefined || value.startsWith('--')) {
         process.stderr.write(`spec-governance-gate: ${token} requires a value\n`);
@@ -91,6 +104,7 @@ function parseArgs(args: string[]): GateOptions {
       if (token === '--feature') feature = value;
       else if (token === '--repo-root') repoRoot = value;
       else if (token === '--override') override = value;
+      else if (token === '--checkpoint') checkpoint = value;
       else {
         const parsed = Number.parseInt(value, 10);
         if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -114,6 +128,7 @@ function parseArgs(args: string[]): GateOptions {
     json,
     ...(override !== undefined ? { override } : {}),
     ...(repoRoot !== undefined ? { repoRoot } : {}),
+    ...(checkpoint !== undefined ? { checkpoint } : {}),
   };
 }
 
@@ -123,6 +138,30 @@ function countIterations(auditLogText: string): number {
     if (BARRAGE_HEADER_RE.test(line)) n += 1;
   }
   return n;
+}
+
+// Per-checkpoint scoping (AUDIT-20260607-05): keep ONLY the audit-barrage lift
+// sections whose run-dir basename is tagged with `-<checkpoint>` (govern-spec.sh
+// tags each run via the barrage's run-dir label). Returns an audit-log text
+// containing just those sections, so the dampener + iteration tally evaluate one
+// checkpoint's independent loop. Non-matching + non-barrage sections are dropped
+// (the dampener only reads barrage sections anyway).
+function filterByCheckpoint(auditLogText: string, checkpoint: string): string {
+  const lines = auditLogText.split(/\r?\n/);
+  const SECTION_HEADER_RE = /^##\s+/;
+  const out: string[] = [];
+  let keep = false;
+  for (const line of lines) {
+    if (SECTION_HEADER_RE.test(line)) {
+      const m = BARRAGE_HEADER_RE.exec(line);
+      // A barrage section's run-dir basename is the `(...)` capture; keep it when
+      // it ends with the checkpoint tag. Any other `## ` header ends the keep window.
+      const basename = m !== null ? /\(([^)]+)\)/.exec(line)?.[1] ?? '' : '';
+      keep = m !== null && basename.endsWith(`-${checkpoint}`);
+    }
+    if (keep) out.push(line);
+  }
+  return out.join('\n');
 }
 
 export async function runSpecGovernanceGate(args: string[]): Promise<void> {
@@ -146,7 +185,13 @@ export async function runSpecGovernanceGate(args: string[]): Promise<void> {
     process.exit(2);
   }
 
-  const auditLogText = await readFile(auditLogPath, 'utf8');
+  const auditLogTextRaw = await readFile(auditLogPath, 'utf8');
+  // Per-checkpoint independent loops (AUDIT-20260607-05): scope evaluation to the
+  // runs for one checkpoint when --checkpoint is given; otherwise evaluate all.
+  const auditLogText =
+    opts.checkpoint !== undefined
+      ? filterByCheckpoint(auditLogTextRaw, opts.checkpoint)
+      : auditLogTextRaw;
 
   // --- the PORTED criterion (the load-bearing reuse) ---
   const dampener = checkBarrageDampener({ auditLogText, threshold: PROTOCOL_THRESHOLD });
@@ -182,6 +227,7 @@ export async function runSpecGovernanceGate(args: string[]): Promise<void> {
 
   const verdict: ConvergenceVerdict = {
     feature: opts.feature,
+    checkpoint: opts.checkpoint ?? null,
     state,
     rule,
     iterations,

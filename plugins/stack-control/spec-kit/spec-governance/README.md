@@ -55,8 +55,15 @@ to `scripts/bash/govern-spec.sh`. Environment overrides:
 The gate verb may also be run directly:
 
 ```bash
-stackctl spec-governance-gate --feature <slug> [--ceiling N] [--override "<reason>"] [--json]
+stackctl spec-governance-gate --feature <slug> [--checkpoint <after_clarify|after_plan>] [--ceiling N] [--override "<reason>"] [--json]
 ```
+
+`--checkpoint` scopes convergence to one checkpoint's runs (independent
+per-checkpoint loops, FR-011/FR-014): each enabled checkpoint has its own loop +
+ceiling, and a passed `after_clarify` gate is durable — not re-opened by
+`after_plan` findings. `govern-spec.sh` tags each run with its checkpoint and
+passes `--checkpoint` automatically; `GOVERN_CHECKPOINT` overrides the default
+(`after_clarify`, or `after_plan` when a plan is folded).
 
 ## No dw-lifecycle dependency
 

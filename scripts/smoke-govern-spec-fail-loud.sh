@@ -79,6 +79,37 @@ if command -v dw-lifecycle >/dev/null 2>&1; then
   grep -Eq 'primary audit unit|could not be folded' "${work}/err3.txt" \
     || fail "AUDIT-14 stderr lacks an actionable over-budget-spec message"
   echo "smoke-fail-loud: AUDIT-14 OK — over-budget spec exits 2 (never plan-only)" >&2
+
+  # ---- AUDIT-20260607-07: all model families fail (zero healthy) → outage, fail loud ----
+  # Stub barrage: render succeeds, but `audit-barrage` exits 1 (zero healthy).
+  # govern-spec.sh must emit an OUTAGE message, exit 2, and NOT lift (audit-log untouched).
+  outage_stub="${work}/outage-barrage"
+  cat > "${outage_stub}" <<'STUBEOF'
+#!/usr/bin/env bash
+set -euo pipefail
+verb="${1:-}"; shift || true
+case "${verb}" in
+  audit-barrage-render)
+    out=""; while [ $# -gt 0 ]; do [ "$1" = "--output" ] && { out="$2"; shift; }; shift; done
+    printf 'STUB PROMPT\n' > "${out}" ;;
+  audit-barrage) exit 1 ;;          # zero healthy families
+  audit-barrage-lift) echo "stub-lift: MUST NOT be reached on an outage" >&2; exit 99 ;;
+  *) exit 2 ;;
+esac
+STUBEOF
+  chmod +x "${outage_stub}"
+  before_hash="$(shasum "${audit_log}" | awk '{print $1}')"
+  set +e
+  GOVERN_REPO_ROOT="${work}" GOVERN_FEATURE_SLUG="${slug}" GOVERN_SPEC_PATH="${work}/spec.md" \
+  GOVERN_BARRAGE_BIN="${outage_stub}" \
+    bash "${GOVERN_SPEC_SH}" >"${work}/out4.txt" 2>"${work}/err4.txt"
+  rc=$?
+  set -e
+  [ "${rc}" -eq 2 ] || fail "AUDIT-07 expected exit 2 on a zero-healthy barrage, got ${rc}"
+  grep -Eq 'OUTAGE' "${work}/err4.txt" || fail "AUDIT-07 stderr lacks an actionable OUTAGE message"
+  [ "${before_hash}" = "$(shasum "${audit_log}" | awk '{print $1}')" ] \
+    || fail "AUDIT-07 audit-log mutated — the lift ran on an outage (must not)"
+  echo "smoke-fail-loud: AUDIT-07 OK — zero-healthy barrage = OUTAGE, exit 2, no lift" >&2
 fi
 
 # ---- T013: reduced coverage is recorded, not presented as full ----
@@ -102,7 +133,7 @@ GOVERN_REPO_ROOT="${cw2}" GOVERN_FEATURE_SLUG="${slug2}" \
 GOVERN_SPEC_PATH="${cw2}/spec.md" GOVERN_MODELS="${PINNED_MODEL}" \
   bash "${GOVERN_SPEC_SH}" || true
 
-runs="${cw2}/.dw-lifecycle/scope-discovery/audit-runs"
+runs="${cw2}/.stack-control/audit-runs"
 [ -d "${runs}" ] || fail "T013 no run-dir produced"
 rundir="$(find "${runs}" -mindepth 1 -maxdepth 1 -type d | head -n1)"
 # The run records exactly the lane(s) that ran — a per-model output file for the
