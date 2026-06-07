@@ -649,3 +649,78 @@ Surface:    specs/004-spec-governance/spec.md:95-97, specs/004-spec-governance/s
 The edge case says the loop “must run unattended (fix-and-re-barrage without operator presence),” and FR-010 describes “barrage → triage/fix the spec → re-barrage.” But FR-004 requires findings to be routed into triage where each gets an explicit durable disposition, and the spec never defines who or what performs unattended fixes, how dispositions are assigned, or what guardrails prevent automated edits from changing spec intent.
 
 This is a design gap because the feature’s blocking gate depends on repeated remediation, not just repeated audit runs. A reasonable fix is to define the unattended actor and limits: for example, whether only an agent-driven flow can auto-edit, whether raw hooks merely stop and report, and whether automated dispositions require explicit metadata distinct from maintainer triage.
+
+## 2026-06-07 — audit-barrage lift (20260607T040412671Z-pluggable-lifecycle-providers-after_clarify)
+
+### AUDIT-20260607-24 — The `healthy` family predicate claims "parseable output" but operationalizes it as a raw byte count — the two are not equivalent
+
+Finding-ID: AUDIT-20260607-24
+Status:     open
+Severity:   high
+Surface:    spec.md FR-008 ("A model family is **healthy** … when it ran to completion and emitted parseable output (**≥1 byte of stdout and no spawn/timeout error**)"); also Edge Cases ("A model family times out or errors mid-run"), Key Entities "Audit capability"
+
+The `healthy` predicate is load-bearing for three separate behaviors: the zero-healthy outage that triggers fail-loud (FR-005), the coverage honesty count (FR-008), and the distinction between a clean zero-finding run and an outage (FR-009). FR-008 defines it as *"emitted parseable output"* and then immediately operationalizes that as *"≥1 byte of stdout and no spawn/timeout error."* Those are not the same bar, and the gap is exploitable in exactly the failure mode this feature exists to prevent. A model family that exits 0 but writes a refusal string, a usage/help banner, a stack trace, or a truncated non-JSON fragment to stdout satisfies "≥1 byte of stdout, no spawn/timeout error" and is therefore counted **healthy** — contributing to coverage and to the "≥1 healthy family" floor — while having produced **zero parseable findings**. That run is then indistinguishable from a genuine clean zero-finding run (FR-009), and if it is the *only* "healthy" family, it masks what is really a zero-healthy outage (FR-005), letting an ungoverned spec record as governed. That is the precise silent-skip the no-fallbacks principle (FR-005, US3) is meant to make mechanically impossible.
+
+The fix is to make the operationalization match the prose: "healthy" must require output that *parses into the finding schema* (zero or more well-formed findings), not merely a non-empty stdout. Define the parse contract (what shape counts as parseable; what an explicit "no findings" emission looks like vs. an unparseable blob) and state that an exit-0-with-unparseable-stdout family is **unhealthy**, counted toward the outage, not toward coverage. As written, the byte-count definition contradicts its own "parseable output" clause.
+
+### AUDIT-20260607-25 — FR-003's "shared repo-relative path token" clustering rule trivially yields false cross-model agreement when findings cite the same file
+
+Finding-ID: AUDIT-20260607-25 (claude-02 + claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Surface:    spec.md FR-003 ("two findings cluster when … they cite a **shared repo-relative path token**; clustering is transitive, and a cluster spanning ≥2 families is `cross-model-agreed`"); Key Entities "Finding"; SC-002
+
+Cross-model agreement is the feature's headline HIGH-confidence signal (US2, SC-002). FR-003 says two findings cluster — and therefore become `cross-model-agreed` if they come from ≥2 families — when they "cite a shared repo-relative path token." For a *spec-governance* barrage the artifact under audit is almost always a single file: `specs/004-spec-governance/spec.md`. Every finding that anchors to that spec cites the same path token. Under the rule as written, **every finding from every family that mentions `spec.md` clusters together** into one giant transitive cluster spanning all families, and the whole pile is labeled `cross-model-agreed`. That destroys the signal: cross-model agreement should mean "two families independently flagged the *same root cause*," not "two families both pointed at the one file we're auditing." This is the opposite of the genetic-diversity intent in FR-002/US2.
+
+A reasonable fix narrows the path-token rule so a bare top-level spec path does not count (require a finer locator — a line range, an FR-id, a section anchor — or exclude the artifact's own path from the token set), and/or requires the heading-substring branch to also hold before path-token agreement is asserted. Without this, SC-002's "distinguishable from `single-model` findings" will be vacuously true (almost nothing is single-model) and the operator's prioritization worklist collapses.
+
+### AUDIT-20260607-26 — The non-converged terminal state has no defined forward path — the loop's only documented exit may be a dead end
+
+Finding-ID: AUDIT-20260607-26
+Status:     open
+Severity:   medium
+Surface:    spec.md FR-014 ("if convergence is not reached after a configured iteration ceiling, the system MUST surface **non-convergence** … rather than loop forever"); FR-010 (override); SC-008; Edge Cases ("Governance never converges")
+
+FR-014 and SC-008 define a recorded non-converged terminal state as the bound on the loop, and FR-010 defines an override (operator action, mandatory reason) as the way to clear findings and open the gate. What the spec never reconciles is the relationship between the two: once a checkpoint hits its ceiling and records `non-converged`, **what is the forward path to graduation?** Options the spec leaves open: (a) the operator records an override and the spec graduates despite non-convergence; (b) the non-converged state is permanent and the spec cannot graduate at all until the underlying findings are fixed and a *new* governance run is started (resetting the ceiling); (c) the ceiling is per-graduation-attempt and a fresh attempt is allowed. These have materially different consequences under the "unattended/all-night" directive that motivates FR-014 — if (b)/(c) with no override path, an all-night run that hits the ceiling simply stops with no machine-resolvable next step; if (a), an override can graduate a genuinely non-converging (i.e. still self-contradictory) spec, which is exactly the outcome the gate exists to prevent, so the override's evidentiary bar at the *ceiling* needs the same recorded-reason discipline FR-010 gives finding-level overrides.
+
+The spec should state explicitly whether `override` applies to the non-converged terminal state and, if so, what is recorded; and whether/how a new attempt resets the per-checkpoint ceiling. Right now "escalate to the operator" is the entire contract, which is under-specified for an unattended loop.
+
+### AUDIT-20260607-27 — No configuration surface is named for *enabling* the `after_plan` checkpoint
+
+Finding-ID: AUDIT-20260607-27
+Status:     open
+Severity:   low
+Surface:    spec.md FR-011 ("MUST be **configurable to also fire at `after_plan`**"); FR-014 (which does name `--ceiling`/`GOVERN_CEILING`); FR-010 (which names `--override`/`GOVERN_OVERRIDE`)
+
+Round 2 closed AUDIT-21 by naming the ceiling's config surface (`--ceiling` / `GOVERN_CEILING`) and AUDIT-19 by naming the override surface (`--override` / `GOVERN_OVERRIDE`). The parallel gap for checkpoint selection was not closed: FR-011 says the `after_plan` checkpoint is "configurable" but names no surface — flag, env var, extension manifest field, or per-feature config — for turning it on, nor a default (the default is implicitly "after_clarify only," but that is never stated as the off-state for after_plan). This is the same unstated-config-surface shape the project's own guidance flags as a magic-config bug-factory, now isolated to the one checkpoint knob that the round-2 pass happened not to cover. State the enablement surface and its default explicitly, consistent with how `--ceiling` and `--override` are now specified.
+
+### AUDIT-20260607-28 — SC-006 is filed under "Measurable Outcomes" but its predicate ("with high probability") is not measurable as worded
+
+Finding-ID: AUDIT-20260607-28
+Status:     open
+Severity:   low
+Surface:    spec.md SC-006 ("On a spec seeded with a known self-contradiction, the automatic barrage surfaces that contradiction **with high probability across the model battery** … not a per-run determinism guarantee")
+
+The round-2 resolution of AUDIT-22 correctly removed the false determinism claim, but it relabeled SC-006 as "probabilistic" while leaving it in the **Measurable Outcomes** section with a predicate — "with high probability" — that has no operational threshold and no run count. As worded, no conformance test or audit can decide whether SC-006 passed or failed: "high probability" names no N, no acceptance ratio, and no observation procedure. That makes it the one success criterion in the list that cannot be checked, which undercuts the section's purpose. The original AUDIT-22 note even offered a checkable reformulation ("across N runs the seeded contradiction is surfaced in at least one," or "the convergence loop does not graduate the seeded spec until the contradiction is dispositioned"); the adopted wording took neither. Either give SC-006 a measurable form (an N-run threshold, or tie it to the gate's behavior on the seeded spec, which *is* deterministic) or move it out of "Measurable Outcomes" into an illustrative/non-binding scenario so the section stays honest about what it guarantees.
+
+### AUDIT-20260607-29 — The edge-case section still contradicts the no-auto-edit contract
+
+Finding-ID: AUDIT-20260607-29
+Status:     open
+Severity:   medium
+Surface:    specs/004-spec-governance/spec.md:109, specs/004-spec-governance/spec.md:130
+
+FR-014 now says spec-governance “does NOT auto-edit the spec” and that the fix step is the author’s act. But the Edge Cases section still says the convergence loop must run unattended as “fix-and-re-barrage without operator presence.” That phrase preserves the original implication that remediation itself can happen without an operator/author actor.
+
+This matters because the spec is the contract implementers will follow, and these two statements describe different automation boundaries. The edge case should use the same contract as FR-014: unattended gate evaluation and bounded non-convergence recording, with fixes performed by the authoring agent/operator under the normal spec-editing contract.
+
+### AUDIT-20260607-30 — A persistent override environment variable can silently override later gates
+
+Finding-ID: AUDIT-20260607-30
+Status:     open
+Severity:   medium
+Surface:    specs/004-spec-governance/spec.md:126, specs/004-spec-governance/spec.md:130
+
+FR-010 allows overrides via `GOVERN_OVERRIDE` or `--override "<reason>"`, and FR-014 applies that escape to the bounded convergence loop. The spec does not scope the environment-variable override to a specific spec, checkpoint, run, or invocation. In an unattended flow, a leftover `GOVERN_OVERRIDE` in the shell environment could satisfy “an override is recorded” for later checkpoints or specs without a fresh operator decision.
+
+That weakens the gate’s integrity even though a reason string exists. A reasonable fix is to make env-based overrides one-shot and scoped in the recorded verdict, for example requiring spec/checkpoint/run identity or preferring an explicit CLI flag for actual gate bypasses.
