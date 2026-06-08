@@ -71,12 +71,20 @@ function locateInArchive(archiveSource: string, grammar: GrammarSpec, id: string
   }
 
   // Row-keyed: the marker is the table row whose identifier column equals id.
+  // Mirror archiveMarkerIds (archive-file.ts): only DATA rows after the
+  // separator are candidate Units — the leading header row is column-schema
+  // chrome and must never be located as a Unit (AUDIT-20260608-46).
   const idCol = grammar.unit.identifierColumn;
+  let pastSeparator = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     if (!line.trimStart().startsWith('|')) continue;
     const cells = tableCells(line);
-    if (isSeparatorRow(cells)) continue;
+    if (isSeparatorRow(cells)) {
+      pastSeparator = true;
+      continue;
+    }
+    if (!pastSeparator) continue; // the header row is chrome, not a Unit
     if (idCol < cells.length && cells[idCol] === id) {
       return { contentLines: [line], removeStart: i, removeEnd: i };
     }

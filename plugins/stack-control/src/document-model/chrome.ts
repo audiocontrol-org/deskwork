@@ -52,7 +52,22 @@ export function findGrammarComments(lines: readonly string[]): GrammarComment[] 
       end++;
       closeFound = lines[end]!.includes('-->');
     }
-    if (!closeFound) continue; // unterminated comment — not chrome
+    if (!closeFound) {
+      // An unterminated comment is normally just not-chrome. But if it CLEARLY
+      // opens a grammar declaration (the content after `<!--`, trimmed, starts
+      // with the sentinel) and never closes, silently skipping it would
+      // misdiagnose a malformed grammar declaration as a MISSING one — pointing
+      // the operator at the wrong repair ("add a grammar" vs. "close the `-->`").
+      // Fail loud naming the unterminated grammar comment (AUDIT-20260608-45,
+      // same fail-loud class as the AUDIT-35 frontmatter fix).
+      const afterOpen = lines[i]!.slice(open + 4);
+      if (afterOpen.trimStart().startsWith(GRAMMAR_SENTINEL)) {
+        throw new DocumentModelError(
+          `unterminated grammar comment: the \`${GRAMMAR_SENTINEL}\` declaration opened on line ${i + 1} is never closed with \`-->\` through end-of-document; close the comment (this is a malformed grammar declaration, not a missing one)`,
+        );
+      }
+      continue; // non-grammar unterminated comment — not chrome
+    }
     // Inner text between <!-- and -->.
     const block = lines.slice(i, end + 1).join('\n');
     const inner = block.slice(block.indexOf('<!--') + 4, block.lastIndexOf('-->'));

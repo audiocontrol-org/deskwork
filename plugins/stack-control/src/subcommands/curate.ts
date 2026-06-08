@@ -55,14 +55,32 @@ export async function runCurateCli(args: string[]): Promise<void> {
       return;
     }
 
-    // Dry-run: only `disorder` / `unarchived-terminal` mean applying would
-    // change the document. With none of those, the document is clean — report
-    // it as such, but still surface any informational notices (seam / coherence)
-    // so they aren't silently hidden (AUDIT-20260608-31).
+    // Dry-run: a THREE-way headline (AUDIT-20260608-43), refining the AUDIT-31
+    // two-way split. Only `disorder` / `unarchived-terminal` are ACTIONABLE —
+    // applying curate would change the document. `up-to-date-seam` and
+    // `coherence-notice` are informational (curate never mutates either).
+    //
+    // The three cases are distinct because a `coherence-notice` is REAL
+    // ledger↔archive drift — calling that "clean" misleads the operator. But
+    // curate does not auto-fix coherence drift (FR-006 makes reconciling the
+    // ledger↔archive the operator's responsibility), so it is neither "clean"
+    // nor "would change":
+    //   1. ZERO findings           → "clean" (truly well-formed/ordered/archived).
+    //   2. informational-only (≥1)  → "no automatic changes; N notice(s)" — never
+    //                                 "clean", never "would change"; surface them.
+    //   3. ≥1 actionable           → "would change (dry-run)" + all findings.
     const actionable = report.findings.filter(isActionable);
     const informational = report.findings.filter((f) => !isActionable(f));
+
     if (actionable.length === 0) {
-      process.stdout.write('curate: clean — well-formed, well-ordered, properly archived.\n');
+      if (informational.length === 0) {
+        process.stdout.write('curate: clean — well-formed, well-ordered, properly archived.\n');
+        return;
+      }
+      const count = informational.length;
+      process.stdout.write(
+        `curate: no automatic changes; ${count} notice${count === 1 ? '' : 's'}:\n`,
+      );
       for (const f of informational) {
         process.stdout.write(`  - [${f.kind}] ${f.message}\n`);
       }

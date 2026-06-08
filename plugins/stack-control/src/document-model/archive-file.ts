@@ -5,10 +5,39 @@
 
 import type { GrammarSpec } from './types.js';
 
-/** Split a markdown table row into trimmed cells (drops the outer pipes). */
+/**
+ * Split a markdown table row into trimmed cells (drops the outer pipes).
+ *
+ * Splits on UNESCAPED `|` only: a backslash-escaped pipe (`\|`) renders as a
+ * literal `|` inside a single cell and is NOT a column delimiter. markdown-it
+ * unescapes `\|` → `|` in inline content, so block-stream's live-parse cells
+ * carry the literal pipe (AUDIT-20260608-47). To keep the archive-scan side
+ * (which sees RAW lines still carrying the `\|` escape) consistent with the
+ * live-parse side, each returned cell unescapes `\|` → `|` as well — so
+ * identifier/status/marker comparisons match across archive ↔ live.
+ */
 export function tableCells(line: string): string[] {
-  const parts = line.split('|');
-  return parts.slice(1, parts.length - 1).map((c) => c.trim());
+  const cells: string[] = [];
+  let current = '';
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]!;
+    if (ch === '\\' && line[i + 1] === '|') {
+      // Escaped pipe — a literal `|` within the cell, not a delimiter. Emit the
+      // unescaped pipe and consume both characters.
+      current += '|';
+      i++;
+      continue;
+    }
+    if (ch === '|') {
+      cells.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  cells.push(current);
+  // Drop the segments outside the leading/trailing outer pipes, then trim.
+  return cells.slice(1, cells.length - 1).map((c) => c.trim());
 }
 
 /** True for a table separator row (`|---|:--:|`). */
