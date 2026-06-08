@@ -1085,3 +1085,49 @@ Surface:    specs/002-parallel-execution-engine/plan.md:1-113
 The audit input includes a newly added `specs/002-parallel-execution-engine/plan.md` that is still the raw template: `[FEATURE]`, `[DATE]`, “NEEDS CLARIFICATION,” “ACTION REQUIRED,” and unused option blocks are all present. This is an operator-discipline trap because `specs/002` is a real roadmap correspondence path, and unattended agents may treat the placeholder plan as project state.
 
 If this file is accidental, remove it from the patch. If it is intended, fill it with the real execution-engine plan and delete the unused template branches before it becomes part of the repo state.
+
+## 2026-06-08 — audit-barrage lift (20260608T202513811Z-pluggable-lifecycle-providers-after_clarify)
+
+### AUDIT-20260608-10 — Reconcile's tasks-complete signal silently ignores `[~]` and any non-`[ xX]` checkbox marker, so a partially-done feature is reported "complete" and proposed for `shipped`
+
+Finding-ID: AUDIT-20260608-10
+Status:     fixed-fc641d46 (tasksComplete now counts ALL `- [.]` checkboxes and requires every one `[xX]`, so a `[~]`/non-checked marker blocks the "complete" verdict instead of vanishing; RED test against a `[x]`+`[~]` tasks.md asserts no shipped proposal. Was reproducible on this repo's own specs/006/tasks.md T052. Fresh-context sub-agent.)
+Severity:   medium
+Surface:    plugins/stack-control/src/roadmap/reconcile.ts:32-40 (`tasksComplete`); reproducible against specs/006-roadmap-protocol/tasks.md:90 (the `[~] T052` line)
+
+`tasksComplete` counts checkboxes with `text.match(/^\s*- \[[ xX]\]/gm)` for "all" and `/^\s*- \[ \]/gm` for "unchecked", returning `true` when `all.length >= 1 && unchecked.length === 0`. The `all` regex only recognizes `[ ]`, `[x]`, `[X]` — it does **not** match `[~]` (or any other marker). A task in the `[~]` state is therefore invisible to *both* counts: it is neither "all" nor "unchecked". So a `tasks.md` containing many `[X]` tasks, one `[~]` task, and zero `[ ]` tasks is reported **complete**, which then drives `statusDrift` to propose `advance <id> to shipped`.
+
+This is directly reproducible on the repo *today*. This feature's own `specs/006-roadmap-protocol/tasks.md` marks T052 as `[~]` ("SUPERSEDED") with every other box `[X]`. The migrated `ROADMAP.md` carries `design:feature/roadmap-protocol` with `status: in-flight` and `spec: specs/006-roadmap-protocol`. Running `stackctl roadmap reconcile` would therefore propose advancing the still-in-flight roadmap-protocol feature to `shipped` — exactly the premature-ship hazard AUDIT-08 flagged, now reachable via an unhandled checkbox state distinct from the governance-graduation concern AUDIT-08 covered. Blast radius is bounded (reconcile is report-only and the operator confirms via `advance`), but the proposal text says "tasks complete," which is false when a `[~]` task is present. A reasonable fix: treat any checkbox state other than `[x]`/`[X]` (including `[~]`) as not-complete — i.e. count "all checkboxes" with `\[.\]` and require every one to be `[xX]` — so an in-progress/superseded marker blocks the "complete" verdict rather than vanishing from the arithmetic.
+
+### AUDIT-20260608-11 — `mutations.add` accumulates a trailing blank line on every invocation — the primary capture path is uncovered by the AUDIT-06 formatting-stability pin
+
+Finding-ID: AUDIT-20260608-11
+Status:     fixed-fc641d46 (mutations.add now emits a separating blank only when the adjacent edge isn't already blank, so repeated captures don't accumulate blank lines near EOF; the AUDIT-06 formatting pin was extended to the add slice-and-insert path. Fresh-context sub-agent.)
+Severity:   low
+Surface:    plugins/stack-control/src/roadmap/mutations.ts (`add`, the `const candidate = [...before, '', ...section, '', ...after]` line); test gap vs. plugins/stack-control/tests/roadmap/mutations-formatting.test.ts
+
+`add` inserts the new section by slicing at the last unit's `span.endLine` (the last *non-blank* body line, since blank lines fall outside spans), then building `[...before, '', ...section, '', ...after]`. `after = sourceLines.slice(insertAt)` is the original trailing blank line(s) plus any postamble. The construction unconditionally prepends a `''` separator before `after`, so each `add` injects one blank line *in addition to* the document's existing trailing blank. On the canonical `ROADMAP.md` (which ends with the last item + one trailing blank), the first `add` leaves two trailing blanks, the second leaves three, and so on — the gap before EOF grows by one blank line per capture.
+
+This matters because `add` is the **most frequent** mutation the SKILL.md prescribes ("capture emergent work in one move … and keep going"), run repeatedly against the live `ROADMAP.md`. AUDIT-20260608-06 added `tests/roadmap/mutations-formatting.test.ts` to pin reassemble round-trip stability, but that test only exercises `decompose` and `reclassify` (the `reassemble` path); `add` uses a different slice-and-insert path that the pin does not cover. The drift is cosmetic (the candidate re-validates fine and the blanks sit before EOF), so severity is low — but it is the exact slow-formatting-drift failure mode AUDIT-06 set out to prevent, left uncovered on the primary path. A fix: only emit the post-section `''` when `after` is non-empty and does not already begin with a blank line, and add an `add`-path case to `mutations-formatting.test.ts` asserting no growth across repeated captures.
+
+### AUDIT-20260608-12 — `scopeOf` strips every line starting with `##`, dropping `###` body sub-notes the grammar explicitly permits
+
+Finding-ID: AUDIT-20260608-12 (claude-03 + codex-02; cross-model)
+Status:     fixed-fc641d46 (scopeOf now strips only the reserved `## ` heading via `/^## /` so `### ` body sub-notes survive into scope per the grammar contract; extractEdges (and scopeOf) now skip ``` / ~~~ fenced-code regions so a field-looking bullet inside a code example is NOT parsed as a real edge. RED tests: a `### sub-note` survives in scope; a fenced `- depends-on:` yields no edge. Fresh-context sub-agent.)
+Severity:   medium
+Surface:    plugins/stack-control/src/roadmap/roadmap-model.ts (`scopeOf`: `.filter((line) => !line.startsWith('##') && !FIELD_BULLET.test(line))`); contradicts plugins/stack-control/grammars/roadmap.peg:~? (the `shallowHead`/H3 comment: "H3+ are valid body sub-notes (level 2 leaves room for `###` inside an item body)")
+
+`scopeOf` derives an item's prose by dropping the heading line and the field bullets: `line.startsWith('##')` is used to exclude the `## identifier` heading. But `'### detail'.startsWith('##')` is also `true`, so any `###` sub-note inside a unit body is silently stripped from the projected `scope`. The heading-keyed `roadmap.peg` rewrite explicitly documents that `### …` lines are *legitimate body sub-notes* ("level 2 leaves room for `###` inside an item body"), so the model's scope projection contradicts the grammar's stated contract.
+
+The downstream consequence shows up in `decompose`: it carries `source.scope` onto every part (`buildSection({ … scope: source.scope … })`). If an item with a `### Design notes` subsection is decomposed, that subsection is dropped from all parts — a silent loss of human-authored prose, the same class of "decompose silently discards body content" concern AUDIT-03 addressed for `deferred-until`/`spec`/`ref`. No current roadmap item uses an H3 body, so the present blast radius is nil, which is why this is low — but it is a latent correctness gap that will bite the first item that uses the sub-note structure the grammar advertises. A fix: exclude only the unit's own heading line (e.g. drop just index 0, or match `/^##\s/` rather than `startsWith('##')`) so `###` sub-notes survive into `scope`.
+
+### AUDIT-20260608-13 — Roadmap CLI silently accepts unknown mutation flags
+
+Finding-ID: AUDIT-20260608-13
+Status:     fixed-fc641d46 (added a per-subaction flag allow-list (SUBACTION_SPECS) + validateFlags; an unknown value-flag (`--depend-on` typo), an unsupported boolean (`--clear` on add), or an extra positional now fails usage exit-2 zero-write BEFORE the mutation, instead of silently producing a valid-but-wrong item. RED tests cover the typo + unsupported-boolean cases. Fresh-context sub-agent.)
+Severity:   medium
+Surface:    plugins/stack-control/src/subcommands/roadmap.ts:40-65, plugins/stack-control/src/subcommands/roadmap.ts:103-117, plugins/stack-control/src/subcommands/roadmap.ts:171-210
+
+`scanFlags` accepts every `--<name> <value>` pair into `values` with no allow-list, and each subaction then reads only the names it knows. That means typos are silently ignored. For example, `roadmap add impl:fix/x --depend-on design:feature/a --apply` succeeds but creates an item with no dependency, because `addInputFrom` only reads `depends-on`.
+
+The blast radius is real roadmap corruption by omission: the feature’s “one-move emergent capture” contract depends on dependencies/grouping being captured correctly, and a misspelled flag produces a valid but semantically wrong item. A reasonable fix is to validate allowed flags per subaction and reject unused `values` or extra positionals with exit 2 before calling the mutation.
