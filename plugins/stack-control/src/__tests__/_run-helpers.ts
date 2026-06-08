@@ -30,6 +30,6 @@ export function resolveTsx(): string {
   );
 }
 
-export function runCli(args: string[]): SpawnSyncReturns<string> {
-  return spawnSync(resolveTsx(), [CLI, ...args], { encoding: 'utf8' });
+export function runCli(args: string[], opts?: { cwd?: string }): SpawnSyncReturns<string> {
+  return spawnSync(resolveTsx(), [CLI, ...args], { encoding: 'utf8', cwd: opts?.cwd });
 }

@@ -20,6 +20,7 @@ import {
   type AddInput,
   type MutationResult,
 } from '../roadmap/mutations.js';
+import { reconcile } from '../roadmap/reconcile.js';
 import { loadRoadmap, type RoadmapModel } from '../roadmap/roadmap-model.js';
 import { blockedReport, mermaid, readyList } from '../roadmap/views.js';
 import { failUsage, grammarDirs } from './document-verb-shared.js';
@@ -156,6 +157,20 @@ function emitDefer(flags: Flags): void {
   reportMutation(defer(flags.doc, id, change, grammarDirs(), flags.apply), 'defer', id);
 }
 
+function emitReconcile(flags: Flags): void {
+  // Spec paths resolve relative to the invocation dir (the repo root in practice).
+  const report = reconcile(flags.doc, grammarDirs(), process.cwd());
+  process.stdout.write(`roadmap reconcile (report-only — proposes, never mutates):\n`);
+  process.stdout.write(`  status drift: ${report.statusDrift.length}\n`);
+  for (const d of report.statusDrift) {
+    process.stdout.write(`    - ${d.identifier}: ${d.recorded} → ${d.onDisk} (${d.proposal})\n`);
+  }
+  process.stdout.write(`  orphan spec dirs: ${report.orphans.length}\n`);
+  for (const o of report.orphans) process.stdout.write(`    - ${o}\n`);
+  process.stdout.write(`  unresolved correspondences: ${report.unresolved.length}\n`);
+  for (const u of report.unresolved) process.stdout.write(`    - ${u}\n`);
+}
+
 export async function runRoadmapCli(args: string[]): Promise<void> {
   const subaction = args[0];
   if (subaction === undefined || subaction.startsWith('--')) {
@@ -194,10 +209,13 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
       case 'defer':
         emitDefer(flags);
         return;
+      case 'reconcile':
+        emitReconcile(flags);
+        return;
       default:
         failUsage(
           'roadmap',
-          `unknown subaction '${subaction}' (known: next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer)`,
+          `unknown subaction '${subaction}' (known: next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, reconcile)`,
         );
     }
   } catch (err) {

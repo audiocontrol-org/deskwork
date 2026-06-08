@@ -94,11 +94,11 @@ TDD is mandatory (Constitution I — NON-NEGOTIABLE): every implementation task 
 **Goal**: report/propose status drift from on-disk artifact progression; never mutate.
 **Independent test**: quickstart Scenario 5 (SC-004 / FR-016/016a/016b/017).
 
-- [ ] T044 [US5] RED: tests for `reconcile` — status-drift proposals from artifact-progression at the item's `spec:` path; orphans via the declared glob; unresolved correspondences reported (never guessed); document hash identical before/after (report-only) — `tests/roadmap/reconcile.test.ts`
-- [ ] T045 [US5] Implement NEW `plugins/stack-control/src/roadmap/reconcile.ts` (read linked dir: spec/plan/tasks presence + tasks completion + governance-graduation record = shipped; no git/gh) — make T044 green
-- [ ] T046 [US5] RED: test verb `roadmap reconcile` is report-only — `tests/roadmap/verb-reconcile.test.ts`
-- [ ] T047 [US5] Implement `reconcile` subaction in the verb — make T046 green
-- [ ] T048 [US5] Checkpoint: quickstart Scenario 5 green (0 silent mutations)
+- [X] T044 [US5] RED: tests for `reconcile` — status-drift proposals from artifact-progression at the item's `spec:` path; orphans via the declared glob; unresolved correspondences reported (never guessed); document hash identical before/after (report-only) — `tests/roadmap/reconcile.test.ts`
+- [X] T045 [US5] Implement NEW `plugins/stack-control/src/roadmap/reconcile.ts` (read linked dir: spec/plan/tasks presence + tasks completion + governance-graduation record = shipped; no git/gh) — make T044 green
+- [X] T046 [US5] RED: test verb `roadmap reconcile` is report-only — `tests/roadmap/verb-reconcile.test.ts`
+- [X] T047 [US5] Implement `reconcile` subaction in the verb — make T046 green
+- [X] T048 [US5] Checkpoint: quickstart Scenario 5 green (0 silent mutations)
 
 ## Phase 8: User Story 6 — Migrate the prose roadmap (Priority: P2)
 
