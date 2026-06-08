@@ -6,6 +6,21 @@ Cross-model agreement (both `claude` and `codex` flag the same root cause indepe
 
 ---
 
+## 2026-06-08 — GRADUATION III: implementation governance (after `/speckit-implement`)
+
+The feature was **implemented** (all 50 `tasks.md` tasks; 248 tests green, `tsc` strict clean, FR-011 anti-coupling gate green, both proof docs working) and then governed via the `deskwork-governance` `after_implement` cross-model barrage (`claude` + `codex`) over the full implementation diff (`84508b52..HEAD`).
+
+**Convergence trajectory — 9 barrage rounds**, each finding fixed fresh-context + TDD-first, then re-barraged: **AUDIT-20260608-23 … -56**. HIGH all cleared in rounds 1–3; the loop never reached a clean zero-finding floor — every round surfaced ~3 fresh **marginal MEDIUM** edges (escaped pipes, edge-less tables, fenced-code `###`, unterminated comments, longer fences, prose-as-header, …), eventually finding edges *in the prior round's fixes* (AUDIT-54 ⊂ AUDIT-51's fix). This is **FM-4 for thorough CODE audit**: a flat-rate genetic-diversity barrage on parser-heavy code is an inexhaustible edge source (`SPEC-AUDIT-FAILURE-MODES.md`).
+
+**Session tally:** ~34 implement-phase findings → **most fixed `fixed-<sha>`** (incl. two STRUCTURAL root-fixes that collapsed the raw-scan class: AUDIT-49 markdown-aware archive heading scan, AUDIT-51 fence-aware grammar detection), the rest **acknowledged** (false-premise / matches-spec / self-referential). Gate **converged** (`single-run-clean`, 0 open HIGH/MED) every round from round 2 on.
+
+**Two non-convergent generators identified (NOT 005 defects — govern-tooling):**
+1. **Self-referential audit-log** — AUDIT-28→42→48 re-flagged a `Users/orion/...` path that exists ONLY as prior-finding prose inside the audit-log, which is itself in the barrage payload (verified 3× absent on disk / in git). The barrage audits its own findings ledger.
+2. **Indiscriminate untracked-fold** — the parked 002 feature's blank `plan.md` scaffold polluted every 005 payload (AUDIT-29).
+Both → suggested fixes recorded for `multi/migrate-audit-barrage` (exclude the audit-log from the payload; scope the untracked-fold to the feature). Follow-up GitHub issues prepared (filing pending operator authorization).
+
+**GRADUATION (operator decision 2026-06-08, at the diminishing-returns plateau):** graduate now. Residual round-9 MEDIUM edges **AUDIT-54/55/56 deferred** to a hardening pass (dispositioned `acknowledged-2026-06-08 (deferred-hardening)` above, full context inline). This is the rule's option (B) override-and-graduate: the implementation is exhaustively hardened; remaining findings are diminishing-value edge-hardening + the two unfixable-in-scope generators. The gate is already `converged`, so no forced override was needed.
+
 ## 2026-06-08 — GRADUATION II: spec-lens convergence pass + final override
 
 After the first graduation (below), the operator ran a **convergence pass under the new spec-mode audit lens** (`feat(audit-barrage): mode-aware audit lens`) to field-test the lens and clear the genuine findings it surfaced. **~50 findings remediated across 15 iterations.** Under the lens, findings shifted entirely off implementation-mechanism onto **promise/decision/contradiction altitude**, and the HIGH count went **8 → 1 → 1 → 1 → 2 → 2 → 1** — a low oscillating tail, never zero (FM-4: specs have no crisp convergence floor; see `SPEC-AUDIT-FAILURE-MODES.md`). Two further mechanism generators were collapsed structurally (the durability "detectable" over-claim; the committed-tree precondition 17→18→19). Final residual: **AUDIT-20260608-22** (block region model vs a row-keyed grammar's sub-block table rows) — a genuine but low-blast promise-altitude completeness gap, dispositioned `acknowledged-deferred-impl-20260608` and scoped into `tasks.md` Phase 8 (T050; pinned RED-first when `roadmap.peg` + the block-stream engine are authored). Graduated via recorded `GOVERN_OVERRIDE` (`state: overridden`). **Key outcome: the lens validated (mechanism litigation gone); prevention promoted — `design/spec-authoring` is now a roadmap feature, the real fix.**
@@ -1150,3 +1165,38 @@ Surface:    plugins/stack-control/src/document-model/unarchive-engine.ts:176-202
 `runUnarchive()` locates archive content by `opts.id`, parses the lifted content, then writes `lifted.identifier` back into the live document and removes the ledger entry for `opts.id`. There is no assertion that `lifted.identifier === opts.id`, and no post-lift uniqueness check against live Units for the lifted identifier. The built-in grammars currently make those values line up, but project/embedded grammars are first-class and can derive identifiers differently from the structural marker.
 
 Blast radius is medium: a malformed or overly flexible grammar override can make `unarchive --id old` insert `new`, remove the `old` ledger entry, and potentially create a duplicate live identifier before the next load catches it. A reasonable fix is to fail loud before any write unless the parsed lifted Unit identifier exactly equals the requested ledger id, then validate the lifted identifier against the current live set.
+
+## 2026-06-08 — audit-barrage lift (20260608T064427595Z-document-primitives-after_clarify)
+
+### AUDIT-20260608-54 — Fence-aware grammar detection mis-parses longer code fences
+
+Finding-ID: AUDIT-20260608-54
+Status:     acknowledged-2026-06-08 (deferred-hardening): operator decision to GRADUATE at the diminishing-returns plateau (see graduation note below). Marginal: chrome.ts fence tracking keys on a 3+-delimiter run; a `<!-- doc-grammar: -->` inside a 4+-backtick fence can still mis-detect (strictly better than pre-AUDIT-51, which mis-detected ALL in-fence comments). Fix later: track opening-fence length + require closing run >= it (CommonMark). Deferred to a hardening pass.
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/chrome.ts:37-87
+
+`findGrammarComments()` now skips `doc-grammar:` comments inside fenced code, but its fence tracker only stores the fence character, not the opening fence length or valid closing shape. A block opened with four backticks can legally contain a three-backtick line, but `fenceDelimiterChar()` treats that as the closing delimiter because it only checks `startsWith('```')`. Any grammar-comment example after that line is scanned as a real declaration.
+
+Blast radius is medium: specs often use longer fences specifically to show triple-backtick examples, and this reintroduces the AUDIT-51 class for a common markdown pattern. A reasonable fix is to store the opening fence length and require a close with the same character, at least that length, and only trailing spaces.
+
+### AUDIT-20260608-55 — Row-keyed unarchive can pick prose as the live table header
+
+Finding-ID: AUDIT-20260608-55
+Status:     acknowledged-2026-06-08 (deferred-hardening): operator graduation decision. Marginal: parseLifted picks the live table header via the first `isTableRowLine`; a pipe-bearing PROSE line above the table could be mis-picked. Fix later: anchor on the table the live Units parsed from (THEAD entry), not the first pipe line. Deferred to a hardening pass.
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/unarchive-engine.ts:95-118; plugins/stack-control/src/document-model/archive-file.ts:72-82
+
+`parseLifted()` finds the row-keyed live header with `doc.sourceLines.find((l) => isTableRowLine(l) && !isSeparatorRow(tableCells(l)))`. After AUDIT-52, `isTableRowLine()` means any line with an unescaped pipe, not an actual markdown table row. A valid roadmap with preamble prose like `phase | slug examples` before the real table loads fine through markdown-it, but unarchive will use that prose line as the header and then fail schema validation or parse the lifted mini-document against the wrong columns.
+
+Blast radius is medium because this makes `unarchive` fail on otherwise valid governed documents with ordinary explanatory prose. The fix should reuse the markdown-it block stream’s `THEAD` entry, like archive’s table preamble path, rather than scanning raw source lines for pipes.
+
+### AUDIT-20260608-56 — Advertised Node engine is lower than the new runtime dependency floor
+
+Finding-ID: AUDIT-20260608-56
+Status:     acknowledged-2026-06-08 (deferred-hardening): operator graduation decision. Trivial manifest-accuracy: confirm plugins/stack-control/package.json engines.node (>=20) matches the floor required by markdown-it/peggy; bump if needed. Deferred to a hardening pass.
+Severity:   medium
+Surface:    plugins/stack-control/package.json:24-25; package-lock.json:1149-1150; package-lock.json:4653-4656
+
+The plugin package declares `"node": ">=20"`, but the newly added `peggy` dependency pulls `@peggyjs/from-mem`, whose lockfile engine is `"node": ">=20.8"`. On Node 20.0 through 20.7, an adopter with engine-strict install settings can fail during the wrapper’s first-run `npm install`, despite satisfying the plugin’s own declared engine range.
+
+Blast radius is medium: this affects fresh adopter installs and upgrades on a supported-by-manifest Node version. A reasonable fix is to raise the plugin/root engine floor to `>=20.8`, or select a parser dependency version whose transitive engine requirements match the advertised floor.
