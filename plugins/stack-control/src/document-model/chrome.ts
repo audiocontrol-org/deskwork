@@ -1,0 +1,103 @@
+// Engine-level document chrome detection (FR-001/FR-002).
+//
+// "Chrome" is the content the grammar must never see: the document frontmatter
+// and the single embedded grammar-declaration comment (the HTML comment whose
+// first token is the `doc-grammar:` sentinel). This module is the single source
+// of truth for finding that chrome — shared by block-stream (which blanks it
+// so the grammar never parses it) and grammar-resolver (which extracts the
+// embedded grammar text from it).
+
+import { DocumentModelError } from './types.js';
+
+/** The sentinel that marks an HTML comment as a grammar declaration (FR-001). */
+export const GRAMMAR_SENTINEL = 'doc-grammar:';
+
+export interface LineRange {
+  /** 0-based inclusive start line index. */
+  readonly start: number;
+  /** 0-based inclusive end line index. */
+  readonly end: number;
+}
+
+export interface GrammarComment {
+  readonly range: LineRange;
+  /** The grammar text inside the comment, after the `doc-grammar:` sentinel. */
+  readonly grammarText: string;
+}
+
+/** Detect leading YAML frontmatter (`---` … `---`). Returns null when absent. */
+export function detectFrontmatter(lines: readonly string[]): LineRange | null {
+  if (lines.length === 0 || lines[0]!.trim() !== '---') return null;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i]!.trim() === '---') return { start: 0, end: i };
+  }
+  return null;
+}
+
+/**
+ * Find every HTML comment whose first non-blank token is the grammar sentinel.
+ * FR-001: a governable document has EXACTLY ONE; the resolver fails loud on
+ * more than one (ambiguous declaration). Returns all matches so the caller can
+ * enforce that.
+ */
+export function findGrammarComments(lines: readonly string[]): GrammarComment[] {
+  const found: GrammarComment[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const open = lines[i]!.indexOf('<!--');
+    if (open === -1) continue;
+    // Locate the comment's closing `-->` (same line or a later line).
+    let end = i;
+    let closeFound = lines[i]!.indexOf('-->', open + 4) !== -1;
+    while (!closeFound && end + 1 < lines.length) {
+      end++;
+      closeFound = lines[end]!.includes('-->');
+    }
+    if (!closeFound) continue; // unterminated comment — not chrome
+    // Inner text between <!-- and -->.
+    const block = lines.slice(i, end + 1).join('\n');
+    const inner = block.slice(block.indexOf('<!--') + 4, block.lastIndexOf('-->'));
+    if (inner.trimStart().startsWith(GRAMMAR_SENTINEL)) {
+      // Body = everything after the first newline following the sentinel (the
+      // sentinel line may carry a format word, e.g. `doc-grammar: peg`). When
+      // the whole declaration is on one line, the body is the trimmed remainder.
+      const afterSentinel = inner.trimStart().slice(GRAMMAR_SENTINEL.length);
+      const nl = afterSentinel.indexOf('\n');
+      const grammarText = nl === -1 ? afterSentinel.trim() : afterSentinel.slice(nl + 1);
+      found.push({ range: { start: i, end }, grammarText });
+    }
+    i = end;
+  }
+  return found;
+}
+
+/**
+ * Blank the chrome line ranges in-place (replace with empty lines) so total
+ * line count — and therefore every other block's original line numbers — is
+ * preserved when the markdown parser runs (FR-002).
+ */
+export function blankChrome(source: string): string {
+  const lines = source.split('\n');
+  const ranges: LineRange[] = [];
+  const fm = detectFrontmatter(lines);
+  if (fm) ranges.push(fm);
+  for (const c of findGrammarComments(lines)) ranges.push(c.range);
+  for (const r of ranges) {
+    for (let i = r.start; i <= r.end; i++) lines[i] = '';
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Resolve the single embedded grammar comment, enforcing FR-001 uniqueness.
+ * Returns null when none is embedded (caller falls through to frontmatter ref).
+ */
+export function embeddedGrammar(source: string): GrammarComment | null {
+  const comments = findGrammarComments(source.split('\n'));
+  if (comments.length === 0) return null;
+  if (comments.length > 1) {
+    throw new DocumentModelError(
+      `ambiguous grammar declaration: ${comments.length} embedded \`${GRAMMAR_SENTINEL}\` comments found; a governable document must declare exactly one`,
+    );
+  }
+  return comments[0]!;
+}

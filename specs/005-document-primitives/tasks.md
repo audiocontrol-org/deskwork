@@ -33,16 +33,16 @@ description: "Task list for design/document-primitives implementation"
 
 **⚠️ CRITICAL**: archive, unarchive, and curate all depend on this layer.
 
-- [ ] T005 Define core types in `plugins/stack-control/src/document-model/types.ts`: `Unit`, `GovernableDocument`, `GrammarSpec`, `LedgerEntry`, `ReconciliationHook`, `ArchiveResult`, `CurateReport` (data-model.md).
-- [ ] T006 [P] RED: block-stream round-trip test in `plugins/stack-control/tests/document-primitives/block-stream.test.ts` (research risk #1) — a Unit's normalized span maps back to the EXACT original markdown line range across loose/tight lists, fenced code with blank lines, setext headings, tables, HTML blocks. Must FAIL.
-- [ ] T007 Implement `plugins/stack-control/src/document-model/block-stream.ts` (markdown-it `md.parse` → normalized one-token-per-line representation + parallel normalized-line→`[startLine,endLine]` map; FR-002). Makes T006 green.
-- [ ] T008 [P] RED: grammar-resolver test in `.../grammar-resolver.test.ts` — embedded wins over frontmatter ref; ref resolves project-override → built-in; neither → fail loud (FR-001/FR-012). Must FAIL.
-- [ ] T009 Implement `plugins/stack-control/src/document-model/grammar-resolver.ts` (FR-001/FR-012). Makes T008 green.
-- [ ] T010 [P] RED: grammar-parse test in `.../grammar-parse.test.ts` — parse a fixture doc against a fixture grammar → typed Units (identifier/status/orderKey/span); malformed grammar AND parse failure → located fail-loud error (research risk #3, FR-003/FR-010). Must FAIL.
-- [ ] T011 Implement `plugins/stack-control/src/document-model/grammar-parse.ts` (`peggy.generate` + parse + span back-map via T007's line map). Makes T010 green.
-- [ ] T012 [P] RED: identifier-validator test in `.../identifier-validator.test.ts` — uniqueness (case-sensitive) across document ∪ archive; non-ordinal CLOSED denylist (bare-int, `F<n>`, `phase-<n>`, `step-<n>`, `#<n>`, leading `<n>`); no-opaque-token; order-key never references identifier (FR-005/FR-004). Must FAIL.
-- [ ] T013 Implement `plugins/stack-control/src/document-model/identifier-validator.ts` (FR-005). Makes T012 green.
-- [ ] T014 [P] Author the two built-in grammars `plugins/stack-control/grammars/roadmap.peg` and `plugins/stack-control/grammars/design-inbox.peg` with their full status vocabularies (FR-013) — used as the REAL test grammars (integration-first, Principle II).
+- [X] T005 Define core types in `plugins/stack-control/src/document-model/types.ts`: `Unit`, `GovernableDocument`, `GrammarSpec`, `LedgerEntry`, `ReconciliationHook`, `ArchiveResult`, `CurateReport` (data-model.md).
+- [X] T006 [P] RED: block-stream round-trip test in `plugins/stack-control/tests/document-primitives/block-stream.test.ts` (research risk #1) — a Unit's normalized span maps back to the EXACT original markdown line range across loose/tight lists, fenced code with blank lines, setext headings, tables, HTML blocks. Must FAIL.
+- [X] T007 Implement `plugins/stack-control/src/document-model/block-stream.ts` (markdown-it `md.parse` → normalized one-token-per-line representation + parallel normalized-line→`[startLine,endLine]` map; FR-002). Makes T006 green.
+- [X] T008 [P] RED: grammar-resolver test in `.../grammar-resolver.test.ts` — embedded wins over frontmatter ref; ref resolves project-override → built-in; neither → fail loud (FR-001/FR-012). Must FAIL.
+- [X] T009 Implement `plugins/stack-control/src/document-model/grammar-resolver.ts` (FR-001/FR-012). Makes T008 green.
+- [X] T010 [P] RED: grammar-parse test in `.../grammar-parse.test.ts` — parse a fixture doc against a fixture grammar → typed Units (identifier/status/orderKey/span); malformed grammar AND parse failure → located fail-loud error (research risk #3, FR-003/FR-010). Must FAIL.
+- [X] T011 Implement `plugins/stack-control/src/document-model/grammar-parse.ts` (`peggy.generate` + parse + span back-map via T007's line map). Makes T010 green.
+- [X] T012 [P] RED: identifier-validator test in `.../identifier-validator.test.ts` — uniqueness (case-sensitive) across document ∪ archive; non-ordinal CLOSED denylist (bare-int, `F<n>`, `phase-<n>`, `step-<n>`, `#<n>`, leading `<n>`); no-opaque-token; order-key never references identifier (FR-005/FR-004). Must FAIL.
+- [X] T013 Implement `plugins/stack-control/src/document-model/identifier-validator.ts` (FR-005). Makes T012 green.
+- [X] T014 [P] Author the two built-in grammars `plugins/stack-control/grammars/roadmap.peg` and `plugins/stack-control/grammars/design-inbox.peg` with their full status vocabularies (FR-013) — used as the REAL test grammars (integration-first, Principle II).
 
 **Checkpoint**: the engine resolves grammars, parses to Units with correct spans, and validates identifiers.
 
