@@ -1071,3 +1071,47 @@ Surface:    plugins/stack-control/src/document-model/archive-file.ts:8-11; plugi
 Live parsing uses markdown-it table tokens, but archive-side helpers split raw markdown rows with `line.split('|')`. Markdown table cells can contain escaped pipes, e.g. `Scope with \| character`. Such a row can parse live and archive successfully, but `unarchive` later counts the archived row with `tableCells()` and sees an extra column, tripping the schema mismatch guard at lines 105-109.
 
 Blast radius is medium: a valid row-keyed roadmap row can become impossible to unarchive after being archived, despite no schema migration. A reasonable fix is to parse archive table rows with the same markdown-aware path used for live rows, or implement a table splitter that respects escaped pipes.
+
+## 2026-06-08 — audit-barrage lift (20260608T062045729Z-document-primitives-after_clarify)
+
+### AUDIT-20260608-48 — Junk re-rooted `Users/orion/.../plan.md` is a genuine new file in this diff — not the hallucination prior rounds dismissed
+
+Finding-ID: AUDIT-20260608-48
+Status:     acknowledged-2026-06-08
+Disposition: FALSE PREMISE / SELF-REFERENTIAL GENERATOR (verified 3x: AUDIT-28/42/48). `git ls-files`, `git diff --name-only 84508b52..HEAD`, and `find` ALL show NO `Users/orion/...` file — tracked, in-diff, or on disk. All payload occurrences are AUDIT-28's quoted prose INSIDE the audit-log, which is itself part of the docs diff the barrage audits — so each round re-discovers the prior finding's quoted path as if new. This cannot converge within 005; it is a govern-payload limitation (the barrage audits its own audit-log). Filed as govern tooling-feedback for multi/migrate-audit-barrage. Not a 005 defect.
+Severity:   medium
+Surface:    `Users/orion/work/deskwork-work/stack-control/specs/002-parallel-execution-engine/plan.md` (new file, entire — the final `diff --git` hunk, `new file mode 100644 index 00000000..92b96c71`, lines 1-113)
+
+The diff under audit contains a real `diff --git a/Users/orion/work/deskwork-work/stack-control/specs/002-parallel-execution-engine/plan.md …` hunk with `new file mode 100644` and 113 lines of an unfilled Spec Kit plan template (`[FEATURE]`, `[DATE]`, `ACTION REQUIRED`, `NEEDS CLARIFICATION`, `[REMOVE IF UNUSED]`). This is the *absolute worktree path re-rooted under the repo root*, creating a spurious top-level `Users/` directory tree. It is distinct from the audit-log prose: AUDIT-28 (`acknowledged-2026-06-08`, "FALSE PREMISE … no `Users/orion/...` re-rooted path exists") and AUDIT-42 (`acknowledged`, "only as quoted prose inside AUDIT-28") both dismissed this path as a self-referential artifact. The diff's own final hunk contradicts those dispositions — the file is a genuine git addition in this payload, not a grep echo of audit-log content.
+
+Blast radius is medium and compounding: if this range is committed (`git add -A`), it lands a permanent junk `Users/...` tree inside the repository — a 002-feature artifact riding in the 005 range, a repo-hygiene defect violating the project's `file-handling.md` "never bare/absolute path" discipline, and a scope leak. The intended file already exists untracked at the correct relative path (`?? specs/002-parallel-execution-engine/plan.md` in git status), so this is a second, junk copy. The fix is to delete the `Users/orion/...` path entirely before any commit, and to correct the AUDIT-28/42 dispositions: their "no such path exists" premise is false against this diff. The prior false-premise dispositions are exactly why this can slip through — the artifact is being treated as a known hallucination when it is a live defect.
+
+### AUDIT-20260608-49 — Heading-keyed archive scan is naive line-regex, not markdown-aware — a `###`-shaped line inside a fenced code block in a unit body silently truncates the unit on unarchive
+
+Finding-ID: AUDIT-20260608-49 (claude-02 + claude-03 + codex-02; cross-model)
+Status:     fixed-b5148241
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/unarchive-engine.ts:50-79 (locateInArchive heading branch); plugins/stack-control/src/document-model/archive-file.ts:53-55 (headingMarkerRe), :75-84 (archiveMarkerIds heading branch)
+
+The live document is parsed markdown-aware (`block-stream.ts` runs markdown-it, which correctly treats fenced-code content as `CODE`, never a heading). But the archive-side helpers scan raw lines with a pure regex. `locateInArchive`'s heading branch finds a unit's start by `head.exec(lines[i])`, then finds its END by the first subsequent line where `head.test(lines[j])` is true (`end = j - 1; break`). `head` is `^#{level}(?!#)\s+(.+?)\s*$`. A heading-keyed unit whose verbatim body contains a fenced code block — or indented/quoted prose — with a line shaped like `### something` will match that regex even though markdown never rendered it as a heading. The located span is truncated at that fake marker, so `unarchive --apply` reinserts a **truncated** unit and silently drops every body line after the embedded `###`. This is silent content loss, the exact failure mode the durability framing exists to prevent. `archiveMarkerIds`'s heading branch (archive-file.ts:75-84) has the same naive scan, so the same body also produces spurious `coherence-notice` markers in `curate` ("archive contains a Unit marker '…' with no ledger entry").
+
+This is the heading-keyed twin of the already-fixed AUDIT-46 (header-row scanning) and AUDIT-47 (naive pipe splitting): the archive side must be as markdown-aware as the live side, and it isn't for heading bodies. Blast radius is medium — the trigger needs a heading-keyed unit body containing a `###`-shaped line in a non-heading context, which is uncommon in the bullet-list design-inbox but entirely plausible for the general engine (the README markets `archive`/`curate` for "a spec, any markdown that accretes settled material"; specs and ADRs routinely contain fenced code with markdown examples or `### TODO`-style comments). A reasonable fix is to locate/count archived heading units by re-parsing the archive body through the same `block-stream` path (or at minimum skipping fenced-code regions) rather than a line regex, so archive-side unit boundaries match live-parse boundaries exactly.
+
+### AUDIT-20260608-50 — Unterminated grammar comments are still swallowed when `doc-grammar:` starts on the next line
+
+Finding-ID: AUDIT-20260608-50
+Status:     fixed-b5148241
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/chrome.ts:43-67
+
+The AUDIT-45 fix only detects an unterminated grammar comment when `doc-grammar:` appears on the same line as `<!--`: it checks `lines[i]!.slice(open + 4)` at lines 57-58. But the normal closed-comment path accepts multiline comments by joining the whole block and checking `inner.trimStart().startsWith(GRAMMAR_SENTINEL)` at lines 70-72. So this malformed declaration is still silently skipped:
+
+```md
+<!--
+doc-grammar: peg
+...
+```
+
+with no closing `-->`.
+
+Blast radius is medium: it is the same wrong-repair class AUDIT-45 intended to close, just with a common multiline comment shape. A reasonable fix is to build the unterminated comment text from `open` through EOF and apply the same `inner.trimStart()` sentinel check used for closed comments.
