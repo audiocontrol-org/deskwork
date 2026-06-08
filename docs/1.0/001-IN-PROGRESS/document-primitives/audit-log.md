@@ -1115,3 +1115,38 @@ doc-grammar: peg
 with no closing `-->`.
 
 Blast radius is medium: it is the same wrong-repair class AUDIT-45 intended to close, just with a common multiline comment shape. A reasonable fix is to build the unterminated comment text from `open` through EOF and apply the same `inner.trimStart()` sentinel check used for closed comments.
+
+## 2026-06-08 — audit-barrage lift (20260608T063051661Z-document-primitives-after_clarify)
+
+### AUDIT-20260608-51 — Embedded grammar detection is raw-line based, so code examples can override or break a valid document grammar
+
+Finding-ID: AUDIT-20260608-51
+Status:     fixed-f4d015a7
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/chrome.ts:43-88; plugins/stack-control/src/document-model/grammar-resolver.ts:185-193
+
+`findGrammarComments()` scans raw lines for any `<!-- ... doc-grammar: ... -->` block without first asking markdown-it whether that comment is inside a fenced code block. Because `resolveGrammar()` gives embedded grammar comments precedence over frontmatter, a governed document with valid `doc-grammar: design-inbox` frontmatter but a fenced example like `<!-- doc-grammar: roadmap -->` will treat the code example as the real embedded declaration and then fail parsing it as a grammar artifact, or choose the wrong grammar if the fenced block contains a complete artifact.
+
+Blast radius is medium: this does not affect the shipped proof docs, but the README explicitly markets these primitives for specs and markdown documents that can plausibly include grammar/comment examples. A reasonable fix is to make grammar-comment discovery markdown-aware, or at minimum ignore candidate comments whose line spans are inside fenced/code blocks according to the same block stream parser.
+
+### AUDIT-20260608-52 — Row-keyed archive helpers only handle pipe tables with leading `|`, while markdown-it accepts optional-edge pipe tables
+
+Finding-ID: AUDIT-20260608-52
+Status:     fixed-f4d015a7
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/archive-file.ts:20-39,91-132; plugins/stack-control/src/document-model/unarchive-engine.ts:92-119
+
+The live parser delegates table recognition to markdown-it, which accepts common pipe-table forms without leading/trailing pipes. The archive-side helpers do not: `archiveMarkerIds()` and `locateInArchive()` skip any row that does not `trimStart().startsWith('|')`, and `tableCells()` always drops the first and last split segments as if outer pipes are present. A live roadmap written as `Codename | Feature | Scope | Status` can parse and archive, but the archive scanner later cannot find its rows, and `parseLifted()` cannot find the live table header for reinsertion.
+
+Blast radius is medium because the built-in `ROADMAP.md` uses outer pipes, but project documents and overrides may use valid markdown table syntax that the live engine already accepts. The archive side should either normalize row-keyed tables through markdown-it as well, or make `tableCells()` and the row scanners support both outer-pipe and no-outer-pipe table forms consistently.
+
+### AUDIT-20260608-53 — `unarchive` does not verify the lifted Unit identity matches the ledger id before writing
+
+Finding-ID: AUDIT-20260608-53
+Status:     fixed-f4d015a7
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/unarchive-engine.ts:176-202
+
+`runUnarchive()` locates archive content by `opts.id`, parses the lifted content, then writes `lifted.identifier` back into the live document and removes the ledger entry for `opts.id`. There is no assertion that `lifted.identifier === opts.id`, and no post-lift uniqueness check against live Units for the lifted identifier. The built-in grammars currently make those values line up, but project/embedded grammars are first-class and can derive identifiers differently from the structural marker.
+
+Blast radius is medium: a malformed or overly flexible grammar override can make `unarchive --id old` insert `new`, remove the `old` ledger entry, and potentially create a duplicate live identifier before the next load catches it. A reasonable fix is to fail loud before any write unless the parsed lifted Unit identifier exactly equals the requested ledger id, then validate the lifted identifier against the current live set.
