@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DocumentModelError } from '../../src/document-model/types.js';
 import { reconcile } from '../../src/roadmap/reconcile.js';
 import { ROADMAP_OPTS } from './helpers.js';
 
@@ -96,5 +97,26 @@ describe('reconcile (T044)', () => {
     const before = readFileSync(docPath, 'utf8');
     reconcile(docPath, ROADMAP_OPTS, baseDir);
     expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('FAILS LOUD when baseDir does not contain the glob-parent (AUDIT-20260608-15)', () => {
+    // A wrong baseDir (no `specs/` underneath it) must throw rather than silently
+    // report every item as unresolved + an empty orphan tree.
+    const { docPath } = buildTree();
+    const wrongBase = mkdtempSync(join(tmpdir(), 'reconcile-wrong-base-'));
+    expect(() => reconcile(docPath, ROADMAP_OPTS, wrongBase)).toThrow(DocumentModelError);
+    expect(() => reconcile(docPath, ROADMAP_OPTS, wrongBase)).toThrow(/specs/);
+  });
+
+  it('does NOT fail loud when the glob-parent exists but is empty', () => {
+    // A legitimately-empty `specs/` is a valid project state, not a wrong base.
+    const { docPath } = buildTree();
+    const emptyBase = mkdtempSync(join(tmpdir(), 'reconcile-empty-specs-'));
+    mkdirSync(join(emptyBase, 'specs'), { recursive: true });
+    const report = reconcile(docPath, ROADMAP_OPTS, emptyBase);
+    // No spec dirs exist ⇒ every referenced item is unresolved, no orphans, no drift.
+    expect(report.orphans).toEqual([]);
+    expect(report.statusDrift).toEqual([]);
+    expect(report.unresolved.length).toBeGreaterThan(0);
   });
 });

@@ -66,7 +66,7 @@ plugins/stack-control/bin/stackctl roadmap reconcile [--doc <path>]   # report-o
                      [--deferred-until "…"] [--spec path] [--ref link] [--apply]
 
 ... roadmap advance <id>     --to <status>           [--apply]   # lifecycle status change
-... roadmap decompose <id>   --into x,y,z            [--apply]   # split one → N; repoint dependents
+... roadmap decompose <id>   --into x,y,z            [--apply]   # split one → N; parts inherit status + depends-on + part-of + deferred-until; repoint dependents
 ... roadmap reclassify <id>  --to <new-identifier>   [--apply]   # rename + rewrite all referencing edges
 ... roadmap defer <id>       --until "…" | --clear   [--apply]   # set/clear the prose deferred-until
 ```

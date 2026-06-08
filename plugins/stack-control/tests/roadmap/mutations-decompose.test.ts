@@ -73,6 +73,40 @@ describe('mutations.decompose (T037)', () => {
     expect(readyIds).not.toContain('impl:feature/x2');
   });
 
+  it('carries the original status onto every part (AUDIT-20260608-14)', () => {
+    // The item to decompose is `in-flight`; its dep is `shipped` so the parts
+    // would be ready/actionable if mis-statused as `planned`. The carry must
+    // keep them `in-flight`, not silently reset to `planned`.
+    const docPath = writeTempRoadmap([
+      '## design:feature/a',
+      '- status: shipped',
+      '',
+      '## impl:feature/x',
+      '- status: in-flight',
+      '- depends-on: design:feature/a',
+    ]);
+    decompose(docPath, 'impl:feature/x', ['impl:feature/x1', 'impl:feature/x2'], ROADMAP_OPTS, true);
+    const model = loadRoadmap(docPath, ROADMAP_OPTS);
+    for (const partId of ['impl:feature/x1', 'impl:feature/x2']) {
+      const part = model.byId.get(partId);
+      expect(part).toBeDefined();
+      // The carry under test: an in-flight item yields in-flight parts, NOT a
+      // silent reset to `planned`.
+      expect(part!.status).toBe('in-flight');
+    }
+  });
+
+  it('a planned item still yields planned parts (status carry is faithful, not forced)', () => {
+    const docPath = writeTempRoadmap([
+      '## impl:feature/x',
+      '- status: planned',
+    ]);
+    decompose(docPath, 'impl:feature/x', ['impl:feature/x1', 'impl:feature/x2'], ROADMAP_OPTS, true);
+    const model = loadRoadmap(docPath, ROADMAP_OPTS);
+    expect(model.byId.get('impl:feature/x1')!.status).toBe('planned');
+    expect(model.byId.get('impl:feature/x2')!.status).toBe('planned');
+  });
+
   it('a decompose that invalidates the graph (into reuses an existing id) is zero-write', () => {
     const docPath = writeTempRoadmap([
       '## impl:feature/a',

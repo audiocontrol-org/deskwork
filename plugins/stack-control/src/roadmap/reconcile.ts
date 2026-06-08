@@ -14,6 +14,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { LoadOptions } from '../document-model/document.js';
+import { DocumentModelError } from '../document-model/types.js';
 import { loadRoadmap } from './roadmap-model.js';
 
 export interface StatusDrift {
@@ -50,7 +51,7 @@ function normalize(p: string): string {
 }
 
 /** The parent segment of a glob of the form `specs/<id>/spec.md` (e.g. `specs`). */
-function globParent(source: string): string | null {
+export function globParent(source: string): string | null {
   const idx = source.indexOf('/*/');
   return idx > 0 ? source.slice(0, idx) : null;
 }
@@ -79,6 +80,21 @@ export function reconcile(
   baseDir: string,
 ): ReconciliationReport {
   const model = loadRoadmap(docPath, opts);
+
+  // Fail loud on a wrong/misconfigured base: when the grammar declares a glob
+  // reconciliation hook but the glob-parent dir is absent under `baseDir`, every
+  // `spec:` path would silently fail `existsSync` and report all-unresolved
+  // (AUDIT-20260608-15). A genuinely-empty `specs/` is a valid project state and
+  // does NOT trip this guard — only a missing parent dir does.
+  const hook = model.doc.grammar.reconciliationHook;
+  const globParentDir = hook !== null && hook.kind === 'glob' ? globParent(hook.source) : null;
+  if (globParentDir !== null && !existsSync(join(baseDir, globParentDir))) {
+    throw new DocumentModelError(
+      `reconcile base '${baseDir}' does not contain the reconciliation glob-parent '${globParentDir}/' ` +
+        `(spec correspondences resolve relative to this base; a wrong base must not silently report all-unresolved)`,
+    );
+  }
+
   const statusDrift: StatusDrift[] = [];
   const unresolved: string[] = [];
   const referenced = new Set<string>();
@@ -102,12 +118,10 @@ export function reconcile(
     }
   }
 
-  const hook = model.doc.grammar.reconciliationHook;
-  const parent = hook !== null && hook.kind === 'glob' ? globParent(hook.source) : null;
   const orphans =
-    parent === null
+    globParentDir === null
       ? []
-      : discoverSpecDirs(baseDir, parent).filter((dir) => !referenced.has(normalize(dir)));
+      : discoverSpecDirs(baseDir, globParentDir).filter((dir) => !referenced.has(normalize(dir)));
 
   return { statusDrift, orphans, unresolved };
 }

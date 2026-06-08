@@ -7,7 +7,8 @@
 // Exit codes: 0 success; 2 usage/parse/validation (ungovernable doc, parse
 // failure, referential-integrity/acyclicity violation, missing arg).
 
-import { dirname, resolve } from 'node:path';
+import { existsSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DocumentModelError } from '../document-model/types.js';
 import { blocks, order } from '../roadmap/graph.js';
@@ -20,7 +21,7 @@ import {
   type AddInput,
   type MutationResult,
 } from '../roadmap/mutations.js';
-import { reconcile } from '../roadmap/reconcile.js';
+import { globParent, reconcile } from '../roadmap/reconcile.js';
 import { loadRoadmap, type RoadmapModel } from '../roadmap/roadmap-model.js';
 import { blockedReport, mermaid, readyList } from '../roadmap/views.js';
 import { failUsage, grammarDirs } from './document-verb-shared.js';
@@ -207,9 +208,41 @@ function emitDefer(flags: Flags): void {
   reportMutation(defer(flags.doc, id, change, grammarDirs(), flags.apply), 'defer', id);
 }
 
+/**
+ * Walk UP from the doc's directory to the nearest ancestor that contains
+ * `<globParent>` as a subdirectory, and return that ancestor. The roadmap's
+ * `spec:` paths (and the reconciliation glob) are relative to wherever the
+ * glob-parent dir lives — NOT to the invocation cwd (AUDIT-20260608-15). Failing
+ * to locate it is fail-loud (a wrong base must never silently report
+ * all-unresolved). Returns the doc's own directory when the grammar declares no
+ * glob hook (nothing to anchor to).
+ */
+function reconcileBaseDir(docPath: string, globParentDir: string | null): string {
+  const start = dirname(resolve(docPath));
+  if (globParentDir === null) return start;
+  let cur = start;
+  for (;;) {
+    const candidate = join(cur, globParentDir);
+    if (existsSync(candidate) && statSync(candidate).isDirectory()) return cur;
+    const parent = dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  throw new DocumentModelError(
+    `reconcile: no ancestor of '${start}' contains the reconciliation glob-parent '${globParentDir}/' ` +
+      `(spec correspondences cannot be resolved; refusing to report all-unresolved against a wrong base)`,
+  );
+}
+
 function emitReconcile(flags: Flags): void {
-  // Spec paths resolve relative to the invocation dir (the repo root in practice).
-  const report = reconcile(flags.doc, grammarDirs(), process.cwd());
+  // Spec paths resolve relative to wherever the glob-parent dir (e.g. `specs/`)
+  // lives, derived from the DOC's location — not the invocation cwd. This makes
+  // `roadmap reconcile` correct from any working directory (AUDIT-20260608-15).
+  const model = loadRoadmap(flags.doc, grammarDirs());
+  const hook = model.doc.grammar.reconciliationHook;
+  const globParentDir = hook !== null && hook.kind === 'glob' ? globParent(hook.source) : null;
+  const baseDir = reconcileBaseDir(flags.doc, globParentDir);
+  const report = reconcile(flags.doc, grammarDirs(), baseDir);
   process.stdout.write(`roadmap reconcile (report-only — proposes, never mutates):\n`);
   process.stdout.write(`  status drift: ${report.statusDrift.length}\n`);
   for (const d of report.statusDrift) {

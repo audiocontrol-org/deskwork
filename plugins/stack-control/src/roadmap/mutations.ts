@@ -182,7 +182,7 @@ export function advance(
 
 /**
  * Split one item into N peers (FR-009). The parts inherit the original's
- * dependencies + grouping; every former dependent's `depends-on` is repointed
+ * status + dependencies + grouping + deferral; every former dependent's `depends-on` is repointed
  * from the original onto all parts. Re-validates the whole graph; an invalidating
  * split (cycle / reused identifier) is zero-write (R7).
  */
@@ -210,6 +210,10 @@ export function decompose(
   const partSections = into.map((id) =>
     buildSection({
       identifier: id,
+      // Carry the original's status so a decomposed in-flight item yields
+      // in-flight parts (and a shipped item stays shipped) — without this the
+      // parts silently reset to `planned` (AUDIT-20260608-14).
+      status: source.status,
       dependsOn: inheritedDeps.length > 0 ? inheritedDeps : undefined,
       partOf: inheritedPartOf.length > 0 ? inheritedPartOf[0] : undefined,
       deferredUntil: source.deferredUntil ?? undefined,
