@@ -15,7 +15,7 @@ The compiled, declared description of a document's structure. Resolved per FR-00
 | `pegText` | string | The declarative `.peg` grammar text compiled by peggy at runtime. |
 | `statusVocabulary` | string[] | All legal statuses (FR-004). |
 | `terminalStatuses` | string[] | Subset of `statusVocabulary` that is archivable (FR-004). |
-| `orderKey` | OrderKey | Declared ordering; MUST NOT be a positional/sequence ordinal (a category/attribute that also appears in a structured identifier is allowed) (FR-004). |
+| `orderKey` | OrderKey | Declared ordering; MUST NOT be a positional/sequence ordinal (a category/attribute that also appears in a structured identifier is allowed). Ties on equal order-key values are broken **by identifier** — a stable, total secondary sort, not a positional encoding (FR-004). |
 | `identifierProduction` | IdentifierRule | The grammar's concrete identifier shape — strict slug or title (FR-005, clarification: per-grammar). |
 | `reconciliationHook` | ReconciliationHook \| null | Optional seam (FR-008); null when undeclared. |
 
@@ -89,7 +89,7 @@ Optional grammar-declared seam for an external source of truth (FR-008).
 | `kind` | `'command' \| 'glob'` | Declared shape of the source. |
 | `source` | string | The command or glob (recorded, **not executed** this feature). |
 
-- **Rule**: this feature only *records/validates* a declared hook; `curate`'s up-to-date check reports "declared, not yet executed" and **never runs it** (clarification 2026-06-07; execution is a later feature).
+- **Rule**: this feature only *records/validates* a declared hook; `curate`'s up-to-date check reports "declared, not executed" and **never runs it** (clarification 2026-06-07; execution is out of scope for this feature — a separate feature owns it).
 
 ## State transitions
 
