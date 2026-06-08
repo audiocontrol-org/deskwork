@@ -17,6 +17,8 @@ import { auditBarrage } from './subcommands/audit-barrage.js';
 import { auditBarrageRender } from './subcommands/audit-barrage-render.js';
 import { auditBarrageLiftCli } from './subcommands/audit-barrage-lift.js';
 import { runGovern } from './subcommands/govern.js';
+import { runArchiveCli } from './subcommands/archive.js';
+import { runUnarchiveCli } from './subcommands/unarchive.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -34,6 +36,9 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // Single-sourced audit-protocol orchestration (govern consolidation):
   // replaces the two divergent bash scripts; the shims exec this verb.
   govern: runGovern,
+  // Document-handling primitives (design/document-primitives).
+  archive: runArchiveCli,
+  unarchive: runUnarchiveCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

@@ -56,20 +56,20 @@ description: "Task list for design/document-primitives implementation"
 
 ### Tests for User Story 1 (RED first) ⚠️
 
-- [ ] T015 [P] [US1] RED: archive dry-run test in `.../archive-engine.test.ts` — selects terminal-status Units, reports planned moves, ZERO writes (FR-009). Must FAIL.
-- [ ] T016 [P] [US1] RED: archive `--apply` test — Units cut by span → appended to `<doc>-archive.md`; ledger written IN the archive file; coherence holds; live doc has zero archivable Units and zero bookkeeping (FR-006, SC-001). Must FAIL.
-- [ ] T017 [P] [US1] RED: archive atomicity test — a simulated mid-`--apply` write failure leaves NOTHING written (FR-006/FR-010 absolute zero-writes). Must FAIL.
-- [ ] T018 [P] [US1] RED: unarchive test in `.../unarchive-engine.test.ts` — restores a named Unit, removes its ledger entry, round-trip restores content; identity collision → fail loud (FR-007). Must FAIL.
+- [X] T015 [P] [US1] RED: archive dry-run test in `.../archive-engine.test.ts` — selects terminal-status Units, reports planned moves, ZERO writes (FR-009). Must FAIL.
+- [X] T016 [P] [US1] RED: archive `--apply` test — Units cut by span → appended to `<doc>-archive.md`; ledger written IN the archive file; coherence holds; live doc has zero archivable Units and zero bookkeeping (FR-006, SC-001). Must FAIL.
+- [X] T017 [P] [US1] RED: archive atomicity test — a simulated mid-`--apply` write failure leaves NOTHING written (FR-006/FR-010 absolute zero-writes). Must FAIL.
+- [X] T018 [P] [US1] RED: unarchive test in `.../unarchive-engine.test.ts` — restores a named Unit, removes its ledger entry, round-trip restores content; identity collision → fail loud (FR-007). Must FAIL.
 
 ### Implementation for User Story 1
 
-- [ ] T019 [US1] Implement `plugins/stack-control/src/document-model/archive-engine.ts` (select → cut by span → append → ledger → coherence; atomic write). Makes T015–T017 green.
-- [ ] T020 [US1] Implement `plugins/stack-control/src/document-model/unarchive-engine.ts` (FR-007 reversal + collision guard). Makes T018 green.
-- [ ] T021 [US1] Implement verb `plugins/stack-control/src/subcommands/archive.ts` (`--doc`, `--apply`; dry-run default; exit codes) per `contracts/archive.md`.
-- [ ] T022 [US1] Implement verb `plugins/stack-control/src/subcommands/unarchive.ts` (`--doc`, `--id`, `--apply`) per `contracts/unarchive.md`.
-- [ ] T023 [US1] Register `archive` + `unarchive` in the `stackctl` dispatcher.
-- [ ] T024 [P] [US1] Author skill `plugins/stack-control/skills/archive/SKILL.md` (thin: dry-run → confirm → apply).
-- [ ] T043 [P] [US1] Author skill `plugins/stack-control/skills/unarchive/SKILL.md` (thin: dry-run → confirm → apply) — the P1 reversibility half (FR-007/US1 Scenario 3/SC-007); a first-class `/stack-control:*` skill parallel to archive, wrapping the `unarchive` verb (T022).
+- [X] T019 [US1] Implement `plugins/stack-control/src/document-model/archive-engine.ts` (select → cut by span → append → ledger → coherence; atomic write). Makes T015–T017 green.
+- [X] T020 [US1] Implement `plugins/stack-control/src/document-model/unarchive-engine.ts` (FR-007 reversal + collision guard). Makes T018 green.
+- [X] T021 [US1] Implement verb `plugins/stack-control/src/subcommands/archive.ts` (`--doc`, `--apply`; dry-run default; exit codes) per `contracts/archive.md`.
+- [X] T022 [US1] Implement verb `plugins/stack-control/src/subcommands/unarchive.ts` (`--doc`, `--id`, `--apply`) per `contracts/unarchive.md`.
+- [X] T023 [US1] Register `archive` + `unarchive` in the `stackctl` dispatcher.
+- [X] T024 [P] [US1] Author skill `plugins/stack-control/skills/archive/SKILL.md` (thin: dry-run → confirm → apply).
+- [X] T043 [P] [US1] Author skill `plugins/stack-control/skills/unarchive/SKILL.md` (thin: dry-run → confirm → apply) — the P1 reversibility half (FR-007/US1 Scenario 3/SC-007); a first-class `/stack-control:*` skill parallel to archive, wrapping the `unarchive` verb (T022).
 
 **Checkpoint**: archive/unarchive MVP works end-to-end against a real grammar.
 
