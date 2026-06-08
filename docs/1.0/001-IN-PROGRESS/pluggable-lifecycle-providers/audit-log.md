@@ -1001,3 +1001,87 @@ Spec amended: `specs/004` FR-007/010/014/015 + SC-006/007/008 + data-model/quick
 NOTE: the FR-015 MED auto-slush is itself spec'd/intended; it remains (keeps the graduated record free of open MEDIUM for SC-007) but is no longer load-bearing for the gate decision (raw counting). Cross-ref: the 005 implement-governance GRADUATION III (`docs/1.0/001-IN-PROGRESS/document-primitives/audit-log.md`) where this was surfaced; GitHub issue: audiocontrol-org/deskwork#432 (sibling of #431).
 
 ---
+
+## 2026-06-08 — audit-barrage lift (20260608T195501360Z-stack-control-after_clarify)
+
+### AUDIT-20260608-02 — `roadmap next` / readyList omits status, so in-flight items are indistinguishable from pickable work
+
+Finding-ID: AUDIT-20260608-02
+Status:     open
+Severity:   medium
+Surface:    plugins/stack-control/src/roadmap/graph.ts:54-60, plugins/stack-control/src/roadmap/views.ts:9-15
+
+`isReady` returns true for *any* non-terminal item whose `depends-on` targets are all `shipped` and which has no `deferred-until` (`graph.ts:54-58`). `in-flight` is non-terminal, so in-flight items appear in the ready frontier. `readyList` (`views.ts:9-15`) then prints only `  - ${item.identifier}` with **no status**. On the live migrated `ROADMAP.md`, `design:feature/document-primitives` and `design:feature/spec-governance` are both `in-flight` with their deps shipped — so `roadmap next` lists them as "ready" with nothing distinguishing them from `planned` work.
+
+The feature's stated purpose (SKILL.md: "a fresh agent can determine what to work on next … from the document alone") is exactly undercut here: a fresh agent runs `roadmap next`, sees an identifier, and cannot tell it is already under active development. The blast radius is duplicate work on an in-flight feature — the failure mode the roadmap exists to prevent. Note the asymmetry: `blockedReport` (`views.ts:25-30`) *does* surface dependency statuses, so the omission in the ready path is inconsistent within the same file. A reasonable fix: render status in the ready-list line (`  - ${id} (${status})`), or have `next` distinguish "ready & planned" (pickable) from "ready & in-flight" (already active).
+
+### AUDIT-20260608-03 — `decompose` silently drops the original item's scope prose, `deferred-until`, `spec`, and `ref`
+
+Finding-ID: AUDIT-20260608-03
+Status:     open
+Severity:   medium
+Surface:    plugins/stack-control/src/roadmap/mutations.ts:200-247
+
+`decompose` builds each part with `buildSection({ identifier, dependsOn, partOf })` (`mutations.ts:222-228`) — only the inherited `depends-on` and the first `part-of` are carried onto the parts. The original Unit's **scope prose body, `deferred-until`, `spec`, and `ref` are all discarded** when the original section is replaced by `partSections` (`mutations.ts:232-235`). The graph re-validates and writes, so this is silent — no warning, no error.
+
+Two of these losses are materially harmful. Dropping `deferred-until` means decomposing a deferred item **un-defers all the parts**: an item the operator explicitly blocked becomes immediately ready, with no signal. Dropping the scope prose means the human-readable description of *what the work is* vanishes — the parts arrive as bare identifiers. Spec FR-009 only promises that parts inherit "dependencies + grouping," so the deps/grouping behavior is spec-conformant; but the silent loss of the deferral condition and the descriptive body is a semantic regression a consumer would not expect from a "split this item" operation. A fix should at minimum carry `deferred-until` onto every part (or refuse to decompose a deferred item) and preserve/seed the scope text.
+
+### AUDIT-20260608-04 — CLI value-flag scanner accepts a `--`-prefixed token as a flag value, unlike `--doc`
+
+Finding-ID: AUDIT-20260608-04
+Status:     open
+Severity:   low
+Surface:    plugins/stack-control/src/subcommands/roadmap.ts:64-78
+
+`--doc` guards against a missing/option-shaped value: `if (v === undefined || v.startsWith('--')) failUsage(...)` (`roadmap.ts:69-71`). The generic value branch does **not** apply the same guard: `const v = args[++i]; if (v === undefined || BOOLEAN_FLAGS.has(token)) failUsage(...); values.set(token.slice(2), v)` (`roadmap.ts:73-77`). So `roadmap advance x --to --apply` silently sets `to = "--apply"` and consumes `--apply` as the status value, rather than failing usage — the mutation then fails deeper (out-of-vocabulary status) with a more confusing error, and `--apply` is swallowed so a write the operator intended is dropped. Separately, the `BOOLEAN_FLAGS.has(token)` arm is dead code: `--apply`/`--clear` are fully handled in earlier branches, so `token` here is never a boolean flag. Mirror the `--doc` guard (`v.startsWith('--')`) in the generic branch for consistent fail-loud behavior.
+
+### AUDIT-20260608-05 — Kahn's topological sort is duplicated between `edges.ts` and `graph.ts`
+
+Finding-ID: AUDIT-20260608-05
+Status:     open
+Severity:   low
+Surface:    plugins/stack-control/src/document-model/edges.ts:73-118, plugins/stack-control/src/roadmap/graph.ts:108-138
+
+`assertAcyclicAndOrder` (`edges.ts:73-118`) and `order` (`graph.ts:108-138`) implement the same in-degree/frontier Kahn's algorithm twice, differing only in tiebreak (identifier-sort vs. `compareItems` phase relation). The engine already runs `assertAcyclicAndOrder` at load (`document.ts:85-87`) and *discards* its returned order, then `graph.order()` recomputes the topological pass from scratch. This is duplicated logic of exactly the kind the project's DRY guidelines target, and the two copies can drift (e.g., a future fix to cycle handling applied to one and not the other). A single parameterized topo-sort taking a tiebreak comparator would collapse both, and `order()` could reuse the load-time computation rather than redoing it.
+
+### AUDIT-20260608-06 — `reassemble`-based mutations have no test asserting formatting stability across repeated mutations
+
+Finding-ID: AUDIT-20260608-06
+Status:     open
+Severity:   low
+Surface:    plugins/stack-control/src/roadmap/mutations.ts:79-90, plugins/stack-control/tests/roadmap/mutations-decompose.test.ts, plugins/stack-control/tests/roadmap/mutations-reclassify.test.ts
+
+`reassemble` reconstructs the document as `pre` + `unitBodies.join('\n\n')` + `post` (`mutations.ts:84-89`), re-deriving inter-unit spacing as exactly one blank line regardless of the source's original spacing, and relying on each Unit's span to capture its body precisely. The decompose/reclassify tests verify *content* correctness via `loadRoadmap(...).byId` but never assert the written bytes' formatting, and the zero-write tests only check `readFileSync === before` on the *failure* path. There is no test that applies a mutation to a document and then applies a second mutation (or re-parses and re-serializes) to confirm whitespace does not accumulate or shift — i.e., that `reassemble` round-trips stably. Given the live `ROADMAP.md` is the document these mutations run against, a slow formatting drift (extra blank lines per `decompose`/`reclassify`) would go unnoticed by the suite. A regression test that mutates twice and asserts the inter-unit spacing is unchanged would pin this contract; it also surfaces whether blank lines between units are inside or outside the Unit spans, which the current tests leave unverified.
+
+### AUDIT-20260608-07 — Terminal archival can invalidate the roadmap graph
+
+Finding-ID: AUDIT-20260608-07
+Status:     open
+Severity:   high
+Surface:    plugins/stack-control/src/document-model/archive-engine.ts:35-38,176-183; plugins/stack-control/ROADMAP.md:25-33,81-88,101-106; plugins/stack-control/tests/roadmap/curate-archive-regression.test.ts:1-3,47-57
+
+`archive` still selects every terminal-status unit (`shipped`/`cancelled`/`retired`) and writes the live document after cutting those spans, with no edge-aware filtering and no `loadDocumentFromSource(newLive, ...)` validation before the live rewrite. That is incompatible with the new roadmap loader, which requires every `depends-on` / `part-of` target to remain present in the live document.
+
+The migrated canonical roadmap already has this shape: `multi:feature/front-door` is `shipped`, while many live items still `depends-on: multi:feature/front-door`. Running `curate --apply` or `archive --apply` on that document would archive `front-door`, leave dangling references, and make subsequent `roadmap next` / `blocked` loads fail. The regression test explicitly covers only “a terminal-status item with no inbound edges,” so it misses the real canonical case. A reasonable fix is to make roadmap archival edge-aware before writing: skip terminal units that are still unit-edge targets, or validate the post-archive live source and fail zero-write if it would dangle references.
+
+### AUDIT-20260608-08 — Reconcile proposes shipped without the required governance-graduation signal
+
+Finding-ID: AUDIT-20260608-08
+Status:     open
+Severity:   medium
+Surface:    plugins/stack-control/src/roadmap/reconcile.ts:32-40,90-96; specs/006-roadmap-protocol/spec.md:158-160; specs/006-roadmap-protocol/tasks.md:97-101
+
+The spec and completed task T045 say `shipped` determination requires artifact progression including a governance-graduation record. The implementation’s only shipped signal is `tasks.md` exists, contains at least one checkbox, and has no unchecked boxes; it then proposes `advance <id> to shipped`.
+
+This is advisory/report-only, so it will not mutate silently, but a downstream operator or agent following the proposal can mark work shipped before the spec’s own completion gate exists. The blast radius is status drift in the authoritative roadmap, not direct code corruption. A reasonable fix is to include the governance-graduation artifact in `tasksComplete`/status derivation, or downgrade tasks-only completion to an in-flight/completed-tasks signal that does not propose `shipped`.
+
+### AUDIT-20260608-09 — Placeholder Spec Kit plan appears in the audited patch
+
+Finding-ID: AUDIT-20260608-09
+Status:     open
+Severity:   medium
+Surface:    specs/002-parallel-execution-engine/plan.md:1-113
+
+The audit input includes a newly added `specs/002-parallel-execution-engine/plan.md` that is still the raw template: `[FEATURE]`, `[DATE]`, “NEEDS CLARIFICATION,” “ACTION REQUIRED,” and unused option blocks are all present. This is an operator-discipline trap because `specs/002` is a real roadmap correspondence path, and unattended agents may treat the placeholder plan as project state.
+
+If this file is accidental, remove it from the patch. If it is intended, fill it with the real execution-engine plan and delete the unused template branches before it becomes part of the repo state.
