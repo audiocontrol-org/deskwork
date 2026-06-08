@@ -175,3 +175,45 @@ Meta-audit synthesizer (audit-barrage Design B): one LLM pass over the N raw mod
 - deferred-until: Design B (meta-audit synthesizer) proves the model-diversity payoff justifies the always-on run-rate cost
 Continuous background audit daemon (audit-barrage Design C): watches for new commits and fires audit jobs continuously out-of-band; the orchestrator loop reads accumulated runs per-turn. Exploratory; highest cost and decoupling.
 
+## design:fix/spec-governance-gate-branch
+- status: planned
+- part-of: design:feature/spec-governance
+- ref: #432
+spec-governance gate graduates at the first 0-HIGH run instead of FR-010 branch a/b, and the FR-014 loop bound is advisory rather than a code interlock (AUDIT-20260608-01).
+
+## design:fix/document-primitives-round9
+- status: planned
+- part-of: design:feature/document-primitives
+- ref: #430
+Round-9 residual hardening of the document-primitives engine: fence-length handling, prose-as-header rejection, and an engine floor (AUDIT-54/55/56).
+
+## multi:gap/session-skills-tailoring
+- status: planned
+- part-of: multi:feature/migrate-session-skills
+- ref: #122
+dw-lifecycle session-start/session-end are project-coupled (hardcoded deskwork conventions); they need per-project tailoring before they can ship as general-use in stack-control.
+
+## multi:gap/session-start-branch-staleness
+- status: planned
+- part-of: multi:feature/migrate-session-skills
+- ref: #422
+session-start branch-staleness detector: warn pre-merge when a feature branch is behind so stale-branch sessions do not silently re-implement shipped work.
+
+## design:gap/scope-discovery-novel-patterns
+- status: planned
+- part-of: design:feature/migrate-scope-discovery
+- ref: #315
+scope-discovery discovery agents act as a pattern inventory and miss novel anti-patterns; a green scope-inventory means no match against the registered catalog, not no novel shapes.
+
+## multi:fix/audit-barrage-self-referential
+- status: planned
+- part-of: multi:feature/migrate-audit-barrage
+- ref: #431
+audit-barrage payload includes its own audit-log, generating self-referential findings; the untracked-fold also pulls unrelated parked-feature scaffolds into the diff.
+
+## multi:gap/retire-review-audit-skills
+- status: planned
+- part-of: multi:feature/migrate-audit-barrage
+- ref: #387
+Retire /dw-lifecycle:review and /dw-lifecycle:audit in favor of audit-barrage as the primary review surface, as part of bringing audit-barrage in-house.
+
