@@ -419,3 +419,83 @@ Surface:    specs/005-document-primitives/spec.md:93, specs/005-document-primiti
 The spec defines an unarchive collision as fail-loud, and the empty-document edge case says `unarchive <id>` follows the “normal not-found path,” but FR-007 does not define what happens when the named id has no ledger entry. FR-010’s enumerated failure modes also omit unarchive-not-found.
 
 Blast radius is medium because the intended behavior is likely fail-loud with zero writes, but “normal not-found path” could also be read as a dry-run-style no-op report. That divergence matters for automation: a missing recovery target should not silently succeed. A reasonable fix is to add “unarchive target absent from ledger/archive” to FR-007 and FR-010 with the exact status: fail loud, actionable message naming the missing identifier, zero writes.
+
+## 2026-06-07 — audit-barrage lift (20260607T235334558Z-document-primitives-after_plan)
+
+### AUDIT-20260607-36 — Order key has no tie-break rule — `curate` reorder and `unarchive` reinsertion are ambiguous for equal-keyed Units
+
+Finding-ID: AUDIT-20260607-36 (claude-01 + claude-04 + codex-03 + codex-04; cross-model)
+Status:     fixed-687079a7
+Severity:   high
+Surface:    spec.md FR-004 (status & order — canonical), FR-007 (unarchive), FR-008 (curate), SC-007
+
+FR-004 defines well-ordered as "its Unit sequence matches the declared order key" with the order key "expressible over status and human-readable fields" — explicitly a *category/attribute* key (the roadmap orders by `phase`). But many Units legitimately share the same key value: a roadmap has multiple `planned` rows, multiple Units in the same `phase`. The spec never states how Units with **equal order-key values** are arranged. This makes two operations underdetermined:
+
+1. **`curate --apply` reorder** (FR-008): "reorders to the declared order key." With ties, multiple arrangements satisfy "matches the declared order key." An agent that doesn't use a stable sort will reorder tied Units differently on each run — `curate` becomes non-idempotent and thrashes version-controlled documents on every invocation, which is the opposite of "ensure it stays correct."
+2. **`unarchive` reinsertion** (FR-007): "reinserted at its declared-order position (per the grammar's order key)." A Unit being restored shares its order-key value with N live Units; the spec gives no rule for *where among the tied group* it lands. SC-007's "content-equivalent, well-ordered" claim is unfalsifiable when any position within the tied run is equally "well-ordered."
+
+Blast radius is high because ties are the common case, not the exception, and an unattended implementer has no anchor to resolve them — they will pick an arbitrary secondary sort (or none), and the operator only discovers the non-determinism when `curate` produces a spurious diff. A one-clause fix: require every grammar's order key to define a **total order** (a deterministic tie-break over a human-readable field, e.g. identifier), and state that `unarchive` places a restored Unit at the unique position that total order dictates.
+
+### AUDIT-20260607-37 — "Must pass `curate`" conflates well-formed with fully-curated — migration target is ambiguous and self-contradicting
+
+Finding-ID: AUDIT-20260607-37
+Status:     fixed-687079a7
+Severity:   high
+Surface:    spec.md FR-013 (two proof documents), FR-008 (curate)
+
+FR-013 states the migration target: "The migrated document MUST end up **well-formed** (it must pass `curate`)." But the parenthetical equates two different bars. FR-008 defines `curate` as ensuring **three** properties — well-formed (FR-003), well-ordered (FR-004), and **properly archived** (composes `archive --apply`, moving terminal-status Units out). "Well-formed" is only the first. "Pass `curate`" can be read two ways that diverge sharply:
+
+- **Reading A** — "parses without fail-loud" (well-formed only). The migrated roadmap may retain `shipped`/`cancelled`/`retired` rows in the live document.
+- **Reading B** — "`curate --apply` produces no changes" (the document is also well-ordered AND has zero archivable Units left). This forces migration to archive every terminal row.
+
+These collide with the feature's own purpose. The proof documents exist to *demonstrate* `archive` (US1/SC-001), which requires terminal-status Units to be present in the live document after migration. Reading B would strip exactly the content the headline demo needs; Reading A leaves them. An unattended migration task will pick one and either over-archive (breaking the demo) or under-archive (and a later reviewer "fixes" it the other way).
+
+Blast radius is high because the two readings produce materially different migrated documents and nothing in the artifact disambiguates. Fix: state the migration target precisely — e.g. "migrated document is **well-formed and well-ordered** (parses, Units in declared order); it MAY retain terminal-status Units, which the archive demo then moves." Drop the imprecise "(it must pass curate)" gloss or scope it to the well-formed + well-ordered subset.
+
+### AUDIT-20260607-38 — Preamble rule + zero-Unit vacuous-truth combine to silently accept malformed documents that produce no Unit marker
+
+Finding-ID: AUDIT-20260607-38
+Status:     fixed-687079a7
+Severity:   high
+Surface:    spec.md FR-002 (document model — two regions), FR-003 (well-formed), Edge Cases ("Empty / zero-Unit document")
+
+FR-002 defines the preamble as "everything **before the first Unit marker**," and the zero-Unit edge case blesses a document that "parses to **zero Units** … well-formed by vacuous truth … NOT a parse failure." FR-003's only fail-loud parse trigger inside the body is "a shallower-than-reserved (or peer-but-non-conforming) heading appearing **after** the first Unit." Compose these three rules and a gap opens: **a document that never produces a single recognized Unit marker is classified entirely as preamble and declared well-formed**, regardless of what it contains.
+
+Consider the row-keyed roadmap whose grammar expects a markdown table. An author corrupts the table (a broken separator row, a stray blank line splitting it) so markdown-it emits paragraphs, not a table — zero rows → zero Units → "all preamble" → well-formed by vacuous truth. The author's broken roadmap silently becomes an "empty roadmap"; `archive` selects nothing, `curate` reports vacuously clean. No fail-loud, no offending span, despite the document being genuinely malformed. The same applies to a heading-keyed inbox whose Units are all authored one level too shallow (no reserved-level marker ever appears) — the whole file reads as preamble.
+
+Blast radius is high because it directly contradicts the feature's load-bearing fail-loud goal (FR-010, Principle V) and an unattended consumer would build exactly the permissive behavior the edge case describes. The intended "fresh document with no rows yet" case is legitimate, but it is indistinguishable, under the current rules, from "document the author tried to fill but malformed." Fix: distinguish the two — e.g. allow a grammar to declare whether zero Units is valid only when the *body region is empty* (no non-preamble, non-Unit content after the preamble), so content that exists but matches no Unit marker fails loud rather than being absorbed into the preamble.
+
+### AUDIT-20260607-39 — `curate --apply` writes the live document twice (reorder then archive-cut); the recoverable-crash model is reasoned only for archive's two files
+
+Finding-ID: AUDIT-20260607-39 (claude-05 + codex-01; cross-model)
+Status:     fixed-687079a7
+Severity:   high
+Surface:    spec.md FR-008 (curate, "reorders first, then archives"), FR-006 (recoverable model), FR-010, SC-003
+
+FR-008 specifies that `curate --apply` "**reorders first, then archives**," composing `archive --apply`. FR-006's carefully-reasoned recoverable-atomicity model is framed around **two files** (live document + sibling archive) and "no single operation atomically commits two files." But the `curate` composition touches the live document **twice in sequence**: write #1 rewrites the live document in reordered form; then `archive --apply` performs write #2 (cut the terminal Units from the live document) plus write #3 (append to the archive + ledger). FR-008 asserts "reorder and archive succeed together or nothing is written," but the spec's mechanism — staged-write-plus-atomic-rename *per file* — only guarantees per-file atomicity, not a transaction spanning a reorder-write followed by a separate archive-cut-write on the same file.
+
+A hard crash *between* the reorder rename and the archive-cut rename leaves the live document reordered-but-not-archived. The recoverable model says the `curate` coherence NOTICE detects residual mismatch — but the coherence check (FR-006) compares the **ledger against the archive file**; it does not detect "live document was reordered but its terminal Units were never archived." That intermediate state is silently a valid (well-formed, reordered) document with un-archived terminal Units — re-running `curate` finishes the job, but nothing *flags* the interrupted state the way the two-file archive inconsistency is flagged.
+
+Blast radius is medium: the end state is self-healing on re-run and governed documents are version-controlled, so data isn't lost — but FR-008's "succeed together or nothing is written" claim is stronger than the mechanism delivers, and SC-003's recoverability story doesn't cover this three-write sequence. Fix: either restate FR-008's atomicity claim to match the recoverable model honestly for the multi-write curate path (reorder and archive are separately-committed; an interrupted curate leaves a well-formed but under-archived document that a re-run completes), or specify that curate stages all live-document mutations into a single atomic rename so the live document is written exactly once.
+
+### AUDIT-20260607-40 — Normal-path cross-file rollback is still mechanically impossible as written
+
+Finding-ID: AUDIT-20260607-40
+Status:     fixed-687079a7
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md:100, specs/005-document-primitives/spec.md:126, specs/005-document-primitives/spec.md:130
+
+The spec says that on the normal same-process path, “a failure before the second rename commits nothing” and leaves zero writes across both files. Atomic rename is per-file; once the first rename has happened, any same-process error before the second rename has already committed one file. The current wording only acknowledges hard interrupts between commits, but the same window exists for ordinary thrown errors, permission failures, disk-full on the second write/rename, or validation discovered too late.
+
+Blast radius is high because this is a contract an implementer cannot satisfy without an explicit transaction protocol such as backups, journal files, or writing all temp files before any rename and only allowing non-failing operations after the first commit point. As written, a builder may implement sequential atomic renames and believe FR-010 is satisfied while still leaving live/archive skew on normal errors. The fix is to either weaken the normal-path guarantee to detectable/recoverable after the first file commit, or specify an actual rollback/journal mechanism.
+
+### AUDIT-20260607-41 — Prohibited scheduling language remains in the reconciliation sections
+
+Finding-ID: AUDIT-20260607-41
+Status:     fixed-687079a7
+Severity:   low
+Surface:    specs/005-document-primitives/spec.md:94, specs/005-document-primitives/spec.md:128, specs/005-document-primitives/spec.md:148, specs/005-document-primitives/spec.md:178; specs/005-document-primitives/plan.md:29
+
+The audit wrapper explicitly rejects deferral-style commitments, but the diff still contains several scheduling references around reconciliation and document-change protocols. The intended scope is clear: reconciliation execution is excluded from this feature, and `curate` only reports the recognized seam. The wording should state that boundary without implying a scheduled continuation.
+
+Blast radius is low for implementation behavior because FR-008 is otherwise clear, but it is a process trap: downstream task generation may preserve the wording as placeholder commitments or the wrapper may reject the artifact. A reasonable fix is to replace those sentences with static scope language such as “execution is excluded from this feature” and remove schedule-implying phrasing.
