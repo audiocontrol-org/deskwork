@@ -27,6 +27,9 @@ describe('stackctl roadmap next/blocked verb (T020)', () => {
     const r = runCli(['roadmap', 'next', '--doc', docPath]);
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('impl:feature/b');
+    // The ready line surfaces the item's status (AUDIT-20260608-02) so in-flight
+    // work reads as distinct from pickable (planned) work.
+    expect(r.stdout).toContain('impl:feature/b (planned)');
     expect(r.stdout).not.toContain('impl:feature/c');
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });

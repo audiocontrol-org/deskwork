@@ -61,6 +61,18 @@ describe('stackctl roadmap mutation verbs (T041)', () => {
     expect(model.byId.get('impl:gap/c')!.kind).toBe('gap');
   });
 
+  it('a --prefixed token cannot be consumed as a value flag → exit 2, zero write', () => {
+    // `defer <id> --until --apply` must fail usage: the next token is a flag,
+    // not a value. Without the guard, `--until` swallows `--apply` (setting the
+    // condition to the literal "--apply" and dropping the operator's intended
+    // write — the command reports dry-run and exits 0). With the guard it must
+    // exit 2 and write nothing (AUDIT-20260608-04).
+    const docPath = tmpCopy('chain');
+    const before = readFileSync(docPath, 'utf8');
+    expect(runCli(['roadmap', 'defer', 'impl:feature/b', '--until', '--apply', '--doc', docPath]).status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
   it('defer --until sets and --clear removes the condition', () => {
     const docPath = tmpCopy('chain');
     expect(runCli(['roadmap', 'defer', 'impl:feature/b', '--until', 'after the spike', '--doc', docPath, '--apply']).status).toBe(0);

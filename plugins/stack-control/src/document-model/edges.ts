@@ -63,6 +63,64 @@ function unitRefFields(grammar: GrammarSpec): Set<string> {
 }
 
 /**
+ * Generic Kahn's topological sort (R3). The ONE auditable home for the graph
+ * engine's topo pass so dependent layers (the roadmap `order` view) don't
+ * re-hand-roll the in-degree loop. Each node's `depsOf(id)` lists the nodes that
+ * must come BEFORE it (dependency → dependent emission). The in-degree-zero
+ * frontier is ordered by `compare`, and on each step the globally smallest ready
+ * node is emitted (the frontier is re-sorted as nodes become ready), so the
+ * result is deterministic under `compare`.
+ *
+ * `onCycle` is called when the queue empties with nodes remaining; it receives
+ * the still-unemitted node ids and MUST throw (fail loud — never a silent skip).
+ * It returns `never` so the type system knows the loop cannot fall through.
+ */
+export function topoOrder(
+  ids: readonly string[],
+  depsOf: (id: string) => readonly string[],
+  compare: (a: string, b: string) => number,
+  onCycle: (remaining: readonly string[]) => never,
+): string[] {
+  const inDegree = new Map<string, number>(ids.map((id) => [id, 0]));
+  // Adjacency: dependency → dependent (so a dependency with no unmet deps of its
+  // own starts at in-degree 0 and is emitted before anything that depends on it).
+  const dependents = new Map<string, string[]>(ids.map((id) => [id, []]));
+
+  for (const id of ids) {
+    for (const dep of depsOf(id)) {
+      // Dangling targets are validated elsewhere (referential integrity); guard
+      // here so the topo pass over a sound graph is well-defined.
+      if (!dependents.has(dep)) continue;
+      dependents.get(dep)!.push(id);
+      inDegree.set(id, inDegree.get(id)! + 1);
+    }
+  }
+
+  const frontier = ids.filter((id) => inDegree.get(id) === 0).sort(compare);
+  const result: string[] = [];
+  while (frontier.length > 0) {
+    const id = frontier.shift()!;
+    result.push(id);
+    let added = false;
+    for (const d of dependents.get(id)!) {
+      const deg = inDegree.get(d)! - 1;
+      inDegree.set(d, deg);
+      if (deg === 0) {
+        frontier.push(d);
+        added = true;
+      }
+    }
+    if (added) frontier.sort(compare);
+  }
+
+  if (result.length < ids.length) {
+    const remaining = ids.filter((id) => inDegree.get(id)! > 0).sort();
+    onCycle(remaining);
+  }
+  return result;
+}
+
+/**
  * Validate acyclicity over a single `references:'unit'` edge-type and return a
  * topological order (each dependency before its dependent) via Kahn's algorithm
  * (R3). A cycle (Kahn's queue empties with nodes remaining) fails loud naming
@@ -75,49 +133,24 @@ export function assertAcyclicAndOrder(
   _grammar: GrammarSpec,
   edgeField: string,
 ): readonly string[] {
-  const ids = units.map((u) => u.identifier);
-  const inDegree = new Map<string, number>(ids.map((id) => [id, 0]));
-  // Adjacency: dependency → dependent (so a dependency with no unmet deps of its
-  // own starts at in-degree 0 and is emitted before anything that depends on it).
-  const dependents = new Map<string, string[]>(ids.map((id) => [id, []]));
-
+  const deps = new Map<string, string[]>(units.map((u) => [u.identifier, []]));
   for (const unit of units) {
     for (const edge of unit.edges) {
       if (edge.field !== edgeField) continue;
-      for (const dep of edge.targets) {
-        // Dangling targets are caught by assertReferentialIntegrity; guard here
-        // so acyclicity over a sound graph is well-defined.
-        if (!dependents.has(dep)) continue;
-        dependents.get(dep)!.push(unit.identifier);
-        inDegree.set(unit.identifier, inDegree.get(unit.identifier)! + 1);
-      }
+      for (const dep of edge.targets) deps.get(unit.identifier)!.push(dep);
     }
   }
-
-  const ready = ids.filter((id) => inDegree.get(id) === 0).sort();
-  const order: string[] = [];
-  while (ready.length > 0) {
-    const id = ready.shift()!;
-    order.push(id);
-    const next: string[] = [];
-    for (const d of dependents.get(id)!) {
-      const deg = inDegree.get(d)! - 1;
-      inDegree.set(d, deg);
-      if (deg === 0) next.push(d);
-    }
-    if (next.length > 0) {
-      ready.push(...next);
-      ready.sort();
-    }
-  }
-
-  if (order.length < ids.length) {
-    const cyclic = ids.filter((id) => inDegree.get(id)! > 0).sort();
-    throw new DocumentModelError(
-      `edge '${edgeField}' graph has a cycle among: ${cyclic.join(', ')} (FR-006 acyclicity)`,
-    );
-  }
-  return order;
+  const compareById = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+  return topoOrder(
+    units.map((u) => u.identifier),
+    (id) => deps.get(id) ?? [],
+    compareById,
+    (remaining) => {
+      throw new DocumentModelError(
+        `edge '${edgeField}' graph has a cycle among: ${remaining.join(', ')} (FR-006 acyclicity)`,
+      );
+    },
+  );
 }
 
 /**

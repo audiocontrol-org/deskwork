@@ -14,6 +14,14 @@ describe('readyList (T030)', () => {
     expect(out).toContain('impl:feature/b');
     expect(out).not.toContain('impl:feature/c');
   });
+
+  it('surfaces each ready item status so in-flight is distinct from planned (AUDIT-20260608-02)', () => {
+    const model = loadRoadmap(fixturePath('chain'), ROADMAP_OPTS);
+    const out = readyList(model);
+    // impl:feature/b is ready AND planned — the status must be visible on the line
+    // so a fresh agent can tell pickable (planned) work from in-flight work.
+    expect(out).toContain('impl:feature/b (planned)');
+  });
 });
 
 describe('blockedReport (T030)', () => {

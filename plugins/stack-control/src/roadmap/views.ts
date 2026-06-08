@@ -9,7 +9,11 @@ import type { RoadmapModel, WorkItem } from './roadmap-model.js';
 export function readyList(model: RoadmapModel): string {
   const items = ready(model);
   const lines = [`roadmap next: ${items.length} ready`];
-  for (const item of items) lines.push(`  - ${item.identifier}`);
+  // Surface each ready item's status (AUDIT-20260608-02): in-flight items are
+  // legitimately "ready" (actionable) but must read as distinct from pickable
+  // (planned) work, so a fresh agent knows what to pick up vs. what is already
+  // under active development.
+  for (const item of items) lines.push(`  - ${item.identifier} (${item.status})`);
   return `${lines.join('\n')}\n`;
 }
 

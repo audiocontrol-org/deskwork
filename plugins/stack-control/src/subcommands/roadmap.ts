@@ -37,9 +37,6 @@ interface Flags {
   readonly values: ReadonlyMap<string, string>;
 }
 
-/** Boolean flags that take no value (everything else `--name <value>`). */
-const BOOLEAN_FLAGS = new Set(['--apply', '--clear']);
-
 /** Generic flag scan: boolean flags, `--doc`/`--<name> <value>`, positionals. */
 function scanFlags(args: readonly string[]): Flags {
   let doc = DEFAULT_DOC;
@@ -59,7 +56,7 @@ function scanFlags(args: readonly string[]): Flags {
       doc = v;
     } else if (token.startsWith('--')) {
       const v = args[++i];
-      if (v === undefined || BOOLEAN_FLAGS.has(token)) failUsage('roadmap', `${token} <value> required`);
+      if (v === undefined || v.startsWith('--')) failUsage('roadmap', `${token} <value> required`);
       values.set(token.slice(2), v);
     } else {
       positionals.push(token);

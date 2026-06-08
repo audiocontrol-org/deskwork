@@ -11,7 +11,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { archiveTableHeaderCells, tableCells } from './archive-file.js';
-import { loadDocument, type LoadOptions } from './document.js';
+import { loadDocument, loadDocumentFromSource, type LoadOptions } from './document.js';
 import { withLedger, serializeLedger } from './ledger.js';
 import {
   DocumentModelError,
@@ -156,6 +156,15 @@ export function preflightArchive(docPath: string, opts: LoadOptions & { readonly
   // buildArchive throws every archive-side fail-loud DocumentModelError; running
   // it here (and discarding the result) is the validation preflight.
   buildArchive(doc, stream, archivable, newLedger);
+
+  // The post-cut LIVE document must itself remain governable: cutting a terminal
+  // Unit that is still a `depends-on`/`part-of` target of a surviving Unit would
+  // leave a dangling reference, bricking every subsequent load (AUDIT-20260608-07).
+  // Re-validate the candidate live content through the full pipeline; a referential-
+  // integrity (or acyclicity / identifier) violation fails loud here, BEFORE any
+  // write (FR-010 zero-write). Edge-free grammars have no inbound edges, so this is
+  // a no-op for them (assertReferentialIntegrity returns early).
+  loadDocumentFromSource(liveWithout(doc, archivable), doc.path, opts);
 }
 
 export function runArchive(docPath: string, opts: ArchiveOptions): ArchiveResult {
@@ -175,6 +184,13 @@ export function runArchive(docPath: string, opts: ArchiveOptions): ArchiveResult
 
   const newArchive = buildArchive(doc, stream, archivable, newLedger);
   const newLive = liveWithout(doc, archivable);
+
+  // Re-validate the post-cut LIVE document through the full pipeline BEFORE any
+  // write: cutting a terminal Unit that is still an edge target of a surviving
+  // Unit dangles a reference and bricks the document (AUDIT-20260608-07). A
+  // referential-integrity / acyclicity / identifier violation fails loud here,
+  // leaving BOTH files untouched (FR-010 zero-write). No-op for edge-free grammars.
+  loadDocumentFromSource(newLive, doc.path, opts);
 
   // Archive first (so moved content exists before it is removed from live),
   // then the live document.

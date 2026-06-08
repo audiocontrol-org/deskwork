@@ -6,10 +6,12 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { runArchive } from '../../src/document-model/archive-engine.js';
 import { runCurate } from '../../src/document-model/curate-engine.js';
 import { archivePathFor } from '../../src/document-model/document.js';
+import { DocumentModelError } from '../../src/document-model/types.js';
 import { loadRoadmap } from '../../src/roadmap/roadmap-model.js';
-import { ROADMAP_OPTS } from './helpers.js';
+import { ROADMAP_OPTS, writeTempRoadmap } from './helpers.js';
 
 function tmpRoadmap(): string {
   const dir = mkdtempSync(join(tmpdir(), 'curate-roadmap-'));
@@ -55,5 +57,50 @@ describe('curate/archive on the heading-keyed roadmap (T055, Scenario 6)', () =>
     const archivePath = archivePathFor(docPath);
     expect(existsSync(archivePath)).toBe(true);
     expect(readFileSync(archivePath, 'utf8')).toContain('design:feature/done');
+  });
+});
+
+// AUDIT-20260608-07 (HIGH): archiving a terminal-status item that is still a
+// `depends-on`/`part-of` target of a LIVE item would leave a dangling reference
+// in the live document, bricking every subsequent roadmap/curate/load. archive
+// (and the curate compose path) MUST re-validate the post-cut live document
+// BEFORE any write and refuse atomically (zero writes) when it would dangle.
+describe('archive refuses to dangle a live edge (AUDIT-20260608-07)', () => {
+  function tmpRoadmapWithLiveEdge(): string {
+    return writeTempRoadmap([
+      '## multi:feature/front-door',
+      '- status: shipped',
+      'A shipped dependency many live items still point at.',
+      '',
+      '## impl:feature/active',
+      '- status: planned',
+      '- depends-on: multi:feature/front-door',
+      'Still in progress; depends on the shipped item.',
+    ]);
+  }
+
+  it('runArchive --apply throws DocumentModelError and writes nothing', () => {
+    const docPath = tmpRoadmapWithLiveEdge();
+    const before = readFileSync(docPath, 'utf8');
+
+    expect(() => runArchive(docPath, { apply: true, ...ROADMAP_OPTS, now: '2026-06-08T00:00:00.000Z' })).toThrow(
+      DocumentModelError,
+    );
+
+    // Zero-write: both the live document AND the (never-created) archive file.
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+    expect(existsSync(archivePathFor(docPath))).toBe(false);
+  });
+
+  it('runCurate --apply throws DocumentModelError and leaves the document byte-for-byte unchanged', () => {
+    const docPath = tmpRoadmapWithLiveEdge();
+    const before = readFileSync(docPath, 'utf8');
+
+    expect(() => runCurate(docPath, { apply: true, ...ROADMAP_OPTS, now: '2026-06-08T00:00:00.000Z' })).toThrow(
+      DocumentModelError,
+    );
+
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+    expect(existsSync(archivePathFor(docPath))).toBe(false);
   });
 });

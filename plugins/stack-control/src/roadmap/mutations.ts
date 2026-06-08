@@ -17,6 +17,7 @@ import {
   type GovernableDocument,
   type Unit,
 } from '../document-model/types.js';
+import { loadRoadmap } from './roadmap-model.js';
 
 const STATUS_LINE = /^\s*[-*]\s+status\s*:/i;
 const DEFERRED_LINE = /^\s*[-*]\s+deferred-until\s*:/i;
@@ -194,12 +195,22 @@ export function decompose(
   const original = requireUnit(doc, identifier);
   const inheritedDeps = edgeTargets(original, 'depends-on');
   const inheritedPartOf = edgeTargets(original, 'part-of');
+  // Read the original's descriptive + blocking-relevant fields via the typed
+  // projection so every part inherits them (AUDIT-20260608-03): a decomposed
+  // deferred item MUST stay deferred — dropping `deferred-until` would silently
+  // un-defer the parts. `spec`/`ref`/scope ride along so parts aren't bare ids.
+  const source = loadRoadmap(docPath, opts).byId.get(identifier);
+  if (source === undefined) throw new DocumentModelError(`roadmap has no item '${identifier}'`);
 
   const partSections = into.map((id) =>
     buildSection({
       identifier: id,
       dependsOn: inheritedDeps.length > 0 ? inheritedDeps : undefined,
       partOf: inheritedPartOf.length > 0 ? inheritedPartOf[0] : undefined,
+      deferredUntil: source.deferredUntil ?? undefined,
+      spec: source.spec ?? undefined,
+      ref: source.ref ?? undefined,
+      scope: source.scope.length > 0 ? source.scope : undefined,
     }).join('\n'),
   );
 

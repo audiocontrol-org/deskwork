@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { decompose } from '../../src/roadmap/mutations.js';
 import { loadRoadmap } from '../../src/roadmap/roadmap-model.js';
+import { ready } from '../../src/roadmap/graph.js';
 import { DocumentModelError } from '../../src/document-model/types.js';
 import { ROADMAP_OPTS, writeTempRoadmap } from './helpers.js';
 
@@ -36,6 +37,40 @@ describe('mutations.decompose (T037)', () => {
       'impl:feature/x1',
       'impl:feature/x2',
     ]);
+  });
+
+  it('carries deferred-until, spec, ref, and scope onto every part (AUDIT-20260608-03)', () => {
+    const docPath = writeTempRoadmap([
+      '## design:feature/a',
+      '- status: shipped',
+      '',
+      '## impl:feature/x',
+      '- status: planned',
+      '- depends-on: design:feature/a',
+      '- deferred-until: design:feature/a ships',
+      '- spec: specs/007-x/spec.md',
+      '- ref: https://example.org/x',
+      'The original x scope prose.',
+    ]);
+    decompose(docPath, 'impl:feature/x', ['impl:feature/x1', 'impl:feature/x2'], ROADMAP_OPTS, true);
+    const model = loadRoadmap(docPath, ROADMAP_OPTS);
+
+    for (const partId of ['impl:feature/x1', 'impl:feature/x2']) {
+      const part = model.byId.get(partId);
+      expect(part).toBeDefined();
+      // The critical carry: a decomposed deferred item must STAY deferred.
+      expect(part!.deferredUntil).toBe('design:feature/a ships');
+      // Descriptive fields ride along so the parts aren't bare identifiers.
+      expect(part!.spec).toBe('specs/007-x/spec.md');
+      expect(part!.ref).toBe('https://example.org/x');
+      expect(part!.scope).toBe('The original x scope prose.');
+    }
+
+    // The deferral being carried means NEITHER part is silently un-deferred into
+    // the ready frontier.
+    const readyIds = ready(model).map((i) => i.identifier);
+    expect(readyIds).not.toContain('impl:feature/x1');
+    expect(readyIds).not.toContain('impl:feature/x2');
   });
 
   it('a decompose that invalidates the graph (into reuses an existing id) is zero-write', () => {
