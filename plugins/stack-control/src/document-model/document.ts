@@ -38,7 +38,21 @@ export function loadDocument(docPath: string, opts: LoadOptions): LoadedDocument
   if (!existsSync(docPath)) {
     throw new DocumentModelError(`document not found: ${docPath}`);
   }
-  const source = readFileSync(docPath, 'utf8');
+  return loadDocumentFromSource(readFileSync(docPath, 'utf8'), docPath, opts);
+}
+
+/**
+ * The full resolve → parse → validate pipeline over an in-memory `source`
+ * string (the ledger/archive companion is still read from disk at `docPath`).
+ * `loadDocument` is the read-from-disk wrapper. Mutations (006 R7) use this to
+ * re-validate a CANDIDATE document before any write: a validation failure throws
+ * here, leaving the on-disk document byte-for-byte unchanged (FR-010 zero-write).
+ */
+export function loadDocumentFromSource(
+  source: string,
+  docPath: string,
+  opts: LoadOptions,
+): LoadedDocument {
   const sourceLines = source.split('\n');
 
   const grammar = resolveGrammar(source, opts);

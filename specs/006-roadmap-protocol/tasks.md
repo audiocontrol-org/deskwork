@@ -55,11 +55,11 @@ TDD is mandatory (Constitution I — NON-NEGOTIABLE): every implementation task 
 **Goal**: capture a discovered bug/gap as a peer item with kind+grouping+deps in one command.
 **Independent test**: quickstart Scenario 3 (SC-003).
 
-- [ ] T023 [US2] RED: tests for `mutations.add` — one-move add with `--part-of`+`--depends-on`; whole-graph re-validate; dangling target ⇒ zero-write (document hash unchanged) — `tests/roadmap/mutations-add.test.ts`
-- [ ] T024 [US2] Implement `add` in NEW `plugins/stack-control/src/roadmap/mutations.ts` (compose load → insert → re-validate → atomic write; zero-write on failure, R7) — make T023 green
-- [ ] T025 [US2] RED: test verb `roadmap add <id> --kind-via-id --part-of … --depends-on … --apply` (dry-run default) — `tests/roadmap/verb-add.test.ts`
-- [ ] T026 [US2] Implement `add` subaction in the verb — make T025 green
-- [ ] T027 [US2] Checkpoint: quickstart Scenario 3 green
+- [X] T023 [US2] RED: tests for `mutations.add` — one-move add with `--part-of`+`--depends-on`; whole-graph re-validate; dangling target ⇒ zero-write (document hash unchanged) — `tests/roadmap/mutations-add.test.ts`
+- [X] T024 [US2] Implement `add` in NEW `plugins/stack-control/src/roadmap/mutations.ts` (compose load → insert → re-validate → atomic write; zero-write on failure, R7) — make T023 green
+- [X] T025 [US2] RED: test verb `roadmap add <id> --kind-via-id --part-of … --depends-on … --apply` (dry-run default) — `tests/roadmap/verb-add.test.ts`
+- [X] T026 [US2] Implement `add` subaction in the verb — make T025 green
+- [X] T027 [US2] Checkpoint: quickstart Scenario 3 green
 
 ## Phase 5: User Story 4 — Query the dependency graph (Priority: P2)
 
