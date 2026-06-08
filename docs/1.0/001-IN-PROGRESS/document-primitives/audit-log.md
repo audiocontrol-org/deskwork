@@ -499,3 +499,16 @@ Surface:    specs/005-document-primitives/spec.md:94, specs/005-document-primiti
 The audit wrapper explicitly rejects deferral-style commitments, but the diff still contains several scheduling references around reconciliation and document-change protocols. The intended scope is clear: reconciliation execution is excluded from this feature, and `curate` only reports the recognized seam. The wording should state that boundary without implying a scheduled continuation.
 
 Blast radius is low for implementation behavior because FR-008 is otherwise clear, but it is a process trap: downstream task generation may preserve the wording as placeholder commitments or the wrapper may reject the artifact. A reasonable fix is to replace those sentences with static scope language such as “execution is excluded from this feature” and remove schedule-implying phrasing.
+
+## 2026-06-08 — audit-barrage lift (20260608T000347204Z-document-primitives-after_plan)
+
+### AUDIT-20260608-01 — FR-004 declares an order *key* but never an ordering *relation* over categorical field values
+
+Finding-ID: AUDIT-20260608-01 (claude-01 + claude-02 + claude-03 + claude-04 + claude-05 + codex-01 + codex-02 + codex-03 + codex-04; cross-model)
+Status:     fixed-0c68291d
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md — FR-004 ("status & order — canonical"); FR-013 roadmap ("ordering by `phase`")
+
+FR-004 says "A document is **well-ordered** if and only if its Unit sequence matches the declared order key" and that the key "MUST be expressible over status and human-readable fields." AUDIT-36 added a tie-break for *equal* order-key values (by identifier), but the spec never defines how *unequal* values of a categorical field compare. The roadmap proof document (FR-013) orders by `phase`, whose values are `design`, `plan`, `impl`, `multi` — a sequence whose intended order (`design < plan < impl < multi`) is **not** the alphabetical order (`design < impl < multi < plan`) an implementer reaches for by default. The same gap applies to ordering by `status` (`planned`, `in-flight`, `shipped`…): there is no natural string order. FR-004's "expressible over … fields" describes *which* field sorts, never the *relation* over that field's value domain.
+
+Blast radius is high because `curate --apply` **mutates the live document into the declared order** (FR-008/SC-002). An unattended agent building from this spec will implement the only ordering the spec gives it — lexicographic comparison of the field value — and `curate --apply` will then *reorder a correct roadmap into a semantically-wrong order* and call it "well-ordered." Nothing in the artifact corrects this. Fix: require each grammar to declare an explicit ordering relation over its order-key domain (e.g. an ordered enumeration of phase values / status values), and define `well-ordered` against that declared relation, with the FR-005 identifier tie-break applying only within equal-rank values.
