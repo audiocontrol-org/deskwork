@@ -64,6 +64,24 @@ Operator owns the (A)-vs-(B) call and any genuine design forks surfaced at the p
 
 ---
 
+## Experiments
+
+### 2026-06-08 — Spec-mode audit lens (mode-aware prompt) — H1 validated
+
+**Hypothesis (H1):** the barrage prompt's mode-agnostic, code-oriented "What to look for" checklist (it literally lists *"operator interrupt mid-operation," "concurrent calls," "files growing past a cap"*) was *instructing* the auditor to litigate implementation in the spec — the FM-2 generator. Fix: a spec-mode lens that scopes the audit to promise/decision/contradiction/ambiguity altitude (WHAT-not-HOW litmus), shipped in the adopter-facing template + payload modules (not a project override).
+
+**Method:** controlled A/B on the *unchanged* 005 spec (its iter-8 mechanism issues were deferred, not fixed, so they were still present). Control = iteration 8 (code lens): **4 HIGH, all mechanism-altitude** (out-of-domain values, reinsertion protocol, schema evolution, uniqueness mechanism). Treatment = iteration 9 (spec lens), same spec.
+
+**Result — validated on altitude (count is the wrong metric).** Treatment surfaced 8 findings, **7 of 8 at promise/decision/contradiction/consistency altitude**: an FR-vs-FR contradiction (FR-003 parse-only vs FR-005 uniqueness), a migration manual-vs-automated missing-decision, two unachievable-promise/ambiguity findings, a scenario-needs-uncommitted-fixture contradiction, leftover-inconsistent-wording, a project-rule hygiene hit. The mechanism-litigation class (interrupt-atomicity protocol, concurrent calls, file layouts, "specify the algorithm") **disappeared entirely**. Same artifact, only the prompt varied → the delta is the lens.
+
+**Over-suppression guard (passed in situ):** the lens caught a textbook FR-vs-FR contradiction + 4 other genuine contradictions — it is NOT blind to real spec defects. No separate seeded-defect run was needed.
+
+**Convergeability:** the treatment findings are *finite* real contradictions (several left by the rushed override remediation) that resolve when fixed — unlike the mechanism *generator*, which was unbounded. So the lens is expected to also fix the *non-convergence*, not just the altitude.
+
+**Caveat — H2 (severity cap) under-fired.** The lens's instruction to self-tag stray mechanism findings `[mechanism — defer to contracts/tests]` and cap them at MEDIUM produced **0 tags**; one borderline-mechanism finding (AUDIT-14, unreadable-ledger vs corrupt-body) slipped through at HIGH. Lesson: **altitude-scoping the lens (H1) is load-bearing; model self-tagging the severity cap (H2) is weak.** If a hard cap is wanted, make it mechanical (lift/gate downgrades mechanism-tagged findings), not a prompt instruction the model may ignore.
+
+**Disposition:** H1 adopted into the shipped prompt (`feat(audit-barrage): mode-aware audit lens`). Follow-ups: (a) decide whether to do a real convergence pass on 005 with the lens (the 8 are genuine), (b) consider mechanizing H2.
+
 ## Entry format (for future audits)
 
 ```
