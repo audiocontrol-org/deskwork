@@ -51,6 +51,15 @@ The deterministic primitive the skills call (`bin/stackctl <verb>`, in-tree Type
 | `stackctl execute-check --spec <dir>` | Gate: is the spec **runnable** for native `/speckit-implement`? Exit 0 (`runnable`) iff `tasks.md` is present; otherwise exit ≠0 naming the missing artifact. Read-only. |
 | `stackctl spec-check --spec <dir>` | Report a spec's authoring state as a machine-readable line (`spec=yes plan=yes tasks=no`), exit 0 when it can report; exit ≠0 (fail-loud) on a missing/unknown flag, an absent dir, or a non-directory. Read-only; never gates on artifact *content* (a partial spec is a valid report). |
 | `stackctl version` | Print the plugin version (lockstep with the rest of the monorepo). |
+| `stackctl archive --doc <path> [--apply]` | Move terminal-status items into the sibling `<doc>-archive.md` (with an in-archive provenance ledger). Dry-run by default. |
+| `stackctl unarchive --doc <path> --id <id> [--apply]` | Return a named archived item to its live document at its declared-order position. Dry-run by default. |
+| `stackctl curate --doc <path> [--apply]` | Ensure a document is well-formed, well-ordered, and properly archived; recognize (never run) a declared reconciliation seam; report ledger↔archive coherence. Dry-run by default. |
+
+## Document primitives
+
+`archive`, `unarchive`, and `curate` keep a **living document** (a roadmap, an idea inbox, a spec, any markdown that accretes settled material) lean and correct. A document becomes **governable** by declaring a block-level **grammar** — embedded as an HTML comment (`<!-- doc-grammar: … -->`) or referenced from frontmatter (`doc-grammar: <id>`, resolved from a project override or a built-in default). The grammar declares what a Unit is (a reserved heading level, or a table row), its status vocabulary + which statuses are terminal (archivable), its declared ordering relation, and its identifier shape. Identifiers are universally **unique / human-readable / non-ordinal** so identity never couples to position.
+
+Each verb defaults to **dry-run** (report, write nothing); writing requires `--apply`. Every validation failure (ungovernable document, parse failure, identifier violation, unarchive locate failure / collision) fails loud with zero writes. Two built-in grammars ship under [`grammars/`](./grammars/) — a heading-keyed `design-inbox` and a row-keyed `roadmap` — and govern the plugin's own [`DESIGN-INBOX.md`](./DESIGN-INBOX.md) and [`ROADMAP.md`](./ROADMAP.md). The agent-facing skills are `/stack-control:archive`, `/stack-control:unarchive`, and `/stack-control:curate` (each: dry-run → confirm → apply).
 
 ## Governance extension
 

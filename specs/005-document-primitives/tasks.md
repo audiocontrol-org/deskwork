@@ -130,10 +130,10 @@ description: "Task list for design/document-primitives implementation"
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T039 Run `scripts/check-no-predecessor-refs.sh` over the product mechanism (engine/verbs/`skills/**` (all three: archive/unarchive/curate)/grammars/fixtures; proof documents excluded) → **zero** predecessor references; the gate is green (FR-011/SC-006). Makes T004 fully green.
-- [ ] T040 [P] Verify Principle VI: every new file < 500 lines; refactor any that exceed it.
-- [ ] T041 [P] Author `plugins/stack-control` README/usage docs for `archive` + `curate` (no rot-prone version strings — link the releases page).
-- [ ] T042 Run all six `quickstart.md` scenarios end-to-end against the two proof documents.
+- [X] T039 Run `scripts/check-no-predecessor-refs.sh` over the product mechanism (engine/verbs/`skills/**` (all three: archive/unarchive/curate)/grammars/fixtures; proof documents excluded) → **zero** predecessor references; the gate is green (FR-011/SC-006). Makes T004 fully green.
+- [X] T040 [P] Verify Principle VI: every new file < 500 lines; refactor any that exceed it.
+- [X] T041 [P] Author `plugins/stack-control` README/usage docs for `archive` + `curate` (no rot-prone version strings — link the releases page).
+- [X] T042 Run all six `quickstart.md` scenarios end-to-end against the two proof documents.
 
 ---
 
