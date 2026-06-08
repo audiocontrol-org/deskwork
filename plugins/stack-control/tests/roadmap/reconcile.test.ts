@@ -35,6 +35,10 @@ function buildTree(): { docPath: string; baseDir: string } {
       '- status: planned',
       '- spec: specs/missing',
       '',
+      '## impl:feature/z',
+      '- status: in-flight',
+      '- spec: specs/z',
+      '',
     ].join('\n'),
     'utf8',
   );
@@ -47,6 +51,9 @@ function buildTree(): { docPath: string; baseDir: string } {
   mk('x', { 'spec.md': '# x', 'tasks.md': '- [x] T001 a\n- [x] T002 b\n' });
   // y: a task unchecked ⇒ no shipped proposal.
   mk('y', { 'spec.md': '# y', 'tasks.md': '- [x] T001 a\n- [ ] T002 b\n' });
+  // z: a task is `[~]` (in-progress/superseded), zero `[ ]` ⇒ NOT complete,
+  // so no shipped proposal (AUDIT-20260608-10).
+  mk('z', { 'spec.md': '# z', 'tasks.md': '- [x] T001 a\n- [~] T002 b\n' });
   // an orphan spec dir referenced by no item.
   mk('orphan', { 'spec.md': '# orphan' });
   return { docPath, baseDir };
@@ -62,6 +69,13 @@ describe('reconcile (T044)', () => {
     expect(drift!.onDisk).toBe('shipped');
     // y is not proposed (a task is still unchecked).
     expect(report.statusDrift.some((d) => d.identifier === 'impl:feature/y')).toBe(false);
+  });
+
+  it('does NOT propose shipped when a task is `[~]` (any non-checked marker)', () => {
+    const { docPath, baseDir } = buildTree();
+    const report = reconcile(docPath, ROADMAP_OPTS, baseDir);
+    // z has `[x]` + `[~]` and zero `[ ]` — the `[~]` must block "complete".
+    expect(report.statusDrift.some((d) => d.identifier === 'impl:feature/z')).toBe(false);
   });
 
   it('lists orphan spec dirs (no roadmap item references them)', () => {

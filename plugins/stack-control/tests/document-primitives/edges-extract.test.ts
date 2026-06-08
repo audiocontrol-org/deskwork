@@ -66,4 +66,33 @@ describe('extractEdges (T006)', () => {
     const body = '## impl:feature/x\n- deferred-until:   ';
     expect(() => extractEdges(body, grammar())).toThrow(/deferred-until/);
   });
+
+  it('ignores field-looking bullets inside a fenced code block (AUDIT-20260608-12)', () => {
+    const body = [
+      '## impl:feature/x',
+      '- status: planned',
+      'Documenting the scope syntax in an example:',
+      '```',
+      '- depends-on: design:feature/ghost',
+      '```',
+      'Prose after the fence.',
+    ].join('\n');
+    const edges = extractEdges(body, grammar());
+    expect(edges.find((e) => e.field === 'depends-on')).toBeUndefined();
+    expect(edges).toEqual([]);
+  });
+
+  it('still parses real field bullets outside a fenced example (AUDIT-20260608-12)', () => {
+    const body = [
+      '## impl:feature/x',
+      '- depends-on: design:feature/a',
+      'A fenced example that must NOT become an edge:',
+      '~~~',
+      '- part-of: design:feature/ghost',
+      '~~~',
+    ].join('\n');
+    const edges = extractEdges(body, grammar());
+    expect(edges).toContainEqual({ field: 'depends-on', targets: ['design:feature/a'] });
+    expect(edges.find((e) => e.field === 'part-of')).toBeUndefined();
+  });
 });

@@ -29,14 +29,19 @@ export interface ReconciliationReport {
   readonly unresolved: readonly string[];
 }
 
-/** True iff `tasks.md` exists with ≥1 checkbox and none left unchecked. */
+/**
+ * True iff `tasks.md` exists with ≥1 checkbox-shaped task and EVERY one is
+ * checked (`[x]`/`[X]`). Any other marker — `[ ]`, `[~]`, or any other single
+ * char inside the brackets — counts as NOT complete and blocks the verdict
+ * (AUDIT-20260608-10): a partially-done feature must never read as "complete".
+ */
 function tasksComplete(tasksPath: string): boolean {
   if (!existsSync(tasksPath)) return false;
   const text = readFileSync(tasksPath, 'utf8');
-  const all = text.match(/^\s*- \[[ xX]\]/gm) ?? [];
+  const all = text.match(/^\s*- \[.\]/gm) ?? [];
   if (all.length === 0) return false;
-  const unchecked = text.match(/^\s*- \[ \]/gm) ?? [];
-  return unchecked.length === 0;
+  const done = text.match(/^\s*- \[[xX]\]/gm) ?? [];
+  return done.length === all.length;
 }
 
 /** Normalize a spec path for comparison (strip a single trailing slash). */

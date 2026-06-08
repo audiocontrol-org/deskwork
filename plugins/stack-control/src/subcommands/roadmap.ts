@@ -37,6 +37,38 @@ interface Flags {
   readonly values: ReadonlyMap<string, string>;
 }
 
+/** Per-subaction grammar: which value-flags it reads + which booleans it accepts. */
+interface SubactionSpec {
+  /** Value-flag names (the `--<name> <value>` keys it reads, sans `--`). */
+  readonly valueFlags: readonly string[];
+  /** Whether `--apply` is meaningful (mutations) or rejected (queries). */
+  readonly apply: boolean;
+  /** Whether `--clear` is meaningful (only `defer`) or rejected. */
+  readonly clear: boolean;
+  /** Max positionals consumed beyond the subaction token (`--doc` is universal). */
+  readonly positionals: number;
+}
+
+// `--doc` is universal (allowed everywhere) and handled separately from `values`.
+const SUBACTION_SPECS: Readonly<Record<string, SubactionSpec>> = {
+  next: { valueFlags: [], apply: false, clear: false, positionals: 0 },
+  blocked: { valueFlags: [], apply: false, clear: false, positionals: 0 },
+  blocks: { valueFlags: [], apply: false, clear: false, positionals: 1 },
+  order: { valueFlags: [], apply: false, clear: false, positionals: 0 },
+  graph: { valueFlags: [], apply: false, clear: false, positionals: 0 },
+  reconcile: { valueFlags: [], apply: false, clear: false, positionals: 0 },
+  add: {
+    valueFlags: ['status', 'scope', 'depends-on', 'part-of', 'deferred-until', 'spec', 'ref'],
+    apply: true,
+    clear: false,
+    positionals: 1,
+  },
+  advance: { valueFlags: ['to'], apply: true, clear: false, positionals: 1 },
+  decompose: { valueFlags: ['into'], apply: true, clear: false, positionals: 1 },
+  reclassify: { valueFlags: ['to'], apply: true, clear: false, positionals: 1 },
+  defer: { valueFlags: ['until'], apply: true, clear: true, positionals: 1 },
+};
+
 /** Generic flag scan: boolean flags, `--doc`/`--<name> <value>`, positionals. */
 function scanFlags(args: readonly string[]): Flags {
   let doc = DEFAULT_DOC;
@@ -63,6 +95,27 @@ function scanFlags(args: readonly string[]): Flags {
     }
   }
   return { doc, apply, clear, positionals, values };
+}
+
+/**
+ * Reject unknown flags, unsupported `--apply`/`--clear`, and extra positionals
+ * for the chosen subaction with exit 2 — BEFORE any mutation/query runs. A
+ * misspelled value-flag (e.g. `--depend-on` for `--depends-on`) would otherwise
+ * be silently ignored, producing a valid-but-wrong roadmap mutation
+ * (AUDIT-20260608-13).
+ */
+function validateFlags(subaction: string, flags: Flags): void {
+  const spec = SUBACTION_SPECS[subaction];
+  if (spec === undefined) return; // unknown subaction handled by the dispatch switch.
+  const allowed = new Set(spec.valueFlags);
+  for (const name of flags.values.keys()) {
+    if (!allowed.has(name)) failUsage('roadmap', `unknown flag --${name} for '${subaction}'`);
+  }
+  if (flags.apply && !spec.apply) failUsage('roadmap', `--apply is not valid for '${subaction}'`);
+  if (flags.clear && !spec.clear) failUsage('roadmap', `--clear is not valid for '${subaction}'`);
+  if (flags.positionals.length > spec.positionals) {
+    failUsage('roadmap', `unexpected positional '${flags.positionals[spec.positionals]!}' for '${subaction}'`);
+  }
 }
 
 /** The first positional, failing usage with a subaction-specific message. */
@@ -174,6 +227,7 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
     failUsage('roadmap', 'a subaction is required (usage: roadmap <next|blocked|add> [flags])');
   }
   const flags = scanFlags(args.slice(1));
+  validateFlags(subaction, flags);
   try {
     switch (subaction) {
       case 'next':

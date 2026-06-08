@@ -73,6 +73,24 @@ describe('stackctl roadmap mutation verbs (T041)', () => {
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
 
+  it('an unknown value flag on advance (--too typo) → exit 2, zero write', () => {
+    // AUDIT-20260608-13: a typo'd flag on a mutation subaction must be rejected
+    // before the mutation runs, not silently ignored.
+    const docPath = tmpCopy('chain');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli(['roadmap', 'advance', 'impl:feature/b', '--too', 'in-flight', '--doc', docPath, '--apply']);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('--clear is rejected on advance (subaction does not support it) → exit 2', () => {
+    const docPath = tmpCopy('chain');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli(['roadmap', 'advance', 'impl:feature/b', '--to', 'in-flight', '--clear', '--doc', docPath, '--apply']);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
   it('defer --until sets and --clear removes the condition', () => {
     const docPath = tmpCopy('chain');
     expect(runCli(['roadmap', 'defer', 'impl:feature/b', '--until', 'after the spike', '--doc', docPath, '--apply']).status).toBe(0);

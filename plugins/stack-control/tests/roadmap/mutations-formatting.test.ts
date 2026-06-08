@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { decompose, reclassify } from '../../src/roadmap/mutations.js';
+import { add, decompose, reclassify } from '../../src/roadmap/mutations.js';
 import { loadRoadmap } from '../../src/roadmap/roadmap-model.js';
 import { ROADMAP_OPTS, writeTempRoadmap } from './helpers.js';
 
@@ -126,5 +126,48 @@ describe('mutations reassemble formatting stability (AUDIT-20260608-06)', () => 
       'impl:feature/x1b',
       'impl:feature/x2',
     ]);
+  });
+});
+
+describe('mutations add formatting stability (AUDIT-20260608-11)', () => {
+  it('add keeps exactly one blank line between units and does not accumulate across repeated adds', () => {
+    const docPath = writeTempRoadmap([
+      '## impl:gap/a',
+      '- status: planned',
+      '',
+      '## impl:gap/b',
+      '- status: planned',
+      '- depends-on: impl:gap/a',
+    ]);
+
+    // `add` is the most frequent mutation the SKILL prescribes (capture emergent
+    // work in one move) — run repeatedly against the live ROADMAP.md. Each pass
+    // must leave exactly one blank line of inter-unit separation and must not
+    // accumulate blank lines anywhere (no run of 3+ newlines).
+    add(docPath, { identifier: 'impl:gap/c', status: 'planned' }, ROADMAP_OPTS, true);
+    const afterFirst = readFileSync(docPath, 'utf8');
+    expect(tripleNewlineRuns(afterFirst)).toBe(0);
+    expect(interUnitBlankCounts(afterFirst)).toEqual([1, 1]);
+    expect(loadRoadmap(docPath, ROADMAP_OPTS).byId.has('impl:gap/c')).toBe(true);
+
+    add(docPath, { identifier: 'impl:gap/d', status: 'planned' }, ROADMAP_OPTS, true);
+    const afterSecond = readFileSync(docPath, 'utf8');
+    expect(tripleNewlineRuns(afterSecond)).toBe(0);
+    expect(interUnitBlankCounts(afterSecond)).toEqual([1, 1, 1]);
+    expect(loadRoadmap(docPath, ROADMAP_OPTS).byId.has('impl:gap/d')).toBe(true);
+
+    add(docPath, { identifier: 'impl:gap/e', status: 'planned' }, ROADMAP_OPTS, true);
+    const afterThird = readFileSync(docPath, 'utf8');
+    // No blank-line growth anywhere across the three repeated adds.
+    expect(tripleNewlineRuns(afterThird)).toBe(0);
+    expect(interUnitBlankCounts(afterThird)).toEqual([1, 1, 1, 1]);
+
+    // Still loads green with every added unit present after the repeated mutations.
+    const model = loadRoadmap(docPath, ROADMAP_OPTS);
+    expect(model.byId.has('impl:gap/a')).toBe(true);
+    expect(model.byId.has('impl:gap/b')).toBe(true);
+    expect(model.byId.has('impl:gap/c')).toBe(true);
+    expect(model.byId.has('impl:gap/d')).toBe(true);
+    expect(model.byId.has('impl:gap/e')).toBe(true);
   });
 });

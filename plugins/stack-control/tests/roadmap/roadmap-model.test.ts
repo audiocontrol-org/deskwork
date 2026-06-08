@@ -43,6 +43,26 @@ describe('roadmap-model loadRoadmap (T016)', () => {
     expect(b.scope).toContain('Scope prose for B.');
   });
 
+  it('preserves a ### sub-note line in scope (AUDIT-20260608-12)', () => {
+    const docPath = writeTempRoadmap([
+      '## design:feature/a',
+      '- status: shipped',
+      '',
+      '## impl:feature/b',
+      '- status: planned',
+      '- depends-on: design:feature/a',
+      'Lead prose for B.',
+      '',
+      '### Sub-note detail',
+      'More detail under the sub-note.',
+    ]);
+    const model = loadRoadmap(docPath, ROADMAP_OPTS);
+    const b = model.items.find((i) => i.identifier === 'impl:feature/b')!;
+    expect(b.scope).toContain('Lead prose for B.');
+    expect(b.scope).toContain('### Sub-note detail');
+    expect(b.scope).toContain('More detail under the sub-note.');
+  });
+
   it('exposes a byId lookup and preserves document order', () => {
     const model = loadRoadmap(fixturePath('chain'), ROADMAP_OPTS);
     expect(model.items.map((i) => i.identifier)).toEqual([

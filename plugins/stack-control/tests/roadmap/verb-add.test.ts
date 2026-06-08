@@ -60,4 +60,33 @@ describe('stackctl roadmap add verb (T025)', () => {
     expect(r.status).toBe(2);
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
+
+  it('an unknown value flag (--depend-on typo) → exit 2, zero write', () => {
+    // AUDIT-20260608-13: a misspelled flag must NOT be silently ignored. The
+    // un-guarded scanner accepted `--depend-on` into `values`, addInputFrom read
+    // only `depends-on`, and the command SUCCEEDED creating a dependency-less
+    // item — a valid-but-wrong roadmap mutation. The guard rejects the unknown
+    // flag with exit 2 BEFORE any mutation, writing nothing.
+    const docPath = tmpCopy('chain');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'roadmap', 'add', 'impl:fix/typo',
+      '--depend-on', 'design:feature/a',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('an unknown boolean flag (--clear on add) → exit 2, zero write', () => {
+    const docPath = tmpCopy('chain');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'roadmap', 'add', 'impl:fix/w',
+      '--clear',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
 });

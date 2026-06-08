@@ -65,12 +65,30 @@ function firstOrNull(targets: readonly string[]): string | null {
 }
 
 const FIELD_BULLET = /^\s*[-*]\s+[A-Za-z][A-Za-z0-9-]*\s*:/;
+/** The unit's reserved level-2 `## ` heading line (NOT `### ` sub-notes). */
+const UNIT_HEADING = /^## /;
+/** A fenced-code-block delimiter (``` ``` `` / `~~~`), matching edges.ts. */
+const SCOPE_FENCE = /^\s*(```|~~~)/;
 
-/** Body prose, dropping the `## heading` line and any `- field:` bullet lines. */
+/**
+ * Body prose, dropping ONLY the unit's reserved `## ` heading line and the real
+ * `- field:` bullet lines. `### ` sub-notes are legitimate body sub-notes per
+ * grammars/roadmap.peg and MUST survive into scope; a field-looking bullet
+ * inside a fenced code block is ordinary example prose (NOT a real field), so it
+ * survives too — kept coherent with extractEdges (AUDIT-20260608-12).
+ */
 function scopeOf(unit: Unit): string {
+  let inFence = false;
   return unit.body
     .split('\n')
-    .filter((line) => !line.startsWith('##') && !FIELD_BULLET.test(line))
+    .filter((line) => {
+      if (SCOPE_FENCE.test(line)) {
+        inFence = !inFence;
+        return true;
+      }
+      if (inFence) return true;
+      return !UNIT_HEADING.test(line) && !FIELD_BULLET.test(line);
+    })
     .join('\n')
     .trim();
 }

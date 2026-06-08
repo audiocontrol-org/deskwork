@@ -13,6 +13,9 @@ import { DocumentModelError, type Edge, type GrammarSpec, type Unit } from './ty
 /** Match a body bullet line `- <field>: <value>` (also `* <field>: …`). */
 const BULLET_FIELD = /^\s*[-*]\s+([A-Za-z][A-Za-z0-9-]*)\s*:\s*(.*)$/;
 
+/** Match a fenced-code-block delimiter (``` ``` `` or `~~~`, any indent). */
+const FENCE = /^\s*(```|~~~)/;
+
 /**
  * Extract declared edge-fields from a Unit body. Pure; does NOT validate
  * cross-Unit references. Lines whose field is not a declared `edgeField` are
@@ -26,7 +29,18 @@ export function extractEdges(body: string, grammar: GrammarSpec): readonly Edge[
   const byField = new Map<string, string[]>();
   const order: string[] = [];
 
+  // Field-looking bullets inside a fenced code block (``` ``` `` / `~~~`) are
+  // ordinary markdown example prose, NOT real edges (AUDIT-20260608-12). Track
+  // fence state and skip those regions so a documented `- depends-on: …` example
+  // never becomes a real reference (which would either break referential
+  // integrity or silently alter readiness/order).
+  let inFence = false;
   for (const line of body.split('\n')) {
+    if (FENCE.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
     const m = BULLET_FIELD.exec(line);
     if (m === null) continue;
     const name = m[1]!;

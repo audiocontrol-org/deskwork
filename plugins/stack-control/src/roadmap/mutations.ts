@@ -149,7 +149,12 @@ export function add(
   const before = sourceLines.slice(0, insertAt);
   const after = sourceLines.slice(insertAt);
   const section = buildSection(input);
-  const candidate = [...before, '', ...section, '', ...after].join('\n');
+  // Emit exactly one blank line on each side of the new section, but never when
+  // the adjacent edge is already blank — otherwise repeated `add`s (the SKILL's
+  // most frequent mutation) accumulate blank lines near EOF (AUDIT-20260608-11).
+  const preBlank = before.length > 0 && before[before.length - 1]!.trim() !== '' ? [''] : [];
+  const postBlank = after.length > 0 && after[0]!.trim() !== '' ? [''] : [];
+  const candidate = [...before, ...preBlank, ...section, ...postBlank, ...after].join('\n');
   return commit(docPath, candidate, opts, apply);
 }
 
