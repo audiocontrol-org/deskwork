@@ -82,6 +82,20 @@ Operator owns the (A)-vs-(B) call and any genuine design forks surfaced at the p
 
 **Disposition:** H1 adopted into the shipped prompt (`feat(audit-barrage): mode-aware audit lens`). Follow-ups: (a) decide whether to do a real convergence pass on 005 with the lens (the 8 are genuine), (b) consider mechanizing H2.
 
+## Prevention beats detection: authoring is the cause
+
+The spec-mode lens (detection) and the diminishing-returns playbook (triage) both treat the *symptom* — an auditor litigating implementation in a spec. The **cause** is **authoring**: a spec that *contains* implementation mechanism invites implementation critique, and no lens fully prevents that, because a mechanism written into a spec generates *genuine* contradictions as it interacts with the rest of the spec.
+
+**Case study (005, the cleanest proof).** AUDIT-17 was valid spec feedback (a durability *promise* was over-strong). The author's fix **added a precondition mechanism** ("require a committed working tree before `--apply`"). That mechanism then spawned AUDIT-18 (it broke curate's reorder→archive) and AUDIT-19 (it was unsatisfiable for the absent sibling archive on first archive) — a mini-generator (17→18→19), the same shape as the durability generator (29→39→40). The fix was never a better mechanism; it was to **un-author it**: collapse to a scoped promise ("recover to the last committed state; uncommitted content is the operator's responsibility; protocol pinned by contracts + tests"). *The author caused the generator by writing HOW instead of WHAT.*
+
+**The discipline has two ends, one litmus (WHAT-vs-HOW):**
+- **Prevention — authoring.** Write at promise/decision altitude. The moment you are writing a precondition, protocol, algorithm, data layout, or edge-case *handling*, stop — that belongs in `contracts/` + RED tests. (The parked **spec-authoring skill** is this half; this run field-validates promoting it.)
+- **Detection — the lens.** The backstop: when mechanism slips in, flag it as *"over-specified mechanism → move to contracts/tests"* (an authoring-violation finding), never demand more of it.
+
+**Precise nuance (don't overcorrect):** specs DO capture promises *about* edges and failures — *"an interrupted op never silently loses committed content"* is a legitimate spec promise. The rule is **state the guarantee, not the mechanism that achieves it.** "No edge cases in specs" is the wrong reading; "no edge-case *handling mechanism* in specs" is right.
+
+**Corollary for the convergence loop:** if a fix you just applied *adds* mechanism (a precondition, a protocol step, a format rule), expect it to generate the next finding. Prefer fixes that *scope a promise* or *defer to contracts/tests* over fixes that *add mechanism*. A fix that adds mechanism to a spec is itself an authoring violation.
+
 ## Entry format (for future audits)
 
 ```
