@@ -963,3 +963,43 @@ Surface:    plugins/stack-control/skills/curate/SKILL.md:13
 The curate skill’s up-to-date check explains that reconciliation execution belongs to “a separate, later capability.” The audit wrapper’s own constraints reject deferred-work phrasing as a bug-factory, and this is an operator-facing skill body that travels with the plugin install.
 
 The blast radius is low because the behavior is otherwise clear: `curate` recognizes the seam and does not execute it. The risk is process hygiene rather than runtime correctness. A reasonable fix is to state the scope boundary without temporal wording, e.g. “reconciliation execution is outside this primitive.”
+
+## 2026-06-08 — audit-barrage lift (20260608T060100517Z-document-primitives-after_clarify)
+
+### AUDIT-20260608-39 — Order-key domain (FR-004) is validated at curate/unarchive but NOT at load/parse/archive — a roadmap row with an out-of-domain phase loads and archives silently
+
+Finding-ID: AUDIT-20260608-39 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     fixed-63e4f239
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/grammar-parse.ts:118-140 (parseUnits — validates status vocabulary only); plugins/stack-control/src/document-model/document.ts:48-53 (loadDocument — no order-domain check); plugins/stack-control/src/document-model/archive-engine.ts:155-181 (runArchive); vs. curate-engine.ts:28 + unarchive-engine.ts:126 (the only `assertInDomain` call sites)
+
+`parseUnits` fails loud when a Unit's `status` is outside the grammar's `statusVocabulary` (grammar-parse.ts:128-132, cited as FR-004), but it never validates that the Unit's `orderValue` is within the grammar's declared ordering relation. The only place the order-key domain is enforced is `assertInDomain`, called from `curate`'s `reorderedSource` (curate-engine.ts:28) and `unarchive`'s `insertIntoLive` (unarchive-engine.ts:126). `loadDocument` and `runArchive` do not call it. Concretely, a roadmap row like `| implementation/foo | … | … | planned |` passes the `CODENAME` shape check in `roadmap.peg` (two non-slash segments), derives `orderValue = 'implementation'`, has a valid status — and therefore loads cleanly and `archive --apply`s out without any error, because `implementation` is never compared against the declared relation `[design, plan, impl, multi]` on those paths.
+
+The blast radius is medium: the same malformed document gives inconsistent signals across verbs. `archive` and a plain load accept it; `curate` and `unarchive` reject it as out-of-domain (T045 explicitly asserts curate fails loud here). An operator (or an unattended builder) who typos a phase can archive rows whose sort key is invalid, only discovering the FR-004 violation later when they happen to run `curate`. The "well-formed" gate the README and skill bodies promise is uniform ("every validation failure fails loud with zero writes") but the implementation's order-domain validation is not uniform — it's load-bearing for ordering verbs and absent for archive/load. A reasonable fix is to call `assertInDomain` for each Unit inside `loadDocument` (or `parseUnits`) so out-of-domain order values fail loud at the same boundary as status-vocabulary and identifier violations, making every verb reject the document consistently.
+
+---
+
+### AUDIT-20260608-40 — AUDIT-35 fix can mis-fire in the inverse direction: a non-governable doc whose leading `---…---` is a thematic break (not YAML frontmatter) now fails loud as "malformed frontmatter YAML"
+
+Finding-ID: AUDIT-20260608-40
+Status:     acknowledged-2026-06-08
+Disposition: Inherent markdown frontmatter-vs-thematic-break ambiguity: a doc opening with `---` is frontmatter by convention, so failing loud on malformed YAML there is the correct default (the alternative is the AUDIT-35 silent-swallow bug just fixed). A doc intending a top-of-file thematic break should not lead with a bare `---` fence. No clean general disambiguation; over-fire on this rare edge is acceptable.
+Severity:   low
+Surface:    plugins/stack-control/src/document-model/grammar-resolver.ts:155-168 (frontmatterRef catch → throw); plugins/stack-control/src/document-model/chrome.ts:47-53 (detectFrontmatter treats any leading `---`…`---` as frontmatter)
+
+`detectFrontmatter` classifies *any* document whose first non-blank line is `---` and that has a later `---` as having a frontmatter block (chrome.ts:47-53) — it cannot distinguish YAML frontmatter from a Markdown thematic break (`---`) that legitimately opens a document. The AUDIT-35 fix made `frontmatterRef` *throw* a `DocumentModelError` when that span fails YAML parsing (grammar-resolver.ts:160-167), on the premise that present-but-broken frontmatter should be surfaced rather than swallowed. The inverse hazard: a document that is genuinely not meant to be governed, but happens to begin with a `---` rule followed by prose that isn't valid YAML (e.g. a line with multiple colons), now fails loud with "fix the frontmatter YAML (this is a parse failure, not a missing grammar)" — pointing the operator at frontmatter they never wrote.
+
+The blast radius is low because the verbs are invoked only on documents the operator intends to govern, so the realistic trigger window is narrow, and the existing tests pin the intended malformed-governed-doc behavior. But it's the symmetric misdirection of the very bug AUDIT-35 closed: AUDIT-35 traded "malformed governed doc reported as ungovernable" for "ungovernable doc with a leading thematic break reported as malformed frontmatter." A more precise fix would gate the throw on the frontmatter block actually looking like a YAML mapping (e.g. only throw when the parsed value is a non-null object that failed, or when a `doc-grammar`-like key is detectably present-but-broken), so a bare thematic-break opener still resolves to "not governable" rather than a YAML-repair error.
+
+---
+
+### AUDIT-20260608-41 — ROADMAP contains temporal deferred-work wording for the reconciliation seam
+
+Finding-ID: AUDIT-20260608-41
+Status:     fixed-63e4f239
+Severity:   low
+Surface:    plugins/stack-control/ROADMAP.md:12-14
+
+The proof roadmap describes the reconciliation hook with temporal capability wording on line 13. Prior AUDIT-38 fixed the same class in the curate skill, but this operator-facing governed proof document still carries the pattern.
+
+Blast radius is low: runtime behavior is clear, and `curate` still recognizes the seam without execution. The risk is process hygiene in a shipped governed document. Reword the sentence as a scope boundary, e.g. state that roadmap-discipline reconciliation plugs into this seam and that `curate` recognizes the seam without executing it.
