@@ -55,7 +55,12 @@ Operator owns the (A)-vs-(B) call and any genuine design forks surfaced at the p
 
 **Process note:** remediations ran as **fresh-context per-finding sub-agent dispatches with whole-artifact scope** (the govern-spec discipline), after an initial lapse where the orchestrator hand-authored fixes (caught + corrected). Fresh-context dispatch reduced but did not eliminate FM-1.
 
-**Outcome:** loop continued past the plateau toward convergence after the structural fix (≤1 HIGH at iter-7). [Update with final disposition — converged / overridden — when the loop closes.]
+**Outcome: graduated via `GOVERN_OVERRIDE` (playbook B) at iteration 8.** Full HIGH trajectory `7→5→2→1→5→5→1→4`. The structural fix broke the durability generator (5→1), but iter-8 re-spiked to 4 HIGH — a *second* plateau, this time **diffuse fix-debt with no common generator** (each iter-6/7 fix's boundary conditions: out-of-domain order value, reinsertion-into-unordered, archive schema evolution, manual-edit uniqueness evasion, zero-live-Unit unarchive, durability attribution). Verify-premise: all implementation-mechanism-altitude, no new design forks. Per playbook B the operator graduated via recorded override; the 7 residual were dispositioned `acknowledged-deferred-impl-20260608` and scoped into `tasks.md` Phase 8 (RED-first). **39 findings fixed across 8 iterations.**
+
+**Lessons added to the catalog from this run:**
+- **Two distinct plateau shapes.** (i) A *single generator* (the durability mechanism, 29→39→40) — broken by a structural root-fix (playbook A). (ii) *Diffuse fix-debt with no common generator* (iter-8's seven) — NOT fixable by one structural change; the signal for playbook B (override + defer to TDD). Distinguishing them is the key judgment: does one change collapse many findings, or are they seven unrelated boundary conditions?
+- **A clean fix still spawns ~N boundary findings next round.** Even a correct, contained fix (the iter-7 ordering-relation fix) surfaced its own edge cases (out-of-domain values, etc.). This is intrinsic to specifying behavior in prose — it is the floor of FM-1, and a reason convergence to literal-zero is often not the right goal for a spec.
+- **The override is the honest terminal state for a spec**, not a failure. Recorded with a substantive reason + deferred findings scoped into the task list, it is playbook B working as designed — distinct from `converged` (which would falsely claim zero residual).
 
 ---
 

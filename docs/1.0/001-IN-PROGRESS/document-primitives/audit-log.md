@@ -6,6 +6,16 @@ Cross-model agreement (both `claude` and `codex` flag the same root cause indepe
 
 ---
 
+## 2026-06-08 — GRADUATION via GOVERN_OVERRIDE (operator decision)
+
+The spec-governance convergence loop ran **8 barrage iterations** (claude + codex, `after_plan`). HIGH trajectory: **7 → 5 → 2 → 1 → 5 → 5 → 1 → 4**. **39 findings remediated** (`fixed-<sha>`) via fresh-context per-finding sub-agent dispatch; the iter-5/6 plateau was broken by a structural root-fix (replacing the two-file-atomicity *mechanism* with a *promise* — see `SPEC-AUDIT-FAILURE-MODES.md`).
+
+The gate is `non-converged` at the ceiling (8) with **7 residual open findings** (AUDIT-20260608-02..08: 4 HIGH, 3 MED). Per `.claude/rules/spec-audit-diminishing-returns.md` (playbook B), the operator chose to **graduate via recorded `GOVERN_OVERRIDE`** rather than keep patching: the residual are diffuse implementation-mechanism-altitude edges with **no common generator and no new design forks**, pinned by `/speckit-plan` contracts + RED tests at implement time. Gate verdict: `state: overridden, openHigh: 4, openMedium: 3, override.recorded: true`.
+
+The 7 are dispositioned `acknowledged-deferred-impl-20260608` and **scoped into `tasks.md`** (Phase 8 — Deferred audit findings) so implementation addresses them; **AUDIT-20260608-06 is a genuine bug** (zero-live-Unit `unarchive`), to be fixed RED-first during implementation.
+
+---
+
 ## 2026-06-07 — audit-barrage lift (20260607T222930484Z-document-primitives-after_plan)
 
 ### AUDIT-20260607-01 — FR-004 order-key constraint is unsatisfiable for both proof grammars — the only natural ordering field is the identifier itself
@@ -512,3 +522,82 @@ Surface:    specs/005-document-primitives/spec.md — FR-004 ("status & order �
 FR-004 says "A document is **well-ordered** if and only if its Unit sequence matches the declared order key" and that the key "MUST be expressible over status and human-readable fields." AUDIT-36 added a tie-break for *equal* order-key values (by identifier), but the spec never defines how *unequal* values of a categorical field compare. The roadmap proof document (FR-013) orders by `phase`, whose values are `design`, `plan`, `impl`, `multi` — a sequence whose intended order (`design < plan < impl < multi`) is **not** the alphabetical order (`design < impl < multi < plan`) an implementer reaches for by default. The same gap applies to ordering by `status` (`planned`, `in-flight`, `shipped`…): there is no natural string order. FR-004's "expressible over … fields" describes *which* field sorts, never the *relation* over that field's value domain.
 
 Blast radius is high because `curate --apply` **mutates the live document into the declared order** (FR-008/SC-002). An unattended agent building from this spec will implement the only ordering the spec gives it — lexicographic comparison of the field value — and `curate --apply` will then *reorder a correct roadmap into a semantically-wrong order* and call it "well-ordered." Nothing in the artifact corrects this. Fix: require each grammar to declare an explicit ordering relation over its order-key domain (e.g. an ordered enumeration of phase values / status values), and define `well-ordered` against that declared relation, with the FR-005 identifier tie-break applying only within equal-rank values.
+
+## 2026-06-08 — audit-barrage lift (20260608T001744175Z-document-primitives-after_plan)
+
+### AUDIT-20260608-02 — Order-key value domain and the declared ordering relation's domain are declared independently — a Unit can have a valid, parseable order-key value with no rank in the relation
+
+Finding-ID: AUDIT-20260608-02
+Status:     acknowledged-deferred-impl-20260608
+Severity:   high
+Surface:    spec.md FR-004 ("Declared ordering relation"), FR-005 ("Per-grammar production"), FR-013(b) (roadmap `phase` order); data-model `GrammarSpec.orderKey`
+
+The recent fix (AUDIT-20260608-01) added a **declared ordering relation** — an ordered enumeration of the order-key field's value domain — and defines `well-ordered` against it. But nothing in the spec requires that a Unit's *actual* order-key value be a **member** of that enumeration. The ordering relation (e.g. roadmap `phase` = `[design, plan, impl, multi]`) is declared on `GrammarSpec.orderKey`, while the order-key value itself arrives through the grammar's **identifier production** (`<phase>/<slug>`) or status parse — two **independently declared** surfaces. FR-005 explicitly says each grammar "declares its concrete identifier production" and the engine "does NOT mandate slug-shape." So a roadmap grammar can legitimately accept `ops/some-slug` (identifier valid, parses fine, non-ordinal, unique) whose `phase` value `ops` is **absent** from the declared `[design, plan, impl, multi]` relation. The spec defines no rank for an out-of-domain value.
+
+Blast radius is high because `curate --apply` **mutates the live document into declared order** (FR-008/SC-002). An unattended agent reaching a Unit whose order-key value isn't in the relation has no defined behavior: it will throw, drop the Unit, or sort it arbitrarily (e.g. to the end), and `curate --apply` will silently produce a "well-ordered" document that isn't — or crash mid-reorder. Nothing in the artifact closes this. Fix: make membership in the declared ordering relation a **well-formedness (FR-003) requirement** — a Unit whose order-key field value is not in the declared enumeration is a fail-loud parse/validation failure naming the offending value — OR require the grammar to guarantee its identifier/status production is a subset of the ordering relation's domain and state that coupling explicitly.
+
+### AUDIT-20260608-03 — `unarchive` reinsertion "at declared-order position" is undefined when the live document is not already well-ordered — and contradicts the SC-007 / US1 "leaving the document well-ordered" claim
+
+Finding-ID: AUDIT-20260608-03
+Status:     acknowledged-deferred-impl-20260608
+Severity:   high
+Surface:    spec.md FR-007 ("reinserted at its declared-order position"), US1 Independent Test + Acceptance Scenario 3, SC-007 ("content-equivalent, well-ordered")
+
+FR-007 says `unarchive` "returns it to the live document — reinserted at its **declared-order position** (per the grammar's order key, FR-004)" and FR-002 is explicit that `curate` — not `unarchive` — is the verb that reorders Units. But US1's Independent Test and Acceptance Scenario 3, and SC-007, all assert the round-trip leaves "the document **content-equivalent and well-ordered**." These two claims are only jointly satisfiable when the live document was **already well-ordered** before the unarchive. If the operator has not run `curate` (the live document has Units out of declared order), inserting a single Unit "at its declared-order position" is ill-defined: there is no single correct index relative to mis-ordered neighbors, and inserting one Unit cannot make a globally out-of-order document well-ordered without reordering the rest.
+
+Blast radius is high because the two natural readings diverge and the artifact doesn't disambiguate. An agent could build (a) "unarchive inserts only, and the round-trip is well-ordered only if the doc was already well-ordered" — in which case SC-007/US1's unconditional "well-ordered" assertion is a false test that will fail on a realistic out-of-order document; or (b) "unarchive must produce a well-ordered document," which forces unarchive to reorder all Units, directly contradicting FR-002/FR-008's statement that `curate` owns reordering. Fix: state the precondition explicitly — `unarchive` computes the insertion index *as if* the document were well-ordered and guarantees a well-ordered result **only when the live document was already well-ordered**; otherwise it inserts at the computed index and the result's global order is the operator's responsibility (run `curate`). Then weaken SC-007/US1's "well-ordered" assertion to that precondition.
+
+### AUDIT-20260608-04 — Row-keyed archive table is brittle under column-schema evolution: append-only + single-table + "reproduces the column schema" have no story for a schema change
+
+Finding-ID: AUDIT-20260608-04
+Status:     acknowledged-deferred-impl-20260608
+Severity:   medium
+Surface:    spec.md FR-006 ("Row-keyed grammar: archived rows live in a single markdown table that reproduces the live document's header row + separator row + column schema"; "append-only ... never rewrites prior archived Units")
+
+FR-006 specifies that a row-keyed grammar's archive is **one** markdown table reproducing the live document's header + separator + column schema, that `archive --apply` is **append-only**, and that it "never rewrites prior archived Units." These three constraints have no defined behavior when the live document's column schema changes over the document's life (an operator adds, removes, or reorders a roadmap column — a routine living-document edit). A subsequent `archive --apply` must append a row whose column count/order no longer matches the existing archive table's header, but append-only forbids rewriting the prior header or prior rows. The result is either a malformed table (rows with mismatched column counts) or an unspecified second table — neither is addressed.
+
+Blast radius is medium: it doesn't break the first archive or the golden path, but it compounds — the failure surfaces only after a schema edit, by which time the archive may already hold many rows, and the corruption is silent until the archive table is read or unarchived. An implementer building strictly to "single table, append-only, reproduce schema" will produce a column-mismatched table. Fix: either state column-schema stability as an assumption/constraint with a fail-loud check when the live header diverges from the archive table header, or specify how the archive accommodates schema evolution (e.g. a new table segment keyed to the new schema, with the ledger remaining the identifier-keyed locator).
+
+### AUDIT-20260608-05 — Ledger-only uniqueness union cannot detect a live↔archive identifier collision created by a manual archive-marker edit — uniqueness can be silently evaded
+
+Finding-ID: AUDIT-20260608-05
+Status:     acknowledged-deferred-impl-20260608
+Severity:   medium
+Surface:    spec.md FR-005 ("Archived identifiers for the union come **solely from the provenance ledger**"), FR-006 manual-edit handling, manual-edit Edge Case, SC-007
+
+FR-005 makes the **ledger the sole source** of archived identifiers for the document ∪ archive uniqueness union, and FR-006/the manual-edit Edge Case accept that an operator hand-editing an archived Unit's **identifier marker** leaves the ledger stale (surfaced later as a `curate` NOTICE, not blocking). The interaction of these two accepted positions produces a concrete uniqueness hole not covered by the "staleness is just a NOTICE" framing: suppose the operator hand-edits an archived Unit's marker from `design/foo` to `design/bar`. The ledger still says `design/foo`. The operator then creates a **live** Unit `design/bar`. The FR-005 uniqueness check consults the ledger (`design/foo`), finds no collision, and **accepts** — but the archive file now physically contains a Unit marker `design/bar` identical to a live Unit. A later `unarchive` or cross-reference resolves `design/bar` ambiguously across two physical Units with the same identifier.
+
+Blast radius is medium: it requires a manual edit (operator responsibility, explicitly accepted), but the consequence is a genuine duplicate-identifier state that the spec elsewhere promises is impossible (FR-005 "Unique within the document ∪ its archive"), and the only safety net (the `curate` coherence NOTICE) flags ledger-vs-marker drift, not the live↔archive-marker duplication. This is worth surfacing distinctly from the already-accepted "staleness is a NOTICE" decision because it is a uniqueness-*invariant* evasion, not mere bookkeeping drift. Fix: either state explicitly that FR-005's "unique within document ∪ archive" is guaranteed only against the ledger (and a manual marker edit can defeat it — narrowing the invariant honestly), or have the `curate` coherence check additionally cross-reference live identifiers against the *physical archive markers* (not just ledger entries) and report any live↔archive marker duplication.
+
+### AUDIT-20260608-06 — Zero-live-Unit documents incorrectly make `unarchive` impossible
+
+Finding-ID: AUDIT-20260608-06
+Status:     acknowledged-deferred-impl-20260608
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md:106, specs/005-document-primitives/spec.md:130
+
+The zero-Unit edge case conflates “the live document has zero Units” with “the archive ledger is empty or absent.” Line 106 explicitly includes “a document whose Units have all been archived” as a valid zero-Unit live document, but then says `unarchive <id>` fails loud because “a zero-Unit document has an empty (or absent) ledger.” That is false for the all-archived case: the live document has zero Units precisely because the archive should contain Units and ledger entries.
+
+Blast radius is high because it breaks the P1 reversibility contract when the live document becomes fully lean. A builder following line 106 could reject `unarchive` from a fully archived document, even though FR-007 says unarchive locates the Unit via the archive ledger. Fix by separating “zero live Units” from “empty/absent archive ledger”: `archive`/`curate` no-op on zero live Units, while `unarchive --id` should succeed if the sibling archive ledger contains the requested id and fail loud only when the ledger/archive lookup fails.
+
+### AUDIT-20260608-07 — Interrupted `curate` detection is attributed to the wrong check
+
+Finding-ID: AUDIT-20260608-07
+Status:     acknowledged-deferred-impl-20260608
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md:103, specs/005-document-primitives/spec.md:131, specs/005-document-primitives/spec.md:159, specs/005-document-primitives/spec.md:173
+
+The durability wording says inconsistencies from an interrupted `--apply` are detectable because “the `curate` coherence check” surfaces them. That is not true for every `curate --apply` interruption path described on line 131: curate reorders first, then archives. If it stops after the live-document reorder but before archive movement, there is no ledger/archive mismatch for the coherence check to report; the detectable condition is instead the ordinary “properly archived” check finding terminal Units still live.
+
+Blast radius is high because SC-003 line 159 specifies the simulated interruption evidence as a ledger/archive mismatch NOTICE. An implementer can satisfy that test while missing the reorder-before-archive interruption state, or can overclaim coherence coverage for a state coherence cannot observe. Fix by stating that interrupted states are detected by `curate`’s full health report: ledger/archive mismatches by the coherence check, and live terminal Units by the properly-archived check.
+
+### AUDIT-20260608-08 — Unarchive locate failures are excluded from the canonical zero-write list
+
+Finding-ID: AUDIT-20260608-08
+Status:     acknowledged-deferred-impl-20260608
+Severity:   medium
+Surface:    specs/005-document-primitives/spec.md:130, specs/005-document-primitives/spec.md:133
+
+FR-007 says `unarchive` fails loud on locate failure: absent/empty ledger or no ledger entry for `--id`. But FR-010’s canonical “validation failure” zero-write list names ungovernable documents, ambiguous grammar declarations, parse failures, identifier violations, and unarchive collisions, while omitting unarchive locate failures.
+
+Blast radius is medium because the intended behavior is strongly implied by FR-007, so a careful implementer will probably fail before writing. The canonical fail-loud section is still the place an unattended builder will use for cross-file zero-write guarantees, and this omission leaves missing-id `unarchive --apply` outside the absolute zero-write contract. Fix by adding unarchive locate failure to FR-010’s zero-write failure list.

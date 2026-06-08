@@ -137,6 +137,21 @@ description: "Task list for design/document-primitives implementation"
 
 ---
 
+## Phase 8: Deferred audit findings (spec-governance GOVERN_OVERRIDE, 2026-06-08)
+
+The spec graduated via override with 7 residual findings deferred to implementation (`acknowledged-deferred-impl-20260608` in the feature audit-log). They are implementation-mechanism-altitude edges to pin RED-first during implementation, NOT spec gaps. Each task: write the failing test exercising the edge, then implement.
+
+- [ ] T044 [P] AUDIT-20260608-06 (**genuine bug**, RED-first): `unarchive` must work when the live document has **zero** live Units but the archive holds the requested `--id` (the empty-doc rule wrongly made this a not-found failure). Test: archive the only Unit, then `unarchive --apply` it back.
+- [ ] T045 [P] AUDIT-20260608-02: a Unit whose order-key field value is **not in the grammar's declared ordering relation** (out-of-domain) → fail loud (FR-004); test the unranked-value case.
+- [ ] T046 [P] AUDIT-20260608-03: define + test `unarchive` reinsertion when the live document is **not already well-ordered** (reinsert at the declared-order position; the surrounding disorder is curate's concern, not unarchive's) — reconcile with SC-007.
+- [ ] T047 [P] AUDIT-20260608-05: the coherence check (curate) must **detect a live↔archive identifier collision created by a manual archive-marker edit** (ledger-only union can't see it) — test the manual-edit evasion path surfaces as a coherence NOTICE.
+- [ ] T048 [P] AUDIT-20260608-04: row-keyed archive table behavior under **column-schema change** between live doc and archive (operational/migration edge) — define + test the mismatch handling.
+- [ ] T049 [P] AUDIT-20260608-07 + -08: align the implementation so interrupted-`curate` detection is attributed to the coherence check, and `unarchive` locate failures are in the zero-write fail-loud set — test both.
+
+**Checkpoint**: the override's deferred edges are closed RED-first; re-run `stackctl govern --mode spec` to confirm they clear (or are consciously re-deferred).
+
+---
+
 ## Dependencies & Execution Order
 
 - **Setup (P1)** → **Foundational (P2, the engine)** → user stories. No story work begins until T005–T014 are done.
