@@ -15,7 +15,7 @@ The compiled, declared description of a document's structure. Resolved per FR-00
 | `pegText` | string | The declarative `.peg` grammar text compiled by peggy at runtime. |
 | `statusVocabulary` | string[] | All legal statuses (FR-004). |
 | `terminalStatuses` | string[] | Subset of `statusVocabulary` that is archivable (FR-004). |
-| `orderKey` | OrderKey | Declared ordering; MUST NOT be a positional/sequence ordinal (a category/attribute that also appears in a structured identifier is allowed). Ties on equal order-key values are broken **by identifier** — a stable, total secondary sort, not a positional encoding (FR-004). |
+| `orderKey` | OrderKey | Declared ordering; MUST NOT be a positional/sequence ordinal (a category/attribute that also appears in a structured identifier is allowed). Carries the field name **and the declared ordering relation** — an **ordered enumeration** of the order-key field's value domain (e.g. roadmap `phase` → `[design, plan, impl, multi]`), against which **well-ordered** is defined; **lexicographic is never assumed**. A categorical order key with no declared relation is a grammar error. Ties **within equal-rank values** are broken **by identifier** — a stable, total secondary sort, not a positional encoding (FR-004). |
 | `identifierProduction` | IdentifierRule | The grammar's concrete identifier shape — strict slug or title (FR-005, clarification: per-grammar). |
 | `reconciliationHook` | ReconciliationHook \| null | Optional seam (FR-008); null when undeclared. |
 

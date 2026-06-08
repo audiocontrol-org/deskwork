@@ -25,7 +25,7 @@ A grammar (`.peg` text) is **trusted local config** compiled and run in-process 
 
 - the **Unit production** (what a unit is + its boundaries over the block stream). The Unit MUST be delimited by a **structural marker a Unit body provably cannot contain** (FR-002 boundary rule): a heading-keyed grammar **reserves its Unit-heading level** (bodies carry only strictly-deeper headings; a reserved-level heading always starts a new Unit), a row-keyed grammar uses the table row. This is what makes the Unit's `span` — and later its archive-file extraction (FR-006/FR-007) — unambiguous;
 - the **status vocabulary** and the **terminal (archivable) subset** (FR-004);
-- the **order key** — expressible over status + human-readable fields, **never** a positional/sequence ordinal (ordering by a category/attribute that also appears in a structured identifier, e.g. roadmap by `phase`, is allowed) (FR-004);
+- the **order key** — expressible over status + human-readable fields, **never** a positional/sequence ordinal (ordering by a category/attribute that also appears in a structured identifier, e.g. roadmap by `phase`, is allowed). When the order key uses a **categorical/enum field**, the grammar MUST also declare an **explicit ordering relation over that field's value domain** — an **ordered enumeration** of its values (e.g. `phase` order = `[design, plan, impl, multi]`, NOT alphabetical); **well-ordered** is defined against that declared relation, **lexicographic is never assumed**, and a categorical order key with no declared relation is a **grammar error** (FR-004);
 - the **identifier production** — a strict slug (`<phase>/<slug>`, recommended) or a title; the engine enforces the FR-005 properties regardless of shape;
 - optionally, a **reconciliation hook** (`kind: command|glob`, `source`) — recorded, not executed (FR-008).
 
@@ -38,5 +38,5 @@ A grammar (`.peg` text) is **trusted local config** compiled and run in-process 
 
 ## Built-in grammars shipped this feature
 
-- `roadmap.peg` — `<phase>/<slug>` identifiers; full status vocabulary `planned`, `in-flight` (active), `shipped`, `cancelled`, `retired` (terminal) (proof instance #2, FR-013).
-- `design-inbox.peg` — title identifiers; full status vocabulary `captured` (active), `promoted`, `dropped` (terminal) (proof instance #1, FR-013).
+- `roadmap.peg` — `<phase>/<slug>` identifiers; full status vocabulary `planned`, `in-flight` (active), `shipped`, `cancelled`, `retired` (terminal); order key `phase` with declared ordering relation `[design, plan, impl, multi]` (NOT alphabetical), equal-`phase` tie-break by identifier (proof instance #2, FR-013).
+- `design-inbox.peg` — title identifiers; full status vocabulary `captured` (active), `promoted`, `dropped` (terminal); declared ordering relation by status rank `[captured, promoted, dropped]`, equal-status tie-break by identifier (title) (proof instance #1, FR-013).
