@@ -1,100 +1,85 @@
 // `stackctl spec-governance-gate --feature <slug>` (T017 + T018).
 //
-// The protocol port (research R3/R4): turns the per-feature audit-barrage run
-// history into a graduation VERDICT by reusing the dw-lifecycle convergence
-// logic (`check-barrage-dampener` Rule A/Rule B) — the SAME function, imported
-// in-house, NOT a hand-retyped approximation (Principle VIII / convergence-gate
-// assertion #7). The only new behavior is the wiring: in dw-lifecycle the
-// dampener decides slush-vs-promote disposition; here the criterion decides
-// whether a spec may graduate to the next Spec Kit step (SC-007).
+// The convergence gate. It owns the FR-010 graduation POLICY in exactly one
+// place and returns a single decision the consumer OBEYS — it is never left to
+// an agent to re-derive policy from a richer output (#432, operator directive
+// 2026-06-08). Concretely:
 //
-// Fail-loud (Principle V / FR-005): a missing audit-log / unresolvable feature
-// NEVER yields a verdict — exit 2, no "governed" claim. The convergence loop is
-// bounded by --ceiling (FR-014): once iterations >= ceiling without convergence
-// the verdict is `non-converged` (escalate), never an infinite spin.
+//   * stdout is ONLY `true` or `false` — `true` = gate OPEN (graduation
+//     permitted / unblocked); `false` = BLOCKED (keep barraging). Nothing else
+//     is printed to stdout, so a caller reads exactly one boolean.
+//   * the EXIT CODE encodes execution status, NOT policy: 0 = the gate
+//     evaluated successfully (whatever the boolean), 2 = fatal / could-not-
+//     evaluate (missing audit-log / unresolvable feature — fail loud, FR-005,
+//     never a "governed" claim). There is no exit-1-means-blocked: blocked is a
+//     normal, successful evaluation that prints `false`.
+//
+// The policy itself (#432 / AUDIT-20260608-01): the gate is OPEN iff the
+// FR-010 dampener is engaged (`check-barrage-dampener`, computed on what each
+// run RAW-SURFACED — see that module) OR an explicit `--override` is supplied.
+// The count of still-open findings has NO bearing (operator directive) — the
+// recent-run convergence signal is the whole policy; detection is the barrage's
+// job. Loop bounding (FR-014 ceiling) belongs to the loop driver, not here.
 
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
-// The ported convergence criterion + the feature-root resolver, now VENDORED
+// The ported convergence criterion + the feature-root resolver, VENDORED
 // in-package (multi/migrate-audit-barrage) — no dw-lifecycle dependency.
-import {
-  checkBarrageDampener,
-  countOpenFindingsUnion,
-} from '../scope-discovery/promote-findings/check-barrage-dampener.js';
+import { checkBarrageDampener } from '../scope-discovery/promote-findings/check-barrage-dampener.js';
 import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
-import {
-  countIterations,
-  filterByCheckpoint,
-} from '../scope-discovery/promote-findings/checkpoint-filter.js';
+import { filterByCheckpoint } from '../scope-discovery/promote-findings/checkpoint-filter.js';
 
-const DEFAULT_CEILING = 5;
-// Audit-protocol threshold (FR-010): Rule A = last 2 consecutive runs each 0
-// HIGH. Fixed by the protocol, not a tunable here.
+// Audit-protocol threshold (FR-010): branch (b) = last 2 consecutive runs each
+// 0 HIGH. Fixed by the protocol, not a tunable here.
 const PROTOCOL_THRESHOLD = 2;
-
-type ConvergenceState = 'converged' | 'blocked' | 'non-converged' | 'overridden';
-type ConvergenceRule = 'single-run-clean' | 'n-consecutive-quiet' | 'none';
-
-interface ConvergenceVerdict {
-  readonly feature: string;
-  /** The checkpoint this verdict is scoped to, or null for the whole audit-log. */
-  readonly checkpoint: string | null;
-  readonly state: ConvergenceState;
-  readonly rule: ConvergenceRule;
-  readonly iterations: number;
-  readonly ceiling: number;
-  readonly openHigh: number;
-  readonly openMedium: number;
-  readonly override: { readonly recorded: boolean; readonly reason?: string };
-}
 
 interface GateOptions {
   readonly feature: string;
-  readonly ceiling: number;
   readonly override?: string;
   readonly repoRoot?: string;
   /** Scope convergence to runs tagged with this checkpoint (AUDIT-20260607-05). */
   readonly checkpoint?: string;
-  readonly json: boolean;
 }
 
 const USAGE = [
   'Usage: stackctl spec-governance-gate',
   '    --feature <slug>          Required. Evaluates the feature audit-log + run history.',
-  '    [--ceiling <N>]           Max iterations before non-converged (default 5).',
-  '    [--override "<reason>"]    Record an explicit override (reason mandatory).',
+  '    [--override "<reason>"]    Force the gate OPEN, recording a mandatory reason.',
   '    [--checkpoint <name>]     Scope convergence to runs for this checkpoint only',
-  '                              (per-checkpoint independent loops, FR-011/FR-014).',
+  '                              (per-checkpoint independent loops, FR-011).',
   '    [--repo-root <path>]      Project root (default: cwd).',
-  '    [--json]                  Emit the ConvergenceVerdict as JSON only.',
   '',
-  'Exit codes: 0 converged/overridden (may graduate); 1 blocked/non-converged',
-  '            (graduation refused); 2 fatal (feature/audit-log absent).',
+  'Prints exactly `true` (gate OPEN — may graduate) or `false` (BLOCKED) to stdout.',
+  'Exit codes: 0 evaluated successfully (read stdout for the decision);',
+  '            2 fatal — could not evaluate (feature/audit-log absent, no decision).',
 ].join('\n');
 
 function parseArgs(args: string[]): GateOptions {
   let feature: string | undefined;
-  let ceiling = DEFAULT_CEILING;
   let override: string | undefined;
   let repoRoot: string | undefined;
   let checkpoint: string | undefined;
-  let json = false;
 
   for (let i = 0; i < args.length; i++) {
     const token = args[i];
     if (token === undefined) continue;
-    if (token === '--json') {
-      json = true;
-      continue;
-    }
     if (token === '--help' || token === '-h') {
       process.stdout.write(`${USAGE}\n`);
       process.exit(0);
     }
+    // `--ceiling`/`--json` are accepted-and-ignored for back-compat with callers
+    // that still pass them: loop bounding moved to the loop driver, and the
+    // output is always the bare boolean (no JSON verdict).
+    if (token === '--ceiling') {
+      i++; // consume the value
+      continue;
+    }
+    if (token === '--json') {
+      continue;
+    }
     if (
       token === '--feature' ||
-      token === '--ceiling' ||
       token === '--override' ||
       token === '--repo-root' ||
       token === '--checkpoint'
@@ -108,15 +93,7 @@ function parseArgs(args: string[]): GateOptions {
       if (token === '--feature') feature = value;
       else if (token === '--repo-root') repoRoot = value;
       else if (token === '--override') override = value;
-      else if (token === '--checkpoint') checkpoint = value;
-      else {
-        const parsed = Number.parseInt(value, 10);
-        if (!Number.isFinite(parsed) || parsed <= 0) {
-          process.stderr.write(`spec-governance-gate: --ceiling must be a positive integer (got '${value}')\n`);
-          process.exit(2);
-        }
-        ceiling = parsed;
-      }
+      else checkpoint = value;
       continue;
     }
     process.stderr.write(`spec-governance-gate: unexpected argument '${token}'\n${USAGE}\n`);
@@ -128,8 +105,6 @@ function parseArgs(args: string[]): GateOptions {
   }
   return {
     feature,
-    ceiling,
-    json,
     ...(override !== undefined ? { override } : {}),
     ...(repoRoot !== undefined ? { repoRoot } : {}),
     ...(checkpoint !== undefined ? { checkpoint } : {}),
@@ -145,14 +120,14 @@ export async function runSpecGovernanceGate(args: string[]): Promise<void> {
   const { root: featureRoot } = await resolveFeatureRoot({ repoRoot, slug: opts.feature });
   if (featureRoot === undefined) {
     process.stderr.write(
-      `spec-governance-gate: FATAL — feature '${opts.feature}' not found under ${join(repoRoot, 'docs')}/*/001-IN-PROGRESS/ (no verdict; spec NOT governed).\n`,
+      `spec-governance-gate: FATAL — feature '${opts.feature}' not found under ${join(repoRoot, 'docs')}/*/001-IN-PROGRESS/ (no decision; spec NOT governed).\n`,
     );
     process.exit(2);
   }
   const auditLogPath = join(featureRoot, 'audit-log.md');
   if (!existsSync(auditLogPath)) {
     process.stderr.write(
-      `spec-governance-gate: FATAL — audit-log not found at ${auditLogPath} (no verdict; spec NOT governed).\n`,
+      `spec-governance-gate: FATAL — audit-log not found at ${auditLogPath} (no decision; spec NOT governed).\n`,
     );
     process.exit(2);
   }
@@ -165,90 +140,27 @@ export async function runSpecGovernanceGate(args: string[]): Promise<void> {
       ? filterByCheckpoint(auditLogTextRaw, opts.checkpoint)
       : auditLogTextRaw;
 
-  // --- the PORTED criterion (the load-bearing reuse) ---
-  // The dampener's consecutive-0-HIGH VERDICT stays PER-RUN (the stability
-  // heuristic over the most-recent window) — unchanged.
+  // The ONE policy decision (#432): the gate is OPEN iff the FR-010 dampener is
+  // engaged (computed on RAW-surfaced severity inside check-barrage-dampener) OR
+  // the operator forced it with --override. No open-finding union, no ceiling,
+  // no rule label — a single boolean the consumer obeys.
   const dampener = checkBarrageDampener({ auditLogText, threshold: PROTOCOL_THRESHOLD });
-  const mostRecent = dampener.recentRunCounts[0];
+  const overridden = opts.override !== undefined;
+  const open = dampener.dampened || overridden;
 
-  // AUDIT-20260607-45: the BLOCKING open-set is the checkpoint-wide UNION of
-  // un-dispositioned HIGH/BLOCKING (and MEDIUM) findings across ALL recorded
-  // runs — a literal `Status:`-line scan via the SAME parser, NOT a similarity
-  // heuristic. A HIGH surfaced `open` in an earlier run, then stochastically not
-  // re-flagged in later runs, must still block graduation until it is
-  // dispositioned (SC-006 absolute). The reported `openHigh`/`openMedium` are
-  // the union; `auditLogText` is already checkpoint-scoped by the caller, so the
-  // union is naturally per-checkpoint (FR-011).
-  const union = countOpenFindingsUnion(auditLogText);
-  const openHigh = union.openHighPlus;
-  const openMedium = union.openMedium;
-  const iterations = countIterations(auditLogText);
-
-  // Which rule engaged — derived from the SAME recentRunCounts the dampener
-  // produced (so the consecutive VERDICT is per-run; assertion #7 holds).
-  const singleRunClean =
-    mostRecent !== undefined && mostRecent.highPlusCount === 0 && mostRecent.mediumCount === 0;
-  const nConsecutiveQuiet =
-    dampener.recentRunCounts.length >= PROTOCOL_THRESHOLD &&
-    dampener.recentRunCounts.every((r) => r.highPlusCount === 0);
-
-  // Graduation requires BOTH the per-run dampener engaging AND the cross-run
-  // union of open HIGH/BLOCKING being empty. The union gate is what makes SC-006
-  // literally true: a prior-run un-dispositioned HIGH blocks even when the
-  // most-recent window is clean. (MEDIUMs are slushed before the gate on the
-  // dampener's own predicate — FR-015 — so an engaged dampener implies the
-  // most-recent residual MEDIUMs are already out of the open set; the union's
-  // MEDIUM count is reported for transparency but does not itself block.)
-  const unionClearOfHighPlus = openHigh === 0;
-
-  let state: ConvergenceState;
-  let rule: ConvergenceRule = 'none';
-  let overrideRecorded = false;
-
-  if (dampener.dampened && unionClearOfHighPlus) {
-    state = 'converged';
-    rule = singleRunClean ? 'single-run-clean' : nConsecutiveQuiet ? 'n-consecutive-quiet' : 'none';
-  } else if (opts.override !== undefined) {
-    // Operator explicitly accepts residual findings — wins over ceiling.
-    state = 'overridden';
-    overrideRecorded = true;
-  } else if (iterations >= opts.ceiling) {
-    state = 'non-converged';
-  } else {
-    state = 'blocked';
-  }
-
-  const verdict: ConvergenceVerdict = {
-    feature: opts.feature,
-    checkpoint: opts.checkpoint ?? null,
-    state,
-    rule,
-    iterations,
-    ceiling: opts.ceiling,
-    openHigh,
-    openMedium,
-    override: overrideRecorded
-      ? { recorded: true, reason: opts.override }
-      : { recorded: false },
-  };
-
-  const mayGraduate = state === 'converged' || state === 'overridden';
-
-  if (opts.json) {
-    process.stdout.write(`${JSON.stringify(verdict)}\n`);
-  } else {
-    process.stdout.write(
-      `spec-governance gate [${opts.feature}]: ${state}` +
-        (rule !== 'none' ? ` (${rule})` : '') +
-        ` — open HIGH=${openHigh}, MED=${openMedium}, iterations=${iterations}/${opts.ceiling}\n`,
+  // stdout: ONLY the boolean. Everything human-readable goes to stderr so the
+  // machine-read channel stays a single token.
+  process.stdout.write(`${open ? 'true' : 'false'}\n`);
+  if (overridden) {
+    process.stderr.write(
+      `spec-governance gate [${opts.feature}]: OPEN by override — reason: ${opts.override}\n`,
     );
-    process.stdout.write(`${JSON.stringify(verdict)}\n`);
-    if (!mayGraduate) {
-      process.stderr.write(
-        `spec-governance gate: graduation REFUSED (${state}). Fix findings & re-govern, or record an --override "<reason>".\n`,
-      );
-    }
+  } else {
+    process.stderr.write(
+      `spec-governance gate [${opts.feature}]: ${open ? 'OPEN' : 'BLOCKED'} — ${dampener.reason}\n`,
+    );
   }
-
-  process.exit(mayGraduate ? 0 : 1);
+  // Exit 0: the gate evaluated successfully (the decision is on stdout). Failed
+  // execution (could-not-evaluate) already exited 2 above.
+  process.exit(0);
 }

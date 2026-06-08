@@ -81,13 +81,13 @@ describe('disposition persistence across revisions (T026 / SC-004)', () => {
       // (2) the new section was appended.
       expect(written).toMatch(/^##\s+2026-06-06\s+—\s+audit-barrage\s+lift\s+\(/m);
 
-      // (3) the gate distinguishes open vs dispositioned: the latest run is clean
-      // (low only) and the old HIGH is acknowledged, so graduation is NOT blocked.
-      const r = runCli(['spec-governance-gate', '--feature', slug, '--repo-root', repo, '--json']);
-      const verdict = JSON.parse(r.stdout) as { state?: string; openHigh?: number };
+      // (3) the latest run is genuinely pristine (low only), so branch (a)
+      // engages and the gate is OPEN — the prior acknowledged HIGH (an earlier
+      // run, not in the recent window) has no bearing (#432). The gate prints
+      // ONLY the boolean; exit code is execution status.
+      const r = runCli(['spec-governance-gate', '--feature', slug, '--repo-root', repo]);
       expect(r.status).toBe(0);
-      expect(verdict.state).toBe('converged');
-      expect(verdict.openHigh).toBe(0);
+      expect(r.stdout.trim()).toBe('true');
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }

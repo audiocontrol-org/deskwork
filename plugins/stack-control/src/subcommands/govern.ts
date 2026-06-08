@@ -15,8 +15,10 @@
  *   GOVERN_REPO_ROOT, GOVERN_BARRAGE_BIN (test stub), GOVERN_NO_SLUSH,
  *   GOVERN_PAYLOAD_BUDGET.
  *
- * Exit codes: 0 may-graduate (converged/overridden), 1 graduation refused
- * (blocked/non-converged), 2 fatal (usage error / capability or payload FATAL).
+ * Exit codes: govern relays the gate's single decision (#432) — 0 when the gate
+ * is OPEN (may graduate), 1 when the gate is BLOCKED (graduation refused), 2
+ * fatal (usage error / capability or payload FATAL). govern does NOT re-derive
+ * policy; it obeys the boolean the gate prints on stdout.
  *
  * NOTE (design doc step 8): the clone-detection step is handled separately by
  * the orchestrator. It is intentionally NOT invoked here — no placeholder, no
@@ -299,13 +301,14 @@ export async function runGovern(args: string[]): Promise<void> {
       stderr: (s) => process.stderr.write(s),
     });
 
-    if (result.gateExit !== 0) {
+    // Obey the gate's single decision (#432); never re-derive policy here.
+    if (!result.gateOpen) {
       process.stderr.write(
         flags.mode === 'spec'
-          ? 'govern: spec graduation REFUSED — convergence gate not satisfied (fix findings & re-govern, or record --override).\n'
-          : 'govern: implementation NOT done — convergence gate not satisfied (fix findings & re-govern, or record --override).\n',
+          ? 'govern: spec graduation REFUSED — convergence gate BLOCKED (fix findings & re-govern, or record --override).\n'
+          : 'govern: implementation NOT done — convergence gate BLOCKED (fix findings & re-govern, or record --override).\n',
       );
-      process.exit(result.gateExit);
+      process.exit(1);
     }
     process.stderr.write(
       flags.mode === 'spec'

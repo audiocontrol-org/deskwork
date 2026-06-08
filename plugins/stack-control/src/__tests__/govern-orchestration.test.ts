@@ -83,7 +83,7 @@ function runGovern(args: string[], env: Record<string, string>) {
 }
 
 describe('stackctl govern — full orchestration with stubbed barrage', () => {
-  it('spec mode runs render→barrage→lift→slush→gate; converged verdict, exit 0', () => {
+  it('spec mode runs render→barrage→lift→slush→gate; gate OPEN, exit 0', () => {
     const repo = makeRepo('feat');
     const fx = mkdtempSync(join(tmpdir(), 'gov-stub-'));
     const stub = writeStubBarrage(fx);
@@ -94,7 +94,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
         ['--mode', 'spec', '--feature', 'feat', '--repo-root', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-a') },
       );
-      expect(`${r.stdout}${r.stderr}`).toMatch(/converged/);
+      expect(`${r.stdout}${r.stderr}`).toMatch(/may graduate|OPEN/);
       expect(r.status).toBe(0);
     } finally {
       rmSync(repo, { recursive: true, force: true });
@@ -102,7 +102,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     }
   });
 
-  it('implement mode now runs slush+gate (behavior change): converged verdict, exit 0', () => {
+  it('implement mode now runs slush+gate (behavior change): gate OPEN, exit 0', () => {
     const repo = makeRepo('feat');
     const fx = mkdtempSync(join(tmpdir(), 'gov-stub-'));
     const stub = writeStubBarrage(fx);
@@ -118,7 +118,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
         ['--mode', 'implement', '--feature', 'feat', '--repo-root', repo, '--diff-base', 'HEAD'],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-b') },
       );
-      expect(`${r.stdout}${r.stderr}`).toMatch(/converged/);
+      expect(`${r.stdout}${r.stderr}`).toMatch(/governed|OPEN/);
       expect(r.status).toBe(0);
     } finally {
       rmSync(repo, { recursive: true, force: true });

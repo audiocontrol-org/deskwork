@@ -29,15 +29,13 @@ function makeRepo(slug: string, sections: string[]): string {
   return repo;
 }
 
+// The gate prints ONLY `true` (OPEN) / `false` (BLOCKED) on stdout (#432); the
+// exit code is execution status (0 evaluated, 2 fatal), never policy.
 function gate(repo: string, slug: string, extra: string[]) {
-  const r = runCli(['spec-governance-gate', '--feature', slug, '--repo-root', repo, '--json', ...extra]);
-  let verdict: Record<string, unknown> | undefined;
-  try {
-    verdict = JSON.parse(r.stdout) as Record<string, unknown>;
-  } catch {
-    verdict = undefined;
-  }
-  return { status: r.status, verdict };
+  const r = runCli(['spec-governance-gate', '--feature', slug, '--repo-root', repo, ...extra]);
+  const out = r.stdout.trim();
+  const open = out === 'true' ? true : out === 'false' ? false : undefined;
+  return { status: r.status, open };
 }
 
 describe('per-checkpoint convergence scoping (AUDIT-20260607-05)', () => {
@@ -48,40 +46,34 @@ describe('per-checkpoint convergence scoping (AUDIT-20260607-05)', () => {
     section('20260607T120000000Z-feat-after_plan', 'high'),
   ];
 
-  it('--checkpoint after_clarify sees ONLY clarify runs → converged, exit 0 (durable past the plan HIGH)', () => {
+  it('--checkpoint after_clarify sees ONLY clarify runs → OPEN (durable past the plan HIGH)', () => {
     const repo = makeRepo('feat', sections);
     try {
-      const { status, verdict } = gate(repo, 'feat', ['--checkpoint', 'after_clarify']);
+      const { status, open } = gate(repo, 'feat', ['--checkpoint', 'after_clarify']);
       expect(status).toBe(0);
-      expect(verdict?.state).toBe('converged');
-      expect(verdict?.openHigh).toBe(0);
-      expect(verdict?.iterations).toBe(2);
-      expect(verdict?.checkpoint).toBe('after_clarify');
+      expect(open).toBe(true);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
   });
 
-  it('--checkpoint after_plan sees ONLY the plan run → blocked on its open HIGH, exit 1', () => {
+  it('--checkpoint after_plan sees ONLY the plan run → BLOCKED on its surfaced HIGH', () => {
     const repo = makeRepo('feat', sections);
     try {
-      const { status, verdict } = gate(repo, 'feat', ['--checkpoint', 'after_plan']);
-      expect(status).toBe(1);
-      expect(verdict?.state).toBe('blocked');
-      expect(verdict?.openHigh).toBe(1);
-      expect(verdict?.iterations).toBe(1);
+      const { status, open } = gate(repo, 'feat', ['--checkpoint', 'after_plan']);
+      expect(status).toBe(0);
+      expect(open).toBe(false);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
   });
 
-  it('no --checkpoint = global (back-compat): sees the plan HIGH → blocked', () => {
+  it('no --checkpoint = global (back-compat): most-recent run surfaced the plan HIGH → BLOCKED', () => {
     const repo = makeRepo('feat', sections);
     try {
-      const { status, verdict } = gate(repo, 'feat', []);
-      expect(status).toBe(1);
-      expect(verdict?.state).toBe('blocked');
-      expect(verdict?.iterations).toBe(3);
+      const { status, open } = gate(repo, 'feat', []);
+      expect(status).toBe(0);
+      expect(open).toBe(false);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }

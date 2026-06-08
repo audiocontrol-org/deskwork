@@ -139,10 +139,12 @@ export interface RunProtocolArgs {
 
 export interface ProtocolResult {
   readonly runDir: string;
-  /** The gate's exit code: 0 may-graduate, 1 refused, 2 fatal. */
-  readonly gateExit: number;
-  /** The gate's stdout (the verdict JSON / human line). */
-  readonly gateOut: string;
+  /**
+   * The gate's single decision, parsed from its stdout boolean (#432): true =
+   * gate OPEN (may graduate), false = BLOCKED. The consumer OBEYS this; it does
+   * not re-derive policy. A could-not-evaluate gate (exit 2) throws before this.
+   */
+  readonly gateOpen: boolean;
 }
 
 function spawnText(
@@ -268,6 +270,8 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
     }
 
     // --- convergence gate (real stackctl), scoped to this checkpoint ---
+    // The gate owns the FR-010 policy and returns a single boolean on stdout
+    // (#432). We OBEY it — never re-derive. Exit 2 = could-not-evaluate (fatal).
     const gateArgs = [
       'spec-governance-gate',
       '--feature',
@@ -276,16 +280,12 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       args.repoRoot,
       '--checkpoint',
       args.checkpoint,
-      '--json',
     ];
-    if (args.ceiling !== undefined && args.ceiling.length > 0) {
-      gateArgs.push('--ceiling', args.ceiling);
-    }
     if (args.override !== undefined && args.override.length > 0) {
       gateArgs.push('--override', args.override);
     }
     const gate = spawnText(args.stackctl, gateArgs);
-    args.stdout(gate.stdout);
+    args.stderr(gate.stderr);
     args.stderr(`govern: run-dir=${runDir}\n`);
 
     if (gate.status === 2) {
@@ -294,7 +294,8 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       );
     }
 
-    return { runDir, gateExit: gate.status, gateOut: gate.stdout };
+    const gateOpen = gate.stdout.trim() === 'true';
+    return { runDir, gateOpen };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

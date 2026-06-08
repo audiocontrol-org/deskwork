@@ -39,45 +39,33 @@ function makeRepo(slug: string, sections: string[]): string {
   return repo;
 }
 
+// The gate prints ONLY `true` (OPEN) / `false` (BLOCKED) to stdout (#432); the
+// exit code is execution status (0 = evaluated, 2 = fatal), NEVER policy.
 function gate(repo: string, slug: string, extra: string[] = []) {
-  const r = runCli([
-    'spec-governance-gate',
-    '--feature',
-    slug,
-    '--repo-root',
-    repo,
-    '--json',
-    ...extra,
-  ]);
-  let verdict: Record<string, unknown> | undefined;
-  try {
-    verdict = JSON.parse(r.stdout) as Record<string, unknown>;
-  } catch {
-    verdict = undefined;
-  }
-  return { status: r.status, verdict, stdout: r.stdout, stderr: r.stderr };
+  const r = runCli(['spec-governance-gate', '--feature', slug, '--repo-root', repo, ...extra]);
+  const out = r.stdout.trim();
+  const open = out === 'true' ? true : out === 'false' ? false : undefined;
+  return { status: r.status, open, stdout: r.stdout, stderr: r.stderr };
 }
 
-describe('spec-governance-gate (T015 / convergence-gate.md #1–#6)', () => {
-  it('#1 latest run 0 HIGH + 0 MED → converged, single-run-clean, exit 0', () => {
+describe('spec-governance-gate (T015 / convergence-gate.md) — single-boolean contract (#432)', () => {
+  it('#1 latest run surfaced 0 HIGH + 0 MED → OPEN (true), exit 0', () => {
     const repo = makeRepo('s1', [
       section('20260606T100000000Z-s1', [
         { heading: 'A low nit only', id: 'AUDIT-20260606-01', sev: 'low' },
       ]),
     ]);
     try {
-      const { status, verdict } = gate(repo, 's1');
+      const { status, open, stdout } = gate(repo, 's1');
       expect(status).toBe(0);
-      expect(verdict?.state).toBe('converged');
-      expect(verdict?.rule).toBe('single-run-clean');
-      expect(verdict?.openHigh).toBe(0);
-      expect(verdict?.openMedium).toBe(0);
+      expect(open).toBe(true);
+      expect(stdout.trim()).toBe('true'); // stdout is ONLY the boolean
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
   });
 
-  it('#2 two consecutive 0-HIGH runs (latest has a MED) → converged, n-consecutive-quiet, exit 0', () => {
+  it('#2 two consecutive runs each surfaced 0 HIGH (latest has a MED) → OPEN (true), exit 0', () => {
     const repo = makeRepo('s2', [
       section('20260606T100000000Z-s2', [
         { heading: 'Earlier low only', id: 'AUDIT-20260606-01', sev: 'low' },
@@ -87,94 +75,88 @@ describe('spec-governance-gate (T015 / convergence-gate.md #1–#6)', () => {
       ]),
     ]);
     try {
-      const { status, verdict } = gate(repo, 's2');
+      const { status, open } = gate(repo, 's2');
       expect(status).toBe(0);
-      expect(verdict?.state).toBe('converged');
-      expect(verdict?.rule).toBe('n-consecutive-quiet');
+      expect(open).toBe(true);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
   });
 
-  it('#3 latest run ≥1 open HIGH, iterations < ceiling → blocked, exit 1', () => {
+  it('#3 latest run surfaced ≥1 HIGH → BLOCKED (false), exit 0 (exit is execution status, not policy)', () => {
     const repo = makeRepo('s3', [
       section('20260606T100000000Z-s3', [
         { heading: 'A real contradiction', id: 'AUDIT-20260606-01', sev: 'high' },
       ]),
     ]);
     try {
-      const { status, verdict } = gate(repo, 's3');
-      expect(status).toBe(1);
-      expect(verdict?.state).toBe('blocked');
-      expect(verdict?.openHigh).toBe(1);
+      const { status, open, stdout } = gate(repo, 's3');
+      expect(status).toBe(0); // evaluated successfully — blocked is not an error
+      expect(open).toBe(false);
+      expect(stdout.trim()).toBe('false');
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
   });
 
-  it('#4 iterations >= ceiling without convergence → non-converged, exit 1', () => {
+  it('#4 --ceiling is accepted but no longer changes the decision (loop bounding moved to the loop driver)', () => {
     const repo = makeRepo('s4', [
       section('20260606T100000000Z-s4', [
         { heading: 'Still high', id: 'AUDIT-20260606-01', sev: 'high' },
       ]),
     ]);
     try {
-      const { status, verdict } = gate(repo, 's4', ['--ceiling', '1']);
-      expect(status).toBe(1);
-      expect(verdict?.state).toBe('non-converged');
-      expect(verdict?.ceiling).toBe(1);
+      const { status, open } = gate(repo, 's4', ['--ceiling', '1']);
+      expect(status).toBe(0);
+      expect(open).toBe(false); // same blocked decision regardless of ceiling
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
   });
 
-  it('#5 --override on a blocked state → overridden, reason recorded, exit 0', () => {
+  it('#5 --override forces the gate OPEN (true) on an otherwise-blocked run, exit 0', () => {
     const repo = makeRepo('s5', [
       section('20260606T100000000Z-s5', [
         { heading: 'A real contradiction', id: 'AUDIT-20260606-01', sev: 'high' },
       ]),
     ]);
     try {
-      const { status, verdict } = gate(repo, 's5', [
+      const { status, open, stderr } = gate(repo, 's5', [
         '--override',
         'operator accepts residual finding for reason Y',
       ]);
       expect(status).toBe(0);
-      expect(verdict?.state).toBe('overridden');
-      const override = verdict?.override as { recorded?: boolean; reason?: string } | undefined;
-      expect(override?.recorded).toBe(true);
-      expect(override?.reason).toMatch(/reason Y/);
+      expect(open).toBe(true);
+      expect(stderr).toMatch(/reason Y/); // the mandatory reason is recorded (to stderr)
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
   });
 
-  it('#6 missing audit-log / absent feature → exit 2, no verdict, no governed claim', () => {
+  it('#6 missing audit-log / absent feature → exit 2, NO decision on stdout (fail loud, no governed claim)', () => {
     const repo = mkdtempSync(join(tmpdir(), 'gate-test-empty-'));
     try {
-      const { status } = gate(repo, 'does-not-exist');
+      const { status, open } = gate(repo, 'does-not-exist');
       expect(status).toBe(2);
+      expect(open).toBeUndefined(); // no true/false printed
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
   });
 
-  it('dispositioned (non-open) HIGH findings do not block — only OPEN HIGH counts', () => {
+  it('a single run that surfaced a HIGH (now fixed) is NOT clean → BLOCKED (false) (#432 corrected behavior)', () => {
+    // Was the bug-encoder: a fixed HIGH used to converge single-run-clean because
+    // only OPEN findings were counted. Now the dampener counts RAW-surfaced
+    // severity, so a run that surfaced a HIGH is not a 0-HIGH run.
     const repo = makeRepo('s7', [
       section('20260606T100000000Z-s7', [
-        {
-          heading: 'A fixed high',
-          id: 'AUDIT-20260606-01',
-          sev: 'high',
-          status: 'fixed-abc1234',
-        },
+        { heading: 'A fixed high', id: 'AUDIT-20260606-01', sev: 'high', status: 'fixed-abc1234' },
       ]),
     ]);
     try {
-      const { status, verdict } = gate(repo, 's7');
+      const { status, open } = gate(repo, 's7');
       expect(status).toBe(0);
-      expect(verdict?.state).toBe('converged');
-      expect(verdict?.openHigh).toBe(0);
+      expect(open).toBe(false);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }

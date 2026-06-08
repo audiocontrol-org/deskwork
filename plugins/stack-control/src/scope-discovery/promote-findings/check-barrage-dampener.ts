@@ -28,6 +28,17 @@ export interface BarrageSectionCount {
   readonly highPlusCount: number;
   /** Open findings with severity === medium. */
   readonly mediumCount: number;
+  /**
+   * RAW-surfaced findings with severity ∈ {high, blocking} — counted by
+   * `Severity:` regardless of `Status:` (#432 / AUDIT-20260608-01). This is what
+   * the run's barrage actually flagged; a HIGH later flipped to `fixed-<sha>`
+   * still counts here. The dampener's two-branch convergence window is computed
+   * on RAW counts so that a HIGH-bearing run does NOT count as a "0-HIGH run"
+   * just because its finding was dispositioned between runs.
+   */
+  readonly rawHighPlusCount: number;
+  /** RAW-surfaced findings with severity === medium (ignores `Status:`; #432). */
+  readonly rawMediumCount: number;
   readonly totalFindings: number;
 }
 
@@ -98,6 +109,8 @@ function countHighPlusInSection(
   // 2026-05-31).
   let highPlusOpen = 0;
   let mediumOpen = 0;
+  let highPlusRaw = 0;
+  let mediumRaw = 0;
   let total = 0;
   let i = section.headerIndex + 1;
   while (i < section.endIndex) {
@@ -120,6 +133,10 @@ function countHighPlusInSection(
     }
     if (severity !== undefined) {
       total += 1;
+      // RAW (#432): what this barrage SURFACED, regardless of later disposition.
+      if (severity === 'high' || severity === 'blocking') highPlusRaw += 1;
+      else if (severity === 'medium') mediumRaw += 1;
+      // OPEN: still-undispositioned (used by the cross-run union, not the window).
       const isOpen = status === 'open' || status === undefined;
       if (isOpen) {
         if (severity === 'high' || severity === 'blocking') highPlusOpen += 1;
@@ -132,45 +149,10 @@ function countHighPlusInSection(
     runDirBasename: section.runDirBasename,
     highPlusCount: highPlusOpen,
     mediumCount: mediumOpen,
+    rawHighPlusCount: highPlusRaw,
+    rawMediumCount: mediumRaw,
     totalFindings: total,
   };
-}
-
-/**
- * Count un-dispositioned HIGH/BLOCKING and MEDIUM open findings across ALL
- * barrage lift sections in the supplied audit-log text — the checkpoint-wide
- * UNION (AUDIT-20260607-45). When the gate is run with `--checkpoint`, the
- * caller has already filtered the text to one checkpoint's runs, so this union
- * is naturally scoped to that checkpoint.
- *
- * This reuses the EXACT same literal-`Status:` parser the dampener uses per-run
- * (`findBarrageSections` + `countHighPlusInSection`). It is a literal Status
- * scan — NOT a similarity / cross-run matching heuristic — so a HIGH recorded
- * `open` in an earlier run still counts until its `Status:` line is flipped to a
- * disposition (`fixed-<sha>` / `acknowledged-<reason>` / `acknowledged-slush-pile-<date>`).
- *
- * Rationale: the dampener's consecutive-0-HIGH VERDICT is per-run (a stability
- * heuristic over the most-recent window). But SC-006 promises absolutely that
- * once a contradiction is surfaced as an open HIGH/BLOCKING finding the gate
- * does NOT graduate until that finding is dispositioned. A HIGH surfaced in run
- * N then stochastically not re-flagged in runs N+1/N+2 must still block. The
- * blocking open-set is therefore the cross-run union; only the consecutive-quiet
- * verdict stays per-run.
- */
-export function countOpenFindingsUnion(auditLogText: string): {
-  readonly openHighPlus: number;
-  readonly openMedium: number;
-} {
-  const lines = auditLogText.split(/\r?\n/);
-  const sections = findBarrageSections(lines);
-  let openHighPlus = 0;
-  let openMedium = 0;
-  for (const section of sections) {
-    const counts = countHighPlusInSection(lines, section);
-    openHighPlus += counts.highPlusCount;
-    openMedium += counts.mediumCount;
-  }
-  return { openHighPlus, openMedium };
 }
 
 export function checkBarrageDampener(
@@ -187,21 +169,23 @@ export function checkBarrageDampener(
     .slice(0, threshold)
     .map((s) => countHighPlusInSection(lines, s));
 
-  // Rule 1 — N-consecutive-quiet (original): last `threshold` runs
-  // all have 0 HIGH+ open. Looser threshold; engages after a streak.
+  // Rule 1 — N-consecutive-quiet: the last `threshold` runs each SURFACED 0
+  // HIGH+. RAW counts (#432 / AUDIT-20260608-01): a run that surfaced a HIGH
+  // then had it fixed between runs is NOT a 0-HIGH run — so two genuinely-clean
+  // consecutive barrages are required, not "one clean run after the last fix."
   const consecutiveQuietEngages =
     recentRunCounts.length >= threshold &&
-    recentRunCounts.every((r) => r.highPlusCount === 0);
+    recentRunCounts.every((r) => r.rawHighPlusCount === 0);
 
-  // Rule 2 — single-run-no-medium-or-high (operator directive
-  // 2026-05-31): the MOST RECENT run has 0 HIGH+ AND 0 MEDIUM open
-  // findings. Stiffer — a single clean run engages without waiting
-  // for the N-streak.
+  // Rule 2 — single-run-clean (operator directive 2026-05-31): the MOST RECENT
+  // run SURFACED 0 HIGH+ AND 0 MEDIUM. RAW counts (#432): a run whose MEDIUMs
+  // were slushed before the gate still "had" those MEDIUMs — so branch (a)
+  // graduates only on a genuinely-pristine barrage, never on a slushed one.
   const mostRecent = recentRunCounts[0];
   const singleRunCleanEngages =
     mostRecent !== undefined &&
-    mostRecent.highPlusCount === 0 &&
-    mostRecent.mediumCount === 0;
+    mostRecent.rawHighPlusCount === 0 &&
+    mostRecent.rawMediumCount === 0;
 
   const dampened = consecutiveQuietEngages || singleRunCleanEngages;
 
@@ -226,18 +210,18 @@ export function checkBarrageDampener(
         `hook should skip — the auditor has gone quiet on real bugs.`
       );
     }
-    const notQuiet = recentRunCounts.filter((r) => r.highPlusCount > 0);
+    const notQuiet = recentRunCounts.filter((r) => r.rawHighPlusCount > 0);
     if (notQuiet.length > 0) {
       return (
         `Not dampened: ${notQuiet.length} of the last ${recentRunCounts.length} ` +
         `runs surfaced HIGH+ findings (most recent non-quiet run: ` +
-        `${notQuiet[0]!.runDirBasename} → ${notQuiet[0]!.highPlusCount} HIGH+).`
+        `${notQuiet[0]!.runDirBasename} → ${notQuiet[0]!.rawHighPlusCount} HIGH+).`
       );
     }
-    if (mostRecent !== undefined && mostRecent.mediumCount > 0) {
+    if (mostRecent !== undefined && mostRecent.rawMediumCount > 0) {
       return (
-        `Not dampened: most recent run (${mostRecent.runDirBasename}) has ` +
-        `0 HIGH+ but ${mostRecent.mediumCount} MEDIUM findings — single-run ` +
+        `Not dampened: most recent run (${mostRecent.runDirBasename}) surfaced ` +
+        `0 HIGH+ but ${mostRecent.rawMediumCount} MEDIUM findings — single-run ` +
         `rule needs 0 MEDIUM too. N-quiet rule needs ${threshold} consecutive 0-HIGH+ runs.`
       );
     }

@@ -33,11 +33,10 @@ function makeRepo(slug: string, auditLogBody: string): { repo: string; auditLog:
 }
 
 function gateConverged(repo: string, slug: string): boolean {
-  const r = runCli(['spec-governance-gate', '--feature', slug, '--repo-root', repo, '--json']);
-  const verdict = JSON.parse(r.stdout) as { state?: string };
-  // converged OR overridden both mean "may graduate"; with no --override the
-  // gate's "may graduate without override" is exactly convergence.
-  return verdict.state === 'converged';
+  // The gate prints ONLY `true` (OPEN) / `false` (BLOCKED) on stdout (#432).
+  // With no --override, gate-open is exactly the dampener's engage decision.
+  const r = runCli(['spec-governance-gate', '--feature', slug, '--repo-root', repo]);
+  return r.stdout.trim() === 'true';
 }
 
 describe('spec-governance-gate port fidelity (T016 / assertion #7)', () => {
