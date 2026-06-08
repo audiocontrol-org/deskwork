@@ -5202,3 +5202,49 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 2. **#432 (convergence-gate defect)** is the highest-value follow-up: amend `specs/004-spec-governance/` FR-010 (branch-(a) genuineness / slush ordering) + FR-014 (loop-driver interlock), RED-first; it also unblocks honest convergence for every future governance loop. Carries forward under `multi/migrate-audit-barrage`.
 3. **#431** (barrage audits its own audit-log → self-referential findings; untracked-fold pulls unrelated scaffolds) — fix in `multi/migrate-audit-barrage`.
 4. **`design/spec-authoring`** still un-specced (the prevention half). 004 AUDIT-48 still open. 002 still parked at `/speckit-plan`.
+
+## 2026-06-08: #432 Facet A — convergence gate reshaped (raw-surfaced counting; single boolean; open issues have no bearing)
+### Feature: pluggable-lifecycle-providers
+### Worktree: stack-control (branch `feature/stack-control`)
+
+**Goal:** Fix #432 Facet A — the convergence gate graduating at the first 0-HIGH run instead of the FR-010 terminal (surfaced driving 005's implement-governance loop). Operator picked "Facet A first (correctness); Facet B only if A doesn't fix the problem."
+
+**Accomplished:**
+- **Root-caused + fixed Facet A.** The dampener counted `Status: open` findings, so a HIGH-bearing run *fixed* between rounds read as a 0-HIGH run, and the slush-before-gate ordering zeroed MEDs before the gate counted — collapsing both FR-010 branches to "first 0-open-HIGH run." Fix: the dampener window now counts what each run **raw-surfaced** (`Severity:` regardless of `Status:`). RED-first; the field R2 early-graduation is pinned to BLOCKED.
+- **Reshaped the gate to a single boolean (operator directives).** The gate prints **only** `true`/`false` on stdout; the **exit code encodes execution status, not policy** (0 evaluated, 2 fatal). Removed the cross-run open-finding union ("open issues have no bearing" — reverses AUDIT-20260607-45), the `state`/`rule` verdict shape, and exit-1-means-blocked. `protocol.ts`/`govern.ts` now **obey** the boolean; dead `countOpenFindingsUnion` removed. **251 tests pass; tsc clean.** (`eed196b3`)
+- **Amended the governed 004 spec to match** — FR-007/010/014/015 + SC-006/007/008 + data-model + quickstart + a dated Clarifications entry recording the three directives; baked in the operator's two-legged rationale for why open state has no bearing ((a) fixed between runs; (b) re-flagged stochastically). (`98d8c7b0`, `42277eb1`)
+- **Updated the agent-facing skills** (the gap the operator caught — I'd missed it): both govern skill bodies + README now teach agents to obey the gate boolean (stop once OPEN; don't re-derive from finding counts). (`0689aa9e`)
+- **Bookkeeping:** posted a #432 progress comment (left open pending operator verification); updated AUDIT-20260608-01 → Facet A fixed / Facet B deferred (`83735920`); captured a `mark-fixed`/`mark-acknowledged` verb idea in the design-inbox (`efcc9e6b`).
+- **Forensic answer (operator question):** traced how the gate got complicated — the dw-lifecycle original was a tidy slush/hook-skip heuristic (no gate, no union, open-counting correct *for that job*); the complexity + bug came from repurposing it as a graduation gate during 004 (open→raw mismatch, slush-before-gate ordering, and the union accreted by 004's *own* spec-governance loop).
+
+**Didn't Work / unresolved:**
+- **Facet B (mechanical loop-driver interlock) deferred** by operator — the loop still lives in skill-body prose (now keyed on the gate boolean). Build only if Facet A proves insufficient. AUDIT-20260608-01 stays open for Facet B.
+- **`open → fixed-<sha>` still has no verb** — captured in the design-inbox, not built (post-#432 stakes are record-integrity, not gate-correctness, since the gate no longer reads `Status:`).
+- #432 stays open pending operator verification. 004 AUDIT-48, #430/#431, `design/spec-authoring`, 002-parked — all unchanged from prior session.
+
+**Course Corrections:**
+- [PROCESS][COMPLEXITY] I launched heavyweight `superpowers:brainstorming` + manufactured multi-option decision forks for a fix whose rule was **already written in FR-010**. Operator: *"You are WAY over-complicating this. The rule is: if (last run 0H/0M || last two runs 0H) → stop + open gate."* Dropped the ceremony, implemented the known rule. Saved as memory `feedback_dont_overcomplicate_known_rule`.
+- [PROCESS] Operator: *"The number of open issues has no bearing on the gate."* → removed the cross-run union (reversed a prior audit finding).
+- [PROCESS] Operator: *"the ONLY thing the gate should return is whether the gate is blocked or unblocked … policy in exactly one place, not at the discretion of an agent."* → single-boolean gate.
+- [PROCESS] Operator: *"not the exit code — that's for encoding normal or failed execution. the gate prints true or false to stdout."* → exit code = execution status; decision on stdout.
+- [DOCUMENTATION] Operator: *"I assume you updated the relevant skill(s) so agents know how to use the new gate interface."* — I had **not**; caught the gap and updated the govern skills + README.
+
+**Quantitative** (re-derived from `git log a5702bfb..HEAD`):
+- Commits: **6** (1 fix, 4 docs/spec, 1 capture). Files changed: **22** (+637 / −629).
+- Tests: **251 plugin tests pass**, `tsc` strict clean. Test files: +`gate-raw-surfaced-convergence.test.ts` (new RED-first); `gate-crossrun-open-high.test.ts` → renamed/rewritten `gate-open-issues-no-bearing.test.ts` (union behavior reversed). No N→M delta claimed (net-neutral; not separately reconciled).
+- Governance barrage rounds this session: **0** (a code-fix session, not a govern loop).
+- GitHub: **1** issue comment (#432); 0 filed, 0 closed.
+- Clone snapshot (session-end): **4 groups, identical to session-start** — no new duplication despite the gate/dampener rewrite.
+- Course corrections: **5** (4 [PROCESS], 1 [DOCUMENTATION]); memories written: 1.
+
+**Insights:**
+- **A "non-discretionary" rule delivered as a rich verdict the agent interprets is, in practice, discretionary.** The single boolean ("policy in one place, obeyed not interpreted") is the structural fix for the same agent-discretion pathology that let last session's loop overrun to R9. The thesis applied to an API surface.
+- **The detection process generated the complexity we removed.** The cross-run union — the biggest piece of gate-specific machinery — was added by 004's own cross-model spec-governance barrage (AUDIT-20260607-45) to close a hole that, per the operator's fixed-between-runs + stochastic-re-flag reasoning, wasn't real. A spec-audit-feeds-a-generator instance that shipped into the *implementation*, not just prose.
+- **Porting is a role change, not a like-for-like copy.** The dampener was correct as a slush/hook-skip heuristic; reusing the same open-counting predicate for a *graduation* question was a category error. The lesson: when a primitive is repurposed, re-derive what it must measure for the new job.
+- **#432 reframed the audit-log `Status:` line's role:** the gate no longer reads it, so `Status:` is now purely a durable record + the slush's input — which is why the `mark-fixed` tooling gap is now record-integrity, not correctness.
+
+**Next step (resume here):**
+1. **Watch whether Facet A is sufficient** in a real governance loop. If graduation still misbehaves, build **Facet B** (move the loop into a code driver that consumes the gate boolean and refuses another round). AUDIT-20260608-01 Facet B stays open for this.
+2. **Triage the design-inbox `mark-fixed`/`mark-acknowledged` verb entry** — first check dw-lifecycle for an existing status-set verb to vendor rather than reinvent (it's `multi/migrate-audit-barrage`-homed).
+3. **#432 stays open pending operator verification** in a real loop; close only after.
+4. Unchanged backlog: #430 (005 hardening), #431 (barrage self-reference), 004 AUDIT-48, `design/spec-authoring` un-specced, 002 parked at `/speckit-plan`.
