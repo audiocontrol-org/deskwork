@@ -1,8 +1,10 @@
 // T037 generality (SC-005/FR-013): BOTH proof documents are governed by the
 // SAME engine code path (loadDocument), differing only in their grammar.
-// T038 lossless migration: every pre-existing inbox entry's body appears in the
-// migrated DESIGN-INBOX.md (no content dropped), normalized status words are
-// preserved, and the migrated document is well-formed (FR-013).
+// T038 lossless migration: the governed DESIGN-INBOX.md is the SINGLE source of
+// truth (the ungoverned docs-tree source was retired to a pointer 2026-06-08, so
+// this test no longer reads it). Assert the historically-migrated entries survive
+// as Units (no content dropped), normalized status words are preserved, and the
+// document is well-formed (FR-013).
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -12,7 +14,6 @@ import { loadDocument } from '../../src/document-model/document.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = resolve(here, '..', '..');
-const REPO_ROOT = resolve(PLUGIN_ROOT, '..', '..');
 const BUILTIN = resolve(PLUGIN_ROOT, 'grammars');
 const OPTS = { builtinGrammarDir: BUILTIN };
 
@@ -21,10 +22,25 @@ const INBOX = resolve(PLUGIN_ROOT, 'DESIGN-INBOX.md');
 // (US6), so the row-keyed half of this "two shapes" proof uses a committed
 // row-keyed fixture on the preserved `roadmap-legacy` grammar instead.
 const ROW_ROADMAP = resolve(here, 'fixtures', 'row-roadmap.md');
-const SOURCE_INBOX = resolve(
-  REPO_ROOT,
-  'docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/design-inbox.md',
-);
+
+// The 12 entries migrated into the governed inbox at 005 (FR-013), frozen here
+// as the no-content-dropped baseline. The former ungoverned source file was
+// retired to a pointer (2026-06-08, single-source-of-truth), so the guard reads
+// this frozen set rather than a live source file. Later entries append on top.
+const MIGRATED_TITLES = [
+  'Audit-barrage as a spec-definition governance step',
+  'SEDA (staged queues) as the execution-engine architecture',
+  'Low-friction out-of-sequence capture as a first-class capability',
+  'Execute audit-fixes in an isolated, minimal context (fresh-context fix dispatch)',
+  "Clone detector doesn't cover shell scripts — bash duplication is invisible to scope-discovery",
+  'Install-drift: nothing checks the .specify install copy against its source',
+  'Spec-authoring skill — consolidate "how to write a spec" guidance (DEFINE-phase tooling)',
+  "Archive skill to keep live documents lean (port dw-lifecycle's workplan-archive capability)",
+  'Plugin-local roadmap with a live queue of in-flight and planned features',
+  'Roadmap protocol — keep the roadmap live, crisp, and up-to-date',
+  'Relationship between the idea bucket (design-inbox) and the roadmap',
+  'Roadmap skill to canonize the roadmap protocol',
+];
 
 describe('generality — one engine, two document shapes (T037, SC-005)', () => {
   it('both proof documents load through the SAME engine, differing only in grammar', () => {
@@ -54,15 +70,10 @@ describe('generality — one engine, two document shapes (T037, SC-005)', () => 
 });
 
 describe('lossless migration of the design inbox (T038, FR-013)', () => {
-  const sourceTitles = readFileSync(SOURCE_INBOX, 'utf8')
-    .split('\n')
-    .filter((l) => l.startsWith('### '))
-    .map((l) => l.slice(4).trim());
-
-  it('every source entry title survives as a Unit identifier (no entry dropped)', () => {
+  it('every migrated entry survives as a Unit identifier in the governed inbox (no entry dropped)', () => {
     const ids = new Set(loadDocument(INBOX, OPTS).doc.units.map((u) => u.identifier));
-    expect(sourceTitles.length).toBe(12);
-    for (const title of sourceTitles) {
+    expect(MIGRATED_TITLES.length).toBe(12);
+    for (const title of MIGRATED_TITLES) {
       expect(ids.has(title)).toBe(true);
     }
   });
@@ -74,7 +85,7 @@ describe('lossless migration of the design inbox (T038, FR-013)', () => {
     }
   });
 
-  it('the migrated document is well-formed (loads without fail-loud)', () => {
+  it('the governed inbox is well-formed (loads without fail-loud)', () => {
     expect(() => loadDocument(INBOX, OPTS)).not.toThrow();
   });
 });

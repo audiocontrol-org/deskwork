@@ -8,7 +8,7 @@ Low-friction insight capture is a direct expression of the stack-control thesis 
 
 ## The convention (until `design/insight-capture`)
 
-1. **Capture is instant and append-only.** When an out-of-sequence design idea surfaces mid-thread, append it to `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/design-inbox.md` in one move. Do **not** stop the current thread to scope it.
+1. **Capture is instant and append-only.** When an out-of-sequence design idea surfaces mid-thread, append it to the **single, governed inbox** [`plugins/stack-control/DESIGN-INBOX.md`](../../plugins/stack-control/DESIGN-INBOX.md) (declares `doc-grammar: design-inbox`) in one move. Do **not** stop the current thread to scope it. *(The former ungoverned source at `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/design-inbox.md` was retired to a pointer on 2026-06-08 — there is one source of truth now; never re-fork capture back into the docs tree.)*
 2. **Capture ≠ scope.** The inbox is a pre-triage parking lot. **Triage is a separate, deliberate pass** that promotes an entry to a spec / roadmap feature / GitHub issue, or drops it with a reason. Never let "capture this" expand into "scope this now."
 3. **Hold multiple threads.** Several design threads live at once is fine and expected. Capture keeps them from being lost; it does not force serialization.
 4. **Entry format stays minimal** — title + Surfaced / Context / Idea / Provisional home / Status — so appending stays a one-move act.
@@ -21,7 +21,7 @@ Low-friction insight capture is a direct expression of the stack-control thesis 
 
 ## Sunset checklist (run when `design/insight-capture` ships)
 
-- [ ] Migrate any un-triaged inbox entries into the plugin's native capture surface.
+- [ ] Migrate any un-triaged inbox entries from the governed `plugins/stack-control/DESIGN-INBOX.md` into the plugin's native capture surface.
 - [ ] **Delete this rule.**
-- [ ] Retire `design-inbox.md` (or convert it to a pointer at the plugin surface).
+- [ ] Retire the governed `plugins/stack-control/DESIGN-INBOX.md` into the native surface. *(The ungoverned docs-tree source was already retired to a pointer on 2026-06-08.)*
 - [ ] Update `stack-control-roadmap.md` (the vision § + `design/insight-capture` row) to reflect the native mechanism is live.
