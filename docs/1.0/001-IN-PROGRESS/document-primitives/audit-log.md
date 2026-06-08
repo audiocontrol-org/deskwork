@@ -691,3 +691,16 @@ Surface:    specs/005-document-primitives/spec.md:16, specs/005-document-primiti
 The audit prompt’s hard constraints say to surface prohibited handoff wording if it appears in the audited text. The spec and plan still contain multiple instances: reconciliation execution is assigned to another feature, parser choice and write protocol are pushed outside the spec, and the Out of Scope section labels several items as candidate later work.
 
 Blast radius is medium because this is not a product behavior contradiction, but it is a governance defect for the audit wrapper and for unattended builders: these phrases can turn required decisions into open-ended handoffs. A reasonable correction is to phrase each boundary as a present-tense scope decision without roadmap language, or move mechanism-level details solely into plan/contracts where the feature process expects them.
+
+## 2026-06-08 — audit-barrage lift (20260608T020149329Z-document-primitives-after_plan)
+
+### AUDIT-20260608-17 — Durability promise "never silently loses content" is contradicted by its own version-control recovery precondition
+
+Finding-ID: AUDIT-20260608-17 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     fixed-9c926cf6
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md — FR-010, FR-006 (durability promise), SC-003(ii), Assumptions ("Governed documents are version-controlled")
+
+FR-010 promises that an interrupted/failed `--apply` "NEVER silently loses or corrupts content" and grounds that promise on version control: "any inconsistency an interruption leaves is **recoverable** (revert to the last commit + re-run)." SC-003(ii) restates it: "a version-control revert restores the pre-operation state." The recovery procedure recovers only **committed** content — but the spec never requires a clean/committed working tree before `--apply`, and the Assumptions say only that documents are "version-controlled," not that they are committed before each operation.
+
+Consider the natural sequence an unattended agent or operator will hit: edit the live document, then run `archive --apply` (which itself rewrites the live document) without committing first, and the write is interrupted. The prescribed recovery — "revert to the last commit" — discards both the crash artifacts **and** the operator's uncommitted pre-operation edits. Content that existed before the operation is silently lost *by the spec's own recovery mechanism*, directly violating "NEVER silently loses content." This is a flaw in the **promise**, not a request for a write mechanism: the promise is strictly stronger than what its stated recovery basis can deliver. Blast radius is high because the whole durability story (FR-006/FR-008/FR-010/SC-003) leans on this single recovery clause, and an agent building from it will treat git as the safety net while an operator with uncommitted work silently loses it. A reasonable fix: state the precondition explicitly — scope the durability promise to **committed** state, or require/assert a clean working tree before `--apply` — so "revert restores the pre-operation state" is true as written.
