@@ -5288,3 +5288,59 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 1. **`/speckit-implement` in a SEPARATE session/worktree** (orchestrator/implementer split). Begins at **Foundational** (T003–T017): the generic edge capability + the **heading-keyed roadmap grammar rewrite (T014–T015 is the gating first step — nothing parses until it lands)**. MVP = Foundational + US1 (through T022: `roadmap next`/`blocked`).
 2. **The grammar rewrite is load-bearing** — `archive`/`curate` operate through it; rewrite row-keyed → heading-keyed *before* the primitives work on the new shape (operator reminder this session).
 3. Unchanged backlog: #430 (005 hardening), #431 (barrage self-reference), #432 (gate Facet B, pending verification), 004 AUDIT-48, `design/spec-authoring` un-specced, 002 parked at `/speckit-plan`. TF-22 folds into the `feature.json`-over-branch-name migration.
+
+## 2026-06-08: design/roadmap-protocol (006) — full `/speckit-implement` (Foundational + US1–US6) + 3-round after_implement governance to convergence
+### Feature: pluggable-lifecycle-providers
+### Worktree: stack-control (branch `feature/stack-control`)
+
+**Goal:** Implement 006-roadmap-protocol end-to-end via `/speckit-implement` (resuming from the prior session's front-half), then run the mandatory `after_implement` governance to convergence. Operator-confirmed scope grew from "MVP" → "continue building US2+" → full feature.
+
+**Accomplished:**
+- **Implemented all 57 tasks** (T052 superseded, not removed), RED-first per Constitution I, across 6 feature commits:
+  - **Foundational (T003–T015):** generic edge capability in the 005 engine — `EdgeFieldSpec`/`Edge` types, `edgeFields` grammar parsing, `extractEdges` + `assertReferentialIntegrity` (FR-005) + `assertAcyclicAndOrder` (Kahn's, FR-006), wired into `loadDocument` so every consumer fails loud on dangling/cyclic edges. Rewrote `roadmap.peg` heading-keyed (`<phase>:<kind>/<slug>`); preserved the row-keyed grammar as `roadmap-legacy.peg` and repointed ~14 row-keyed engine tests + the live ROADMAP.md to it.
+  - **US1 (T016–T022, MVP):** `roadmap-model` (typed WorkItem graph), `graph` (ready/blocked), `roadmap next`/`blocked` verb.
+  - **US2 (T023–T027):** `mutations.add` one-move capture + `roadmap add` verb (extracted `loadDocumentFromSource` for candidate re-validation).
+  - **US4 (T028–T034):** `blocks`/`order` + `views` (ready-list/blocked/mermaid) + the query verbs.
+  - **US3 (T035–T043):** advance/decompose/reclassify/defer mutations (re-validate whole graph, zero-write on failure) + verb subactions.
+  - **US5 (T044–T048):** report-only `reconcile`.
+  - **US6 (T049–T053) + Polish (T054–T057):** migrated the live ROADMAP.md to a 14-item heading-keyed DAG (the dogfood); retired the prose roadmap's feature table to a pointer (vision prose preserved); SKILL.md; curate/archive regression; file-size + strict-typing audit.
+- **`after_implement` governance: 3 barrage rounds to convergence** (cross-model: claude + codex lanes; diffed `6b823d56..HEAD`):
+  - Round 1: 8 findings (1 HIGH — archival could brick the roadmap). 6 fixed (`aeae0281`), 2 acknowledged (premises verified).
+  - Round 2: 5→4 findings, 0 HIGH; **all round-1 fixes held**. 4 fixed (`fc641d46`).
+  - Round 3: 0 HIGH → 2 consecutive quiet runs → **dampener engaged, gate OPEN**. Residual MED/LOW slushed.
+  - **Operator-requested burn-down** of the two material slushed findings (`a2a1e889`): decompose status-carry (AUDIT-14 pt1) + reconcile cwd-coupling (AUDIT-15).
+- **Each fix ran in a fresh-context sub-agent, TDD-first, one at a time** (12 fix dispatches total), per the governance protocol's no-author-in-fatigued-context rule.
+- **Dogfooded `roadmap add`** to capture all 4 filed issues as `fix`/`gap` roadmap items (#433/#434/#435/#436), each `part-of` its parent feature with a `--ref`.
+
+**Didn't Work / unresolved:**
+- **Round-1 AUDIT-03 fix was incomplete** — the decompose field-carry list omitted `status`; the round-3 barrage caught it (AUDIT-14 pt1), fixed in burn-down. Cross-model barrage catching my own incomplete fix is the mechanism working.
+- **AUDIT-14 parts 2/3/4 remain slushed** (`acknowledged-slush-pile-2026-06-08`): codex-01 (rewriteEdgeLine edits fenced examples — cosmetic), claude-03 (field-shaped `--scope` becomes an edge — exotic + fail-loud), codex-02 (multi-target part-of projects only first — completeness). All cosmetic/exotic per the blast-radius analysis; operator scoped burn-down to "the two that matter."
+- **`curate --apply` can't reorder the live ROADMAP.md** — the AUDIT-07 fix correctly refuses (archiving the shipped, depended-upon `front-door` would dangle), so the all-or-nothing curate chokes on the reorder too. The dogfood-added items append out of phase-order; cosmetic only (`roadmap order` derives the correct topological order). This is exactly `design:gap/roadmap-edge-aware-archival` (skip-pinned, reorder/archive the rest).
+- **#433 is a pre-existing 005 failure** (governed DESIGN-INBOX.md missing the source's 13th entry), red at HEAD before this session — confirmed by stashing. Not 006 scope; carried as the suite's 1 failing test.
+
+**Course Corrections:**
+- [PROCESS] I asked the operator how to handle the governance fix-loop. Operator: *"why are you asking me about a well-defined protocol? Is the audit protocol not well defined in the skill(s)?"* — corrected: execute the protocol (fix open findings → re-barrage until clean/dispositioned) without asking.
+- [PROCESS] First governance run used `GOVERN_FEATURE_SLUG=stack-control`; the lift failed (`feature 'stack-control' not found under docs/*/001-IN-PROGRESS/`). The slug must match the docs feature dir (`pluggable-lifecycle-providers`), NOT the plugin/branch name. Re-ran the lift standalone against the existing run-dir; logged as TF-23.
+- [PROCESS] I twice surfaced scope decisions (stop-at-MVP; fire-governance-now) before the operator said "continue building US2+." Erred toward asking; the operator wanted forward progress.
+- [PROCESS] I introduced two `as`-casts in the T005 resolver code; the T056 strict-typing audit caught them and I replaced them with a type-narrowing `.find` before commit. Strict-typing discipline held.
+
+**Quantitative** (re-derived from `git log 6b823d56..HEAD` + `npx vitest run`):
+- Commits: **15** (6 feature + 9 governance fix/lift/disposition/dogfood). Files changed: **69** (+4036 / −144).
+- Tests: **359 at session end (358 pass / 1 pre-existing fail — #433)**; ~89 new test blocks across the edge engine, roadmap layer, verb, and the governance fix-loop. The lone failure (#433) predates this session (confirmed by stash).
+- Governance: 3 barrage rounds; **14 lifted findings** (1 HIGH). **12 fixed**, **2 acknowledged** (AUDIT-08 #434 graduation-record; AUDIT-09 #431 untracked-fold), **3 slushed** (AUDIT-14 pts 2/3/4 — cosmetic/exotic). **Open findings at session end: 0** — but the slush-pile carries AUDIT-14 pts 2/3/4 (3 MEDIUM/LOW cosmetic/exotic sub-items; real but low-impact) per the AUDIT-03 honesty convention.
+- Fix sub-agents: **12** (6 round-1, 4 round-2, 2 burn-down), each fresh-context + RED-first.
+- GitHub issues filed: **4** (#433, #434, #435, #436 — all OPEN; #436 has a fix-evidence comment, safety core resolved). All 4 captured as roadmap items via `roadmap add`.
+- `tsc --noEmit` strict clean; no `any`/`as`/`@ts-ignore`; all new modules ≤ 319 lines.
+- Clone snapshot (session-end): **4 groups, identical to session-start — zero new duplication** despite ~4k lines added.
+
+**Insights:**
+- **The migration dogfood lived the thesis.** Migrating the live roadmap immediately surfaced the feature's own next gap (`design:gap/roadmap-edge-aware-archival`): the moment the roadmap had inbound edges to shipped items, curate/archive's edge-unawareness became a real defect — and `roadmap blocked` on the live doc correctly showed `roadmap-protocol` blocked by `document-primitives (in-flight)`. The dependency-brain works.
+- **Cross-model barrage earns its keep on genetic diversity.** codex independently re-found the HIGH I'd already captured (#436 → AUDIT-07), and the round-3 barrage caught the `status`-carry incompleteness in my own round-1 fix. Two model families catching different failure modes is the value.
+- **The convergence dampener + slush is the right termination, and the AUDIT-03 honesty convention is load-bearing.** "Gate OPEN" alone would have been misleading — the honest report names the 3 slushed sub-items as real-but-cosmetic, so a future reader can't mistake convergence for "all clean."
+- **`roadmap add` is the natural home for discovered work.** Capturing the 4 filed issues as `fix`/`gap` items `part-of` their parent feature (rather than only as GitHub issues) is precisely US2's emergent-capture contract — and cross-links the roadmap to the tracker via `--ref`.
+
+**Next step (resume here):**
+1. **006 implementation is COMPLETE + GOVERNED** (gate OPEN). No open findings; slush-pile carries AUDIT-14 pts 2/3/4 (cosmetic/exotic — burn-down available if desired).
+2. **Open roadmap items / issues** now tracked in `ROADMAP.md`: `design:gap/roadmap-edge-aware-archival` (#436, safety-fixed, UX enhancement remains), `design:fix/inbox-migration-drift` (#433), `design:gap/governance-graduation-record` (#434), `design:gap/row-keyed-test-grammar` (#435), `design:gap/roadmap-order-gating` (FR-018 deferred gating).
+3. **At merge:** reconcile #433 (005 inbox drift — the 1 failing test); reconcile the branch-local session-start/end skills with `main`'s studio-product versions.
+4. **TF-23** (govern slug must match the docs feature dir, not plugin/branch) + TF-22 (branch-name gate) fold into the `feature.json`-over-branch-name migration.
