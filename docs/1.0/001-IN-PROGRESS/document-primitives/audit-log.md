@@ -601,3 +601,93 @@ Surface:    specs/005-document-primitives/spec.md:130, specs/005-document-primit
 FR-007 says `unarchive` fails loud on locate failure: absent/empty ledger or no ledger entry for `--id`. But FR-010’s canonical “validation failure” zero-write list names ungovernable documents, ambiguous grammar declarations, parse failures, identifier violations, and unarchive collisions, while omitting unarchive locate failures.
 
 Blast radius is medium because the intended behavior is strongly implied by FR-007, so a careful implementer will probably fail before writing. The canonical fail-loud section is still the place an unattended builder will use for cross-file zero-write guarantees, and this omission leaves missing-id `unarchive --apply` outside the absolute zero-write contract. Fix by adding unarchive locate failure to FR-010’s zero-write failure list.
+
+## 2026-06-08 — audit-barrage lift (20260608T005825513Z-document-primitives-after_plan)
+
+### AUDIT-20260608-09 — Empty/zero-Unit edge case promises a fail-loud path the two-region model makes unreachable
+
+Finding-ID: AUDIT-20260608-09
+Status:     fixed-a201a089
+Severity:   high
+Surface:    spec.md Edge Case "Empty / zero-Unit document"; FR-002 (two-region model); FR-003
+
+The empty-document edge case asserts a fail-loud path for an unexpectedly-empty parse: *"Vacuous well-formedness requires a successful parse … this is distinct from a parse failure (FR-003) — e.g. intended entries that the grammar did not recognize as Units and that therefore did not fall cleanly into the preamble — which still fails loud."* The two-region model in FR-002 makes that path unreachable. FR-002 defines the **preamble** as *"everything before the first Unit marker,"* preserved verbatim and never fails loud; a block is only a parse failure (FR-003) when it is *"after chrome excision **and outside the document preamble**."* "Outside the preamble" means "after the first Unit marker." In a zero-Unit document there **is no first Unit marker**, so every block is, by definition, before it — i.e. entirely preamble. There is therefore no block that "did not fall cleanly into the preamble," and no fail-loud path can fire. A zero-Unit document **always** parses vacuously well-formed.
+
+The blast radius is high because an unattended builder reading this edge case will try to implement a fail-loud branch distinguishing "intended-but-unrecognized entries" from "legitimate preamble prose" in the all-preamble case — but at the block level those two are identical (both are blocks before any Unit marker), and FR-003 forbids the only tool that could separate them: *"Well-formedness is a parse success/failure, **not a heuristic**."* The builder is left to either ship an impossible/contradictory check or invent a forbidden heuristic. The AUDIT-38 resolution already supplied the correct, achievable signal — the engine **reports the parsed Unit count** so a zero-Unit result is never silent — but the edge-case prose still also claims a fail-loud path beside it. Fix: drop the *"which still fails loud"* clause for the all-preamble (zero-marker) case and state plainly that a zero-Unit document is always vacuously well-formed, with the non-silent parsed-count report as the **only** safety signal; reserve fail-loud for documents that *do* have ≥1 Unit marker followed by a non-conforming block (the path FR-002 actually supports).
+
+### AUDIT-20260608-10 — `unarchive` "declared-order position" reinsertion is ill-defined when the live document is not already well-ordered — a state FR-013 explicitly permits
+
+Finding-ID: AUDIT-20260608-10
+Status:     fixed-a201a089
+Severity:   high
+Surface:    spec.md FR-007; SC-007; FR-013 ("MAY be unordered"); FR-008
+
+FR-007 says `unarchive` *"returns it to the live document — reinserted at its **declared-order position** (per the grammar's order key, FR-004)"* and only touches the named Unit (it "locates," "lifts," "returns," "removes its ledger entry" — it does not reorder the rest). SC-007 promises the round-trip *"restores a content-equivalent, **well-ordered** state."* Both promises silently assume the surrounding live document is already in declared order. FR-013 and the Assumptions block explicitly break that assumption: a migrated document *"need not be fully-curated … and MAY be unordered."* Because `archive` is its own verb (it does not reorder), the reachable sequence **migrate (unordered, well-formed) → `archive --apply` → `unarchive --apply`** lands a Unit-reinsertion into an *unordered* sequence.
+
+"Declared-order position" has no single meaning in an unordered sequence: an agent could insert where the Unit's order-key *would* sit in a hypothetically-sorted document (producing a placement unrelated to the actual neighbors) or scan for the first actual neighbor that out-ranks it (a different, also-defensible result). The spec never disambiguates, so two builders produce two different behaviors. Worse, SC-007's *"well-ordered"* promise is **unachievable** by a single-Unit insertion when the rest is unordered — the only way to honor it is to reorder the whole document, which contradicts FR-007's single-Unit scope (and would surprise an operator who deliberately left the doc uncurated). Blast radius is high: this is a load-bearing P1 reversibility contract (US1) with two roughly-equal readings and an SC that one of them cannot satisfy. Fix: state the precondition explicitly — either (a) `unarchive` reinserts relative to the document's *current* order (defining "declared-order position" against actual neighbors, and narrowing SC-007's "well-ordered" to "well-ordered iff the live document was well-ordered before the round-trip"), or (b) `unarchive` reorders the full Unit sequence on reinsertion (and SC-007/FR-007 are reworded to say so). Pick one; today the spec implies both.
+
+### AUDIT-20260608-11 — Migration is framed as both a manual one-time step and an automated "migration run," with no module, no scope decision, and no verifying SC
+
+Finding-ID: AUDIT-20260608-11
+Status:     fixed-a201a089
+Severity:   medium
+Surface:    spec.md FR-013; Assumptions ("migration is lossless…"); plan.md Project Structure; Out of Scope
+
+FR-013 simultaneously frames migration two incompatible ways. It is *"a **one-time establishment step, not ongoing bookkeeping**"* (reads as manual authoring by the feature implementer), yet it *"**reports each rename at migration time** (in the migration run's output/report)"* and *"MAY normalize a nonconforming identifier … reporting each rename"* (reads as an automated tool with an output channel). plan.md's Project Structure lists no migration module (only `archive`/`unarchive`/`curate` engines + verbs), Out of Scope never addresses migration tooling, FR-011's anti-coupling scan scope omits it, and no Success Criterion verifies the rename-reporting promise.
+
+The blast radius is medium: an unattended builder cannot tell whether to build a `migrate` capability (scope creep into an unspecified, untested module) or treat migration as hand-editing (in which case "the migration run's output/report" has no defined producer and the FR-013 promise *"reports each rename at migration time"* is silently dropped). Either way a stated promise goes unmet or unscoped work appears. Fix: decide and state whether migration is (a) manual authoring — then reword FR-013/Assumptions to drop "migration run/output" language and describe the rename record as something the implementer writes by hand into the establishment commit/PR, or (b) a shipped/one-shot tool — then add it to plan.md's structure, FR-011's scan scope, and add an SC that the rename report is produced.
+
+### AUDIT-20260608-12 — US2 Acceptance Scenario 4 requires a reconciliation-hook-declaring grammar that neither proof document provides and the spec never commits to as a fixture
+
+Finding-ID: AUDIT-20260608-12
+Status:     fixed-a201a089
+Severity:   medium
+Surface:    spec.md US2 Independent Test + Acceptance Scenario 4; FR-008; FR-013
+
+FR-008's only *new* user-visible behavior beyond archive/curate is the **reconciliation seam**: `curate` must *recognize/validate* a declared hook and report it as *"declared, not executed."* US2's Independent Test (*"declares a reconciliation source"*) and Acceptance Scenario 4 (*"a document whose grammar declares a reconciliation hook"*) are the only places that behavior is exercised. But FR-013 establishes exactly two proof documents — a title-keyed inbox and a `<phase>/<slug>` roadmap — and neither is specified to declare a reconciliation hook, and the spec commits to no other fixture that does. The seam-recognition promise thus has no committed artifact to verify it against.
+
+Blast radius is medium: a careful builder will likely fabricate a hook-declaring fixture to satisfy AS4, so the readings barely diverge — but the spec leaves the one genuinely-novel FR-008 capability resting on an artifact it never decides to create, and a builder optimizing to the two named proof documents (SC-005's "two distinct guarantees") could ship the seam unverified. Fix: either have one proof grammar (the roadmap is the natural candidate — Out of Scope already names the future roadmap-discipline protocol that "plugs into curate's FR-008 reconciliation hook") declare the seam, or state explicitly that a third fixture grammar exists solely to exercise the hook-recognition path, and reference it from US2/FR-008.
+
+### AUDIT-20260608-13 — FR-003 defines well-formedness as parse-only while FR-005 makes archive uniqueness part of well-formedness
+
+Finding-ID: AUDIT-20260608-13
+Status:     fixed-a201a089
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md:118-121, specs/005-document-primitives/spec.md:142
+
+FR-003 says a document is well-formed “if and only if” its block stream parses against its declared grammar. FR-005 then says identifier invariants are enforced “as part of FR-003 well-formedness,” including uniqueness across the live document and its archive ledger. Those cannot both be the canonical definition: a live document can parse perfectly while still duplicating an archived ledger identifier.
+
+Blast radius is high because unattended builders may implement “well-formed” as parse-only, especially because FR-013 sets the migration bar as well-formed and separately says it must parse with valid identifiers. That can leave archive-union uniqueness outside gates that rely on well-formedness. A reasonable correction is to split “parses” from “valid governable document,” or revise FR-003 so well-formed explicitly includes parse success plus FR-005 identifier validation.
+
+### AUDIT-20260608-14 — Unreadable archive ledger is not distinguished from a corrupt archive body
+
+Finding-ID: AUDIT-20260608-14
+Status:     fixed-a201a089
+Severity:   high
+Surface:    specs/005-document-primitives/spec.md:99, specs/005-document-primitives/spec.md:121, specs/005-document-primitives/spec.md:129-130
+
+The spec says a corrupt or unparsable archive file does not block live-document validation because archived identifiers come from the ledger only, and corruption is surfaced by the coherence check. But the ledger itself lives inside that same archive file. If corruption makes the ledger absent or unreadable, the spec does not say whether live validation fails loud, treats the archive union as empty, or emits only a NOTICE.
+
+Blast radius is high because the wrong default is dangerous: treating an unreadable ledger as empty allows live identifiers to reuse archived identifiers, undermining FR-005 and making later unarchive behavior ambiguous. A reasonable correction is to state the user-facing promise for ledger-read failure specifically, separate from corruption in archived Unit contents.
+
+### AUDIT-20260608-15 — Row-keyed coherence is undermined by repeated “heading scan” wording
+
+Finding-ID: AUDIT-20260608-15
+Status:     fixed-a201a089
+Severity:   medium
+Surface:    specs/005-document-primitives/spec.md:121, specs/005-document-primitives/spec.md:128-129, specs/005-document-primitives/spec.md:150
+
+FR-006 correctly says row-keyed archives store Units as rows in a single markdown table, but FR-005 and the Provenance Ledger entity still describe the coherence cross-reference as a heading scan. That wording is no longer grammar-neutral: one of the two proof documents is row-keyed, so its archive identifiers are not reserved-level headings.
+
+Blast radius is medium because nearby text at line 129 also says “identifier markers,” so a careful reader can infer the intended generalized behavior. An unattended builder could still implement coherence only for heading-keyed archives and miss ledger-vs-row drift for the roadmap proof document. A reasonable correction is to replace “heading scan” with “archive identifier-marker scan” everywhere and name both marker forms.
+
+### AUDIT-20260608-16 — Spec and plan contain prohibited handoff wording
+
+Finding-ID: AUDIT-20260608-16
+Status:     fixed-a201a089
+Severity:   medium
+Surface:    specs/005-document-primitives/spec.md:16, specs/005-document-primitives/spec.md:131, specs/005-document-primitives/spec.md:169, specs/005-document-primitives/spec.md:173, specs/005-document-primitives/spec.md:178-185; specs/005-document-primitives/plan.md:19
+
+The audit prompt’s hard constraints say to surface prohibited handoff wording if it appears in the audited text. The spec and plan still contain multiple instances: reconciliation execution is assigned to another feature, parser choice and write protocol are pushed outside the spec, and the Out of Scope section labels several items as candidate later work.
+
+Blast radius is medium because this is not a product behavior contradiction, but it is a governance defect for the audit wrapper and for unattended builders: these phrases can turn required decisions into open-ended handoffs. A reasonable correction is to phrase each boundary as a present-tense scope decision without roadmap language, or move mechanism-level details solely into plan/contracts where the feature process expects them.
