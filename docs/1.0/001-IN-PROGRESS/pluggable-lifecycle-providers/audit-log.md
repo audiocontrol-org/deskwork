@@ -1007,7 +1007,7 @@ NOTE: the FR-015 MED auto-slush is itself spec'd/intended; it remains (keeps the
 ### AUDIT-20260608-02 — `roadmap next` / readyList omits status, so in-flight items are indistinguishable from pickable work
 
 Finding-ID: AUDIT-20260608-02
-Status:     open
+Status:     fixed-aeae0281 (readyList now renders `  - <id> (<status>)` so in-flight items read as distinct from pickable planned work; RED-first test in views.test + verb-next-blocked.test. Fresh-context sub-agent.)
 Severity:   medium
 Surface:    plugins/stack-control/src/roadmap/graph.ts:54-60, plugins/stack-control/src/roadmap/views.ts:9-15
 
@@ -1018,7 +1018,7 @@ The feature's stated purpose (SKILL.md: "a fresh agent can determine what to wor
 ### AUDIT-20260608-03 — `decompose` silently drops the original item's scope prose, `deferred-until`, `spec`, and `ref`
 
 Finding-ID: AUDIT-20260608-03
-Status:     open
+Status:     fixed-aeae0281 (decompose now carries deferred-until/spec/ref/scope onto every part via the existing WorkItem projection — a decomposed deferred item stays deferred, never silently un-deferred; RED-first test asserts parts retain deferral + stay out of the ready frontier. Fresh-context sub-agent.)
 Severity:   medium
 Surface:    plugins/stack-control/src/roadmap/mutations.ts:200-247
 
@@ -1029,7 +1029,7 @@ Two of these losses are materially harmful. Dropping `deferred-until` means deco
 ### AUDIT-20260608-04 — CLI value-flag scanner accepts a `--`-prefixed token as a flag value, unlike `--doc`
 
 Finding-ID: AUDIT-20260608-04
-Status:     open
+Status:     fixed-aeae0281 (generic value branch now guards a `--`-prefixed value the same way `--doc` does; dead `BOOLEAN_FLAGS.has` arm + now-unused set removed. RED test: `defer <id> --until --apply` exits 2 zero-write (the falsifying case — the literal `--to` example passed for the wrong reason, via vocab rejection). Fresh-context sub-agent.)
 Severity:   low
 Surface:    plugins/stack-control/src/subcommands/roadmap.ts:64-78
 
@@ -1038,7 +1038,7 @@ Surface:    plugins/stack-control/src/subcommands/roadmap.ts:64-78
 ### AUDIT-20260608-05 — Kahn's topological sort is duplicated between `edges.ts` and `graph.ts`
 
 Finding-ID: AUDIT-20260608-05
-Status:     open
+Status:     fixed-aeae0281 (collapsed the duplicated Kahn's into one parameterized `topoOrder(ids, depsOf, compare, onCycle)` in edges.ts; `assertAcyclicAndOrder` (identifier tiebreak) and `graph.order()` (phase tiebreak) both delegate — identical orders + cycle errors, guarded by edges-acyclic + graph-blocks-order tests unchanged. Fresh-context sub-agent.)
 Severity:   low
 Surface:    plugins/stack-control/src/document-model/edges.ts:73-118, plugins/stack-control/src/roadmap/graph.ts:108-138
 
@@ -1047,7 +1047,7 @@ Surface:    plugins/stack-control/src/document-model/edges.ts:73-118, plugins/st
 ### AUDIT-20260608-06 — `reassemble`-based mutations have no test asserting formatting stability across repeated mutations
 
 Finding-ID: AUDIT-20260608-06
-Status:     open
+Status:     fixed-aeae0281 (added tests/roadmap/mutations-formatting.test.ts pinning reassemble round-trip stability across repeated reclassify/decompose — no 3+-newline runs, exactly one blank line per inter-unit gap, no growth; makes explicit that blank lines live OUTSIDE Unit spans. Test passed immediately — reassemble was already stable; gap-only finding, no production change. Fresh-context sub-agent.)
 Severity:   low
 Surface:    plugins/stack-control/src/roadmap/mutations.ts:79-90, plugins/stack-control/tests/roadmap/mutations-decompose.test.ts, plugins/stack-control/tests/roadmap/mutations-reclassify.test.ts
 
@@ -1056,7 +1056,7 @@ Surface:    plugins/stack-control/src/roadmap/mutations.ts:79-90, plugins/stack-
 ### AUDIT-20260608-07 — Terminal archival can invalidate the roadmap graph
 
 Finding-ID: AUDIT-20260608-07
-Status:     open
+Status:     fixed-aeae0281 (HIGH; cross-model match to the captured design:gap/roadmap-edge-aware-archival + #436. Engine-level fix: archive re-validates the post-cut LIVE document via loadDocumentFromSource BEFORE any write and fails loud ZERO-WRITE when archiving would dangle a depends-on/part-of target; curate's preflightArchive runs the same check before its reorder write, so the whole compose path is zero-write. Generic — edge-free grammars (design-inbox, roadmap-legacy) unchanged. RED-first test covers the canonical case the prior test missed: a shipped item that is a live depends-on target → runArchive + runCurate both throw zero-write. Resolves the safety core of #436; the "skip-pinned-and-archive-the-rest" UX enhancement remains the gap item's future scope. Fresh-context sub-agent.)
 Severity:   high
 Surface:    plugins/stack-control/src/document-model/archive-engine.ts:35-38,176-183; plugins/stack-control/ROADMAP.md:25-33,81-88,101-106; plugins/stack-control/tests/roadmap/curate-archive-regression.test.ts:1-3,47-57
 
@@ -1067,7 +1067,7 @@ The migrated canonical roadmap already has this shape: `multi:feature/front-door
 ### AUDIT-20260608-08 — Reconcile proposes shipped without the required governance-graduation signal
 
 Finding-ID: AUDIT-20260608-08
-Status:     open
+Status:     acknowledged-20260608 (premise verified + tracked #434. The governance-graduation record the spec names is NOT an on-disk artifact today — the spec-governance gate prints true/false and persists nothing — so requiring it in `tasksComplete` would mean inventing machinery for a capability that does not exist (refused per the verify-premise rule). reconcile is REPORT-ONLY and the proposal text states its basis verbatim ("tasks complete at <path>"), so a reader sees the signal is tasks-completion, not graduation. The real fix (persist a per-spec graduation record, then strengthen reconcile) is tracked in #434 and spans 004+006; the reconcile.ts header comment already documents the limitation + cites #434.)
 Severity:   medium
 Surface:    plugins/stack-control/src/roadmap/reconcile.ts:32-40,90-96; specs/006-roadmap-protocol/spec.md:158-160; specs/006-roadmap-protocol/tasks.md:97-101
 
@@ -1078,7 +1078,7 @@ This is advisory/report-only, so it will not mutate silently, but a downstream o
 ### AUDIT-20260608-09 — Placeholder Spec Kit plan appears in the audited patch
 
 Finding-ID: AUDIT-20260608-09
-Status:     open
+Status:     acknowledged-20260608 (premise partly false + out of 006 scope. `specs/002-parallel-execution-engine/plan.md` is NOT part of the 006 implementation — it is a PRE-EXISTING UNTRACKED file (present in `git status` at session start, never staged in any 006 commit). It surfaced in the barrage payload only because the audit-barrage folds untracked working-tree files into the diff — the known issue #431 ("audit-barrage payload … untracked-fold pulls unrelated parked-feature scaffolds"). So it is not "part of the repo state" as the finding assumes. The stray template belongs to the parked 002 feature; not deleting a file I did not create — flagged here + relates to #431. No 006 change warranted.)
 Severity:   medium
 Surface:    specs/002-parallel-execution-engine/plan.md:1-113
 
