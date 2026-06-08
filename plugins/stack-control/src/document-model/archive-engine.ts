@@ -83,6 +83,18 @@ function rowTablePreamble(doc: GovernableDocument, stream: BlockStream): { heade
   return { header, separator };
 }
 
+/** Append one ledger entry per moved Unit to the existing ledger (FR-006). */
+function ledgerWithMoves(
+  ledger: readonly LedgerEntry[],
+  moved: readonly Unit[],
+  now: string,
+): LedgerEntry[] {
+  return [
+    ...ledger,
+    ...moved.map((u) => ({ identifier: u.identifier, archivedAt: now, fromStatus: u.status })),
+  ];
+}
+
 function buildArchive(
   doc: GovernableDocument,
   stream: BlockStream,
@@ -139,11 +151,7 @@ export function preflightArchive(docPath: string, opts: LoadOptions & { readonly
   const archivable = selectArchivable(doc);
   if (archivable.length === 0) return;
 
-  const now = opts.now ?? new Date().toISOString();
-  const newLedger: LedgerEntry[] = [
-    ...ledger,
-    ...archivable.map((u) => ({ identifier: u.identifier, archivedAt: now, fromStatus: u.status })),
-  ];
+  const newLedger = ledgerWithMoves(ledger, archivable, opts.now ?? new Date().toISOString());
 
   // buildArchive throws every archive-side fail-loud DocumentModelError; running
   // it here (and discarding the result) is the validation preflight.
@@ -163,11 +171,7 @@ export function runArchive(docPath: string, opts: ArchiveOptions): ArchiveResult
     return { applied: false, moves: opts.apply ? [] : moves, archivePath: doc.archivePath };
   }
 
-  const now = opts.now ?? new Date().toISOString();
-  const newLedger: LedgerEntry[] = [
-    ...ledger,
-    ...archivable.map((u) => ({ identifier: u.identifier, archivedAt: now, fromStatus: u.status })),
-  ];
+  const newLedger = ledgerWithMoves(ledger, archivable, opts.now ?? new Date().toISOString());
 
   const newArchive = buildArchive(doc, stream, archivable, newLedger);
   const newLive = liveWithout(doc, archivable);
