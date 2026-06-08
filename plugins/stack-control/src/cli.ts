@@ -19,6 +19,7 @@ import { auditBarrageLiftCli } from './subcommands/audit-barrage-lift.js';
 import { runGovern } from './subcommands/govern.js';
 import { runArchiveCli } from './subcommands/archive.js';
 import { runUnarchiveCli } from './subcommands/unarchive.js';
+import { runCurateCli } from './subcommands/curate.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -39,6 +40,7 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // Document-handling primitives (design/document-primitives).
   archive: runArchiveCli,
   unarchive: runUnarchiveCli,
+  curate: runCurateCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

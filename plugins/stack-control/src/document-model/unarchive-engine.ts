@@ -11,6 +11,7 @@
 // fail loud with zero writes.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { isSeparatorRow, tableCells } from './archive-file.js';
 import { buildBlockStream } from './block-stream.js';
 import { loadDocument, type LoadOptions } from './document.js';
 import { parseUnits } from './grammar-parse.js';
@@ -36,15 +37,6 @@ interface Located {
   /** Inclusive 0-based archive line range to remove on apply. */
   readonly removeStart: number;
   readonly removeEnd: number;
-}
-
-function isSeparatorRow(cells: readonly string[]): boolean {
-  return cells.length > 0 && cells.every((c) => /^:?-+:?$/.test(c));
-}
-
-function tableCells(line: string): string[] {
-  const parts = line.split('|');
-  return parts.slice(1, parts.length - 1).map((c) => c.trim());
 }
 
 /** Locate the archived Unit's content by its structural marker (FR-006/FR-007). */

@@ -83,16 +83,16 @@ description: "Task list for design/document-primitives implementation"
 
 ### Tests for User Story 2 (RED first) ⚠️
 
-- [ ] T025 [P] [US2] RED: curate well-formed test in `.../curate-engine.test.ts` — parse failure / identifier violation fails loud with offending span; no partial fix (FR-003). Must FAIL.
-- [ ] T026 [P] [US2] RED: curate well-ordered test — reports disorder; `--apply` reorders to declared order key WITHOUT changing any identity (FR-004/FR-005, SC-002). Must FAIL.
-- [ ] T027 [P] [US2] RED: curate properly-archived test — flags terminal-status Units still live; `--apply` composes `archive` (FR-006/FR-008). Must FAIL.
-- [ ] T028 [P] [US2] RED: curate up-to-date seam test — a declared reconciliation hook is reported "declared, not yet executed" and NEVER run; absent hook is silent; other checks still run (FR-008). Must FAIL.
+- [X] T025 [P] [US2] RED: curate well-formed test in `.../curate-engine.test.ts` — parse failure / identifier violation fails loud with offending span; no partial fix (FR-003). Must FAIL.
+- [X] T026 [P] [US2] RED: curate well-ordered test — reports disorder; `--apply` reorders to declared order key WITHOUT changing any identity (FR-004/FR-005, SC-002). Must FAIL.
+- [X] T027 [P] [US2] RED: curate properly-archived test — flags terminal-status Units still live; `--apply` composes `archive` (FR-006/FR-008). Must FAIL.
+- [X] T028 [P] [US2] RED: curate up-to-date seam test — a declared reconciliation hook is reported "declared, not yet executed" and NEVER run; absent hook is silent; other checks still run (FR-008). Must FAIL.
 
 ### Implementation for User Story 2
 
-- [ ] T029 [US2] Implement `plugins/stack-control/src/document-model/curate-engine.ts` (composes `archive-engine`; FR-008). Makes T025–T028 green.
-- [ ] T030 [US2] Implement verb `plugins/stack-control/src/subcommands/curate.ts` per `contracts/curate.md` + register in the dispatcher.
-- [ ] T031 [P] [US2] Author skill `plugins/stack-control/skills/curate/SKILL.md` (thin: dry-run → confirm → apply).
+- [X] T029 [US2] Implement `plugins/stack-control/src/document-model/curate-engine.ts` (composes `archive-engine`; FR-008). Makes T025–T028 green.
+- [X] T030 [US2] Implement verb `plugins/stack-control/src/subcommands/curate.ts` per `contracts/curate.md` + register in the dispatcher.
+- [X] T031 [P] [US2] Author skill `plugins/stack-control/skills/curate/SKILL.md` (thin: dry-run → confirm → apply).
 
 **Checkpoint**: US1 + US2 both work.
 
