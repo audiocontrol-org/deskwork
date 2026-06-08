@@ -106,3 +106,11 @@ with `/stack-control:curate` (promoted/dropped entries archive out).
 - **Idea:** A `stack-control` **roadmap skill** that canonizes the roadmap protocol — the surface through which rows are added/advanced/archived and the roadmap is reconciled, so the protocol is enforced by invocation rather than relying on memory. Composes with the archive skill (shipped rows → archive) and the plugin-local roadmap queue.
 - **Provisional home:** stack-control program-management capability. Candidate roadmap feature. Cluster: roadmap-queue + roadmap-protocol + archive-skill.
 - **Status:** **captured** (awaiting triage).
+
+### Lean read-only web app to visualize a stack-control project's data stores
+
+- **Surfaced:** 2026-06-08, operator request during the roadmap + issue-triage session.
+- **Context:** A stack-control project accumulates several markdown data stores — the governed roadmap (a DAG), this design-inbox, the Spec Kit specs (spec/plan/tasks/contracts/checklists), and the audit-logs + audit-run dirs. Today they're reached by opening files or running CLI verbs (`roadmap graph`/`order`/`blocked`, `curate`). There is no single low-friction surface to browse the documents and see *process views* at a glance.
+- **Idea:** A **lean, read-only** web app (explicitly **no CRUD** — not an editor) that does two things: (a) easy navigable access to the underlying documents (roadmap, design-inbox, specs, audit logs); and (b) computed **views onto process data** — e.g. the roadmap dependency tree / DAG (the existing `roadmap graph` mermaid, rendered interactively), ready/blocked lists, design-inbox triage state, spec progress, audit-finding state. Visualization + access only.
+- **Provisional home:** `multi/control-plane-frontend` — the read-only "visualize the stores" subset of the fuller control-plane UI; could ship as an early standalone slice (much smaller than the spec to implementation negotiation / engine-run surfaces). Relates to roadmap-protocol (graph view) and insight-capture (inbox view).
+- **Status:** **captured** (awaiting triage).
