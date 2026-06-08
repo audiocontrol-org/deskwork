@@ -105,3 +105,21 @@ Reach parity, then retire the predecessor — the absorb-then-retire endgame.
 - ref: #436
 curate/archive would archive a shipped item still referenced by a depends-on edge and dangle it; roadmap archival must be edge-aware (skip terminal items that are still depends-on/part-of targets).
 
+## design:fix/inbox-migration-drift
+- status: planned
+- part-of: design:feature/document-primitives
+- ref: #433
+Governed DESIGN-INBOX.md is missing the 13th source entry (the mark-fixed/mark-acknowledged verb); generality T038 is red at HEAD. Re-migrate or reconcile the inbox against its source.
+
+## design:gap/governance-graduation-record
+- status: planned
+- part-of: design:feature/spec-governance
+- ref: #434
+Governance graduation has no on-disk record (the gate prints true/false, persists nothing); roadmap reconcile falls back to tasks-completion as the shipped signal. Persist a per-spec graduation record, then strengthen reconcile to require it.
+
+## design:gap/row-keyed-test-grammar
+- status: planned
+- part-of: design:feature/document-primitives
+- ref: #435
+Optional cleanup: replace roadmap-legacy.peg with a purpose-named row-keyed test grammar so legacy can be retired. Current decision (kept) is to keep legacy as the canonical row-keyed example grammar.
+
