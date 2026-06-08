@@ -859,3 +859,72 @@ Surface:    specs/002-parallel-execution-engine/plan.md:1-113
 The audited diff adds `specs/002-parallel-execution-engine/plan.md`, but the feature under audit is `document-primitives`. The file is an untouched Spec Kit template: `[FEATURE]`, `[DATE]`, `[Extract from feature spec...]`, `ACTION REQUIRED`, `NEEDS CLARIFICATION`, and `[REMOVE IF UNUSED]` placeholders remain throughout lines 1-113.
 
 Blast radius is medium because this is not just stray prose: it creates or changes a feature artifact for `002-parallel-execution-engine` with placeholder guidance that future agents may treat as real planning state. A reasonable fix is to remove this file from the document-primitives change unless it was intentionally authored, and if intentional, replace every template placeholder with the actual 002 plan content before it lands.
+
+## 2026-06-08 — audit-barrage lift (20260608T054029950Z-document-primitives-after_clarify)
+
+### AUDIT-20260608-30 — Interrupted `--apply` archive leaves the document in a live↔ledger collision state that every verb fails loud on at load — the "recoverable" durability promise has no tooling-assisted recovery path
+
+Finding-ID: AUDIT-20260608-30
+Status:     acknowledged-2026-06-08
+Disposition: MATCHES SPEC, not a defect. FR-010 promises recovery of an interrupted --apply via VERSION-CONTROL revert (commit before a mutating --apply); content is never lost (archive written first). A live↔ledger collision after an interrupted apply correctly fails loud at load (FR-005 uniqueness is a doc∪archive invariant). Tooling-assisted recovery (curate offering to drop the stale ledger+copy) is a future ENHANCEMENT beyond 005 scope, not a promise this feature makes. Filed mentally as a follow-up idea.
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/archive-engine.ts:140-152; plugins/stack-control/src/document-model/document.ts:48-52; plugins/stack-control/src/document-model/identifier-validator.ts:74-92
+
+`runArchive` writes the archive file first (with the new ledger entry **and** the moved Unit content), then writes the live document (archive-engine.ts:148-151). The durability comment (archive-engine.ts:6-12) frames the interim crash state as "recoverable, never silently lost." It is true the content is not lost — but trace the *next* load: the archive now carries a ledger entry for `Shipped idea` while the live document still contains `### Shipped idea`. `loadDocument` seeds `validateIdentifiers` with the ledger ids (document.ts:48-52), and the still-live Unit then collides with the ledger id, throwing the FR-005 uniqueness violation (identifier-validator.ts:85-90). 
+
+Because *every* verb (archive, unarchive, **and curate**) routes through `loadDocument`, all three fail loud on this state. The "fix it" tool — `curate` — cannot help: it throws at load before it can compose any reconciliation, and the live↔ledger collision is a hard fail-loud, not the soft `coherence-notice` path (curate-engine.ts:50-71 only covers ledger↔marker drift). The blast radius: the one scenario the write-ordering exists to handle gracefully (a crash between the two `writeFileSync` calls) leaves the document unloadable by the entire toolchain, recoverable only by manual file surgery. The narrow trigger window keeps this at medium, but the headline durability framing oversells the recovery story; a reasonable fix is for `curate` (or a dedicated recovery path) to detect a live-Unit-whose-id-is-also-in-the-ledger and offer to drop the stale ledger+archive copy, rather than fail loud with no assisted exit.
+
+### AUDIT-20260608-31 — `curate` dry-run reports "would change (dry-run)" for documents whose only findings are informational (reconciliation seam / coherence NOTICE) — fires on the roadmap proof doc on every clean run
+
+Finding-ID: AUDIT-20260608-31
+Status:     fixed-ebcb45a8
+Severity:   medium
+Surface:    plugins/stack-control/src/subcommands/curate.ts:27-42; plugins/stack-control/src/document-model/curate-engine.ts:96-104
+
+`runCurate` unconditionally pushes an `up-to-date-seam` finding whenever the grammar declares a reconciliation hook (curate-engine.ts:96-104), and the roadmap grammar (`roadmap.peg:13-15`) declares one. The CLI then branches purely on `report.findings.length` (curate.ts:28): a non-empty findings list that is *entirely* informational (the seam, or a `coherence-notice`) still prints `curate: would change (dry-run):` (curate.ts:37). For the `ROADMAP.md` proof document — well-formed, well-ordered, fully archived — `curate` will therefore **never** report the "clean — well-formed, well-ordered, properly archived" message the skill body tells the operator to stop on (`skills/curate/SKILL.md:24`). 
+
+The seam finding's own message says "declared, **not yet executed**" — i.e. nothing changes — so labeling it "would change" is contradictory. The blast radius is an unattended agent (or operator) reading "would change (dry-run)" and concluding `curate --apply` is needed when the document is already correct, or conversely learning to ignore the header because it always fires. The CLI should classify findings into actionable (`disorder`, `unarchived-terminal`) vs. informational (`up-to-date-seam`, `coherence-notice`) and only emit "would change" when an actionable finding is present, surfacing the rest as notices. The existing `verb-curate.test.ts` only exercises disordered docs, so this messaging path is untested.
+
+### AUDIT-20260608-32 — `case 'html_block'` in the block stream is unreachable with the default `new MarkdownIt()` (html:false); HTML blocks in document bodies normalize to paragraphs, and the block-stream test gives false confidence of HTML-block support
+
+Finding-ID: AUDIT-20260608-32
+Status:     fixed-ebcb45a8
+Severity:   low
+Surface:    plugins/stack-control/src/document-model/block-stream.ts:18,84-86; plugins/stack-control/tests/document-primitives/block-stream.test.ts:106-110
+
+`block-stream.ts` constructs `const md = new MarkdownIt();` (block-stream.ts:18) with no options, so `options.html` is `false`. markdown-it's `html_block` rule returns early when `options.html` is false, meaning raw block HTML (`<div>…</div>`) is emitted as a **paragraph**, never an `html_block` token. The `case 'html_block':` arm (block-stream.ts:84-86) is therefore dead code in practice. 
+
+The block-stream test's "HTML block maps to its full source line range" assertion (block-stream.test.ts:106-110) checks only `sourceOf(last)` (the line-range text), which is identical whether the lines render as `P` or `HTML` — so the test passes while the entry's `kind` is actually `P`, masking that the HTML path never executes. This is harmless today (no shipped grammar matches on `HTML` kind, and grammar comments are blanked by `blankChrome` before parsing), so the blast radius is low — but the dead arm plus the green-looking test create a false impression that HTML blocks are first-class in the stream. If a future grammar ever needs to distinguish HTML blocks, it will silently see paragraphs. Either enable `html: true` deliberately and assert on `kind` in the test, or drop the unreachable case and the misleading assertion.
+
+### AUDIT-20260608-33 — `archive --apply` leaves accreting blank-line gaps that `curate` — the tidiness tool — never normalizes
+
+Finding-ID: AUDIT-20260608-33
+Status:     fixed-ebcb45a8
+Severity:   low
+Surface:    plugins/stack-control/src/document-model/archive-engine.ts:42-48; plugins/stack-control/src/document-model/curate-engine.ts:23-46
+
+`liveWithout` removes exactly a Unit's span lines (head..last body line) but leaves the surrounding blank lines (archive-engine.ts:42-48). Archiving a heading-keyed Unit from the middle of a document therefore leaves both the blank line that preceded its heading and the blank line that followed its body, producing a double-blank gap; repeated archive/unarchive cycles accrete these. `curate`'s reorder path (curate-engine.ts:23-46) slices Units by span and re-joins with a fixed separator, but it only rewrites the live document when the *order* actually changes (`reorderedSource` returns `null` for an already-ordered doc, curate-engine.ts:26-29), so a well-ordered-but-blank-bloated document is never tidied.
+
+The blast radius is purely cosmetic — the documents still parse and round-trip correctly (the canonical proof docs are row-keyed where rows are contiguous, so they don't exhibit it) — hence low. But `curate`'s stated purpose is "keep a live governed document lean and correct," and whitespace accretion from the primitive it composes (`archive`) is exactly the kind of drift an operator would expect `curate` to absorb. Worth either trimming the trailing/leading blank on cut, or having `curate` normalize consecutive blank runs between Units.
+
+### AUDIT-20260608-34 — Runtime dependency sentinel still bypasses the expanded dependency probe
+
+Finding-ID: AUDIT-20260608-34
+Status:     fixed-ebcb45a8
+Severity:   high
+Surface:    plugins/stack-control/bin/stackctl:132-143
+
+The fix for the new runtime deps expanded `RUNTIME_DEPS` to `markdown-it peggy yaml tsx`, but the version sentinel still short-circuits the probe entirely. If `node_modules/.deskwork-install-complete-0.37.0` exists from a prior install that only had `tsx`, lines 136-137 set `NEEDS_INSTALL=0` without calling `all_deps_installed()`, so the wrapper dispatches into code that imports `markdown-it`, `peggy`, and `yaml` and fails module resolution.
+
+Blast radius is high because this is the adopter-mode entrypoint for every new verb. A reasonable fix is to treat the sentinel as a cache for “probe already passed for this dependency set,” not as a substitute for the probe, or key the sentinel by a dependency-set hash/package-lock hash instead of only the plugin version.
+
+### AUDIT-20260608-35 — Invalid frontmatter YAML is swallowed and reclassified as “not governable”
+
+Finding-ID: AUDIT-20260608-35
+Status:     fixed-ebcb45a8
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/grammar-resolver.ts:155-168
+
+`frontmatterRef()` catches YAML parse errors and returns `null`, so a document with a present but malformed frontmatter grammar declaration is reported as `document declares no grammar; not governable`. That is a silent fallback over a configuration parse failure, and it points the operator at the wrong repair: adding a grammar declaration, not fixing the broken YAML.
+
+Blast radius is medium because valid docs are unaffected, but malformed governed docs fail with misleading diagnostics at the main verb boundary. A reasonable fix is to throw a `DocumentModelError` from the catch path when leading frontmatter exists but cannot be parsed, preserving the fail-loud contract with an actionable message.
