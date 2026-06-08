@@ -119,10 +119,10 @@ description: "Task list for design/document-primitives implementation"
 
 ## Phase 6: Proof documents & generality (FR-013 / SC-005)
 
-- [ ] T035 [P] Establish `plugins/stack-control/DESIGN-INBOX.md` by lifting the current project design-inbox content (declares the design-inbox grammar; **lossless** migration over **content bodies** — every existing entry's body preserved; a nonconforming identifier MAY be normalized to satisfy FR-005, recording the rename; the result must pass `curate`).
-- [ ] T036 [P] Establish `plugins/stack-control/ROADMAP.md` (new plugin-local roadmap; declares the roadmap grammar; `<phase>/<slug>` rows).
-- [ ] T037 RED→green: generality integration test in `.../generality.test.ts` — BOTH proof documents are governed by the SAME engine code path, differing only in grammar (SC-005).
-- [ ] T038 RED→green: lossless-migration test — every pre-existing inbox entry's **body** appears in `DESIGN-INBOX.md` with no content dropped; any normalized identifier has its rename recorded; the migrated document passes `curate` (FR-013 lossless-over-content-bodies).
+- [X] T035 [P] Establish `plugins/stack-control/DESIGN-INBOX.md` by lifting the current project design-inbox content (declares the design-inbox grammar; **lossless** migration over **content bodies** — every existing entry's body preserved; a nonconforming identifier MAY be normalized to satisfy FR-005, recording the rename; the result must pass `curate`).
+- [X] T036 [P] Establish `plugins/stack-control/ROADMAP.md` (new plugin-local roadmap; declares the roadmap grammar; `<phase>/<slug>` rows).
+- [X] T037 RED→green: generality integration test in `.../generality.test.ts` — BOTH proof documents are governed by the SAME engine code path, differing only in grammar (SC-005).
+- [X] T038 RED→green: lossless-migration test — every pre-existing inbox entry's **body** appears in `DESIGN-INBOX.md` with no content dropped; any normalized identifier has its rename recorded; the migrated document passes `curate` (FR-013 lossless-over-content-bodies).
 
 **Checkpoint**: one engine, two real document shapes, no content lost.
 
