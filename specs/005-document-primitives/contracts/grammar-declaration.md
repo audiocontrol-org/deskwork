@@ -38,5 +38,5 @@ A grammar (`.peg` text) is **trusted local config** compiled and run in-process 
 
 ## Built-in grammars shipped this feature
 
-- `roadmap.peg` — `<phase>/<slug>` identifiers; full status vocabulary `planned`, `in-flight` (active), `shipped`, `cancelled`, `retired` (terminal); order key `phase` with declared ordering relation `[design, plan, impl, multi]` (NOT alphabetical), equal-`phase` tie-break by identifier (proof instance #2, FR-013).
+- `roadmap.peg` — `<phase>/<slug>` identifiers; full status vocabulary `planned`, `in-flight` (active), `shipped`, `cancelled`, `retired` (terminal); order key `phase` with declared ordering relation `[design, plan, impl, multi]` (NOT alphabetical), equal-`phase` tie-break by identifier; **declares a reconciliation hook** (the seam the future roadmap-discipline protocol plugs into — recognized/validated by `curate`, not executed per FR-008) (proof instance #2, FR-013).
 - `design-inbox.peg` — title identifiers; full status vocabulary `captured` (active), `promoted`, `dropped` (terminal); declared ordering relation by status rank `[captured, promoted, dropped]`, equal-status tie-break by identifier (title) (proof instance #1, FR-013).
