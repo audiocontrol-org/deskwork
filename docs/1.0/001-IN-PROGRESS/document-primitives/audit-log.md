@@ -1003,3 +1003,71 @@ Surface:    plugins/stack-control/ROADMAP.md:12-14
 The proof roadmap describes the reconciliation hook with temporal capability wording on line 13. Prior AUDIT-38 fixed the same class in the curate skill, but this operator-facing governed proof document still carries the pattern.
 
 Blast radius is low: runtime behavior is clear, and `curate` still recognizes the seam without execution. The risk is process hygiene in a shipped governed document. Reword the sentence as a scope boundary, e.g. state that roadmap-discipline reconciliation plugs into this seam and that `curate` recognizes the seam without executing it.
+
+## 2026-06-08 — audit-barrage lift (20260608T060906976Z-document-primitives-after_clarify)
+
+### AUDIT-20260608-42 — Re-rooted absolute path `Users/orion/.../plan.md` is actually present in the payload — the very artifact AUDIT-28 dismissed as hallucinated
+
+Finding-ID: AUDIT-20260608-42
+Status:     acknowledged-2026-06-08
+Disposition: FALSE PREMISE (verified): the `Users/orion/...` string occurs in the payload ONLY as quoted prose inside AUDIT-28 in the audit-log, which is itself part of the diff (5 grep hits, all in audit-log content). `find` confirms no such path on disk. Self-referential artifact of the audit-log being in the barrage payload — re-discovers the prior finding's quoted path. AUDIT-28's false-premise disposition stands. (The real untracked file is the relative-path blank 002 scaffold per AUDIT-29 — govern untracked-fold noise, out of 005 scope.)
+Severity:   medium
+Surface:    `Users/orion/work/deskwork-work/stack-control/specs/002-parallel-execution-engine/plan.md` (new file, entire — second diff hunk after the `---` separator); cross-ref docs/1.0/001-IN-PROGRESS/document-primitives/audit-log.md AUDIT-20260608-28
+
+The audited diff adds a new file at the repo-relative path `Users/orion/work/deskwork-work/stack-control/specs/002-parallel-execution-engine/plan.md` — the *absolute worktree path re-rooted under the repo root*, creating a spurious top-level `Users/` directory tree inside the repository. The content is an unfilled Spec Kit plan template (`[FEATURE]`, `[DATE]`, `ACTION REQUIRED`, `NEEDS CLARIFICATION`, `[REMOVE IF UNUSED]`) for feature **002 (parallel-execution-engine)** — unrelated to the 005 document-primitives feature under audit. This is the byproduct of a botched write (a `$PWD`-prefixed path mis-joined onto the repo root). Note the legitimately-intended file already exists untracked at the correct `specs/002-parallel-execution-engine/plan.md` (git status: `?? specs/002-parallel-execution-engine/plan.md`), so this is a *second, junk copy*.
+
+The blast radius is medium and compounding: the prior governance round recorded AUDIT-20260608-28 with disposition "FALSE PREMISE (verified): no `Users/orion/...` re-rooted path exists in the repo … The auditor hallucinated a re-rooted path." That dismissal is now contradicted by the diff's own contents — the re-rooted path *is* in the payload. If this gets `git add -A`'d it commits a permanent junk `Users/...` tree (a 003/002 scope-leak riding in the 005 range, and a repo-hygiene defect that violates the project's file-handling discipline). The fix is to delete the `Users/orion/...` path entirely (the real 002 stub already lives at `specs/002-parallel-execution-engine/plan.md`), and to correct the AUDIT-28 disposition since its "no such path exists" premise no longer holds.
+
+### AUDIT-20260608-43 — `curate` prints "clean — well-formed, well-ordered, properly archived" even when a coherence-notice (real ledger↔archive drift) is the only finding
+
+Finding-ID: AUDIT-20260608-43
+Status:     fixed-c1c75589
+Severity:   low
+Surface:    plugins/stack-control/src/subcommands/curate.ts:69-76 (the `actionable.length === 0` branch); plugins/stack-control/skills/curate/SKILL.md:36 (the "clean → nothing to do; stop" instruction); plugins/stack-control/src/document-model/curate-engine.ts:48-69 (coherence-notice generation)
+
+The AUDIT-31 fix correctly classifies `up-to-date-seam` and `coherence-notice` as informational so an informational-only dry-run prints "clean" rather than "would change." But the "clean" headline string is `clean — well-formed, well-ordered, properly archived`, and it fires unconditionally when no *actionable* finding is present — including when a `coherence-notice` is present. A coherence notice is not cosmetic: `coherenceFindings` emits "archive contains a Unit marker '<id>' with no ledger entry" (curate-engine.ts:60-65), which means an archived Unit exists that `unarchive` cannot locate (its ledger entry is gone) — i.e. a unit that is effectively unrecoverable. Printing "properly archived" as the headline directly contradicts that notice.
+
+The blast radius is low because the notice text *is* still printed on the lines below the headline (curate.ts:71-73), so a careful operator sees it. The trap is for the skimming operator: SKILL.md:36 instructs "clean → nothing to do; stop," so an operator who reads only the "clean — properly archived" headline concludes the document is fine and stops, missing a genuine drift signal that may indicate lost archive data. A more precise fix would suppress or qualify the "properly archived" clause when `informational` contains any `coherence-notice` (e.g. "clean — well-formed and well-ordered; NOTE: N coherence issue(s) below"), so the headline never asserts a property the notices below it contradict.
+
+### AUDIT-20260608-44 — What I checked that came back clean
+
+Finding-ID: AUDIT-20260608-44
+Status:     acknowledged-2026-06-08
+Disposition: Informational — the auditor's "what I checked that came back clean" notes section, not a finding. No action.
+Severity:   informational
+Surface:    plugins/stack-control/src/document-model/* (engine), src/subcommands/* (verbs), grammars/*.peg, bin/stackctl
+
+I specifically verified: (1) the block-stream span back-mapping (`toSpan`, `spanFor`) across setext/fence/table/list — the round-trip test pins exact line ranges and the indices are correct; (2) the AUDIT-33 blank-collapse in `liveWithout` — the `justCut` boundary logic drops exactly one seam blank and cannot touch blanks inside retained fenced code; (3) the symmetric column-schema guards in `buildArchive` (archive side) and `parseLifted` (unarchive side) — both compare live-header cells vs archived-row cells and fail loud with zero writes; (4) the AUDIT-39 load-time `assertInDomain` over every Unit, making `archive`/load reject out-of-domain order values consistently with curate/unarchive; (5) the `preflightArchive` ordering in `runCurate` — it surfaces archive-side validation before the reorder write, and the archive build is content-deterministic so the pre-reorder preflight stays valid post-reorder; (6) the bin/stackctl AUDIT-34 fix — the dependency probe is now authoritative and the sentinel is a non-overriding hint. Edge cases (zero-unit doc, archive→unarchive round-trip, locate failure, identity collision, fresh-install vs partial-install) are each pinned by a test. Had any of these had an off-by-one in the span map, a missing guard on the unarchive side, or a write landing ahead of a validation throw, I would have flagged it blocking/high; they don't.
+
+### AUDIT-20260608-45 — Unterminated embedded grammar comments are silently reclassified as “not governable”
+
+Finding-ID: AUDIT-20260608-45
+Status:     fixed-c1c75589
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/chrome.ts:43-55; plugins/stack-control/src/document-model/grammar-resolver.ts:189-197
+
+`findGrammarComments()` sees an opening `<!--`, scans for `-->`, and if no close is found it just `continue`s as “not chrome” at line 55. If that unterminated comment is a `doc-grammar:` declaration, `embeddedGrammar()` returns null, `frontmatterRef()` may also return null, and `resolveGrammar()` reports `document declares no grammar; not governable` at lines 195-197.
+
+Blast radius is medium: a present but malformed embedded grammar declaration is a configuration parse failure, not absence of governance. This is the embedded-comment twin of the already-fixed malformed-frontmatter class, and it points the operator at the wrong repair. A reasonable fix is to detect an unterminated comment whose inner text begins with `doc-grammar:` and throw `DocumentModelError` naming the unterminated grammar declaration.
+
+### AUDIT-20260608-46 — Row-keyed unarchive scans the archive table header as a candidate Unit row
+
+Finding-ID: AUDIT-20260608-46
+Status:     fixed-c1c75589
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/unarchive-engine.ts:73-82; plugins/stack-control/src/document-model/archive-file.ts:40-67
+
+`archiveMarkerIds()` correctly excludes row-keyed chrome by ignoring rows until after the separator at lines 58-67. `locateInArchive()` does not use the same rule: it scans every pipe row, skips only separator rows, and returns the first row whose identifier column equals `--id` at lines 73-82. That means the header row is still considered a possible archived Unit.
+
+Blast radius is medium because it needs a corrupted or hand-edited ledger entry, but row-keyed structural chrome is supposed to be uniformly excluded. With a custom row-keyed grammar whose identifier shape accepts title-like values, a ledger id equal to the header cell could cause `unarchive` to lift and reinsert the table header as content. The fix is to make `locateInArchive()` follow the same “past separator only” scan used by `archiveMarkerIds()`.
+
+### AUDIT-20260608-47 — Naive table-cell splitting breaks row-keyed archive round-trips for escaped pipe cells
+
+Finding-ID: AUDIT-20260608-47
+Status:     fixed-c1c75589
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/archive-file.ts:8-11; plugins/stack-control/src/document-model/unarchive-engine.ts:105-109
+
+Live parsing uses markdown-it table tokens, but archive-side helpers split raw markdown rows with `line.split('|')`. Markdown table cells can contain escaped pipes, e.g. `Scope with \| character`. Such a row can parse live and archive successfully, but `unarchive` later counts the archived row with `tableCells()` and sees an extra column, tripping the schema mismatch guard at lines 105-109.
+
+Blast radius is medium: a valid row-keyed roadmap row can become impossible to unarchive after being archived, despite no schema migration. A reasonable fix is to parse archive table rows with the same markdown-aware path used for live rows, or implement a table splitter that respects escaped pipes.
