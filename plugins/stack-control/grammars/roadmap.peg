@@ -16,11 +16,15 @@ reconciliationHook:
   source: "specs/*/spec.md"
 ---
 {{
-  // The roadmap is ROW-KEYED: each table data row is a Unit. The identifier is
-  // the codename in column 0 (`<phase>/<slug>`); the status is column 3. The
-  // table HEADER (THEAD) + separator are row-keyed structural chrome (preamble),
-  // never Units. Order value is the phase, parsed from the identifier — sorted
-  // by the declared relation [design, plan, impl, multi], NOT lexicographically.
+  // The roadmap is ROW-KEYED: each table data row is a Unit. The identifier and
+  // status columns are SINGLE-SOURCED from the grammar metadata
+  // (`unit.identifierColumn` / `unit.statusColumn`) and passed in via parse
+  // options (AUDIT-20260608-26) — never hardcoded here. For the shipped built-in
+  // they are 0 (codename `<phase>/<slug>`) and 3 (status); a project override
+  // that shifts those columns is honored end-to-end. The table HEADER (THEAD) +
+  // separator are row-keyed structural chrome (preamble), never Units. Order
+  // value is the phase, parsed from the identifier — sorted by the declared
+  // relation [design, plan, impl, multi], NOT lexicographically.
   function cell(text, i) {
     const cells = text.split('\x1f');
     return i < cells.length ? cells[i].trim() : '';
@@ -32,8 +36,8 @@ document = preamble units:unit* postamble { return units; }
 preamble = (!row anyLine)*
 
 unit = r:row {
-  const id = cell(r.text, 0);
-  const status = cell(r.text, 3).toLowerCase();
+  const id = cell(r.text, options.identifierColumn);
+  const status = cell(r.text, options.statusColumn).toLowerCase();
   const phase = id.split('/')[0];
   return { identifier: id, status, orderValue: phase, startLine: r.line, endLine: r.line };
 }

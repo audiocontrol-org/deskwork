@@ -96,9 +96,21 @@ export function parseUnits(
     );
   }
 
+  // The grammar metadata is the SINGLE source of truth for row-keyed column
+  // indices (AUDIT-20260608-26). Pass them into the PEG via parse options so the
+  // body reads `options.identifierColumn` / `options.statusColumn` instead of
+  // hardcoding literals — keeping the live parse in agreement with the
+  // archive-marker scan + unarchive locate (both of which read the metadata
+  // columns). Heading-keyed grammars use no columns; an empty options object is a
+  // harmless no-op for them.
+  const parseOptions: peggy.ParserOptions =
+    grammar.unit.kind === 'row'
+      ? { identifierColumn: grammar.unit.identifierColumn, statusColumn: grammar.unit.statusColumn }
+      : {};
+
   let parsed: unknown;
   try {
-    parsed = parser.parse(stream.normalized);
+    parsed = parser.parse(stream.normalized, parseOptions);
   } catch (err) {
     throw new DocumentModelError(
       `document does not parse against grammar '${grammar.id}'${locationSuffix(err)}: ${messageOf(err)}`,
