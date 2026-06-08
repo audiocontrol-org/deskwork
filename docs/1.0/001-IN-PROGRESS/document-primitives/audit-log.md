@@ -17,7 +17,7 @@ The feature was **implemented** (all 50 `tasks.md` tasks; 248 tests green, `tsc`
 **Two non-convergent generators identified (NOT 005 defects — govern-tooling):**
 1. **Self-referential audit-log** — AUDIT-28→42→48 re-flagged a `Users/orion/...` path that exists ONLY as prior-finding prose inside the audit-log, which is itself in the barrage payload (verified 3× absent on disk / in git). The barrage audits its own findings ledger.
 2. **Indiscriminate untracked-fold** — the parked 002 feature's blank `plan.md` scaffold polluted every 005 payload (AUDIT-29).
-Both → suggested fixes recorded for `multi/migrate-audit-barrage` (exclude the audit-log from the payload; scope the untracked-fold to the feature). Follow-up GitHub issues prepared (filing pending operator authorization).
+Both → suggested fixes recorded for `multi/migrate-audit-barrage` (exclude the audit-log from the payload; scope the untracked-fold to the feature). Follow-up issues filed: audiocontrol-org/deskwork#431 (the generators) and #430 (round-9 residual hardening).
 
 **GRADUATION (operator decision 2026-06-08, at the diminishing-returns plateau):** graduate now. Residual round-9 MEDIUM edges **AUDIT-54/55/56 deferred** to a hardening pass (dispositioned `acknowledged-2026-06-08 (deferred-hardening)` above, full context inline). This is the rule's option (B) override-and-graduate: the implementation is exhaustively hardened; remaining findings are diminishing-value edge-hardening + the two unfixable-in-scope generators. The gate is already `converged`, so no forced override was needed.
 
@@ -1171,7 +1171,7 @@ Blast radius is medium: a malformed or overly flexible grammar override can make
 ### AUDIT-20260608-54 — Fence-aware grammar detection mis-parses longer code fences
 
 Finding-ID: AUDIT-20260608-54
-Status:     acknowledged-2026-06-08 (deferred-hardening): operator decision to GRADUATE at the diminishing-returns plateau (see graduation note below). Marginal: chrome.ts fence tracking keys on a 3+-delimiter run; a `<!-- doc-grammar: -->` inside a 4+-backtick fence can still mis-detect (strictly better than pre-AUDIT-51, which mis-detected ALL in-fence comments). Fix later: track opening-fence length + require closing run >= it (CommonMark). Deferred to a hardening pass.
+Status:     acknowledged-2026-06-08 (deferred-hardening): operator decision to GRADUATE at the diminishing-returns plateau (see graduation note below). Marginal: chrome.ts fence tracking keys on a 3+-delimiter run; a `<!-- doc-grammar: -->` inside a 4+-backtick fence can still mis-detect (strictly better than pre-AUDIT-51, which mis-detected ALL in-fence comments). Fix later: track opening-fence length + require closing run >= it (CommonMark). Deferred to a hardening pass. Tracked: audiocontrol-org/deskwork#430.
 Severity:   medium
 Surface:    plugins/stack-control/src/document-model/chrome.ts:37-87
 
@@ -1182,7 +1182,7 @@ Blast radius is medium: specs often use longer fences specifically to show tripl
 ### AUDIT-20260608-55 — Row-keyed unarchive can pick prose as the live table header
 
 Finding-ID: AUDIT-20260608-55
-Status:     acknowledged-2026-06-08 (deferred-hardening): operator graduation decision. Marginal: parseLifted picks the live table header via the first `isTableRowLine`; a pipe-bearing PROSE line above the table could be mis-picked. Fix later: anchor on the table the live Units parsed from (THEAD entry), not the first pipe line. Deferred to a hardening pass.
+Status:     acknowledged-2026-06-08 (deferred-hardening): operator graduation decision. Marginal: parseLifted picks the live table header via the first `isTableRowLine`; a pipe-bearing PROSE line above the table could be mis-picked. Fix later: anchor on the table the live Units parsed from (THEAD entry), not the first pipe line. Deferred to a hardening pass. Tracked: audiocontrol-org/deskwork#430.
 Severity:   medium
 Surface:    plugins/stack-control/src/document-model/unarchive-engine.ts:95-118; plugins/stack-control/src/document-model/archive-file.ts:72-82
 
@@ -1193,7 +1193,7 @@ Blast radius is medium because this makes `unarchive` fail on otherwise valid go
 ### AUDIT-20260608-56 — Advertised Node engine is lower than the new runtime dependency floor
 
 Finding-ID: AUDIT-20260608-56
-Status:     acknowledged-2026-06-08 (deferred-hardening): operator graduation decision. Trivial manifest-accuracy: confirm plugins/stack-control/package.json engines.node (>=20) matches the floor required by markdown-it/peggy; bump if needed. Deferred to a hardening pass.
+Status:     acknowledged-2026-06-08 (deferred-hardening): operator graduation decision. Trivial manifest-accuracy: confirm plugins/stack-control/package.json engines.node (>=20) matches the floor required by markdown-it/peggy; bump if needed. Deferred to a hardening pass. Tracked: audiocontrol-org/deskwork#430.
 Severity:   medium
 Surface:    plugins/stack-control/package.json:24-25; package-lock.json:1149-1150; package-lock.json:4653-4656
 
