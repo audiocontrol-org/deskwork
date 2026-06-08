@@ -26,9 +26,10 @@ Optional environment overrides:
   `<!-- SPECKIT START -->` marker).
 - `GOVERN_PLAN_PATH` — when set (the `after_plan` checkpoint), the plan file is
   folded alongside the spec (FR-013).
-- `GOVERN_CEILING` — max convergence iterations before `non-converged` (FR-014).
-- `GOVERN_OVERRIDE` — a recorded override reason; allows graduation on a
-  blocked verdict (FR-010).
+- `GOVERN_CEILING` — max convergence iterations before the loop records
+  non-convergence (FR-014; the loop bound, enforced by the driver, not the gate).
+- `GOVERN_OVERRIDE` — a recorded override reason; **forces the gate OPEN** when it
+  would otherwise be BLOCKED (FR-010).
 
 The script reads the spec (+ plan when `after_plan`) into the audit payload,
 fires `dw-lifecycle audit-barrage` (multiple LLM CLIs in parallel), lifts
@@ -36,9 +37,21 @@ findings into the feature `audit-log.md`, then evaluates the convergence gate
 (`stackctl spec-governance-gate`). It branches only on the findings + feature
 slug — never on which tool authored the spec.
 
+**The gate is a single boolean you obey, not a verdict you interpret (#432).**
+The gate itself prints exactly `true` (OPEN — may graduate) or `false` (BLOCKED)
+to stdout; its exit code is execution status (0 evaluated, 2 fatal), never
+policy. You drive the loop through the `govern` pass, which relays that decision:
+**exit 0 = gate OPEN ("may graduate")**, **exit 1 = gate BLOCKED ("REFUSED")**,
+**exit 2 = fatal** (capability/audit-log absent — never a governed claim). Do not
+re-derive graduation from finding counts — obey the relayed decision. The gate
+decides OPEN on what the **recent run(s) raw-surfaced** (FR-010): branch (a) one
+pristine run (0 HIGH + 0 MED), or branch (b) two consecutive 0-HIGH runs. The
+count of still-open findings has **no bearing** (#432).
+
 ## Fixing findings — fresh-context sub-agent dispatch
 
-When the gate verdict is `blocked` (open HIGH/MEDIUM findings), **do NOT author
+When the govern pass reports the gate **BLOCKED** (exit 1 — the recent run(s)
+surfaced HIGHs, or aren't yet two consecutive 0-HIGH runs), **do NOT author
 the fixes in this orchestrating context.** Fix quality degrades under
 accumulated context — each round's expansive edits become the next round's
 findings (observed directly in the 004 self-hosted dogfood: a fresh HIGH landed
@@ -73,10 +86,10 @@ instead. For each open finding:
    collide on the single `spec.md`. Each sub-agent gets its own clean context
    regardless of ordering; serialization is purely for write-safety.
 4. After all open findings are addressed, **re-run `govern-spec.sh`** (re-barrage
-   → re-gate) and repeat until the gate reports `converged`, the per-checkpoint
-   ceiling is hit (`non-converged`), or a substantive `GOVERN_OVERRIDE` is
-   recorded. Residual MEDIUM/LOW are slushed automatically once the dampener
-   engages. When several findings stem from one root change, run a **whole-spec
+   → re-gate) and repeat until the govern pass reports the gate **OPEN** (exit 0,
+   may graduate), the per-checkpoint ceiling is hit, or a substantive
+   `GOVERN_OVERRIDE` is recorded. Residual MEDIUM/LOW are slushed automatically
+   once the dampener engages. When several findings stem from one root change, run a **whole-spec
    consistency sweep** first (one sub-agent, full spec in context, tasked to find
    and fix *every* surface that contradicts the corrected model) before
    re-barraging — rather than letting the barrage surface the leftovers one at a
@@ -103,9 +116,9 @@ always-loaded rule `.claude/rules/spec-audit-diminishing-returns.md`.
 
 ## Result
 
-Report the printed run-dir path and the convergence verdict, and summarize:
+Report the printed run-dir path and the gate decision, and summarize:
 how many model lanes produced output, how many findings were lifted, and
-whether the spec may graduate (`converged`/`overridden`) or graduation is
-refused (`blocked`/`non-converged`). If the script exits 2 (e.g. `dw-lifecycle`
-absent), surface the failure — governance is never optional and a spec is never
-recorded as governed when the capability is absent (FR-005).
+whether the spec **may graduate** (govern exit 0 — gate OPEN, or an override) or
+graduation is **refused** (govern exit 1 — gate BLOCKED). If the script exits 2
+(e.g. `dw-lifecycle` absent), surface the failure — governance is never optional
+and a spec is never recorded as governed when the capability is absent (FR-005).

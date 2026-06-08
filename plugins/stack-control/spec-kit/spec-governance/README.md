@@ -24,14 +24,16 @@ extension, and a feature of the `pluggable-lifecycle-providers` north star
 - Runs stack-control's **own** audit-barrage (no dw-lifecycle dependency — the
   barrage + protocol are vendored in-package via `multi/migrate-audit-barrage`):
   `stackctl audit-barrage-render` → `audit-barrage` → `audit-barrage-lift`.
-- **Convergence gate** (`stackctl spec-governance-gate`): the spec may graduate
-  only when the **ported** `check-barrage-dampener` criterion is met —
-  **0 open HIGH + 0 open MEDIUM in the latest run** (single-run-clean), **or
-  0 open HIGH across the last 2 runs** (n-consecutive-quiet). Otherwise
-  `blocked`; once iterations reach the configured `--ceiling` without
-  convergence the verdict is `non-converged` (escalate — never an infinite
-  loop). An explicit `--override "<reason>"` records an accepted residual and
-  permits graduation.
+- **Convergence gate** (`stackctl spec-governance-gate`): owns the FR-010
+  graduation policy in **one place** and prints a **single boolean** the consumer
+  obeys (#432) — `true` (OPEN, may graduate) / `false` (BLOCKED) on stdout; the
+  exit code is execution status (0 evaluated, 2 fatal), never policy. The gate is
+  OPEN when the **ported** `check-barrage-dampener` criterion is met over what the
+  recent run(s) **raw-surfaced** (by `Severity:`, ignoring later `Status:`) —
+  **0 HIGH + 0 MEDIUM in the latest run**, **or 0 HIGH across the last 2 runs** —
+  or an `--override "<reason>"` is recorded. The **count of still-open findings
+  has no bearing**; loop bounding (the `--ceiling`) is the loop driver's job, not
+  the gate's (the gate emits no `non-converged` state).
 - **Slush pile** (`stackctl slush-findings`): once the dampener is engaged
   (2 consecutive 0-HIGH runs, or 0 HIGH + 0 MED), the residual MEDIUM/LOW findings
   of the run are flipped to `acknowledged-slush-pile-<date>` — **not fixed, not
@@ -59,10 +61,12 @@ to `scripts/bash/govern-spec.sh`. Environment overrides:
 - `GOVERN_PLAN_PATH` — set on the `after_plan` checkpoint to fold the plan too.
 - `GOVERN_CEILING` / `GOVERN_OVERRIDE` — convergence ceiling / recorded override.
 
-The gate verb may also be run directly:
+The gate verb may also be run directly — it prints `true` (OPEN) / `false`
+(BLOCKED) to stdout (exit 0 evaluated, 2 fatal):
 
 ```bash
-stackctl spec-governance-gate --feature <slug> [--checkpoint <after_clarify|after_plan>] [--ceiling N] [--override "<reason>"] [--json]
+stackctl spec-governance-gate --feature <slug> [--checkpoint <after_clarify|after_plan>] [--override "<reason>"]
+# → prints `true` or `false`.  (--ceiling / --json are accepted but ignored: #432)
 ```
 
 `--checkpoint` scopes convergence to one checkpoint's runs (independent

@@ -111,5 +111,5 @@ The spec-mode lens (detection) and the diminishing-returns playbook (triage) bot
 **Failure modes observed:** <FM-1/2/3/4 + the concrete finding IDs>
 **Plateau? structural root-fix or override?** <what broke it / how it closed>
 **Genuine deep tensions (vs noise):** <cross-model / real design forks>
-**Outcome:** <converged / overridden + reason>
+**Outcome:** <gate OPEN (clean) / overridden + reason>
 ```
