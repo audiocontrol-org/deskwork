@@ -1131,3 +1131,27 @@ Surface:    plugins/stack-control/src/subcommands/roadmap.ts:40-65, plugins/stac
 `scanFlags` accepts every `--<name> <value>` pair into `values` with no allow-list, and each subaction then reads only the names it knows. That means typos are silently ignored. For example, `roadmap add impl:fix/x --depend-on design:feature/a --apply` succeeds but creates an item with no dependency, because `addInputFrom` only reads `depends-on`.
 
 The blast radius is real roadmap corruption by omission: the feature’s “one-move emergent capture” contract depends on dependencies/grouping being captured correctly, and a misspelled flag produces a valid but semantically wrong item. A reasonable fix is to validate allowed flags per subaction and reject unused `values` or extra positionals with exit 2 before calling the mutation.
+
+## 2026-06-08 — audit-barrage lift (20260608T204317594Z-pluggable-lifecycle-providers-after_clarify)
+
+### AUDIT-20260608-14 — `decompose` silently resets every part's status to `planned`, dropping the original item's status
+
+Finding-ID: AUDIT-20260608-14 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-08
+Severity:   medium
+Surface:    plugins/stack-control/src/roadmap/mutations.ts:222-241 (`decompose` → `partSections`), plugins/stack-control/src/roadmap/mutations.ts:120 (`buildSection` status default)
+
+`decompose` builds each part via `buildSection({ identifier, dependsOn, partOf, deferredUntil, spec, ref, scope })` — note that **`status` is never passed**. `buildSection` therefore falls through to `status: input.status ?? DEFAULT_STATUS`, so every part is emitted as `planned` regardless of the original item's status. AUDIT-20260608-03 explicitly enumerated the fields decompose must carry (`deferred-until`/`spec`/`ref`/scope) and fixed those, but `status` was not in that list and is silently lost.
+
+The blast radius is the exact failure mode AUDIT-20260608-02 was raised to prevent. Decomposing an `in-flight` item — the common case, since you split work as understanding sharpens *during* active development — silently produces `planned` parts. Those parts re-enter the ready frontier as pickable work (`isReady` returns true for a non-deferred `planned` item with shipped deps), so a fresh agent running `roadmap next` sees them as available-to-start, with no signal that they are the remainder of work already underway. Decomposing a `shipped` item silently un-ships it into `planned` parts. Because the deferral carry from AUDIT-03 keeps deferred parts out of the frontier, the operator may reasonably assume *all* relevant attributes are carried — status is the conspicuous gap. A reasonable fix: carry `source.status` onto every part (or require the operator to confirm a status when decomposing a non-`planned` item), and document the chosen behavior in the SKILL — the spec (FR-009) only promises deps+grouping inheritance, so the status handling is currently undefined-by-omission rather than decided.
+
+### AUDIT-20260608-15 — `roadmap reconcile` resolves `spec:` paths against `process.cwd()` while the default `--doc` is an absolute plugin-internal path — silent "all unresolved" off-root
+
+Finding-ID: AUDIT-20260608-15
+Status:     acknowledged-slush-pile-2026-06-08
+Severity:   medium
+Surface:    plugins/stack-control/src/subcommands/roadmap.ts:230-244 (`emitReconcile`), plugins/stack-control/src/subcommands/roadmap.ts:30-33 (`DEFAULT_DOC`), plugins/stack-control/src/roadmap/reconcile.ts:79-101 (`reconcile` baseDir usage)
+
+`emitReconcile` calls `reconcile(flags.doc, grammarDirs(), process.cwd())`. The default doc (`DEFAULT_DOC`) is resolved **absolutely** to the plugin-internal `plugins/stack-control/ROADMAP.md`, whose `spec:` values are repo-root-relative (`specs/005-document-primitives`, etc.). But `reconcile` joins those paths against `baseDir = process.cwd()` (`reconcile.ts:90` `join(baseDir, rel)`). So correct output depends entirely on the invocation cwd being the repo root — a coupling that is nowhere validated or derived from the document's own location.
+
+The blast radius is silent wrong output, which is worse than a crash for an unattended agent. Run from any directory other than the repo root, every item's `spec:` path fails the `existsSync(specDir)` check and is pushed to `unresolved` (`reconcile.ts:91-94`); `statusDrift` comes back empty and `orphans` is computed over a likely-absent `specs/` tree. An agent reading "status drift: 0 / unresolved correspondences: N" would conclude there is nothing to advance, when in fact the tool simply looked in the wrong place. The SKILL's documented invocation happens to run from repo root so the happy path works, but nothing enforces it. A reasonable fix: derive `baseDir` from the resolved document's directory (or an explicit `--base`/repo-root discovery) rather than `process.cwd()`, and fail loud when the glob parent (`specs/`) does not exist under the chosen base rather than silently reporting everything unresolved.
