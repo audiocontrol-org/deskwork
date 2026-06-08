@@ -5112,3 +5112,51 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 3. **Spec-authoring skill:** answer the two open questions (promote vs fold; barrage-DRY-criterion now vs later); the barrage-enforced single-source criterion would immediately help 004's remaining iterations.
 4. Reconcile stale `feature/pluggable-lifecycle-providers` branch strings → `feature/stack-control` (now also in `specs/004-*/{spec,plan}.md`).
 5. `impl/execution-engine` (`specs/002`) stays parked at `/speckit-plan` (its `plan.md` is still the empty template stub, untracked). Bootstrap with `/session-start`.
+
+---
+
+## 2026-06-08: design/document-primitives (005) end-to-end via Spec Kit + spec-governance; mode-aware spec-audit lens built; prevention-vs-detection discovered
+### Feature: pluggable-lifecycle-providers
+### Worktree: stack-control (branch `feature/stack-control`)
+
+**Goal:** Capture some roadmap-lifecycle feature ideas; then design + spec a new feature (generalized document-handling primitives `archive`/`curate`) and drive it through the full Spec Kit chain with cross-model spec-governance.
+
+**Accomplished:**
+- **Captured 5 inbox ideas** (archive skill, plugin-local roadmap, roadmap protocol, idea-bucket↔roadmap relationship, roadmap skill) — `a41356f9`.
+- **Brainstormed + specced `design/document-primitives`** (`specs/005-document-primitives/`): generalized `archive`/`curate` over **self-describing documents** (a declared block-level grammar; well-formed ≡ parses; identifiers human-readable + non-ordinal; ledger in the archive file; anti-coupling = zero predecessor refs in the shipped product). Ran the full Spec Kit order: **specify → clarify (3 Qs) → plan (peggy + markdown-it, parser tech researched via sub-agent) → checklist (27-item engine-rigor) → tasks (42, RED-first) → analyze**.
+- **Ran spec-governance (`stackctl govern --mode spec`) to ground — 15 barrage iterations, ~48 findings remediated.** All remediation via fresh-context per-finding sub-agent dispatch (whole-artifact scope), after the operator caught a lapse (below). Two graduations via `GOVERN_OVERRIDE` (8 findings deferred total → `tasks.md` Phase 8, T044–T050).
+- **Built the mode-aware audit lens** (operator hypothesis) into the **adopter-facing** plugin surface (`feat(audit-barrage): mode-aware audit lens`): per-mode `{{audit_lens}}` + `{{artifact_framing}}` vars; spec lens scopes to promise/decision/contradiction altitude (WHAT-vs-HOW litmus); implement lens unchanged. RED-first, 108 tests green, tsc clean.
+- **Promoted `design/spec-authoring`** to a roadmap feature (the *prevention* half) after discovering authoring is the cause; updated roadmap + design-inbox.
+- **Created the durable discovery artifacts:** `plugins/stack-control/spec-kit/spec-governance/SPEC-AUDIT-FAILURE-MODES.md` (the well-known log) + `.claude/rules/spec-audit-diminishing-returns.md` (always-loaded stop-heuristic) + a pointer in the govern-spec skill body.
+
+**Didn't Work / unresolved:**
+- **005 never cleanly converged — graduated by override twice.** Under the spec lens the HIGH count settled into a **low oscillating no-floor tail (8→1→1→1→2→2→1)**, never zero. This is FM-4 (specs have no crisp convergence floor), not a defect in the loop.
+- **8 findings deferred to implementation** (tasks Phase 8): the iter-8 set (7) + AUDIT-22 (row-keyed region mapping). AUDIT-06 (zero-live-Unit unarchive) is a genuine bug flagged for RED-first fix.
+- **Two mechanism-generators were self-inflicted by my own fixes** (the durability promise 29→39→40; the committed-tree precondition 17→18→19) — each an authoring error (writing HOW), collapsed structurally.
+- The **H2 severity-cap** (auditor self-tagging `[mechanism]` + MEDIUM cap) under-fired (0 tags); dropped — the lens made it non-load-bearing.
+- **005 implementation not started** (separate session, orchestrator/implementer split). **`design/spec-authoring` promoted but not specced.** **004 still parked with AUDIT-48 open** (prior session, untouched).
+
+**Course Corrections:**
+- [PROCESS] **The big one — I hand-authored spec fixes in the orchestrator context instead of fresh-context sub-agent dispatch.** Operator: *"the audit protocol demands remediations run in sub-agents… are you doing that? if not, is it because you're ignoring the skill or is the demand genuinely missing?"* I verified the demand was genuinely present (`govern-spec.md` § Fixing findings), reverted my hand-edits, and ran ALL subsequent remediation via fresh sub-agents. The lapse: I drove via the `stackctl govern` CLI and never loaded the skill body, despite having read the inbox entry describing the discipline this very session.
+- [PROCESS] **Build it into the adopter-facing control surface, not a project override.** Operator corrected the lens to ship in the plugin (template + payload modules + render contract), not `.stack-control/`.
+- [PROCESS][COMPLEXITY] **Two operator meta-redirects that became the session's real value:** *"we should be keeping a log of our discoveries"* (→ the failure-modes log + rule) and *"we need to refine how specs are authored so they don't invite implementation-level critique"* (→ the prevention/detection synthesis + `design/spec-authoring` promotion). Both were insights I should have surfaced; the operator pulled the work up to the meta-level.
+
+**Quantitative** (re-derived from `git log 0c388aea..HEAD`):
+- Commits: **38**. Files changed: **27** (+2151 / −18).
+- Spec-governance barrage iterations over 005: **15** (claude + codex; gemini disabled per config). Findings: **~48 remediated `fixed-<sha>`; 8 deferred-to-impl across 2 overrides.**
+- Sub-agent dispatches: **~24** (parser-tech research + remediation clusters + the RED-first lens build).
+- Clone snapshot (session-end): **3 groups, all pre-existing** — identical to session-start; **no new duplication** despite the new lens code.
+- Course corrections: **3** substantive [PROCESS] operator redirects (fresh-context dispatch; adopter-surface; two meta-redirects) + the lens hypothesis the operator proposed and we validated.
+
+**Insights:**
+- **Spec-auditing has no crisp convergence floor** (unlike code: 0 findings = clean). An aggressive cross-model barrage always finds another under-specified edge in non-trivial prose. Detecting diminishing returns is the hard, fuzzy part — hence the log + rule.
+- **Two plateau shapes, two responses:** a *single generator* (e.g. two-file atomicity) → structural root-fix collapses it; *diffuse fix-debt with no common generator* → override + defer. Distinguishing them is the key judgment.
+- **A fix that ADDS mechanism to a spec is itself an authoring violation** — it becomes the next round's generator (the precondition chain 17→18→19 is the proof). Prefer scope-the-promise / defer-to-contracts over add-mechanism.
+- **Prevention beats detection.** The lens (detection) raises altitude but has an irreducible tail; the cause is authoring, so `design/spec-authoring` (write at promise altitude) is the leverage. Detection + prevention share one WHAT-vs-HOW litmus (judge-end and write-end).
+- **The lens is validated:** under it, mechanism litigation disappeared and findings became genuine promise-level contradictions — and it caught a textbook FR-vs-FR contradiction, so it's not over-suppressing.
+
+**Next step (resume here):**
+1. **Spec `design/spec-authoring`** (now a promoted roadmap feature, the prevention half) — its rules are field-derived (promises-before-mechanism; DRY-for-prose; WHAT-vs-HOW litmus; "mechanism → contracts/tests"; verify-premise; capture-vs-scope) and can double as barrage criteria. Use `/speckit-specify` when ready.
+2. **005 implementation** via `/speckit-implement` in a **dedicated session** (orchestrator/implementer split) — starts with `tasks.md` Phase 8 (T044–T050) carrying the deferred findings; AUDIT-06 is a real bug to fix RED-first.
+3. **004 (spec-governance)** remains parked with **AUDIT-48 open** (override-scope enforcement) — separate thread from before this session.
+4. `impl/execution-engine` (`specs/002`) still parked at `/speckit-plan`.
