@@ -80,7 +80,13 @@ Operator owns the (A)-vs-(B) call and any genuine design forks surfaced at the p
 
 **Caveat — H2 (severity cap) under-fired.** The lens's instruction to self-tag stray mechanism findings `[mechanism — defer to contracts/tests]` and cap them at MEDIUM produced **0 tags**; one borderline-mechanism finding (AUDIT-14, unreadable-ledger vs corrupt-body) slipped through at HIGH. Lesson: **altitude-scoping the lens (H1) is load-bearing; model self-tagging the severity cap (H2) is weak.** If a hard cap is wanted, make it mechanical (lift/gate downgrades mechanism-tagged findings), not a prompt instruction the model may ignore.
 
-**Disposition:** H1 adopted into the shipped prompt (`feat(audit-barrage): mode-aware audit lens`). Follow-ups: (a) decide whether to do a real convergence pass on 005 with the lens (the 8 are genuine), (b) consider mechanizing H2.
+**Disposition:** H1 adopted into the shipped prompt (`feat(audit-barrage): mode-aware audit lens`).
+
+**Convergence pass (the end-to-end test of the lens).** Ran 005 to ground under the lens: **8 → 1 → 1 → 1 → 2 → 2 → 1** HIGH across iterations 9–15. The findings were genuine, finite, promise-altitude contradictions (FR-vs-FR, over-strong promises, missing decisions, region-model gaps) — NOT a mechanism generator. Two further generators that DID appear were collapsed structurally per playbook A (the durability "detectable" over-claim; the committed-tree precondition, 17→18→19 — itself caused by a *fix that added mechanism*, the corollary above). It never reached literal zero: it settled into a **low oscillating no-floor tail (1–2/round)**, each finding a ripple of a prior fix interacting with the rest. Closed at the tail via `GOVERN_OVERRIDE` (the lone residual AUDIT-22 — row-keyed region mapping — deferred to implementation/contracts, tasks Phase 8).
+
+**Two conclusions, both load-bearing:**
+1. **The lens works** — it permanently removed the mechanism-litigation class; the loop now produces only genuine promise-altitude findings.
+2. **Detection has an irreducible tail; prevention is the leverage.** Even with perfect altitude, a non-trivial spec yields ~1–2 promise-level ripples per round because each fix interacts. The way to start near the floor instead of grinding toward it is to **author the spec right** — so `design/spec-authoring` was promoted to a roadmap feature (the prevention sibling to `design/spec-governance`'s detection). H2 (the self-tag severity cap) stays unmechanized for now; it under-fired and the lens made it non-load-bearing.
 
 ## Prevention beats detection: authoring is the cause
 

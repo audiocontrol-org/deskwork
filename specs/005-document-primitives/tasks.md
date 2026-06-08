@@ -147,6 +147,7 @@ The spec graduated via override with 7 residual findings deferred to implementat
 - [ ] T047 [P] AUDIT-20260608-05: the coherence check (curate) must **detect a live↔archive identifier collision created by a manual archive-marker edit** (ledger-only union can't see it) — test the manual-edit evasion path surfaces as a coherence NOTICE.
 - [ ] T048 [P] AUDIT-20260608-04: row-keyed archive table behavior under **column-schema change** between live doc and archive (operational/migration edge) — define + test the mismatch handling.
 - [ ] T049 [P] AUDIT-20260608-07 + -08: align the implementation so interrupted-`curate` detection is attributed to the coherence check, and `unarchive` locate failures are in the zero-write fail-loud set — test both.
+- [ ] T050 [P] AUDIT-20260608-22 (deferred from the spec-lens convergence pass): define how the block-level region model (preamble/Unit-sequence/postamble) maps onto a **row-keyed** grammar where Units are sub-block table data rows — classify the table header + separator rows (row-keyed structural chrome) so the roadmap proof doc does not fail loud on its own column header. Pin RED-first when authoring `roadmap.peg` + `block-stream.ts`; reflect the answer in `contracts/grammar-declaration.md`. Required for SC-005 (both proof docs governed by the same engine).
 
 **Checkpoint**: the override's deferred edges are closed RED-first; re-run `stackctl govern --mode spec` to confirm they clear (or are consciously re-deferred).
 
