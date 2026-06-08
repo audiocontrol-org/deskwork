@@ -75,9 +75,11 @@ export function buildBlockStream(source: string): BlockStream {
       case 'hr':
         entries.push({ kind: 'HR', text: '', span: toSpan(t.map) });
         break;
-      case 'html_block':
-        entries.push({ kind: 'HTML', text: norm(t.content.split('\n')[0] ?? ''), span: toSpan(t.map) });
-        break;
+      // No `html_block` arm: the engine constructs MarkdownIt with `html:false`,
+      // so raw HTML (`<div>…</div>`) is never tokenized as an `html_block` — it
+      // normalizes to a paragraph (`paragraph_open`) and is carried as an opaque
+      // `P` body. Enabling `html:true` would change parsing for all documents,
+      // which is out of scope.
       case 'thead_open':
         inThead = true;
         break;

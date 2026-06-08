@@ -124,6 +124,43 @@ describe('grammar resolution (T008)', () => {
     }
   });
 
+  it('present-but-malformed frontmatter YAML → fail loud (NOT "not governable")', () => {
+    // AUDIT-20260608-35: a document WITH a leading frontmatter block whose YAML
+    // is malformed must fail loud naming the broken frontmatter — never silently
+    // fall back to "not governable" (which points the operator at the wrong fix:
+    // "add a grammar" instead of "fix the broken YAML").
+    const { root, project, builtin } = tmpDirs();
+    try {
+      const src = ['---', 'doc-grammar: [unterminated', '---', '', '### x'].join('\n');
+      expect(() => resolveGrammar(src, { projectGrammarDir: project, builtinGrammarDir: builtin })).toThrow(
+        DocumentModelError,
+      );
+      expect(() => resolveGrammar(src, { projectGrammarDir: project, builtinGrammarDir: builtin })).toThrow(
+        /frontmatter|malformed|invalid.*yaml/i,
+      );
+      // And it must NOT be reported as "not governable".
+      expect(() => resolveGrammar(src, { projectGrammarDir: project, builtinGrammarDir: builtin })).not.toThrow(
+        /not governable/i,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('well-formed frontmatter WITHOUT a doc-grammar key → not governable (no throw on parse)', () => {
+    // Guard the inverse: a frontmatter that PARSES cleanly but lacks the
+    // `doc-grammar` key is still "not governable" — only a PARSE error fails loud.
+    const { root, project, builtin } = tmpDirs();
+    try {
+      const src = ['---', 'title: A document', 'tags: [a, b]', '---', '', '### x'].join('\n');
+      expect(() => resolveGrammar(src, { projectGrammarDir: project, builtinGrammarDir: builtin })).toThrow(
+        /not governable/i,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('a ref to a nonexistent grammar id → fail loud', () => {
     const { root, project, builtin } = tmpDirs();
     try {

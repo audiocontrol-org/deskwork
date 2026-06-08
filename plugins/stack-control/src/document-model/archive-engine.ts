@@ -42,7 +42,29 @@ function liveWithout(doc: GovernableDocument, moved: readonly Unit[]): string {
   for (const u of moved) {
     for (let line = u.span.startLine; line <= u.span.endLine; line++) cut.add(line);
   }
-  return doc.sourceLines.filter((_, i) => !cut.has(i + 1)).join('\n');
+  // Filter out the cut spans, then collapse the gap each cut leaves: a blank
+  // line that sits immediately AFTER a removed region is dropped when the
+  // last-kept line is also blank, so a middle cut can't accrete a double blank
+  // (AUDIT-20260608-33). This operates only at cut boundaries — a `justCut`
+  // flag is set only when the previous source line was part of a removed span,
+  // so blank lines inside retained blocks (e.g. fenced code) are never touched.
+  const kept: string[] = [];
+  let justCut = false;
+  for (let i = 0; i < doc.sourceLines.length; i++) {
+    const line = doc.sourceLines[i]!;
+    if (cut.has(i + 1)) {
+      justCut = true;
+      continue;
+    }
+    if (justCut && line.trim() === '' && kept.length > 0 && kept[kept.length - 1]!.trim() === '') {
+      // Drop this boundary blank: the line preceding the cut was already blank,
+      // so keeping this one would double the blank run at the seam.
+      continue;
+    }
+    kept.push(line);
+    justCut = false;
+  }
+  return kept.join('\n');
 }
 
 /** The header + separator lines of a row-keyed document's table (FR-006). */

@@ -152,7 +152,16 @@ export function parseGrammarArtifact(text: string, source: GrammarSource): Gramm
   };
 }
 
-/** Read a `doc-grammar: <id>` reference from the document frontmatter. */
+/**
+ * Read a `doc-grammar: <id>` reference from the document frontmatter.
+ *
+ * Returns null only when there is genuinely no usable grammar ref: no leading
+ * frontmatter at all, or frontmatter that PARSES cleanly but carries no
+ * `doc-grammar` key. A present-but-malformed frontmatter block is a
+ * configuration parse failure, NOT an absent grammar — it fails loud
+ * (FR-010 / Constitution Principle V) so the operator is pointed at the broken
+ * YAML, not misdirected to "add a grammar". (AUDIT-20260608-35.)
+ */
 function frontmatterRef(source: string): string | null {
   const lines = source.split('\n');
   const fm = detectFrontmatter(lines);
@@ -160,8 +169,11 @@ function frontmatterRef(source: string): string | null {
   let parsed: unknown;
   try {
     parsed = parseYaml(lines.slice(fm.start + 1, fm.end).join('\n'));
-  } catch {
-    return null;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new DocumentModelError(
+      `document has a leading \`---\` frontmatter block but its YAML is malformed and cannot be parsed — ${msg}; fix the frontmatter YAML (this is a parse failure, not a missing grammar)`,
+    );
   }
   if (!isRecord(parsed)) return null;
   const ref = parsed['doc-grammar'];

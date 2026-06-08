@@ -104,8 +104,15 @@ describe('block-stream round-trip (T006)', () => {
     expect(thead!.text.split('\x1f')).toEqual(['A', 'B']);
   });
 
-  it('HTML block maps to its full source line range', () => {
+  it('raw HTML normalizes to a paragraph (html:false) over its full source line range', () => {
+    // The engine constructs MarkdownIt with the default `html:false`, so raw
+    // HTML is never tokenized as an `html_block` — it is emitted as a paragraph
+    // (`P`) whose span covers the full `<div>…</div>` source lines. Asserting
+    // BOTH kind and span pins the real behavior; asserting span alone (as the
+    // prior test did) passed regardless of kind and masked the dead html_block
+    // path.
     const last = entries[entries.length - 1]!;
+    expect(last.kind).toBe('P');
     expect(sourceOf(last)).toBe('<div>\nhtml block\n</div>');
   });
 });

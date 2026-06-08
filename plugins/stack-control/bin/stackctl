@@ -22,8 +22,13 @@
 #      node_modules. Dispatch via the local tsx.
 #   3. First run (or partial install — e.g. tsx present but a later-added
 #      runtime dep missing): npm install in $PLUGIN_ROOT, then
-#      dispatch. A version-keyed sentinel short-circuits the probe on
-#      subsequent runs; a version bump invalidates it and forces a probe.
+#      dispatch. The dependency probe (all_deps_installed) is the
+#      AUTHORITATIVE skip signal — install runs whenever any declared
+#      runtime dep is actually missing. A version-keyed sentinel is only a
+#      cache hint that the install completed for this version; it can never
+#      override a failing probe (a stale sentinel written when the dep set
+#      was smaller must not mask a now-missing dep). A version bump also
+#      invalidates the sentinel.
 
 set -euo pipefail
 
@@ -47,8 +52,9 @@ find_tsx() {
 }
 
 # Read the plugin manifest version; used to name the install-complete
-# sentinel so version bumps force a re-probe. Empty string disables the
-# sentinel fast-path (every run probes), which is the conservative default.
+# sentinel cache marker. Empty string just means no marker is written; it
+# does not change behavior, since the dependency probe (not the marker) is
+# the authoritative skip signal.
 plugin_version() {
   local manifest="${PLUGIN_ROOT}/.claude-plugin/plugin.json"
   [ -f "${manifest}" ] || { printf ''; return 0; }
@@ -98,17 +104,14 @@ run_install() {
   ) >&2
 }
 
+# Write the install-complete cache marker after a successful probe/install.
+# It is a hint only — the dependency probe, not this file, decides whether
+# install must run (see the NEEDS_INSTALL block below).
 write_sentinel() {
   local version=$1
   [ -n "${version}" ] || return 0
   [ -d "${PLUGIN_ROOT}/node_modules" ] || return 0
   : > "${PLUGIN_ROOT}/node_modules/.deskwork-install-complete-${version}" 2>/dev/null || true
-}
-
-sentinel_present() {
-  local version=$1
-  [ -n "${version}" ] || return 1
-  [ -f "${PLUGIN_ROOT}/node_modules/.deskwork-install-complete-${version}" ]
 }
 
 TSX_BIN="$(find_tsx || true)"
@@ -133,9 +136,14 @@ NEEDS_INSTALL=0
 if [ -z "${TSX_BIN}" ]; then
   NEEDS_INSTALL=1
 elif [ "${IS_WORKSPACE_DEV}" -eq 0 ]; then
-  if sentinel_present "${VERSION}"; then
-    NEEDS_INSTALL=0
-  elif all_deps_installed; then
+  # The probe is authoritative: every declared runtime dep must actually be
+  # present on disk to skip install. The sentinel is only a cache hint and is
+  # NOT trusted on its own — a stale sentinel written when RUNTIME_DEPS was
+  # smaller would otherwise mask a now-missing dep and crash on first
+  # dispatch. Run the probe regardless of the sentinel; refresh the sentinel
+  # when the probe passes so it stays a faithful "install complete for this
+  # version" marker.
+  if all_deps_installed; then
     write_sentinel "${VERSION}"
     NEEDS_INSTALL=0
   else
