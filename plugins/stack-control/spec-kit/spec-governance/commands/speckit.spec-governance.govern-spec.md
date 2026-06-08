@@ -85,6 +85,22 @@ instead. For each open finding:
 The orchestrator's only jobs in the loop are **dispatch → apply → re-barrage** —
 never hand-authoring spec prose.
 
+## Diminishing returns — detect the plateau, don't chase a generator
+
+Unlike code, a spec has **no crisp convergence floor** — an aggressive cross-model
+barrage can always find another under-specified edge in prose. Before raising the
+ceiling or looping another round, ask: *am I converging, or feeding a generator?*
+**Read [`../SPEC-AUDIT-FAILURE-MODES.md`](../SPEC-AUDIT-FAILURE-MODES.md)** (the
+catalog + heuristics) — and **append a new entry after the loop closes**. Plateau
+signals: HIGH stops monotonically decreasing; new findings are mostly fix-debt; a
+root issue resurfaces under a new ID; findings drop to implementation-mechanism
+altitude (the spec being asked to *be* the code). At the plateau, **stop patching
+instances**: apply a **structural root-fix** (de-specify an over-specified
+mechanism → state the *promise* + defer the protocol to contracts/TDD; or
+DRY-collapse a duplicated rule) or record a substantive `GOVERN_OVERRIDE` — never
+just raise the ceiling and keep patching. The operator owns that call. See the
+always-loaded rule `.claude/rules/spec-audit-diminishing-returns.md`.
+
 ## Result
 
 Report the printed run-dir path and the convergence verdict, and summarize:
