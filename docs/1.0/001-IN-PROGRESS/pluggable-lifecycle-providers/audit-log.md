@@ -972,7 +972,7 @@ The blast radius is exactly the feature's reason to exist, and it bites hardest 
 ### AUDIT-20260608-01 — the convergence gate graduates at the FIRST 0-HIGH run (not FR-010 branch a/b), and FR-014's loop bound is realized as an advisory verdict, not a code-enforced interlock
 
 Finding-ID: AUDIT-20260608-01
-Status:     open
+Status:     open — Facet A FIXED (eed196b3 + spec 98d8c7b0/42277eb1 + skills 0689aa9e); Facet B DEFERRED (operator 2026-06-08: do B only if A does not fix the problem)
 Severity:   high
 Surface:    plugins/stack-control/src/subcommands/spec-governance-gate.ts (the convergence decision block); plugins/stack-control/src/scope-discovery/promote-findings/check-barrage-dampener.ts:99-137,196-206 (`countHighPlusInSection` counts `Status: open` only; `singleRunCleanEngages`); plugins/stack-control/src/govern/protocol.ts (the `render → barrage → lift → slush → gate` chain); plugins/stack-control/spec-kit/deskwork-governance/commands/speckit.deskwork-governance.govern.md step 4 (the loop lives in skill-body prose); specs/004-spec-governance/spec.md FR-010 (canonical convergence rule), FR-014 (bounded loop), FR-015 (slush). Surfaced manually while driving the `design/document-primitives` (005) implement-phase governance loop; affects BOTH spec-mode and implement-mode governance (one gate, two phases — FR-006).
 
@@ -988,6 +988,16 @@ The gate returns `mayGraduate` (a *permission*; exit 0 on `converged`/`overridde
 
 The two compound: a mis-computed stop signal (A) that is also non-binding (B).
 
-Disposition: **open.** Scope → amend `specs/004-spec-governance/spec.md` FR-010 (branch-(a) genuineness / slush ordering) + FR-014 (loop-driver interlock), with RED-first fix-tasks added to `specs/004-spec-governance/tasks.md` when 004 resumes; the gate + loop migrate under `multi/migrate-audit-barrage`, which must carry this forward. NOTE: the FR-015 MED auto-slush is itself spec'd/intended — the defect is the slush-before-single-run-clause **interaction** (it subverts the genuineness branch (a) assumes), not the slush per se. Cross-ref: the 005 implement-governance GRADUATION III (`docs/1.0/001-IN-PROGRESS/document-primitives/audit-log.md`) where this was surfaced; GitHub issue: audiocontrol-org/deskwork#432 (sibling of #431, the audit-log self-reference generator).
+Disposition: **Facet A FIXED 2026-06-08; Facet B DEFERRED (operator).**
+
+**Facet A — fixed (#432), with the design evolved beyond the three options above under three operator directives:**
+1. *Raw-surfaced counting.* The dampener window now counts what each run **raw-surfaced** (`Severity:` regardless of `Status:`), so a HIGH-bearing run fixed between runs is not a 0-HIGH run and a slushed-MED run is not single-run-clean — restoring branch (a) genuineness and the branch (b) two-consecutive stability guard (the field R5 terminal). (`check-barrage-dampener.ts`, `spec-governance-gate.ts`; commit `eed196b3`.)
+2. *Open issues have no bearing.* The cross-run open-finding union (AUDIT-20260607-45) is **removed** from the gate — the recent-run convergence signal is the whole policy. Rationale: (a) findings are fixed between runs, so a prior `open` entry is stale; (b) an unfixed finding is re-flagged stochastically by the barrage and returns to the recent window. This narrows SC-006 / SC-007 (spec amended).
+3. *Single boolean, policy in one place.* The gate prints **only** `true`/`false` on stdout; the exit code encodes execution status, not policy — no `state`/`rule` for a consumer to re-derive. `protocol.ts`/`govern.ts` obey the boolean.
+Spec amended: `specs/004` FR-007/010/014/015 + SC-006/007/008 + data-model/quickstart + dated Clarifications entry (`98d8c7b0`, `42277eb1`). Govern skills + README updated to the boolean interface (`0689aa9e`). 251 plugin tests pass; tsc clean; RED-first tests pin the field R2 early-graduation, raw counting, the single-boolean contract, and "open issues have no bearing".
+
+**Facet B (the loop-driver interlock) — DEFERRED** by operator decision (2026-06-08): "we'll do Facet B if Facet A doesn't fix the problem." The convergence loop still lives in the govern skill-body prose (now keyed on the gate's boolean: stop once OPEN). If Facet A proves insufficient, mechanize the loop into a code driver that consumes the gate boolean and refuses another round. Carries forward under `multi/migrate-audit-barrage`.
+
+NOTE: the FR-015 MED auto-slush is itself spec'd/intended; it remains (keeps the graduated record free of open MEDIUM for SC-007) but is no longer load-bearing for the gate decision (raw counting). Cross-ref: the 005 implement-governance GRADUATION III (`docs/1.0/001-IN-PROGRESS/document-primitives/audit-log.md`) where this was surfaced; GitHub issue: audiocontrol-org/deskwork#432 (sibling of #431).
 
 ---
