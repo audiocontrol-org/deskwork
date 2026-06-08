@@ -16,11 +16,14 @@ reconciliationHook:
   source: "specs/*/spec.md"
 ---
 {{
-  // LEGACY row-keyed roadmap grammar (006 T015). Preserved verbatim from the
-  // pre-006 `roadmap.peg` while the canonical roadmap migrates to the
-  // heading-keyed `roadmap` grammar (US6). Row-keyed consumers (engine tests
-  // that exercise archive/curate/unarchive through a row-keyed example) point
-  // at `doc-grammar: roadmap-legacy`. Retired by T052 once migration is green.
+  // Row-keyed roadmap grammar (006 T015). Originally the pre-006 `roadmap.peg`,
+  // preserved verbatim when the canonical roadmap migrated to the heading-keyed
+  // `roadmap` grammar (US6). It is NOT removed: it is now the canonical
+  // ROW-KEYED EXAMPLE grammar that the document-model engine tests use to prove
+  // archive/curate/unarchive work on the row-keyed code path (the engine
+  // supports both `heading` and `row` UnitMarkers). Removing it would drop that
+  // coverage — see audiocontrol-org/deskwork#435 for the T052 intent-vs-coverage
+  // decision. Row-keyed consumers point at `doc-grammar: roadmap-legacy`.
   //
   // The roadmap is ROW-KEYED: each table data row is a Unit. The identifier and
   // status columns are SINGLE-SOURCED from the grammar metadata

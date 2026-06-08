@@ -17,7 +17,10 @@ const BUILTIN = resolve(PLUGIN_ROOT, 'grammars');
 const OPTS = { builtinGrammarDir: BUILTIN };
 
 const INBOX = resolve(PLUGIN_ROOT, 'DESIGN-INBOX.md');
-const ROADMAP = resolve(PLUGIN_ROOT, 'ROADMAP.md');
+// The live ROADMAP.md migrated to the heading-keyed `roadmap` grammar in 006
+// (US6), so the row-keyed half of this "two shapes" proof uses a committed
+// row-keyed fixture on the preserved `roadmap-legacy` grammar instead.
+const ROW_ROADMAP = resolve(here, 'fixtures', 'row-roadmap.md');
 const SOURCE_INBOX = resolve(
   REPO_ROOT,
   'docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/design-inbox.md',
@@ -26,17 +29,15 @@ const SOURCE_INBOX = resolve(
 describe('generality — one engine, two document shapes (T037, SC-005)', () => {
   it('both proof documents load through the SAME engine, differing only in grammar', () => {
     const inbox = loadDocument(INBOX, OPTS);
-    const roadmap = loadDocument(ROADMAP, OPTS);
+    const roadmap = loadDocument(ROW_ROADMAP, OPTS);
 
     // Same code path produced Units for both.
     expect(inbox.doc.units.length).toBeGreaterThan(0);
     expect(roadmap.doc.units.length).toBeGreaterThan(0);
 
     // The only difference is the grammar: heading-keyed inbox vs row-keyed
-    // roadmap. During the 006 transition the LIVE ROADMAP.md is still row-keyed
-    // and points at `roadmap-legacy` (the preserved row-keyed grammar); US6
-    // migrates it to the heading-keyed canonical `roadmap`. The "one engine, two
-    // shapes" proof holds regardless of which grammar id the row-keyed doc uses.
+    // roadmap-legacy. (The live ROADMAP.md is now heading-keyed `roadmap` after
+    // the 006 US6 migration; the row-keyed proof uses the committed fixture.)
     expect(inbox.doc.grammar.id).toBe('design-inbox');
     expect(roadmap.doc.grammar.id).toBe('roadmap-legacy');
     expect(inbox.doc.grammar.unit.kind).toBe('heading');

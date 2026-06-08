@@ -105,18 +105,18 @@ TDD is mandatory (Constitution I — NON-NEGOTIABLE): every implementation task 
 **Goal**: the canonical heading-keyed `ROADMAP.md` becomes the single source; the prose roadmap retires to a pointer.
 **Independent test**: quickstart Scenario 7 (SC-005 / FR-019/020).
 
-- [ ] T049 [US6] RED: presence test — every real feature from `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md` exists as an item in the migrated `ROADMAP.md`; the graph validates green — `tests/roadmap/migration-presence.test.ts`
-- [ ] T050 [US6] Author the heading-keyed canonical `plugins/stack-control/ROADMAP.md` from the prose roadmap (scope + explicit `depends-on` edges derived from prose dependency notes; statuses from current reality) — make T049 green. MUST include: (a) a `design:feature/roadmap-protocol` row for this feature itself (the manual self-seed per Assumptions), and (b) a `design:gap/roadmap-order-gating` item capturing the deferred hard out-of-order gating (FR-018) so the deferral is a captured roadmap item, never silently dropped
-- [ ] T051 [US6] Retire `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md` to a pointer at the canonical roadmap; capture any bug/gap found during migration as `fix`/`gap` items (FR-020)
-- [ ] T052 [US6] Remove the legacy `plugins/stack-control/grammars/roadmap-legacy.peg` once migration is green (no remaining row-keyed roadmap)
-- [ ] T053 [US6] Checkpoint: quickstart Scenario 7 green (one canonical roadmap)
+- [X] T049 [US6] RED: presence test — every real feature from `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md` exists as an item in the migrated `ROADMAP.md`; the graph validates green — `tests/roadmap/migration-presence.test.ts`
+- [X] T050 [US6] Author the heading-keyed canonical `plugins/stack-control/ROADMAP.md` from the prose roadmap (scope + explicit `depends-on` edges derived from prose dependency notes; statuses from current reality) — make T049 green. MUST include: (a) a `design:feature/roadmap-protocol` row for this feature itself (the manual self-seed per Assumptions), and (b) a `design:gap/roadmap-order-gating` item capturing the deferred hard out-of-order gating (FR-018) so the deferral is a captured roadmap item, never silently dropped
+- [X] T051 [US6] Retire `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md` to a pointer at the canonical roadmap; capture any bug/gap found during migration as `fix`/`gap` items (FR-020)
+- [~] T052 [US6] Remove the legacy `plugins/stack-control/grammars/roadmap-legacy.peg` once migration is green (no remaining row-keyed roadmap) — SUPERSEDED: roadmap-legacy.peg is KEPT as the canonical row-keyed example grammar (only row-keyed engine coverage); removing it would drop that coverage. Operator decision filed audiocontrol-org/deskwork#435.
+- [X] T053 [US6] Checkpoint: quickstart Scenario 7 green (one canonical roadmap)
 
 ## Phase 9: Polish & Cross-Cutting
 
-- [ ] T054 [P] Author `plugins/stack-control/skills/roadmap/SKILL.md` — the `/stack-control:roadmap` discipline + verb usage; dry-run-first; enforcement lives here + the verb (never a git hook)
-- [ ] T055 [P] Regression test: `curate`/`archive` operate unchanged on the heading-keyed roadmap (quickstart Scenario 6) — `tests/roadmap/curate-archive-regression.test.ts`
-- [ ] T056 File-size audit: every new module ≤ 500 lines (Constitution VI); `tsc` strict clean across the plugin; no `any`/`as`/`@ts-ignore`
-- [ ] T057 Full quickstart run-through; session-end clone-snapshot (no new duplication); ready for `after_implement` governance barrage
+- [X] T054 [P] Author `plugins/stack-control/skills/roadmap/SKILL.md` — the `/stack-control:roadmap` discipline + verb usage; dry-run-first; enforcement lives here + the verb (never a git hook)
+- [X] T055 [P] Regression test: `curate`/`archive` operate unchanged on the heading-keyed roadmap (quickstart Scenario 6) — `tests/roadmap/curate-archive-regression.test.ts`
+- [X] T056 File-size audit: every new module ≤ 500 lines (Constitution VI); `tsc` strict clean across the plugin; no `any`/`as`/`@ts-ignore`
+- [X] T057 Full quickstart run-through; session-end clone-snapshot (no new duplication); ready for `after_implement` governance barrage
 
 ## Dependencies & execution order
 

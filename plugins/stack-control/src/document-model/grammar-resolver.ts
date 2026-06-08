@@ -126,15 +126,16 @@ function parseEdgeFields(raw: unknown, ctx: string): EdgeFieldSpec[] {
       throw new DocumentModelError(`grammar ${where}: each edge field must be a mapping`);
     }
     const name = reqString(entry, 'name', where);
-    const references = entry.references;
-    if (typeof references !== 'string' || !EDGE_REFERENCES.includes(references as (typeof EDGE_REFERENCES)[number])) {
+    // Narrow to the union by membership (no cast — find returns the literal type).
+    const references = EDGE_REFERENCES.find((r) => r === entry.references);
+    if (references === undefined) {
       throw new DocumentModelError(
         `grammar ${where}: \`references\` must be one of ${EDGE_REFERENCES.join(' | ')}`,
       );
     }
     return {
       name,
-      references: references as EdgeFieldSpec['references'],
+      references,
       acyclic: reqBool(entry, 'acyclic', where),
       blocking: reqBool(entry, 'blocking', where),
     };
