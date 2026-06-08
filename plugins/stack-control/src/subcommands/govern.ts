@@ -34,10 +34,16 @@ import {
   runProtocol,
   type BarrageVars,
 } from '../govern/protocol.js';
-import { assembleImplementPayload } from '../govern/payload-implement.js';
+import {
+  assembleImplementPayload,
+  CODE_AUDIT_LENS,
+  CODE_ARTIFACT_FRAMING,
+} from '../govern/payload-implement.js';
 import {
   assembleSpecPayload,
   GovernPayloadError,
+  SPEC_AUDIT_LENS,
+  SPEC_ARTIFACT_FRAMING,
 } from '../govern/payload-spec.js';
 import { readFileSync } from 'node:fs';
 
@@ -175,7 +181,7 @@ function resolveSpecPath(repoRoot: string, flagValue: string | undefined): strin
   return join(repoRoot, dirname(markerPath), 'spec.md');
 }
 
-function buildImplementVars(
+export function buildImplementVars(
   repoRoot: string,
   slug: string,
   diffBaseFlag: string | undefined,
@@ -203,13 +209,15 @@ function buildImplementVars(
     diff: payload.diff,
     audit_log_excerpt: excerpt,
     commit_subjects: payload.commitSubjects,
+    audit_lens: CODE_AUDIT_LENS,
+    artifact_framing: CODE_ARTIFACT_FRAMING,
   };
   const checkpoint =
     checkpointFlag ?? pick(undefined, process.env.GOVERN_CHECKPOINT) ?? 'after_clarify';
   return { vars, checkpoint };
 }
 
-function buildSpecVars(
+export function buildSpecVars(
   repoRoot: string,
   slug: string,
   specPathFlag: string | undefined,
@@ -236,6 +244,8 @@ function buildSpecVars(
     diff: payload.diff,
     audit_log_excerpt: excerpt,
     commit_subjects: '',
+    audit_lens: SPEC_AUDIT_LENS,
+    artifact_framing: SPEC_ARTIFACT_FRAMING,
   };
   return { vars, checkpoint: payload.checkpoint };
 }

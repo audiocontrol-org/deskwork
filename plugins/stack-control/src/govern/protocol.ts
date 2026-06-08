@@ -93,6 +93,19 @@ export interface BarrageVars {
   readonly diff: string;
   readonly audit_log_excerpt: string;
   readonly commit_subjects: string;
+  /**
+   * Mode-aware lens for the prompt's "What to look for" section. Implement mode
+   * supplies CODE_AUDIT_LENS (code-quality / edge-case checklist); spec mode
+   * supplies SPEC_AUDIT_LENS (promise / decision / contradiction / ambiguity
+   * altitude). Keeping the lens as data keeps the render mode-agnostic.
+   */
+  readonly audit_lens: string;
+  /**
+   * Mode-aware framing for the prompt's "Under audit" section — how to read the
+   * folded artifact (code-with-line-anchors vs. spec-as-promises). CODE_* for
+   * implement, SPEC_* for spec.
+   */
+  readonly artifact_framing: string;
 }
 
 /**

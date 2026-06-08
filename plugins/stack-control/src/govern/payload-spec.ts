@@ -28,6 +28,36 @@ import { statSync, readFileSync } from 'node:fs';
 const DEFAULT_PAYLOAD_BUDGET = 256 * 1024;
 
 /**
+ * Spec-mode audit lens — the prompt's "What to look for" section for a SPEC.
+ * Scopes the audit to spec altitude (promise / decision / contradiction /
+ * ambiguity) instead of the code-quality checklist, so spec audits don't
+ * litigate implementation in the spec (the non-converging-findings failure
+ * mode). The render is mode-agnostic; the lens is data.
+ */
+export const SPEC_AUDIT_LENS = [
+  '**You are auditing a SPECIFICATION — a statement of PROMISES, REQUIREMENTS, and DESIGN DECISIONS — NOT an implementation.** Look for flaws in *what the spec promises and decides*, never in *how it would be built*:',
+  '',
+  '- **Internal contradictions** — two requirements, a requirement and a success criterion, an acceptance scenario and an FR, or two design decisions that cannot all hold. The highest-value spec finding.',
+  '- **Impossible or self-contradictory promises** — a guarantee the spec makes that cannot be true as stated. Flag the *promise* as unachievable; do NOT demand the mechanism that would achieve it.',
+  '- **Ambiguity an unattended builder resolves wrongly** — a requirement with two roughly-equally-plausible readings the spec never disambiguates; the wrong one gets built by default.',
+  '- **Unmeasurable / untestable promises** — a success criterion or requirement with no way to tell whether it is met.',
+  '- **Missing user-facing guarantee or decision** — a behavior the feature\'s stated goals require but the spec never commits to (a missing *promise*, not a missing *mechanism*).',
+  '- **Over-specified mechanism (altitude violation)** — the spec dictating *how* something is implemented: algorithms, data-structure or file layouts, write/recovery protocols, parser internals, exhaustive edge-case handling. Flag this as *"move to contracts/tests — too detailed for a spec."*',
+  '',
+  '**Litmus before you emit any finding:** *is this a flaw in WHAT the spec promises/decides, or in HOW it would be implemented?* WHAT (promise / decision / contradiction / ambiguity) → in scope, flag it. HOW (mechanism / algorithm / protocol / data-layout / edge-case handling) → OUT of scope: the mechanism is pinned by contracts + RED tests at implementation time, not by spec prose, and a coherent promise needs no mechanism to be a good spec.',
+  '',
+  '**Do NOT flag** "what happens on empty input / concurrent calls / partial failure / operator interrupt mid-operation / maximum input" as missing — those are implementation edge cases the tests pin, UNLESS the spec makes a contradictory or impossible *promise* about them. **Do NOT flag** "the algorithm / format / protocol / data structure is unspecified." If you nonetheless surface a mechanism-level observation, mark it **at most `medium`** and prefix its finding heading with `[mechanism — defer to contracts/tests]`.',
+].join('\n');
+
+/**
+ * Spec-mode artifact framing — the prompt's "Under audit" lead-in for a SPEC.
+ * Tells the auditor to read the folded artifact as promises/decisions, not
+ * code, and to anchor findings to section / requirement IDs.
+ */
+export const SPEC_ARTIFACT_FRAMING =
+  'The specification under audit — requirements, success criteria, acceptance scenarios, and design decisions. Read it as a statement of promises and decisions, not code. Anchor each finding to a specific section or requirement ID (e.g. `FR-007`, `SC-003`), or call out a missing promise that should be stated but isn\'t.';
+
+/**
  * Thrown when a REQUIRED artifact cannot be folded (missing or over budget).
  * Fail-loud, never a silent degrade (FR-005 / AUDIT-20260607-14/-15).
  */
