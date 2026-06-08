@@ -10,7 +10,7 @@ keyed by its `<phase>/<slug>` codename; rows are ordered by the `phase` relation
 Statuses: `planned`, `in-flight` (active), and the terminal `shipped` /
 `cancelled` / `retired`. Keep it lean with `/stack-control:curate` — shipped and
 retired rows archive out. The grammar declares a reconciliation hook (the seam
-a future roadmap-discipline protocol plugs into); `curate` recognizes it but
+the planned roadmap-discipline protocol plugs into); `curate` recognizes it but
 does not execute it.
 
 | Codename | Feature | Scope | Status |

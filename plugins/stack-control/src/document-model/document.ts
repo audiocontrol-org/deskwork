@@ -9,6 +9,7 @@ import { buildBlockStream } from './block-stream.js';
 import { resolveGrammar, type ResolveOptions } from './grammar-resolver.js';
 import { parseUnits } from './grammar-parse.js';
 import { assertOrderKeyNotIdentifier, validateIdentifiers } from './identifier-validator.js';
+import { assertInDomain } from './ordering.js';
 import { readLedger } from './ledger.js';
 import {
   DocumentModelError,
@@ -51,6 +52,14 @@ export function loadDocument(docPath: string, opts: LoadOptions): LoadedDocument
   // FR-005 uniqueness over document ∪ archive — archived ids come SOLELY from
   // the ledger (FR-006), never from scanning the archive contents.
   validateIdentifiers(units, ledger.map((e) => e.identifier));
+
+  // FR-004/FR-003 well-formedness: every Unit's order-key value must lie within
+  // the grammar's declared relation. Asserting here (alongside identifier
+  // validation) makes an out-of-domain value fail loud at LOAD, so EVERY verb
+  // (archive — which never reorders — included) refuses it consistently, rather
+  // than only curate/unarchive catching it when they happen to reorder
+  // (AUDIT-20260608-39). Reuses the canonical assertInDomain (no duplication).
+  for (const unit of units) assertInDomain(grammar, unit);
 
   const doc: GovernableDocument = { path: docPath, archivePath, grammar, units, sourceLines };
   return { doc, stream, ledger };
