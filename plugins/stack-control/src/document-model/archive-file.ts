@@ -7,7 +7,8 @@ import { buildBlockStream } from './block-stream.js';
 import type { BlockEntry, GrammarSpec } from './types.js';
 
 /**
- * Split a markdown table row into trimmed cells (drops the outer pipes).
+ * Split a markdown table row into trimmed cells (drops outer border pipes when
+ * present — optional-edge tables without outer pipes are handled, AUDIT-52).
  *
  * Splits on UNESCAPED `|` only: a backslash-escaped pipe (`\|`) renders as a
  * literal `|` inside a single cell and is NOT a column delimiter. markdown-it
@@ -37,13 +38,48 @@ export function tableCells(line: string): string[] {
     current += ch;
   }
   cells.push(current);
-  // Drop the segments outside the leading/trailing outer pipes, then trim.
-  return cells.slice(1, cells.length - 1).map((c) => c.trim());
+  // Optional-edge pipe tables (AUDIT-20260608-52): markdown-it accepts rows
+  // WITHOUT a leading/trailing outer pipe (`a | b | c`), not just the fully
+  // bordered form (`| a | b | c |`). Drop an outer empty segment ONLY when the
+  // row actually had that outer pipe — a leading empty only when the line's
+  // first non-space char is `|`, a trailing empty only when the last non-space
+  // char is `|`. The live-parse side (block-stream collectRowCells) is already
+  // edge-agnostic because it reads markdown-it's parsed td tokens.
+  const trimmed = line.trim();
+  let start = 0;
+  let end = cells.length;
+  if (trimmed.startsWith('|') && end - start > 0) start += 1;
+  if (trimmed.endsWith('|') && end - start > 0) end -= 1;
+  return cells.slice(start, end).map((c) => c.trim());
 }
 
 /** True for a table separator row (`|---|:--:|`). */
 export function isSeparatorRow(cells: readonly string[]): boolean {
   return cells.length > 0 && cells.every((c) => /^:?-+:?$/.test(c));
+}
+
+/**
+ * True when a raw line is a candidate markdown table row (AUDIT-20260608-52).
+ *
+ * Optional-edge tables don't begin with `|` (`a | b | c`), so a `startsWith('|')`
+ * gate silently skips them — the same edge-blindness that motivated the
+ * `tableCells` fix, one level up in the scan loops that FEED `tableCells`. A
+ * table row is any line carrying at least one UNESCAPED `|` (a backslash-escaped
+ * `\|` is literal cell content, not a column delimiter). Separator rows match
+ * too — callers disambiguate with `isSeparatorRow`. Prose without a pipe never
+ * matches, so this stays as conservative as the prior gate for non-table lines.
+ */
+export function isTableRowLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed === '') return false;
+  for (let i = 0; i < trimmed.length; i++) {
+    if (trimmed[i] === '\\' && trimmed[i + 1] === '|') {
+      i++;
+      continue;
+    }
+    if (trimmed[i] === '|') return true;
+  }
+  return false;
 }
 
 /**
@@ -95,7 +131,7 @@ function ledgerCommentRange(archiveSource: string): { start: number; end: number
 export function archiveTableHeaderCells(archiveSource: string): string[] | null {
   const lines = archiveSource.split('\n');
   for (let i = 0; i < lines.length; i++) {
-    if (!lines[i]!.trimStart().startsWith('|')) continue;
+    if (!isTableRowLine(lines[i]!)) continue;
     const cells = tableCells(lines[i]!);
     if (isSeparatorRow(cells)) continue;
     // The first non-separator table row IS the header (a single archived-Unit
@@ -122,7 +158,7 @@ export function archiveMarkerIds(archiveSource: string, grammar: GrammarSpec): s
   const ids: string[] = [];
   let pastSeparator = false;
   for (const line of lines) {
-    if (!line.trimStart().startsWith('|')) continue;
+    if (!isTableRowLine(line)) continue;
     const cells = tableCells(line);
     if (isSeparatorRow(cells)) {
       pastSeparator = true;

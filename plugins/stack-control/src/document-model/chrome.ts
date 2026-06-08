@@ -35,14 +35,56 @@ export function detectFrontmatter(lines: readonly string[]): LineRange | null {
 }
 
 /**
+ * Detect a fenced-code-block delimiter line. A fence opens (and closes) on a
+ * line whose trimmed content STARTS with a run of 3+ backticks or 3+ tildes
+ * (the common CommonMark case; an info-string like ```markdown may follow).
+ * Returns the fence character (`` ` `` or `~`) for a candidate delimiter, else
+ * null. We keep this deliberately simple: a fence delimiter sits alone on its
+ * line (modulo an info-string) — the common case the grammar-example docs use.
+ */
+function fenceDelimiterChar(line: string): '`' | '~' | null {
+  const t = line.trimStart();
+  if (t.startsWith('```')) return '`';
+  if (t.startsWith('~~~')) return '~';
+  return null;
+}
+
+/**
  * Find every HTML comment whose first non-blank token is the grammar sentinel.
  * FR-001: a governable document has EXACTLY ONE; the resolver fails loud on
  * more than one (ambiguous declaration). Returns all matches so the caller can
  * enforce that.
+ *
+ * Fence-aware (AUDIT-20260608-51): stack-control documents its own grammar
+ * syntax, so a `<!-- doc-grammar: ... -->` opener can legitimately appear INSIDE
+ * a fenced code block as a documented EXAMPLE. Such an opener is code, never a
+ * real declaration — detecting it would either override the document's real
+ * grammar or trip the >1-declaration ambiguity fail-loud. We track fenced-code-
+ * block state while scanning and SKIP any `<!--` opener that begins inside a
+ * fence. The skip applies consistently to BOTH the terminated and unterminated
+ * branches (a malformed example in a fence must not fail loud either). This
+ * cannot use buildBlockStream — findGrammarComments is called (via blankChrome)
+ * BY buildBlockStream, so the fence tracking lives directly in this line scan.
  */
 export function findGrammarComments(lines: readonly string[]): GrammarComment[] {
   const found: GrammarComment[] = [];
+  // Fence char of the currently-open fenced code block, or null when outside a
+  // fence. A fence closes on a later delimiter line using the same fence char.
+  let openFence: '`' | '~' | null = null;
   for (let i = 0; i < lines.length; i++) {
+    const fenceChar = fenceDelimiterChar(lines[i]!);
+    if (fenceChar !== null) {
+      if (openFence === null) {
+        openFence = fenceChar; // opening delimiter
+      } else if (fenceChar === openFence) {
+        openFence = null; // matching closing delimiter
+      }
+      // A fence delimiter line is never itself a grammar-comment opener.
+      continue;
+    }
+    // Inside a fenced code block: any `<!--` here is a documented example, not a
+    // real declaration. Skip it for both the terminated and unterminated cases.
+    if (openFence !== null) continue;
     const open = lines[i]!.indexOf('<!--');
     if (open === -1) continue;
     // Locate the comment's closing `-->` (same line or a later line).

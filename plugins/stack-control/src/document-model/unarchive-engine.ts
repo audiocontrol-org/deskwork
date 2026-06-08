@@ -11,7 +11,7 @@
 // fail loud with zero writes.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { isSeparatorRow, reservedHeadingEntries, tableCells } from './archive-file.js';
+import { isSeparatorRow, isTableRowLine, reservedHeadingEntries, tableCells } from './archive-file.js';
 import { buildBlockStream } from './block-stream.js';
 import { loadDocument, type LoadOptions } from './document.js';
 import { parseUnits } from './grammar-parse.js';
@@ -75,7 +75,7 @@ function locateInArchive(archiveSource: string, grammar: GrammarSpec, id: string
   let pastSeparator = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    if (!line.trimStart().startsWith('|')) continue;
+    if (!isTableRowLine(line)) continue; // edge-agnostic (AUDIT-52 sibling)
     const cells = tableCells(line);
     if (isSeparatorRow(cells)) {
       pastSeparator = true;
@@ -95,7 +95,7 @@ function locateInArchive(archiveSource: string, grammar: GrammarSpec, id: string
 function parseLifted(grammar: GrammarSpec, located: Located, doc: GovernableDocument): Unit {
   let mini: string;
   if (grammar.unit.kind === 'row') {
-    const header = doc.sourceLines.find((l) => l.trimStart().startsWith('|') && !isSeparatorRow(tableCells(l)));
+    const header = doc.sourceLines.find((l) => isTableRowLine(l) && !isSeparatorRow(tableCells(l)));
     if (header === undefined) {
       throw new DocumentModelError(
         `unarchive: row-keyed live document ${doc.path} has no table header to reinsert into (see T044)`,
@@ -126,6 +126,25 @@ function parseLifted(grammar: GrammarSpec, located: Located, doc: GovernableDocu
   return units[0]!;
 }
 
+/**
+ * AUDIT-20260608-53: bridge the gap between "located by id" and "parsed identity".
+ * `locateInArchive` finds the archived content by a RAW match (heading text /
+ * identifier-column cell === the requested id) and never runs the grammar's
+ * identifier production; `parseLifted` re-parses that content THROUGH the grammar
+ * to recover the Unit. The two derive identity independently. If they disagree
+ * (e.g. a manually-edited archive body, or a future grammar whose production
+ * transforms the marker) we would otherwise write the Unit back under an
+ * unexpected identity and drop the ledger entry for the requested id — a silent
+ * identity drift. Fail loud naming BOTH ids, BEFORE any write (zero writes).
+ */
+export function assertLiftedIdentityMatches(requestedId: string, lifted: Unit): void {
+  if (lifted.identifier !== requestedId) {
+    throw new DocumentModelError(
+      `unarchive: identity drift — located '${requestedId}' but the lifted content parses to '${lifted.identifier}'; the archived body's identity does not match the requested id (no writes performed)`,
+    );
+  }
+}
+
 function insertIntoLive(doc: GovernableDocument, located: Located, lifted: Unit): string {
   const grammar = doc.grammar;
   assertInDomain(grammar, lifted);
@@ -142,7 +161,7 @@ function insertIntoLive(doc: GovernableDocument, located: Located, lifted: Unit)
       // separator (chrome, not Units) in the live document. Reinsert the row
       // immediately after the separator so it rejoins that table.
       const sepIdx = lines.findIndex(
-        (l) => l.trimStart().startsWith('|') && isSeparatorRow(tableCells(l)),
+        (l) => isTableRowLine(l) && isSeparatorRow(tableCells(l)),
       );
       if (sepIdx === -1) {
         throw new DocumentModelError(
@@ -186,6 +205,9 @@ export function runUnarchive(docPath: string, opts: UnarchiveOptions): ArchiveRe
   const archiveSource = readFileSync(doc.archivePath, 'utf8');
   const located = locateInArchive(archiveSource, doc.grammar, opts.id);
   const lifted = parseLifted(doc.grammar, located, doc);
+  // AUDIT-20260608-53: the located content's parsed identity must match the id we
+  // located by — assert before reporting (dry-run) or writing (apply).
+  assertLiftedIdentityMatches(opts.id, lifted);
 
   const move: ArchiveMove = { identifier: lifted.identifier, status: entry.fromStatus, span: lifted.span };
   if (!opts.apply) {
