@@ -60,7 +60,14 @@ export function findGrammarComments(lines: readonly string[]): GrammarComment[] 
       // the operator at the wrong repair ("add a grammar" vs. "close the `-->`").
       // Fail loud naming the unterminated grammar comment (AUDIT-20260608-45,
       // same fail-loud class as the AUDIT-35 frontmatter fix).
-      const afterOpen = lines[i]!.slice(open + 4);
+      //
+      // The sentinel may sit on the SAME line as `<!--` OR on a later line (the
+      // `<!--` line is bare). Compute the inner content the same way the
+      // terminated-comment branch computes `inner` — slice from after `<!--` to
+      // the end-of-document (there is no `-->`) — so the multi-line opener is
+      // caught too (AUDIT-20260608-50). The same-line case is the prefix of this.
+      const block = lines.slice(i).join('\n');
+      const afterOpen = block.slice(block.indexOf('<!--') + 4);
       if (afterOpen.trimStart().startsWith(GRAMMAR_SENTINEL)) {
         throw new DocumentModelError(
           `unterminated grammar comment: the \`${GRAMMAR_SENTINEL}\` declaration opened on line ${i + 1} is never closed with \`-->\` through end-of-document; close the comment (this is a malformed grammar declaration, not a missing one)`,

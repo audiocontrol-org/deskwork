@@ -3,7 +3,8 @@
 // markers only — the reserved-level heading for a heading-keyed grammar, or the
 // table row for a row-keyed grammar.
 
-import type { GrammarSpec } from './types.js';
+import { buildBlockStream } from './block-stream.js';
+import type { BlockEntry, GrammarSpec } from './types.js';
 
 /**
  * Split a markdown table row into trimmed cells (drops the outer pipes).
@@ -45,9 +46,48 @@ export function isSeparatorRow(cells: readonly string[]): boolean {
   return cells.length > 0 && cells.every((c) => /^:?-+:?$/.test(c));
 }
 
-/** The reserved-level heading marker regex for a heading-keyed grammar. */
-export function headingMarkerRe(level: number): RegExp {
-  return new RegExp(`^#{${level}}(?!#)\\s+(.+?)\\s*$`);
+/**
+ * The reserved-level heading block entries in an archive, in document order
+ * (AUDIT-20260608-49). The archive scan is MARKDOWN-AWARE: it reuses the block
+ * parser rather than scanning raw lines, so a `###`-shaped line inside a fenced
+ * code block (a `CODE` entry, never an `H<level>` entry) cannot be mistaken for
+ * a Unit marker.
+ *
+ * `buildBlockStream` blanks frontmatter + the `doc-grammar:` comment but NOT the
+ * `doc-archive-ledger` comment. With `html:false`, markdown-it surfaces the
+ * comment's lines as paragraph (`P`) entries — except a `###`-shaped line inside
+ * the ledger body would surface as an `H<level>` entry. So we additionally
+ * exclude any heading entry whose span falls inside the ledger comment region.
+ * (In practice an identifier never starts with `#`, but the exclusion is the
+ * robust guard, not a reliance on that.)
+ */
+export function reservedHeadingEntries(archiveSource: string, level: number): BlockEntry[] {
+  const kind = `H${level}`;
+  const ledger = ledgerCommentRange(archiveSource);
+  return buildBlockStream(archiveSource).entries.filter((e) => {
+    if (e.kind !== kind) return false;
+    if (ledger !== null && e.span.startLine >= ledger.start && e.span.startLine <= ledger.end) {
+      return false; // a `###`-shaped line inside the ledger comment is not a marker
+    }
+    return true;
+  });
+}
+
+/** The 1-based inclusive line range of the `doc-archive-ledger` comment, or
+ * null when the archive has none. Mirrors ledger.ts's block detection but is
+ * kept local to avoid a circular import. */
+function ledgerCommentRange(archiveSource: string): { start: number; end: number } | null {
+  const lines = archiveSource.split('\n');
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (start === -1 && lines[i]!.trim().startsWith('<!--') && lines[i]!.includes('doc-archive-ledger')) {
+      start = i;
+      if (lines[i]!.includes('-->')) return { start: start + 1, end: i + 1 };
+      continue;
+    }
+    if (start !== -1 && lines[i]!.includes('-->')) return { start: start + 1, end: i + 1 };
+  }
+  return null;
 }
 
 /** The header row cells of a row-keyed archive's table (the row before the
@@ -71,17 +111,13 @@ export function archiveTableHeaderCells(archiveSource: string): string[] | null 
  * only data rows after the separator count.
  */
 export function archiveMarkerIds(archiveSource: string, grammar: GrammarSpec): string[] {
-  const lines = archiveSource.split('\n');
   if (grammar.unit.kind === 'heading') {
-    const re = headingMarkerRe(grammar.unit.level);
-    const ids: string[] = [];
-    for (const line of lines) {
-      const m = re.exec(line);
-      if (m) ids.push(m[1]!);
-    }
-    return ids;
+    // Markdown-aware: the markers are the reserved-level heading block entries
+    // (AUDIT-20260608-49). The entry's `text` is the heading's identifier.
+    return reservedHeadingEntries(archiveSource, grammar.unit.level).map((e) => e.text);
   }
 
+  const lines = archiveSource.split('\n');
   const idCol = grammar.unit.identifierColumn;
   const ids: string[] = [];
   let pastSeparator = false;

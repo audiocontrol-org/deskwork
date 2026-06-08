@@ -11,7 +11,7 @@
 // fail loud with zero writes.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { isSeparatorRow, tableCells } from './archive-file.js';
+import { isSeparatorRow, reservedHeadingEntries, tableCells } from './archive-file.js';
 import { buildBlockStream } from './block-stream.js';
 import { loadDocument, type LoadOptions } from './document.js';
 import { parseUnits } from './grammar-parse.js';
@@ -43,28 +43,25 @@ interface Located {
 function locateInArchive(archiveSource: string, grammar: GrammarSpec, id: string): Located {
   const lines = archiveSource.split('\n');
   if (grammar.unit.kind === 'heading') {
-    const level = grammar.unit.level;
-    const head = new RegExp(`^#{${level}}(?!#)\\s+(.+?)\\s*$`);
-    let start = -1;
-    for (let i = 0; i < lines.length; i++) {
-      const m = head.exec(lines[i]!);
-      if (m && m[1] === id) {
-        start = i;
-        break;
-      }
-    }
-    if (start === -1) {
+    // Markdown-aware scan (AUDIT-20260608-49): the reserved-level heading
+    // markers are block entries, so a `###`-shaped line inside a fenced code
+    // block in a Unit body is a CODE entry — never a marker — and can no longer
+    // truncate the lift. The block span is 1-based inclusive; convert to the
+    // 0-based archive line indices removeStart/removeEnd/contentLines use.
+    const headings = reservedHeadingEntries(archiveSource, grammar.unit.level);
+    const idx = headings.findIndex((e) => e.text === id);
+    if (idx === -1) {
       throw new DocumentModelError(
         `unarchive: ledger references '${id}', but its content was not found in the archive body`,
       );
     }
-    let end = lines.length - 1;
-    for (let j = start + 1; j < lines.length; j++) {
-      if (head.test(lines[j]!)) {
-        end = j - 1;
-        break;
-      }
-    }
+    // start: the matched heading's first line (1-based span.startLine → 0-based).
+    const start = headings[idx]!.span.startLine - 1;
+    // end: the line just before the NEXT reserved-level heading (1-based
+    // next.span.startLine → its 0-based index is next.span.startLine - 1, so the
+    // previous Unit's last 0-based line is next.span.startLine - 2), else EOF.
+    const next = headings[idx + 1];
+    const end = next !== undefined ? next.span.startLine - 2 : lines.length - 1;
     const slice = lines.slice(start, end + 1);
     while (slice.length > 0 && slice[slice.length - 1]!.trim() === '') slice.pop();
     return { contentLines: slice, removeStart: start, removeEnd: end };

@@ -56,6 +56,41 @@ describe('unterminated embedded grammar comment (AUDIT-20260608-45)', () => {
     }
   });
 
+  it('an UNTERMINATED grammar declaration with the sentinel on the SECOND line fails loud (AUDIT-20260608-50)', () => {
+    // AUDIT-45's fix only inspected the text on the SAME line as `<!--`
+    // (`afterOpen`). When the comment is written with `<!--` alone on its line
+    // and `doc-grammar:` on the NEXT line, `afterOpen` is empty so the sentinel
+    // check missed it → the comment was silently skipped → misdiagnosed as
+    // "not governable". The multi-line inner content (across lines, trimmed)
+    // must be examined for the sentinel too.
+    const { root, project, builtin } = tmpDirs();
+    try {
+      const src = [
+        '# A document',
+        '',
+        '<!--',
+        'doc-grammar: peg',
+        'id: emb',
+        'unit:',
+        '  kind: heading',
+        '  level: 3',
+        '',
+        '### A unit',
+      ].join('\n');
+      expect(() => resolveGrammar(src, { projectGrammarDir: project, builtinGrammarDir: builtin })).toThrow(
+        DocumentModelError,
+      );
+      expect(() => resolveGrammar(src, { projectGrammarDir: project, builtinGrammarDir: builtin })).toThrow(
+        /unterminated|not closed|missing.*-->/i,
+      );
+      expect(() => resolveGrammar(src, { projectGrammarDir: project, builtinGrammarDir: builtin })).not.toThrow(
+        /not governable/i,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('a normal unterminated NON-grammar comment does NOT trigger the fail-loud', () => {
     // Control: an otherwise-governable document (frontmatter ref) that also has a
     // plain unterminated `<!-- just a note` comment must resolve normally — only
