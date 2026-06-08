@@ -7,6 +7,13 @@ feature-codename: design/roadmap-protocol
 
 # Roadmap protocol — design
 
+> **Post-clarify note (2026-06-08):** `/speckit-clarify` refined the item identifier
+> from `<phase>/<slug>` (as shown in the examples below) to **`<phase>:<kind>/<slug>`**
+> (e.g. `impl:fix/roadmap-cycle-detection`), with a first-class `reclassify` operation
+> for changing phase/kind. The canonical, current form is in
+> `specs/006-roadmap-protocol/spec.md` (Clarifications + FR-001/FR-001a). The examples
+> in this design doc retain the original shape for historical fidelity.
+
 > Brainstorming output. Captures the decisions and their rationale so the
 > subsequent Spec Kit spec (`/speckit-specify`) is authored from a settled
 > design rather than re-derived. Per the program lifecycle this is the

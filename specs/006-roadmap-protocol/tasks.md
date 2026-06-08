@@ -106,7 +106,7 @@ TDD is mandatory (Constitution I — NON-NEGOTIABLE): every implementation task 
 **Independent test**: quickstart Scenario 7 (SC-005 / FR-019/020).
 
 - [ ] T049 [US6] RED: presence test — every real feature from `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md` exists as an item in the migrated `ROADMAP.md`; the graph validates green — `tests/roadmap/migration-presence.test.ts`
-- [ ] T050 [US6] Author the heading-keyed canonical `plugins/stack-control/ROADMAP.md` from the prose roadmap (scope + explicit `depends-on` edges derived from prose dependency notes; statuses from current reality) — make T049 green
+- [ ] T050 [US6] Author the heading-keyed canonical `plugins/stack-control/ROADMAP.md` from the prose roadmap (scope + explicit `depends-on` edges derived from prose dependency notes; statuses from current reality) — make T049 green. MUST include: (a) a `design:feature/roadmap-protocol` row for this feature itself (the manual self-seed per Assumptions), and (b) a `design:gap/roadmap-order-gating` item capturing the deferred hard out-of-order gating (FR-018) so the deferral is a captured roadmap item, never silently dropped
 - [ ] T051 [US6] Retire `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md` to a pointer at the canonical roadmap; capture any bug/gap found during migration as `fix`/`gap` items (FR-020)
 - [ ] T052 [US6] Remove the legacy `plugins/stack-control/grammars/roadmap-legacy.peg` once migration is green (no remaining row-keyed roadmap)
 - [ ] T053 [US6] Checkpoint: quickstart Scenario 7 green (one canonical roadmap)
