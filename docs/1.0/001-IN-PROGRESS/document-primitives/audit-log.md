@@ -810,3 +810,52 @@ Surface:    plugins/stack-control/src/document-model/curate-engine.ts:111-118; p
 `runCurate()` writes the reordered live document first, then calls `runArchive()`. But `runArchive()` can still throw a `DocumentModelError` before writing, for example the row-keyed column-schema mismatch check in `archive-engine.ts`. That error maps to the documented usage/config failure path, while the live document has already been changed by the reorder write.
 
 Blast radius is medium: it takes a combined condition, such as a disordered roadmap plus an existing archive whose table schema no longer matches. But when it happens, the docs promise validation/config failures are fail-loud with zero writes, and `curate` has already rewritten the live document. A reasonable fix is to preflight the archive operation before writing the reorder, or compute both target outputs first and only write after every validation/config check has passed.
+
+## 2026-06-08 — audit-barrage lift (20260608T052957249Z-document-primitives-after_clarify)
+
+### AUDIT-20260608-26 — Row-keyed column indices are dual-sourced: declared in grammar metadata AND hardcoded in the PEG body — a project override that edits only the metadata silently breaks
+
+Finding-ID: AUDIT-20260608-26 (claude-01 + claude-04 + codex-03; cross-model)
+Status:     fixed-92a43781
+Severity:   medium
+Surface:    plugins/stack-control/grammars/roadmap.peg:3-5,30-31,41-44; plugins/stack-control/src/document-model/archive-file.ts:50,62-64; plugins/stack-control/src/document-model/unarchive-engine.ts:88-96; plugins/stack-control/src/document-model/types.ts:30-39
+
+The row-keyed grammar declares `identifierColumn: 0` and `statusColumn: 3` in its YAML metadata header (`roadmap.peg:3-5`), and these are parsed into `GrammarSpec.unit` (`UnitMarker` row variant, types.ts:30-39). But the PEG body that actually parses the live document hardcodes the same indices as literals — `cell(id = r.text, 0)` and `cell(r.text, 3)` (roadmap.peg:30-31). The two must agree, yet they are two independent sources of truth in one file. Worse, the engine reads the *metadata* column for a DIFFERENT code path than the PEG: `archiveMarkerIds` and `unarchive`'s `locateInArchive` scan the archive table using `grammar.unit.identifierColumn` (archive-file.ts:50,62-64; unarchive-engine.ts:88-96), while the live-document parse derives the identifier from the PEG's hardcoded column 0.
+
+For the shipped built-ins the indices coincide at 0/3, so nothing breaks today. The blast radius is for FR-012 project overrides — an explicitly first-class extension path (`.stack-control/grammars/<id>.peg`, resolver.ts:184-195). An override author editing the declarative metadata to, say, `identifierColumn: 1` would get a live-document parse that still identifies by column 0 (PEG), while archive-marker scanning and unarchive location use column 1 (metadata). The result is silent identity mismatch: `unarchive --id <x>` can't locate a row it just archived, and curate emits false coherence NOTICEs — with no error pointing at the cause. This is exactly the "configuration that should be data ending up as code" trap. A reasonable fix is to make the PEG read the columns from a parameter the engine injects (peggy supports passing options into `parser.parse(input, { startRule, ...})` / initializer globals), or to drop the metadata `statusColumn`/`identifierColumn` fields entirely and treat the PEG as the sole authority, documenting that override authors must edit the PEG body.
+
+### AUDIT-20260608-27 — FR-011 anti-coupling gate scope omits the shipped entry point (bin/stackctl) and src/cli.ts — the gate's "zero predecessor references in the shipped mechanism" guarantee is narrower than the spec asserts
+
+Finding-ID: AUDIT-20260608-27 (claude-02 + codex-02; cross-model)
+Status:     acknowledged-2026-06-08
+Disposition: FR-011's match scope is deliberately the 005 mechanism (document-model/verbs/skills/grammars/fixtures). The `dw-lifecycle` tokens in `src/cli.ts` + `bin/stackctl` are accurate 003 front-door lineage/provenance comments, out of the gate's declared scope by design; rewording would erase correct provenance the spec permits. Spec/gate scope tension noted; the scope clause is authoritative.
+Severity:   medium
+Surface:    scripts/check-no-predecessor-refs.sh:51-60; plugins/stack-control/bin/stackctl:6,14-16; plugins/stack-control/src/cli.ts:37-40
+
+The gate's `SCOPE` array scans `src/document-model`, the three document verb files, the three skill dirs, `grammars`, and the fixtures dir (check-no-predecessor-refs.sh:51-60). It does NOT scan `bin/stackctl` or `src/cli.ts`. But `bin/stackctl` — the actual shipped entry point of the mechanism — contains a literal `dw-lifecycle` token: "Mirrors plugins/dw-lifecycle/bin/dw-lifecycle's resolution order" (bin/stackctl:6). FR-011/SC-006 state the *shipped product mechanism* contains zero predecessor references, and the spec's only carve-out is the two proof documents (ROADMAP.md / DESIGN-INBOX.md), not bin-wrapper comments.
+
+The references in question are lineage comments and are functionally harmless, so this is low severity — but it is a genuine gap between what the gate enforces and what the spec claims. A green gate is being read as proof of FR-011 compliance (T039 marks SC-006 satisfied), while a `grep -rIE 'dw-lifecycle' plugins/stack-control/bin plugins/stack-control/src/cli.ts` returns a hit. Either the spec should explicitly exclude lineage comments in `bin/`/shared CLI plumbing (mirroring the proof-doc exclusion), or the gate scope should include `bin/stackctl` + `src/cli.ts` and the comments be reworded to drop the predecessor token. As written, the artifact and the gate disagree about coverage.
+
+### AUDIT-20260608-28 — Accidental file committed at a bogus nested absolute-style path: `Users/orion/work/deskwork-work/stack-control/specs/002-parallel-execution-engine/plan.md`
+
+Finding-ID: AUDIT-20260608-28
+Status:     acknowledged-2026-06-08
+Disposition: FALSE PREMISE (verified): no `Users/orion/...` re-rooted path exists in the repo (`find` over the tree returns nothing; no top-level `Users/` dir). The auditor hallucinated a re-rooted path from the untracked-file diff rendering of the pre-existing `specs/002-parallel-execution-engine/plan.md`.
+Severity:   medium
+Surface:    Users/orion/work/deskwork-work/stack-control/specs/002-parallel-execution-engine/plan.md (new file, entire); diff second hunk
+
+The diff adds a new file whose repo-relative path is `Users/orion/work/deskwork-work/stack-control/specs/002-parallel-execution-engine/plan.md`. That is the *absolute* worktree path re-rooted under the repo, creating a spurious top-level `Users/` directory tree inside the repository. The content is an unfilled Spec Kit plan template (placeholders `[FEATURE]`, `[DATE]`, `[link]`, "Option 1/2/3 [REMOVE IF UNUSED]") for feature **002 (parallel-execution-engine)** — unrelated to the document-primitives (005) feature under audit.
+
+This is almost certainly the byproduct of a botched command (a `>`/`mkdir -p` against `$PWD`-prefixed path, or a tool writing to an absolute path mis-joined onto the repo root). It is both a scope-leak (a 002 artifact riding in the 005 range) and a repo-hygiene defect (a junk `Users/...` directory). The intended file is the legitimately-tracked `specs/002-parallel-execution-engine/plan.md` shown as untracked in git status. Fix: delete the `Users/orion/...` path entirely; if a 002 plan stub is wanted, it belongs at `specs/002-parallel-execution-engine/plan.md` and not in this feature's commit range.
+
+### AUDIT-20260608-29 — Placeholder Spec Kit plan file is included under an unrelated feature
+
+Finding-ID: AUDIT-20260608-29
+Status:     acknowledged-2026-06-08
+Disposition: OUT OF 005 SCOPE: `specs/002-parallel-execution-engine/plan.md` is a pre-existing UNTRACKED blank /speckit-plan scaffold for the parked 002 feature (present at session start, never committed, not produced by 005). It entered the barrage payload only via govern's untracked-file fold. Not this feature's artifact to author/delete; left for the operator/002.
+Severity:   medium
+Surface:    specs/002-parallel-execution-engine/plan.md:1-113
+
+The audited diff adds `specs/002-parallel-execution-engine/plan.md`, but the feature under audit is `document-primitives`. The file is an untouched Spec Kit template: `[FEATURE]`, `[DATE]`, `[Extract from feature spec...]`, `ACTION REQUIRED`, `NEEDS CLARIFICATION`, and `[REMOVE IF UNUSED]` placeholders remain throughout lines 1-113.
+
+Blast radius is medium because this is not just stray prose: it creates or changes a feature artifact for `002-parallel-execution-engine` with placeholder guidance that future agents may treat as real planning state. A reasonable fix is to remove this file from the document-primitives change unless it was intentionally authored, and if intentional, replace every template placeholder with the actual 002 plan content before it lands.
