@@ -928,3 +928,38 @@ Surface:    plugins/stack-control/src/document-model/grammar-resolver.ts:155-168
 `frontmatterRef()` catches YAML parse errors and returns `null`, so a document with a present but malformed frontmatter grammar declaration is reported as `document declares no grammar; not governable`. That is a silent fallback over a configuration parse failure, and it points the operator at the wrong repair: adding a grammar declaration, not fixing the broken YAML.
 
 Blast radius is medium because valid docs are unaffected, but malformed governed docs fail with misleading diagnostics at the main verb boundary. A reasonable fix is to throw a `DocumentModelError` from the catch path when leading frontmatter exists but cannot be parsed, preserving the fail-loud contract with an actionable message.
+
+## 2026-06-08 — audit-barrage lift (20260608T055058094Z-document-primitives-after_clarify)
+
+### AUDIT-20260608-36 — Row-keyed `unarchive` can reinsert an archived row into a changed live table schema
+
+Finding-ID: AUDIT-20260608-36
+Status:     fixed-e44daeed
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/unarchive-engine.ts:92-100,168-185; plugins/stack-control/src/document-model/archive-engine.ts:114-120
+
+`archive` explicitly guards row-keyed column-schema drift before appending to an existing archive: it compares the live table column count with the archive table column count and fails loud on mismatch. `unarchive` has no equivalent guard. It builds a mini document from the current live header plus the located archived row, parses it, then writes that row back to the live document without checking that the archived row has the same column count/schema as the current live table.
+
+The blast radius is medium because this is a migration/manual-edit edge, but it can silently corrupt the live roadmap table: a 4-column archived row can be reinserted into a 5-column live table as long as the identifier/status columns still parse. A reasonable fix is to compare `tableCells(located.contentLines[0]).length` against the current live header cell count before writing, and fail loud with the same schema-mismatch class of error used by `archive`.
+
+### AUDIT-20260608-37 — Declared identifier shapes are parsed but never enforced
+
+Finding-ID: AUDIT-20260608-37
+Status:     fixed-e44daeed
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/grammar-resolver.ts:88-95,142-151; plugins/stack-control/src/document-model/identifier-validator.ts:73-91; plugins/stack-control/grammars/roadmap.peg:12-13,38-42
+
+The grammar metadata declares an identifier shape (`slug` or `title`), and the README says the grammar declares “its identifier shape.” But after `parseIdentifier()` stores `identifierProduction`, the validator only checks readability, ordinal denylist, opacity, and uniqueness. It never enforces the declared shape. For the built-in roadmap grammar, `identifier.kind: slug` plus comments describe `<phase>/<slug>`, but `roadmap.peg` accepts any text in the identifier column and derives `phase` with `id.split('/')[0]`.
+
+The blast radius is medium: malformed roadmap IDs such as `impl` can pass the universal invariant checks and also pass ordering because `impl` is in the phase relation, even though they are not `<phase>/<slug>` codenames. That lets invalid governed rows archive/unarchive as legitimate Units. A reasonable fix is to validate `grammar.identifierProduction` in `validateIdentifiers` or during parse, with a concrete slug rule for row-keyed roadmap codenames.
+
+### AUDIT-20260608-38 — Curate skill contains prohibited temporal deferred-work wording
+
+Finding-ID: AUDIT-20260608-38
+Status:     fixed-e44daeed
+Severity:   low
+Surface:    plugins/stack-control/skills/curate/SKILL.md:13
+
+The curate skill’s up-to-date check explains that reconciliation execution belongs to “a separate, later capability.” The audit wrapper’s own constraints reject deferred-work phrasing as a bug-factory, and this is an operator-facing skill body that travels with the plugin install.
+
+The blast radius is low because the behavior is otherwise clear: `curate` recognizes the seam and does not execute it. The risk is process hygiene rather than runtime correctness. A reasonable fix is to state the scope boundary without temporal wording, e.g. “reconciliation execution is outside this primitive.”
