@@ -7,6 +7,7 @@
 // against the grammar's declared vocabulary (FR-004).
 
 import peggy from 'peggy';
+import { extractEdges } from './edges.js';
 import {
   DocumentModelError,
   type BlockStream,
@@ -131,12 +132,16 @@ export function parseUnits(
       );
     }
     const span = spanFor(stream, raw, grammar.id);
+    const body = sourceLines.slice(span.startLine - 1, span.endLine).join('\n');
     return {
       identifier: raw.identifier,
       status: raw.status,
       orderValue: raw.orderValue,
       span,
-      body: sourceLines.slice(span.startLine - 1, span.endLine).join('\n'),
+      body,
+      // Edge extraction is grammar-declared (006 R6); a grammar with no
+      // `edgeFields` yields [] — identical to pre-feature behavior.
+      edges: extractEdges(body, grammar),
     };
   });
 }

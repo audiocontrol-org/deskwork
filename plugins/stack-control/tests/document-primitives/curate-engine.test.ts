@@ -116,7 +116,7 @@ describe('curate — properly-archived (T027)', () => {
 describe('curate — up-to-date seam (T028)', () => {
   const ROADMAP = [
     '---',
-    'doc-grammar: roadmap',
+    'doc-grammar: roadmap-legacy',
     '---',
     '',
     '# Roadmap',

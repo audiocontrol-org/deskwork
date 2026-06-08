@@ -32,9 +32,13 @@ describe('generality — one engine, two document shapes (T037, SC-005)', () => 
     expect(inbox.doc.units.length).toBeGreaterThan(0);
     expect(roadmap.doc.units.length).toBeGreaterThan(0);
 
-    // The only difference is the grammar: heading-keyed inbox vs row-keyed roadmap.
+    // The only difference is the grammar: heading-keyed inbox vs row-keyed
+    // roadmap. During the 006 transition the LIVE ROADMAP.md is still row-keyed
+    // and points at `roadmap-legacy` (the preserved row-keyed grammar); US6
+    // migrates it to the heading-keyed canonical `roadmap`. The "one engine, two
+    // shapes" proof holds regardless of which grammar id the row-keyed doc uses.
     expect(inbox.doc.grammar.id).toBe('design-inbox');
-    expect(roadmap.doc.grammar.id).toBe('roadmap');
+    expect(roadmap.doc.grammar.id).toBe('roadmap-legacy');
     expect(inbox.doc.grammar.unit.kind).toBe('heading');
     expect(roadmap.doc.grammar.unit.kind).toBe('row');
 

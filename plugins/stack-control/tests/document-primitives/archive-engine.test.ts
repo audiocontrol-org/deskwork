@@ -150,7 +150,7 @@ describe('archive engine — durability (T017)', () => {
 
 const ROADMAP = [
   '---',
-  'doc-grammar: roadmap',
+  'doc-grammar: roadmap-legacy',
   '---',
   '',
   '# Roadmap',

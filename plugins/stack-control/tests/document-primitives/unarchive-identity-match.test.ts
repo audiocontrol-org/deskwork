@@ -68,6 +68,7 @@ describe('unarchive identity-match guard (AUDIT-20260608-53)', () => {
       orderValue: 'impl',
       span: { startLine: 1, endLine: 1 },
       body: '| impl/x | shipped |',
+      edges: [],
     };
 
     let message = '';
@@ -88,6 +89,7 @@ describe('unarchive identity-match guard (AUDIT-20260608-53)', () => {
       orderValue: 'impl',
       span: { startLine: 1, endLine: 1 },
       body: '| impl/x | shipped |',
+      edges: [],
     };
     expect(() => assertLiftedIdentityMatches('impl/x', lifted)).not.toThrow();
   });
@@ -95,7 +97,7 @@ describe('unarchive identity-match guard (AUDIT-20260608-53)', () => {
   it('the self-consistent built-in roadmap grammar still round-trips (guard never fires in the happy path)', () => {
     const ROADMAP = [
       '---',
-      'doc-grammar: roadmap',
+      'doc-grammar: roadmap-legacy',
       '---',
       '',
       '# Roadmap',

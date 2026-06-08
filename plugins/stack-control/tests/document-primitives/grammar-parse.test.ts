@@ -82,8 +82,11 @@ describe('grammar-parse (T010)', () => {
 });
 
 describe('grammar-parse — row-keyed roadmap grammar (T014, integration-first)', () => {
+  // The row-keyed roadmap grammar was preserved as `roadmap-legacy.peg` when
+  // `roadmap.peg` became heading-keyed (006 T015); this row-keyed engine test
+  // exercises the legacy grammar until US6 retires it (T052).
   const roadmap = (): GrammarSpec =>
-    parseGrammarArtifact(readFileSync(join(GRAMMARS, 'roadmap.peg'), 'utf8'), 'builtin');
+    parseGrammarArtifact(readFileSync(join(GRAMMARS, 'roadmap-legacy.peg'), 'utf8'), 'builtin');
 
   const ROADMAP = [
     '# Roadmap', // 1 preamble

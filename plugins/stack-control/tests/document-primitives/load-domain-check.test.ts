@@ -20,7 +20,7 @@ const OPTS = { now: '2026-06-08T00:00:00.000Z', builtinGrammarDir: BUILTIN };
 const ROADMAP = (rows: string[]) =>
   [
     '---',
-    'doc-grammar: roadmap',
+    'doc-grammar: roadmap-legacy',
     '---',
     '',
     '# Roadmap',

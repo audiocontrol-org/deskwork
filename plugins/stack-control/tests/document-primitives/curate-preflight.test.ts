@@ -28,7 +28,7 @@ function tmp(body: string, name: string) {
 
 const ROADMAP4 = [
   '---',
-  'doc-grammar: roadmap',
+  'doc-grammar: roadmap-legacy',
   '---',
   '',
   '# Roadmap',
@@ -56,7 +56,7 @@ describe('AUDIT-20260608-25 — curate --apply archive-side validation is a pref
     // against the 4-col archive table).
     const disorderedFiveCol = [
       '---',
-      'doc-grammar: roadmap',
+      'doc-grammar: roadmap-legacy',
       '---',
       '',
       '# Roadmap',

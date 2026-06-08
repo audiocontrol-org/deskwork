@@ -119,7 +119,7 @@ describe('unarchive engine (T018)', () => {
 describe('unarchive engine — row-keyed (T018, roadmap)', () => {
   const ROADMAP = [
     '---',
-    'doc-grammar: roadmap',
+    'doc-grammar: roadmap-legacy',
     '---',
     '',
     '# Roadmap',

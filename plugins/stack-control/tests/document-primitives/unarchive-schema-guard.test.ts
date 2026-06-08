@@ -27,7 +27,7 @@ function tmp(body: string, name: string) {
 const ROADMAP = (rows: string[]) =>
   [
     '---',
-    'doc-grammar: roadmap',
+    'doc-grammar: roadmap-legacy',
     '---',
     '',
     '# Roadmap',
@@ -54,7 +54,7 @@ describe('AUDIT-20260608-36 — row-keyed unarchive column-schema guard', () => 
     // archive's column-schema mismatch).
     const live5 = [
       '---',
-      'doc-grammar: roadmap',
+      'doc-grammar: roadmap-legacy',
       '---',
       '',
       '# Roadmap',

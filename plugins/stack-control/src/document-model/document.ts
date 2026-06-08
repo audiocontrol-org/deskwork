@@ -6,6 +6,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { buildBlockStream } from './block-stream.js';
+import { assertAcyclicAndOrder, assertReferentialIntegrity } from './edges.js';
 import { resolveGrammar, type ResolveOptions } from './grammar-resolver.js';
 import { parseUnits } from './grammar-parse.js';
 import { assertOrderKeyNotIdentifier, validateIdentifiers } from './identifier-validator.js';
@@ -60,6 +61,16 @@ export function loadDocument(docPath: string, opts: LoadOptions): LoadedDocument
   // than only curate/unarchive catching it when they happen to reorder
   // (AUDIT-20260608-39). Reuses the canonical assertInDomain (no duplication).
   for (const unit of units) assertInDomain(grammar, unit);
+
+  // 006 FR-005/FR-006: edges were extracted per-Unit during the parse
+  // (grammar-parse → extractEdges). Validate the cross-Unit graph at LOAD so any
+  // consumer — curate/archive/roadmap — refuses a dangling reference or a cycle
+  // over an acyclic edge-type consistently (Scenario 2). A grammar with no
+  // `edgeFields` is a no-op (assertReferentialIntegrity returns early).
+  assertReferentialIntegrity(units, grammar);
+  for (const ef of grammar.edgeFields) {
+    if (ef.references === 'unit' && ef.acyclic) assertAcyclicAndOrder(units, grammar, ef.name);
+  }
 
   const doc: GovernableDocument = { path: docPath, archivePath, grammar, units, sourceLines };
   return { doc, stream, ledger };

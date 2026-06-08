@@ -15,22 +15,22 @@ TDD is mandatory (Constitution I — NON-NEGOTIABLE): every implementation task 
 
 **Generic edge capability (engine)**
 
-- [ ] T003 Add `EdgeFieldSpec` + `Edge` types and extend `GrammarSpec` (`edgeFields`) + `Unit` (`edges`) in `plugins/stack-control/src/document-model/types.ts` (per contracts/edge-engine-api.md)
-- [ ] T004 [P] RED: test `grammar-resolver` parses an `edgeFields` metadata block (and absence ⇒ empty) in `plugins/stack-control/tests/document-primitives/grammar-resolver-edgefields.test.ts`
-- [ ] T005 Implement `edgeFields` parsing in `plugins/stack-control/src/document-model/grammar-resolver.ts` (validate `references` ∈ {unit,external,prose}; `acyclic`/`blocking` booleans) — make T004 green
-- [ ] T006 [P] RED: test `extractEdges(body, grammar)` parses declared edge-field lines (`- depends-on: a, b`), ignores undeclared fields, fails loud on malformed lines — `tests/document-primitives/edges-extract.test.ts`
-- [ ] T007 Implement `extractEdges` in NEW `plugins/stack-control/src/document-model/edges.ts` — make T006 green
-- [ ] T008 [P] RED: test `assertReferentialIntegrity` fails loud naming field+source+missing target for a dangling `references:'unit'` edge; passes for sound docs (FR-005) — `tests/document-primitives/edges-integrity.test.ts`
-- [ ] T009 Implement `assertReferentialIntegrity` in `edges.ts` — make T008 green
-- [ ] T010 [P] RED: test `assertAcyclicAndOrder` returns a topological order for a DAG and fails loud naming the cycle for a cyclic edge-type (FR-006) — `tests/document-primitives/edges-acyclic.test.ts`
-- [ ] T011 Implement `assertAcyclicAndOrder` (Kahn's; R3) in `edges.ts` — make T010 green
-- [ ] T012 RED: test `loadDocument` populates `Unit.edges` and runs referential integrity on load (a dangling-edge fixture fails loud) — `tests/document-primitives/document-edges-integration.test.ts`
-- [ ] T013 Wire `extractEdges` + `assertReferentialIntegrity` into `plugins/stack-control/src/document-model/document.ts` `loadDocument` — make T012 green
+- [X] T003 Add `EdgeFieldSpec` + `Edge` types and extend `GrammarSpec` (`edgeFields`) + `Unit` (`edges`) in `plugins/stack-control/src/document-model/types.ts` (per contracts/edge-engine-api.md)
+- [X] T004 [P] RED: test `grammar-resolver` parses an `edgeFields` metadata block (and absence ⇒ empty) in `plugins/stack-control/tests/document-primitives/grammar-resolver-edgefields.test.ts`
+- [X] T005 Implement `edgeFields` parsing in `plugins/stack-control/src/document-model/grammar-resolver.ts` (validate `references` ∈ {unit,external,prose}; `acyclic`/`blocking` booleans) — make T004 green
+- [X] T006 [P] RED: test `extractEdges(body, grammar)` parses declared edge-field lines (`- depends-on: a, b`), ignores undeclared fields, fails loud on malformed lines — `tests/document-primitives/edges-extract.test.ts`
+- [X] T007 Implement `extractEdges` in NEW `plugins/stack-control/src/document-model/edges.ts` — make T006 green
+- [X] T008 [P] RED: test `assertReferentialIntegrity` fails loud naming field+source+missing target for a dangling `references:'unit'` edge; passes for sound docs (FR-005) — `tests/document-primitives/edges-integrity.test.ts`
+- [X] T009 Implement `assertReferentialIntegrity` in `edges.ts` — make T008 green
+- [X] T010 [P] RED: test `assertAcyclicAndOrder` returns a topological order for a DAG and fails loud naming the cycle for a cyclic edge-type (FR-006) — `tests/document-primitives/edges-acyclic.test.ts`
+- [X] T011 Implement `assertAcyclicAndOrder` (Kahn's; R3) in `edges.ts` — make T010 green
+- [X] T012 RED: test `loadDocument` populates `Unit.edges` and runs referential integrity on load (a dangling-edge fixture fails loud) — `tests/document-primitives/document-edges-integration.test.ts`
+- [X] T013 Wire `extractEdges` + `assertReferentialIntegrity` into `plugins/stack-control/src/document-model/document.ts` `loadDocument` — make T012 green
 
 **Grammar rewrite (the contract the primitives operate through)**
 
-- [ ] T014 RED: test the heading-keyed roadmap grammar parses a fixture into Units with `<phase>:<kind>/<slug>` identifiers + parsed edges; a non-conforming `## heading` fails loud; `orderValue` = phase — `tests/document-primitives/roadmap-grammar-heading.test.ts`
-- [ ] T015 Rewrite `plugins/stack-control/grammars/roadmap.peg` to heading-keyed (level 2) with the `<phase>:<kind>/<slug>` production + `edgeFields` metadata (per contracts/roadmap-grammar.md); preserve the current row-keyed grammar as `plugins/stack-control/grammars/roadmap-legacy.peg` until migration — make T014 green
+- [X] T014 RED: test the heading-keyed roadmap grammar parses a fixture into Units with `<phase>:<kind>/<slug>` identifiers + parsed edges; a non-conforming `## heading` fails loud; `orderValue` = phase — `tests/document-primitives/roadmap-grammar-heading.test.ts`
+- [X] T015 Rewrite `plugins/stack-control/grammars/roadmap.peg` to heading-keyed (level 2) with the `<phase>:<kind>/<slug>` production + `edgeFields` metadata (per contracts/roadmap-grammar.md); preserve the current row-keyed grammar as `plugins/stack-control/grammars/roadmap-legacy.peg` until migration — make T014 green
 
 **Roadmap model (typed graph over the document)**
 

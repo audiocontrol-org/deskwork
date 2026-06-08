@@ -12,7 +12,7 @@ import {
 import { DocumentModelError, type GrammarSpec, type Unit } from '../../src/document-model/types.js';
 
 function unit(identifier: string): Unit {
-  return { identifier, status: 'captured', orderValue: 'captured', span: { startLine: 1, endLine: 1 }, body: '' };
+  return { identifier, status: 'captured', orderValue: 'captured', span: { startLine: 1, endLine: 1 }, body: '', edges: [] };
 }
 
 describe('non-ordinal denylist (closed v1 set, FR-005)', () => {
@@ -68,6 +68,7 @@ describe('order key never references the identifier (FR-004)', () => {
     orderKey: { field: 'status', relation: ['captured'] },
     identifierProduction: { kind: 'title' },
     reconciliationHook: null,
+    edgeFields: [],
   };
 
   it('accepts an order key over a non-identifier field', () => {

@@ -1,0 +1,74 @@
+---
+id: roadmap-legacy
+unit:
+  kind: row
+  identifierColumn: 0
+  statusColumn: 3
+statusVocabulary: [planned, in-flight, shipped, cancelled, retired]
+terminalStatuses: [shipped, cancelled, retired]
+orderKey:
+  field: phase
+  relation: [design, plan, impl, multi]
+identifier:
+  kind: slug
+reconciliationHook:
+  kind: glob
+  source: "specs/*/spec.md"
+---
+{{
+  // LEGACY row-keyed roadmap grammar (006 T015). Preserved verbatim from the
+  // pre-006 `roadmap.peg` while the canonical roadmap migrates to the
+  // heading-keyed `roadmap` grammar (US6). Row-keyed consumers (engine tests
+  // that exercise archive/curate/unarchive through a row-keyed example) point
+  // at `doc-grammar: roadmap-legacy`. Retired by T052 once migration is green.
+  //
+  // The roadmap is ROW-KEYED: each table data row is a Unit. The identifier and
+  // status columns are SINGLE-SOURCED from the grammar metadata
+  // (`unit.identifierColumn` / `unit.statusColumn`) and passed in via parse
+  // options (AUDIT-20260608-26) — never hardcoded here. For the shipped built-in
+  // they are 0 (codename `<phase>/<slug>`) and 3 (status); a project override
+  // that shifts those columns is honored end-to-end. The table HEADER (THEAD) +
+  // separator are row-keyed structural chrome (preamble), never Units. Order
+  // value is the phase, parsed from the identifier — sorted by the declared
+  // relation [design, plan, impl, multi], NOT lexicographically.
+  function cell(text, i) {
+    const cells = text.split('\x1f');
+    return i < cells.length ? cells[i].trim() : '';
+  }
+  // This grammar DECLARES `identifier.kind: slug` with the concrete shape
+  // `<phase>/<slug>` (see metadata + the header comment). Per FR-005 the engine
+  // enforces only the universal identifier PROPERTIES (unique / non-ordinal /
+  // human-readable); the engine does NOT mandate slug shape — each grammar owns
+  // its own concrete production. So the roadmap grammar enforces ITS OWN shape
+  // here: a non-empty phase segment, a literal `/`, and a non-empty slug
+  // segment (e.g. `impl/execution-engine`). A row whose identifier cell is not
+  // of that form is a PARSE FAILURE (the action calls error()), so no Unit is
+  // produced and the engine fails loud per FR-003 (AUDIT-20260608-37). Neither
+  // segment may itself contain a `/` (a `<phase>/<slug>` codename is exactly two
+  // slash-separated segments).
+  const CODENAME = /^[^\s/]+\/[^\s/]+$/;
+}}
+
+document = preamble units:unit* postamble { return units; }
+
+preamble = (!row anyLine)*
+
+unit = r:row {
+  const id = cell(r.text, options.identifierColumn);
+  if (!CODENAME.test(id)) {
+    error(`roadmap identifier '${id}' is not a '<phase>/<slug>' codename (e.g. 'impl/execution-engine')`);
+  }
+  const status = cell(r.text, options.statusColumn).toLowerCase();
+  const phase = id.split('/')[0];
+  return { identifier: id, status, orderValue: phase, startLine: r.line, endLine: r.line };
+}
+
+row = "ROW" TAB t:lineText nl { return { text: t, line: location().start.line }; }
+
+postamble = (!row anyLine)*
+
+anyLine = kind TAB lineText nl
+kind = $[A-Za-z0-9]+
+lineText = $[^\n]*
+TAB = "\t"
+nl = "\n" / !.

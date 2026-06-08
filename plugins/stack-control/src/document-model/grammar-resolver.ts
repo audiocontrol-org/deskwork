@@ -13,6 +13,7 @@ import { parse as parseYaml } from 'yaml';
 import { detectFrontmatter, embeddedGrammar } from './chrome.js';
 import {
   DocumentModelError,
+  type EdgeFieldSpec,
   type GrammarSource,
   type GrammarSpec,
   type IdentifierRule,
@@ -104,6 +105,42 @@ function parseHook(raw: unknown, ctx: string): ReconciliationHook | null {
   return { kind, source: reqString(raw, 'source', ctx) };
 }
 
+function reqBool(obj: Record<string, unknown>, key: string, ctx: string): boolean {
+  const v = obj[key];
+  if (typeof v !== 'boolean') {
+    throw new DocumentModelError(`grammar ${ctx}: edge field \`${key}\` must be a boolean`);
+  }
+  return v;
+}
+
+const EDGE_REFERENCES = ['unit', 'external', 'prose'] as const;
+
+function parseEdgeFields(raw: unknown, ctx: string): EdgeFieldSpec[] {
+  if (raw === null || raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    throw new DocumentModelError(`grammar ${ctx}: \`edgeFields\` must be a list`);
+  }
+  return raw.map((entry, i): EdgeFieldSpec => {
+    const where = `${ctx} edgeFields[${i}]`;
+    if (!isRecord(entry)) {
+      throw new DocumentModelError(`grammar ${where}: each edge field must be a mapping`);
+    }
+    const name = reqString(entry, 'name', where);
+    const references = entry.references;
+    if (typeof references !== 'string' || !EDGE_REFERENCES.includes(references as (typeof EDGE_REFERENCES)[number])) {
+      throw new DocumentModelError(
+        `grammar ${where}: \`references\` must be one of ${EDGE_REFERENCES.join(' | ')}`,
+      );
+    }
+    return {
+      name,
+      references: references as EdgeFieldSpec['references'],
+      acyclic: reqBool(entry, 'acyclic', where),
+      blocking: reqBool(entry, 'blocking', where),
+    };
+  });
+}
+
 /** Parse a grammar artifact (YAML metadata header + PEG body) into a spec. */
 export function parseGrammarArtifact(text: string, source: GrammarSource): GrammarSpec {
   const lines = text.split('\n');
@@ -149,6 +186,7 @@ export function parseGrammarArtifact(text: string, source: GrammarSource): Gramm
     orderKey,
     identifierProduction: parseIdentifier(metaUnknown.identifier, id),
     reconciliationHook: parseHook(metaUnknown.reconciliationHook, id),
+    edgeFields: parseEdgeFields(metaUnknown.edgeFields, id),
   };
 }
 

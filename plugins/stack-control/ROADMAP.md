@@ -1,5 +1,5 @@
 ---
-doc-grammar: roadmap
+doc-grammar: roadmap-legacy
 ---
 
 # stack-control — roadmap

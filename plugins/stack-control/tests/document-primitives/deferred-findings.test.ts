@@ -28,7 +28,7 @@ const ids = (p: string): string[] => loadDocument(p, OPTS).doc.units.map((u) => 
 const ROADMAP = (rows: string[]) =>
   [
     '---',
-    'doc-grammar: roadmap',
+    'doc-grammar: roadmap-legacy',
     '---',
     '',
     '# Roadmap',
@@ -137,7 +137,7 @@ describe('T048 / AUDIT-04 — row-keyed archive under a column-schema change fai
       docPath,
       [
         '---',
-        'doc-grammar: roadmap',
+        'doc-grammar: roadmap-legacy',
         '---',
         '',
         '# Roadmap',

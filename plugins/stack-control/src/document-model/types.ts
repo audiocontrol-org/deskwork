@@ -52,6 +52,36 @@ export interface ReconciliationHook {
   readonly source: string;
 }
 
+/**
+ * How a grammar declares that a body field is an edge/reference (006 R6,
+ * data-model.md). Declared in grammar YAML metadata as an optional `edgeFields`
+ * list. Absent ⇒ no edges (backward-compatible with `design-inbox`).
+ */
+export interface EdgeFieldSpec {
+  /** The body field label, e.g. `depends-on`, `part-of`, `spec`, `deferred-until`. */
+  readonly name: string;
+  /**
+   * `unit` = referential-integrity-checked against Unit identifiers;
+   * `external` = free string (path/URL/id); `prose` = free text.
+   */
+  readonly references: 'unit' | 'external' | 'prose';
+  /** Only meaningful for `references: 'unit'`; a cycle over this edge-type fails loud (006 FR-006). */
+  readonly acyclic: boolean;
+  /** Semantic hint consumed by the roadmap layer; the engine does not interpret it. */
+  readonly blocking: boolean;
+}
+
+/** A parsed reference on a Unit (006 — populated by `edges.ts` from the body). */
+export interface Edge {
+  /** The `EdgeFieldSpec.name` this came from. */
+  readonly field: string;
+  /**
+   * For `references: 'unit'` — referenced identifiers (validated to exist).
+   * For `external`/`prose` — the raw value(s) as a single-element list.
+   */
+  readonly targets: readonly string[];
+}
+
 /** The compiled, declared description of a document's structure (FR-001/FR-012). */
 export interface GrammarSpec {
   readonly id: string;
@@ -65,6 +95,8 @@ export interface GrammarSpec {
   readonly orderKey: OrderKey;
   readonly identifierProduction: IdentifierRule;
   readonly reconciliationHook: ReconciliationHook | null;
+  /** Declared edge/reference fields (006 R6); empty when undeclared. */
+  readonly edgeFields: readonly EdgeFieldSpec[];
 }
 
 /** Inclusive original-markdown line range (1-based), the unit of cut/move. */
@@ -105,6 +137,8 @@ export interface Unit {
   readonly span: Span;
   /** Raw block content; never interpreted by the engine. */
   readonly body: string;
+  /** Parsed edges/refs from the body per the grammar's `edgeFields` (006); empty when none. */
+  readonly edges: readonly Edge[];
 }
 
 /** A parsed markdown document bound to its grammar (FR-002). */

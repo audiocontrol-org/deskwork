@@ -29,7 +29,7 @@ const OPTS = { now: NOW, builtinGrammarDir: BUILTIN };
 
 const ROADMAP = [
   '---',
-  'doc-grammar: roadmap',
+  'doc-grammar: roadmap-legacy',
   '---',
   '',
   '# Roadmap',

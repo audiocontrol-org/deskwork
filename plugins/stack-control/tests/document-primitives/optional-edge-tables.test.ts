@@ -39,7 +39,7 @@ const ids = (p: string): string[] => loadDocument(p, OPTS).doc.units.map((u) => 
 const ROADMAP_EDGELESS = (rows: string[]) =>
   [
     '---',
-    'doc-grammar: roadmap',
+    'doc-grammar: roadmap-legacy',
     '---',
     '',
     '# Roadmap',

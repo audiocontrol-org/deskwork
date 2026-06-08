@@ -25,7 +25,7 @@ function tmpDoc(body: string, name: string) {
 // finding — which is informational, not actionable.
 const CLEAN_ROADMAP = [
   '---',
-  'doc-grammar: roadmap',
+  'doc-grammar: roadmap-legacy',
   '---',
   '',
   '# Roadmap',

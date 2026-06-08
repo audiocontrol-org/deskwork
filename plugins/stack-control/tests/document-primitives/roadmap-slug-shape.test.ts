@@ -28,7 +28,7 @@ function writeDoc(rows: readonly string[]): string {
   const docPath = join(dir, 'ROADMAP.md');
   const src = [
     '---',
-    'doc-grammar: roadmap',
+    'doc-grammar: roadmap-legacy',
     '---',
     '',
     '# Roadmap',
