@@ -66,28 +66,28 @@ TDD is mandatory (Constitution I — NON-NEGOTIABLE): every implementation task 
 **Goal**: `blocks`, derived `order`, and the mermaid graph view (extends US1's next/blocked).
 **Independent test**: quickstart Scenario 1 full (blocks/order/graph) (FR-013/008/014).
 
-- [ ] T028 [P] [US4] RED: tests for `blocks(x)` and derived `order` (topological + phase tiebreak via `ordering.compareUnits`) — `tests/roadmap/graph-blocks-order.test.ts`
-- [ ] T029 [US4] Implement `blocks` + `order` in `plugins/stack-control/src/roadmap/graph.ts` — make T028 green
-- [ ] T030 [P] [US4] RED: tests for `views` — ready-list/blocked-report formatting + mermaid flowchart from `depends-on` (FR-014/015; derived, never persisted) — `tests/roadmap/views.test.ts`
-- [ ] T031 [US4] Implement NEW `plugins/stack-control/src/roadmap/views.ts` — make T030 green
-- [ ] T032 [US4] RED: test verb `roadmap blocks <id>` / `order` / `graph` — `tests/roadmap/verb-queries.test.ts`
-- [ ] T033 [US4] Implement `blocks`/`order`/`graph` subactions in the verb — make T032 green
-- [ ] T034 [US4] Checkpoint: graph queries + mermaid green
+- [X] T028 [P] [US4] RED: tests for `blocks(x)` and derived `order` (topological + phase tiebreak via `ordering.compareUnits`) — `tests/roadmap/graph-blocks-order.test.ts`
+- [X] T029 [US4] Implement `blocks` + `order` in `plugins/stack-control/src/roadmap/graph.ts` — make T028 green
+- [X] T030 [P] [US4] RED: tests for `views` — ready-list/blocked-report formatting + mermaid flowchart from `depends-on` (FR-014/015; derived, never persisted) — `tests/roadmap/views.test.ts`
+- [X] T031 [US4] Implement NEW `plugins/stack-control/src/roadmap/views.ts` — make T030 green
+- [X] T032 [US4] RED: test verb `roadmap blocks <id>` / `order` / `graph` — `tests/roadmap/verb-queries.test.ts`
+- [X] T033 [US4] Implement `blocks`/`order`/`graph` subactions in the verb — make T032 green
+- [X] T034 [US4] Checkpoint: graph queries + mermaid green
 
 ## Phase 6: User Story 3 — Mid-build re-decomposition (Priority: P2)
 
 **Goal**: decompose/reclassify/advance/defer as supported, graph-revalidating, zero-write-on-failure mutations.
 **Independent test**: quickstart Scenario 4 (FR-009/010/001a).
 
-- [ ] T035 [P] [US3] RED: tests for `mutations.advance` (lifecycle) + `mutations.defer` (set/clear prose `deferred-until`) — `tests/roadmap/mutations-advance-defer.test.ts`
-- [ ] T036 [US3] Implement `advance` + `defer` in `mutations.ts` — make T035 green
-- [ ] T037 [P] [US3] RED: tests for `mutations.decompose` (split one→N; resolve former dependents; cycle ⇒ zero-write) — `tests/roadmap/mutations-decompose.test.ts`
-- [ ] T038 [US3] Implement `decompose` in `mutations.ts` — make T037 green
-- [ ] T039 [P] [US3] RED: tests for `mutations.reclassify` (rename identifier + rewrite every referencing edge atomically; zero-write on failure — FR-001a) — `tests/roadmap/mutations-reclassify.test.ts`
-- [ ] T040 [US3] Implement `reclassify` in `mutations.ts` — make T039 green
-- [ ] T041 [US3] RED: test verb `advance`/`decompose`/`reclassify`/`defer` subactions — `tests/roadmap/verb-mutations.test.ts`
-- [ ] T042 [US3] Implement those subactions in the verb — make T041 green
-- [ ] T043 [US3] Checkpoint: quickstart Scenario 4 green
+- [X] T035 [P] [US3] RED: tests for `mutations.advance` (lifecycle) + `mutations.defer` (set/clear prose `deferred-until`) — `tests/roadmap/mutations-advance-defer.test.ts`
+- [X] T036 [US3] Implement `advance` + `defer` in `mutations.ts` — make T035 green
+- [X] T037 [P] [US3] RED: tests for `mutations.decompose` (split one→N; resolve former dependents; cycle ⇒ zero-write) — `tests/roadmap/mutations-decompose.test.ts`
+- [X] T038 [US3] Implement `decompose` in `mutations.ts` — make T037 green
+- [X] T039 [P] [US3] RED: tests for `mutations.reclassify` (rename identifier + rewrite every referencing edge atomically; zero-write on failure — FR-001a) — `tests/roadmap/mutations-reclassify.test.ts`
+- [X] T040 [US3] Implement `reclassify` in `mutations.ts` — make T039 green
+- [X] T041 [US3] RED: test verb `advance`/`decompose`/`reclassify`/`defer` subactions — `tests/roadmap/verb-mutations.test.ts`
+- [X] T042 [US3] Implement those subactions in the verb — make T041 green
+- [X] T043 [US3] Checkpoint: quickstart Scenario 4 green
 
 ## Phase 7: User Story 5 — Reconciliation backstop, report-only (Priority: P3)
 

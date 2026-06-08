@@ -3,6 +3,7 @@
 // "satisfied iff shipped" rule; `blockedBy` explains why an item is not ready.
 // `part-of` is ignored for readiness (non-blocking grouping).
 
+import { compareUnits } from '../document-model/ordering.js';
 import { DocumentModelError } from '../document-model/types.js';
 import type { RoadmapModel, WorkItem } from './roadmap-model.js';
 
@@ -67,4 +68,61 @@ export function isReady(model: RoadmapModel, item: WorkItem): boolean {
 /** The ready frontier: every non-terminal item whose deps are all shipped (FR-012). */
 export function ready(model: RoadmapModel): readonly WorkItem[] {
   return model.items.filter((item) => isReady(model, item));
+}
+
+/** Items that declare `depends-on: <identifier>` (the reverse edge, FR-013). */
+export function blocks(model: RoadmapModel, identifier: string): readonly WorkItem[] {
+  if (!model.byId.has(identifier)) {
+    throw new DocumentModelError(`roadmap has no item '${identifier}'`);
+  }
+  return model.items.filter((item) => item.dependsOn.includes(identifier));
+}
+
+/** compareUnits adapter: order by the declared phase relation, then identifier. */
+function compareItems(model: RoadmapModel, a: WorkItem, b: WorkItem): number {
+  return compareUnits(
+    model.doc.grammar,
+    { orderValue: a.phase, identifier: a.identifier },
+    { orderValue: b.phase, identifier: b.identifier },
+  );
+}
+
+/**
+ * Derived total order: topological over `depends-on` (dependency before
+ * dependent), ties within a layer broken by the phase relation then identifier
+ * (Kahn's; FR-008). Acyclicity was enforced at load, so this never deadlocks.
+ */
+export function order(model: RoadmapModel): readonly WorkItem[] {
+  const inDegree = new Map<string, number>(model.items.map((i) => [i.identifier, 0]));
+  const dependents = new Map<string, string[]>(model.items.map((i) => [i.identifier, []]));
+  for (const item of model.items) {
+    for (const dep of item.dependsOn) {
+      dependents.get(dep)!.push(item.identifier);
+      inDegree.set(item.identifier, inDegree.get(item.identifier)! + 1);
+    }
+  }
+
+  const byCompare = (a: string, b: string): number =>
+    compareItems(model, model.byId.get(a)!, model.byId.get(b)!);
+
+  const frontier = model.items.filter((i) => inDegree.get(i.identifier) === 0).map((i) => i.identifier).sort(byCompare);
+  const result: WorkItem[] = [];
+  while (frontier.length > 0) {
+    const id = frontier.shift()!;
+    result.push(model.byId.get(id)!);
+    let added = false;
+    for (const d of dependents.get(id)!) {
+      const deg = inDegree.get(d)! - 1;
+      inDegree.set(d, deg);
+      if (deg === 0) {
+        frontier.push(d);
+        added = true;
+      }
+    }
+    if (added) frontier.sort(byCompare);
+  }
+  if (result.length < model.items.length) {
+    throw new DocumentModelError('roadmap order: unexpected cycle (should have failed loud at load)');
+  }
+  return result;
 }
