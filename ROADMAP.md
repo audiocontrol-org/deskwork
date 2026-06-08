@@ -1,5 +1,11 @@
 # Roadmap
 
+> **RETIRED as the live forward queue (2026-06-08).** The canonical, **governed** forward roadmap for `stack-control` is now [`plugins/stack-control/ROADMAP.md`](plugins/stack-control/ROADMAP.md) — a heading-keyed dependency DAG you reason over with `/stack-control:roadmap` (`next` / `blocked` / `order` / `graph`). This file is **preserved below as historical and cross-plugin prose**; it is no longer the source of truth for what to build next.
+>
+> **What migrated into the governed roadmap** — the **autonomous implementation loop** arc (see "Autonomous implementation loop" below) → `impl:feature/autonomous-loop` + six gaps (`spec-ambiguity-surface`, `skip-around-blocked-tasks`, `halt-and-resume`, `final-verification-gate`, `loop-reentry-idempotence`, `resource-budget-self-stop`); the **audit-barrage Design B / Design C** arcs (see "Audit-barrage feature shape" below) → `multi:gap/audit-barrage-metaaudit` + `multi:gap/audit-barrage-daemon`. The `stack-control` program itself was migrated earlier, in feature 006.
+>
+> **What is NOT in the governed roadmap** (it lives elsewhere) — released history → [GitHub releases](https://github.com/audiocontrol-org/deskwork/releases); open backlog → [`gh issue list`](https://github.com/audiocontrol-org/deskwork/issues); the **graphical-entries / deskwork editorial product** arc is a **separate plugin**, not `stack-control` work, and stays tracked via [#301](https://github.com/audiocontrol-org/deskwork/issues/301). The "Recently shipped" dw-lifecycle history below is retained for context only.
+
 Forward-looking plan for the deskwork project. Active initiatives, near-term planned work, and the long-term arc the architecture is converging toward. No dates — milestones, not deadlines.
 
 For released history see [GitHub releases](https://github.com/audiocontrol-org/deskwork/releases). For the open backlog see [`gh issue list`](https://github.com/audiocontrol-org/deskwork/issues).

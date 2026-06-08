@@ -123,3 +123,55 @@ Governance graduation has no on-disk record (the gate prints true/false, persist
 - ref: #435
 Optional cleanup: replace roadmap-legacy.peg with a purpose-named row-keyed test grammar so legacy can be retired. Current decision (kept) is to keep legacy as the canonical row-keyed example grammar.
 
+## impl:feature/autonomous-loop
+- status: planned
+- depends-on: impl:feature/execution-engine, impl:feature/governance
+Point an orchestrator at a workplan, fire the implement loop, and return when it is fully implemented, tested, and audited — self-regulating and self-correcting, halting only on genuine spec ambiguity. The industrialize-execution arc of the thesis.
+
+## impl:gap/spec-ambiguity-surface
+- status: planned
+- depends-on: impl:feature/autonomous-loop
+- part-of: impl:feature/autonomous-loop
+Structural halt-loudly surface for genuine spec ambiguity, classified local / spec-fork / cross-cutting; package each halt with question + options + impact + rollback cost so the operator can answer in 30 seconds. The hardest gap.
+
+## impl:gap/skip-around-blocked-tasks
+- status: planned
+- depends-on: impl:feature/autonomous-loop
+- part-of: impl:feature/autonomous-loop
+Skip a blocked task and keep going on independent work: needs a third workplan task-state (neither open nor done) the implement-loop gate walks past, dependency-inference guards against lock-in, and an outstanding-blocks cap that halts entirely.
+
+## impl:gap/halt-and-resume
+- status: planned
+- depends-on: impl:feature/autonomous-loop
+- part-of: impl:feature/autonomous-loop
+Clean paused-awaiting-operator state + resume verb: awaiting-operator/<task-id>.md carrying question + recommendation + impact + rollback cost; operator answers async; the audit-log records every block and every resume.
+
+## impl:gap/final-verification-gate
+- status: planned
+- depends-on: impl:feature/autonomous-loop
+- part-of: impl:feature/autonomous-loop
+Aggregate shippable gate (all tests green, tsc clean, no open findings, audit-log clean, smoke green) — workplan-exhausted is not feature-shippable. Composes existing verbs; the easiest gap.
+
+## impl:gap/loop-reentry-idempotence
+- status: planned
+- depends-on: impl:feature/autonomous-loop
+- part-of: impl:feature/autonomous-loop
+Re-running the implement loop against the same workplan after a mid-task session death (context exhaustion / network / restart) picks up cleanly; harden the in-flight barrage hook + auto-flips against leaving inconsistent state.
+
+## impl:gap/resource-budget-self-stop
+- status: planned
+- depends-on: impl:feature/autonomous-loop
+- part-of: impl:feature/autonomous-loop
+A budget for run-until-done (wall-clock and/or task-count cap): halt and report what is left so a long autonomous loop cannot run away unnoticed.
+
+## multi:gap/audit-barrage-metaaudit
+- status: planned
+- depends-on: multi:feature/migrate-audit-barrage
+Meta-audit synthesizer (audit-barrage Design B): one LLM pass over the N raw model outputs ranks by confidence x actionability, de-dupes, flags cross-model agreement, and emits a single structured findings block — collapsing the operator review surface from N raw files to one summary.
+
+## multi:gap/audit-barrage-daemon
+- status: planned
+- depends-on: multi:feature/migrate-audit-barrage
+- deferred-until: Design B (meta-audit synthesizer) proves the model-diversity payoff justifies the always-on run-rate cost
+Continuous background audit daemon (audit-barrage Design C): watches for new commits and fires audit jobs continuously out-of-band; the orchestrator loop reads accumulated runs per-turn. Exploratory; highest cost and decoupling.
+
