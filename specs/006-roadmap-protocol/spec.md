@@ -16,6 +16,16 @@ The roadmap exists to **reason about and capture decisions about what to build a
 
 The motivating failure occurred while scoping this very feature: the agent did not know the `archive`/`curate` primitives were already built (005) and re-derived a stale decomposition. The current prose roadmap is a degraded mess because it had no structure or discipline; the low-friction design-inbox cannot fix this because frictionless capture deliberately discards structure (dependencies, order, decomposition). This feature is the structured handoff target where captured shape is promoted into durable, machine-checkable structure. It is a direct expression of the thesis: encode the dependency graph so that "an agent rebuilds / reorders / relitigates" becomes a *mechanically preventable* failure, not a vigilance task.
 
+## Clarifications
+
+### Session 2026-06-08
+
+- Q: Identifiers & ordering for non-feature items (`fix`/`gap`/`primitive`) when those aren't phases? → A: Identifier is `<phase>:<kind>/<slug>` (e.g. `impl:fix/roadmap-cycle-detection`); `kind` is derived from the identifier; phase still drives the order relation `[design, plan, impl, multi]`. Re-classification (changing phase/kind) is a first-class `reclassify` operation that rewrites all referencing edges atomically — never a hand-edit.
+- Q: How does a roadmap item map to its on-disk feature for reconciliation (codenames ≠ numbered spec dirs)? → A: An explicit, optional correspondence field on the item (e.g. `spec: specs/002-parallel-execution-engine`) that points at its on-disk artifact once one exists; no fuzzy/slug matching. An item with no field is "not yet started." The declared `glob` serves the reverse check (a spec dir with no roadmap item is an orphan to flag).
+- Q: What on-disk signal determines a feature's real state for reconciliation? → A: Artifact progression in the linked spec dir — `spec.md` only ≈ early; `+plan`/`+tasks` ≈ in-flight; `tasks.md` fully checked plus a governance-graduation record ≈ shipped. Self-contained (governance writes its records into the feature dir), no git/gh dependency. Advisory only.
+- Q: `deferred-until` representation — prose-only or a machine-watched target? → A: Prose-only condition. It blocks readiness while present; the operator clears it when satisfied (release is operator judgment). Matches the fuzzy learning-milestone example; a machine-checkable variant is a future roadmap item, not v1.
+- Q: How do roadmap `fix`/`gap` items relate to GitHub issues / audit-log findings? → A: Distinct. The roadmap is authoritative for sequencing/dependencies only; an item MAY carry an optional reference (link) to an issue or finding, but does NOT subsume either tracker. Issues keep work-tracking + the closure gate; the audit-log keeps findings. Deeper `promote-findings` integration is the deferred capture-seam work, not v1.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A fresh agent reads the roadmap and acts correctly (Priority: P1)
@@ -113,13 +123,15 @@ The real content of today's degraded prose roadmap (scope, the dependency relati
 
 **Item model**
 
-- **FR-001**: The roadmap MUST represent each unit of work as an item carrying a stable, human-readable, non-ordinal identifier; a kind (`feature` / `primitive` / `fix` / `gap`); a status from the declared vocabulary (`planned` / `in-flight` / `shipped` / `cancelled` / `retired`); rough scope prose; and typed dependency edges.
+- **FR-001**: The roadmap MUST represent each unit of work as an item carrying a stable, human-readable, non-ordinal identifier of the form `<phase>:<kind>/<slug>` (e.g. `impl:fix/roadmap-cycle-detection`), from which `kind` (`feature` / `primitive` / `fix` / `gap`) and `phase` (`design` / `plan` / `impl` / `multi`) are derived; a status from the declared vocabulary (`planned` / `in-flight` / `shipped` / `cancelled` / `retired`); rough scope prose; and typed dependency edges.
+- **FR-001a**: Because identity encodes `phase` and `kind`, changing either MUST be done through a first-class `reclassify` operation that renames the item and rewrites every referencing edge atomically (subject to the same graph re-validation and zero-write-on-failure guarantee as all mutations — FR-010). A `<phase>:<kind>` prefix MUST NOT be hand-edited in place (which would orphan edges; FR-005 fails loud on the resulting dangling reference).
 - **FR-002**: Items MUST be peers in a single graph (a `fix`/`gap` is a peer node that can block any other item), with an optional non-blocking `part-of` grouping edge to a parent item for readability.
+- **FR-002a**: An item MAY carry an optional reference to an external tracker record (a GitHub issue or audit-log finding) as a link. The roadmap is authoritative for sequencing/dependencies only and MUST NOT subsume the issue tracker or the audit-log; the reference is a link, not a mirror.
 
 **Edges & integrity**
 
 - **FR-003**: The roadmap MUST support a hard `depends-on` edge that references another item by identifier and is considered satisfied only when the referenced item is `shipped`.
-- **FR-004**: The roadmap MUST support a conditional `deferred-until` edge carrying a prose condition; it blocks an item's readiness, but its release is an explicit operator judgment, never an automatic on-ship event.
+- **FR-004**: The roadmap MUST support a conditional `deferred-until` edge carrying a **prose-only** condition; it blocks an item's readiness, but its release is an explicit operator judgment (the operator clears the condition when satisfied), never an automatic on-ship event and never auto-evaluated by the tool.
 - **FR-005**: Every edge MUST be referential-integrity-checked: an edge to a non-existent item is rejected (fail loud), never written.
 - **FR-006**: The `depends-on` graph MUST be acyclic; a cycle is rejected (fail loud) and named, never written.
 - **FR-007**: Identifier uniqueness MUST be enforced across items.
@@ -130,7 +142,7 @@ The real content of today's degraded prose roadmap (scope, the dependency relati
 
 **Mutations (the living-document protocol)**
 
-- **FR-009**: The roadmap MUST provide supported operations to add an item, advance an item's status, re-decompose one item into several (rewriting affected edges), set a `deferred-until` condition, and archive terminal-status items.
+- **FR-009**: The roadmap MUST provide supported operations to add an item, advance an item's status, re-decompose one item into several (rewriting affected edges), `reclassify` an item (change phase/kind, rewriting referencing edges — FR-001a), set a `deferred-until` condition, and archive terminal-status items.
 - **FR-010**: Every mutation MUST re-validate the whole graph (referential integrity, acyclicity, identifier uniqueness) and MUST refuse to write a graph that would be left invalid — a validation failure leaves the document byte-for-byte unchanged (zero-write).
 - **FR-011**: Emergent work MUST be capturable in a single operation that records kind, `part-of`, and `depends-on` together, so a discovered bug/gap is added with its ordering and blocking relationships intact.
 
@@ -143,7 +155,9 @@ The real content of today's degraded prose roadmap (scope, the dependency relati
 
 **Reconciliation (detection backstop)**
 
-- **FR-016**: The roadmap MUST provide a reconciliation operation that compares each item's recorded status against on-disk feature reality and reports/proposes discrepancies.
+- **FR-016**: The roadmap MUST provide a reconciliation operation that compares each item's recorded status against on-disk feature reality and reports/proposes discrepancies. An item declares its on-disk artifact via an explicit, optional correspondence field (e.g. `spec: specs/<dir>`); reconciliation MUST NOT infer correspondence by fuzzy/slug matching. An item with no correspondence field is treated as not-yet-started. An ambiguous or missing correspondence is reported, never guessed.
+- **FR-016a**: Reconciliation MUST also perform the reverse check — surfacing on-disk feature artifacts (via the declared `glob`) that have no corresponding roadmap item (orphans to flag).
+- **FR-016b**: The on-disk state signal for reconciliation MUST be derived from artifact progression in the linked spec dir: presence of `spec.md` / `plan.md` / `tasks.md`, `tasks.md` completion, and a governance-graduation record (which governance writes into the feature dir) for the `shipped` determination. Reconciliation MUST NOT depend on git/branch-merge state. This signal is advisory input to the report only (FR-017).
 - **FR-017**: Reconciliation MUST be report-only: it MUST NOT mutate any item's recorded status without a separate, explicit operator action. (The roadmap records intent; intent is not overwritten by execution state.)
 
 **Enforcement posture**
@@ -206,18 +220,13 @@ The generalizable principle: **for artifacts whose primary consumer is an agent 
 - Built on the existing 005 `design/document-primitives` engine; the roadmap grammar, status vocabulary, terminal set, phase order relation, and the declared (currently unexecuted) reconciliation hook already exist and are reused, not rebuilt.
 - The governed plugin-local roadmap is canonical; the prose program roadmap is migrated and retired to a pointer.
 - Program single-branch convention (`feature/stack-control`) is followed; a per-feature git branch is not created (consistent with specs 001–005).
-- **Interim default (subject to `/speckit-clarify`)**: `deferred-until` carries a prose condition only; an optional machine-watched target item is a convenience, not required for v1.
-- **Interim default (subject to `/speckit-clarify`)**: roadmap `fix`/`gap` items are distinct from GitHub issues and audit-log findings; an item MAY reference an issue, but the roadmap does not subsume the issue tracker.
-- **Interim default**: the `design/roadmap-protocol` row is seeded by hand at setup (the protocol cannot list itself before it exists); thereafter it self-maintains.
+- The `design:feature/roadmap-protocol` row is seeded by hand at setup (the protocol cannot list itself before it exists); thereafter it self-maintains. (The long-term self-listing mechanism remains a deferred decision.)
 
 ## Deferred Decisions (for `/speckit-clarify`)
 
-Captured per operator direction; **not** to be resolved prematurely. These are genuine forks, recorded so the clarify pass can resolve them rather than an agent guessing:
+The `/speckit-clarify` session 2026-06-08 resolved the reconciliation correspondence + truth-source signal, the `deferred-until` representation, and the issues/audit-log relationship (see Clarifications). One genuine fork remains deferred:
 
-1. **Reconciliation source-of-truth signal** — Spec Kit artifact progression vs. governance-graduation/merge vs. a layered combination — and the **row↔spec-dir correspondence mechanism**: codenames differ from numbered spec dirs (`impl/execution-engine` ↔ `002-parallel-execution-engine`; `impl/governance` ↔ `001-speckit-backhalf-slice`), so slug-equality will not work. Reconciliation needs an explicit correspondence mechanism.
-2. **`deferred-until` representation** — prose-only condition, or also an optional watched target item whose status the tool tracks as a hint.
-3. **Relationship to GitHub issues / audit-log findings** — whether a `fix`/`gap` item references, mirrors, or is independent of an issue/finding; placement relative to existing `promote-findings`/issues machinery (overlaps the design-inbox "idea-bucket ↔ roadmap relationship" entry, the deferred Unit 5).
-4. **Self-listing** — the long-term mechanism for the roadmap to carry its own row beyond the manual seed.
+1. **Self-listing** — the long-term mechanism for the roadmap to carry its own row beyond the manual seed (and, more broadly, the capture-seam relationship to `design/insight-capture` — the deferred Unit 5). Low-impact for v1; the manual seed is sufficient to start.
 
 ## Dependencies
 
