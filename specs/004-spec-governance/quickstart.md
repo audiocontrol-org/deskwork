@@ -23,15 +23,15 @@ Runnable validation scenarios that prove the feature works end-to-end. Reference
 
 ## Scenario 3 — Convergence gate blocks then opens (FR-010 / SC-007)
 
-1. On a spec with an open HIGH finding, run `stackctl spec-governance-gate --feature <slug>`.
-2. **Expected**: `state=blocked`, exit 1 — the spec may not graduate.
+1. On a spec whose most-recent run surfaced a HIGH, run `stackctl spec-governance-gate --feature <slug>`.
+2. **Expected**: stdout `false` (BLOCKED), exit 0 (evaluated — blocked is not an error) — the spec may not graduate.
 3. Fix the spec, re-run the governance hook (iteration 2), then the gate.
-4. **Expected**: when the latest run is 0 HIGH + 0 MED → `state=converged, rule=single-run-clean`, exit 0; OR after two consecutive 0-HIGH runs → `state=converged, rule=n-consecutive-quiet`, exit 0.
+4. **Expected**: when the latest run surfaced 0 HIGH + 0 MED → stdout `true`, exit 0; OR after two consecutive 0-HIGH runs → stdout `true`, exit 0. ("Surfaced" = raw `Severity:`, ignoring later `Status:` — #432.)
 
 ## Scenario 4 — Bounded non-convergence (FR-014 / SC-008)
 
 1. With `--ceiling 2`, drive a spec whose findings keep recurring across iterations.
-2. **Expected**: at `iterations >= ceiling` the gate returns `state=non-converged`, exit 1 — it escalates rather than looping forever.
+2. **Expected**: the **loop driver** stops after the ceiling iterations and escalates (records non-convergence) rather than looping forever. The gate itself only ever prints `true`/`false`; bounded termination is the driver's job, not the gate's (#432).
 
 ## Scenario 5 — Fail loud when capability absent (US3 / SC-003)
 
@@ -41,8 +41,8 @@ Runnable validation scenarios that prove the feature works end-to-end. Reference
 
 ## Scenario 6 — Override is recorded (FR-010)
 
-1. On a `blocked` verdict, run the gate with `--override "operator accepts residual finding X for reason Y"`.
-2. **Expected**: `state=overridden`, exit 0, and the reason is durably recorded in the run record.
+1. On a `false` (BLOCKED) decision, run the gate with `--override "operator accepts residual finding X for reason Y"`.
+2. **Expected**: stdout `true` (forced OPEN), exit 0, and the reason is recorded (to stderr).
 
 ## Dogfood (self-hosting)
 
@@ -50,4 +50,4 @@ Runnable validation scenarios that prove the feature works end-to-end. Reference
 
 ## Done When
 
-All six scenarios pass on a real feature tree, and the gate verdict matches `check-barrage-dampener`'s engage decision on identical input (port-fidelity assertion, `contracts/convergence-gate.md` #7).
+All six scenarios pass on a real feature tree, and the gate's `true`/`false` decision matches `check-barrage-dampener`'s engage decision on identical input (port-fidelity assertion, `contracts/convergence-gate.md` #8).

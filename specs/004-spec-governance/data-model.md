@@ -27,37 +27,31 @@ The definition-time moment the barrage fires.
 - `artifacts`: `[spec]` for `after_clarify`; `[spec, plan]` for `after_plan` — FR-013
 - Validation: at least `after_clarify` MUST be enabled (the feature is inert otherwise); `after_specify` is not an allowed default.
 
-### ConvergenceVerdict (the protocol port — R3/R4)
-Output of `stackctl spec-governance-gate`; the graduation decision.
-- `state`: `converged | blocked | non-converged | overridden`
-- `rule`: which criterion engaged — `single-run-clean` (Rule B: 0 HIGH + 0 MED in the latest run) | `n-consecutive-quiet` (Rule A: 0 HIGH across the last 2 runs) | `none`
-- `iterations`: count of barrage runs in this graduation attempt
-- `ceiling`: configured max iterations (FR-014)
-- `openHigh`, `openMedium`: counts of open findings at the gate evaluation
-- `override`: `{ recorded: bool, reason?: string }` — required to graduate when not `converged` (mirrors `impl/execution-engine` FR-030)
-- Transitions:
-  - `blocked` → `converged` once Rule A or Rule B is satisfied on a subsequent run
-  - `blocked` → `non-converged` when `iterations >= ceiling` without convergence (escalate; SC-008)
-  - any non-`converged` → `overridden` only via an explicit recorded override
+### Gate decision (the protocol port — R3/R4; reshaped #432)
+Output of `stackctl spec-governance-gate`; a **single boolean** the consumer obeys (policy in exactly one place — #432).
+- **stdout**: `true` (gate OPEN — may graduate) or `false` (BLOCKED). Nothing else.
+- **exit code**: execution status, NOT policy — `0` evaluated successfully (read stdout), `2` fatal / could-not-evaluate (FR-005).
+- The decision: OPEN iff the **dampener is engaged** (FR-010, computed on **raw-surfaced** severity over the recent run(s)) OR an **override** (`--override "<reason>"`, mandatory reason recorded to stderr) is supplied. There is no `state`/`rule`/`openHigh`/`ceiling` field — those let a consumer re-derive policy.
+- Loop bounding (the FR-014 ceiling, `non-converged` escalation) is the **loop driver's** responsibility, not the gate's — the gate returns only the convergence boolean.
 
 ### GovernanceRun (iteration set)
 The sequence of barrage iterations for one spec graduation attempt.
-- `slug`, `checkpoint`, `runDirs: string[]` (one per iteration), `verdict: ConvergenceVerdict`
-- Invariant: terminates in exactly one of `converged | overridden | non-converged` (never open-ended) — SC-008.
+- `slug`, `checkpoint`, `runDirs: string[]` (one per iteration), and the per-run gate decision (OPEN/BLOCKED).
+- Invariant (enforced by the loop driver, FR-014): terminates in exactly one of converged (gate OPEN) | overridden | non-converged-at-ceiling (never open-ended) — SC-008.
 
 ## Relationships
 
 ```
 SpecGovernanceCheckpoint --fires--> BarrageRun (1..ceiling) --lifts--> Finding[] --> audit-log
                                           |                                  |
-                                          +----> GovernanceRun.runDirs       +--> ConvergenceVerdict (reads open HIGH/MED across runs)
-GovernanceRun --has-one--> ConvergenceVerdict --gates--> spec graduation (next Spec Kit step)
+                                          +----> GovernanceRun.runDirs       +--> gate decision (dampener over what RECENT runs raw-surfaced)
+loop driver --consumes--> gate boolean --gates--> spec graduation (next Spec Kit step); --bounds--> ceiling (FR-014)
 ```
 
 ## Validation rules (from requirements)
 
-- A spec MUST NOT graduate unless `ConvergenceVerdict.state ∈ {converged, overridden}` (FR-010 / SC-007).
-- `non-converged` MUST be reachable within `ceiling` iterations (FR-014 / SC-008) — no unbounded loop.
+- A spec MUST NOT graduate unless the gate prints `true` (dampener engaged or override) — FR-010 / SC-007.
+- The FR-014 ceiling MUST be enforced by the loop driver (the gate emits no `non-converged` state) — SC-008; no unbounded loop.
 - An override MUST record a reason and be durable in the run record (FR-010).
-- If the audit capability is absent, no verdict is produced — the flow fails loud (FR-005); a spec is never recorded as governed (SC-003).
+- If the audit capability is absent, no decision is produced — the flow fails loud (FR-005, exit 2); a spec is never recorded as governed (SC-003).
 - Degraded coverage (missing model families) is recorded on the `BarrageRun`, never presented as full (FR-008).
