@@ -106,12 +106,12 @@ description: "Task list for design/document-primitives implementation"
 
 ### Tests for User Story 3 (RED first) ⚠️
 
-- [ ] T032 [P] [US3] RED: ordinal-rejection end-to-end test in `.../identifier-invariants.test.ts` — a doc whose grammar admits `F3` / bare-int / `phase-2` fails loud at the verb boundary naming the identifier (FR-005). Must FAIL until T034.
-- [ ] T033 [P] [US3] RED: identity-stability test — identifiers byte-for-byte unchanged across a curate reorder AND an archive→unarchive round-trip (SC-004). Must FAIL until T034.
+- [X] T032 [P] [US3] RED: ordinal-rejection end-to-end test in `.../identifier-invariants.test.ts` — a doc whose grammar admits `F3` / bare-int / `phase-2` fails loud at the verb boundary naming the identifier (FR-005). Must FAIL until T034.
+- [X] T033 [P] [US3] RED: identity-stability test — identifiers byte-for-byte unchanged across a curate reorder AND an archive→unarchive round-trip (SC-004). Must FAIL until T034.
 
 ### Implementation for User Story 3
 
-- [ ] T034 [US3] Wire `identifier-validator` (T013) into the archive/unarchive/curate verb paths so violations fail loud end-to-end (FR-005/FR-010). Makes T032–T033 green.
+- [X] T034 [US3] Wire `identifier-validator` (T013) into the archive/unarchive/curate verb paths so violations fail loud end-to-end (FR-005/FR-010). Makes T032–T033 green.
 
 **Checkpoint**: identifier invariants enforced at every verb boundary.
 
