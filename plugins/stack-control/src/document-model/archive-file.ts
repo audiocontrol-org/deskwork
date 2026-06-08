@@ -21,6 +21,21 @@ export function headingMarkerRe(level: number): RegExp {
   return new RegExp(`^#{${level}}(?!#)\\s+(.+?)\\s*$`);
 }
 
+/** The header row cells of a row-keyed archive's table (the row before the
+ * separator), or null when the archive has no table yet. */
+export function archiveTableHeaderCells(archiveSource: string): string[] | null {
+  const lines = archiveSource.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i]!.trimStart().startsWith('|')) continue;
+    const cells = tableCells(lines[i]!);
+    if (isSeparatorRow(cells)) continue;
+    // The first non-separator table row IS the header (a single archived-Unit
+    // table reproduces the live header + separator + column schema — FR-006).
+    return cells;
+  }
+  return null;
+}
+
 /**
  * The identifiers present as structural markers in an archive file. For a
  * row-keyed archive the leading header row + separator are chrome and excluded;

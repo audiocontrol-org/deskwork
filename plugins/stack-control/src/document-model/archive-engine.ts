@@ -10,6 +10,7 @@
 // the archive (recoverable, never silently lost), not destroyed.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { archiveTableHeaderCells, tableCells } from './archive-file.js';
 import { loadDocument, type LoadOptions } from './document.js';
 import { withLedger, serializeLedger } from './ledger.js';
 import {
@@ -84,6 +85,18 @@ function buildArchive(
   // moved Units at EOF (append-only — FR-006).
   const withNewLedger = withLedger(existing, newLedger).replace(/\n+$/, '');
   if (doc.grammar.unit.kind === 'row') {
+    // AUDIT-04 / T048: the archived-Unit table reproduces the live header +
+    // column schema. If the live document's column count has since changed,
+    // appending a row would silently misalign the archive table — fail loud
+    // (the migration hazard) rather than corrupt it.
+    const archiveHeader = archiveTableHeaderCells(existing);
+    const { header } = rowTablePreamble(doc, stream);
+    const liveCols = tableCells(header).length;
+    if (archiveHeader !== null && archiveHeader.length !== liveCols) {
+      throw new DocumentModelError(
+        `archive: row-keyed column-schema mismatch — the live document table has ${liveCols} columns but the existing archive table has ${archiveHeader.length}; reconcile the schema before archiving (FR-006)`,
+      );
+    }
     // Rows append directly after the last existing row (no blank line) so they
     // stay in the same archived-Unit table.
     return `${withNewLedger}\n${unitContent.join('\n')}\n`;

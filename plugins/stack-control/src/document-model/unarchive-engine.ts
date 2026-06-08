@@ -120,10 +120,19 @@ function insertIntoLive(doc: GovernableDocument, located: Located, lifted: Unit)
 
   if (liveUnits.length === 0) {
     if (rowKeyed) {
-      // The empty-table reinsertion edge is the genuine bug scoped to T044.
-      throw new DocumentModelError(
-        `unarchive: the live row-keyed document has zero Units (no table to reinsert into) — see tasks T044`,
+      // AUDIT-06 / T044: archiving every data row leaves the table header +
+      // separator (chrome, not Units) in the live document. Reinsert the row
+      // immediately after the separator so it rejoins that table.
+      const sepIdx = lines.findIndex(
+        (l) => l.trimStart().startsWith('|') && isSeparatorRow(tableCells(l)),
       );
+      if (sepIdx === -1) {
+        throw new DocumentModelError(
+          `unarchive: the live row-keyed document has no table (header + separator) to reinsert '${lifted.identifier}' into`,
+        );
+      }
+      lines.splice(sepIdx + 1, 0, ...located.contentLines);
+      return lines.join('\n');
     }
     lines.push('', ...located.contentLines);
     return lines.join('\n');
