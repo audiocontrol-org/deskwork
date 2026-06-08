@@ -3,18 +3,25 @@
 # stackctl — thin wrapper that first-run-installs runtime deps in
 # adopter (sparse-clone) mode, then dispatches to src/cli.ts via tsx.
 #
-# Mirrors plugins/dw-lifecycle/bin/dw-lifecycle's resolution order, but
-# stack-control's only runtime dep is `tsx` (Feature 1's verbs are
-# file-presence + JSON reads — no yaml/zod/ajv/jscpd). Update the probe
-# list below if the plugin gains a new runtime dep.
+# Mirrors plugins/dw-lifecycle/bin/dw-lifecycle's resolution order. The
+# runtime deps the dispatched code imports are markdown-it, peggy, yaml,
+# and tsx (the document-primitives block-stream / grammar-parse /
+# grammar-resolver modules import the first three at runtime). The probe
+# list below MUST stay in sync with package.json's "dependencies" — if the
+# plugin gains a new runtime dep, add it to RUNTIME_DEPS or an adopter
+# install with a partial node_modules/ will skip npm install and then fail
+# Node module resolution on first dispatch.
 #
 # Resolution order (first match wins):
 #   1. Workspace dev path: tsx resolves from an ancestor's
 #      node_modules/.bin/ via npm workspace hoist. Dispatch via it; the
-#      monorepo install owns the dep set (no install here).
-#   2. Adopter post-install: tsx exists at $PLUGIN_ROOT/node_modules/.bin/tsx.
-#      Dispatch via the local tsx.
-#   3. First run (or partial install): npm install in $PLUGIN_ROOT, then
+#      monorepo install owns the full dep set (no install or probe here —
+#      hoisted deps resolve from PLUGIN_ROOT via Node's upward lookup).
+#   2. Adopter post-install: tsx exists at $PLUGIN_ROOT/node_modules/.bin/tsx
+#      AND every declared runtime dep is present under $PLUGIN_ROOT/
+#      node_modules. Dispatch via the local tsx.
+#   3. First run (or partial install — e.g. tsx present but a later-added
+#      runtime dep missing): npm install in $PLUGIN_ROOT, then
 #      dispatch. A version-keyed sentinel short-circuits the probe on
 #      subsequent runs; a version bump invalidates it and forces a probe.
 
@@ -61,9 +68,16 @@ dep_installed() {
   [ -f "${PLUGIN_ROOT}/node_modules/${dep}/package.json" ]
 }
 
-# Probe every declared runtime dep. stack-control's set is just tsx.
+# Declared runtime deps — keep in sync with package.json "dependencies".
+# The dispatched code imports markdown-it / peggy / yaml at runtime; tsx is
+# the runner. A probe that only checked tsx would skip npm install on a
+# partial adopter install (tsx present, the rest missing) and then crash on
+# Node module resolution at first dispatch.
+RUNTIME_DEPS="markdown-it peggy yaml tsx"
+
+# Probe every declared runtime dep.
 all_deps_installed() {
-  for dep in tsx; do
+  for dep in ${RUNTIME_DEPS}; do
     if ! dep_installed "${dep}"; then
       return 1
     fi

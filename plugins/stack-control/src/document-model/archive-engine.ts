@@ -104,6 +104,30 @@ function buildArchive(
   return `${withNewLedger}\n\n${unitContent.join('\n\n')}\n`;
 }
 
+/** Validate that an `--apply` archive of `docPath` would succeed WITHOUT
+ * writing anything. Loads + parses + composes the would-be archive + live
+ * outputs, surfacing every fail-loud `DocumentModelError` the write path would
+ * raise (notably the row-keyed column-schema mismatch). Returns when the apply
+ * is provably write-safe; throws otherwise. This is the seam curate uses to
+ * preflight its composed archive step before it mutates the live document, so a
+ * validation/config failure leaves the live document untouched (FR-010 zero
+ * writes). */
+export function preflightArchive(docPath: string, opts: LoadOptions & { readonly now?: string }): void {
+  const { doc, stream, ledger } = loadDocument(docPath, opts);
+  const archivable = selectArchivable(doc);
+  if (archivable.length === 0) return;
+
+  const now = opts.now ?? new Date().toISOString();
+  const newLedger: LedgerEntry[] = [
+    ...ledger,
+    ...archivable.map((u) => ({ identifier: u.identifier, archivedAt: now, fromStatus: u.status })),
+  ];
+
+  // buildArchive throws every archive-side fail-loud DocumentModelError; running
+  // it here (and discarding the result) is the validation preflight.
+  buildArchive(doc, stream, archivable, newLedger);
+}
+
 export function runArchive(docPath: string, opts: ArchiveOptions): ArchiveResult {
   const { doc, stream, ledger } = loadDocument(docPath, opts);
   const archivable = selectArchivable(doc);

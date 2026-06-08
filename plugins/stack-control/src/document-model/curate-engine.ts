@@ -5,7 +5,7 @@
 // `archive --apply` (scoped durability promise — FR-010).
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { runArchive } from './archive-engine.js';
+import { preflightArchive, runArchive } from './archive-engine.js';
 import { archiveMarkerIds } from './archive-file.js';
 import { loadDocument, type LoadOptions } from './document.js';
 import { assertInDomain, compareUnits } from './ordering.js';
@@ -109,6 +109,12 @@ export function runCurate(docPath: string, opts: CurateOptions): CurateReport {
   }
 
   // Apply: reorder first (write the live document), then compose archive.
+  // PREFLIGHT the composed archive step BEFORE the reorder write so any
+  // archive-side fail-loud validation (e.g. the row-keyed column-schema
+  // mismatch) cannot fire AFTER a partial write — a validation/config failure
+  // must leave the live document untouched (FR-010 zero writes).
+  preflightArchive(docPath, opts);
+
   let didReorder = false;
   if (reordered !== null) {
     writeFileSync(doc.path, reordered, 'utf8');

@@ -36,16 +36,45 @@ function assertReadable(id: string): void {
 }
 
 /**
+ * Validate the FR-005 invariants over the archived ledger identifiers ALONE:
+ * each must be readable (non-empty, non-opaque) and non-ordinal, and the ledger
+ * must carry no duplicate identifier (a duplicate ledger entry is corruption,
+ * never a legitimate provenance record — FR-006/FR-010). Returns the validated
+ * identifiers as a Set so the caller can seed the document ∪ archive uniqueness
+ * check (FR-005). Throws on the first violation, naming it.
+ */
+export function validateLedgerIdentifiers(archivedIdentifiers: readonly string[]): Set<string> {
+  const seen = new Set<string>();
+  for (const id of archivedIdentifiers) {
+    assertReadable(id);
+    if (isOrdinalIdentifier(id)) {
+      throw new DocumentModelError(
+        `identifier invariant violation: archived ledger identifier '${id}' is a positional/sequence index (FR-005 non-ordinal)`,
+      );
+    }
+    if (seen.has(id)) {
+      throw new DocumentModelError(
+        `identifier invariant violation: duplicate archived ledger identifier '${id}' in the provenance ledger (FR-005/FR-006 corruption)`,
+      );
+    }
+    seen.add(id);
+  }
+  return seen;
+}
+
+/**
  * Validate the FR-005 invariants across the live Units ∪ the archived
  * identifiers. `archivedIdentifiers` come SOLELY from the provenance ledger
- * (FR-006) — never from scanning the archive contents. Uniqueness is a
- * case-sensitive exact match. Throws on the first violation, naming it.
+ * (FR-006) — never from scanning the archive contents; they are themselves
+ * validated (readable / non-ordinal / no duplicates) before seeding the
+ * uniqueness check. Uniqueness is a case-sensitive exact match. Throws on the
+ * first violation, naming it.
  */
 export function validateIdentifiers(
   units: readonly Unit[],
   archivedIdentifiers: readonly string[],
 ): void {
-  const seen = new Set<string>(archivedIdentifiers);
+  const seen = validateLedgerIdentifiers(archivedIdentifiers);
   for (const u of units) {
     assertReadable(u.identifier);
     if (isOrdinalIdentifier(u.identifier)) {
