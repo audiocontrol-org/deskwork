@@ -20,6 +20,7 @@ import { runGovern } from './subcommands/govern.js';
 import { runArchiveCli } from './subcommands/archive.js';
 import { runUnarchiveCli } from './subcommands/unarchive.js';
 import { runCurateCli } from './subcommands/curate.js';
+import { runRoadmapCli } from './subcommands/roadmap.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -41,6 +42,8 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   archive: runArchiveCli,
   unarchive: runUnarchiveCli,
   curate: runCurateCli,
+  // Roadmap protocol semantic layer (design/roadmap-protocol).
+  roadmap: runRoadmapCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

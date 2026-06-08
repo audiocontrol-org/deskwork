@@ -8,8 +8,8 @@ TDD is mandatory (Constitution I — NON-NEGOTIABLE): every implementation task 
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Create roadmap test fixtures under `plugins/stack-control/tests/roadmap/fixtures/` — heading-keyed roadmap docs covering: linear chain, diamond, dependency cycle, dangling edge, `deferred-until` set, terminal-status-still-live, duplicate identifier
-- [ ] T002 [P] Create the `plugins/stack-control/tests/roadmap/` Vitest suite scaffolding (shared fixture loaders, temp-dir helpers mirroring `tests/document-primitives/`)
+- [X] T001 [P] Create roadmap test fixtures under `plugins/stack-control/tests/roadmap/fixtures/` — heading-keyed roadmap docs covering: linear chain, diamond, dependency cycle, dangling edge, `deferred-until` set, terminal-status-still-live, duplicate identifier
+- [X] T002 [P] Create the `plugins/stack-control/tests/roadmap/` Vitest suite scaffolding (shared fixture loaders, temp-dir helpers mirroring `tests/document-primitives/`)
 
 ## Phase 2: Foundational (BLOCKING — all user stories depend on this)
 
@@ -34,8 +34,8 @@ TDD is mandatory (Constitution I — NON-NEGOTIABLE): every implementation task 
 
 **Roadmap model (typed graph over the document)**
 
-- [ ] T016 RED: test `roadmap-model` loads a roadmap document into `WorkItem[]` (phase/kind parsed from identifier; dependsOn/partOf/deferredUntil/spec/ref populated) — `tests/roadmap/roadmap-model.test.ts`
-- [ ] T017 Implement `plugins/stack-control/src/roadmap/roadmap-model.ts` (compose document-model load + edges) — make T016 green
+- [X] T016 RED: test `roadmap-model` loads a roadmap document into `WorkItem[]` (phase/kind parsed from identifier; dependsOn/partOf/deferredUntil/spec/ref populated) — `tests/roadmap/roadmap-model.test.ts`
+- [X] T017 Implement `plugins/stack-control/src/roadmap/roadmap-model.ts` (compose document-model load + edges) — make T016 green
 
 **Checkpoint**: engine parses heading-keyed roadmaps with integrity-checked edges; `curate`/`archive` still load the new grammar. Foundational complete.
 
@@ -44,11 +44,11 @@ TDD is mandatory (Constitution I — NON-NEGOTIABLE): every implementation task 
 **Goal**: a fresh session reads the roadmap and answers next-ready / why-blocked from the document alone.
 **Independent test**: quickstart Scenario 1 (SC-001/SC-006).
 
-- [ ] T018 [P] [US1] RED: tests for `ready` + `blockedBy` over chain/diamond/deferred/terminal fixtures (ready iff all deps `shipped`, no `deferred-until`, non-terminal; cancelled/retired dep ⇒ blocked, never satisfied) — `tests/roadmap/graph-ready-blocked.test.ts`
-- [ ] T019 [US1] Implement `ready` + `blockedBy` in NEW `plugins/stack-control/src/roadmap/graph.ts` — make T018 green
-- [ ] T020 [US1] RED: test the verb emits `roadmap next` (ready-list) and `roadmap blocked` (blockers named); no writes — `tests/roadmap/verb-next-blocked.test.ts`
-- [ ] T021 [US1] Implement `roadmap` verb `next`/`blocked` subactions in `plugins/stack-control/src/subcommands/roadmap.ts` and register `roadmap` in `plugins/stack-control/src/cli.ts` — make T020 green
-- [ ] T022 [US1] Checkpoint: quickstart Scenario 1 green end-to-end (MVP delivers fresh-agent orientation)
+- [X] T018 [P] [US1] RED: tests for `ready` + `blockedBy` over chain/diamond/deferred/terminal fixtures (ready iff all deps `shipped`, no `deferred-until`, non-terminal; cancelled/retired dep ⇒ blocked, never satisfied) — `tests/roadmap/graph-ready-blocked.test.ts`
+- [X] T019 [US1] Implement `ready` + `blockedBy` in NEW `plugins/stack-control/src/roadmap/graph.ts` — make T018 green
+- [X] T020 [US1] RED: test the verb emits `roadmap next` (ready-list) and `roadmap blocked` (blockers named); no writes — `tests/roadmap/verb-next-blocked.test.ts`
+- [X] T021 [US1] Implement `roadmap` verb `next`/`blocked` subactions in `plugins/stack-control/src/subcommands/roadmap.ts` and register `roadmap` in `plugins/stack-control/src/cli.ts` — make T020 green
+- [X] T022 [US1] Checkpoint: quickstart Scenario 1 green end-to-end (MVP delivers fresh-agent orientation)
 
 ## Phase 4: User Story 2 — Emergent-work capture in one move (Priority: P1)
 
