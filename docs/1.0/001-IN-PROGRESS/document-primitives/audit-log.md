@@ -775,3 +775,38 @@ Surface:    specs/005-document-primitives/spec.md — FR-002 (block-stream pipel
 FR-002 defines the entire region model over the **block stream**: *"a governable document has exactly three regions, in order: an optional preamble (everything before the first Unit marker), then the Unit sequence … then an optional postamble"* and *"A block the grammar does not account for … is a parse failure."* This model assumes Unit boundaries fall on **block boundaries** — natural for the heading-keyed inbox, where a Unit is a top-level `### Title` block. But the roadmap proof doc (FR-013(b)) is **row-keyed**, and a markdown table is a **single block**: the header row, separator row, and all data rows are one block in the block stream. The roadmap's Units are the **data rows — sub-block elements inside that one table block.** The region model never reconciles this: the "first Unit marker" for the roadmap is a row *inside* a block, so "everything before the first Unit marker" splits a single block (the table) down the middle — the table header + separator rows are before the first data-row Unit, but they are neither a separate block nor classified by any region rule. They are not chrome (FR-002 excises only the grammar comment + frontmatter), not Units (they don't match the Unit production), and not Unit bodies (bodies are *strictly-deeper headings*, a heading-keyed concept with no row analogue).
 
 The blast radius is high because the roadmap is one of the two **mandatory** proof documents (FR-013) and SC-005 requires both to be *"governed by the same engine."* An unattended builder applying FR-002 literally has a genuinely plausible wrong path: treat each table row as a candidate Unit, find the header row does not match the Unit production, and emit *"a block the grammar does not account for → parse failure"* — failing a perfectly valid roadmap and breaking US2/SC-005 for proof instance #2. The competing correct path (silently treat table header+separator as preamble-equivalent) is never stated, so the builder is choosing between two readings with no disambiguator. A reasonable fix: FR-002 must state how the region model maps onto a row-keyed grammar — explicitly classify the table's header+separator rows (e.g. as part of the row-keyed grammar's structural chrome, excised like the grammar comment, or as a row-keyed "preamble" inside the table block) so the roadmap doesn't fail loud on its own column header.
+
+## 2026-06-08 — audit-barrage lift (20260608T051821613Z-document-primitives-after_clarify)
+
+### AUDIT-20260608-23 — `stackctl` does not install the runtime deps this feature now imports
+
+Finding-ID: AUDIT-20260608-23
+Status:     fixed-11077cc0
+Severity:   high
+Surface:    plugins/stack-control/bin/stackctl:3-9,64-70,118-143; plugins/stack-control/package.json:12-16; plugins/stack-control/src/document-model/block-stream.ts:10-11; plugins/stack-control/src/document-model/grammar-parse.ts:9; plugins/stack-control/src/document-model/grammar-resolver.ts:12
+
+The feature adds runtime dependencies `markdown-it`, `peggy`, and `yaml` in `package.json`, and the document-primitives code imports them at runtime. But the adopter wrapper still says the only runtime dep is `tsx`, and `all_deps_installed()` only probes `tsx`. If a plugin install already has `tsx` and a version sentinel, or a partial local install has only `tsx`, the wrapper skips `npm install` and dispatches into code that immediately fails module resolution for `markdown-it`/`peggy`/`yaml`.
+
+Blast radius is high because the new user-facing verbs are only reachable through this wrapper in adopter mode. A user can install the updated plugin and have every `archive`, `unarchive`, and `curate` invocation fail before the CLI starts, despite the package manifest being correct. The runtime-dependency probe and stale comment need to be updated to cover the actual declared runtime imports, or the sentinel must be invalidated when the dependency set changes.
+
+### AUDIT-20260608-24 — Archived identifiers are not validated for the FR-005 invariant set
+
+Finding-ID: AUDIT-20260608-24
+Status:     fixed-11077cc0
+Severity:   high
+Surface:    plugins/stack-control/src/document-model/document.ts:48-53; plugins/stack-control/src/document-model/identifier-validator.ts:43-57; plugins/stack-control/src/document-model/unarchive-engine.ts:168-185
+
+`loadDocument()` passes ledger identifiers into `validateIdentifiers()` only as the initial `seen` set. `validateIdentifiers()` checks readability, non-ordinal shape, and duplicate detection only for live Units as it iterates `units`; archived ledger identifiers are never checked for empty/opaque/ordinal values, and duplicate ledger entries collapse inside the `Set`. Then `unarchive` can locate an archived `F3`/UUID/etc. from the ledger, parse it, and write it back to the live document without re-running the full identifier validator on the lifted Unit.
+
+Blast radius is high because FR-005 is presented as a document ∪ archive invariant, not just a live-document invariant. This means upgraded or hand-edited archives can carry invalid identities undetected, and `unarchive --apply` can reintroduce them into the live document even though the verb boundary claims to enforce identifier invariants end-to-end. A reasonable fix is to validate archived ledger identifiers with the same readable/non-ordinal/unique checks before returning from `loadDocument()`, and to reject duplicate ledger identifiers explicitly.
+
+### AUDIT-20260608-25 — `curate --apply` can mutate the live document before an archive-side exit-2 failure
+
+Finding-ID: AUDIT-20260608-25
+Status:     fixed-11077cc0
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/curate-engine.ts:111-118; plugins/stack-control/src/document-model/archive-engine.ts:92-98; plugins/stack-control/README.md:62; plugins/stack-control/skills/curate/SKILL.md:41-44
+
+`runCurate()` writes the reordered live document first, then calls `runArchive()`. But `runArchive()` can still throw a `DocumentModelError` before writing, for example the row-keyed column-schema mismatch check in `archive-engine.ts`. That error maps to the documented usage/config failure path, while the live document has already been changed by the reorder write.
+
+Blast radius is medium: it takes a combined condition, such as a disordered roadmap plus an existing archive whose table schema no longer matches. But when it happens, the docs promise validation/config failures are fail-loud with zero writes, and `curate` has already rewritten the live document. A reasonable fix is to preflight the archive operation before writing the reorder, or compute both target outputs first and only write after every validation/config check has passed.
