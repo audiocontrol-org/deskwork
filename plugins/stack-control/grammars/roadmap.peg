@@ -29,6 +29,18 @@ reconciliationHook:
     const cells = text.split('\x1f');
     return i < cells.length ? cells[i].trim() : '';
   }
+  // This grammar DECLARES `identifier.kind: slug` with the concrete shape
+  // `<phase>/<slug>` (see metadata + the header comment). Per FR-005 the engine
+  // enforces only the universal identifier PROPERTIES (unique / non-ordinal /
+  // human-readable); the engine does NOT mandate slug shape — each grammar owns
+  // its own concrete production. So the roadmap grammar enforces ITS OWN shape
+  // here: a non-empty phase segment, a literal `/`, and a non-empty slug
+  // segment (e.g. `impl/execution-engine`). A row whose identifier cell is not
+  // of that form is a PARSE FAILURE (the action calls error()), so no Unit is
+  // produced and the engine fails loud per FR-003 (AUDIT-20260608-37). Neither
+  // segment may itself contain a `/` (a `<phase>/<slug>` codename is exactly two
+  // slash-separated segments).
+  const CODENAME = /^[^\s/]+\/[^\s/]+$/;
 }}
 
 document = preamble units:unit* postamble { return units; }
@@ -37,6 +49,9 @@ preamble = (!row anyLine)*
 
 unit = r:row {
   const id = cell(r.text, options.identifierColumn);
+  if (!CODENAME.test(id)) {
+    error(`roadmap identifier '${id}' is not a '<phase>/<slug>' codename (e.g. 'impl/execution-engine')`);
+  }
   const status = cell(r.text, options.statusColumn).toLowerCase();
   const phase = id.split('/')[0];
   return { identifier: id, status, orderValue: phase, startLine: r.line, endLine: r.line };

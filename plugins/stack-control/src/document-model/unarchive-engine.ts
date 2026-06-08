@@ -96,6 +96,19 @@ function parseLifted(grammar: GrammarSpec, located: Located, doc: GovernableDocu
         `unarchive: row-keyed live document ${doc.path} has no table header to reinsert into (see T044)`,
       );
     }
+    // AUDIT-20260608-36: guard the archived row's column count against the
+    // CURRENT live table header — symmetric with archive's "column-schema
+    // mismatch" fail-loud (archive-engine.ts buildArchive). Reinserting a row
+    // whose column count disagrees with the live table would silently misalign
+    // it (the identifier/status columns can still parse). Fail loud with zero
+    // writes (this runs before any write).
+    const liveCols = tableCells(header).length;
+    const rowCols = tableCells(located.contentLines[0]!).length;
+    if (rowCols !== liveCols) {
+      throw new DocumentModelError(
+        `unarchive: row-keyed column-schema mismatch — the live document table has ${liveCols} columns but the archived row has ${rowCols}; reconcile the schema before unarchiving (FR-007)`,
+      );
+    }
     const sep = `|${tableCells(header).map(() => '---').join('|')}|`;
     mini = `${header}\n${sep}\n${located.contentLines.join('\n')}`;
   } else {

@@ -10,7 +10,7 @@ Bring a live governed document back to a correct, tidy state. `curate` runs four
 1. **Well-formed** — the document parses against its grammar and every identifier is valid. A violation fails loud (no partial fix); the operator repairs the document.
 2. **Well-ordered** — Units are in the grammar's declared order (an ordered enumeration over the order-key field, tie-broken by identifier). On `--apply`, `curate` reorders mechanically **without changing any identity**.
 3. **Properly archived** — terminal-status Units still living in the document are flagged. On `--apply`, `curate` composes `archive` and moves them out.
-4. **Up-to-date** — if the grammar declares a reconciliation hook, `curate` reports it as *declared, not yet executed* and **never runs it** (execution is a separate, later capability). Silent when no hook is declared.
+4. **Up-to-date** — if the grammar declares a reconciliation hook, `curate` reports it as *declared, not yet executed* and **never runs it** (reconciliation execution is outside this primitive's scope). Silent when no hook is declared.
 
 It also reports a **coherence NOTICE** if the provenance ledger and the archive file's markers have drifted (e.g. from a manual identifier edit) — a notice, never a failure; manual edits are the operator's responsibility.
 
