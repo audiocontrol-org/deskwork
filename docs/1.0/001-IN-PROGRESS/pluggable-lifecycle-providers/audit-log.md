@@ -1137,7 +1137,7 @@ The blast radius is real roadmap corruption by omission: the feature’s “one-
 ### AUDIT-20260608-14 — `decompose` silently resets every part's status to `planned`, dropping the original item's status
 
 Finding-ID: AUDIT-20260608-14 (claude-01 + claude-03 + codex-01 + codex-02; cross-model)
-Status:     acknowledged-slush-pile-2026-06-08
+Status:     partially-fixed — part 1 (status reset, claude-01) FIXED-a2a1e889 (decompose now carries `status: source.status` onto every part; RED test asserts an in-flight item yields in-flight parts; SKILL documents the inherited fields). Parts 2/3/4 remain acknowledged-slush-pile-2026-06-08 (operator-confirmed burn-down scope = "the two that matter"; these are cosmetic/exotic per the blast-radius analysis): codex-01 (rewriteEdgeLine edits a `- depends-on:` line inside a fenced code example — cosmetic only, since extractEdges already ignores fenced bullets, so the edited line is not a real edge); claude-03 (a `--scope` value literally shaped like a field bullet, written un-fenced, becomes a real edge on reparse — low-probability + itself fail-loud on dangle); codex-02 (multi-target `part-of` is integrity-checked by the engine but the WorkItem model projects only the first target — completeness, no corruption).
 Severity:   medium
 Surface:    plugins/stack-control/src/roadmap/mutations.ts:222-241 (`decompose` → `partSections`), plugins/stack-control/src/roadmap/mutations.ts:120 (`buildSection` status default)
 
@@ -1148,7 +1148,7 @@ The blast radius is the exact failure mode AUDIT-20260608-02 was raised to preve
 ### AUDIT-20260608-15 — `roadmap reconcile` resolves `spec:` paths against `process.cwd()` while the default `--doc` is an absolute plugin-internal path — silent "all unresolved" off-root
 
 Finding-ID: AUDIT-20260608-15
-Status:     acknowledged-slush-pile-2026-06-08
+Status:     fixed-a2a1e889 (the verb now derives baseDir by walking up from the resolved doc's dir to the nearest ancestor containing the grammar's glob-parent (`specs/`) — independent of process.cwd(); reconcile fails loud (DocumentModelError) when that parent is absent under baseDir, replacing the silent "all unresolved" off-root output. No git/gh — pure filesystem walk; reconcile(docPath,opts,baseDir) signature intact. RED tests: reconcile correct from a foreign cwd; fail-loud exit-2 when no `specs/` ancestor. Fresh-context sub-agent.)
 Severity:   medium
 Surface:    plugins/stack-control/src/subcommands/roadmap.ts:230-244 (`emitReconcile`), plugins/stack-control/src/subcommands/roadmap.ts:30-33 (`DEFAULT_DOC`), plugins/stack-control/src/roadmap/reconcile.ts:79-101 (`reconcile` baseDir usage)
 
