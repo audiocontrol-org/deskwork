@@ -5248,3 +5248,43 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 2. **Triage the design-inbox `mark-fixed`/`mark-acknowledged` verb entry** — first check dw-lifecycle for an existing status-set verb to vendor rather than reinvent (it's `multi/migrate-audit-barrage`-homed).
 3. **#432 stays open pending operator verification** in a real loop; close only after.
 4. Unchanged backlog: #430 (005 hardening), #431 (barrage self-reference), 004 AUDIT-48, `design/spec-authoring` un-specced, 002 parked at `/speckit-plan`.
+
+## 2026-06-08: design/roadmap-protocol (006) — brainstorm + full Spec Kit front-half (specify→clarify→plan→tasks→analyze)
+### Feature: pluggable-lifecycle-providers
+### Worktree: stack-control (branch `feature/stack-control`)
+
+**Goal:** Start working on the roadmap protocol (the design-inbox roadmap cluster). Orchestrator session — design + Spec Kit authoring only; implementation is a separate session.
+
+**Accomplished:**
+- **Brainstormed the roadmap protocol to a settled design** via `superpowers:brainstorming`, conversationally (operator drove it as a use-case discussion, not a questionnaire). Settled model: the roadmap is a **DAG of heading-keyed work items** — the program's dependency-and-sequencing brain a fresh agent reads to act correctly without re-explanation. First-class **typed edges**: `depends-on` (hard, acyclic, satisfied when target shipped), `deferred-until` (prose condition, blocks readiness, operator-cleared), `part-of` (non-blocking grouping). Items are **peers**; kinds `feature/primitive/fix/gap`; **order derived** (topological + phase tiebreak); the tool **reasons over** the graph (next-ready / blocked-by / blocks / mermaid). **Markdown, not a database** — decided with full rationale at the operator's request (the primary consumer is a file-reading agent in-context; history lives in git diffs; the table was the problem, not markdown → heading-keyed sections).
+- **Discovered mid-brainstorm that 005 already built the substrate** (archive/curate/unarchive engine + verbs + skills, the heading-keyed grammar path, and a `roadmap` grammar with a *declared-but-unexecuted* `reconciliationHook`). Reframed the feature to its true remaining scope: **Unit 2+3** (the protocol + its mechanical home) as a generic **edge capability** on the 005 engine plus a roadmap **semantic layer** (`stackctl roadmap` verb + `/stack-control:roadmap` skill).
+- **Ran the full Spec Kit front-half for `006-roadmap-protocol`**, all pushed: brainstorming design doc (`docs/superpowers/specs/2026-06-08-…`); **specify** (21 FRs + 6 SCs, incl. a "Settled Architectural Decisions — do not relitigate" section capturing the markdown-over-DB reasoning + the generalizable principle); **clarify** (5 forks resolved — identifier `<phase>:<kind>/<slug>` + `reclassify`; explicit correspondence field; artifact-progression truth-source; prose-only `deferred-until`; distinct-from-issues); **plan** (+ research R1–R9, data-model, 3 contracts, quickstart, Constitution Check PASS); **tasks** (57 RED-first, 9 phases, MVP = Foundational + US1); **analyze** (0 critical/high, ~100% coverage, 2 small remediations applied).
+- **Captured TF-22** (the `check-prerequisites.sh` branch-name gate vs. the single-branch convention).
+
+**Didn't Work / unresolved:**
+- **Two Spec Kit scripts fight the single-branch convention** — `before_specify`'s `speckit.git.feature` (would spawn a per-feature branch) and `check-prerequisites.sh --require-tasks` (hard-aborts on a non-numbered branch, blocking `/speckit-analyze`'s path resolution). Worked around both; logged as **TF-22** (same family as TF-14/15/17 — `.specify/feature.json` should be the resolution source, not the branch name).
+- **Implementation not started** — orchestrator/implementer split; `/speckit-implement` is a separate session/worktree.
+- **Deferred (captured, not dropped):** the long-term self-listing mechanism; hard out-of-order **gating** (FR-018 — now an authored roadmap item per remediation C1); Unit 5 (capture↔roadmap promotion seam, blocked on `design/insight-capture`).
+
+**Course Corrections:**
+- [PROCESS] **I began decomposing the feature without knowing the archive/curate primitives + roadmap grammar already existed (005).** Operator: *"we just built the archive and curate primitives."* This is *literally the motivating failure the roadmap protocol exists to prevent* — the map didn't carry done-state/deps, so a fresh agent (me) re-derived a stale decomposition. Reframed the scope mid-brainstorm onto the existing engine.
+- [PROCESS] **I jumped to mechanism (multiple-choice reconciliation-signal questions) before grounding the use case.** Operator: *"we should talk through the use case and the motivating challenges… that should drive most of the design."* Backed up to open use-case elicitation, which produced the real model (dependency-brain, not status-dashboard).
+- [PROCESS] **I proposed a `.claude/rules/` rule to "bind future agents" to the markdown-over-DB decision.** Operator: *"we don't use rules to enforce policy."* Correct model: policy is enforced by **mechanism** (the engine has no DB path), rules/docs capture *rationale*, not enforcement. Dropped the rule; the spec's Settled-Decisions section + the architecture itself carry it.
+
+**Quantitative** (re-derived from `git log 831b5a2f..HEAD`):
+- Commits: **7** (1 design-doc, 1 spec, 1 clarify, 1 plan, 1 tasks, 1 analyze-remediation, 1 tooling-feedback). Files changed: **14** (+1252 / −2).
+- Spec Kit chain: specify → clarify (**5 Q**) → plan (R1–R9 + 3 contracts) → tasks (**57** tasks, 9 phases) → analyze (**0** critical/high; 2 remediations C1/I1 applied).
+- Clone snapshot (session-end): **4 groups, identical to session-start** — **no new duplication** (docs/spec-only session; no source written).
+- GitHub issues: **0** filed, **0** closed (planning session). Tooling friction: **1** (TF-22).
+- Course corrections: **3** ([PROCESS] ×3).
+
+**Insights:**
+- **The session was the motivating use case, lived.** An agent re-deriving a stale decomposition because the map didn't carry done-state/deps is *exactly* the failure the roadmap protocol prevents — the strongest possible validation of the feature's thesis, surfaced by the operator in one line.
+- **"Should we use a database?" has a clean answer grounded in WHO reads the artifact** (a file-reading agent in-context) **and WHERE its history lives** (git diffs are the decision record). The table was the readability problem, not markdown; heading-keyed sections fix it while staying on the 005 engine. Generalizes: prefer governed markdown over a DB for agent-read, git-diffable artifacts; recover queryability by computing views on demand.
+- **First-class dependency edges are the leverage.** Operator: *"relitigating how it all is supposed to fit together is exhausting… every time an opportunity to fuck it up."* Encoding the DAG makes relitigation mechanically unnecessary — the thesis applied to program structure.
+- **Encoding mutable attributes (kind) in the identifier (`<phase>:<kind>/<slug>`) couples identity to classification**, so `reclassify` must be a first-class edge-rewriting op — cheap here because `decompose` already needs edge-rewriting machinery.
+
+**Next step (resume here):**
+1. **`/speckit-implement` in a SEPARATE session/worktree** (orchestrator/implementer split). Begins at **Foundational** (T003–T017): the generic edge capability + the **heading-keyed roadmap grammar rewrite (T014–T015 is the gating first step — nothing parses until it lands)**. MVP = Foundational + US1 (through T022: `roadmap next`/`blocked`).
+2. **The grammar rewrite is load-bearing** — `archive`/`curate` operate through it; rewrite row-keyed → heading-keyed *before* the primitives work on the new shape (operator reminder this session).
+3. Unchanged backlog: #430 (005 hardening), #431 (barrage self-reference), #432 (gate Facet B, pending verification), 004 AUDIT-48, `design/spec-authoring` un-specced, 002 parked at `/speckit-plan`. TF-22 folds into the `feature.json`-over-branch-name migration.
