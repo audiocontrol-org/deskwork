@@ -111,6 +111,29 @@ describe('stackctl inbox capture verb (T009)', () => {
   });
 });
 
+describe('stackctl inbox flag-shaped value flags (AUDIT-BARRAGE codex-02/claude-02)', () => {
+  // A free-text value that begins with `--` is legitimate single-line content
+  // for a tool about CLI/process ideas (`--idea "--apply should be rejected on
+  // list"`). The generic value-flag branch must accept it, not fail usage.
+  it('--idea with a flag-shaped value is accepted → exit 0 + value present', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const r = runCli([
+      'inbox', 'capture', 'Flag-shaped idea',
+      '--idea', '--apply is not a flag here',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(0);
+    expect(readFileSync(docPath, 'utf8')).toContain('--apply is not a flag here');
+  });
+
+  // The dedicated --doc guard must stay strict: --doc with no following token
+  // remains a usage error (exit 2), proving the relaxation is scoped to the
+  // generic value-flag branch only.
+  it('--doc with NO value still → exit 2 (--doc guard intact)', () => {
+    expect(runCli(['inbox', 'list', '--doc']).status).toBe(2);
+  });
+});
+
 describe('stackctl inbox promote / drop verbs (T014)', () => {
   it('promote "<title>" --to <ref> --apply → exit 0, status promoted', () => {
     const docPath = tmpCopy('sample-inbox');

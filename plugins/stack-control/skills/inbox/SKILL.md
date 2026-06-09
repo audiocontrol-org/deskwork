@@ -5,7 +5,9 @@ description: "Low-friction insight capture for the governed design inbox: captur
 
 # /stack-control:inbox
 
-Capture and triage out-of-sequence design ideas against the project's governed `DESIGN-INBOX.md`. This is the **native** capture mechanism — it replaces the interim hand-append convention (`.claude/rules/design-inbox.md`, retired when this shipped). There is exactly **one** capture mechanism and **one** inbox source of truth.
+Capture and triage out-of-sequence design ideas against a governed `DESIGN-INBOX.md`. This is the **native** capture mechanism — it replaces the interim hand-append convention (`.claude/rules/design-inbox.md`, retired when this shipped). There is exactly **one** capture mechanism and **one** inbox source of truth.
+
+**Which inbox `--doc` targets:** when `--doc` is omitted, the verb defaults to the **plugin-bundled** `plugins/stack-control/DESIGN-INBOX.md` — this monorepo's own inbox (the in-repo dogfood). It does **not** auto-discover an adopter project's inbox relative to cwd (that discovery is a tracked follow-up, `design:gap/project-relative-doc-discovery`). If you are capturing into anything other than this repo's bundled inbox, pass `--doc <path>` explicitly.
 
 Every mutation re-validates the whole governed document before any write and is **zero-write-on-failure** — a duplicate title or structural violation is refused leaving the inbox byte-for-byte unchanged. No more raw hand-edits that corrupt the inbox undetected.
 

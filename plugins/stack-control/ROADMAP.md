@@ -227,3 +227,8 @@ Advancing a roadmap item's status when its spec is finalized must be NON-DISCRET
 - part-of: design:feature/insight-capture
 Automated hand-off of a promoted inbox entry into deskwork's Ideas stage (out of insight-capture v1 per spec clarification 4; fast-follow). Today promote only records a target reference.
 
+## design:gap/project-relative-doc-discovery
+- status: planned
+- part-of: design:feature/migrate-scope-discovery
+stackctl inbox/roadmap default --doc to the plugin-bundled DESIGN-INBOX.md/ROADMAP.md (correct for in-repo dogfood, wrong for an adopter running without --doc). Add project-relative governed-doc discovery (cwd/config resolution) for the whole verb family so adopters get their own inbox/roadmap by default. Surfaced by the 007 after_implement barrage (AUDIT-BARRAGE-codex-01, HIGH).
+

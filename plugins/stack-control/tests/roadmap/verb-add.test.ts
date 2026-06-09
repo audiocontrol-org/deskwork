@@ -78,6 +78,21 @@ describe('stackctl roadmap add verb (T025)', () => {
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
 
+  it('a flag-shaped --scope value is accepted → exit 0, item written', () => {
+    // AUDIT-BARRAGE codex-02/claude-02: a free-text value beginning with `--` is
+    // legitimate single-line content. The generic value-flag branch must accept
+    // it rather than fail usage before reaching the mutation layer.
+    const docPath = tmpCopy('chain');
+    const r = runCli([
+      'roadmap', 'add', 'impl:fix/flag-shaped-scope',
+      '--scope', '--something descriptive',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(0);
+    const model = loadRoadmap(docPath, ROADMAP_OPTS);
+    expect(model.byId.get('impl:fix/flag-shaped-scope')).toBeDefined();
+  });
+
   it('an unknown boolean flag (--clear on add) → exit 2, zero write', () => {
     const docPath = tmpCopy('chain');
     const before = readFileSync(docPath, 'utf8');

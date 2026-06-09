@@ -6,7 +6,16 @@
 // (src/roadmap/mutations.ts, src/inbox/mutations.ts) compose them rather than
 // each re-deriving the validate-then-write / unit-locating / append plumbing.
 
-import { renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { loadDocumentFromSource, type LoadOptions } from './document.js';
 import type { GovernableDocument, Unit } from './types.js';
@@ -28,12 +37,23 @@ let tempCounter = 0;
  * document truncated or torn (AUDIT-BARRAGE-codex-01). On any failure the temp
  * file is best-effort removed and the error rethrown — no temp artifact is left
  * behind, and the live document is either fully the old content or fully the new.
+ *
+ * Identity-preserving (AUDIT-BARRAGE-claude-01): when `docPath` is a symlink we
+ * rewrite its REAL target (so the symlink survives and keeps pointing at the
+ * now-updated file), and we copy the existing target's permission mode onto the
+ * temp file before the rename (so a non-default mode is not silently lost).
  */
 function atomicReplace(docPath: string, contents: string): void {
-  const tempPath = join(dirname(docPath), `.${basename(docPath)}.tmp-${process.pid}-${tempCounter++}`);
+  // Resolve a symlink to its real path so we replace the underlying file, not
+  // the link — renaming over the link would clobber it into a regular file.
+  const target = lstatSync(docPath).isSymbolicLink() ? realpathSync(docPath) : docPath;
+  const tempPath = join(dirname(target), `.${basename(target)}.tmp-${process.pid}-${tempCounter++}`);
   try {
     writeFileSync(tempPath, contents, 'utf8');
-    renameSync(tempPath, docPath);
+    // Preserve the original file's permission mode across the replacement; for a
+    // new file (target absent) the default mode is correct.
+    if (existsSync(target)) chmodSync(tempPath, statSync(target).mode & 0o777);
+    renameSync(tempPath, target);
   } catch (err) {
     try {
       unlinkSync(tempPath);

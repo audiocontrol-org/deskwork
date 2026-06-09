@@ -2,7 +2,7 @@
 
 The capture/triage surface for the governed design inbox. Mirrors the `stackctl roadmap` contract: one noun verb, subactions, **dry-run by default, `--apply` to write**, exit `0` success / `2` usage-or-fatal. All mutations re-validate the whole document and are **zero-write-on-failure**.
 
-Universal flag: `--doc <path>` (defaults to the project's governed `DESIGN-INBOX.md`).
+Universal flag: `--doc <path>`. When omitted it defaults to the **plugin-bundled** governed `plugins/stack-control/DESIGN-INBOX.md` — i.e. this monorepo's own inbox (the in-repo dogfood use), the same default-resolution shape `stackctl roadmap` uses for its `ROADMAP.md`. It is **not** resolved relative to an arbitrary adopter project's cwd: project-relative governed-doc discovery does not exist yet (tracked as `design:gap/project-relative-doc-discovery`). Adopters operating on their own inbox MUST pass `--doc <path>` explicitly until that discovery lands.
 
 ## `inbox capture <title> --idea "<text>" [options]`
 

@@ -72,8 +72,21 @@ export function scanVerbFlags(
       if (v === undefined || v.startsWith('--')) failUsage(verb, '--doc <path> required');
       doc = v;
     } else if (token.startsWith('--')) {
+      // Generic free-text value flags (inbox/roadmap `--idea`, `--scope`, …)
+      // accept a value that itself begins with `--` — flag-shaped prose is
+      // legitimate single-line content for a tool about CLI/process ideas
+      // (e.g. `--idea "--apply should be rejected on list"`)
+      // (AUDIT-BARRAGE codex-02/claude-02). The two cases that stay usage errors:
+      //   1. no next token at all (value flag at the very end of argv); and
+      //   2. the next token is a RECOGNIZED boolean flag for this verb — that is
+      //      an operator who forgot the value, and silently swallowing the
+      //      boolean would drop their intent (e.g. `defer <id> --until --apply`
+      //      must NOT consume `--apply` as the condition; AUDIT-20260608-04).
+      // (The dedicated `--doc` branch above keeps its own stricter guard.)
       const v = args[++i];
-      if (v === undefined || v.startsWith('--')) failUsage(verb, `${token} <value> required`);
+      if (v === undefined || (v.startsWith('--') && recognizedBooleans.has(v.slice(2)))) {
+        failUsage(verb, `${token} <value> required`);
+      }
       values.set(token.slice(2), v);
     } else {
       positionals.push(token);

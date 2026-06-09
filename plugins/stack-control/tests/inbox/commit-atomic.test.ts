@@ -8,10 +8,20 @@
 // (no partial / torn write).
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname } from 'node:path';
+import {
+  chmodSync,
+  copyFileSync,
+  lstatSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  symlinkSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { commit } from '../../src/inbox/mutations.js';
-import { INBOX_OPTS, tmpCopy } from './helpers.js';
+import { fixturePath, INBOX_OPTS, tmpCopy } from './helpers.js';
 
 const VALID_ENTRY = '\n### An atomic-write idea\n- **Status:** **captured**\n';
 
@@ -44,6 +54,30 @@ describe('commitCandidate atomic-write contract (AUDIT-BARRAGE-codex-01)', () =>
     const entries = readdirSync(dirname(docPath));
     expect(entries).toEqual(['DESIGN-INBOX.md']);
     expect(entries.some((e) => e.includes('.tmp'))).toBe(false);
+  });
+
+  it('apply=true: preserves the target file mode (AUDIT-BARRAGE-claude-01)', () => {
+    const docPath = tmpCopy('sample-inbox');
+    chmodSync(docPath, 0o600);
+    const candidate = readFileSync(docPath, 'utf8') + VALID_ENTRY;
+    commit(docPath, candidate, INBOX_OPTS, true);
+    expect(statSync(docPath).mode & 0o777).toBe(0o600);
+    expect(readFileSync(docPath, 'utf8')).toBe(candidate);
+  });
+
+  it('apply=true: a symlink target stays a symlink and the real file is updated (AUDIT-BARRAGE-claude-01)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'inbox-symlink-'));
+    const realPath = join(dir, 'real.md');
+    const linkPath = join(dir, 'link.md');
+    copyFileSync(fixturePath('sample-inbox'), realPath);
+    symlinkSync(realPath, linkPath);
+    const candidate = readFileSync(realPath, 'utf8') + VALID_ENTRY;
+
+    commit(linkPath, candidate, INBOX_OPTS, true);
+
+    expect(lstatSync(linkPath).isSymbolicLink()).toBe(true);
+    expect(readFileSync(linkPath, 'utf8')).toBe(candidate);
+    expect(readFileSync(realPath, 'utf8')).toBe(candidate);
   });
 
   it('dry-run (apply=false): writes nothing and leaves no temp file', () => {
