@@ -1155,3 +1155,41 @@ Surface:    plugins/stack-control/src/subcommands/roadmap.ts:230-244 (`emitRecon
 `emitReconcile` calls `reconcile(flags.doc, grammarDirs(), process.cwd())`. The default doc (`DEFAULT_DOC`) is resolved **absolutely** to the plugin-internal `plugins/stack-control/ROADMAP.md`, whose `spec:` values are repo-root-relative (`specs/005-document-primitives`, etc.). But `reconcile` joins those paths against `baseDir = process.cwd()` (`reconcile.ts:90` `join(baseDir, rel)`). So correct output depends entirely on the invocation cwd being the repo root — a coupling that is nowhere validated or derived from the document's own location.
 
 The blast radius is silent wrong output, which is worse than a crash for an unattended agent. Run from any directory other than the repo root, every item's `spec:` path fails the `existsSync(specDir)` check and is pushed to `unresolved` (`reconcile.ts:91-94`); `statusDrift` comes back empty and `orphans` is computed over a likely-absent `specs/` tree. An agent reading "status drift: 0 / unresolved correspondences: N" would conclude there is nothing to advance, when in fact the tool simply looked in the wrong place. The SKILL's documented invocation happens to run from repo root so the happy path works, but nothing enforces it. A reasonable fix: derive `baseDir` from the resolved document's directory (or an explicit `--base`/repo-root discovery) rather than `process.cwd()`, and fail loud when the glob parent (`specs/`) does not exist under the chosen base rather than silently reporting everything unresolved.
+
+## 2026-06-09 — audit-barrage lift (20260609T021533222Z-pluggable-lifecycle-providers-after_clarify)
+
+### AUDIT-20260609-01 — Inbox status-line locator is unanchored — a body field containing `**Status:**` is rewritten instead of the real status bullet
+
+Finding-ID: AUDIT-20260609-01 (claude-01 + claude-02 + claude-03 + codex-02; cross-model)
+Status:     fixed-e41e14f9
+Disposition: FIXED (TDD-first, commit e41e14f9). Anchored `INBOX_STATUS_LINE` to a leading list bullet `/^\s*[-*]\s+\*\*Status:\*\*/i` (claude-01). Added `assertSingleLine()` fail-loud, zero-write newline rejection on every scalar capture/triage field (claude-02 + codex-02). claude-03 (promote-record shape) dispositioned BY-DESIGN — the `- **Promoted-to:**` body line is the deliberate machine-greppable form (research D2); the legacy inline `→` form is migrated-data only; documented the canonical form in the inbox SKILL. +9 RED-first tests; suite 399→408 green.
+Severity:   medium
+Surface:    plugins/stack-control/src/inbox/mutations.ts:32 (`INBOX_STATUS_LINE`), :104-118 (`transition` → `lineInUnit` + `lines[idx] = ...`)
+
+`INBOX_STATUS_LINE = /\*\*Status:\*\*/i` is **unanchored** — it matches the substring `**Status:**` anywhere on a line. `transition` then does `idx = lineInUnit(lines, unit, INBOX_STATUS_LINE)` (`lineInUnit` returns the *first* matching line in the unit span) and blindly rewrites `lines[idx] = '- **Status:** **${toStatus}**'`, then splices the record line after it. Because `buildCaptureSection` emits the body in order `Surfaced → Context → Idea → Provisional-home → Status`, the real status bullet is **last**, so any earlier body field whose free text contains the literal `**Status:**` is matched first and overwritten — losing that field's text while leaving the actual `captured` status bullet untouched. Contrast the roadmap locator `STATUS_LINE = /^\s*[-*]\s+status\s*:/i` (mutations.ts:34), which is `^`-anchored to a leading bullet and cannot collide with body prose; the inbox regex dropped that anchor.
+
+This is not a contrived input: the inbox is a tool *about its own tooling*, so capturing an idea like `--idea "Add a **Status:** filter to inbox list"` or `--context "track **Status:** transitions"` is natural (the fixture itself is full of meta entries like "Try a TUI inbox view"). Promoting/dropping such an entry rewrites the Idea/Context line to `- **Status:** **promoted**`, producing an entry with two status-shaped bullets and lost prose. The whole-document re-validation in `commitCandidate` is the only backstop: depending on how the `design-inbox` grammar resolves the resulting duplicate status bullets, the outcome is either a silently corrupted entry (validation passes, idea text gone) or a confusing exit-2 refusal of a legitimate promote (validation rejects the malformed unit). A reasonable fix is to anchor the locator to a leading status bullet, mirroring roadmap: `/^\s*-\s+\*\*Status:\*\*/i`.
+
+### AUDIT-20260609-02 — `commitCandidate` promises atomic writes but writes the target file in place
+
+Finding-ID: AUDIT-20260609-02
+Status:     fixed-e41e14f9
+Disposition: FIXED (TDD-first, commit e41e14f9). `commitCandidate` now writes via a same-directory temp file + `renameSync` (`atomicReplace`), so a crash/interrupt/disk-error mid-write can never tear the live governed document; the temp is best-effort cleaned up on failure. Makes the "atomic" claim true for BOTH inbox and roadmap (shared substrate). Stable ESM-safe test asserts the path's inode changes (rename) + no temp residue.
+Severity:   medium
+Surface:    plugins/stack-control/src/document-model/mutations-core.ts:25-33
+
+`commitCandidate` validates the candidate before writing, but the actual write is `writeFileSync(docPath, candidate, 'utf8')` directly against the live document. That satisfies zero-write for validation failures, but it is not an atomic replacement: an interrupt, disk error, or process crash during the write can still leave a truncated or partially-written inbox/roadmap. The new inbox docs and tests repeatedly describe mutation writes as atomic, so downstream users will assume the live document cannot be torn by a write-time failure.
+
+The blast radius is medium: normal validation failures are handled, but the feature’s safety claim is specifically about durable governed documents, and this helper is now the shared substrate for both inbox and roadmap mutations. A reasonable fix is to replace the in-place write with a same-directory temp-file write followed by `renameSync`, ideally reusing the existing atomic writer pattern already present under `src/scope-discovery/util/atomic-write-file.ts` or creating a sync equivalent for document-model mutations.
+
+### AUDIT-20260609-03 — Roadmap closeout text adds a post-v1 placeholder for Ideas-stage hand-off
+
+Finding-ID: AUDIT-20260609-03
+Status:     fixed-e41e14f9
+Disposition: FIXED (commit e41e14f9). The deskwork Ideas-stage hand-off is now a tracked governed roadmap item — `design:gap/insight-capture-ideas-stage-handoff` (planned, part-of `design:feature/insight-capture`), added via `roadmap add`. The `design/insight-capture` closeout cell was de-prosed to reference the tracked item instead of carrying the deferral as a completion-note commitment.
+Severity:   low
+Surface:    docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md:75
+
+The updated `design/insight-capture` roadmap row says the CLI surface is delivered and the interim convention is retired, but the same closeout cell also records “deskwork Ideas-stage hand-off” as a later item. The audit prompt explicitly treats this class of deferral wording as a bug-factory, and this is in the audited diff.
+
+The blast radius is low because the implementation and spec clearly scope v1 to CLI capture/triage, so a reasonable reader will not conclude the shipped feature is missing code. The trap is process/documentation: a future unattended agent may treat the row as an open commitment embedded in a completion note instead of a separately governed work item. A cleaner fix is to promote that remaining scope into the governed roadmap as its own item, or remove the placeholder from the completed feature row.
