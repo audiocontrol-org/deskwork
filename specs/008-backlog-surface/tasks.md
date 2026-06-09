@@ -16,10 +16,10 @@
 
 ## Phase 2: Foundational (blocks US1–US4 — the external-backend adapter + verb shell)
 
-- [ ] T005 RED: `tests/backlog/backend.test.ts` — the typed adapter against the **real** `backlog` binary: a missing binary throws a descriptive error naming the dependency + remediation (no fallback, Principle V); a non-zero backend exit surfaces stderr and throws; `create` returns the parsed new item id; `list` returns the items; `exists(ref)` reports presence (for idempotency)
-- [ ] T006 Implement `src/backlog/backend.ts` — thin typed adapter via `spawnSync` (mirror `src/scope-discovery/audit-barrage/spawn-cli.ts`); typed `create`/`list`/`exists` ops parsing `--plain`/JSON; throw-on-missing-binary and throw-on-non-zero-exit. Make T005 green
-- [ ] T007 RED: `tests/backlog/verb-backlog.test.ts` — the `backlog` verb dispatcher shell: unknown subaction → exit 2; unknown flag → exit 2; a required flag missing its value → exit 2 with a descriptive message; subactions route
-- [ ] T008 Implement the `backlog` verb dispatcher shell in `src/subcommands/backlog.ts` (subaction routing, flag validation à la `roadmap`/`inbox`, exit 0/2, catch adapter errors → exit 2 with remediation) and register `backlog: runBacklogCli` in `src/cli.ts` `SUBCOMMANDS`. Make T007 green
+- [X] T005 RED: `tests/backlog/backend.test.ts` — the typed adapter against the **real** `backlog` binary: a missing binary throws a descriptive error naming the dependency + remediation (no fallback, Principle V); a non-zero backend exit surfaces stderr and throws; `create` returns the parsed new item id; `list` returns the items; `exists(ref)` reports presence (for idempotency)
+- [X] T006 Implement `src/backlog/backend.ts` — thin typed adapter via `spawnSync`; typed `create`/`list`/`exists` ops. WRITES shell out to the real binary (`task create --plain`, id parsed from the `Task <ID> -` line); READS parse the YAML-frontmatter task files (the durable artifact — `backlog task list --plain` and `search` expose neither refs nor labels, which idempotency + the `type:` label both need). throw-on-missing-binary + throw-on-non-zero-exit. Make T005 green
+- [X] T007 RED: `tests/backlog/verb-backlog.test.ts` — the `backlog` verb dispatcher shell: unknown subaction → exit 2; unknown flag → exit 2; a required flag missing its value → exit 2 with a descriptive message; subactions route (read-only `list` pulled forward, mirroring inbox — no stub handler)
+- [X] T008 Implement the `backlog` verb dispatcher shell in `src/subcommands/backlog.ts` (subaction routing, flag validation à la `roadmap`/`inbox`, exit 0/2, catch adapter errors → exit 2 with remediation) and register `backlog: runBacklogCli` in `src/cli.ts` `SUBCOMMANDS`. Make T007 green. (Backlog root = `STACKCTL_BACKLOG_DIR` env ?? plugin root, mirroring inbox's bundled-default + test-seam; `runCli` extended with an optional `env`.)
 
 ## Phase 3: User Story 1 — Capture found work in one move (Priority: P1) 🎯 MVP
 

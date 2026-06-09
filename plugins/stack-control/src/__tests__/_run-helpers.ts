@@ -30,6 +30,15 @@ export function resolveTsx(): string {
   );
 }
 
-export function runCli(args: string[], opts?: { cwd?: string }): SpawnSyncReturns<string> {
-  return spawnSync(resolveTsx(), [CLI, ...args], { encoding: 'utf8', cwd: opts?.cwd });
+export function runCli(
+  args: string[],
+  opts?: { cwd?: string; env?: Record<string, string> },
+): SpawnSyncReturns<string> {
+  return spawnSync(resolveTsx(), [CLI, ...args], {
+    encoding: 'utf8',
+    cwd: opts?.cwd,
+    // Merge over the inherited env when provided (e.g. STACKCTL_BACKLOG_DIR);
+    // undefined → spawnSync inherits process.env unchanged (existing callers).
+    env: opts?.env ? { ...process.env, ...opts.env } : undefined,
+  });
 }

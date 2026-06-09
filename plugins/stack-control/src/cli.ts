@@ -22,6 +22,7 @@ import { runUnarchiveCli } from './subcommands/unarchive.js';
 import { runCurateCli } from './subcommands/curate.js';
 import { runRoadmapCli } from './subcommands/roadmap.js';
 import { runInboxCli } from './subcommands/inbox.js';
+import { runBacklogCli } from './subcommands/backlog.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -47,6 +48,8 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   roadmap: runRoadmapCli,
   // Low-friction insight capture (design/insight-capture).
   inbox: runInboxCli,
+  // Backlog slush-pile surface — external-backend adapter verb (008).
+  backlog: runBacklogCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
