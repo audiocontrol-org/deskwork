@@ -70,7 +70,7 @@ Once native capture exists, the interim design-inbox convention — the prose ru
 ### Edge Cases
 
 - **Duplicate identifier**: capturing an idea whose title/identifier already exists is refused with a descriptive error; the inbox is unchanged.
-- **Concurrent captures**: two captures racing against the same inbox must not interleave into a corrupt or partially-written document; the loser fails loud or serializes, never silently clobbers.
+- **Concurrent captures**: each capture MUST be an atomic, fully-validated single-file write, so the inbox is never left corrupt or partially written. Cross-process locking is out of v1 scope: under genuine concurrency the writes serialize at the filesystem and the last writer wins (the same guarantee the existing `roadmap add` mutation provides) — an accepted v1 limitation, with a file-lock / compare-and-swap as a documented fast-follow if real contention appears.
 - **Inbox missing / not governable**: capture and triage fail loud (descriptive error), never auto-create, repair, or silently no-op.
 - **Empty / whitespace-only idea**: refused with a descriptive error (no empty entry recorded).
 - **Promote/drop of a non-existent or already-terminal entry**: refused with a descriptive error; no silent state change.
