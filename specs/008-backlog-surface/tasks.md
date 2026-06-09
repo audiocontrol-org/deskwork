@@ -28,7 +28,7 @@
 
 - [ ] T009 [P] [US1] RED: `tests/backlog/mappings.test.ts` (capture half) — `typeLabelStamp(input)` maps `bug`/`gap` → backlog `type` + the `agent-found` label; rejects an unknown type
 - [ ] T010 [US1] Implement `src/backlog/mappings.ts` `typeLabelStamp`. Make T009 (capture half) green
-- [ ] T011 [US1] RED: capture cases in `tests/backlog/capture.test.ts` (via `runCli` + real binary) — `backlog capture "<title>" --type bug --ref <url>` → exit 0 + item present with type/label/ref; empty `<title>` → exit 2 + nothing written; invalid `--type` → exit 2; **`ROADMAP.md` unchanged**; capturing a 2nd item leaves the 1st byte-identical (FR-006)
+- [ ] T011 [US1] RED: capture cases in `tests/backlog/capture.test.ts` (via `runCli` + real binary) — `backlog capture "<title>" --type bug --ref <url>` → exit 0 + item present with type/label/ref; empty `<title>` → exit 2 + nothing written; invalid `--type` → exit 2; a plain capture applies **no priority/triage** (capture ≠ scope, FR-003); **`ROADMAP.md` unchanged**; capturing a 2nd item leaves the 1st byte-identical (FR-006)
 - [ ] T012 [US1] Wire the `capture` subaction into `src/subcommands/backlog.ts` (positional `<title>`; flags `--type`/`--ref`/`--body`; stamp via `typeLabelStamp`; create via the adapter). Make T011 green
 - [ ] T013 [US1] Checkpoint: run quickstart Scenario 1 against a scratch backlog dir (capture exit 0; bad-input refusals exit 2; roadmap + siblings unchanged)
 
@@ -37,7 +37,7 @@
 **Goal**: review the captured items as a tier distinct from the roadmap; triage/inspection delegated to native commands.
 **Independent test**: after captures, `list` reports every item read-only and writes nothing.
 
-- [ ] T014 [US2] RED: `list` cases in `tests/backlog/verb-backlog.test.ts` — `backlog list` prints each item's id + status + type and writes nothing; backend failure → exit 2
+- [ ] T014 [US2] RED: `list` cases in `tests/backlog/verb-backlog.test.ts` — `backlog list` prints each item's id + status + type and writes nothing; the listing reports only backlog items, never `ROADMAP.md` entries (tier distinct, FR-008); backend failure → exit 2
 - [ ] T015 [US2] Implement the read-only `list` subaction in `src/subcommands/backlog.ts` (via the adapter). Make T014 green
 - [ ] T016 [US2] Checkpoint: run quickstart Scenario 2 — `list` is read-only; native `board`/`show`/`cleanup` are the delegated triage path (not re-wrapped, Principle VIII)
 

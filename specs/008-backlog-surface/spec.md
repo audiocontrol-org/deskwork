@@ -94,7 +94,7 @@ When the cross-model audit-barrage convergence loop parks (dampens) a residual f
 **Capture (US1)**
 
 - **FR-001**: The system MUST let an agent or operator capture a found bug or gap into the backlog in a single command invocation, without requiring them to leave or lose their current working thread.
-- **FR-002**: Each captured item MUST record a type (at minimum distinguishing *bug* from *gap*) and MAY record an optional reference (e.g. a URL or locator) to the context in which it was found.
+- **FR-002**: Each captured item MUST record a type (at minimum distinguishing *bug* from *gap*; the import paths additionally set provenance-class types `imported-issue` / `migrated-finding`, see Key Entities) and MAY record an optional reference (e.g. a URL or locator) to the context in which it was found.
 - **FR-003**: Capture MUST NOT require or perform triage, prioritization, or roadmap promotion — classifying and scoping a captured item is a separate, later, operator-driven act (capture ≠ scope).
 - **FR-004**: Capturing into the backlog MUST NOT modify `ROADMAP.md` or any other curated artifact.
 - **FR-005**: The backlog's contents MUST be durable, human-readable written artifacts versioned in the working tree (per the thesis: memory loss is countered by durable *written* artifacts; the store must be prose-auditable, not an opaque binary).
