@@ -28,6 +28,8 @@ import {
   requireMapValue,
   requirePositional,
   scanVerbFlags,
+  validateSubactionFlags,
+  type SubactionGrammar,
 } from './document-verb-shared.js';
 
 interface Flags {
@@ -36,14 +38,7 @@ interface Flags {
   readonly values: ReadonlyMap<string, string>;
 }
 
-interface SubactionSpec {
-  readonly valueFlags: readonly string[];
-  /** Whether `--apply` is meaningful (imports are dry-run by default). */
-  readonly apply: boolean;
-  readonly positionals: number;
-}
-
-const SUBACTION_SPECS: Readonly<Record<string, SubactionSpec>> = {
+const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   capture: { valueFlags: ['type', 'ref', 'body'], apply: false, positionals: 1 },
   list: { valueFlags: [], apply: false, positionals: 0 },
   'import-github': { valueFlags: [], apply: true, positionals: 0 },
@@ -59,20 +54,6 @@ const ALL_VALUE_FLAGS: readonly string[] = [
 function scanFlags(args: readonly string[]): Flags {
   const s = scanVerbFlags('backlog', args, '', ['apply'], ALL_VALUE_FLAGS);
   return { apply: s.booleans.has('apply'), positionals: s.positionals, values: s.values };
-}
-
-/** Reject unknown flags, unsupported `--apply`, and extra positionals (exit 2). */
-function validateFlags(subaction: string, flags: Flags): void {
-  const spec = SUBACTION_SPECS[subaction];
-  if (spec === undefined) return; // unknown subaction handled by the dispatch switch.
-  const allowed = new Set(spec.valueFlags);
-  for (const name of flags.values.keys()) {
-    if (!allowed.has(name)) failUsage('backlog', `unknown flag --${name} for '${subaction}'`);
-  }
-  if (flags.apply && !spec.apply) failUsage('backlog', `--apply is not valid for '${subaction}'`);
-  if (flags.positionals.length > spec.positionals) {
-    failUsage('backlog', `unexpected positional '${flags.positionals[spec.positionals]!}' for '${subaction}'`);
-  }
 }
 
 /** Fail-loud if the backlog project marker is absent (Principle V). */
@@ -189,7 +170,7 @@ export async function runBacklogCli(args: string[]): Promise<void> {
     );
   }
   const flags = scanFlags(args.slice(1));
-  validateFlags(subaction, flags);
+  validateSubactionFlags('backlog', subaction, SUBACTION_SPECS[subaction], flags);
   try {
     switch (subaction) {
       case 'capture':

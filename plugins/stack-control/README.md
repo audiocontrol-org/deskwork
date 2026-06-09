@@ -58,6 +58,10 @@ The deterministic primitive the skills call (`bin/stackctl <verb>`, in-tree Type
 | `stackctl inbox promote "<title>" --to <ref> [--apply]` | Triage: record a captured entry's graduation target (status → `promoted`). Records the reference only — does NOT create the target. Dry-run by default. |
 | `stackctl inbox drop "<title>" --reason "<why>" [--apply]` | Triage: discard a captured entry with a recorded reason (status → `dropped`). Dry-run by default. |
 | `stackctl inbox list [--doc <path>]` | Read-only: list each inbox entry's identifier + status. |
+| `stackctl backlog capture "<title>" --type bug\|gap [--ref/--body]` | Capture found work into the slush pile in one move — stamps `agent-found` + `type:<v>` labels, applies **no priority** (capture ≠ scope). Exit 0 prints the id; bad input → exit 2, nothing written; `ROADMAP.md` untouched. |
+| `stackctl backlog list` | Read-only: list each item's id + status + type (a tier distinct from `ROADMAP.md`). Triage/inspection delegate to backlog.md's native `board`/`task <id>`/`cleanup`. |
+| `stackctl backlog import-github [--apply]` | One-time, idempotent snapshot of open GitHub issues → `imported-issue` items (backlinked `gh-<n>`, labels + body carried). GitHub never mutated; dry-run by default; fail-loud on a missing/unauthenticated `gh`. |
+| `stackctl backlog import-slush --feature <slug> [--apply]` | One-time backfill of existing `acknowledged-slush-pile` audit-log entries → `migrated-finding` items; rewrites each to `migrated-to-backlog <task-id>`. HIGHs never migrated; idempotent; dry-run by default. |
 
 ## Document primitives
 
@@ -70,6 +74,20 @@ Each verb defaults to **dry-run** (report, write nothing); writing requires `--a
 `stackctl inbox` makes out-of-sequence design-idea capture a first-class, **one-move, fail-safe** operation against the governed [`DESIGN-INBOX.md`](./DESIGN-INBOX.md) — the native capability that **replaces the retired interim hand-append convention**. Capture is instant and never requires finishing the current thread (**capture ≠ scope**); triage is a separate deliberate pass (`promote` records a graduation target and reuses the existing creators — it does not create the target; `drop` records a reason). Lean-keeping reuses the generic `curate`/`archive`/`unarchive` verbs. Every mutation re-validates the whole document and is zero-write-on-failure. The agent-facing skill is [`/stack-control:inbox`](./skills/inbox/SKILL.md).
 
 > **Which inbox does `--doc` target?** When omitted, `--doc` defaults to the **plugin-bundled** `DESIGN-INBOX.md` (this monorepo's own inbox), not your project's. Project-relative inbox discovery is a tracked follow-up (`design:gap/project-relative-doc-discovery`); until it lands, **adopters operating on their own inbox MUST pass `--doc <path>` explicitly** (or set `STACKCTL_INBOX_DEFAULT_DOC`).
+
+## Backlog slush pile — intake: three sources, one pile
+
+`stackctl backlog` is a structured, agent-easy **slush pile** for found-mid-work bugs/gaps, kept deliberately **separate from the curated `ROADMAP.md`** so the roadmap stays a small hand-curated DAG while the backlog absorbs the flood. Unlike `inbox`/`roadmap` (in-tree governed documents), `backlog` is the plugin's first **external-backend adapter** verb: it shells to **backlog.md** (the `backlog` binary, pinned in the plugin), which owns the git-diffable YAML-frontmatter task files under `backlog/` and the native triage surface. The verb stamps project conventions (type, labels, provenance) and delegates triage/inspection to backlog.md's native `board` / `task <id>` / `cleanup` (faithful tool adoption — not re-wrapped). The agent-facing skill is [`/stack-control:backlog`](./skills/backlog/SKILL.md).
+
+**Capture ≠ scope.** A plain `capture` records found work in one move with no priority/triage; classifying, prioritizing, and any promotion to `ROADMAP.md` is a separate, later, operator-driven pass.
+
+**Three intake sources feed one pile** — the single burn-down queue:
+
+1. **Ongoing agent capture** (`backlog capture`) — found work recorded mid-task.
+2. **A one-time GitHub-issue snapshot** (`backlog import-github`) — open issues imported read-only and idempotently (GitHub never mutated; backlinked `gh-<n>`).
+3. **Audit-barrage parked residuals** — when the convergence dampener parks a MEDIUM/LOW finding, it routes into the pile. `stackctl slush-findings` was **rewired**: a parked flip now becomes a `migrated-finding` backlog item and its audit-log entry records `migrated-to-backlog <task-id>` instead of an indefinitely-held `acknowledged-slush-pile` status — leaving the audit-log a clean open/fixed convergence ledger. The dampener **decision** stays in governance (`slush-remaining.ts`, unchanged); only the destination moved. HIGHs are **never** slushed. `backlog import-slush` backfills existing parked entries. The old **`--burn-down` flag is removed — working the backlog IS the burn-down queue.**
+
+> **Which backlog does the verb target?** The dir whose `backlog/` tree is operated on defaults to the **plugin-bundled** `backlog/`; set `STACKCTL_BACKLOG_DIR` to override (the adopter/test seam until project-relative discovery lands). The backend (`backlog.md`) is pinned in the plugin's `package.json`; a missing binary fails loud with remediation.
 
 ## Governance extension
 

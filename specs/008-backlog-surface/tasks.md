@@ -66,10 +66,10 @@
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T028 [P] File-size + strict-typing audit: every new module ≤ 500 lines; `tsc --noEmit` strict clean; no `any`/`as`/`@ts-ignore` in new src
-- [ ] T029 [P] Author `plugins/stack-control/skills/backlog/SKILL.md` — the `/stack-control:backlog` touch point: when to capture (a bug/gap found mid-work), the **capture ≠ scope** discipline, and the verb surface (capture/list/import-github/import-slush; triage delegated to native `board`/`show`/`cleanup`)
-- [ ] T030 [P] Document `stackctl backlog` in the plugin README (verb rows + an "Intake: three sources, one pile" section; note the `slush-findings` rewire + `--burn-down` removal)
-- [ ] T031 Full quickstart run-through (all 4 scenarios end-to-end against scratch dirs) + full `vitest` suite green + session-end clone-snapshot. **DRY**: review NEW duplication against the adapter/verb plumbing; extract any shared verb flag-scan/require into the existing `document-verb-shared.ts` (or a sibling) per the 007 precedent, or JUSTIFY a residual clone
+- [X] T028 [P] File-size + strict-typing audit: every new module ≤ 500 lines (largest is `backlog.ts` ≈ 210); `tsc --noEmit` strict clean; no `any`/`as`/`@ts-ignore` in new src (verified by grep)
+- [X] T029 [P] Author `plugins/stack-control/skills/backlog/SKILL.md` — the `/stack-control:backlog` touch point: when to capture (a bug/gap found mid-work), the **capture ≠ scope** discipline, and the verb surface (capture/list/import-github/import-slush; triage delegated to native `board`/`task <id>`/`cleanup`)
+- [X] T030 [P] Document `stackctl backlog` in the plugin README (verb rows + a "Backlog slush pile — intake: three sources, one pile" section; notes the `slush-findings` rewire + `--burn-down` removal)
+- [X] T031 Full quickstart run-through (all 4 scenarios run live at the per-phase checkpoints against scratch dirs) + full `vitest` suite green (463 passed / 87 files) + clone-snapshot. **DRY**: extracted the shared per-subaction flag-grammar validator into `document-verb-shared.ts` (`validateSubactionFlags` + `SubactionGrammar`), adopted by backlog/roadmap/inbox — this killed both the new `backlog⟷roadmap` clone AND the pre-existing `inbox⟷roadmap` one (snapshot 8→6). The one residual NEW clone (`slush-migrate⟷slush-remaining` entry-walk, 9 lines) is JUSTIFIED: D5 freezes `slush-remaining.ts`, so `slush-migrate` re-implements the walk parametrized on a status predicate.
 
 ## Dependencies & Execution Order
 

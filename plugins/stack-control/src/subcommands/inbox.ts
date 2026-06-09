@@ -16,6 +16,8 @@ import {
   requireMapValue,
   requirePositional,
   scanVerbFlags,
+  validateSubactionFlags,
+  type SubactionGrammar,
 } from './document-verb-shared.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -35,16 +37,9 @@ interface Flags {
   readonly values: ReadonlyMap<string, string>;
 }
 
-/** Per-subaction grammar: value-flags it reads, whether `--apply` is meaningful. */
-interface SubactionSpec {
-  readonly valueFlags: readonly string[];
-  readonly apply: boolean;
-  /** Max positionals consumed beyond the subaction token (`--doc` is universal). */
-  readonly positionals: number;
-}
-
 // `--doc` is universal (allowed everywhere) and handled separately from `values`.
-const SUBACTION_SPECS: Readonly<Record<string, SubactionSpec>> = {
+// Per-subaction grammar is the shared `SubactionGrammar` (document-verb-shared).
+const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   capture: { valueFlags: ['idea', 'surfaced', 'context', 'home'], apply: true, positionals: 1 },
   promote: { valueFlags: ['to'], apply: true, positionals: 1 },
   drop: { valueFlags: ['reason'], apply: true, positionals: 1 },
@@ -61,25 +56,6 @@ const ALL_VALUE_FLAGS: readonly string[] = [
 function scanFlags(args: readonly string[]): Flags {
   const s = scanVerbFlags('inbox', args, DEFAULT_DOC, ['apply'], ALL_VALUE_FLAGS);
   return { doc: s.doc, apply: s.booleans.has('apply'), positionals: s.positionals, values: s.values };
-}
-
-/**
- * Reject unknown flags, unsupported `--apply`, and extra positionals for the
- * chosen subaction with exit 2 — BEFORE any mutation/query runs. A misspelled
- * value-flag would otherwise be silently ignored, producing a valid-but-wrong
- * mutation (mirrors roadmap validateFlags, AUDIT-20260608-13).
- */
-function validateFlags(subaction: string, flags: Flags): void {
-  const spec = SUBACTION_SPECS[subaction];
-  if (spec === undefined) return; // unknown subaction handled by the dispatch switch.
-  const allowed = new Set(spec.valueFlags);
-  for (const name of flags.values.keys()) {
-    if (!allowed.has(name)) failUsage('inbox', `unknown flag --${name} for '${subaction}'`);
-  }
-  if (flags.apply && !spec.apply) failUsage('inbox', `--apply is not valid for '${subaction}'`);
-  if (flags.positionals.length > spec.positionals) {
-    failUsage('inbox', `unexpected positional '${flags.positionals[spec.positionals]!}' for '${subaction}'`);
-  }
 }
 
 /** The first positional, failing usage with a subaction-specific message. */
@@ -139,7 +115,7 @@ export async function runInboxCli(args: string[]): Promise<void> {
     failUsage('inbox', 'a subaction is required (usage: inbox <capture|promote|drop|list> [flags])');
   }
   const flags = scanFlags(args.slice(1));
-  validateFlags(subaction, flags);
+  validateSubactionFlags('inbox', subaction, SUBACTION_SPECS[subaction], flags);
   try {
     switch (subaction) {
       case 'capture':

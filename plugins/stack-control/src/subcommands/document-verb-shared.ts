@@ -112,6 +112,49 @@ export function scanVerbFlags(
   return { doc, positionals, values, booleans };
 }
 
+/** Per-subaction flag grammar shared by the subaction-dispatching verbs. */
+export interface SubactionGrammar {
+  readonly valueFlags: readonly string[];
+  /** Whether `--apply` is meaningful for the subaction. */
+  readonly apply: boolean;
+  /** Whether `--clear` is meaningful (roadmap `defer`); absent → not allowed. */
+  readonly clear?: boolean;
+  /** Max positionals consumed beyond the subaction token. */
+  readonly positionals: number;
+}
+
+/**
+ * Reject unknown value-flags, an unsupported `--apply`/`--clear`, and extra
+ * positionals for the chosen subaction (exit 2) — BEFORE any mutation/query
+ * runs. Shared by roadmap/inbox/backlog so the grammar-enforcement is single-
+ * sourced (the flag SCAN is already shared via scanVerbFlags). An unknown
+ * subaction (`grammar === undefined`) is left to the verb's dispatch switch.
+ */
+export function validateSubactionFlags(
+  verb: string,
+  subaction: string,
+  grammar: SubactionGrammar | undefined,
+  flags: {
+    readonly apply: boolean;
+    readonly clear?: boolean;
+    readonly positionals: readonly string[];
+    readonly values: ReadonlyMap<string, string>;
+  },
+): void {
+  if (grammar === undefined) return;
+  const allowed = new Set(grammar.valueFlags);
+  for (const name of flags.values.keys()) {
+    if (!allowed.has(name)) failUsage(verb, `unknown flag --${name} for '${subaction}'`);
+  }
+  if (flags.apply && !grammar.apply) failUsage(verb, `--apply is not valid for '${subaction}'`);
+  if (flags.clear === true && grammar.clear !== true) {
+    failUsage(verb, `--clear is not valid for '${subaction}'`);
+  }
+  if (flags.positionals.length > grammar.positionals) {
+    failUsage(verb, `unexpected positional '${flags.positionals[grammar.positionals]!}' for '${subaction}'`);
+  }
+}
+
 /** The first positional, failing usage with a subaction-specific message. */
 export function requirePositional(
   verb: string,

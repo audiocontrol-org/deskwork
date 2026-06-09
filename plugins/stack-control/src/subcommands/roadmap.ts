@@ -30,6 +30,8 @@ import {
   requireMapValue,
   requirePositional,
   scanVerbFlags,
+  validateSubactionFlags,
+  type SubactionGrammar,
 } from './document-verb-shared.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -44,20 +46,9 @@ interface Flags {
   readonly values: ReadonlyMap<string, string>;
 }
 
-/** Per-subaction grammar: which value-flags it reads + which booleans it accepts. */
-interface SubactionSpec {
-  /** Value-flag names (the `--<name> <value>` keys it reads, sans `--`). */
-  readonly valueFlags: readonly string[];
-  /** Whether `--apply` is meaningful (mutations) or rejected (queries). */
-  readonly apply: boolean;
-  /** Whether `--clear` is meaningful (only `defer`) or rejected. */
-  readonly clear: boolean;
-  /** Max positionals consumed beyond the subaction token (`--doc` is universal). */
-  readonly positionals: number;
-}
-
 // `--doc` is universal (allowed everywhere) and handled separately from `values`.
-const SUBACTION_SPECS: Readonly<Record<string, SubactionSpec>> = {
+// Per-subaction grammar is the shared `SubactionGrammar` (document-verb-shared).
+const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   next: { valueFlags: [], apply: false, clear: false, positionals: 0 },
   blocked: { valueFlags: [], apply: false, clear: false, positionals: 0 },
   blocks: { valueFlags: [], apply: false, clear: false, positionals: 1 },
@@ -92,27 +83,6 @@ function scanFlags(args: readonly string[]): Flags {
     positionals: s.positionals,
     values: s.values,
   };
-}
-
-/**
- * Reject unknown flags, unsupported `--apply`/`--clear`, and extra positionals
- * for the chosen subaction with exit 2 — BEFORE any mutation/query runs. A
- * misspelled value-flag (e.g. `--depend-on` for `--depends-on`) would otherwise
- * be silently ignored, producing a valid-but-wrong roadmap mutation
- * (AUDIT-20260608-13).
- */
-function validateFlags(subaction: string, flags: Flags): void {
-  const spec = SUBACTION_SPECS[subaction];
-  if (spec === undefined) return; // unknown subaction handled by the dispatch switch.
-  const allowed = new Set(spec.valueFlags);
-  for (const name of flags.values.keys()) {
-    if (!allowed.has(name)) failUsage('roadmap', `unknown flag --${name} for '${subaction}'`);
-  }
-  if (flags.apply && !spec.apply) failUsage('roadmap', `--apply is not valid for '${subaction}'`);
-  if (flags.clear && !spec.clear) failUsage('roadmap', `--clear is not valid for '${subaction}'`);
-  if (flags.positionals.length > spec.positionals) {
-    failUsage('roadmap', `unexpected positional '${flags.positionals[spec.positionals]!}' for '${subaction}'`);
-  }
 }
 
 /** The first positional, failing usage with a subaction-specific message. */
@@ -252,7 +222,7 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
     failUsage('roadmap', 'a subaction is required (usage: roadmap <next|blocked|add> [flags])');
   }
   const flags = scanFlags(args.slice(1));
-  validateFlags(subaction, flags);
+  validateSubactionFlags('roadmap', subaction, SUBACTION_SPECS[subaction], flags);
   try {
     switch (subaction) {
       case 'next':
