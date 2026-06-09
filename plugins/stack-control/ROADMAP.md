@@ -89,13 +89,13 @@ The self-hosting bootstrap: plugin + stackctl + native Spec Kit execution. The t
 Migrate audit-barrage + the audit protocol (convergence criterion + finding state machine) in-house; the one-way execution→governance seam survives.
 
 ## multi:feature/migrate-session-skills
-- status: planned
+- status: cancelled
 - depends-on: multi:feature/front-door
-Migrate session-start / session-end lifecycle skills into stack-control.
+Migrate session-start / session-end lifecycle skills into stack-control. Cancelled — superseded by multi:feature/session-skills (build native, not port): dw-lifecycle's session skills are hardcoded to deskwork conventions (#122), so they are rebuilt native rather than migrated. The #122/#422 gaps and retire-dw-lifecycle's dependency moved to the native feature.
 
 ## multi:feature/retire-dw-lifecycle
 - status: planned
-- depends-on: design:feature/migrate-scope-discovery, multi:feature/migrate-audit-barrage, multi:feature/migrate-session-skills
+- depends-on: design:feature/migrate-scope-discovery, multi:feature/migrate-audit-barrage, multi:feature/session-skills
 Reach parity, then retire the predecessor — the absorb-then-retire endgame.
 
 ## design:gap/roadmap-edge-aware-archival
@@ -189,13 +189,13 @@ Round-9 residual hardening of the document-primitives engine: fence-length handl
 
 ## multi:gap/session-skills-tailoring
 - status: planned
-- part-of: multi:feature/migrate-session-skills
+- part-of: multi:feature/session-skills
 - ref: #122
 dw-lifecycle session-start/session-end are project-coupled (hardcoded deskwork conventions); they need per-project tailoring before they can ship as general-use in stack-control.
 
 ## multi:gap/session-start-branch-staleness
 - status: planned
-- part-of: multi:feature/migrate-session-skills
+- part-of: multi:feature/session-skills
 - ref: #422
 session-start branch-staleness detector: warn pre-merge when a feature branch is behind so stale-branch sessions do not silently re-implement shipped work.
 
@@ -231,4 +231,14 @@ Automated hand-off of a promoted inbox entry into deskwork's Ideas stage (exclud
 - status: planned
 - part-of: design:feature/migrate-scope-discovery
 stackctl inbox/roadmap default --doc to the plugin-bundled DESIGN-INBOX.md/ROADMAP.md (correct for in-repo dogfood, wrong for an adopter running without --doc). Add project-relative governed-doc discovery (cwd/config resolution) for the whole verb family so adopters get their own inbox/roadmap by default. Surfaced by the 007 after_implement barrage (AUDIT-BARRAGE-codex-01, HIGH).
+
+## multi:feature/session-skills
+- status: planned
+- depends-on: multi:feature/front-door
+Native, Spec-Kit-aware session-start / session-end lifecycle skills for stack-control: bootstrap a fresh agent into the active spec + governed roadmap + open work at session boot, and capture the journal + tooling-friction + clone-snapshot at session close. Built native (NOT ported from dw-lifecycle, whose session skills are hardcoded to deskwork conventions).
+
+## multi:feature/project-doc-setup
+- status: planned
+- depends-on: multi:feature/front-door
+Post-install project setup: scaffold the governed documents + config the plugin verbs require (ROADMAP.md, DESIGN-INBOX.md, the backlog store, stack-control config) into a freshly-installed adopter project, so stackctl inbox/roadmap/backlog work without hand-authoring the docs. The create-side complement to design:gap/project-relative-doc-discovery (which resolves an adopter own docs at read time).
 
