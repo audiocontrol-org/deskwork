@@ -1276,3 +1276,55 @@ Finding-ID: AUDIT-20260609-11 (codex-02)
 Status:     fixed-6903bff2
 Disposition: FIXED. Removed the temporal "fast-follow" qualifier from the `design:gap/insight-capture-ideas-stage-handoff` item (project no-temporal-terms rule); kept the durable scope boundary ("excluded from insight-capture v1 per spec clarification 4").
 Severity:   low
+
+## 2026-06-09 — audit-barrage lift (20260609T041357641Z-pluggable-lifecycle-providers-after_clarify)
+
+### AUDIT-20260609-12 — Wrong-default-doc regression tests assert the wrong file and can corrupt the committed bundled inbox on a regression
+
+Finding-ID: AUDIT-20260609-12
+Status:     fixed-4d859c92
+Disposition: FIXED (commit 4d859c92). Added a `STACKCTL_INBOX_DEFAULT_DOC` env override to `inbox.ts` (a test seam + usable operator override toward `design:gap/project-relative-doc-discovery`) and hardened the wrong-doc regression test to point the default at an ISOLATED copy and assert THAT file (the actually-at-risk default) is byte-for-byte unchanged. A regression can no longer pollute the committed bundled DESIGN-INBOX.md, and the assertion targets the right file. Env-seam smoke confirmed the override isolates the default.
+Severity:   medium
+Surface:    plugins/stack-control/tests/inbox/verb-inbox.test.ts:168-187 (the two `claude-01` swallowing cases); plugins/stack-control/src/subcommands/inbox.ts:25 (`DEFAULT_DOC`)
+
+The two regression tests added to lock the round-3 claude-01 fix (`AUDIT-20260609-08` — scanner must not swallow a following recognized flag as a value) do not actually guard the bug they name, and the suite has no isolation of the `DEFAULT_DOC` path. The first test runs `inbox capture --idea --doc <docPath> --apply` and asserts `expect(readFileSync(docPath)).toBe(before)`. But the bug-under-test never writes to `docPath`: in the pre-fix scanner, `--idea` swallows `--doc`, `docPath` lands in the **title** positional slot, `--doc` is never set, and the write goes to `DEFAULT_DOC = resolve(here,'..','..','DESIGN-INBOX.md')` — the committed `plugins/stack-control/DESIGN-INBOX.md`, not the tmpCopy. So the `readFileSync(docPath).toBe(before)` assertion is decorative — it can never fail for this command in either the fixed or buggy code. The only assertion that distinguishes fixed (exit 2) from buggy (exit 0) is `r.status === 2`.
+
+The concrete hazard: if the claude-01 fix is ever reverted or weakened, this test fails on the status check, but in failing it writes a junk entry (title = a `/tmp/...` path) into the **committed, source-controlled** `DESIGN-INBOX.md`, because the buggy path runs `capture(DEFAULT_DOC, …, apply=true)` against the real bundled file before the assertion is evaluated. The round-3 log already records this failure mode happening for real: *"The auto-lift for this run was lost to a test-side-effect cleanup."* A regression-guard whose failure mode corrupts a committed file is itself a liability, and it provides false reassurance — the file-level guard points at a file the bug provably never touches. The robust fix is to make the default-doc resolvable to an isolated path under test (env override, or inject the default), and assert the *actual* at-risk file (the bundled default) is unchanged. As written, the suite's regression coverage for the exact wrong-document-write class that AUDIT-06/08 rated HIGH rests entirely on an exit-code check, with the file-level proof aimed at the wrong target.
+
+### AUDIT-20260609-13 — `scanVerbFlags` emits a misleading "<flag> <value> required" when an *unknown* flag is immediately followed by a recognized flag
+
+Finding-ID: AUDIT-20260609-13
+Status:     fixed-52e082ec
+Disposition: FIXED (TDD-first, commit 52e082ec). `scanVerbFlags`'s value-flag branch now distinguishes the true fault: when the leading `--<name>` is NOT a recognized flag of the verb, it emits `unknown flag <token>` rather than the misleading `<token> <value> required` (which had sent the operator to supply a value and trip a different unknown-flag error on the next attempt). Auditor rated it hygiene, not a correctness defect (fail-loud/zero-write); RED test asserts the message.
+Severity:   low
+Surface:    plugins/stack-control/src/subcommands/document-verb-shared.ts:88-93 (generic value-flag branch)
+
+The generic value-flag branch fires `failUsage(verb, \`${token} <value> required\`)` whenever the next token is a recognized flag of the verb. For an *unknown* leading flag this produces a message that misdescribes the problem. `inbox capture "t" --bogus --idea "x"` reports `inbox: --bogus <value> required` — but `--bogus` is not a flag the verb has; the real fault is "unknown flag." The operator's natural correction is to supply a value (`--bogus val --idea "x"`), which then trips a *different* error from `validateFlags`: `unknown flag --bogus for 'capture'`. Two different errors across two attempts for one mistake.
+
+Blast radius is low: every path here is fail-loud and zero-write (exit 2, the inbox is untouched), so there is no data risk — it is purely a usability trap in the one-move flow, the same misleading-"required"-message class that `AUDIT-20260609-05` already named for the forgotten-value case (that fix surfaced the *forgotten value* message correctly but did not address the *unknown leading flag* trigger). A reasonable fix: before treating a `--`-prefixed token as a value flag, check membership in `recognizedFlagNames` and emit `unknown flag <token>` for non-members rather than `<token> <value> required`. Given the fail-loud/zero-write safety this is hygiene, not a correctness defect.
+
+---
+
+### AUDIT-20260609-14 — What I checked and found clean
+
+Finding-ID: AUDIT-20260609-14
+Status:     acknowledged-informational
+Disposition: ACKNOWLEDGED — not a finding; the auditor's clean-list verifying the implementation is sound after the prior rounds (atomicReplace, both status-line anchors, transition/terminal-gating, validateFlags, the roadmap shared-substrate refactor). No action required. Recorded as the convergence evidence: round-4 surfaced 0 HIGH and the net-new signal was only the test-isolation MED (-12) + two LOWs (-13, -15), all now fixed.
+Severity:   informational
+Surface:    (the rest of the diff)
+
+I verified the surfaces most likely to still carry defects after three prior rounds, and they are sound: (1) `atomicReplace` (mutations-core.ts:42-62) is correct — temp created in `dirname(target)` so `renameSync` can never hit EXDEV, symlink resolved via `realpathSync` before write, mode copied via `statSync(target).mode & 0o777`, temp best-effort unlinked on any throw without masking the original error, and the `lstatSync(docPath)` precondition is honestly documented as caller-guaranteed (AUDIT-09 fix holds). (2) The grammar `statusOf` leading-anchor (design-inbox.peg:32) and the mutation `INBOX_STATUS_LINE` leading-bullet anchor (mutations.ts) are correctly asymmetric — one operates on marker-stripped block text, the other on raw source lines — and the mid-line `**Status:**`-in-prose case is covered by tests at both layers. (3) `transition` correctly gates on `terminalStatuses`, locates the real status bullet, and splices the record line after a status that `buildCaptureSection` always emits last; promote's record-and-reuse (no target validation) matches FR-014 and is tested. (4) `validateFlags` rejects unknown flags / `--apply`-on-`list` / positional overflow before any mutation, and the roadmap refactor onto the shared `mutations-core`/`document-verb-shared` substrate preserves behavior with symmetry-lock tests on the roadmap verb. The only thing I would have rated higher had it been silent is the test-isolation gap in claude-01 — but it fails loud via exit code, so its real cost is repo pollution and false coverage signal, not a shipped wrong-document write.
+
+The two findings above are the net-new signal; the implementation itself is in good shape after the prior rounds.
+
+### AUDIT-20260609-15 — Roadmap gap item still uses temporal placeholder wording
+
+Finding-ID: AUDIT-20260609-15
+Status:     fixed-4d859c92
+Disposition: FIXED (commit 4d859c92). De-temporalized the remaining "Today promote only records a target reference" wording in the `design:gap/insight-capture-ideas-stage-handoff` item → "The shipped promote verb records a target reference only" (project no-temporal-terms rule; same class as the -11 "fast-follow" fix).
+Severity:   low
+Surface:    plugins/stack-control/ROADMAP.md:225-228
+
+The new governed roadmap item `design:gap/insight-capture-ideas-stage-handoff` ends with “Today promote only records a target reference.” That is a temporal placeholder in a durable governance document, and it repeats the same documentation-discipline shape that prior AUDIT-20260609-11 fixed for “fast-follow” wording. The intended durable boundary is already clear without the temporal framing: promote records a target reference; Ideas-stage hand-off is outside insight-capture v1 per spec clarification 4.
+
+Blast radius is low because the implementation contract remains clear and this does not change runtime behavior. The risk is process drift: unattended agents can treat “Today …” as an implicit near-term commitment rather than a stable scope boundary. A reasonable fix is to replace it with durable wording such as “Current `promote` semantics record a target reference only” or “The shipped promote verb records a target reference only.”
