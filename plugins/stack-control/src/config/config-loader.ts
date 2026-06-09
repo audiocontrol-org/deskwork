@@ -1,0 +1,120 @@
+// Installation config loader (009 T006) — load + validate
+// `.stack-control/config.yaml`, translating snake_case wire keys to camelCase
+// in-memory. Mirrors the audit-barrage config-loader's fail-loud, prefixed-error
+// style. STRUCTURAL validation only: version, unknown-key rejection, non-empty
+// strings, the {feature} placeholder. Path containment/escape (FR-024) needs the
+// installation root and lives in resolve-paths.ts.
+
+import { readFileSync } from 'node:fs';
+import { parse as parseYaml } from 'yaml';
+import { errorMessage, isPlainObject } from '../scope-discovery/util/typeguards.js';
+import { InstallationError } from './errors.js';
+import type { InstallationConfig, InstallationPaths } from './types.js';
+
+const FEATURE_PLACEHOLDER = '{feature}';
+
+/** Known top-level keys (wire/snake form). Anything else fails loud. */
+const KNOWN_TOP_LEVEL = new Set(['version', 'base_dir', 'paths']);
+
+/** Known `paths.*` keys (wire/snake form) → in-memory camelCase key. */
+const PATHS_KEY_MAP: ReadonlyMap<string, keyof InstallationPaths> = new Map([
+  ['roadmap', 'roadmap'],
+  ['inbox', 'inbox'],
+  ['backlog', 'backlog'],
+  ['audit_log', 'auditLog'],
+  ['feature_audit_log_pattern', 'featureAuditLogPattern'],
+]);
+
+/** Read + validate a config file from disk. `configPath` labels every error. */
+export function loadInstallationConfig(configPath: string): InstallationConfig {
+  let body: string;
+  try {
+    body = readFileSync(configPath, 'utf8');
+  } catch (err) {
+    throw new InstallationError(
+      'invalid-config',
+      `stackctl config: failed to read ${configPath}: ${errorMessage(err)}`,
+    );
+  }
+  return parseInstallationConfig(body, configPath);
+}
+
+/** Pure parse + validate + snake→camel translation. `sourceLabel` prefixes errors. */
+export function parseInstallationConfig(body: string, sourceLabel: string): InstallationConfig {
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(body);
+  } catch (err) {
+    throw fail(sourceLabel, `malformed YAML: ${errorMessage(err)}`);
+  }
+  if (!isPlainObject(parsed)) {
+    throw fail(sourceLabel, 'top-level value must be a mapping');
+  }
+
+  for (const key of Object.keys(parsed)) {
+    if (!KNOWN_TOP_LEVEL.has(key)) {
+      throw fail(sourceLabel, `unknown top-level key '${key}' (no silent ignore)`);
+    }
+  }
+
+  const version = requirePositiveInteger(parsed['version'], 'version', sourceLabel);
+  const config: { version: number; baseDir?: string; paths?: InstallationPaths } = { version };
+
+  if (parsed['base_dir'] !== undefined) {
+    config.baseDir = requireNonEmptyString(parsed['base_dir'], 'base_dir', sourceLabel);
+  }
+
+  if (parsed['paths'] !== undefined) {
+    config.paths = parsePaths(parsed['paths'], sourceLabel);
+  }
+
+  return config;
+}
+
+function parsePaths(raw: unknown, sourceLabel: string): InstallationPaths {
+  if (!isPlainObject(raw)) {
+    throw fail(sourceLabel, "'paths' must be a mapping");
+  }
+  const out: { -readonly [K in keyof InstallationPaths]: string } = {};
+  for (const [wireKey, value] of Object.entries(raw)) {
+    const camel = PATHS_KEY_MAP.get(wireKey);
+    if (camel === undefined) {
+      throw fail(sourceLabel, `unknown paths.${wireKey} key (no silent ignore)`);
+    }
+    const str = requireNonEmptyString(value, `paths.${wireKey}`, sourceLabel);
+    if (camel === 'featureAuditLogPattern' && !str.includes(FEATURE_PLACEHOLDER)) {
+      throw fail(
+        sourceLabel,
+        `paths.feature_audit_log_pattern must contain the literal '${FEATURE_PLACEHOLDER}' placeholder`,
+      );
+    }
+    out[camel] = str;
+  }
+  return out;
+}
+
+function requirePositiveInteger(value: unknown, field: string, sourceLabel: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+    throw fail(sourceLabel, `${field} must be a positive integer (got ${describe(value)})`);
+  }
+  return value;
+}
+
+function requireNonEmptyString(value: unknown, field: string, sourceLabel: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw fail(sourceLabel, `${field} must be a non-empty string (got ${describe(value)})`);
+  }
+  return value;
+}
+
+function describe(value: unknown): string {
+  if (value === null) return 'null';
+  if (value === undefined) return 'absent';
+  if (typeof value === 'number') return `${value}`;
+  if (typeof value === 'string') return `'${value}'`;
+  return typeof value;
+}
+
+function fail(sourceLabel: string, message: string): InstallationError {
+  return new InstallationError('invalid-config', `stackctl config: ${sourceLabel}: ${message}`);
+}
