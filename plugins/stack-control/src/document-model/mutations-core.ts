@@ -41,6 +41,12 @@ let tempCounter = 0;
  * rewrite its REAL target (so the symlink survives and keeps pointing at the
  * now-updated file), and we copy the existing target's permission mode onto the
  * temp file before the rename (so a non-default mode is not silently lost).
+ *
+ * Precondition (AUDIT-20260609-17): temp-then-rename requires WRITE permission on
+ * the document's PARENT DIRECTORY (to create the temp file and rename over the
+ * target) — a deliberate trade-off for atomicity, stricter than the prior
+ * in-place write which needed only file-write permission. A writable governed
+ * doc inside a read-only directory will fail loud (EACCES/EROFS, zero write).
  */
 function atomicReplace(docPath: string, contents: string): void {
   // Resolve a symlink to its real path so we replace the underlying file, not
