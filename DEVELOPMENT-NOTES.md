@@ -5432,3 +5432,52 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 1. **007 is IMPLEMENTED + governed** (gate dampened/OPEN; 0 open findings from this work). Next is **review / ship**: `/speckit` has no ship step — use `/dw-lifecycle:review` or open a PR. Operator owns merge.
 2. **Post-merge:** advance `design:feature/insight-capture` → `shipped` in the governed `ROADMAP.md`; the new gaps this session added (`design:gap/insight-capture-ideas-stage-handoff`, `design:gap/project-relative-doc-discovery`) are tracked there.
 3. **At merge:** reconcile the branch-local session skills with `main`; the `feature.json`-over-branch-name migration (TF-09/14/15/17/22/23) + the new governance-tooling frictions (TF-25/26/27) fold in.
+
+---
+
+## 2026-06-09: choosing backlog.md for an agent "backlog" slush pile — investigation + design (ADR) + inbox capture
+### Feature: pluggable-lifecycle-providers
+### Worktree: stack-control (branch `feature/stack-control`)
+
+**Goal:** Operator asked to investigate `beads` (gastownhall/beads) for issue management. It evolved into a brainstorm of a **new "backlog" surface** — a structured, agent-easy *slush pile* for bugs/gaps agents find mid-work, deliberately separate from the carefully-curated `ROADMAP.md` — and a substrate decision. Design-only session; no implementation.
+
+**Accomplished:**
+- **Two hands-on tool spikes** (not README-reading) in `/tmp` scratch dirs: **beads `bd` 1.0.5** (Dolt-backed graph tracker) and **backlog.md 1.46.0** (markdown-native, TS/npm, built-in MCP server). Drove each through the slush-pile workflow: one-move capture, structured fields, separating a pile from a curated view, dependency support, the git/storage story, agent integration.
+- **Ran `superpowers:brainstorming`** to a complete design through a sequence of operator-owned forks. **Decisions:** (1) substrate = **backlog.md** (markdown-in-tree, prose-auditable, TS-stack fit) over beads; (2) a **new "backlog"** capturing agent-found bugs/gaps **plus** a one-time snapshot import of the 37 open GitHub issues (GitHub **unmutated**); (3) **opinionated `/stack-control:backlog` verb over backlog.md as the ONE concrete backend, port deferred** (Principle II + the 2026-06-04 provider-port decision — the Spec Kit pattern is concrete-first / port-deferred); (4) **migrate `slush-findings` into the backlog** in one integrated phase (the audit-barrage's parked residuals *are* bugs/gaps); (5) **skill + CLI, not MCP**.
+- **Wrote the design doc as an ADR** — `docs/superpowers/specs/2026-06-09-backlog-surface-design.md`: architecture (first external-backend adapter verb), 3 intake sources, the `slush-findings` migration, scope + named deferrals, a **"Future: dependency-graph overlay"** section (the roadmap reasoner is store-agnostic at the `WorkItem` boundary), and an **"Alternatives considered"** section (verified beads-vs-backlog.md head-to-head + why beads/`SLUSH.md` were rejected).
+- **Captured the graph-overlay insight** to the governed `DESIGN-INBOX.md` via `stackctl inbox capture` (followed the `/stack-control:inbox` SKILL.md procedure rather than hand-rolling the CLI).
+- 3 commits, all docs, pushed.
+
+**Didn't Work / unresolved:**
+- **No code** — design only. The Spec Kit `spec.md` is not yet created; next is `/speckit-specify` in a **separate implementation session** (orchestrator/implementation split).
+- **Spec-review gate still open** — operator to review the design doc before planning.
+- A couple of `AskUserQuestion` modals were denied/overridden with prose (the "who is it for" audience question; substrate answered "I don't know"). The operator prefers prose for nuanced calls and YAGNI'd several forks — I over-asked early.
+
+**Course Corrections:**
+- [PROCESS] Operator reframed "evaluate beads" → *"I need a slush pile, separate from the curated roadmap, for issues agents find."* This **inverted my earlier beads-vs-markdown tension**: a slush pile's defining trait is flooding, which is exactly what breaks markdown — so beads' opaque-store weakness matters least there. (The thesis's durable-written-artifacts + TS-stack fit + trial framing still tipped to backlog.md.)
+- [COMPLEXITY] I first recommended **MCP** for capture; operator pushed back (*"I turn into the mcp janitor"*). Reversed to **skill + CLI** — which also matches the project's `enforcement-lives-in-skills` + fail-loud principles and is worktree-portable. The honest comparison (MCP's single-vendor advantages are modest; its daemon/config-drift costs are real) landed it.
+- [PROCESS] Operator proposed a **backend-agnostic port up front**; calibrated to **"opinionated verb, concrete backend, port deferred"** by citing their own 2026-06-04 decision + Principle II — the Spec Kit pattern they cited is *concrete-first, port-deferred*, the opposite of building the abstraction now.
+- [PROCESS] Operator caught me about to hand-roll the inbox CLI — *"isn't there a skill for inbox capture?"* Read + followed the `inbox` SKILL.md instead.
+- [PROCESS] Operator YAGNI'd concurrency/merge-safety and the GitHub close/migrate disposition — *"worry about it when it becomes a problem."* Captured as named deferrals, not silent cuts.
+- [DOCUMENTATION] Operator asked whether the spec is the right home for the investigation rationale. Clarified: `spec.md` stays requirements-only (spec-governance would flag rationale as wrong-altitude); the **design doc (ADR)** is the home → added "Alternatives considered."
+
+**Quantitative** (re-derived from `git log 05b45287..HEAD`):
+- Commits: **3** — `81cd8355` (design doc), `618e5874` (graph-overlay future + inbox capture), `5905aefb` (alternatives-considered). All `docs(backlog)` / docs.
+- Files changed: **2** — the design doc (+286) and `DESIGN-INBOX.md` (+7); **293 insertions, 0 deletions**.
+- Code / tests: **0** (design session). Clone snapshot: **6 groups = session-start baseline, 0 new** (no TS written).
+- Hands-on spikes: **2** (`bd` 1.0.5, `backlog.md` 1.46.0). Skills invoked: `superpowers:brainstorming`; `stack-control:inbox` (via its SKILL.md — the in-dev plugin isn't registered as an invocable skill this session).
+- Operator messages: ~13. Course corrections: **6** (4 PROCESS, 1 COMPLEXITY, 1 DOCUMENTATION).
+- GitHub issues: **0** progressed/closed (the 37 open issues are a *future* import target, untouched this session).
+
+**Insights:**
+- **The slush-pile reframe inverted a tension.** I'd framed beads' opaque Dolt SSOT as the dealbreaker vs the prose-governance model. But the slush tier is precisely where prose-fidelity matters least (it floods) and queryability matters most — so the objection weakens there. backlog.md still won, but on *different* grounds (markdown-in-tree honoring "durable written artifacts," TS-stack fit, trial-reversibility), not the original one.
+- **The project's own pluggability discipline argues for deferring the abstraction.** "Opinionated capability over a pluggable backend" is the stack-control identity, but Principle II + the 2026-06-04 provider-port decision say *build concretely against one real backend, generalize from real instances*. The operator citing "the Spec Kit pattern" as a reason to build the port actually argues for the opposite — Spec Kit is concrete-first, port-deferred.
+- **The roadmap reasoner is already store-agnostic** at the `WorkItem` boundary (`graph.ts` views operate on `WorkItem`/`RoadmapModel`; only `toWorkItem` couples to the doc engine) — so backlog.md could later reuse `ready`/`blocked`/`graph` via a sibling `backlogTaskToWorkItem()` projection. Verified by reading the source, not assumed.
+- **skill + CLI > MCP for this dogfood**: fail-loud, worktree-portable, no daemon to janitor, and reversible (backlog.md ships the MCP server if multi-vendor capture ever matters).
+
+**Next step (resume here):**
+1. **Spec-review gate open** — operator reviews `docs/superpowers/specs/2026-06-09-backlog-surface-design.md`.
+2. On approval: **seed `/speckit-specify`** from the design doc in a **separate implementation session/worktree**. `spec.md` stays requirements-only; rationale lives in the ADR.
+3. **Triage** the new `DESIGN-INBOX.md` entry ("Overlay homegrown dependency reasoning on backlog.md via the WorkItem boundary") in a later deliberate pass.
+4. Scratch spikes at `/tmp/beads-spike` + `/tmp/backlog-spike` can be removed.
+5. Prior **007** next-steps still stand (review/ship 007; advance the roadmap item post-merge).
