@@ -1237,3 +1237,42 @@ Surface:    plugins/stack-control/src/subcommands/inbox.ts:21-23; specs/007-insi
 The contract says `--doc` defaults to the project’s governed `DESIGN-INBOX.md`, and the skill tells agents to capture against the project’s governed inbox. The implementation instead sets `DEFAULT_DOC = resolve(here, '..', '..', 'DESIGN-INBOX.md')`, which is the plugin package’s own `plugins/stack-control/DESIGN-INBOX.md`, independent of the invoking project/cwd.
 
 The blast radius is high for adopters and unattended agents: `stackctl inbox capture ... --apply` without `--doc` is documented as the normal one-move path, but it will mutate the plugin-bundled inbox rather than the current project’s inbox. That breaks the “one source of truth” promise by silently recording the idea in the wrong governed document. A reasonable fix is to resolve the default from the project root/cwd, or require `--doc` until project inbox discovery exists; either way, make the contract, skill, and code agree.
+
+## 2026-06-09 — audit-barrage round-3 (verification re-barrage; run 20260609T035439132Z)
+
+The round-3 verification barrage (after rounds 1-2's fixes) surfaced **0 HIGH** plus 5 findings — all fix-debt or incompleteness from rounds 1-2. Two were real correctness issues (one a regression introduced by round-2's AUDIT-05 relaxation); all 5 root-fixed in **commit 6903bff2**. The auto-lift for this run was lost to a test-side-effect cleanup; this consolidated entry is the durable record.
+
+### AUDIT-20260609-07 — design-inbox grammar `statusOf` substring-matches body prose (codex-01, MEDIUM)
+
+Finding-ID: AUDIT-20260609-07 (codex-01)
+Status:     fixed-6903bff2
+Disposition: FIXED (TDD-first). Round-1 anchored the mutation locator but the GRAMMAR parser (`grammars/design-inbox.peg` `statusOf`) was still substring-based, so a captured idea like `Add a **Status:** filter to inbox list` was parsed as status `filter` and the capture rejected. Anchored `statusOf` to a LEADING `**Status:**` (`/^\s*\*\*Status:\*\*/`). Empirical correction: the block stream strips a list item's leading `- ` marker, so the real status bullet reaches `statusOf` as a leading `**Status:**` while the Idea line carries a mid-line `**Status:**` — the leading anchor distinguishes them. Added a capture test using `**Status:** <word>` (the case the round-1 regression test missed by using `**Status:**,` with a comma).
+Severity:   medium
+
+### AUDIT-20260609-08 — scanner silently swallows a following known flag as a value (claude-01, MEDIUM; regression of AUDIT-05)
+
+Finding-ID: AUDIT-20260609-08 (claude-01)
+Status:     fixed-6903bff2
+Disposition: FIXED (TDD-first). The round-2 AUDIT-05 relaxation rejected a forgotten value only when the next token was a recognized BOOLEAN, so `inbox capture --idea --doc /x --apply` silently consumed `--doc` as the idea and wrote to the wrong (default) document — the exact wrong-doc class AUDIT-06 worried about, now reachable from one dropped token. `scanVerbFlags` now takes the verb's value-flag names and rejects when the next token is ANY recognized flag (boolean ∪ value-flag ∪ `doc`), while still accepting non-flag `--`-prefixed prose (the AUDIT-05 free-text intent preserved). RED proved the un-fixed code silently mutated the bundled DESIGN-INBOX.md.
+Severity:   medium
+
+### AUDIT-20260609-09 — atomicReplace dead `existsSync` guard + misleading comment (claude-02, LOW)
+
+Finding-ID: AUDIT-20260609-09 (claude-02)
+Status:     fixed-6903bff2
+Disposition: FIXED. `lstatSync(docPath)` throws ENOENT on an absent path before the later `existsSync(target)` guard, so that guard was always true (dead) and its "new file" comment unreachable. Dropped the guard (chmod unconditional) and corrected the comment to state the precondition honestly (atomicReplace does not create files; callers' `loadDocument` already enforced presence).
+Severity:   low
+
+### AUDIT-20260609-10 — inbox.ts DEFAULT_DOC comment contradicted the AUDIT-06 disposition (claude-03, LOW)
+
+Finding-ID: AUDIT-20260609-10 (claude-03)
+Status:     fixed-6903bff2
+Disposition: FIXED. The code comment still read "The project's governed design inbox (the single source of truth)" — the very framing AUDIT-06 flagged. Aligned it with the contract/SKILL: the default is this monorepo's plugin-bundled inbox; adopters must pass `--doc` until `design:gap/project-relative-doc-discovery` lands. Now contract + skill + code (incl. the comment) all agree.
+Severity:   low
+
+### AUDIT-20260609-11 — roadmap item carried temporal placeholder wording (codex-02, LOW)
+
+Finding-ID: AUDIT-20260609-11 (codex-02)
+Status:     fixed-6903bff2
+Disposition: FIXED. Removed the temporal "fast-follow" qualifier from the `design:gap/insight-capture-ideas-stage-handoff` item (project no-temporal-terms rule); kept the durable scope boundary ("excluded from insight-capture v1 per spec clarification 4").
+Severity:   low
