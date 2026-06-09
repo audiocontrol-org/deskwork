@@ -1354,3 +1354,60 @@ Surface:    plugins/stack-control/src/document-model/mutations-core.ts:46-62 (`a
 The AUDIT-20260609-02 fix replaced roadmap's prior in-place `writeFileSync(docPath, candidate)` with `atomicReplace` (temp-write in `dirname(target)` + `renameSync`). AUDIT-20260609-04 named two side effects of that switch (mode + symlink identity) and resolved them. A third side effect was not named: the temp-then-rename path requires **write+execute permission on the document's parent directory** (to create the `.tmp-<pid>-<n>` file and to rename over the target), whereas the previous in-place `writeFileSync(docPath, …)` only required write permission on the *file itself*. A governed document that is writable but lives in a read-only directory (e.g. a checked-out tree where the operator tightened the dir mode, or a doc mounted read-only at the directory level) was mutable before this diff and is not now — `writeFileSync(tempPath, …)` throws EACCES/EROFS, the temp is best-effort unlinked, and the error rethrows.
 
 The blast radius is low and there is no data risk: the failure is fail-loud (the `DocumentModelError`/IO error propagates to exit non-zero) with zero partial write, and read-only parent directories on a writable governed doc are uncommon — the in-repo default docs live in writable trees. It is worth recording because (a) it is a genuine, falsifiable behavior change introduced in this diff (writable-file-in-readonly-dir: old code succeeds, new code fails) that AUDIT-04 did not cover, and (b) it now applies to the roadmap verb too, which previously never needed dir-write perm. No fix is required if the trade-off (atomicity for dir-write-perm) is intended; a one-line note in the `atomicReplace` doc-comment naming the dir-write-permission precondition would make it an explicit decision rather than an accident, matching how the mode/symlink decisions were documented after AUDIT-04.
+
+## 2026-06-09 — audit-barrage lift (20260609T192022929Z-pluggable-lifecycle-providers-after_clarify)
+
+### AUDIT-20260609-18 — Quadratic file I/O: `exists()` re-reads and re-parses every task file once per imported issue/finding
+
+Finding-ID: AUDIT-20260609-18
+Status: migrated-to-backlog TASK-1
+Severity:   medium
+Surface:    plugins/stack-control/src/backlog/backend.ts:168-170 (`exists`) + 126-135 (`listItems`); reached per-iteration by src/backlog/github-import.ts:46-48 and src/backlog/slush-migrate.ts:118-120
+
+`exists(ref)` is implemented as `listItems().some((i) => i.refs.includes(ref))`, and `listItems()` does a full `readdirSync` + `readFileSync` + `parseYaml` over **every** task file in `backlog/tasks/`. Both import paths call `exists` once per input item: `importGithub` calls `backend.exists(ref)` for each of up to 1000 issues (github-import.ts:46), and `migrateFindings` calls it for each parked finding (slush-migrate.ts:118). The result is O(issues × tasks) directory walks + YAML parses — for N open issues against an M-item pile, N×M full file reads and parses.
+
+The blast radius is the explicit design intent: the backlog is described as the tier that "absorbs the flood" of found work, so M is expected to grow large, and `import-github` against a real repo already reports "would import 136 issue(s)" (T020 checkpoint). 136 issues × a few-hundred-item pile is tens of thousands of synchronous parses for a single import. It's a one-time op so it won't break correctness, but it will get noticeably slow exactly as the pile fulfils its purpose. A reasonable fix is to materialize the ref-set once (`const seen = new Set(backend.list().flatMap(i => i.refs))`) and pass a predicate into the import loop, turning N×M into N+M.
+
+### AUDIT-20260609-19 — `slush-findings` rewire derives the dry-run count and the applied migration from two independent walks — a keying divergence silently drops findings and leaves them `open`
+
+Finding-ID: AUDIT-20260609-19 (claude-02 + codex-02; cross-model)
+Status: migrated-to-backlog TASK-2
+Severity:   medium
+Surface:    plugins/stack-control/src/subcommands/slush-findings.ts:164-184
+
+The rewired apply path computes what to migrate from a *second, independent* walk of the audit-log: `findFindingsByStatus(text, STATUS_OPEN_RE).filter((f) => flipIds.has(f.findingId))`, where `flipIds` comes from `slushRemaining`'s `res.flips`. But the dry-run branch reports `ids` (derived from `res`), not from this recomputed set. There are now two sources of truth for "which findings migrate": `res.flips` (dampener decision) and `findFindingsByStatus` (re-parse, canonicalized via `slush-migrate.ts:62`).
+
+These align in the tested fixtures (simple `Finding-ID: AUDIT-20260607-NN` lines where `canonical(id) === id` and Status is literally `open`), so the suite is green. The risk is the keying contract between the two walks: `findFindingsByStatus` canonicalizes finding ids to `AUDIT-\d{8}-\d+` and only matches `^Status:\s*open\b`, whereas `slushRemaining` is a frozen module (D5) whose id format and flip predicate this code does not control. If a flip's id or status ever fails to match the recomputed walk, the dry-run prints "would migrate N" while apply migrates fewer — and the unmigrated finding's Status stays `open` in the audit-log (since `mig.newAuditLogText` only rewrote the matched ones), silently breaking the "0 open MEDIUM at graduation" convergence invariant the govern orchestration depends on, with exit 0 and a success message. A more robust shape is to migrate exactly the set the dampener decided (carry the status-line indices through `res.flips`) rather than re-deriving it, so dry-run and apply can never disagree.
+
+### AUDIT-20260609-20 — `gh issue list --limit 1000` silently truncates — violates the project's no-silent-caps discipline
+
+Finding-ID: AUDIT-20260609-20
+Status: migrated-to-backlog TASK-3
+Severity:   medium
+Surface:    plugins/stack-control/src/backlog/github-import.ts:115-119 (`readGhIssues`)
+
+`readGhIssues` hard-codes `--limit 1000` on the `gh issue list` call. A repository with more than 1000 open issues silently imports only the first 1000, with no log line, warning, or indication that the snapshot is partial. The verb's user-facing output (`backlog import-github: created N`) reads as "I imported all open issues" when it may have imported a bounded subset.
+
+The blast radius is bounded-but-misleading: the "one-time snapshot of open issues" contract (SKILL.md, README) promises completeness, and the project's own discipline (`.claude/rules/ui-verification.md` and the scope-discovery "No silent caps" rule) is explicit that "if a workflow bounds coverage … `log()` what was dropped — silent truncation reads as 'covered everything' when it didn't." deskwork itself currently has ~136 open issues so the cap isn't hit today, which is exactly when this rots unnoticed. A reasonable fix is to detect a full page (count === limit) and emit a warning to stderr naming the cap, or paginate until exhausted.
+
+### AUDIT-20260609-21 — Adopter slush routing writes to the plugin-bundled backlog with no per-invocation override — and the README caveat is softer than the inbox one AUDIT-06 hardened
+
+Finding-ID: AUDIT-20260609-21 (claude-04 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-4
+Severity:   medium
+Surface:    plugins/stack-control/src/backlog/root.ts:13-15 (`backlogRoot`); reached automatically by src/subcommands/slush-findings.ts:170 (`backlogRoot()`), which `govern` invokes as its slush step (cf. tests/.../govern-orchestration.test.ts:79-84 setting `STACKCTL_BACKLOG_DIR`)
+
+`backlogRoot()` defaults to the plugin root (`resolve(here, '..', '..')`), so an unset `STACKCTL_BACKLOG_DIR` routes slush migrations into the *plugin-bundled* `plugins/stack-control/backlog/`. This is the same wrong-destination shape as AUDIT-20260609-06/-16 for the inbox default-doc, but with two aggravating differences. First, the write is **automatic**: the `slush-findings` step fires inside `stackctl govern` (the `deskwork-governance` `after_implement` hook), so an adopter never types a `backlog` command and has no `--doc`/flag moment to redirect it — the only seam is an env var set before invoking govern, which the hook does not set. Their dampener-parked findings land in the installed plugin's directory (inside the marketplace clone / `node_modules`), unowned and effectively lost. Second, the README's backlog caveat ("set `STACKCTL_BACKLOG_DIR` to override") is phrased as an option, whereas the AUDIT-06 disposition deliberately hardened the inbox caveat to "adopters **MUST** pass `--doc`" across contract + SKILL + README.
+
+The blast radius is the adopter's parked MEDIUM/LOW findings silently written to a directory they don't track — the same "one source of truth broken in the wrong direction" AUDIT-06 rated HIGH for inbox, made worse here by the lack of any per-invocation override point. The project-relative-discovery follow-up (`design:gap/project-relative-doc-discovery`) is already tracked, so this is about closing the documentation/expectation gap in the interim: the README backlog section and SKILL.md should carry the same "MUST set `STACKCTL_BACKLOG_DIR` until project-relative discovery lands" strength as the inbox surfaces, and ideally note that govern's slush step inherits this default.
+
+### AUDIT-20260609-22 — A single malformed task file makes `list`/`exists`/imports throw an uncaught error (exit 1, not the graceful BacklogError → exit 2)
+
+Finding-ID: AUDIT-20260609-22
+Status: migrated-to-backlog TASK-5
+Severity:   low
+Surface:    plugins/stack-control/src/backlog/backend.ts:97-99 (`projectTask` → `parseYaml`) + 126-135 (`listItems`, no per-file guard)
+
+`projectTask` calls `parseYaml(block)` with no try/catch, and `listItems` iterates every `.md` file calling it. A single task file with malformed YAML frontmatter (a hand-edited task, a partial write, a merge-conflict marker) throws out of `parseYaml`, which propagates through `listItems` → `list`/`exists`. In `runBacklogCli` the catch handler only maps `BacklogError` to exit 2 with remediation (backlog.ts:194-198); a raw YAML error is rethrown and the dispatcher exits 1 with a stack trace rather than the verb's fail-loud-with-remediation contract.
+
+The blast radius is low — backlog.md owns the write format so well-formed files are the norm, and the failure is loud (a crash, not a silent skip). But it degrades one corrupt file into a total outage of `list` and both imports' idempotency checks, with an unhelpful exit-1 stack instead of the descriptive exit-2 message the verb promises. Wrapping the per-file parse in a try/catch that throws a `BacklogError` naming the offending file (or skips it with a stderr warning) would keep the failure within the verb's documented contract and point the operator at the file to fix.
