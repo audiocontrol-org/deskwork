@@ -4,6 +4,43 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-06-09 (roadmap additions + 008 backlog feature implementation + self-governance): build the backlog slush-pile surface end-to-end, then govern it
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers (branch `feature/stack-control`)
+
+**Goal:** (a) add two items to the governed roadmap (native session-skills + project-doc-setup); (b) implement `008-backlog-surface` — the `stackctl backlog` slush-pile surface — via `/speckit-implement`; (c) run the mandatory `after_implement` governance.
+
+**Accomplished:**
+- **Roadmap (brainstorming skill → governed `roadmap` verb):** added `multi:feature/session-skills` (native, not migrate) + `multi:feature/project-doc-setup`; superseded `multi:feature/migrate-session-skills` (→ cancelled), re-homed its #122/#422 gap children + retire-dw-lifecycle's depends-on onto the native feature. Reconciled the program-narrative roadmap, the retired root ROADMAP.md, and the succession **rule** so "build native, not migrate" is consistent everywhere (the rule is loaded every session — leaving it stale would re-seed the cancelled framing).
+- **008 backlog feature — all 31 tasks, RED-first, 7 phase commits.** `stackctl backlog` (capture/list/import-github/import-slush) — the plugin's first **external-backend adapter** verb over `backlog.md@1.46.0`. Writes shell out to the real binary; reads parse the YAML-frontmatter task files (the durable artifact — `task list --plain`/`search` expose neither refs nor labels). US4 rewired `slush-findings` so parked audit residuals route to the backlog (`migrated-to-backlog`) instead of `acknowledged-slush-pile`; `slush-remaining.ts` (the dampener DECISION) left frozen per D5; `--burn-down` removed. Final state: **463 tests green, tsc strict clean, 0 `any`/`as`/`@ts-ignore`, all modules ≤ ~210 lines.**
+- **DRY (T031):** extracted the shared per-subaction flag-grammar validator (`validateSubactionFlags` + `SubactionGrammar`) into `document-verb-shared.ts`; adopted by backlog/roadmap/inbox — killed both the new `backlog⟷roadmap` clone AND the pre-existing `inbox⟷roadmap` one (snapshot 8→6).
+- **Self-governance (the dogfood paid off):** the cross-model barrage (claude + codex) over the 008 diff found **0 HIGH → gate dampened**, and US4's own rewire **routed the 7 MEDIUM/LOW findings into the backlog it just built** (`AUDIT-20260609-18..22 → TASK-1..5`; -19/-21 cross-model = high-confidence). Protocol-faithful: at dampened convergence, residuals are slushed to the burn-down queue, not chased in a fix-loop at graduation.
+
+**Didn't Work / had to fix mid-flight:**
+- **Spec assumed a native `type` field; backlog.md has none.** Per D7 (drive the real binary) discovered type must be carried as a `type:<v>` label. Adjusted the adapter + mappings.
+- **`backlog init` is interactive + git-requiring.** A hand-authored `filesystem_only` config is the deterministic equivalent (verified hands-on); the test helper drops a committed config rather than running `init`.
+- **The slush rewire polluted the committed dogfood pile during tests** — engaged-slush `--apply` writes to `backlogRoot()`; un-isolated govern/slush tests wrote real task files + mutated `config.yml`. Fixed by isolating every such test via `STACKCTL_BACKLOG_DIR` (and injecting it in the `runGovern` helper so no govern test can ever write the committed pile). Cleaned the pollution; verified clean via `git status` after each suite run.
+
+**Course Corrections:**
+- [PROCESS] Operator: *"use the appropriate skill"* — I was about to hand-run `roadmap add` directly; switched to `superpowers:brainstorming` to clarify the session-skills framing + supersede fork before mutating the governed doc.
+- [PROCESS] Operator: *"what does the protocol say?"* — I'd offered an ad-hoc fix-vs-backlog menu for the governance findings and had reverted the slush routing over a committed-pile concern. The protocol is explicit: at 0-HIGH dampened convergence, MEDIUM/LOW residuals are slushed to the backlog (the burn-down queue), not fixed at graduation. Re-applied the protocol-correct routing (lift from the existing run-dir → slush → backlog) and committed it. My revert was the mistake.
+
+**Quantitative (re-derived from `git log bebf7792..HEAD`):**
+- Commits: 10 (2 roadmap + 7 feature[008] + 1 governance).
+- Tests: 432 → 463 (+31 net) — new `tests/backlog/*` (backend, verb, capture, mappings, import-github, import-slush, slush-findings-rewire) + updated govern/spec-governance slush tests.
+- Clone groups (plugins/stack-control): 6 → 6 (one NEW: `slush-migrate⟷slush-remaining`, justified D5; one pre-existing removed by the validator extraction).
+- Governance: 1 barrage run, 2 model lanes (claude+codex), 7 findings → 5 audit entries (2 cross-model), 0 HIGH, all routed to backlog.
+- Open findings at session end: **5 in the backlog burn-down queue (TASK-1..5; all MEDIUM/LOW, scoped not dropped)** + **1 pre-existing program-level open HIGH `AUDIT-20260607-48`** (predates 008; left open by the slush — HIGHs never slushed; not this feature's to resolve).
+
+**Insights:**
+- **The barrage caught its own footgun.** Finding AUDIT-20260609-21 (govern's slush auto-writes the bundled pile with no override seam) literally manifested *during the govern run* that surfaced it — the committed pile got written because govern's slush ran with `STACKCTL_BACKLOG_DIR` unset. The cross-model audit's value was concrete, not abstract.
+- **The dampener is the anti-nit-loop mechanism, and the backlog is now its destination.** US4 closed the loop the thesis wanted: residual findings don't get chased forever (operator-attention sink) nor dropped (debt) — they're parked in a structured, git-diffable burn-down queue. The feature governed itself by this exact path on its first run.
+- **"Build native, not migrate" for session skills is the higher-leverage call** — dw-lifecycle's session skills are project-coupled (#122); porting would carry the coupling. The roadmap + rule now reflect this.
+
+**Next step:** the 5 backlog findings are a burn-down pass (recommend the 3 quick wins first: -21 doc/code `STACKCTL_BACKLOG_DIR` mismatch, -20 silent `--limit 1000` cap, -18 O(N×M) `exists()`). The pre-existing HIGH `AUDIT-20260607-48` wants a program-level governance look, separate from 008. 008 itself is implement-complete + governed; remaining lifecycle is review/ship/complete at the operator's discretion.
+
+---
+
 ## 2026-05-06 (studio-bridge brainstorming + feature bootstrap): design a phone-first control channel from deskwork-studio to the local Claude Code session
 ### Feature: studio-bridge (NEW exploratory feature, branched from deskwork-plugin)
 ### Worktree: deskwork-plugin (this session) + studio-bridge (newly created at end-of-session)
