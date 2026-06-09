@@ -137,15 +137,26 @@ describe('stackctl inbox flag-shaped value flags (AUDIT-BARRAGE codex-02/claude-
   // RECOGNIZED flag of the verb as its value. `--idea --doc <copy> --apply` is an
   // operator who forgot the idea value; the un-fixed scanner parsed
   // values['idea']='--doc', positional[0]='<copy>' (the TITLE slot), --apply
-  // boolean, and the doc stayed the DEFAULT — a silent wrong-document write.
-  // Rejecting --doc (a recognized flag name) as the forgotten value makes it
-  // exit 2 BEFORE any mutation, so the tmpCopy stays byte-for-byte unchanged.
-  it('--idea swallowing the following --doc flag → exit 2, tmpCopy unchanged (claude-01)', () => {
-    const docPath = tmpCopy('sample-inbox');
-    const before = readFileSync(docPath, 'utf8');
-    const r = runCli(['inbox', 'capture', '--idea', '--doc', docPath, '--apply']);
-    expect(r.status).toBe(2);
-    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  // boolean, and the doc stayed the DEFAULT — a silent wrong-document write to
+  // the DEFAULT doc (not the tmpCopy). AUDIT-20260609-12: the real at-risk file
+  // is DEFAULT_DOC, so we override it to an ISOLATED copy via the env seam and
+  // assert THAT file is unchanged — a regression can never pollute the committed
+  // bundled DESIGN-INBOX.md, and the assertion targets the actually-at-risk file.
+  it('--idea swallowing the following --doc flag → exit 2, the DEFAULT doc untouched (claude-01)', () => {
+    const isolatedDefault = tmpCopy('sample-inbox');
+    const defaultBefore = readFileSync(isolatedDefault, 'utf8');
+    const titleSlot = tmpCopy('sample-inbox');
+    const prevEnv = process.env.STACKCTL_INBOX_DEFAULT_DOC;
+    process.env.STACKCTL_INBOX_DEFAULT_DOC = isolatedDefault;
+    try {
+      const r = runCli(['inbox', 'capture', '--idea', '--doc', titleSlot, '--apply']);
+      expect(r.status).toBe(2);
+      // The actually-at-risk file (the resolved default) is byte-for-byte unchanged.
+      expect(readFileSync(isolatedDefault, 'utf8')).toBe(defaultBefore);
+    } finally {
+      if (prevEnv === undefined) delete process.env.STACKCTL_INBOX_DEFAULT_DOC;
+      else process.env.STACKCTL_INBOX_DEFAULT_DOC = prevEnv;
+    }
   });
 
   it('--idea swallowing the following --surfaced value flag → exit 2 (claude-01)', () => {

@@ -21,8 +21,12 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 /** Default when `--doc` is omitted: this monorepo's plugin-bundled inbox (the
  * in-repo dogfood), NOT an adopter's cwd-relative inbox. Adopters must pass
- * `--doc` until `design:gap/project-relative-doc-discovery` lands (AUDIT-20260609-06). */
-const DEFAULT_DOC = resolve(here, '..', '..', 'DESIGN-INBOX.md');
+ * `--doc` until `design:gap/project-relative-doc-discovery` lands (AUDIT-20260609-06).
+ * `STACKCTL_INBOX_DEFAULT_DOC` overrides it — primarily a TEST SEAM so a
+ * wrong-doc regression can never touch the committed bundled file
+ * (AUDIT-20260609-12); also a usable operator override toward the discovery gap. */
+const DEFAULT_DOC =
+  process.env.STACKCTL_INBOX_DEFAULT_DOC ?? resolve(here, '..', '..', 'DESIGN-INBOX.md');
 
 interface Flags {
   readonly doc: string;
