@@ -158,7 +158,7 @@ After scaffolding (or finding) the working files, setup verifies that each one i
 
 - **FR-021**: The setup, config, and resolution model MUST support multiple independent stack-control installations within a single repository, each with its own config and its own isolated set of working files.
 - **FR-022**: Setup MUST operate on exactly one installation per invocation and MUST NOT create, mutate, or delete any other installation's working files or config.
-- **FR-023**: A governed verb MUST deterministically resolve which installation it operates on from its invocation context, MUST operate only on that installation's working files, and MUST fail loudly when the context matches no installation or is genuinely ambiguous (never an arbitrary pick, never a fallback to a bundled copy).
+- **FR-023**: A governed verb MUST deterministically resolve which installation it operates on from its invocation context, MUST operate only on that installation's working files, and MUST fail loudly when the context matches no installation or is genuinely ambiguous (never an arbitrary pick, never a fallback to a bundled copy). The "invocation context" MUST be defined surface-agnostically (FR-026) — a CLI working directory today, a client-supplied root in future.
 - **FR-024**: Setup MUST detect and refuse (or require explicit operator intent for) configurations in which two installations would share a working-file location, or in which an installation's configured location escapes its own scope — rather than silently allowing cross-installation interference.
 
 #### Verification & reachability
@@ -167,6 +167,11 @@ After scaffolding (or finding) the working files, setup verifies that each one i
 - **FR-011**: Setup MUST determine the installation root deterministically, and MUST fail loudly if the target is ambiguous, rather than writing working files to an unintended directory.
 - **FR-013**: Setup MUST be reachable through the plugin's publicly-advertised surface (a `stackctl` verb and/or a `/stack-control:…` skill) so that an adopter who follows the install docs can run it without privileged or in-repo-only steps.
 - **FR-014**: Setup MUST NOT require network access, secrets, or interactive prompts to produce a valid installation (it scaffolds local governed working files only).
+
+#### Surface-agnostic distribution (CLI-first)
+
+- **FR-025**: Setup and every governed verb MUST be fully invocable through the `stackctl` CLI by any agent or a human, with **no Claude-Code-specific surface (skill, slash command, hook) required** to reach the capability. The CLI is the vendor-neutral core; surfaces over it (the Claude Code plugin's skills today; Agent-Skills / `AGENTS.md` / an MCP server in future) are thin adapters, never the sole path to a capability.
+- **FR-026**: The installation-resolution and config contract MUST be **surface-agnostic**: it resolves an installation from a generic invocation context (a working directory today; a client-supplied root such as an MCP root in future) and MUST NOT bake in an assumption that a specific host surface is present. A new adapter MUST be able to sit on top of the same contract without changing it.
 
 #### Trigger model (operator decision 2026-06-09)
 
@@ -196,11 +201,12 @@ After scaffolding (or finding) the working files, setup verifies that each one i
 - **SC-006**: Setup produces a valid installation with no network access, no secrets, and no interactive input.
 - **SC-007**: An operator can place every governed working file at a location of their choosing; 100% of consuming verbs then resolve the configured location by default (configurability is complete — no working file is location-locked).
 - **SC-008**: In a single repo, two installations set up at different subtrees operate in full isolation: a capture in one appears in zero of the other's working files, and re-running setup for one installation produces zero changes to the other's files (content-hash equality).
+- **SC-009**: Setup and every governed verb run to completion in a plain shell (no Claude Code session and no plugin surface present) — the capability is reachable through the `stackctl` CLI alone.
 
 ## Assumptions
 
 - **Trigger model (operator decision 2026-06-09 — resolved, FR-015/016/017)**: setup is reachable **both** as an explicit operator-invoked step **and** automatically on a governed verb's first use when working files are missing. The fail-loud principle is honored in spirit rather than by aborting: auto-scaffold is always **announced** and only ever creates empty, contentless files — no hidden state change, no fabricated data.
-- **Shared config + resolution contract**: this feature and the read-side `design:gap/project-relative-doc-discovery` agree on one config schema and one installation-resolution model; the abstraction is derived from these two concrete uses (constitution Principle II), not designed speculatively. Exact config schema, file name, on-disk locations, and the resolution mechanism are a plan/contracts concern.
+- **Shared config + resolution contract**: this feature and the read-side `design:gap/project-relative-doc-discovery` agree on one config schema and one installation-resolution model; the abstraction is derived from these two concrete uses (constitution Principle II), not designed speculatively. Exact config schema, file name, on-disk locations, and the resolution mechanism are a plan/contracts concern. The resolution model is **surface-agnostic** (CLI cwd or future client root) per FR-025/FR-026 — the CLI is the vendor-neutral core; the Claude Code plugin, Agent-Skills, and a future MCP server are adapters over it, never the sole path.
 - **Configurable locations with project-relative defaults**: every governed working file's location is independently configurable; when unset, a documented project-relative default applies. An emerging `.stack-control/` per-project directory convention already exists in the code (used for grammars) and is a candidate home for config and co-located defaults — but whether defaults are co-located under `.stack-control/` or scattered at conventional repo paths is an Open Question.
 - **Per-installation config**: a repo may host N installations, each scoped to a subtree, each with its own config and isolated working files. "One repo = one installation" is explicitly NOT assumed.
 - **Empty-but-valid seeding**: scaffolded working files carry no example/business content beyond the minimal structure their parsers require.
@@ -211,7 +217,7 @@ After scaffolding (or finding) the working files, setup verifies that each one i
 
 These are genuine forks the operator owns; captured here rather than silently defaulted (constitution Principle II — capture-then-scope):
 
-- **OQ-1 — Installation resolution model**: How does a verb determine which installation it belongs to? Candidates: nearest-enclosing config via upward directory walk from cwd (git-style); an explicit registry of installation roots; an explicit per-invocation selector. Drives FR-023 and the read-side contract.
+- **OQ-1 — Installation resolution model**: How does a verb determine which installation it belongs to? Candidates: nearest-enclosing config via upward directory walk from cwd (git-style); an explicit registry of installation roots; an explicit per-invocation selector. Drives FR-023 and the read-side contract. Whichever model is chosen MUST be expressible surface-agnostically (FR-026) — the "context" is a directory/root, not a host-specific handle.
 - **OQ-2 — Default location convention**: When locations are unconfigured, are working files co-located under a single per-installation directory (e.g. `.stack-control/`) or scattered at conventional repo paths (roadmap/inbox at the installation root, as the current dogfood places them)? Drives FR-019.
 - **OQ-3 — Configurable-location granularity**: Is each working file an independent path, or a base directory + conventional file names, or both (base dir with per-file overrides)? Drives FR-018.
 - **OQ-4 — Managed-set membership**: Exactly which governed working files does *setup* scaffold (roadmap, inbox, backlog, config are in; audit log is named in scope — but do slush/burn-down records, scope-discovery registries/clones baselines, and governance run directories get scaffolded by setup, or created lazily by their own verbs)? Drives FR-001/FR-002.
