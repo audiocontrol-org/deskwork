@@ -6,12 +6,17 @@
 // source without writing. MVP layer ships `add`; advance/decompose/reclassify/
 // defer follow in US3 (this same file, under the cap).
 
-import { writeFileSync } from 'node:fs';
 import {
   loadDocument,
-  loadDocumentFromSource,
   type LoadOptions,
 } from '../document-model/document.js';
+import {
+  commitCandidate,
+  findUnit,
+  lineInUnit,
+  spliceWithBlankLines,
+  type MutationResult,
+} from '../document-model/mutations-core.js';
 import {
   DocumentModelError,
   type GovernableDocument,
@@ -19,22 +24,18 @@ import {
 } from '../document-model/types.js';
 import { loadRoadmap } from './roadmap-model.js';
 
+// Re-export the shared result type so callers (subcommands/roadmap.ts) keep
+// importing it from here.
+export type { MutationResult } from '../document-model/mutations-core.js';
+
 const STATUS_LINE = /^\s*[-*]\s+status\s*:/i;
 const DEFERRED_LINE = /^\s*[-*]\s+deferred-until\s*:/i;
 
-/** Find a Unit by identifier, failing loud when absent. */
+/** Find a roadmap item by identifier, failing loud when absent. */
 function requireUnit(doc: GovernableDocument, identifier: string): Unit {
-  const unit = doc.units.find((u) => u.identifier === identifier);
+  const unit = findUnit(doc, identifier);
   if (unit === undefined) throw new DocumentModelError(`roadmap has no item '${identifier}'`);
   return unit;
-}
-
-/** 0-based index of the first line within a Unit's span matching `re` (-1 if none). */
-function lineInUnit(lines: readonly string[], unit: Unit, re: RegExp): number {
-  for (let i = unit.span.startLine - 1; i <= unit.span.endLine - 1; i++) {
-    if (re.test(lines[i]!)) return i;
-  }
-  return -1;
 }
 
 /** The verbatim source lines of a Unit (its `## head` through its last body line). */
@@ -92,12 +93,6 @@ export interface AddInput {
   readonly ref?: string;
 }
 
-export interface MutationResult {
-  readonly applied: boolean;
-  /** The candidate document source (the new content, applied or dry-run). */
-  readonly source: string;
-}
-
 function buildSection(input: AddInput): string[] {
   const lines = [`## ${input.identifier}`, `- status: ${input.status ?? DEFAULT_STATUS}`];
   if (input.dependsOn !== undefined && input.dependsOn.length > 0) {
@@ -109,22 +104,6 @@ function buildSection(input: AddInput): string[] {
   if (input.ref !== undefined) lines.push(`- ref: ${input.ref}`);
   if (input.scope !== undefined && input.scope.length > 0) lines.push(input.scope);
   return lines;
-}
-
-/**
- * Re-validate a candidate document against its grammar + graph, then write it
- * iff `apply`. A validation failure throws (zero-write); on success and dry-run,
- * the candidate is returned but not written.
- */
-function commit(
-  docPath: string,
-  candidate: string,
-  opts: LoadOptions,
-  apply: boolean,
-): MutationResult {
-  loadDocumentFromSource(candidate, docPath, opts);
-  if (apply) writeFileSync(docPath, candidate, 'utf8');
-  return { applied: apply, source: candidate };
 }
 
 /** Insert a new item (one-move emergent capture). Re-validates whole graph (R7). */
@@ -143,19 +122,16 @@ export function add(
   }
   const sourceLines = doc.sourceLines;
   // Append after the last unit (the operator reorders with curate); when the
-  // roadmap is empty, append at end of document.
+  // roadmap is empty, append at end of document. spliceWithBlankLines keeps
+  // repeated adds tidy (AUDIT-20260608-11).
   const insertAt =
     doc.units.length > 0 ? doc.units[doc.units.length - 1]!.span.endLine : sourceLines.length;
-  const before = sourceLines.slice(0, insertAt);
-  const after = sourceLines.slice(insertAt);
-  const section = buildSection(input);
-  // Emit exactly one blank line on each side of the new section, but never when
-  // the adjacent edge is already blank — otherwise repeated `add`s (the SKILL's
-  // most frequent mutation) accumulate blank lines near EOF (AUDIT-20260608-11).
-  const preBlank = before.length > 0 && before[before.length - 1]!.trim() !== '' ? [''] : [];
-  const postBlank = after.length > 0 && after[0]!.trim() !== '' ? [''] : [];
-  const candidate = [...before, ...preBlank, ...section, ...postBlank, ...after].join('\n');
-  return commit(docPath, candidate, opts, apply);
+  const candidate = spliceWithBlankLines(
+    sourceLines.slice(0, insertAt),
+    buildSection(input),
+    sourceLines.slice(insertAt),
+  );
+  return commitCandidate(docPath, candidate, opts, apply);
 }
 
 /** Change an item's status along the lifecycle (re-validates whole graph; R7). */
@@ -177,7 +153,7 @@ export function advance(
   const idx = lineInUnit(lines, unit, STATUS_LINE);
   if (idx < 0) throw new DocumentModelError(`item '${identifier}' has no status line to advance`);
   lines[idx] = `- status: ${toStatus}`;
-  return commit(docPath, lines.join('\n'), opts, apply);
+  return commitCandidate(docPath, lines.join('\n'), opts, apply);
 }
 
 /**
@@ -242,7 +218,7 @@ export function decompose(
     }
     bodies.push(body.join('\n'));
   }
-  return commit(docPath, reassemble(doc, bodies), opts, apply);
+  return commitCandidate(docPath, reassemble(doc, bodies), opts, apply);
 }
 
 /**
@@ -278,7 +254,7 @@ export function reclassify(
     }
     return body.join('\n');
   });
-  return commit(docPath, reassemble(doc, bodies), opts, apply);
+  return commitCandidate(docPath, reassemble(doc, bodies), opts, apply);
 }
 
 export interface DeferChange {
@@ -315,5 +291,5 @@ export function defer(
       lines.splice(insertAfter + 1, 0, newLine);
     }
   }
-  return commit(docPath, lines.join('\n'), opts, apply);
+  return commitCandidate(docPath, lines.join('\n'), opts, apply);
 }

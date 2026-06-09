@@ -24,7 +24,13 @@ import {
 import { globParent, reconcile } from '../roadmap/reconcile.js';
 import { loadRoadmap, type RoadmapModel } from '../roadmap/roadmap-model.js';
 import { blockedReport, mermaid, readyList } from '../roadmap/views.js';
-import { failUsage, grammarDirs } from './document-verb-shared.js';
+import {
+  failUsage,
+  grammarDirs,
+  requireMapValue,
+  requirePositional,
+  scanVerbFlags,
+} from './document-verb-shared.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** Default canonical roadmap (heading-keyed after US6 migration). */
@@ -70,32 +76,16 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionSpec>> = {
   defer: { valueFlags: ['until'], apply: true, clear: true, positionals: 1 },
 };
 
-/** Generic flag scan: boolean flags, `--doc`/`--<name> <value>`, positionals. */
+/** Scan flags via the shared subaction-verb scanner; `--apply`/`--clear` booleans. */
 function scanFlags(args: readonly string[]): Flags {
-  let doc = DEFAULT_DOC;
-  let apply = false;
-  let clear = false;
-  const positionals: string[] = [];
-  const values = new Map<string, string>();
-  for (let i = 0; i < args.length; i++) {
-    const token = args[i]!;
-    if (token === '--apply') {
-      apply = true;
-    } else if (token === '--clear') {
-      clear = true;
-    } else if (token === '--doc') {
-      const v = args[++i];
-      if (v === undefined || v.startsWith('--')) failUsage('roadmap', '--doc <path> required');
-      doc = v;
-    } else if (token.startsWith('--')) {
-      const v = args[++i];
-      if (v === undefined || v.startsWith('--')) failUsage('roadmap', `${token} <value> required`);
-      values.set(token.slice(2), v);
-    } else {
-      positionals.push(token);
-    }
-  }
-  return { doc, apply, clear, positionals, values };
+  const s = scanVerbFlags('roadmap', args, DEFAULT_DOC, ['apply', 'clear']);
+  return {
+    doc: s.doc,
+    apply: s.booleans.has('apply'),
+    clear: s.booleans.has('clear'),
+    positionals: s.positionals,
+    values: s.values,
+  };
 }
 
 /**
@@ -121,16 +111,12 @@ function validateFlags(subaction: string, flags: Flags): void {
 
 /** The first positional, failing usage with a subaction-specific message. */
 function requireId(flags: Flags, subaction: string): string {
-  const id = flags.positionals[0];
-  if (id === undefined) failUsage('roadmap', `${subaction} requires an <identifier> positional`);
-  return id;
+  return requirePositional('roadmap', flags.positionals, `${subaction} requires an <identifier> positional`);
 }
 
 /** Require a named `--<flag> <value>`. */
 function requireValue(flags: Flags, name: string): string {
-  const v = flags.values.get(name);
-  if (v === undefined) failUsage('roadmap', `--${name} <value> required`);
-  return v;
+  return requireMapValue('roadmap', flags.values, name);
 }
 
 function reportMutation(result: MutationResult, verb: string, id: string): void {

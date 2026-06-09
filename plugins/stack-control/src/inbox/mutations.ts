@@ -6,23 +6,24 @@
 // writing. Mirrors src/roadmap/mutations.ts (research D1/D3); reuses the
 // document-primitives engine + the design-inbox grammar unchanged.
 
-import { writeFileSync } from 'node:fs';
+import { loadDocument, type LoadOptions } from '../document-model/document.js';
 import {
-  loadDocument,
-  loadDocumentFromSource,
-  type LoadOptions,
-} from '../document-model/document.js';
+  commitCandidate,
+  findUnit,
+  lineInUnit,
+  spliceWithBlankLines,
+  type MutationResult,
+} from '../document-model/mutations-core.js';
 import { DocumentModelError, type GovernableDocument, type Unit } from '../document-model/types.js';
+
+// Re-export the shared result type so callers can keep importing it from here.
+export type { MutationResult } from '../document-model/mutations-core.js';
+// Re-export the shared validate-and-commit helper under its inbox-local name.
+export { commitCandidate as commit } from '../document-model/mutations-core.js';
 
 // The design-inbox status bullet is grammar-specific: `- **Status:** **<s>**`
 // (NOT roadmap's `- status:`). Locate it to rewrite in place (research D3).
 const INBOX_STATUS_LINE = /\*\*Status:\*\*/i;
-
-export interface MutationResult {
-  readonly applied: boolean;
-  /** The candidate document source (the new content, applied or dry-run). */
-  readonly source: string;
-}
 
 /** One-move capture input; only title + idea are required (FR-002). */
 export interface CaptureInput {
@@ -31,23 +32,6 @@ export interface CaptureInput {
   readonly surfaced?: string;
   readonly context?: string;
   readonly home?: string;
-}
-
-/**
- * Re-validate a candidate document against its grammar + graph, then write it
- * iff `apply`. A validation failure throws `DocumentModelError` *before* any
- * write (zero-write); on success and dry-run, the candidate is returned but not
- * written. The single fail-safe substrate every inbox mutation commits through.
- */
-export function commit(
-  docPath: string,
-  candidate: string,
-  opts: LoadOptions,
-  apply: boolean,
-): MutationResult {
-  loadDocumentFromSource(candidate, docPath, opts);
-  if (apply) writeFileSync(docPath, candidate, 'utf8');
-  return { applied: apply, source: candidate };
 }
 
 /** The `### <title>` section for a new captured entry (Status bullet last,
@@ -86,30 +70,19 @@ export function capture(
   const sourceLines = doc.sourceLines;
   const insertAt =
     doc.units.length > 0 ? doc.units[doc.units.length - 1]!.span.endLine : sourceLines.length;
-  const before = sourceLines.slice(0, insertAt);
-  const after = sourceLines.slice(insertAt);
-  const section = buildCaptureSection(input);
-  // Exactly one blank line on each side of the new section, never doubling an
-  // already-blank edge (mirrors roadmap add — keeps repeated captures tidy).
-  const preBlank = before.length > 0 && before[before.length - 1]!.trim() !== '' ? [''] : [];
-  const postBlank = after.length > 0 && after[0]!.trim() !== '' ? [''] : [];
-  const candidate = [...before, ...preBlank, ...section, ...postBlank, ...after].join('\n');
-  return commit(docPath, candidate, opts, apply);
+  const candidate = spliceWithBlankLines(
+    sourceLines.slice(0, insertAt),
+    buildCaptureSection(input),
+    sourceLines.slice(insertAt),
+  );
+  return commitCandidate(docPath, candidate, opts, apply);
 }
 
-/** Find a Unit by identifier, failing loud when absent (Principle V). */
-function requireUnit(doc: GovernableDocument, identifier: string): Unit {
-  const unit = doc.units.find((u) => u.identifier === identifier);
+/** Find an inbox entry by identifier, failing loud when absent (Principle V). */
+function requireEntry(doc: GovernableDocument, identifier: string): Unit {
+  const unit = findUnit(doc, identifier);
   if (unit === undefined) throw new DocumentModelError(`inbox has no entry '${identifier}'`);
   return unit;
-}
-
-/** 0-based index of the first line within a Unit's span matching `re` (-1 if none). */
-function lineInUnit(lines: readonly string[], unit: Unit, re: RegExp): number {
-  for (let i = unit.span.startLine - 1; i <= unit.span.endLine - 1; i++) {
-    if (re.test(lines[i]!)) return i;
-  }
-  return -1;
 }
 
 /**
@@ -128,7 +101,7 @@ function transition(
   apply: boolean,
 ): MutationResult {
   const { doc } = loadDocument(docPath, opts);
-  const unit = requireUnit(doc, identifier);
+  const unit = requireEntry(doc, identifier);
   if (doc.grammar.terminalStatuses.includes(unit.status)) {
     throw new DocumentModelError(
       `entry '${identifier}' is already terminal (${unit.status}); promote/drop are only valid from 'captured'`,
@@ -139,7 +112,7 @@ function transition(
   if (idx < 0) throw new DocumentModelError(`entry '${identifier}' has no status line to rewrite`);
   lines[idx] = `- **Status:** **${toStatus}**`;
   lines.splice(idx + 1, 0, recordLine);
-  return commit(docPath, lines.join('\n'), opts, apply);
+  return commitCandidate(docPath, lines.join('\n'), opts, apply);
 }
 
 /**

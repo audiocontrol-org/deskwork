@@ -58,9 +58,9 @@
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T023 [P] File-size + strict-typing audit: every new module ≤ 500 lines (Constitution VI); `tsc --noEmit` strict clean across the plugin; no `any`/`as`/`@ts-ignore`
-- [ ] T024 [P] Document `stackctl inbox` in the plugin README (capture verb replaces the retired convention; cross-link the SKILL)
-- [ ] T025 Full quickstart run-through (all 3 scenarios) + full `vitest` suite green + session-end clone-snapshot (no new duplication); ready for `after_implement` governance barrage
+- [X] T023 [P] File-size + strict-typing audit: every new module ≤ 500 lines (largest: mutations.ts 149, inbox.ts 158, roadmap.ts 298); `tsc --noEmit` strict clean; no `any`/`as`/`@ts-ignore` in new src. ✅
+- [X] T024 [P] Documented `stackctl inbox` in the plugin README (4 verb rows + an "Insight capture" section noting it replaces the retired convention; cross-linked the SKILL). ✅
+- [X] T025 Full quickstart run-through (all 3 scenarios, end-to-end against scratch copies of the governed inbox) + full `vitest` suite green (**399/399**) + session-end clone-snapshot. **DRY:** the substantive new duplication (the validate-and-commit/unit-locating mutation engine, then the verb flag-scan/require plumbing) was extracted into shared modules (`document-model/mutations-core.ts`, `document-verb-shared.ts`) used by BOTH inbox and roadmap. Two small residual clones JUSTIFIED: the 6-line `validateFlags` (legitimately differs — roadmap validates `--clear`, inbox doesn't; full unification is a verb-framework change beyond 007 scope, same magnitude as the 4 tolerated baseline clones) and the 11-line test-helper mirror (research D8 explicitly prescribes mirroring `tests/roadmap/*`; per-suite fixtures-on-disk is the testing convention). Ready for `after_implement` governance.
 
 ## Dependencies & Execution Order
 

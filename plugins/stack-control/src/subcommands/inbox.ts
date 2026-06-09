@@ -10,7 +10,13 @@ import { fileURLToPath } from 'node:url';
 import { loadDocument } from '../document-model/document.js';
 import { DocumentModelError } from '../document-model/types.js';
 import { capture, drop, promote, type CaptureInput, type MutationResult } from '../inbox/mutations.js';
-import { failUsage, grammarDirs } from './document-verb-shared.js';
+import {
+  failUsage,
+  grammarDirs,
+  requireMapValue,
+  requirePositional,
+  scanVerbFlags,
+} from './document-verb-shared.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** The project's governed design inbox (the single source of truth). */
@@ -39,29 +45,10 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionSpec>> = {
   list: { valueFlags: [], apply: false, positionals: 0 },
 };
 
-/** Generic flag scan: `--apply`, `--doc <path>`, `--<name> <value>`, positionals. */
+/** Scan flags via the shared subaction-verb scanner; `--apply` is the only boolean. */
 function scanFlags(args: readonly string[]): Flags {
-  let doc = DEFAULT_DOC;
-  let apply = false;
-  const positionals: string[] = [];
-  const values = new Map<string, string>();
-  for (let i = 0; i < args.length; i++) {
-    const token = args[i]!;
-    if (token === '--apply') {
-      apply = true;
-    } else if (token === '--doc') {
-      const v = args[++i];
-      if (v === undefined || v.startsWith('--')) failUsage('inbox', '--doc <path> required');
-      doc = v;
-    } else if (token.startsWith('--')) {
-      const v = args[++i];
-      if (v === undefined || v.startsWith('--')) failUsage('inbox', `${token} <value> required`);
-      values.set(token.slice(2), v);
-    } else {
-      positionals.push(token);
-    }
-  }
-  return { doc, apply, positionals, values };
+  const s = scanVerbFlags('inbox', args, DEFAULT_DOC, ['apply']);
+  return { doc: s.doc, apply: s.booleans.has('apply'), positionals: s.positionals, values: s.values };
 }
 
 /**
@@ -85,16 +72,12 @@ function validateFlags(subaction: string, flags: Flags): void {
 
 /** The first positional, failing usage with a subaction-specific message. */
 function requireId(flags: Flags, subaction: string): string {
-  const id = flags.positionals[0];
-  if (id === undefined) failUsage('inbox', `${subaction} requires a <title> positional`);
-  return id;
+  return requirePositional('inbox', flags.positionals, `${subaction} requires a <title> positional`);
 }
 
 /** Require a named `--<flag> <value>`. */
 function requireValue(flags: Flags, name: string): string {
-  const v = flags.values.get(name);
-  if (v === undefined) failUsage('inbox', `--${name} <value> required`);
-  return v;
+  return requireMapValue('inbox', flags.values, name);
 }
 
 function reportMutation(result: MutationResult, verb: string, id: string): void {

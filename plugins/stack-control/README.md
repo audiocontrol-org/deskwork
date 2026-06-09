@@ -54,12 +54,20 @@ The deterministic primitive the skills call (`bin/stackctl <verb>`, in-tree Type
 | `stackctl archive --doc <path> [--apply]` | Move terminal-status items into the sibling `<doc>-archive.md` (with an in-archive provenance ledger). Dry-run by default. |
 | `stackctl unarchive --doc <path> --id <id> [--apply]` | Return a named archived item to its live document at its declared-order position. Dry-run by default. |
 | `stackctl curate --doc <path> [--apply]` | Ensure a document is well-formed, well-ordered, and properly archived; recognize (never run) a declared reconciliation seam; report ledger↔archive coherence. Dry-run by default. |
+| `stackctl inbox capture "<title>" --idea "<text>" [--surfaced/--context/--home] [--apply]` | Capture an out-of-sequence design idea into the governed inbox in one move (status `captured`). Whole-document re-validation; zero-write-on-failure. Dry-run by default. |
+| `stackctl inbox promote "<title>" --to <ref> [--apply]` | Triage: record a captured entry's graduation target (status → `promoted`). Records the reference only — does NOT create the target. Dry-run by default. |
+| `stackctl inbox drop "<title>" --reason "<why>" [--apply]` | Triage: discard a captured entry with a recorded reason (status → `dropped`). Dry-run by default. |
+| `stackctl inbox list [--doc <path>]` | Read-only: list each inbox entry's identifier + status. |
 
 ## Document primitives
 
 `archive`, `unarchive`, and `curate` keep a **living document** (a roadmap, an idea inbox, a spec, any markdown that accretes settled material) lean and correct. A document becomes **governable** by declaring a block-level **grammar** — embedded as an HTML comment (`<!-- doc-grammar: … -->`) or referenced from frontmatter (`doc-grammar: <id>`, resolved from a project override or a built-in default). The grammar declares what a Unit is (a reserved heading level, or a table row), its status vocabulary + which statuses are terminal (archivable), its declared ordering relation, and its identifier shape. Identifiers are universally **unique / human-readable / non-ordinal** so identity never couples to position.
 
 Each verb defaults to **dry-run** (report, write nothing); writing requires `--apply`. Every validation failure (ungovernable document, parse failure, identifier violation, unarchive locate failure / collision) fails loud with zero writes. Two built-in grammars ship under [`grammars/`](./grammars/) — a heading-keyed `design-inbox` and a row-keyed `roadmap` — and govern the plugin's own [`DESIGN-INBOX.md`](./DESIGN-INBOX.md) and [`ROADMAP.md`](./ROADMAP.md). The agent-facing skills are `/stack-control:archive`, `/stack-control:unarchive`, and `/stack-control:curate` (each: dry-run → confirm → apply).
+
+## Insight capture
+
+`stackctl inbox` makes out-of-sequence design-idea capture a first-class, **one-move, fail-safe** operation against the governed [`DESIGN-INBOX.md`](./DESIGN-INBOX.md) — the native capability that **replaces the retired interim hand-append convention**. Capture is instant and never requires finishing the current thread (**capture ≠ scope**); triage is a separate deliberate pass (`promote` records a graduation target and reuses the existing creators — it does not create the target; `drop` records a reason). Lean-keeping reuses the generic `curate`/`archive`/`unarchive` verbs. Every mutation re-validates the whole document and is zero-write-on-failure. The agent-facing skill is [`/stack-control:inbox`](./skills/inbox/SKILL.md).
 
 ## Governance extension
 
