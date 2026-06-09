@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,5 +31,5 @@
 
 ## Notes
 
-- **3 [NEEDS CLARIFICATION] markers remain intentionally** (FR-012 inbox↔roadmap relationship, FR-013 v1 scope boundary, FR-014 graduation mechanism) plus a 4th open question (deskwork Ideas-stage depth) captured in the Open Questions section. Per the operator's capture-don't-cut directive and the front-door `define` chain, these are **deliberately left for `/speckit-clarify`** (the dedicated resolution pass) rather than pre-decided here. All other quality items pass.
-- The spec is ready for `/speckit-clarify`.
+- All four open forks were **resolved in `/speckit-clarify` (Session 2026-06-08)**: v1 = capture + triage/graduation; inbox/roadmap stay two surfaces with a defined promotion path; `promote` records linkage + reuses existing creators; deskwork Ideas-stage integration is out of v1. No `[NEEDS CLARIFICATION]` markers remain.
+- All checklist items pass. The spec is ready for `/speckit-plan`.

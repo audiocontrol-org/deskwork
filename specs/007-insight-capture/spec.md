@@ -8,6 +8,15 @@
 
 **Input**: User description: "Low-friction insight capture (design/insight-capture) — make out-of-sequence design-idea capture a first-class stack-control capability: capture an insight in ONE move, mid-thread, without losing the current thread; capture ≠ scope; hold multiple threads at once; native capture verb + inbox surface that appends to the governed inbox with add-time re-validation; triage/graduation paths; retires the interim design-inbox convention."
 
+## Clarifications
+
+### Session 2026-06-08
+
+- Q: v1 capability boundary — capture only, or capture + triage/graduation? → A: **Capture + triage/graduation** — the full loop (safe capture + promote/drop) ships in v1.
+- Q: Inbox↔roadmap relationship — two surfaces, two views of one store, or separate-with-promotion? → A: **Two separate governed surfaces with a defined promotion path** — promoting an entry routes through the existing `roadmap add` capability and records the linkage; they are NOT unified into one store in this feature.
+- Q: Graduation mechanism — automate target creation, or record linkage + reuse existing creators? → A: **Record linkage + reuse creators** — `promote` records status + target reference and reuses the existing creators (`roadmap add`, issue creation, spec authoring); it does not re-implement target creation.
+- Q: deskwork Ideas-stage integration depth in v1? → A: **None in v1** — promote-to-document records a target reference only; automated hand-off to deskwork's Ideas stage is a fast-follow.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Safe one-move capture (Priority: P1)
@@ -82,9 +91,9 @@ Once native capture exists, the interim design-inbox convention — the prose ru
 - **FR-009**: The system MUST present the current inbox contents (entries and their states) for review.
 - **FR-010**: All capture and triage operations MUST fail loud with a descriptive error when preconditions are unmet (inbox missing or not governable, target entry absent, etc.); they MUST NOT silently no-op, fabricate, or write partial state.
 - **FR-011**: Shipping this capability MUST retire the interim design-inbox convention (the prose rule and the docs-tree pointer) so exactly one capture mechanism and one inbox source of truth remain.
-- **FR-012**: The relationship between the **idea bucket (inbox)** and the **roadmap** MUST be defined [NEEDS CLARIFICATION: are the inbox and roadmap two distinct surfaces, or two views over one underlying store? What is the exact promotion path from a captured entry to a roadmap item, and which surface owns which state?].
-- **FR-013**: The v1 capability boundary MUST be set [NEEDS CLARIFICATION: does v1 deliver capture only (with triage remaining the existing curate/archive verbs + manual status edits), or does v1 also deliver dedicated triage/graduation operations (promote/drop)?].
-- **FR-014**: The graduation mechanism MUST be specified [NEEDS CLARIFICATION: is promotion-to-roadmap done by reusing the existing roadmap "add" capability for the graduation target, or by a standalone promote operation that records the target reference? Same question for spec/issue targets].
+- **FR-012**: The inbox and the roadmap MUST remain **two separate governed surfaces** (distinct documents). Promotion of an inbox entry to a roadmap item MUST follow a **defined promotion path** that routes through the existing roadmap "add" capability and records the resulting linkage on the entry. This feature MUST NOT unify the inbox and roadmap into one underlying store.
+- **FR-013**: v1 MUST deliver **both** capture **and** triage/graduation: the safe one-move capture (US1) and the promote/drop operations (US2) are in scope for v1 (the full loop), reusing the existing lean-keeping (curate/archive) operations rather than reinventing them.
+- **FR-014**: Promotion MUST be a **record-and-reuse** operation: `promote` sets the entry's status to `promoted` and records the target reference (spec / roadmap item / GitHub issue). It MUST NOT re-implement target creation — the target artifact is created via the existing capabilities (roadmap "add", issue creation, spec authoring), invoked separately. This keeps capture/triage decoupled from the target-creation subsystems.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -107,14 +116,16 @@ Once native capture exists, the interim design-inbox convention — the prose ru
 
 - The capability is built on, and consistent with, the existing governed inbox and the document-primitives engine; the existing lean-keeping operations (curate/archive) are reused rather than reinvented.
 - **CLI is the v1 interaction surface.** A richer graphical capture/inbox surface belongs to `multi/control-plane-frontend`, not this feature (informed default; revisit only if clarification overrides).
-- **deskwork Ideas-stage integration is optional and out of v1 scope** (informed default — captured as Open Question 4 below so it is not lost; the operator may pull it in).
+- **deskwork Ideas-stage integration is out of v1 scope** (confirmed in Clarifications 2026-06-08): promote-to-document records a target reference only; automated hand-off to the Ideas stage is a fast-follow.
 - The program runs on one long-lived branch with numbered spec dirs; the active spec dir is resolved via the `CLAUDE.md` Spec Kit marker, not the branch name.
 - This feature `depends-on` the shipped stack-control front door (`multi/feature/front-door`) and is authored and run through it.
 - Constitution constraints apply at implementation time (TDD-first; no fallbacks/mock data outside tests; strict typing; file-size cap; enforcement in skill bodies + CLI verbs, never git hooks; branch on capability, not vendor). These are recorded here for traceability; the concrete mechanism is the plan's concern, not this spec's.
 
-## Open Questions (capture-don't-cut — to resolve in `/speckit-clarify`)
+## Open Questions
 
-1. **Inbox ↔ roadmap relationship** (FR-012): two distinct surfaces, or two views over one store? The exact promotion path and which surface owns which state.
-2. **v1 scope boundary** (FR-013): capture-only, or capture + dedicated triage/graduation operations.
-3. **Graduation mechanism** (FR-014): reuse the roadmap "add" capability for roadmap-bound graduation vs. a standalone promote operation; how spec/issue targets are recorded.
-4. **deskwork Ideas-stage integration depth**: none in v1 (current default), a recorded reference, or a full hand-off for entries that become documents.
+All four open questions were resolved in **Clarifications → Session 2026-06-08**:
+
+1. **Inbox ↔ roadmap relationship** (FR-012) → two separate surfaces + a defined promotion path (no unification).
+2. **v1 scope boundary** (FR-013) → capture + triage/graduation (the full loop).
+3. **Graduation mechanism** (FR-014) → record linkage + reuse existing creators.
+4. **deskwork Ideas-stage integration depth** → none in v1 (target reference only).
