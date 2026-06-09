@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [x] No [NEEDS CLARIFICATION] markers remain — FR-015 trigger model resolved (operator 2026-06-09); the 5 remaining genuine forks are captured in a dedicated **Open Questions** section (OQ-1..5) for `/speckit-clarify`, not left as inline markers
+- [x] No [NEEDS CLARIFICATION] markers remain — FR-015 trigger model + all 5 Open Questions (OQ-1..5) resolved in the 2026-06-09 `/speckit-clarify` session; answers integrated into the Clarifications section and the relevant FRs/entities
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -33,5 +33,5 @@
 
 - All checklist items pass. FR-015 trigger model resolved by operator 2026-06-09 (explicit + auto-on-first-use; FR-016/017 keep faith with fail-loud via announced, contentless auto-scaffold).
 - Spec expanded 2026-06-09 (operator) to capture monorepo **multiple installations** (US4, FR-021..024, SC-008), **configurable per-working-file locations** (US3, FR-018..020, SC-007), and the **broader working-file set including audit logs** (FR-001, entities). Grounded in the plugin's real resolution code (every verb currently defaults to the bundled copy; `.stack-control/` dir convention already exists for grammars).
-- **5 Open Questions (OQ-1..5)** carry the genuine design forks (installation resolution, default location convention, configurable-location granularity, managed-set membership, installation boundary/nesting) into `/speckit-clarify`. These are scope decisions the operator owns — captured, not defaulted.
-- Recommended next: `/speckit-clarify` to resolve OQ-1..5 before `/speckit-plan`.
+- **All 5 Open Questions resolved** in the 2026-06-09 `/speckit-clarify` session: OQ-1 upward-walk resolution (config presence marks root); OQ-2 audience-split defaults (human docs at root, internal stores under `.stack-control/`); OQ-3 base-dir + per-file overrides; OQ-4 two-tier audit log (per-feature primary + program-level scaffolded by setup); OQ-5 nested-installation nearest-wins + fail-loud collision refusal.
+- Recommended next: `/speckit-plan`.
