@@ -9,11 +9,17 @@
 // Foundational layer (T008): the shell + read-only `list`. capture (T012),
 // import-github (T019), import-slush (T024) wire their handlers in their phases.
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createBacklogBackend, BacklogError } from '../backlog/backend.js';
 import { CAPTURE_TYPES, isCaptureType, typeLabelStamp } from '../backlog/mappings.js';
+import {
+  importGithub,
+  parseIssues,
+  readGhIssues,
+  type GithubIssue,
+} from '../backlog/github-import.js';
 import {
   failUsage,
   requireMapValue,
@@ -109,6 +115,32 @@ function emitCapture(flags: Flags): void {
   process.stdout.write(`backlog capture: ${id}\n`);
 }
 
+/** Resolve open issues for the import: a test seam reads a JSON file (no
+ * network); otherwise the real `gh` CLI (read-only). */
+function resolveIssues(): GithubIssue[] {
+  const file = process.env.STACKCTL_GH_ISSUES_FILE;
+  if (file !== undefined) return parseIssues(readFileSync(file, 'utf8'));
+  return readGhIssues(process.env.STACKCTL_GH_BIN);
+}
+
+/** One-time, idempotent GitHub-issue import (US3). Dry-run unless `--apply`. */
+function emitImportGithub(flags: Flags): void {
+  const root = backlogRoot();
+  requireProject(root);
+  const backend = createBacklogBackend({ cwd: root });
+  const res = importGithub({ backend, issues: resolveIssues(), apply: flags.apply });
+  if (res.applied) {
+    process.stdout.write(
+      `backlog import-github: created ${res.created.length}, skipped ${res.skipped.length} (already present)\n`,
+    );
+  } else {
+    process.stdout.write(
+      `backlog import-github: dry-run — would import ${res.planned.length} issue(s), ${res.skipped.length} already present (use --apply to write)\n`,
+    );
+    for (const n of res.planned) process.stdout.write(`  - gh-${n}\n`);
+  }
+}
+
 /** Read-only: print each item's id + status + type. Never writes. */
 function emitList(): void {
   const root = backlogRoot();
@@ -138,6 +170,9 @@ export async function runBacklogCli(args: string[]): Promise<void> {
         return;
       case 'list':
         emitList();
+        return;
+      case 'import-github':
+        emitImportGithub(flags);
         return;
       default:
         failUsage(

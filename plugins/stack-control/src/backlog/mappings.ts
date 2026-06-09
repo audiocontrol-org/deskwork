@@ -18,6 +18,13 @@ export function isCaptureType(t: string): boolean {
   return CAPTURE_TYPE_SET.has(t);
 }
 
+/** The `type:<value>` label that carries an item's type (backlog has no native
+ * type field). Used by capture (bug/gap) and the import paths
+ * (imported-issue/migrated-finding). */
+export function typeLabel(type: string): string {
+  return `type:${type}`;
+}
+
 /**
  * Map a capture type to the backlog labels: the project label + the `type:<t>`
  * label. Fail-loud on an unknown type (Principle V) — never silently stamp a
@@ -27,5 +34,5 @@ export function typeLabelStamp(type: string): string[] {
   if (!isCaptureType(type)) {
     throw new Error(`unknown capture type '${type}' (expected one of: ${CAPTURE_TYPES.join(', ')})`);
   }
-  return [PROJECT_LABEL, `type:${type}`];
+  return [PROJECT_LABEL, typeLabel(type)];
 }

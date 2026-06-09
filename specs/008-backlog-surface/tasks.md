@@ -46,10 +46,10 @@
 **Goal**: one-time, idempotent snapshot import of open GitHub issues; GitHub unmutated.
 **Independent test**: dry-run reports the set + writes nothing; apply creates one backlinked item per issue; re-run creates zero duplicates; GitHub unchanged.
 
-- [ ] T017 [P] [US3] RED: `tests/backlog/import-github.test.ts` — dry-run writes nothing + reports the would-import set; apply creates one `imported-issue` item per injected issue with `ref=gh-<number>` + carried labels + body; an issue body containing `#` imports cleanly (FR-015); re-run skips existing `gh-NNN` (zero duplicates, FR-012); a missing/unauthenticated `gh` path → exit 2 with remediation; the injected GitHub source is never written (FR-010)
-- [ ] T018 [US3] Implement `src/backlog/github-import.ts` — read `gh issue list --json number,title,body,labels,url` (injectable for tests), map each open issue → an `imported-issue` item via the adapter, idempotent skip by `gh-NNN`; pure-tsx (no shell pipeline) so `#`/markdown bodies are safe
-- [ ] T019 [US3] Wire the `import-github` subaction into `src/subcommands/backlog.ts` (dry-run default; `--apply`). Make T017 green
-- [ ] T020 [US3] Checkpoint: run quickstart Scenario 3 (dry-run, apply, idempotent re-run, GitHub-unmutated, fail-loud on missing `gh`)
+- [X] T017 [P] [US3] RED: `tests/backlog/import-github.test.ts` — dry-run writes nothing + reports the would-import set; apply creates one `imported-issue` item per injected issue with `ref=gh-<number>` + carried labels + body; an issue body containing `#` imports cleanly (FR-015); re-run skips existing `gh-NNN` (zero duplicates, FR-012); a missing/unauthenticated `gh` path → exit 2 with remediation; the injected GitHub source is never written (FR-010)
+- [X] T018 [US3] Implement `src/backlog/github-import.ts` — `importGithub` (injected issues + adapter; idempotent skip by `gh-NNN`) + `parseIssues` (defensively typed) + `readGhIssues` (read-only `gh issue list --json …`, fail-loud); pure-tsx via spawnSync argv (no shell pipeline) so `#`/markdown bodies are safe
+- [X] T019 [US3] Wire the `import-github` subaction into `src/subcommands/backlog.ts` (dry-run default; `--apply`; `STACKCTL_GH_ISSUES_FILE`/`STACKCTL_GH_BIN` test seams). Make T017 green
+- [X] T020 [US3] Checkpoint: ran quickstart Scenario 3 live — real-`gh` dry-run reported "would import 136 issue(s)" and wrote nothing; injected-fixture apply/idempotent-re-run/`#`-body/GitHub-unmutated all green; missing `gh` → exit 2 with remediation
 
 ## Phase 6: User Story 4 — Route audit-barrage residuals into the same pile (Priority: P3)
 
