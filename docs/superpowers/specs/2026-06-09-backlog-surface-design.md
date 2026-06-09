@@ -162,6 +162,40 @@ backfill.
 - The GitHub close/migrate disposition (decided later, by trial outcome).
 - Replacing `DESIGN-INBOX`/inbox or `ROADMAP` with the backlog.
 - Concurrency / merge-safe IDs (beads territory; revisit if flooding becomes a problem).
+- A dependency-graph overlay reusing the roadmap reasoner over backlog tasks (see "Future" below).
+
+## Future: dependency-graph overlay (not v1)
+
+backlog.md's native dependency support is lean — a `dependencies:` array plus a `sequence` command
+that computes topological waves; no `ready`/`blocked`/`graph` verb, no reverse-dependent view, one
+edge type (`depends-on`). The project's own reasoner is richer **and already store-agnostic at the
+`WorkItem` boundary**: the views in `src/roadmap/graph.ts` (`ready`, `blockedBy`, `dependents`,
+`unmetDependencies`) operate on an abstract `WorkItem` / `RoadmapModel`, not on `ROADMAP.md`. The
+only coupling to the markdown engine is the `toWorkItem(unit)` projection.
+
+So our dependency capabilities could be **overlaid** on backlog.md by writing a sibling projection
+`backlogTaskToWorkItem()` that maps:
+
+- `dependencies: […]` → `dependsOn`
+- backlog's `--parent` (native parent/child) → `partOf`
+- a label convention (e.g. `deferred-until:…`) → `deferredUntil`
+- backlog status `Done` → the "satisfies a `depends-on` edge" status (today a satisfied-status
+  constant in `graph.ts`, scoped to `shipped`)
+
+Then `graph.ts`'s views run **unchanged**, exposed as `stackctl backlog next/blocked/graph`. The one
+bounded piece: `order`/`topoOrder` lives in `document-model/edges.ts` typed to `Unit`, so pure
+ordering either re-expresses over `WorkItem` or synthesizes Units — a small lift, not a
+reimplementation. This is the "opinionated capability over a pluggable backend" thesis applied to
+dependency reasoning: the graph reasoner is the capability; `ROADMAP.md` and backlog.md are two
+stores it can project from.
+
+**Why not v1 (Principle II — Integration-First, No Speculative Building):** speculative until
+backlog.md has proven out *and* we want it to grow toward the roadmap's role. The satisfied-status
+semantics differ enough between a slush pile (`Done`) and the curated roadmap (`shipped`) that real
+use should set the rule. What v1 *should* do is keep the door open — have `src/backlog/backend.ts`
+expose tasks (with `dependencies` / `parent` / labels) in a structured form a future projection can
+consume. This is the validated path that closes the graph-feature gap if backlog ever eyes replacing
+`ROADMAP.md`.
 
 ## Why MCP is not used
 

@@ -126,3 +126,10 @@ Every mutation re-validates the whole document and is zero-write-on-failure.
 - **Idea:** A **lean, read-only** web app (explicitly **no CRUD** — not an editor) that does two things: (a) easy navigable access to the underlying documents (roadmap, design-inbox, specs, audit logs); and (b) computed **views onto process data** — e.g. the roadmap dependency tree / DAG (the existing `roadmap graph` mermaid, rendered interactively), ready/blocked lists, design-inbox triage state, spec progress, audit-finding state. Visualization + access only.
 - **Provisional home:** `multi/control-plane-frontend` — the read-only "visualize the stores" subset of the fuller control-plane UI; could ship as an early standalone slice (much smaller than the spec to implementation negotiation / engine-run surfaces). Relates to roadmap-protocol (graph view) and insight-capture (inbox view).
 - **Status:** **captured** (awaiting triage).
+
+### Overlay homegrown dependency reasoning on backlog.md via the WorkItem boundary
+- **Surfaced:** 2026-06-09 backlog-surface brainstorm — operator asked whether backlog.md could carry our dependency-graph capabilities
+- **Context:** Closes the graph-feature gap if backlog ever replaces ROADMAP.md; open question is Done-vs-shipped satisfied-status semantics; not v1 per Principle II
+- **Idea:** roadmap/graph.ts views (ready/blockedBy/dependents) operate on an abstract WorkItem/RoadmapModel rather than ROADMAP.md, so a sibling backlogTaskToWorkItem() projection (dependencies to dependsOn, parent to partOf, label to deferredUntil, Done to satisfied-status) lets backlog.md reuse them as stackctl backlog next/blocked/graph; only topoOrder is Unit-typed and needs a small lift
+- **Provisional home:** docs/superpowers/specs/2026-06-09-backlog-surface-design.md; possible future stack-control feature
+- **Status:** **captured**
