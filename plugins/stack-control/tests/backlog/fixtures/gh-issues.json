@@ -1,0 +1,23 @@
+[
+  {
+    "number": 395,
+    "title": "doctor validate.ts exceeds 500-line file-size cap",
+    "body": "The file is 644 lines after #394.\n\n## Repro\n1. `wc -l src/doctor/validate.ts`\n2. Observe > 500\n\n## Fix\nSplit the rule table out. See also #394.",
+    "labels": [{ "name": "enhancement" }],
+    "url": "https://github.com/audiocontrol-org/deskwork/issues/395"
+  },
+  {
+    "number": 100,
+    "title": "Plain issue with no markdown control characters in its body",
+    "body": "A short plain description with no hashes or fences.",
+    "labels": [{ "name": "bug" }, { "name": "good first issue" }],
+    "url": "https://github.com/audiocontrol-org/deskwork/issues/100"
+  },
+  {
+    "number": 422,
+    "title": "session-start branch-staleness detector",
+    "body": "",
+    "labels": [],
+    "url": "https://github.com/audiocontrol-org/deskwork/issues/422"
+  }
+]

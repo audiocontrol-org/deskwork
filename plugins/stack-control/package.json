@@ -10,6 +10,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "backlog.md": "1.46.0",
     "markdown-it": "^14.1.0",
     "peggy": "^5.0.0",
     "tsx": "^4.21.0",

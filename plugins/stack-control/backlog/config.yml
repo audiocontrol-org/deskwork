@@ -1,0 +1,18 @@
+# Committed backlog.md config for the stack-control slush pile (008-backlog-surface, T002).
+# backlog.md operates on this `backlog/` tree relative to its invocation cwd.
+# `filesystem_only: true` — backlog performs NO git ops of its own; stack-control
+# commits the task files and the project's pre-commit/pre-push hooks stay intact.
+# A hand-authored config is sufficient (verified hands-on at 1.46.0): `backlog
+# task create` works against it without a full `backlog init` and without git.
+project_name: "stack-control backlog"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "Done"]
+labels: []
+date_format: yyyy-mm-dd
+auto_open_browser: false
+remote_operations: false
+auto_commit: false
+filesystem_only: true
+bypass_git_hooks: false
+check_active_branches: false
+task_prefix: "task"

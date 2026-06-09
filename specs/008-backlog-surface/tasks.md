@@ -9,10 +9,10 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Add `backlog.md` as a pinned dependency in `plugins/stack-control/package.json` and `npm install` so the `backlog` binary resolves under the plugin (verified hands-on at 1.46.0; pin the exact version)
-- [ ] T002 [P] Create `plugins/stack-control/backlog/config.yml` (committed) — `filesystem_only: true` (backlog performs no git ops of its own — we commit, hooks intact), default statuses, and a `task_prefix`
-- [ ] T003 [P] Create `plugins/stack-control/tests/backlog/fixtures/` — a committed sample audit-log.md carrying ≥2 `acknowledged-slush-pile-<date>` MEDIUM/LOW entries (+ a HIGH that must never migrate) for the slush backfill/migration tests, and a sample injected GitHub issue-list JSON (including one issue whose body contains `#`)
-- [ ] T004 [P] Create `plugins/stack-control/tests/backlog/helpers.ts` mirroring `tests/inbox/helpers.ts` — FIXTURES path, a `tmpBacklog()` that initializes an isolated tmp backlog dir via the real binary, and a `runCli` (spawnSync) helper
+- [X] T001 [P] Add `backlog.md` as a pinned dependency in `plugins/stack-control/package.json` and `npm install` so the `backlog` binary resolves under the plugin (verified hands-on at 1.46.0; pin the exact version)
+- [X] T002 [P] Create `plugins/stack-control/backlog/config.yml` (committed) — `filesystem_only: true` (backlog performs no git ops of its own — we commit, hooks intact), default statuses, and a `task_prefix`
+- [X] T003 [P] Create `plugins/stack-control/tests/backlog/fixtures/` — a committed sample audit-log.md carrying ≥2 `acknowledged-slush-pile-<date>` MEDIUM/LOW entries (+ a HIGH that must never migrate) for the slush backfill/migration tests, and a sample injected GitHub issue-list JSON (including one issue whose body contains `#`)
+- [X] T004 [P] Create `plugins/stack-control/tests/backlog/helpers.ts` mirroring `tests/inbox/helpers.ts` — FIXTURES path, a `tmpBacklog()` that initializes an isolated tmp backlog dir via the real binary (a committed-config copy; `init` is interactive + git-requiring, so a hand-authored `filesystem_only` config is the deterministic equivalent verified hands-on), and a `runCli` (spawnSync) helper
 
 ## Phase 2: Foundational (blocks US1–US4 — the external-backend adapter + verb shell)
 
