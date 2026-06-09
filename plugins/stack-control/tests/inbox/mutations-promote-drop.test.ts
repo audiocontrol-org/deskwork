@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { promote, drop } from '../../src/inbox/mutations.js';
+import { capture, promote, drop } from '../../src/inbox/mutations.js';
 import { loadDocument } from '../../src/document-model/document.js';
 import { DocumentModelError } from '../../src/document-model/types.js';
 import { INBOX_OPTS, tmpCopy } from './helpers.js';
@@ -81,6 +81,58 @@ describe('mutations.drop (T012)', () => {
     expect(() => drop(docPath, 'Inbox entry pinning', 'x', INBOX_OPTS, true)).toThrow(
       DocumentModelError,
     );
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+});
+
+describe('mutations status-line locator anchoring (AUDIT-BARRAGE-claude-01)', () => {
+  // The status locator must anchor to a LEADING list bullet — a body field whose
+  // free text contains the literal substring `**Status:**` (a natural single-line
+  // input for an inbox about its own tooling) must NOT be clobbered by transition.
+  it('promote rewrites the real status bullet, not an idea field containing the literal `**Status:**`', () => {
+    const docPath = tmpCopy('sample-inbox');
+    // `**Status:**` appears in the idea prose but is NOT a leading status bullet.
+    // (The grammar's own statusOf ignores it because it is not followed by a
+    //  status word; the bug under test is the transition LOCATOR matching it.)
+    const idea = 'Sort inbox by **Status:**, then by date';
+    capture(docPath, { title: 'Status filter idea', idea }, INBOX_OPTS, true);
+    promote(docPath, 'Status filter idea', 'multi:gap/inbox-status-filter', INBOX_OPTS, true);
+    // The real status became promoted...
+    expect(statusOf(docPath, 'Status filter idea')).toBe('promoted');
+    // ...and the idea prose is still present verbatim (it was NOT overwritten).
+    const src = readFileSync(docPath, 'utf8');
+    expect(src).toContain(`- **Idea:** ${idea}`);
+    expect(src).toContain('multi:gap/inbox-status-filter');
+  });
+});
+
+describe('mutations triage newline-injection rejection (AUDIT-BARRAGE-claude-02 + codex-02)', () => {
+  const INJECT = '\n### Injected\n- **Status:** **captured**';
+
+  it('promote --to containing a newline throws + zero write', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    expect(() =>
+      promote(docPath, 'Try a TUI inbox view', `multi:gap/x${INJECT}`, INBOX_OPTS, true),
+    ).toThrow(DocumentModelError);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('drop --reason containing a newline throws + zero write', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    expect(() =>
+      drop(docPath, 'Try a TUI inbox view', `superseded${INJECT}`, INBOX_OPTS, true),
+    ).toThrow(DocumentModelError);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('promote --to containing a carriage return throws + zero write', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    expect(() =>
+      promote(docPath, 'Try a TUI inbox view', 'multi:gap/x\rinjected', INBOX_OPTS, true),
+    ).toThrow(DocumentModelError);
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
 });

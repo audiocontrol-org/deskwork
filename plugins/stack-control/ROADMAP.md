@@ -222,3 +222,8 @@ Retire /dw-lifecycle:review and /dw-lifecycle:audit in favor of audit-barrage as
 - part-of: design:feature/roadmap-protocol
 Advancing a roadmap item's status when its spec is finalized must be NON-DISCRETIONARY (thesis: make it mechanical, never rely on the agent remembering roadmap advance). Add a Spec Kit hook on spec finalization (e.g. after_tasks / after_analyze) that advances the roadmap item whose spec: field points at the just-finalized spec dir to in-flight, resolved via .specify/feature.json. Surfaced as TF-24.
 
+## design:gap/insight-capture-ideas-stage-handoff
+- status: planned
+- part-of: design:feature/insight-capture
+Automated hand-off of a promoted inbox entry into deskwork's Ideas stage (out of insight-capture v1 per spec clarification 4; fast-follow). Today promote only records a target reference.
+

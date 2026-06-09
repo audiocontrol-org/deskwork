@@ -83,6 +83,43 @@ describe('mutations.capture (T007)', () => {
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
 
+  it('rejects a newline-injection in --idea (phantom unit) — throws + zero write (AUDIT-BARRAGE-claude-02/codex-02)', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    expect(() =>
+      capture(
+        docPath,
+        { title: 'Injecting idea', idea: 'real idea\n### Injected\n- **Status:** **captured**' },
+        INBOX_OPTS,
+        true,
+      ),
+    ).toThrow(DocumentModelError);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('rejects a newline in title / surfaced / context / home — throws + zero write', () => {
+    const fields: Array<Partial<Record<'surfaced' | 'context' | 'home', string>>> = [
+      { surfaced: 'a\nb' },
+      { context: 'a\nb' },
+      { home: 'a\nb' },
+    ];
+    for (const extra of fields) {
+      const docPath = tmpCopy('sample-inbox');
+      const before = readFileSync(docPath, 'utf8');
+      expect(() =>
+        capture(docPath, { title: 'Field idea', idea: 'ok', ...extra }, INBOX_OPTS, true),
+      ).toThrow(DocumentModelError);
+      expect(readFileSync(docPath, 'utf8')).toBe(before);
+    }
+    // title with a newline is rejected too.
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    expect(() =>
+      capture(docPath, { title: 'Title\n### Injected', idea: 'ok' }, INBOX_OPTS, true),
+    ).toThrow(DocumentModelError);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
   it('FR-006 — capturing one thread leaves every pre-existing entry byte-identical', () => {
     const docPath = tmpCopy('sample-inbox');
     capture(docPath, { title: 'A fourth thread', idea: 'held alongside the others' }, INBOX_OPTS, true);

@@ -49,6 +49,8 @@ plugins/stack-control/bin/stackctl inbox drop "<title>" --reason "<why>" [--doc 
 
 - `promote`/`drop` are valid only from a `captured` entry. An absent or already-terminal entry is refused (exit 2, zero write).
 - After `promote`, create the target separately (`roadmap add` / issue / spec) — the verb only recorded the linkage.
+- **Canonical recording form:** `promote` records the graduation target as a `- **Promoted-to:** <ref>` body line and `drop` records a `- **Drop-reason:** <reason>` line — a machine-greppable body bullet (research D2), distinct from the entry's status bullet. Some pre-native migrated entries record the target *inline* on the status line (`- **Status:** **promoted** → <ref>`); that inline form is legacy. New code reads the `Promoted-to:`/`Drop-reason:` bullets as canonical.
+- Scalar field values (`<title>`, `--idea`, `--surfaced`, `--context`, `--home`, `--to`, `--reason`) must be single-line — a value containing a newline is refused (exit 2, zero write) to prevent a `### ` heading from injecting a phantom entry.
 
 ## List
 

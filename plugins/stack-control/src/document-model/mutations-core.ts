@@ -6,7 +6,8 @@
 // (src/roadmap/mutations.ts, src/inbox/mutations.ts) compose them rather than
 // each re-deriving the validate-then-write / unit-locating / append plumbing.
 
-import { writeFileSync } from 'node:fs';
+import { renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { loadDocumentFromSource, type LoadOptions } from './document.js';
 import type { GovernableDocument, Unit } from './types.js';
 
@@ -16,11 +17,39 @@ export interface MutationResult {
   readonly source: string;
 }
 
+// Monotonic suffix for temp file names (Math.random()/Date.now() are unavailable
+// in some runtime contexts; pid + counter is collision-resistant enough here).
+let tempCounter = 0;
+
+/**
+ * Atomically replace `docPath` with `contents`: write a same-directory temp file
+ * first, then `renameSync` over the target — atomic within one filesystem, so a
+ * crash/interrupt/disk-error during the write can never leave the live governed
+ * document truncated or torn (AUDIT-BARRAGE-codex-01). On any failure the temp
+ * file is best-effort removed and the error rethrown — no temp artifact is left
+ * behind, and the live document is either fully the old content or fully the new.
+ */
+function atomicReplace(docPath: string, contents: string): void {
+  const tempPath = join(dirname(docPath), `.${basename(docPath)}.tmp-${process.pid}-${tempCounter++}`);
+  try {
+    writeFileSync(tempPath, contents, 'utf8');
+    renameSync(tempPath, docPath);
+  } catch (err) {
+    try {
+      unlinkSync(tempPath);
+    } catch {
+      // best-effort cleanup; the original error is what matters
+    }
+    throw err;
+  }
+}
+
 /**
  * Re-validate a candidate document against its grammar + graph, then write it
  * iff `apply`. A validation failure throws `DocumentModelError` *before* any
  * write (zero-write); on success and dry-run, the candidate is returned but not
- * written. The single fail-safe substrate every mutation commits through.
+ * written. The on-apply write is atomic (temp-then-rename). The single fail-safe
+ * substrate every mutation commits through.
  */
 export function commitCandidate(
   docPath: string,
@@ -29,7 +58,7 @@ export function commitCandidate(
   apply: boolean,
 ): MutationResult {
   loadDocumentFromSource(candidate, docPath, opts);
-  if (apply) writeFileSync(docPath, candidate, 'utf8');
+  if (apply) atomicReplace(docPath, candidate);
   return { applied: apply, source: candidate };
 }
 

@@ -23,7 +23,26 @@ export { commitCandidate as commit } from '../document-model/mutations-core.js';
 
 // The design-inbox status bullet is grammar-specific: `- **Status:** **<s>**`
 // (NOT roadmap's `- status:`). Locate it to rewrite in place (research D3).
-const INBOX_STATUS_LINE = /\*\*Status:\*\*/i;
+// ANCHORED to a leading list bullet (mirrors roadmap's STATUS_LINE), so an
+// earlier body field whose free text happens to contain the literal substring
+// `**Status:**` (a natural input for an inbox about its own tooling, e.g.
+// `--idea "Add a **Status:** filter"`) is NOT matched + overwritten first
+// (AUDIT-BARRAGE-claude-01).
+const INBOX_STATUS_LINE = /^\s*[-*]\s+\*\*Status:\*\*/i;
+
+/**
+ * Reject (fail-loud, zero-write) an operator-supplied scalar field containing a
+ * newline (`\n` or `\r`). The design-inbox grammar is heading-keyed, so an
+ * embedded newline could split one capture into a second structurally-valid Unit
+ * — whole-document validation would PASS and the injection would commit silently,
+ * breaking the one-move-captures-one-idea contract (FR-011). We reject rather
+ * than escape (AUDIT-BARRAGE-claude-02 + codex-02).
+ */
+function assertSingleLine(label: string, value: string): void {
+  if (/[\r\n]/.test(value)) {
+    throw new DocumentModelError(`${label} must not contain a newline`);
+  }
+}
 
 /** One-move capture input; only title + idea are required (FR-002). */
 export interface CaptureInput {
@@ -66,6 +85,11 @@ export function capture(
   if (input.idea.trim().length === 0) {
     throw new DocumentModelError('capture requires a non-empty --idea');
   }
+  assertSingleLine('capture <title>', input.title);
+  assertSingleLine('capture --idea', input.idea);
+  if (input.surfaced !== undefined) assertSingleLine('capture --surfaced', input.surfaced);
+  if (input.context !== undefined) assertSingleLine('capture --context', input.context);
+  if (input.home !== undefined) assertSingleLine('capture --home', input.home);
   const { doc } = loadDocument(docPath, opts);
   const sourceLines = doc.sourceLines;
   const insertAt =
@@ -131,6 +155,7 @@ export function promote(
   if (target.trim().length === 0) {
     throw new DocumentModelError('promote requires a non-empty --to <ref>');
   }
+  assertSingleLine('promote --to', target);
   return transition(docPath, identifier, 'promoted', `- **Promoted-to:** ${target.trim()}`, opts, apply);
 }
 
@@ -145,5 +170,6 @@ export function drop(
   if (reason.trim().length === 0) {
     throw new DocumentModelError('drop requires a non-empty --reason');
   }
+  assertSingleLine('drop --reason', reason);
   return transition(docPath, identifier, 'dropped', `- **Drop-reason:** ${reason.trim()}`, opts, apply);
 }
