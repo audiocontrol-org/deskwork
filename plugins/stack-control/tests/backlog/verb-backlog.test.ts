@@ -5,7 +5,7 @@
 // capture cases (T011) and import cases (T017/T023) append to their own files.
 
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCli } from '../../src/__tests__/_run-helpers.js';
@@ -67,5 +67,43 @@ describe('stackctl backlog list (T014/T015 pulled into Foundational, read-only)'
     const r = runBacklog(['list'], noProject);
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/backlog/i);
+  });
+});
+
+// T014 (US2) — list is a tier DISTINCT from the curated roadmap (FR-008) and is
+// strictly read-only (FR-007). list was pulled into the foundational layer
+// (T015 done in T008); these are the US2-specific coverage assertions.
+describe('stackctl backlog list — tier distinct + read-only (US2, T014)', () => {
+  it('reports only backlog items, never ROADMAP.md entries (tier distinct, FR-008)', () => {
+    const dir = tmpBacklog();
+    writeFileSync(
+      join(dir, 'ROADMAP.md'),
+      '# Roadmap\n\n## design:feature/curated-thing\n- status: planned\nA curated roadmap entry.\n',
+    );
+    const backend = createBacklogBackend({ cwd: dir });
+    backend.create({ title: 'a found bug', labels: ['agent-found', 'type:bug'], refs: ['gh-1'] });
+
+    const r = runBacklog(['list'], dir);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/a found bug/);
+    expect(r.stdout).not.toMatch(/curated-thing/);
+    expect(r.stdout).not.toMatch(/Roadmap/);
+  });
+
+  it('writes nothing — the backlog tree is byte-identical after a list (FR-007)', () => {
+    const dir = tmpBacklog();
+    const backend = createBacklogBackend({ cwd: dir });
+    backend.create({ title: 'item', labels: ['agent-found', 'type:gap'] });
+    const tasksDir = join(dir, 'backlog', 'tasks');
+    const snapshot = readdirSync(tasksDir)
+      .map((f) => `${f}::${readFileSync(join(tasksDir, f), 'utf8')}`)
+      .join('\n');
+
+    expect(runBacklog(['list'], dir).status).toBe(0);
+
+    const after = readdirSync(tasksDir)
+      .map((f) => `${f}::${readFileSync(join(tasksDir, f), 'utf8')}`)
+      .join('\n');
+    expect(after).toBe(snapshot);
   });
 });

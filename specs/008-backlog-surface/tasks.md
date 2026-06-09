@@ -37,9 +37,9 @@
 **Goal**: review the captured items as a tier distinct from the roadmap; triage/inspection delegated to native commands.
 **Independent test**: after captures, `list` reports every item read-only and writes nothing.
 
-- [ ] T014 [US2] RED: `list` cases in `tests/backlog/verb-backlog.test.ts` — `backlog list` prints each item's id + status + type and writes nothing; the listing reports only backlog items, never `ROADMAP.md` entries (tier distinct, FR-008); backend failure → exit 2
-- [ ] T015 [US2] Implement the read-only `list` subaction in `src/subcommands/backlog.ts` (via the adapter). Make T014 green
-- [ ] T016 [US2] Checkpoint: run quickstart Scenario 2 — `list` is read-only; native `board`/`show`/`cleanup` are the delegated triage path (not re-wrapped, Principle VIII)
+- [X] T014 [US2] RED: `list` cases in `tests/backlog/verb-backlog.test.ts` — `backlog list` prints each item's id + status + type and writes nothing; the listing reports only backlog items, never `ROADMAP.md` entries (tier distinct, FR-008); no-backlog-project → exit 2 (list reads frontmatter, so the failure mode is a missing project marker, not a shell-out non-zero)
+- [X] T015 [US2] Implement the read-only `list` subaction in `src/subcommands/backlog.ts` (via the adapter). Make T014 green. (Implemented in T008 — `list` pulled into the foundational layer like inbox; T014 adds the US2-specific tier-distinct + writes-nothing coverage.)
+- [X] T016 [US2] Checkpoint: ran quickstart Scenario 2 live — `stackctl backlog list` is the read-only tier; native `backlog task <id> --plain`/`board`/`cleanup` work as the delegated triage path against a stackctl-created pile (not re-wrapped, Principle VIII)
 
 ## Phase 5: User Story 3 — Seed the pile from open GitHub issues (Priority: P2)
 
