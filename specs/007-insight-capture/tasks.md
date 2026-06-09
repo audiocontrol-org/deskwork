@@ -38,13 +38,13 @@
 **Goal**: promote (record target, reuse creators) / drop (record reason); reuse existing curate/archive for lean-keeping.
 **Independent test**: quickstart Scenario 2 (SC-005).
 
-- [ ] T012 [P] [US2] RED: `tests/inbox/mutations-promote-drop.test.ts` — `promote()` sets status `promoted` + records the target reference; `drop()` sets `dropped` + records the reason; absent entry → throws; already-terminal entry → throws; zero-write on any failure; **`promote` only RECORDS the target reference — it does NOT create or validate the target artifact (FR-014/FR-012, record-and-reuse; the target need not exist in the inbox)**
-- [ ] T013 [US2] Implement `promote()` + `drop()` in `src/inbox/mutations.ts` (advance-style: rewrite the design-inbox `**Status:**` bullet — note its grammar-specific shape, see research D3 — and append the target/reason body line; commit via T004 helper). Make T012 green
-- [ ] T014 [US2] RED: promote/drop verb cases in `tests/inbox/verb-inbox.test.ts` — `inbox promote "<title>" --to <ref> --apply` → exit 0; `inbox drop "<title>" --reason … --apply` → exit 0; missing `--to`/`--reason` → exit 2; absent/terminal entry → exit 2 + zero write
-- [ ] T015 [US2] Wire `promote` + `drop` subactions into `src/subcommands/inbox.ts`. Make T014 green
-- [ ] T016 [P] [US2] RED: `inbox list` cases in `tests/inbox/verb-inbox.test.ts` — lists each entry id + status, writes nothing; missing/ungovernable inbox → exit 2
-- [ ] T017 [US2] Implement the read-only `list` subaction in `src/subcommands/inbox.ts`. Make T016 green
-- [ ] T018 [US2] Checkpoint: run quickstart Scenario 2 — promote/drop behave; lean-keeping via the EXISTING `curate`/`archive`/`unarchive` against `DESIGN-INBOX.md` works with no new code (verify reuse, FR-008/SC-005)
+- [X] T012 [P] [US2] RED: `tests/inbox/mutations-promote-drop.test.ts` — `promote()` sets status `promoted` + records the target reference; `drop()` sets `dropped` + records the reason; absent entry → throws; already-terminal entry → throws; zero-write on any failure; **`promote` only RECORDS the target reference — it does NOT create or validate the target artifact (FR-014/FR-012, record-and-reuse; the target need not exist in the inbox)**
+- [X] T013 [US2] Implement `promote()` + `drop()` in `src/inbox/mutations.ts` (advance-style: rewrite the design-inbox `**Status:**` bullet — note its grammar-specific shape, see research D3 — and append the target/reason body line; commit via T004 helper). Make T012 green
+- [X] T014 [US2] RED: promote/drop verb cases in `tests/inbox/verb-inbox.test.ts` — `inbox promote "<title>" --to <ref> --apply` → exit 0; `inbox drop "<title>" --reason … --apply` → exit 0; missing `--to`/`--reason` → exit 2; absent/terminal entry → exit 2 + zero write
+- [X] T015 [US2] Wire `promote` + `drop` subactions into `src/subcommands/inbox.ts`. Make T014 green
+- [X] T016 [P] [US2] RED: `inbox list` cases in `tests/inbox/verb-inbox.test.ts` — lists each entry id + status, writes nothing; missing/ungovernable inbox → exit 2 *(satisfied in Phase 2 — list pulled forward into T006)*
+- [X] T017 [US2] Implement the read-only `list` subaction in `src/subcommands/inbox.ts`. Make T016 green *(done in T006)*
+- [X] T018 [US2] Checkpoint: ran quickstart Scenario 2 — promote/drop behave (refusals exit 2 on absent/terminal); lean-keeping via the EXISTING `archive`/`unarchive` against `DESIGN-INBOX.md` works with **no new code** (9 terminal entries → 0 in live inbox; archive sibling created; restore works) — FR-008/SC-005 by reuse. ✅
 
 ## Phase 5: User Story 3 — One mechanism, one source of truth (Priority: P3)
 

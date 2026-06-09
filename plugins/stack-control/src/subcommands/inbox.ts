@@ -9,7 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadDocument } from '../document-model/document.js';
 import { DocumentModelError } from '../document-model/types.js';
-import { capture, type CaptureInput, type MutationResult } from '../inbox/mutations.js';
+import { capture, drop, promote, type CaptureInput, type MutationResult } from '../inbox/mutations.js';
 import { failUsage, grammarDirs } from './document-verb-shared.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -32,9 +32,10 @@ interface SubactionSpec {
 }
 
 // `--doc` is universal (allowed everywhere) and handled separately from `values`.
-// promote/drop specs are added by US2 as those subactions are wired.
 const SUBACTION_SPECS: Readonly<Record<string, SubactionSpec>> = {
   capture: { valueFlags: ['idea', 'surfaced', 'context', 'home'], apply: true, positionals: 1 },
+  promote: { valueFlags: ['to'], apply: true, positionals: 1 },
+  drop: { valueFlags: ['reason'], apply: true, positionals: 1 },
   list: { valueFlags: [], apply: false, positionals: 0 },
 };
 
@@ -116,6 +117,18 @@ function emitCapture(flags: Flags): void {
   reportMutation(capture(flags.doc, input, grammarDirs(), flags.apply), 'capture', title);
 }
 
+function emitPromote(flags: Flags): void {
+  const id = requireId(flags, 'promote');
+  const target = requireValue(flags, 'to');
+  reportMutation(promote(flags.doc, id, target, grammarDirs(), flags.apply), 'promote', id);
+}
+
+function emitDrop(flags: Flags): void {
+  const id = requireId(flags, 'drop');
+  const reason = requireValue(flags, 'reason');
+  reportMutation(drop(flags.doc, id, reason, grammarDirs(), flags.apply), 'drop', id);
+}
+
 /** Read-only: print each entry's identifier + status. Never writes. */
 function emitList(flags: Flags): void {
   const { doc } = loadDocument(flags.doc, grammarDirs());
@@ -136,6 +149,12 @@ export async function runInboxCli(args: string[]): Promise<void> {
     switch (subaction) {
       case 'capture':
         emitCapture(flags);
+        return;
+      case 'promote':
+        emitPromote(flags);
+        return;
+      case 'drop':
+        emitDrop(flags);
         return;
       case 'list':
         emitList(flags);

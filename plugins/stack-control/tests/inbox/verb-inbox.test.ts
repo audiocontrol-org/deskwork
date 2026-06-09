@@ -110,3 +110,64 @@ describe('stackctl inbox capture verb (T009)', () => {
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
 });
+
+describe('stackctl inbox promote / drop verbs (T014)', () => {
+  it('promote "<title>" --to <ref> --apply → exit 0, status promoted', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const r = runCli([
+      'inbox', 'promote', 'Try a TUI inbox view',
+      '--to', 'multi:gap/inbox-tui', '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(0);
+    const list = runCli(['inbox', 'list', '--doc', docPath]);
+    expect(list.stdout).toContain('Try a TUI inbox view [promoted]');
+    expect(readFileSync(docPath, 'utf8')).toContain('multi:gap/inbox-tui');
+  });
+
+  it('drop "<title>" --reason … --apply → exit 0, status dropped', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const r = runCli([
+      'inbox', 'drop', 'Audit-barrage cost telemetry',
+      '--reason', 'folded into the diminishing-returns log', '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(0);
+    const list = runCli(['inbox', 'list', '--doc', docPath]);
+    expect(list.stdout).toContain('Audit-barrage cost telemetry [dropped]');
+  });
+
+  it('promote missing --to → exit 2, zero write', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli(['inbox', 'promote', 'Try a TUI inbox view', '--doc', docPath, '--apply']);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('drop missing --reason → exit 2, zero write', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli(['inbox', 'drop', 'Try a TUI inbox view', '--doc', docPath, '--apply']);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('promote an absent entry → exit 2, zero write', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'inbox', 'promote', 'No such entry', '--to', 'x', '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('promote an already-terminal entry → exit 2, zero write', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'inbox', 'promote', 'Inbox entry pinning', '--to', 'x', '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+});

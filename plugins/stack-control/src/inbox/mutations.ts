@@ -12,7 +12,11 @@ import {
   loadDocumentFromSource,
   type LoadOptions,
 } from '../document-model/document.js';
-import { DocumentModelError } from '../document-model/types.js';
+import { DocumentModelError, type GovernableDocument, type Unit } from '../document-model/types.js';
+
+// The design-inbox status bullet is grammar-specific: `- **Status:** **<s>**`
+// (NOT roadmap's `- status:`). Locate it to rewrite in place (research D3).
+const INBOX_STATUS_LINE = /\*\*Status:\*\*/i;
 
 export interface MutationResult {
   readonly applied: boolean;
@@ -91,4 +95,82 @@ export function capture(
   const postBlank = after.length > 0 && after[0]!.trim() !== '' ? [''] : [];
   const candidate = [...before, ...preBlank, ...section, ...postBlank, ...after].join('\n');
   return commit(docPath, candidate, opts, apply);
+}
+
+/** Find a Unit by identifier, failing loud when absent (Principle V). */
+function requireUnit(doc: GovernableDocument, identifier: string): Unit {
+  const unit = doc.units.find((u) => u.identifier === identifier);
+  if (unit === undefined) throw new DocumentModelError(`inbox has no entry '${identifier}'`);
+  return unit;
+}
+
+/** 0-based index of the first line within a Unit's span matching `re` (-1 if none). */
+function lineInUnit(lines: readonly string[], unit: Unit, re: RegExp): number {
+  for (let i = unit.span.startLine - 1; i <= unit.span.endLine - 1; i++) {
+    if (re.test(lines[i]!)) return i;
+  }
+  return -1;
+}
+
+/**
+ * Shared triage transition (advance-style; research D3): rewrite a captured
+ * entry's `**Status:**` bullet to `toStatus` and append a recorded body line
+ * (the target reference for promote, the reason for drop), then re-validate the
+ * whole doc and write atomically. Refuses (zero-write) when the entry is absent
+ * or already terminal — promote/drop are only valid from `captured`.
+ */
+function transition(
+  docPath: string,
+  identifier: string,
+  toStatus: string,
+  recordLine: string,
+  opts: LoadOptions,
+  apply: boolean,
+): MutationResult {
+  const { doc } = loadDocument(docPath, opts);
+  const unit = requireUnit(doc, identifier);
+  if (doc.grammar.terminalStatuses.includes(unit.status)) {
+    throw new DocumentModelError(
+      `entry '${identifier}' is already terminal (${unit.status}); promote/drop are only valid from 'captured'`,
+    );
+  }
+  const lines = [...doc.sourceLines];
+  const idx = lineInUnit(lines, unit, INBOX_STATUS_LINE);
+  if (idx < 0) throw new DocumentModelError(`entry '${identifier}' has no status line to rewrite`);
+  lines[idx] = `- **Status:** **${toStatus}**`;
+  lines.splice(idx + 1, 0, recordLine);
+  return commit(docPath, lines.join('\n'), opts, apply);
+}
+
+/**
+ * Promote a captured entry (FR-007/FR-014): status → `promoted`, recording the
+ * graduation target reference. RECORD-AND-REUSE — the target is recorded only,
+ * NOT validated against or created here (creation is a separate `roadmap add` /
+ * issue / spec step). The ref may reference anything; it need not exist.
+ */
+export function promote(
+  docPath: string,
+  identifier: string,
+  target: string,
+  opts: LoadOptions,
+  apply: boolean,
+): MutationResult {
+  if (target.trim().length === 0) {
+    throw new DocumentModelError('promote requires a non-empty --to <ref>');
+  }
+  return transition(docPath, identifier, 'promoted', `- **Promoted-to:** ${target.trim()}`, opts, apply);
+}
+
+/** Drop a captured entry (FR-007): status → `dropped`, recording the reason. */
+export function drop(
+  docPath: string,
+  identifier: string,
+  reason: string,
+  opts: LoadOptions,
+  apply: boolean,
+): MutationResult {
+  if (reason.trim().length === 0) {
+    throw new DocumentModelError('drop requires a non-empty --reason');
+  }
+  return transition(docPath, identifier, 'dropped', `- **Drop-reason:** ${reason.trim()}`, opts, apply);
 }
