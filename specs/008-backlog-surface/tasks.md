@@ -26,11 +26,11 @@
 **Goal**: one-move capture of a found bug/gap into the pile; capture ≠ scope; roadmap + siblings untouched.
 **Independent test**: capture a bug with type + ref; the item exists with the project label; `ROADMAP.md` and pre-existing items are byte-for-byte unchanged.
 
-- [ ] T009 [P] [US1] RED: `tests/backlog/mappings.test.ts` (capture half) — `typeLabelStamp(input)` maps `bug`/`gap` → backlog `type` + the `agent-found` label; rejects an unknown type
-- [ ] T010 [US1] Implement `src/backlog/mappings.ts` `typeLabelStamp`. Make T009 (capture half) green
-- [ ] T011 [US1] RED: capture cases in `tests/backlog/capture.test.ts` (via `runCli` + real binary) — `backlog capture "<title>" --type bug --ref <url>` → exit 0 + item present with type/label/ref; empty `<title>` → exit 2 + nothing written; invalid `--type` → exit 2; a plain capture applies **no priority/triage** (capture ≠ scope, FR-003); **`ROADMAP.md` unchanged**; capturing a 2nd item leaves the 1st byte-identical (FR-006)
-- [ ] T012 [US1] Wire the `capture` subaction into `src/subcommands/backlog.ts` (positional `<title>`; flags `--type`/`--ref`/`--body`; stamp via `typeLabelStamp`; create via the adapter). Make T011 green
-- [ ] T013 [US1] Checkpoint: run quickstart Scenario 1 against a scratch backlog dir (capture exit 0; bad-input refusals exit 2; roadmap + siblings unchanged)
+- [X] T009 [P] [US1] RED: `tests/backlog/mappings.test.ts` (capture half) — `typeLabelStamp(input)` maps `bug`/`gap` → the `type:<v>` label + the `agent-found` label (backlog.md has no native type field); rejects an unknown type
+- [X] T010 [US1] Implement `src/backlog/mappings.ts` `typeLabelStamp` (+ `isCaptureType`/`CAPTURE_TYPES`/`PROJECT_LABEL`). Make T009 (capture half) green
+- [X] T011 [US1] RED: capture cases in `tests/backlog/capture.test.ts` (via `runCli` + real binary) — `backlog capture "<title>" --type bug --ref <url>` → exit 0 + item present with type/label/ref; empty `<title>` → exit 2 + nothing written; invalid `--type` → exit 2; a plain capture applies **no priority/triage** (capture ≠ scope, FR-003); **`ROADMAP.md` unchanged**; capturing a 2nd item leaves the 1st byte-identical (FR-006)
+- [X] T012 [US1] Wire the `capture` subaction into `src/subcommands/backlog.ts` (positional `<title>`; flags `--type`/`--ref`/`--body`; stamp via `typeLabelStamp`; create via the adapter). Make T011 green
+- [X] T013 [US1] Checkpoint: ran quickstart Scenario 1 live via `bin/stackctl` against a scratch backlog dir — capture exit 0 + id; empty-title/invalid-type refused exit 2 with descriptive messages; `ROADMAP.md` byte-unchanged
 
 ## Phase 4: User Story 2 — See the pile without polluting the roadmap (Priority: P2)
 

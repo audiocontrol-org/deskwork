@@ -13,7 +13,13 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createBacklogBackend, BacklogError } from '../backlog/backend.js';
-import { failUsage, scanVerbFlags } from './document-verb-shared.js';
+import { CAPTURE_TYPES, isCaptureType, typeLabelStamp } from '../backlog/mappings.js';
+import {
+  failUsage,
+  requireMapValue,
+  requirePositional,
+  scanVerbFlags,
+} from './document-verb-shared.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -82,6 +88,27 @@ function requireProject(root: string): void {
   }
 }
 
+/** One-move capture (US1): stamp project+type labels, create via the adapter.
+ * Does NOT triage — no priority is applied (capture ≠ scope, FR-003). */
+function emitCapture(flags: Flags): void {
+  const title = requirePositional('backlog', flags.positionals, 'capture requires a <title> positional');
+  if (title.trim() === '') failUsage('backlog', 'capture <title> must be non-empty');
+  const type = requireMapValue('backlog', flags.values, 'type');
+  if (!isCaptureType(type)) {
+    failUsage('backlog', `--type must be one of: ${CAPTURE_TYPES.join(', ')}`);
+  }
+  const root = backlogRoot();
+  requireProject(root);
+  const ref = flags.values.get('ref');
+  const id = createBacklogBackend({ cwd: root }).create({
+    title,
+    labels: typeLabelStamp(type),
+    refs: ref !== undefined ? [ref] : [],
+    body: flags.values.get('body'),
+  });
+  process.stdout.write(`backlog capture: ${id}\n`);
+}
+
 /** Read-only: print each item's id + status + type. Never writes. */
 function emitList(): void {
   const root = backlogRoot();
@@ -106,6 +133,9 @@ export async function runBacklogCli(args: string[]): Promise<void> {
   validateFlags(subaction, flags);
   try {
     switch (subaction) {
+      case 'capture':
+        emitCapture(flags);
+        return;
       case 'list':
         emitList();
         return;
