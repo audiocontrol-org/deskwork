@@ -5385,3 +5385,50 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 1. **007 is AUTHORED + governance-ready** (`spec=yes plan=yes tasks=yes`; roadmap item `in-flight`). Implement in a **separate session**: `/stack-control:execute` (drives `/speckit-implement` over `tasks.md` + `after_implement` governance). **MVP = Foundational + US1.**
 2. Roadmap gaps to weigh before/with 007: `design:gap/roadmap-advance-on-spec-finalize` (TF-24) and the migration-debt cluster captured this session.
 3. **At merge:** reconcile the branch-local session skills with `main`; the `feature.json`-over-branch-name migration (TF-09/14/15/17/22/23/24) folds in several frictions at once.
+
+## 2026-06-09: `design/insight-capture` (007) — full Spec Kit implement + 5-round `after_implement` governance to convergence
+### Feature: pluggable-lifecycle-providers
+### Worktree: stack-control (branch `feature/stack-control`)
+
+**Goal:** Resume from 007 authored + governance-ready (front-half done last session). Run `/speckit-implement` over `tasks.md` as the **implementation session** (orchestrator/implementation split), build the full feature (operator chose all 6 phases, verb name `inbox capture` as specced), then drive the mandatory `after_implement` `deskwork-governance` barrage to convergence.
+
+**Accomplished:**
+- **All 25 tasks, RED-first, full feature.** Foundational (commit helper + `inbox` verb shell + `list`) → US1 safe one-move capture → US2 triage (`promote`/`drop`, record-and-reuse FR-014; lean-keeping via the **existing** `curate`/`archive`/`unarchive` with zero new code) → US3 retire the interim convention (removed `.claude/rules/design-inbox.md` + the docs-tree pointer; the new `skills/inbox/SKILL.md` is the discipline's home) → Polish. Each quickstart scenario exercised end-to-end against scratch copies of the governed inbox.
+- **Pre-flight:** resolved the 25-item `correctness.md` requirements-quality checklist by tracing every item to a concrete spec clause (consistent with `/speckit-analyze`'s 0-crit/0-high).
+- **DRY extraction (T025).** The clone snapshot flagged that mirroring `roadmap` (research D1/D3) created real duplication, so I lifted the shared engine out: `document-model/mutations-core.ts` (validate-then-write `commitCandidate`, `findUnit`, `lineInUnit`, `spliceWithBlankLines`, `MutationResult`) + `subcommands/document-verb-shared.ts` (`scanVerbFlags`, `requirePositional`, `requireMapValue`). **Both inbox AND roadmap compose them now**; roadmap's full suite stayed green.
+- **`after_implement` governance — 5 barrage rounds to convergence.** Cross-model barrage (claude + codex lanes). All **17 findings** fixed (TDD-first, in fresh-context sub-agents per the fix-dispatch discipline) or operator-dispositioned, each recorded in `audit-log.md` with a `fixed-<sha>` reference. Round-by-round: R1 (newline-injection [cross-model], unanchored mutation locator, atomic-write) → R2 (1 HIGH default-doc + scanner-`--`-value + atomicReplace mode/symlink) → R3 (grammar `statusOf` still substring-based, scanner over-relaxation re-opened wrong-doc, dead-code, comment/temporal nits) → R4 (test-isolation MED + LOWs) → R5 (README caveat gap, dir-perm note). **Gate OPEN — dampened** (R4+R5 both 0 HIGH); the auditor's clean-list verified the implementation sound.
+- **Verification artifacts.** Full suite **359 → 420** (+61 test cases); `tsc --noEmit` strict clean; every new/refactored module under the 500-line cap; clone snapshot 4 → 6 groups (2 new, both justified). 17 commits, 29 files, +1835/−174.
+
+**Didn't Work / unresolved:**
+- **The governance loop ran long (5 rounds) and several findings were fix-debt from my own fixes** — a round-2 scanner relaxation re-opened a silent wrong-doc write (R3 caught it); a round-1 fix anchored the *mutation* locator but not the *grammar's* `statusOf`, so R3 still rejected legit `**Status:** <word>` prose. Real defects, but the textbook "feeding the generator" dynamic. I root-fixed (grammar anchor, scanner reject-any-known-flag) rather than patch instances, and stopped grinding once findings descended to doc/comment hygiene the auditor itself called "not a correctness defect."
+- **The HIGH (default `--doc` → plugin-bundled inbox, not an adopter's) was dispositioned, not code-fixed** (operator: document + track). Behavior kept (identical to the shipping `roadmap` verb); contract/SKILL/README/code aligned; tracked as `design:gap/project-relative-doc-discovery`. The real adopter fix is deferred to that gap.
+- **Convergence needed an EXTRA barrage round** purely from a bookkeeping artifact: R3's auto-lift was clobbered when the full vitest run fired a `govern` integration test that mutates the committed `audit-log.md` (and the cleanup reverted a real lift), so the dampener still counted R2's HIGH in its 2-run window. → TF-26 / TF-27.
+- **2 `Status: open` findings remain in `audit-log.md`** — both from PRIOR sessions (AUDIT-20260607-48, AUDIT-20260608-01), not this work. Flagged for honesty; not in 007 scope.
+- **Feature not merged.** On `feature/stack-control`; review/ship/merge + advancing the roadmap item to `shipped` are operator-owned post-merge steps.
+
+**Course Corrections:**
+- [PROCESS] Operator chose **full feature (all 6 phases)** + verb name **`inbox capture`** (as specced) up front — set scope before implementation, no mid-flight guessing.
+- [PROCESS] Operator on the HIGH default-doc fork: **document + track**, don't diverge inbox from the shipping roadmap verb — kept behavior, fixed the docs to agree, tracked the real fix as a roadmap gap.
+- [PROCESS] Operator on the round-2 lower findings: **fix both, then re-barrage** — established the fix-real-findings-then-verify cadence I carried through R3–R5.
+- [COMPLEXITY] Self-correction: chose to **DRY-extract** the shared engine rather than leave the research-prescribed mirror duplication (T025 "no new duplication"); verified roadmap unaffected.
+- [PROCESS] Mid-session API drop killed a fix sub-agent after it wrote the RED test; I finished the atomic-write impl in-session (mechanical, test-pinned) rather than re-dispatch — and replaced a brittle ESM `vi.spyOn(fs)` test with a stable inode-change assertion.
+
+**Quantitative** (re-derived from `git log 07c1457f..HEAD`):
+- Commits: **17**. Files changed: **29** (+1835 / −174).
+- Tests: **359 → 420** (+61 cases): the inbox feature suite + governance-fix RED tests across `tests/inbox/*` and `tests/roadmap/verb-add.test.ts`. `tsc` strict clean.
+- Governance: **5 barrage rounds**, 2 model lanes each; **17 findings** total (1 HIGH dispositioned, 6 MEDIUM, 8 LOW, 2 informational) — all fixed or dispositioned; gate **dampened (OPEN)**.
+- Sub-agent dispatches: **4** (3 completed, 1 API-dropped mid-run and finished in-session).
+- Clone snapshot (session-end): **6 groups** = 4 pre-existing baseline + 2 new, both justified (test-helper mirror per research D8; 6-line `validateFlags` that legitimately differs on boolean flags). **No new unjustified duplication.**
+- Open findings at session end: **0 from this session** (all 17 fixed/dispositioned). 2 carry-over `open` findings in `audit-log.md` are from prior sessions (AUDIT-20260607-48; AUDIT-20260608-01 Facet B operator-deferred) — named here per the slush-pile honesty convention.
+- GitHub issues: 0 filed, 0 closed (the #433 inbox-drift test was resolved on a prior session; nothing new here).
+
+**Insights:**
+- **The cross-model barrage is a genuine net for fix-debt, not just original defects.** Two of the most important catches (R3 grammar-`statusOf`, R3 scanner-over-relaxation) were flaws in *my own* prior-round fixes. The fresh-context fix-dispatch discipline matters precisely because the fix author degrades under accumulated context — both real regressions were introduced mid-session and caught by an independent lane.
+- **Detecting the convergence plateau is the hard part (and it's fuzzy for code too, not just specs).** Findings descended HIGH → MED → LOW-message-wording across rounds; each round's nit was a leaf of the prior fix. The discipline that worked: root-fix the *generator* (anchor the grammar, reject any-known-flag) instead of patching instances, and graduate once residuals are implementation/doc-altitude the auditor flags as "not a correctness defect."
+- **The dampener's "2 consecutive auto-lifted quiet runs" is brittle to lift loss.** A test that mutates the committed `audit-log.md` (the `govern` integration test) cost a real lift and forced an extra full barrage. Governance artifacts shouldn't be writable by the test suite, and the dampener shouldn't depend on an auto-lift that a test side-effect can clobber. → TF-26/27.
+- **"One governed store, surfaces must AGREE" is a recurring completion trap.** The HIGH disposition said "make contract, skill, code agree" — I aligned three surfaces and missed the README (R5 MED), the *canonical adopter-facing* one. The lesson: when a disposition says "align the surfaces," enumerate ALL of them (contract, SKILL, code comment, README) before claiming agreement.
+
+**Next step (resume here):**
+1. **007 is IMPLEMENTED + governed** (gate dampened/OPEN; 0 open findings from this work). Next is **review / ship**: `/speckit` has no ship step — use `/dw-lifecycle:review` or open a PR. Operator owns merge.
+2. **Post-merge:** advance `design:feature/insight-capture` → `shipped` in the governed `ROADMAP.md`; the new gaps this session added (`design:gap/insight-capture-ideas-stage-handoff`, `design:gap/project-relative-doc-discovery`) are tracked there.
+3. **At merge:** reconcile the branch-local session skills with `main`; the `feature.json`-over-branch-name migration (TF-09/14/15/17/22/23) + the new governance-tooling frictions (TF-25/26/27) fold in.
