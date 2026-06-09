@@ -105,7 +105,7 @@ A monorepo hosts several sub-projects, each of which uses stack-control independ
 
 1. **Given** a repo with two installations, **When** a verb runs within one installation's scope, **Then** it resolves and mutates only that installation's working files.
 2. **Given** two installations exist, **When** setup runs for one of them, **Then** the other installation's working files and config are untouched.
-3. **Given** a verb is invoked from a location that is within a specific installation's scope, **When** it resolves its working file, **Then** the resolution is deterministic and selects that installation (never a sibling) — and fails loudly if the invocation context matches no installation or is genuinely ambiguous.
+3. **Given** a verb is invoked from a location that is within a specific installation's scope, **When** it resolves its working file, **Then** the resolution is deterministic and selects the nearest enclosing installation (never a sibling) — and fails loudly if the invocation context matches no installation. (Upward-walk + nearest-wins makes resolution unique; there is no ambiguous-match case for a verb — only no-match.)
 
 ---
 
@@ -175,7 +175,8 @@ After scaffolding (or finding) the working files, setup verifies that each one i
 #### Verification & reachability
 
 - **FR-009**: Setup MUST verify that every required working file (created or pre-existing) is well-formed for its consuming verb, and MUST fail loudly — naming the offending file and the reason — when one is present but malformed (no silent success over a broken project).
-- **FR-011**: Setup MUST determine the installation root deterministically, and MUST fail loudly if the target is ambiguous, rather than writing working files to an unintended directory.
+- **FR-011**: Setup MUST determine the installation root deterministically, and MUST fail loudly if the `--at`/cwd target is ambiguous (e.g. not a directory), rather than writing working files to an unintended directory.
+- **FR-012**: *(Tombstone — merged into FR-020 "record existing non-default locations" during the 2026-06-09 monorepo-scope expansion. ID retained so FR references in tasks/commits stay stable.)*
 - **FR-013**: Setup MUST be reachable through the plugin's publicly-advertised surface (a `stackctl` verb and/or a `/stack-control:…` skill) so that an adopter who follows the install docs can run it without privileged or in-repo-only steps.
 - **FR-014**: Setup MUST NOT require network access, secrets, or interactive prompts to produce a valid installation (it scaffolds local governed working files only).
 
