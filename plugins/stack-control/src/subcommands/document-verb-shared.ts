@@ -96,6 +96,12 @@ export function scanVerbFlags(
       //      accepted as free-text prose (case (1)/(2) only fire on real flags).
       const v = args[++i];
       if (v === undefined || (v.startsWith('--') && recognizedFlagNames.has(v.slice(2)))) {
+        // Surface the true fault: if the LEADING token is not itself a flag the
+        // verb recognizes, the operator's mistake is an unknown flag, not a
+        // missing value — saying "<flag> <value> required" would send them to
+        // supply a value and then trip a *different* unknown-flag error from
+        // validateFlags on the next attempt (AUDIT-20260609-13).
+        if (!recognizedFlagNames.has(token.slice(2))) failUsage(verb, `unknown flag ${token}`);
         failUsage(verb, `${token} <value> required`);
       }
       values.set(token.slice(2), v);

@@ -168,6 +168,18 @@ describe('stackctl inbox flag-shaped value flags (AUDIT-BARRAGE codex-02/claude-
     expect(r.status).toBe(2);
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
+
+  // AUDIT-20260609-13: an UNKNOWN leading flag followed by a recognized flag must
+  // report the true fault ("unknown flag") — not a misleading "<flag> <value>
+  // required" that sends the operator to supply a value and trip a different
+  // unknown-flag error on the next attempt.
+  it('unknown leading flag followed by a recognized flag → exit 2 + "unknown flag" message', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const r = runCli(['inbox', 'capture', 't', '--bogus', '--idea', 'x', '--doc', docPath]);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('unknown flag --bogus');
+    expect(r.stderr).not.toContain('required');
+  });
 });
 
 describe('stackctl inbox promote / drop verbs (T014)', () => {
