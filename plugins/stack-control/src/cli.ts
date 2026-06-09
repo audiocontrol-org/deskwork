@@ -21,6 +21,7 @@ import { runArchiveCli } from './subcommands/archive.js';
 import { runUnarchiveCli } from './subcommands/unarchive.js';
 import { runCurateCli } from './subcommands/curate.js';
 import { runRoadmapCli } from './subcommands/roadmap.js';
+import { runInboxCli } from './subcommands/inbox.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -44,6 +45,8 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   curate: runCurateCli,
   // Roadmap protocol semantic layer (design/roadmap-protocol).
   roadmap: runRoadmapCli,
+  // Low-friction insight capture (design/insight-capture).
+  inbox: runInboxCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

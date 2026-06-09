@@ -9,15 +9,16 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Create `plugins/stack-control/tests/inbox/fixtures/sample-inbox.md` — a committed, valid governed design-inbox fixture (frontmatter `doc-grammar: design-inbox`; a few `captured` entries + at least one terminal entry) for mutation/verb tests
-- [ ] T002 [P] Create `plugins/stack-control/tests/inbox/helpers.ts` mirroring `tests/roadmap/helpers.ts` (FIXTURES path, `INBOX_OPTS` LoadOptions with `builtinGrammarDir`, `tmpCopy(name)` for an isolated tmp copy)
+- [X] T001 [P] Create `plugins/stack-control/tests/inbox/fixtures/sample-inbox.md` — a committed, valid governed design-inbox fixture (frontmatter `doc-grammar: design-inbox`; a few `captured` entries + at least one terminal entry) for mutation/verb tests
+- [X] T002 [P] Create `plugins/stack-control/tests/inbox/helpers.ts` mirroring `tests/roadmap/helpers.ts` (FIXTURES path, `INBOX_OPTS` LoadOptions with `builtinGrammarDir`, `tmpCopy(name)` for an isolated tmp copy)
 
 ## Phase 2: Foundational (blocks US1 + US2 — shared safety primitive + verb shell)
 
-- [ ] T003 RED: `tests/inbox/commit.test.ts` — the shared validate-and-commit helper: a candidate that fails whole-document validation throws `DocumentModelError` and leaves the file byte-for-byte unchanged (zero-write); a valid candidate writes atomically (dry-run writes nothing)
-- [ ] T004 Implement the shared `commit(docPath, candidate, opts, apply)` helper in `src/inbox/mutations.ts` (mirror `roadmap/mutations.ts:commit` — `loadDocumentFromSource(candidate)` re-validates the whole doc, then `writeFileSync` only on apply; throws before any write on failure). Make T003 green
-- [ ] T005 RED: `tests/inbox/verb-inbox.test.ts` — the `inbox` verb dispatcher shell: unknown subaction → exit 2; unknown flag → exit 2; missing/ungovernable `--doc` → exit 2 with a descriptive message; `--apply` parsed
-- [ ] T006 Implement the `inbox` verb dispatcher shell in `src/subcommands/inbox.ts` (subaction routing, `--doc`/`--apply` parsing, unknown-flag rejection à la roadmap `validateFlags`, exit 0/2, catch `DocumentModelError`→exit 2) and register `inbox: runInboxCli` in `src/cli.ts` `SUBCOMMANDS`. Make T005 green
+- [X] T003 RED: `tests/inbox/commit.test.ts` — the shared validate-and-commit helper: a candidate that fails whole-document validation throws `DocumentModelError` and leaves the file byte-for-byte unchanged (zero-write); a valid candidate writes atomically (dry-run writes nothing)
+- [X] T004 Implement the shared `commit(docPath, candidate, opts, apply)` helper in `src/inbox/mutations.ts` (mirror `roadmap/mutations.ts:commit` — `loadDocumentFromSource(candidate)` re-validates the whole doc, then `writeFileSync` only on apply; throws before any write on failure). Make T003 green
+- [X] T005 RED: `tests/inbox/verb-inbox.test.ts` — the `inbox` verb dispatcher shell: unknown subaction → exit 2; unknown flag → exit 2; missing/ungovernable `--doc` → exit 2 with a descriptive message; `--apply` parsed
+- [X] T006 Implement the `inbox` verb dispatcher shell in `src/subcommands/inbox.ts` (subaction routing, `--doc`/`--apply` parsing, unknown-flag rejection à la roadmap `validateFlags`, exit 0/2, catch `DocumentModelError`→exit 2) and register `inbox: runInboxCli` in `src/cli.ts` `SUBCOMMANDS`. Make T005 green
+  - **Reorder note:** the read-only `list` subaction (originally T016/T017, US2) was pulled forward into T006 — it is the shell's natural doc-load path, so "ungovernable `--doc` → exit 2" is asserted honestly here rather than via a stub handler (Principle V, no-fallbacks). T016/T017 are satisfied by this commit; their checkboxes are ticked in Phase 4.
 
 **Checkpoint**: engine-backed commit helper + verb shell exist and are green; ready for capture.
 
