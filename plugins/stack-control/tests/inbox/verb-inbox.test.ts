@@ -132,6 +132,31 @@ describe('stackctl inbox flag-shaped value flags (AUDIT-BARRAGE codex-02/claude-
   it('--doc with NO value still → exit 2 (--doc guard intact)', () => {
     expect(runCli(['inbox', 'list', '--doc']).status).toBe(2);
   });
+
+  // AUDIT-BARRAGE claude-01: a value flag must NOT silently swallow a FOLLOWING
+  // RECOGNIZED flag of the verb as its value. `--idea --doc <copy> --apply` is an
+  // operator who forgot the idea value; the un-fixed scanner parsed
+  // values['idea']='--doc', positional[0]='<copy>' (the TITLE slot), --apply
+  // boolean, and the doc stayed the DEFAULT — a silent wrong-document write.
+  // Rejecting --doc (a recognized flag name) as the forgotten value makes it
+  // exit 2 BEFORE any mutation, so the tmpCopy stays byte-for-byte unchanged.
+  it('--idea swallowing the following --doc flag → exit 2, tmpCopy unchanged (claude-01)', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli(['inbox', 'capture', '--idea', '--doc', docPath, '--apply']);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('--idea swallowing the following --surfaced value flag → exit 2 (claude-01)', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'inbox', 'capture', 'A title', '--idea', '--surfaced', 'today', '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
 });
 
 describe('stackctl inbox promote / drop verbs (T014)', () => {

@@ -19,7 +19,9 @@ import {
 } from './document-verb-shared.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-/** The project's governed design inbox (the single source of truth). */
+/** Default when `--doc` is omitted: this monorepo's plugin-bundled inbox (the
+ * in-repo dogfood), NOT an adopter's cwd-relative inbox. Adopters must pass
+ * `--doc` until `design:gap/project-relative-doc-discovery` lands (AUDIT-20260609-06). */
 const DEFAULT_DOC = resolve(here, '..', '..', 'DESIGN-INBOX.md');
 
 interface Flags {
@@ -45,9 +47,15 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionSpec>> = {
   list: { valueFlags: [], apply: false, positionals: 0 },
 };
 
+/** The union of every subaction's value-flag names, so the scanner can reject a
+ * forgotten value that swallows another recognized flag (AUDIT-BARRAGE-claude-01). */
+const ALL_VALUE_FLAGS: readonly string[] = [
+  ...new Set(Object.values(SUBACTION_SPECS).flatMap((s) => s.valueFlags)),
+];
+
 /** Scan flags via the shared subaction-verb scanner; `--apply` is the only boolean. */
 function scanFlags(args: readonly string[]): Flags {
-  const s = scanVerbFlags('inbox', args, DEFAULT_DOC, ['apply']);
+  const s = scanVerbFlags('inbox', args, DEFAULT_DOC, ['apply'], ALL_VALUE_FLAGS);
   return { doc: s.doc, apply: s.booleans.has('apply'), positionals: s.positionals, values: s.values };
 }
 

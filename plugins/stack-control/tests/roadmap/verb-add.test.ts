@@ -93,6 +93,49 @@ describe('stackctl roadmap add verb (T025)', () => {
     expect(model.byId.get('impl:fix/flag-shaped-scope')).toBeDefined();
   });
 
+  it('--scope swallowing the following --apply boolean → exit 2, zero write (AUDIT-BARRAGE claude-01)', () => {
+    // Symmetry lock for the inbox claude-01 fix on the roadmap verb. `--scope
+    // --apply` with no id is an operator who forgot the scope value; swallowing
+    // --apply (a recognized boolean) drops their intent. Must exit 2, write
+    // nothing. (Already rejected pre-fix; locks the boolean case stays rejected.)
+    const docPath = tmpCopy('chain');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli(['roadmap', 'add', '--scope', '--apply', '--doc', docPath]);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('--scope swallowing the following --depends-on value flag → exit 2, zero write (claude-01)', () => {
+    // The pre-fix scanner only rejected a following recognized BOOLEAN; a
+    // following recognized VALUE-flag name (`--depends-on`) was swallowed as the
+    // scope value. On the roadmap verb the downstream positional-overflow /
+    // strict-id guards happen to catch the resulting shape, so the EXIT is 2 both
+    // before and after — this test locks the zero-write symmetry; the genuinely
+    // RED silent-wrong-write manifestation is on the inbox verb (verb-inbox.test).
+    const docPath = tmpCopy('chain');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'roadmap', 'add', 'impl:fix/swallow',
+      '--scope', '--depends-on', 'design:feature/a',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('a flag-shaped --scope value (NOT a recognized flag) is still accepted → exit 0 (claude-02 preserved)', () => {
+    // The claude-01 fix must NOT regress the claude-02 free-text relaxation: a
+    // value that begins with `--` but is NOT a recognized flag name of the verb
+    // stays legitimate single-line content.
+    const docPath = tmpCopy('chain');
+    const r = runCli([
+      'roadmap', 'add', 'impl:fix/free-text-scope',
+      '--scope', '--something free text',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(0);
+  });
+
   it('an unknown boolean flag (--clear on add) → exit 2, zero write', () => {
     const docPath = tmpCopy('chain');
     const before = readFileSync(docPath, 'utf8');

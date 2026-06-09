@@ -8,7 +8,6 @@
 
 import {
   chmodSync,
-  existsSync,
   lstatSync,
   realpathSync,
   renameSync,
@@ -50,9 +49,11 @@ function atomicReplace(docPath: string, contents: string): void {
   const tempPath = join(dirname(target), `.${basename(target)}.tmp-${process.pid}-${tempCounter++}`);
   try {
     writeFileSync(tempPath, contents, 'utf8');
-    // Preserve the original file's permission mode across the replacement; for a
-    // new file (target absent) the default mode is correct.
-    if (existsSync(target)) chmodSync(tempPath, statSync(target).mode & 0o777);
+    // Preserve the original file's permission mode across the replacement. `target`
+    // is GUARANTEED to exist: the `lstatSync(docPath)` above already threw if it
+    // didn't, and every caller runs `loadDocument(docPath)` first — atomicReplace
+    // never creates a new file, so the mode copy is unconditional.
+    chmodSync(tempPath, statSync(target).mode & 0o777);
     renameSync(tempPath, target);
   } catch (err) {
     try {

@@ -76,9 +76,15 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionSpec>> = {
   defer: { valueFlags: ['until'], apply: true, clear: true, positionals: 1 },
 };
 
+/** The union of every subaction's value-flag names, so the scanner can reject a
+ * forgotten value that swallows another recognized flag (AUDIT-BARRAGE-claude-01). */
+const ALL_VALUE_FLAGS: readonly string[] = [
+  ...new Set(Object.values(SUBACTION_SPECS).flatMap((s) => s.valueFlags)),
+];
+
 /** Scan flags via the shared subaction-verb scanner; `--apply`/`--clear` booleans. */
 function scanFlags(args: readonly string[]): Flags {
-  const s = scanVerbFlags('roadmap', args, DEFAULT_DOC, ['apply', 'clear']);
+  const s = scanVerbFlags('roadmap', args, DEFAULT_DOC, ['apply', 'clear'], ALL_VALUE_FLAGS);
   return {
     doc: s.doc,
     apply: s.booleans.has('apply'),

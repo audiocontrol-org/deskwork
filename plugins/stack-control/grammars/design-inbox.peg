@@ -20,8 +20,16 @@ reconciliationHook: null
   // appearing inside the Unit sequence forces a parse failure (leftover input),
   // which the engine reports as fail-loud (FR-003).
   function statusOf(bodyLines) {
+    // ANCHORED to a LEADING `**Status:**` (mirrors the mutation locator
+    // INBOX_STATUS_LINE). The block stream strips a list-item's `- ` marker, so a
+    // real status bullet `- **Status:** **captured**` surfaces here as body text
+    // `**Status:** **captured**` (verified empirically). An EARLIER body field
+    // whose free text merely CONTAINS the substring `**Status:**` — e.g. the Idea
+    // line `**Idea:** Add a **Status:** filter to inbox list` — has `**Status:**`
+    // mid-line, NOT leading, so it is no longer matched first and misparsed as
+    // status `filter` (AUDIT-BARRAGE-codex-01).
     for (const b of bodyLines) {
-      const m = /\*\*Status:\*\*\s*\*{0,2}\s*([A-Za-z][A-Za-z-]*)/.exec(b.text);
+      const m = /^\s*\*\*Status:\*\*\s*\*{0,2}\s*([A-Za-z][A-Za-z-]*)/.exec(b.text);
       if (m) return m[1].toLowerCase();
     }
     return null;

@@ -120,6 +120,27 @@ describe('mutations.capture (T007)', () => {
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
 
+  it('captures an idea whose prose contains a literal `**Status:** <word>` without misparsing status (AUDIT-BARRAGE codex-01)', () => {
+    // The grammar's statusOf scanned every body line for `**Status:**` and took
+    // the FIRST match anywhere on a line. The Idea line below contains the literal
+    // `**Status:** filter`, so the substring scan parsed status as `filter` (not in
+    // [captured, promoted, dropped]) and the whole-doc re-validation REJECTED the
+    // capture (zero-write). Anchoring statusOf to a leading `**Status:**` body line
+    // (the real status bullet's shape after list-marker stripping) fixes it.
+    const docPath = tmpCopy('sample-inbox');
+    capture(
+      docPath,
+      { title: 'Status filter for inbox list', idea: 'Add a **Status:** filter to inbox list' },
+      INBOX_OPTS,
+      true,
+    );
+    const { doc } = loadDocument(docPath, INBOX_OPTS);
+    const unit = doc.units.find((u) => u.identifier === 'Status filter for inbox list');
+    expect(unit).toBeDefined();
+    expect(unit!.status).toBe('captured');
+    expect(readFileSync(docPath, 'utf8')).toContain('Add a **Status:** filter to inbox list');
+  });
+
   it('FR-006 — capturing one thread leaves every pre-existing entry byte-identical', () => {
     const docPath = tmpCopy('sample-inbox');
     capture(docPath, { title: 'A fourth thread', idea: 'held alongside the others' }, INBOX_OPTS, true);
