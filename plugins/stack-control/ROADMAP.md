@@ -29,7 +29,7 @@ this document is the live feature queue.
 Generalized archive / unarchive / curate over self-describing governed documents — the engine this roadmap protocol is built on.
 
 ## design:feature/insight-capture
-- status: planned
+- status: in-flight
 - depends-on: multi:feature/front-door
 One-move out-of-sequence insight capture as a first-class control-plane capability; capture ≠ scope. Retires the interim design-inbox convention.
 
@@ -216,4 +216,9 @@ audit-barrage payload includes its own audit-log, generating self-referential fi
 - part-of: multi:feature/migrate-audit-barrage
 - ref: #387
 Retire /dw-lifecycle:review and /dw-lifecycle:audit in favor of audit-barrage as the primary review surface, as part of bringing audit-barrage in-house.
+
+## design:gap/roadmap-advance-on-spec-finalize
+- status: planned
+- part-of: design:feature/roadmap-protocol
+Advancing a roadmap item's status when its spec is finalized must be NON-DISCRETIONARY (thesis: make it mechanical, never rely on the agent remembering roadmap advance). Add a Spec Kit hook on spec finalization (e.g. after_tasks / after_analyze) that advances the roadmap item whose spec: field points at the just-finalized spec dir to in-flight, resolved via .specify/feature.json. Surfaced as TF-24.
 
