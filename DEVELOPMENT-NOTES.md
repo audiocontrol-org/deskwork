@@ -5344,3 +5344,44 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 2. **Open roadmap items / issues** now tracked in `ROADMAP.md`: `design:gap/roadmap-edge-aware-archival` (#436, safety-fixed, UX enhancement remains), `design:fix/inbox-migration-drift` (#433), `design:gap/governance-graduation-record` (#434), `design:gap/row-keyed-test-grammar` (#435), `design:gap/roadmap-order-gating` (FR-018 deferred gating).
 3. **At merge:** reconcile #433 (005 inbox drift — the 1 failing test); reconcile the branch-local session-start/end skills with `main`'s studio-product versions.
 4. **TF-23** (govern slug must match the docs feature dir, not plugin/branch) + TF-22 (branch-name gate) fold into the `feature.json`-over-branch-name migration.
+
+## 2026-06-08: roadmap/inbox governance hygiene + `design/insight-capture` (007) — full Spec Kit front-half through the front door
+### Feature: pluggable-lifecycle-providers
+### Worktree: stack-control (branch `feature/stack-control`)
+
+**Goal:** Resuming from 006-complete. Operator-driven, several threads: migrate the legacy roadmap into the governed roadmap; triage open issues into it; capture + unify the design-inbox to one source of truth; then author the next feature — `design/insight-capture` (007) — end-to-end **through the front door**; advance its roadmap item and capture the friction that advancing should be mechanical.
+
+**Accomplished:**
+- **Legacy roadmap migration.** Migrated the forward arcs from the prose `./ROADMAP.md` into the governed `plugins/stack-control/ROADMAP.md` via `roadmap add` (autonomous-loop family: 1 feature + 6 gaps; audit-barrage Design B/C: 2 gaps). Retired root `./ROADMAP.md` to a pointer (prose preserved, mirroring the 006 pattern). **18 → 27 items.**
+- **Issue triage into the roadmap.** Triaged all **136** open issues; captured the **7** stack-control-relevant ones as `part-of` items with `--ref` (direct-feature fixes #432/#430; migration-debt gaps #122/#422/#315/#431/#387). Left editorial-product + dw-lifecycle-process issues in the tracker (operator decision). **27 → 34 items.**
+- **Design-inbox unified to one source of truth.** Captured the read-only data-store-visualization web-app idea; then synced the missing `mark-fixed` entry into the governed `DESIGN-INBOX.md`, retired the ungoverned docs-tree source to a pointer, repointed `.claude/rules/design-inbox.md`'s capture target to the governed file, and rewrote the T038 `generality.test.ts` to drop the retired-source coupling (frozen baseline). **This resolved #433** (the suite's lone failing test) — full suite **358/1 → 359/359 green**.
+- **`design/insight-capture` (007) authored through the front door.** Drove native `/speckit-specify … /speckit-analyze` + `stackctl spec-check`, staying on the one long-lived branch (ran `before_specify` `git.feature` `--dry-run` only — no divergent branch). specify (3 US, 14 FR, 6 SC) → clarify (4 forks: capture+triage v1 · two surfaces+promotion path · record-and-reuse promote · no Ideas-stage v1) → plan (Constitution PASS; `inbox` verb mirrors `roadmap add`/`advance`; reuse engine+grammar+curate/archive) + research/data-model/contracts/quickstart → checklist (caught+fixed a real spec↔plan concurrency conflict) → tasks (25 RED-first, by user story) → analyze (0 critical/0 high, 100% coverage; applied C1/C2 tightenings).
+- **Advanced + captured the mechanical-advance friction.** `roadmap advance design:feature/insight-capture → in-flight`; logged **TF-24** (advancing the roadmap on spec finalization is discretionary — the thesis failure mode) and added `design:gap/roadmap-advance-on-spec-finalize` (a Spec Kit hook on spec finalization). **Final roadmap: 35 items.**
+
+**Didn't Work / unresolved:**
+- **`check-prerequisites.sh` branch-name gate (TF-09/TF-22) hit again** on `/speckit-analyze`'s `--require-tasks`; worked around via `feature.json` paths. The `before_specify` `git.feature` mandatory hook would also spawn a divergent branch — ran `--dry-run` only. Both fold into the `feature.json`-over-branch-name migration.
+- **007 implementation NOT started** — separate session per the orchestrator/implementation split.
+- **Verb name** (`inbox` vs a top-level `capture`) left as a noted structure choice for implementation time.
+
+**Course Corrections:**
+- [PROCESS] Operator: advancing the roadmap should be a **non-discretionary outcome of finishing the spec**, not something the agent remembers. → captured TF-24 + `design:gap/roadmap-advance-on-spec-finalize` (the "make it mechanical, don't rely on the agent" thesis, same shape as #432).
+- [PROCESS] Operator asked **"should we use the front door?"** before starting 007 → confirmed yes and drove 007 through `define`'s chain rather than raw `/speckit-*` (dogfood discipline; 007 is the first real downstream feature built through the front door).
+- [PROCESS] zsh does not word-split a `$VAR="… roadmap"` command string (unlike bash) → a roadmap-mutation script no-op'd; re-ran with explicit commands.
+
+**Quantitative** (re-derived from `git log 1d92d8f1..HEAD`):
+- Commits: **11**. Files changed: **18** (+817 / −143). All docs/specs — no new plugin `src` (only `generality.test.ts` rewritten).
+- Tests: **359/359 pass** (was 358 pass / 1 fail at session-start; #433 resolved by the inbox unification). `tsc` strict clean.
+- Roadmap: **18 → 35 items** (+9 legacy migration, +7 issue capture, +1 TF-24 gap; +1 status advance, no item).
+- GitHub issues: **0 filed, 0 closed**; #433's drift resolved on-branch (evidence comment posted; closure is the operator's call).
+- Clone snapshot (session-end): **4 groups, identical to session-start — zero new duplication.**
+- Open findings at session end: **0** (no governance barrage ran — an authoring/hygiene session, not an implement loop).
+
+**Insights:**
+- **The front door earns its keep as the authoring surface.** Driving 007 through `define`'s chain (specify→analyze) with `spec-check` gating + a governance-ready handoff is the self-hosting dogfood working on a real downstream feature — not just the throwaway proof.
+- **"One governed store per concern" is becoming the default.** This session removed two sources-of-truth (root `ROADMAP.md` → pointer; docs `design-inbox` → pointer) and resolved the drift test. Single-source-of-truth + the document-primitives engine is the through-line.
+- **Discretionary status-keeping is the recurring anti-pattern.** TF-24 is the same shape as #432 — a "non-discretionary rule" delivered as a discretionary action. The fix is always a mechanical hook, never a documented reminder.
+
+**Next step (resume here):**
+1. **007 is AUTHORED + governance-ready** (`spec=yes plan=yes tasks=yes`; roadmap item `in-flight`). Implement in a **separate session**: `/stack-control:execute` (drives `/speckit-implement` over `tasks.md` + `after_implement` governance). **MVP = Foundational + US1.**
+2. Roadmap gaps to weigh before/with 007: `design:gap/roadmap-advance-on-spec-finalize` (TF-24) and the migration-debt cluster captured this session.
+3. **At merge:** reconcile the branch-local session skills with `main`; the `feature.json`-over-branch-name migration (TF-09/14/15/17/22/23/24) folds in several frictions at once.
