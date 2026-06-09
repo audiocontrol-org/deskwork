@@ -53,6 +53,65 @@ We need a **slush pile**: a structured, agent-easy intake for found work that is
    foundation (not split into a later phase), accepting that the (in-use) governance convergence loop
    now depends on backlog.md.
 
+## Alternatives considered
+
+Two alternatives were evaluated **hands-on** this session (not from READMEs): `beads` (`bd` 1.0.5) and
+`backlog.md` (1.46.0) were each installed into a scratch project and driven through the slush-pile
+workflow (one-move capture, structured fields, separating a pile from a curated view, dependency
+support, the git/storage story, the agent-integration surface).
+
+### beads — rejected for this use
+
+beads (`bd`) is a *"distributed graph issue tracker for AI agents, powered by Dolt."* It is the
+richer **graph** engine and is genuinely stronger where this slush pile is weaker:
+
+- `discovered-from` provenance edges, semantic `find-duplicates`, `bd ready`/`bd blocked`, a `graph`
+  render, typed edges (`relates_to`/`duplicates`/`supersedes`).
+- **Hash IDs + Dolt cell-merge** — purpose-built for many agents writing concurrently (the
+  zero-conflict design directly targets the merge friction tracked in #413).
+
+It was rejected as the substrate because:
+
+- **SSOT is an opaque binary Dolt DB**, gitignored (`.dolt/`, `*.db`), synced over a separate
+  `refs/dolt/data` ref namespace — not the working tree, not `git diff`-able. The `.beads/issues.jsonl`
+  export is committable but the docs explicitly warn *"don't treat JSONL as the source of truth."*
+  This collides with the thesis's load-bearing principle *"memory loss → durable **written**
+  artifacts"* — the slush store would not be a readable artifact.
+- **Go + Dolt toolchain** vs the project's TypeScript/npm stack.
+- **Invasive `init`**: it auto-wrote `CLAUDE.md`, `.claude/settings.json` (a SessionStart hook),
+  `AGENTS.md`, a `SKILL.md`, **and auto-committed to git** — against a repo with a curated `CLAUDE.md`
+  + rules + an existing `session-start` skill.
+
+beads' decisive advantage — concurrent multi-agent merge-safety — was explicitly deferred by the
+operator (*"we can worry about that when it becomes a problem"*). Because backlog.md stores plain
+markdown, a later migration to beads (or hash-suffixed IDs) is not a one-way door.
+
+### head-to-head (verified)
+
+| Dimension | beads | backlog.md |
+|---|---|---|
+| Storage | Dolt binary DB, gitignored, separate `refs/dolt/data` sync | YAML-frontmatter `.md` files, one per task, **in the working tree** |
+| Prose-auditable (barrage/operator reads the store) | ✗ (only the JSONL mirror) | ✓ — it *is* markdown |
+| Stack fit | Go + Dolt | **TypeScript + npm** (matches) |
+| One-move capture | `bd q` → ID | `task create` / `draft create` |
+| Keep slush out of a curated view | labels + query language | status / drafts tier (no `--label` filter on `list`) |
+| Dedup a flood | ✓ semantic `find-duplicates` | ✗ fuzzy `search` only |
+| Provenance | ✓ `discovered-from` | ✗ generic `depends-on` only |
+| Merge-safe under parallel agents | ✓ hash IDs, zero-conflict | ✗ sequential `TASK-1` IDs |
+| Ready / unblocked view | ✓ `bd ready` | ~ `sequence list` (dependency order) |
+| Capture → curate seam | `bd promote` (wisp→bead) | `draft promote` (draft→task) |
+| Install invasiveness | high (auto-wrote files + auto-committed) | lower (interactive; non-interactive skips client setup) |
+| UI | text / JSONL | kanban TUI + web UI |
+
+### build-your-own `SLUSH.md` — rejected
+
+A governed `SLUSH.md` + a hand-built `/stack-control:slush` verb on the existing `document-model`
+engine was considered (it would stay fully in-model and add zero external deps). Rejected because
+backlog.md *is* the markdown slush pile done well — a hand-rolled one would reimplement
+query/board/cleanup/drafts worse, and a flat governed markdown doc floods (the very failure mode the
+pile exists to avoid). The opinionated-verb-over-concrete-backend decision (#4) captures the
+in-model benefit (an opinionated `/stack-control:backlog` touch point) without the reimplementation.
+
 ## Architecture
 
 ```
