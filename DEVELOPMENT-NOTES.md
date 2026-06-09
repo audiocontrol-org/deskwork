@@ -4,6 +4,42 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-06-09 (009 project-doc-setup — full DEFINE chain): spec → clarify → plan → tasks → analyze for post-install project setup
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers (branch `feature/stack-control`)
+
+**Goal:** Spec the roadmap's `multi:feature/project-doc-setup` (operator: *"spec the project init feature"*) — the create-side that scaffolds the governed working files + config the `stackctl` verbs require into an adopter project. Authored the full Spec Kit DEFINE chain through `/speckit-analyze`; implementation is deferred to a separate implementation session per the two-session rule.
+
+**Accomplished:**
+- **`specs/009-project-doc-setup/` authored end-to-end:** spec (27 FRs, 9 SCs, 5 user stories) → clarify (all 5 Open Questions resolved) → plan (research D1–D10, data-model, 2 contracts, quickstart) → tasks (34, RED-first, MVP = US1) → analyze (0 critical/high, 100% coverage). 7 commits, all pushed.
+- **Scope expanded twice in capture-mode at operator prompting** — neither was in the first draft: (1) **monorepo multiple installations** + **configurable per-working-file locations** (operator: *"multiple installations… and configurable locations… critical for setting up a project that consumes our plugin"*); (2) the **audit log is two-tier** (operator: *"a separate audit log per feature, otherwise the audit log will get enormous"*) — per-feature logs (`specs/<feature>/audit-log.md`, the feature lifecycle's job) are the size control; installation setup scaffolds only the program-level log.
+- **5 clarify decisions locked** (all grounded in existing code): OQ-1 upward-walk resolution (config presence marks the root); OQ-2 audience-split defaults (human docs at root, internal stores under `.stack-control/`); OQ-3 base-dir + per-file overrides; OQ-4 two-tier audit log; OQ-5 nested-installation nearest-wins + fail-loud collision refusal.
+- **CLI-first / surface-agnostic constraint folded in** (FR-025/026, SC-009) after a distribution-shape discussion: the `stackctl` CLI is the vendor-neutral core; the Claude Code plugin / Agent-Skills / a future MCP server are adapters over it. Installation resolution takes a generic directory/root context (CLI cwd today, MCP root later) so no adapter needs a contract change.
+- **Plan grounded in real resolution code:** the three current bundled-default resolution points (`DEFAULT_DOC` in inbox/roadmap, `backlogRoot()`, `grammarDirs()`) carry code comments literally deferring to *"until `project-relative-doc-discovery` lands"* — 009 lands it via a shared config+resolution port exercised by two concrete instances (create-side setup + read-side verbs), satisfying Principle II. Mirrors the audit-barrage `config-loader` pattern; reuses 008's `filesystem_only` backlog init.
+- **analyze remediation:** closed the FR-012 numbering gap (tombstone; content had merged into FR-020 during the monorepo rewrite) and tightened the US4 "genuinely ambiguous" wording (upward-walk nearest-wins is deterministic — no ambiguous-match case for a verb).
+
+**Didn't Work / deferred:**
+- **`/speckit-clarify` & `/speckit-analyze` branch-name prereq friction:** `check-prerequisites.sh --require-tasks` rejects `feature/stack-control` (expects a `NNN-` branch); the `--paths-only` variant reads `.specify/feature.json` and works. Proceeded via feature.json (authoritative). See tooling-feedback.
+- **Implementation not started** — DEFINE-only session; `/speckit-implement` runs in the implementation worktree session (two-session rule).
+
+**Course Corrections:**
+- [PROCESS] Operator denied an `AskUserQuestion` decision-menu mid-discussion and redirected: *"I'll worry about mcp server later. I was hoping there was a vendor-agnostic equivalent to a plugin."* — when the operator is thinking aloud, answer the actual question directly rather than escalating to a 4-option modal. Adjusted to a prose answer (CLI is the vendor-neutral layer; no single universal plugin standard) and folded the durable constraint into the spec.
+
+**Quantitative (re-derived from `git log 4483748a..HEAD`):**
+- Commits: 7 (all `docs(009)`; no source code — DEFINE phase).
+- Artifacts: spec.md, plan.md, research.md, data-model.md, quickstart.md, 2 contracts, tasks.md, requirements checklist.
+- Clone groups (plugins/stack-control): 6 → 6 (unchanged — no source written this session; baseline identical to session start).
+- Open findings at session end: 0 new (no implementation, no governance run). Pre-existing program-level HIGH `AUDIT-20260607-48` remains open (predates this work).
+
+**Insights:**
+- **Capture-mode paid off twice.** The first spec draft was complete-looking but wrong-scoped (one repo = one installation; four flat artifacts). The operator's two prompts surfaced the monorepo and two-tier-audit-log shapes that reshape the config contract. Writing the draft *fast* and letting the operator react beat trying to pre-guess the full scope.
+- **Grounding the plan in the actual resolution code changed the design.** Reading `DEFAULT_DOC`/`backlogRoot()`/`grammarDirs()` revealed 009 isn't "add setup" — it's "land the shared resolver those three comments already promise," which makes the read-side wiring (and thus the `project-relative-doc-discovery` subsumption) intrinsic, not optional.
+- **The two-tier audit log is the same anti-enormous instinct as the dampener/backlog from 008** — partition by the natural boundary (feature) rather than prune a single growing file.
+
+**Next step:** Hand off to the **implementation session** (feature worktree) for `/speckit-implement` — MVP is US1 (Phases 1→2→3: the shared port + setup verb + read-side wiring + dogfood). Two operator decisions pending at implementation: (1) `roadmap reconcile` on whether `design:gap/project-relative-doc-discovery` is subsumed (T034); (2) the in-repo dogfood root choice (repo root vs `plugins/stack-control/`, D9/T020).
+
+---
+
 ## 2026-06-09 (roadmap additions + 008 backlog feature implementation + self-governance): build the backlog slush-pile surface end-to-end, then govern it
 ### Feature: pluggable-lifecycle-providers
 ### Worktree: pluggable-lifecycle-providers (branch `feature/stack-control`)
