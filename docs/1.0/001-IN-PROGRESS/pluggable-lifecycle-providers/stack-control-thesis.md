@@ -53,4 +53,4 @@ Per the barbell, **DEFINE gets the heavy investment**; IMPLEMENT is industrializ
 - Settled succession decisions: [`.claude/rules/stack-control-succession.md`](../../../../.claude/rules/stack-control-succession.md)
 - Dev principles every spec inherits: [`.specify/memory/constitution.md`](../../../../.specify/memory/constitution.md)
 - Feature north star: [`prd.md`](./prd.md)
-- Out-of-sequence idea capture: [`design-inbox.md`](./design-inbox.md)
+- Out-of-sequence idea capture: the governed [`DESIGN-INBOX.md`](../../../../plugins/stack-control/DESIGN-INBOX.md) via the native [`/stack-control:inbox`](../../../../plugins/stack-control/skills/inbox/SKILL.md) verb (the interim `design-inbox.md` convention retired when `design/insight-capture` shipped)

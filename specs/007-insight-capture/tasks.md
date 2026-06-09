@@ -51,10 +51,10 @@
 **Goal**: retire the interim convention; relocate its discipline to the skill body + verb.
 **Independent test**: quickstart Scenario 3 (SC-004).
 
-- [ ] T019 [US3] RED: `tests/inbox/retirement.test.ts` — asserts the single-mechanism outcome: `.claude/rules/design-inbox.md` absent, the docs-tree pointer `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/design-inbox.md` absent, and no remaining doc instructs hand-appending to the inbox
-- [ ] T020 [US3] Author `plugins/stack-control/skills/inbox/SKILL.md` — the capture/promote/drop discipline + verb usage (dry-run-first; capture≠scope; record-not-create) as the NEW home for the discipline the interim rule held (per `.claude/rules/enforcement-lives-in-skills.md`)
-- [ ] T021 [US3] Remove `.claude/rules/design-inbox.md` and the docs-tree pointer; repoint remaining cross-references (plugin README, other rules) to `/stack-control:inbox` + the verb. Make T019 green
-- [ ] T022 [US3] Checkpoint: run quickstart Scenario 3 — one capture mechanism, one source of truth confirmed
+- [X] T019 [US3] RED: `tests/inbox/retirement.test.ts` — asserts the single-mechanism outcome: `.claude/rules/design-inbox.md` absent, the docs-tree pointer `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/design-inbox.md` absent, and no remaining doc instructs hand-appending to the inbox
+- [X] T020 [US3] Author `plugins/stack-control/skills/inbox/SKILL.md` — the capture/promote/drop discipline + verb usage (dry-run-first; capture≠scope; record-not-create) as the NEW home for the discipline the interim rule held (per `.claude/rules/enforcement-lives-in-skills.md`)
+- [X] T021 [US3] Removed `.claude/rules/design-inbox.md` and the docs-tree pointer; repointed cross-references (thesis canonical-links, roadmap vision § + row, the governed `DESIGN-INBOX.md` header) to `/stack-control:inbox` + the verb. Historical journal/audit-log/tooling-feedback entries left intact (append-only history). T019 green.
+- [X] T022 [US3] Checkpoint: Scenario 3 confirmed — both interim files removed, native `/stack-control:inbox` is the only documented capture path, governed `DESIGN-INBOX.md` is the single source of truth. Full suite 399/399 green (generality.test.ts unaffected per research D6).
 
 ## Phase 6: Polish & Cross-Cutting
 

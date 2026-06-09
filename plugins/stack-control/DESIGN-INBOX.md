@@ -10,6 +10,10 @@ entry is a `### <title>` Unit with a `**Status:**` of `captured` (active),
 (discarded). Governed by the built-in `design-inbox` grammar; keep it lean
 with `/stack-control:curate` (promoted/dropped entries archive out).
 
+Capture and triage entries with the native [`/stack-control:inbox`](./skills/inbox/SKILL.md)
+verb (`inbox capture` / `promote` / `drop` / `list`) — never by hand-editing.
+Every mutation re-validates the whole document and is zero-write-on-failure.
+
 ### Audit-barrage as a spec-definition governance step
 
 - **Surfaced:** 2026-06-06, mid-triage of `impl/execution-engine`'s spec barrage.
