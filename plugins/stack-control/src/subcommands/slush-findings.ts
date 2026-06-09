@@ -2,26 +2,33 @@
 // from dw-lifecycle slush-remaining via multi/migrate-audit-barrage; the
 // workplan half is dropped — Spec-Kit features have no workplan.md, TF-12).
 //
-// When the dampener is engaged (HIGH-quiet: 0 HIGH in the latest run + 0 MED, OR
-// 2 consecutive 0-HIGH runs), bin the residual MEDIUM/LOW findings of the most
-// recent barrage to `Status: acknowledged-slush-pile-<date>` — NOT fixed, NOT
-// open — so the convergence loop terminates. HIGHs are NEVER slushed. Refuses to
-// slush while the dampener is not engaged (real bugs still surfacing).
+// The dampener DECISION (when to park: HIGH-quiet — 0 HIGH in the latest run +
+// 0 MED, OR 2 consecutive 0-HIGH runs) lives in slush-remaining.ts, UNCHANGED.
+// 008 REWIRE (US4): only the DESTINATION of a parked flip changed. Instead of
+// flipping the residual MEDIUM/LOW findings to `acknowledged-slush-pile-<date>`,
+// each parked finding becomes a `migrated-finding` backlog item and its audit-log
+// entry records `Status: migrated-to-backlog <task-id>` — leaving the audit-log
+// a clean open/fixed convergence ledger, with the backlog as the single burn-down
+// queue (FR-016/FR-020/FR-022). HIGHs are NEVER slushed. Refuses to slush while
+// the dampener is not engaged (real bugs still surfacing). `--burn-down` is
+// removed — working the backlog IS the burn-down.
 //
 // --checkpoint scopes the dampener DECISION to one checkpoint's runs (the same
-// per-checkpoint loop the gate uses). --burn-down re-opens slush-pile entries so
-// a future pass can fix them ("go back through the slush pile and burn it down").
+// per-checkpoint loop the gate uses).
 
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
-import {
-  slushRemaining,
-  burnDownSlush,
-} from '../scope-discovery/promote-findings/slush-remaining.js';
+import { slushRemaining } from '../scope-discovery/promote-findings/slush-remaining.js';
 import { filterByCheckpoint } from '../scope-discovery/promote-findings/checkpoint-filter.js';
+import { createBacklogBackend } from '../backlog/backend.js';
+import { backlogRoot } from '../backlog/root.js';
+import { findFindingsByStatus, migrateFindings } from '../backlog/slush-migrate.js';
+
+/** Open-status predicate for locating the flipped findings to migrate. */
+const STATUS_OPEN_RE = /^Status:\s*open\b/i;
 
 interface SlushOptions {
   readonly feature: string;
@@ -30,16 +37,14 @@ interface SlushOptions {
   readonly slushDate?: string;
   readonly scope: 'latest' | 'all';
   readonly apply: boolean;
-  readonly burnDown: boolean;
 }
 
 const USAGE = [
   'Usage: stackctl slush-findings',
   '    --feature <slug>          Required.',
   '    [--checkpoint <name>]     Scope the dampener decision to one checkpoint.',
-  '    [--slush-date <YYYY-MM-DD>] Date for the acknowledged-slush-pile-<date> tag (default: today UTC).',
-  '    [--scope latest|all]      Sections to act on (default: latest for slush, all for burn-down).',
-  '    [--burn-down]             Re-open slush-pile findings instead of slushing.',
+  '    [--slush-date <YYYY-MM-DD>] Date passed to the dampener decision (default: today UTC).',
+  '    [--scope latest|all]      Sections to act on (default: latest).',
   '    [--apply]                 Write the change (default: dry-run).',
   '    [--help]',
   '',
@@ -60,13 +65,11 @@ function parseArgs(args: string[]): SlushOptions {
   let slushDate: string | undefined;
   let scope: 'latest' | 'all' | undefined;
   let apply = false;
-  let burnDown = false;
 
   for (let i = 0; i < args.length; i++) {
     const token = args[i];
     if (token === undefined) continue;
     if (token === '--apply') { apply = true; continue; }
-    if (token === '--burn-down') { burnDown = true; continue; }
     if (token === '--help' || token === '-h') { process.stdout.write(`${USAGE}\n`); process.exit(0); }
     if (
       token === '--feature' || token === '--repo-root' || token === '--checkpoint' ||
@@ -99,13 +102,12 @@ function parseArgs(args: string[]): SlushOptions {
     process.exit(2);
   }
   // Slush defaults to the latest barrage (operator intent: "items in scope of
-  // THIS barrage"); burn-down defaults to the whole pile.
-  const resolvedScope = scope ?? (burnDown ? 'all' : 'latest');
+  // THIS barrage").
+  const resolvedScope = scope ?? 'latest';
   return {
     feature,
     scope: resolvedScope,
     apply,
-    burnDown,
     ...(repoRoot !== undefined ? { repoRoot } : {}),
     ...(checkpoint !== undefined ? { checkpoint } : {}),
     ...(slushDate !== undefined ? { slushDate } : {}),
@@ -133,21 +135,6 @@ export async function runSlushFindings(args: string[]): Promise<void> {
   }
   const text = await readFile(auditLogPath, 'utf8');
 
-  if (opts.burnDown) {
-    const { reopened, newAuditLogText } = burnDownSlush({ auditLogText: text, scope: opts.scope });
-    if (reopened.length === 0) {
-      process.stderr.write('slush-findings: burn-down — no acknowledged-slush-pile findings to re-open.\n');
-      process.exit(0);
-    }
-    if (opts.apply) {
-      await atomicWriteFile(auditLogPath, newAuditLogText);
-      process.stdout.write(`slush-findings: burn-down APPLIED — re-opened ${reopened.length} finding(s): ${reopened.map((r) => r.findingId).join(', ')}\n`);
-    } else {
-      process.stdout.write(`slush-findings: burn-down DRY-RUN — would re-open ${reopened.length} finding(s): ${reopened.map((r) => r.findingId).join(', ')} (pass --apply to write)\n`);
-    }
-    process.exit(0);
-  }
-
   const decisionAuditLogText =
     opts.checkpoint !== undefined ? filterByCheckpoint(text, opts.checkpoint) : undefined;
   const res = slushRemaining({
@@ -174,11 +161,27 @@ export async function runSlushFindings(args: string[]): Promise<void> {
     process.stdout.write('slush-findings: dampener engaged, but no open MEDIUM/LOW findings in scope to slush (no-op).\n');
     process.exit(0);
   }
+  // 008 REWIRE: the destination is the backlog. The dampener DECISION above
+  // (res.flips) is unchanged; here we route each parked flip to a migrated-finding
+  // backlog item and record `migrated-to-backlog <task-id>` on its audit-log
+  // entry — NOT `acknowledged-slush-pile`. We deliberately do NOT consume
+  // res.newAuditLogText (which carries the old parked status); slush-remaining
+  // stays frozen, we just stop using that one output.
   if (opts.apply) {
-    await atomicWriteFile(auditLogPath, res.newAuditLogText);
-    process.stdout.write(`slush-findings: APPLIED — slushed ${ids.length} finding(s) to acknowledged-slush-pile: ${ids.join(', ')}\n`);
+    const flipIds = new Set(res.flips.map((f) => f.findingId));
+    const findings = findFindingsByStatus(text, STATUS_OPEN_RE).filter((f) => flipIds.has(f.findingId));
+    const backend = createBacklogBackend({ cwd: backlogRoot() });
+    const mig = migrateFindings({ auditLogText: text, findings, backend, featureSlug: opts.feature });
+    await atomicWriteFile(auditLogPath, mig.newAuditLogText);
+    process.stdout.write(
+      `slush-findings: APPLIED — migrated ${mig.migrated.length} finding(s) to the backlog: ${mig.migrated
+        .map((m) => `${m.findingId}→${m.taskId}`)
+        .join(', ')}\n`,
+    );
   } else {
-    process.stdout.write(`slush-findings: DRY-RUN — would slush ${ids.length} finding(s): ${ids.join(', ')} (pass --apply to write)\n`);
+    process.stdout.write(
+      `slush-findings: DRY-RUN — would migrate ${ids.length} finding(s) to the backlog: ${ids.join(', ')} (pass --apply to write)\n`,
+    );
   }
   process.exit(0);
 }

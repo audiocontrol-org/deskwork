@@ -4,7 +4,12 @@
 // (T021, US4) appends to this file.
 
 import { describe, it, expect } from 'vitest';
-import { typeLabelStamp, PROJECT_LABEL, CAPTURE_TYPES } from '../../src/backlog/mappings.js';
+import {
+  typeLabelStamp,
+  PROJECT_LABEL,
+  CAPTURE_TYPES,
+  severityToPriority,
+} from '../../src/backlog/mappings.js';
 
 describe('typeLabelStamp (capture, T009)', () => {
   it('bug → [agent-found, type:bug]', () => {
@@ -23,5 +28,21 @@ describe('typeLabelStamp (capture, T009)', () => {
 
   it('an unknown type is rejected (fail-loud, not silently stamped)', () => {
     expect(() => typeLabelStamp('nonsense')).toThrow(/type/i);
+  });
+});
+
+describe('severityToPriority (slush migration, T021)', () => {
+  it('MEDIUM → medium (case-insensitive)', () => {
+    expect(severityToPriority('MEDIUM')).toBe('medium');
+    expect(severityToPriority('medium')).toBe('medium');
+  });
+
+  it('LOW → low', () => {
+    expect(severityToPriority('LOW')).toBe('low');
+  });
+
+  it('a HIGH reaching the mapping throws — HIGHs are never slushed (FR-018)', () => {
+    expect(() => severityToPriority('HIGH')).toThrow(/never slushed|high/i);
+    expect(() => severityToPriority('blocking')).toThrow();
   });
 });

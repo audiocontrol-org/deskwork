@@ -10,9 +10,9 @@
 // import-github (T019), import-slush (T024) wire their handlers in their phases.
 
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { createBacklogBackend, BacklogError } from '../backlog/backend.js';
+import { backlogRoot } from '../backlog/root.js';
 import { CAPTURE_TYPES, isCaptureType, typeLabelStamp } from '../backlog/mappings.js';
 import {
   importGithub,
@@ -20,24 +20,15 @@ import {
   readGhIssues,
   type GithubIssue,
 } from '../backlog/github-import.js';
+import { backfillSlush } from '../backlog/slush-migrate.js';
+import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
+import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
 import {
   failUsage,
   requireMapValue,
   requirePositional,
   scanVerbFlags,
 } from './document-verb-shared.js';
-
-const here = dirname(fileURLToPath(import.meta.url));
-
-/**
- * The dir whose `backlog/` tree the binary operates on. Defaults to the
- * plugin-bundled root (the in-repo dogfood, mirroring inbox/roadmap defaulting
- * to the bundled doc); `STACKCTL_BACKLOG_DIR` overrides it — the test seam, and
- * the adopter override until `design:gap/project-relative-doc-discovery` lands.
- */
-function backlogRoot(): string {
-  return process.env.STACKCTL_BACKLOG_DIR ?? resolve(here, '..', '..');
-}
 
 interface Flags {
   readonly apply: boolean;
@@ -141,6 +132,42 @@ function emitImportGithub(flags: Flags): void {
   }
 }
 
+/** Resolve the feature's audit-log: a test seam reads/writes a file directly;
+ * otherwise resolve docs/<v>/001-IN-PROGRESS/<slug>/audit-log.md. */
+async function resolveAuditLog(featureSlug: string): Promise<{ path: string; text: string }> {
+  const seam = process.env.STACKCTL_AUDIT_LOG_FILE;
+  if (seam !== undefined) {
+    if (!existsSync(seam)) failUsage('backlog', `audit-log file not found: ${seam}`);
+    return { path: seam, text: readFileSync(seam, 'utf8') };
+  }
+  const { root } = await resolveFeatureRoot({ repoRoot: process.cwd(), slug: featureSlug });
+  if (root === undefined) failUsage('backlog', `feature '${featureSlug}' not found under docs/*/001-IN-PROGRESS/`);
+  const path = join(root, 'audit-log.md');
+  if (!existsSync(path)) failUsage('backlog', `audit-log not found at ${path}`);
+  return { path, text: readFileSync(path, 'utf8') };
+}
+
+/** One-time backfill of acknowledged-slush-pile entries into the pile (US4). */
+async function emitImportSlush(flags: Flags): Promise<void> {
+  const root = backlogRoot();
+  requireProject(root);
+  const featureSlug = requireMapValue('backlog', flags.values, 'feature');
+  const { path, text } = await resolveAuditLog(featureSlug);
+  const backend = createBacklogBackend({ cwd: root });
+  const res = backfillSlush({ auditLogText: text, backend, featureSlug, apply: flags.apply });
+  if (flags.apply && res.result !== undefined) {
+    await atomicWriteFile(path, res.newAuditLogText);
+    process.stdout.write(
+      `backlog import-slush: migrated ${res.result.migrated.length}, skipped ${res.result.skipped.length} (already migrated)\n`,
+    );
+  } else {
+    process.stdout.write(
+      `backlog import-slush: dry-run — would migrate ${res.planned.length} parked finding(s) (use --apply to write)\n`,
+    );
+    for (const id of res.planned) process.stdout.write(`  - ${id}\n`);
+  }
+}
+
 /** Read-only: print each item's id + status + type. Never writes. */
 function emitList(): void {
   const root = backlogRoot();
@@ -173,6 +200,9 @@ export async function runBacklogCli(args: string[]): Promise<void> {
         return;
       case 'import-github':
         emitImportGithub(flags);
+        return;
+      case 'import-slush':
+        await emitImportSlush(flags);
         return;
       default:
         failUsage(

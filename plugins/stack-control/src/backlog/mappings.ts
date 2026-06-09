@@ -26,6 +26,24 @@ export function typeLabel(type: string): string {
 }
 
 /**
+ * Map a parked audit-finding's severity to a backlog priority (US4). Only
+ * MEDIUM/LOW (and lower — informational/unspecified) findings are ever parked;
+ * a HIGH/blocking severity reaching this mapping is a fail-loud invariant
+ * breach (HIGHs are NEVER slushed, FR-018) and throws (Principle V). Unknown /
+ * informational / unspecified severities map to the lowest priority rather than
+ * dropping the migrate.
+ */
+export function severityToPriority(severity: string | undefined): 'medium' | 'low' {
+  const s = (severity ?? '').toLowerCase();
+  if (s === 'high' || s === 'blocking') {
+    throw new Error(
+      `severity '${severity}' is HIGH/blocking and must never reach the priority mapping — HIGHs are never slushed (FR-018)`,
+    );
+  }
+  return s === 'medium' ? 'medium' : 'low';
+}
+
+/**
  * Map a capture type to the backlog labels: the project label + the `type:<t>`
  * label. Fail-loud on an unknown type (Principle V) — never silently stamp a
  * bogus type.

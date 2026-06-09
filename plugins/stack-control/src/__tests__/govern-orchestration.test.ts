@@ -11,6 +11,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, rmSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveTsx, CLI } from './_run-helpers.js';
+import { tmpBacklog } from '../../tests/backlog/helpers.js';
 
 // A fake barrage bin that satisfies the render/barrage/lift verbs the protocol
 // shells out to. It ignores all flags except the few it needs:
@@ -78,7 +79,9 @@ function makeRepo(slug: string): string {
 function runGovern(args: string[], env: Record<string, string>) {
   return spawnSync(resolveTsx(), [CLI, 'govern', ...args], {
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    // Isolate the backlog destination of govern's slush step (008 rewire) to a
+    // fresh tmp dir so no govern test ever writes the committed dogfood pile.
+    env: { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog(), ...env },
   });
 }
 
@@ -166,8 +169,9 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
       );
       expect(r.status).toBe(0);
       const t = readFileSync(log, 'utf8');
-      // the earlier run's MEDIUM must be slushed by the convergence (scope=all) slush
-      expect(t).toMatch(/AUDIT-20260607-01[\s\S]*?Status:\s+acknowledged-slush-pile-/);
+      // the earlier run's MEDIUM must be routed to the backlog by the convergence
+      // (scope=all) slush — 008 rewire: migrated-to-backlog, not acknowledged-slush-pile
+      expect(t).toMatch(/AUDIT-20260607-01[\s\S]*?Status:\s+migrated-to-backlog TASK-\d+/);
       // 0 open MEDIUM anywhere in the checkpoint at graduation (SC-007 absolute)
       expect(t).not.toMatch(/Severity:\s+medium[\s\S]*?Status:\s+open/i);
       expect(t).not.toMatch(/Status:\s+open[\s\S]*?Severity:\s+medium/i);
