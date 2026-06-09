@@ -9,6 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadDocument } from '../document-model/document.js';
 import { DocumentModelError } from '../document-model/types.js';
+import { capture, type CaptureInput, type MutationResult } from '../inbox/mutations.js';
 import { failUsage, grammarDirs } from './document-verb-shared.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -31,8 +32,9 @@ interface SubactionSpec {
 }
 
 // `--doc` is universal (allowed everywhere) and handled separately from `values`.
-// capture/promote/drop specs are added by US1/US2 as those subactions are wired.
+// promote/drop specs are added by US2 as those subactions are wired.
 const SUBACTION_SPECS: Readonly<Record<string, SubactionSpec>> = {
+  capture: { valueFlags: ['idea', 'surfaced', 'context', 'home'], apply: true, positionals: 1 },
   list: { valueFlags: [], apply: false, positionals: 0 },
 };
 
@@ -80,6 +82,40 @@ function validateFlags(subaction: string, flags: Flags): void {
   }
 }
 
+/** The first positional, failing usage with a subaction-specific message. */
+function requireId(flags: Flags, subaction: string): string {
+  const id = flags.positionals[0];
+  if (id === undefined) failUsage('inbox', `${subaction} requires a <title> positional`);
+  return id;
+}
+
+/** Require a named `--<flag> <value>`. */
+function requireValue(flags: Flags, name: string): string {
+  const v = flags.values.get(name);
+  if (v === undefined) failUsage('inbox', `--${name} <value> required`);
+  return v;
+}
+
+function reportMutation(result: MutationResult, verb: string, id: string): void {
+  process.stdout.write(
+    result.applied
+      ? `inbox ${verb}: ${id}\n`
+      : `inbox ${verb}: dry-run — would ${verb} ${id} (use --apply to write)\n`,
+  );
+}
+
+function emitCapture(flags: Flags): void {
+  const title = requireId(flags, 'capture');
+  const input: CaptureInput = {
+    title,
+    idea: requireValue(flags, 'idea'),
+    surfaced: flags.values.get('surfaced'),
+    context: flags.values.get('context'),
+    home: flags.values.get('home'),
+  };
+  reportMutation(capture(flags.doc, input, grammarDirs(), flags.apply), 'capture', title);
+}
+
 /** Read-only: print each entry's identifier + status. Never writes. */
 function emitList(flags: Flags): void {
   const { doc } = loadDocument(flags.doc, grammarDirs());
@@ -98,6 +134,9 @@ export async function runInboxCli(args: string[]): Promise<void> {
   validateFlags(subaction, flags);
   try {
     switch (subaction) {
+      case 'capture':
+        emitCapture(flags);
+        return;
       case 'list':
         emitList(flags);
         return;

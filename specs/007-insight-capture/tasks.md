@@ -27,11 +27,11 @@
 **Goal**: capture an idea in one move; add-time whole-document re-validation; zero-write-on-failure.
 **Independent test**: quickstart Scenario 1 (SC-001/002/003).
 
-- [ ] T007 [US1] RED: `tests/inbox/mutations-capture.test.ts` — `capture()` appends a `captured` entry and the doc still validates; duplicate identifier → throws + zero write; empty/whitespace idea → throws; dry-run writes nothing; **capturing leaves pre-existing entries byte-identical (FR-006 — multiple threads held at once, one capture doesn't disturb others)**
-- [ ] T008 [US1] Implement `capture(docPath, input, opts, apply)` in `src/inbox/mutations.ts` — build a `### <title>` section (status `captured`; optional Surfaced/Context/Idea/Provisional-home body fields; reject empty title/idea) and commit via the T004 helper. Make T007 green
-- [ ] T009 [US1] RED: capture verb cases in `tests/inbox/verb-inbox.test.ts` (via `runCli`) — `inbox capture "<title>" --idea … --apply` → exit 0 + entry present; missing `<title>` or `--idea` → exit 2; duplicate → exit 2 + zero write; dry-run → exit 0 + unchanged
-- [ ] T010 [US1] Wire the `capture` subaction into `src/subcommands/inbox.ts` (positional `<title>`; flags `--idea`/`--surfaced`/`--context`/`--home`; dispatch to `capture()`). Make T009 green
-- [ ] T011 [US1] Checkpoint: run quickstart Scenario 1 against a scratch inbox copy; confirm capture + duplicate-refusal + dry-run all behave
+- [X] T007 [US1] RED: `tests/inbox/mutations-capture.test.ts` — `capture()` appends a `captured` entry and the doc still validates; duplicate identifier → throws + zero write; empty/whitespace idea → throws; dry-run writes nothing; **capturing leaves pre-existing entries byte-identical (FR-006 — multiple threads held at once, one capture doesn't disturb others)**
+- [X] T008 [US1] Implement `capture(docPath, input, opts, apply)` in `src/inbox/mutations.ts` — build a `### <title>` section (status `captured`; optional Surfaced/Context/Idea/Provisional-home body fields; reject empty title/idea) and commit via the T004 helper. Make T007 green
+- [X] T009 [US1] RED: capture verb cases in `tests/inbox/verb-inbox.test.ts` (via `runCli`) — `inbox capture "<title>" --idea … --apply` → exit 0 + entry present; missing `<title>` or `--idea` → exit 2; duplicate → exit 2 + zero write; dry-run → exit 0 + unchanged
+- [X] T010 [US1] Wire the `capture` subaction into `src/subcommands/inbox.ts` (positional `<title>`; flags `--idea`/`--surfaced`/`--context`/`--home`; dispatch to `capture()`). Make T009 green
+- [X] T011 [US1] Checkpoint: ran quickstart Scenario 1 against a scratch copy of the governed inbox — capture (exit 0, entry `captured`), duplicate refusal (exit 2, byte-for-byte unchanged = SC-002), dry-run (exit 0, unchanged). ✅
 
 ## Phase 4: User Story 2 — Triage & graduation (Priority: P2)
 

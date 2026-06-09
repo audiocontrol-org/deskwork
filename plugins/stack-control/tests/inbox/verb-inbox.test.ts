@@ -57,3 +57,56 @@ describe('stackctl inbox list (T016/T017, pulled into Foundational)', () => {
     expect(r.status).toBe(2);
   });
 });
+
+describe('stackctl inbox capture verb (T009)', () => {
+  it('--apply captures an entry in one move → exit 0 + entry present', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const r = runCli([
+      'inbox', 'capture', 'Remote capture from phone',
+      '--idea', 'Capture inbox entries from the control-plane frontend',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(0);
+    expect(readFileSync(docPath, 'utf8')).toContain('### Remote capture from phone');
+    const list = runCli(['inbox', 'list', '--doc', docPath]);
+    expect(list.stdout).toContain('Remote capture from phone');
+  });
+
+  it('missing <title> positional → exit 2', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli(['inbox', 'capture', '--idea', 'x', '--doc', docPath, '--apply']);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('missing --idea → exit 2', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli(['inbox', 'capture', 'No idea given', '--doc', docPath, '--apply']);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('duplicate title → exit 2, zero write', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'inbox', 'capture', 'Try a TUI inbox view',
+      '--idea', 'dup', '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('dry-run (no --apply) → exit 0, inbox unchanged', () => {
+    const docPath = tmpCopy('sample-inbox');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'inbox', 'capture', 'Dry idea', '--idea', 'x', '--doc', docPath,
+    ]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('Dry idea');
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+});
