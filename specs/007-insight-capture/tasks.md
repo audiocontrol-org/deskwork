@@ -26,7 +26,7 @@
 **Goal**: capture an idea in one move; add-time whole-document re-validation; zero-write-on-failure.
 **Independent test**: quickstart Scenario 1 (SC-001/002/003).
 
-- [ ] T007 [US1] RED: `tests/inbox/mutations-capture.test.ts` — `capture()` appends a `captured` entry and the doc still validates; duplicate identifier → throws + zero write; empty/whitespace idea → throws; dry-run writes nothing
+- [ ] T007 [US1] RED: `tests/inbox/mutations-capture.test.ts` — `capture()` appends a `captured` entry and the doc still validates; duplicate identifier → throws + zero write; empty/whitespace idea → throws; dry-run writes nothing; **capturing leaves pre-existing entries byte-identical (FR-006 — multiple threads held at once, one capture doesn't disturb others)**
 - [ ] T008 [US1] Implement `capture(docPath, input, opts, apply)` in `src/inbox/mutations.ts` — build a `### <title>` section (status `captured`; optional Surfaced/Context/Idea/Provisional-home body fields; reject empty title/idea) and commit via the T004 helper. Make T007 green
 - [ ] T009 [US1] RED: capture verb cases in `tests/inbox/verb-inbox.test.ts` (via `runCli`) — `inbox capture "<title>" --idea … --apply` → exit 0 + entry present; missing `<title>` or `--idea` → exit 2; duplicate → exit 2 + zero write; dry-run → exit 0 + unchanged
 - [ ] T010 [US1] Wire the `capture` subaction into `src/subcommands/inbox.ts` (positional `<title>`; flags `--idea`/`--surfaced`/`--context`/`--home`; dispatch to `capture()`). Make T009 green
@@ -37,7 +37,7 @@
 **Goal**: promote (record target, reuse creators) / drop (record reason); reuse existing curate/archive for lean-keeping.
 **Independent test**: quickstart Scenario 2 (SC-005).
 
-- [ ] T012 [P] [US2] RED: `tests/inbox/mutations-promote-drop.test.ts` — `promote()` sets status `promoted` + records the target reference; `drop()` sets `dropped` + records the reason; absent entry → throws; already-terminal entry → throws; zero-write on any failure
+- [ ] T012 [P] [US2] RED: `tests/inbox/mutations-promote-drop.test.ts` — `promote()` sets status `promoted` + records the target reference; `drop()` sets `dropped` + records the reason; absent entry → throws; already-terminal entry → throws; zero-write on any failure; **`promote` only RECORDS the target reference — it does NOT create or validate the target artifact (FR-014/FR-012, record-and-reuse; the target need not exist in the inbox)**
 - [ ] T013 [US2] Implement `promote()` + `drop()` in `src/inbox/mutations.ts` (advance-style: rewrite the design-inbox `**Status:**` bullet — note its grammar-specific shape, see research D3 — and append the target/reason body line; commit via T004 helper). Make T012 green
 - [ ] T014 [US2] RED: promote/drop verb cases in `tests/inbox/verb-inbox.test.ts` — `inbox promote "<title>" --to <ref> --apply` → exit 0; `inbox drop "<title>" --reason … --apply` → exit 0; missing `--to`/`--reason` → exit 2; absent/terminal entry → exit 2 + zero write
 - [ ] T015 [US2] Wire `promote` + `drop` subactions into `src/subcommands/inbox.ts`. Make T014 green
