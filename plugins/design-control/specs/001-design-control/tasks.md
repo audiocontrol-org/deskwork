@@ -104,6 +104,19 @@ verbatim in substance** — when they drift, the PRD wins.
       denylist would leak them — round-9). Applies to TEXT nodes only; class values stay inert
       (axis-1). 16 tests incl. the planted Math-bold heading + emoji-as-icon rejections and the
       example wireframe passing.
+- [x] **[backlog TASK-7 + TASK-1, selected 2026-06-10]** Derive `URL_ATTRS` from URL-tagged
+      allowlist entries (AUDIT-20260606-07 structural fix, ex-#428): the allowlist declares each
+      attr's kind (`plain`/`url`) at a single point; `URL_ATTRS` is computed, so an allowlisted
+      URL-bearing attr cannot silently skip value scanning. TDD: behavioral test loops every
+      url-kind (tag, attr) pair through the lint with planted `javascript:`/`data:`/external
+      values and expects findings (the allowlist→scanning direction TASK-1 names).
+      **Done — `74b824cc`** (RED: 5 failures on the missing export; GREEN: kind-tagged specs +
+      derived exports; 6 new tests, export shapes unchanged).
+- [x] **[backlog TASK-2, selected 2026-06-10]** Direct case-mangled-SRI-payload test
+      (AUDIT-20260606-21): plant a wrong-case base64 payload, assert `stylesheet-sri-mismatch`;
+      verify non-vacuous via a payload-lowercasing mutation check before trusting it.
+      **Done — `ec6308cb`** (mutation-verified both directions; the case-insensitive-compare
+      mutation is caught by exactly this test and nothing else).
 - [ ] Adversarial validator: the lint MUST reject inline-style / `<style>` / `<script>` / `data:`
       / external-resource / presentational-attr leakage AND emoji-as-icon AND `𝐌𝐚𝐭𝐡`-bold-heading
       text leakage. Grandfather allowlist entries require an issue link + expiry.

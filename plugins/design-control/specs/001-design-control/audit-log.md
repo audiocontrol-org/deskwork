@@ -308,7 +308,7 @@ The round-1 fix's code/test comments labeled mixed-rel as `AUDIT-20260606-01/cod
 ### AUDIT-20260606-07 — Invariant test + audit-log claim guard only the resource-attr direction, leaving AUDIT-04's own `a ping` example unprotected
 
 Finding-ID: AUDIT-20260606-07 (claude-01; codex CLEAN — convergence signature)
-Status:     migrated-to-backlog TASK-1 (2026-06-10; was acknowledged-slush-pile-2026-06-06)
+Status:     fixed-74b824cc (2026-06-10; via backlog TASK-1+TASK-7, operator-selected; was migrated-to-backlog TASK-1)
 Severity:   low
 Surface:    plugins/design-control/src/__tests__/lint/check-mockup-lofi.test.ts (coverage test); plugins/design-control/src/lint/allowlist.ts (URL_ATTRS doc)
 
@@ -493,7 +493,7 @@ Informational (no live bug): `buildSketchKitPin` is the only constructor of a pi
 ### AUDIT-20260606-21 — Base64-case-preservation — the central novel behavior of `normalizeSriToken` — is only incidentally tested; no test directly asserts a wrong-case payload is rejected
 
 Finding-ID: AUDIT-20260606-21
-Status:     migrated-to-backlog TASK-2 (2026-06-10; was acknowledged-slush-pile-2026-06-06)
+Status:     fixed-ec6308cb (2026-06-10; via backlog TASK-2, operator-selected; was migrated-to-backlog TASK-2)
 Severity:   low
 Surface:    plugins/design-control/src/__tests__/lint/stylesheet-pin.test.ts:171-191 (and the helper at plugins/design-control/src/lint/stylesheet-pin.ts:80-86)
 
