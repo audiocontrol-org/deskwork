@@ -278,6 +278,16 @@ At session start, an advisory check compares each locally-sourced `.specify` ext
 - **Succession + enforcement rules** — `.claude/rules/stack-control-succession.md` (isolation invariant) and `.claude/rules/enforcement-lives-in-skills.md` (enforcement fires from skill bodies + CLI verbs, never git hooks).
 - **Subsumption to reconcile** — `design:gap/project-relative-doc-discovery` (009 T034 surfaced it as likely subsumed); confirm no overlap with this feature's config resolution before duplicating it.
 
+## Migration boundary — explicitly out of scope for THIS feature
+
+To prevent a future session from re-migrating already-done or differently-owned code (the "coral reef around the as-built shape" hazard), the boundary is stated here in the durable spec, not only in research:
+
+- **Already migrated — do NOT re-migrate:** the audit-barrage cross-model audit, the promote-findings dampener/checkpoint-filter/extract/slush machinery, and the shared `util` helpers already present under `plugins/stack-control/src/scope-discovery/`.
+- **Different ownership — NOT this feature (belongs to the audit-barrage/govern migration):** the audit-finding orchestration loop — controller, orchestrator-loop, mediation, escalation, recovery, the LLM auditor/judge, and the remainder of promote-findings (apply, audit-log editor/walker, auto-flip/auto-position, close-shipped, cross-reference, proposal-file, substantive-reason, tdd-enforcement, workplan editors) — plus the workplan-archive and tooling-feedback-import tooling.
+- **Dropped entirely (per OQ-6):** the hook-install machinery, agent-prompt-mirror installers, the pilot-migration helper, and the hook-uninstall helper.
+
+This boundary is a *requirement* of the migration, not merely a tactical note (CHK003): the feature is "the clone-detection + discovery + registry + dispatch-wrapper + install/doctor surface," and nothing in the three buckets above.
+
 ## Open Questions *(for /speckit-clarify)*
 
 - **OQ-1 — Migration semantics confirmation.** ✅ RESOLVED (Session 2026-06-09): vendor/copy. `dw-lifecycle` keeps a fully-working copy (tests/baselines must not break — SC-010) until a separate feature retires it wholesale; never a destructive move.
