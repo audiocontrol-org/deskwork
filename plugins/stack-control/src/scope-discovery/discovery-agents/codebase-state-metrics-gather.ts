@@ -185,8 +185,9 @@ export async function gatherMetricsInput(
 
   // -- Git history -----------------------------------------------------------
   const noGit = args.noGitHistory === true;
+  const emptyCommits: CommitEdit[] = [];
   const gitResult = noGit
-    ? { available: false, commits: [] as CommitEdit[] }
+    ? { available: false, commits: emptyCommits }
     : readGitHistory(args.repoRoot, lookback);
 
   // -- Scan runs + disposition transitions ----------------------------------

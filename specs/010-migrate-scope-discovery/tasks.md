@@ -169,15 +169,15 @@ description: "Task list — Migrate scope-discovery into stack-control"
 
 ## Phase 11: Polish & cross-cutting
 
-- [ ] T072 [P] SC-010 verification: run `dw-lifecycle`'s own scope-discovery tests + a `check-clones` in its tree; assert its baseline/config are byte-for-byte unchanged (quickstart Scenario 9).
-- [ ] T073 [P] SC-009 verification: run every migrated verb in a plain shell with no Claude Code surface (quickstart Scenario 10).
-- [ ] T074 [P] `tsc` strict + lint clean (no `any`/`as`/`@ts-ignore`); confirm every new source file ≤500 lines (Principle VI; R4 splits landed).
-- [ ] T075 [P] FR-004 ledger: record per-component whether it ported verbatim/generalized or rebuilt native, in `specs/010-migrate-scope-discovery/port-ledger.md`.
-- [ ] T076 [P] Update `plugins/stack-control/README.md` + the new SKILL.md files documenting the scope-discovery verbs, the per-codebase-default behavior, and the `.stack-control/scope-discovery/` config contract.
-- [ ] T077 Promote the "Captured for future expansion" items (v2 agents, cross-language, studio surface, cross-repo rollup, Agent-intercept) to first-class roadmap/backlog entries (operator tracking requirement; spec § "Captured for future expansion").
-- [ ] T078 Reconcile `design:gap/project-relative-doc-discovery` subsumption (CHK033) — confirm no duplicate config-resolution; record the decision for `roadmap reconcile`.
-- [ ] T079 Note the retirement of the interim `.dw-lifecycle/scope-discovery/clone-snapshot.sh` stopgap now that the full per-codebase detector ships (do not delete dw-lifecycle's; document that stack-control no longer needs the snapshot path).
-- [ ] T081 [P] RED: `__tests__/scope-discovery/subcommand-flag-validation.test.ts` — every migrated subcommand rejects an unknown/malformed flag with a fail-loud error (contracts § "each subcommand validates its own flags — no flag silently ignored"); covers the CLI-surface invariant the integration tests exercise only indirectly. (Analyze remediation V2.)
+- [X] T072 [P] SC-010 verification: run `dw-lifecycle`'s own scope-discovery tests + a `check-clones` in its tree; assert its baseline/config are byte-for-byte unchanged (quickstart Scenario 9).
+- [X] T073 [P] SC-009 verification: run every migrated verb in a plain shell with no Claude Code surface (quickstart Scenario 10).
+- [X] T074 [P] `tsc` strict + lint clean (no `any`/`as`/`@ts-ignore`); confirm every new source file ≤500 lines (Principle VI; R4 splits landed).
+- [X] T075 [P] FR-004 ledger: record per-component whether it ported verbatim/generalized or rebuilt native, in `specs/010-migrate-scope-discovery/port-ledger.md`.
+- [X] T076 [P] Update `plugins/stack-control/README.md` + the new SKILL.md files documenting the scope-discovery verbs, the per-codebase-default behavior, and the `.stack-control/scope-discovery/` config contract.
+- [X] T077 Promote the "Captured for future expansion" items (v2 agents, cross-language, studio surface, cross-repo rollup, Agent-intercept) to first-class roadmap/backlog entries (operator tracking requirement; spec § "Captured for future expansion").
+- [X] T078 Reconcile `design:gap/project-relative-doc-discovery` subsumption (CHK033) — confirm no duplicate config-resolution; record the decision for `roadmap reconcile`.
+- [X] T079 Note the retirement of the interim `.dw-lifecycle/scope-discovery/clone-snapshot.sh` stopgap now that the full per-codebase detector ships (do not delete dw-lifecycle's; document that stack-control no longer needs the snapshot path).
+- [X] T081 [P] RED: `__tests__/scope-discovery/subcommand-flag-validation.test.ts` — every migrated subcommand rejects an unknown/malformed flag with a fail-loud error (contracts § "each subcommand validates its own flags — no flag silently ignored"); covers the CLI-surface invariant the integration tests exercise only indirectly. (Analyze remediation V2.)
 
 ---
 
