@@ -261,6 +261,42 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// AUDIT-20260610-62 (round-18 gpt-5-01, HIGH): start="0" reversed counts DOWN
+// through NEGATIVE markers (0., -1., -2., …) — generated punctuation columns
+// reopening the channel the digits-only rule (AUDIT-54) claimed closed. A
+// reversed list with an explicit start must not run below 1.
+describe('check-mockup-lofi — reversed list numbering (AUDIT-20260610-62)', () => {
+  it('rejects reversed start=0 with more items than start (round-18 input)', () => {
+    expect(
+      rules(wrap(`<ol start="0" reversed><li></li><li></li><li></li><li></li><li></li></ol>`)),
+    ).toContain('list-numbering');
+  });
+  it('accepts a reversed countdown that stays positive (start >= items)', () => {
+    expect(rules(wrap(`<ol start="5" reversed><li>a</li><li>b</li><li>c</li></ol>`))).toEqual([]);
+  });
+  it('accepts a default-start reversed list (numbers n..1)', () => {
+    expect(rules(wrap(`<ol reversed><li>a</li><li>b</li></ol>`))).toEqual([]);
+  });
+});
+
+// AUDIT-20260610-64 (round-18 gpt-5-03, LOW fp): reset is the same native
+// form class as submit/button.
+describe('check-mockup-lofi — reset input (AUDIT-20260610-64)', () => {
+  it('accepts input type=reset', () => {
+    expect(rules(wrap(`<form><input type="reset" value="Reset filters"></form>`))).toEqual([]);
+  });
+});
+
+// AUDIT-20260610-63 (round-18 gpt-5-02, MED) — BOUNDARY recurrence: UA default
+// LINK styling (blue/underline) is the same unstyled-baseline class as native
+// control chrome (clause 2). Pinned by fixture; clause wording generalized to
+// UA default rendering of semantic HTML.
+describe('check-mockup-lofi — UA link styling boundary (AUDIT-20260610-63)', () => {
+  it('BOUNDARY (documented): a bare external nav link passes (UA default link rendering)', () => {
+    expect(rules(wrap(`<p><a href="https://example.com/pricing">View pricing</a></p>`))).toEqual([]);
+  });
+});
+
 // AUDIT-20260610-60 (round-17 gpt-5-01, HIGH): the round-15 percent-decode
 // COMPOSED with the round-8 backslash rule into an ordering bug — the lint
 // decoded %5C to \ and then treated it as a separator, but the browser splits

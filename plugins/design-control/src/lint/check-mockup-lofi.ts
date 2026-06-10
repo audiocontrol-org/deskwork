@@ -21,7 +21,8 @@
  *   statistics — heuristics here are the whack-a-mole the round-7 allowlist
  *   pivot abolished. The cross-model referee's gross-class imagery judgment
  *   (PRD § referee, gross classes 5–7) owns this class.
- * - UA DEFAULT CHROME (AUDIT-26/-30): browser-native control rendering is the
+ * - UA DEFAULT RENDERING of semantic HTML (AUDIT-26/-30; links per -63):
+ *   browser-native control chrome AND default link/heading styling are the
  *   definitional UNSTYLED baseline, not author-supplied polish; kit styling
  *   for controls is kit-completeness work (backlog TASK-18), not a lint gap.
  * - COMPOSITION OF SANCTIONED ATOMS (AUDIT-48, round-13 — the general form):
@@ -390,6 +391,29 @@ function checkElement(el: Element, ctx: WalkContext): void {
       // href), not <a> navigation links.
       if (RESOURCE_URL_ATTRS[tag]?.has(attr) && EXTERNAL_URL_RE.test(value)) {
         findings.push({ rule: 'external-resource', tag, attr, message: `external resource URL in ${attr} on <${tag}> is rejected` });
+      }
+    }
+  }
+
+  // A reversed list with an explicit start must not run below 1
+  // (AUDIT-20260610-62): start="0" reversed renders 0., -1., -2. — generated
+  // NEGATIVE punctuation markers reopening the AUDIT-54 channel.
+  if (tag === 'ol') {
+    const attrs = ta.getAttrList(el);
+    const reversed = attrs.some((a) => a.name.toLowerCase() === 'reversed');
+    const startRaw = attrs.find((a) => a.name.toLowerCase() === 'start')?.value;
+    if (reversed && startRaw !== undefined && /^\d+$/.test(startRaw.trim())) {
+      const start = Number(startRaw.trim());
+      const itemCount = el.childNodes.filter(
+        (n) => ta.isElementNode(n) && ta.getTagName(n).toLowerCase() === 'li',
+      ).length;
+      if (start - itemCount + 1 < 1) {
+        findings.push({
+          rule: 'list-numbering',
+          tag,
+          attr: 'start',
+          message: `reversed list with start="${startRaw}" and ${itemCount} items counts down past 1 (negative "-N." markers are a generated-punctuation channel)`,
+        });
       }
     }
   }

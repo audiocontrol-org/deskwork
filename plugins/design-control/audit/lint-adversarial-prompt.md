@@ -36,8 +36,9 @@ the appended source for the exact rules.
    image arises from GRID placement under prose dilution (geometry is invisible
    to content statistics). A text-art finding is in scope ONLY if it is a
    PUNCTUATION FLOW variant slipping the density gates.
-2. **UA default chrome.** Browser-native control rendering (button / checkbox /
-   radio / input widgets) is the definitional UNSTYLED baseline, not
+2. **UA default rendering of semantic HTML.** Browser-native control chrome
+   (button / checkbox / radio / input widgets) AND default link/heading/list
+   styling (blue underlined links etc.) are the definitional UNSTYLED baseline, not
    author-supplied polish. Kit styling for controls is tracked kit-completeness
    work, not a lint gap. A native-chrome finding is in scope ONLY if it shows
    author-shippable styling riding the controls (attributes/values the lint
