@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deskwork/dw-lifecycle/schema/refactor-markers.yaml.schema.json",
+  "title": "Refactor-Context Markers (Dispatch-Wrapper Override)",
+  "description": "Project-supplied override of the built-in refactor-marker regex list used by the dispatch-wrapper. When .dw-lifecycle/scope-discovery/refactor-markers.yaml exists, the supplied `markers:` list REPLACES the wrapper's built-in defaults (does not merge — the project owns the full list). A marker match on the task prompt causes the wrapper to append the REFACTOR_PRECONDITIONS_CHECKLIST prelude to the dispatched prompt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["markers"],
+  "properties": {
+    "markers": {
+      "description": "Case-insensitive RegExp source strings. Compiled with the 'i' flag by the wrapper. ANY match in the task prompt triggers the refactor-context prelude.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  }
+}

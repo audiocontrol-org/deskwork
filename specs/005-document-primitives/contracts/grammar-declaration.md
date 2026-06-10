@@ -1,0 +1,43 @@
+# Contract: grammar declaration & resolution
+
+How a document becomes **governable** (FR-001, FR-012). This is the contract every governable document and every grammar author conforms to.
+
+## Resolution (per document, fail-loud, no fallback)
+
+The engine resolves a document's grammar in this order; the first hit wins:
+
+1. **Embedded** — an HTML comment block in the document declaring the grammar inline:
+   ```
+   <!-- doc-grammar: peg
+   <peg grammar text…>
+   -->
+   ```
+2. **Frontmatter reference** — `doc-grammar: <id>` in the document's frontmatter, resolved against:
+   1. project override `.stack-control/grammars/<id>.peg`, then
+   2. built-in default `plugins/stack-control/grammars/<id>.peg`.
+3. **Neither present** → **fail loud**: `document declares no grammar; not governable` (exit non-zero, zero writes).
+
+When both an embedded block and a frontmatter reference exist, **embedded wins** (precedence is fixed, not a merge).
+
+## Grammar obligations
+
+A grammar (`.peg` text) is **trusted local config** compiled and run in-process (spec Assumptions — grammar trust model; same model as `.deskwork/*.ts` overrides). It MUST declare, in a form the engine can extract:
+
+- the **Unit production** (what a unit is + its boundaries over the block stream). The Unit MUST be delimited by a **structural marker a Unit body provably cannot contain** (FR-002 boundary rule): a heading-keyed grammar **reserves its Unit-heading level** (bodies carry only strictly-deeper headings; a reserved-level heading always starts a new Unit), a row-keyed grammar uses the table row. This is what makes the Unit's `span` — and later its archive-file extraction (FR-006/FR-007) — unambiguous;
+  - **Row-keyed structural chrome (AUDIT-22 resolution):** for a row-keyed grammar the table's **header row and separator row are chrome, never Units** — the block stream emits the header as a distinct `THEAD` block (separate from each data `ROW` block) and the separator carries no block at all, so the grammar's Unit production matches **data rows only** and the document's own column header never fails loud as an unrecognized block. The archived-Unit table reproduces that header + separator + column schema (FR-006); the engine scans data rows past the separator only (it excludes the header when computing markers).
+- the **status vocabulary** and the **terminal (archivable) subset** (FR-004);
+- the **order key** — expressible over status + human-readable fields, **never** a positional/sequence ordinal (ordering by a category/attribute that also appears in a structured identifier, e.g. roadmap by `phase`, is allowed). When the order key uses a **categorical/enum field**, the grammar MUST also declare an **explicit ordering relation over that field's value domain** — an **ordered enumeration** of its values (e.g. `phase` order = `[design, plan, impl, multi]`, NOT alphabetical); **well-ordered** is defined against that declared relation, **lexicographic is never assumed**, and a categorical order key with no declared relation is a **grammar error** (FR-004);
+- the **identifier production** — a strict slug (`<phase>/<slug>`, recommended) or a title; the engine enforces the FR-005 properties regardless of shape;
+- optionally, a **reconciliation hook** (`kind: command|glob`, `source`) — recorded, not executed (FR-008).
+
+## Engine guarantees to the grammar author
+
+- A malformed grammar produces a **clean, located error** (never a crash) — FR-003/FR-010 (research risk #3).
+- The engine **excises its own chrome before the grammar runs** — the embedded grammar-declaration comment (the HTML comment beginning with the `doc-grammar:` sentinel, FR-001) and the document frontmatter are stripped from the block stream by a pre-parse step (FR-002), so the grammar never sees and never has to account for them. Other HTML comments are ordinary blocks the grammar sees.
+- Prose bodies are **opaque** — the grammar matches block structure, not body prose (FR-002).
+- Identifier-invariant violations are reported against the offending Unit (FR-005).
+
+## Built-in grammars shipped this feature
+
+- `roadmap.peg` — `<phase>/<slug>` identifiers; full status vocabulary `planned`, `in-flight` (active), `shipped`, `cancelled`, `retired` (terminal); order key `phase` with declared ordering relation `[design, plan, impl, multi]` (NOT alphabetical), equal-`phase` tie-break by identifier; **declares a reconciliation hook** (the seam the future roadmap-discipline protocol plugs into — recognized/validated by `curate`, not executed per FR-008) (proof instance #2, FR-013).
+- `design-inbox.peg` — title identifiers; full status vocabulary `captured` (active), `promoted`, `dropped` (terminal); declared ordering relation by status rank `[captured, promoted, dropped]`, equal-status tie-break by identifier (title) (proof instance #1, FR-013).

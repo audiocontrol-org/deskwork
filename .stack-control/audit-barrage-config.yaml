@@ -1,0 +1,37 @@
+# Audit-barrage model battery — project override for graphical-entries.
+#
+# Overrides the plugin default at:
+#   plugins/dw-lifecycle/templates/audit-barrage-config.yaml
+#
+# Disabled gemini effective 2026-06-01 — gemini-cli was failing 94.1% of runs
+# (16 of 17 across the graphical-entries Phase 0 audit cycle) on two cascading
+# error modes: (1) ClassifierStrategy JSON-routing failures in
+# @google/gemini-cli-core/.../baseLlmClient.js#generateJson (retry exhaustion
+# on empty/unparsable JSON); (2) "exhausted your capacity on this model" API
+# quota errors after the routing failure. Stderrs captured under
+# audit-runs/*/stderr/gemini.txt show the consistent pattern. The audit-barrage
+# was effectively a 2/3 fleet (claude + codex) in practice; making that explicit
+# here so the orchestrator's "models attempted" count and the dampener counter
+# don't get polluted by a model that always fails.
+#
+# Re-enable when the gemini-cli upstream fixes the JSON-mode routing
+# reliability OR our gemini account has sustained quota. See
+# https://github.com/audiocontrol-org/deskwork/issues (the LLM-CLI-failure
+# tooling-feedback context).
+
+# Phase 12 Task 8 (#397, 2026-06-04): migrated to {{prompt-stdin}} for
+# both active models. The argv path failed with spawn E2BIG on bootstrap
+# HEAD~N ranges; stdin delivery bypasses the OS per-arg limit. Phase 19's
+# verb path supports {{prompt-stdin}} since v0.32.1 (the cached v0.36.0
+# binary respects this override even though its own plugin default still
+# ships {{prompt}} until v0.37.0).
+
+models:
+  - name: claude
+    binary: claude
+    args_template: "-p {{prompt-stdin}}"
+    timeout_seconds: 300
+  - name: codex
+    binary: codex
+    args_template: "exec {{prompt-stdin}}"
+    timeout_seconds: 300

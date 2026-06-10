@@ -68,7 +68,16 @@ export const ConfigSchema = z.object({
     }),
   session: z
     .object({
-      start: z.object({ preamble: z.string().default('') }).default({ preamble: '' }),
+      start: z
+        .object({
+          preamble: z.string().default(''),
+          // Phase 28 / #422 — branch-staleness nudge threshold for the
+          // session-start advisory. Absent = use the verb's own default
+          // (currently 5). Non-negative integers only; negatives and
+          // fractions fail the Zod parse with an actionable error.
+          branchStalenessThreshold: z.number().int().nonnegative().optional(),
+        })
+        .default({ preamble: '' }),
       end: z.object({ preamble: z.string().default('') }).default({ preamble: '' }),
     })
     .default({ start: { preamble: '' }, end: { preamble: '' } }),

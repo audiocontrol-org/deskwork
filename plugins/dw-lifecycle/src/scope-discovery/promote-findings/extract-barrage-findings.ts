@@ -13,16 +13,26 @@
  * `### <heading>` block followed by `Finding-ID:`, `Status:`,
  * `Severity:`, `Surface:` field lines and a free-form body.
  *
- * Agreement heuristic (mirrors the spirit of
- * `cross-reference-audit-run.ts`):
+ * Agreement heuristic (post-#427 contract; tightened 2026-06-06):
  *
  *   - heading substring overlap of ≥ 12 chars (case-insensitive,
  *     punctuation-stripped) — catches paraphrased findings about the
- *     same root cause; OR
+ *     same root cause; AND
  *   - shared repo-relative path token in the Surface field — catches
- *     findings that name the same file regardless of heading wording.
+ *     findings that name the same file.
+ *
+ * BOTH conditions must hold to draw a cluster edge. The pre-#427 OR
+ * semantic over-merged distinct mechanisms in the same file (the
+ * design-control dogfood surfaced this: five distinct findings in
+ * `allowlist.ts` chained into one cluster via surface alone, with
+ * `mergeCluster` then dropping every non-representative body).
  *
  * Two findings cluster transitively: A↔B + B↔C → {A, B, C}.
+ *
+ * When a cluster has multiple members, `mergeCluster` concatenates every
+ * member's body — labelled by source model — so the merged entry
+ * preserves each model's actionable detail. The pre-#427 behavior kept
+ * only the representative's body.
  *
  * `INDEX.md` and `PROMPT.md` are skipped (they're metadata, not model
  * output). Files that fail to parse any finding blocks emit a warning
@@ -228,7 +238,10 @@ function clusterFindings(
       const fi = rawFindings[i]!;
       const fj = rawFindings[j]!;
       if (fi.model === fj.model) continue;
-      if (headingsAgree(fi.heading, fj.heading) || surfacesAgree(fi.surface, fj.surface)) {
+      // Post-#427: AND-semantic. Both heading + surface must agree to
+      // draw a cluster edge. The pre-#427 OR-edge over-merged distinct
+      // mechanisms that happened to touch the same file.
+      if (headingsAgree(fi.heading, fj.heading) && surfacesAgree(fi.surface, fj.surface)) {
         union(i, j);
       }
     }
@@ -257,11 +270,21 @@ function mergeCluster(cluster: readonly RawModelFinding[]): ExtractedFinding {
       highestSeverity = f.severity;
     }
   }
+  // Post-#427: concatenate every cluster member's body. Single-member
+  // clusters keep the original body verbatim (no label overhead);
+  // multi-member clusters bullet-list each model's perspective so
+  // reviewers see every actionable detail.
+  const body =
+    sortedCluster.length === 1
+      ? representative.body
+      : sortedCluster
+          .map((f) => `- [${f.model}] ${f.body.trim()}`)
+          .join('\n');
   return {
     heading: representative.heading,
     severity: highestSeverity,
     surface: representative.surface,
-    body: representative.body,
+    body,
     sourceModels,
     sourceFindingIds,
     crossModelAgreement: sourceModels.length >= 2,

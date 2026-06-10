@@ -33,7 +33,7 @@
  */
 
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { existsSync, type Dirent } from 'node:fs';
+import { existsSync, realpathSync, type Dirent } from 'node:fs';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -48,6 +48,7 @@ import {
   reportJson,
   reportText,
 } from './anti-patterns-report.js';
+import { FeatureNotFoundError, resolveFeatureScope } from './resolve-feature-scope.js';
 import { toPosix } from './util/glob.js';
 import { errorMessage } from './util/typeguards.js';
 
@@ -83,6 +84,13 @@ export interface CliOptions {
    * terminated. The pre-commit hook wires this flag explicitly.
    */
   readonly gateMode: boolean;
+  /**
+   * Phase 18: per-feature narrowing slug. When set, the scan walks
+   * ONLY feature-scope files (per resolveFeatureScope's hybrid
+   * scope-manifest-or-git-diff source) instead of `--root`. Mutually
+   * exclusive with `--root`. Refs #417.
+   */
+  readonly feature: string | null;
 }
 
 // Re-export shared types so the validator can import everything from
@@ -96,9 +104,11 @@ export type { Finding, ScanResult } from './anti-patterns-report.js';
 export function parseCli(argv: readonly string[]): CliOptions {
   let registryPath = DEFAULT_REGISTRY;
   let scanRoot = DEFAULT_ROOT;
+  let rootExplicit = false;
   let quiet = false;
   let json = false;
   let gateMode = false;
+  let feature: string | null = null;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     switch (arg) {
@@ -113,6 +123,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
         const next = argv[i + 1];
         if (next === undefined) throw new Error('--root requires a path argument');
         scanRoot = next;
+        rootExplicit = true;
         i += 1;
         break;
       }
@@ -125,6 +136,13 @@ export function parseCli(argv: readonly string[]): CliOptions {
       case '--gate-mode':
         gateMode = true;
         break;
+      case '--feature': {
+        const next = argv[i + 1];
+        if (next === undefined) throw new Error('--feature requires a slug argument');
+        feature = next;
+        i += 1;
+        break;
+      }
       case '--help':
       case '-h':
         printHelp();
@@ -134,7 +152,14 @@ export function parseCli(argv: readonly string[]): CliOptions {
         throw new Error(`unknown argument: ${arg}`);
     }
   }
-  return { registryPath, scanRoot, quiet, json, gateMode };
+  if (feature !== null && rootExplicit) {
+    throw new Error(
+      '--feature and --root are mutually exclusive: --feature narrows the scan to ' +
+        "the feature's scope-manifest (or git-diff fallback); --root scans a fixed " +
+        'directory tree. Pass one or the other, not both.',
+    );
+  }
+  return { registryPath, scanRoot, quiet, json, gateMode, feature };
 }
 
 function printHelp(): void {
@@ -272,7 +297,7 @@ function positionToLine(content: string, position: number): number {
 // Top-level scan
 // ---------------------------------------------------------------------------
 
-export async function scan(opts: CliOptions): Promise<ScanResult> {
+export async function scan(opts: CliOptions, fileListOverride?: readonly string[]): Promise<ScanResult> {
   const registry = await loadRegistry(opts.registryPath);
   // filter to actively-enforced entries only.
   // `blessed` and `cursed` entries fire; `pending`, `ignore`,
@@ -295,7 +320,13 @@ export async function scan(opts: CliOptions): Promise<ScanResult> {
   // with the entry id + the missing path so the operator can update
   // `canonical_file:` in one step.
   assertCanonicalFilesExist(activeEntries);
-  const files = await listSourceFiles(opts.scanRoot);
+  // When the caller supplied a pre-resolved file list (Phase 18
+  // `--feature` narrowing), use it directly. Otherwise walk the
+  // `--root` tree as before.
+  const files =
+    fileListOverride === undefined
+      ? await listSourceFiles(opts.scanRoot)
+      : [...fileListOverride].sort();
   const findings: Finding[] = [];
   const cwd = process.cwd();
   for (const file of files) {
@@ -365,9 +396,35 @@ export async function main(argv: readonly string[]): Promise<number> {
     process.stderr.write(`anti-patterns: ${errorMessage(err)}\n`);
     return 2;
   }
+  // Phase 18: when --feature is set, resolve scope and narrow the scan
+  // to feature-scope .ts/.tsx files. Refs #417.
+  let fileListOverride: readonly string[] | undefined;
+  if (opts.feature !== null) {
+    const repoRoot = process.cwd();
+    let canonRepo = repoRoot;
+    try {
+      canonRepo = realpathSync(repoRoot);
+    } catch {
+      /* keep raw if realpath fails */
+    }
+    try {
+      const scope = await resolveFeatureScope({ slug: opts.feature, repoRoot });
+      fileListOverride = scope.files
+        .filter((f) => SCANNED_EXTENSIONS.has(extname(f)))
+        .map((f) => resolve(canonRepo, f))
+        .filter((abs) => existsSync(abs));
+    } catch (err) {
+      if (err instanceof FeatureNotFoundError) {
+        process.stderr.write(`anti-patterns: ${err.message}\n`);
+        return 2;
+      }
+      process.stderr.write(`anti-patterns: ${errorMessage(err)}\n`);
+      return 2;
+    }
+  }
   let result: ScanResult;
   try {
-    result = await scan(opts);
+    result = await scan(opts, fileListOverride);
   } catch (err) {
     process.stderr.write(`anti-patterns: ${errorMessage(err)}\n`);
     return 2;
