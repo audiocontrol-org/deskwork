@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: "Structured slush pile for found-mid-work bugs/gaps, kept deliberately separate from the curated ROADMAP.md. Capture a found bug/gap in ONE move (capture ≠ scope) and return to your task; list the pile; seed it once from open GitHub issues; route audit-barrage parked residuals into it. Triage/inspection delegate to backlog.md's native board/show/cleanup. Wraps `stackctl backlog` (backed by backlog.md)."
+description: "Structured slush pile for found-mid-work bugs/gaps, kept deliberately separate from the curated ROADMAP.md. Capture a found bug/gap in ONE move (capture ≠ scope) and return to your task; list the pile; seed it once from open GitHub issues; route audit-barrage parked residuals into it; promote an item into the feature-rigor tier (record-only) when it earns the full spec-driven treatment. Triage/inspection delegate to backlog.md's native board/show/cleanup. Wraps `stackctl backlog` (backed by backlog.md)."
 ---
 
 # /stack-control:backlog
@@ -20,6 +20,7 @@ Unlike `inbox`/`roadmap` (in-tree governed documents), `backlog` is an **externa
 3. **The pile is separate from the roadmap.** No `backlog` action ever writes `ROADMAP.md`. Reviewing the pile never conflates it with the curated roadmap.
 4. **One pile, three intake sources.** Ongoing agent `capture`, a one-time GitHub-issue snapshot (`import-github`), and audit-barrage parked residuals (`import-slush` + the rewired `slush-findings`) all feed the **same** pile, which is the single burn-down queue.
 5. **Default to capturing.** If unsure whether found work is in scope, capture it and keep going — captures are durable, git-diffable, and cheap; a lost bug is not.
+6. **Promotion is record-only.** When a backlog item earns the full spec-driven treatment, `promote` records the graduation linkage — it never creates the target. Creating the spec / roadmap node / task is a separate, deliberate operator step via the existing creator. This mirrors the inbox `promote` precedent (record, don't create).
 
 ## Capture (one move, mid-task)
 
@@ -75,7 +76,29 @@ plugins/stack-control/bin/stackctl backlog import-slush --feature <slug> --apply
 - **HIGH-severity findings are NEVER slushed/migrated.** Idempotent.
 - Ongoing routing happens automatically via `stackctl slush-findings` (the dampener-engaged path now writes backlog items, not `acknowledged-slush-pile`). `--burn-down` is removed — **working the backlog IS the burn-down**.
 
+## Promote into the feature rigor (record-only)
+
+This is the **seam between the two work-tracking tiers**: the lightweight backlog and the spec-driven feature rigor. When a backlog item earns the full treatment, `promote` records a navigable graduation linkage on the item so the thread is never lost — without creating the target.
+
+```bash
+plugins/stack-control/bin/stackctl backlog promote <item-id> [<item-id>...] \
+  --to <target-ref> [--apply]
+```
+
+- **`--to <target-ref>`** is required. One of three typed graduation targets, chosen per the nature of the item:
+  - `spec:specs/NNN-slug` — graduate to a **new Spec Kit feature spec** (created via [`/stack-control:define`](../define/SKILL.md) → `/speckit-specify`).
+  - `tasks:specs/NNN-slug` — add as a **task inside an existing feature's `tasks.md`** (edited when the task is added).
+  - `roadmap:<phase>:<kind>/<slug>` — graduate to a **roadmap DAG node** (created via [`/stack-control:roadmap`](../roadmap/SKILL.md) `add`).
+- **Record-only** (mirrors the inbox `promote` precedent): writes the `promoted` label + a greppable `- **Promoted-to:** <target-ref>` linkage line on the item, **preserving** every pre-existing label / `gh-<n>` ref / body. It does **not** create the target — that is a separate operator step via the creator above.
+- **Dry-run by default**; `--apply` writes. A dry-run reports the intended linkage and writes nothing.
+- **Pending-create advisory:** the target need not exist on disk yet (record-don't-create). If its path is absent, promote records the link and notes the create step is still pending (advisory, not an error).
+- **Single vs batch:** `spec:` / `roadmap:` are single-item (one item seeds one new feature / node). `tasks:` accepts **N item-ids in one invocation** (batch related items into one feature's `tasks.md`), **all-or-nothing** — if any id is missing or already promoted, the whole batch is refused with zero writes.
+- **Idempotent guard:** re-promoting an already-`promoted` item is refused (no duplicate / conflicting linkage).
+
+**Bidirectional navigability** (record-only side note): promote writes the backlog→target link now. The target→backlog back-reference is recorded **by convention when the target is created** — a new spec notes its origin in Context, a roadmap node carries the `TASK-<n>` ref, a `tasks.md` task line references the originating `TASK-<n>`. See [`/stack-control:roadmap`](../roadmap/SKILL.md) and [`/stack-control:define`](../define/SKILL.md) for the feature/roadmap tier's view of this seam.
+
 ## Exit codes
 
-- `0` — success / no-op (including a dry-run that wrote nothing).
-- `2` — usage error (unknown subaction/flag, missing required value, empty title, invalid type) OR a fail-loud failure: a missing `backlog`/`gh` binary or a non-zero backend exit, with remediation. Never a silent skip or empty success.
+- `0` — success / no-op (including a dry-run that wrote nothing, and a promote recorded against a not-yet-created target).
+- `1` — `promote` runtime fail-loud: a named item does not exist, or the backlog store / a task file is malformed. Zero partial writes.
+- `2` — usage error (unknown subaction/flag, missing required value, empty title, invalid type, a malformed `--to` ref, multiple ids on a non-`tasks:` target, a re-promotion of an already-promoted item) OR a fail-loud failure on the capture/import paths: a missing `backlog`/`gh` binary or a non-zero backend exit, with remediation. Never a silent skip or empty success.
