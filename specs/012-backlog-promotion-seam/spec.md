@@ -19,6 +19,14 @@ The **inbox** tier already established the pattern: `stackctl inbox promote --to
 
 This feature closes that seam and documents the two-tier relationship so the tiers reference each other.
 
+## Clarifications
+
+### Session 2026-06-10
+
+- Q: Which graduation targets should backlog promote support? → A: Three targets, chosen per the nature of the backlog item — a new Spec Kit feature spec, a task inside an existing feature's `tasks.md`, and a roadmap node. (A GitHub-issue round-trip target is out of scope — see Non-Goals.)
+- Q: Should promote create the target, or only record the linkage? → A: Record-only, mirroring the inbox `promote` precedent (creation is a separate operator step).
+- Q: What promotion granularity? → A: Both — a single item → a new feature / roadmap node, AND batching N related items into one existing feature's `tasks.md`.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Promote a backlog item into the feature rigor with a recorded linkage (Priority: P1)
@@ -81,10 +89,10 @@ A new contributor (human or agent) reading the backlog docs can discover how a b
 ### Functional Requirements
 
 - **FR-001**: The system MUST provide a backlog-tier promotion action that graduates a named backlog item toward the feature-rigor tier, mirroring the inbox `promote` precedent.
-- **FR-002**: The system MUST support promotion to the targets [NEEDS CLARIFICATION: which graduation targets are in scope — (a) a new Spec Kit feature spec, (b) a task inside an existing feature's tasks.md, (c) a roadmap node, (d) a GitHub issue round-trip — one, several, or all?].
+- **FR-002**: The system MUST support promotion to three graduation targets, selected per the nature of the backlog item: (a) a new Spec Kit feature spec, (b) a task inside an existing feature's `tasks.md`, and (c) a roadmap DAG node. A GitHub-issue round-trip target is out of scope for this feature (see Non-Goals).
 - **FR-003**: On promotion, the system MUST record the graduation target on the backlog item as a machine-greppable backlink and mark the item `promoted` (a status / label distinct from the existing type and `gh-<n>` ref labels).
-- **FR-004**: The promotion action's relationship to target creation MUST be [NEEDS CLARIFICATION: record-only (write the backlink + status, creation is a separate operator step, mirroring inbox) OR record-and-create (the verb invokes the existing creator)?]. In either case it MUST NOT silently partially apply, and MUST NOT reimplement the target creators.
-- **FR-005**: The system MUST support the promotion granularity [NEEDS CLARIFICATION: single backlog item → a new feature only, OR also batch N related items into one existing feature's tasks.md?].
+- **FR-004**: The promotion action MUST be **record-only**, mirroring the inbox `promote` precedent: it writes the backlink + `promoted` marker on the backlog item and does NOT create the target — creating the target is a separate, deliberate operator step via the existing creator. It MUST NOT reimplement the target creators and MUST NOT silently partially apply.
+- **FR-005**: The system MUST support **both** granularities: a single backlog item → a new feature spec or roadmap node, AND batching N related backlog items into one existing feature's `tasks.md`.
 - **FR-006**: The system MUST be idempotent / guarded on re-promotion of an already-`promoted` item (refuse or no-op with a clear signal — not a duplicate / conflicting linkage), mirroring the inbox terminal-state guard.
 - **FR-007**: The bidirectional linkage MUST be defined: the backlog item records its target, and the target (spec / roadmap node / tasks.md entry) SHOULD record the originating backlog ref so the link is navigable both ways. (Default assumption below; confirm in clarify.)
 - **FR-008**: The action MUST be dry-run by default and write only under an explicit apply flag, consistent with the inbox / backlog / roadmap mutation verbs.
@@ -123,3 +131,4 @@ A new contributor (human or agent) reading the backlog docs can discover how a b
 - Reimplementing Spec Kit authoring (`/speckit-specify` and the downstream chain) or the roadmap engine — this feature wires the backlog into them.
 - Automating the *decision* to promote (triage judgment stays the operator's); the feature mechanizes the *recording* of a promotion the operator has decided to make.
 - A studio / GUI surface for promotion (CLI-first; any GUI is a separate concern).
+- A GitHub-issue round-trip promotion target — deferred. (The #444 / TASK-16 tooling-friction routing policy may later define routing a backlog item back out to a GitHub issue; it is out of scope for this seam.)

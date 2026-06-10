@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — **3 remain by design** (FR-002 promotion targets, FR-004 record-vs-create, FR-005 granularity); these are the genuine operator-owned scope forks, deferred to `/speckit-clarify` per the project's capture-don't-cut rule.
+- [x] No [NEEDS CLARIFICATION] markers remain — the 3 forks (FR-002 targets, FR-004 record-vs-create, FR-005 granularity) were resolved by the operator in the 2026-06-10 clarify session and encoded into the spec.
 - [x] Requirements are testable and unambiguous (each resolved FR maps to an acceptance scenario / SC)
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
