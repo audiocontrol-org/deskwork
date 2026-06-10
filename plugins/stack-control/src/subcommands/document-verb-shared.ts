@@ -6,18 +6,31 @@
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { LoadOptions } from '../document-model/document.js';
+import { findInstallation } from '../config/installation.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** Built-in grammars ship at `plugins/stack-control/grammars/`. */
 export const BUILTIN_GRAMMAR_DIR = resolve(here, '..', '..', 'grammars');
 
-/** FR-012 override location, relative to the invoking project's working dir. */
-export function grammarDirs(): LoadOptions {
+/** Grammar load options rooted at a specific installation root (009 T018). */
+export function grammarOptsForRoot(root: string): LoadOptions {
   return {
-    projectGrammarDir: join(process.cwd(), '.stack-control', 'grammars'),
+    projectGrammarDir: join(root, '.stack-control', 'grammars'),
     builtinGrammarDir: BUILTIN_GRAMMAR_DIR,
   };
+}
+
+/**
+ * Grammar dirs for the current invocation (009 T018): resolve the enclosing
+ * installation and root the project grammar override at IT, not raw cwd. When
+ * outside any installation, only the built-in grammars apply (no bundled
+ * project-grammar guess). A non-existent project grammar dir is tolerated by the
+ * resolver, so this is behavior-preserving when no installation/override exists.
+ */
+export function grammarDirs(): LoadOptions {
+  const inst = findInstallation(process.cwd());
+  return inst ? grammarOptsForRoot(inst.root) : { builtinGrammarDir: BUILTIN_GRAMMAR_DIR };
 }
 
 /** Reject a missing value / unknown flag / stray positional with exit 2. */

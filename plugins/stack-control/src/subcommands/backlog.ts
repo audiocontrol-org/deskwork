@@ -12,7 +12,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createBacklogBackend, BacklogError } from '../backlog/backend.js';
-import { backlogRoot } from '../backlog/root.js';
+import { resolveInstallationBacklog } from '../backlog/root.js';
+import { InstallationError } from '../config/errors.js';
+import { scaffoldKey } from '../setup/scaffold.js';
 import { CAPTURE_TYPES, isCaptureType, typeLabelStamp } from '../backlog/mappings.js';
 import {
   importGithub,
@@ -66,6 +68,31 @@ function requireProject(root: string): void {
   }
 }
 
+/**
+ * Resolve the backlog root for a verb, honoring the STACKCTL_BACKLOG_DIR seam,
+ * else the enclosing installation (009 T017/T019). On the installation path, a
+ * missing store is auto-on-first-use scaffolded + announced (FR-015/016). On the
+ * seam path a missing store still fails loud (exit 2) — the seam points at a
+ * specific dir the operator manages, not an installation to bootstrap. Outside any
+ * installation with no seam, resolveInstallation fails loud directing to setup.
+ */
+function ensureBacklogProject(): string {
+  const seam = process.env.STACKCTL_BACKLOG_DIR;
+  if (seam !== undefined && seam !== '') {
+    requireProject(seam);
+    return seam;
+  }
+  const { storeDir, root, resolved } = resolveInstallationBacklog();
+  if (!existsSync(join(storeDir, 'config.yml'))) {
+    scaffoldKey('backlog', resolved);
+    process.stdout.write(
+      `backlog: scaffolded missing backlog store at ${storeDir} ` +
+        `(auto-on-first-use; run \`stackctl setup\` for the full installation)\n`,
+    );
+  }
+  return root;
+}
+
 /** One-move capture (US1): stamp project+type labels, create via the adapter.
  * Does NOT triage — no priority is applied (capture ≠ scope, FR-003). */
 function emitCapture(flags: Flags): void {
@@ -75,8 +102,7 @@ function emitCapture(flags: Flags): void {
   if (!isCaptureType(type)) {
     failUsage('backlog', `--type must be one of: ${CAPTURE_TYPES.join(', ')}`);
   }
-  const root = backlogRoot();
-  requireProject(root);
+  const root = ensureBacklogProject();
   const ref = flags.values.get('ref');
   const id = createBacklogBackend({ cwd: root }).create({
     title,
@@ -97,8 +123,7 @@ function resolveIssues(): GithubIssue[] {
 
 /** One-time, idempotent GitHub-issue import (US3). Dry-run unless `--apply`. */
 function emitImportGithub(flags: Flags): void {
-  const root = backlogRoot();
-  requireProject(root);
+  const root = ensureBacklogProject();
   const backend = createBacklogBackend({ cwd: root });
   const res = importGithub({ backend, issues: resolveIssues(), apply: flags.apply });
   if (res.applied) {
@@ -130,8 +155,7 @@ async function resolveAuditLog(featureSlug: string): Promise<{ path: string; tex
 
 /** One-time backfill of acknowledged-slush-pile entries into the pile (US4). */
 async function emitImportSlush(flags: Flags): Promise<void> {
-  const root = backlogRoot();
-  requireProject(root);
+  const root = ensureBacklogProject();
   const featureSlug = requireMapValue('backlog', flags.values, 'feature');
   const { path, text } = await resolveAuditLog(featureSlug);
   const backend = createBacklogBackend({ cwd: root });
@@ -151,8 +175,7 @@ async function emitImportSlush(flags: Flags): Promise<void> {
 
 /** Read-only: print each item's id + status + type. Never writes. */
 function emitList(): void {
-  const root = backlogRoot();
-  requireProject(root);
+  const root = ensureBacklogProject();
   const items = createBacklogBackend({ cwd: root }).list();
   process.stdout.write(`backlog list: ${items.length} item${items.length === 1 ? '' : 's'}\n`);
   for (const it of items) {
@@ -192,6 +215,10 @@ export async function runBacklogCli(args: string[]): Promise<void> {
         );
     }
   } catch (err) {
+    if (err instanceof InstallationError) {
+      process.stderr.write(`backlog: ${err.message}\n`);
+      process.exit(err.code === 'escape' || err.code === 'collision' ? 2 : 1);
+    }
     if (err instanceof BacklogError) {
       process.stderr.write(`backlog: ${err.message}\n`);
       process.exit(2);

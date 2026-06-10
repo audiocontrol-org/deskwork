@@ -51,6 +51,7 @@ The deterministic primitive the skills call (`bin/stackctl <verb>`, in-tree Type
 | `stackctl execute-check --spec <dir>` | Gate: is the spec **runnable** for native `/speckit-implement`? Exit 0 (`runnable`) iff `tasks.md` is present; otherwise exit ≠0 naming the missing artifact. Read-only. |
 | `stackctl spec-check --spec <dir>` | Report a spec's authoring state as a machine-readable line (`spec=yes plan=yes tasks=no`), exit 0 when it can report; exit ≠0 (fail-loud) on a missing/unknown flag, an absent dir, or a non-directory. Read-only; never gates on artifact *content* (a partial spec is a valid report). |
 | `stackctl version` | Print the plugin version (lockstep with the rest of the monorepo). |
+| `stackctl setup [--at <dir>] [--apply]` | Scaffold a **stack-control installation** — write `.stack-control/config.yaml` + the governed working files the verbs read through (roadmap, inbox, backlog store, program audit log). Non-destructive + idempotent; dry-run by default; fail-loud on a malformed required file (exit 1) or a config escape/collision (exit 2). |
 | `stackctl archive --doc <path> [--apply]` | Move terminal-status items into the sibling `<doc>-archive.md` (with an in-archive provenance ledger). Dry-run by default. |
 | `stackctl unarchive --doc <path> --id <id> [--apply]` | Return a named archived item to its live document at its declared-order position. Dry-run by default. |
 | `stackctl curate --doc <path> [--apply]` | Ensure a document is well-formed, well-ordered, and properly archived; recognize (never run) a declared reconciliation seam; report ledger↔archive coherence. Dry-run by default. |
@@ -73,7 +74,26 @@ Each verb defaults to **dry-run** (report, write nothing); writing requires `--a
 
 `stackctl inbox` makes out-of-sequence design-idea capture a first-class, **one-move, fail-safe** operation against the governed [`DESIGN-INBOX.md`](./DESIGN-INBOX.md) — the native capability that **replaces the retired interim hand-append convention**. Capture is instant and never requires finishing the current thread (**capture ≠ scope**); triage is a separate deliberate pass (`promote` records a graduation target and reuses the existing creators — it does not create the target; `drop` records a reason). Lean-keeping reuses the generic `curate`/`archive`/`unarchive` verbs. Every mutation re-validates the whole document and is zero-write-on-failure. The agent-facing skill is [`/stack-control:inbox`](./skills/inbox/SKILL.md).
 
-> **Which inbox does `--doc` target?** When omitted, `--doc` defaults to the **plugin-bundled** `DESIGN-INBOX.md` (this monorepo's own inbox), not your project's. Project-relative inbox discovery is a tracked follow-up (`design:gap/project-relative-doc-discovery`); until it lands, **adopters operating on their own inbox MUST pass `--doc <path>` explicitly** (or set `STACKCTL_INBOX_DEFAULT_DOC`).
+> **Which inbox does `--doc` target?** When omitted, the verb resolves the enclosing **stack-control installation** (the nearest ancestor with `.stack-control/config.yaml`) and operates on its configured inbox — run [`/stack-control:setup`](./skills/setup/SKILL.md) once to create one. A missing inbox is auto-scaffolded on first use; outside any installation the verb fails loud directing you to `stackctl setup`. `--doc <path>` (or `STACKCTL_INBOX_DEFAULT_DOC`) overrides resolution for an explicit target. See [Project setup](#project-setup) below.
+
+## Project setup
+
+`stackctl setup` (and the thin [`/stack-control:setup`](./skills/setup/SKILL.md) skill over it) bootstraps a **stack-control installation** into a project — the governed working files the `inbox` / `roadmap` / `backlog` / governance verbs operate on, plus the shared `.stack-control/config.yaml` that binds them. After setup, every governed verb resolves the project-local file with no `--doc`.
+
+The config's **presence marks the installation root**. Verbs resolve their working file by walking **up** from the invocation directory to the nearest `.stack-control/config.yaml` (nearest-wins on nesting), then per file: **per-file override > base dir > audience-split default** (human docs `ROADMAP.md` / `DESIGN-INBOX.md` at the root; internal stores — backlog, program audit log — under `.stack-control/`). Pre-author `paths.*` overrides to record an existing/custom layout; a monorepo holds several installations (`setup --at <pkg>`), each isolated. Setup is non-destructive (never overwrites existing content), idempotent (a complete re-run writes nothing), and fail-loud (a malformed required file is surfaced by name and never clobbered; a location that escapes the root or collides with another key/installation is refused).
+
+```yaml
+# .stack-control/config.yaml — presence marks the installation root
+version: 1
+paths:                              # all optional; each relative-to-root (or absolute within root)
+  roadmap: "ROADMAP.md"
+  inbox: "DESIGN-INBOX.md"
+  backlog: ".stack-control/backlog"
+  audit_log: ".stack-control/audit-log.md"
+  feature_audit_log_pattern: "specs/{feature}/audit-log.md"
+```
+
+This repo dogfoods it: a root [`.stack-control/config.yaml`](../../.stack-control/config.yaml) records the plugin's own scattered layout (`ROADMAP.md` / `DESIGN-INBOX.md` under `plugins/stack-control/`, the program audit log under `docs/1.0/…/`), so the plugin's verbs resolve through the same config an adopter uses — no bundled-copy special case.
 
 ## Backlog slush pile — intake: three sources, one pile
 
@@ -87,7 +107,21 @@ Each verb defaults to **dry-run** (report, write nothing); writing requires `--a
 2. **A one-time GitHub-issue snapshot** (`backlog import-github`) — open issues imported read-only and idempotently (GitHub never mutated; backlinked `gh-<n>`).
 3. **Audit-barrage parked residuals** — when the convergence dampener parks a MEDIUM/LOW finding, it routes into the pile. `stackctl slush-findings` was **rewired**: a parked flip now becomes a `migrated-finding` backlog item and its audit-log entry records `migrated-to-backlog <task-id>` instead of an indefinitely-held `acknowledged-slush-pile` status — leaving the audit-log a clean open/fixed convergence ledger. The dampener **decision** stays in governance (`slush-remaining.ts`, unchanged); only the destination moved. HIGHs are **never** slushed. `backlog import-slush` backfills existing parked entries. The old **`--burn-down` flag is removed — working the backlog IS the burn-down queue.**
 
-> **Which backlog does the verb target?** The dir whose `backlog/` tree is operated on defaults to the **plugin-bundled** `backlog/`; set `STACKCTL_BACKLOG_DIR` to override (the adopter/test seam until project-relative discovery lands). The backend (`backlog.md`) is pinned in the plugin's `package.json`; a missing binary fails loud with remediation.
+> **Which backlog does the verb target?** When `STACKCTL_BACKLOG_DIR` is unset, the verb resolves the enclosing **stack-control installation** (the nearest ancestor with `.stack-control/config.yaml`) and operates on its configured backlog store — run [`/stack-control:setup`](./skills/setup/SKILL.md) once to create one. A missing store is auto-scaffolded on first use; outside any installation the verb fails loud directing you to `stackctl setup`. `STACKCTL_BACKLOG_DIR` remains the explicit override. See [Project setup](#project-setup) above. The backend (`backlog.md`) is pinned in the plugin's `package.json`; a missing binary fails loud with remediation.
+
+## Scope discovery — per-codebase duplication + drift gates
+
+`stack-control` vendors the **scope-discovery** surface (migrated from `dw-lifecycle`): a jscpd-backed clone detector with a dispositioned baseline, upfront discovery + mid-implementation widening, registry-driven checks, a sub-agent dispatch grammar gate, and install/doctor/export tooling. Every capability is a `stackctl` verb (the vendor-neutral core — runnable in a plain shell, no Claude Code surface required); each `/stack-control:*` skill is a thin adapter.
+
+**Per-codebase by default.** The clone detector and the registry checks scope to the **nearest-enclosing stack-control installation** (the dir whose `.stack-control/config.yaml` encloses your cwd), excluding any nested child-installation subtrees — never the whole repo. So duplication aligns with the same boundary every governed verb resolves against, and a copy vendored from another codebase (e.g. audit-barrage vendored from `dw-lifecycle`) is **not** flagged as a clone of its origin. `--root` overrides the default.
+
+- **Clone detection / disposition:** `check-clones` (per-codebase; `--gate-mode` exits 1 on a NEW group), `dispose-clone`, `batch-dispose`, `refresh-clones-baseline`, `check-disposition-survivor`, `check-refactor-preconditions` (Step 0a/0b refactor preconditions refused when incomplete).
+- **Discovery:** `scope-inventory <feature>` (fans the discovery agents → a schema-valid manifest + run evidence; a green run with novel-shape candidates is **not** all-clear), `scope-widen "<complaint>"`, `scope-summary`, `scope-export`.
+- **Registry-driven checks (config-activated):** `check-anti-patterns`, `check-adopters`, `check-module-symmetry`, `check-deprecations`. An absent/empty default registry is a clean no-op (zero cost until the project opts in).
+- **Dispatch discipline:** `wrap-prompt` / `validate-return` (Searched/Included/Excluded grammar + forbidden-deferral rejection), `validate-scope-discovery` (adversarial gutted-stub self-check).
+- **Install / health:** `install-scope-discovery` (seeds empty-but-valid registries + schemas + `config.yaml` under `.stack-control/scope-discovery/`; idempotent, non-destructive), `customize <name>` (project override > plugin default), `scope-doctor` (`--fix`), `install-drift` (advisory, non-blocking — warns when local `.specify` extension copies drift from the plugin source).
+
+**Config contract.** Scope-discovery's registries + dispositioned baseline live under the installation's `.stack-control/scope-discovery/` (`clones.yaml`, `anti-patterns.yaml`, `adopter-manifests.yaml`, `migration-map.yaml`, and a `config.yaml` with its own `schemaVersion`). They are **created lazily-and-announced** by the verb that first needs them (or eagerly by `install-scope-discovery`), never pre-scaffolded into the 009 working-file set. Malformed input fails loud and is never treated as empty. Governance `--mode implement` runs the per-codebase clone step and surfaces NEW intra-codebase duplication alongside the gate verdict.
 
 ## Governance extension
 

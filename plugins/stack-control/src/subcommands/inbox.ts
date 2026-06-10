@@ -3,32 +3,29 @@
 // `roadmap` verb: a generic flag scan + per-subaction flag grammar + dispatch.
 // Dry-run by default; `--apply` writes (mutations). Read-only `list` never
 // writes. Exit 0 success; 2 usage/parse/validation (catch DocumentModelError →
-// exit 2). Subactions: list (here); capture/promote/drop wired in US1/US2.
+// exit 2); 1 when run outside any installation with no --doc/seam (009 read-side
+// wiring — InstallationError 'not-found' fails loud directing to `stackctl setup`).
 
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { loadDocument } from '../document-model/document.js';
+import { loadDocument, type LoadOptions } from '../document-model/document.js';
 import { DocumentModelError } from '../document-model/types.js';
+import { InstallationError } from '../config/errors.js';
 import { capture, drop, promote, type CaptureInput, type MutationResult } from '../inbox/mutations.js';
 import {
   failUsage,
-  grammarDirs,
   requireMapValue,
   requirePositional,
   scanVerbFlags,
   validateSubactionFlags,
   type SubactionGrammar,
 } from './document-verb-shared.js';
+import { resolveVerbDoc } from './working-file.js';
 
-const here = dirname(fileURLToPath(import.meta.url));
-/** Default when `--doc` is omitted: this monorepo's plugin-bundled inbox (the
- * in-repo dogfood), NOT an adopter's cwd-relative inbox. Adopters must pass
- * `--doc` until `design:gap/project-relative-doc-discovery` lands (AUDIT-20260609-06).
- * `STACKCTL_INBOX_DEFAULT_DOC` overrides it — primarily a TEST SEAM so a
- * wrong-doc regression can never touch the committed bundled file
- * (AUDIT-20260609-12); also a usable operator override toward the discovery gap. */
-const DEFAULT_DOC =
-  process.env.STACKCTL_INBOX_DEFAULT_DOC ?? resolve(here, '..', '..', 'DESIGN-INBOX.md');
+// When `--doc` is omitted, the inbox resolves through the enclosing installation
+// (009 read-side wiring, FR-003). `STACKCTL_INBOX_DEFAULT_DOC` still overrides as
+// a TEST SEAM / operator escape hatch; outside any installation with neither set,
+// resolution fails loud directing to `stackctl setup` (no bundled fallback, D8).
+// A sentinel default lets the flag scanner report whether --doc was passed.
+const NO_DOC = '\0__inbox_no_doc__';
 
 interface Flags {
   readonly doc: string;
@@ -54,7 +51,7 @@ const ALL_VALUE_FLAGS: readonly string[] = [
 
 /** Scan flags via the shared subaction-verb scanner; `--apply` is the only boolean. */
 function scanFlags(args: readonly string[]): Flags {
-  const s = scanVerbFlags('inbox', args, DEFAULT_DOC, ['apply'], ALL_VALUE_FLAGS);
+  const s = scanVerbFlags('inbox', args, NO_DOC, ['apply'], ALL_VALUE_FLAGS);
   return { doc: s.doc, apply: s.booleans.has('apply'), positionals: s.positionals, values: s.values };
 }
 
@@ -76,7 +73,7 @@ function reportMutation(result: MutationResult, verb: string, id: string): void 
   );
 }
 
-function emitCapture(flags: Flags): void {
+function emitCapture(doc: string, opts: LoadOptions, flags: Flags): void {
   const title = requireId(flags, 'capture');
   const input: CaptureInput = {
     title,
@@ -85,24 +82,24 @@ function emitCapture(flags: Flags): void {
     context: flags.values.get('context'),
     home: flags.values.get('home'),
   };
-  reportMutation(capture(flags.doc, input, grammarDirs(), flags.apply), 'capture', title);
+  reportMutation(capture(doc, input, opts, flags.apply), 'capture', title);
 }
 
-function emitPromote(flags: Flags): void {
+function emitPromote(doc: string, opts: LoadOptions, flags: Flags): void {
   const id = requireId(flags, 'promote');
   const target = requireValue(flags, 'to');
-  reportMutation(promote(flags.doc, id, target, grammarDirs(), flags.apply), 'promote', id);
+  reportMutation(promote(doc, id, target, opts, flags.apply), 'promote', id);
 }
 
-function emitDrop(flags: Flags): void {
+function emitDrop(doc: string, opts: LoadOptions, flags: Flags): void {
   const id = requireId(flags, 'drop');
   const reason = requireValue(flags, 'reason');
-  reportMutation(drop(flags.doc, id, reason, grammarDirs(), flags.apply), 'drop', id);
+  reportMutation(drop(doc, id, reason, opts, flags.apply), 'drop', id);
 }
 
 /** Read-only: print each entry's identifier + status. Never writes. */
-function emitList(flags: Flags): void {
-  const { doc } = loadDocument(flags.doc, grammarDirs());
+function emitList(docPath: string, opts: LoadOptions): void {
+  const { doc } = loadDocument(docPath, opts);
   process.stdout.write(`inbox list: ${doc.units.length} entr${doc.units.length === 1 ? 'y' : 'ies'}\n`);
   for (const unit of doc.units) {
     process.stdout.write(`  - ${unit.identifier} [${unit.status}]\n`);
@@ -114,29 +111,47 @@ export async function runInboxCli(args: string[]): Promise<void> {
   if (subaction === undefined || subaction.startsWith('--')) {
     failUsage('inbox', 'a subaction is required (usage: inbox <capture|promote|drop|list> [flags])');
   }
+  // Reject an unknown subaction before resolving the doc, so an unknown verb is a
+  // usage error (exit 2) rather than triggering installation resolution.
+  if (SUBACTION_SPECS[subaction] === undefined) {
+    failUsage('inbox', `unknown subaction '${subaction}' (known: capture, promote, drop, list)`);
+  }
   const flags = scanFlags(args.slice(1));
   validateSubactionFlags('inbox', subaction, SUBACTION_SPECS[subaction], flags);
   try {
+    const { doc, opts } = resolveVerbDoc({
+      key: 'inbox',
+      explicitDoc: flags.doc === NO_DOC ? null : flags.doc,
+      envSeam: process.env.STACKCTL_INBOX_DEFAULT_DOC,
+      cwd: process.cwd(),
+      announce: (message) => process.stdout.write(`${message}\n`),
+    });
     switch (subaction) {
       case 'capture':
-        emitCapture(flags);
+        emitCapture(doc, opts, flags);
         return;
       case 'promote':
-        emitPromote(flags);
+        emitPromote(doc, opts, flags);
         return;
       case 'drop':
-        emitDrop(flags);
+        emitDrop(doc, opts, flags);
         return;
       case 'list':
-        emitList(flags);
+        emitList(doc, opts);
         return;
-      default:
-        failUsage(
-          'inbox',
-          `unknown subaction '${subaction}' (known: capture, promote, drop, list)`,
-        );
     }
+    // Exhaustiveness backstop (AUDIT-20260610-09): the pre-dispatch guard only
+    // rejects subactions ABSENT from SUBACTION_SPECS. A subaction REGISTERED in
+    // SUBACTION_SPECS but missing a `case` above would otherwise fall through and
+    // return exit 0 — a silent no-op. `subaction` is typed `string` (from args[0]),
+    // not a union, so the `never` assignment can't be a compile-time check here;
+    // the runtime fail-loud below restores the loud-failure guarantee.
+    failUsage('inbox', `unhandled subaction '${subaction}' (registered in grammar but no dispatch case)`);
   } catch (err) {
+    if (err instanceof InstallationError) {
+      process.stderr.write(`inbox: ${err.message}\n`);
+      process.exit(err.code === 'escape' || err.code === 'collision' ? 2 : 1);
+    }
     if (err instanceof DocumentModelError) {
       process.stderr.write(`inbox: ${err.message}\n`);
       process.exit(2);
