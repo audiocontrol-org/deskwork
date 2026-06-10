@@ -295,5 +295,17 @@ describe('lintWireframe — punctuation-density imagery channel (AUDIT-20260610-
       const r = lintWireframeStructural(wrap(`<table>${row}${row}${row}</table>`));
       expect(r.findings.map((f) => f.rule)).not.toContain('punctuation-density');
     });
+
+    // AUDIT-20260610-31 (round-7 gpt-5-03, HIGH): LETTER flow art — monospace
+    // rows of letters drawing a wordmark (ratio 0 punctuation). Letter mass IS
+    // what copy is made of, so content statistics cannot separate letter-art
+    // from prose in any layout; the glyph-class side of the declared boundary.
+    // Referee's gross-class imagery domain.
+    it('BOUNDARY (documented): letter flow art in code rows passes the mechanical axes', () => {
+      const art =
+        `<h1><code>DDDDxxxAAxxxSSSS</code><br><code>DDxDDxAxAAxSSxxx</code></h1>`;
+      const r = lintWireframeStructural(wrap(art));
+      expect(r.findings.map((f) => f.rule)).not.toContain('punctuation-density');
+    });
   });
 });

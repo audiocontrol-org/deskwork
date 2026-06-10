@@ -7,18 +7,25 @@
  * allowlist closure, not a denylist patch. Anything not enumerated in
  * `@/lint/allowlist` is rejected by the catch-all.
  *
- * SCOPE BOUNDARY (AUDIT-20260610-18, extended by -27): text-as-imagery that
- * emerges from STRUCTURAL GEOMETRY — glyphs distributed across grid cells
- * whose image arises from CELL PLACEMENT rather than text-flow density — is
- * OUTSIDE the lint's mechanical closure, for letter mosaics AND for
- * punctuation art diluted by prose cells (a label column drops every
- * flow-aggregate below the density ratio while the punctuation columns still
- * draw the icon). Grid geometry is invisible to content statistics; chasing
- * it cell-pattern by cell-pattern is the whack-a-mole the round-7 allowlist
- * pivot abolished. The density gates (node / block aggregate / sibling run)
- * bound text-FLOW art; geometric composition is the cross-model REFEREE's
- * gross-class imagery judgment (PRD § referee, gross classes 5–7). Boundary
- * fixtures in the codepoint suite pin both forms explicitly.
+ * SCOPE BOUNDARY (AUDIT-20260610-18, refined by -27 and -31 — the stable
+ * statement of what content statistics can and cannot see):
+ *
+ * - MECHANICALLY GATED: PUNCTUATION text-FLOW art. Punctuation mass is
+ *   statistically anomalous against copy, so the density gates (per-node,
+ *   block aggregate, consecutive-sibling run) catch it.
+ * - REFEREE'S DOMAIN (outside mechanical closure): text-as-imagery composed
+ *   of LETTER glyphs in ANY layout (flow rows of letter-art — round-7
+ *   gpt-5-03 — or grid mosaics — AUDIT-18), and punctuation art whose image
+ *   arises from GRID PLACEMENT under prose dilution (AUDIT-27). Letter mass
+ *   IS what copy is made of, and grid geometry is invisible to content
+ *   statistics — heuristics here are the whack-a-mole the round-7 allowlist
+ *   pivot abolished. The cross-model referee's gross-class imagery judgment
+ *   (PRD § referee, gross classes 5–7) owns this class.
+ * - UA DEFAULT CHROME (AUDIT-26/-30): browser-native control rendering is the
+ *   definitional UNSTYLED baseline, not author-supplied polish; kit styling
+ *   for controls is kit-completeness work (backlog TASK-18), not a lint gap.
+ *
+ * Boundary fixtures in the codepoint suite pin each declared form explicitly.
  *
  * This task ships axis 1 only. The stylesheet identity-pin (single pinned
  * `<link>` by canonical path + content hash) is task 4; the text codepoint

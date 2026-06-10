@@ -27,15 +27,21 @@ pinned stylesheet. The lint is an **allowlist on two axes** (element/attribute +
 text codepoints) plus a stylesheet identity-pin (which can also verify SRI). Read
 the appended source for the exact rules.
 
-**Declared scope boundary (not a defeat):** text-as-imagery that emerges from
-STRUCTURAL GEOMETRY — glyphs distributed across grid cells whose image arises
-from cell PLACEMENT rather than text-flow density (AUDIT-20260610-18 letter
-mosaics; AUDIT-20260610-27 prose-diluted punctuation grids) — is documented as
-OUTSIDE the lint's mechanical closure and assigned to the cross-model design
-referee's gross-class imagery judgment. The density gates (per-node, block
-aggregate, sibling run) bound text-FLOW art only. A grid-art finding is in scope
-ONLY if it shows the boundary is drawn wrongly (e.g. a FLOW-art variant slipping
-the density gates without geometric dilution).
+**Declared scope boundaries (not defeats):**
+
+1. **Text-as-imagery.** Mechanically gated: PUNCTUATION flow art (the density
+   gates: per-node, block aggregate, sibling run). Referee's domain, outside
+   mechanical closure: LETTER-composed imagery in ANY layout (flow rows or grid
+   mosaics — letter mass is what copy is made of) and punctuation art whose
+   image arises from GRID placement under prose dilution (geometry is invisible
+   to content statistics). A text-art finding is in scope ONLY if it is a
+   PUNCTUATION FLOW variant slipping the density gates.
+2. **UA default chrome.** Browser-native control rendering (button / checkbox /
+   radio / input widgets) is the definitional UNSTYLED baseline, not
+   author-supplied polish. Kit styling for controls is tracked kit-completeness
+   work, not a lint gap. A native-chrome finding is in scope ONLY if it shows
+   author-shippable styling riding the controls (attributes/values the lint
+   should gate), not the mere fact of platform widget rendering.
 
 ## Find inputs that break the promise — both directions
 
