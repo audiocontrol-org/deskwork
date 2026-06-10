@@ -40,12 +40,16 @@ type Element = DefaultTreeAdapterMap['element'];
 
 export interface LintOptions {
   /**
-   * When supplied, additionally enforce the stylesheet identity-pin (axis 1.5):
-   * exactly one stylesheet `<link>`, resolving to the canonical path, whose
-   * content hash matches the pinned sketch-kit.css. Omit for the pure,
-   * filesystem-free element/attribute lint (axis 1 only).
+   * REQUIRED (AUDIT-20260610-11, round-2 cross-model): the stylesheet
+   * identity-pin (axis 1.5) — exactly one stylesheet `<link>`, resolving to the
+   * canonical path, whose content hash matches the pinned sketch-kit.css. The
+   * lo-fi guarantee ("lint green ⇒ genuinely lo-fi") is only true under the
+   * pin; making it optional made the unsafe configuration the default (a
+   * designed local file NAMED sketch-kit.css passed green). Callers that
+   * genuinely want the filesystem-free axes use
+   * {@link lintWireframeStructural}, whose name carries no identity guarantee.
    */
-  readonly stylesheetPin?: StylesheetPin;
+  readonly stylesheetPin: StylesheetPin;
 }
 
 const SCRIPT_URI_RE = /^\s*(?:javascript|vbscript):/i;
@@ -196,11 +200,13 @@ function walk(node: AnyNode, ctx: WalkContext): void {
 }
 
 /**
- * Lint a wireframe HTML string against the element/attribute allowlist.
- * Returns all findings (does not short-circuit) so the operator sees every
- * violation in one pass.
+ * STRUCTURAL lint only — axes 1 (element/attribute allowlist) + 2 (text
+ * codepoint allowlist), filesystem-free. The name deliberately carries NO
+ * lo-fi-guarantee claim: without the identity pin, a designed local stylesheet
+ * named like the kit passes these axes (AUDIT-20260610-01/-11). Use
+ * {@link lintWireframe} for the guarantee-bearing check.
  */
-export function lintWireframe(html: string, options?: LintOptions): LintResult {
+export function lintWireframeStructural(html: string): LintResult {
   const ctx: WalkContext = { findings: [], stylesheetLinkCount: 0 };
   walk(parse(html), ctx);
   const { findings } = ctx;
@@ -215,8 +221,25 @@ export function lintWireframe(html: string, options?: LintOptions): LintResult {
       message: `${ctx.stylesheetLinkCount} stylesheet links found — exactly one (the sketch-kit stylesheet) is permitted`,
     });
   }
-  if (options?.stylesheetPin) {
-    findings.push(...checkStylesheetIdentity(html, options.stylesheetPin));
+  return { ok: findings.length === 0, findings };
+}
+
+/**
+ * Lint a wireframe HTML string with the FULL lo-fi guarantee: structural axes
+ * plus the stylesheet identity-pin (axis 1.5). The pin is required — the
+ * guarantee is false without it, so a pin-less call throws instead of
+ * silently degrading to the filename-only check (AUDIT-20260610-11; no
+ * fallbacks). Returns all findings (does not short-circuit) so the operator
+ * sees every violation in one pass.
+ */
+export function lintWireframe(html: string, options: LintOptions): LintResult {
+  if (!options?.stylesheetPin) {
+    throw new Error(
+      'lintWireframe requires options.stylesheetPin — the lo-fi guarantee is false without the identity pin. ' +
+        'Use lintWireframeStructural(html) for the filesystem-free axes (no guarantee claim).',
+    );
   }
+  const structural = lintWireframeStructural(html);
+  const findings = [...structural.findings, ...checkStylesheetIdentity(html, options.stylesheetPin)];
   return { ok: findings.length === 0, findings };
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { lintWireframe, ALLOWED_TAGS } from '@/lint/check-mockup-lofi';
+import { lintWireframe, lintWireframeStructural, ALLOWED_TAGS } from '@/lint/check-mockup-lofi';
 import { URL_ATTRS, RESOURCE_URL_ATTRS } from '@/lint/allowlist';
 import { SKETCH_KIT_SAMPLE_PATH } from '@/wireframe-kit/sketch-kit';
 
@@ -10,11 +10,11 @@ const wrap = (bodyInner: string): string =>
   `<title>WF</title><link rel="stylesheet" href="sketch-kit.css"></head>` +
   `<body class="sk sk-theme-grayscale">${bodyInner}</body></html>`;
 
-const rules = (html: string): string[] => lintWireframe(html).findings.map((f) => f.rule);
+const rules = (html: string): string[] => lintWireframeStructural(html).findings.map((f) => f.rule);
 
 describe('check-mockup-lofi — accepts genuinely lo-fi wireframes', () => {
   it('passes the shipped example wireframe', () => {
-    const result = lintWireframe(readFileSync(SKETCH_KIT_SAMPLE_PATH, 'utf8'));
+    const result = lintWireframeStructural(readFileSync(SKETCH_KIT_SAMPLE_PATH, 'utf8'));
     expect(result.findings, JSON.stringify(result.findings)).toEqual([]);
     expect(result.ok).toBe(true);
   });
@@ -29,7 +29,7 @@ describe('check-mockup-lofi — accepts genuinely lo-fi wireframes', () => {
         `<a href="#"><button type="button" class="sk-btn">Go</button></a>` +
         `</section></div>`,
     );
-    const result = lintWireframe(html);
+    const result = lintWireframeStructural(html);
     expect(result.findings, JSON.stringify(result.findings)).toEqual([]);
     expect(result.ok).toBe(true);
   });
@@ -37,12 +37,12 @@ describe('check-mockup-lofi — accepts genuinely lo-fi wireframes', () => {
   it('permits arbitrary (inert) class values — pinned stylesheet is the sole CSS source', () => {
     // Per round-8: class values are permitted-but-inert; the lint constrains
     // tags/attrs, not class strings.
-    const result = lintWireframe(wrap(`<div class="totally-made-up not-an-sk-class">x</div>`));
+    const result = lintWireframeStructural(wrap(`<div class="totally-made-up not-an-sk-class">x</div>`));
     expect(result.ok, JSON.stringify(result.findings)).toBe(true);
   });
 
   it('permits HTML comments (inert)', () => {
-    expect(lintWireframe(wrap(`<!-- a note --><div>x</div>`)).ok).toBe(true);
+    expect(lintWireframeStructural(wrap(`<!-- a note --><div>x</div>`)).ok).toBe(true);
   });
 });
 
@@ -107,12 +107,12 @@ describe('check-mockup-lofi — rejects external/embedded resources', () => {
     expect(rules(html)).toContain('data-uri');
   });
   it('does NOT false-positive on the substring "data:" inside an ordinary value', () => {
-    expect(lintWireframe(wrap(`<div class="metadata-row">x</div>`)).ok).toBe(true);
+    expect(lintWireframeStructural(wrap(`<div class="metadata-row">x</div>`)).ok).toBe(true);
   });
   // AUDIT-20260606-01 (claude-01): data: scanning must be scoped to href, not
   // every attribute value — class values are inert/unconstrained (round-8).
   it('permits a class value that literally contains "data:" (inert, round-8)', () => {
-    const r = lintWireframe(wrap(`<div class="data:x">y</div>`));
+    const r = lintWireframeStructural(wrap(`<div class="data:x">y</div>`));
     expect(r.ok, JSON.stringify(r.findings)).toBe(true);
   });
   it('permits prose containing "data:" in a non-URL attribute (meta content / title)', () => {
@@ -121,7 +121,7 @@ describe('check-mockup-lofi — rejects external/embedded resources', () => {
       `<meta name="description" content="a dashboard of the data: scheme">` +
       `<title>WF</title><link rel="stylesheet" href="sketch-kit.css"></head>` +
       `<body class="sk"><div title="see the data: scheme">x</div></body></html>`;
-    expect(lintWireframe(html).ok, JSON.stringify(lintWireframe(html).findings)).toBe(true);
+    expect(lintWireframeStructural(html).ok, JSON.stringify(lintWireframeStructural(html).findings)).toBe(true);
   });
   // AUDIT-20260606-01 (claude-02): a disallowed attribute carrying a data: value
   // is reported as disallowed-attribute (allowlist membership decided first), not
@@ -199,6 +199,27 @@ describe('check-mockup-lofi — rejects the <pre> preserved-whitespace imagery c
 
   it('still accepts inline <code> (whitespace collapses; not an art channel)', () => {
     expect(rules(wrap(`<p>run <code>npm test</code> first</p>`))).toEqual([]);
+  });
+});
+
+// AUDIT-20260610-11 (round-2 gpt-5-01 HIGH + fable5-01; cross-model): the
+// guarantee-bearing entry point must not make the unsafe configuration the
+// default. lintWireframe REQUIRES the pin (throws without — no fallbacks);
+// axis-1/2-only linting lives under the explicitly non-guarantee name
+// lintWireframeStructural.
+describe('lintWireframe API contract — pin is required (AUDIT-20260610-11)', () => {
+  it('lintWireframe THROWS when invoked without a stylesheet pin', () => {
+    const html = wrap(`<div class="sk-shell">x</div>`);
+    // Cast through the structural escape hatch a JS caller would have.
+    const bare = lintWireframe as unknown as (h: string) => unknown;
+    expect(() => bare(html)).toThrowError(/stylesheetPin/);
+  });
+
+  it('lintWireframeStructural lints axes 1+2 and is named to carry no identity guarantee', () => {
+    expect(lintWireframeStructural(wrap(`<div class="sk-shell">x</div>`)).ok).toBe(true);
+    expect(
+      lintWireframeStructural(wrap(`<script>1</script>`)).findings.map((f) => f.rule),
+    ).toContain('disallowed-element');
   });
 });
 

@@ -7,8 +7,12 @@ you may read other files in the repo read-only to confirm a hypothesis).
 
 ## The guarantee you must break
 
-`lintWireframe(html)` (in `@/lint/check-mockup-lofi`) exists to make ONE promise
-trustworthy:
+`lintWireframe(html, { stylesheetPin })` (in `@/lint/check-mockup-lofi`) exists to
+make ONE promise trustworthy. The pin is REQUIRED — a pin-less call throws
+(AUDIT-20260610-11); the separate `lintWireframeStructural(html)` runs only the
+filesystem-free axes and deliberately claims NO lo-fi guarantee. Attack the
+guarantee-bearing pinned form; a structural-only finding counts only if it
+violates the structural function's own narrower documented claims:
 
 > **lint green ⇒ the wireframe is genuinely LO-FI.** A wireframe that passes the
 > lint cannot masquerade as finished visual design.
@@ -30,8 +34,8 @@ Prioritize (A); it is the dangerous failure.
 - **(A) FALSE NEGATIVE (leak) — highest priority.** A wireframe that is NOT
   genuinely lo-fi (carries designed typography, polish, an image, an external or
   swappable loaded resource, hidden/effective styling, or otherwise *could read as
-  finished design*) yet `lintWireframe(html)` returns `ok: true` / emits no finding
-  for that channel. Each is a hole in the guarantee.
+  finished design*) yet the pinned `lintWireframe(html, { stylesheetPin })` returns
+  `ok: true` / emits no finding for that channel. Each is a hole in the guarantee.
 - **(B) FALSE POSITIVE (over-rejection).** A genuinely lo-fi, legitimate wireframe
   input (the kind a real operator would author for structure-and-flow) that the
   lint wrongly rejects.

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { isAllowedCodepoint, findDisallowedCodepoints } from '@/lint/codepoint';
-import { lintWireframe } from '@/lint/check-mockup-lofi';
+import { lintWireframeStructural } from '@/lint/check-mockup-lofi';
 import { SKETCH_KIT_SAMPLE_PATH } from '@/wireframe-kit/sketch-kit';
 
 const cp = (ch: string): number => ch.codePointAt(0)!;
@@ -97,10 +97,10 @@ describe('findDisallowedCodepoints', () => {
 });
 
 describe('lintWireframe — axis 2 integration', () => {
-  const rules = (html: string): string[] => lintWireframe(html).findings.map((f) => f.rule);
+  const rules = (html: string): string[] => lintWireframeStructural(html).findings.map((f) => f.rule);
 
   it('the shipped example wireframe passes the codepoint allowlist', () => {
-    const r = lintWireframe(readFileSync(SKETCH_KIT_SAMPLE_PATH, 'utf8'));
+    const r = lintWireframeStructural(readFileSync(SKETCH_KIT_SAMPLE_PATH, 'utf8'));
     expect(r.findings.filter((f) => f.rule === 'disallowed-codepoint')).toEqual([]);
   });
   it('rejects a Math-bold heading (the planted round-9 case)', () => {

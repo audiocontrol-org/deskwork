@@ -7,7 +7,7 @@ import {
   buildSketchKitPin,
   checkStylesheetIdentity,
 } from '@/lint/stylesheet-pin';
-import { lintWireframe } from '@/lint/check-mockup-lofi';
+import { lintWireframe, lintWireframeStructural } from '@/lint/check-mockup-lofi';
 import { SKETCH_KIT_CSS_PATH, SKETCH_KIT_DIR, SKETCH_KIT_FONTS } from '@/wireframe-kit/sketch-kit';
 
 const dirs: string[] = [];
@@ -277,8 +277,11 @@ describe('lintWireframe with stylesheetPin — inert-class invariant', () => {
     expect(rules([...r.findings])).toEqual(expect.arrayContaining(['inline-style', 'stylesheet-unresolvable']));
   });
 
-  it('without a pin, the lint is axis-1 only (filesystem-free, backward compatible)', () => {
+  it('structural form is axis-1/2 only (filesystem-free; carries no identity guarantee)', () => {
+    // AUDIT-20260610-11: the pin-less call is no longer a lintWireframe mode —
+    // it throws. The filesystem-free axes live under the explicitly
+    // non-guarantee name.
     const html = page(`<link rel="stylesheet" href="sketch-kit.css">`);
-    expect(lintWireframe(html).ok).toBe(true); // no pin → no identity check, no fs access
+    expect(lintWireframeStructural(html).ok).toBe(true);
   });
 });

@@ -10,6 +10,7 @@ export type { LintRule, LintFinding, LintResult } from '@/lint/types';
 export {
   type LintOptions,
   lintWireframe,
+  lintWireframeStructural,
   ALLOWED_TAGS,
 } from '@/lint/check-mockup-lofi';
 

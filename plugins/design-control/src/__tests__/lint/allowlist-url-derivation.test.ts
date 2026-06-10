@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lintWireframe } from '@/lint/check-mockup-lofi';
+import { lintWireframeStructural } from '@/lint/check-mockup-lofi';
 import { URL_ATTRS, URL_ATTR_PAIRS, TAG_ATTRS, GLOBAL_ATTRS } from '@/lint/allowlist';
 
 /** Embed a body fragment in an otherwise-valid lo-fi skeleton to isolate one rule. */
@@ -8,7 +8,7 @@ const wrap = (bodyInner: string): string =>
   `<title>WF</title><link rel="stylesheet" href="sketch-kit.css"></head>` +
   `<body class="sk sk-theme-grayscale">${bodyInner}</body></html>`;
 
-const rules = (html: string): string[] => lintWireframe(html).findings.map((f) => f.rule);
+const rules = (html: string): string[] => lintWireframeStructural(html).findings.map((f) => f.rule);
 
 /** Render one element carrying `attr="value"`, valid enough to isolate the value check. */
 const elementWith = (tag: string, attr: string, value: string): string => {
