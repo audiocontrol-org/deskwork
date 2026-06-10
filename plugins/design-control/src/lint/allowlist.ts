@@ -65,7 +65,10 @@ const GLOBAL_ATTR_SPECS: Readonly<Record<string, AttrKind>> = {
 
 const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>>> = {
   meta: { charset: 'plain', name: 'plain', content: 'plain' },
-  link: { rel: 'plain', href: 'url', media: 'plain' },
+  // `media` deliberately ABSENT (AUDIT-20260610-13, gpt-5-04 + fable-07a):
+  // media="print" mutes the pinned kit for screen rendering, so green would no
+  // longer mean the kit is IN EFFECT. Wireframes have no print-styling case.
+  link: { rel: 'plain', href: 'url' },
   a: { href: 'url' },
   button: { type: 'plain' },
   ol: { start: 'plain', reversed: 'plain' },

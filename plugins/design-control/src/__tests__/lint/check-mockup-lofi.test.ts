@@ -202,6 +202,26 @@ describe('check-mockup-lofi — rejects the <pre> preserved-whitespace imagery c
   });
 });
 
+// AUDIT-20260610-13 (round-2 gpt-5-04 MED + round-1 fable-07a; cross-round
+// recurrence): media="print" mutes the pinned kit for screen rendering, so
+// "lint green" no longer guarantees the kit is IN EFFECT — browser-default
+// rendering replaces it. Wireframes have no print-styling use case; media is
+// removed from link's allowlisted attrs entirely.
+describe('check-mockup-lofi — rejects link media (kit-muting channel, AUDIT-20260610-13)', () => {
+  it('rejects media="print" on the kit stylesheet link', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css" media="print"></head><body class="sk">x</body></html>`;
+    expect(rules(html)).toContain('disallowed-attribute');
+  });
+  it('rejects media even with an innocuous value (the attr, not the value, is the channel)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css" media="screen"></head><body class="sk">x</body></html>`;
+    expect(rules(html)).toContain('disallowed-attribute');
+  });
+});
+
 // AUDIT-20260610-11 (round-2 gpt-5-01 HIGH + fable5-01; cross-model): the
 // guarantee-bearing entry point must not make the unsafe configuration the
 // default. lintWireframe REQUIRES the pin (throws without — no fallbacks);
