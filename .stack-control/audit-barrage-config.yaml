@@ -26,12 +26,20 @@
 # binary respects this override even though its own plugin default still
 # ships {{prompt}} until v0.37.0).
 
+# timeout_seconds 600 (2026-06-10, TF-003 — see
+# plugins/design-control/specs/001-design-control/tooling-feedback.md): 300s
+# is too short for heavy adversarial / multi-file prompts. The design-control
+# lint barrage (full lint source + directive prompt) timed out claude at 300s
+# with zero output while codex finished in 169s; the same fix previously
+# landed only in the .dw-lifecycle copy of this config, which stackctl does
+# not read.
+
 models:
   - name: claude
     binary: claude
     args_template: "-p {{prompt-stdin}}"
-    timeout_seconds: 300
+    timeout_seconds: 600
   - name: codex
     binary: codex
     args_template: "exec {{prompt-stdin}}"
-    timeout_seconds: 300
+    timeout_seconds: 600
