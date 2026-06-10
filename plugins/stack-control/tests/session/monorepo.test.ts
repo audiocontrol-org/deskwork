@@ -3,7 +3,7 @@
 // sibling untouched; `--at <other>` orients on the other (FR-015/SC-009). US3.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCli } from '../../src/__tests__/_run-helpers.js';
@@ -34,7 +34,9 @@ function mkInstallationAt(root: string, sub: string): string {
 
 describe('monorepo isolation', () => {
   it('resolves the nearest enclosing installation; sibling files untouched', () => {
-    const root = mkdtempSync(join(tmpdir(), 'sc-mono-'));
+    // realpath: on macOS tmpdir() is the /var -> /private/var symlink; the
+    // resolver canonicalizes installationRoot, so compare against canonical paths.
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'sc-mono-')));
     made.push(root);
     const a = mkInstallationAt(root, 'a');
     const b = mkInstallationAt(root, 'b');
@@ -48,7 +50,9 @@ describe('monorepo isolation', () => {
   });
 
   it('--at <other> orients on the other installation', () => {
-    const root = mkdtempSync(join(tmpdir(), 'sc-mono-'));
+    // realpath: on macOS tmpdir() is the /var -> /private/var symlink; the
+    // resolver canonicalizes installationRoot, so compare against canonical paths.
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'sc-mono-')));
     made.push(root);
     const a = mkInstallationAt(root, 'a');
     const b = mkInstallationAt(root, 'b');
