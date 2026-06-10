@@ -66,7 +66,7 @@ plugins/stack-control/
 │   ├── subcommands/
 │   │   └── backlog.ts            # +1 SUBACTION_SPEC entry + dispatch case for `promote` (thin)
 │   └── backlog/
-│       ├── backend.ts            # reused as-is (read item, write body/labels)
+│       ├── backend.ts            # +edit() — shells `backlog task edit <id> --add-label promoted --append-notes "Promoted-to: <ref>"` (additive; current backend has only create/list/exists). See research D6.
 │       ├── mappings.ts           # +promoted marker label constant if needed
 │       ├── promote.ts            # NEW — promotion logic (record linkage, status, targets, guard)
 │       └── promote-targets.ts    # NEW (if needed for cap) — target-ref parsing/validation per kind

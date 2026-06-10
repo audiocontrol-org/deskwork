@@ -37,3 +37,15 @@ Phase 0 decisions. Each resolves a plan-phase open question grounded in the exis
 **Decision**: Single-item is the base; batch is N item-ids promoted to **one** existing-feature `tasks.md` target in a single invocation (all-or-nothing: if any item is missing/terminal, the whole batch is refused before any write). Batch is only meaningful for the `tasks:` target (grouping related items into a feature); `spec:` / `roadmap:` are single-item (one item seeds one feature/node).
 
 **Rationale**: Matches the operator's "single + batch" clarify answer and the natural shapes (a feature gathers many tasks; a new feature/node is seeded by one item). All-or-nothing preserves the no-partial-write guarantee (SC-002).
+
+## D6 — How an existing backlog item is mutated (resolves analyze finding A1)
+
+**Decision**: Add an `edit()` method to `BacklogBackend` (currently only `create` / `list` / `exists`) that shells the **verified** `backlog.md` CLI `task edit` command:
+- `--add-label promoted` — sets the marker (D3), **additively** (no clobber of existing `agent-found` / `type:*` / `gh-<n>` labels — satisfies FR-013).
+- `--append-notes "Promoted-to: <target-ref>"` — records the linkage (D2), **additively** (appends; preserves the existing body).
+
+Verified against `backlog.md@1.46.0`: `backlog task edit [taskId]` exposes `--add-label`, `--remove-label`, `-d/--description`, `--append-notes`, `--comment`. The two additive flags (`--add-label`, `--append-notes`) give a clean record-only mutation with **no read-modify-write** (which would risk clobbering concurrent edits).
+
+**Why this matters**: the original plan said "backend reused as-is (write labels)" — but the backend had no mutation path at all. This decision names the real mechanism so implementation does not discover the gap mid-stream. The idempotency guard (D3/FR-006) reads the item's frontmatter labels **directly from the task file** (as `exists()` already does — `list --plain` exposes neither labels nor refs), detecting an existing `promoted` label before any `edit()`.
+
+**Alternatives considered**: (a) `-d/--description` rewrite — rejected: replaces the body, requires read-modify-write, risks clobbering. (b) direct frontmatter/body file rewrite bypassing the CLI — rejected: the backlog.md CLI owns the task-file format (backend.ts:3); bypassing it is the kind of format-coupling the backend exists to avoid.

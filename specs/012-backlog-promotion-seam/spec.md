@@ -114,8 +114,8 @@ A new contributor (human or agent) reading the backlog docs can discover how a b
 
 - **SC-001**: An operator can promote a backlog item into the feature rigor in a single command, and afterward the item shows a navigable backlink to its target (no manual re-keying, no lost thread).
 - **SC-002**: 100% of promotions either fully apply or fully no-op — there is no partial-write outcome on any error path (verified by the fail-loud edge-case tests).
-- **SC-003**: Given a promoted backlog item, a reader can reach its feature-tier target, and from the target reach the originating backlog item, without external knowledge (bidirectional navigability, per the FR-007 decision).
-- **SC-004**: A new contributor reading either tier's documentation can correctly describe how work moves from backlog to feature rigor (the discovery gap named by the originating issue is closed).
+- **SC-003**: Given a promoted backlog item, a reader can reach its feature-tier target, and from the target reach the originating backlog item, without external knowledge (bidirectional navigability, per the FR-007 decision). The backlog→target link is written by promote; the target→backlog back-reference is recorded by convention when the target is created (a separate step) — so the target side is verified manually at target-create time, since promote is record-only.
+- **SC-004**: A new contributor reading either tier's documentation can correctly describe how work moves from backlog to feature rigor (the discovery gap named by the originating issue is closed). Verified mechanically by the US3 doc-presence / cross-reference check (each tier's docs reference the other + the canonical description); the qualitative "can describe" outcome is proxied by that check.
 - **SC-005**: Re-running a promotion on an already-promoted item never produces a second, conflicting linkage.
 
 ## Assumptions

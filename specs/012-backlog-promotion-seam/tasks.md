@@ -26,8 +26,10 @@ In-tree plugin: source under `plugins/stack-control/src/`, tests under `plugins/
 
 - [ ] T003 [P] RED: `plugins/stack-control/tests/backlog/promote-targets.test.ts` — assert target-ref parsing accepts well-formed `spec:specs/NNN-slug`, `tasks:specs/NNN-slug`, `roadmap:<phase>:<kind>/<slug>` and rejects unknown/empty kinds (contract tests 6, 11).
 - [ ] T004 Implement `plugins/stack-control/src/backlog/promote-targets.ts` — parse + shape-validate the three typed target refs; expose the kind + normalized ref; reject malformed (no disk check — record-don't-create, D4). → GREEN T003.
-- [ ] T005 RED: `plugins/stack-control/tests/backlog/promote.test.ts` — assert the record-only writer adds the `promoted` label + `- **Promoted-to:** <ref>` body bullet and **preserves** existing labels/refs/body (FR-013); dry-run writes nothing (contract tests 1, 2).
-- [ ] T006 Implement `plugins/stack-control/src/backlog/promote.ts` — record-only promotion over `createBacklogBackend`: read item, augment label + bullet, dry-run/apply, preserve fields. No target creation (FR-004). → GREEN T005.
+- [ ] T004a RED: in `plugins/stack-control/tests/backlog/backend-edit.test.ts` — assert a new `BacklogBackend.edit()` **additively** adds a label and appends a notes line to an existing task, **preserving** existing labels/refs/body (resolves analyze finding A1; D6).
+- [ ] T004b Add `edit()` to `BacklogBackend` in `plugins/stack-control/src/backlog/backend.ts` — shells `backlog task edit <id> --add-label <label> --append-notes <text>` via the existing `run()` (additive, no read-modify-write; the backend had only create/list/exists). → GREEN T004a.
+- [ ] T005 RED: `plugins/stack-control/tests/backlog/promote.test.ts` — assert the record-only writer adds the `promoted` label + a `Promoted-to: <ref>` linkage line and **preserves** existing labels/refs/body (FR-013); dry-run writes nothing (contract tests 1, 2).
+- [ ] T006 Implement `plugins/stack-control/src/backlog/promote.ts` — record-only promotion via `backend.edit()` (T004b): add the `promoted` label + append the `Promoted-to:` linkage, dry-run/apply, preserve fields. No target creation (FR-004). → GREEN T005.
 - [ ] T007 RED: in `promote.test.ts`, assert the idempotency guard — an already-`promoted` item is refused with zero write (contract test 7, FR-006).
 - [ ] T008 Implement the guard in `promote.ts` (detect existing `promoted` label/bullet → refuse). → GREEN T007.
 
@@ -89,7 +91,7 @@ In-tree plugin: source under `plugins/stack-control/src/`, tests under `plugins/
 ## Dependencies & Execution Order
 
 - **Phase 1 (T001–T002)** → blocks everything (label constant + fixture).
-- **Phase 2 (T003–T008)** → the promote core; blocks all user stories. RED→GREEN pairs: T003/T004, T005/T006, T007/T008.
+- **Phase 2 (T003–T008)** → the promote core; blocks all user stories. RED→GREEN pairs: T003/T004, **T004a/T004b (backend `edit()` — A1)**, T005/T006, T007/T008. T006 (writer) depends on T004b (backend edit). The idempotency guard (T007/T008) reads labels directly from the task file (D6), as `exists()` already does.
 - **US1 (Phase 3)** depends on Phase 2; the MVP and first independently shippable increment.
 - **US2 (Phase 4)** depends on US1's dispatch wiring (extends it for batch/`tasks:`).
 - **US3 (Phase 5)** depends on the verb existing (US1) so the docs describe real behavior.
