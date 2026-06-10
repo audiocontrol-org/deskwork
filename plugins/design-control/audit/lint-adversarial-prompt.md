@@ -42,6 +42,15 @@ the appended source for the exact rules.
    work, not a lint gap. A native-chrome finding is in scope ONLY if it shows
    author-shippable styling riding the controls (attributes/values the lint
    should gate), not the mere fact of platform widget rendering.
+3. **Composition of sanctioned atoms.** Imagery composed by GEOMETRIC PLACEMENT
+   of allowlisted visual atoms — kit primitives (.sk-dot grids), native control
+   states (checked-checkbox rasters), text glyphs in grids — is OUTSIDE the
+   mechanical closure: each atom is legitimate, the arrangements are
+   statistically indistinguishable from real idioms (dot-status matrices,
+   permission grids), and the image exists only to an eye. This is the
+   referee's gross-class imagery judgment. A composition finding is in scope
+   ONLY if it shows a NEW unsanctioned atom or a flow-statistical signature the
+   density gates should have caught.
 
 ## Find inputs that break the promise — both directions
 

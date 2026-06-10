@@ -261,6 +261,41 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// AUDIT-20260610-48 (round-13 gpt-5-01 HIGH + gpt-5-02 MED) — DOCUMENTED
+// BOUNDARY, the general form: imagery composed by GEOMETRIC PLACEMENT of
+// sanctioned visual atoms (kit primitives like .sk-dot; native control
+// states like checked checkboxes; text glyphs). Both defeating inputs are
+// statistically indistinguishable from legitimate idioms — a dot-status
+// matrix and a permissions grid ARE wireframe content; the image emerges
+// only by LOOKING, which is the referee's charter (gross classes 5–7).
+// These fixtures pin the composition side of the declared boundary.
+describe('check-mockup-lofi — composition boundary (AUDIT-20260610-48)', () => {
+  it('BOUNDARY (documented): a kit-primitive dot grid passes the mechanical axes', () => {
+    const grid =
+      `<table><tbody><tr><td></td><td><div class="sk-dot"></div></td></tr>` +
+      `<tr><td><div class="sk-dot"></div></td><td></td></tr></tbody></table>`;
+    expect(rules(wrap(grid))).toEqual([]);
+  });
+  it('BOUNDARY (documented): a checked-checkbox grid passes the mechanical axes', () => {
+    const grid =
+      `<table><tbody><tr><td><input type="checkbox" checked disabled></td>` +
+      `<td><input type="checkbox" disabled></td></tr></tbody></table>`;
+    expect(rules(wrap(grid))).toEqual([]);
+  });
+});
+
+// AUDIT-20260610-49 (round-13 gpt-5-03, LOW fp): checkbox/radio value is a
+// SUBMISSION value, never rendered — the visible-value gates scope to types
+// whose value actually renders.
+describe('check-mockup-lofi — non-rendered values (AUDIT-20260610-49)', () => {
+  it('accepts a non-Latin submission value on a checkbox', () => {
+    expect(rules(wrap(`<form><label><input type="checkbox" value="plan-①"> Starter plan</label></form>`))).toEqual([]);
+  });
+  it('still rejects designed glyphs in a rendered submit value', () => {
+    expect(rules(wrap(`<input type="submit" value="🎉 Launch">`))).toContain('disallowed-codepoint');
+  });
+});
+
 // AUDIT-20260610-41 (round-11 gpt-5-01, MED): viewport meta content is a
 // rendering channel (forced scale/zoom presentation) — the one enumerated meta
 // whose VALUE stayed unconstrained. Only the canonical responsive declaration

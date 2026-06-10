@@ -24,8 +24,16 @@
  * - UA DEFAULT CHROME (AUDIT-26/-30): browser-native control rendering is the
  *   definitional UNSTYLED baseline, not author-supplied polish; kit styling
  *   for controls is kit-completeness work (backlog TASK-18), not a lint gap.
+ * - COMPOSITION OF SANCTIONED ATOMS (AUDIT-48, round-13 — the general form):
+ *   imagery composed by GEOMETRIC PLACEMENT of allowlisted visual atoms (kit
+ *   primitives like .sk-dot, native control states like checked checkboxes,
+ *   text glyphs). The atoms are each legitimate; the arrangements are
+ *   statistically indistinguishable from real idioms (a dot-status matrix, a
+ *   permissions grid); the image exists only to an eye. Constraining
+ *   placement would constrain STRUCTURE itself — which is what a wireframe
+ *   is. The referee looks; the lint does not pretend to.
  *
- * Boundary fixtures in the codepoint suite pin each declared form explicitly.
+ * Boundary fixtures pin each declared form explicitly (codepoint + lofi suites).
  *
  * This task ships axis 1 only. The stylesheet identity-pin (single pinned
  * `<link>` by canonical path + content hash) is task 4; the text codepoint
@@ -219,7 +227,16 @@ function checkElement(el: Element, ctx: WalkContext): void {
     // the designed-glyph channel axis-2 closes for text nodes must not
     // survive in attributes the operator can see. class/id stay
     // value-unconstrained (inert under the pin, round-8).
-    if (attr === 'title' || attr === 'placeholder' || attr === 'value' || attr.startsWith('aria-')) {
+    // `value` is a SUBMISSION value (never rendered) on checkbox/radio
+    // (AUDIT-20260610-49) — the visible gates scope to types whose value
+    // renders (field content / button label).
+    const valueIsRendered =
+      attr !== 'value' ||
+      tag !== 'input' ||
+      !['checkbox', 'radio'].includes(
+        (ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'type')?.value ?? '').toLowerCase(),
+      );
+    if ((attr === 'title' || attr === 'placeholder' || attr === 'value' || attr.startsWith('aria-')) && valueIsRendered) {
       for (const { codepoint, char } of findDisallowedCodepoints(value)) {
         findings.push({
           rule: 'disallowed-codepoint',
