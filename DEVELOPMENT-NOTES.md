@@ -4,6 +4,51 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-06-10 (010 session-skills — full DEFINE chain): specify → clarify → plan → checklist → tasks → analyze for native session lifecycle skills
+### Feature: pluggable-lifecycle-providers
+### Worktree: web session, branch `claude/stack-control-4ssjr9` (branched from `feature/stack-control` @ c2f411a)
+
+**Goal:** Operator branched a fresh web session from `feature/stack-control` and redirected away from 009 ("009 is being developed in another branch") to **`multi:feature/session-skills`** — native, Spec-Kit-aware session-start / session-end skills (the #122/#422 roadmap gaps). Authored the full Spec Kit DEFINE chain through `/speckit-analyze`; implementation deferred to a separate session per the two-session boundary.
+
+**Accomplished:**
+- **`specs/010-session-skills/` authored end-to-end** through the front door: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` → `/speckit-checklist` (the in-order checklist step, run after tasks to keep Principle VIII faithful). **7 commits, all `docs(010)`, all pushed.**
+- **Spec**: 21 FRs, 9 SCs, 5 prioritized independently-testable user stories (US1 MVP = orient-and-stop; US2 capture-at-close; US3 decoupling/#122; US4 branch-staleness/#422; US5 CLI-first), 11 edge cases. Grounded in the **two concrete instances** (branch-local `.claude/skills/session-{start,end}` + `plugins/dw-lifecycle/skills/session-{start,end}`) per Principle II — generalize, not port.
+- **Clarify**: 4 operator-owned forks resolved, all accepting the recommended default — staleness base (upstream-else-default-branch), session-end posture (capture-only; refuse-to-end gates deferred to the migrations that own them), monorepo selection (cwd-nearest + `--at`), journal authorship (auto-derive mechanical, agent composes narrative).
+- **Plan**: two thin verbs over a pure `src/session/` module; Constitution Check PASS. The decoupling **consumes 009's shared `src/config/` port and extends its key set** with `journal`/`tooling_feedback`/`clone_scope` — making session-skills the *second real consumer* that proves 009's extensible managed set (Principle II load-bearing). research D1–D10, data-model, 3 contracts, quickstart (10 plain-shell scenarios). Grounded in a real code-map (CLI dispatch, the 3 bundled-default resolution points, the backlog backend, `repo.ts` git helpers).
+- **Tasks**: 37 RED-first, story-organized; MVP = US1 (Phases 1→2→3). T037 surfaces the two operator calls for a `roadmap reconcile`.
+- **Analyze**: 0 CRITICAL/HIGH, 100% FR+SC coverage, 0 duplication; 3 LOW (remediated I1 — added `close.ts` to the plan structure; U1/C1 are intentional promise-altitude deferrals).
+- **Checklist**: 34 requirements-quality items across the operator's 5 risk clusters + cross-cutting; CHK017/030/032 map to the analyze LOWs so the implementation session confirms rather than rediscovers them.
+- **Pre-DEFINE git housekeeping**: rebased `claude/stack-control-4ssjr9` onto `feature/stack-control` (it had been on `origin/main` with no unique work) and force-pushed (the old remote branch had been deleted server-side, so it went through as a clean new-branch push).
+
+**Course Corrections:**
+- [PROCESS] **Operator redirected the work-tracking surface mid-DEFINE**: after `/speckit-clarify`, "since we've moved to a local backlog mechanism, I no longer want any references to github issues in the start and end session skills." Replaced all behavioral GitHub-issue references with the local backlog (008) — session-start surfaces open backlog items, session-end surfaces progressed items (0 auto-transitions), journal "backlog items touched"; added explicit `MUST NOT reference/query GitHub issues` guards (FR-001/009/SC-006), the Backlog entity, the 008 dependency, and a Clarifications bullet. Asked one binary about the provenance #122/#422 citations → operator chose KEEP as roadmap traceability (they never appear in the shipped skills).
+
+**Didn't Work / deferred:**
+- **No code** — DEFINE-only. `/speckit-implement` runs in a separate implementation session/worktree (two-session boundary).
+- **Two operator calls queued (T037)** for implementation: (1) the **009 build-order sequencing** — session-skills consumes/extends 009's config port (build the port here, or wait for 009?); (2) **backlog changed-since** — "progressed this session" derives from commit refs; should 008's backend grow a first-class changed-since surface?
+
+**Quantitative (re-derived from `git log c2f411a..HEAD`):**
+- Commits: **7** — `2d6e375` (specify), `f007f0b` (clarify), `ab4dec6` (backlog-not-issues), `e7bb10b` (plan), `5120201` (tasks), `7f186c5` (analyze remediation), `3025559` (checklist). All `docs(010)`.
+- Files changed: **13**, **+962 / −2** (spec/plan/research/data-model/3 contracts/quickstart/tasks + 2 checklists + feature.json + CLAUDE.md marker).
+- Code / tests: **0** (DEFINE phase).
+- Clone snapshot: test-fixture groups only = session-start baseline, **0 new** (no source written).
+- Open findings at session end: **0 new** (no governance run — front-half only; `after_implement` governance fires in the implementation session). Pre-existing program-level HIGH `AUDIT-20260607-48` remains open (predates this work).
+- Operator messages: ~15. Course corrections: **1** (PROCESS).
+
+**Tooling friction:** the `check-prerequisites.sh --require-tasks` branch-name gate aborted again on `/speckit-analyze` — this time on the `claude/stack-control-4ssjr9` web-session branch (≠ `NNN-name`). Same root cause + `--paths-only` workaround already captured as **TF-30** / **TF-09**; the web-session branch is a new wrinkle but not a new friction. **No new TF entry** (append-one-per-friction). Proceeded via `feature.json` (authoritative) + manual artifact-presence check.
+
+**Insights:**
+- **Spec-to-the-contract kept DEFINE unblocked by 009's branch.** Writing 010 against 009's config+resolution *contract* (not its implementation) let the whole DEFINE chain proceed while 009 is built elsewhere; the build-order is surfaced as an operator/roadmap call (plan § Dependency-sequencing), not silently decided — the same "surface, don't decide" shape as 009's own scope-coordination note.
+- **The two concrete instances made the spec honest.** Having both the branch-local and the dw-lifecycle session skills in hand meant the #122 decoupling was concrete (remove *these* hardcoded paths/branch/slug), not aspirational — Principle II working as intended.
+- **The backlog redirect validated capture-then-scope.** The first spec drafted GitHub-issue surfacing (inherited from both concrete instances); the operator's one-line redirect reshaped the work-tracking surface cleanly because the spec was already structured (FRs/entities/SCs to retarget), not because I pre-guessed it.
+
+**Next step (resume here):**
+1. **Hand off to an implementation session** (separate worktree) for `/speckit-implement` 010 — MVP = US1 (Phases 1→2→3: config extension → git primitives → orient + session-start verb + skill). `after_implement` governance fires there.
+2. **Resolve the two T037 operator calls first**: (a) 009 build-order sequencing; (b) backlog changed-since surface.
+3. Reconcile the branch-local session-start/session-end bootstrap docs with the native skills at merge (they note "reconcile at merge").
+
+---
+
 ## 2026-06-09 (009 project-doc-setup — full DEFINE chain): spec → clarify → plan → tasks → analyze for post-install project setup
 ### Feature: pluggable-lifecycle-providers
 ### Worktree: pluggable-lifecycle-providers (branch `feature/stack-control`)
