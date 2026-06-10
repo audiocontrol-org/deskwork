@@ -959,3 +959,62 @@ Status:     fixed-d3137b5d (2026-06-10; form/input/label[for] allowlisted; input
 Severity:   low
 Surface:    plugins/design-control/src/lint/allowlist.ts
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 6 (run 20260610T204029454Z; codex only — claude 0 bytes, 4th consecutive)
+
+Triage notes: claude silent (5 of 7 runs; deskwork issue 447). Codex: 1 HIGH +
+2 MED + 1 LOW, all verified. The HIGH is a completion gap in this loop's own
+round-5 fix; the MEDs and LOW probe the declared boundary and the gate's
+trade-offs rather than the closures — the finding curve is flattening into
+boundary territory. Round verdict: NOT converged (1 HIGH, fixed).
+
+### AUDIT-20260610-25 — input placeholder/value are rendered text the visible-attr gates missed
+
+Finding-ID: AUDIT-20260610-25 (round-6 gpt-5-codex-01, HIGH)
+Status:     fixed-e895a685 (2026-06-10; placeholder + value join title/aria in the codepoint + density gates)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
+
+Completion gap of AUDIT-19/-24: the field renders its placeholder; the submit
+button renders its value. Designed glyphs/emoji and punctuation art rode both
+under a green pin (verified pre-fix).
+
+### AUDIT-20260610-26 — Native control chrome renders UA styling outside the kit (ACKNOWLEDGED)
+
+Finding-ID: AUDIT-20260610-26 (round-6 gpt-5-codex-02, MED)
+Status:     acknowledged-by-design (2026-06-10, b955ce03; kit-completeness styling captured as backlog TASK-18)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (allowed native controls)
+
+UA default chrome is the definitional UNSTYLED baseline, not author-supplied
+polish — the guarantee targets designed detail an author can ship, and platform
+chrome varies by machine and is read as default. The legitimate residual (themed
+wireframes render controls inconsistently) is kit-completeness work, parked as
+TASK-18.
+
+### AUDIT-20260610-27 — Prose-diluted punctuation grid: the geometric boundary form (BOUNDARY EXTENDED)
+
+Finding-ID: AUDIT-20260610-27 (round-6 gpt-5-codex-03, MED)
+Status:     acknowledged-scope-boundary (2026-06-10, b955ce03; extends AUDIT-18 — geometry over glyph-class)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (content statistics vs grid placement)
+
+Punctuation columns draw an icon while a prose label cell dilutes every flow
+aggregate below the density ratio. Codex correctly noted this is NOT the
+declared letter-mosaic boundary as worded — so the boundary's wording was the
+bug: the real line is FLOW art (mechanically gated: node / block / sibling-run
+density) vs GEOMETRIC composition (cell placement, invisible to content
+statistics — referee's gross-class domain). Docstring + prompt reworded; second
+boundary fixture pins the punctuation-grid side.
+
+### AUDIT-20260610-28 — Skeleton "________" line over-rejected (ACKNOWLEDGED-WONTFIX)
+
+Finding-ID: AUDIT-20260610-28 (round-6 gpt-5-codex-04, LOW)
+Status:     acknowledged-wontfix (2026-06-10; the kit's .sk-line is the placeholder idiom)
+Severity:   low
+Surface:    plugins/design-control/src/lint/codepoint.ts (density trade-off)
+Direction:  false-positive
+
+Exempting underscore runs reopens the horizontal-stroke channel the density gate
+exists to bound; the finding messages already steer to the kit placeholders.
+Accepted specificity cost, on the record.
