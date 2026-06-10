@@ -95,6 +95,7 @@ plugins/stack-control/
 │   │   ├── staleness.ts                # branch-staleness: base = upstream else repo default branch; ahead/behind; skip-clean (FR-016/017)
 │   │   ├── journal.ts                  # journal entry assembly: auto-derive mechanical/quantitative from git log; narrative slots (FR-006)
 │   │   ├── progressed-backlog.ts       # backlog items referenced in the session's commits (touched/progressed; FR-009)
+│   │   ├── close.ts                    # session-end close steps: tooling-friction append + advisory clone-snapshot over clone_scope (FR-007/008)
 │   │   └── report.ts                   # render the orientation report
 │   ├── subcommands/
 │   │   ├── session-start.ts            # NEW — runSessionStartCli (read-only; resolve installation; orient; report; STOP)
