@@ -143,6 +143,7 @@ description: "Task list — Migrate scope-discovery into stack-control"
 - [ ] T063 [US6] GREEN: port `scope-export.ts` + `summary.ts` → export/summary tests GREEN (FR-030).
 - [ ] T064 [US6] Add subcommands `install-scope-discovery`, `customize` (scope-discovery category), `scope-summary`, `scope-export`, and the scope-discovery `doctor` rules wiring + register in `src/cli.ts`; author the `/stack-control:*` skills.
 - [ ] T065 [US6] Integration: drive quickstart Scenario 6 end-to-end.
+- [ ] T080 [P] [US6] RED: `__tests__/scope-discovery/cross-installation-isolation.test.ts` — a `dispose-clone`/`refresh-clones-baseline` (and a registry write) in installation A leaves a sibling installation B's baseline + registries byte-for-byte unchanged (SC-004 clause b; spec § "Edge Cases" concurrent installations). GREEN is satisfied by the boundary-scoped writes from T005/T016/T024/T025 — this task fails first if any write escapes its installation. (Analyze remediation V1.)
 
 ---
 
@@ -176,6 +177,7 @@ description: "Task list — Migrate scope-discovery into stack-control"
 - [ ] T077 Promote the "Captured for future expansion" items (v2 agents, cross-language, studio surface, cross-repo rollup, Agent-intercept) to first-class roadmap/backlog entries (operator tracking requirement; spec § "Captured for future expansion").
 - [ ] T078 Reconcile `design:gap/project-relative-doc-discovery` subsumption (CHK033) — confirm no duplicate config-resolution; record the decision for `roadmap reconcile`.
 - [ ] T079 Note the retirement of the interim `.dw-lifecycle/scope-discovery/clone-snapshot.sh` stopgap now that the full per-codebase detector ships (do not delete dw-lifecycle's; document that stack-control no longer needs the snapshot path).
+- [ ] T081 [P] RED: `__tests__/scope-discovery/subcommand-flag-validation.test.ts` — every migrated subcommand rejects an unknown/malformed flag with a fail-loud error (contracts § "each subcommand validates its own flags — no flag silently ignored"); covers the CLI-surface invariant the integration tests exercise only indirectly. (Analyze remediation V2.)
 
 ---
 
@@ -187,6 +189,7 @@ description: "Task list — Migrate scope-discovery into stack-control"
 - **US3/US4/US5/US6 (Phases 5–8)** each depend on Foundational; their RED files are distinct → the four RED clusters (T030–T032, T040–T042, T050–T051, T056–T059) are mutually `[P]`. US4's regime-holdout agent depends on US3's synthesis (T045 after T035).
 - **US7 (Phase 9)** depends on US1. **US8 (Phase 10)** is independent of the detector internals.
 - **Polish (Phase 11)** last; T072 (dw-lifecycle-untouched) and T074 (cap/typing) gate "done."
+- **Remediation tasks (from /speckit-analyze):** T080 (SC-004 cross-installation isolation) sits in US6 and `[P]` with the other US6 REDs; T081 (subcommand flag-validation) is cross-cutting in Polish and `[P]`. Total tasks: 81.
 
 ### Parallel opportunities
 
