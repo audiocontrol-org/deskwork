@@ -8,10 +8,15 @@ deskwork:
   id: 60692084-08dc-4395-b861-7c66ec523743
 ---
 
-# PRD: design-control — portable UX/UI surface-change discipline
+# Feature Specification: design-control — portable UX/UI surface-change discipline
+
+**Feature Branch**: `feature/design-control`
+**Created**: 2026-06-05
+**Status**: In implementation (Phase 1 of 6 — see `tasks.md`)
+**Input**: Ported 2026-06-10 from the dw-lifecycle feature docs (`docs/1.0/001-IN-PROGRESS/design-control/prd.md`; git history preserves the original) into the stack-control regime. The content below is the operator-approved PRD verbatim — the design-of-record converged via 11 adversarial audit-barrage rounds; only this header and relative links were adjusted in the port.
 
 > **Design-of-record.** This PRD is the self-standing design for the feature. It absorbs the
-> converged design [`docs/superpowers/specs/2026-06-04-design-control-design.md`](../../../superpowers/specs/2026-06-04-design-control-design.md)
+> converged design [`docs/superpowers/specs/2026-06-04-design-control-design.md`](../../../../docs/superpowers/specs/2026-06-04-design-control-design.md)
 > (v12 — converged via 11 adversarial audit-barrage rounds, claude + codex in parallel, run until
 > **two consecutive rounds returned zero HIGH findings**, rounds 10 + 11, the operator's stop
 > criterion) and its companion [`DESIGN-DISCIPLINE-THESIS.md`](../../../../DESIGN-DISCIPLINE-THESIS.md).

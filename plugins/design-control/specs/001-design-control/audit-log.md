@@ -21,9 +21,14 @@ Status quick-reference:
 
 Canonical grep queue:
 
-- unfinished work: `grep -nE "^Status:[[:space:]]+(open|acknowledged|fixed-)" docs/1.0/001-IN-PROGRESS/design-control/audit-log.md`
-- new findings: `grep -nE "^Status:[[:space:]]+open" docs/1.0/001-IN-PROGRESS/design-control/audit-log.md`
-- awaiting verification: `grep -nE "^Status:[[:space:]]+fixed-" docs/1.0/001-IN-PROGRESS/design-control/audit-log.md`
+- unfinished work: `grep -nE "^Status:[[:space:]]+(open|acknowledged|fixed-)" plugins/design-control/specs/001-design-control/audit-log.md`
+- new findings: `grep -nE "^Status:[[:space:]]+open" plugins/design-control/specs/001-design-control/audit-log.md`
+- awaiting verification: `grep -nE "^Status:[[:space:]]+fixed-" plugins/design-control/specs/001-design-control/audit-log.md`
+
+> Ported 2026-06-10 from `docs/1.0/001-IN-PROGRESS/design-control/audit-log.md` into the
+> stack-control regime (this file moved; history preserved by git). Historical `Surface:` lines
+> below that name the old path describe where findings lived at the time — left verbatim
+> (append-only log; never rewrite history).
 
 ---
 

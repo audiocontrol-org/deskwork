@@ -13,7 +13,7 @@
  * converged spec's hard invariant — exactly one identity-pinned sketch-kit
  * `<link rel=stylesheet>` — is preserved: all three themes live in the single
  * `sketch-kit.css`, selected by a `.sk-theme-*` root class. See
- * `docs/1.0/001-IN-PROGRESS/design-control/mockups/sketch-kit/DECISION.md`.
+ * `plugins/design-control/specs/001-design-control/mockups/sketch-kit/DECISION.md`.
  *
  * The module exports DATA + PATHS only; it performs no file IO at import time.
  * Callers (the lint, the authoring skill, tests) read the assets themselves.

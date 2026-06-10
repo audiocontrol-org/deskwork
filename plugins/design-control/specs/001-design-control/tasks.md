@@ -4,9 +4,15 @@ targetVersion: "1.0"
 date: 2026-06-05
 ---
 
-# Workplan — design-control
+# Tasks: design-control — portable UX/UI surface-change discipline
 
-Derived from [`prd.md`](prd.md) (the design-of-record) and the converged design
+> Ported 2026-06-10 from the dw-lifecycle workplan (`docs/1.0/001-IN-PROGRESS/design-control/workplan.md`;
+> git history preserves the original) into the stack-control regime. Phase structure, checkbox
+> states, and acceptance criteria are preserved verbatim; only this header and relative links were
+> adjusted. Phase-level status is mirrored in the plugin [`ROADMAP.md`](../../ROADMAP.md); the
+> checkboxes here are the fine-grained source of truth.
+
+Derived from [`spec.md`](spec.md) (the design-of-record) and the converged design
 `docs/superpowers/specs/2026-06-04-design-control-design.md` (11 audit-barrage rounds, two
 consecutive zero-HIGH). Build order is **inverted**: ship `v1-scaffold` first (zero referee
 dependency); build the referee as a gated evidence-spike last. TDD-shaped: each task writes failing

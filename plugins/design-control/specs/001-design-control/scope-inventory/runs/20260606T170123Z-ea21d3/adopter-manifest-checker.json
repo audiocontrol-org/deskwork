@@ -1,0 +1,11 @@
+{
+  "agent": "adopter-manifest-checker",
+  "featureSlug": "design-control",
+  "registryPath": ".dw-lifecycle/scope-discovery/adopter-manifests.yaml",
+  "findings": [],
+  "meta": {
+    "entriesScanned": 0,
+    "filesVisited": 0,
+    "holdoutCount": 0
+  }
+}

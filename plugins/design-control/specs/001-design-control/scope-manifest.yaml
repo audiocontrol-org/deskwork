@@ -1,0 +1,201 @@
+kind: code
+feature_slug: design-control
+generated_by: strawman
+generated_at: 2026-06-06T17:01:23.820Z
+scenarios:
+  - id: default
+    label: Default state
+    description: Strawman scenario; operator curates the real scenario matrix.
+reference_docs:
+  - path: plugins/design-control/specs/001-design-control/spec.md
+    role: prd
+    summary: Feature PRD — synthesis anchor (ported 2026-06-10 into the stack-control regime).
+  - path: .dw-lifecycle/scope-discovery/LAYOUT.md
+    role: other
+    summary: On-disk layout contract for scope-discovery artifacts.
+discovery_themes:
+  - engine (50 occurrences)
+  - wireframe (17 occurrences)
+  - referee (10 occurrences)
+  - never (4 occurrences)
+  - surface (3 occurrences)
+  - gate (2 occurrences)
+  - manifest (2 occurrences)
+  - spec (2 occurrences)
+  - baseline (0 occurrences)
+  - gross (0 occurrences)
+modules:
+  - glob: plugins/design-control/src/lint/**/*.{ts,tsx}
+    label: lint
+    patterns:
+      - id: magic-number
+        kind: grep
+        description: Inline numeric literal >= 10 not bound to a const/named identifier
+          (heuristic — synthesis layer + operator curate)
+        query: (?<![A-Za-z0-9_.=])\d{2,}\b
+regime_holdouts:
+  anti_patterns: []
+  adopter_manifests: []
+  module_symmetry: []
+  deprecations: []
+  meta:
+    total: 0
+    by_source:
+      anti_pattern: 0
+      adopter_manifest: 0
+      module_symmetry: 0
+      deprecation: 0
+    by_status:
+      actively_enforced: 0
+      candidate: 0
+discovered_candidates:
+  - cluster_id: cluster-0000
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "* (AUDIT-20260606-04).".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/allowlist.ts
+  - cluster_id: cluster-0001
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "* allowlist entries) is
+      tracked in #428.".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/allowlist.ts
+  - cluster_id: cluster-0002
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "* collector so the two cannot
+      disagree (AUDIT-20260606-08).".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/allowlist.ts
+  - cluster_id: cluster-0003
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "// disallowed-attribute
+      (AUDIT-20260606-01/claude-02), not mislabeled.".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/check-mockup-lofi.ts
+  - cluster_id: cluster-0004
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "// class invariant
+      (AUDIT-20260606-01). Gating on URL_ATTRS rather than a".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/check-mockup-lofi.ts
+  - cluster_id: cluster-0005
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "// URL attr is auto-scanned
+      (AUDIT-20260606-04).".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/check-mockup-lofi.ts
+  - cluster_id: cluster-0006
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "// pulls a non-CSS resource
+      (AUDIT-20260606-02/codex-01). The exact path+hash".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/check-mockup-lofi.ts
+  - cluster_id: cluster-0007
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "* (PRD round-9/10). Symmetric
+      with the element/attribute allowlist: a denylist".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/codepoint.ts
+  - cluster_id: cluster-0008
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "* ideographic spacers as an
+      alignment channel, round-10), and an enumerated set".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/codepoint.ts
+  - cluster_id: cluster-0009
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "/** Enumerated whitespace:
+      space, newline, tab only (round-10). */".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/codepoint.ts
+  - cluster_id: cluster-0010
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "// (U+00F7) math symbols,
+      plus Latin Extended-A (U+0100–U+017F).".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/codepoint.ts
+  - cluster_id: cluster-0011
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "* text — composes to its
+      precomposed form (AUDIT-20260606-22). This rescues NFD".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/codepoint.ts
+  - cluster_id: cluster-0012
+    summary: "1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: \"return 'U+' +
+      cp.toString(16).toUpperCase().padStart(4, '0');\"."
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/codepoint.ts
+  - cluster_id: cluster-0013
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "// disagree on what counts as
+      a stylesheet link (AUDIT-20260606-08): a mixed".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/stylesheet-pin.ts
+  - cluster_id: cluster-0014
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "// `../`-escaping href pull
+      arbitrary files off disk (AUDIT-20260606-10).".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/stylesheet-pin.ts
+  - cluster_id: cluster-0015
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "// and an
+      unrecognized-algorithm-only integrity (AUDIT-20260606-15; the prior".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/stylesheet-pin.ts
+  - cluster_id: cluster-0016
+    summary: '1 matches across 1 file(s); provenance distribution:
+      registered-pattern:1. Representative shape: "// lowercased
+      (AUDIT-20260606-18 case, -19 options).".'
+    member_count: 1
+    exemplar_files:
+      - plugins/design-control/src/lint/stylesheet-pin.ts
+codebase_state_metrics:
+  generated_at: 2026-06-06T17:01:23.820Z
+  classification_completeness:
+    catalogued_distinct_shapes: 168
+    pending_distinct_shapes: 88
+    uncatalogued_candidates: 0
+    total_distinct_shapes: 256
+    ratio: 0.65625
+  coverage_per_blessed_pattern: []
+  violation_density_per_cursed_pattern: []
+  surface_uniformity: []
+  catalog_stability:
+    git_available: true
+    lookback_commits: 20
+    commits_with_edits: 17
+    total_catalog_edits: 17
+    edits_per_commit_avg: 0.85
+    trend: increasing
+  discovered_candidate_rate:
+    pending_entries_total: 88
+    unattributed_pending: 88
+    by_scan_run: []
+    trend: null
+  disposition_latency:
+    transitioned_count: 0
+    median_latency_ms: null
+    p90_latency_ms: null
+    slowest_five: []
+notes: Strawman synthesized from 6 discovery agent(s) (adopter-manifest-checker,
+  ast-grep-matrix, clone-detector-reader, prd-themed-pattern-hunter,
+  regime-holdout-detector, ui-route-enumerator). Operator curates
+  devices/scenarios/primitives.

@@ -1,0 +1,11 @@
+{
+  "agent": "clone-detector-reader",
+  "featureSlug": "design-control",
+  "baselinePath": ".dw-lifecycle/scope-discovery/clones.yaml",
+  "filterApplied": "modules-in-scope",
+  "modulesInScope": [
+    "engine-adapter",
+    "lint"
+  ],
+  "clones": []
+}

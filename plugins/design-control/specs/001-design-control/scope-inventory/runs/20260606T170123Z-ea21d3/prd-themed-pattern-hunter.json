@@ -1,0 +1,512 @@
+{
+  "agent": "prd-themed-pattern-hunter",
+  "featureSlug": "design-control",
+  "themes": [
+    {
+      "term": "referee",
+      "occurrences": [
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 114,
+          "snippet": "*  - for `referee-screenshot`: rubricItemIds present, non-empty, and echo the"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 156,
+          "snippet": "if (request.method === 'referee-screenshot') {"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 160,
+          "snippet": "'rubricItemIds must be present and non-empty on a referee-screenshot response.',"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 6,
+          "snippet": "*    `translate-design-language`, `referee-screenshot`. These require an engine"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 23,
+          "snippet": "* - `referee-screenshot`      — engine referees a rendered screenshot against a"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 33,
+          "snippet": "'referee-screenshot',"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 102,
+          "snippet": "* Rubric-item ids. Required (and load-bearing) for `referee-screenshot`;"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 135,
+          "snippet": "* `referee-screenshot` responses; may be omitted for other methods."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 175,
+          "snippet": "request: EngineAdapterRequestFor<'referee-screenshot'>,"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 176,
+          "snippet": "): Promise<EngineAdapterResponseFor<'referee-screenshot'>>;"
+        }
+      ]
+    },
+    {
+      "term": "engine",
+      "occurrences": [
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 2,
+          "snippet": "* Conformance schemas + the load-bearing echo-validator for engine-adapter"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 11,
+          "snippet": "*     check that proves the engine acted on the inputs it was handed."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 21,
+          "snippet": "} from '@/engine-adapter/types';"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 37,
+          "snippet": "* Structural schema for an engine-adapter request."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 79,
+          "snippet": "* Structural schema for an engine-adapter response. The response has no"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 106,
+          "snippet": "* `request`'s identity fields and carries the required engine metadata. Does NOT"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 214,
+          "snippet": "* Safe entry point for UNTRUSTED engine output. Runs the structural zod schemas"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 220,
+          "snippet": "* This makes the safe path the easy path: a caller wiring engine output that"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/index.ts",
+          "line": 2,
+          "snippet": "* Public surface of the design-control engine-adapter library."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/index.ts",
+          "line": 4,
+          "snippet": "* Import via `@/engine-adapter`. This barrel declares the engine-adapter"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/index.ts",
+          "line": 24,
+          "snippet": "} from '@/engine-adapter/types';"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/index.ts",
+          "line": 32,
+          "snippet": "} from '@/engine-adapter/conformance';"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/index.ts",
+          "line": 38,
+          "snippet": "} from '@/engine-adapter/preflight';"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 2,
+          "snippet": "* Fail-loud engine presence check, scoped to EXECUTION paths."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 5,
+          "snippet": "*  - EXECUTION paths (engine-driven): `author-wireframe`,"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 6,
+          "snippet": "*    `translate-design-language`, `referee-screenshot`. These require an engine"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 8,
+          "snippet": "*    them and throws loud when the engine is absent."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 11,
+          "snippet": "*    engine and works with no engine installed."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 13,
+          "snippet": "* The invariant — \"manual authoring never requires the engine\" — is enforced by"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 22,
+          "snippet": "} from '@/engine-adapter/types';"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 25,
+          "snippet": "* Probe that reports whether a given engine adapter is available. The concrete"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 37,
+          "snippet": "/** The engine method whose execution path is being gated. */"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 46,
+          "snippet": "* MANUAL authoring never calls this function — that path requires no engine."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 56,
+          "snippet": ": `Remedy: install/enable the \"${adapterId}\" engine adapter, `;"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 58,
+          "snippet": "`Engine adapter \"${adapterId}\" is required by the \"${options.method}\" execution path but is not available. ` +"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 60,
+          "snippet": "`or use the manual authoring path (which needs no engine).`,"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 2,
+          "snippet": "* Engine-adapter interface declaration for design-control."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 4,
+          "snippet": "* The engine-adapter is the contract between the design-control plugin's"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 6,
+          "snippet": "* refereeing) and a concrete design engine. The default engine is the Claude"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 9,
+          "snippet": "* wire a specific engine are supplied by callers via dependency injection."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 17,
+          "snippet": "* The three engine methods design-control invokes. Each corresponds to one"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 18,
+          "snippet": "* execution path that requires an engine to be present (see preflight)."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 20,
+          "snippet": "* - `author-wireframe`        — engine authors a wireframe from a manifest."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 21,
+          "snippet": "* - `translate-design-language` — engine translates a design-language spec into"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 23,
+          "snippet": "* - `referee-screenshot`      — engine referees a rendered screenshot against a"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 39,
+          "snippet": "* Closed set of defined failure modes an engine response may carry. A response"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 43,
+          "snippet": "* - `engine-absent`    — the required engine/adapter was not available."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 44,
+          "snippet": "* - `malformed-output` — the engine produced output that did not parse/conform."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 45,
+          "snippet": "* - `lint-rejected`    — the engine output was rejected by a lint/validation gate."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 46,
+          "snippet": "* - `low-confidence`   — the engine completed but with confidence below a usable"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 48,
+          "snippet": "* - `timeout`          — the engine did not respond within the allotted budget."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 49,
+          "snippet": "* - `internal-error`   — an unexpected internal error inside the engine/adapter."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 52,
+          "snippet": "'engine-absent',"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 88,
+          "snippet": "* Request envelope handed to an engine method, parameterised by the specific"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 95,
+          "snippet": "/** Which engine method this request targets. Narrowed to `M`. */"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 97,
+          "snippet": "/** The manifest the engine is acting on. Echoed back by the response. */"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 99,
+          "snippet": "/** Image hashes the engine is asked to act on. Echoed back by the response. */"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 117,
+          "snippet": "* Response envelope returned by an engine method, parameterised by the specific"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 119,
+          "snippet": "* response ECHOES the request's identity fields and carries the engine's model"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 128,
+          "snippet": "* The image hashes the engine acted on. Must be a superset-or-equal of the"
+        }
+      ]
+    },
+    {
+      "term": "wireframe",
+      "occurrences": [
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 5,
+          "snippet": "*  - EXECUTION paths (engine-driven): `author-wireframe`,"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 9,
+          "snippet": "*  - MANUAL authoring path (operator-driven): the operator authors a wireframe"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 5,
+          "snippet": "* execution paths (wireframe authoring, design-language translation, screenshot"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 20,
+          "snippet": "* - `author-wireframe`        — engine authors a wireframe from a manifest."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 31,
+          "snippet": "'author-wireframe',"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 169,
+          "snippet": "request: EngineAdapterRequestFor<'author-wireframe'>,"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 170,
+          "snippet": "): Promise<EngineAdapterResponseFor<'author-wireframe'>>;"
+        },
+        {
+          "file": "plugins/design-control/src/lint/allowlist.ts",
+          "line": 17,
+          "snippet": "/** The closed set of structural tags a wireframe may use. */"
+        },
+        {
+          "file": "plugins/design-control/src/lint/check-mockup-lofi.ts",
+          "line": 2,
+          "snippet": "* `check-mockup-lofi` — the lo-fi wireframe lint, axis 1 (element/attribute"
+        },
+        {
+          "file": "plugins/design-control/src/lint/check-mockup-lofi.ts",
+          "line": 162,
+          "snippet": "* Lint a wireframe HTML string against the element/attribute allowlist."
+        },
+        {
+          "file": "plugins/design-control/src/lint/codepoint.ts",
+          "line": 59,
+          "snippet": "/** True iff `cp` is permitted in wireframe text content. */"
+        },
+        {
+          "file": "plugins/design-control/src/lint/stylesheet-pin.ts",
+          "line": 12,
+          "snippet": "* check additionally ensures the link points where the wireframe expects. An"
+        },
+        {
+          "file": "plugins/design-control/src/lint/stylesheet-pin.ts",
+          "line": 26,
+          "snippet": "import { SKETCH_KIT_CSS_PATH, SKETCH_KIT_STYLESHEET_FILENAME } from '@/wireframe-kit/sketch-kit';"
+        },
+        {
+          "file": "plugins/design-control/src/lint/stylesheet-pin.ts",
+          "line": 49,
+          "snippet": "/** Directory the wireframe's relative hrefs resolve against. */"
+        },
+        {
+          "file": "plugins/design-control/src/lint/stylesheet-pin.ts",
+          "line": 60,
+          "snippet": "* the wireframe's directory; `canonicalPath` defaults to the kit stylesheet"
+        },
+        {
+          "file": "plugins/design-control/src/lint/stylesheet-pin.ts",
+          "line": 61,
+          "snippet": "* sitting next to the wireframe (the conventional adopter layout)."
+        },
+        {
+          "file": "plugins/design-control/src/lint/stylesheet-pin.ts",
+          "line": 115,
+          "snippet": "* Verify the wireframe links exactly one stylesheet and that it IS the pinned"
+        }
+      ]
+    },
+    {
+      "term": "surface",
+      "occurrences": [
+        {
+          "file": "plugins/design-control/src/engine-adapter/index.ts",
+          "line": 2,
+          "snippet": "* Public surface of the design-control engine-adapter library."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 28,
+          "snippet": "* loop all derive from one declaration — collapsing the drift surface to one site."
+        },
+        {
+          "file": "plugins/design-control/src/lint/index.ts",
+          "line": 2,
+          "snippet": "* Public surface of the design-control lint library."
+        }
+      ]
+    },
+    {
+      "term": "scaffold",
+      "occurrences": []
+    },
+    {
+      "term": "spec",
+      "occurrences": [
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 21,
+          "snippet": "* - `translate-design-language` — engine translates a design-language spec into"
+        },
+        {
+          "file": "plugins/design-control/src/lint/stylesheet-pin.ts",
+          "line": 30,
+          "snippet": "/** SRI hash algorithms, strongest first (the order the SRI spec selects by). */"
+        }
+      ]
+    },
+    {
+      "term": "gate",
+      "occurrences": [
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 45,
+          "snippet": "* - `lint-rejected`    — the engine output was rejected by a lint/validation gate."
+        },
+        {
+          "file": "plugins/design-control/src/lint/allowlist.ts",
+          "line": 97,
+          "snippet": "* stylesheet link. Shared by axis-1's link-rel gate and the identity-pin's link"
+        }
+      ]
+    },
+    {
+      "term": "never",
+      "occurrences": [
+        {
+          "file": "plugins/design-control/src/engine-adapter/conformance.ts",
+          "line": 223,
+          "snippet": "* Unlike {@link validateConformance} (which never throws), this function throws if"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 10,
+          "snippet": "*    by hand. This path NEVER calls {@link preflightEngine}, so it requires no"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 13,
+          "snippet": "* The invariant — \"manual authoring never requires the engine\" — is enforced by"
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/preflight.ts",
+          "line": 46,
+          "snippet": "* MANUAL authoring never calls this function — that path requires no engine."
+        }
+      ]
+    },
+    {
+      "term": "viewport",
+      "occurrences": []
+    },
+    {
+      "term": "manifest",
+      "occurrences": [
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 20,
+          "snippet": "* - `author-wireframe`        — engine authors a wireframe from a manifest."
+        },
+        {
+          "file": "plugins/design-control/src/engine-adapter/types.ts",
+          "line": 97,
+          "snippet": "/** The manifest the engine is acting on. Echoed back by the response. */"
+        }
+      ]
+    },
+    {
+      "term": "gross",
+      "occurrences": []
+    },
+    {
+      "term": "baseline",
+      "occurrences": []
+    }
+  ]
+}
