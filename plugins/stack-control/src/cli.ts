@@ -44,6 +44,8 @@ import { runScopeSummary } from './subcommands/scope-summary.js';
 import { runScopeExport } from './subcommands/scope-export.js';
 import { runScopeDoctor } from './subcommands/scope-doctor.js';
 import { runCustomize } from './subcommands/customize.js';
+import { runScopeInventory } from './subcommands/scope-inventory.js';
+import { runScopeWiden } from './subcommands/scope-widen.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -99,6 +101,9 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   'scope-doctor': runScopeDoctor,
   'scope-summary': runScopeSummary,
   'scope-export': runScopeExport,
+  // Scope-discovery: upfront surface discovery + mid-impl widening (010 / US3).
+  'scope-inventory': runScopeInventory,
+  'scope-widen': runScopeWiden,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

@@ -86,16 +86,16 @@ description: "Task list — Migrate scope-discovery into stack-control"
 
 **Goal**: `scope-inventory` fans the agents → schema-valid manifest; `scope-widen` surfaces missed siblings; green ≠ all-clear. **Independent test**: quickstart Scenario 3.
 
-- [ ] T030 [P] [US3] RED: `__tests__/scope-discovery/synthesis.test.ts` — synthesis folds agent outputs into a schema-valid manifest; novel-shape candidates surfaced, NOT reported all-clear (FR-017).
-- [ ] T031 [P] [US3] RED: `__tests__/scope-discovery/discovery-agents.test.ts` — the four universal agents produce expected surfaces over a fixture; route-enumerator default is override-able (FR-018).
-- [ ] T032 [P] [US3] RED: `__tests__/scope-discovery/scope-widen.test.ts` — widen surfaces a sibling absent from the prior manifest, reconciled (FR-016).
-- [ ] T033 [US3] GREEN: port `discovery-agents/{ui-route-enumerator,pattern-matrix,prd-themed-pattern-hunter,prd-relevance,clone-detector-reader,shared,types,synthesis-discovered-candidates}.ts` + `pattern-handlers/*` → T031 GREEN.
-- [ ] T034 [US3] GREEN: port `discovery-agents/codebase-state-metrics*.ts` SPLIT to ≤500 lines (extract gather/types per R4) → agent test GREEN.
-- [ ] T035 [US3] GREEN: port `synthesis*.ts` (synthesis, -cli, -derive, -derive-regime, -error-hints, -report, -types, -warnings) → T030 GREEN.
-- [ ] T036 [US3] GREEN: port `scope-inventory.ts` SPLIT to ≤500 (extract fan-out/evidence helper per R4) + `scope-inventory-cli.ts` → inventory test GREEN (FR-015).
-- [ ] T037 [US3] GREEN: port `scope-widen.ts` + `scope-widen-cli.ts` + `scope-widen-delta.ts` → T032 GREEN.
-- [ ] T038 [US3] Add subcommands `scope-inventory`, `scope-widen` + register in `src/cli.ts`; author the two `/stack-control:*` skills.
-- [ ] T039 [US3] Integration: drive quickstart Scenario 3 end-to-end.
+- [X] T030 [P] [US3] RED: `__tests__/scope-discovery/synthesis.test.ts` — synthesis folds agent outputs into a schema-valid manifest; novel-shape candidates surfaced, NOT reported all-clear (FR-017).
+- [X] T031 [P] [US3] RED: `__tests__/scope-discovery/discovery-agents.test.ts` — the four universal agents produce expected surfaces over a fixture; route-enumerator default is override-able (FR-018).
+- [X] T032 [P] [US3] RED: `__tests__/scope-discovery/scope-widen.test.ts` — widen surfaces a sibling absent from the prior manifest, reconciled (FR-016).
+- [X] T033 [US3] GREEN: port `discovery-agents/{ui-route-enumerator,pattern-matrix,prd-themed-pattern-hunter,prd-relevance,clone-detector-reader,shared,types,synthesis-discovered-candidates}.ts` + `pattern-handlers/*` → T031 GREEN.
+- [X] T034 [US3] GREEN: port `discovery-agents/codebase-state-metrics*.ts` SPLIT to ≤500 lines (extract gather/types per R4) → agent test GREEN.
+- [X] T035 [US3] GREEN: port `synthesis*.ts` (synthesis, -cli, -derive, -derive-regime, -error-hints, -report, -types, -warnings) → T030 GREEN.
+- [X] T036 [US3] GREEN: port `scope-inventory.ts` SPLIT to ≤500 (extract fan-out/evidence helper per R4) + `scope-inventory-cli.ts` → inventory test GREEN (FR-015).
+- [X] T037 [US3] GREEN: port `scope-widen.ts` + `scope-widen-cli.ts` + `scope-widen-delta.ts` → T032 GREEN.
+- [X] T038 [US3] Add subcommands `scope-inventory`, `scope-widen` + register in `src/cli.ts`; author the two `/stack-control:*` skills.
+- [X] T039 [US3] Integration: drive quickstart Scenario 3 end-to-end.
 
 ---
 
