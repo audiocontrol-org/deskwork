@@ -5,12 +5,13 @@
 #
 # Mirrors plugins/dw-lifecycle/bin/dw-lifecycle's resolution order. The
 # runtime deps the dispatched code imports are markdown-it, peggy, yaml,
-# and tsx (the document-primitives block-stream / grammar-parse /
-# grammar-resolver modules import the first three at runtime). The probe
-# list below MUST stay in sync with package.json's "dependencies" — if the
-# plugin gains a new runtime dep, add it to RUNTIME_DEPS or an adopter
-# install with a partial node_modules/ will skip npm install and then fail
-# Node module resolution on first dispatch.
+# jscpd, ajv, ajv-formats, and tsx (the document-primitives modules import
+# the first three at runtime; the scope-discovery clone-detector + schema
+# validators import jscpd/ajv/ajv-formats — 010). The probe list below MUST
+# stay in sync with package.json's "dependencies" — if the plugin gains a new
+# runtime dep, add it to RUNTIME_DEPS or an adopter install with a partial
+# node_modules/ will skip npm install and then fail Node module resolution on
+# first dispatch.
 #
 # Resolution order (first match wins):
 #   1. Workspace dev path: tsx resolves from an ancestor's
@@ -79,7 +80,7 @@ dep_installed() {
 # the runner. A probe that only checked tsx would skip npm install on a
 # partial adopter install (tsx present, the rest missing) and then crash on
 # Node module resolution at first dispatch.
-RUNTIME_DEPS="markdown-it peggy yaml tsx"
+RUNTIME_DEPS="markdown-it peggy yaml jscpd ajv ajv-formats tsx"
 
 # Probe every declared runtime dep.
 all_deps_installed() {

@@ -52,12 +52,12 @@ description: "Task list — Migrate scope-discovery into stack-control"
 
 **Goal**: `stackctl check-clones` finds duplication scoped to the codebase by default, never cross-codebase. **Independent test**: quickstart Scenario 1 (two-codebase fixture; cross-codebase exclusion; vendored audit-barrage not flagged).
 
-- [ ] T014 [P] [US1] RED: `__tests__/scope-discovery/check-clones.percodebase.test.ts` — two-installation fixture with a cross-codebase duplicate + an intra-A duplicate: default run from A reports intra-A only, zero A↔B matches; explicit `--root` honored (FR-005/006/008; SC-001).
-- [ ] T015 [P] [US1] RED: `__tests__/scope-discovery/check-clones.vendored.test.ts` — the audit-barrage vendored from dw-lifecycle into stack-control is NOT reported as a clone (SC-002).
-- [ ] T016 [US1] GREEN: port `scope-discovery/clone-detector.ts` with the boundary default = resolved installation root (T005), nested children added to jscpd ignore; retain `--root`/`--baseline`/`--gate-mode`/`--diff`/`--json`/`--quiet` flags → T014/T015 GREEN.
-- [ ] T017 [US1] Add `check-clones` subcommand `src/subcommands/check-clones.ts` (flag validation, exit-code convention per contracts) and register it in `src/cli.ts`.
-- [ ] T018 [P] [US1] Author `/stack-control:check-clones` skill at `skills/check-clones/SKILL.md` (thin adapter over the verb).
-- [ ] T019 [US1] Integration: `__tests__/scope-discovery/check-clones.integration.test.ts` drives quickstart Scenario 1 end-to-end against the tmp fixture.
+- [X] T014 [P] [US1] RED: `__tests__/scope-discovery/check-clones.percodebase.test.ts` — two-installation fixture with a cross-codebase duplicate + an intra-A duplicate: default run from A reports intra-A only, zero A↔B matches; explicit `--root` honored (FR-005/006/008; SC-001).
+- [X] T015 [P] [US1] RED: `__tests__/scope-discovery/check-clones.vendored.test.ts` — the audit-barrage vendored from dw-lifecycle into stack-control is NOT reported as a clone (SC-002).
+- [X] T016 [US1] GREEN: port `scope-discovery/clone-detector.ts` with the boundary default = resolved installation root (T005), nested children added to jscpd ignore; retain `--root`/`--baseline`/`--gate-mode`/`--diff`/`--json`/`--quiet` flags → T014/T015 GREEN.
+- [X] T017 [US1] Add `check-clones` subcommand `src/subcommands/check-clones.ts` (flag validation, exit-code convention per contracts) and register it in `src/cli.ts`.
+- [X] T018 [P] [US1] Author `/stack-control:check-clones` skill at `skills/check-clones/SKILL.md` (thin adapter over the verb).
+- [X] T019 [US1] Integration: `__tests__/scope-discovery/check-clones.integration.test.ts` drives quickstart Scenario 1 end-to-end against the tmp fixture.
 
 **Checkpoint**: per-codebase clone detection works by default and is the proven boundary the rest builds on.
 

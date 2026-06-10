@@ -21,8 +21,10 @@
 
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { type CloneGroup, makeCloneGroup, sha1HexOfText } from './clones-yaml.js';
 import { isEnoent, isPlainObject } from './util/typeguards.js';
 
@@ -64,13 +66,14 @@ export async function runJscpd(opts: {
 
   const ignoreGlobs = [...BASE_IGNORE, ...opts.ignore.map((p) => toIgnoreGlob(opts.root, p))];
 
-  // `--yes` to npx so it never prompts to install in non-TTY contexts (stdin is
-  // 'ignore' below, so a prompt would hang). `--absolute` so report member
-  // paths are absolute (stable across cwd). `--gitignore` honors the tree's
-  // .gitignore. `--silent` suppresses progress; we read the JSON instead.
+  // Resolve and run the LOCALLY-INSTALLED jscpd (pinned ^4) via node — NOT
+  // `npx jscpd`, which from a scan cwd outside the repo would fetch a different
+  // (newer, flag-incompatible) jscpd from the registry. `--absolute` so report
+  // member paths are absolute (stable across cwd); `--gitignore` honors the
+  // tree's .gitignore; `--silent` suppresses progress (we read the JSON).
+  const jscpdBin = resolveJscpdBin();
   const jscpdArgs = [
-    '--yes',
-    'jscpd',
+    jscpdBin,
     opts.root,
     '--min-tokens',
     MIN_TOKENS,
@@ -89,7 +92,7 @@ export async function runJscpd(opts: {
 
   let stderr = '';
   await new Promise<void>((resolvePromise, rejectPromise) => {
-    const proc = spawn('npx', jscpdArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const proc = spawn(process.execPath, jscpdArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
     proc.stdout?.on('data', () => {
       /* swallow jscpd progress; we read the JSON report instead */
     });
@@ -132,6 +135,28 @@ export async function detectClonesViaJscpd(opts: {
   } finally {
     await rm(reportAbs, { force: true }).catch(() => undefined);
   }
+}
+
+/**
+ * Resolve the locally-installed jscpd JS entry by walking up from this module
+ * to the nearest `node_modules/jscpd/bin/jscpd` (mirrors _run-helpers.resolveTsx
+ * / bin/stackctl's find-by-walk-up — works whether npm hoisted the dep to the
+ * monorepo root or nested it plugin-local). Fail loud (Principle V) if absent —
+ * never silently fall back to a registry fetch that could be a different jscpd.
+ */
+function resolveJscpdBin(): string {
+  let cur = dirname(fileURLToPath(import.meta.url));
+  for (;;) {
+    const candidate = join(cur, 'node_modules', 'jscpd', 'bin', 'jscpd');
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  throw new Error(
+    'jscpd not found: no node_modules/jscpd/bin/jscpd at or above the scope-discovery ' +
+      'module. Run `npm install` (jscpd is a declared dependency).',
+  );
 }
 
 /** An absolute excluded path → a glob jscpd will match; a glob passes through. */
