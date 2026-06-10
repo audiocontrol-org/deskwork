@@ -6,11 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:32'
+updated_date: '2026-06-10 21:51'
 labels:
   - agent-found
   - 'type:gap'
-  - promoted
 dependencies: []
 references:
   - gh-434
@@ -30,9 +29,3 @@ Recovered from #434 (closed NOT_PLANNED during the GitHub->backlog migration, wh
 
 **Scope:** spans 004 (spec-governance) + 006 (roadmap reconcile). Surfaced during 006 US5 implementation.
 <!-- SECTION:DESCRIPTION:END -->
-
-## Implementation Notes
-
-<!-- SECTION:NOTES:BEGIN -->
-- **Promoted-to:** tasks:specs/013-audit-protocol-hardening
-<!-- SECTION:NOTES:END -->

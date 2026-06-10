@@ -6,10 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:20'
+updated_date: '2026-06-10 21:51'
 labels:
   - agent-found
   - 'type:bug'
+  - promoted
 dependencies: []
 references:
   - gh-442
@@ -49,3 +50,9 @@ Teach the feature resolver to consult `.specify/feature.json` / the `specs/NNN-<
 
 Discovered live; local backlog ref: design-control installation TASK-5. Filed per the new policy: tooling friction goes to GitHub issues (reliably cross-project).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** spec:specs/013-audit-protocol-hardening
+<!-- SECTION:NOTES:END -->
