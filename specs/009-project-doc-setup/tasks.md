@@ -108,7 +108,7 @@ Source: `plugins/stack-control/src/…` · Tests: `plugins/stack-control/tests/�
 - [X] T031 [P] `tsc` strict + lint clean (no `any`/`as`/`@ts-ignore`); confirm every new module ≤ 500 lines (Principle VI).
 - [X] T032 [P] Update `plugins/stack-control/README.md` (+ the new SKILL.md) documenting `stackctl setup` and the `.stack-control/config.yaml` contract; note CLI-first/surface-agnostic resolution.
 - [X] T033 Run `bash .dw-lifecycle/scope-discovery/clone-snapshot.sh`; refactor or justify any NEW clone (watch `config/config-loader.ts` vs the audit-barrage `config-loader.ts` — extract a shared YAML-load helper if duplicated).
-- [ ] T034 Surface to the operator (do NOT auto-merge) that `design:gap/project-relative-doc-discovery` is likely subsumed by the read-side wiring landed here — for a `roadmap reconcile` decision (plan § Scope-coordination note).
+- [X] T034 Surface to the operator (do NOT auto-merge) that `design:gap/project-relative-doc-discovery` is likely subsumed by the read-side wiring landed here — for a `roadmap reconcile` decision (plan § Scope-coordination note).
 
 ---
 
