@@ -57,3 +57,8 @@ stance. Source essay: <https://stackcontrol.org/blog/the-lifecycle-and-why-agent
 - TypeScript: strict, `@/` imports, no `any`/`as`/`@ts-ignore`, files < 300–500 lines, no
   fallbacks/mock-data outside tests (throw instead). `npm --workspace @deskwork/plugin-design-control test`
   runs `tsc --noEmit && vitest`.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
