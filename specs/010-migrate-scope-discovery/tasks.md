@@ -23,9 +23,9 @@ description: "Task list — Migrate scope-discovery into stack-control"
 
 ## Phase 1: Setup (shared infrastructure)
 
-- [ ] T001 Add `jscpd` ^4, `ajv` ^8, `ajv-formats` ^3 to `plugins/stack-control/package.json` dependencies (R2); run `npm install` and confirm the workspace resolves.
-- [ ] T002 [P] Create the `plugins/stack-control/src/scope-discovery/{discovery-agents,discovery-agents/pattern-handlers,doctor-rules,schema,util}/` directory skeleton per plan § Project Structure.
-- [ ] T003 [P] Create the test root `plugins/stack-control/src/__tests__/scope-discovery/` with a shared tmp-fixture helper (two-installation fixture builder) used by integration tests.
+- [X] T001 Add `jscpd` ^4, `ajv` ^8, `ajv-formats` ^3 to `plugins/stack-control/package.json` dependencies (R2); run `npm install` and confirm the workspace resolves.
+- [X] T002 [P] Create the `plugins/stack-control/src/scope-discovery/{discovery-agents,discovery-agents/pattern-handlers,doctor-rules,schema,util}/` directory skeleton per plan § Project Structure.
+- [X] T003 [P] Create the test root `plugins/stack-control/src/__tests__/scope-discovery/` with a shared tmp-fixture helper (two-installation fixture builder) used by integration tests.
 
 ---
 
