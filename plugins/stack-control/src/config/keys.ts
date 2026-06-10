@@ -13,4 +13,8 @@ export const WORKING_FILE_KEYS: readonly WorkingFileKey[] = [
   'inbox',
   'backlog',
   'auditLog',
+  // session-skills (011) — extends the managed set (009 FR-001).
+  'journal',
+  'toolingFeedback',
+  'cloneScope',
 ];

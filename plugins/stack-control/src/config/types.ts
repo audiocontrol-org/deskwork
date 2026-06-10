@@ -15,7 +15,18 @@
  * records only their `featureAuditLogPattern`) and operation-products (created
  * lazily by the verb that produces them).
  */
-export type WorkingFileKey = 'config' | 'roadmap' | 'inbox' | 'backlog' | 'auditLog';
+export type WorkingFileKey =
+  | 'config'
+  | 'roadmap'
+  | 'inbox'
+  | 'backlog'
+  | 'auditLog'
+  // session-skills (011) extends the managed set with three keys it owns — the
+  // additive change 009's FR-001 anticipates (a second real consumer of the
+  // port). journal/toolingFeedback are human docs at root; cloneScope is a dir.
+  | 'journal'
+  | 'toolingFeedback'
+  | 'cloneScope';
 
 /** Optional per-file location overrides (relative-to-root, or absolute within root). */
 export interface InstallationPaths {
@@ -25,6 +36,11 @@ export interface InstallationPaths {
   readonly auditLog?: string;
   /** Per-feature audit-log pattern; MUST contain the literal `{feature}` placeholder. */
   readonly featureAuditLogPattern?: string;
+  // session-skills (011) keys.
+  readonly journal?: string;
+  readonly toolingFeedback?: string;
+  /** The per-codebase clone-detection scope (a directory). */
+  readonly cloneScope?: string;
 }
 
 /** Parsed + validated `.stack-control/config.yaml` (in-memory, camelCase). */

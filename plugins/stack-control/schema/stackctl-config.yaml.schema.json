@@ -31,6 +31,21 @@
           "minLength": 1,
           "description": "Per-feature audit-log pattern; MUST contain the literal {feature} placeholder.",
           "pattern": "\\{feature\\}"
+        },
+        "journal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "session-skills (011): the development journal (human doc); default <root>/DEVELOPMENT-NOTES.md. session-end appends, session-start reads the latest entry."
+        },
+        "tooling_feedback": {
+          "type": "string",
+          "minLength": 1,
+          "description": "session-skills (011): the tooling-friction log (human doc); default <root>/tooling-feedback.md. session-end appends."
+        },
+        "clone_scope": {
+          "type": "string",
+          "minLength": 1,
+          "description": "session-skills (011): the per-codebase clone-detection scope (a directory); default the installation root. session-end's advisory clone-snapshot scans this subtree."
         }
       }
     }

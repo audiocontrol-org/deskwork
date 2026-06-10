@@ -30,6 +30,10 @@ const PATHS_KEY_MAP: ReadonlyMap<string, keyof InstallationPaths> = new Map([
   ['backlog', 'backlog'],
   ['audit_log', 'auditLog'],
   ['feature_audit_log_pattern', 'featureAuditLogPattern'],
+  // session-skills (011) keys.
+  ['journal', 'journal'],
+  ['tooling_feedback', 'toolingFeedback'],
+  ['clone_scope', 'cloneScope'],
 ]);
 
 /** Read + validate a config file from disk. `configPath` labels every error. */
