@@ -4669,3 +4669,164 @@ Surface:    commit subject `docs(scope-discovery): disposition AUDIT-35/36/38 fr
 The audited range dispositions four findings — AUDIT-35, 36, 37, and 38 — adding Task 46/47/48/49 to the workplan and four blocks to the audit-log. AUDIT-37's audit-log block carries `Status: fixed-9fb4db0b…` and Task 48 (`Closes AUDIT-20260604-37`) is a full fix-task. Yet the docs commit subject enumerates only "AUDIT-35/36/38," dropping 37. Whether 37's disposition landed in the docs commit or the test commit (`9fb4db0b`, subject "pin bare {{prompt-stdin}} template strips to empty argv"), no commit subject in the range names "disposition AUDIT-37" — so a reader scanning `git log --oneline` for where 37 was handled finds no subject-level signal.
 
 This is the same subject/content-drift class the prior audit-log already flagged repeatedly (AUDIT-31/33/36: "the commit subject says X while the durable record does Y"). It's cosmetic here — the content reconciles — but the project's own `DEVELOPMENT-NOTES.md` § "Quantitative reporting conventions" treats subject-vs-content honesty as load-bearing. Fix: when a single docs commit dispositions four findings, the subject should list all four (or say "AUDIT-35–38"), so the enumerated set matches the blocks the commit actually writes.
+
+## 2026-06-04 — audit-barrage lift (20260604T183413186Z-scope-discovery)
+
+### AUDIT-20260604-41 — README marks Phase 12 Task 9 "not started" while the workplan in the same diff marks all of Task 9 complete
+
+Finding-ID: AUDIT-20260604-41 (claude-01 + claude-02 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md` (Phase 12 row, "Task 9 (#396 …) not started") vs. `docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md` Task 9 (all of Step 0–4 flipped `- [ ]` → `- [x]`)
+
+The README Phase 12 cell edited in this diff states: *"Task 9 (#396 — `audit-barrage-render` `{{var}}` false-positives) not started."* The workplan edit in the same diff range flips every one of Task 9's Step 0–4 boxes to `[x]` and three of four acceptance-criteria boxes to `[x]`, with a state-accounting note asserting the fix "already shipped on this branch + on main." The top commit subject (`5aaf81a9 … tick Phase 12 Task 9 — #396 … fix shipped pre-scoping`) confirms the workplan was ticked in a later commit that did not back-update the README row. The net HEAD state therefore has two canonical feature docs directly contradicting each other on the same task's status.
+
+This is the subject-vs-content drift class the audit-log already flags repeatedly (AUDIT-31/33/36/40). A future reader reconciling "what's left in Phase 12" gets opposite answers from the README and the workplan. Fix: update the README Phase 12 cell to reflect that Task 9's substance shipped pre-scoping (mirroring the Task 8 treatment already in that cell), so the README and workplan agree.
+
+### AUDIT-20260604-42 — AUDIT-39 fix removes the false e2e claim but leaves the bare-`{{prompt-stdin}}` gemini default with no end-to-end spawn coverage
+
+Finding-ID: AUDIT-20260604-42
+Status:     acknowledged-slush-pile-2026-06-04
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/audit-barrage/spawn-cli.test.ts:329-350` (AUDIT-37 test, post-AUDIT-39 edit)
+
+The diff correctly deletes the over-claiming "Verified via integration …" sentence (AUDIT-39's ask) and replaces it with an honest "Coverage scope … UNIT-level only" comment. Good. But the chosen disposition closes the honesty defect by *narrowing the claim*, not by closing the gap AUDIT-37 originally named: the gemini default now ships the bare-token `args_template: "{{prompt-stdin}}"` shape, and the only test pinning it is the `buildArgs('  {{prompt-stdin}}  ', …) === []` unit assertion. No test drives that bare shape through `spawnCli` end-to-end; the new comment itself concedes the spawn path "is NOT" exercised. The e2big counterfactual tests still use placeholder-preceded-by-tokens shapes (`-p {{prompt-stdin}}`, `-e … {{prompt-stdin}}`), exactly as AUDIT-37 said.
+
+This is the highest-risk shape of the new default (a stray empty-string argv element would only manifest at actual spawn), and it remains verified only at the `buildArgs` boundary. The honesty fix is real and sufficient to stop the false record, so this is low severity — but the operator should know the disposition traded coverage for accuracy rather than adding the missing assertion. A genuine close would add one `spawnCli`-level assertion that the bare-placeholder template launches the gemini-shaped fake CLI with zero argv (not `['']`) and exits 0.
+
+## 2026-06-06 — audit-barrage lift (20260606T154751269Z-scope-discovery)
+
+### AUDIT-20260606-01 — Async race condition between scoped findings → tooling-feedback.md template is read but absent from the audited range; readFile has no guard, turning a missing template into an unhandled crash strictly worse than the bug it replaces
+
+Finding-ID: AUDIT-20260606-01 (claude-01 + codex-01; cross-model)
+Status:     fixed-f40dec3e
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/subcommands/audit-barrage-lift.ts:120-160` (`ensureAuditArtifactsExist`) + missing `plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md`
+
+**Disposition note:** This entry merged TWO distinct HIGH findings (claude's missing-template-guard concern + codex's dry-run-mutation concern) under one ID because the audit-barrage-lift ran against the v0.38.0 installed binary, which still carries the pre-#427 OR-edge over-merge bug — the very bug AUDIT-01's claude half complains about IS what produced AUDIT-01 itself. Both underlying defects landed in `f40dec3e`: (a) dry-run no longer mutates filesystem (init gated on `opts.apply`); (b) template ENOENT converted to clean exit 2 + actionable diagnostic via try/catch + `missingTemplates` result field. The `tooling-feedback.md` template existed in the repo (not a packaging defect); audit was correct that it wasn't in the audited diff range. Cure verified by `audit-barrage-lift.first-barrage.test.ts` dry-run scenario + helper-shape assertion.
+
+`ensureAuditArtifactsExist` reads **two** templates with bare `readFile`:
+
+```js
+const tmpl = await readFile(join(tdir, 'audit-log.md'), 'utf8');   // added in this diff
+...
+const tmpl = await readFile(join(tdir, 'tooling-feedback.md'), 'utf8'); // NOT in this diff
+```
+
+The diff adds `templates/scope-discovery/audit-log.md` (`new file mode`) but the symmetric `tooling-feedback.md` template — which the code reads and the new test (`audit-barrage-lift.first-barrage.test.ts:103`, asserting `# Tooling Feedback — ${slug}`) depends on — is **not in the audited range**. A reviewer cannot confirm it exists, nor verify the `substituteSlug` claim that it uses the HTML-escaped `&lt;feature-slug&gt;` form. If `audit-log.md` is genuinely new in Phase 29, its symmetric sibling should be too; its absence is either an incomplete commit or an undocumented pre-existing dependency.
+
+Worse, neither `readFile` is wrapped in try/catch. The pre-#426 code returned a clean `return 2` with a human-readable message when `audit-log.md` was absent. The new code, if **either** template is missing on an adopter machine — e.g. `templates/scope-discovery/` is not in the published npm package's `files` allowlist (a packaging defect this diff doesn't let me verify) — throws an unhandled ENOENT and rejects the whole `runAuditBarrageLift` promise. That is a strictly worse failure mode than the bug being fixed: the operator's first barrage now crashes the entire `implement-hook` chain with a stack trace instead of a tracked finding. Per `.claude/rules/agent-discipline.md` § "Packaging IS UX," wrap both reads and emit a clean diagnostic (`return 2`) that names the missing template path, and include the `tooling-feedback.md` template in the change so the dependency is auditable.
+
+### AUDIT-20260606-02 — Async dispatch race → AND-semantic raises the bar for *recognizing* cross-model agreement; no test pins the genuine same-bug/different-heading case, so the core HIGH-confidence signal can now silently under-merge
+
+Finding-ID: AUDIT-20260606-02
+Status:     informational
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/extract-barrage-findings.ts:241` (the `&&` edge condition)
+
+**Disposition rationale:** Accepted as a design tradeoff per #427's chosen "medium fix" (operator-confirmed in the Phase 29 scoping step). The pre-#427 OR-edge over-merged distinct mechanisms touching the same surface — actively hiding real defects (the design-control dogfood's three run-dirs each merged 3-5 distinct findings under one ID). The post-#427 AND-edge does narrow what counts as cross-model agreement, but: (a) `mergeCluster` now concatenates EVERY cluster member's body labelled by source model — so when cross-model agreement IS recognized, both perspectives surface; (b) the operator can still see the same-cause-different-heading cross-model signal by reading the two distinct entries side-by-side, which is materially better than the over-merged hide-behind-attribution-suffix shape; (c) the canary surfaces — design-control's `(claude-XX + codex-XX)` shape — typically share BOTH 12+ char heading overlap AND surface (the cross-model audit guidance encourages models to be specific about the defect), so legitimate cross-model merges continue to fire. The case where two models flag the same root cause with NO 12-char heading overlap is rare in practice (audit-barrage-prompt.md guides models toward concrete defect headings). Re-evaluate if real-world dogfood surfaces cases where genuine cross-model agreement splits into two entries — file as a follow-up issue then.
+
+The fix flips the cluster-edge condition from `headingsAgree(...) || surfacesAgree(...)` to `headingsAgree(...) && surfacesAgree(...)`. This correctly stops the #427 over-merge, but it trades a false-merge problem for a false-split one against the exact signal audit-barrage exists to produce. Per `.claude/rules/agent-discipline.md`: *"Cross-model agreement (two+ models flagging the same root cause) is the HIGH-confidence signal."*
+
+In practice two models flagging the **same** bug frequently phrase headings with no 12-char literal overlap — `"Null deref in parseConfig"` vs `"parseConfig crashes on empty input"` describe one defect but share no 12-char substring. Pre-#427 these merged via surface and surfaced as a cross-model HIGH-confidence cluster; post-#427 they split into two independent findings, and the operator loses the very "two models agree" signal the barrage is for. The hard `&&` has no escape hatch (e.g. "surface-only edge still merges when both findings are HIGH severity and name the same `path:line`").
+
+Critically, **none of the added tests pin this risk**. Both AND tests (`extract-barrage-findings.test.ts:`"merges 2-model agreement via heading-substring + same surface"`; `.merge.test.ts:`"legitimately merges mixed-rel claude+codex pair") use headings that already share a long literal substring, so they only exercise the easy case. There is no test asserting that a genuine cross-model same-root-cause pair with *paraphrased* headings still clusters — which is the case most likely to regress in real use. Add a fixture for the paraphrased-heading cross-model pair and decide explicitly whether it should merge; if the answer is "no," document that audit-barrage now requires heading-wording agreement to detect cross-model consensus, because that is a material narrowing of the tool's headline contract.
+
+### AUDIT-20260606-03 — Promise resolution after dispose → post-write duplicate check fails loud only *after* the corrupted workplan is already written to disk; no rollback leaves the repo in an inconsistent committed-on-disk state
+
+Finding-ID: AUDIT-20260606-03
+Status:     fixed-8ba1afca3c5cf493744177f3ac6a9122d414447e
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/promote-findings.ts:502-516` (post-write assertion block)
+
+The new defensive check runs `findDuplicateTaskHeadings` on the workplan **after** `applyProposal` has already written it:
+
+```js
+if (result.workplanWritten) {
+  const postWorkplan = await args.read.workplan(workplanPath);
+  const dups = findDuplicateTaskHeadings(postWorkplan);
+  if (dups.length > 0) { stderr.write(...); return 1; }
+}
+```
+
+When this fires, the duplicate-laden workplan is **already persisted to disk** — the check detects the corruption but does not prevent it. The error message instructs the operator to "Renumber the duplicates by hand, then re-run," but in the meantime the feature's canonical workplan has colliding `### Task X.Y` headings on disk, and `applyStatusFlips` (imported at line 36) may have already mutated `audit-log.md` to mark the findings scoped — so the audit-log now claims a clean disposition while the workplan it points at is broken. That is the precise subject-vs-content drift class the project's own audit-log flags repeatedly (AUDIT-31/33/36/40/41).
+
+A "defense" that persists the corruption it detects is half a guard. Either compute the proposed workplan text in memory and run `findDuplicateTaskHeadings` *before* writing (rejecting with no disk mutation), or capture the pre-write workplan and restore it on a non-empty `dups` result so the failure is atomic. Failing loud is good; failing loud after committing the bad state to disk is not the same thing.
+
+### AUDIT-20260606-04 — Method-envelope binding wrong on rebind → `collectAllTaskIds` silently drops a mixed dotted/flat ledger range, leaving those archived IDs re-issuable by the very forward-walk that depends on the set being complete
+
+Finding-ID: AUDIT-20260606-04
+Status:     fixed-8ba1afca3c5cf493744177f3ac6a9122d414447e
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:380-405` (ledger-range expansion in `collectAllTaskIds`)
+
+The range expander handles two shapes — both-dotted (`5.1-5.123`) and both-flat (`1-5`) — via:
+
+```js
+if (dotStart !== -1 && dotEnd !== -1) { ...dotted... }
+else if (dotStart === -1 && dotEnd === -1) { ...flat... }
+```
+
+A **mixed** range where one endpoint is dotted and the other flat (`5.1-8`, or a malformed `39-39.5`) matches neither branch and is silently skipped — no `continue` warning, no fallthrough add. The whole point of feeding `takenIds` into `nextTaskNumberFactory` (#420) is to forward-walk past every archived ID; an archived range that falls through this gap is **not** in the set, so the factory can re-issue an ID the ledger says is taken — re-introducing exactly the collision class the fix targets. The same silent-skip also happens when `prefix !== endPrefix` (a cross-prefix dotted range like `39.10-40.2`). These are edge shapes, but the ledger is hand-written, so malformed/mixed ranges are realistic. At minimum, log a warning when a ledger range matches no branch so the dropped range is visible rather than silently un-defended.
+
+### AUDIT-20260606-05 — TODO/FIXME comments still in source → `.dw-lifecycle/close-shipped/runs/<ts>/` uses second-granularity timestamps and ships no gitignore/cleanup, so the "never clobbers under concurrent invocations" claim is overstated and the dir accrues untracked cruft
+
+Finding-ID: AUDIT-20260606-05 (claude-05 + codex-02; cross-model)
+Status:     fixed-8ba1afca3c5cf493744177f3ac6a9122d414447e
+Severity:   low
+Surface:    `plugins/dw-lifecycle/skills/close-shipped/SKILL.md:258-279` (the new `RUN_DIR` block + the explanatory paragraph)
+
+The replacement for bare `/tmp/release-notes.md` is genuinely better (worktree-local), but two claims/omissions undercut it:
+
+1. **Collision claim is overstated.** `RUN_DIR=".dw-lifecycle/close-shipped/runs/$(date -u +%Y%m%dT%H%M%SZ)"` is second-granularity. The prose asserts it "never clobbers under concurrent invocations," but two `/release` runs entering the block within the same wall-clock second produce the identical `RUN_DIR` and the second `>` truncates the first. For the actual concurrency the rule cares about (two worktrees racing), sub-second overlap is plausible. Either add a PID/`mktemp -d` suffix or soften the claim to "worktree-scoped" rather than "never clobbers."
+
+2. **No gitignore/cleanup.** This project commits `.dw-lifecycle/scope-discovery/`, so `.dw-lifecycle/` is partially tracked; `.dw-lifecycle/close-shipped/runs/...` lands as **untracked** files that show up in `git status` and are one stray `git add .` away from being committed, and nothing prunes the per-release timestamped dirs. The diff documents writing there but adds no `.gitignore` entry and no cleanup step. Add `.dw-lifecycle/close-shipped/runs/` to `.gitignore` (or have the verb clean up after a successful `gh release edit`) so release runs don't accumulate as repo noise.
+
+### AUDIT-20260606-06 — Confidence-check duplicated → two new `TASK_HEADING_RE.exec(line)` loop call-sites; if that shared regex carries the `/g` flag, persisted `lastIndex` makes both new scanners skip lines non-deterministically
+
+Finding-ID: AUDIT-20260606-06
+Status:     withdrawn-2026-06-06
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/auto-position.ts:354-360, 416-423` (`collectAllTaskIds` and `findDuplicateTaskHeadings`)
+
+**Withdrawal rationale:** False positive. The actual `TASK_HEADING_RE` declaration at `auto-position.ts:59-60` reads `/^###\s+Task\s+(\d+)(?:\.(\d+))?\s*(?:\([^)]*(?:\([^)]*\)[^)]*)*\))?\s*:/i` — carries only the `/i` (case-insensitive) flag, not `/g` or `/y`. The finding speculated about the `/g` flag being present and warned about lastIndex skip-every-other-match behavior, but the regex is non-global. `RegExp.prototype.exec` on a non-global regex does NOT mutate lastIndex, so the loop call-sites are safe. No regression risk; no action required. Adding a "must remain non-global" pinning comment per the audit's defensive suggestion is reasonable future work but not blocking; the test suite's coverage of `collectAllTaskIds` and `findDuplicateTaskHeadings` provides implicit guard (any flag change that breaks them would surface immediately).
+
+Both new functions iterate lines and call `TASK_HEADING_RE.exec(line)` against a module-level shared regex:
+
+```js
+for (const line of lines) {
+  const m = TASK_HEADING_RE.exec(line);
+  if (m === null) continue;
+  ...
+}
+```
+
+If `TASK_HEADING_RE` is declared with the `g` (or `y`) flag, `RegExp.prototype.exec` mutates and persists `lastIndex` across calls. Looping over fresh per-line strings with the **same** stateful regex object then produces the classic skip-every-other-match bug — a heading on one line advances `lastIndex` past the start of the next line's match, yielding `null`, and the collected ID set silently misses tasks. That directly defeats the #420 "global scan catches every heading" guarantee. The regex isn't in the diff so I can't confirm its flags; the passing tests suggest it's non-global today, but two new call-sites now depend on that invariant. Either assert it (`TASK_HEADING_RE.lastIndex = 0` before each loop, or construct a fresh `RegExp` per function) or add a comment pinning "must remain non-global — `.exec`-in-loop call sites depend on it," so a future flag addition doesn't quietly break the collision defense.
+
+---
+
+I walked all four fixes (#420 auto-position collision defense, #426 first-barrage auto-init, #427 AND-semantic merge, #425 `/tmp` scrub) plus the six new/edited test files. Strongest signals: the unguarded template reads (claude-01) and the AND-semantic narrowing the cross-model agreement signal without a regression test for the paraphrased-heading case (claude-02). The `findDuplicateTaskHeadings` string-sort (non-numeric ordering of `39.7` vs `39.15`) and the `substituteSlug` `$`-in-slug `String.replace` quirk are both real but too low-probability against kebab-case slugs to merit their own blocks.
+
+## 2026-06-06 — audit-barrage lift (20260606T172545822Z-scope-discovery)
+
+### AUDIT-20260606-07 — Duplicate rollback is not atomic for the whole auto command
+
+Finding-ID: AUDIT-20260606-07
+Status:     fixed-a7e36a31
+Severity:   medium
+Surface:    plugins/dw-lifecycle/src/subcommands/promote-findings.ts:424-441,516-529
+
+`promote-findings --auto` can mutate `audit-log.md` before the new duplicate-task rollback point: informational findings are flipped at lines 424-441, then non-informational findings are applied later. If the post-write duplicate check fires at lines 516-529, the rollback restores only `workplan.md`, while the earlier audit-log flips remain durable. The error message then says `no disk mutation persists`, which is false for any mixed batch containing informational findings plus workplan-scoped findings.
+
+This matters because the command returns failure while leaving a partially applied audit-log state. A reasonable fix is to either move informational flips until after the workplan duplicate check succeeds, capture and restore the pre-run audit-log text on this failure path, or narrow the diagnostic so it does not claim full-command atomicity.
+
+### AUDIT-20260606-08 — Missing-template diagnostic test never exercises the missing-template path
+
+Finding-ID: AUDIT-20260606-08
+Status:     fixed-a7e36a31
+Severity:   low
+Surface:    plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/audit-barrage-lift.first-barrage.test.ts:120-139
+
+The test title claims it verifies “clean exit 2 + actionable diagnostic when a bundled template is missing,” but the body calls `ensureAuditArtifactsExist` against the real bundled templates and asserts `missingTemplates` is `[]`. Lines 128-132 explicitly say both templates should be readable, so the ENOENT branch and `runAuditBarrageLift` exit-2 diagnostic are not covered.
+
+This leaves the HIGH fix’s important packaging-defect behavior pinned only by code inspection. Make the template directory injectable, or otherwise test a controlled missing-template fixture through `runAuditBarrageLift`, and assert the non-crashing exit code plus stderr message.

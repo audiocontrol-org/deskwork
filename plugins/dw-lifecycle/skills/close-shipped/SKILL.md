@@ -255,18 +255,26 @@ The `--to-tag` is the just-pushed tag; the `--from-tag` defaults to the previous
 
 ### (2) Auto-generated release-notes body
 
-Pipe the skill's release-notes output into `gh release edit` so adopters reading `gh release view v<version>` see the closure trail:
+Pipe the skill's release-notes output into `gh release edit` so adopters reading `gh release view v<version>` see the closure trail.
+
+Use the in-tree per-run path scheme (matches the Phase A precedent from #412) — `.dw-lifecycle/close-shipped/runs/<timestamp>/release-notes.md` is worktree-scoped and the project's `.gitignore` already excludes `.dw-lifecycle/close-shipped/` so runs don't accumulate as tracked noise:
 
 ```
-dw-lifecycle close-shipped --to-tag v<version> --release-notes-body > /tmp/release-notes.md
-gh release edit v<version> --notes-file /tmp/release-notes.md
+RUN_DIR=".dw-lifecycle/close-shipped/runs/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+mkdir -p "$RUN_DIR"
+dw-lifecycle close-shipped --to-tag v<version> --release-notes-body > "$RUN_DIR/release-notes.md"
+gh release edit v<version> --notes-file "$RUN_DIR/release-notes.md"
 ```
+
+The `$$` (shell PID) suffix prevents two same-second concurrent `/release` invocations from a single worktree from clobbering each other (second-granularity timestamps alone would). Per AUDIT-20260606-05.
 
 Or via process substitution in a single line:
 
 ```
 gh release edit v<version> --notes-file <(dw-lifecycle close-shipped --to-tag v<version> --release-notes-body)
 ```
+
+Per `.claude/rules/file-handling.md` § "Never use bare `/tmp/<name>` paths," bare `/tmp/release-notes.md` is unsafe: two concurrent `/release` invocations in different worktrees would clobber each other. The in-tree runs-dir form preserves the artifact alongside the closure proposals + verdicts the rest of the verb writes there.
 
 The body shape:
 

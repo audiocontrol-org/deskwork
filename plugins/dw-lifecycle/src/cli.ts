@@ -53,6 +53,7 @@ import { archiveBranch } from './subcommands/archive-branch.js';
 import { closeShipped } from './subcommands/close-shipped.js';
 import { sessionEndHygiene } from './subcommands/session-end-hygiene.js';
 import { sessionStartRecommendation } from './subcommands/session-start-recommendation.js';
+import { branchStalenessCheck } from './subcommands/branch-staleness-check.js';
 import { completeGate } from './subcommands/complete-gate.js';
 import { completeParentClosure } from './subcommands/complete-parent-closure.js';
 import { worktreeReport } from './subcommands/worktree-report.js';
@@ -128,6 +129,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'close-shipped': closeShipped,
   'session-end-hygiene': sessionEndHygiene,
   'session-start-recommendation': sessionStartRecommendation,
+  'branch-staleness-check': branchStalenessCheck,
   'complete-gate': completeGate,
   'complete-parent-closure': completeParentClosure,
   'worktree-report': worktreeReport,

@@ -5805,3 +5805,321 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 1. **Run the scoped `after_implement` governance barrage** over the novel/risky surface (boundary resolver, synthesis/scope-inventory decouplings, govern clone-step) — assemble a focused diff, render the implement-mode prompt, fire the 3 model lanes, triage findings TDD-first (one fresh sub-agent per finding) per `/speckit-deskwork-governance-govern`.
 2. 010 is otherwise complete + pushed; deterministic gate green. Operator owns the merge.
 3. Note: 011 (session-skills) landed in parallel and was pulled in cleanly (cli.ts carries both 010 + 011 verbs; SPECKIT marker now points at 011).
+## 2026-06-04 (cont. 3): Phase 12 Task 8 (#397 audit-barrage E2BIG) → PR #416 → v0.37.0 release
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** Resume the prior session's recommendation queue starting with Phase 12 Task 8 (#397 — `audit-barrage spawn E2BIG: prompt passed via argv overflows ARG_MAX on large diffs`). Walk the TDD-first task block, ship the fix, walk any audit-barrage follow-ups the end-of-task hook surfaces, then PR + merge + release.
+
+**Accomplished:**
+
+- **Phase 12 Task 8 (#397) shipped end-to-end.** Three structural changes in commit `e7f5b4df`:
+  - `spawn-cli.ts` wraps `spawn()` in `try/catch` (Node emits `E2BIG` synchronously; the existing async `child.on('error', ...)` handler never sees it). Defense-in-depth E2BIG classification in the async path too.
+  - `classifyE2BIGSpawnError(promptBytes, raw)` exported helper produces a structured message naming the byte count, `{{prompt-stdin}}` migration path, issue #397, and MIGRATING.md. The classifier message lets adopters fix the override without reading source.
+  - `templates/audit-barrage-config.yaml` flips defaults for all three CLIs (claude/codex/gemini) to `{{prompt-stdin}}`. `MIGRATING.md` prepends a "Migrating to v0.37.0+" section with the recommended migration + back-compat note. `audit-barrage-cli-notes.md` reframes Phase 19's section opt-in → default.
+- **TDD pinning.** New `spawn-cli.e2big.test.ts` (5 MiB payload → `{{prompt}}` classifier fires with all five contract assertions; same payload → `{{prompt-stdin}}` exits 0). Pre-fix: the test surfaced the synchronous throw uncaught at `spawn-cli.ts:134`. Post-fix: 19/19 spawn-cli tests + 113/113 audit-barrage tests + 2699/2699 full plugin suite.
+- **End-of-task chain dogfooded itself.** Structural chain green (clones 0 NEW after refactor, anti-patterns 0, adopters 0). `implement-hook` fired twice this session — cycle 1 promoted 4 findings (AUDIT-35/36/37/38); cycle 2 dampener-engaged (2 consecutive 0-HIGH+ runs) and slushed 2 more (AUDIT-39/40). All 6 dispositioned in-session.
+- **6 audit findings dispositioned.** AUDIT-37 (HIGH, missing bare-`{{prompt-stdin}}` regression-lock test) fixed in `9fb4db0b`. AUDIT-35 (workplan templates `Closes #N` → `Refs #N` per operator-owned-closure rule) in `2ffead37`. AUDIT-36 (AUDIT-34 mislabel — substance addressed in `4d8c083f`) audit-log status flipped. AUDIT-38 (typo "Phase 19's Phase 19") fixed inline. AUDIT-39 (over-claiming test comment narrating unwritten e2e coverage) fixed in `7bfeccb9`. AUDIT-40 (misclassification — finding misread the trailer-as-signal convention) hand-acknowledged with explanatory disposition.
+- **Refactor — `reportSpawnError` extraction.** Structural-chain found a 13-line clone group (`0c7f9106c1be`) at `spawn-cli.ts:175:187` ↔ `:219:231` after the initial fix. Collapsed into a `reportSpawnError(err)` closure called from both sync-catch and async-error paths. Behavior identical; clone resolved.
+- **Workplan-policy update — `Closes #N` → `Refs #N`.** Per AUDIT-35 (medium, cross-model), all 8 fix-issue task blocks (Tasks 9, 40–45 — Phase 6; Task 8/9 — Phase 12) prescribed `Closes #N` trailers, which auto-close GH issues on merge and violate the "operator owns closure after install + verify" rule. The 7 unimplemented task blocks updated to `Refs #N`. Task 8's already-shipped Step 4 line documents the auto-close caveat: commit `e7f5b4df`'s `Closes #397` trailer will auto-close on merge; operator must reopen + verify against installed v0.37.0.
+- **Task 50 (#415) scoped this session.** Operator-named friction: SKILL.md for `/dw-lifecycle:session-start` Step 7 + `/dw-lifecycle:implement` Step 6a prescribe `dw-lifecycle check-clones --feature <slug>` (and three sibling verbs), but the v0.36.0 binaries reject `--feature` with "unknown arg". Filed [#415](https://github.com/audiocontrol-org/deskwork/issues/415) with per-verb repro + SKILL.md-vs-CLI table + three fix options. Scoped as Phase 6 Task 50 with the same TDD-first shape; Step 3 recommends Option 1 (accept-but-ignore on the verb side) as the smallest surface fixing both ends.
+- **PR #416 merged at `452d693e`.** 12 files / +1232 / −538. Auto-merge enabled; CI green; merge landed at 16:37:06Z.
+- **v0.37.0 released.** `/release` skill walked the 4-pause flow: preconditions → version pick (0.37.0) → bump diff (11 files, 21+/21−) → tag draft → atomic push → CI publish via OIDC → `assert-published` green (all 3 npm packages: `@deskwork/core` / `cli` / `studio` at 0.37.0) → marketplace smoke green (clone + npm install + studio boot + all routes 200). Release URL: https://github.com/audiocontrol-org/deskwork/releases/tag/v0.37.0. Plugin installed; smoke-tested via `check-clones` against this worktree (exit 0).
+
+**Course corrections:**
+
+- **AUDIT-37 reclassification.** The promote-findings template auto-classified Task 48 (AUDIT-37) as `(non-bug)` even though adding the missing regression-lock test IS a code change verifiable by test. The trailer should be `Closes` (not `Acknowledges`) — used `Closes` after marking the disposition `**Reclassified to bug**` in the task body. apply-audit-flips then auto-flipped AUDIT-37 → `fixed-9fb4db0b`.
+- **apply-audit-flips skipped AUDIT-39's flip.** After my fix for AUDIT-39 (commit `7bfeccb9`), apply-audit-flips saw the prior auto-slush status (`acknowledged-slush-pile-2026-06-04`) as already-dispositioned and skipped the trailer-driven flip. Hand-flipped AUDIT-39 → `fixed-7bfeccb9` in commit `2ba1ce9f`. This is a verb-side gap: the slush-pile status should not block a subsequent `Closes AUDIT-X` trailer from flipping the entry to `fixed-<sha>`. Worth filing as a follow-up.
+
+**Insights:**
+
+- **Node's `spawn()` throws E2BIG synchronously, not via the `'error'` event.** The Phase 19 stdin-vs-argv detection was added without an E2BIG catch because the failure mode was assumed to be async. The bug-repro test surfaced this in seconds: `spawn(...)` threw at `spawn-cli.ts:134` instead of routing through `child.on('error', ...)`. The sync-throw vs async-emit asymmetry for OS-level rejections (E2BIG, EMFILE, ENAMETOOLONG) is the load-bearing detail; the defense-in-depth async classifier protects against future platform shifts.
+- **End-of-task implement-hook surfaced 4 legitimate findings on a small fix (~239 LoC).** Cross-model agreement (claude-03 + claude-05 + codex-01 + codex-02 on AUDIT-37) caught the bare-placeholder coverage gap that single-model review would have missed — the e2e tests use `-p {{prompt-stdin}}` / `-e ... {{prompt-stdin}}` (placeholder preceded by other tokens), but the gemini default ships the bare-token shape; no test pinned that path. The audit-barrage's genetic-diversity-in-failure-modes thesis paid off here.
+- **The workplan-template `Closes #N` policy was a latent class bug.** All 8 fix-issue task blocks scoped in the prior session prescribed `Closes #N` trailers, every one of which would have auto-closed GH issues on merge. The audit-barrage caught it for THIS commit before it became 8 separate auto-close violations. The fix changed 7 unimplemented templates + documented Task 8's already-shipped trailer as a caveat. Forward-looking templates now match the project rule.
+- **The release flow surfaced one papercut + zero blockers.** `validate-version` wants `0.37.0` (no `v` prefix); I tried `v0.37.0` first and got a regex rejection. Worth a SKILL.md sentence: *"the helper validates the version without the leading `v`."* The rest of the flow — bump, commit, tag, atomic-push, assert-published (retried with backoff), marketplace smoke — was crisp; ~5 min elapsed wall clock from push to release URL.
+- **SKILL.md vs. CLI drift (#415, Task 50) IS the operator-named pattern from Task 45 (#413).** The same drift class — "the SKILL.md prescribes X; the CLI does Y" — recurs as both rename drift (#413 merge-from-main bookkeeping) and flag drift (#415 `--feature`). Both are signs that the SKILL.md is a separate source-of-truth from the CLI surface and they desynchronize without a binding test. Task 50 Step 3 (accept-but-ignore) closes #415 but doesn't close the broader class. A future hardening would test SKILL.md prescriptions against CLI flag-parser output mechanically.
+
+**Quantitative:**
+
+- Commits this session: 11 — `e7f5b4df` Task 8 fix · `740377e9` refactor + project-override migration · `9fb4db0b` AUDIT-37 test · `2ffead37` AUDIT-35/36/38 dispositions · `7bfeccb9` AUDIT-39 fix + AUDIT-40 dispose · `2ba1ce9f` hand-flip AUDIT-39 · `50ea40b2` Task 50 scope · `89c939e7` chore: release v0.37.0 (on main) · `452d693e` PR #416 merge (on main) · tag `v0.37.0` annotated · merge of PR #416 cascaded into this branch by the operator's earlier pattern.
+- Tests this session: 2696 → 2699 (+3 net new tests: `spawn-cli.e2big.test.ts` × 2 + bare-`{{prompt-stdin}}` regression-lock in `spawn-cli.test.ts`).
+- Audit findings dispositioned: 6 (AUDIT-35 acknowledged-prose-updated, AUDIT-36 acknowledged-flipped-audit-34, AUDIT-37 fixed-9fb4db0b, AUDIT-38 acknowledged-typo-fixed, AUDIT-39 fixed-7bfeccb9, AUDIT-40 acknowledged-misclassification).
+- Audit-log AUDIT-34 status flipped: `acknowledged-slush-pile-2026-06-04` → `fixed-4d8c083f` (reconciliation of yesterday's mislabel).
+- GH issues filed: 1 (#415 — structural-chain SKILL.md `--feature` flag drift).
+- GH issues touched (`pending-verification` carryover from prior session, now also referenced this session): #294, #295, #401, #402, #403, #404, #405, #407, #409, #410, #411, #412, #413, #415.
+- GH issues closed by this session's release (per `Closes #397` trailer in commit `e7f5b4df` → PR #416 merge → main): #397. **Per project rule, #397 stays operator-pending-reopen until installed-release verification.**
+- Audit-barrage runs: 2 (20260604T160450496Z-scope-discovery + 20260604T161650717Z-scope-discovery). Cycle 1: 4 promoted, 0 slushed; cycle 2: 0 promoted, 2 slushed (dampener engaged on 2 consecutive 0-HIGH+ runs).
+- Sub-agent dispatches: 0 (small focused fix; no orchestration needed).
+- Workplan changes: Task 48 (AUDIT-37) marked done; Tasks 46/47/49 (AUDIT-35/36/38) marked done; Task 50 (#415) scoped; 7 of 8 fix-issue task blocks updated `Closes #N` → `Refs #N`.
+- Release: v0.37.0 published to npm (@deskwork/core, @deskwork/cli, @deskwork/studio); marketplace smoke green; plugin cache populated at `/Users/orion/.claude/plugins/cache/deskwork/dw-lifecycle/0.37.0/`.
+
+### Hygiene observations
+
+- issue #386 [CLOSED] referenced this session: audit-barrage spawn E2BIG on large diffs — every implement-hook fire after a long autonomous run loses cross-model coverage
+- issue #397 [CLOSED] referenced this session: audit-barrage spawn E2BIG: prompt passed via argv overflows ARG_MAX on large diffs (blocks barrage on bootstrap HEAD~10 range). **Auto-closed by GH on the `Closes #397` trailer in commit `e7f5b4df` (PR #416 merge). Per project rule, operator must reopen + verify against installed v0.37.0 before final closure.**
+- issue #415 [OPEN] referenced this session: structural-chain SKILL.md prescribes --feature <slug> flag that the v0.36.0 verbs reject — scoped as Phase 6 Task 50 this session.
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals (carryover from prior session; consider `/dw-lifecycle:dismantle-worktrees` if paused).
+
+### Next session recommendation (hygiene)
+
+- Resume: **Phase 12 Task 9 (fix-issue-#396) — `audit-barrage-render` false-positives on `{{var}}`-shaped strings inside the diff**, per the operator's priority queue established prior session (`#397 → #396 → #411 → #412 → #366 → #350 → #297 → #413 → #415`). #397 shipped at v0.37.0; #396 is the next in the queue.
+   - Implementation-priority queue (operator-set): #396 (Phase 12 Task 9) → #411 (Task 40) → #412 (Task 41) → #366 (Task 42) → #350 (Task 43) → #297 (Task 44) → #413 (Task 45) → #415 (Task 50).
+   - The hygiene-helper's mechanical "first unchecked" pick was Task 40 (Phase 6 numerically precedes Phase 12 in workplan order); the operator's queue overrides text order.
+- Triage: #415 (Task 50 scoped this session; pending implementation). All `pending-verification`-labeled issues from prior session's close-shipped dogfood (#294/#295/#401/#402/#403/#404/#405/#407/#409/#410) remain operator-pending-verify. #397 also pending operator-reopen-and-verify (see hygiene observations above).
+- Address TBD markers: (no bare TBD markers introduced this session).
+- Dismantle stale worktrees: `/Users/orion/work/deskwork-work/graphical-entries` (`feature/graphical-entries`) — 4 of 9 signals. Consider `/dw-lifecycle:dismantle-worktrees` next session if graphical-entries work is paused.
+
+## 2026-06-04 (cont. 4): Session-start bootstrap + scope #418 (Phase 12 Task 10) + new Phase 27 (session-end archive hook)
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** Resume the prior session's recommendation queue starting with Phase 12 Task 9 (#396 `audit-barrage-render` `{{var}}` false-positives). Operator redirected after session-start bootstrap — scope two new items into the workplan instead: a fix for GH #418 (audit-barrage E2BIG fix is inert for existing configs) and a new Phase 27 wiring `archive-phases` into `/dw-lifecycle:session-end` to keep the live workplan focused.
+
+**Accomplished:**
+
+- **Session-start bootstrap via `/dwss`.** Confirmed active feature (scope-discovery, branch `feature/scope-discovery`, worktree clean). Read prior session journal (cont. 3) + hygiene helper output. Structural snapshot: `clones=256 total / 0 NEW vs baseline · anti-patterns=0 (4 entries scanned across 0 files) · holdouts=0 · symmetry-deltas=registry empty`.
+- **Flag-drift bug (#415 / Phase 6 Task 50) re-confirmed live during bootstrap.** All four structural-chain verbs (`check-clones`, `check-anti-patterns`, `check-adopters`, `check-module-symmetry`) reject `--feature <slug>` with `unknown arg`. Re-ran each verb without the flag to get the advisory snapshot above. This was already scoped as Phase 6 Task 50 last session; no new finding, just confirms the issue still bites at the prescribed firing point.
+- **Scoped GH #418 → Phase 12 Task 10.** Issue claim: `audit-barrage` E2BIG fix (#397, v0.37.0) is inert for existing configs because the committed dogfood YAML + installer "Example override" comment still teach `{{prompt}}`. State-accounting check against this branch revealed the issue is half-fixed:
+   - Surface (a) — this repo's `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml`: **ALREADY migrated** in prior session's commit `740377e9` (PR #416, v0.37.0). The issue body was filed pre-merge while verifying on `feature/deskwork-plugin` (per its Provenance line).
+   - Surface (b) — `install-scope-discovery.ts:117-131` "Example override" comment block: **STILL `{{prompt}}`** on `main` + this branch. Direct fix scoped.
+   - Surface (c) — already-installed adopters' configs: **STILL `{{prompt}}`** universally. Auto-migration path scoped as Step 4 with operator-pick between (i) doctor rule, (ii) fire-time warning, (iii) both.
+   - Task block uses TDD-first shape + `Refs #418` trailer (operator-owned closure per AUDIT-35; no auto-close on merge).
+- **Scoped new Phase 27 — wire `archive-phases` into `/dw-lifecycle:session-end`.** 3 core tasks: (1) phase-completion detection helper, (2) `archive-phases --auto-detect` CLI flag, (3) SKILL.md Step 9.5 wiring (between Step 9 closing-discipline + Step 10 commit). Plus 1 optional Task 4 doctor-rule companion (`phase-ready-to-archive`) captured in design questions. Open design questions (operator pick at implementation): firing mode (auto-apply vs operator-confirm vs doctor-only), doctor-rule ship/skip, config-flag default, ordering. Motivation: live workplan currently 1820 lines despite only 5 active phases — completed phases linger between manual archive sweeps. Symmetric with Phase 26 Task 5 Step 2's `/complete` wiring.
+- **Closing discipline (Step 9) green.** `check-disposition-survivor` exit 0 (no clones.yaml regressions). `check-open-findings --feature scope-discovery` reports zero open findings. Bare-TBD scan via hygiene helper: no markers introduced this session.
+
+**Didn't Work:**
+
+- **Hygiene helper missed #418 in the "issues referenced this session" enumeration.** The helper derives from `git log <boundarySha>..HEAD` commit subjects + bodies; this session's scoping work is uncommitted at the time of hygiene capture, so the helper's session range is empty. Not a bug — the journal entry captures the narrative authoritatively; the helper is a mechanical companion.
+- **`session-start-recommendation` mechanical Resume pick is Task 40 Step 0 (Phase 6 #411).** The operator-set queue (last session: #396 → #411 → #412 → #366 → #350 → #297 → #413 → #415) overrides text order. The helper's mechanical pick will continue to surface the first unchecked task per file scan until #396 is implemented; not a defect, just the documented helper behavior.
+
+**Course Corrections:**
+
+- **[PROCESS] `check-disposition-survivor` verb's flag surface differs from session-end SKILL.md.** SKILL.md Step 9 prescribes `check-disposition-survivor --feature <slug>`; verb's actual flags are `--allow-disposition-loss / --baseline / --head-ref / --repo` — no `--feature`. Same drift class as #415 (structural-chain verbs). I invoked without the flag and it worked (silent + exit 0). Could fold into the existing Phase 6 Task 50 (#415) scope — Task 50 currently lists 4 structural-chain verbs; adding `check-disposition-survivor` makes it 5. Or file separately. Capturing here for the next session to decide.
+- **[PROCESS] No mechanical priority-queue persistence.** The operator-set queue from prior session (`#396 → #411 → ...`) only survives in the journal entry text + my context. Phase 27 + #418 are unplaced; if the operator wants them in the queue, they'll need to state it explicitly (or a tooling change tracks queue position explicitly — too speculative to scope without operator framing).
+
+**Quantitative:**
+
+- Commits this session: 1 (session-end commit bundling the two scope deltas + this journal entry, per skill Step 10 prescription).
+- Workplan delta: +133 lines net (Task 10 +36; Phase 27 +97); workplan now 1880 lines (was 1747 at session start).
+- README delta: +1 row (Phase 27), 1 row updated (Phase 12 to mention Task 10), active-phases note now `6, 11, 12, 20, 24, 27`.
+- Structural snapshot at session-end: identical to session-start (no source code changed; scoping was doc-only).
+- Issues scoped: 1 (#418 → Phase 12 Task 10).
+- New phases scoped: 1 (Phase 27, no GH issue yet — the operator can file one if the implementation phase needs an external tracker).
+- Audit findings dispositioned: 0 (no new audit-log activity this session).
+- Sub-agent dispatches: 0.
+
+**Insights:**
+
+- **The "verify reviewer-cited external constraints" memory paid off on #418.** Issue body asserted surface (a) was still broken on this repo; a 30-second `git show main:<path>` confirmed it was already migrated in commit `740377e9`. Without that check, I'd have written a 3-surface task block including a "migrate the committed YAML" step that's already shipped — would have led to a wasted implementation cycle + a confusing "fix" commit that did nothing. Verification at scope-time is cheaper than verification at implementation-time.
+- **Capture-vs-scope discipline made Phase 27 honest.** The natural temptation was to pre-decide: "auto-detect-and-apply, config-flag default true, ship the doctor rule too." Instead the 4 design questions are captured for operator pick at implementation. The cost is ~30 lines of design-question prose in the workplan; the benefit is operator-owned scope decisions actually made by the operator, not by me masquerading as the operator with capture-time-recommendation cover.
+- **Flag-drift is a recurring class, not a one-off bug.** #415 named structural-chain verbs; `check-disposition-survivor` shows the same drift class survives outside that scope. A general "SKILL.md prescribes flag X / CLI rejects flag X" mechanical test would close the class. Phase 6 Task 50's current scope is limited to the 4 structural-chain verbs; expanding to all SKILL-prescribed flags is a design call for the operator.
+
+### Hygiene observations
+
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/hygiene` `feature/hygiene` — 3 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: **Phase 12 Task 9 (fix-issue-#396) — `audit-barrage-render` false-positives on `{{var}}`-shaped strings inside the diff**, per the operator-set priority queue established in prior session:
+   `#396 (Phase 12 Task 9) → #411 (Task 40) → #412 (Task 41) → #366 (Task 42) → #350 (Task 43) → #297 (Task 44) → #413 (Task 45) → #415 (Task 50)`.
+   New this session and **unplaced in the queue**: `#418 (Phase 12 Task 10)` + `Phase 27` (no GH issue yet). Operator decides placement.
+   The hygiene-helper's mechanical Resume pick was Task 40 Step 0 (first unchecked text-order); the operator queue overrides.
+- Triage: pending-verification carryover from prior sessions remains: #294, #295, #401, #402, #403, #404, #405, #407, #409, #410, #411, #412, #413. #397 also pending operator-reopen-and-verify against installed v0.37.0.
+- Address TBD markers: (no bare TBD markers introduced this session)
+- Dismantle stale worktrees: `/Users/orion/work/deskwork-work/graphical-entries` (4/9 signals), `/Users/orion/work/deskwork-work/hygiene` (3/9 signals) — consider `/dw-lifecycle:dismantle-worktrees` if either is paused.
+- Flag-drift follow-up: `check-disposition-survivor` verb rejects the SKILL-prescribed `--feature <slug>` flag — same class as #415. Fold into Task 50 scope OR file separately.
+
+## 2026-06-04 (hygiene cont. 3): close-shipped follow-ups + audit-barrage-surfaced bugs
+### Feature: hygiene
+### Worktree: hygiene
+
+**Goal:** Address the two close-shipped bugs from the v0.35.0..v0.36.0 dogfood (#411 + #412) on the hygiene branch. Use the new archive-phases tooling to keep the workplan slim. Ship a follow-up PR.
+
+**Accomplished:**
+
+- Synced feature/hygiene to tip-of-main (v0.36.0) after sitting since 2026-05-30.
+- Archived Phases 0-15 via `dw-lifecycle archive-phases --feature hygiene --phases 0-15 --apply --allow-vestigial`. Active workplan went 588 → 75 lines; 608-line `workplan-archive.md` written. 5 phases used the vestigial path (substantive reason citing the project's pending-verification gate).
+- Scoped Phase 16 (#411) + Phase 17 (#412) into the active workplan with default fix options drawn from the issue bodies; README status table updated.
+- Implemented Phase 16 Task 1 — `preflightLabel` helper + wiring in `applyV2`; auto-creates the label with canonical color + description when absent; throws `InvalidProposalError` BEFORE per-item loop on auto-create failure. Test surface extended 5 → 9 cases.
+- Implemented Phase 17 Task 1 — SKILL.md per-run path scheme; smoke mirrors the convention; `.gitignore` already covered the runs dir via the broader rule.
+- End-of-task audit-barrage surfaced 2 cross-model findings on the new code; both fixed in the same PR before ship:
+  - AUDIT-20260604-01 (medium, cross-model: claude + codex) — pre-flight created the label even when every item was effective-skip. Fixed by gating `preflightLabel` on `args.proposal.items.some(item => effectiveVerdict(item) === 'shipped')`.
+  - AUDIT-20260604-02 (low) — smoke's `CS_RUN_TS` hardcoded `-000Z`. Replaced with portable `python3` expression yielding real millisecond precision (BSD `date` doesn't support `%N`).
+- Audit-flips landed: both findings now `fixed-<sha>` in audit-log.
+- PR #414 opened + merged into main (8-commit history preserved via merge commit `6029365c`).
+
+**Didn't Work:**
+
+- First session-end-hygiene invocation used a stale `--session-start-sha 2dcda6a` (the 2026-05-29 session-end commit), which spanned the entire 18-commit window since that boundary AND inadvertently captured cross-branch commit markers from feature/scope-discovery work that landed via main. Re-running with `a3338e58^` (the boundary right before this session's first commit) produced the correct narrow scope. Lesson: when the worktree has been synced forward across a multi-branch monorepo's merge cycle, the prior session-end SHA is the WRONG boundary — use the parent of the first session commit instead.
+- `dw-lifecycle implement-hook` first invocation outaged with `spawn E2BIG` (argv overflow); second invocation fired successfully and surfaced the 2 findings above. The verb's outage-forwards behavior worked correctly — the loop didn't stall.
+- The `--feature` flag is documented for `check-clones` / `check-anti-patterns` / `check-adopters` in the implement SKILL.md but not accepted by the actual CLI surface at v0.36.0 — had to run without the flag. SKILL.md prose is ahead of CLI.
+
+**Course Corrections:**
+
+- [PROCESS] **Used `Closes #411` / `Closes #412` in commit messages, which auto-closed the issues on PR merge — violating the project's "Issue closure requires verification in a formally-installed release" rule.** Caught at session-end when the hygiene observations rendered both issues as `[CLOSED]`. Re-opened both with explanatory comments naming the verify-in-installed-release gate. Lesson: use `Refs #NNN` or `Tracked at #NNN` (NOT GitHub's auto-close grammar) when the work ships behind a verification gate. The parenthetical `(pending operator verification post-release)` in the commit body did NOT prevent the auto-close.
+- [PROCESS] The `cd plugins/dw-lifecycle && ...` Bash pattern leaves the next invocation's cwd in an unexpected state (persistent shell across calls). Hit this once when a follow-up `git add` failed with `pathspec did not match`. Need to either prefix every plugin-dir command with `cd /Users/orion/work/deskwork-work/hygiene/plugins/dw-lifecycle && ...` to be self-contained, or use absolute paths in vitest invocations.
+
+**Quantitative:**
+
+- Commits this session: 6 task-completion commits + 1 docs-archive commit = 7 (`git log --oneline a3338e58~..HEAD` since the session's first commit landed).
+- Tests: plugin suite 2700/2700 pass post-PR-merge (was 2696 pre-session per the prior journal entry; +4 net from the 5 → 10-case extension in close-shipped-apply-v2.test.ts).
+- Audit findings dispositioned: 2 closed (AUDIT-20260604-01 fixed-7f119181, AUDIT-20260604-02 fixed-19f63100). 0 acknowledged, 0 slushed (the dampener wasn't engaged — most-recent run had 1 MEDIUM which failed the single-run-rule).
+- Issues filed this session: 0 GH issues filed (work was on existing #411 + #412).
+- Workplan reduction: 588 → 75 lines (active) via archive-phases.
+- Sub-agent dispatches: 0 (in-session work throughout; audit-barrage runs out-of-band as its own dispatch surface).
+
+**Insights:**
+
+- **The audit-barrage chain caught a real cross-model bug in the same session it was introduced.** Phase 16's `preflightLabel` was reviewed in-band, passed tests, and shipped to PR. Then the end-of-task hook fired, and BOTH claude and codex independently flagged the "creates label even when all-skip" failure mode. The cross-model agreement converged on the same finding from different framings — exactly the third-audit-surface value-add the Phase 12 self-dogfood predicted. The in-band review missed it because the test cases used `labelExists: true` (which short-circuits the create call). The barrage's adversarial framing was the disambiguator.
+- **The `--allow-vestigial` reason field for `archive-phases` works as intended.** Five phases (10/12/13/14/15) had unchecked items that were genuinely pending-verification per project canon. The substantive-reason validator accepted "All implementation shipped in v0.28.0-v0.28.1; remaining unchecked items are pending-verification acceptance criteria..." — the 40-char floor is the right size to force a real reason without overwhelming the ledger.
+- **Auto-promoted fix-tasks land in the active workplan BEFORE the Task 1 entry that produced them.** The `dw-lifecycle implement-hook` `promote-findings --auto` step inserted Tasks 2 + 3 above the existing Task 1 in Phase 16. The scoped-as-next gate semantic worked correctly (open findings ARE the next-N tasks → proceed). The visual ordering is confusing to read (Task 2/3 appear before Task 1) but the gate logic is right.
+
+### Hygiene observations
+
+- issue #375 referenced this session: feat(hygiene): Phase 14 walker accuracy + Phase 15 close-shipped redesign (#369 + #374)
+- issue #411 [OPEN] referenced this session: close-shipped apply: pending-verification label must already exist; no pre-flight / auto-create
+- issue #412 [OPEN] referenced this session: close-shipped SKILL.md prescribes bare /tmp/<name> paths that conflict with file-handling rule
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- Resume: Live verification against a repo without the label (operator-driven, post-ship walk per the project's verify-in-installed-release rule).
+- Triage: #411 (close-shipped apply: pending-verification label must already exist; no pre-flight / auto-create); #412 (close-shipped SKILL.md prescribes bare /tmp/<name> paths that conflict with file-handling rule)
+- Address TBD markers: (no bare TBD markers introduced this session)
+- Dismantle stale worktrees: /Users/orion/work/deskwork-work/graphical-entries (`feature/graphical-entries`) — 4 of 9 signals
+
+## 2026-06-04 (cont. 5): /dwi burndown attempt — #396 ticked, #411 re-implemented + reset out, merged main
+
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** Resume the operator's prior-session queue starting with `#396` (Phase 12 Task 9 — `audit-barrage-render` `{{var}}` false-positives), per the cont. 4 hygiene recommendation. Walk the TDD-first task block, ship the fix, walk audit-barrage follow-ups, then continue to `#411` / `#412` / etc.
+
+**Accomplished:**
+
+- **`#396` (Phase 12 Task 9) — substance verified pre-shipped; workplan + README ticked.** State-checked on this branch + on `main` via `git show main:<path>`: the renderer at `plugins/dw-lifecycle/src/scope-discovery/audit-barrage/prompt-renderer.ts` already implements the two-phase UUID-token substitution that #396 asked for. Bug-repro test at `prompt-renderer.test.ts:203-233` exists; live-verified `audit-barrage-render` against vars whose values contain literal `{{prompt}}` / `{{feature_slug}}` / `{{var_name}}` markers (exit 0, all literals preserved). Workplan boxes ticked in `5aaf81a9`; the README Phase 12 row updated to mirror the Task 8 "shipped pre-scoping" treatment in `158c8bcc` (closed AUDIT-20260604-41 in the same diff).
+- **`#411` (Phase 6 Task 40) attempted, then RESET OUT.** Shipped a 290-line substantive fix at `f9f98598` (pre-flight `gh label list` + auto-create + `MissingLabelError` + `--no-create-label` opt-out + 4 new tests + SKILL.md update). The audit-barrage end-of-task hook surfaced 3 cross-model findings (AUDIT-44 strict-typing `as`-cast, AUDIT-45 box-honesty drift, AUDIT-43 hand-flip-precedent reminder) which I addressed in `d71574b9` + `1038a156`. **Then I checked `git show main:<path>` for `#412` (Task 41) and discovered main has ALREADY shipped both `#411` AND `#412` via PR #414** (`1c012b76` for #411's `preflightLabel`; `7f119181` for the all-skip refinement; `aab90948` for #412's SKILL.md path-scheme rewrite). My `#411` implementation diverged from main's canonical fix on six API axes (`ensureLabelExists` vs `preflightLabel`, hardcoded color/description vs arg-passed, new `MissingLabelError` class vs reused `InvalidProposalError`, `--no-create-label` opt-out vs mandatory-auto-create, removed `ApplyV2Result.notes` vs preserved, private vs exported). Per operator decision (option A — cleanest history), reset to `158c8bcc` to drop the three divergent commits entirely.
+- **Merged `origin/main` into `feature/scope-discovery` cleanly.** One conflict in `DEVELOPMENT-NOTES.md` (both branches added a "cont. 3" entry on 2026-06-04 for different features); resolved by preserving both entries and disambiguating the hygiene heading to `(hygiene cont. 3)`. Brought in 24 main-side commits including the canonical fixes for #411 + #412 + Phase 18 (`#417`) which adds the `--feature <slug>` flag wiring across all four structural-chain verbs (`check-clones` / `check-anti-patterns` / `check-adopters` / `check-module-symmetry`) plus `check-disposition-survivor` + `check-refactor-preconditions`. Substantively closes `#415` (Task 50) on the source side — though the installed plugin binary at `v0.37.0` still rejects `--feature` because it pre-dates the Phase 18 merge.
+- **Merge-conflict type drift fixed in the merge commit (`db51d4ff`).** The Phase 18 `feature: string | null` required field broke 3 internal call sites in `discovery-agents/{adopter-manifest-checker,regime-holdout-detector}.ts` (they build `CliOptions` literals for internal scan calls). Fixed by passing `feature: null` — the discovery-agent paths scan repo-wide / module-wide, not feature-narrowed. `tsc -p plugins/dw-lifecycle/tsconfig.json --noEmit` exit 0; full plugin suite 2730/2730 (was 2703 pre-merge; +27 from main's new Phase 18 feature-flag tests).
+- **End-of-task chain dogfooded itself three times.** Cycle 1 (after `5aaf81a9`): lift surfaced AUDIT-41 + AUDIT-42, both auto-slushed by the dampener. Cycle 2 (after `f9f98598`): lift surfaced AUDIT-43 + AUDIT-44 + AUDIT-45, all auto-slushed. Cycle 3 (after `d71574b9` + `1038a156`): barrage came back 0 findings, dampener engaged via single-run rule, fired-and-slushed semantic returned 0 promoted / 0 slushed (convergence). The `apply-audit-flips` verb's skip-if-already-dispositioned behavior is the correct contract — slushed entries don't auto-flip; the hand-flip-to-`fixed-<sha>` convention (AUDIT-31/33/36 precedent) is the manual escalation path I exercised in `d71574b9` for AUDIT-41 + `1038a156` for AUDIT-43/44/45 before the reset reverted both audit-log files to their `158c8bcc` state.
+
+**Didn't Work:**
+
+- **Did NOT verify state-on-main BEFORE implementing `#411`.** Same failure mode as the prior session's `#418` surface (a) catch — *"verify reviewer-cited external constraints"* memory paid off when I applied it (Task 9 / #396), but I lapsed when I picked up Task 40 / #411. The cost: 3 commits of divergent implementation + 1 cascade-burndown commit + 1 audit-log hand-flip commit, all reset out. This is the same friction class GH `#413` already names ("Merging main into a feature branch produces friction in audit-log / scope-discovery / disposition bookkeeping"); the discipline gap is on me, not on the tooling.
+- **Did NOT recognize the divergence faster.** I started Task 41 / #412 and only spotted the duplication when I went to grep for `/tmp/close-shipped` in the SKILL.md and noticed `main`'s version already had the per-run dir scheme. Should have run `git fetch origin main && git log feature/scope-discovery..main` at the top of `/dwi` to enumerate what main has shipped that this branch hasn't.
+- **The session-end-hygiene helper's "Resume" pick was structurally wrong.** Its mechanical first-unchecked-task scan pointed at Task 40 Step 0 — which is the task whose substance is now on main. The helper has no concept of "this branch is stale; the substantive fix is upstream." Operator queue overrides the helper's mechanical pick (the prior session's journal noted this explicitly), but the helper's signal is now actively misleading rather than just incomplete.
+
+**Course corrections:**
+
+- **[PROCESS] Pre-implementation state-check against main is non-negotiable for any task whose body cites a "Surface" path.** The "verify reviewer-cited external constraints" memory needs to fire on EVERY task pickup, not just the ones whose issue body explicitly asserts repo state. Cost-benefit: a 30-second `git show main:<path>` (or `git log feature..main -- <path>`) check pre-task is cheaper than 3 commits of divergent work + reset + merge.
+- **[PROCESS] When the branch is N commits behind main with N > ~5, merge BEFORE implementing.** Pre-session this branch was 24 behind main; the divergence cost would have been zero if the merge had happened first. The agent-discipline `agent-discipline.md` doesn't currently codify a "merge-first-when-stale" cue — worth a rule update later, or fold into the implement skill's Step 1 ("Confirm slug and target version").
+- **[PROCESS] The `cd plugins/dw-lifecycle && ...` Bash pattern leaves the next invocation's cwd in an unexpected state.** Hit this multiple times this session — `pwd` came back at `/Users/orion/work/deskwork-work/scope-discovery/plugins/dw-lifecycle` after a prior `cd` chained with `&&` succeeded. The hygiene branch's cont. 3 journal entry also flagged this exact pattern. Self-contained absolute paths or explicit `cd /Users/orion/work/deskwork-work/scope-discovery && cd plugins/dw-lifecycle && ...` would close the gap.
+
+**Quantitative:**
+
+- Commits this session: **6** task-completion attempts + **1** merge commit = **7** total. Of the task commits, 2 kept (`5aaf81a9`, `158c8bcc`), 3 reset out (`f9f98598`, `d71574b9`, `1038a156`). Net **3 kept** + **1 merge** = **4 net commits ahead of origin/feature/scope-discovery**.
+- Tests: pre-merge 2703 → post-merge 2730 (+27 from main's Phase 18 feature-flag tests). Full plugin suite green; `tsc --noEmit` exit 0.
+- Audit findings: 5 surfaced across 3 cycles (AUDIT-41, 42, 43, 44, 45); all 5 reverted out of the audit-log when the 3 commits were reset (AUDIT-41 + 42's lift writes were in `158c8bcc`, not reset — let me verify post-merge state).
+- Branches: 0 behind origin/main, 5 ahead (3 prior session-end docs + this session's 4 net = 5 from origin/feature/scope-discovery's tip).
+- Audit-barrage runs: 3 (each cycle of end-of-task chain). All converged on dampener-engaged state.
+
+**Insights:**
+
+- **The friction `#413` describes is a fundamental cost of parallel-branch work in a monorepo.** This session's pattern — branch stale by 24 commits, two of the queue's substantive tasks ALREADY shipped on main, the agent re-implementing them in ignorance — is exactly what `#413`'s portfolio of cures aims to mechanize. The lesson: until `#413` ships the mechanical pre-implementation state-check, the cost falls on the agent to run it manually. Either the implement skill needs a Step 1.5 that enumerates main-side fixes against the queue, or the hygiene-helper's "Resume" output needs a "but check main first" disclaimer.
+- **The `git reset --hard` auto-mode-classifier interaction.** The classifier correctly refused single-character "A" / "1" replies as authorization for destructive history rewrite; only the explicit "git reset" reply got through. The friction feels right — destructive ops shouldn't pass under ambiguous authorization — but the operator UX cost is two extra turns. Worth knowing for future divergent-branch unwinds.
+- **The implement-hook's per-cycle audit-barrage cost was meaningful — but the convergence-via-dampener semantic worked exactly as designed.** Cycle 3 came back 0 findings; the dampener engaged via single-run rule; the per-task report stayed terse. The cost is real (3 barrages × ~30s each = ~90s of agent attention plus the parallel-model CLI fan-out) but the value is what AUDIT-41 / AUDIT-43 captured — both were real bookkeeping defects in my just-shipped work that the cross-model agreement (claude-01/02/03 + codex-01/02) surfaced before the operator saw them. Whether the per-iteration cost is worth it on a session with this many cycles is operator territory; the design is doing its job.
+
+### Hygiene observations
+
+- issue #375 referenced this session: feat(hygiene): Phase 14 walker accuracy + Phase 15 close-shipped redesign (#369 + #374) — *(from merged-in main commits; not directly touched this session)*
+- issue #396 [OPEN] referenced this session: implement-hook audit-barrage-render false-positives on {{var}}-shaped strings inside the diff var value (blocks /dwi barrage) — workplan + README ticked, awaiting operator post-release verification
+- issue #397 [CLOSED] referenced this session: audit-barrage spawn E2BIG: prompt passed via argv overflows ARG_MAX on large diffs — *(from prior session; shipped in v0.37.0; operator-reopen-and-verify still pending per AUDIT-35)*
+- issue #410 referenced this session: feat(scope-discovery): Phase 24 retire git-hook enforcement + Phase 25 module rename + Phase 26 archive-phases verb — *(prior session; surfaced via journal merge)*
+- issue #411 [OPEN] referenced this session: close-shipped apply: pending-verification label must already exist; no pre-flight / auto-create — **already shipped on main via PR #414**; my divergent implementation was reset out
+- issue #412 [OPEN] referenced this session: close-shipped SKILL.md prescribes bare /tmp/<name> paths that conflict with file-handling rule — **already shipped on main via PR #414**; no work needed
+- issue #413 [OPEN] referenced this session: Merging main into a feature branch produces friction in audit-log / scope-discovery / disposition bookkeeping — exact failure mode this session hit
+- issue #414 referenced this session: feat(hygiene): close-shipped follow-ups — pre-flight label + per-run paths (#411 + #412) — *(the canonical main-side fix this branch absorbed via merge)*
+- issue #415 [OPEN] referenced this session: structural-chain SKILL.md prescribes --feature <slug> flag that the v0.36.0 verbs reject — **substantively closed on source via Phase 18 / #417** (main shipped via PR #421); installed-plugin binary (`v0.37.0` cache) still rejects `--feature`, closes at next release
+- issue #416 referenced this session: fix(audit-barrage): catch E2BIG + flip default to {{prompt-stdin}} (closes #397) — *(prior session)*
+- issue #417 [OPEN] referenced this session: Phase 18: dw-lifecycle structural-check verbs reject --feature; SKILL prose drifts from CLI — *(superseded by main's Phase 18 ship; this is `#415`'s twin; operator can close)*
+- issue #421 referenced this session: feat(hygiene): structural verbs accept + scope to --feature <slug> (Phase 18) — *(the canonical main-side fix; closes the Task 50 surface)*
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/hygiene` `feature/hygiene` — 3 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/pluggable-lifecycle-providers` `feature/pluggable-lifecycle-providers` — 3 of 9 staleness signals
+
+### Next session recommendation (hygiene)
+
+- **Resume: re-assess the operator queue against the now-fresh main.** Tasks 9, 40, 41 closed (substantive work landed on main). Task 50 (#415) source-side closed but installed-plugin gap remains. Tasks 42 (#366), 43 (#350), 44 (#297), 45 (#413) need pre-implementation state-check against main BEFORE pickup — apply the "verify reviewer-cited external constraints" memory at queue head. The hygiene helper's mechanical pick (Task 40 Step 0) is now misleading; operator should explicitly state the queue head.
+- Triage: pending-verification carryover stays substantial — #294, #295, #401, #402, #403, #404, #405, #407, #409, #410. Also: #411 + #412 now in this same pre-verification bucket since they shipped via PR #414 (need operator install + verify pass against the v0.37.0+ released-after-merge). #397 still pending operator-reopen-and-verify against installed v0.37.0. #415 + #417 effectively redundant pair (both name the same flag-drift class); operator can close one as duplicate.
+- Address TBD markers: (no bare TBD markers introduced this session)
+- Dismantle stale worktrees: 3 candidates — `graphical-entries` (4/9 signals), `hygiene` (3/9), `pluggable-lifecycle-providers` (3/9). Consider `/dw-lifecycle:dismantle-worktrees` if any are paused.
+- Workflow improvement: at the top of `/dw-lifecycle:implement`, run `git fetch origin main && git log feature/scope-discovery..origin/main --oneline | wc -l` to detect "branch is N commits behind main" before picking up any task; merge BEFORE implementing when N > ~5. The implement skill SKILL.md doesn't currently codify this; worth a rule update or skill amendment after operator scoping.
+
+## 2026-06-04 (cont. 6): Phase 28 ship + v0.38.0 release + post-release verification sweep + 12 issue closures
+
+### Feature: scope-discovery
+### Worktree: scope-discovery
+
+**Goal:** Resume from cont. 5's hygiene recommendation — pick a high-value queue item against the now-fresh main. Operator pivot at session-start picked "address stale-branch friction at root" but redirected the placement from implement-loop to session-start (one-time cost, not per-iteration tax).
+
+**Accomplished:**
+
+- **Phase 28 scoped + shipped end-to-end.** New phase added to workplan + README with 4 tasks (pure-fn lib, CLI verb, config schema, SKILL.md wiring). All 4 task checklists + 4-of-6 acceptance criteria ticked (the 2 untickable are post-install operator verification per the project's closure rule). GH issue [#422](https://github.com/audiocontrol-org/deskwork/issues/422) filed with capture-mode body (cross-refs #413 / cont. 5 incident). Single commit `4d003915` (725 insertions, 4 deletions across 11 files: pure-fn lib + CLI verb + config schema + SKILL.md Step 8 + 3 new test files).
+- **PR #423 opened + merged.** Verification before completion: `cd plugins/dw-lifecycle && npm test` = 2755/2755 pass (was 2730 pre-Phase 28; +25 net). `tsc --noEmit` exit 0. Live-verify against this repo printed `Branch staleness: 0 commits behind origin/main (threshold 5).` exit 0. PR landed via standard merge-commit (`13599c27`); branch + worktree preserved per finishing-a-development-branch Option 2.
+- **CI gate handled with discovered context.** PR #423's CI was UNSTABLE due to pre-existing `@deskwork/studio` screenshot-test failures already red on main across 3 prior merges today (#414, #416, #421). Surfaced state + got explicit go-ahead before pushing the merge button. Phase 28's own contract: 2755/2755 in CI on the plugin workspace; 0 net failures introduced.
+- **v0.38.0 released.** All 4 release pauses cleared cleanly. Preconditions green; 11-file pure-version-bump diff with no surprises; tag message names both Phase 18 + Phase 28 (Phase 18 source-side closure of #415/#417 rode along from the cont. 5 merge); atomic --follow-tags push exit 0; `assert-published` confirmed all 3 npm packages live; `scripts/smoke-marketplace.sh` exit 0 with every route + asset returning 200. Release URL: https://github.com/audiocontrol-org/deskwork/releases/tag/v0.38.0
+- **Operator delegated the operator-side install + verification call.** Operator's framing: *"This counts as the operator-side install. I want you to verify the fixes actually work instead of making me do it."* — explicit override of the agent-discipline rule's reserved "operator decides closure" clause. I ran the verification sweep against the installed v0.38.0 binary at `~/.claude/plugins/cache/deskwork/dw-lifecycle/0.38.0/`.
+- **12 issues closed with verified evidence:** #294, #295, #397, #401, #402, #403, #404 (Phase 24 retirements all return `Unknown subcommand`); #405 (canonical + alias both work; alias prints stderr deprecation warning); #407 (`archive-phases --all` dry-run produces per-phase verdict shape); #410 (combined Phase 24+25+26 PR contract preserved end-to-end); #411 (close-shipped scanned 22 commits in v0.37.0..v0.38.0, applied `pending-verification` label to #417, 0 failures — pre-flight gate works); #412 (3 named `/tmp/` paths replaced with `.dw-lifecycle/close-shipped/runs/<timestamp>/`).
+- **#409 verification surfaced a NOT-shipped fix; corrected the misleading label.** `mergeDispositions()` at `plugins/dw-lifecycle/src/scope-discovery/clones-yaml.ts:439` still keys on `g.id` (the content-derived hash the issue named as the broken key). No content-fingerprint or rename-matching logic in source or tests. Removed the misleading `pending-verification` label (the issue is awaiting implementation, not verification) + posted explanatory comment.
+- **#418 verification surfaced a partial ship.** Surface 1 (this repo's committed `audit-barrage-config.yaml`) was migrated to `{{prompt-stdin}}`. Surface 2 (installer "Example override" block at `install-scope-discovery.ts:122-130`) still teaches `{{prompt}}`. Auto-migration not shipped. Posted partial-verification comment; kept open pending Phase 12 Task 10.
+- **New issue filed: [#425](https://github.com/audiocontrol-org/deskwork/issues/425).** Sibling of #412 — `/tmp/release-notes.md` at SKILL.md:261-262 in the `--release-notes-body` code path is a leftover the original #412 scope didn't name. Cross-references #412.
+
+**Didn't Work:**
+
+- **Hygiene helper's "Resume" pick was misleading at session-end** — points at Task 40 Step 0 (the close-shipped #411 surface) which already shipped + got closed this session. Same pathology as cont. 5: the mechanical first-unchecked-task scan doesn't know about the closure work that happened. Operator-overridden in the recommendation block below.
+- **`@deskwork/studio` CI failures are still red on main** across at least 5 merges today (PR #414, #416, #421, #410-pre, #423). Not my territory but the pattern is worth flagging — every PR that merges today inherits the broken CI signal.
+- **The cont. 5 stale-branch incident's discipline lesson didn't fire during the implementation pickup** (cont. 5 journal flagged: pre-implementation state-check against main is non-negotiable). I correctly used it for #418's surface check during verification, but the Phase 28 implementation itself was on a fresh-merged branch so the question never arose. The discipline gap is more "when stale-branch matters" than "always check"; Phase 28 (the new branch-staleness verb) is the mechanization of the lesson.
+
+**Course corrections:**
+
+- **[PROCESS] Operator can delegate the operator-side install + verification call.** The agent-discipline rule "Issue closure requires verification in a formally-installed release" reserves the closure transition for the operator. The operator's "This counts as the operator-side install" was an explicit override for this session. Pattern: when the operator delegates a normally-reserved decision, surface the override + execute. Do not extrapolate the override to future sessions; each delegation is per-session unless the rule itself changes.
+- **[PROCESS] Auto-applied `pending-verification` label is not proof of fix.** The `close-shipped` walker labels any issue referenced in the release range, regardless of whether the underlying fix substantively landed. #409 had the label but the fix didn't ship; verification revealed the gap. Lesson: when verifying a `pending-verification` issue, exercise the actual code path, not just the label.
+
+**Quantitative:**
+
+- Commits this session: **1 substantive** (`4d003915` Phase 28) + **1 merge** (`13599c27` PR #423 → main) + **1 release** (`3e8903ec` chore: release v0.38.0) = **3 total**.
+- PRs: **1** opened + merged (#423).
+- Releases: **1** (v0.38.0 — Phase 18 + Phase 28).
+- Tests: 2730 → 2755 (+25 new from Phase 28); plugin suite green in CI.
+- Issues: **12** closed with verified evidence (#294, #295, #397, #401-405, #407, #410, #411, #412), **1** filed (#425), **2** commented + relabeled (#409, #418), **1** new issue from Phase 28 scoping (#422 → closed via close-shipped + verification).
+- Verification: 14 issues exercised against the installed v0.38.0 binary; 12 closure-ready, 1 NOT-verified-fix-missing (#409), 1 partial-verified (#418).
+- Audit findings: 0 (no audit-barrage cycles this session; Phase 28's implementation was single-commit + tested in isolation).
+
+**Insights:**
+
+- **Phase 28's verb is the mechanization of cont. 5's lesson.** The cont. 5 journal named the stale-branch failure mode + manually proposed the cure ("check at session-start"). Phase 28 ships that cure as code that fires automatically. The session-start helper's misleading "Resume" pick is a different but related pathology — the helper's mechanical task-pick doesn't know about closures or main-side state. Both gaps point at the same architectural fact: the session-start surface needs richer context than the current journal-extracted prior recommendation provides.
+- **The verification sweep was high-leverage.** 14 issues exercised against the installed binary in roughly one session-hour produced: 12 closures (durable cleanup of the open queue), 1 not-shipped detection (#409 — corrected misleading state), 1 partial-detection (#418 — accurate state recorded), 1 new bug found (#425). The marginal cost of running each verification was small relative to the cleanup value. Worth considering: a `/dw-lifecycle:verify-pending` skill that batches this against any `pending-verification`-labeled issues post-release.
+- **Branch-staleness math worked at the verification surface too.** When I ran `branch-staleness-check` from inside the feature worktree (not main), it correctly reported "2 commits behind origin/main" — the chore-release commit + merge commit had landed on main but this worktree hadn't pulled them. The number was honest; the threshold (5) correctly didn't trip. Pure-fn boundary contract held in the real environment.
+- **CI red-on-main is a normalization risk.** Five PR merges today landed against a known-red CI; the project's working norm absorbed it without comment. The right move per `enforcement-lives-in-skills.md` § "a `--no-verify` push by the maintainer is evidence the hook chain is broken" is to fix the underlying flake, not normalize the bypass. The `@deskwork/studio` screenshot-test cluster is a candidate for a focused triage session.
+
+### Hygiene observations
+
+- v0.38.0 released — substantive shipping of Phase 18 (#415/#417 source-closure) + Phase 28 (#422)
+- issues closed this session: #294, #295, #397, #401, #402, #403, #404, #405, #407, #410, #411, #412 (12 total — all verified against installed binary)
+- issue #409 [OPEN] — refresh-clones-baseline carry-forward fix did NOT ship; `pending-verification` label removed (misleading)
+- issue #418 [OPEN] — audit-barrage E2BIG fix partially shipped (Surface 1 cured, Surface 2 + auto-migration outstanding); kept open pending Phase 12 Task 10
+- issue #422 [CLOSED] — Phase 28 branch-staleness verb verified live; closed via close-shipped workflow
+- issue #425 [OPEN, NEW] — sibling of #412: /tmp/release-notes.md leftover in close-shipped SKILL.md release-notes-body code path
+- worktree `/Users/orion/work/deskwork-work/graphical-entries` `feature/graphical-entries` — 4 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/hygiene` `feature/hygiene` — 3 of 9 staleness signals
+- worktree `/Users/orion/work/deskwork-work/pluggable-lifecycle-providers` `feature/pluggable-lifecycle-providers` — 3 of 9 staleness signals (per cont. 5 helper output; cont. 6 helper missed it but the staleness wasn't cleared)
+
+### Next session recommendation (hygiene)
+
+- **Resume:** queue head per the operator's call. Remaining substantive in-flight: Phase 12 Task 10 (#418, auto-migration path — operator pick required on doctor-rule vs. fire-time warning vs. both), Phase 20 Tasks 1-2 (not started), Phase 24 Task 10 post-release verification, Phase 27 (session-end archive hook — not started). The session-end-hygiene helper's mechanical "Resume" pick at Task 40 Step 0 is stale (Task 40 / #411 closed this session); ignore the helper output and let the operator state the queue head.
+- **Triage:** #409's lost fix needs scoping (carry-forward content-fingerprint algorithm sketched in the issue body; ready for a workplan task). #425 (new) is a small SKILL.md edit + commit — could fold into Phase 12 Task 10 or its own micro-phase. The `@deskwork/studio` red-CI cluster (screenshot-capture + screenshot-paste-drop) is a different concern area but normalization risk per the agent-discipline rule.
+- **Address TBD markers:** none introduced this session.
+- **Dismantle stale worktrees:** 3 candidates — `graphical-entries` (4/9), `hygiene` (3/9), `pluggable-lifecycle-providers` (3/9, carried from cont. 5). Consider `/dw-lifecycle:dismantle-worktrees` if any are paused.
+- **Workflow improvement:** the post-release verification sweep against the installed binary was high-leverage (12 closures + 2 corrections + 1 new bug found in roughly one session-hour). Consider productizing as `/dw-lifecycle:verify-pending` — batches the install-and-exercise pattern against any `pending-verification`-labeled issues post-release. Would systematize what cont. 6 did ad-hoc.
+- **Branch-staleness check fired correctly during cont. 6.** From the feature worktree post-release: "2 commits behind origin/main (threshold 5)" — below the nudge line, math honest. The Phase 28 cure is working end-to-end.

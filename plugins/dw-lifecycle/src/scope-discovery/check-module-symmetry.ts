@@ -41,6 +41,7 @@ import {
   renderMatrix,
   tallyStatuses,
 } from './module-symmetry-report.js';
+import { FeatureNotFoundError, resolveFeatureScope } from './resolve-feature-scope.js';
 import { errorMessage } from './util/typeguards.js';
 
 const DEFAULT_REGISTRY = '.dw-lifecycle/scope-discovery/adopter-manifests.yaml';
@@ -54,15 +55,25 @@ export interface CliOptions {
   readonly writeArtifact: boolean;
   readonly artifactPath: string;
   readonly quiet: boolean;
+  /**
+   * Phase 18: per-feature narrowing slug. When set, the matrix's
+   * `modules` column is filtered to the subset of modules touched by
+   * the feature's scope (per resolveFeatureScope's hybrid
+   * scope-manifest-or-git-diff source). Mutually exclusive with
+   * `--root`. Refs #417.
+   */
+  readonly feature: string | null;
 }
 
 export function parseCli(argv: readonly string[]): CliOptions {
   let registryPath = DEFAULT_REGISTRY;
   let scanRoot = DEFAULT_ROOT;
+  let rootExplicit = false;
   let moduleRoot = DEFAULT_MODULE_ROOT;
   let writeArtifact = false;
   let artifactPath = ARTIFACT_PATH;
   let quiet = false;
+  let feature: string | null = null;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     switch (arg) {
@@ -77,6 +88,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
         const next = argv[i + 1];
         if (next === undefined) throw new Error('--root requires a path argument');
         scanRoot = next;
+        rootExplicit = true;
         i += 1;
         break;
       }
@@ -100,6 +112,13 @@ export function parseCli(argv: readonly string[]): CliOptions {
       case '--quiet':
         quiet = true;
         break;
+      case '--feature': {
+        const next = argv[i + 1];
+        if (next === undefined) throw new Error('--feature requires a slug argument');
+        feature = next;
+        i += 1;
+        break;
+      }
       case '--help':
       case '-h':
         printHelp();
@@ -109,6 +128,13 @@ export function parseCli(argv: readonly string[]): CliOptions {
         throw new Error(`unknown argument: ${arg}`);
     }
   }
+  if (feature !== null && rootExplicit) {
+    throw new Error(
+      '--feature and --root are mutually exclusive: --feature narrows the matrix ' +
+        "to modules touched by the feature's scope; --root scans a fixed directory tree. " +
+        'Pass one or the other, not both.',
+    );
+  }
   return {
     registryPath,
     scanRoot,
@@ -116,6 +142,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
     writeArtifact,
     artifactPath,
     quiet,
+    feature,
   };
 }
 
@@ -145,12 +172,31 @@ export async function main(argv: readonly string[]): Promise<number> {
     process.stderr.write(`module-symmetry: ${errorMessage(err)}\n`);
     return 2;
   }
+  // Phase 18: --feature narrows the matrix to feature-touched modules.
+  let featureScopeFiles: readonly string[] | undefined;
+  if (opts.feature !== null) {
+    try {
+      const scope = await resolveFeatureScope({
+        slug: opts.feature,
+        repoRoot: process.cwd(),
+      });
+      featureScopeFiles = scope.files;
+    } catch (err) {
+      if (err instanceof FeatureNotFoundError) {
+        process.stderr.write(`module-symmetry: ${err.message}\n`);
+        return 2;
+      }
+      process.stderr.write(`module-symmetry: ${errorMessage(err)}\n`);
+      return 2;
+    }
+  }
   let matrix: SymmetryMatrix;
   try {
     matrix = await computeMatrix({
       registryPath: opts.registryPath,
       scanRoot: opts.scanRoot,
       moduleRoot: opts.moduleRoot,
+      featureScopeFiles,
     });
   } catch (err) {
     process.stderr.write(`module-symmetry: ${errorMessage(err)}\n`);

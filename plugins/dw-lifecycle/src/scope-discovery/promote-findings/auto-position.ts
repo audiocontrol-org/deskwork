@@ -298,14 +298,157 @@ export function computeAutoPosition(workplanText: string): AutoPosition {
  *
  * Either way, the numbering doesn't collide with existing tasks in
  * the phase.
+ *
+ * Post-#420: optional `takenIds` set (built via `collectAllTaskIds`)
+ * defends against scan/phase-span gaps the per-phase scanner can miss
+ * (e.g. tasks misplaced under another phase's heading). The factory
+ * forward-walks from `currentMax + 1` and skips any ID already taken.
+ * Without `takenIds` the legacy max+1+idx behavior is preserved.
  */
 export function nextTaskNumberFactory(
   position: AutoPosition,
+  takenIds?: ReadonlySet<string>,
 ): (item: unknown, idx: number) => string {
-  if (position.convention === 'flat') {
-    return (_item, idx) =>
-      `${position.currentMaxNumberInPhase + 1 + idx}`;
+  const renderId = (minor: number): string => {
+    return position.convention === 'flat'
+      ? `${minor}`
+      : `${position.phaseNumber}.${minor}`;
+  };
+  if (takenIds === undefined || takenIds.size === 0) {
+    return (_item, idx) => renderId(position.currentMaxNumberInPhase + 1 + idx);
   }
-  return (_item, idx) =>
-    `${position.phaseNumber}.${position.currentMaxNumberInPhase + 1 + idx}`;
+  const issued: string[] = [];
+  let cursor = position.currentMaxNumberInPhase;
+  return (_item, idx) => {
+    if (idx < issued.length) return issued[idx]!;
+    while (issued.length <= idx) {
+      cursor += 1;
+      const candidate = renderId(cursor);
+      if (!takenIds.has(candidate) && !issued.includes(candidate)) {
+        issued.push(candidate);
+      }
+    }
+    return issued[idx]!;
+  };
+}
+
+/**
+ * Collect every `### Task X.Y` (or `### Task N`) ID present in the
+ * workplan, plus every range listed in the archive ledger's
+ * `archived-fix-tasks` field. Returns a set keyed by the rendered ID
+ * form (`"39.15"` or `"5"`).
+ *
+ * Post-#420 defensive scan: union of (live workplan headings) +
+ * (archive ledger ranges). The per-phase scanner in `computeAutoPosition`
+ * filters by phase-span line range, so a heading misplaced under
+ * another phase's section is invisible to it; this set is global and
+ * catches every heading the canonical regex recognizes.
+ *
+ * Post-AUDIT-20260606-04: ranges with mixed dotted/flat endpoints or
+ * cross-prefix dotted endpoints (`39.10-40.2`) match neither expansion
+ * branch and were previously silently skipped — leaving those archived
+ * IDs absent from the set and re-issuable by the very forward-walk
+ * that depends on the set being complete. The `warn` sink (when
+ * supplied) now surfaces each dropped range so the operator sees the
+ * gap; the silent-drop is preserved as the default behavior for
+ * call-sites that don't pass `warn`.
+ */
+export function collectAllTaskIds(
+  workplanText: string,
+  warn?: (message: string) => void,
+): Set<string> {
+  const lines = workplanText.split('\n');
+  const ids = new Set<string>();
+  for (const line of lines) {
+    const m = TASK_HEADING_RE.exec(line);
+    if (m === null) continue;
+    const major = m[1] ?? '';
+    const minor = m[2];
+    if (minor !== undefined && minor.length > 0) {
+      ids.add(`${major}.${minor}`);
+    } else {
+      ids.add(major);
+    }
+  }
+  try {
+    const ledger = parseLedgerFromWorkplan(workplanText);
+    if (ledger !== null && ledger.archivedFixTasks !== undefined) {
+      for (const range of ledger.archivedFixTasks) {
+        const startStr = String(range.start);
+        if (range.end === undefined) {
+          ids.add(startStr);
+          continue;
+        }
+        const endStr = String(range.end);
+        // Both `5.1-5.123` (dotted) and `1-5` (flat) shapes; handle both.
+        const dotStart = startStr.indexOf('.');
+        const dotEnd = endStr.indexOf('.');
+        if (dotStart !== -1 && dotEnd !== -1) {
+          const prefix = startStr.slice(0, dotStart);
+          const endPrefix = endStr.slice(0, dotEnd);
+          if (prefix !== endPrefix) {
+            warn?.(
+              `collectAllTaskIds: dropped cross-prefix dotted ledger range ${startStr}-${endStr}; archived IDs in this range may be re-issued`,
+            );
+            continue;
+          }
+          const lo = Number(startStr.slice(dotStart + 1));
+          const hi = Number(endStr.slice(dotEnd + 1));
+          if (!Number.isFinite(lo) || !Number.isFinite(hi)) {
+            warn?.(
+              `collectAllTaskIds: dropped non-numeric dotted ledger range ${startStr}-${endStr}`,
+            );
+            continue;
+          }
+          for (let m = lo; m <= hi; m += 1) ids.add(`${prefix}.${m}`);
+        } else if (dotStart === -1 && dotEnd === -1) {
+          const lo = Number(startStr);
+          const hi = Number(endStr);
+          if (!Number.isFinite(lo) || !Number.isFinite(hi)) {
+            warn?.(
+              `collectAllTaskIds: dropped non-numeric flat ledger range ${startStr}-${endStr}`,
+            );
+            continue;
+          }
+          for (let n = lo; n <= hi; n += 1) ids.add(`${n}`);
+        } else {
+          warn?.(
+            `collectAllTaskIds: dropped mixed dotted/flat ledger range ${startStr}-${endStr}; archived IDs in this range may be re-issued`,
+          );
+        }
+      }
+    }
+  } catch {
+    // Malformed ledger — fall through; the live-heading set still applies.
+  }
+  return ids;
+}
+
+/**
+ * Post-write defense (Phase 29 / #420): walk the resulting workplan
+ * and surface every `### Task X.Y` ID that appears more than once.
+ * `applyProposal` calls this after writing and fails loud when the
+ * result is non-empty so an operator notices the duplicate before it
+ * compounds.
+ */
+export function findDuplicateTaskHeadings(workplanText: string): string[] {
+  const lines = workplanText.split('\n');
+  const seen = new Map<string, number>();
+  const dups = new Set<string>();
+  for (const line of lines) {
+    const m = TASK_HEADING_RE.exec(line);
+    if (m === null) continue;
+    const major = m[1] ?? '';
+    const minor = m[2];
+    const id =
+      minor !== undefined && minor.length > 0 ? `${major}.${minor}` : major;
+    const prior = seen.get(id);
+    if (prior === undefined) {
+      seen.set(id, 1);
+    } else {
+      seen.set(id, prior + 1);
+      dups.add(id);
+    }
+  }
+  return Array.from(dups).sort();
 }

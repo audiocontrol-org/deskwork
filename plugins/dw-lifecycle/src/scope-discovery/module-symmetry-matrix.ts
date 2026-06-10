@@ -140,6 +140,15 @@ export interface ComputeOptions {
   readonly scanRoot: string;
   /** Module-root directory (relative to scanRoot). Default `'src'`. */
   readonly moduleRoot?: string;
+  /**
+   * Phase 18: when set, the matrix's `modules` column is filtered to
+   * the subset whose `<moduleRoot>/<slug>/...` files appear in this
+   * list. Caller (check-module-symmetry's main) computes this from
+   * `resolveFeatureScope` when `--feature <slug>` is passed. Empty
+   * list → zero modules → matrix carries the empty-set semantics
+   * (no rows surface any cell). Refs #417.
+   */
+  readonly featureScopeFiles?: readonly string[];
 }
 
 /**
@@ -150,7 +159,16 @@ export interface ComputeOptions {
 export async function computeMatrix(opts: ComputeOptions): Promise<SymmetryMatrix> {
   const rootAbs = resolve(opts.scanRoot);
   const moduleRoot = opts.moduleRoot ?? DEFAULT_MODULE_ROOT;
-  const modules = await discoverModules(rootAbs, moduleRoot);
+  let modules = await discoverModules(rootAbs, moduleRoot);
+  // Phase 18: filter modules to those touched by the feature scope.
+  if (opts.featureScopeFiles !== undefined) {
+    const touchedModules = new Set<string>();
+    for (const file of opts.featureScopeFiles) {
+      const m = moduleForPath(file, modules, moduleRoot);
+      if (m !== null) touchedModules.add(m);
+    }
+    modules = modules.filter((m) => touchedModules.has(m));
+  }
   const registry = await loadRegistry(opts.registryPath);
   // filter to actively-enforced entries before
   // building the matrix. Adopter-manifest entries with `status:
