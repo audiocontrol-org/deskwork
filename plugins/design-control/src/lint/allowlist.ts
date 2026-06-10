@@ -31,24 +31,60 @@ export const ALLOWED_TAGS: ReadonlySet<string> = new Set([
   'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption', 'colgroup', 'col',
 ]);
 
-/** Attributes permitted on ANY allowed element. `aria-*` is handled by prefix. */
-export const GLOBAL_ATTRS: ReadonlySet<string> = new Set([
-  'class', 'id', 'title', 'lang', 'dir', 'role',
-]);
+/**
+ * Each allowlisted attribute declares its KIND at the single point of
+ * declaration (AUDIT-20260606-07 / ex-#428):
+ *
+ * - `'plain'` — the value is inert text; no URL-shape scanning.
+ * - `'url'` — the value is a URL and MUST be scheme/control-scanned; membership
+ *   in {@link URL_ATTRS} / {@link URL_ATTR_PAIRS} is DERIVED from this tag.
+ *
+ * Deriving (rather than hand-maintaining a parallel `URL_ATTRS` set) makes the
+ * "every URL-bearing allowlisted attr is scanned" invariant hold by
+ * construction: an attr cannot be added to the allowlist without an explicit
+ * kind decision, and a `'url'` decision automatically extends scanning. The
+ * remaining reviewable judgment is the kind itself — a behavioral test loops
+ * every url-kind pair through the lint to keep the pipeline honest.
+ */
+type AttrKind = 'plain' | 'url';
 
-/** Per-tag attributes permitted in addition to {@link GLOBAL_ATTRS}. */
-export const TAG_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
-  meta: new Set(['charset', 'name', 'content']),
-  link: new Set(['rel', 'href', 'media']),
-  a: new Set(['href']),
-  button: new Set(['type']),
-  ol: new Set(['start', 'reversed']),
-  li: new Set(['value']),
-  td: new Set(['colspan', 'rowspan', 'headers']),
-  th: new Set(['colspan', 'rowspan', 'headers', 'scope']),
-  col: new Set(['span']),
-  colgroup: new Set(['span']),
+const GLOBAL_ATTR_SPECS: Readonly<Record<string, AttrKind>> = {
+  class: 'plain', id: 'plain', title: 'plain', lang: 'plain', dir: 'plain', role: 'plain',
 };
+
+const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>>> = {
+  meta: { charset: 'plain', name: 'plain', content: 'plain' },
+  link: { rel: 'plain', href: 'url', media: 'plain' },
+  a: { href: 'url' },
+  button: { type: 'plain' },
+  ol: { start: 'plain', reversed: 'plain' },
+  li: { value: 'plain' },
+  td: { colspan: 'plain', rowspan: 'plain', headers: 'plain' },
+  th: { colspan: 'plain', rowspan: 'plain', headers: 'plain', scope: 'plain' },
+  col: { span: 'plain' },
+  colgroup: { span: 'plain' },
+};
+
+/** Attributes permitted on ANY allowed element. `aria-*` is handled by prefix. */
+export const GLOBAL_ATTRS: ReadonlySet<string> = new Set(Object.keys(GLOBAL_ATTR_SPECS));
+
+/** Per-tag attributes permitted in addition to {@link GLOBAL_ATTRS}. Derived. */
+export const TAG_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = Object.fromEntries(
+  Object.entries(TAG_ATTR_SPECS).map(([tag, specs]) => [tag, new Set(Object.keys(specs))]),
+);
+
+/**
+ * Every url-kind `(tag, attr)` pair in the allowlist — the behavioral-test
+ * surface for the allowlist→scanning direction (each pair must be value-scanned
+ * by the lint).
+ */
+export const URL_ATTR_PAIRS: ReadonlyArray<readonly [string, string]> = Object.entries(
+  TAG_ATTR_SPECS,
+).flatMap(([tag, specs]) =>
+  Object.entries(specs)
+    .filter(([, kind]) => kind === 'url')
+    .map(([attr]) => [tag, attr] as const),
+);
 
 /**
  * Presentational attributes that get a distinct, clearer rejection message than
@@ -64,22 +100,16 @@ export const PRESENTATIONAL_ATTRS: ReadonlySet<string> = new Set([
 /**
  * Attributes whose VALUE is a URL and must be scheme/control-scanned (data:,
  * javascript:, control-char obfuscation). This is the SSOT the lint gates its
- * value-shape checks on — NOT a hardcoded `'href'` literal — so adding a future
- * URL-bearing attr here automatically extends scheme coverage to it
- * (AUDIT-20260606-04).
+ * value-shape checks on — NOT a hardcoded `'href'` literal — so a future
+ * URL-bearing attr automatically extends scheme coverage (AUDIT-20260606-04).
  *
- * INVARIANT: every URL-bearing attribute in the allowlist ({@link TAG_ATTRS} /
- * {@link GLOBAL_ATTRS}) is a member of this set, so its values are scheme/
- * control-scanned. This holds today and is non-vacuous: the allowlist's only URL
- * attr is `href`, which is present here. The RESOURCE direction is test-enforced
- * (`RESOURCE_URL_ATTRS ⊆ URL_ATTRS`); the non-resource direction (`a ping`,
- * `form action`, `q cite`) is currently vacuous — no such attr is in the
- * allowlist, so there is nothing unscanned.
- *
- * Machine-checking the non-resource direction (deriving this set from URL-tagged
- * allowlist entries) is tracked in #428.
+ * DERIVED from the url-kind entries of the attr specs above (AUDIT-20260606-07
+ * / ex-#428): every URL-bearing attribute in the allowlist is a member by
+ * construction — an allowlisted attr cannot skip scanning without an explicit
+ * `'plain'` kind decision at its declaration site. The allowlist→scanning
+ * direction is additionally behavior-tested over {@link URL_ATTR_PAIRS}.
  */
-export const URL_ATTRS: ReadonlySet<string> = new Set(['href']);
+export const URL_ATTRS: ReadonlySet<string> = new Set(URL_ATTR_PAIRS.map(([, attr]) => attr));
 
 /**
  * Resource-LOADING URL attributes, by tag — the subset of {@link URL_ATTRS}
