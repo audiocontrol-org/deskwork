@@ -830,3 +830,34 @@ Verification weakened the claim: the defeating input ALSO trips disallowed-eleme
 the "legitimate author idiom" premise fails. The axes-disagreement (census counts
 template content the pin's collector ignores) is latent-only on always-rejected
 inputs. Recorded as observation; no code change, no backlog item.
+
+## 2026-06-10 — lint adversarial barrage ROUND 3 (run 20260610T194644238Z; codex only — claude 0 bytes)
+
+Triage notes: claude produced ZERO bytes (0 stdout / 0 stderr; the silent-timeout
+shape — deskwork issue 447; the run dir also persists no per-model run record, the
+BarrageRun JSON is stdout-only). Degraded fleet: no cross-model signal this round.
+Codex: 2 HIGH false-negatives (both sharding responses to the round-2 density gate,
+both behaviorally verified ok=true pre-fix), 1 LOW false-positive recurrence, plus
+a grounded-clean list confirming base/SVG/style/script/mixed-rel/media/external/
+swapped-kit/swapped-font/SRI/entity channels hold. Round verdict: NOT converged.
+
+### AUDIT-20260610-17 — Sharded punctuation art defeats the per-text-node density gate (code shards; table-cell mosaic)
+
+Finding-ID: AUDIT-20260610-17 (round-3 gpt-5-01 + gpt-5-02; one mechanism — shard below the per-node floor, reassemble at the rendered row)
+Status:     fixed-1a783fe1 (2026-06-10; density also runs over each block container's aggregate descendant text; per-node check kept for diluted-block inline islands)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts + codepoint.ts
+
+Adjacent `<code>` shards of 7 chars (below PUNCT_DENSITY_MIN_LENGTH) joined by br
+row control, and one-glyph-per-`<td>` mosaics with the table supplying the raster,
+both rendered wordmarks under a verified pin. Fixed at the granularity the shards
+reassemble at: DENSITY_BLOCK_TAGS aggregate text. Specificity fixtures: data
+tables, short placeholder rows, prose pages stay green; a letter-diluted block
+containing one dense inline island still trips via the kept per-node check.
+
+### AUDIT-20260610-08 recurrence — native form flow over-rejection (round-3 gpt-5-03, LOW)
+
+Third surfacing of the form-controls theme (round-1 gpt-5-05 → AUDIT-08/TASK-15;
+now `<form>` + `<input type=text>`). Still parked as backlog TASK-15 per the
+intake rule; the recurrence count strengthens its selection case — it is also a
+direct input to the Phase-1 positive-corpus task.
