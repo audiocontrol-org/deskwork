@@ -227,5 +227,21 @@ describe('lintWireframe — punctuation-density imagery channel (AUDIT-20260610-
         `<p>(Prices include VAT — see notes…)</p></main>`;
       expect(rules(wrap(html))).not.toContain('punctuation-density');
     });
+
+    // AUDIT-20260610-18 (round-4 gpt-5-codex-01, HIGH) — DOCUMENTED BOUNDARY,
+    // not a closure: a LETTER mosaic (one allowlisted letter per table cell,
+    // 0% punctuation) renders a wordmark the density gate structurally cannot
+    // see, and a single-char-cell heuristic collides with legitimate Y/N
+    // feature matrices. General text-as-imagery is the REFEREE's gross-class
+    // imagery judgment (PRD §referee; gross classes 5–7), not the lint's
+    // mechanical closure — the lint's claim is scoped accordingly (see the
+    // adversarial prompt + module docstring). This fixture PINS the boundary
+    // so it is explicit, falsifiable, and on the record.
+    it('BOUNDARY (documented): a letter mosaic in table cells passes the mechanical axes', () => {
+      const row =
+        '<tr>' + 'AAACCCMMMEEE'.split('').map((c) => `<td>${c}</td>`).join('') + '</tr>';
+      const r = lintWireframeStructural(wrap(`<table>${row}${row}${row}</table>`));
+      expect(r.findings.map((f) => f.rule)).not.toContain('punctuation-density');
+    });
   });
 });

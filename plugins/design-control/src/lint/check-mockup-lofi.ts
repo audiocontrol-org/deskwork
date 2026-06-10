@@ -7,6 +7,16 @@
  * allowlist closure, not a denylist patch. Anything not enumerated in
  * `@/lint/allowlist` is rejected by the catch-all.
  *
+ * SCOPE BOUNDARY (AUDIT-20260610-18): text-as-imagery composed of allowlisted
+ * LETTER glyphs at structural granularity (e.g. a wordmark mosaic of one
+ * letter per table cell) is OUTSIDE the lint's mechanical closure — letter
+ * grids are statistically indistinguishable from legitimate Y/N feature
+ * matrices, and stacking shape heuristics is the whack-a-mole the round-7
+ * allowlist pivot abolished. The punctuation-density gate bounds punctuation
+ * art only; general text-as-imagery is the cross-model REFEREE's gross-class
+ * imagery judgment (PRD § referee, gross classes 5–7). A boundary fixture in
+ * the codepoint suite pins this explicitly.
+ *
  * This task ships axis 1 only. The stylesheet identity-pin (single pinned
  * `<link>` by canonical path + content hash) is task 4; the text codepoint
  * allowlist is task 5; the adversarial corpus is tasks 6–7. The pipeline shape
