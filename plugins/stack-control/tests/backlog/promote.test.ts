@@ -133,7 +133,6 @@ describe('promote writer — mid-batch write failure is fail-loud + names writte
       create: (s) => real.create(s),
       list: () => real.list(),
       exists: (r) => real.exists(r),
-      assertWellFormed: () => real.assertWellFormed(),
       edit: (id: string, spec: EditSpec) => {
         if (id === failId) throw new BacklogError(`simulated backend failure on ${id}`);
         real.edit(id, spec);

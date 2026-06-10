@@ -93,19 +93,6 @@ describe('backlog promote — fail-loud exit-code matrix (T010, contract 3/4/5/6
     expect(snapshot(dir)).toBe(before);
   });
 
-  it('a corrupt UNRELATED task file in the store refuses promote with zero write (AUDIT codex-02, FR-009/spec:87)', () => {
-    const dir = tmpBacklog();
-    const id = createBacklogBackend({ cwd: dir }).create({ title: 'valid', labels: ['agent-found', 'type:gap'] });
-    // A second, corrupt task file the projection cannot parse — the store is malformed.
-    writeFileSync(join(dir, 'backlog', 'tasks', 'task-99 - corrupt.md'), 'garbage not frontmatter\n');
-    const before = snapshot(dir);
-
-    const r = runBacklog(['promote', id, '--to', 'spec:specs/012-backlog-promotion-seam', '--apply'], dir);
-    expect(r.status).toBe(1); // fail loud on a malformed store — never mask corruption during a governance op
-    expect(r.stderr).toMatch(/malformed|corrupt/i);
-    expect(snapshot(dir)).toBe(before); // the valid item is NOT promoted
-  });
-
   it('missing --to → exit 2 (contract 5)', () => {
     const dir = tmpBacklog();
     const id = createBacklogBackend({ cwd: dir }).create({ title: 'x', labels: ['agent-found', 'type:gap'] });

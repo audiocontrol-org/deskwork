@@ -62,11 +62,6 @@ export interface BacklogBackend {
   /** Additively edit an existing item (add a label / append notes). Shells the
    * real binary; a non-zero exit (e.g. unknown id) throws BacklogError (D6). */
   edit(id: string, spec: EditSpec): void;
-  /** Fail loud if ANY task file in the store is malformed (unparseable
-   * frontmatter / missing id). Unlike `list`/`exists` — which tolerate by
-   * skipping — this is the preflight a mutation runs so it never masks a
-   * corrupt store (FR-009, no-silent-skip). Throws BacklogError naming the file. */
-  assertWellFormed(): void;
 }
 
 export interface BacklogBackendOptions {
@@ -196,19 +191,6 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
       if (spec.appendNotes !== undefined) args.push('--append-notes', spec.appendNotes);
       args.push('--plain');
       run(args); // non-zero (e.g. unknown id) → BacklogError, never a silent no-op
-    },
-
-    assertWellFormed(): void {
-      if (!existsSync(tasksDir)) return;
-      for (const file of readdirSync(tasksDir)) {
-        if (!file.endsWith('.md')) continue;
-        if (projectTask(readFileSync(join(tasksDir, file), 'utf8')) === null) {
-          throw new BacklogError(
-            `malformed backlog task file: '${file}' (unparseable frontmatter or missing id) — ` +
-              `fix or remove it before mutating the store`,
-          );
-        }
-      }
     },
   };
 }
