@@ -34,7 +34,7 @@ description: "Task list — Migrate scope-discovery into stack-control"
 **Purpose**: the per-codebase boundary resolver, jscpd wrapper, clones.yaml parse/serialize, schema validation, and the not-yet-migrated `util/*` — everything downstream depends on these.
 
 - [ ] T004 [P] RED: `__tests__/scope-discovery/codebase-boundary.test.ts` — boundary resolves to nearest-enclosing `.stack-control` installation, excludes nested child subtrees, and FAILS LOUD (no cwd fallback) when no config is found (FR-007; data-model § CodebaseBoundary).
-- [ ] T005 [US-foundation] GREEN: implement `scope-discovery/codebase-boundary.ts` reusing 009 `src/config/resolve-paths.ts` walk-up; derive `excludedChildren`; no `process.cwd()` default → T004 GREEN.
+- [ ] T005 GREEN: implement `scope-discovery/codebase-boundary.ts` reusing 009 `src/config/resolve-paths.ts` walk-up; derive `excludedChildren`; no `process.cwd()` default → T004 GREEN.
 - [ ] T006 [P] RED: `__tests__/scope-discovery/jscpd-runner.test.ts` — runner invokes jscpd scoped to a given root + ignore-list, parses the JSON report, surfaces engine crashes as exit-2 errors.
 - [ ] T007 GREEN: port `scope-discovery/jscpd-runner.ts` from dw-lifecycle, parameterized by boundary root + ignore (no repo-root assumption) → T006 GREEN.
 - [ ] T008 [P] RED: `__tests__/scope-discovery/clones-yaml.test.ts` — parse/serialize round-trip, stable content-hashed ids, malformed file fails loud (FR-035).
