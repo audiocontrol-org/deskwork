@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import { parse, defaultTreeAdapter as ta } from 'parse5';
 import type { DefaultTreeAdapterMap } from 'parse5';
 import type { LintFinding } from '@/lint/types';
-import { isStylesheetRel } from '@/lint/allowlist';
+import { isStylesheetRel, splitHtmlTokens } from '@/lint/allowlist';
 import {
   SKETCH_KIT_CSS_PATH,
   SKETCH_KIT_DIR,
@@ -128,7 +128,7 @@ function collectThemeClasses(node: AnyNode, out: Set<string>): void {
   if (ta.isElementNode(node)) {
     const classValue = ta.getAttrList(node).find((a) => a.name.toLowerCase() === 'class')?.value;
     if (classValue) {
-      for (const token of classValue.split(/\s+/)) {
+      for (const token of splitHtmlTokens(classValue)) {
         if (token.startsWith('sk-theme-')) out.add(token);
       }
     }
@@ -239,7 +239,7 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
     // case-insensitive (W3C SRI), and a trailing `?options` is stripped by the
     // browser — but the base64 payload is case-sensitive, so only the prefix is
     // lowercased (AUDIT-20260606-18 case, -19 options).
-    const tokens = link.integrity.split(/\s+/).filter(Boolean).map(normalizeSriToken);
+    const tokens = splitHtmlTokens(link.integrity).map(normalizeSriToken);
     const strongest = SRI_ALGOS.find((algo) => tokens.some((t) => t.startsWith(`${algo}-`)));
     if (!strongest) {
       findings.push({

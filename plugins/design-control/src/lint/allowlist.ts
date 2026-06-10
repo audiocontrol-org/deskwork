@@ -157,6 +157,7 @@ export const INPUT_TYPE_ALLOWLIST: ReadonlySet<string> = new Set([
   'text', 'email', 'search', 'password', 'checkbox', 'radio', 'button', 'submit',
   'number', // AUDIT-20260610-43: quantity fields are structural; spinner is UA baseline
   'tel', // AUDIT-20260610-47: same structural class as email/search
+  'url', // AUDIT-20260610-52: same text-field class
 ]);
 
 /**
@@ -178,14 +179,28 @@ export const VIEWPORT_CONTENT_ALLOWLIST: ReadonlySet<string> = new Set([
 export const META_NAME_ALLOWLIST: ReadonlySet<string> = new Set(['viewport', 'description']);
 
 /**
+ * Split an HTML token-list attribute value (class / rel / integrity) the way
+ * the BROWSER does: on ASCII whitespace ONLY (tab, LF, FF, CR, space —
+ * the HTML spec's "ASCII whitespace"). JS `\s` additionally matches NBSP and
+ * Unicode spacers, which created a tokenization DIFFERENTIAL
+ * (AUDIT-20260610-50): `rel="stylesheet "` was one clean token to the
+ * lint but a non-stylesheet token to the browser — kit silently not applied
+ * under a green pin. Every token split in the lint goes through this.
+ */
+export function splitHtmlTokens(value: string): string[] {
+  return value.split(/[\t\n\f\r ]+/).filter(Boolean);
+}
+
+/**
  * A `rel` attribute value names EXACTLY a stylesheet — the normalized token set
  * is `['stylesheet']`, nothing more. A mixed `rel="stylesheet icon"` /
  * `"stylesheet preload"` still pulls a non-CSS resource, so it is NOT a clean
  * stylesheet link. Shared by axis-1's link-rel gate and the identity-pin's link
- * collector so the two cannot disagree (AUDIT-20260606-08).
+ * collector so the two cannot disagree (AUDIT-20260606-08). ASCII-whitespace
+ * tokenization per AUDIT-20260610-50.
  */
 export function isStylesheetRel(relValue: string): boolean {
-  const tokens = relValue.toLowerCase().split(/\s+/).filter(Boolean);
+  const tokens = splitHtmlTokens(relValue.toLowerCase());
   return tokens.length === 1 && tokens[0] === 'stylesheet';
 }
 

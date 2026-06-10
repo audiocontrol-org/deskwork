@@ -261,6 +261,56 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// AUDIT-20260610-50 (round-14 gpt-5-01 + gpt-5-02, both HIGH; one mechanism):
+// whitespace-DEFINITION differential — JS \s matches NBSP but the browser's
+// HTML token lists split on ASCII whitespace only, so rel="stylesheet&nbsp;"
+// and class="sk&nbsp;..." read as DIFFERENT tokens to the browser than to the
+// lint (kit silently not applied under a green pin). All token splits now use
+// the HTML-spec ASCII set.
+describe('check-mockup-lofi — ASCII-whitespace tokenization (AUDIT-20260610-50)', () => {
+  it('rejects an NBSP-suffixed stylesheet rel (browser sees a non-stylesheet token)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet " href="sketch-kit.css"></head><body class="sk">x</body></html>`;
+    expect(rules(html)).toContain('disallowed-link-rel');
+  });
+  it('rejects an NBSP-joined body class (browser sees one token, not sk)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css"></head>` +
+      `<body class="sk sk-theme-grayscale"><div>x</div></body></html>`;
+    expect(rules(html)).toContain('kit-root-missing');
+  });
+});
+
+// AUDIT-20260610-51 (round-14 gpt-5-03, HIGH): punctuation rows sharded
+// through RENDERED input values — visible author text riding controls, which
+// aggregateText (text nodes only) never saw. Rendered values join the
+// sibling-run accumulator.
+describe('check-mockup-lofi — rendered values join density runs (AUDIT-20260610-51)', () => {
+  it('rejects sharded punctuation button values (round-14 defeating input)', () => {
+    const html =
+      `<form><input type="button" value="###"><input type="button" value="..###">` +
+      `<input type="button" value="#####"><br><input type="button" value="#..">` +
+      `<input type="button" value="##..."></form>`;
+    expect(rules(wrap(html))).toContain('punctuation-density');
+  });
+  it('accepts ordinary button rows (copy-shaped values break the run)', () => {
+    const html =
+      `<form><input type="button" value="Back"><input type="button" value="Save draft">` +
+      `<input type="button" value="Continue"></form>`;
+    expect(rules(wrap(html))).toEqual([]);
+  });
+});
+
+// AUDIT-20260610-52 (round-14 gpt-5-04, LOW fp): url is the same text-field
+// class as email/search/tel.
+describe('check-mockup-lofi — url input (AUDIT-20260610-52)', () => {
+  it('accepts input type=url', () => {
+    expect(rules(wrap(`<form><label for="s">Website</label><input id="s" type="url" placeholder="https://example.com"></form>`))).toEqual([]);
+  });
+});
+
 // AUDIT-20260610-48 (round-13 gpt-5-01 HIGH + gpt-5-02 MED) — DOCUMENTED
 // BOUNDARY, the general form: imagery composed by GEOMETRIC PLACEMENT of
 // sanctioned visual atoms (kit primitives like .sk-dot; native control

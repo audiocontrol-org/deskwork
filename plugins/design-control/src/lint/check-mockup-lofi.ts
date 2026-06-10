@@ -56,6 +56,7 @@ import {
   INPUT_TYPE_ALLOWLIST,
   VIEWPORT_CONTENT_ALLOWLIST,
   isStylesheetRel,
+  splitHtmlTokens,
 } from '@/lint/allowlist';
 
 export { ALLOWED_TAGS } from '@/lint/allowlist';
@@ -136,6 +137,7 @@ const DENSITY_BLOCK_TAGS: ReadonlySet<string> = new Set([
   'div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
   'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'figure', 'figcaption',
   'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption',
+  'form', // AUDIT-20260610-51: sharded control values ride form rows
 ]);
 
 /** Concatenated descendant text of an element (template content included). */
@@ -145,6 +147,39 @@ function aggregateText(el: Element): string {
     if (ta.isTextNode(node)) out += ta.getTextNodeContent(node);
     if ('content' in node && node.content) {
       for (const child of node.content.childNodes) visit(child);
+    }
+    if ('childNodes' in node) {
+      for (const child of node.childNodes) visit(child);
+    }
+  };
+  visit(el);
+  return out;
+}
+
+/**
+ * Like {@link aggregateText} but ALSO includes the author text that controls
+ * RENDER (input value on rendered types, input/textarea placeholder) —
+ * AUDIT-20260610-51: punctuation rows sharded through button values are
+ * visible author text the text-node walk never sees. Used by the density
+ * block/run paths ONLY (the empty-textarea rule keeps plain aggregateText so a
+ * legitimate placeholder is not mistaken for content).
+ */
+function renderedText(el: Element): string {
+  let out = aggregateText(el);
+  const visit = (node: AnyNode): void => {
+    if (ta.isElementNode(node)) {
+      const nodeTag = ta.getTagName(node).toLowerCase();
+      if (nodeTag === 'input' || nodeTag === 'textarea') {
+        const attrs = ta.getAttrList(node);
+        const type = (attrs.find((a) => a.name.toLowerCase() === 'type')?.value ?? '').toLowerCase();
+        const valueRenders = nodeTag === 'input' && !['checkbox', 'radio'].includes(type);
+        for (const { name, value } of attrs) {
+          const attr = name.toLowerCase();
+          if ((attr === 'value' && valueRenders) || attr === 'placeholder') {
+            out += ' ' + value;
+          }
+        }
+      }
     }
     if ('childNodes' in node) {
       for (const child of node.childNodes) visit(child);
@@ -165,9 +200,9 @@ function checkElement(el: Element, ctx: WalkContext): void {
   // selected on the body root — sk-theme-* below body composes mixed-theme
   // surfaces (per-section typography/palette/texture switching), a pinned-CSS
   // polish channel through class PLACEMENT rather than substitution.
-  const classTokens = (
-    ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'class')?.value ?? ''
-  ).split(/\s+/).filter(Boolean);
+  const classTokens = splitHtmlTokens(
+    ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'class')?.value ?? '',
+  );
   // Distinct themes, not raw tokens (AUDIT-20260610-46): duplicate identical
   // tokens compose nothing.
   const themeTokens = [...new Set(classTokens.filter((t) => t.startsWith('sk-theme-')))];
@@ -350,7 +385,7 @@ function checkElement(el: Element, ctx: WalkContext): void {
 
   // Block-aggregate punctuation density (AUDIT-20260610-17): the rendered
   // row/region is what sharded punctuation art reassembles at.
-  if (DENSITY_BLOCK_TAGS.has(tag) && isPunctuationDense(aggregateText(el))) {
+  if (DENSITY_BLOCK_TAGS.has(tag) && isPunctuationDense(renderedText(el))) {
     findings.push({
       rule: 'punctuation-density',
       tag,
@@ -391,7 +426,7 @@ function checkElement(el: Element, ctx: WalkContext): void {
         classify(ta.getTextNodeContent(child));
       } else if (ta.isElementNode(child)) {
         if (ta.getTagName(child).toLowerCase() === 'br') continue; // row separator: transparent
-        classify(aggregateText(child));
+        classify(renderedText(child));
       }
     }
     flush();
