@@ -1275,3 +1275,19 @@ Finding-ID: AUDIT-20260610-52 (round-14 gpt-5-04, LOW)
 Status:     fixed-db8f5602 (2026-06-10; url joins INPUT_TYPE_ALLOWLIST)
 Severity:   low
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 15 (run 20260610T224855633Z; codex only — claude 0 bytes, 13th consecutive)
+
+**ZERO-HIGH round (convergence count: 1 of 2).** 2 MED + 3 LOW, all verified,
+all fixed in f5e6b516:
+
+- AUDIT-20260610-53 (MED): dir layout-direction channel → dir dropped from the
+  global allowlist (Latin-only v1 text axis; re-add with i18n)
+- AUDIT-20260610-54 (MED): li value="-1" generated-marker punctuation columns →
+  digits-only list numbering (list-numbering rule)
+- AUDIT-20260610-55 (LOW): legacy/missing doctype = quirks rendering mode →
+  standards doctype required (doctype-required rule)
+- AUDIT-20260610-56 (LOW fp): percent-encoded kit href over-rejected → href
+  compares percent-decode (browser-faithful)
+- AUDIT-20260610-57 (LOW fp): initial-scale=1.0 over-rejected → numeric
+  viewport values canonicalize
