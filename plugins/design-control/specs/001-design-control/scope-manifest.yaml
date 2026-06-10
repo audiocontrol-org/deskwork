@@ -9,7 +9,8 @@ scenarios:
 reference_docs:
   - path: plugins/design-control/specs/001-design-control/spec.md
     role: prd
-    summary: Feature PRD — synthesis anchor (ported 2026-06-10 into the stack-control regime).
+    summary: Feature PRD — synthesis anchor (ported 2026-06-10 into the
+      stack-control regime).
   - path: .dw-lifecycle/scope-discovery/LAYOUT.md
     role: other
     summary: On-disk layout contract for scope-discovery artifacts.
@@ -24,6 +25,9 @@ discovery_themes:
   - spec (2 occurrences)
   - baseline (0 occurrences)
   - gross (0 occurrences)
+  - design (38 occurrences)
+  - frontend-design (15 occurrences)
+  - declared (2 occurrences)
 modules:
   - glob: plugins/design-control/src/lint/**/*.{ts,tsx}
     label: lint

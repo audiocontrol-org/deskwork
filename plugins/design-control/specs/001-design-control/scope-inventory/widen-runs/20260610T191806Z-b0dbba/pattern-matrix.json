@@ -1,0 +1,457 @@
+{
+  "agent": "ast-grep-matrix",
+  "featureSlug": "design-control",
+  "patterns": [
+    {
+      "id": "as-type-cast",
+      "description": "`as <TypeName>` cast (banned per CLAUDE.md \"never bypass typing\")",
+      "regex": "\\bas\\s+(?!const\\b|unknown\\b)[A-Z][A-Za-z0-9_]*",
+      "hits": [],
+      "provenance": "registered-pattern"
+    },
+    {
+      "id": "any-annotation",
+      "description": "`: any` type annotation (banned per CLAUDE.md)",
+      "regex": ":\\s*any\\b(?![A-Za-z0-9_])",
+      "hits": [],
+      "provenance": "registered-pattern"
+    },
+    {
+      "id": "ts-ignore-pragma",
+      "description": "`@ts-ignore` or `@ts-expect-error` (banned per CLAUDE.md)",
+      "regex": "@ts-(?:ignore|expect-error)\\b",
+      "hits": [
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 30,
+          "snippet": "* method is a type error (asserted below with @ts-expect-error)."
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 87,
+          "snippet": "// @ts-expect-error — authorWireframe must reject a referee-screenshot request envelope."
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 94,
+          "snippet": "// @ts-expect-error — refereeScreenshot must reject an author-wireframe request envelope."
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 101,
+          "snippet": "// @ts-expect-error — payload is a REQUIRED key on the request envelope; omitting it is a type error."
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 117,
+          "snippet": "// excluded here and covered separately by the payload-omitted `@ts-expect-error`"
+        }
+      ],
+      "provenance": "registered-pattern"
+    },
+    {
+      "id": "magic-number",
+      "description": "Inline numeric literal >= 10 not bound to a const/named identifier (heuristic — synthesis layer + operator curate)",
+      "regex": "(?<![A-Za-z0-9_.=])\\d{2,}\\b",
+      "hits": [
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 17,
+          "snippet": "manifestId: 'manifest-001',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 27,
+          "snippet": "manifestId: 'manifest-001',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 51,
+          "snippet": "it('rejects a request missing the payload key entirely (AUDIT-05 key-presence contract)', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 57,
+          "snippet": "it('accepts a request whose payload key is present with an explicit undefined value (AUDIT-05)', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 92,
+          "snippet": "manifestId: 'manifest-001',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 117,
+          "snippet": "const response = { ...baseSuccessResponse(), manifestId: 'manifest-999' };"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 133,
+          "snippet": "manifestId: 'manifest-001',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 232,
+          "snippet": "describe('non-execution conformance surface requires no engine probe (AUDIT-02)', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 260,
+          "snippet": "describe('parseAndValidate — parse-then-echo wrapper (AUDIT-03)', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 298,
+          "snippet": "const rawResponse = { ...baseSuccessResponse(), manifestId: 'manifest-999' };"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 13,
+          "snippet": "* Compile-time field-set drift guard (AUDIT-20260605-08). The request schema"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 99,
+          "snippet": "it('rejects (at the type level) a request envelope that omits the required payload key (AUDIT-05)', async () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 106,
+          "snippet": "it('pins each schema to its type — field-set AND field-type drift fail tsc (AUDIT-08, AUDIT-10)', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 119,
+          "snippet": "// restores the field-TYPE drift teeth the bare key-set assertion lacked (AUDIT-10):"
+        },
+        {
+          "file": "src/__tests__/lint/allowlist-url-derivation.test.ts",
+          "line": 20,
+          "snippet": "// AUDIT-20260606-07 / ex-#428 (backlog TASK-7 + TASK-1): URL_ATTRS is DERIVED"
+        },
+        {
+          "file": "src/__tests__/lint/allowlist-url-derivation.test.ts",
+          "line": 24,
+          "snippet": "describe('allowlist URL-attr derivation (AUDIT-20260606-07 / TASK-7+1)', () => {"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 88,
+          "snippet": "// AUDIT-20260606-02 (codex-01): mixed rel tokens must not slip the gate."
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 98,
+          "snippet": "// AUDIT-20260606-03 (codex-02 + claude-03; cross-model): control-char-obfuscated"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 112,
+          "snippet": "// AUDIT-20260606-01 (claude-01): data: scanning must be scoped to href, not"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 126,
+          "snippet": "// AUDIT-20260606-01 (claude-02): a disallowed attribute carrying a data: value"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 167,
+          "snippet": "// AUDIT-20260606-04 (claude-01): the cross-module invariant must be explicit —"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 181,
+          "snippet": "// AUDIT-20260610-04 (gpt-5-03 HIGH + fable-07; cross-model channel): preserved"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 189,
+          "snippet": "describe('check-mockup-lofi — rejects the <pre> preserved-whitespace imagery channel (AUDIT-20260610-04)', () => {"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 190,
+          "snippet": "it('rejects the planted ASCII-art wordmark (gpt-5-03 defeating input)', () => {"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 205,
+          "snippet": "// AUDIT-20260610-01 (gpt-5-02 + fable-02; cross-model HIGH): bare lintWireframe"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 212,
+          "snippet": "describe('check-mockup-lofi — axis-1 stylesheet narrowing (AUDIT-20260610-01)', () => {"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 217,
+          "snippet": "it('rejects a foreign-named local stylesheet (fable-02 defeating input)', () => {"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 245,
+          "snippet": "// gpt-5-02's deeper variant: axis-1 is filesystem-free and cannot prove the"
+        },
+        {
+          "file": "src/__tests__/lint/codepoint.test.ts",
+          "line": 52,
+          "snippet": "expect(isAllowedCodepoint(0xfe0f)).toBe(false); // variation selector-16"
+        },
+        {
+          "file": "src/__tests__/lint/codepoint.test.ts",
+          "line": 56,
+          "snippet": "it('rejects non-enumerated whitespace (nbsp, em space, ideographic space) — round-10', () => {"
+        },
+        {
+          "file": "src/__tests__/lint/codepoint.test.ts",
+          "line": 70,
+          "snippet": "expect(findDisallowedCodepoints('Recent entries — café, naïve. 12 items…')).toEqual([]);"
+        },
+        {
+          "file": "src/__tests__/lint/codepoint.test.ts",
+          "line": 72,
+          "snippet": "// AUDIT-20260606-22 (claude-01): NFD-decomposed accented Latin (macOS / pasted"
+        },
+        {
+          "file": "src/__tests__/lint/codepoint.test.ts",
+          "line": 80,
+          "snippet": "// AUDIT-20260606-24 (claude-01): NFC COMPOSES, it does not STRIP — a combining"
+        },
+        {
+          "file": "src/__tests__/lint/codepoint.test.ts",
+          "line": 82,
+          "snippet": "// -22 fix rests on, so a strip-based regression would fail)."
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 103,
+          "snippet": "// AUDIT-20260606-08 (claude-01 + codex-01): standalone, a mixed rel must NOT"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 115,
+          "snippet": "// AUDIT-20260606-10 (claude-02): a path-escaping href is reported WITHOUT"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 135,
+          "snippet": "// AUDIT-20260606-15 (claude-01): a legitimately-STRONGER pin (the real kit"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 171,
+          "snippet": "// AUDIT-20260606-18 (claude-01 + codex-01; cross-model): the SRI algorithm"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 182,
+          "snippet": "// AUDIT-20260606-19 (claude-02): a spec-valid `?options` suffix is stripped by"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 191,
+          "snippet": "// AUDIT-20260606-21 (backlog TASK-2): the base64 PAYLOAD is case-sensitive —"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 210,
+          "snippet": "// AUDIT-20260610-03 (gpt-5-01, HIGH): the pin certified the CSS bytes only — the"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 217,
+          "snippet": "describe('checkStylesheetIdentity — transitive font pinning (AUDIT-20260610-03)', () => {"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 236,
+          "snippet": "it('a tampered woff2 at a kit font path is rejected (the gpt-5-01 swap)', () => {"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 14,
+          "snippet": "* (AUDIT-20260610-02): under a verified pin, a class value either (a) matches"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 31,
+          "snippet": "// text-level structure. NOTE: `pre` is deliberately ABSENT (AUDIT-20260610-04,"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 32,
+          "snippet": "// gpt-5-03 + fable-07): preserved whitespace renders ASCII-art logos/wordmarks"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 47,
+          "snippet": "* declaration (AUDIT-20260606-07 / ex-#428):"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 115,
+          "snippet": "* URL-bearing attr automatically extends scheme coverage (AUDIT-20260606-04)."
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 117,
+          "snippet": "* DERIVED from the url-kind entries of the attr specs above (AUDIT-20260606-07"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 118,
+          "snippet": "* / ex-#428): every URL-bearing attribute in the allowlist is a member by"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 139,
+          "snippet": "* collector so the two cannot disagree (AUDIT-20260606-08)."
+        },
+        {
+          "file": "src/lint/check-mockup-lofi.ts",
+          "line": 113,
+          "snippet": "// disallowed-attribute (AUDIT-20260606-01/claude-02), not mislabeled."
+        },
+        {
+          "file": "src/lint/check-mockup-lofi.ts",
+          "line": 121,
+          "snippet": "// class invariant (AUDIT-20260606-01). Gating on URL_ATTRS rather than a"
+        },
+        {
+          "file": "src/lint/check-mockup-lofi.ts",
+          "line": 123,
+          "snippet": "// URL attr is auto-scanned (AUDIT-20260606-04)."
+        },
+        {
+          "file": "src/lint/check-mockup-lofi.ts",
+          "line": 147,
+          "snippet": "// pulls a non-CSS resource (AUDIT-20260606-02/codex-01). The exact path+hash"
+        },
+        {
+          "file": "src/lint/check-mockup-lofi.ts",
+          "line": 155,
+          "snippet": "// Axis-1 stylesheet narrowing (AUDIT-20260610-01, gpt-5-02 + fable-02):"
+        },
+        {
+          "file": "src/lint/check-mockup-lofi.ts",
+          "line": 207,
+          "snippet": "// Axis-1 singleton census (AUDIT-20260610-01): more than one stylesheet link"
+        },
+        {
+          "file": "src/lint/codepoint.ts",
+          "line": 3,
+          "snippet": "* (PRD round-9/10). Symmetric with the element/attribute allowlist: a denylist"
+        },
+        {
+          "file": "src/lint/codepoint.ts",
+          "line": 12,
+          "snippet": "* ideographic spacers as an alignment channel, round-10), and an enumerated set"
+        },
+        {
+          "file": "src/lint/codepoint.ts",
+          "line": 19,
+          "snippet": "/** Enumerated whitespace: space, newline, tab only (round-10). */"
+        },
+        {
+          "file": "src/lint/codepoint.ts",
+          "line": 54,
+          "snippet": "// (U+00F7) math symbols, plus Latin Extended-A (U+0100–U+017F)."
+        },
+        {
+          "file": "src/lint/codepoint.ts",
+          "line": 79,
+          "snippet": "* text — composes to its precomposed form (AUDIT-20260606-22). This rescues NFD"
+        },
+        {
+          "file": "src/lint/codepoint.ts",
+          "line": 102,
+          "snippet": "return 'U+' + cp.toString(16).toUpperCase().padStart(4, '0');"
+        },
+        {
+          "file": "src/lint/stylesheet-pin.ts",
+          "line": 6,
+          "snippet": "* — including the three `.sk-theme-*` lo-fi languages (AUDIT-20260610-02;"
+        },
+        {
+          "file": "src/lint/stylesheet-pin.ts",
+          "line": 62,
+          "snippet": "* (AUDIT-20260610-03): the pin certifies the CSS bytes, and the CSS names"
+        },
+        {
+          "file": "src/lint/stylesheet-pin.ts",
+          "line": 93,
+          "snippet": "// (AUDIT-20260610-03). Reads fail loud — a missing shipped font is a"
+        },
+        {
+          "file": "src/lint/stylesheet-pin.ts",
+          "line": 124,
+          "snippet": "// disagree on what counts as a stylesheet link (AUDIT-20260606-08): a mixed"
+        },
+        {
+          "file": "src/lint/stylesheet-pin.ts",
+          "line": 162,
+          "snippet": "// `../`-escaping href pull arbitrary files off disk (AUDIT-20260606-10)."
+        },
+        {
+          "file": "src/lint/stylesheet-pin.ts",
+          "line": 197,
+          "snippet": "// and an unrecognized-algorithm-only integrity (AUDIT-20260606-15; the prior"
+        },
+        {
+          "file": "src/lint/stylesheet-pin.ts",
+          "line": 203,
+          "snippet": "// lowercased (AUDIT-20260606-18 case, -19 options)."
+        },
+        {
+          "file": "src/lint/stylesheet-pin.ts",
+          "line": 224,
+          "snippet": "// Transitive font pinning (AUDIT-20260610-03): the pinned CSS names the kit's"
+        },
+        {
+          "file": "src/wireframe-kit/sketch-kit.ts",
+          "line": 11,
+          "snippet": "* Multi-theme decision (2026-06-05, operator): the kit ships THREE lo-fi visual"
+        },
+        {
+          "file": "src/wireframe-kit/sketch-kit.ts",
+          "line": 16,
+          "snippet": "* `plugins/design-control/specs/001-design-control/mockups/sketch-kit/DECISION.md`."
+        },
+        {
+          "file": "src/wireframe-kit/sketch-kit.ts",
+          "line": 82,
+          "snippet": "weight: 400,"
+        },
+        {
+          "file": "src/wireframe-kit/sketch-kit.ts",
+          "line": 83,
+          "snippet": "file: 'fonts/patrick-hand-400.woff2',"
+        },
+        {
+          "file": "src/wireframe-kit/sketch-kit.ts",
+          "line": 88,
+          "snippet": "weight: 400,"
+        },
+        {
+          "file": "src/wireframe-kit/sketch-kit.ts",
+          "line": 89,
+          "snippet": "file: 'fonts/space-mono-400.woff2',"
+        },
+        {
+          "file": "src/wireframe-kit/sketch-kit.ts",
+          "line": 94,
+          "snippet": "weight: 700,"
+        },
+        {
+          "file": "src/wireframe-kit/sketch-kit.ts",
+          "line": 95,
+          "snippet": "file: 'fonts/space-mono-700.woff2',"
+        }
+      ],
+      "provenance": "registered-pattern"
+    }
+  ],
+  "discoveredCandidates": []
+}
