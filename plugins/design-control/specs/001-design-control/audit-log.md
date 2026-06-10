@@ -700,7 +700,7 @@ closes the differential).
 ### AUDIT-20260610-08 — Over-rejection: `label for` + `<input>` (structure-and-flow form controls)
 
 Finding-ID: AUDIT-20260610-08 (gpt-5-05; single-model, behaviorally verified)
-Status:     open
+Status:     fixed-d3137b5d (2026-06-10, via AUDIT-20260610-24 — fourth surfacing promoted it from the parked backlog)
 Backlog:    TASK-15
 Severity:   medium
 Surface:    plugins/design-control/src/lint/allowlist.ts (element/attr omissions)
@@ -912,3 +912,50 @@ Direction:  false-positive
 End-to-end fixtures: a correct digest passes the FULL lint; a wrong digest still
 rejects through the now-reachable normalizeSriToken machinery (AUDIT-15/18/19/21
 hardening finally exercisable on green documents).
+
+## 2026-06-10 — lint adversarial barrage ROUND 5 (run 20260610T202003272Z; codex only — claude 0 bytes, 3rd consecutive)
+
+Triage notes: claude silent again (4 of 6 runs; deskwork issue 447). Codex:
+2 HIGH + 1 MED + 1 LOW, all behaviorally verified pre-fix. Notably two findings
+are direct challenges to THIS loop's earlier fix rationales — the auditor is
+reading the source comments and attacking the stated reasoning, which is the
+adversarial process working as designed. Round verdict: NOT converged.
+
+### AUDIT-20260610-21 — Tooltip carries the punctuation logo (AUDIT-19's fix was codepoint-only)
+
+Finding-ID: AUDIT-20260610-21 (round-5 gpt-5-codex-02, MED)
+Status:     fixed-acdf9b58 (2026-06-10; visible attr values get the density gate too)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (title/aria values)
+
+### AUDIT-20260610-22 — Stacked sibling rows below the per-block floor; parent diluted by prose
+
+Finding-ID: AUDIT-20260610-22 (round-5 gpt-5-codex-03, HIGH)
+Status:     fixed-acdf9b58 (2026-06-10; consecutive density-shaped sibling blocks accumulate as a RUN — ratio-qualified at any length, floor applied to the run; a prose sibling breaks the run)
+Severity:   high
+Surface:    plugins/design-control/src/lint/codepoint.ts + check-mockup-lofi.ts
+
+7-char `<p>` rows slipped the per-block floor while the heading diluted the body
+aggregate — vertical reassembly. punctuationRatio() extracted as the shared
+primitive. Specificity fixtures: interleaved copy and short dash-placeholder
+lists stay green.
+
+### AUDIT-20260610-23 — Absent theme fonts fall through to local system DESIGNED fonts
+
+Finding-ID: AUDIT-20260610-23 (round-5 gpt-5-codex-01, HIGH)
+Status:     fixed-b7d5644e (2026-06-10; SKETCH_KIT_FONTS carries its theme; a USED font-bearing theme with the font absent → font-missing; absent stays clean for unused themes + fontless grayscale)
+Severity:   high
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts + wireframe-kit/sketch-kit.ts
+
+Direct refutation of AUDIT-03's "absent is clean: no foreign bytes load"
+rationale — the marker theme's fallback stack IS designed local fonts
+(cursive/handwriting). The fix narrows the absent-is-clean claim to themes the
+document does not use.
+
+### AUDIT-20260610-24 — Native form flow over-rejected (FOURTH surfacing; promoted)
+
+Finding-ID: AUDIT-20260610-24 (round-5 gpt-5-codex-04 LOW; rounds 1/3/5 = AUDIT-08/TASK-15)
+Status:     fixed-d3137b5d (2026-06-10; form/input/label[for] allowlisted; input type enumerated — image/color stay rejected. Closes parked AUDIT-20260610-08 / backlog TASK-15)
+Severity:   low
+Surface:    plugins/design-control/src/lint/allowlist.ts
+Direction:  false-positive
