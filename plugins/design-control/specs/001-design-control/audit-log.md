@@ -971,7 +971,7 @@ boundary territory. Round verdict: NOT converged (1 HIGH, fixed).
 ### AUDIT-20260610-25 — input placeholder/value are rendered text the visible-attr gates missed
 
 Finding-ID: AUDIT-20260610-25 (round-6 gpt-5-codex-01, HIGH)
-Status:     fixed-e895a685 (2026-06-10; placeholder + value join title/aria in the codepoint + density gates)
+Status:     fixed-403bf02f (2026-06-10; placeholder + value join title/aria in the codepoint + density gates)
 Severity:   high
 Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
 
