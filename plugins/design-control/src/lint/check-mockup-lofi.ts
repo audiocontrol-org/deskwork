@@ -152,9 +152,29 @@ function checkElement(el: Element, ctx: WalkContext): void {
   // Kit-root census (AUDIT-20260610-29): without the bare `sk` token on body,
   // the pinned kit is loaded but IN EFFECT nowhere — the page renders through
   // UA default styling. Checked post-walk in the entry points.
+  // Theme placement (AUDIT-20260610-38): the DECISION contract is ONE theme,
+  // selected on the body root — sk-theme-* below body composes mixed-theme
+  // surfaces (per-section typography/palette/texture switching), a pinned-CSS
+  // polish channel through class PLACEMENT rather than substitution.
+  const classTokens = (
+    ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'class')?.value ?? ''
+  ).split(/\s+/).filter(Boolean);
+  const themeTokens = classTokens.filter((t) => t.startsWith('sk-theme-'));
   if (tag === 'body') {
-    const classValue = ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'class')?.value ?? '';
-    if (classValue.split(/\s+/).includes(SKETCH_KIT_ROOT_CLASS)) ctx.kitRootPresent = true;
+    if (classTokens.includes(SKETCH_KIT_ROOT_CLASS)) ctx.kitRootPresent = true;
+    if (themeTokens.length > 1) {
+      findings.push({
+        rule: 'theme-placement',
+        tag,
+        message: `body carries ${themeTokens.length} sk-theme-* tokens (${themeTokens.join(', ')}) — the kit contract is ONE adopter-selected theme on the body root`,
+      });
+    }
+  } else if (themeTokens.length > 0) {
+    findings.push({
+      rule: 'theme-placement',
+      tag,
+      message: `sk-theme-* on <${tag}> (${themeTokens.join(', ')}) — theme classes belong on the body root only; sub-tree themes compose mixed visual languages (polish via placement)`,
+    });
   }
 
   if (!ALLOWED_TAGS.has(tag)) {

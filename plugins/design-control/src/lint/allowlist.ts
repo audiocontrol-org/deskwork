@@ -77,13 +77,14 @@ const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>
   // unreachable while axis-1 rejected the attr outright.
   link: { rel: 'plain', href: 'url', integrity: 'plain' },
   a: { href: 'url' },
-  button: { type: 'plain' },
+  button: { type: 'plain', disabled: 'plain' },
   // Form flow (AUDIT-20260610-24): input.type is plain-kind here but its VALUE
   // is enumerated (INPUT_TYPE_ALLOWLIST) — image loads a resource, color opens
   // a visual picker; both stay rejected.
-  input: { type: 'plain', placeholder: 'plain', value: 'plain', checked: 'plain' },
+  input: { type: 'plain', placeholder: 'plain', value: 'plain', checked: 'plain', disabled: 'plain' },
   textarea: { placeholder: 'plain' },
   label: { for: 'plain' },
+  option: { selected: 'plain' },
   ol: { start: 'plain', reversed: 'plain' },
   li: { value: 'plain' },
   td: { colspan: 'plain', rowspan: 'plain', headers: 'plain' },

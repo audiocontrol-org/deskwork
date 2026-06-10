@@ -266,6 +266,23 @@ describe('lintWireframe — punctuation-density imagery channel (AUDIT-20260610-
       );
     });
 
+    // AUDIT-20260610-39 (round-10 gpt-5-02, MED): ratio-gaming — punctuation
+    // flow art with embedded wordmark letters at exactly 75% punctuation, under
+    // the 0.8 gate. The ratio drops to 0.6: legit copy lines run far below it,
+    // and art diluted past 0.6 converges to letter-art (the declared referee
+    // boundary).
+    it('rejects letter-diluted punctuation flow art at ~75% (round-10 defeating input)', () => {
+      expect(rules(wrap(`<p>###AC###<br>##A##C##<br>###ME###</p>`))).toContain(
+        'punctuation-density',
+      );
+    });
+
+    it('punctuation-heavy but copy-shaped lines stay under the lowered ratio', () => {
+      expect(rules(wrap(`<p>Wait… (really?!) — see p. 4–7</p>`))).not.toContain(
+        'punctuation-density',
+      );
+    });
+
     // AUDIT-20260610-18 (round-4 gpt-5-codex-01, HIGH) — DOCUMENTED BOUNDARY,
     // not a closure: a LETTER mosaic (one allowlisted letter per table cell,
     // 0% punctuation) renders a wordmark the density gate structurally cannot

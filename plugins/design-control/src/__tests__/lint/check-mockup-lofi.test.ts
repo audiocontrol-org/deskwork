@@ -261,6 +261,28 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// AUDIT-20260610-38 (round-10 gpt-5-01, HIGH): sk-theme-* below body composes
+// mixed-theme surfaces (per-section typography/palette/texture switching) —
+// the DECISION doc's contract is ONE theme, selected on the body root. Theme
+// tokens are placement-checked: body only, at most one.
+describe('check-mockup-lofi — theme placement (AUDIT-20260610-38)', () => {
+  it('rejects a theme class below body (round-10 defeating input shape)', () => {
+    expect(
+      rules(wrap(`<section class="sk-card sk-theme-blueprint"><h1>Acme Pro</h1></section>`)),
+    ).toContain('theme-placement');
+  });
+  it('rejects two theme tokens on body', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css"></head>` +
+      `<body class="sk sk-theme-grayscale sk-theme-marker"><div>x</div></body></html>`;
+    expect(rules(html)).toContain('theme-placement');
+  });
+  it('accepts a single body theme (the sanctioned shape)', () => {
+    expect(rules(wrap(`<div class="sk-shell">x</div>`))).toEqual([]);
+  });
+});
+
 // AUDIT-20260610-36 (round-9 gpt-5-01 HIGH + gpt-5-02 MED; one mechanism):
 // multiline visible-attr values RENDER per line (placeholder in the textarea
 // viewport; title in the tooltip), but density scanned the aggregate string —
@@ -291,6 +313,19 @@ describe('check-mockup-lofi — select/option (AUDIT-20260610-37)', () => {
   });
   it('option text rides the text gates', () => {
     expect(rules(wrap(`<select><option>𝐏𝐫𝐞𝐦𝐢𝐮𝐦</option></select>`))).toContain('disallowed-codepoint');
+  });
+});
+
+// AUDIT-20260610-40 (round-10 gpt-5-03/-04, LOW fps): disabled and selected
+// are structural form state, same class as checked.
+describe('check-mockup-lofi — disabled/selected state (AUDIT-20260610-40)', () => {
+  it('accepts a disabled button', () => {
+    expect(rules(wrap(`<form><button type="button" disabled>Continue</button></form>`))).toEqual([]);
+  });
+  it('accepts a selected option', () => {
+    expect(
+      rules(wrap(`<select><option>Starter</option><option selected>Team</option></select>`)),
+    ).toEqual([]);
   });
 });
 

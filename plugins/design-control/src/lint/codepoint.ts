@@ -118,7 +118,11 @@ export function formatCodepoint(cp: number): string {
  * referee's gross-class judgment remains the backstop for text-as-imagery.
  */
 export const PUNCT_DENSITY_MIN_LENGTH = 8;
-export const PUNCT_DENSITY_RATIO = 0.8;
+// 0.8 → 0.6 (AUDIT-20260610-39): art rows with embedded wordmark letters sat
+// at exactly 75%. Legit copy lines run far below 0.6 ("Wait… (really?!)" ≈
+// 0.5 worst-case fixture), and art diluted past 0.6 converges to letter-art —
+// the declared referee boundary.
+export const PUNCT_DENSITY_RATIO = 0.6;
 
 /**
  * Punctuation ratio of `text`'s non-whitespace codepoints (0 for empty). Used

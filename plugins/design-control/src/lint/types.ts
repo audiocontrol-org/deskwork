@@ -19,6 +19,7 @@ export type LintRule =
   | 'disallowed-input-type'
   | 'kit-root-missing'
   | 'textarea-content'
+  | 'theme-placement'
   | 'stylesheet-filename-mismatch'
   // axis 2 — text-content codepoint allowlist
   | 'disallowed-codepoint'
