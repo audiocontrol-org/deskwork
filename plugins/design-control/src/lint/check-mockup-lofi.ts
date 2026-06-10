@@ -111,9 +111,14 @@ function isAllowedAttr(tag: string, attr: string): boolean {
  * not hide (or fake) a kit-named basename.
  */
 function hrefBasename(href: string): string {
-  const noSuffix = percentDecode(href.split(/[?#]/)[0]);
+  // Order matters (AUDIT-20260610-60): the browser splits segments on the RAW
+  // string (raw \ normalizes to / in special-scheme URLs) and only then
+  // decodes — so %5C is a literal filename CHARACTER, not a separator. The
+  // round-15 decode-then-split pipeline inverted this and let an encoded
+  // backslash smuggle a non-kit fetch under a kit-looking basename.
+  const noSuffix = href.split(/[?#]/)[0];
   const segments = noSuffix.split(/[/\\]/);
-  return segments[segments.length - 1] ?? '';
+  return percentDecode(segments[segments.length - 1] ?? '');
 }
 
 
@@ -298,7 +303,7 @@ function checkElement(el: Element, ctx: WalkContext): void {
     }
     // `input type` is an enumerated structural set (AUDIT-20260610-24):
     // image loads a resource; color/file/range open visual chrome.
-    if (tag === 'input' && attr === 'type' && !INPUT_TYPE_ALLOWLIST.has(value.toLowerCase())) {
+    if (tag === 'input' && attr === 'type' && !INPUT_TYPE_ALLOWLIST.has(value.trim().toLowerCase())) {
       findings.push({
         rule: 'disallowed-input-type',
         tag,

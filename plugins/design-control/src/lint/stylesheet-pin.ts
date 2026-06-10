@@ -193,7 +193,21 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
       message: `stylesheet href "${link.href}" carries a query — a query-aware host can serve different bytes than the file the pin verifies; link the kit without a query`,
     });
   }
-  const hrefPath = percentDecode(link.href.split(/[?#]/)[0]).replace(/\\/g, '/');
+  // Decode-after-segmentation (AUDIT-20260610-60): raw backslashes normalize
+  // to / (WHATWG), then each SEGMENT percent-decodes. A decoded separator is a
+  // literal name CHARACTER and must not re-segment the path — a%2F..%2Fkit
+  // would otherwise alias back to the canonical path via resolve while the
+  // browser fetches a literal one-segment name; such a segment stays RAW (it
+  // can never name the kit either way).
+  const hrefPath = link.href
+    .split(/[?#]/)[0]
+    .replace(/\\/g, '/')
+    .split('/')
+    .map((segment) => {
+      const decoded = percentDecode(segment);
+      return /[/\\]/.test(decoded) ? segment : decoded;
+    })
+    .join('/');
   const resolved = resolve(pin.baseDir, hrefPath);
   // If the href resolves off the pinned path, the link is already known-wrong;
   // report and STOP without reading. Reading first would let an absolute or

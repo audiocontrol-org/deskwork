@@ -249,6 +249,16 @@ describe('checkStylesheetIdentity — query/fragment on the kit href (AUDIT-14 �
     const html = page(`<link rel="stylesheet" href="sketch-kit.css?v=2">`);
     expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-query');
   });
+  // AUDIT-20260610-60 hardening: a decoded segment must not RE-SEGMENT the
+  // path — %2F..%2F would otherwise alias back to the canonical kit path via
+  // resolve while the browser fetches a literal one-segment name.
+  it('rejects an encoded-slash dot-dot alias (a%2F..%2Fsketch-kit.css)', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(`<link rel="stylesheet" href="a%2F..%2Fsketch-kit.css">`);
+    expect(rules(checkStylesheetIdentity(html, pin)).length).toBeGreaterThan(0);
+  });
+
   it('accepts a fragment on the kit href (never sent to the server)', () => {
     const dir = freshDir();
     const pin = buildSketchKitPin(dir);

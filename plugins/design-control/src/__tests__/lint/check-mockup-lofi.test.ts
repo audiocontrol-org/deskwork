@@ -261,6 +261,42 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// AUDIT-20260610-60 (round-17 gpt-5-01, HIGH): the round-15 percent-decode
+// COMPOSED with the round-8 backslash rule into an ordering bug — the lint
+// decoded %5C to \ and then treated it as a separator, but the browser splits
+// segments BEFORE decoding, so %5C is a literal filename character. Decode
+// happens after segmentation; a decoded separator is a name char.
+describe('check-mockup-lofi — decode-after-segmentation (AUDIT-20260610-60)', () => {
+  it('rejects a percent-encoded backslash href (round-17 defeating input)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href=".%5Csketch-kit.css"></head><body class="sk"><h1>x</h1></body></html>`;
+    expect(rules(html)).toContain('stylesheet-filename-mismatch');
+  });
+  it('still accepts an in-segment percent-encoded kit name (%73ketch)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="%73ketch-kit.css"></head><body class="sk"><p>x</p></body></html>`;
+    expect(rules(html)).not.toContain('stylesheet-filename-mismatch');
+  });
+  it('still rejects a raw-backslash foreign basename (themes\\brand.css)', () => {
+    expect(
+      rules(
+        `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+          `<link rel="stylesheet" href="themes\\brand.css"></head><body class="sk">x</body></html>`,
+      ),
+    ).toContain('stylesheet-filename-mismatch');
+  });
+});
+
+// AUDIT-20260610-61 (round-17 gpt-5-02, LOW fp): browsers reflect a
+// whitespace-padded type to its trimmed state; " TEXT " is a text field.
+describe('check-mockup-lofi — padded input type (AUDIT-20260610-61)', () => {
+  it('accepts a whitespace-padded TEXT type', () => {
+    expect(rules(wrap(`<form><input type=" TEXT " placeholder="x"></form>`))).toEqual([]);
+  });
+});
+
 // AUDIT-20260610-59 (round-16 gpt-5-02, LOW fp): details/summary are
 // structure-and-flow disclosure primitives — same UA-baseline class as the
 // accepted form controls. `open` is structural state like checked.
