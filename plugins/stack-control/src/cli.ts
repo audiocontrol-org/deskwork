@@ -30,6 +30,10 @@ import { runBatchDispose } from './subcommands/batch-dispose.js';
 import { runRefreshClonesBaseline } from './subcommands/refresh-clones-baseline.js';
 import { runCheckDispositionSurvivor } from './subcommands/check-disposition-survivor.js';
 import { runCheckRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
+import { wrapPrompt } from './subcommands/wrap-prompt.js';
+import { validateReturn } from './subcommands/validate-return.js';
+import { runValidateScopeDiscovery } from './subcommands/validate-scope-discovery.js';
+import { runInstallDrift } from './subcommands/install-drift.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -67,6 +71,12 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   'refresh-clones-baseline': runRefreshClonesBaseline,
   'check-disposition-survivor': runCheckDispositionSurvivor,
   'check-refactor-preconditions': runCheckRefactorPreconditions,
+  // Scope-discovery: sub-agent dispatch grammar gate (010 / US5).
+  'wrap-prompt': wrapPrompt,
+  'validate-return': validateReturn,
+  'validate-scope-discovery': runValidateScopeDiscovery,
+  // Scope-discovery: install-drift advisory (010 / US8).
+  'install-drift': runInstallDrift,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

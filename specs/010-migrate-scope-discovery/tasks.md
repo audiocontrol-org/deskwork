@@ -120,12 +120,12 @@ description: "Task list — Migrate scope-discovery into stack-control"
 
 **Goal**: enforce Searched/Included/Excluded grammar + forbidden-deferral rejection; harness fails on a gutted gate. **Independent test**: quickstart Scenario 5.
 
-- [ ] T050 [P] [US5] RED: `__tests__/scope-discovery/dispatch-wrapper.test.ts` — reject missing-enumeration when searched>included; reject forbidden-deferral phrase; refactor-marked task gets the preconditions prelude (FR-024/025).
-- [ ] T051 [P] [US5] RED: `__tests__/scope-discovery/gutted-stub.test.ts` — the validator harness FAILS against a deliberately gutted gate stub (FR-026; SC-007).
-- [ ] T052 [US5] GREEN: port `dispatch-grammar.ts` + `dispatch-wrapper.ts` + `dispatch-wrapper-overrides.ts` (project-overridable forbidden-phrase list) → T050 GREEN.
-- [ ] T053 [US5] GREEN: port `dispatch-wrapper-cli.ts` + `validate-scope-discovery.ts` (the adversarial harnesses incl. gutted-stub self-check) → T051 GREEN.
-- [ ] T054 [US5] Add subcommands `dispatch-wrapper`, `validate-scope-discovery` + register in `src/cli.ts`; author the `/stack-control:*` skills.
-- [ ] T055 [US5] Integration: drive quickstart Scenario 5 end-to-end.
+- [X] T050 [P] [US5] RED: `__tests__/scope-discovery/dispatch-wrapper.test.ts` — reject missing-enumeration when searched>included; reject forbidden-deferral phrase; refactor-marked task gets the preconditions prelude (FR-024/025).
+- [X] T051 [P] [US5] RED: `__tests__/scope-discovery/gutted-stub.test.ts` — the validator harness FAILS against a deliberately gutted gate stub (FR-026; SC-007).
+- [X] T052 [US5] GREEN: port `dispatch-grammar.ts` + `dispatch-wrapper.ts` + `dispatch-wrapper-overrides.ts` (project-overridable forbidden-phrase list) → T050 GREEN.
+- [X] T053 [US5] GREEN: port `dispatch-wrapper-cli.ts` + `validate-scope-discovery.ts` (the adversarial harnesses incl. gutted-stub self-check) → T051 GREEN.
+- [X] T054 [US5] Add subcommands `dispatch-wrapper`, `validate-scope-discovery` + register in `src/cli.ts`; author the `/stack-control:*` skills.
+- [X] T055 [US5] Integration: drive quickstart Scenario 5 end-to-end.
 
 ---
 
