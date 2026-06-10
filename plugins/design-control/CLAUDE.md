@@ -50,13 +50,20 @@ stance. Source essay: <https://stackcontrol.org/blog/the-lifecycle-and-why-agent
 
 ## Working conventions (this plugin)
 
-- **Backlog-first intake (operator rule, 2026-06-10):** every bug, gap, friction report, and
-  slushed audit finding goes into the **local backlog FIRST** (`stackctl backlog capture
-  <title> --type bug|gap --ref <pointer>`, or `backlog import-slush` once it can resolve
-  spec-layout features). Work is then **selected OUT of the backlog by the operator** — the
-  agent never picks a backlog item to work on unilaterally. Capture ≠ scope: capturing is
-  always in-bounds and immediate; selection is the operator's. When a slushed audit-log
-  finding migrates, flip its `Status:` to `migrated-to-backlog <task-id>` in place.
+- **Intake routing (operator rules, 2026-06-10):** two tracks, split by who can fix it:
+  - **This project's bugs, gaps, and slushed audit findings → the local backlog FIRST**
+    (`stackctl backlog capture <title> --type bug|gap --ref <pointer>`, or `backlog
+    import-slush` once #442 lands). Work is then **selected OUT of the backlog by the
+    operator** — the agent never picks a backlog item to work on unilaterally. Capture ≠
+    scope: capturing is always in-bounds and immediate; selection is the operator's. When a
+    slushed audit-log finding migrates, flip its `Status:` to `migrated-to-backlog <task-id>`
+    in place.
+  - **Tooling friction (defects in tools this project consumes — stackctl, Spec Kit, any
+    upstream) → a GitHub issue on the tool's repo**, which is reliably cross-project; the
+    installation-scoped backlog is a burn-down queue and must not accumulate items this
+    project cannot fix. If a friction item was already captured locally, mark it Done with a
+    `filed-upstream` label + the issue URL in its notes (precedent: TASK-3/4/5 → #441/#440/#442).
+    The append-only `tooling-feedback.md` repro log remains a valid companion record.
 - Adversarial validation of the lint is a **re-runnable process**, not a hand-authored
   fixture set: `audit/lint-adversarial-prompt.md` fired via `stackctl audit-barrage`.
   Codify every genuine defeat into the deterministic vitest corpus (the crib) + register the
