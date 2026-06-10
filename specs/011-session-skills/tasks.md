@@ -1,10 +1,10 @@
 ---
-description: "Task list for 010-session-skills"
+description: "Task list for 011-session-skills"
 ---
 
 # Tasks: Native session-start / session-end lifecycle skills (session-skills)
 
-**Input**: Design documents from `specs/010-session-skills/`
+**Input**: Design documents from `specs/011-session-skills/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/, quickstart.md
 **Tests**: RED-first is **mandatory** (constitution Principle I) — every implementation task is preceded by a failing test seen failing for the expected reason.
 **Branch**: `feature/stack-control` (one long-lived program branch).

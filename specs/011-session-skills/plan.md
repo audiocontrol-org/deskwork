@@ -2,7 +2,7 @@
 
 **Branch**: `feature/stack-control` (one long-lived program branch) | **Date**: 2026-06-10 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `specs/010-session-skills/spec.md`
+**Input**: Feature specification from `specs/011-session-skills/spec.md`
 
 ## Summary
 
@@ -68,7 +68,7 @@ session-start surfacing **open backlog items** and session-end surfacing **progr
 ### Documentation (this feature)
 
 ```text
-specs/010-session-skills/
+specs/011-session-skills/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 — decisions grounded in the code map + 009 contract + the two concrete instances
 ├── data-model.md        # Phase 1 — config key extension, orientation report, journal entry, staleness signal, chain-position

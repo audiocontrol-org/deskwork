@@ -4,14 +4,16 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
-## 2026-06-10 (010 session-skills — full DEFINE chain): specify → clarify → plan → checklist → tasks → analyze for native session lifecycle skills
+## 2026-06-10 (session-skills — full DEFINE chain): specify → clarify → plan → checklist → tasks → analyze for native session lifecycle skills
+
+> **Renumbered 010 → 011 (2026-06-10).** This feature was authored as `specs/010-session-skills/` on the web-session branch while `feature/stack-control` independently took `010` for `migrate-scope-discovery`. On merging the latter in, the collision was resolved by renumbering this feature to `011-session-skills`. The `docs(010)` commit prefixes below are the original history; the live spec dir is now `specs/011-session-skills/`.
 ### Feature: pluggable-lifecycle-providers
 ### Worktree: web session, branch `claude/stack-control-4ssjr9` (branched from `feature/stack-control` @ c2f411a)
 
 **Goal:** Operator branched a fresh web session from `feature/stack-control` and redirected away from 009 ("009 is being developed in another branch") to **`multi:feature/session-skills`** — native, Spec-Kit-aware session-start / session-end skills (the #122/#422 roadmap gaps). Authored the full Spec Kit DEFINE chain through `/speckit-analyze`; implementation deferred to a separate session per the two-session boundary.
 
 **Accomplished:**
-- **`specs/010-session-skills/` authored end-to-end** through the front door: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` → `/speckit-checklist` (the in-order checklist step, run after tasks to keep Principle VIII faithful). **7 commits, all `docs(010)`, all pushed.**
+- **`specs/011-session-skills/` (authored as `010`, since renumbered) authored end-to-end** through the front door: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` → `/speckit-checklist` (the in-order checklist step, run after tasks to keep Principle VIII faithful). **7 commits, all `docs(010)`, all pushed.**
 - **Spec**: 21 FRs, 9 SCs, 5 prioritized independently-testable user stories (US1 MVP = orient-and-stop; US2 capture-at-close; US3 decoupling/#122; US4 branch-staleness/#422; US5 CLI-first), 11 edge cases. Grounded in the **two concrete instances** (branch-local `.claude/skills/session-{start,end}` + `plugins/dw-lifecycle/skills/session-{start,end}`) per Principle II — generalize, not port.
 - **Clarify**: 4 operator-owned forks resolved, all accepting the recommended default — staleness base (upstream-else-default-branch), session-end posture (capture-only; refuse-to-end gates deferred to the migrations that own them), monorepo selection (cwd-nearest + `--at`), journal authorship (auto-derive mechanical, agent composes narrative).
 - **Plan**: two thin verbs over a pure `src/session/` module; Constitution Check PASS. The decoupling **consumes 009's shared `src/config/` port and extends its key set** with `journal`/`tooling_feedback`/`clone_scope` — making session-skills the *second real consumer* that proves 009's extensible managed set (Principle II load-bearing). research D1–D10, data-model, 3 contracts, quickstart (10 plain-shell scenarios). Grounded in a real code-map (CLI dispatch, the 3 bundled-default resolution points, the backlog backend, `repo.ts` git helpers).

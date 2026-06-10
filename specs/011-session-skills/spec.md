@@ -1,6 +1,6 @@
 # Feature Specification: Native session-start / session-end lifecycle skills (session-skills)
 
-**Feature Branch**: `feature/stack-control` (spec dir `010-session-skills`)
+**Feature Branch**: `feature/stack-control` (spec dir `011-session-skills`)
 
 **Created**: 2026-06-10
 
