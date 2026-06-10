@@ -1180,3 +1180,38 @@ Status:     fixed-f2db6029 (2026-06-10; number joins INPUT_TYPE_ALLOWLIST)
 Severity:   low
 Surface:    plugins/design-control/src/lint/allowlist.ts
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 12 (run 20260610T220538629Z; codex only — claude 0 bytes, 10th consecutive)
+
+Zero-HIGH streak RESET (was 1). 2 HIGH + 2 LOW, all verified, all fixed in
+7f660f27. Both HIGHs attack this loop's own earlier fixes — the run
+accumulator's element-only blind spot, and AUDIT-14's query acceptance turning
+out to be a swap channel.
+
+### AUDIT-20260610-44 — Text-node sibling rows (br-separated) slipped the run accumulator
+
+Finding-ID: AUDIT-20260610-44 (round-12 gpt-5-01, HIGH)
+Status:     fixed-7f660f27 (2026-06-10; text-node children join the run; br transparent; prose still breaks)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
+
+### AUDIT-20260610-45 — Query on the kit href is a swap channel (SUPERSEDES AUDIT-14's acceptance)
+
+Finding-ID: AUDIT-20260610-45 (round-12 gpt-5-02, HIGH)
+Status:     fixed-7f660f27 (2026-06-10; stylesheet-query rule — the browser requests the suffixed URL a query-aware host can map to different bytes; fragments stay fine; ?v over-rejection is the accepted cost)
+Severity:   high
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts
+
+### AUDIT-20260610-46 — Duplicate identical theme token over-rejected
+
+Finding-ID: AUDIT-20260610-46 (round-12 gpt-5-03, LOW)
+Status:     fixed-7f660f27 (2026-06-10; distinct-theme count)
+Severity:   low
+Direction:  false-positive
+
+### AUDIT-20260610-47 — tel input over-rejected
+
+Finding-ID: AUDIT-20260610-47 (round-12 gpt-5-04, LOW)
+Status:     fixed-7f660f27 (2026-06-10; tel joins INPUT_TYPE_ALLOWLIST)
+Severity:   low
+Direction:  false-positive
