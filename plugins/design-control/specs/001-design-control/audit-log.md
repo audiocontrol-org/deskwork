@@ -649,7 +649,7 @@ allowlist) each have over-rejection costs.
 ### AUDIT-20260610-05 — Attribute VALUES are never codepoint- or semantics-scanned (meta theme-color / color-scheme; title/aria glyph channels)
 
 Finding-ID: AUDIT-20260610-05 (gpt-5-04 + fable-03 + fable-07c; cross-model — HIGH-confidence on the channel)
-Status:     open
+Status:     fixed-d7f4025a (2026-06-10, via AUDIT-20260610-19 — recurrence pressure promoted it from the parked backlog)
 Backlog:    TASK-12
 Severity:   medium
 Surface:    plugins/design-control/src/lint/allowlist.ts + check-mockup-lofi.ts (attr values beyond URL_ATTRS unconstrained)
@@ -670,7 +670,7 @@ argues for selection.
 ### AUDIT-20260610-06 — `integrity` is rejected by axis-1, so the pin's SRI branch is unreachable on any lint-green document
 
 Finding-ID: AUDIT-20260610-06 (fable-04; single-model, behaviorally verified)
-Status:     open
+Status:     fixed-70c2c320 (2026-06-10, via AUDIT-20260610-20 — second surfacing promoted it from the parked backlog)
 Backlog:    TASK-13
 Severity:   medium
 Surface:    plugins/design-control/src/lint/allowlist.ts (link attrs) vs stylesheet-pin.ts (SRI verification)
@@ -861,3 +861,54 @@ Third surfacing of the form-controls theme (round-1 gpt-5-05 → AUDIT-08/TASK-1
 now `<form>` + `<input type=text>`). Still parked as backlog TASK-15 per the
 intake rule; the recurrence count strengthens its selection case — it is also a
 direct input to the Phase-1 positive-corpus task.
+
+## 2026-06-10 — lint adversarial barrage ROUND 4 (run 20260610T200156342Z; codex only — claude 0 bytes, 2nd consecutive)
+
+Triage notes: claude silent again (0 stdout / 0 stderr; deskwork issue 447 —
+3 of 5 runs now). Codex: 1 HIGH + 2 MED, all behaviorally verified; both MEDs
+are recurrences of parked items, which the dispositions below close. Codex's
+clean list: base/foreign-content/img-iframe-object/mixed-rel/external/media/
+cache-bust/swapped-kit/swapped-fonts all hold. Round verdict: NOT converged
+(1 HIGH), but the HIGH is dispositioned as a declared scope boundary rather
+than a code fix — see AUDIT-18.
+
+### AUDIT-20260610-18 — Letter mosaic in table cells: text-as-imagery beyond content statistics (DECLARED BOUNDARY)
+
+Finding-ID: AUDIT-20260610-18 (round-4 gpt-5-codex-01; behaviorally verified)
+Status:     acknowledged-scope-boundary (2026-06-10, e9137d31; backlog TASK-17 holds the selectable heuristic option)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (mechanical closure limit)
+
+A wordmark mosaic of one allowlisted LETTER per `<td>` (0% punctuation) renders
+imagery no content-statistics gate can see; a single-char-cell heuristic is
+statistically indistinguishable from a legitimate Y/N feature matrix, and
+stacking shape heuristics is the round-7 whack-a-mole. Disposition is
+claim-narrowing per the PRD's "claim matched to evidence" discipline: the lint
+docstring + adversarial prompt now DECLARE general text-as-imagery from
+allowlisted glyphs at structural granularity outside the mechanical closure,
+assigned to the cross-model referee's gross-class imagery judgment (PRD gross
+classes 5–7); a boundary fixture pins it. Future letter-mosaic findings are in
+scope only if they show the boundary drawn wrongly.
+
+### AUDIT-20260610-19 — Visible attr values (title/aria) carry designed glyphs; meta name unconstrained
+
+Finding-ID: AUDIT-20260610-19 (round-4 gpt-5-codex-02 MED; THIRD surfacing of AUDIT-05 — rounds 1, 2, 4, both models)
+Status:     fixed-d7f4025a (2026-06-10; title + aria-* values pass the codepoint allowlist; meta name enumerated {viewport, description} — theme-color/color-scheme rejected by NAME. Closes parked AUDIT-20260610-05 / backlog TASK-12)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts + allowlist.ts
+
+The recurrence pressure (three rounds, both models independently) promoted the
+parked finding into the loop. class/id stay value-unconstrained (inert under the
+pin, round-8 as amended by AUDIT-02's disposition).
+
+### AUDIT-20260610-20 — Correct SRI over-rejected (recurrence of AUDIT-06; SRI branch unreachable)
+
+Finding-ID: AUDIT-20260610-20 (round-4 gpt-5-codex-03 MED; second surfacing of fable-04 = AUDIT-06)
+Status:     fixed-70c2c320 (2026-06-10; integrity allowlisted plain-kind on link — its value is axis-1.5's to verify. Closes parked AUDIT-20260610-06 / backlog TASK-13)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/allowlist.ts (link attrs)
+Direction:  false-positive
+
+End-to-end fixtures: a correct digest passes the FULL lint; a wrong digest still
+rejects through the now-reachable normalizeSriToken machinery (AUDIT-15/18/19/21
+hardening finally exercisable on green documents).
