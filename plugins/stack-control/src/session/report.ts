@@ -42,6 +42,22 @@ export function renderOrientation(report: OrientationReport): string {
   lines.push(`Open backlog (${report.openBacklog.length}):`);
   if (report.openBacklog.length === 0) lines.push('  (backlog empty)');
   for (const i of report.openBacklog) lines.push(`  - ${i.id} [${i.status}] ${i.title}`);
+  lines.push('');
+
+  lines.push('Branch staleness:');
+  lines.push(`  ${renderStaleness(report)}`);
 
   return lines.join('\n') + '\n';
+}
+
+function renderStaleness(report: OrientationReport): string {
+  const s = report.staleness;
+  switch (s.kind) {
+    case 'behind':
+      return `behind ${s.base} by ${s.behindCount} commit(s) — consider rebasing (advisory)`;
+    case 'current':
+      return 'up to date with base';
+    case 'skipped':
+      return `skipped (${s.reason})`;
+  }
 }

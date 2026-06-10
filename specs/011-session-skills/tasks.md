@@ -97,9 +97,9 @@ This feature **consumes** 009's `src/config/{installation,resolve-paths,config-l
 
 **Goal**: session-start warns when the branch is behind its base; advisory, never blocks. **Independent test**: behind → advisory; level → none; undeterminable → clean skip (quickstart Scenario 7).
 
-- [ ] T027 [P] [US4] RED: `plugins/stack-control/tests/session/staleness.test.ts` — branch behind base → advisory with count; level/ahead → no warning; detached/no-base → clean skip note; in **all** cases the session still starts (FR-016/FR-017/SC-005).
-- [ ] T028 [US4] Implement `plugins/stack-control/src/session/staleness.ts` (base via T005 `resolveBase`; `aheadBehind`; `StalenessSignal` skip-clean) → GREEN T027.
-- [ ] T029 [US4] Wire the `StalenessSignal` into `orient.ts`'s `OrientationReport` and `report.ts` rendering (the previously-omitted slot).
+- [X] T027 [P] [US4] RED: `plugins/stack-control/tests/session/staleness.test.ts` — branch behind base → advisory with count; level/ahead → no warning; detached/no-base → clean skip note; in **all** cases the session still starts (FR-016/FR-017/SC-005).
+- [X] T028 [US4] Implement `plugins/stack-control/src/session/staleness.ts` (base via T005 `resolveBase`; `aheadBehind`; `StalenessSignal` skip-clean) → GREEN T027.
+- [X] T029 [US4] Wire the `StalenessSignal` into `orient.ts`'s `OrientationReport` and `report.ts` rendering (the previously-omitted slot).
 
 ---
 
@@ -107,8 +107,8 @@ This feature **consumes** 009's `src/config/{installation,resolve-paths,config-l
 
 **Goal**: both verbs run in a plain shell with no Claude Code surface; skills are pure adapters. **Independent test**: plain-shell run equals skill-path output (quickstart Scenario 10).
 
-- [ ] T030 [P] [US5] RED: `plugins/stack-control/tests/session/cli-first.test.ts` — `runCli(['session-start'])` / `runCli(['session-end'])` complete in a plain shell (no Claude Code) producing the report/record; assert the skills add no behavior the CLI lacks (FR-018/FR-019/SC-007).
-- [ ] T031 [US5] Confirm both verbs + both SKILL.md adapters satisfy CLI-first (no Claude-Code-only path; skills only quote the verb) → GREEN T030.
+- [X] T030 [P] [US5] RED: `plugins/stack-control/tests/session/cli-first.test.ts` — `runCli(['session-start'])` / `runCli(['session-end'])` complete in a plain shell (no Claude Code) producing the report/record; assert the skills add no behavior the CLI lacks (FR-018/FR-019/SC-007).
+- [X] T031 [US5] Confirm both verbs + both SKILL.md adapters satisfy CLI-first (no Claude-Code-only path; skills only quote the verb) → GREEN T030.
 
 ---
 

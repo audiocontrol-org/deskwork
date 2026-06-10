@@ -13,6 +13,7 @@ import { loadRoadmap } from '../roadmap/roadmap-model.js';
 import { isReady, isTerminal, ready } from '../roadmap/graph.js';
 import { grammarOptsForRoot } from '../subcommands/document-verb-shared.js';
 import { inferChainPosition, type ChainPosition } from './chain-position.js';
+import { checkStaleness, type StalenessSignal } from './staleness.js';
 
 /** A roadmap item projected for the report (the 006 WorkItem, narrowed). */
 export interface RoadmapItemRef {
@@ -39,6 +40,8 @@ export interface OrientationReport {
   readonly activeSpec: ChainPosition | null;
   readonly latestJournalEntry: JournalEntrySummary | null;
   readonly openBacklog: readonly BacklogItemRef[];
+  /** Branch-staleness advisory (US4); never blocks (FR-016/FR-017). */
+  readonly staleness: StalenessSignal;
 }
 
 export interface OrientInput {
@@ -54,6 +57,7 @@ export function orient(input: OrientInput): OrientationReport {
     activeSpec: inferChainPosition(repoRoot),
     latestJournalEntry: gatherLatestJournalEntry(installation.resolved.journal),
     openBacklog: gatherOpenBacklog(installation.resolved.backlog),
+    staleness: checkStaleness(installation.root),
   };
 }
 
