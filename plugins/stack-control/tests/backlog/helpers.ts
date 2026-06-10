@@ -15,8 +15,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 export const FIXTURES = resolve(here, 'fixtures');
 export const PLUGIN_ROOT = resolve(here, '..', '..');
-/** The committed backlog.md config the dogfood pile uses (T002). */
-export const COMMITTED_CONFIG = resolve(PLUGIN_ROOT, 'backlog', 'config.yml');
+/** The committed backlog.md config the dogfood pile uses (T002). Relocated to
+ *  the default `.stack-control/backlog` layout when stack-control adopted its
+ *  own per-plugin installation. */
+export const COMMITTED_CONFIG = resolve(PLUGIN_ROOT, '.stack-control', 'backlog', 'config.yml');
 
 export { runCli } from '../../src/__tests__/_run-helpers.js';
 

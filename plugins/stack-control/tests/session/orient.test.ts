@@ -13,7 +13,7 @@ import { createBacklogBackend } from '../../src/backlog/backend.js';
 import { orient } from '../../src/session/orient.js';
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const COMMITTED_BACKLOG_CONFIG = resolve(PLUGIN_ROOT, 'backlog', 'config.yml');
+const COMMITTED_BACKLOG_CONFIG = resolve(PLUGIN_ROOT, '.stack-control', 'backlog', 'config.yml');
 
 let root: string;
 afterEach(() => {
