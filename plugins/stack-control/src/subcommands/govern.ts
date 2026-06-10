@@ -49,6 +49,7 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { readFileSync } from 'node:fs';
+import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // src/subcommands → src → plugin root → bin/stackctl
@@ -163,6 +164,26 @@ function tail(text: string, n: number): string {
   return lines.slice(Math.max(0, lines.length - n)).join('\n');
 }
 
+/**
+ * Spec 013 (TASK-25): resolve the feature's audit-log excerpt through
+ * the layout-aware `resolveFeatureRoot` helper instead of a hardcoded
+ * `docs/1.0/001-IN-PROGRESS/<slug>` path. A `specs/NNN-<slug>` feature's
+ * audit-log was invisible to the old hardcoded path, so the barrage
+ * prompt silently carried an empty excerpt (a forbidden fallback). An
+ * empty string here means there is genuinely no prior audit-log to show
+ * (no findings yet) — NOT a masked wrong-path miss.
+ */
+export async function resolveAuditLogExcerpt(
+  repoRoot: string,
+  slug: string,
+  tailLines = 40,
+): Promise<string> {
+  const { root } = await resolveFeatureRoot({ repoRoot, slug });
+  if (root === undefined) return '';
+  const auditLog = join(root, 'audit-log.md');
+  return existsSync(auditLog) ? tail(readFileSync(auditLog, 'utf8'), tailLines) : '';
+}
+
 /** Resolve the spec path from --spec-path/env, else the CLAUDE.md SPECKIT marker. */
 function resolveSpecPath(repoRoot: string, flagValue: string | undefined): string {
   const explicit = pick(flagValue, process.env.GOVERN_SPEC_PATH);
@@ -189,6 +210,7 @@ export function buildImplementVars(
   slug: string,
   diffBaseFlag: string | undefined,
   checkpointFlag: string | undefined,
+  auditLogExcerpt: string,
 ): { vars: BarrageVars; checkpoint: string } {
   const base = diffBaseFlag ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
   const budgetEnv = process.env.GOVERN_PAYLOAD_BUDGET;
@@ -204,13 +226,11 @@ export function buildImplementVars(
       `govern: empty diff against ${base} — running barrage over the plan context only (edge case; no defects expected).\n`,
     );
   }
-  const auditLog = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', slug, 'audit-log.md');
-  const excerpt = existsSync(auditLog) ? tail(readFileSync(auditLog, 'utf8'), 40) : '';
   const vars: BarrageVars = {
     feature_slug: slug,
     workplan_summary: `Governance pass over the just-implemented work for feature '${slug}', diffed against ${base}. The differentiated back half audits a plan it did not author or execute.`,
     diff: payload.diff,
-    audit_log_excerpt: excerpt,
+    audit_log_excerpt: auditLogExcerpt,
     commit_subjects: payload.commitSubjects,
     audit_lens: CODE_AUDIT_LENS,
     artifact_framing: CODE_ARTIFACT_FRAMING,
@@ -226,6 +246,7 @@ export function buildSpecVars(
   specPathFlag: string | undefined,
   planPathFlag: string | undefined,
   checkpointFlag: string | undefined,
+  auditLogExcerpt: string,
 ): { vars: BarrageVars; checkpoint: string } {
   const specPath = resolveSpecPath(repoRoot, specPathFlag);
   const planPath = pick(planPathFlag, process.env.GOVERN_PLAN_PATH);
@@ -239,13 +260,11 @@ export function buildSpecVars(
       ? { budgetBytes: Number.parseInt(budgetEnv, 10) }
       : {}),
   });
-  const auditLog = join(repoRoot, 'docs', '1.0', '001-IN-PROGRESS', slug, 'audit-log.md');
-  const excerpt = existsSync(auditLog) ? tail(readFileSync(auditLog, 'utf8'), 40) : '';
   const vars: BarrageVars = {
     feature_slug: slug,
     workplan_summary: `Definition-time governance pass over the SPEC for feature '${slug}' (${specPath}${payload.planNote}). The design-phase barrage audits a spec — internal contradictions, ambiguity, unstated assumptions, missing edge cases — not produced code.`,
     diff: payload.diff,
-    audit_log_excerpt: excerpt,
+    audit_log_excerpt: auditLogExcerpt,
     commit_subjects: '',
     audit_lens: SPEC_AUDIT_LENS,
     artifact_framing: SPEC_ARTIFACT_FRAMING,
@@ -280,10 +299,15 @@ export async function runGovern(args: string[]): Promise<void> {
     assertBarrageBinPresent(barrageBin);
     const stackctl = join(PLUGIN_ROOT, 'bin', 'stackctl');
 
+    // Spec 013 (TASK-25): resolve the audit-log excerpt through the
+    // layout-aware helper here (async), then thread it into the pure
+    // var-builders — so a specs/NNN-<slug> feature's audit-log is found
+    // instead of silently empty under the old hardcoded docs/ path.
+    const auditLogExcerpt = await resolveAuditLogExcerpt(repoRoot, slug);
     const built =
       flags.mode === 'spec'
-        ? buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint)
-        : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint);
+        ? buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint, auditLogExcerpt)
+        : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint, auditLogExcerpt);
 
     // US7 (FR-032): implement-mode governance runs the per-codebase clone step,
     // surfacing NEW intra-codebase duplication alongside the gate verdict
