@@ -85,9 +85,9 @@ This feature **consumes** 009's `src/config/{installation,resolve-paths,config-l
 
 **Goal**: both verbs resolve every working file through config at any configured location, fail loud outside an installation, and honor the nearest-enclosing + `--at` override. **Independent test**: custom locations honored; outside-installation fails loud; monorepo isolation (quickstart Scenarios 8–9).
 
-- [ ] T024 [P] [US3] RED: `plugins/stack-control/tests/session/decoupling.test.ts` — both verbs read/write at non-default configured locations (journal/roadmap/clone_scope); running either outside any installation fails loud naming the missing installation, **no bundled-copy fallback** (FR-012/FR-014/SC-003/SC-004).
-- [ ] T025 [P] [US3] RED: `plugins/stack-control/tests/session/monorepo.test.ts` — two installations at distinct subtrees: a verb run in one resolves the **nearest** enclosing installation and leaves the sibling's files unchanged; `--at <other>` orients on the other (FR-015/SC-009).
-- [ ] T026 [US3] Add the `--at <dir>` override to both `session-start.ts` and `session-end.ts` (surface-agnostic context → `resolveInstallation`), and audit both verbs for any residual hardcoded path (all reads/writes through `resolvePaths`) → GREEN T024/T025.
+- [X] T024 [P] [US3] RED: `plugins/stack-control/tests/session/decoupling.test.ts` — both verbs read/write at non-default configured locations (journal/roadmap/clone_scope); running either outside any installation fails loud naming the missing installation, **no bundled-copy fallback** (FR-012/FR-014/SC-003/SC-004).
+- [X] T025 [P] [US3] RED: `plugins/stack-control/tests/session/monorepo.test.ts` — two installations at distinct subtrees: a verb run in one resolves the **nearest** enclosing installation and leaves the sibling's files unchanged; `--at <other>` orients on the other (FR-015/SC-009).
+- [X] T026 [US3] Add the `--at <dir>` override to both `session-start.ts` and `session-end.ts` (surface-agnostic context → `resolveInstallation`), and audit both verbs for any residual hardcoded path (all reads/writes through `resolvePaths`) → GREEN T024/T025.
 
 **Checkpoint**: the native decoupling (#122) is proven on a non-deskwork layout.
 
