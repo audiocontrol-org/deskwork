@@ -1244,3 +1244,34 @@ Status:     fixed-803cd4e0 (2026-06-10; visible-value gates scope to types whose
 Severity:   low
 Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 14 (run 20260610T223352761Z; codex only — claude 0 bytes, 12th consecutive)
+
+3 HIGH + 1 LOW, all verified, all fixed in db8f5602. The strongest round in a
+while: a whitespace-DEFINITION differential (a genuine parser-differential
+class, the lint's founding threat model) and a rendered-value channel the
+density aggregation never saw.
+
+### AUDIT-20260610-50 — NBSP tokenization differential (rel + class) — JS \s vs HTML ASCII whitespace
+
+Finding-ID: AUDIT-20260610-50 (round-14 gpt-5-01 + gpt-5-02, both HIGH; one mechanism)
+Status:     fixed-db8f5602 (2026-06-10; splitHtmlTokens — HTML-spec ASCII set — at all four token sites: rel gate, class/theme tokens, pin theme collector, SRI tokens)
+Severity:   high
+Surface:    plugins/design-control/src/lint/allowlist.ts + check-mockup-lofi.ts + stylesheet-pin.ts
+
+rel="stylesheet&nbsp;" / class="sk&nbsp;..." were clean tokens to the lint but
+different tokens to the browser — kit silently NOT APPLIED under a green pin.
+
+### AUDIT-20260610-51 — Punctuation rows sharded through RENDERED control values
+
+Finding-ID: AUDIT-20260610-51 (round-14 gpt-5-03, HIGH)
+Status:     fixed-db8f5602 (2026-06-10; renderedText — aggregate + rendered input values/placeholders — feeds the density block/run paths; form joins the block set)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
+
+### AUDIT-20260610-52 — url input over-rejected
+
+Finding-ID: AUDIT-20260610-52 (round-14 gpt-5-04, LOW)
+Status:     fixed-db8f5602 (2026-06-10; url joins INPUT_TYPE_ALLOWLIST)
+Severity:   low
+Direction:  false-positive
