@@ -172,6 +172,16 @@ describe('backlog promote — batch tasks: + advisory (T013/T014, US2, contract 
     expect(taskFileFor(dir, id)).toMatch(/labels:[\s\S]*promoted/); // still recorded
   });
 
+  it('a duplicate id in a batch is refused with zero write (AUDIT codex-01)', () => {
+    const dir = tmpBacklog();
+    const id = createBacklogBackend({ cwd: dir }).create({ title: 'a', labels: ['agent-found', 'type:gap'] });
+    const before = snapshot(dir);
+
+    const r = runBacklog(['promote', id, id, '--to', 'tasks:specs/008-backlog-surface', '--apply'], dir);
+    expect(r.status).toBe(2); // usage: a repeated id would double-write the linkage
+    expect(snapshot(dir)).toBe(before); // zero write
+  });
+
   it('a target path that exists yields NO pending-create advisory (D4)', () => {
     const dir = tmpBacklog();
     const id = createBacklogBackend({ cwd: dir }).create({ title: 'x', labels: ['agent-found', 'type:gap'] });

@@ -14,7 +14,9 @@ import {
   promote,
   PromoteAlreadyPromotedError,
   PromoteItemMissingError,
+  PromotePartialWriteError,
 } from '../../src/backlog/promote.js';
+import { BacklogError, type BacklogBackend, type EditSpec } from '../../src/backlog/backend.js';
 import { tmpBacklog } from './helpers.js';
 
 function snapshotTasks(cwd: string): string {
@@ -114,5 +116,54 @@ describe('promote writer — fail-loud + idempotency guard (T007, contract 3/7)'
       promote({ ids: [id], target: parseTarget('roadmap:design:gap/other'), apply: true, backend, cwd }),
     ).toThrow(PromoteAlreadyPromotedError);
     expect(snapshotTasks(cwd)).toBe(afterFirst); // the second promote wrote nothing
+  });
+});
+
+// AUDIT-BARRAGE claude-01 ≡ codex-02 (cross-model): the per-item write loop is
+// not transactional. A mid-batch backend.edit() failure cannot be made all-or-
+// nothing through the shelled backlog.md CLI (D6 owns the format; there is no
+// multi-task atomic edit). The honest contract: preflight is all-or-nothing;
+// once writing begins, a backend failure is fail-loud AND must name exactly
+// which ids were already written so the operator retries only the remainder
+// (the idempotency guard makes that re-run safe).
+describe('promote writer — mid-batch write failure is fail-loud + names written ids (AUDIT claude-01/codex-02)', () => {
+  /** A backend that delegates to the real one but throws on edit(failId). */
+  function failingOn(real: BacklogBackend, failId: string): BacklogBackend {
+    return {
+      create: (s) => real.create(s),
+      list: () => real.list(),
+      exists: (r) => real.exists(r),
+      edit: (id: string, spec: EditSpec) => {
+        if (id === failId) throw new BacklogError(`simulated backend failure on ${id}`);
+        real.edit(id, spec);
+      },
+    };
+  }
+
+  it('surfaces PromotePartialWriteError naming the items already written when a later edit fails', () => {
+    const cwd = tmpBacklog();
+    const real = createBacklogBackend({ cwd });
+    const a = real.create({ title: 'a', labels: ['agent-found', 'type:gap'] });
+    const b = real.create({ title: 'b', labels: ['agent-found', 'type:gap'] });
+
+    let thrown: unknown;
+    try {
+      promote({
+        ids: [a, b],
+        target: parseTarget('tasks:specs/008-backlog-surface'),
+        apply: true,
+        backend: failingOn(real, b), // a writes; b fails mid-loop
+        cwd,
+      });
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeInstanceOf(PromotePartialWriteError);
+    expect((thrown as PromotePartialWriteError).written).toEqual([a]); // a was committed
+    expect((thrown as Error).message).toContain(a); // recovery: names what landed
+    // a is genuinely promoted on disk; b is not — the real partial state, surfaced honestly
+    expect(taskFileFor(cwd, a)).toMatch(/labels:[\s\S]*promoted/);
+    expect(taskFileFor(cwd, b)).not.toMatch(/labels:[\s\S]*promoted/);
   });
 });

@@ -20,7 +20,9 @@ import { parseTarget, allowsBatch, TargetRefError } from '../backlog/promote-tar
 import {
   promote,
   PromoteAlreadyPromotedError,
+  PromoteDuplicateIdError,
   PromoteItemMissingError,
+  PromotePartialWriteError,
   type PromoteResult,
 } from '../backlog/promote.js';
 import {
@@ -228,11 +230,18 @@ function emitPromote(flags: Flags): void {
   try {
     reportPromote(promote({ ids, target, apply: flags.apply, backend, cwd: process.cwd() }));
   } catch (err) {
-    if (err instanceof PromoteAlreadyPromotedError) {
+    // Usage-class refusals (preflight, zero write) → exit 2.
+    if (err instanceof PromoteAlreadyPromotedError || err instanceof PromoteDuplicateIdError) {
       process.stderr.write(`backlog: ${err.message}\n`);
       process.exit(2);
     }
-    if (err instanceof PromoteItemMissingError || err instanceof BacklogError) {
+    // Runtime fail-loud → exit 1. PromotePartialWriteError already names the
+    // ids that landed so the operator can retry the remainder.
+    if (
+      err instanceof PromoteItemMissingError ||
+      err instanceof PromotePartialWriteError ||
+      err instanceof BacklogError
+    ) {
       process.stderr.write(`backlog: ${err.message}\n`);
       process.exit(1);
     }

@@ -47,4 +47,14 @@ describe('promote docs — feature/roadmap tier references the backlog origin (T
     expect(doc).toMatch(/promot/i); // promote / promotion
     expect(doc).toMatch(/\.\.\/backlog\/SKILL\.md/); // navigable back to the canonical description
   });
+
+  // AUDIT-BARRAGE claude-02: define/SKILL.md also carries the cross-reference
+  // (spec: targets graduate via define). Guard it so the discovery gap can't
+  // silently re-open at the define entry point if that prose is later removed.
+  it('the define SKILL references the backlog as a promotion origin', () => {
+    const doc = read('define/SKILL.md');
+    expect(doc).toMatch(/backlog/i);
+    expect(doc).toMatch(/promot/i);
+    expect(doc).toMatch(/\.\.\/backlog\/SKILL\.md/);
+  });
 });

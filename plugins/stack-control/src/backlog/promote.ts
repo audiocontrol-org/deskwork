@@ -31,6 +31,41 @@ export class PromoteItemMissingError extends Error {
   }
 }
 
+/** The same id appears more than once in a batch → usage error (exit 2), zero
+ * write — a duplicate would append a second `Promoted-to:` linkage, violating
+ * the no-duplicate-linkage guard (AUDIT-BARRAGE codex-01). */
+export class PromoteDuplicateIdError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PromoteDuplicateIdError';
+  }
+}
+
+/**
+ * A batch write failed PART-WAY through (AUDIT-BARRAGE claude-01 ≡ codex-02).
+ * Preflight validation is all-or-nothing, but the per-item writes are not
+ * transactional — the shelled backlog.md CLI owns the task-file format (D6) and
+ * exposes no multi-task atomic edit, so a backend failure on item k+1 leaves
+ * items 1..k genuinely promoted. This is the HONEST surface of that state: it
+ * names exactly which ids were written so the operator retries only the
+ * remainder (a re-run of the whole batch is safely refused by the idempotency
+ * guard on the already-written items). The verb maps it to a runtime exit 1.
+ */
+export class PromotePartialWriteError extends Error {
+  readonly written: readonly string[];
+  readonly failedId: string;
+  constructor(written: readonly string[], failedId: string, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    super(
+      `promote partially applied — recorded [${written.join(', ')}] then failed on ${failedId}: ${detail}. ` +
+        `The recorded items are promoted; re-run promote on the REMAINING ids only (already-promoted ids are refused).`,
+    );
+    this.name = 'PromotePartialWriteError';
+    this.written = written;
+    this.failedId = failedId;
+  }
+}
+
 export interface PromoteRequest {
   /** One id (single) or N ids (batch — caller already enforced batch is tasks:-only). */
   readonly ids: readonly string[];
@@ -54,17 +89,31 @@ export interface PromoteResult {
 
 /**
  * Record the promotion linkage on each named item (record-only). Validates the
- * WHOLE batch first — every id must exist and be un-promoted — then, only under
- * `apply`, writes the `promoted` label + the `Promoted-to:` linkage additively
- * (preserving every pre-existing field, FR-013). Any precondition failure throws
- * before a single write (all-or-nothing). Reads labels via the backend's
- * file-frontmatter projection (as `exists()` does — `list --plain` exposes
- * neither, D6).
+ * WHOLE batch first — no duplicate ids, every id exists and is un-promoted — so
+ * any **preflight** failure throws before a single write (all-or-nothing on the
+ * validation axis). Then, under `apply`, writes the `promoted` label + the
+ * `Promoted-to:` linkage additively (preserving every pre-existing field,
+ * FR-013). The per-item writes are NOT transactional: the shelled backlog.md CLI
+ * exposes no multi-task atomic edit (D6), so a backend failure mid-batch leaves
+ * the already-written items promoted and raises PromotePartialWriteError naming
+ * them (the honest surface — see that error's doc). Reads labels via the
+ * backend's file-frontmatter projection (as `exists()` does — `list --plain`
+ * exposes neither, D6).
  */
 export function promote(req: PromoteRequest): PromoteResult {
+  // Preflight: reject duplicate ids before any store access (codex-01) — a
+  // repeated id would append a second linkage, violating the no-duplicate guard.
+  const seen = new Set<string>();
+  for (const id of req.ids) {
+    if (seen.has(id)) {
+      throw new PromoteDuplicateIdError(`backlog item '${id}' is listed more than once in the batch`);
+    }
+    seen.add(id);
+  }
+
   const byId = new Map(req.backend.list().map((i) => [i.id, i]));
 
-  // Validate the entire batch before any mutation (SC-002, all-or-nothing).
+  // Validate the entire batch before any mutation (preflight all-or-nothing).
   for (const id of req.ids) {
     const item = byId.get(id);
     if (item === undefined) {
@@ -85,11 +134,19 @@ export function promote(req: PromoteRequest): PromoteResult {
       : undefined;
 
   if (req.apply) {
+    const written: string[] = [];
     for (const id of req.ids) {
-      req.backend.edit(id, {
-        addLabel: PROMOTED_LABEL,
-        appendNotes: promotedToLine(req.target.ref),
-      });
+      try {
+        req.backend.edit(id, {
+          addLabel: PROMOTED_LABEL,
+          appendNotes: promotedToLine(req.target.ref),
+        });
+      } catch (err) {
+        // Non-transactional mid-batch failure: surface what already landed so the
+        // operator retries only the remainder (claude-01 ≡ codex-02).
+        throw new PromotePartialWriteError(written, id, err);
+      }
+      written.push(id);
     }
   }
 
