@@ -51,6 +51,7 @@ The deterministic primitive the skills call (`bin/stackctl <verb>`, in-tree Type
 | `stackctl execute-check --spec <dir>` | Gate: is the spec **runnable** for native `/speckit-implement`? Exit 0 (`runnable`) iff `tasks.md` is present; otherwise exit ≠0 naming the missing artifact. Read-only. |
 | `stackctl spec-check --spec <dir>` | Report a spec's authoring state as a machine-readable line (`spec=yes plan=yes tasks=no`), exit 0 when it can report; exit ≠0 (fail-loud) on a missing/unknown flag, an absent dir, or a non-directory. Read-only; never gates on artifact *content* (a partial spec is a valid report). |
 | `stackctl version` | Print the plugin version (lockstep with the rest of the monorepo). |
+| `stackctl setup [--at <dir>] [--apply]` | Scaffold a **stack-control installation** — write `.stack-control/config.yaml` + the governed working files the verbs read through (roadmap, inbox, backlog store, program audit log). Non-destructive + idempotent; dry-run by default; fail-loud on a malformed required file (exit 1) or a config escape/collision (exit 2). |
 | `stackctl archive --doc <path> [--apply]` | Move terminal-status items into the sibling `<doc>-archive.md` (with an in-archive provenance ledger). Dry-run by default. |
 | `stackctl unarchive --doc <path> --id <id> [--apply]` | Return a named archived item to its live document at its declared-order position. Dry-run by default. |
 | `stackctl curate --doc <path> [--apply]` | Ensure a document is well-formed, well-ordered, and properly archived; recognize (never run) a declared reconciliation seam; report ledger↔archive coherence. Dry-run by default. |
@@ -73,7 +74,26 @@ Each verb defaults to **dry-run** (report, write nothing); writing requires `--a
 
 `stackctl inbox` makes out-of-sequence design-idea capture a first-class, **one-move, fail-safe** operation against the governed [`DESIGN-INBOX.md`](./DESIGN-INBOX.md) — the native capability that **replaces the retired interim hand-append convention**. Capture is instant and never requires finishing the current thread (**capture ≠ scope**); triage is a separate deliberate pass (`promote` records a graduation target and reuses the existing creators — it does not create the target; `drop` records a reason). Lean-keeping reuses the generic `curate`/`archive`/`unarchive` verbs. Every mutation re-validates the whole document and is zero-write-on-failure. The agent-facing skill is [`/stack-control:inbox`](./skills/inbox/SKILL.md).
 
-> **Which inbox does `--doc` target?** When omitted, `--doc` defaults to the **plugin-bundled** `DESIGN-INBOX.md` (this monorepo's own inbox), not your project's. Project-relative inbox discovery is a tracked follow-up (`design:gap/project-relative-doc-discovery`); until it lands, **adopters operating on their own inbox MUST pass `--doc <path>` explicitly** (or set `STACKCTL_INBOX_DEFAULT_DOC`).
+> **Which inbox does `--doc` target?** When omitted, the verb resolves the enclosing **stack-control installation** (the nearest ancestor with `.stack-control/config.yaml`) and operates on its configured inbox — run [`/stack-control:setup`](./skills/setup/SKILL.md) once to create one. A missing inbox is auto-scaffolded on first use; outside any installation the verb fails loud directing you to `stackctl setup`. `--doc <path>` (or `STACKCTL_INBOX_DEFAULT_DOC`) overrides resolution for an explicit target. See [Project setup](#project-setup) below.
+
+## Project setup
+
+`stackctl setup` (and the thin [`/stack-control:setup`](./skills/setup/SKILL.md) skill over it) bootstraps a **stack-control installation** into a project — the governed working files the `inbox` / `roadmap` / `backlog` / governance verbs operate on, plus the shared `.stack-control/config.yaml` that binds them. After setup, every governed verb resolves the project-local file with no `--doc`.
+
+The config's **presence marks the installation root**. Verbs resolve their working file by walking **up** from the invocation directory to the nearest `.stack-control/config.yaml` (nearest-wins on nesting), then per file: **per-file override > base dir > audience-split default** (human docs `ROADMAP.md` / `DESIGN-INBOX.md` at the root; internal stores — backlog, program audit log — under `.stack-control/`). Pre-author `paths.*` overrides to record an existing/custom layout; a monorepo holds several installations (`setup --at <pkg>`), each isolated. Setup is non-destructive (never overwrites existing content), idempotent (a complete re-run writes nothing), and fail-loud (a malformed required file is surfaced by name and never clobbered; a location that escapes the root or collides with another key/installation is refused).
+
+```yaml
+# .stack-control/config.yaml — presence marks the installation root
+version: 1
+paths:                              # all optional; each relative-to-root (or absolute within root)
+  roadmap: "ROADMAP.md"
+  inbox: "DESIGN-INBOX.md"
+  backlog: ".stack-control/backlog"
+  audit_log: ".stack-control/audit-log.md"
+  feature_audit_log_pattern: "specs/{feature}/audit-log.md"
+```
+
+This repo dogfoods it: a root [`.stack-control/config.yaml`](../../.stack-control/config.yaml) records the plugin's own scattered layout (`ROADMAP.md` / `DESIGN-INBOX.md` under `plugins/stack-control/`, the program audit log under `docs/1.0/…/`), so the plugin's verbs resolve through the same config an adopter uses — no bundled-copy special case.
 
 ## Backlog slush pile — intake: three sources, one pile
 

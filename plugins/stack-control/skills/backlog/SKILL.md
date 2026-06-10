@@ -11,7 +11,7 @@ Unlike `inbox`/`roadmap` (in-tree governed documents), `backlog` is an **externa
 
 > Per `.claude/rules/enforcement-lives-in-skills.md`, the capture discipline lives in this skill body + the `stackctl backlog` verb — not in a rule or a git hook.
 
-**Which backlog the verb targets:** the dir whose `backlog/` tree is operated on defaults to the **plugin-bundled** `plugins/stack-control/backlog/` (the in-repo dogfood). `STACKCTL_BACKLOG_DIR` overrides it — the adopter/override seam until project-relative discovery lands (`design:gap/project-relative-doc-discovery`).
+**Which backlog the verb targets:** when `STACKCTL_BACKLOG_DIR` is unset, the verb resolves the enclosing **stack-control installation** — the nearest ancestor with a `.stack-control/config.yaml` — and operates on its configured backlog store (the `backlog` binary runs in the store's parent dir). This is the landing of `design:gap/project-relative-doc-discovery`. Run [`/stack-control:setup`](../setup/SKILL.md) once to create an installation; a missing store is **auto-scaffolded on first use** (announced). Outside any installation the verb **fails loud** directing you to `stackctl setup` (no bundled-copy fallback). `STACKCTL_BACKLOG_DIR` still overrides resolution for an explicit, one-off target.
 
 ## The discipline (why this exists)
 

@@ -9,16 +9,11 @@
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { WORKING_FILE_KEYS } from '../config/keys.js';
 import type { ResolvedPaths, WorkingFileKey } from '../config/types.js';
 
 /** Scaffold order: config first (creates .stack-control), then the rest. */
-export const MANAGED_KEYS: readonly WorkingFileKey[] = [
-  'config',
-  'roadmap',
-  'inbox',
-  'backlog',
-  'auditLog',
-];
+export const MANAGED_KEYS = WORKING_FILE_KEYS;
 
 export const ROADMAP_SKELETON = `---
 doc-grammar: roadmap

@@ -7,7 +7,8 @@
 
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path';
 import { InstallationError } from './errors.js';
-import type { InstallationConfig, ResolvedPaths, WorkingFileKey } from './types.js';
+import { WORKING_FILE_KEYS } from './keys.js';
+import type { InstallationConfig, ResolvedPaths } from './types.js';
 
 /** Fixed config-marker dir — not affected by base_dir. */
 const MARKER_DIR = '.stack-control';
@@ -53,8 +54,8 @@ function within(root: string, p: string, label: string): string {
 }
 
 function assertNoCollision(resolved: ResolvedPaths): void {
-  const seen = new Map<string, WorkingFileKey>();
-  for (const key of Object.keys(resolved) as WorkingFileKey[]) {
+  const seen = new Map<string, string>();
+  for (const key of WORKING_FILE_KEYS) {
     const p = resolved[key];
     const prior = seen.get(p);
     if (prior !== undefined) {
