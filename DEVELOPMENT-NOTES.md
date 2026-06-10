@@ -5632,3 +5632,43 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 1. **`/speckit-implement` 008** in a **separate implementation session/worktree** (orchestrator/implementation split). MVP = Setup + Foundational adapter + US1 capture; then US2/US3/US4 + the slush-findings rewire; `after_implement` governance fires there.
 2. Prior **007** next-steps still stand (review/ship 007; advance its roadmap item post-merge).
 3. Triage the `DESIGN-INBOX.md` graph-overlay entry in a later deliberate pass.
+
+---
+
+## 2026-06-10: `design/migrate-scope-discovery` (010) — full Spec Kit front-half (specify → clarify → plan → checklist → tasks → analyze)
+### Feature: pluggable-lifecycle-providers
+### Worktree: pluggable-lifecycle-providers
+
+**Goal:** Investigate whether the duplication + scope-discovery mechanisms are in `stack-control` yet, then author the spec for migrating them. Outcome: they are NOT (only audit-barrage + partial promote-findings/util are present); ran the complete Spec Kit front-half for the migration as `specs/010-migrate-scope-discovery/`.
+
+**Accomplished:**
+- **Investigation:** mapped what's migrated (audit-barrage, promote-findings dampener/checkpoint/extract/slush, util partial) vs. NOT (clone detector, scope-inventory/widen, discovery agents, registries, dispatch wrapper, install/doctor). Confirmed there was no spec for it — only the roadmap entry (line 70) + the original 2026-05-24 canonization design.
+- **specify → analyze, all six steps:** spec.md (8 prioritized user stories, FR-001…035, SC-001…011, explicit out-of-scope migration boundary), 5 clarifications, plan.md + research (R1–R6) + data-model + contracts/cli-verbs + quickstart (10 scenarios), migration.md checklist (34 items), tasks.md (**81** tasks, TDD RED-first), and a clean `/speckit-analyze` (0 critical/high) with two MEDIUM findings remediated (T080 SC-004 cross-installation isolation, T081 subcommand flag-validation).
+- **Grounded the plan in real source:** inventoried dw-lifecycle's `src/scope-discovery/` (157 files), pinned the per-codebase fix to a concrete change (`clone-detector.ts`'s `process.cwd()` default → resolved 009 installation root via `config/resolve-paths.ts`), identified the new dep (`jscpd`) + 3 files over the 500-line cap to split.
+- **Decisions captured durably:** full-surface single delivery (no phasing); vendor/copy (dw-lifecycle untouched, SC-010); per-codebase boundary = nearest-enclosing 009 installation; drop hook-install machinery (enforcement-lives-in-skills); port-and-generalize default. Saved a new memory `feedback-no-partial-feature-delivery`.
+
+**Didn't Work / unresolved:**
+- OQ-5 (install-drift advisory home) was deferred at clarify, then resolved in research R6 (built here per the no-partial decision; session-start wiring left to `multi/session-skills`).
+- The `design:gap/project-relative-doc-discovery` subsumption (009 T034) is still open — tasked as T078 (reconcile before duplicating config-resolution).
+
+**Course Corrections:**
+- [PROCESS] Operator overrode my recommended **clone-core-first phasing** in favor of **full-surface single delivery**, articulating the hazard: partial implementation gets dropped on the floor by forgetful agents; future agents are blind to intended-but-unbuilt capabilities and "build coral reefs around the as-built structure." Reshaped the founding-increment decision, added a hard roadmap-tracking requirement for future-expansion items, and saved the preference to memory.
+- [UX] Operator declined the AskUserQuestion picker for the increment decision and wanted plain-prose options + a non-technical explanation first; switched to prose and a moving-the-workshop analogy before they decided.
+
+**Quantitative:**
+- Commits: **7** (this session, all `docs(010)`) + 1 session-end doc commit.
+- Code / tests: **0** (front-half spec session — no implementation). Clone snapshot (`plugins/stack-control`): **6 groups = standing baseline, 0 new** (docs-only session).
+- Open findings at session end: **0** (no audit-barrage — front-half only; `after_implement` governance fires in the implementation session).
+- Operator messages: ~13. Course corrections: **2** (1 PROCESS, 1 UX).
+
+**Tooling friction:** the mandatory `before_specify` `speckit.git.feature` hook would have forced a new per-spec branch, conflicting with the one-branch convention (specs 001–009 all on `feature/stack-control`). Skipped it (operator-confirmed) and created the spec dir + `feature.json` directly. New entry **TF-32** (distinct from TF-30's path-resolver gate).
+
+**Insights:**
+- **The "no partial delivery" principle is now a first-class working rule.** It reshaped not just the increment decision but the spec itself (explicit out-of-scope boundary in the body; future-items carry a roadmap-tracking obligation, not prose). The anti-coral-reef framing also justified the `/speckit-analyze` V1 fix — SC-004 being half-tested was exactly an intended-but-unbuilt gap.
+- **A migration's hard part is the boundary, not the code.** Most of scope-discovery is port-and-generalize of proven modules; the genuinely-new work is one mechanic (per-codebase scoping) + precise IN/ALREADY/OUT bucketing so the audit-orchestration loop isn't re-migrated and audit-barrage isn't re-done.
+- **Settled clarifications make the front-half fast, but the boundary work is where the leverage is** — specify produced a large spec quickly because the operator's decisions were crisp; the value was in keeping HOW (jscpd path, ajv) in research/plan and WHAT (per-codebase default, fail-loud) in FRs.
+
+**Next step (resume here):**
+1. **`/speckit-implement` 010** in a **separate implementation session** on `feature/stack-control` (orchestrator/implementation split). Build order: Setup → Foundational boundary (T004/T005) → US1 (prove per-codebase scoping) → US2–US8 → Polish; `after_implement` governance fires there. Watch T051 (gutted-stub), T080 (cross-installation isolation), T072 (dw-lifecycle untouched).
+2. Reconcile the `project-relative-doc-discovery` subsumption (T078) and promote future-expansion items to the roadmap (T077) as part of completion.
+3. Prior 007/008 next-steps still stand.
