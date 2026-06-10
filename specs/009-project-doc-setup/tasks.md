@@ -70,8 +70,8 @@ Source: `plugins/stack-control/src/…` · Tests: `plugins/stack-control/tests/�
 
 **Goal**: idempotent, non-destructive re-run. **Independent test**: seed partial+content, re-run, assert hash-equality + missing-only-created (quickstart Scenario 2).
 
-- [ ] T022 [P] [US2] RED: `plugins/stack-control/tests/setup/idempotent.test.ts` — pre-existing item content byte-for-byte unchanged (hash equality); partial project completes only the missing items; full re-run is a no-op; report distinguishes created vs already-present (SC-002).
-- [ ] T023 [US2] Enforce the scaffold-missing-only + non-destructive guarantees in `setup.ts`/`scaffold.ts` (skip any existing item; never open-for-write an existing file) → GREEN T022.
+- [X] T022 [P] [US2] RED: `plugins/stack-control/tests/setup/idempotent.test.ts` — pre-existing item content byte-for-byte unchanged (hash equality); partial project completes only the missing items; full re-run is a no-op; report distinguishes created vs already-present (SC-002).
+- [X] T023 [US2] Enforce the scaffold-missing-only + non-destructive guarantees in `setup.ts`/`scaffold.ts` (skip any existing item; never open-for-write an existing file) → GREEN T022.
 
 ---
 
