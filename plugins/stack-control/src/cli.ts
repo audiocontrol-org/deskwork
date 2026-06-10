@@ -25,6 +25,11 @@ import { runInboxCli } from './subcommands/inbox.js';
 import { runBacklogCli } from './subcommands/backlog.js';
 import { runSetupCli } from './subcommands/setup.js';
 import { runCheckClones } from './subcommands/check-clones.js';
+import { runDisposeClone } from './subcommands/dispose-clone.js';
+import { runBatchDispose } from './subcommands/batch-dispose.js';
+import { runRefreshClonesBaseline } from './subcommands/refresh-clones-baseline.js';
+import { runCheckDispositionSurvivor } from './subcommands/check-disposition-survivor.js';
+import { runCheckRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -56,6 +61,12 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   setup: runSetupCli,
   // Scope-discovery: per-codebase clone detection (010 / US1).
   'check-clones': runCheckClones,
+  // Scope-discovery: clone-disposition lifecycle (010 / US2).
+  'dispose-clone': runDisposeClone,
+  'batch-dispose': runBatchDispose,
+  'refresh-clones-baseline': runRefreshClonesBaseline,
+  'check-disposition-survivor': runCheckDispositionSurvivor,
+  'check-refactor-preconditions': runCheckRefactorPreconditions,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

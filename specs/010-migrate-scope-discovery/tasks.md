@@ -67,16 +67,16 @@ description: "Task list — Migrate scope-discovery into stack-control"
 
 **Goal**: disposition clone groups, gate NEW vs baseline, Step 0 refactor preconditions, refresh carries dispositions. **Independent test**: quickstart Scenario 2.
 
-- [ ] T020 [P] [US2] RED: `__tests__/scope-discovery/dispose-clone.test.ts` — keep/ignore dispositions write + persist; `refactor` REFUSED without Step 0a (canonical-side) + Step 0b (tests-proof) (FR-011; SC-005).
-- [ ] T021 [P] [US2] RED: `__tests__/scope-discovery/new-gating.test.ts` — gate-mode surfaces a NEW intra-codebase clone (exit 1); dispositioned groups don't re-trip (FR-012; SC-006).
-- [ ] T022 [P] [US2] RED: `__tests__/scope-discovery/refresh-baseline.test.ts` — refresh carries forward curated dispositions across a pure file rename (FR-013).
-- [ ] T023 [US2] GREEN: port `scope-discovery/clones-yaml.refactor.ts` (Step 0a/0b fields + validation) → T020 GREEN.
-- [ ] T024 [US2] GREEN: port `scope-discovery/dispose-clone.ts` + `check-refactor-preconditions.ts` + `check-refactor-preconditions.runtime.ts` + `refactor-preconditions-prompt.ts` → T020 GREEN.
-- [ ] T025 [US2] GREEN: port `scope-discovery/refresh-clones-baseline.ts` + `check-disposition-survivor.ts` → T021/T022 GREEN.
-- [ ] T026 [US2] GREEN: port `scope-discovery/batch-dispose.ts` SPLIT to ≤500 lines (extract apply/render helper per R4) → bulk-disposition test GREEN (FR-014).
-- [ ] T027 [US2] Add subcommands `dispose-clone`, `batch-dispose`, `refresh-clones-baseline`, `check-disposition-survivor`, `check-refactor-preconditions` in `src/subcommands/` + register in `src/cli.ts`.
-- [ ] T028 [P] [US2] Author the matching `/stack-control:*` skills under `skills/`.
-- [ ] T029 [US2] Integration: drive quickstart Scenario 2 end-to-end.
+- [X] T020 [P] [US2] RED: `__tests__/scope-discovery/dispose-clone.test.ts` — keep/ignore dispositions write + persist; `refactor` REFUSED without Step 0a (canonical-side) + Step 0b (tests-proof) (FR-011; SC-005).
+- [X] T021 [P] [US2] RED: `__tests__/scope-discovery/new-gating.test.ts` — gate-mode surfaces a NEW intra-codebase clone (exit 1); dispositioned groups don't re-trip (FR-012; SC-006).
+- [X] T022 [P] [US2] RED: `__tests__/scope-discovery/refresh-baseline.test.ts` — refresh carries forward curated dispositions across a pure file rename (FR-013).
+- [X] T023 [US2] GREEN: port `scope-discovery/clones-yaml.refactor.ts` (Step 0a/0b fields + validation) → T020 GREEN.
+- [X] T024 [US2] GREEN: port `scope-discovery/dispose-clone.ts` + `check-refactor-preconditions.ts` + `check-refactor-preconditions.runtime.ts` + `refactor-preconditions-prompt.ts` → T020 GREEN.
+- [X] T025 [US2] GREEN: port `scope-discovery/refresh-clones-baseline.ts` + `check-disposition-survivor.ts` → T021/T022 GREEN.
+- [X] T026 [US2] GREEN: port `scope-discovery/batch-dispose.ts` SPLIT to ≤500 lines (extract apply/render helper per R4) → bulk-disposition test GREEN (FR-014).
+- [X] T027 [US2] Add subcommands `dispose-clone`, `batch-dispose`, `refresh-clones-baseline`, `check-disposition-survivor`, `check-refactor-preconditions` in `src/subcommands/` + register in `src/cli.ts`.
+- [X] T028 [P] [US2] Author the matching `/stack-control:*` skills under `skills/`.
+- [X] T029 [US2] Integration: drive quickstart Scenario 2 end-to-end.
 
 **Checkpoint**: the full vendored detector (baseline + dispositions + NEW-gating + Step 0) replaces the `clone-snapshot.sh` stopgap.
 

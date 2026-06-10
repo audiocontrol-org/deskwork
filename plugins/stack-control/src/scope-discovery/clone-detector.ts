@@ -20,7 +20,7 @@
 // 1 one or more NEW groups since the baseline, 2 I/O / parse / engine error.
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import {
   type CloneDiff,
   type CloneGroup,
@@ -33,10 +33,8 @@ import {
 } from './clones-yaml.js';
 import { detectClonesViaJscpd } from './jscpd-runner.js';
 import { resolveCodebaseBoundary, type CodebaseBoundary } from './codebase-boundary.js';
+import { DEFAULT_BASELINE_REL } from './baseline-path.js';
 import { errorMessage, isEnoent } from './util/typeguards.js';
-
-/** Per-codebase baseline, relative to the resolved installation root. */
-const DEFAULT_BASELINE_REL = join('.stack-control', 'scope-discovery', 'clones.yaml');
 
 export interface DetectCodebaseClonesOptions {
   /** Where to start the installation walk-up (default cwd for the CLI). */
