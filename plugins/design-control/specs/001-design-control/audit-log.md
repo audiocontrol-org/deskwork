@@ -662,6 +662,11 @@ channel. Candidate fix: extend the kind vocabulary (74b824cc's `plain`/`url`) wi
 value-policy per attr (e.g. `meta name` restricted to an enumerated set; codepoint-scan
 human-visible value attrs).
 
+**Recurrence (2026-06-10 round 2):** both halves independently re-surfaced — codex
+gpt-5-03 (theme-color, MED) and claude fable5-04 (title-attr glyphs, informational).
+Still parked as backlog TASK-12 per the dampener rewiring; the recurrence count now
+argues for selection.
+
 ### AUDIT-20260610-06 — `integrity` is rejected by axis-1, so the pin's SRI branch is unreachable on any lint-green document
 
 Finding-ID: AUDIT-20260610-06 (fable-04; single-model, behaviorally verified)
@@ -732,3 +737,96 @@ Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (media not constra
 guarantees the kit is *linked*, not *in effect*. Renders as browser-default (not
 polish), so observation only; recorded because it narrows the inertness reasoning's
 stated precondition. No backlog item — informational entries are not work.
+
+**Recurrence + supersession (2026-06-10 round 2):** codex independently re-found the
+channel as gpt-5-04 (MED) — cross-round, cross-model. Superseded-by AUDIT-20260610-13,
+which fixes it (media removed from link's allowlist, ee1537ab).
+
+## 2026-06-10 — lint adversarial barrage ROUND 2 (run 20260610T192041895Z; codex + claude, full fleet)
+
+Triage notes: fired after the round-1 fixes (f068e6af, 0bdccc5c, f9abab31,
+3949b6b1). Every claim verified by executing the real lint before recording.
+Claude additionally ran a grounded-CLEAN sweep (entities, foreign content,
+noscript, second-stylesheet smuggling, font substitution) — all closed in pin
+mode; "pin-mode polish leakage via parser/encoding/namespace channels: none
+found." Round verdict: NOT converged (HIGHs present). Recurrences of parked
+MEDs noted on their entries (AUDIT-05: gpt-5-03 theme-color + fable5-04 title
+glyphs both re-surfaced; still parked as backlog TASK-12).
+
+### AUDIT-20260610-11 — The pin is opt-in at the API level: the unsafe configuration is the default call
+
+Finding-ID: AUDIT-20260610-11 (gpt-5-01 HIGH + fable5-01; cross-model — HIGH-confidence)
+Status:     fixed-2f28003b (2026-06-10; pin REQUIRED at lintWireframe — pin-less call throws; lintWireframeStructural carries the no-guarantee axes; barrage prompt re-aimed at the pinned contract)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (LintOptions.stylesheetPin was optional)
+
+Round-1's axis-1 narrowing (AUDIT-01, f068e6af) reduced the bare-call exposure but
+the residual WAS the API shape: a designed local file named sketch-kit.css passed
+the default invocation green. Both models converged on the contract-level framing
+("the guarantee under audit is about lintWireframe(html), and in its default shape
+that guarantee does not hold"). Fix splits the entry points: guarantee-bearing
+lintWireframe requires the pin and throws without it (no fallbacks);
+lintWireframeStructural is the explicitly non-guarantee filesystem-free form.
+
+### AUDIT-20260610-12 — code+br punctuation rows reconstruct pixel-art imagery after the pre removal
+
+Finding-ID: AUDIT-20260610-12 (gpt-5-02; single-model, behaviorally verified)
+Status:     fixed-a0fb33ca (2026-06-10; axis-2 punctuation-density rule — >=8 non-ws codepoints at >=80% punctuation rejects; bounds the channel, referee stays the text-as-imagery backstop)
+Severity:   high
+Surface:    plugins/design-control/src/lint/codepoint.ts + check-mockup-lofi.ts checkText
+
+The round-1 pre removal closed preserved-whitespace art; gpt-5-02 rebuilt the
+wordmark from dense punctuation rows with br row control (verified ok=true pinned,
+pre-fix). The channel is punctuation MASS — alternation defeats run-detection, so
+the rule is density-shaped, with copy-shaped acceptance fixtures guarding the
+specificity arm.
+
+### AUDIT-20260610-13 — link media mutes the pinned kit (cross-round recurrence of AUDIT-10)
+
+Finding-ID: AUDIT-20260610-13 (gpt-5-04 MED + round-1 fable-07a; cross-round, cross-model)
+Status:     fixed-ee1537ab (2026-06-10; media removed from link's allowlisted attrs)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/allowlist.ts (link attrs)
+
+media="print" passed the pin while the browser never applied the kit on screen —
+green meant LINKED, not IN EFFECT. Two models across two rounds independently
+found the channel; no kind decision makes the attr safe, and wireframes have no
+print-styling use case. Supersedes informational AUDIT-20260610-10.
+
+### AUDIT-20260610-14 — Over-rejection: cache-bust query/fragment on the kit href (axes disagreed)
+
+Finding-ID: AUDIT-20260610-14 (fable5-03; single-model, behaviorally verified)
+Status:     fixed-d2b04dc1 (2026-06-10; pin strips ?# before compare AND read, mirroring axis-1's basename handling)
+Severity:   low
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts
+Direction:  false-positive
+
+`sketch-kit.css?v=2` tripped stylesheet-path-mismatch (resolve kept the suffix)
+while axis-1 accepted the same href. Fixed with a tampered-bytes-through-suffixed-
+href fixture proving the identity check still fires.
+
+### AUDIT-20260610-15 — Over-rejection: Romanian comma-below letters (Latin Extended-B boundary)
+
+Finding-ID: AUDIT-20260610-15 (gpt-5-05; single-model, behaviorally verified)
+Status:     fixed-d2b04dc1 (2026-06-10; enumerated U+0218–U+021B extension; rest of Extended-B stays rejected)
+Severity:   low
+Surface:    plugins/design-control/src/lint/codepoint.ts (accented-Latin allowlist)
+Direction:  false-positive
+
+"Conținut și acțiuni" — genuine lo-fi structural copy — was rejected; Ș/ș/Ț/ț sit
+one block past the Extended-A ceiling. Four-codepoint enumerated extension, not a
+block grant (Ǎ fixture pins the boundary).
+
+### AUDIT-20260610-16 — template-nested stylesheet link trips the axis-1 singleton census (claim weakened on verification)
+
+Finding-ID: AUDIT-20260610-16 (fable5-02)
+Status:     informational
+Severity:   informational
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (walk descends template.content) vs stylesheet-pin.ts (collector does not)
+Direction:  false-positive (claimed)
+
+Verification weakened the claim: the defeating input ALSO trips disallowed-element
+— `template` was never in ALLOWED_TAGS, so no lint-green document can carry one and
+the "legitimate author idiom" premise fails. The axes-disagreement (census counts
+template content the pin's collector ignores) is latent-only on always-rejected
+inputs. Recorded as observation; no code change, no backlog item.
