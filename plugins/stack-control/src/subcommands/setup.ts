@@ -7,7 +7,8 @@
 
 import { existsSync, statSync } from 'node:fs';
 import { dirname, join, resolve as resolvePath } from 'node:path';
-import { findInstallation } from '../config/installation.js';
+import { findInstallation, configPathFor } from '../config/installation.js';
+import { loadInstallationConfig } from '../config/config-loader.js';
 import { resolvePaths } from '../config/resolve-paths.js';
 import { InstallationError } from '../config/errors.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
@@ -25,11 +26,14 @@ import type {
 
 interface SetupArgs {
   readonly at: string;
+  /** True when the operator named --at explicitly; false when `at` is the defaulted cwd. */
+  readonly atExplicit: boolean;
   readonly apply: boolean;
 }
 
 function parseArgs(args: readonly string[]): SetupArgs {
   let at = process.cwd();
+  let atExplicit = false;
   let apply = false;
   for (let i = 0; i < args.length; i++) {
     const token = args[i]!;
@@ -39,22 +43,23 @@ function parseArgs(args: readonly string[]): SetupArgs {
       const value = args[++i];
       if (value === undefined || value.startsWith('--')) failUsage('setup', '--at <dir> required');
       at = resolvePath(value);
+      atExplicit = true;
     } else if (token.startsWith('--')) {
       failUsage('setup', `unknown flag ${token}`);
     } else {
       failUsage('setup', `unexpected positional '${token}'`);
     }
   }
-  return { at, apply };
+  return { at, atExplicit, apply };
 }
 
 export async function runSetupCli(args: string[]): Promise<void> {
-  const { at, apply } = parseArgs(args);
+  const { at, atExplicit, apply } = parseArgs(args);
   if (existsSync(at) && !statSync(at).isDirectory()) {
     failUsage('setup', `--at ${at} is not a directory`);
   }
 
-  const { root, resolved } = resolveTarget(at);
+  const { root, resolved } = resolveTarget(at, atExplicit);
   assertNoNestedInstallationCollision(root, resolved);
   const grammarOpts = grammarOptsForRoot(root);
 
@@ -131,15 +136,33 @@ function nestedInstallationEnclosing(location: string, root: string): string | n
 }
 
 /**
- * Resolve an existing enclosing installation (idempotent re-run), or designate a
- * fresh root at `at` with a default config. A config refusal (escape/collision)
- * exits 2; a malformed existing config exits 1.
+ * Resolve the installation `setup` will operate on.
+ *
+ * - **Explicit `--at <dir>` is authoritative** (AUDIT-20260610-01): the operator
+ *   named the target, so designate the installation rooted at EXACTLY
+ *   `resolvePath(at)` — idempotent re-run when that exact dir already carries its
+ *   own `.stack-control/config.yaml`, fresh creation there otherwise. Never an
+ *   enclosing ancestor (which would silently ignore `--at` and create nothing at
+ *   the named subdir).
+ * - **Defaulted cwd (no `--at`)** preserves the upward-walk: an unqualified
+ *   `setup` in a subdir of an installation operates on that enclosing
+ *   installation (idempotent re-run); only a cwd outside any installation
+ *   designates a fresh root at the cwd.
+ *
+ * A config refusal (escape/collision) exits 2; a malformed existing config exits 1.
  */
-function resolveTarget(at: string): { root: string; resolved: ResolvedPaths } {
+function resolveTarget(at: string, atExplicit: boolean): { root: string; resolved: ResolvedPaths } {
   try {
+    const root = resolvePath(at);
+    if (atExplicit) {
+      // The named dir is the root. Idempotent re-run iff it has its OWN config.
+      const config: InstallationConfig = existsSync(configPathFor(root))
+        ? loadInstallationConfig(configPathFor(root))
+        : { version: 1 };
+      return { root, resolved: resolvePaths(root, config) };
+    }
     const found = findInstallation(at);
     if (found) return { root: found.root, resolved: found.resolved };
-    const root = resolvePath(at);
     const config: InstallationConfig = { version: 1 };
     return { root, resolved: resolvePaths(root, config) };
   } catch (err) {

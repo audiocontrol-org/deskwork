@@ -77,10 +77,10 @@ Source: `plugins/stack-control/src/…` · Tests: `plugins/stack-control/tests/�
 
 ## Phase 5: User Story 3 — Configurable locations (Priority: P1)
 
-**Goal**: each working file relocatable; locations recorded. **Independent test**: custom locations honored + resolved by verbs (quickstart Scenario 3).
+**Goal**: each working file relocatable; the setup report records every resolved location while the config records per-file *overrides* (an unset `paths.<key>` implies the audience-split default — keeping the common config a one-liner, per research.md D3). **Independent test**: custom locations honored + resolved by verbs (quickstart Scenario 3).
 
-- [X] T024 [P] [US3] RED: `plugins/stack-control/tests/setup/configurable.test.ts` — custom per-file location honored + recorded; unset → audience-split default recorded; an existing file at a non-default location is recorded, not duplicated (SC-007, FR-018/019/020).
-- [X] T025 [US3] In `setup.ts`: write/update the installation config with every resolved location; record an existing non-default file's location rather than scaffolding a duplicate → GREEN T024.
+- [X] T024 [P] [US3] RED: `plugins/stack-control/tests/setup/configurable.test.ts` — custom per-file location honored + persisted as an override; unset → no `paths.<key>` written (audience-split default implied) yet reported; an existing file at a non-default location is recorded as an override, not duplicated (SC-007, FR-018/019/020).
+- [X] T025 [US3] In `setup.ts`: report every resolved location and persist per-file *overrides* into the installation config (an unset key implies the default — per D3, defaults are not materialized); record an existing non-default file's location as an override rather than scaffolding a duplicate → GREEN T024.
 
 ---
 

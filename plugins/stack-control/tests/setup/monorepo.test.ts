@@ -5,7 +5,7 @@
 // refused (SC-008, FR-021/022/023/024, quickstart Scenarios 4 + 7).
 
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -70,6 +70,37 @@ describe('setup monorepo isolation (US4)', () => {
     const r = runCli(['setup', '--apply'], { cwd: proj });
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/escape/i);
+  });
+
+  it('explicit --at into a subdir of an existing installation creates a NEW child there, not the parent', () => {
+    // Parent IS an installation.
+    const parent = freshProject();
+    expect(runCli(['setup', '--at', parent, '--apply'], { cwd: parent }).status).toBe(0);
+    expect(existsSync(join(parent, '.stack-control', 'config.yaml'))).toBe(true);
+
+    // Explicit --at into a child subdir, cwd = parent. The named target is
+    // authoritative: a fresh child installation is created at parent/child,
+    // NOT operating on the enclosing parent (AUDIT-20260610-01).
+    const child = join(parent, 'child');
+    mkdirSync(child, { recursive: true });
+    const r = runCli(['setup', '--at', child, '--apply'], { cwd: parent });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain(child);
+
+    // Child has its OWN installation + working files.
+    expect(existsSync(join(child, '.stack-control', 'config.yaml'))).toBe(true);
+    expect(existsSync(join(child, 'ROADMAP.md'))).toBe(true);
+    expect(existsSync(join(child, 'DESIGN-INBOX.md'))).toBe(true);
+
+    // Isolation: a capture in the child reaches the child's inbox, not the parent's.
+    expect(runCli(['inbox', 'capture', 'child-only', '--idea', 'z', '--apply'], { cwd: child }).status).toBe(0);
+    expect(readFileSync(join(child, 'DESIGN-INBOX.md'), 'utf8')).toContain('child-only');
+    expect(readFileSync(join(parent, 'DESIGN-INBOX.md'), 'utf8')).not.toContain('child-only');
+
+    // A verb run in the child then resolves the child (nearest-wins), not the parent.
+    const list = runCli(['inbox', 'list'], { cwd: child });
+    expect(list.status).toBe(0);
+    expect(list.stdout).toContain('child-only');
   });
 
   it('refuses a parent location that reaches into a nested child installation', () => {

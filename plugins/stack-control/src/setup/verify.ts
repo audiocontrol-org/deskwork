@@ -1,7 +1,10 @@
-// Per-key well-formedness verification (009 T012) — the validity oracle is the
-// consuming parser itself (D6): a roadmap/inbox is loaded through the document
-// model; the config through the installation loader; the backlog store by its
-// `config.yml` marker; the program audit log by its header. A malformed item
+// Per-key well-formedness verification (009 T012). Where a strict consuming
+// parser exists, IT is the validity oracle (D6): the config is loaded through
+// the installation loader; a roadmap/inbox through the document model. The
+// backlog store has no parser here — it is verified structurally by its
+// `config.yml` marker. The program audit log likewise has no strict parser
+// (audit logs are regex-read, not parsed), so its oracle is a structural
+// `# Audit Log` header check, not a D6 parser round-trip. A malformed item
 // fails loud, named — never overwritten (FR-009/FR-010). US5 (T029) extends the
 // drift/unresolvable-location handling.
 

@@ -29,7 +29,7 @@ Per-feature audit logs (`specs/<feature>/audit-log.md`) and operation-products (
 
 The config's **presence marks the installation root**. Verbs resolve their working file by walking **up** from the invocation directory to the nearest ancestor with a `.stack-control/config.yaml` (nearest-wins on nesting), then per-file: **override > base dir > audience-split default** (human docs at the root; internal stores under `.stack-control/`).
 
-- **Configurable locations.** Pre-author `.stack-control/config.yaml` with `paths.<key>` overrides to record an existing/custom layout; `setup` fills in only what's missing and records every location.
+- **Configurable locations.** Pre-author `.stack-control/config.yaml` with `paths.<key>` overrides to record an existing/custom layout; `setup` fills in only what's missing. The setup **report** records every resolved location; the **config** records only per-file *overrides* (an unset `paths.<key>` implies the audience-split default), keeping the common config a one-liner (`version: 1`).
 - **Monorepo.** `--at <pkg>` targets a subtree as its own installation. Sibling installations are isolated; a capture in one never reaches another's files.
 - **Auto-on-first-use.** A governed verb inside an installation whose working file is missing scaffolds it (announced, contentless) and proceeds — byte-identical to what `setup` would create. A verb **outside** any installation fails loud directing you here (no bundled-copy fallback).
 

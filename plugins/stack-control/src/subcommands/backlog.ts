@@ -10,9 +10,9 @@
 // import-github (T019), import-slush (T024) wire their handlers in their phases.
 
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { createBacklogBackend, BacklogError } from '../backlog/backend.js';
-import { resolveInstallation } from '../config/installation.js';
+import { resolveInstallationBacklog } from '../backlog/root.js';
 import { InstallationError } from '../config/errors.js';
 import { scaffoldKey } from '../setup/scaffold.js';
 import { CAPTURE_TYPES, isCaptureType, typeLabelStamp } from '../backlog/mappings.js';
@@ -82,16 +82,15 @@ function ensureBacklogProject(): string {
     requireProject(seam);
     return seam;
   }
-  const inst = resolveInstallation(process.cwd());
-  const storeDir = inst.resolved.backlog;
+  const { storeDir, root, resolved } = resolveInstallationBacklog();
   if (!existsSync(join(storeDir, 'config.yml'))) {
-    scaffoldKey('backlog', inst.resolved);
+    scaffoldKey('backlog', resolved);
     process.stdout.write(
       `backlog: scaffolded missing backlog store at ${storeDir} ` +
         `(auto-on-first-use; run \`stackctl setup\` for the full installation)\n`,
     );
   }
-  return dirname(storeDir);
+  return root;
 }
 
 /** One-move capture (US1): stamp project+type labels, create via the adapter.

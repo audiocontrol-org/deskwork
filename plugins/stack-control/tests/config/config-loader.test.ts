@@ -66,6 +66,18 @@ describe('parseInstallationConfig — fail-loud', () => {
     expect(() => parseInstallationConfig('version: "1"\n', LABEL)).toThrow(/version/);
   });
 
+  it('rejects an unsupported future version (2) naming the version', () => {
+    expect(() => parseInstallationConfig('version: 2\n', LABEL)).toThrow(InstallationError);
+    expect(() => parseInstallationConfig('version: 2\n', LABEL)).toThrow(/2/);
+    try {
+      parseInstallationConfig('version: 2\n', LABEL);
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(InstallationError);
+      expect((err as InstallationError).code).toBe('invalid-config');
+    }
+  });
+
   it('rejects an unknown top-level key', () => {
     expect(() =>
       parseInstallationConfig('version: 1\nmystery: true\n', LABEL),

@@ -140,6 +140,13 @@ export async function runInboxCli(args: string[]): Promise<void> {
         emitList(doc, opts);
         return;
     }
+    // Exhaustiveness backstop (AUDIT-20260610-09): the pre-dispatch guard only
+    // rejects subactions ABSENT from SUBACTION_SPECS. A subaction REGISTERED in
+    // SUBACTION_SPECS but missing a `case` above would otherwise fall through and
+    // return exit 0 — a silent no-op. `subaction` is typed `string` (from args[0]),
+    // not a union, so the `never` assignment can't be a compile-time check here;
+    // the runtime fail-loud below restores the loud-failure guarantee.
+    failUsage('inbox', `unhandled subaction '${subaction}' (registered in grammar but no dispatch case)`);
   } catch (err) {
     if (err instanceof InstallationError) {
       process.stderr.write(`inbox: ${err.message}\n`);

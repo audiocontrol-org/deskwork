@@ -13,6 +13,13 @@ import type { InstallationConfig, InstallationPaths } from './types.js';
 
 const FEATURE_PLACEHOLDER = '{feature}';
 
+/**
+ * Currently-supported config schema versions. An unknown future `version`
+ * (e.g. `2`) is a descriptive error, not a silent best-effort v1 parse
+ * (data-model § Validation rules). Adding v2 later is a one-line change here.
+ */
+const SUPPORTED_VERSIONS: ReadonlySet<number> = new Set([1]);
+
 /** Known top-level keys (wire/snake form). Anything else fails loud. */
 const KNOWN_TOP_LEVEL = new Set(['version', 'base_dir', 'paths']);
 
@@ -57,7 +64,7 @@ export function parseInstallationConfig(body: string, sourceLabel: string): Inst
     }
   }
 
-  const version = requirePositiveInteger(parsed['version'], 'version', sourceLabel);
+  const version = requireSupportedVersion(parsed['version'], sourceLabel);
   const config: { version: number; baseDir?: string; paths?: InstallationPaths } = { version };
 
   if (parsed['base_dir'] !== undefined) {
@@ -91,6 +98,18 @@ function parsePaths(raw: unknown, sourceLabel: string): InstallationPaths {
     out[camel] = str;
   }
   return out;
+}
+
+function requireSupportedVersion(value: unknown, sourceLabel: string): number {
+  const version = requirePositiveInteger(value, 'version', sourceLabel);
+  if (!SUPPORTED_VERSIONS.has(version)) {
+    const supported = [...SUPPORTED_VERSIONS].join(', ');
+    throw fail(
+      sourceLabel,
+      `version ${version} is not supported (supported versions: ${supported})`,
+    );
+  }
+  return version;
 }
 
 function requirePositiveInteger(value: unknown, field: string, sourceLabel: string): number {

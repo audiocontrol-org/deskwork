@@ -63,6 +63,16 @@ describe('stackctl setup — fresh project (US1)', () => {
     expect(r.stdout).toMatch(/dry|would/i);
   });
 
+  it('dry-run on a fresh project does not claim items are already present + well-formed', () => {
+    // AUDIT-20260610-04: dry-run fresh must not report "ready: yes (all required
+    // items present + well-formed)" while every item is in the would-create state.
+    const proj = freshProject();
+    const r = runCli(['setup'], { cwd: proj });
+    expect(r.status).toBe(0);
+    expect(r.stdout).not.toContain('all required items present + well-formed');
+    expect(r.stdout).toMatch(/would be ready after/i);
+  });
+
   it('unknown flag / stray positional → exit 2', () => {
     const proj = freshProject();
     expect(runCli(['setup', '--bogus'], { cwd: proj }).status).toBe(2);

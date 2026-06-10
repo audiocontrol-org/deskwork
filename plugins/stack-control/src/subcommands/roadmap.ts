@@ -9,6 +9,7 @@
 
 import { existsSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import type { LoadOptions } from '../document-model/document.js';
 import { DocumentModelError } from '../document-model/types.js';
 import { InstallationError } from '../config/errors.js';
 import { blocks, order } from '../roadmap/graph.js';
@@ -26,7 +27,6 @@ import { loadRoadmap, type RoadmapModel } from '../roadmap/roadmap-model.js';
 import { blockedReport, mermaid, readyList } from '../roadmap/views.js';
 import {
   failUsage,
-  grammarDirs,
   requireMapValue,
   requirePositional,
   scanVerbFlags,
@@ -136,9 +136,9 @@ function addInputFrom(flags: Flags): AddInput {
   };
 }
 
-function emitAdd(flags: Flags): void {
+function emitAdd(flags: Flags, opts: LoadOptions): void {
   const input = addInputFrom(flags);
-  const result = add(flags.doc, input, grammarDirs(), flags.apply);
+  const result = add(flags.doc, input, opts, flags.apply);
   process.stdout.write(
     result.applied
       ? `roadmap add: added ${input.identifier}\n`
@@ -146,31 +146,31 @@ function emitAdd(flags: Flags): void {
   );
 }
 
-function emitAdvance(flags: Flags): void {
+function emitAdvance(flags: Flags, opts: LoadOptions): void {
   const id = requireId(flags, 'advance');
-  const result = advance(flags.doc, id, requireValue(flags, 'to'), grammarDirs(), flags.apply);
+  const result = advance(flags.doc, id, requireValue(flags, 'to'), opts, flags.apply);
   reportMutation(result, 'advance', id);
 }
 
-function emitDecompose(flags: Flags): void {
+function emitDecompose(flags: Flags, opts: LoadOptions): void {
   const id = requireId(flags, 'decompose');
   const into = requireValue(flags, 'into')
     .split(',')
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
-  reportMutation(decompose(flags.doc, id, into, grammarDirs(), flags.apply), 'decompose', id);
+  reportMutation(decompose(flags.doc, id, into, opts, flags.apply), 'decompose', id);
 }
 
-function emitReclassify(flags: Flags): void {
+function emitReclassify(flags: Flags, opts: LoadOptions): void {
   const id = requireId(flags, 'reclassify');
-  const result = reclassify(flags.doc, id, requireValue(flags, 'to'), grammarDirs(), flags.apply);
+  const result = reclassify(flags.doc, id, requireValue(flags, 'to'), opts, flags.apply);
   reportMutation(result, 'reclassify', id);
 }
 
-function emitDefer(flags: Flags): void {
+function emitDefer(flags: Flags, opts: LoadOptions): void {
   const id = requireId(flags, 'defer');
   const change = flags.clear ? { clear: true } : { until: requireValue(flags, 'until') };
-  reportMutation(defer(flags.doc, id, change, grammarDirs(), flags.apply), 'defer', id);
+  reportMutation(defer(flags.doc, id, change, opts, flags.apply), 'defer', id);
 }
 
 /**
@@ -199,15 +199,15 @@ function reconcileBaseDir(docPath: string, globParentDir: string | null): string
   );
 }
 
-function emitReconcile(flags: Flags): void {
+function emitReconcile(flags: Flags, opts: LoadOptions): void {
   // Spec paths resolve relative to wherever the glob-parent dir (e.g. `specs/`)
   // lives, derived from the DOC's location — not the invocation cwd. This makes
   // `roadmap reconcile` correct from any working directory (AUDIT-20260608-15).
-  const model = loadRoadmap(flags.doc, grammarDirs());
+  const model = loadRoadmap(flags.doc, opts);
   const hook = model.doc.grammar.reconciliationHook;
   const globParentDir = hook !== null && hook.kind === 'glob' ? globParent(hook.source) : null;
   const baseDir = reconcileBaseDir(flags.doc, globParentDir);
-  const report = reconcile(flags.doc, grammarDirs(), baseDir);
+  const report = reconcile(flags.doc, opts, baseDir);
   process.stdout.write(`roadmap reconcile (report-only — proposes, never mutates):\n`);
   process.stdout.write(`  status drift: ${report.statusDrift.length}\n`);
   for (const d of report.statusDrift) {
@@ -235,7 +235,7 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
   const scanned = scanFlags(args.slice(1));
   validateSubactionFlags('roadmap', subaction, SUBACTION_SPECS[subaction], scanned);
   try {
-    const { doc } = resolveVerbDoc({
+    const { doc, opts } = resolveVerbDoc({
       key: 'roadmap',
       explicitDoc: scanned.doc === NO_DOC ? null : scanned.doc,
       envSeam: process.env.STACKCTL_ROADMAP_DEFAULT_DOC,
@@ -245,39 +245,46 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
     const flags: Flags = { ...scanned, doc };
     switch (subaction) {
       case 'next':
-        process.stdout.write(readyList(loadRoadmap(flags.doc, grammarDirs())));
+        process.stdout.write(readyList(loadRoadmap(flags.doc, opts)));
         return;
       case 'blocked':
-        process.stdout.write(blockedReport(loadRoadmap(flags.doc, grammarDirs())));
+        process.stdout.write(blockedReport(loadRoadmap(flags.doc, opts)));
         return;
       case 'blocks':
-        emitBlocks(loadRoadmap(flags.doc, grammarDirs()), flags);
+        emitBlocks(loadRoadmap(flags.doc, opts), flags);
         return;
       case 'order':
-        emitOrder(loadRoadmap(flags.doc, grammarDirs()));
+        emitOrder(loadRoadmap(flags.doc, opts));
         return;
       case 'graph':
-        process.stdout.write(mermaid(loadRoadmap(flags.doc, grammarDirs())));
+        process.stdout.write(mermaid(loadRoadmap(flags.doc, opts)));
         return;
       case 'add':
-        emitAdd(flags);
+        emitAdd(flags, opts);
         return;
       case 'advance':
-        emitAdvance(flags);
+        emitAdvance(flags, opts);
         return;
       case 'decompose':
-        emitDecompose(flags);
+        emitDecompose(flags, opts);
         return;
       case 'reclassify':
-        emitReclassify(flags);
+        emitReclassify(flags, opts);
         return;
       case 'defer':
-        emitDefer(flags);
+        emitDefer(flags, opts);
         return;
       case 'reconcile':
-        emitReconcile(flags);
+        emitReconcile(flags, opts);
         return;
     }
+    // Exhaustiveness backstop (AUDIT-20260610-09): the pre-dispatch guard only
+    // rejects subactions ABSENT from SUBACTION_SPECS. A subaction REGISTERED in
+    // SUBACTION_SPECS but missing a `case` above would otherwise fall through and
+    // return exit 0 — a silent no-op. `subaction` is typed `string` (from args[0]),
+    // not a union, so the `never` assignment can't be a compile-time check here;
+    // the runtime fail-loud below restores the loud-failure guarantee.
+    failUsage('roadmap', `unhandled subaction '${subaction}' (registered in grammar but no dispatch case)`);
   } catch (err) {
     if (err instanceof InstallationError) {
       process.stderr.write(`roadmap: ${err.message}\n`);
