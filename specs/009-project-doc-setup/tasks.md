@@ -79,8 +79,8 @@ Source: `plugins/stack-control/src/…` · Tests: `plugins/stack-control/tests/�
 
 **Goal**: each working file relocatable; locations recorded. **Independent test**: custom locations honored + resolved by verbs (quickstart Scenario 3).
 
-- [ ] T024 [P] [US3] RED: `plugins/stack-control/tests/setup/configurable.test.ts` — custom per-file location honored + recorded; unset → audience-split default recorded; an existing file at a non-default location is recorded, not duplicated (SC-007, FR-018/019/020).
-- [ ] T025 [US3] In `setup.ts`: write/update the installation config with every resolved location; record an existing non-default file's location rather than scaffolding a duplicate → GREEN T024.
+- [X] T024 [P] [US3] RED: `plugins/stack-control/tests/setup/configurable.test.ts` — custom per-file location honored + recorded; unset → audience-split default recorded; an existing file at a non-default location is recorded, not duplicated (SC-007, FR-018/019/020).
+- [X] T025 [US3] In `setup.ts`: write/update the installation config with every resolved location; record an existing non-default file's location rather than scaffolding a duplicate → GREEN T024.
 
 ---
 
