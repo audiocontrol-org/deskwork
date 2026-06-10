@@ -166,8 +166,9 @@ function spawnText(
 /**
  * The shared render → barrage → lift → slush → gate chain. Both modes run the
  * full chain (the intended behavior change for implement mode, which previously
- * stopped after lift). The clone-detection step (design doc step 8) is handled
- * separately by the orchestrator and is intentionally NOT invoked here.
+ * stopped after lift). The per-codebase clone-detection step (US7 / FR-032) runs
+ * in implement mode from `subcommands/govern.ts` (see govern/clone-step.ts),
+ * before this gate chain — it is advisory and does not affect the gate verdict.
  */
 export function runProtocol(args: RunProtocolArgs): ProtocolResult {
   const work = mkdtempSync(join(tmpdir(), 'govern.'));

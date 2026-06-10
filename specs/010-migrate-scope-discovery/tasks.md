@@ -151,9 +151,9 @@ description: "Task list — Migrate scope-discovery into stack-control"
 
 **Goal**: `govern --mode implement` runs the per-codebase clone step; TODO placeholder gone. **Independent test**: quickstart Scenario 7.
 
-- [ ] T066 [P] [US7] RED: `__tests__/scope-discovery/govern-clone-step.test.ts` — implement-mode govern over a diff with a NEW intra-codebase clone surfaces it; no TODO remains (FR-032; SC-011).
-- [ ] T067 [US7] GREEN: wire the clone-detection step into `src/subcommands/govern.ts` + `src/govern/protocol.ts` (replace the TODO), calling the per-codebase `check-clones` from Phase 3 → T066 GREEN.
-- [ ] T068 [US7] Integration: drive quickstart Scenario 7 end-to-end.
+- [X] T066 [P] [US7] RED: `__tests__/scope-discovery/govern-clone-step.test.ts` — implement-mode govern over a diff with a NEW intra-codebase clone surfaces it; no TODO remains (FR-032; SC-011).
+- [X] T067 [US7] GREEN: wire the clone-detection step into `src/subcommands/govern.ts` + `src/govern/protocol.ts` (replace the TODO), calling the per-codebase `check-clones` from Phase 3 → T066 GREEN.
+- [X] T068 [US7] Integration: drive quickstart Scenario 7 end-to-end.
 
 ---
 

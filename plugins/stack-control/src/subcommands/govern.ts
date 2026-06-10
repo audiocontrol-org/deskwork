@@ -20,9 +20,9 @@
  * fatal (usage error / capability or payload FATAL). govern does NOT re-derive
  * policy; it obeys the boolean the gate prints on stdout.
  *
- * NOTE (design doc step 8): the clone-detection step is handled separately by
- * the orchestrator. It is intentionally NOT invoked here — no placeholder, no
- * fallback; simply omitted.
+ * Implement-mode also runs the per-codebase clone-detection step (US7 / FR-032):
+ * it surfaces NEW intra-codebase duplication introduced by the governed change,
+ * advisory alongside the convergence-gate verdict. See govern/clone-step.ts.
  */
 
 import { existsSync } from 'node:fs';
@@ -47,6 +47,7 @@ import {
   SPEC_AUDIT_LENS,
   SPEC_ARTIFACT_FRAMING,
 } from '../govern/payload-spec.js';
+import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { readFileSync } from 'node:fs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -283,6 +284,13 @@ export async function runGovern(args: string[]): Promise<void> {
       flags.mode === 'spec'
         ? buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint)
         : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint);
+
+    // US7 (FR-032): implement-mode governance runs the per-codebase clone step,
+    // surfacing NEW intra-codebase duplication alongside the gate verdict
+    // (advisory — does not override the convergence gate, #432).
+    if (flags.mode === 'implement') {
+      await runCloneDetectionStep({ repoRoot, write: (s) => process.stderr.write(s) });
+    }
 
     const noSlush = flags.noSlush || process.env.GOVERN_NO_SLUSH === '1';
     const result = runProtocol({
