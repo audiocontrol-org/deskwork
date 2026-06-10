@@ -120,8 +120,12 @@ export function formatCodepoint(cp: number): string {
 export const PUNCT_DENSITY_MIN_LENGTH = 8;
 export const PUNCT_DENSITY_RATIO = 0.8;
 
-/** True iff `text` trips the punctuation-density imagery gate. */
-export function isPunctuationDense(text: string): boolean {
+/**
+ * Punctuation ratio of `text`'s non-whitespace codepoints (0 for empty). Used
+ * by the density gate and by the sibling-run accumulator (AUDIT-20260610-22),
+ * which needs the ratio WITHOUT the length floor.
+ */
+export function punctuationRatio(text: string): number {
   let total = 0;
   let punct = 0;
   for (const char of text.normalize('NFC')) {
@@ -130,5 +134,22 @@ export function isPunctuationDense(text: string): boolean {
     total += 1;
     if (isAsciiPunctuation(cp) || TYPOGRAPHIC_PUNCT.has(cp)) punct += 1;
   }
-  return total >= PUNCT_DENSITY_MIN_LENGTH && punct / total >= PUNCT_DENSITY_RATIO;
+  return total === 0 ? 0 : punct / total;
+}
+
+/** Non-whitespace codepoint count of `text`. */
+function nonWhitespaceLength(text: string): number {
+  let total = 0;
+  for (const char of text.normalize('NFC')) {
+    if (!WHITESPACE.has(char.codePointAt(0)!)) total += 1;
+  }
+  return total;
+}
+
+/** True iff `text` trips the punctuation-density imagery gate. */
+export function isPunctuationDense(text: string): boolean {
+  return (
+    nonWhitespaceLength(text) >= PUNCT_DENSITY_MIN_LENGTH &&
+    punctuationRatio(text) >= PUNCT_DENSITY_RATIO
+  );
 }

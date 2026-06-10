@@ -228,6 +228,44 @@ describe('lintWireframe — punctuation-density imagery channel (AUDIT-20260610-
       expect(rules(wrap(html))).not.toContain('punctuation-density');
     });
 
+    // AUDIT-20260610-21 (round-5 gpt-5-codex-02, MED): the AUDIT-19 fix
+    // codepoint-scanned title/aria values but did not density-scan them — a
+    // tooltip carried the punctuation logo. Visible attr values get BOTH gates.
+    it('rejects punctuation art in a title tooltip (round-5 defeating input)', () => {
+      expect(
+        rules(wrap(`<button type="button" class="sk-btn" title="###..###..#####&#10;#..##..#..#....">Hover</button>`)),
+      ).toContain('punctuation-density');
+    });
+
+    it('accepts an ordinary punctuation-bearing title', () => {
+      expect(rules(wrap(`<div title="(see notes, p. 4–7)">x</div>`))).not.toContain(
+        'punctuation-density',
+      );
+    });
+
+    // AUDIT-20260610-22 (round-5 gpt-5-codex-03, HIGH): stacked sibling blocks
+    // each below the per-node floor (7-char rows) with the parent diluted by
+    // prose — the rows reassemble vertically. Consecutive density-shaped
+    // sibling blocks are aggregated as a RUN and the floor applies to the run.
+    it('rejects stacked sibling p-rows below the per-block floor (round-5 defeating input)', () => {
+      const art =
+        `<h1>Product dashboard overview</h1>` +
+        `<p>#.....#</p><p>#.....#</p><p>#######</p><p>#.....#</p><p>#.....#</p>`;
+      expect(rules(wrap(art))).toContain('punctuation-density');
+    });
+
+    it('prose siblings break the run (no false positive on interleaved copy)', () => {
+      const html =
+        `<p>#..#</p><p>Quarterly totals are shown per region.</p><p>#..#</p>`;
+      expect(rules(wrap(html))).not.toContain('punctuation-density');
+    });
+
+    it('a short placeholder-dash list stays green (run below the floor)', () => {
+      expect(rules(wrap(`<ul><li>—</li><li>—</li><li>—</li></ul>`))).not.toContain(
+        'punctuation-density',
+      );
+    });
+
     // AUDIT-20260610-18 (round-4 gpt-5-codex-01, HIGH) — DOCUMENTED BOUNDARY,
     // not a closure: a LETTER mosaic (one allowlisted letter per table cell,
     // 0% punctuation) renders a wordmark the density gate structurally cannot

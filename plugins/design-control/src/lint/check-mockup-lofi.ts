@@ -43,7 +43,13 @@ export type { LintRule, LintFinding, LintResult } from '@/lint/types';
 
 import type { LintFinding, LintResult } from '@/lint/types';
 import { checkStylesheetIdentity, type StylesheetPin } from '@/lint/stylesheet-pin';
-import { findDisallowedCodepoints, formatCodepoint, isPunctuationDense } from '@/lint/codepoint';
+import {
+  findDisallowedCodepoints,
+  formatCodepoint,
+  isPunctuationDense,
+  punctuationRatio,
+  PUNCT_DENSITY_RATIO,
+} from '@/lint/codepoint';
 import { SKETCH_KIT_STYLESHEET_FILENAME } from '@/wireframe-kit/sketch-kit';
 
 type AnyNode = DefaultTreeAdapterMap['node'];
@@ -176,6 +182,16 @@ function checkElement(el: Element, ctx: WalkContext): void {
           message: `disallowed codepoint ${formatCodepoint(codepoint)} (${JSON.stringify(char)}) in ${attr} on <${tag}> — visible attribute values follow the lo-fi codepoint allowlist`,
         });
       }
+      // Visible attr values get the density gate too (AUDIT-20260610-21):
+      // a tooltip is a hover-rendered surface for the same punctuation art.
+      if (isPunctuationDense(value)) {
+        findings.push({
+          rule: 'punctuation-density',
+          tag,
+          attr,
+          message: `${attr} on <${tag}> is punctuation-dense (imagery-shaped) — tooltip/announced text follows the same anti-art gate as text content`,
+        });
+      }
     }
     // `meta name` is an enumerated set (AUDIT-20260610-19): theme-color /
     // color-scheme are visual channels carried by NAME.
@@ -222,6 +238,37 @@ function checkElement(el: Element, ctx: WalkContext): void {
       tag,
       message: `aggregate text of <${tag}> is punctuation-dense (imagery-shaped, not copy-shaped) — sharded pixel/ASCII-art channels are rejected; use the .sk-img placeholder for image regions`,
     });
+  }
+
+  // Sibling-RUN density (AUDIT-20260610-22, round-5): stacked sibling blocks
+  // each below the per-node floor (7-char rows) reassemble vertically while a
+  // prose sibling dilutes the parent aggregate. Consecutive density-shaped
+  // element children (punctuation ratio >= the gate's ratio, any length) are
+  // accumulated as a run; the length floor applies to the run's combined text.
+  // A prose sibling breaks the run, so interleaved copy stays green.
+  if (DENSITY_BLOCK_TAGS.has(tag)) {
+    let run = '';
+    const flush = (): void => {
+      if (run !== '' && isPunctuationDense(run)) {
+        findings.push({
+          rule: 'punctuation-density',
+          tag,
+          message: `a run of consecutive punctuation-dense child blocks of <${tag}> is imagery-shaped (stacked pixel/ASCII-art rows) — use the .sk-img placeholder for image regions`,
+        });
+      }
+      run = '';
+    };
+    for (const child of el.childNodes) {
+      if (!ta.isElementNode(child)) continue;
+      const text = aggregateText(child);
+      const trimmed = text.replace(/[\s]/g, '');
+      if (trimmed.length > 0 && punctuationRatio(text) >= PUNCT_DENSITY_RATIO) {
+        run += text;
+      } else if (trimmed.length > 0) {
+        flush();
+      }
+    }
+    flush();
   }
 
   // Only the pinned sketch-kit stylesheet link is permitted. The rel token set
