@@ -65,7 +65,12 @@ export interface StylesheetPin {
    * system stack (no foreign bytes load); a designed font planted at the path
    * is present-but-different and is caught.
    */
-  readonly expectedFonts: ReadonlyArray<{ readonly file: string; readonly sha256: string }>;
+  readonly expectedFonts: ReadonlyArray<{
+    readonly file: string;
+    readonly sha256: string;
+    /** Theme class whose `@font-face` loads this file (AUDIT-20260610-23). */
+    readonly theme: string;
+  }>;
 }
 
 /** SRI-format digest of stylesheet bytes (`<algo>-<base64>`); defaults to sha256. */
@@ -95,6 +100,7 @@ export function buildSketchKitPin(baseDir: string, canonicalPath?: string): Styl
     expectedFonts: SKETCH_KIT_FONTS.map((font) => ({
       file: font.file,
       sha256: hashStylesheet(readFileSync(join(SKETCH_KIT_DIR, font.file)), 'sha256'),
+      theme: font.theme,
     })),
   };
 }
@@ -115,6 +121,21 @@ function normalizeSriToken(token: string): string {
 interface StylesheetLink {
   readonly href: string;
   readonly integrity: string | undefined;
+}
+
+/** Collect every `sk-theme-*` class token used anywhere in the document. */
+function collectThemeClasses(node: AnyNode, out: Set<string>): void {
+  if (ta.isElementNode(node)) {
+    const classValue = ta.getAttrList(node).find((a) => a.name.toLowerCase() === 'class')?.value;
+    if (classValue) {
+      for (const token of classValue.split(/\s+/)) {
+        if (token.startsWith('sk-theme-')) out.add(token);
+      }
+    }
+  }
+  if ('childNodes' in node) {
+    for (const child of node.childNodes) collectThemeClasses(child, out);
+  }
 }
 
 function collectStylesheetLinks(node: AnyNode, out: StylesheetLink[]): void {
@@ -226,14 +247,26 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
     }
   }
 
-  // Transitive font pinning (AUDIT-20260610-03): the pinned CSS names the kit's
-  // @font-face files; any file PRESENT at one of those baseDir-relative paths
-  // must carry the shipped kit's bytes. Absent files are clean (the browser
-  // falls back; no foreign bytes load) — a swapped designed font is
-  // present-but-different and is rejected here.
+  // Transitive font pinning (AUDIT-20260610-03 + -23): the pinned CSS names
+  // the kit's @font-face files; any file PRESENT at one of those
+  // baseDir-relative paths must carry the shipped kit's bytes (a swapped
+  // designed font is present-but-different and rejected). An ABSENT file is
+  // clean ONLY when no theme the document uses requires it — for a used
+  // font-bearing theme, absence falls through to local system designed fonts
+  // (cursive/handwriting stacks; round-5 gpt-5-codex-01), so it is flagged.
+  const usedThemes = new Set<string>();
+  collectThemeClasses(parse(html), usedThemes);
   for (const font of pin.expectedFonts) {
     const fontPath = resolve(pin.baseDir, font.file);
-    if (!existsSync(fontPath)) continue;
+    if (!existsSync(fontPath)) {
+      if (usedThemes.has(font.theme)) {
+        findings.push({
+          rule: 'font-missing',
+          message: `kit font ${font.file} is missing but the document uses ${font.theme} — the browser would fall back to unpinned local designed fonts; ship the kit's fonts/ alongside the stylesheet`,
+        });
+      }
+      continue;
+    }
     const actual = hashStylesheet(readFileSync(fontPath), 'sha256');
     if (actual !== font.sha256) {
       findings.push({

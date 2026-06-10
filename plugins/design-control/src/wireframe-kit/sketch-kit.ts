@@ -69,6 +69,13 @@ export interface SketchKitFont {
   readonly file: string;
   /** Path to the OFL license text, relative to {@link SKETCH_KIT_DIR}. */
   readonly license: string;
+  /**
+   * The theme whose `@font-face` loads this file (AUDIT-20260610-23): a
+   * document using this theme with the font ABSENT falls through to local
+   * system designed fonts (cursive/handwriting stacks), so the identity pin
+   * requires the file to be present when the theme is used.
+   */
+  readonly theme: SketchKitTheme;
 }
 
 /**
@@ -82,18 +89,21 @@ export const SKETCH_KIT_FONTS: readonly SketchKitFont[] = [
     weight: 400,
     file: 'fonts/patrick-hand-400.woff2',
     license: 'fonts/patrick-hand.OFL.txt',
+    theme: 'sk-theme-marker',
   },
   {
     family: 'Space Mono',
     weight: 400,
     file: 'fonts/space-mono-400.woff2',
     license: 'fonts/space-mono.OFL.txt',
+    theme: 'sk-theme-blueprint',
   },
   {
     family: 'Space Mono',
     weight: 700,
     file: 'fonts/space-mono-700.woff2',
     license: 'fonts/space-mono.OFL.txt',
+    theme: 'sk-theme-blueprint',
   },
 ];
 

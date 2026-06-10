@@ -283,6 +283,41 @@ describe('checkStylesheetIdentity — transitive font pinning (AUDIT-20260610-03
     expect(checkStylesheetIdentity(kitHtml, pin)).toEqual([]);
   });
 
+  // AUDIT-20260610-23 (round-5 gpt-5-codex-01, HIGH): ABSENT fonts are not
+  // unconditionally clean — a font-bearing theme (sk-theme-marker) with its
+  // woff2 missing falls through to local system handwriting fonts (Bradley
+  // Hand / Comic Sans / cursive), making typography depend on unpinned
+  // designed fonts under a green pin. Absent stays clean ONLY when no used
+  // theme requires the font.
+  it('flags a missing font when the document uses the theme that requires it', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css"></head>` +
+      `<body class="sk sk-theme-marker"><div class="sk-shell">x</div></body></html>`;
+    expect(rules(checkStylesheetIdentity(html, pin))).toContain('font-missing');
+  });
+
+  it('absent fonts stay clean for a theme that bundles none (grayscale)', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    expect(checkStylesheetIdentity(kitHtml, pin)).toEqual([]);
+  });
+
+  it('a present genuine font satisfies its theme (other themes’ fonts not demanded)', () => {
+    const dir = freshDir();
+    mkdirSync(join(dir, 'fonts'), { recursive: true });
+    const marker = SKETCH_KIT_FONTS.find((f) => f.file.includes('patrick-hand'))!;
+    copyFileSync(join(SKETCH_KIT_DIR, marker.file), join(dir, marker.file));
+    const pin = buildSketchKitPin(dir);
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css"></head>` +
+      `<body class="sk sk-theme-marker"><div class="sk-shell">x</div></body></html>`;
+    expect(checkStylesheetIdentity(html, pin)).toEqual([]);
+  });
+
   it('a tampered woff2 at a kit font path is rejected (the gpt-5-01 swap)', () => {
     const dir = freshDir();
     mkdirSync(join(dir, 'fonts'), { recursive: true });

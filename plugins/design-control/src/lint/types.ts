@@ -27,7 +27,8 @@ export type LintRule =
   | 'stylesheet-unresolvable'
   | 'stylesheet-hash-mismatch'
   | 'stylesheet-sri-mismatch'
-  | 'font-hash-mismatch';
+  | 'font-hash-mismatch'
+  | 'font-missing';
 
 export interface LintFinding {
   readonly rule: LintRule;
