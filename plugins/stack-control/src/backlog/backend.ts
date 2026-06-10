@@ -42,6 +42,16 @@ export interface CaptureSpec {
   readonly priority?: 'high' | 'medium' | 'low';
 }
 
+/** Additive, field-preserving mutations for `edit` (012, D6). Both are append /
+ * add operations — no read-modify-write, so concurrent edits are never clobbered
+ * (FR-013). */
+export interface EditSpec {
+  /** Add a label additively (existing labels preserved). */
+  readonly addLabel?: string;
+  /** Append a line to the task's implementation notes (existing body preserved). */
+  readonly appendNotes?: string;
+}
+
 export interface BacklogBackend {
   /** Create one item via the real binary; returns the assigned id (e.g. TASK-1). */
   create(spec: CaptureSpec): string;
@@ -49,6 +59,9 @@ export interface BacklogBackend {
   list(): readonly BacklogItem[];
   /** Whether any item already carries `ref` (import idempotency). */
   exists(ref: string): boolean;
+  /** Additively edit an existing item (add a label / append notes). Shells the
+   * real binary; a non-zero exit (e.g. unknown id) throws BacklogError (D6). */
+  edit(id: string, spec: EditSpec): void;
 }
 
 export interface BacklogBackendOptions {
@@ -170,6 +183,14 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
 
     exists(ref: string): boolean {
       return listItems().some((i) => i.refs.includes(ref));
+    },
+
+    edit(id: string, spec: EditSpec): void {
+      const args = ['task', 'edit', id];
+      if (spec.addLabel !== undefined) args.push('--add-label', spec.addLabel);
+      if (spec.appendNotes !== undefined) args.push('--append-notes', spec.appendNotes);
+      args.push('--plain');
+      run(args); // non-zero (e.g. unknown id) → BacklogError, never a silent no-op
     },
   };
 }
