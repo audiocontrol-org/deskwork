@@ -27,9 +27,9 @@ This feature **consumes** 009's `src/config/{installation,resolve-paths,config-l
 
 ## Phase 1: Setup (config extension)
 
-- [ ] T001 [P] Extend `plugins/stack-control/src/config/types.ts` — add `journal | tooling_feedback | clone_scope` to the `WorkingFileKey` union and the corresponding `journal` / `toolingFeedback` / `cloneScope` fields to `ResolvedPaths` (types only, per data-model.md §1).
-- [ ] T002 [P] Extend `plugins/stack-control/schema/stackctl-config.yaml.schema.json` — add `paths.{journal,tooling_feedback,clone_scope}` (optional strings, `additionalProperties: false` preserved), per `contracts/session-config-extension.md`.
-- [ ] T003 [P] Add audience-split defaults for the three keys to `plugins/stack-control/src/config/resolve-paths.ts` default map: `journal` → root `DEVELOPMENT-NOTES.md`, `tooling_feedback` → root `tooling-feedback.md`, `clone_scope` → root `.` (dir). No change to the resolver/precedence algorithm.
+- [X] T001 [P] Extend `plugins/stack-control/src/config/types.ts` — add `journal | tooling_feedback | clone_scope` to the `WorkingFileKey` union and the corresponding `journal` / `toolingFeedback` / `cloneScope` fields to `ResolvedPaths` (types only, per data-model.md §1).
+- [X] T002 [P] Extend `plugins/stack-control/schema/stackctl-config.yaml.schema.json` — add `paths.{journal,tooling_feedback,clone_scope}` (optional strings, `additionalProperties: false` preserved), per `contracts/session-config-extension.md`.
+- [X] T003 [P] Add audience-split defaults for the three keys to `plugins/stack-control/src/config/resolve-paths.ts` default map: `journal` → root `DEVELOPMENT-NOTES.md`, `tooling_feedback` → root `tooling-feedback.md`, `clone_scope` → root `.` (dir). No change to the resolver/precedence algorithm.
 
 ---
 
@@ -37,8 +37,8 @@ This feature **consumes** 009's `src/config/{installation,resolve-paths,config-l
 
 > Both branch-staleness (US4) and the journal boundary + commit/push (US2) sit on git. Build RED-first; extend the existing `src/repo.ts` rather than a second git layer (plan Structure Decision).
 
-- [ ] T004 [P] RED: `plugins/stack-control/tests/session/git.test.ts` — `resolveBase()` returns the configured upstream when set, else the repo default branch, else `undeterminable`; `aheadBehind(base)` returns the behind count; detached HEAD / no-upstream-no-default → `undeterminable`; `sessionBoundary(--since?)` resolves explicit → merge-base-with-base → `HEAD~N`.
-- [ ] T005 Implement the git helpers in `plugins/stack-control/src/session/git.ts` (re-exporting/reusing `src/repo.ts` `execSync` precedent): `resolveBase`, `aheadBehind`, `sessionBoundary` → GREEN T004.
+- [X] T004 [P] RED: `plugins/stack-control/tests/session/git.test.ts` — `resolveBase()` returns the configured upstream when set, else the repo default branch, else `undeterminable`; `aheadBehind(base)` returns the behind count; detached HEAD / no-upstream-no-default → `undeterminable`; `sessionBoundary(--since?)` resolves explicit → merge-base-with-base → `HEAD~N`.
+- [X] T005 Implement the git helpers in `plugins/stack-control/src/session/git.ts` (re-exporting/reusing `src/repo.ts` `execSync` precedent): `resolveBase`, `aheadBehind`, `sessionBoundary` → GREEN T004.
 
 **Checkpoint**: base resolution + ahead/behind + session-boundary SHA available to US2/US4.
 
@@ -49,15 +49,15 @@ This feature **consumes** 009's `src/config/{installation,resolve-paths,config-l
 **Goal**: `stackctl session-start` resolves the installation, reports roadmap + active-spec chain position + latest journal + open backlog, and STOPS (read-only). No staleness yet (US4) and cwd-resolved only (US3 adds `--at`).
 **Independent test**: configured installation with roadmap + active spec + prior journal → `session-start` reports all four and takes no action (quickstart Scenarios 1–3).
 
-- [ ] T006 [P] [US1] RED: `plugins/stack-control/tests/session/chain-position.test.ts` — present-artifact-set → next `/speckit-*` step (plan-no-tasks → tasks; tasks → analyze/implement); missing `.specify/feature.json` → `null`; partial chain inferred (FR-003/FR-005).
-- [ ] T007 [P] [US1] RED: `plugins/stack-control/tests/session/orient.test.ts` — assembles roadmap ready/blocked (006 reasoner), latest journal entry, and open backlog items (008 `list()`), all read through the resolved config paths; **asserts no GitHub-issue query** (FR-001).
-- [ ] T008 [P] [US1] RED: `plugins/stack-control/tests/session/start-readonly.test.ts` — `session-start` produces 0 on-disk changes (SC-008); re-run identical; STOP (invokes no `/speckit-*` step, FR-002/FR-021); fails loud (exit 1) when run outside any installation (FR-014).
-- [ ] T009 [US1] Implement `plugins/stack-control/src/session/chain-position.ts` (pure: read `.specify/feature.json`, inspect artifact set, infer next step) → GREEN T006.
-- [ ] T010 [US1] Implement `plugins/stack-control/src/session/orient.ts` (compose roadmap reasoner + backlog `list()` + latest-journal read; all via `resolvePaths`) → GREEN T007.
-- [ ] T011 [US1] Implement `plugins/stack-control/src/session/report.ts` (render `OrientationReport`; staleness slot omitted until US4; `--json` shape).
-- [ ] T012 [US1] Implement `plugins/stack-control/src/subcommands/session-start.ts` — `runSessionStartCli`: `resolveInstallation(cwd)`, orient, report, read-only, fail-loud outside installation, exit 0/1/2 (contracts/session-start-cli.md) → GREEN T008.
-- [ ] T013 [US1] Register `session-start: runSessionStartCli` in `plugins/stack-control/src/cli.ts` SUBCOMMANDS.
-- [ ] T014 [US1] Create `plugins/stack-control/skills/session-start/SKILL.md` — thin adapter over the CLI (when to run; report-and-stop discipline; CLI-first note).
+- [X] T006 [P] [US1] RED: `plugins/stack-control/tests/session/chain-position.test.ts` — present-artifact-set → next `/speckit-*` step (plan-no-tasks → tasks; tasks → analyze/implement); missing `.specify/feature.json` → `null`; partial chain inferred (FR-003/FR-005).
+- [X] T007 [P] [US1] RED: `plugins/stack-control/tests/session/orient.test.ts` — assembles roadmap ready/blocked (006 reasoner), latest journal entry, and open backlog items (008 `list()`), all read through the resolved config paths; **asserts no GitHub-issue query** (FR-001).
+- [X] T008 [P] [US1] RED: `plugins/stack-control/tests/session/start-readonly.test.ts` — `session-start` produces 0 on-disk changes (SC-008); re-run identical; STOP (invokes no `/speckit-*` step, FR-002/FR-021); fails loud (exit 1) when run outside any installation (FR-014).
+- [X] T009 [US1] Implement `plugins/stack-control/src/session/chain-position.ts` (pure: read `.specify/feature.json`, inspect artifact set, infer next step) → GREEN T006.
+- [X] T010 [US1] Implement `plugins/stack-control/src/session/orient.ts` (compose roadmap reasoner + backlog `list()` + latest-journal read; all via `resolvePaths`) → GREEN T007.
+- [X] T011 [US1] Implement `plugins/stack-control/src/session/report.ts` (render `OrientationReport`; staleness slot omitted until US4; `--json` shape).
+- [X] T012 [US1] Implement `plugins/stack-control/src/subcommands/session-start.ts` — `runSessionStartCli`: `resolveInstallation(cwd)`, orient, report, read-only, fail-loud outside installation, exit 0/1/2 (contracts/session-start-cli.md) → GREEN T008.
+- [X] T013 [US1] Register `session-start: runSessionStartCli` in `plugins/stack-control/src/cli.ts` SUBCOMMANDS.
+- [X] T014 [US1] Create `plugins/stack-control/skills/session-start/SKILL.md` — thin adapter over the CLI (when to run; report-and-stop discipline; CLI-first note).
 
 **Checkpoint**: US1 independently testable — a fresh agent is oriented and stops. **This is the MVP.**
 

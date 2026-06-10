@@ -46,6 +46,7 @@ import { runScopeDoctor } from './subcommands/scope-doctor.js';
 import { runCustomize } from './subcommands/customize.js';
 import { runScopeInventory } from './subcommands/scope-inventory.js';
 import { runScopeWiden } from './subcommands/scope-widen.js';
+import { runSessionStartCli } from './subcommands/session-start.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -104,6 +105,8 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // Scope-discovery: upfront surface discovery + mid-impl widening (010 / US3).
   'scope-inventory': runScopeInventory,
   'scope-widen': runScopeWiden,
+  // Native session lifecycle skills (011 / session-skills).
+  'session-start': runSessionStartCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
