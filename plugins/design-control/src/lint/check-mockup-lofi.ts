@@ -170,11 +170,13 @@ function checkElement(el: Element, ctx: WalkContext): void {
       continue;
     }
     // Human-visible attribute VALUES pass the codepoint allowlist
-    // (AUDIT-20260610-19): `title` renders as a tooltip and `aria-*` is
-    // announced/displayable — the designed-glyph channel axis-2 closes for
-    // text nodes must not survive in attributes the operator can see.
-    // class/id stay value-unconstrained (inert under the pin, round-8).
-    if (attr === 'title' || attr.startsWith('aria-')) {
+    // (AUDIT-20260610-19; placeholder/value added by -25): `title` renders as
+    // a tooltip, `aria-*` is announced/displayable, `placeholder` renders in
+    // the empty field, and `value` renders as the control's label/content —
+    // the designed-glyph channel axis-2 closes for text nodes must not
+    // survive in attributes the operator can see. class/id stay
+    // value-unconstrained (inert under the pin, round-8).
+    if (attr === 'title' || attr === 'placeholder' || attr === 'value' || attr.startsWith('aria-')) {
       for (const { codepoint, char } of findDisallowedCodepoints(value)) {
         findings.push({
           rule: 'disallowed-codepoint',

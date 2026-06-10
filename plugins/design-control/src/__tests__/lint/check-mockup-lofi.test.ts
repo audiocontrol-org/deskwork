@@ -227,6 +227,28 @@ describe('check-mockup-lofi — native form flow (AUDIT-20260610-24)', () => {
   it('rejects a src attribute on input via the allowlist catch-all', () => {
     expect(rules(wrap(`<input type="text" src="x.png">`))).toContain('disallowed-attribute');
   });
+
+  // AUDIT-20260610-25 (round-6 gpt-5-codex-01, HIGH): input placeholder/value
+  // are RENDERED text (the field shows the placeholder; the submit button shows
+  // the value) — they get the same codepoint + density gates as title/aria.
+  it('rejects designed glyphs in a placeholder (round-6 defeating input)', () => {
+    expect(rules(wrap(`<input type="text" placeholder="𝐏𝐫𝐞𝐦𝐢𝐮𝐦 brand search">`))).toContain(
+      'disallowed-codepoint',
+    );
+  });
+  it('rejects emoji in a submit value', () => {
+    expect(rules(wrap(`<input type="submit" value="🎉 Launch">`))).toContain(
+      'disallowed-codepoint',
+    );
+  });
+  it('rejects punctuation art in a placeholder (density gate applies)', () => {
+    expect(rules(wrap(`<input type="text" placeholder="###..###..#####">`))).toContain(
+      'punctuation-density',
+    );
+  });
+  it('accepts ordinary placeholder/value copy', () => {
+    expect(rules(wrap(`<input type="search" placeholder="Search entries…" value="draft">`))).toEqual([]);
+  });
 });
 
 // AUDIT-20260610-19 (round-4 gpt-5-codex-02 MED; third surfacing of the
