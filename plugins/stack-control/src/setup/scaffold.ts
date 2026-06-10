@@ -10,7 +10,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { WORKING_FILE_KEYS } from '../config/keys.js';
-import type { ResolvedPaths, WorkingFileKey } from '../config/types.js';
+import type { ResolvedPaths, ScaffoldedKey } from '../config/types.js';
 
 /** Scaffold order: config first (creates .stack-control), then the rest. */
 export const MANAGED_KEYS = WORKING_FILE_KEYS;
@@ -69,7 +69,7 @@ export function backlogConfigYml(): string {
 }
 
 export interface ScaffoldOutcome {
-  readonly key: WorkingFileKey;
+  readonly key: ScaffoldedKey;
   readonly location: string;
   readonly created: boolean;
 }
@@ -78,13 +78,13 @@ export interface ScaffoldOutcome {
  * The target whose existence marks `key` as already-present. For the backlog the
  * marker is `config.yml` inside the store dir (the dir alone is not enough).
  */
-export function targetExists(key: WorkingFileKey, resolved: ResolvedPaths): boolean {
+export function targetExists(key: ScaffoldedKey, resolved: ResolvedPaths): boolean {
   if (key === 'backlog') return existsSync(join(resolved.backlog, 'config.yml'));
   return existsSync(resolved[key]);
 }
 
 /** Write the empty-but-valid skeleton for `key` when missing; never overwrite. */
-export function scaffoldKey(key: WorkingFileKey, resolved: ResolvedPaths): ScaffoldOutcome {
+export function scaffoldKey(key: ScaffoldedKey, resolved: ResolvedPaths): ScaffoldOutcome {
   const location = resolved[key];
   if (targetExists(key, resolved)) return { key, location, created: false };
 

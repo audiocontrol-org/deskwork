@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { loadDocument, type LoadOptions } from '../document-model/document.js';
 import { loadInstallationConfig } from '../config/config-loader.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
-import type { ResolvedPaths, WorkingFileKey } from '../config/types.js';
+import type { ResolvedPaths, ScaffoldedKey } from '../config/types.js';
 
 export interface VerifyOutcome {
   readonly ok: boolean;
@@ -22,7 +22,7 @@ export interface VerifyOutcome {
 
 /** Verify one managed item against its consuming parser. Never throws. */
 export function verifyKey(
-  key: WorkingFileKey,
+  key: ScaffoldedKey,
   resolved: ResolvedPaths,
   grammarOpts: LoadOptions,
 ): VerifyOutcome {

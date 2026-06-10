@@ -81,7 +81,11 @@ function gatherLatestJournalEntry(journalPath: string): JournalEntrySummary | nu
   if (!existsSync(journalPath)) return null;
   const text = readFileSync(journalPath, 'utf8');
   const lines = text.split('\n');
-  const start = lines.findIndex((l) => l.startsWith('## '));
+  // Entries live AFTER the first horizontal-rule `---` preamble separator (where
+  // session-end inserts them). A `## ` preamble title before it is not an entry.
+  const sepIdx = lines.findIndex((l) => l.trim() === '---');
+  const searchStart = sepIdx === -1 ? 0 : sepIdx + 1;
+  const start = lines.findIndex((l, i) => i >= searchStart && l.startsWith('## '));
   if (start === -1) return null;
   const heading = lines[start]!.slice(3).trim();
   const body: string[] = [];

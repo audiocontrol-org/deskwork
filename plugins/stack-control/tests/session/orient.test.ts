@@ -38,7 +38,11 @@ doc-grammar: roadmap
 - depends-on: impl:feature/ready-one
 `;
 
-const JOURNAL = `# Development Notes
+// The preamble title is itself an H2 (## ) — as in the real DEVELOPMENT-NOTES.md
+// — so "latest entry" must be the first ## AFTER the --- separator, not the title.
+const JOURNAL = `## Development Notes
+
+Session journal preamble.
 
 ---
 

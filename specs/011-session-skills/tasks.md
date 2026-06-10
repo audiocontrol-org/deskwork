@@ -114,11 +114,11 @@ This feature **consumes** 009's `src/config/{installation,resolve-paths,config-l
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T032 [P] Execute quickstart.md Scenarios 1–10 in a **plain shell** (no Claude Code surface) and record outcomes (SC-007).
-- [ ] T033 [P] `tsc` strict + lint clean (no `any`/`as`/`@ts-ignore`); confirm every new module ≤ 500 lines (Principle VI).
-- [ ] T034 [P] Add the three new key overrides to the repo-root dogfood `.stack-control/config.yaml` — `journal` → `DEVELOPMENT-NOTES.md`, `tooling_feedback` → `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/tooling-feedback.md`, `clone_scope` → `plugins/stack-control` — and verify the plugin's own session verbs resolve through it (research D9).
-- [ ] T035 Run `bash .dw-lifecycle/scope-discovery/clone-snapshot.sh`; refactor or justify any NEW clone (watch `src/session/git.ts` vs `src/repo.ts`; `orient.ts` readers vs existing inbox/roadmap readers).
-- [ ] T036 Update `plugins/stack-control/README.md` (+ the two new SKILL.md) documenting `stackctl session-start` / `session-end` and the three `.stack-control/config.yaml` keys; note CLI-first / surface-agnostic resolution.
+- [X] T032 [P] Execute quickstart.md Scenarios 1–10 in a **plain shell** (no Claude Code surface) and record outcomes (SC-007).
+- [X] T033 [P] `tsc` strict + lint clean (no `any`/`as`/`@ts-ignore`); confirm every new module ≤ 500 lines (Principle VI).
+- [X] T034 [P] Add the three new key overrides to the repo-root dogfood `.stack-control/config.yaml` — `journal` → `DEVELOPMENT-NOTES.md`, `tooling_feedback` → `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/tooling-feedback.md`, `clone_scope` → `plugins/stack-control` — and verify the plugin's own session verbs resolve through it (research D9).
+- [X] T035 Run `bash .dw-lifecycle/scope-discovery/clone-snapshot.sh`; refactor or justify any NEW clone (watch `src/session/git.ts` vs `src/repo.ts`; `orient.ts` readers vs existing inbox/roadmap readers).
+- [X] T036 Update `plugins/stack-control/README.md` (+ the two new SKILL.md) documenting `stackctl session-start` / `session-end` and the three `.stack-control/config.yaml` keys; note CLI-first / surface-agnostic resolution.
 - [ ] T037 Surface to the operator (do NOT auto-decide): (a) the **009 build-order sequencing** (plan § Dependency-sequencing) and (b) the **backlog changed-since** question (plan § Scope-coordination) — for a `roadmap reconcile` decision.
 
 ---

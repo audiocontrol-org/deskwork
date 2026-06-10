@@ -1,20 +1,18 @@
-// The managed working-file set as a typed constant (009) — the single source of
-// truth for "which keys an installation scaffolds + resolves", config-first
-// (scaffold order: config creates .stack-control before the rest). Sharing this
-// list across resolve-paths (collision iteration) and scaffold (write order)
-// avoids a duplicated key-list and lets us iterate WorkingFileKey without an
-// `as` cast.
+// The SCAFFOLDED managed working-file set as a typed constant (009) — the keys
+// `setup` writes, in config-first order (config creates .stack-control before the
+// rest). Drives scaffold write-order (scaffold.ts MANAGED_KEYS). NOT every
+// resolvable key: session-skills' journal/toolingFeedback/cloneScope are resolved
+// (resolve-paths) but NOT scaffolded — they are operation-products session-end
+// creates lazily, and cloneScope is a scope pointer (a dir), nothing to scaffold
+// (see types.ts § managed set). The collision check iterates the resolved object
+// itself, so those keys are still validated without being scaffolded.
 
-import type { WorkingFileKey } from './types.js';
+import type { ScaffoldedKey } from './types.js';
 
-export const WORKING_FILE_KEYS: readonly WorkingFileKey[] = [
+export const WORKING_FILE_KEYS: readonly ScaffoldedKey[] = [
   'config',
   'roadmap',
   'inbox',
   'backlog',
   'auditLog',
-  // session-skills (011) — extends the managed set (009 FR-001).
-  'journal',
-  'toolingFeedback',
-  'cloneScope',
 ];

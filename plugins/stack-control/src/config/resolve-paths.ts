@@ -7,7 +7,6 @@
 
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path';
 import { InstallationError } from './errors.js';
-import { WORKING_FILE_KEYS } from './keys.js';
 import type { InstallationConfig, ResolvedPaths } from './types.js';
 
 /** Fixed config-marker dir — not affected by base_dir. */
@@ -65,8 +64,10 @@ function within(root: string, p: string, label: string): string {
 
 function assertNoCollision(resolved: ResolvedPaths): void {
   const seen = new Map<string, string>();
-  for (const key of WORKING_FILE_KEYS) {
-    const p = resolved[key];
+  // Iterate the resolved object itself (not the SCAFFOLDED key set) so every
+  // resolvable key — including the resolve-only session-skills keys — is
+  // collision-checked, while only the scaffolded set drives setup's write order.
+  for (const [key, p] of Object.entries(resolved)) {
     const prior = seen.get(p);
     if (prior !== undefined) {
       throw new InstallationError(

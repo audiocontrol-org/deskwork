@@ -15,18 +15,18 @@
  * records only their `featureAuditLogPattern`) and operation-products (created
  * lazily by the verb that produces them).
  */
-export type WorkingFileKey =
-  | 'config'
-  | 'roadmap'
-  | 'inbox'
-  | 'backlog'
-  | 'auditLog'
-  // session-skills (011) extends the managed set with three keys it owns — the
-  // additive change 009's FR-001 anticipates (a second real consumer of the
-  // port). journal/toolingFeedback are human docs at root; cloneScope is a dir.
-  | 'journal'
-  | 'toolingFeedback'
-  | 'cloneScope';
+/** The keys `setup` SCAFFOLDS — the installation-level managed set written at
+ * setup time (config-first order). A strict subset of WorkingFileKey. */
+export type ScaffoldedKey = 'config' | 'roadmap' | 'inbox' | 'backlog' | 'auditLog';
+
+/**
+ * Every RESOLVABLE working-file key. session-skills (011) extends the resolvable
+ * set with three keys it owns — the additive change 009's FR-001 anticipates (a
+ * second real consumer of the port) — but they are NOT scaffolded: journal /
+ * toolingFeedback are human docs session-end creates lazily, and cloneScope is a
+ * scope pointer (a dir). So they widen WorkingFileKey but not ScaffoldedKey.
+ */
+export type WorkingFileKey = ScaffoldedKey | 'journal' | 'toolingFeedback' | 'cloneScope';
 
 /** Optional per-file location overrides (relative-to-root, or absolute within root). */
 export interface InstallationPaths {
@@ -70,7 +70,7 @@ export type SetupStatus = 'created' | 'already-present' | 'skipped' | 'malformed
 
 /** One managed-set item's setup outcome (FR-006). */
 export interface SetupItem {
-  readonly key: WorkingFileKey;
+  readonly key: ScaffoldedKey;
   readonly location: string;
   readonly status: SetupStatus;
   readonly detail?: string;

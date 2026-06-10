@@ -91,9 +91,23 @@ paths:                              # all optional; each relative-to-root (or ab
   backlog: ".stack-control/backlog"
   audit_log: ".stack-control/audit-log.md"
   feature_audit_log_pattern: "specs/{feature}/audit-log.md"
+  journal: "DEVELOPMENT-NOTES.md"          # session-skills: the development journal (human doc)
+  tooling_feedback: "tooling-feedback.md"  # session-skills: the tooling-friction log (human doc)
+  clone_scope: "."                         # session-skills: per-codebase clone-snapshot scope (a dir)
 ```
 
 This repo dogfoods it: a root [`.stack-control/config.yaml`](../../.stack-control/config.yaml) records the plugin's own scattered layout (`ROADMAP.md` / `DESIGN-INBOX.md` under `plugins/stack-control/`, the program audit log under `docs/1.0/…/`), so the plugin's verbs resolve through the same config an adopter uses — no bundled-copy special case.
+
+## Session lifecycle
+
+Two native verbs bookend a working session, both resolving every working file through the installation config above (no hardcoded path, branch, or feature slug). Agent-facing skills: [`/stack-control:session-start`](./skills/session-start/SKILL.md) and [`/stack-control:session-end`](./skills/session-end/SKILL.md) — thin adapters over the CLI.
+
+| Verb | What it does |
+|---|---|
+| `stackctl session-start [--at <dir>] [--json]` | **Read-only** boot orientation, then **stops** (no authoring/implementation step fires). Reports the roadmap ready/blocked frontier (006 reasoner), the active Spec Kit spec's chain position + next `/speckit-*` step (from `.specify/feature.json` + the present artifacts), the latest journal entry, the open **local backlog** (never GitHub), and a branch-staleness advisory (behind base → count; undeterminable → clean skip; never blocks). 0 on-disk changes; fail-loud (exit 1) outside any installation. |
+| `stackctl session-end [--at <dir>] [--since <sha>] [--no-push] [--friction "<note>"]… [--json]` | **Capture-only** close — never refuses to end. Appends a journal entry (mechanical/quantitative sections auto-derived from `git log <boundary>..HEAD`; **empty narrative slots** for the agent; honest sparse entry on a no-op; configured template else default), captures surfaced `--friction` (append-only), runs the advisory clone-snapshot over `clone_scope` (skip-with-note if absent; never blocks), surfaces the backlog items **referenced in the session's commits** (evidence; **0 status transitions**; no GitHub query), then **commits doc-only + pushes** (warns on uncommitted non-doc changes; push failure → exit 3, record safe locally). |
+
+Both run to completion in a plain shell with **no Claude Code surface** — the CLI is the vendor-neutral core; the skills add no behavior the CLI lacks.
 
 ## Backlog slush pile — intake: three sources, one pile
 

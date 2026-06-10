@@ -12,3 +12,8 @@ paths:
   backlog: "plugins/stack-control/backlog"
   audit_log: "docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/audit-log.md"
   feature_audit_log_pattern: "specs/{feature}/audit-log.md"
+  # session-skills (011 D9): the journal lives at the repo root; tooling friction
+  # under the program docs; the per-codebase clone scope is the plugin's own tree.
+  journal: "DEVELOPMENT-NOTES.md"
+  tooling_feedback: "docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/tooling-feedback.md"
+  clone_scope: "plugins/stack-control"
