@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-set -euo pipefail
+#
+# Husky 9 invokes hooks via sh, not bash, regardless of the shebang. On
+# Debian-family hosts /bin/sh is dash, which does NOT support
+# `set -o pipefail`. Stick to posix-compat strict mode (set -eu) — same
+# fix already applied to .husky/pre-push.
+set -eu
 
 # pre-commit — no-op stub.
 #
