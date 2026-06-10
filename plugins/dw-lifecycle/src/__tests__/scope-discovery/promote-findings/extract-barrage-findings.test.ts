@@ -227,10 +227,23 @@ describe('extractBarrageFindings — top-level extraction + cross-model agreemen
     expect(findings[0]?.sourceModels.sort()).toEqual(['claude', 'codex', 'gemini']);
   });
 
-  it('merges 2-model agreement via surface path-token match', async () => {
-    const runDir = makeRunDir('two-agree-surface', {
+  it('does NOT merge two findings with independent headings sharing a surface (#427 contract)', async () => {
+    // Post-#427: shared surface alone is insufficient for a cluster edge.
+    // Two distinct mechanisms in the same file (`bar.ts`) stay separate.
+    const runDir = makeRunDir('two-distinct-mechs-same-surface', {
       'claude.md': singleFindingMarkdown('claude', 'Async race condition', 'plugins/dw-lifecycle/src/foo/bar.ts:100'),
       'codex.md': singleFindingMarkdown('codex', 'Promise resolution after dispose', 'plugins/dw-lifecycle/src/foo/bar.ts:120'),
+    });
+    const findings = await extractBarrageFindings({ runDir });
+    expect(findings).toHaveLength(2);
+  });
+
+  it('merges 2-model agreement via heading-substring + same surface (AND semantic)', async () => {
+    // The post-#427 contract preserves legitimate cross-model merges where
+    // BOTH heading-substring AND surface-token agreement hold.
+    const runDir = makeRunDir('two-agree-and', {
+      'claude.md': singleFindingMarkdown('claude', 'Async race condition in dispatch', 'plugins/dw-lifecycle/src/foo/bar.ts:100'),
+      'codex.md': singleFindingMarkdown('codex', 'Async race condition: dispatch loop yields too early', 'plugins/dw-lifecycle/src/foo/bar.ts:120'),
     });
     const findings = await extractBarrageFindings({ runDir });
     expect(findings).toHaveLength(1);
@@ -308,10 +321,22 @@ describe('extractBarrageFindings — top-level extraction + cross-model agreemen
     expect(warnings.join('\n')).toContain('claude');
   });
 
-  it('handles multi-path Surface across cross-model agreement', async () => {
-    const runDir = makeRunDir('multi-path', {
+  it('does NOT merge multi-path surfaces without heading agreement (#427 contract)', async () => {
+    // Post-#427: surface-token overlap alone is insufficient. The two
+    // findings here share `src/binding.ts` but have independent headings
+    // ("Calendar binding drift" vs "Drift between two surfaces").
+    const runDir = makeRunDir('multi-path-no-heading', {
       'claude.md': singleFindingMarkdown('claude', 'Calendar binding drift', 'src/calendar.ts:42, src/binding.ts:88'),
       'codex.md': singleFindingMarkdown('codex', 'Drift between two surfaces', 'src/binding.ts:90'),
+    });
+    const findings = await extractBarrageFindings({ runDir });
+    expect(findings).toHaveLength(2);
+  });
+
+  it('merges multi-path surfaces when one path matches AND headings agree (#427 AND)', async () => {
+    const runDir = makeRunDir('multi-path-with-heading', {
+      'claude.md': singleFindingMarkdown('claude', 'Calendar binding drift on save', 'src/calendar.ts:42, src/binding.ts:88'),
+      'codex.md': singleFindingMarkdown('codex', 'Calendar binding drift in fallback path', 'src/binding.ts:90'),
     });
     const findings = await extractBarrageFindings({ runDir });
     expect(findings).toHaveLength(1);

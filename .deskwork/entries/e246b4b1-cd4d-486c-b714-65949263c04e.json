@@ -1,0 +1,14 @@
+{
+  "uuid": "e246b4b1-cd4d-486c-b714-65949263c04e",
+  "slug": "pluggable-lifecycle-providers/prd",
+  "title": "pluggable-lifecycle-providers",
+  "keywords": [],
+  "source": "manual",
+  "currentStage": "Final",
+  "iterationByStage": {},
+  "lane": "default",
+  "artifactKind": "markdown",
+  "artifactPath": "docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/prd.md",
+  "createdAt": "2026-06-04T20:37:44.655Z",
+  "updatedAt": "2026-06-04T20:52:06.997Z"
+}

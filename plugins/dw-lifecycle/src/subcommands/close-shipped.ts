@@ -674,6 +674,9 @@ function runApplyV2Cli(args: readonly string[]): number {
   const runGh: RunGh = defaultRunGh;
   try {
     const result = applyV2({ proposal, runGh });
+    for (const note of result.notes) {
+      process.stdout.write(`${note}\n`);
+    }
     process.stdout.write(
       `Applied ${result.applied.length}, skipped ${result.skipped.length}, failed ${result.failed.length}.\n`,
     );

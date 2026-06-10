@@ -79,6 +79,7 @@ yarn-error.log*
 ## Worktree-local commit-message scratch file (per .claude/rules/file-handling.md).
 ## Subagents write multi-line commit messages here, then 'git commit -F' from it.
 .git-commit-msg.tmp
+.git-issue-body.tmp
 
 ## Claude Code local
 .claude/settings.json
@@ -143,3 +144,9 @@ yarn-error.log*
 .dw-lifecycle/dismantle-worktrees/
 .dw-lifecycle/complete-parent-closure/
 .dw-lifecycle/close-shipped/
+
+# Spec Kit extension catalog cache (transient)
+.specify/extensions/.cache/
+
+# stack-control audit-barrage run outputs (vendored from dw-lifecycle)
+.stack-control/audit-runs/

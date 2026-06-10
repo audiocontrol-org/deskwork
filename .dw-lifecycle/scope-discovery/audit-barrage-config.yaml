@@ -23,7 +23,14 @@
 # `{{prompt-stdin}}` so the audit prompt is delivered via child stdin instead
 # of argv — bypasses the OS ARG_MAX limit that fails large-diff barrages with
 # `spawn E2BIG` (the #386/#397 fix; this config was a pre-#397 override that
-# still used argv). Matches the plugin default template.
+# still used argv). Matches the plugin default template. (Same migration
+# recorded on main as Phase 12 Task 8, #397: Phase 19's verb path supports
+# {{prompt-stdin}} since v0.32.1.)
+#
+# 2026-06-10 merge note: timeout_seconds 600 kept from the feature branch —
+# the TF-003 fix (300s was too short for heavy adversarial / multi-file
+# prompts; see specs/001-design-control/tooling-feedback.md TF-003).
+
 models:
   - name: claude
     binary: claude

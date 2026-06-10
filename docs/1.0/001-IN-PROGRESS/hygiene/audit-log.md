@@ -295,3 +295,25 @@ formally-installed release" rule.
 |---|---|---|---|---|
 | `8841be9` (pre-review) | 173 | 0 | 1 | DROPPED is intended (deleted `resolveSessionBoundaryIso` + internal `tryGit`). |
 | Review fixes (this commit) | (re-run after commit) | 0 expected | 0 expected | Fixes are localized edits to comments + one defensive wrapper; no new code shapes. |
+
+## 2026-06-04 — audit-barrage lift (20260604T153758900Z-hygiene)
+
+### AUDIT-20260604-01 — All-skip apply still creates the `pending-verification` label in the target repo
+
+Finding-ID: AUDIT-20260604-01 (claude-01 + claude-02 + claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status:     fixed-7f119181d95b64fcc3274533455034d41b5059c2
+Severity:   medium
+Surface:    plugins/dw-lifecycle/src/close-shipped/apply-v2.ts:185-203 (the `applyV2` body) + test `close-shipped-apply-v2.test.ts:` "pre-flight: label absent → label create runs"
+
+`applyV2` runs `preflightLabel` unconditionally, right after `validateProposal` and before the per-item loop — with no check for whether any item is effectively shipped. The new test "pre-flight: label absent → label create runs, 'created' note surfaces in result" proves this: it builds a `skipOnly` proposal (every item `decision: 'skip'`), runs apply, and asserts `labelCreateCalls.length === 1`. So an operator who reviews a proposal, decides every candidate is a false positive, and applies the all-skip result will nonetheless create a brand-new `pending-verification` label in the target repo that no issue will ever carry. That's a write side-effect on the adopter's repo for a no-op apply — a small but real pollution, and surprising given the apply did nothing else.
+
+The fix is to gate the pre-flight on there being at least one effectively-shipped item: compute `proposal.items.some(i => effectiveVerdict(i) === 'shipped')` first, and only call `preflightLabel` when that's true (otherwise skip straight to the empty-result return). `effectiveVerdict` already exists in the file, so this is a two-line guard. As written, the label is created before the loop even discovers there's nothing to label.
+
+### AUDIT-20260604-02 — smoke-hygiene per-run timestamp hardcodes `-000Z` and diverges from the SKILL.md format it claims to mirror
+
+Finding-ID: AUDIT-20260604-02
+Status:     fixed-19f6310095640ac506fefe47d7e3697b8ed89bd9
+Severity:   low
+Surface:    scripts/smoke-hygiene.sh:415-420 (`CS_RUN_TS="$(date -u +%Y-%m-%dT%H-%M-%S-000Z)"`)
+
+The smoke comment states it mirrors "the SKILL.md's per-run project-local path convention so the smoke documents the canonical adopter path." But SKILL.md Step 1 specifies a millisecond-bearing timestamp (`2026-06-04T15-22-31-417Z`), whereas the smoke hardcodes the millisecond field as `000` because `date` can't emit ms portably. Two consequences: (1) the smoke's path shape doesn't actually match the documented convention it claims to demonstrate (the ms segment is always `000`), and (2) two smoke runs (or two close-shipped runs) that start in the same wall-clock second collide on the run dir — the very race-prone collision Phase 17 exists to prevent. For a hand-run smoke this is benign, but it undercuts the "documents the canonical path" rationale in the comment. Appending `$$` (PID) or `$RANDOM` to the smoke's `CS_RUN_TS` would both restore uniqueness and make the divergence-from-SKILL note unnecessary.

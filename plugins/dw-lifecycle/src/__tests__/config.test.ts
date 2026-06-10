@@ -45,4 +45,35 @@ describe('config', () => {
     });
     expect(cfg.branches.archive.compareRef).toBe('upstream/master');
   });
+
+  it('accepts session.start.branchStalenessThreshold as a non-negative integer (Phase 28 #422)', () => {
+    const cfg = validateConfig({
+      version: 1,
+      session: { start: { preamble: '', branchStalenessThreshold: 10 }, end: { preamble: '' } },
+    });
+    expect(cfg.session.start.branchStalenessThreshold).toBe(10);
+  });
+
+  it('omits session.start.branchStalenessThreshold when not provided (verb supplies default)', () => {
+    const cfg = validateConfig({ version: 1 });
+    expect(cfg.session.start.branchStalenessThreshold).toBeUndefined();
+  });
+
+  it('rejects negative branchStalenessThreshold with a clear error', () => {
+    expect(() =>
+      validateConfig({
+        version: 1,
+        session: { start: { preamble: '', branchStalenessThreshold: -3 }, end: { preamble: '' } },
+      }),
+    ).toThrow(/branchStalenessThreshold/);
+  });
+
+  it('rejects non-integer branchStalenessThreshold with a clear error', () => {
+    expect(() =>
+      validateConfig({
+        version: 1,
+        session: { start: { preamble: '', branchStalenessThreshold: 2.5 }, end: { preamble: '' } },
+      }),
+    ).toThrow(/branchStalenessThreshold/);
+  });
 });

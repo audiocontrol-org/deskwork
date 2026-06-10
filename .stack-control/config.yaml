@@ -1,0 +1,19 @@
+version: 1
+# In-repo dogfood (009 D9): the `plugins/stack-control` installation rooted at
+# the repo root. Per-file overrides record the ACTUAL scattered layout — the
+# human docs live under plugins/stack-control/, the program audit log under
+# docs/1.0/.../, the backlog store under plugins/stack-control/backlog/. This is
+# the strongest test of configurable locations (D3) on a real, messy tree: the
+# plugin's own verbs resolve through this config, with no bundled-copy special
+# case (that would be a silent fallback — Principle V).
+paths:
+  roadmap: "plugins/stack-control/ROADMAP.md"
+  inbox: "plugins/stack-control/DESIGN-INBOX.md"
+  backlog: "plugins/stack-control/backlog"
+  audit_log: "docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/audit-log.md"
+  feature_audit_log_pattern: "specs/{feature}/audit-log.md"
+  # session-skills (011 D9): the journal lives at the repo root; tooling friction
+  # under the program docs; the per-codebase clone scope is the plugin's own tree.
+  journal: "DEVELOPMENT-NOTES.md"
+  tooling_feedback: "docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/tooling-feedback.md"
+  clone_scope: "plugins/stack-control"

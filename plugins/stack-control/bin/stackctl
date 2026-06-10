@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+#
+# stackctl — thin wrapper that first-run-installs runtime deps in
+# adopter (sparse-clone) mode, then dispatches to src/cli.ts via tsx.
+#
+# Mirrors plugins/dw-lifecycle/bin/dw-lifecycle's resolution order. The
+# runtime deps the dispatched code imports are markdown-it, peggy, yaml,
+# jscpd, ajv, ajv-formats, backlog.md, and tsx (the document-primitives modules
+# import the first three at runtime; the scope-discovery clone-detector + schema
+# validators import jscpd/ajv/ajv-formats — 010; the backlog backend spawns the
+# backlog.md CLI for write operations — 008). The probe list below MUST
+# stay in sync with package.json's "dependencies" — if the plugin gains a new
+# runtime dep, add it to RUNTIME_DEPS or an adopter install with a partial
+# node_modules/ will skip npm install and then fail Node module resolution on
+# first dispatch.
+#
+# Resolution order (first match wins):
+#   1. Workspace dev path: tsx resolves from an ancestor's
+#      node_modules/.bin/ via npm workspace hoist. Dispatch via it; the
+#      monorepo install owns the full dep set (no install or probe here —
+#      hoisted deps resolve from PLUGIN_ROOT via Node's upward lookup).
+#   2. Adopter post-install: tsx exists at $PLUGIN_ROOT/node_modules/.bin/tsx
+#      AND every declared runtime dep is present under $PLUGIN_ROOT/
+#      node_modules. Dispatch via the local tsx.
+#   3. First run (or partial install — e.g. tsx present but a later-added
+#      runtime dep missing): npm install in $PLUGIN_ROOT, then
+#      dispatch. The dependency probe (all_deps_installed) is the
+#      AUTHORITATIVE skip signal — install runs whenever any declared
+#      runtime dep is actually missing. A version-keyed sentinel is only a
+#      cache hint that the install completed for this version; it can never
+#      override a failing probe (a stale sentinel written when the dep set
+#      was smaller must not mask a now-missing dep). A version bump also
+#      invalidates the sentinel.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Walk up from PLUGIN_ROOT looking for a usable tsx bin. Handles the
+# workspace-hoist case (deps land in monorepo root's node_modules/.bin)
+# and the adopter post-install case (deps land in this plugin's
+# node_modules/.bin).
+find_tsx() {
+  local cur="${PLUGIN_ROOT}"
+  while [ "${cur}" != "/" ]; do
+    if [ -x "${cur}/node_modules/.bin/tsx" ]; then
+      printf '%s' "${cur}/node_modules/.bin/tsx"
+      return 0
+    fi
+    cur="$(dirname "${cur}")"
+  done
+  return 1
+}
+
+# Read the plugin manifest version; used to name the install-complete
+# sentinel cache marker. Empty string just means no marker is written; it
+# does not change behavior, since the dependency probe (not the marker) is
+# the authoritative skip signal.
+plugin_version() {
+  local manifest="${PLUGIN_ROOT}/.claude-plugin/plugin.json"
+  [ -f "${manifest}" ] || { printf ''; return 0; }
+  node -e "
+    try {
+      const m = JSON.parse(require('fs').readFileSync('${manifest}', 'utf8'));
+      if (typeof m.version === 'string' && m.version) process.stdout.write(m.version);
+    } catch (e) { /* sentinel is optional; never fail the shim over it */ }
+  " 2>/dev/null || printf ''
+}
+
+# Probe whether a declared runtime dep is installed in the plugin's own
+# node_modules/ (test the dep's package.json, not just the dir, so a
+# partial install where the dir exists but metadata never landed is caught).
+dep_installed() {
+  local dep=$1
+  [ -f "${PLUGIN_ROOT}/node_modules/${dep}/package.json" ]
+}
+
+# Declared runtime deps — keep in sync with package.json "dependencies".
+# The dispatched code imports markdown-it / peggy / yaml at runtime; the
+# backlog backend spawns the backlog.md CLI; tsx is the runner. A probe that
+# only checked tsx would skip npm install on a partial adopter install (tsx
+# present, the rest missing) and then crash on Node module resolution (or a
+# missing backlog.md binary) at first dispatch.
+RUNTIME_DEPS="markdown-it peggy yaml jscpd ajv ajv-formats backlog.md tsx"
+
+# Probe every declared runtime dep.
+all_deps_installed() {
+  for dep in ${RUNTIME_DEPS}; do
+    if ! dep_installed "${dep}"; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+run_install() {
+  echo "stackctl: installing plugin dependencies (first run for v${1:-unknown})..." >&2
+  (
+    cd "${PLUGIN_ROOT}"
+    # --workspaces=false: when sparse-cloned from a workspaces-declaring
+    # monorepo, npm would otherwise hoist node_modules/ to the workspace
+    # root, leaving ${PLUGIN_ROOT}/node_modules/ empty. Force install into
+    # the plugin's own node_modules/.
+    npm install --omit=dev --workspaces=false \
+      --no-audit --no-fund --loglevel=error
+  ) >&2
+}
+
+# Write the install-complete cache marker after a successful probe/install.
+# It is a hint only — the dependency probe, not this file, decides whether
+# install must run (see the NEEDS_INSTALL block below).
+write_sentinel() {
+  local version=$1
+  [ -n "${version}" ] || return 0
+  [ -d "${PLUGIN_ROOT}/node_modules" ] || return 0
+  : > "${PLUGIN_ROOT}/node_modules/.deskwork-install-complete-${version}" 2>/dev/null || true
+}
+
+TSX_BIN="$(find_tsx || true)"
+VERSION="$(plugin_version)"
+
+# Detect workspace dev path: tsx resolved from an ancestor (NOT from
+# PLUGIN_ROOT/node_modules itself). The monorepo owns dep resolution there;
+# we don't probe the plugin's own node_modules.
+IS_WORKSPACE_DEV=0
+if [ -n "${TSX_BIN}" ]; then
+  case "${TSX_BIN}" in
+    "${PLUGIN_ROOT}/node_modules/.bin/tsx")
+      IS_WORKSPACE_DEV=0
+      ;;
+    *)
+      IS_WORKSPACE_DEV=1
+      ;;
+  esac
+fi
+
+NEEDS_INSTALL=0
+if [ -z "${TSX_BIN}" ]; then
+  NEEDS_INSTALL=1
+elif [ "${IS_WORKSPACE_DEV}" -eq 0 ]; then
+  # The probe is authoritative: every declared runtime dep must actually be
+  # present on disk to skip install. The sentinel is only a cache hint and is
+  # NOT trusted on its own — a stale sentinel written when RUNTIME_DEPS was
+  # smaller would otherwise mask a now-missing dep and crash on first
+  # dispatch. Run the probe regardless of the sentinel; refresh the sentinel
+  # when the probe passes so it stays a faithful "install complete for this
+  # version" marker.
+  if all_deps_installed; then
+    write_sentinel "${VERSION}"
+    NEEDS_INSTALL=0
+  else
+    NEEDS_INSTALL=1
+  fi
+fi
+
+if [ "${NEEDS_INSTALL}" -eq 1 ]; then
+  run_install "${VERSION}"
+  TSX_BIN="$(find_tsx || true)"
+  if [ -z "${TSX_BIN}" ]; then
+    echo "stackctl: npm install completed but tsx is still not resolvable from ${PLUGIN_ROOT}. Aborting." >&2
+    exit 1
+  fi
+  if ! all_deps_installed; then
+    echo "stackctl: npm install completed but one or more declared deps are still missing under ${PLUGIN_ROOT}/node_modules. Aborting." >&2
+    exit 1
+  fi
+  write_sentinel "${VERSION}"
+fi
+
+exec "${TSX_BIN}" "${PLUGIN_ROOT}/src/cli.ts" "$@"

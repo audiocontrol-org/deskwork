@@ -35,7 +35,9 @@ import { applyProposal, ApplyProposalError } from '../scope-discovery/promote-fi
 import { applyStatusFlips } from '../scope-discovery/promote-findings/audit-log-editor.js';
 import {
   AutoPositionError,
+  collectAllTaskIds,
   computeAutoPosition,
+  findDuplicateTaskHeadings,
   nextTaskNumberFactory,
 } from '../scope-discovery/promote-findings/auto-position.js';
 import type {
@@ -415,9 +417,17 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
         !alreadyScoped.has(canonicalOf(f.findingId)) &&
         (f.severity ?? '').toLowerCase() !== 'informational',
     );
-    if (informationalFindings.length > 0) {
-      const today = now.toISOString().slice(0, 10);
-      const informationalStatus = `acknowledged-informational-${today}`;
+    // Post-AUDIT-BARRAGE-codex-01 (re-audit): informational-flip
+    // bookkeeping happens AFTER the workplan apply + post-write
+    // duplicate check succeeds. The pre-fix flow flipped them first
+    // and the rollback path then claimed "no disk mutation persists"
+    // — false if any informational flips had already landed on disk.
+    // Deferring the flips makes the diagnostic honest and the entire
+    // auto path atomic-on-failure.
+    const today = now.toISOString().slice(0, 10);
+    const informationalStatus = `acknowledged-informational-${today}`;
+    const flipInformational = async (): Promise<number | null> => {
+      if (informationalFindings.length === 0) return null;
       try {
         await applyStatusFlips({
           auditLogPath,
@@ -437,8 +447,11 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
       stdout.write(
         `Auto-flipped: ${informationalFindings.length} informational finding(s) to ${informationalStatus}.\n`,
       );
-    }
+      return null;
+    };
     if (newFindings.length === 0) {
+      const flipExit = await flipInformational();
+      if (flipExit !== null) return flipExit;
       stdout.write(
         `promote-findings --auto: no new findings to scope on feature ${opts.featureSlug} (${findings.length} open finding(s) already scoped in workplan).\n`,
       );
@@ -475,6 +488,18 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
         result: null,
       })),
     };
+    // Phase 29 / #420: defensive collision-avoidance. Pass the global
+    // set of every Task ID present in the workplan (live + archived
+    // ledger ranges) so `nextTaskNumberFactory` forward-walks past any
+    // pre-existing ID the per-phase scanner can miss (e.g. a task
+    // misplaced under another phase's heading).
+    //
+    // Post-AUDIT-20260606-04: surface ledger-range drop warnings on
+    // stderr so the operator sees malformed/mixed-form ranges that
+    // could leave archived IDs re-issuable.
+    const takenIds = collectAllTaskIds(workplanText, (m) =>
+      stderr.write(`promote-findings --auto: ${m}\n`),
+    );
     let result;
     try {
       result = await applyProposal({
@@ -482,7 +507,7 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
         featureSlug: opts.featureSlug,
         read: args.read,
         write: args.write,
-        taskNumberFor: nextTaskNumberFactory(position),
+        taskNumberFor: nextTaskNumberFactory(position, takenIds),
       });
     } catch (err) {
       if (err instanceof ApplyProposalError) {
@@ -491,6 +516,38 @@ export async function runPromoteFindings(args: RunOptions): Promise<number> {
       }
       throw err;
     }
+    // Phase 29 / #420: post-write assertion + AUDIT-03 atomic-rollback.
+    // Re-read the workplan after applyProposal writes. If the write
+    // introduced any new duplicate `### Task X.Y` heading (post-write
+    // dups not already present pre-write), restore the pre-write
+    // content from `workplanText` (buffered before the write) so the
+    // failure is atomic — the corrupted state never lingers on disk.
+    // Pre-existing dups don't trigger rollback (they survive the
+    // restore unchanged).
+    if (result.workplanWritten) {
+      const preDups = new Set(findDuplicateTaskHeadings(workplanText));
+      const postWorkplan = await args.read.workplan(workplanPath);
+      const postDups = findDuplicateTaskHeadings(postWorkplan);
+      const newDups = postDups.filter((id) => !preDups.has(id));
+      if (newDups.length > 0) {
+        // Atomic rollback per AUDIT-20260606-03 + codex re-audit:
+        // rewrite the original workplan; informational flips were
+        // deferred until after this check, so the entire auto path
+        // is atomic on failure (no audit-log mutations to undo).
+        await args.write.workplan(workplanPath, workplanText);
+        stderr.write(
+          `promote-findings --auto: post-write check detected NEW duplicate task headings in workplan: ${newDups.join(', ')}. ` +
+            `Workplan restored to its pre-apply content; informational-finding flips were deferred and did NOT execute. ` +
+            `Re-run after investigating the auto-positioner's seek logic for the IDs that collided.\n`,
+        );
+        return 1;
+      }
+    }
+    // Workplan apply + duplicate-check succeeded — now flip the
+    // informational findings (deferred from earlier in this scope to
+    // preserve atomicity on workplan failure).
+    const flipExit = await flipInformational();
+    if (flipExit !== null) return flipExit;
     stdout.write(
       `Auto-applied: ${result.outcomes.filter((o) => o.applied).length} finding(s) at ${position.phaseHeading} (line ${position.insertAfterLine}).\n`,
     );

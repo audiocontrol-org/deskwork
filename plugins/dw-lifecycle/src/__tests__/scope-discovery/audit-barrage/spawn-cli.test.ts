@@ -323,4 +323,28 @@ describe('Phase 19 (#386) — {{prompt-stdin}} placeholder', () => {
     const argsStdin = ba('-e SCRIPT {{prompt-stdin}}', 'hello');
     expect(argsStdin).toEqual(['-e', 'SCRIPT']);
   });
+
+  // AUDIT-20260604-37 — the gemini default in audit-barrage-config.yaml
+  // now ships `args_template: "{{prompt-stdin}}"` (bare placeholder,
+  // no flag). Pin that the stripping logic produces `[]` rather than
+  // `['']` so gemini is launched with zero argv, not one empty arg.
+  // Cross-model (claude-03 + claude-05 + codex-01 + codex-02).
+  //
+  // Coverage scope (per AUDIT-39 reconciliation): UNIT-level only.
+  // This test pins `buildArgs` against the bare-placeholder shape;
+  // it does NOT exercise an end-to-end spawn against a fake
+  // gemini-shaped CLI. The buildArgs contract is the load-bearing
+  // half of the gemini default's correctness — the spawn-cli's
+  // stdin-vs-argv dispatch reads the placeholder via the same
+  // detection used here.
+  it('AUDIT-37: bare {{prompt-stdin}} template strips to empty argv (no stray empty-string arg)', async () => {
+    const { buildArgs: ba } = await import(
+      '../../../scope-discovery/audit-barrage/spawn-cli.js'
+    );
+    expect(ba('{{prompt-stdin}}', 'whatever-prompt')).toEqual([]);
+    // Same shape with surrounding whitespace (gemini's template is
+    // written with quotes that may collapse with leading/trailing
+    // whitespace under YAML parsing).
+    expect(ba('  {{prompt-stdin}}  ', 'whatever-prompt')).toEqual([]);
+  });
 });

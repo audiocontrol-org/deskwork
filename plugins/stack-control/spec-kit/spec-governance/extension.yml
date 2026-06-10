@@ -1,0 +1,41 @@
+schema_version: "1.0"
+
+extension:
+  id: spec-governance
+  name: "stack-control Spec Governance"
+  version: "0.40.0"
+  description: "Fires the cross-model audit-barrage over a SPEC at definition time + gates graduation on convergence"
+  author: stack-control
+
+requires:
+  speckit_version: ">=0.9.0"
+  tools:
+    # The audit-barrage + convergence protocol are stack-control's OWN
+    # (vendored via multi/migrate-audit-barrage) — NO dw-lifecycle dependency.
+    # The barrage verbs dispatch through the plugin's bundled stackctl. The only
+    # hard external tool is git; model-family CLIs are configured + degradable.
+    - name: git
+      required: true
+
+provides:
+  commands:
+    - name: speckit.spec-governance.govern-spec
+      file: commands/speckit.spec-governance.govern-spec.md
+      description: "Govern the clarified spec: cross-model audit-barrage + convergence gate"
+
+hooks:
+  # Default checkpoint — the spec is decision-complete after clarify (FR-011).
+  # Non-optional: the feature is inert if this never fires.
+  after_clarify:
+    command: speckit.spec-governance.govern-spec
+    optional: false
+    description: "Govern the clarified spec: cross-model audit-barrage + convergence gate"
+  # Configurable per project (FR-011); audits spec + plan together (FR-013).
+  after_plan:
+    command: speckit.spec-governance.govern-spec
+    optional: true
+    description: "Govern the spec+plan after planning (optional)"
+  # NOTE: after_specify is intentionally NOT declared (FR-011 / research R5):
+  # a just-specified spec may still carry intentional unresolved-clarification
+  # placeholders, which generate barrage noise. after_clarify is the first
+  # decision-complete checkpoint.

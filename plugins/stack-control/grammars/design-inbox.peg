@@ -1,0 +1,71 @@
+---
+id: design-inbox
+unit:
+  kind: heading
+  level: 3
+statusVocabulary: [captured, promoted, dropped]
+terminalStatuses: [promoted, dropped]
+orderKey:
+  field: status
+  relation: [captured, promoted, dropped]
+identifier:
+  kind: title
+reconciliationHook: null
+---
+{{
+  // The design-inbox is HEADING-KEYED: each `### <title>` starts a Unit; the
+  // title IS the identifier. Status lives in a body bullet `**Status:** <s>`.
+  // The grammar parses the normalized block stream (one `<KIND>\t<TEXT>` line
+  // per block) into Units; an H1/H2 (shallower than the reserved level 3)
+  // appearing inside the Unit sequence forces a parse failure (leftover input),
+  // which the engine reports as fail-loud (FR-003).
+  function statusOf(bodyLines) {
+    // ANCHORED to a LEADING `**Status:**` (mirrors the mutation locator
+    // INBOX_STATUS_LINE). The block stream strips a list-item's `- ` marker, so a
+    // real status bullet `- **Status:** **captured**` surfaces here as body text
+    // `**Status:** **captured**` (verified empirically). An EARLIER body field
+    // whose free text merely CONTAINS the substring `**Status:**` — e.g. the Idea
+    // line `**Idea:** Add a **Status:** filter to inbox list` — has `**Status:**`
+    // mid-line, NOT leading, so it is no longer matched first and misparsed as
+    // status `filter` (AUDIT-BARRAGE-codex-01).
+    for (const b of bodyLines) {
+      const m = /^\s*\*\*Status:\*\*\s*\*{0,2}\s*([A-Za-z][A-Za-z-]*)/.exec(b.text);
+      if (m) return m[1].toLowerCase();
+    }
+    return null;
+  }
+}}
+
+document = preamble units:unit* postamble { return units; }
+
+preamble = (!unitHead anyLine)*
+
+unit = h:unitHead b:bodyLine* {
+  const status = statusOf(b);
+  return {
+    identifier: h.text,
+    status,
+    orderValue: status,
+    startLine: h.line,
+    endLine: b.length ? b[b.length - 1].line : h.line,
+  };
+}
+
+unitHead = "H3" TAB t:lineText nl { return { text: t, line: location().start.line }; }
+
+bodyLine = !unitHead !shallowHead k:kind TAB t:lineText nl {
+  return { kind: k, text: t, line: location().start.line };
+}
+
+postamble = (!unitHead anyLine)*
+
+// A shallower-or-peer heading (H1/H2) is NOT a valid body line; it terminates
+// the Unit and, if a later Unit head follows, leaves leftover input → parse
+// failure (the two-region model: interleaved shallow heading is illegal).
+shallowHead = ("H1" / "H2") TAB
+
+anyLine = kind TAB lineText nl
+kind = $[A-Za-z0-9]+
+lineText = $[^\n]*
+TAB = "\t"
+nl = "\n" / !.

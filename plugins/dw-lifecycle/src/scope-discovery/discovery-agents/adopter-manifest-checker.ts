@@ -87,6 +87,9 @@ export async function checkAdopterManifests(
     // Internal scan call — `gateMode` only affects the CLI exit code,
     // not the returned ScanResult, so the value is immaterial here.
     gateMode: false,
+    // Phase 18 added the per-feature narrowing field as required (per #417).
+    // The discovery-agent path scans repo-wide, so pass null.
+    feature: null,
   });
   const findings: AdopterManifestCheckerFinding[] = [];
   for (const manifest of result.manifests) {

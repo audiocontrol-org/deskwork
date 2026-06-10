@@ -1,0 +1,31 @@
+{
+  "name": "@deskwork/plugin-stack-control",
+  "version": "0.40.0",
+  "private": true,
+  "description": "Workspace package for the stack-control Claude Code plugin",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "ajv": "^8.17.0",
+    "ajv-formats": "^3.0.0",
+    "backlog.md": "1.46.0",
+    "jscpd": "^4.0.0",
+    "markdown-it": "^14.1.0",
+    "peggy": "^5.0.0",
+    "tsx": "^4.21.0",
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -21,11 +21,15 @@ The skill operates in three phases (`scan` → agent dispatch → `propose`) fol
 
 ### Phase A — scan + agent dispatch + propose
 
-1. Resolve `--from-tag` and `--to-tag` (or accept the defaults: previous + most-recent `v*` tags).
+1. Resolve `--from-tag` and `--to-tag` (or accept the defaults: previous + most-recent `v*` tags). Compute the per-run timestamp once (ISO-8601 with `:` and `.` replaced for filesystem safety, e.g. `2026-06-04T15-22-31-417Z`) and thread it through every scratch artifact path in the rest of this phase. The per-run dir is `.dw-lifecycle/close-shipped/runs/<timestamp>/`.
+
+   **Why a per-run project-local dir, not `/tmp/`.** Bare `/tmp/<name>` paths violate `.claude/rules/file-handling.md` § "Never use bare `/tmp/<name>` paths" — they're shared-namespace and race-prone across concurrent worktrees, parallel sessions, and dispatched sub-agents. The per-run project-local scheme mirrors the existing `.dw-lifecycle/close-shipped/proposals-<timestamp>.json` convention, isolates artifacts per-worktree, and keeps the run auditable post-hoc.
+
 2. Run the scan helper to emit the candidate bundle set:
 
    ```bash
-   dw-lifecycle close-shipped scan --from-tag <vA> --to-tag <vB> --output /tmp/close-shipped-bundles.json
+   dw-lifecycle close-shipped scan --from-tag <vA> --to-tag <vB> \
+     --output .dw-lifecycle/close-shipped/runs/<timestamp>/bundles.json
    ```
 
 3. Read the bundles JSON. Count `bundles.length`. If the count exceeds the configured threshold (default 50), surface the count to the operator and confirm before continuing.
@@ -60,14 +64,14 @@ The skill operates in three phases (`scan` → agent dispatch → `propose`) fol
 
 5. Collect the verdicts. For each candidate, parse the agent's response as JSON. If the first parse fails, re-dispatch ONCE with a short correction note (e.g. "your previous response was not valid JSON; return only the verdict JSON"). If the second response also fails to parse, record `agent_verdict: "error"` with the raw response excerpt.
 
-6. Write the verdicts JSON to `/tmp/close-shipped-verdicts.json` with shape `{ "verdicts": [{ "issue": <number>, "verdict": "...", "reason": "..." }, ...] }`.
+6. Write the collected verdicts JSON to `.dw-lifecycle/close-shipped/runs/<timestamp>/verdicts.json` with shape `{ "verdicts": [{ "issue": <number>, "verdict": "...", "reason": "..." }, ...] }`. The verdicts file is the per-run artifact; the orchestrator does the parse-and-collect work in-session from the sub-agents' JSON responses, so the sub-agents themselves don't write to disk.
 
 7. Run the propose helper:
 
    ```bash
    dw-lifecycle close-shipped propose \
-     --bundles /tmp/close-shipped-bundles.json \
-     --verdicts /tmp/close-shipped-verdicts.json
+     --bundles .dw-lifecycle/close-shipped/runs/<timestamp>/bundles.json \
+     --verdicts .dw-lifecycle/close-shipped/runs/<timestamp>/verdicts.json
    ```
 
    This writes the proposal JSON under `.dw-lifecycle/close-shipped/proposals-<timestamp>.json` and prints the markdown summary table.
@@ -84,9 +88,11 @@ The skill operates in three phases (`scan` → agent dispatch → `propose`) fol
 
 2. Pre-validation: every item must have a non-empty `decision`. If any is empty, the helper exits 2 and the operator re-edits the proposal.
 
-3. Per-item dispatch: each `accept-verdict`-shipped or `override-shipped` item posts a `pending-verification` comment + adds the label via `gh`. Failures recorded per-item; partial-success surfaces with per-row reasons.
+3. **Label pre-flight (Phase 16 / [#411](https://github.com/audiocontrol-org/deskwork/issues/411)).** Before the per-item loop, `apply` checks whether the target label exists in the repo (`gh label list --search <label> --json name`). If the label is missing, it auto-creates the label with the canonical color + description and surfaces a one-line `created '<label>' label on <repo> (color <hex>)` note. If the auto-create itself fails (permissions / rate limit / etc.), `apply` aborts with an actionable `InvalidProposalError` BEFORE any comment posts — that's the half-applied-state guard. The pre-flight runs exactly once per `apply` invocation.
 
-4. Report `applied: N, skipped: M, failed: P` to the operator.
+4. Per-item dispatch: each `accept-verdict`-shipped or `override-shipped` item posts a `pending-verification` comment + adds the label via `gh`. Failures recorded per-item; partial-success surfaces with per-row reasons.
+
+5. Report `applied: N, skipped: M, failed: P` to the operator. Any pre-flight `created` note prints on stdout before the summary line.
 
 ## Legacy fallback
 
@@ -249,18 +255,26 @@ The `--to-tag` is the just-pushed tag; the `--from-tag` defaults to the previous
 
 ### (2) Auto-generated release-notes body
 
-Pipe the skill's release-notes output into `gh release edit` so adopters reading `gh release view v<version>` see the closure trail:
+Pipe the skill's release-notes output into `gh release edit` so adopters reading `gh release view v<version>` see the closure trail.
+
+Use the in-tree per-run path scheme (matches the Phase A precedent from #412) — `.dw-lifecycle/close-shipped/runs/<timestamp>/release-notes.md` is worktree-scoped and the project's `.gitignore` already excludes `.dw-lifecycle/close-shipped/` so runs don't accumulate as tracked noise:
 
 ```
-dw-lifecycle close-shipped --to-tag v<version> --release-notes-body > /tmp/release-notes.md
-gh release edit v<version> --notes-file /tmp/release-notes.md
+RUN_DIR=".dw-lifecycle/close-shipped/runs/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+mkdir -p "$RUN_DIR"
+dw-lifecycle close-shipped --to-tag v<version> --release-notes-body > "$RUN_DIR/release-notes.md"
+gh release edit v<version> --notes-file "$RUN_DIR/release-notes.md"
 ```
+
+The `$$` (shell PID) suffix prevents two same-second concurrent `/release` invocations from a single worktree from clobbering each other (second-granularity timestamps alone would). Per AUDIT-20260606-05.
 
 Or via process substitution in a single line:
 
 ```
 gh release edit v<version> --notes-file <(dw-lifecycle close-shipped --to-tag v<version> --release-notes-body)
 ```
+
+Per `.claude/rules/file-handling.md` § "Never use bare `/tmp/<name>` paths," bare `/tmp/release-notes.md` is unsafe: two concurrent `/release` invocations in different worktrees would clobber each other. The in-tree runs-dir form preserves the artifact alongside the closure proposals + verdicts the rest of the verb writes there.
 
 The body shape:
 

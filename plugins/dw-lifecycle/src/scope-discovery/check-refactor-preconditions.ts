@@ -52,6 +52,7 @@ import {
   checkRuntimePreconditions,
   preconditionError,
 } from './check-refactor-preconditions.runtime.js';
+import { FeatureNotFoundError, resolveFeatureScope } from './resolve-feature-scope.js';
 import { errorMessage, isEnoent } from './util/typeguards.js';
 
 const DEFAULT_BASELINE = '.dw-lifecycle/scope-discovery/clones.yaml';
@@ -78,6 +79,14 @@ export interface Cli {
    * failures but exits 0.
    */
   readonly gateMode: boolean;
+  /**
+   * Phase 18: per-feature narrowing slug. When set, only marker IDs
+   * whose clone-group has ≥1 member in feature-scope (per
+   * resolveFeatureScope's hybrid scope-manifest-or-git-diff source)
+   * are validated; out-of-scope IDs are silently skipped (NOT a
+   * refusal). Refs #417.
+   */
+  readonly feature: string | null;
 }
 
 function takeNext(argv: readonly string[], i: number, flag: string): string {
@@ -94,6 +103,7 @@ function parseCli(argv: readonly string[]): Cli {
   let testTimeoutSeconds = DEFAULT_TEST_TIMEOUT_SECONDS;
   let skipTestRun = false;
   let gateMode = false;
+  let feature: string | null = null;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--commit-msg-file') { commitMsgFile = takeNext(argv, i, a); i += 1; }
@@ -110,6 +120,7 @@ function parseCli(argv: readonly string[]): Cli {
     }
     else if (a === '--skip-test-run') skipTestRun = true;
     else if (a === '--gate-mode') gateMode = true;
+    else if (a === '--feature') { feature = takeNext(argv, i, a); i += 1; }
     else throw new Error(`unknown arg: ${a}`);
   }
   if (commitMsgFile !== null && commitMsgInline !== null) {
@@ -123,6 +134,7 @@ function parseCli(argv: readonly string[]): Cli {
     testTimeoutSeconds,
     skipTestRun,
     gateMode,
+    feature,
   };
 }
 
@@ -271,6 +283,12 @@ function checkGroupForMarker(
 /**
  * Programmatic entry point — exported so the adversarial validator
  * harness can drive the gate without subprocess overhead.
+ *
+ * Phase 18: when `cli.feature` is set, only IDs whose clone-group has
+ * ≥1 member in feature-scope are validated; out-of-scope IDs are
+ * silently skipped (NOT a refusal — the gate's contract is "verify
+ * the preconditions for THIS feature's refactors," not "refuse if any
+ * marker is out of scope"). Refs #417.
  */
 export async function runGate(cli: Cli, commitMessage: string): Promise<GateResult> {
   const markedIds = extractRefactorMarkers(commitMessage);
@@ -278,11 +296,46 @@ export async function runGate(cli: Cli, commitMessage: string): Promise<GateResu
   const baseline = await loadBaseline(cli);
   const byId = new Map<string, CloneGroup>();
   for (const g of baseline.clones) byId.set(g.id, g);
+  let inScopeIds: ReadonlySet<string> | null = null;
+  if (cli.feature !== null && cli.feature !== undefined) {
+    const scope = await resolveFeatureScope({
+      slug: cli.feature,
+      repoRoot: cli.repoRoot,
+    });
+    const scopeFiles = new Set(scope.files);
+    const allowed = new Set<string>();
+    for (const id of markedIds) {
+      const group = byId.get(id);
+      if (group === undefined) {
+        // Unknown ID — keep it through so the standard error path
+        // ("refactor marker names X but no entry exists") still fires.
+        allowed.add(id);
+        continue;
+      }
+      const memberFiles = group.members.map(stripMemberRange);
+      if (memberFiles.some((f) => scopeFiles.has(f))) {
+        allowed.add(id);
+      }
+    }
+    inScopeIds = allowed;
+  }
   const errors: PreconditionError[] = [];
   for (const id of markedIds) {
+    if (inScopeIds !== null && !inScopeIds.has(id)) continue;
     errors.push(...checkGroupForMarker(id, byId, cli));
   }
   return { markedIds, errors };
+}
+
+/**
+ * Strip jscpd's `:start:end` suffix from a clone member entry so the
+ * file path can be compared against the resolver's scope set.
+ */
+function stripMemberRange(member: string): string {
+  const lastColon = member.lastIndexOf(':');
+  if (lastColon < 0) return member;
+  const prev = member.lastIndexOf(':', lastColon - 1);
+  return prev < 0 ? member : member.slice(0, prev);
 }
 
 function formatErrors(result: GateResult): string {
@@ -321,6 +374,10 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
   try {
     result = await runGate(cli, commitMessage);
   } catch (e) {
+    if (e instanceof FeatureNotFoundError) {
+      process.stderr.write(`check-refactor-preconditions: ${e.message}\n`);
+      return 2;
+    }
     process.stderr.write(`check-refactor-preconditions: ${errorMessage(e)}\n`);
     return 2;
   }
