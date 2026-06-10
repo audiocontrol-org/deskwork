@@ -51,8 +51,11 @@ function isAsciiPunctuation(cp: number): boolean {
 
 function isAccentedLatin(cp: number): boolean {
   // Latin-1 Supplement letters (U+00C0–U+00FF) minus the × (U+00D7) and ÷
-  // (U+00F7) math symbols, plus Latin Extended-A (U+0100–U+017F).
+  // (U+00F7) math symbols, plus Latin Extended-A (U+0100–U+017F), plus the
+  // Romanian comma-below letters Ș/ș/Ț/ț (U+0218–U+021B; AUDIT-20260610-15 —
+  // an enumerated four-codepoint extension, NOT a Latin Extended-B grant).
   if (cp >= 0x00c0 && cp <= 0x00ff) return cp !== 0x00d7 && cp !== 0x00f7;
+  if (cp >= 0x0218 && cp <= 0x021b) return true;
   return cp >= 0x0100 && cp <= 0x017f;
 }
 

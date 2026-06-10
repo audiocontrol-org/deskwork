@@ -115,6 +115,25 @@ describe('lintWireframe — axis 2 integration', () => {
   });
 });
 
+// AUDIT-20260610-15 (round-2 gpt-5-05, LOW false-positive): Romanian
+// comma-below letters Ș/ș/Ț/ț are Latin Extended-B (U+0218–U+021B), one block
+// past the allowlist's Extended-A ceiling — genuinely lo-fi structural copy
+// was rejected. Enumerated extension, not a block grant.
+describe('codepoint allowlist — Romanian comma-below letters (AUDIT-20260610-15)', () => {
+  it('permits Ș ș Ț ț', () => {
+    for (const ch of ['Ș', 'ș', 'Ț', 'ț']) {
+      expect(isAllowedCodepoint(ch.codePointAt(0)!), ch).toBe(true);
+    }
+  });
+  it('accepts the planted Romanian lo-fi copy through the lint', () => {
+    const r = lintWireframeStructural(wrap(`<h1 class="sk-h1">Conținut și acțiuni</h1>`));
+    expect(r.findings.map((f) => f.rule)).not.toContain('disallowed-codepoint');
+  });
+  it('does not open the rest of Latin Extended-B (Ǎ stays rejected)', () => {
+    expect(isAllowedCodepoint(0x01cd)).toBe(false);
+  });
+});
+
 // AUDIT-20260610-12 (round-2 gpt-5-02, HIGH): <code>+<br> rows of dense
 // punctuation reconstruct pixel-art wordmarks after the <pre> removal — the
 // channel is punctuation MASS with row control, not preserved whitespace.

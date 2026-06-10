@@ -207,6 +207,33 @@ describe('checkStylesheetIdentity', () => {
   });
 });
 
+// AUDIT-20260610-14 (round-2 fable5-03, LOW false-positive): a conventional
+// cache-bust query (?v=2) or fragment on the kit href was rejected as
+// stylesheet-path-mismatch because path.resolve kept the suffix — while
+// axis-1's basename check strips it (axes disagreed). A browser/static host
+// resolves the suffix-less file; the pin must compare and read the same way.
+describe('checkStylesheetIdentity — query/fragment on the kit href (AUDIT-20260610-14)', () => {
+  it('accepts a cache-busting query on the kit href', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css?v=2">`);
+    expect(checkStylesheetIdentity(html, pin)).toEqual([]);
+  });
+  it('accepts a fragment on the kit href', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css#anchor">`);
+    expect(checkStylesheetIdentity(html, pin)).toEqual([]);
+  });
+  it('still verifies the suffix-less bytes (tampered file rejects despite ?v)', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    writeFileSync(join(dir, 'sketch-kit.css'), '/* tampered */');
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css?v=2">`);
+    expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-hash-mismatch');
+  });
+});
+
 // AUDIT-20260610-03 (gpt-5-01, HIGH): the pin certified the CSS bytes only — the
 // @font-face woff2 files the CSS loads were not hashed, so a swapped brand/icon
 // font rendered polished typography under a green pin. The pin now carries
