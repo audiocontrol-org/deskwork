@@ -19,6 +19,8 @@ The **inbox** tier already established the pattern: `stackctl inbox promote --to
 
 This feature closes that seam and documents the two-tier relationship so the tiers reference each other.
 
+> **Origin:** promoted from backlog item `TASK-15` ("stack-control docs: backlog → per-feature tasks.md promotion seam is undocumented") via `stackctl backlog promote TASK-15 --to spec:specs/012-backlog-promotion-seam`. This is the target-side back-reference of the bidirectional linkage the feature itself introduces (D2 convention) — the feature records its own origin, closing the dangling thread that motivated it.
+
 ## Clarifications
 
 ### Session 2026-06-10

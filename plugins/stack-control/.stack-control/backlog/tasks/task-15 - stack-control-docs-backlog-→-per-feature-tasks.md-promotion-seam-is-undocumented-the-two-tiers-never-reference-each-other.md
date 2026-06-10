@@ -6,13 +6,19 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
+updated_date: '2026-06-10 20:04'
 labels:
   - agent-found
   - 'type:gap'
+  - promoted
 dependencies: []
 references:
   - gh-443
 ordinal: 15000
 ---
 
+## Implementation Notes
 
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** spec:specs/012-backlog-promotion-seam
+<!-- SECTION:NOTES:END -->
