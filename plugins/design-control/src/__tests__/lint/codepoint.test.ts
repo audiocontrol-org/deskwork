@@ -281,5 +281,19 @@ describe('lintWireframe — punctuation-density imagery channel (AUDIT-20260610-
       const r = lintWireframeStructural(wrap(`<table>${row}${row}${row}</table>`));
       expect(r.findings.map((f) => f.rule)).not.toContain('punctuation-density');
     });
+
+    // AUDIT-20260610-27 (round-6 gpt-5-codex-03, MED): the geometric form of
+    // the same boundary — punctuation columns drawing an icon while a prose
+    // label cell dilutes every flow aggregate (row/table/body) below the
+    // density ratio. Grid PLACEMENT is invisible to content statistics; this
+    // pins the punctuation-grid side of the declared boundary alongside the
+    // letter-mosaic side above. Referee's gross-class imagery domain.
+    it('BOUNDARY (documented): prose-diluted punctuation grid passes the mechanical axes', () => {
+      const row =
+        `<tr><td>#</td><td>#</td><td>#</td><td>#</td><td>#</td><td>#</td><td>#</td>` +
+        `<td>Hero navigation region label</td></tr>`;
+      const r = lintWireframeStructural(wrap(`<table>${row}${row}${row}</table>`));
+      expect(r.findings.map((f) => f.rule)).not.toContain('punctuation-density');
+    });
   });
 });

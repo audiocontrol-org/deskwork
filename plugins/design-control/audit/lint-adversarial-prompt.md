@@ -27,14 +27,15 @@ pinned stylesheet. The lint is an **allowlist on two axes** (element/attribute +
 text codepoints) plus a stylesheet identity-pin (which can also verify SRI). Read
 the appended source for the exact rules.
 
-**Declared scope boundary (not a defeat):** text-as-imagery composed of
-allowlisted LETTER glyphs at structural granularity — wordmark mosaics of one
-letter per table cell and kin (AUDIT-20260610-18) — is documented as OUTSIDE the
-lint's mechanical closure and assigned to the cross-model design referee's
-gross-class imagery judgment. The punctuation-density gate bounds punctuation art
-only. A letter-mosaic finding is in scope ONLY if it shows the documented boundary
-is drawn wrongly (e.g. a mechanically-closable subclass the source claims is
-closed, or a punctuation-art variant slipping the density gates).
+**Declared scope boundary (not a defeat):** text-as-imagery that emerges from
+STRUCTURAL GEOMETRY — glyphs distributed across grid cells whose image arises
+from cell PLACEMENT rather than text-flow density (AUDIT-20260610-18 letter
+mosaics; AUDIT-20260610-27 prose-diluted punctuation grids) — is documented as
+OUTSIDE the lint's mechanical closure and assigned to the cross-model design
+referee's gross-class imagery judgment. The density gates (per-node, block
+aggregate, sibling run) bound text-FLOW art only. A grid-art finding is in scope
+ONLY if it shows the boundary is drawn wrongly (e.g. a FLOW-art variant slipping
+the density gates without geometric dilution).
 
 ## Find inputs that break the promise — both directions
 
