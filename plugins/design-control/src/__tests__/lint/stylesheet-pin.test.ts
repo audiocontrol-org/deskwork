@@ -187,6 +187,24 @@ describe('checkStylesheetIdentity', () => {
     const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="${pin.expectedSri.sha384}?foo=bar">`);
     expect(checkStylesheetIdentity(html, pin)).toEqual([]);
   });
+
+  // AUDIT-20260606-21 (backlog TASK-2): the base64 PAYLOAD is case-sensitive —
+  // the load-bearing invariant of normalizeSriToken's slice-at-first-dash shape
+  // (only the algorithm prefix is lowercased). A case-mangled payload is a
+  // genuinely-wrong digest and must be REJECTED in the suite's own voice, not
+  // by luck of the fixture digest's mixed case.
+  it('rejects a correct-algorithm token whose base64 payload case is mangled', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const payload = pin.expectedSri.sha384.replace(/^sha384-/, '');
+    const mangled = payload.replace(/[a-zA-Z]/g, (c) =>
+      c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase(),
+    );
+    // Guard against vacuity: the swap must actually change the payload.
+    expect(mangled).not.toBe(payload);
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="sha384-${mangled}">`);
+    expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-sri-mismatch');
+  });
 });
 
 describe('lintWireframe with stylesheetPin — inert-class invariant', () => {
