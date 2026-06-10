@@ -28,9 +28,9 @@ export const ALLOWED_TAGS: ReadonlySet<string> = new Set([
   'div', 'span', 'header', 'footer', 'main', 'nav', 'section', 'article', 'aside',
   // headings
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  // native form flow (AUDIT-20260610-24 — structure, not polish; input's
-  // `type` is value-enumerated via INPUT_TYPE_ALLOWLIST)
-  'form', 'input',
+  // native form flow (AUDIT-20260610-24 + textarea via -32 — structure, not
+  // polish; input's `type` is value-enumerated via INPUT_TYPE_ALLOWLIST)
+  'form', 'input', 'textarea',
   // text-level structure. NOTE: `pre` is deliberately ABSENT (AUDIT-20260610-04,
   // gpt-5-03 + fable-07): preserved whitespace renders ASCII-art logos/wordmarks
   // from purely allowlisted codepoints — a text-channel image the codepoint axis
@@ -81,6 +81,7 @@ const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>
   // is enumerated (INPUT_TYPE_ALLOWLIST) — image loads a resource, color opens
   // a visual picker; both stay rejected.
   input: { type: 'plain', placeholder: 'plain', value: 'plain' },
+  textarea: { placeholder: 'plain' },
   label: { for: 'plain' },
   ol: { start: 'plain', reversed: 'plain' },
   li: { value: 'plain' },

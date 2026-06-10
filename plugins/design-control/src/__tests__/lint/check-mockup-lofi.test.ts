@@ -202,6 +202,41 @@ describe('check-mockup-lofi — rejects the <pre> preserved-whitespace imagery c
   });
 });
 
+// AUDIT-20260610-29 (round-7 gpt-5-01, HIGH): a document that never applies
+// the kit ROOT class loads the pinned stylesheet but renders entirely through
+// UA default styling — green meant the kit was linked and byte-true, not IN
+// EFFECT. The body must carry the `sk` root token.
+describe('check-mockup-lofi — kit root class required (AUDIT-20260610-29)', () => {
+  it('rejects a document whose body lacks the sk root class (round-7 defeating input)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css"></head>` +
+      `<body><main><h1>Acme Analytics</h1></main></body></html>`;
+    expect(rules(html)).toContain('kit-root-missing');
+  });
+  it('accepts a body carrying sk among other classes', () => {
+    expect(rules(wrap(`<div class="sk-shell">x</div>`))).toEqual([]);
+  });
+  it('rejects a body whose classes do not include the bare sk token (sk-theme alone)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css"></head>` +
+      `<body class="sk-theme-grayscale"><div>x</div></body></html>`;
+    expect(rules(html)).toContain('kit-root-missing');
+  });
+});
+
+// AUDIT-20260610-32 (round-7 gpt-5-04, LOW fp): textarea is the multi-line
+// sibling of the accepted input case — same structural class.
+describe('check-mockup-lofi — textarea (AUDIT-20260610-32)', () => {
+  it('accepts a labeled textarea with placeholder', () => {
+    expect(rules(wrap(`<form><label for="n">Notes</label><textarea id="n" placeholder="Add notes"></textarea></form>`))).toEqual([]);
+  });
+  it('textarea placeholder rides the visible-attr gates', () => {
+    expect(rules(wrap(`<textarea placeholder="𝐍𝐨𝐭𝐞𝐬"></textarea>`))).toContain('disallowed-codepoint');
+  });
+});
+
 // AUDIT-20260610-24 (round-5 gpt-5-codex-04; FOURTH surfacing of the
 // form-controls over-rejection: rounds 1, 3, 5 = AUDIT-08/TASK-15): native
 // form flow is structure, not polish. form / input / label[for] are

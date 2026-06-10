@@ -17,6 +17,7 @@ export type LintRule =
   | 'disallowed-link-rel'
   | 'disallowed-meta-name'
   | 'disallowed-input-type'
+  | 'kit-root-missing'
   | 'stylesheet-filename-mismatch'
   // axis 2 — text-content codepoint allowlist
   | 'disallowed-codepoint'

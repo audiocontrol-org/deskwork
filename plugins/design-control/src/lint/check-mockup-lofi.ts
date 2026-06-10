@@ -54,7 +54,7 @@ import {
   punctuationRatio,
   PUNCT_DENSITY_RATIO,
 } from '@/lint/codepoint';
-import { SKETCH_KIT_STYLESHEET_FILENAME } from '@/wireframe-kit/sketch-kit';
+import { SKETCH_KIT_ROOT_CLASS, SKETCH_KIT_STYLESHEET_FILENAME } from '@/wireframe-kit/sketch-kit';
 
 type AnyNode = DefaultTreeAdapterMap['node'];
 type Element = DefaultTreeAdapterMap['element'];
@@ -102,6 +102,8 @@ function hrefBasename(href: string): string {
 interface WalkContext {
   readonly findings: LintFinding[];
   stylesheetLinkCount: number;
+  /** body carries the bare `sk` root token (AUDIT-20260610-29). */
+  kitRootPresent: boolean;
 }
 
 /**
@@ -139,6 +141,14 @@ function aggregateText(el: Element): string {
 function checkElement(el: Element, ctx: WalkContext): void {
   const { findings } = ctx;
   const tag = ta.getTagName(el).toLowerCase();
+
+  // Kit-root census (AUDIT-20260610-29): without the bare `sk` token on body,
+  // the pinned kit is loaded but IN EFFECT nowhere — the page renders through
+  // UA default styling. Checked post-walk in the entry points.
+  if (tag === 'body') {
+    const classValue = ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'class')?.value ?? '';
+    if (classValue.split(/\s+/).includes(SKETCH_KIT_ROOT_CLASS)) ctx.kitRootPresent = true;
+  }
 
   if (!ALLOWED_TAGS.has(tag)) {
     findings.push({
@@ -357,7 +367,7 @@ function walk(node: AnyNode, ctx: WalkContext): void {
  * {@link lintWireframe} for the guarantee-bearing check.
  */
 export function lintWireframeStructural(html: string): LintResult {
-  const ctx: WalkContext = { findings: [], stylesheetLinkCount: 0 };
+  const ctx: WalkContext = { findings: [], stylesheetLinkCount: 0, kitRootPresent: false };
   walk(parse(html), ctx);
   const { findings } = ctx;
   // Axis-1 singleton census (AUDIT-20260610-01): more than one stylesheet link
@@ -369,6 +379,15 @@ export function lintWireframeStructural(html: string): LintResult {
       rule: 'stylesheet-not-singleton',
       tag: 'link',
       message: `${ctx.stylesheetLinkCount} stylesheet links found — exactly one (the sketch-kit stylesheet) is permitted`,
+    });
+  }
+  // Kit root required (AUDIT-20260610-29): linked-and-byte-true is not IN
+  // EFFECT; without the `sk` body token the document renders UA-styled.
+  if (!ctx.kitRootPresent) {
+    findings.push({
+      rule: 'kit-root-missing',
+      tag: 'body',
+      message: `body does not carry the "${SKETCH_KIT_ROOT_CLASS}" kit root class — the pinned stylesheet is loaded but in effect nowhere (UA default rendering)`,
     });
   }
   return { ok: findings.length === 0, findings };
