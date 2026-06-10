@@ -241,6 +241,7 @@ PLUGIN_BIN_PAIRS=(
   "deskwork:deskwork"
   "deskwork-studio:deskwork-studio"
   "dw-lifecycle:dw-lifecycle"
+  "stack-control:stackctl"
 )
 
 # ----- Phase A: full marketplace clone -----------------------------------

@@ -5,9 +5,10 @@
 #
 # Mirrors plugins/dw-lifecycle/bin/dw-lifecycle's resolution order. The
 # runtime deps the dispatched code imports are markdown-it, peggy, yaml,
-# jscpd, ajv, ajv-formats, and tsx (the document-primitives modules import
-# the first three at runtime; the scope-discovery clone-detector + schema
-# validators import jscpd/ajv/ajv-formats — 010). The probe list below MUST
+# jscpd, ajv, ajv-formats, backlog.md, and tsx (the document-primitives modules
+# import the first three at runtime; the scope-discovery clone-detector + schema
+# validators import jscpd/ajv/ajv-formats — 010; the backlog backend spawns the
+# backlog.md CLI for write operations — 008). The probe list below MUST
 # stay in sync with package.json's "dependencies" — if the plugin gains a new
 # runtime dep, add it to RUNTIME_DEPS or an adopter install with a partial
 # node_modules/ will skip npm install and then fail Node module resolution on
@@ -76,11 +77,12 @@ dep_installed() {
 }
 
 # Declared runtime deps — keep in sync with package.json "dependencies".
-# The dispatched code imports markdown-it / peggy / yaml at runtime; tsx is
-# the runner. A probe that only checked tsx would skip npm install on a
-# partial adopter install (tsx present, the rest missing) and then crash on
-# Node module resolution at first dispatch.
-RUNTIME_DEPS="markdown-it peggy yaml jscpd ajv ajv-formats tsx"
+# The dispatched code imports markdown-it / peggy / yaml at runtime; the
+# backlog backend spawns the backlog.md CLI; tsx is the runner. A probe that
+# only checked tsx would skip npm install on a partial adopter install (tsx
+# present, the rest missing) and then crash on Node module resolution (or a
+# missing backlog.md binary) at first dispatch.
+RUNTIME_DEPS="markdown-it peggy yaml jscpd ajv ajv-formats backlog.md tsx"
 
 # Probe every declared runtime dep.
 all_deps_installed() {
