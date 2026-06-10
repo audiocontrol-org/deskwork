@@ -101,8 +101,14 @@ export interface PromoteResult {
  * exposes neither, D6).
  */
 export function promote(req: PromoteRequest): PromoteResult {
-  // Preflight: reject duplicate ids before any store access (codex-01) — a
-  // repeated id would append a second linkage, violating the no-duplicate guard.
+  // Preflight: a malformed store fails loud (FR-009) — never mask a corrupt
+  // task file by silently skipping it during a mutation (AUDIT codex-02). This
+  // runs before id validation so "the store is corrupt" is diagnosed honestly
+  // rather than surfacing as a misleading "item does not exist".
+  req.backend.assertWellFormed();
+
+  // Reject duplicate ids before any further store access — a repeated id would
+  // append a second linkage, violating the no-duplicate guard (AUDIT codex-01 r1).
   const seen = new Set<string>();
   for (const id of req.ids) {
     if (seen.has(id)) {
