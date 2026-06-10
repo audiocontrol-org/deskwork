@@ -1018,3 +1018,52 @@ Direction:  false-positive
 Exempting underscore runs reopens the horizontal-stroke channel the density gate
 exists to bound; the finding messages already steer to the kit placeholders.
 Accepted specificity cost, on the record.
+
+## 2026-06-10 — lint adversarial barrage ROUND 7 (run 20260610T205614241Z; codex only — claude 0 bytes, 5th consecutive)
+
+Triage notes: claude 6 of 8 silent (deskwork issue 447). Codex: 3 HIGH + 1 LOW,
+all verified. One genuine new closure (kit root), one boundary-wording defect
+(letter flow art), one recurrence of an acknowledged finding, one fair
+completion of the form fix. Round verdict: NOT converged.
+
+### AUDIT-20260610-29 — Kit loaded but IN EFFECT nowhere: the sk root class was never required
+
+Finding-ID: AUDIT-20260610-29 (round-7 gpt-5-01, HIGH)
+Status:     fixed-16bd38ae (2026-06-10; body must carry the bare sk token — kit-root-missing; fixture also rejects sk-theme-* without the root)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
+
+A document with the pinned stylesheet but no `.sk` root rendered entirely
+UA-styled — green meant linked-and-byte-true, not applied. The strongest
+remaining real closure; the walk now censuses body's class tokens.
+
+### AUDIT-20260610-30 — Native control chrome (recurrence of acknowledged AUDIT-26)
+
+Finding-ID: AUDIT-20260610-30 (round-7 gpt-5-02; MED→HIGH regrade by the auditor)
+Status:     superseded-by-AUDIT-20260610-26 (standing acknowledgment; prompt now declares the baseline with the in-scope exception so recurrences stop)
+Severity:   high (claimed)
+Surface:    same as AUDIT-26
+
+### AUDIT-20260610-31 — Letter FLOW art: the boundary's geometry wording was wrong (BOUNDARY STABILIZED)
+
+Finding-ID: AUDIT-20260610-31 (round-7 gpt-5-03, HIGH; behaviorally verified)
+Status:     acknowledged-scope-boundary (2026-06-10, ba11126c; the stable statement is GLYPH CLASS, not layout)
+Severity:   high
+Surface:    plugins/design-control/src/lint/codepoint.ts
+
+Monospace rows of letters draw a wordmark at 0% punctuation — flow-text, so the
+round-6 "geometry" framing didn't cover it; the auditor was right that the
+boundary as worded was leaky. Stable three-part statement now in docstring +
+prompt: punctuation FLOW art = mechanically gated (density gates); LETTER
+imagery in ANY layout + grid-diluted punctuation = referee's gross-class domain
+(letter mass is what copy is made of; geometry is invisible to content
+statistics); UA chrome = unstyled baseline. Third boundary fixture pins letter
+flow art.
+
+### AUDIT-20260610-32 — textarea over-rejected (completion of the form fix)
+
+Finding-ID: AUDIT-20260610-32 (round-7 gpt-5-04, LOW)
+Status:     fixed-16bd38ae (2026-06-10; textarea allowlisted with placeholder riding the visible-attr gates)
+Severity:   low
+Surface:    plugins/design-control/src/lint/allowlist.ts
+Direction:  false-positive
