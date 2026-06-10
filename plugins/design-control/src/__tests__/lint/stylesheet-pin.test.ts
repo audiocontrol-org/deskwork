@@ -329,6 +329,35 @@ describe('checkStylesheetIdentity — transitive font pinning (AUDIT-20260610-03
     expect(checkStylesheetIdentity(html, pin)).toEqual([]);
   });
 
+  // AUDIT-20260610-58 (round-16 gpt-5-01, HIGH): CSS url() resolves relative
+  // to the STYLESHEET, not the wireframe — a kit linked from a subdirectory
+  // (assets/sketch-kit.css) loads assets/fonts/*, but the pin checked
+  // baseDir/fonts/*. Font paths anchor at the resolved stylesheet's dir.
+  it('verifies fonts relative to the stylesheet dir, not baseDir (round-16 input)', () => {
+    const dir = freshDir();
+    mkdirSync(join(dir, 'assets', 'fonts'), { recursive: true });
+    mkdirSync(join(dir, 'fonts'), { recursive: true });
+    copyFileSync(SKETCH_KIT_CSS_PATH, join(dir, 'assets', 'sketch-kit.css'));
+    const marker = SKETCH_KIT_FONTS.find((f) => f.file.includes('patrick-hand'))!;
+    // genuine font at the WRONG (baseDir) location; swapped at the REAL one
+    copyFileSync(join(SKETCH_KIT_DIR, marker.file), join(dir, marker.file));
+    writeFileSync(join(dir, 'assets', marker.file), 'swapped-designed-font');
+    const pin = buildSketchKitPin(dir, join(dir, 'assets', 'sketch-kit.css'));
+    const html = page(`<link rel="stylesheet" href="assets/sketch-kit.css">`, `<div class="sk sk-theme-marker">x</div>`);
+    expect(rules(checkStylesheetIdentity(html, pin))).toContain('font-hash-mismatch');
+  });
+
+  it('a genuine subdirectory layout passes (fonts beside the stylesheet)', () => {
+    const dir = freshDir();
+    mkdirSync(join(dir, 'assets', 'fonts'), { recursive: true });
+    copyFileSync(SKETCH_KIT_CSS_PATH, join(dir, 'assets', 'sketch-kit.css'));
+    const marker = SKETCH_KIT_FONTS.find((f) => f.file.includes('patrick-hand'))!;
+    copyFileSync(join(SKETCH_KIT_DIR, marker.file), join(dir, 'assets', marker.file));
+    const pin = buildSketchKitPin(dir, join(dir, 'assets', 'sketch-kit.css'));
+    const html = page(`<link rel="stylesheet" href="assets/sketch-kit.css">`, `<div class="sk sk-theme-marker">x</div>`);
+    expect(checkStylesheetIdentity(html, pin)).toEqual([]);
+  });
+
   it('a tampered woff2 at a kit font path is rejected (the gpt-5-01 swap)', () => {
     const dir = freshDir();
     mkdirSync(join(dir, 'fonts'), { recursive: true });

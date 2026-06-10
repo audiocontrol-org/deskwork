@@ -20,7 +20,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parse, defaultTreeAdapter as ta } from 'parse5';
 import type { DefaultTreeAdapterMap } from 'parse5';
@@ -268,8 +268,12 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
   // (cursive/handwriting stacks; round-5 gpt-5-codex-01), so it is flagged.
   const usedThemes = new Set<string>();
   collectThemeClasses(parse(html), usedThemes);
+  // Font paths anchor at the RESOLVED STYLESHEET's directory, not baseDir
+  // (AUDIT-20260610-58): CSS url() is stylesheet-relative, so a kit linked
+  // from a subdirectory loads its fonts beside itself.
+  const stylesheetDir = dirname(resolved);
   for (const font of pin.expectedFonts) {
-    const fontPath = resolve(pin.baseDir, font.file);
+    const fontPath = resolve(stylesheetDir, font.file);
     if (!existsSync(fontPath)) {
       if (usedThemes.has(font.theme)) {
         findings.push({

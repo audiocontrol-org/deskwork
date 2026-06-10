@@ -32,6 +32,8 @@ export const ALLOWED_TAGS: ReadonlySet<string> = new Set([
   // via -37 — structure, not polish; input's `type` is value-enumerated via
   // INPUT_TYPE_ALLOWLIST)
   'form', 'input', 'textarea', 'select', 'option',
+  // disclosure structure (AUDIT-20260610-59 — UA-baseline class, like controls)
+  'details', 'summary',
   // text-level structure. NOTE: `pre` is deliberately ABSENT (AUDIT-20260610-04,
   // gpt-5-03 + fable-07): preserved whitespace renders ASCII-art logos/wordmarks
   // from purely allowlisted codepoints — a text-channel image the codepoint axis
@@ -89,6 +91,7 @@ const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>
   textarea: { placeholder: 'plain' },
   label: { for: 'plain' },
   option: { selected: 'plain' },
+  details: { open: 'plain' },
   ol: { start: 'plain', reversed: 'plain' },
   li: { value: 'plain' },
   td: { colspan: 'plain', rowspan: 'plain', headers: 'plain' },

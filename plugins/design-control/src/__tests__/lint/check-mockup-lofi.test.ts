@@ -261,6 +261,20 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// AUDIT-20260610-59 (round-16 gpt-5-02, LOW fp): details/summary are
+// structure-and-flow disclosure primitives — same UA-baseline class as the
+// accepted form controls. `open` is structural state like checked.
+describe('check-mockup-lofi — details/summary (AUDIT-20260610-59)', () => {
+  it('accepts a disclosure block', () => {
+    expect(
+      rules(wrap(`<details><summary>Advanced filters</summary><p>Status and owner controls.</p></details>`)),
+    ).toEqual([]);
+  });
+  it('accepts a default-open disclosure', () => {
+    expect(rules(wrap(`<details open><summary>Filters</summary><p>x</p></details>`))).toEqual([]);
+  });
+});
+
 // Round-15 fixes (AUDIT-20260610-53..57): zero-HIGH round; 2 MED + 3 LOW.
 describe('check-mockup-lofi — round-15 channels', () => {
   // AUDIT-53 (gpt-5-01, MED): dir flips layout direction — author-supplied
