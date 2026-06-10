@@ -138,6 +138,14 @@ export const RESOURCE_URL_ATTRS: Readonly<Record<string, ReadonlySet<string>>> =
 };
 
 /**
+ * Enumerated `meta name` values (AUDIT-20260610-19): `theme-color` paints
+ * browser chrome with brand color and `color-scheme` flips dark mode — visual
+ * channels carried by NAME, so the name itself is allowlisted. `charset` is an
+ * attribute, not a name, and is handled by the attr specs.
+ */
+export const META_NAME_ALLOWLIST: ReadonlySet<string> = new Set(['viewport', 'description']);
+
+/**
  * A `rel` attribute value names EXACTLY a stylesheet — the normalized token set
  * is `['stylesheet']`, nothing more. A mixed `rel="stylesheet icon"` /
  * `"stylesheet preload"` still pulls a non-CSS resource, so it is NOT a clean

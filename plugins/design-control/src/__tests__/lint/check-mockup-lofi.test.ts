@@ -202,6 +202,48 @@ describe('check-mockup-lofi — rejects the <pre> preserved-whitespace imagery c
   });
 });
 
+// AUDIT-20260610-19 (round-4 gpt-5-codex-02 MED; third surfacing of the
+// attr-value channel = AUDIT-05/TASK-12, found by both models across rounds
+// 1/2/4): human-visible attribute VALUES — title tooltips, aria-* announced
+// text — now pass the codepoint allowlist; meta name is an enumerated set, so
+// the theme-color / color-scheme browser-chrome channels are rejected by NAME.
+// class/id stay value-unconstrained (inert under the pin, round-8 as amended).
+describe('check-mockup-lofi — human-visible attr values (AUDIT-20260610-19)', () => {
+  it('rejects designed glyphs in a title tooltip (gpt-5-codex-02 defeating input)', () => {
+    expect(
+      rules(wrap(`<button type="button" class="sk-btn" title="𝐏𝐫𝐞𝐦𝐢𝐮𝐦 polished CTA">Continue</button>`)),
+    ).toContain('disallowed-codepoint');
+  });
+  it('rejects emoji in aria-label (announced/displayable channel)', () => {
+    expect(rules(wrap(`<div aria-label="🎉 launch">x</div>`))).toContain('disallowed-codepoint');
+  });
+  it('accepts ordinary ASCII/accented title and aria values', () => {
+    expect(rules(wrap(`<div title="Détails du plan" aria-label="plan details">x</div>`))).toEqual([]);
+  });
+  it('rejects meta theme-color by NAME (browser-chrome color channel)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
+      `<meta name="theme-color" content="#ff0066"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css"></head><body class="sk">x</body></html>`;
+    expect(rules(html)).toContain('disallowed-meta-name');
+  });
+  it('rejects meta color-scheme by NAME (dark-mode flip channel)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
+      `<meta name="color-scheme" content="dark"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css"></head><body class="sk">x</body></html>`;
+    expect(rules(html)).toContain('disallowed-meta-name');
+  });
+  it('accepts enumerated meta names (viewport, description)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
+      `<meta name="viewport" content="width=device-width, initial-scale=1">` +
+      `<meta name="description" content="structure-and-flow wireframe">` +
+      `<title>WF</title><link rel="stylesheet" href="sketch-kit.css"></head><body class="sk">x</body></html>`;
+    expect(rules(html)).toEqual([]);
+  });
+});
+
 // AUDIT-20260610-13 (round-2 gpt-5-04 MED + round-1 fable-07a; cross-round
 // recurrence): media="print" mutes the pinned kit for screen rendering, so
 // "lint green" no longer guarantees the kit is IN EFFECT — browser-default

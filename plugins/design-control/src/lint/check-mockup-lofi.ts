@@ -24,6 +24,7 @@ import {
   RESOURCE_URL_ATTRS,
   DATA_URI_RE,
   EXTERNAL_URL_RE,
+  META_NAME_ALLOWLIST,
   isStylesheetRel,
 } from '@/lint/allowlist';
 
@@ -150,6 +151,31 @@ function checkElement(el: Element, ctx: WalkContext): void {
     if (!isAllowedAttr(tag, attr)) {
       findings.push({ rule: 'disallowed-attribute', tag, attr, message: `attribute ${attr} on <${tag}> is not in the allowlist` });
       continue;
+    }
+    // Human-visible attribute VALUES pass the codepoint allowlist
+    // (AUDIT-20260610-19): `title` renders as a tooltip and `aria-*` is
+    // announced/displayable — the designed-glyph channel axis-2 closes for
+    // text nodes must not survive in attributes the operator can see.
+    // class/id stay value-unconstrained (inert under the pin, round-8).
+    if (attr === 'title' || attr.startsWith('aria-')) {
+      for (const { codepoint, char } of findDisallowedCodepoints(value)) {
+        findings.push({
+          rule: 'disallowed-codepoint',
+          tag,
+          attr,
+          message: `disallowed codepoint ${formatCodepoint(codepoint)} (${JSON.stringify(char)}) in ${attr} on <${tag}> — visible attribute values follow the lo-fi codepoint allowlist`,
+        });
+      }
+    }
+    // `meta name` is an enumerated set (AUDIT-20260610-19): theme-color /
+    // color-scheme are visual channels carried by NAME.
+    if (tag === 'meta' && attr === 'name' && !META_NAME_ALLOWLIST.has(value.toLowerCase())) {
+      findings.push({
+        rule: 'disallowed-meta-name',
+        tag,
+        attr,
+        message: `meta name="${value}" is not in the enumerated allowlist (${[...META_NAME_ALLOWLIST].join(', ')}) — theme-color/color-scheme are browser-chrome visual channels`,
+      });
     }
     // Value-level URL checks apply ONLY to URL-bearing attrs (URL_ATTRS, the
     // SSOT — currently just href). Scanning every value for "data:" over-

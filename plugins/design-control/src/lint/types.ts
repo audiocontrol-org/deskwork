@@ -15,6 +15,7 @@ export type LintRule =
   | 'external-resource'
   | 'disallowed-uri-scheme'
   | 'disallowed-link-rel'
+  | 'disallowed-meta-name'
   | 'stylesheet-filename-mismatch'
   // axis 2 — text-content codepoint allowlist
   | 'disallowed-codepoint'
