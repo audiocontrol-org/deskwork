@@ -1363,3 +1363,17 @@ Finding-ID: AUDIT-20260610-64 (round-18 gpt-5-03, LOW)
 Status:     fixed-9ac50da5 (2026-06-10; reset joins INPUT_TYPE_ALLOWLIST)
 Severity:   low
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 19 (run 20260610T234331253Z; codex only — claude 0 bytes, 17th consecutive)
+
+**ZERO-HIGH round (convergence count: 1 of 2).** Codex's own summary: "I did
+not find a high-confidence false-negative within the declared scope" — both
+findings are select-surface false-positives, fixed in 930a718c.
+
+### AUDIT-20260610-65 — select/option form-state completions
+
+Finding-ID: AUDIT-20260610-65 (round-19 gpt-5-01 LOW + gpt-5-02 MED; one surface)
+Status:     fixed-930a718c (2026-06-10; select.disabled + option.value/disabled allowlisted; visible-value gate rescoped to input-only rendered values)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/allowlist.ts + check-mockup-lofi.ts
+Direction:  false-positive
