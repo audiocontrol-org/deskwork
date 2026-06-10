@@ -571,3 +571,164 @@ Disposition override: slush-pile; a real cross-model LOW — my AUDIT-23 disposi
 The new AUDIT-23 disposition records an informational observation and twice frames the remediation as deferred-but-coming: "Global per-document message dedup or positional context is an optional future enhancement at the `checkText`/walk boundary; **not done now**" (line 521) and "that is a small enhancement at the `checkText`/walk boundary" (line 526). Per the project's own discipline (`.claude/rules/agent-discipline.md` § "Just for now is bullshit") and the prior triage note at the top of this audit-log that explicitly flagged conditional future-work wording ("to be done when…"), "not done now" reads as the same soft-IOU smell — it implies the work *will* happen without any tracking surface to ensure it does.
 
 The audit prompt's hard constraint also directs surfacing deferral phrasing found in the diff. An informational "no code change" disposition is legitimate, but the wording should commit one way or the other: either file an issue and reference it (`tracked in #NNN`), or state it as an accepted observation that is *not* planned ("position-less findings are the established pattern for this lint; no change planned"). Rewriting to drop "not done now" / "future enhancement" and adopting won't-do/issue-linked framing keeps the record from reintroducing the exact operator-discipline smell the surrounding entries have been closing.
+
+## 2026-06-10 — lint adversarial barrage (runs 20260610T184044970Z + 20260610T184725158Z; codex + claude/fable via stackctl)
+
+Triage notes: every defeating-input below was VERIFIED by executing the real lint
+(not the auditor's prediction) before recording. Same-root-cause cross-model
+findings are folded into one entry; distinct mechanisms stay separate (TF-002).
+Per the backlog-first intake rule (plugin CLAUDE.md, 2026-06-10), each
+work-bearing finding is captured into the installation backlog; the operator
+selects work out. Claude's first pass timed out at 300s with zero output — the
+TF-003 600s fix had landed only in the unread .dw-lifecycle config copy;
+re-landed in .stack-control/audit-barrage-config.yaml (b0a8b24f) and re-fired.
+
+### AUDIT-20260610-01 — Stylesheet pin is opt-in: bare `lintWireframe(html)` admits any local stylesheet
+
+Finding-ID: AUDIT-20260610-01 (gpt-5-02 + fable-02; cross-model — HIGH-confidence)
+Status:     open
+Backlog:    TASK-8
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (stylesheetPin optional)
+
+Without `options.stylesheetPin` no singleton/path/hash check runs; axis-1 accepts any
+relative `<link rel="stylesheet" href="theme.css">` (not external, no bad scheme), so a
+polished local stylesheet rides under a green lint — "lint green ⇒ lo-fi" does not hold
+at the bare-function level. Verified: `ok=true`, zero findings. Candidate fixes: pure
+axis-1 rejects any stylesheet href that is not the kit's canonical name, or the pin
+becomes non-optional at every verb/skill call site (with the bare function documented
+as axis-1-only).
+
+### AUDIT-20260610-02 — Kit themes defeat the inertness premise: `class` alone switches designed typography/color/grid imagery under a green PINNED lint
+
+Finding-ID: AUDIT-20260610-02 (fable-01; single-model, behaviorally verified)
+Status:     open
+Backlog:    TASK-9
+Severity:   high
+Surface:    plugins/design-control/src/lint/allowlist.ts (class inertness premise) + assets/sketch-kit (theme system)
+
+`<body class="sk sk-theme-blueprint">` under a VERIFIED pin renders bundled designed
+typefaces (Space Mono / Patrick Hand), a full palette, and a linear-gradient grid
+background — via the exact channel (class values) axis-1 declares permitted-but-inert.
+Verified: `ok=true` with the pin. The round-8 inertness invariant is false against the
+file the pin certifies. Tension with the operator-approved multi-theme decision
+(mockups/sketch-kit/DECISION.md: the three themes ARE the kit's lo-fi languages) —
+needs an operator call: either the themes are lo-fi-by-definition (amend the invariant
+wording to "inert excluding the closed `.sk-*` vocabulary") or theme-switching is an
+authoring-time decision the lint should pin (e.g. expected-theme in the manifest).
+
+### AUDIT-20260610-03 — Transitive font resources are not identity-pinned
+
+Finding-ID: AUDIT-20260610-03 (gpt-5-01; single-model, behaviorally verified)
+Status:     open
+Backlog:    TASK-10
+Severity:   high
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (pin hashes CSS bytes only)
+
+The pin certifies `sketch-kit.css` bytes; the `@font-face src: url("fonts/*.woff2")`
+files the CSS loads are not hashed. A swapped brand/icon font renders polished
+typography while pin + lint stay green. Candidate fix: extend `buildSketchKitPin` to
+hash the kit's font manifest (the sketch-kit SSOT module already exports the font
+paths) and verify on disk at pin-build time.
+
+### AUDIT-20260610-04 — ASCII-art imagery channel through `<pre>` (and preserved whitespace generally)
+
+Finding-ID: AUDIT-20260610-04 (gpt-5-03 HIGH + fable-07 low; cross-model on the channel, severity disagreement)
+Status:     open
+Backlog:    TASK-11
+Severity:   high
+Surface:    plugins/design-control/src/lint/codepoint.ts (whitespace/punctuation imagery)
+
+A logo/wordmark rendered as ASCII art in `<pre>` uses only allowlisted codepoints +
+preserved whitespace. Verified: `ok=true`. Codex grades it HIGH (branding imagery);
+claude grades it low (plausibly within structure-and-flow). Disposition needs the
+operator's read on whether ASCII art violates the lo-fi guarantee; candidate
+mechanical fixes (whitespace-run/line-art heuristics, `<pre>` removal from the
+allowlist) each have over-rejection costs.
+
+### AUDIT-20260610-05 — Attribute VALUES are never codepoint- or semantics-scanned (meta theme-color / color-scheme; title/aria glyph channels)
+
+Finding-ID: AUDIT-20260610-05 (gpt-5-04 + fable-03 + fable-07c; cross-model — HIGH-confidence on the channel)
+Status:     open
+Backlog:    TASK-12
+Severity:   medium
+Surface:    plugins/design-control/src/lint/allowlist.ts + check-mockup-lofi.ts (attr values beyond URL_ATTRS unconstrained)
+
+`<meta name="theme-color" content="#ff0066">` paints browser chrome with brand color;
+`color-scheme` flips dark mode; `title`/`aria-*`/`id` values accept any codepoints
+(𝐃𝐞𝐬𝐢𝐠𝐧𝐞𝐝 tooltips). Verified: `ok=true`. The codepoint allowlist guards text nodes
+only; the URL checks guard url-kind attrs only — everything else is an unscanned value
+channel. Candidate fix: extend the kind vocabulary (74b824cc's `plain`/`url`) with a
+value-policy per attr (e.g. `meta name` restricted to an enumerated set; codepoint-scan
+human-visible value attrs).
+
+### AUDIT-20260610-06 — `integrity` is rejected by axis-1, so the pin's SRI branch is unreachable on any lint-green document
+
+Finding-ID: AUDIT-20260610-06 (fable-04; single-model, behaviorally verified)
+Status:     open
+Backlog:    TASK-13
+Severity:   medium
+Surface:    plugins/design-control/src/lint/allowlist.ts (link attrs) vs stylesheet-pin.ts (SRI verification)
+
+Authoring the recommended hardening — a correct `integrity` digest on the kit link —
+yields `disallowed-attribute`; the entire `normalizeSriToken`/strongest-algorithm
+machinery (AUDIT-15/18/19/21 hardened) can never fire on a document axis-1 accepts.
+Verified: `ok=false` with a CORRECT sha384. The two axes contradict. Fix: allowlist
+`integrity` (kind: plain — its value is verified by axis-1.5, not URL-scanned), or
+document SRI-must-be-absent and delete the dead branch.
+
+### AUDIT-20260610-07 — Charset differential: the lint judges the caller's UTF-8 decode; the browser honors `<meta charset>`
+
+Finding-ID: AUDIT-20260610-07 (fable-05; single-model)
+Status:     open
+Backlog:    TASK-14
+Severity:   medium
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (decoded-string API; charset unvalidated)
+
+A wireframe stored in a declared legacy encoding renders different glyphs in the
+browser than the UTF-8 string the lint scanned — a typography channel the codepoint
+axis structurally cannot see. Not behaviorally probed (requires byte-level fixture);
+mechanism confirmed by API shape (lint takes a decoded string; parse5 ignores meta
+charset). Candidate fix: reject any `<meta charset>` other than utf-8 (cheap,
+closes the differential).
+
+### AUDIT-20260610-08 — Over-rejection: `label for` + `<input>` (structure-and-flow form controls)
+
+Finding-ID: AUDIT-20260610-08 (gpt-5-05; single-model, behaviorally verified)
+Status:     open
+Backlog:    TASK-15
+Severity:   medium
+Surface:    plugins/design-control/src/lint/allowlist.ts (element/attr omissions)
+Direction:  false-positive
+
+A legitimate lo-fi search-form wireframe (`<label for="q">` + `<input id="q"
+placeholder="Query">`) is rejected (`disallowed-attribute(for)`,
+`disallowed-element`). Verified. Form controls are structure, not polish. Fix needs
+kind decisions per 74b824cc's vocabulary (input/type/placeholder/for all plain) and a
+view on which controls belong (input/textarea/select/option?) — feeds the
+positive-corpus task directly.
+
+### AUDIT-20260610-09 — `EXTERNAL_URL_RE` misses backslash-authority hrefs
+
+Finding-ID: AUDIT-20260610-09 (fable-06; single-model)
+Status:     open
+Backlog:    TASK-16
+Severity:   low
+Surface:    plugins/design-control/src/lint/allowlist.ts (EXTERNAL_URL_RE)
+
+`href="\\cdn.example.com\theme.css"` normalizes (WHATWG) to protocol-relative and
+fetches remotely, but the regex requires literal `//`. Confined to the no-pin mode
+(pinned mode catches it as path-mismatch), so low. Fix: normalize `\` → `/` before
+the external test.
+
+### AUDIT-20260610-10 — `media` can mute the pinned kit (informational)
+
+Finding-ID: AUDIT-20260610-10 (fable-07a; single-model)
+Status:     informational
+Severity:   informational
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (media not constrained)
+
+`media="(min-width:99999px)"` passes the pin while the kit never applies — green
+guarantees the kit is *linked*, not *in effect*. Renders as browser-default (not
+polish), so observation only; recorded because it narrows the inertness reasoning's
+stated precondition. No backlog item — informational entries are not work.
