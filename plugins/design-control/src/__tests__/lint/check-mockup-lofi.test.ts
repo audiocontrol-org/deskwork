@@ -261,6 +261,48 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// AUDIT-20260610-41 (round-11 gpt-5-01, MED): viewport meta content is a
+// rendering channel (forced scale/zoom presentation) — the one enumerated meta
+// whose VALUE stayed unconstrained. Only the canonical responsive declaration
+// is permitted.
+describe('check-mockup-lofi — viewport content (AUDIT-20260610-41)', () => {
+  const metaDoc = (content: string): string =>
+    `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
+    `<meta name="viewport" content="${content}"><title>WF</title>` +
+    `<link rel="stylesheet" href="sketch-kit.css"></head><body class="sk">x</body></html>`;
+  it('rejects a scaling/zoom-forcing viewport (round-11 defeating input)', () => {
+    expect(rules(metaDoc('width=375, initial-scale=0.38, user-scalable=no'))).toContain(
+      'disallowed-viewport',
+    );
+  });
+  it('accepts the canonical responsive viewport', () => {
+    expect(rules(metaDoc('width=device-width, initial-scale=1'))).toEqual([]);
+  });
+});
+
+// AUDIT-20260610-42 (round-11 gpt-5-02, MED): a password value renders as
+// masking BULLETS — author-controlled glyph substitution through an allowed
+// attribute. Wireframes have no business prefilling secrets; password inputs
+// must not carry value (placeholder renders as plain text and stays fine).
+describe('check-mockup-lofi — password value (AUDIT-20260610-42)', () => {
+  it('rejects a prefilled password (renders as decorative bullets)', () => {
+    expect(rules(wrap(`<input type="password" value="AAAAAAAAAAAAAAAA">`))).toContain(
+      'password-value',
+    );
+  });
+  it('accepts a password input with placeholder only', () => {
+    expect(rules(wrap(`<input type="password" placeholder="Enter code">`))).toEqual([]);
+  });
+});
+
+// AUDIT-20260610-43 (round-11 gpt-5-03, LOW fp): number is structural
+// (quantity/seats); spinner chrome is UA baseline per the declared boundary.
+describe('check-mockup-lofi — number input (AUDIT-20260610-43)', () => {
+  it('accepts input type=number', () => {
+    expect(rules(wrap(`<form><label>Seats <input type="number" placeholder="3"></label></form>`))).toEqual([]);
+  });
+});
+
 // AUDIT-20260610-38 (round-10 gpt-5-01, HIGH): sk-theme-* below body composes
 // mixed-theme surfaces (per-section typography/palette/texture switching) —
 // the DECISION doc's contract is ONE theme, selected on the body root. Theme

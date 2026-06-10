@@ -46,6 +46,7 @@ import {
   EXTERNAL_URL_RE,
   META_NAME_ALLOWLIST,
   INPUT_TYPE_ALLOWLIST,
+  VIEWPORT_CONTENT_ALLOWLIST,
   isStylesheetRel,
 } from '@/lint/allowlist';
 
@@ -258,6 +259,36 @@ function checkElement(el: Element, ctx: WalkContext): void {
         attr,
         message: `meta name="${value}" is not in the enumerated allowlist (${[...META_NAME_ALLOWLIST].join(', ')}) — theme-color/color-scheme are browser-chrome visual channels`,
       });
+    }
+    // Viewport content is a rendering channel (AUDIT-20260610-41): forced
+    // scale/zoom presents an app-screenshot look outside the pinned kit. Only
+    // the canonical responsive declaration passes.
+    if (tag === 'meta' && attr === 'content') {
+      const nameValue = ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'name')?.value;
+      if (nameValue?.toLowerCase() === 'viewport') {
+        const normalized = value.toLowerCase().split(',').map((p) => p.trim()).filter(Boolean).sort().join(',');
+        if (!VIEWPORT_CONTENT_ALLOWLIST.has(normalized)) {
+          findings.push({
+            rule: 'disallowed-viewport',
+            tag,
+            attr,
+            message: `viewport content "${value}" is not the canonical responsive declaration (width=device-width, initial-scale=1) — viewport scaling is a rendering channel`,
+          });
+        }
+      }
+    }
+    // A password value renders as masking BULLETS (AUDIT-20260610-42) —
+    // author-controlled glyph substitution; wireframes don't prefill secrets.
+    if (tag === 'input' && attr === 'value') {
+      const typeValue = ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'type')?.value;
+      if (typeValue?.toLowerCase() === 'password' && value !== '') {
+        findings.push({
+          rule: 'password-value',
+          tag,
+          attr,
+          message: `a prefilled password renders as a row of masking bullets (decorative glyph substitution) — use placeholder for the field's copy`,
+        });
+      }
     }
     // Value-level URL checks apply ONLY to URL-bearing attrs (URL_ATTRS, the
     // SSOT — currently just href). Scanning every value for "data:" over-

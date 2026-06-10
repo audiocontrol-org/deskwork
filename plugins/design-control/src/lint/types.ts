@@ -20,6 +20,8 @@ export type LintRule =
   | 'kit-root-missing'
   | 'textarea-content'
   | 'theme-placement'
+  | 'disallowed-viewport'
+  | 'password-value'
   | 'stylesheet-filename-mismatch'
   // axis 2 — text-content codepoint allowlist
   | 'disallowed-codepoint'

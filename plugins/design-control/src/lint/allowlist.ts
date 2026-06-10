@@ -155,6 +155,17 @@ export const RESOURCE_URL_ATTRS: Readonly<Record<string, ReadonlySet<string>>> =
  */
 export const INPUT_TYPE_ALLOWLIST: ReadonlySet<string> = new Set([
   'text', 'email', 'search', 'password', 'checkbox', 'radio', 'button', 'submit',
+  'number', // AUDIT-20260610-43: quantity fields are structural; spinner is UA baseline
+]);
+
+/**
+ * The one permitted viewport declaration (AUDIT-20260610-41): viewport content
+ * is a rendering channel (forced scale/zoom presentation), so only the
+ * canonical responsive line is allowed. Compared as a normalized
+ * comma-separated pair set: lowercased, trimmed, SORTED, comma-joined.
+ */
+export const VIEWPORT_CONTENT_ALLOWLIST: ReadonlySet<string> = new Set([
+  'initial-scale=1,width=device-width',
 ]);
 
 /**
