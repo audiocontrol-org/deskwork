@@ -6,7 +6,7 @@ Durable record of audit findings + their dispositions. Status values: `open` →
 
 ## 2026-06-10 — after_implement governance barrage (009 read-side + setup)
 
-Cross-model audit-barrage (`stackctl govern --mode implement`) over the full 009 diff (base `c2f411ad`). Models: `claude` (opus48, exit 0, 172s) + `codex` (gpt-5, exit 0, 87s). Run dir: `.stack-control/audit-runs/20260610T002606307Z-009-project-doc-setup-after_clarify/`. 6 claude + 4 codex raw findings → 9 deduped entries. **Lift step failed** (audit-barrage-lift resolves `docs/*/001-IN-PROGRESS/<slug>/`, not the Spec Kit `specs/<feature>/` layout — see tooling-feedback below); findings recorded here by hand.
+Cross-model audit-barrage (`stackctl govern --mode implement`) over the full 009 diff (base `c2f411ad`). Models: `claude` (opus48, exit 0, 172s) + `codex` (gpt-5, exit 0, 87s). Run dir: `.stack-control/audit-runs/20260610T002606307Z-009-project-doc-setup-after_clarify/`. 6 claude + 4 codex raw findings → 9 deduped entries. **Lift step failed** (audit-barrage-lift resolves `docs/*/001-IN-PROGRESS/<slug>/`, not the Spec Kit `specs/<feature>/` layout — logged as **TF-31** in `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/tooling-feedback.md`); findings recorded here by hand.
 
 ### HIGH
 
@@ -59,9 +59,4 @@ Surface: `plugins/stack-control/src/subcommands/{inbox,roadmap}.ts` dispatch.
 Title: Removing the `default` switch arm drops the exhaustiveness backstop.
 The pre-dispatch unknown-subaction guard rejects only subactions ABSENT from `SUBACTION_SPECS`; a spec key without a matching `case` would now silently no-op (exit 0). Fix: add a `const _exhaustive: never = subaction` after each switch (compile-time exhaustiveness) — or restore a `default` that fails loud.
 
-### Tooling friction (governance harness — NOT 009 code)
-
-**TF-20260610-01** — Status: open — surfaced this run
-Surface: `audit-barrage-lift` feature-audit-log resolution (`src/subcommands/backlog.ts` `resolveAuditLog` → `resolveFeatureRoot`, `docs/*/001-IN-PROGRESS/<slug>/audit-log.md`).
-Title: The governance lift step resolves the feature audit-log under the dw-lifecycle docs layout, not the Spec Kit `specs/<feature>/` layout.
-`stackctl govern --mode implement` ran the barrage successfully (both model lanes exit 0) but the lift step exited 2: `feature '009-project-doc-setup' not found under docs/*/001-IN-PROGRESS/`. The whole point of the `deskwork-governance` Spec Kit extension is to govern features authored under `specs/<feature>/`, but the lift inherits dw-lifecycle's `docs/*/001-IN-PROGRESS/<slug>/` convention, so it cannot find (or create) `specs/<feature>/audit-log.md`. Findings for THIS run were recorded by hand into this file as a result. Fix candidate: teach the lift's feature-audit-log resolution to honor the Spec Kit `specs/<feature>/audit-log.md` location (or the installation config's `feature_audit_log_pattern`, which the 009 dogfood already declares as `specs/{feature}/audit-log.md`). Operator decision — this is governance-harness scope, not 009.
+> The governance lift-path friction surfaced by this run is a tooling-harness issue, not a 009 code finding — it is logged as **TF-31** in `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/tooling-feedback.md` (the designated Spec-Kit friction log), not here.
