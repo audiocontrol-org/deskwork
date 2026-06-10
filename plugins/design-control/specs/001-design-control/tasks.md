@@ -21,12 +21,12 @@ verbatim in substance** — when they drift, the PRD wins.
 
 > **Design-shaped feature — orchestrate existing engines, don't build them.** Per the thesis:
 > never roll your own visual verification. `/frontend-design` is the engine for the *authoring*
-> concerns; the **referee is a cross-model audit-barrage** (reuses dw-lifecycle audit-barrage +
+> concerns; the **referee is a cross-model audit-barrage** (reuses stack-control audit-barrage +
 > audit-protocol, parameterized for design review — `/frontend-design` in the Claude agent, each
 > other family's equivalent in its agent; cross-model agreement = signal). See the PRD **DESIGN
 > AMENDMENT (2026-06-06)**. Any UI/CSS authored here (the sketch-kit) is a static lo-fi
 > convention. Implementation runs in a **separate session** against the `design-control` worktree
-> (`/dw-lifecycle:implement`).
+> (`/stack-control:execute`, successor to the deprecated `/dw-lifecycle:implement`).
 
 > **Definitions** (see PRD § Definitions): a **surface** is an operator-declared named UI region
 > (`surface id`), verified across `route/state + viewport + capture-step` (a `capture-step` is a
@@ -197,7 +197,7 @@ preserved); a **referee-preview manifest** that omits a required referee field i
 ## Phase 5 — `v1-referee-preview` evidence-spike (GATED; advisory only)
 
 > **Per the PRD DESIGN AMENDMENT (2026-06-06): the referee is a cross-model audit-barrage**, not a
-> single Claude-vision shim. It REUSES the dw-lifecycle audit-barrage + audit-protocol (declared
+> single Claude-vision shim. It REUSES the stack-control audit-barrage + audit-protocol (declared
 > cross-plugin dependency), parameterized with a design-review prompt that directs each family's
 > agent to review the screenshot / live web interface against wireframe-spirit +
 > design-language-letter using its own design engine (`/frontend-design` in the Claude agent, the
@@ -206,7 +206,7 @@ preserved); a **referee-preview manifest** that omits a required referee field i
 
 - [ ] `referee-screenshot` fulfilled by the **cross-model audit-barrage**: a design-review prompt
       template (explicitly names the per-family engine — `/frontend-design` for Claude, codex's
-      equivalent, etc.) + the reuse wiring onto dw-lifecycle `audit-barrage` + audit-protocol. v1
+      equivalent, etc.) + the reuse wiring onto stack-control `audit-barrage` + audit-protocol. v1
       fires every family that can both review the image/web-interface AND run a design engine
       (Claude + codex certain; gemini if its CLI qualifies). No bespoke vision engine is built;
       per-family vision conformance is gated on the falsification set (a non-qualifying family is

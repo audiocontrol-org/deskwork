@@ -13,7 +13,7 @@ deskwork:
 **Feature Branch**: `feature/design-control`
 **Created**: 2026-06-05
 **Status**: In implementation (Phase 1 of 6 — see `tasks.md`)
-**Input**: Ported 2026-06-10 from the dw-lifecycle feature docs (`docs/1.0/001-IN-PROGRESS/design-control/prd.md`; git history preserves the original) into the stack-control regime. The content below is the operator-approved PRD verbatim — the design-of-record converged via 11 adversarial audit-barrage rounds; only this header and relative links were adjusted in the port.
+**Input**: Ported 2026-06-10 from the dw-lifecycle feature docs (`docs/1.0/001-IN-PROGRESS/design-control/prd.md`; git history preserves the original) into the stack-control regime. The content below is the operator-approved PRD verbatim — the design-of-record converged via 11 adversarial audit-barrage rounds. Port adjustments, in full: this header; relative links whose depth changed; and a same-day amendment renaming the referee's declared cross-plugin dependency and the implement-session verb from the deprecated dw-lifecycle plugin to its stack-control successor (byte-equivalent verb interface; operator decision 2026-06-10). Provenance mentions of dw-lifecycle (e.g. the `.dw-lifecycle/scope-discovery/audit-runs` convergence records) are left verbatim.
 
 > **Design-of-record.** This PRD is the self-standing design for the feature. It absorbs the
 > converged design [`docs/superpowers/specs/2026-06-04-design-control-design.md`](../../../../docs/superpowers/specs/2026-06-04-design-control-design.md)
@@ -75,7 +75,8 @@ This supersedes the "single Claude `/frontend-design` referee adapter; the audit
 text-only; cross-model vision is phase-2-unproven" framing that still appears in the
 engine-adapter-seam and identity passages (kept for convergence provenance). Operator decision:
 
-- **The referee is the dw-lifecycle audit-barrage + audit protocol, parameterized for design
+- **The referee is the stack-control audit-barrage + audit protocol (successor to the deprecated
+  dw-lifecycle verbs, byte-equivalent interface), parameterized for design
   review** — design-control *productizing* the same discipline it is developed with (Level 2),
   not a bespoke verifier. Multiple model agents *look at* the realized surface (a screenshot
   **or the live web interface** — the agents are agentic + multimodal; the prompt instructs them
@@ -86,7 +87,7 @@ engine-adapter-seam and identity passages (kept for convergence provenance). Ope
   the Claude agent, the equivalent design-review tool in each other family's agent (e.g. codex).
   "`/frontend-design` is the engine" holds *inside the Claude judge*; the barrage adds the other
   families for the stochastic-correctness diversity that makes the verdict trustworthy.
-- **Reuse, not re-implement:** the referee invokes the existing dw-lifecycle audit-barrage +
+- **Reuse, not re-implement:** the referee invokes the existing stack-control audit-barrage +
   audit-protocol (declared cross-plugin dependency, like `/frontend-design`), parameterized with
   a design-review prompt. Embodying a parallel copy would itself be "rolling your own."
 - **Architected as a barrage from v1:** v1 fires whatever model families can both review the
@@ -172,7 +173,7 @@ conformance clauses are load-bearing:
 **The referee is architected as a barrage from v1** (superseding the prior "one Claude adapter;
 cross-model vision is phase-2-unproven" plan — that plan wrongly assumed the barrage is
 text-only). v1 fires whatever model families can both review the image/web-interface AND run a
-design engine. The referee **reuses** the existing dw-lifecycle audit-barrage + audit-protocol
+design engine. The referee **reuses** the existing stack-control audit-barrage + audit-protocol
 (declared cross-plugin dependency), parameterized with a design-review prompt — it builds no
 vision engine of its own. Per-family vision conformance (image ingestion at fidelity +
 structured output) is a Phase-5 deliverable, gated on the falsification set; a family that
@@ -511,7 +512,7 @@ a screenshot) — NOT agent-independent (a referee engine is required; declared 
 + fail-loud preflight). **`/frontend-design` is the engine, not a tool we build** — any UI/CSS
 authored here (the sketch-kit) is a **static lo-fi convention**; visual verification is
 `/frontend-design`. Implementation runs in a **separate session** against the `design-control`
-worktree via `/dw-lifecycle:implement`.
+worktree via `/stack-control:execute` (successor to the deprecated `/dw-lifecycle:implement`).
 
 ## Phase 2-of-product (captured; out of v1)
 
