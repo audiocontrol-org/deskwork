@@ -261,6 +261,39 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// AUDIT-20260610-36 (round-9 gpt-5-01 HIGH + gpt-5-02 MED; one mechanism):
+// multiline visible-attr values RENDER per line (placeholder in the textarea
+// viewport; title in the tooltip), but density scanned the aggregate string —
+// art rows hid behind a prose tail. The density gate runs per LINE of a
+// multiline visible-attr value.
+describe('check-mockup-lofi — per-line density on visible attrs (AUDIT-20260610-36)', () => {
+  it('rejects placeholder art rows with a diluting prose tail (round-9 gpt-5-01)', () => {
+    const v = `#######   #######&#10;#.....#   #.....#&#10;Ordinary onboarding notes and review copy that dilutes the whole-string statistics`;
+    expect(rules(wrap(`<textarea placeholder="${v}"></textarea>`))).toContain('punctuation-density');
+  });
+  it('rejects title tooltip art rows with a diluting prose tail (round-9 gpt-5-02)', () => {
+    const v = `#######   #######&#10;#.....#   #.....#&#10;Ordinary roadmap approval notes and review prose dilute the aggregate value`;
+    expect(rules(wrap(`<button type="button" class="sk-btn" title="${v}">Continue</button>`))).toContain('punctuation-density');
+  });
+  it('accepts a legitimate multiline placeholder', () => {
+    const v = `Add your notes here&#10;One idea per line&#10;(optional)`;
+    expect(rules(wrap(`<textarea placeholder="${v}"></textarea>`))).toEqual([]);
+  });
+});
+
+// AUDIT-20260610-37 (round-9 gpt-5-03, LOW fp): select/option are the same
+// structural form class as input/textarea.
+describe('check-mockup-lofi — select/option (AUDIT-20260610-37)', () => {
+  it('accepts a labeled select with options', () => {
+    expect(
+      rules(wrap(`<form><label for="plan">Plan</label><select id="plan"><option>Starter</option><option>Team</option></select></form>`)),
+    ).toEqual([]);
+  });
+  it('option text rides the text gates', () => {
+    expect(rules(wrap(`<select><option>𝐏𝐫𝐞𝐦𝐢𝐮𝐦</option></select>`))).toContain('disallowed-codepoint');
+  });
+});
+
 // AUDIT-20260610-24 (round-5 gpt-5-codex-04; FOURTH surfacing of the
 // form-controls over-rejection: rounds 1, 3, 5 = AUDIT-08/TASK-15): native
 // form flow is structure, not polish. form / input / label[for] are

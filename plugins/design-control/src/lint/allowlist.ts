@@ -28,9 +28,10 @@ export const ALLOWED_TAGS: ReadonlySet<string> = new Set([
   'div', 'span', 'header', 'footer', 'main', 'nav', 'section', 'article', 'aside',
   // headings
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  // native form flow (AUDIT-20260610-24 + textarea via -32 — structure, not
-  // polish; input's `type` is value-enumerated via INPUT_TYPE_ALLOWLIST)
-  'form', 'input', 'textarea',
+  // native form flow (AUDIT-20260610-24 + textarea via -32 + select/option
+  // via -37 — structure, not polish; input's `type` is value-enumerated via
+  // INPUT_TYPE_ALLOWLIST)
+  'form', 'input', 'textarea', 'select', 'option',
   // text-level structure. NOTE: `pre` is deliberately ABSENT (AUDIT-20260610-04,
   // gpt-5-03 + fable-07): preserved whitespace renders ASCII-art logos/wordmarks
   // from purely allowlisted codepoints — a text-channel image the codepoint axis

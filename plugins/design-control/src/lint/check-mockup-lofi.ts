@@ -205,14 +205,17 @@ function checkElement(el: Element, ctx: WalkContext): void {
           message: `disallowed codepoint ${formatCodepoint(codepoint)} (${JSON.stringify(char)}) in ${attr} on <${tag}> — visible attribute values follow the lo-fi codepoint allowlist`,
         });
       }
-      // Visible attr values get the density gate too (AUDIT-20260610-21):
-      // a tooltip is a hover-rendered surface for the same punctuation art.
-      if (isPunctuationDense(value)) {
+      // Visible attr values get the density gate too (AUDIT-20260610-21) —
+      // and PER LINE (AUDIT-20260610-36): a multiline placeholder renders
+      // linewise in the textarea viewport and a multiline title renders
+      // linewise in the tooltip, so art rows must not hide behind a diluting
+      // prose tail in the aggregate string.
+      if (isPunctuationDense(value) || value.split('\n').some((line) => isPunctuationDense(line))) {
         findings.push({
           rule: 'punctuation-density',
           tag,
           attr,
-          message: `${attr} on <${tag}> is punctuation-dense (imagery-shaped) — tooltip/announced text follows the same anti-art gate as text content`,
+          message: `${attr} on <${tag}> carries punctuation-dense (imagery-shaped) content — rendered attr surfaces follow the same anti-art gate as text content, per line`,
         });
       }
     }
