@@ -6,7 +6,7 @@
 // write-failure / 2 usage-or-config-refusal (contracts/setup-cli.md).
 
 import { existsSync, statSync } from 'node:fs';
-import { resolve as resolvePath } from 'node:path';
+import { dirname, join, resolve as resolvePath } from 'node:path';
 import { findInstallation } from '../config/installation.js';
 import { resolvePaths } from '../config/resolve-paths.js';
 import { InstallationError } from '../config/errors.js';
@@ -55,6 +55,7 @@ export async function runSetupCli(args: string[]): Promise<void> {
   }
 
   const { root, resolved } = resolveTarget(at);
+  assertNoNestedInstallationCollision(root, resolved);
   const grammarOpts = grammarOptsForRoot(root);
 
   const items: SetupItem[] = [];
@@ -89,6 +90,44 @@ export async function runSetupCli(args: string[]): Promise<void> {
   const report: SetupReport = { installationRoot: root, items, ready };
   process.stdout.write(renderReport(report, !apply));
   process.exit(ready ? 0 : 1);
+}
+
+/**
+ * Cross-installation isolation (009 T027, FR-024 / D10): a parent installation's
+ * scope EXCLUDES nested child subtrees. Refuse (exit 2) any resolved working-file
+ * location that falls within a nested child installation (a strict descendant of
+ * `root` carrying its own `.stack-control/config.yaml`). Sibling-installation
+ * collisions are already caught by the within-root containment check (a sibling
+ * is outside this root → 'escape').
+ */
+function assertNoNestedInstallationCollision(root: string, resolved: ResolvedPaths): void {
+  for (const key of MANAGED_KEYS) {
+    const location = resolved[key];
+    const childRoot = nestedInstallationEnclosing(location, root);
+    if (childRoot !== null) {
+      process.stderr.write(
+        `setup: configured ${key} location ${location} falls within a nested installation ` +
+          `rooted at ${childRoot} (a parent's scope excludes nested child subtrees — FR-024)\n`,
+      );
+      process.exit(2);
+    }
+  }
+}
+
+/**
+ * Walk up from `location`'s directory toward `root`; return the nearest strict
+ * descendant of `root` that carries a `.stack-control/config.yaml` (a nested
+ * child installation enclosing `location`), or null when none intervenes.
+ */
+function nestedInstallationEnclosing(location: string, root: string): string | null {
+  let dir = dirname(resolvePath(location));
+  for (;;) {
+    if (dir === root) return null;
+    if (existsSync(join(dir, '.stack-control', 'config.yaml'))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null; // reached filesystem root without hitting `root`
+    dir = parent;
+  }
 }
 
 /**

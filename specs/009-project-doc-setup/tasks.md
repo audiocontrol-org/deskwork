@@ -88,8 +88,8 @@ Source: `plugins/stack-control/src/…` · Tests: `plugins/stack-control/tests/�
 
 **Goal**: N installations per repo, fully isolated; nearest-wins; collisions refused. **Independent test**: two installations, capture isolation + re-setup isolation + cross-installation collision refusal (quickstart Scenarios 4 + 7).
 
-- [ ] T026 [P] [US4] RED: `plugins/stack-control/tests/setup/monorepo.test.ts` — two installations at distinct subtrees operate in isolation (a capture in one reaches zero of the other's files); re-setup of one leaves the other hash-unchanged; a verb in a subdir resolves nearest-wins; a configured location escaping the root or colliding with a sibling installation is refused (SC-008, FR-021/022/023/024).
-- [ ] T027 [US4] In `setup.ts` + `resolve-paths.ts`: honor `--at` targeting; add cross-installation collision/escape detection (parent scope excludes nested child subtrees) → GREEN T026.
+- [X] T026 [P] [US4] RED: `plugins/stack-control/tests/setup/monorepo.test.ts` — two installations at distinct subtrees operate in isolation (a capture in one reaches zero of the other's files); re-setup of one leaves the other hash-unchanged; a verb in a subdir resolves nearest-wins; a configured location escaping the root or colliding with a sibling installation is refused (SC-008, FR-021/022/023/024).
+- [X] T027 [US4] In `setup.ts` + `resolve-paths.ts`: honor `--at` targeting; add cross-installation collision/escape detection (parent scope excludes nested child subtrees) → GREEN T026.
 
 ---
 
