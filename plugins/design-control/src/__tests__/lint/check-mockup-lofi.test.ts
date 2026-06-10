@@ -202,6 +202,33 @@ describe('check-mockup-lofi — rejects the <pre> preserved-whitespace imagery c
   });
 });
 
+// AUDIT-20260610-24 (round-5 gpt-5-codex-04; FOURTH surfacing of the
+// form-controls over-rejection: rounds 1, 3, 5 = AUDIT-08/TASK-15): native
+// form flow is structure, not polish. form / input / label[for] are
+// allowlisted; input type is an ENUMERATED structural set — type="image"
+// (resource-loading) and type="color" (visual picker chrome) stay rejected.
+describe('check-mockup-lofi — native form flow (AUDIT-20260610-24)', () => {
+  it('accepts the round-5 form-step wireframe', () => {
+    expect(
+      rules(wrap(`<form><label>Email</label><input type="text"><button type="button" class="sk-btn">Continue</button></form>`)),
+    ).toEqual([]);
+  });
+  it('accepts label[for] + input id/placeholder (the round-1 variant)', () => {
+    expect(
+      rules(wrap(`<label for="q">Search</label><input id="q" type="search" placeholder="Query">`)),
+    ).toEqual([]);
+  });
+  it('rejects input type="image" (resource-loading control)', () => {
+    expect(rules(wrap(`<input type="image">`))).toContain('disallowed-input-type');
+  });
+  it('rejects input type="color" (visual picker channel)', () => {
+    expect(rules(wrap(`<input type="color">`))).toContain('disallowed-input-type');
+  });
+  it('rejects a src attribute on input via the allowlist catch-all', () => {
+    expect(rules(wrap(`<input type="text" src="x.png">`))).toContain('disallowed-attribute');
+  });
+});
+
 // AUDIT-20260610-19 (round-4 gpt-5-codex-02 MED; third surfacing of the
 // attr-value channel = AUDIT-05/TASK-12, found by both models across rounds
 // 1/2/4): human-visible attribute VALUES — title tooltips, aria-* announced

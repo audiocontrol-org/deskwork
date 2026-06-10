@@ -28,6 +28,9 @@ export const ALLOWED_TAGS: ReadonlySet<string> = new Set([
   'div', 'span', 'header', 'footer', 'main', 'nav', 'section', 'article', 'aside',
   // headings
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  // native form flow (AUDIT-20260610-24 — structure, not polish; input's
+  // `type` is value-enumerated via INPUT_TYPE_ALLOWLIST)
+  'form', 'input',
   // text-level structure. NOTE: `pre` is deliberately ABSENT (AUDIT-20260610-04,
   // gpt-5-03 + fable-07): preserved whitespace renders ASCII-art logos/wordmarks
   // from purely allowlisted codepoints — a text-channel image the codepoint axis
@@ -74,6 +77,11 @@ const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>
   link: { rel: 'plain', href: 'url', integrity: 'plain' },
   a: { href: 'url' },
   button: { type: 'plain' },
+  // Form flow (AUDIT-20260610-24): input.type is plain-kind here but its VALUE
+  // is enumerated (INPUT_TYPE_ALLOWLIST) — image loads a resource, color opens
+  // a visual picker; both stay rejected.
+  input: { type: 'plain', placeholder: 'plain', value: 'plain' },
+  label: { for: 'plain' },
   ol: { start: 'plain', reversed: 'plain' },
   li: { value: 'plain' },
   td: { colspan: 'plain', rowspan: 'plain', headers: 'plain' },
@@ -136,6 +144,15 @@ export const URL_ATTRS: ReadonlySet<string> = new Set(URL_ATTR_PAIRS.map(([, att
 export const RESOURCE_URL_ATTRS: Readonly<Record<string, ReadonlySet<string>>> = {
   link: new Set(['href']),
 };
+
+/**
+ * Enumerated `input type` values (AUDIT-20260610-24): the structural form
+ * controls. `image` LOADS a resource (src), `file`/`color`/`range`/`date`-kin
+ * open visual chrome — none are structure-and-flow; all stay rejected.
+ */
+export const INPUT_TYPE_ALLOWLIST: ReadonlySet<string> = new Set([
+  'text', 'email', 'search', 'password', 'checkbox', 'radio', 'button', 'submit',
+]);
 
 /**
  * Enumerated `meta name` values (AUDIT-20260610-19): `theme-color` paints

@@ -35,6 +35,7 @@ import {
   DATA_URI_RE,
   EXTERNAL_URL_RE,
   META_NAME_ALLOWLIST,
+  INPUT_TYPE_ALLOWLIST,
   isStylesheetRel,
 } from '@/lint/allowlist';
 
@@ -192,6 +193,16 @@ function checkElement(el: Element, ctx: WalkContext): void {
           message: `${attr} on <${tag}> is punctuation-dense (imagery-shaped) — tooltip/announced text follows the same anti-art gate as text content`,
         });
       }
+    }
+    // `input type` is an enumerated structural set (AUDIT-20260610-24):
+    // image loads a resource; color/file/range open visual chrome.
+    if (tag === 'input' && attr === 'type' && !INPUT_TYPE_ALLOWLIST.has(value.toLowerCase())) {
+      findings.push({
+        rule: 'disallowed-input-type',
+        tag,
+        attr,
+        message: `input type="${value}" is not in the enumerated structural set (${[...INPUT_TYPE_ALLOWLIST].join(', ')})`,
+      });
     }
     // `meta name` is an enumerated set (AUDIT-20260610-19): theme-color /
     // color-scheme are visual channels carried by NAME.
