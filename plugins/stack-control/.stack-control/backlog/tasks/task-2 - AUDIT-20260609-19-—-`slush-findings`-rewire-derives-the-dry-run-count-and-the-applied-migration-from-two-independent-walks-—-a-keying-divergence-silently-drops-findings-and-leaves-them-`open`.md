@@ -7,10 +7,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-09 19:37'
+updated_date: '2026-06-10 21:32'
 labels:
   - 'type:migrated-finding'
   - 'feature:pluggable-lifecycle-providers'
   - 'finding:AUDIT-20260609-19'
+  - promoted
 dependencies: []
 references:
   - 'audit:pluggable-lifecycle-providers:AUDIT-20260609-19'
@@ -18,4 +20,8 @@ priority: medium
 ordinal: 2000
 ---
 
+## Implementation Notes
 
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** tasks:specs/013-audit-protocol-hardening
+<!-- SECTION:NOTES:END -->
