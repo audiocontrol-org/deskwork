@@ -50,6 +50,13 @@ stance. Source essay: <https://stackcontrol.org/blog/the-lifecycle-and-why-agent
 
 ## Working conventions (this plugin)
 
+- **Backlog-first intake (operator rule, 2026-06-10):** every bug, gap, friction report, and
+  slushed audit finding goes into the **local backlog FIRST** (`stackctl backlog capture
+  <title> --type bug|gap --ref <pointer>`, or `backlog import-slush` once it can resolve
+  spec-layout features). Work is then **selected OUT of the backlog by the operator** — the
+  agent never picks a backlog item to work on unilaterally. Capture ≠ scope: capturing is
+  always in-bounds and immediate; selection is the operator's. When a slushed audit-log
+  finding migrates, flip its `Status:` to `migrated-to-backlog <task-id>` in place.
 - Adversarial validation of the lint is a **re-runnable process**, not a hand-authored
   fixture set: `audit/lint-adversarial-prompt.md` fired via `stackctl audit-barrage`.
   Codify every genuine defeat into the deterministic vitest corpus (the crib) + register the
