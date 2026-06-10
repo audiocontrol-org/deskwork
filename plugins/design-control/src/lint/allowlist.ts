@@ -22,9 +22,14 @@ export const ALLOWED_TAGS: ReadonlySet<string> = new Set([
   'div', 'span', 'header', 'footer', 'main', 'nav', 'section', 'article', 'aside',
   // headings
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  // text-level structure
+  // text-level structure. NOTE: `pre` is deliberately ABSENT (AUDIT-20260610-04,
+  // gpt-5-03 + fable-07): preserved whitespace renders ASCII-art logos/wordmarks
+  // from purely allowlisted codepoints — a text-channel image the codepoint axis
+  // cannot see. Outside <pre>, whitespace collapsing destroys the art (and
+  // nbsp-style spacers are codepoint-rejected). A code-sample REGION in a
+  // wireframe is a `.sk-img` placeholder; inline `code` stays (collapsing).
   'p', 'strong', 'em', 'small', 'br', 'hr', 'a', 'button', 'label',
-  'blockquote', 'code', 'pre', 'figure', 'figcaption',
+  'blockquote', 'code', 'figure', 'figcaption',
   // lists
   'ul', 'ol', 'li', 'dl', 'dt', 'dd',
   // tables

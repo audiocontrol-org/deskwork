@@ -178,6 +178,30 @@ describe('check-mockup-lofi — allowlist surface', () => {
   });
 });
 
+// AUDIT-20260610-04 (gpt-5-03 HIGH + fable-07; cross-model channel): preserved
+// whitespace in <pre> renders ASCII-art logos/wordmarks from purely allowlisted
+// codepoints — a text-channel image the codepoint axis structurally cannot see.
+// <pre> is removed from the allowlist: it is THE preserved-whitespace channel,
+// and the lo-fi answer for a code-sample region is the .sk-img placeholder.
+// Outside <pre>, HTML whitespace collapsing destroys the art (and nbsp-style
+// spacers are already rejected by the codepoint axis), so removal closes the
+// channel rather than relocating it.
+describe('check-mockup-lofi — rejects the <pre> preserved-whitespace imagery channel (AUDIT-20260610-04)', () => {
+  it('rejects the planted ASCII-art wordmark (gpt-5-03 defeating input)', () => {
+    const art =
+      `<pre>   ___   ____ __  __ _____\n  / _ \\ / ___|  \\/  | ____|\n / /_\\ \\ |   | |\\/| |  _|\n/ ___ \\ |___| |  | | |___\n/_/   \\_\\____|_|  |_|_____|</pre>`;
+    expect(rules(wrap(art))).toContain('disallowed-element');
+  });
+
+  it('rejects <pre> even with innocuous content (the channel, not the payload, is closed)', () => {
+    expect(rules(wrap(`<pre>plain text</pre>`))).toContain('disallowed-element');
+  });
+
+  it('still accepts inline <code> (whitespace collapses; not an art channel)', () => {
+    expect(rules(wrap(`<p>run <code>npm test</code> first</p>`))).toEqual([]);
+  });
+});
+
 // AUDIT-20260610-01 (gpt-5-02 + fable-02; cross-model HIGH): bare lintWireframe
 // admitted ANY local stylesheet — the pin was the only identity check and it is
 // opt-in. Axis-1 narrowing (filesystem-free): the stylesheet link must be a
