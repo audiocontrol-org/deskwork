@@ -207,6 +207,29 @@ describe('checkStylesheetIdentity', () => {
   });
 });
 
+// AUDIT-20260610-20 (round-4 gpt-5-codex-03 MED; recurrence of round-2
+// fable-04 = AUDIT-06/TASK-13): authoring the recommended SRI hardening was
+// rejected by axis-1 (integrity not allowlisted), making the pin's whole SRI
+// branch unreachable on any lint-green document. integrity is now allowlisted
+// plain-kind on link — its VALUE is verified by axis-1.5, not URL-scanned.
+describe('full lint accepts an authored SRI integrity (AUDIT-20260610-20)', () => {
+  it('a correct integrity digest passes the FULL lint (axis-1 + pin)', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="${pin.expectedHash}">`);
+    const r = lintWireframe(html, { stylesheetPin: pin });
+    expect(r.findings, JSON.stringify(r.findings)).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+  it('a WRONG integrity digest still rejects through the full lint', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="sha256-WRONG">`);
+    const r = lintWireframe(html, { stylesheetPin: pin });
+    expect(r.findings.map((f) => f.rule)).toContain('stylesheet-sri-mismatch');
+  });
+});
+
 // AUDIT-20260610-14 (round-2 fable5-03, LOW false-positive): a conventional
 // cache-bust query (?v=2) or fragment on the kit href was rejected as
 // stylesheet-path-mismatch because path.resolve kept the suffix — while

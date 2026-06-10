@@ -68,7 +68,10 @@ const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>
   // `media` deliberately ABSENT (AUDIT-20260610-13, gpt-5-04 + fable-07a):
   // media="print" mutes the pinned kit for screen rendering, so green would no
   // longer mean the kit is IN EFFECT. Wireframes have no print-styling case.
-  link: { rel: 'plain', href: 'url' },
+  // `integrity` is plain-kind (AUDIT-20260610-20, fable-04 + gpt-5-codex-03):
+  // its value is verified by the pin's SRI branch (axis 1.5), which was
+  // unreachable while axis-1 rejected the attr outright.
+  link: { rel: 'plain', href: 'url', integrity: 'plain' },
   a: { href: 'url' },
   button: { type: 'plain' },
   ol: { start: 'plain', reversed: 'plain' },
