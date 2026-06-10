@@ -32,7 +32,7 @@ export type { LintRule, LintFinding, LintResult } from '@/lint/types';
 
 import type { LintFinding, LintResult } from '@/lint/types';
 import { checkStylesheetIdentity, type StylesheetPin } from '@/lint/stylesheet-pin';
-import { findDisallowedCodepoints, formatCodepoint } from '@/lint/codepoint';
+import { findDisallowedCodepoints, formatCodepoint, isPunctuationDense } from '@/lint/codepoint';
 import { SKETCH_KIT_STYLESHEET_FILENAME } from '@/wireframe-kit/sketch-kit';
 
 type AnyNode = DefaultTreeAdapterMap['node'];
@@ -176,10 +176,19 @@ function checkElement(el: Element, ctx: WalkContext): void {
 }
 
 function checkText(node: DefaultTreeAdapterMap['textNode'], findings: LintFinding[]): void {
-  for (const { codepoint, char } of findDisallowedCodepoints(ta.getTextNodeContent(node))) {
+  const content = ta.getTextNodeContent(node);
+  for (const { codepoint, char } of findDisallowedCodepoints(content)) {
     findings.push({
       rule: 'disallowed-codepoint',
       message: `disallowed codepoint ${formatCodepoint(codepoint)} (${JSON.stringify(char)}) in text content — outside the lo-fi codepoint allowlist`,
+    });
+  }
+  // AUDIT-20260610-12: imagery-shaped punctuation mass (pixel-art rows) is
+  // rejected per text node — see isPunctuationDense for the channel rationale.
+  if (isPunctuationDense(content)) {
+    findings.push({
+      rule: 'punctuation-density',
+      message: `text content is punctuation-dense (imagery-shaped, not copy-shaped) — pixel/ASCII-art channels are rejected; use the .sk-img placeholder for image regions`,
     });
   }
 }

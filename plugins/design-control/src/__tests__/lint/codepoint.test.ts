@@ -114,3 +114,46 @@ describe('lintWireframe — axis 2 integration', () => {
     expect(rules(wrap(`<div class="𝐃-decorative">ok</div>`))).not.toContain('disallowed-codepoint');
   });
 });
+
+// AUDIT-20260610-12 (round-2 gpt-5-02, HIGH): <code>+<br> rows of dense
+// punctuation reconstruct pixel-art wordmarks after the <pre> removal — the
+// channel is punctuation MASS with row control, not preserved whitespace.
+// Density rule: a text node with ≥ 8 non-whitespace codepoints of which ≥ 80%
+// are punctuation is imagery-shaped, not copy-shaped. Bounds the channel; the
+// referee's gross-class judgment remains the backstop for text-as-imagery.
+describe('lintWireframe — punctuation-density imagery channel (AUDIT-20260610-12)', () => {
+  const rules = (html: string): string[] => lintWireframeStructural(html).findings.map((f) => f.rule);
+
+  it('rejects the planted pixel-art row (gpt-5-02 defeating input, single row)', () => {
+    expect(rules(wrap(`<code>###..###..#####</code>`))).toContain('punctuation-density');
+  });
+
+  it('rejects the full code+br wordmark', () => {
+    const art =
+      `<h1 class="sk-h1"><code>###..###..#####</code><br><code>#..##..#..#....</code><br><code>#####..#..####.</code></h1>`;
+    expect(rules(wrap(art))).toContain('punctuation-density');
+  });
+
+  it('rejects punctuation art outside code too (divs give rows; the channel is density)', () => {
+    expect(rules(wrap(`<div>(((((-----)))))</div>`))).toContain('punctuation-density');
+  });
+
+  it('accepts ordinary copy with trailing ellipsis and punctuation', () => {
+    expect(rules(wrap(`<p>Loading the dashboard, please wait…</p>`))).not.toContain('punctuation-density');
+  });
+
+  it('accepts a short pure-punctuation node (below the length floor)', () => {
+    expect(rules(wrap(`<p>…</p>`))).not.toContain('punctuation-density');
+    expect(rules(wrap(`<span>—</span>`))).not.toContain('punctuation-density');
+  });
+
+  it('accepts parenthesized/punctuation-heavy but copy-shaped text', () => {
+    expect(rules(wrap(`<p>(see notes, p. 4–7)</p>`))).not.toContain('punctuation-density');
+  });
+
+  it('accepts inline code that is actual code-shaped copy', () => {
+    expect(rules(wrap(`<p>run <code>npm test --workspaces</code> first</p>`))).not.toContain(
+      'punctuation-density',
+    );
+  });
+});

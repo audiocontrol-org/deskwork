@@ -18,6 +18,7 @@ export type LintRule =
   | 'stylesheet-filename-mismatch'
   // axis 2 — text-content codepoint allowlist
   | 'disallowed-codepoint'
+  | 'punctuation-density'
   // axis 1.5 — stylesheet identity-pin
   | 'stylesheet-missing'
   | 'stylesheet-not-singleton'

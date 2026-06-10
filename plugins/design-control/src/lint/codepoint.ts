@@ -101,3 +101,31 @@ export function findDisallowedCodepoints(text: string): DisallowedCodepoint[] {
 export function formatCodepoint(cp: number): string {
   return 'U+' + cp.toString(16).toUpperCase().padStart(4, '0');
 }
+
+/**
+ * Punctuation-density imagery gate (AUDIT-20260610-12, round-2 gpt-5-02):
+ * after `<pre>`'s removal closed preserved-whitespace ASCII art, dense
+ * punctuation rows with `<br>`/block row control reconstruct pixel-art
+ * wordmarks from allowlisted codepoints. The channel is punctuation MASS —
+ * copy-shaped text is mostly letters; imagery-shaped text is mostly
+ * punctuation. A text node with at least {@link PUNCT_DENSITY_MIN_LENGTH}
+ * non-whitespace codepoints of which at least {@link PUNCT_DENSITY_RATIO}
+ * are punctuation is rejected. This BOUNDS the channel (run-detection is
+ * defeatable by alternation; density is what imagery cannot do without); the
+ * referee's gross-class judgment remains the backstop for text-as-imagery.
+ */
+export const PUNCT_DENSITY_MIN_LENGTH = 8;
+export const PUNCT_DENSITY_RATIO = 0.8;
+
+/** True iff `text` trips the punctuation-density imagery gate. */
+export function isPunctuationDense(text: string): boolean {
+  let total = 0;
+  let punct = 0;
+  for (const char of text.normalize('NFC')) {
+    const cp = char.codePointAt(0)!;
+    if (WHITESPACE.has(cp)) continue;
+    total += 1;
+    if (isAsciiPunctuation(cp) || TYPOGRAPHIC_PUNCT.has(cp)) punct += 1;
+  }
+  return total >= PUNCT_DENSITY_MIN_LENGTH && punct / total >= PUNCT_DENSITY_RATIO;
+}
