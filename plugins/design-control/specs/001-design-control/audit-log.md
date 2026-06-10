@@ -1215,3 +1215,32 @@ Finding-ID: AUDIT-20260610-47 (round-12 gpt-5-04, LOW)
 Status:     fixed-7f660f27 (2026-06-10; tel joins INPUT_TYPE_ALLOWLIST)
 Severity:   low
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 13 (run 20260610T222034909Z; codex only — claude 0 bytes, 11th consecutive)
+
+1 HIGH + 1 MED (one class — the composition boundary in its general form) +
+1 LOW fp (fixed). Round verdict: the HIGH is dispositioned as the declared
+boundary's general statement, not a code fix.
+
+### AUDIT-20260610-48 — Imagery composed by geometric placement of SANCTIONED ATOMS (BOUNDARY, general form)
+
+Finding-ID: AUDIT-20260610-48 (round-13 gpt-5-01 HIGH + gpt-5-02 MED; one class — kit-primitive grids + control-state rasters)
+Status:     acknowledged-scope-boundary (2026-06-10, 803cd4e0; prompt clause 3 + docstring + two boundary fixtures)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (composition channel)
+
+.sk-dot grids and checked-checkbox rasters draw marks from atoms that are each
+legitimate, in arrangements statistically indistinguishable from real idioms
+(dot-status matrices, permission grids). The image exists only to an eye;
+constraining placement would constrain STRUCTURE itself, which is what a
+wireframe is. The referee looks; the lint does not pretend to. In-scope
+exception declared: a new unsanctioned atom or a flow-statistical signature
+the density gates should catch.
+
+### AUDIT-20260610-49 — checkbox/radio submission values wrongly scanned as visible text
+
+Finding-ID: AUDIT-20260610-49 (round-13 gpt-5-03, LOW)
+Status:     fixed-803cd4e0 (2026-06-10; visible-value gates scope to types whose value renders)
+Severity:   low
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
+Direction:  false-positive
