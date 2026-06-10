@@ -1067,3 +1067,38 @@ Status:     fixed-16bd38ae (2026-06-10; textarea allowlisted with placeholder ri
 Severity:   low
 Surface:    plugins/design-control/src/lint/allowlist.ts
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 8 (run 20260610T211155471Z; codex only — claude 0 bytes, 6th consecutive)
+
+Triage notes: codex 1 HIGH + 2 LOW; the HIGH is a channel THIS loop's round-7
+textarea addition opened — the loop is now mostly auditing its own deltas, the
+expected end-stage shape. Codex's grounded-clean list re-confirms mixed-rel /
+SRI / swapped-fonts / foreign-content / URL-control-entity paths hold. Round
+verdict: NOT converged (1 HIGH, fixed).
+
+### AUDIT-20260610-33 — textarea content reopened the preserved-whitespace channel with scroll dilution
+
+Finding-ID: AUDIT-20260610-33 (round-8 gpt-5-01, HIGH)
+Status:     fixed-c890b79e (2026-06-10; textarea must be EMPTY — textarea-content rule; copy belongs in the gated placeholder)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
+
+Visible viewport renders the art; scrolled-out prose dilutes the density
+counter — statistics cannot see the viewport, so the closure is
+allowlist-shaped (empty content), not statistical.
+
+### AUDIT-20260610-34 — Backslash-relative kit href over-rejected by the pin's POSIX resolve
+
+Finding-ID: AUDIT-20260610-34 (round-8 gpt-5-02, LOW)
+Status:     fixed-c890b79e (2026-06-10; backslashes normalized to slashes before resolve, matching WHATWG + axis-1)
+Severity:   low
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts
+Direction:  false-positive
+
+### AUDIT-20260610-35 — checked state over-rejected
+
+Finding-ID: AUDIT-20260610-35 (round-8 gpt-5-03, LOW)
+Status:     fixed-c890b79e (2026-06-10; checked allowlisted — structural form state)
+Severity:   low
+Surface:    plugins/design-control/src/lint/allowlist.ts
+Direction:  false-positive
