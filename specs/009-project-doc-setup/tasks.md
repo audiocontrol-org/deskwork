@@ -97,8 +97,8 @@ Source: `plugins/stack-control/src/…` · Tests: `plugins/stack-control/tests/�
 
 **Goal**: malformed/drifted files fail loud, never false-clean. **Independent test**: malformed required file → exit 1 named, not overwritten (quickstart Scenario 5).
 
-- [ ] T028 [P] [US5] RED: `plugins/stack-control/tests/setup/verify.test.ts` — a present-but-malformed required file → exit 1, named, `ready=false`, NOT overwritten (drift surfaced, FR-010); a config pointing at a missing/ unresolvable location is reported; an all-valid project reports ready (SC-005).
-- [ ] T029 [US5] Extend `plugins/stack-control/src/setup/verify.ts`: malformed/drift handling (surface, never overwrite) + config-resolves-but-missing detection → GREEN T028.
+- [X] T028 [P] [US5] RED: `plugins/stack-control/tests/setup/verify.test.ts` — a present-but-malformed required file → exit 1, named, `ready=false`, NOT overwritten (drift surfaced, FR-010); a config pointing at a missing/ unresolvable location is reported; an all-valid project reports ready (SC-005).
+- [X] T029 [US5] Extend `plugins/stack-control/src/setup/verify.ts`: malformed/drift handling (surface, never overwrite) + config-resolves-but-missing detection → GREEN T028.
 
 ---
 
