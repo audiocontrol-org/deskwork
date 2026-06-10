@@ -3,7 +3,7 @@
 **Scope:** this file applies ONLY to work on the `design-control` plugin. It lives at the
 plugin root — NOT in the monorepo's top-level `.claude/` — deliberately: per the lifecycle
 philosophy this plugin is built on, **rules are path-scoped and load only where relevant.**
-A session working on `deskwork`, `dw-lifecycle`, or anything else must not be forced to
+A session working on `deskwork`, `stack-control`, or anything else must not be forced to
 carry this context. Claude Code loads this nested `CLAUDE.md` when a session reads or edits
 files under `plugins/design-control/`, which is exactly the scope intended.
 
@@ -36,7 +36,7 @@ beneath every decision in this plugin. The load-bearing points:
 ## Level 1 vs Level 2 — do not conflate
 
 Two distinct applications of the same disciplines:
-- **Level 1 (how we DEVELOP this plugin):** dw-lifecycle's scope-discovery + audit-barrage run
+- **Level 1 (how we DEVELOP this plugin):** stack-control's scope-discovery + audit-barrage run
   over our TypeScript (clone/coverage scans; cross-model code review; adversarial validation of
   the lint). Dogfooding.
 - **Level 2 (what this plugin SHIPS):** design-control *productizes* the design-domain forms of
@@ -51,9 +51,9 @@ stance. Source essay: <https://stackcontrol.org/blog/the-lifecycle-and-why-agent
 ## Working conventions (this plugin)
 
 - Adversarial validation of the lint is a **re-runnable process**, not a hand-authored
-  fixture set: `audit/lint-adversarial-prompt.md` fired via `dw-lifecycle audit-barrage`.
+  fixture set: `audit/lint-adversarial-prompt.md` fired via `stackctl audit-barrage`.
   Codify every genuine defeat into the deterministic vitest corpus (the crib) + register the
-  leakage class via `dw-lifecycle scope-widen`.
+  leakage class via `stackctl scope-widen`.
 - TypeScript: strict, `@/` imports, no `any`/`as`/`@ts-ignore`, files < 300–500 lines, no
   fallbacks/mock-data outside tests (throw instead). `npm --workspace @deskwork/plugin-design-control test`
   runs `tsc --noEmit && vitest`.
