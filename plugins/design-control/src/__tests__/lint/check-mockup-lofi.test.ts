@@ -261,6 +261,26 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// AUDIT-20260610-65 (round-19 gpt-5-01/-02, LOW+MED fps): select state and
+// option metadata complete the form surface — disabled on select (same state
+// class as button/input), value/disabled on option (value is SUBMISSION
+// metadata; the rendered text is the element's text, already gated).
+describe('check-mockup-lofi — select/option completions (AUDIT-20260610-65)', () => {
+  it('accepts a disabled select', () => {
+    expect(
+      rules(wrap(`<form><label for="s">Stage</label><select id="s" disabled><option selected>Draft</option></select></form>`)),
+    ).toEqual([]);
+  });
+  it('accepts the placeholder-option idiom', () => {
+    expect(
+      rules(wrap(`<select><option value="" disabled selected>Pick a stage...</option><option value="draft">Draft</option></select>`)),
+    ).toEqual([]);
+  });
+  it('option value is non-rendered: non-Latin submission values pass', () => {
+    expect(rules(wrap(`<select><option value="plan-①">Starter</option></select>`))).toEqual([]);
+  });
+});
+
 // AUDIT-20260610-62 (round-18 gpt-5-01, HIGH): start="0" reversed counts DOWN
 // through NEGATIVE markers (0., -1., -2., …) — generated punctuation columns
 // reopening the channel the digits-only rule (AUDIT-54) claimed closed. A

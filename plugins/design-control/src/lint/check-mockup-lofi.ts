@@ -273,12 +273,15 @@ function checkElement(el: Element, ctx: WalkContext): void {
     // `value` is a SUBMISSION value (never rendered) on checkbox/radio
     // (AUDIT-20260610-49) — the visible gates scope to types whose value
     // renders (field content / button label).
+    // `value` renders ONLY on input controls whose value is the field
+    // content / label (AUDIT-20260610-49; option/li per -65: submission and
+    // numbering metadata respectively — their rendered text is elsewhere).
     const valueIsRendered =
       attr !== 'value' ||
-      tag !== 'input' ||
-      !['checkbox', 'radio'].includes(
-        (ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'type')?.value ?? '').toLowerCase(),
-      );
+      (tag === 'input' &&
+        !['checkbox', 'radio'].includes(
+          (ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'type')?.value ?? '').toLowerCase(),
+        ));
     if ((attr === 'title' || attr === 'placeholder' || attr === 'value' || attr.startsWith('aria-')) && valueIsRendered) {
       for (const { codepoint, char } of findDisallowedCodepoints(value)) {
         findings.push({

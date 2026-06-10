@@ -90,7 +90,10 @@ const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>
   input: { type: 'plain', placeholder: 'plain', value: 'plain', checked: 'plain', disabled: 'plain' },
   textarea: { placeholder: 'plain' },
   label: { for: 'plain' },
-  option: { selected: 'plain' },
+  // option.value is SUBMISSION metadata (AUDIT-20260610-65) — the rendered
+  // text is the element's text, which the text gates already scan.
+  option: { selected: 'plain', value: 'plain', disabled: 'plain' },
+  select: { disabled: 'plain' },
   details: { open: 'plain' },
   ol: { start: 'plain', reversed: 'plain' },
   li: { value: 'plain' },
