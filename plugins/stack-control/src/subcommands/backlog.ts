@@ -16,6 +16,13 @@ import { resolveInstallationBacklog } from '../backlog/root.js';
 import { InstallationError } from '../config/errors.js';
 import { scaffoldKey } from '../setup/scaffold.js';
 import { CAPTURE_TYPES, isCaptureType, typeLabelStamp } from '../backlog/mappings.js';
+import { parseTarget, allowsBatch, TargetRefError } from '../backlog/promote-targets.js';
+import {
+  promote,
+  PromoteAlreadyPromotedError,
+  PromoteItemMissingError,
+  type PromoteResult,
+} from '../backlog/promote.js';
 import {
   importGithub,
   parseIssues,
@@ -45,6 +52,7 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   list: { valueFlags: [], apply: false, positionals: 0 },
   'import-github': { valueFlags: [], apply: true, positionals: 0 },
   'import-slush': { valueFlags: ['feature'], apply: true, positionals: 0 },
+  promote: { valueFlags: ['to'], apply: true, positionals: 1, unboundedPositionals: true },
 };
 
 const ALL_VALUE_FLAGS: readonly string[] = [
@@ -173,6 +181,65 @@ async function emitImportSlush(flags: Flags): Promise<void> {
   }
 }
 
+/** Render the promote outcome (dry-run vs apply) + the pending-create advisory. */
+function reportPromote(res: PromoteResult): void {
+  const ids = res.recorded.join(', ');
+  if (res.applied) {
+    process.stdout.write(`backlog promote: recorded ${ids} → ${res.targetRef}\n`);
+  } else {
+    process.stdout.write(
+      `backlog promote: dry-run — would record ${ids} → ${res.targetRef} (use --apply to write)\n`,
+    );
+  }
+  if (res.pendingCreate !== undefined) {
+    process.stdout.write(
+      `  - note: target ${res.pendingCreate} does not yet exist — create it as a separate step (record-only)\n`,
+    );
+  }
+}
+
+/**
+ * Promote (US1/US2): record the graduation linkage on one or N backlog items
+ * (record-only, FR-004). Usage faults (missing --to, malformed ref, multi-id on
+ * a non-tasks target, no id) → exit 2 via failUsage BEFORE any store access.
+ * Runtime fail-loud (missing item, malformed store) → exit 1; the re-promotion
+ * guard → exit 2. The promote-specific exit mapping is handled HERE so the
+ * generic BacklogError→2 dispatcher mapping does not mask a runtime exit-1.
+ */
+function emitPromote(flags: Flags): void {
+  const ids = flags.positionals;
+  if (ids.length === 0) failUsage('backlog', 'promote requires at least one <item-id> positional');
+  const to = requireMapValue('backlog', flags.values, 'to');
+  let target;
+  try {
+    target = parseTarget(to);
+  } catch (err) {
+    if (err instanceof TargetRefError) failUsage('backlog', err.message);
+    throw err;
+  }
+  if (ids.length > 1 && !allowsBatch(target.kind)) {
+    failUsage(
+      'backlog',
+      `multiple item-ids are only valid for a tasks: target (got ${target.kind}:) — batch one feature's tasks.md`,
+    );
+  }
+  const root = ensureBacklogProject();
+  const backend = createBacklogBackend({ cwd: root });
+  try {
+    reportPromote(promote({ ids, target, apply: flags.apply, backend, cwd: process.cwd() }));
+  } catch (err) {
+    if (err instanceof PromoteAlreadyPromotedError) {
+      process.stderr.write(`backlog: ${err.message}\n`);
+      process.exit(2);
+    }
+    if (err instanceof PromoteItemMissingError || err instanceof BacklogError) {
+      process.stderr.write(`backlog: ${err.message}\n`);
+      process.exit(1);
+    }
+    throw err;
+  }
+}
+
 /** Read-only: print each item's id + status + type. Never writes. */
 function emitList(): void {
   const root = ensureBacklogProject();
@@ -189,7 +256,7 @@ export async function runBacklogCli(args: string[]): Promise<void> {
   if (subaction === undefined || subaction.startsWith('--')) {
     failUsage(
       'backlog',
-      'a subaction is required (usage: backlog <capture|list|import-github|import-slush> [flags])',
+      'a subaction is required (usage: backlog <capture|list|import-github|import-slush|promote> [flags])',
     );
   }
   const flags = scanFlags(args.slice(1));
@@ -208,10 +275,13 @@ export async function runBacklogCli(args: string[]): Promise<void> {
       case 'import-slush':
         await emitImportSlush(flags);
         return;
+      case 'promote':
+        emitPromote(flags);
+        return;
       default:
         failUsage(
           'backlog',
-          `unknown subaction '${subaction}' (known: capture, list, import-github, import-slush)`,
+          `unknown subaction '${subaction}' (known: capture, list, import-github, import-slush, promote)`,
         );
     }
   } catch (err) {
