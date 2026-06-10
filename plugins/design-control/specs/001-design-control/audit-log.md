@@ -1334,3 +1334,32 @@ Finding-ID: AUDIT-20260610-61 (round-17 gpt-5-02, LOW)
 Status:     fixed-edbf7007 (2026-06-10; trim before the enumerated compare)
 Severity:   low
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 18 (run 20260610T233031320Z; codex only — claude 0 bytes, 16th consecutive)
+
+1 HIGH + 1 MED + 1 LOW; HIGH and LOW fixed, MED is a boundary recurrence
+(clause generalized). All in 9ac50da5.
+
+### AUDIT-20260610-62 — reversed + start composition counts down through negative punctuation markers
+
+Finding-ID: AUDIT-20260610-62 (round-18 gpt-5-01, HIGH)
+Status:     fixed-9ac50da5 (2026-06-10; a reversed list with explicit start must not run below 1; default-start reversed and positive countdowns stay green)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
+
+start="0" reversed renders 0., -1., -2. — the AUDIT-54 generated-marker channel
+reopened through attribute COMPOSITION.
+
+### AUDIT-20260610-63 — UA default link styling (boundary recurrence; clause generalized)
+
+Finding-ID: AUDIT-20260610-63 (round-18 gpt-5-02, MED)
+Status:     acknowledged-scope-boundary (2026-06-10, 9ac50da5; clause 2 generalized from control chrome to UA default rendering of semantic HTML; fixture pins the bare-link case)
+Severity:   medium
+Surface:    boundary clause 2
+
+### AUDIT-20260610-64 — reset input over-rejected
+
+Finding-ID: AUDIT-20260610-64 (round-18 gpt-5-03, LOW)
+Status:     fixed-9ac50da5 (2026-06-10; reset joins INPUT_TYPE_ALLOWLIST)
+Severity:   low
+Direction:  false-positive
