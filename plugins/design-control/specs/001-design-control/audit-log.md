@@ -1102,3 +1102,25 @@ Status:     fixed-c890b79e (2026-06-10; checked allowlisted — structural form 
 Severity:   low
 Surface:    plugins/design-control/src/lint/allowlist.ts
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 9 (run 20260610T212520711Z; codex only — claude 0 bytes, 7th consecutive)
+
+Triage notes: 1 HIGH + 1 MED (one mechanism, folded per TF-002) + 1 LOW fp.
+The dilution lesson from round 8 turned against multiline ATTR values — the
+loop continues auditing its own deltas. Round verdict: NOT converged (HIGH,
+fixed same round).
+
+### AUDIT-20260610-36 — Multiline visible-attr values render per LINE; density scanned the aggregate
+
+Finding-ID: AUDIT-20260610-36 (round-9 gpt-5-01 HIGH + gpt-5-02 MED; one mechanism — placeholder viewport + title tooltip)
+Status:     fixed-00a6cfec (2026-06-10; density gate runs per line of visible-attr values; legit multiline placeholder fixture green)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
+
+### AUDIT-20260610-37 — select/option over-rejected
+
+Finding-ID: AUDIT-20260610-37 (round-9 gpt-5-03, LOW)
+Status:     fixed-00a6cfec (2026-06-10; allowlisted — same structural class as input/textarea; option text rides the text gates)
+Severity:   low
+Surface:    plugins/design-control/src/lint/allowlist.ts
+Direction:  false-positive
