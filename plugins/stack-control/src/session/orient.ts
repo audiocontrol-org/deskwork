@@ -97,9 +97,15 @@ function gatherLatestJournalEntry(journalPath: string): JournalEntrySummary | nu
   return { heading, excerpt };
 }
 
-/** Open backlog items via the 008 backend. The store dir's parent is the binary
- * cwd; a missing store yields [] (backend.list short-circuits on absence). */
+/** backlog.md's terminal status (config: ["To Do", "In Progress", "Done"]). */
+const TERMINAL_BACKLOG_STATUSES: ReadonlySet<string> = new Set(['done', 'cancelled', 'canceled']);
+
+/** OPEN backlog items via the 008 backend — terminal (Done) items excluded so
+ * "open backlog" means work still to pick up. The store dir's parent is the
+ * binary cwd; a missing store yields [] (backend.list short-circuits on absence). */
 function gatherOpenBacklog(backlogStore: string): readonly BacklogItemRef[] {
-  const items = createBacklogBackend({ cwd: dirname(backlogStore) }).list();
-  return items.map((i) => ({ id: i.id, title: i.title, status: i.status }));
+  return createBacklogBackend({ cwd: dirname(backlogStore) })
+    .list()
+    .filter((i) => !TERMINAL_BACKLOG_STATUSES.has(i.status.trim().toLowerCase()))
+    .map((i) => ({ id: i.id, title: i.title, status: i.status }));
 }

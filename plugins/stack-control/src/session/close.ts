@@ -74,8 +74,9 @@ function runCloneSnapshot(input: CloseInput): CloneSnapshotResult {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     return { ran: true, newDuplication: countGroups(out) };
-  } catch {
-    return { ran: false, skipped: 'clone-snapshot tool failed (advisory; not blocking)' };
+  } catch (err) {
+    const detail = err instanceof Error ? `: ${err.message.split('\n')[0]}` : '';
+    return { ran: false, skipped: `clone-snapshot tool failed (advisory; not blocking)${detail}` };
   }
 }
 

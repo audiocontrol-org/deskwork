@@ -102,4 +102,25 @@ describe('orient', () => {
     const report = orient({ installation: inst, repoRoot: root });
     expect(report.openBacklog.map((i) => i.title)).toContain('a found bug');
   });
+
+  it('excludes terminal (Done) backlog items from the OPEN list (M3)', () => {
+    root = mkInstallation();
+    seedBacklog(root, 'still open');
+    writeDoneTask(root, 'already done');
+    const inst = resolveInstallation(root);
+    const report = orient({ installation: inst, repoRoot: root });
+    const titles = report.openBacklog.map((i) => i.title);
+    expect(titles).toContain('still open');
+    expect(titles).not.toContain('already done'); // Done is terminal, not open
+  });
 });
+
+/** Write a raw Done task file into the installation's backlog store. */
+function writeDoneTask(installRoot: string, title: string): void {
+  const tasksDir = join(installRoot, '.stack-control', 'backlog', 'tasks');
+  mkdirSync(tasksDir, { recursive: true });
+  writeFileSync(
+    join(tasksDir, 'task-999.md'),
+    `---\nid: TASK-999\ntitle: ${title}\nstatus: Done\nlabels: []\n---\n`,
+  );
+}

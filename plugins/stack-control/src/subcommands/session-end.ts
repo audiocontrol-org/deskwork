@@ -92,39 +92,68 @@ function openBacklog(installation: Installation): readonly BacklogItemRef[] {
     .map((i) => ({ id: i.id, title: i.title, status: i.status }));
 }
 
-/** Warn (not block) when uncommitted changes exist outside the doc paths. */
-function uncommittedNonDocWarning(cwd: string, docRel: readonly string[]): string | undefined {
-  const status = git(cwd, ['status', '--porcelain']);
+/** The git repository toplevel (the base both `status --porcelain` paths and
+ * pathspecs must share). Falls back to `cwd` when not in a git repo — the commit
+ * step then fails loud as before. H1: installation root need not be the git root. */
+function gitToplevel(cwd: string): string {
+  try {
+    return git(cwd, ['rev-parse', '--show-toplevel']);
+  } catch {
+    return cwd;
+  }
+}
+
+/** Parse one `git status --porcelain` line to its path, handling the rename
+ * form (`R  old -> new`). Returns the (possibly renamed-to) path. */
+function porcelainPath(line: string): string {
+  const rest = line.slice(3).trim();
+  const arrow = rest.indexOf(' -> ');
+  return (arrow >= 0 ? rest.slice(arrow + 4) : rest).trim();
+}
+
+/** Warn (not block) when uncommitted changes exist outside the doc paths. Paths
+ * are compared against the git toplevel (porcelain's base), so a nested
+ * installation does not falsely flag its own doc files (H1). */
+function uncommittedNonDocWarning(gitRoot: string, docRel: readonly string[]): string | undefined {
+  // Read porcelain UNTRIMMED — trimming would strip the leading status-column
+  // space of the first line (` M path` → `M path`), shifting slice(3).
+  const status = execFileSync('git', ['status', '--porcelain'], {
+    cwd: gitRoot,
+    encoding: 'utf8',
+  });
   if (status.length === 0) return undefined;
   const docSet = new Set(docRel);
   const nonDoc = status
     .split('\n')
-    .map((l) => l.slice(3).trim())
+    .filter((l) => l.length > 0)
+    .map(porcelainPath)
     .filter((p) => p.length > 0 && !docSet.has(p));
   if (nonDoc.length === 0) return undefined;
   return `uncommitted non-doc changes NOT included in the session-end commit: ${nonDoc.join(', ')}`;
 }
 
-/** Commit only the doc paths (pathspec commit → doc-only, FR-011). */
-function commitDocs(cwd: string, docRel: readonly string[]): string {
-  git(cwd, ['add', '--', ...docRel]);
-  git(cwd, ['commit', '-m', 'docs(session): session-end record', '--', ...docRel]);
-  return git(cwd, ['rev-parse', 'HEAD']);
+/** Commit only the doc paths (pathspec commit → doc-only, FR-011), toplevel-relative. */
+function commitDocs(gitRoot: string, docRel: readonly string[]): string {
+  git(gitRoot, ['add', '--', ...docRel]);
+  git(gitRoot, ['commit', '-m', 'docs(session): session-end record', '--', ...docRel]);
+  return git(gitRoot, ['rev-parse', 'HEAD']);
 }
 
-/** Push with a bounded retry. Returns the push error message on failure. */
-function pushDocs(cwd: string): string | null {
+/** Push with a bounded retry. Returns the push error message on failure. Retries
+ * immediately (no spawned `sleep` — that is non-portable and could escape the
+ * try, crashing the documented exit-3 contract). */
+function pushDocs(gitRoot: string): string | null {
   const attempts = 3;
+  let lastErr = 'push failed';
   for (let i = 0; i < attempts; i++) {
     try {
-      execFileSync('git', ['push'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      execFileSync('git', ['push'], { cwd: gitRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
       return null;
     } catch (err) {
-      if (i === attempts - 1) return err instanceof Error ? err.message.split('\n')[0]! : String(err);
-      execFileSync('sleep', ['0.15']);
+      lastErr = err instanceof Error ? err.message.split('\n')[0]! : String(err);
     }
   }
-  return 'push failed';
+  return lastErr;
 }
 
 interface SessionEndReport {
@@ -186,15 +215,18 @@ export async function runSessionEndCli(args: string[]): Promise<void> {
 
   const docPaths = [installation.resolved.journal];
   if (close.toolingFrictionCaptured) docPaths.push(installation.resolved.toolingFeedback);
-  const docRel = docPaths.map((p) => relative(cwd, p));
+  // Commit/status/push share the git toplevel as their path base (H1: the
+  // installation root may be a subdir of the git repo).
+  const gitRoot = gitToplevel(cwd);
+  const docRel = docPaths.map((p) => relative(gitRoot, p));
 
-  const warning = uncommittedNonDocWarning(cwd, docRel);
-  const sha = commitDocs(cwd, docRel);
+  const warning = uncommittedNonDocWarning(gitRoot, docRel);
+  const sha = commitDocs(gitRoot, docRel);
 
   let pushed = false;
   let pushError: string | undefined;
   if (!flags.noPush) {
-    const err = pushDocs(cwd);
+    const err = pushDocs(gitRoot);
     pushed = err === null;
     if (err !== null) pushError = err;
   }

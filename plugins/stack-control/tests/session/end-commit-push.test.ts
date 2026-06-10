@@ -114,6 +114,30 @@ describe('session-end — commit + push', () => {
     expect(git(repo, 'rev-parse', 'HEAD')).not.toBe(remoteBefore);
   });
 
+  it('commits the doc without a spurious non-doc warning when the installation root is a SUBDIR of the git repo (H1)', () => {
+    // git repo at <repo>; installation nested at <repo>/proj.
+    const repo = mkdtempSync(join(tmpdir(), 'sc-nested-'));
+    made.push(repo);
+    const proj = join(repo, 'proj');
+    mkdirSync(join(proj, '.stack-control'), { recursive: true });
+    writeFileSync(join(proj, '.stack-control', 'config.yaml'), 'version: 1\n');
+    writeFileSync(join(proj, 'ROADMAP.md'), ROADMAP);
+    writeFileSync(join(proj, 'DEVELOPMENT-NOTES.md'), '# Development Notes\n\n---\n');
+    git(repo, 'init', '-q', '-b', 'main');
+    git(repo, 'config', 'user.email', 't@t.t');
+    git(repo, 'config', 'user.name', 'T');
+    git(repo, 'config', 'commit.gpgsign', 'false');
+    git(repo, 'add', '-A');
+    git(repo, 'commit', '-q', '-m', 'initial');
+
+    const r = runCli(['session-end', '--no-push'], { cwd: proj });
+    expect(r.status).toBe(0);
+    // the journal IS committed at its nested path
+    expect(git(repo, 'log', '-1', '--name-only', '--format=')).toContain('proj/DEVELOPMENT-NOTES.md');
+    // and it is NOT falsely flagged as an uncommitted non-doc change
+    expect(`${r.stdout}${r.stderr}`).not.toMatch(/DEVELOPMENT-NOTES\.md.*non-doc|non-doc.*DEVELOPMENT-NOTES\.md/);
+  });
+
   it('fails loud (exit 1) outside any installation', () => {
     const bare = mkdtempSync(join(tmpdir(), 'sc-noinst-'));
     made.push(bare);
