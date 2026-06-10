@@ -16,14 +16,19 @@
  * lint only performs the identity check when a caller supplies a `StylesheetPin`.
  */
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parse, defaultTreeAdapter as ta } from 'parse5';
 import type { DefaultTreeAdapterMap } from 'parse5';
 import type { LintFinding } from '@/lint/types';
 import { isStylesheetRel } from '@/lint/allowlist';
-import { SKETCH_KIT_CSS_PATH, SKETCH_KIT_STYLESHEET_FILENAME } from '@/wireframe-kit/sketch-kit';
+import {
+  SKETCH_KIT_CSS_PATH,
+  SKETCH_KIT_DIR,
+  SKETCH_KIT_FONTS,
+  SKETCH_KIT_STYLESHEET_FILENAME,
+} from '@/wireframe-kit/sketch-kit';
 
 type AnyNode = DefaultTreeAdapterMap['node'];
 
@@ -48,6 +53,16 @@ export interface StylesheetPin {
   readonly expectedSri: Readonly<Record<SriAlgo, string>>;
   /** Directory the wireframe's relative hrefs resolve against. */
   readonly baseDir: string;
+  /**
+   * Expected sha256 (SRI format) of each SHIPPED kit font, keyed by the
+   * kit-relative file path the pinned CSS references via `@font-face`
+   * (AUDIT-20260610-03): the pin certifies the CSS bytes, and the CSS names
+   * these files, so a wireframe-side font at one of these paths must carry the
+   * kit's bytes. Verified only when PRESENT — an absent font falls back to a
+   * system stack (no foreign bytes load); a designed font planted at the path
+   * is present-but-different and is caught.
+   */
+  readonly expectedFonts: ReadonlyArray<{ readonly file: string; readonly sha256: string }>;
 }
 
 /** SRI-format digest of stylesheet bytes (`<algo>-<base64>`); defaults to sha256. */
@@ -71,6 +86,13 @@ export function buildSketchKitPin(baseDir: string, canonicalPath?: string): Styl
       sha384: hashStylesheet(content, 'sha384'),
       sha512: hashStylesheet(content, 'sha512'),
     },
+    // Same trusted source as the CSS: the plugin's SHIPPED font files
+    // (AUDIT-20260610-03). Reads fail loud — a missing shipped font is a
+    // broken kit install, not a skippable check.
+    expectedFonts: SKETCH_KIT_FONTS.map((font) => ({
+      file: font.file,
+      sha256: hashStylesheet(readFileSync(join(SKETCH_KIT_DIR, font.file)), 'sha256'),
+    })),
   };
 }
 
@@ -193,6 +215,23 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
           message: `SRI integrity's ${strongest} digest does not match the kit (${pin.expectedSri[strongest]})`,
         });
       }
+    }
+  }
+
+  // Transitive font pinning (AUDIT-20260610-03): the pinned CSS names the kit's
+  // @font-face files; any file PRESENT at one of those baseDir-relative paths
+  // must carry the shipped kit's bytes. Absent files are clean (the browser
+  // falls back; no foreign bytes load) — a swapped designed font is
+  // present-but-different and is rejected here.
+  for (const font of pin.expectedFonts) {
+    const fontPath = resolve(pin.baseDir, font.file);
+    if (!existsSync(fontPath)) continue;
+    const actual = hashStylesheet(readFileSync(fontPath), 'sha256');
+    if (actual !== font.sha256) {
+      findings.push({
+        rule: 'font-hash-mismatch',
+        message: `kit font ${font.file} does not match the shipped kit bytes (a swapped font renders designed typography under a green pin)`,
+      });
     }
   }
   return findings;

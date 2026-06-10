@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, copyFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -8,7 +8,7 @@ import {
   checkStylesheetIdentity,
 } from '@/lint/stylesheet-pin';
 import { lintWireframe } from '@/lint/check-mockup-lofi';
-import { SKETCH_KIT_CSS_PATH } from '@/wireframe-kit/sketch-kit';
+import { SKETCH_KIT_CSS_PATH, SKETCH_KIT_DIR, SKETCH_KIT_FONTS } from '@/wireframe-kit/sketch-kit';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -204,6 +204,55 @@ describe('checkStylesheetIdentity', () => {
     expect(mangled).not.toBe(payload);
     const html = page(`<link rel="stylesheet" href="sketch-kit.css" integrity="sha384-${mangled}">`);
     expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-sri-mismatch');
+  });
+});
+
+// AUDIT-20260610-03 (gpt-5-01, HIGH): the pin certified the CSS bytes only — the
+// @font-face woff2 files the CSS loads were not hashed, so a swapped brand/icon
+// font rendered polished typography under a green pin. The pin now carries
+// expected hashes of the SHIPPED kit fonts (same trusted source as the CSS) and
+// verifies any font file PRESENT at the wireframe's baseDir against them.
+// Absent fonts are NOT a violation: the browser falls back — no foreign bytes
+// load; a designed font planted at the path is present-but-different → caught.
+describe('checkStylesheetIdentity — transitive font pinning (AUDIT-20260610-03)', () => {
+  const kitHtml = page(`<link rel="stylesheet" href="sketch-kit.css">`);
+
+  it('absent fonts dir is clean (browser fallback; no foreign bytes)', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    expect(checkStylesheetIdentity(kitHtml, pin)).toEqual([]);
+  });
+
+  it('genuine copies of the shipped fonts are clean', () => {
+    const dir = freshDir();
+    mkdirSync(join(dir, 'fonts'), { recursive: true });
+    for (const font of SKETCH_KIT_FONTS) {
+      copyFileSync(join(SKETCH_KIT_DIR, font.file), join(dir, font.file));
+    }
+    const pin = buildSketchKitPin(dir);
+    expect(checkStylesheetIdentity(kitHtml, pin)).toEqual([]);
+  });
+
+  it('a tampered woff2 at a kit font path is rejected (the gpt-5-01 swap)', () => {
+    const dir = freshDir();
+    mkdirSync(join(dir, 'fonts'), { recursive: true });
+    const target = SKETCH_KIT_FONTS[0];
+    writeFileSync(join(dir, target.file), 'not-the-kit-font-bytes');
+    const pin = buildSketchKitPin(dir);
+    expect(rules(checkStylesheetIdentity(kitHtml, pin))).toContain('font-hash-mismatch');
+  });
+
+  it('one genuine + one tampered font yields exactly one font finding (localized)', () => {
+    const dir = freshDir();
+    mkdirSync(join(dir, 'fonts'), { recursive: true });
+    const [genuine, tampered] = [SKETCH_KIT_FONTS[0], SKETCH_KIT_FONTS[1]];
+    copyFileSync(join(SKETCH_KIT_DIR, genuine.file), join(dir, genuine.file));
+    writeFileSync(join(dir, tampered.file), 'swapped-designed-font');
+    const pin = buildSketchKitPin(dir);
+    const findings = checkStylesheetIdentity(kitHtml, pin);
+    const fontFindings = findings.filter((f) => f.rule === 'font-hash-mismatch');
+    expect(fontFindings).toHaveLength(1);
+    expect(fontFindings[0].message).toContain(tampered.file);
   });
 });
 
