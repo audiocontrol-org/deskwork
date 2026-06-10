@@ -1314,3 +1314,23 @@ Finding-ID: AUDIT-20260610-59 (round-16 gpt-5-02, LOW)
 Status:     fixed-62d578e6 (2026-06-10; disclosure allowlisted; open is structural state)
 Severity:   low
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 17 (run 20260610T231601987Z; codex only — claude 0 bytes, 15th consecutive)
+
+1 HIGH + 1 LOW, both verified, fixed in edbf7007. The HIGH is an ordering
+COMPOSITION of two of this loop's own fixes (round-15 percent-decode ×
+round-8 backslash separator).
+
+### AUDIT-20260610-60 — Decode-before-segmentation: %5C smuggled a non-kit fetch under a kit basename
+
+Finding-ID: AUDIT-20260610-60 (round-17 gpt-5-01, HIGH)
+Status:     fixed-edbf7007 (2026-06-10; both href pipelines decode AFTER segmentation; a segment whose decode introduces a separator stays RAW — self-hardened against the a%2F..%2F resolve-alias variant found during the fix, fixture added preemptively)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts + stylesheet-pin.ts
+
+### AUDIT-20260610-61 — Whitespace-padded input type over-rejected
+
+Finding-ID: AUDIT-20260610-61 (round-17 gpt-5-02, LOW)
+Status:     fixed-edbf7007 (2026-06-10; trim before the enumerated compare)
+Severity:   low
+Direction:  false-positive
