@@ -180,8 +180,10 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
   // Strip a query/fragment before the lexical compare and the read — a browser
   // or static host resolves the suffix-less file, and axis-1's basename check
   // already strips them; the axes must agree (AUDIT-20260610-14, fable5-03's
-  // cache-bust over-rejection).
-  const hrefPath = link.href.split(/[?#]/)[0];
+  // cache-bust over-rejection). Backslashes normalize to slashes the same way
+  // the WHATWG URL parser does (AUDIT-20260610-34: ".\\sketch-kit.css" is the
+  // kit to a browser, but a literal filename char to POSIX path.resolve).
+  const hrefPath = link.href.split(/[?#]/)[0].replace(/\\/g, '/');
   const resolved = resolve(pin.baseDir, hrefPath);
   // If the href resolves off the pinned path, the link is already known-wrong;
   // report and STOP without reading. Reading first would let an absolute or

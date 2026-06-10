@@ -80,7 +80,7 @@ const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>
   // Form flow (AUDIT-20260610-24): input.type is plain-kind here but its VALUE
   // is enumerated (INPUT_TYPE_ALLOWLIST) — image loads a resource, color opens
   // a visual picker; both stay rejected.
-  input: { type: 'plain', placeholder: 'plain', value: 'plain' },
+  input: { type: 'plain', placeholder: 'plain', value: 'plain', checked: 'plain' },
   textarea: { placeholder: 'plain' },
   label: { for: 'plain' },
   ol: { start: 'plain', reversed: 'plain' },

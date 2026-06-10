@@ -263,6 +263,18 @@ function checkElement(el: Element, ctx: WalkContext): void {
     }
   }
 
+  // textarea must be EMPTY (AUDIT-20260610-33): it preserves whitespace (the
+  // pre channel) AND scrolls, so visible-viewport art can hide behind
+  // scrolled-out diluting prose — statistics cannot see the viewport. The
+  // lo-fi idiom for its copy is the (gated) placeholder.
+  if (tag === 'textarea' && aggregateText(el).trim() !== '') {
+    findings.push({
+      rule: 'textarea-content',
+      tag,
+      message: `textarea must be empty in a wireframe (its rendered surface preserves whitespace and scrolls — the pre/ASCII-art channel); use placeholder for its copy`,
+    });
+  }
+
   // Block-aggregate punctuation density (AUDIT-20260610-17): the rendered
   // row/region is what sharded punctuation art reassembles at.
   if (DENSITY_BLOCK_TAGS.has(tag) && isPunctuationDense(aggregateText(el))) {

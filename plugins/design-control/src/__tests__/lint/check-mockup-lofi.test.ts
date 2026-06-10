@@ -235,6 +235,30 @@ describe('check-mockup-lofi — textarea (AUDIT-20260610-32)', () => {
   it('textarea placeholder rides the visible-attr gates', () => {
     expect(rules(wrap(`<textarea placeholder="𝐍𝐨𝐭𝐞𝐬"></textarea>`))).toContain('disallowed-codepoint');
   });
+
+  // AUDIT-20260610-33 (round-8 gpt-5-01, HIGH): textarea preserves whitespace
+  // (the pre channel reopened) AND scrolls, so the visible viewport renders
+  // punctuation art while scrolled-out prose dilutes the density counter.
+  // Allowlist-shaped closure, not statistics: a wireframe textarea must be
+  // EMPTY — placeholder (gated) is the lo-fi idiom for its copy.
+  it('rejects textarea with non-whitespace content (round-8 defeating input shape)', () => {
+    const art = `<textarea>###..###..#####\n#..##..#..#....\nLong diluting prose copy here.</textarea>`;
+    expect(rules(wrap(art))).toContain('textarea-content');
+  });
+  it('rejects textarea with even plain prose content (the channel, not the payload)', () => {
+    expect(rules(wrap(`<textarea>prefilled review copy</textarea>`))).toContain('textarea-content');
+  });
+  it('accepts whitespace-only textarea content (formatting artifacts)', () => {
+    expect(rules(wrap(`<textarea>\n  </textarea>`))).toEqual([]);
+  });
+});
+
+// AUDIT-20260610-35 (round-8 gpt-5-03, LOW fp): checked is structural state
+// for a form wireframe (default-selected checkbox/radio), not styling.
+describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
+  it('accepts a checked checkbox', () => {
+    expect(rules(wrap(`<form><label><input type="checkbox" checked> Email updates</label></form>`))).toEqual([]);
+  });
 });
 
 // AUDIT-20260610-24 (round-5 gpt-5-codex-04; FOURTH surfacing of the

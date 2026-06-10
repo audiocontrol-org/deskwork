@@ -255,6 +255,17 @@ describe('checkStylesheetIdentity — query/fragment on the kit href (AUDIT-2026
     const html = page(`<link rel="stylesheet" href="sketch-kit.css?v=2">`);
     expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-hash-mismatch');
   });
+
+  // AUDIT-20260610-34 (round-8 gpt-5-02, LOW fp): the browser normalizes
+  // backslashes to slashes in special-scheme URLs, so href=".\sketch-kit.css"
+  // requests the pinned kit — but POSIX path.resolve treated the backslash as
+  // a literal filename char. The pin normalizes like axis-1's basename does.
+  it('accepts a backslash-relative kit href (browser-equivalent path)', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(`<link rel="stylesheet" href=".\\sketch-kit.css">`);
+    expect(checkStylesheetIdentity(html, pin)).toEqual([]);
+  });
 });
 
 // AUDIT-20260610-03 (gpt-5-01, HIGH): the pin certified the CSS bytes only — the
