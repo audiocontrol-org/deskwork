@@ -1,15 +1,20 @@
 // Shared resolution of the backlog root — the dir whose `backlog/` tree the
 // `backlog` binary operates on. Used by the `backlog` verb (capture/list/import)
 // and the rewired `slush-findings` verb so both agree on where the pile lives.
-// Defaults to the plugin-bundled root (the in-repo dogfood, mirroring inbox/
-// roadmap defaulting to the bundled doc); `STACKCTL_BACKLOG_DIR` overrides it —
-// the test seam, and the adopter override until project-relative discovery lands.
+//
+// 009 T017: resolves through the installation config. The STACKCTL_BACKLOG_DIR
+// seam wins (test seam / operator override); otherwise the enclosing
+// installation's resolved backlog store determines the root — the root is the
+// store dir's PARENT, because the `backlog` binary hardcodes the `backlog/`
+// subdir under its cwd. Outside any installation with no seam, resolveInstallation
+// fails loud directing to `stackctl setup` (no bundled fallback — Principle V / D8).
 
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const here = dirname(fileURLToPath(import.meta.url));
+import { dirname } from 'node:path';
+import { resolveInstallation } from '../config/installation.js';
 
 export function backlogRoot(): string {
-  return process.env.STACKCTL_BACKLOG_DIR ?? resolve(here, '..', '..');
+  const seam = process.env.STACKCTL_BACKLOG_DIR;
+  if (seam !== undefined && seam !== '') return seam;
+  const inst = resolveInstallation(process.cwd());
+  return dirname(inst.resolved.backlog);
 }

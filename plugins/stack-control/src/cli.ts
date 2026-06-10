@@ -23,6 +23,7 @@ import { runCurateCli } from './subcommands/curate.js';
 import { runRoadmapCli } from './subcommands/roadmap.js';
 import { runInboxCli } from './subcommands/inbox.js';
 import { runBacklogCli } from './subcommands/backlog.js';
+import { runSetupCli } from './subcommands/setup.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -50,6 +51,8 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   inbox: runInboxCli,
   // Backlog slush-pile surface — external-backend adapter verb (008).
   backlog: runBacklogCli,
+  // Post-install project setup — create-side of the config + resolution port (009).
+  setup: runSetupCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

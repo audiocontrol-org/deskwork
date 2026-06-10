@@ -9,8 +9,8 @@
 
 import { existsSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { DocumentModelError } from '../document-model/types.js';
+import { InstallationError } from '../config/errors.js';
 import { blocks, order } from '../roadmap/graph.js';
 import {
   add,
@@ -33,10 +33,13 @@ import {
   validateSubactionFlags,
   type SubactionGrammar,
 } from './document-verb-shared.js';
+import { resolveVerbDoc } from './working-file.js';
 
-const here = dirname(fileURLToPath(import.meta.url));
-/** Default canonical roadmap (heading-keyed after US6 migration). */
-const DEFAULT_DOC = resolve(here, '..', '..', 'ROADMAP.md');
+// When `--doc` is omitted, the roadmap resolves through the enclosing
+// installation (009 read-side wiring, FR-003); outside any installation it fails
+// loud directing to `stackctl setup` (no bundled fallback, D8). A sentinel
+// default lets the flag scanner report whether --doc was passed.
+const NO_DOC = '\0__roadmap_no_doc__';
 
 interface Flags {
   readonly doc: string;
@@ -75,7 +78,7 @@ const ALL_VALUE_FLAGS: readonly string[] = [
 
 /** Scan flags via the shared subaction-verb scanner; `--apply`/`--clear` booleans. */
 function scanFlags(args: readonly string[]): Flags {
-  const s = scanVerbFlags('roadmap', args, DEFAULT_DOC, ['apply', 'clear'], ALL_VALUE_FLAGS);
+  const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear'], ALL_VALUE_FLAGS);
   return {
     doc: s.doc,
     apply: s.booleans.has('apply'),
@@ -221,9 +224,25 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
   if (subaction === undefined || subaction.startsWith('--')) {
     failUsage('roadmap', 'a subaction is required (usage: roadmap <next|blocked|add> [flags])');
   }
-  const flags = scanFlags(args.slice(1));
-  validateSubactionFlags('roadmap', subaction, SUBACTION_SPECS[subaction], flags);
+  // Reject an unknown subaction before resolving the doc, so an unknown verb is a
+  // usage error (exit 2) rather than triggering installation resolution.
+  if (SUBACTION_SPECS[subaction] === undefined) {
+    failUsage(
+      'roadmap',
+      `unknown subaction '${subaction}' (known: next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, reconcile)`,
+    );
+  }
+  const scanned = scanFlags(args.slice(1));
+  validateSubactionFlags('roadmap', subaction, SUBACTION_SPECS[subaction], scanned);
   try {
+    const { doc } = resolveVerbDoc({
+      key: 'roadmap',
+      explicitDoc: scanned.doc === NO_DOC ? null : scanned.doc,
+      envSeam: process.env.STACKCTL_ROADMAP_DEFAULT_DOC,
+      cwd: process.cwd(),
+      announce: (message) => process.stdout.write(`${message}\n`),
+    });
+    const flags: Flags = { ...scanned, doc };
     switch (subaction) {
       case 'next':
         process.stdout.write(readyList(loadRoadmap(flags.doc, grammarDirs())));
@@ -258,13 +277,12 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
       case 'reconcile':
         emitReconcile(flags);
         return;
-      default:
-        failUsage(
-          'roadmap',
-          `unknown subaction '${subaction}' (known: next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, reconcile)`,
-        );
     }
   } catch (err) {
+    if (err instanceof InstallationError) {
+      process.stderr.write(`roadmap: ${err.message}\n`);
+      process.exit(err.code === 'escape' || err.code === 'collision' ? 2 : 1);
+    }
     if (err instanceof DocumentModelError) {
       process.stderr.write(`roadmap: ${err.message}\n`);
       process.exit(2);
