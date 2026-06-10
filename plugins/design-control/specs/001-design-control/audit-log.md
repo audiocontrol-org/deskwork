@@ -1124,3 +1124,32 @@ Status:     fixed-00a6cfec (2026-06-10; allowlisted — same structural class as
 Severity:   low
 Surface:    plugins/design-control/src/lint/allowlist.ts
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 10 (run 20260610T213806274Z; codex only — claude 0 bytes, 8th consecutive)
+
+Triage notes: 1 HIGH + 1 MED + 2 LOW, all verified, all fixed same round. The
+HIGH (theme placement) is the best find in several rounds — a pinned-CSS polish
+channel via class PLACEMENT, against the DECISION doc's one-theme-on-body
+contract. Codex's grounded-clean list re-confirms all earlier closures.
+
+### AUDIT-20260610-38 — sk-theme-* below body composes mixed-theme polish
+
+Finding-ID: AUDIT-20260610-38 (round-10 gpt-5-01, HIGH)
+Status:     fixed-bdecbd70 (2026-06-10; theme-placement rule — theme tokens on body only, at most one)
+Severity:   high
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
+
+### AUDIT-20260610-39 — Ratio-gaming: letter-embedded punctuation art at 75% under the 0.8 gate
+
+Finding-ID: AUDIT-20260610-39 (round-10 gpt-5-02, MED)
+Status:     fixed-bdecbd70 (2026-06-10; PUNCT_DENSITY_RATIO 0.8 → 0.6 — copy lines run far below; art diluted past 0.6 converges to the letter-art referee boundary)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/codepoint.ts
+
+### AUDIT-20260610-40 — disabled/selected over-rejected (state completions)
+
+Finding-ID: AUDIT-20260610-40 (round-10 gpt-5-03 + gpt-5-04, LOW)
+Status:     fixed-bdecbd70 (2026-06-10; structural form state, same class as checked)
+Severity:   low
+Surface:    plugins/design-control/src/lint/allowlist.ts
+Direction:  false-positive
