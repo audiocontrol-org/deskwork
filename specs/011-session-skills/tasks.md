@@ -67,15 +67,15 @@ This feature **consumes** 009's `src/config/{installation,resolve-paths,config-l
 
 **Goal**: `stackctl session-end` writes the journal (auto-mechanical + narrative slots), captures friction, runs the advisory clone-snapshot, surfaces progressed backlog, and commits + pushes. **Independent test**: session with a commit + a local bare remote → `session-end` → journal appended, pushed, progressed backlog surfaced (quickstart Scenarios 4–6).
 
-- [ ] T015 [P] [US2] RED: `plugins/stack-control/tests/session/end-journal.test.ts` — auto-derived mechanical sections (commit count/subjects, files-changed, backlog-items-touched) from `git log <boundary>..HEAD` + empty narrative slots; an honest sparse entry on a no-op session; written at the configured `journal` path; follows configured template else default (FR-006/FR-013).
-- [ ] T016 [P] [US2] RED: `plugins/stack-control/tests/session/progressed-backlog.test.ts` — backlog items referenced in session commits surfaced as progressed; backlog store status **unchanged** (0 auto-transitions); **no GitHub-issue query** (FR-009/SC-006).
-- [ ] T017 [P] [US2] RED: `plugins/stack-control/tests/session/end-commit-push.test.ts` — stages + commits doc-only; pushes to a local **bare** remote (assert commit present after re-fetch); warns (not blocks) on uncommitted non-doc changes (FR-011); push failure → exit 3, record committed locally (FR-010).
-- [ ] T018 [US2] Implement `plugins/stack-control/src/session/journal.ts` (auto-derive mechanical via T005 boundary + git log; emit narrative slots; configured-template-or-default) → GREEN T015.
-- [ ] T019 [US2] Implement `plugins/stack-control/src/session/progressed-backlog.ts` (commit-ref IDs ∩ backlog `list()`; surface-only) → GREEN T016.
-- [ ] T020 [US2] Implement `plugins/stack-control/src/session/close.ts` — tooling-friction append (resolved `tooling_feedback`, skip-clean if none) + advisory clone-snapshot over resolved `clone_scope` (skip-with-note if unconfigured/tool-absent).
-- [ ] T021 [US2] Implement `plugins/stack-control/src/subcommands/session-end.ts` — `runSessionEndCli`: resolve, journal, close (friction + snapshot), progressed-backlog, commit + push (bounded retry, `--no-push`), report, exit 0/1/2/3 (contracts/session-end-cli.md) → GREEN T017.
-- [ ] T022 [US2] Register `session-end: runSessionEndCli` in `plugins/stack-control/src/cli.ts` SUBCOMMANDS.
-- [ ] T023 [US2] Create `plugins/stack-control/skills/session-end/SKILL.md` — thin adapter (when to run; capture-only discipline; CLI-first note).
+- [X] T015 [P] [US2] RED: `plugins/stack-control/tests/session/end-journal.test.ts` — auto-derived mechanical sections (commit count/subjects, files-changed, backlog-items-touched) from `git log <boundary>..HEAD` + empty narrative slots; an honest sparse entry on a no-op session; written at the configured `journal` path; follows configured template else default (FR-006/FR-013).
+- [X] T016 [P] [US2] RED: `plugins/stack-control/tests/session/progressed-backlog.test.ts` — backlog items referenced in session commits surfaced as progressed; backlog store status **unchanged** (0 auto-transitions); **no GitHub-issue query** (FR-009/SC-006).
+- [X] T017 [P] [US2] RED: `plugins/stack-control/tests/session/end-commit-push.test.ts` — stages + commits doc-only; pushes to a local **bare** remote (assert commit present after re-fetch); warns (not blocks) on uncommitted non-doc changes (FR-011); push failure → exit 3, record committed locally (FR-010).
+- [X] T018 [US2] Implement `plugins/stack-control/src/session/journal.ts` (auto-derive mechanical via T005 boundary + git log; emit narrative slots; configured-template-or-default) → GREEN T015.
+- [X] T019 [US2] Implement `plugins/stack-control/src/session/progressed-backlog.ts` (commit-ref IDs ∩ backlog `list()`; surface-only) → GREEN T016.
+- [X] T020 [US2] Implement `plugins/stack-control/src/session/close.ts` — tooling-friction append (resolved `tooling_feedback`, skip-clean if none) + advisory clone-snapshot over resolved `clone_scope` (skip-with-note if unconfigured/tool-absent).
+- [X] T021 [US2] Implement `plugins/stack-control/src/subcommands/session-end.ts` — `runSessionEndCli`: resolve, journal, close (friction + snapshot), progressed-backlog, commit + push (bounded retry, `--no-push`), report, exit 0/1/2/3 (contracts/session-end-cli.md) → GREEN T017.
+- [X] T022 [US2] Register `session-end: runSessionEndCli` in `plugins/stack-control/src/cli.ts` SUBCOMMANDS.
+- [X] T023 [US2] Create `plugins/stack-control/skills/session-end/SKILL.md` — thin adapter (when to run; capture-only discipline; CLI-first note).
 
 **Checkpoint**: US2 independently testable — a session's record is durably captured + pushed.
 

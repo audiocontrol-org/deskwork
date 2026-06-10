@@ -39,6 +39,41 @@ function git(cwd: string, args: readonly string[]): string {
   return execFileSync('git', [...args], { cwd, encoding: 'utf8' }).trim();
 }
 
+/** One commit in the session range. */
+export interface CommitRecord {
+  readonly sha: string;
+  readonly subject: string;
+  readonly body: string;
+}
+
+const RECORD_SEP = '\x1e';
+const FIELD_SEP = '\x1f';
+
+/** Commits in `<boundary>..HEAD`, newest first. Empty when the range is empty. */
+export function commitsSince(cwd: string, boundary: string): readonly CommitRecord[] {
+  const out = git(cwd, [
+    'log',
+    `--format=%H${FIELD_SEP}%s${FIELD_SEP}%b${RECORD_SEP}`,
+    `${boundary}..HEAD`,
+  ]);
+  if (out.length === 0) return [];
+  return out
+    .split(RECORD_SEP)
+    .map((r) => r.trim())
+    .filter((r) => r.length > 0)
+    .map((r) => {
+      const [sha = '', subject = '', body = ''] = r.split(FIELD_SEP);
+      return { sha: sha.trim(), subject: subject.trim(), body: body.trim() };
+    });
+}
+
+/** Count of distinct files changed across `<boundary>..HEAD`. */
+export function filesChangedSince(cwd: string, boundary: string): number {
+  const out = git(cwd, ['diff', '--name-only', `${boundary}..HEAD`]);
+  if (out.length === 0) return 0;
+  return new Set(out.split('\n').map((l) => l.trim()).filter((l) => l.length > 0)).size;
+}
+
 /**
  * Resolve the staleness base (research D3): the configured upstream if set, else
  * the repository default branch (origin/HEAD → origin/main → origin/master), else

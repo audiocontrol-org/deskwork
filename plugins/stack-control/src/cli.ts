@@ -47,6 +47,7 @@ import { runCustomize } from './subcommands/customize.js';
 import { runScopeInventory } from './subcommands/scope-inventory.js';
 import { runScopeWiden } from './subcommands/scope-widen.js';
 import { runSessionStartCli } from './subcommands/session-start.js';
+import { runSessionEndCli } from './subcommands/session-end.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -107,6 +108,7 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   'scope-widen': runScopeWiden,
   // Native session lifecycle skills (011 / session-skills).
   'session-start': runSessionStartCli,
+  'session-end': runSessionEndCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
