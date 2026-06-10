@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-06-10: Recover dropped backlog bodies; author + narrow spec 013 (audit-protocol path resolution)
+
+**Goal:** Triage the backlog's most egregious audit-protocol friction and graduate it into the Spec Kit rigor via the promote seam — and, along the way, recover data lost in a prior GitHub→backlog migration.
+
+**Accomplished:**
+- **Recovered 9 dropped backlog task bodies** (TASK-12/13/14/16/17/18/19/20/21). A prior GitHub→backlog migration used `backlog capture --ref gh-N` WITHOUT `--body`, then closed the issues `NOT_PLANNED` — orphaning the only copy of each body in a closed issue. Restored each from the still-intact closed issue via native `backlog task edit`, with a provenance header (`7b8784b2`).
+- **Authored spec 013 (audit-protocol-hardening) to runnable** through the native Spec Kit chain: `specify → plan → tasks` (`spec=yes plan=yes tasks=yes`), RED-first, Constitution Check clean. Artifacts: spec, plan, research (6 code-anchored decisions), data-model, two contracts, quickstart, 17-task tasks.md.
+- **Narrowed 013 to the must-fix** (operator scoping pass): layout-aware feature/audit-log resolution — widen `resolveFeatureRoot` to the `specs/NNN-slug/` layout (TASK-14) — + first-barrage audit-log scaffold (TASK-13). Out-of-scope items recorded in the spec's *Out of Scope — deferred, not dropped* ledger.
+- **Promote reconciliation through the seam:** promoted TASK-14 (spec lead) + TASK-13 (task) to 013; un-promoted the earlier mis-scoped cluster (TASK-18/12/2/19) back to the pile — no item lost.
+- **Filed TASK-23** (backlog promote has no inverse / un-promote verb) and **TASK-24** (scope-* direct-path reconciliation follow-on, research D5).
+
+**Didn't Work:**
+- **Picked the wrong cluster first.** Opened by promoting a backlog-backend hardening cluster (TASK-1–5) before the operator redirected to the audit-protocol problems; reverted those promotes (uncommitted `git restore`) and re-promoted the right set.
+- **Auto-derived session-end Quantitative reported 0 commits** (boundary mis-detection); corrected by hand from `git log 128523b1..HEAD`.
+
+**Course Corrections:**
+- [PROCESS] Wrong priority first (backlog-backend perf over audit protocol). Operator: *"the most important friction issues are the broken audit protocol problems … when it's broken, everything else is even more broken."*
+- [PROCESS] Off-roaded reading task `.md` files + raw grep instead of native tooling. Operator: *"use the stack-control infrastructure … don't offroad unless the tooling is genuinely broken."* (The un-promote hand-edit WAS a genuine-tooling-gap case → filed TASK-23.)
+- [PROCESS] Authored the spec assuming all six defects were broken; a Phase-0 code-verification pass found US1 Facet A already fixed (`eed196b3`). Operator then narrowed: Facet B is *"not a blocker; don't implement"*; the rigid audit-log path is *"the absolute must fix problem."*
+- [FABRICATION-adjacent / data] Operator flagged the empty-body migration as *"INSANE"* — the backlog husks had no detail and the source issues were closed; recovered all 9.
+
+**Insights:**
+- A backlog item whose body lives only in a closed GitHub issue is one prune away from permanent loss. GitHub→backlog migration MUST carry bodies (`import-github`, not bare `capture --ref`); capture should refuse/warn on a gh-ref with no `--body`.
+- **Verify each defect against current code before planning** — backlog items go stale. Facet A was fixed *after* its issue was migrated to the backlog, so the captured assumption was wrong. RED-first planning is what surfaced the already-done work.
+- The rigid `docs/*/001-IN-PROGRESS/<slug>/` resolver (`feature-root.ts`) is the single chokepoint blocking the audit protocol on Spec Kit features; widening that **one** helper unblocks the whole governance surface (gate/lift/slush/backlog) at once. This is the 013 MVP.
+
+**Quantitative (auto-derivation corrected — verb reported 0; re-derived from `git log 128523b1..HEAD`):**
+- Commits: 7 — recover bodies (`7b8784b2`), specify 013 + promote (`1a1a8a3d`), marker → 013 (`4a60cd33`), narrow 013 (`3daa55b2`), plan + artifacts (`14f021a3`), tasks.md (`4367d35a`), session-end record (`4bd643ac`).
+- Files changed: 25 (+861 / −2).
+- Backlog touched: TASK-2, TASK-12, TASK-13, TASK-14, TASK-16, TASK-17, TASK-18, TASK-19, TASK-20, TASK-21, TASK-23, TASK-24.
+- New backlog items: TASK-23 (un-promote verb gap), TASK-24 (scope-* follow-on).
+- Spec 013: runnable; 17 implementation tasks; MVP = US1 (resolver widen). Not yet implemented (separate session per the two-session boundary).
+
 ## 2026-06-10: Implement spec 012 (backlog promote seam), audit-protocol course-correction, release v0.41.0
 
 **Goal:** Implement spec 012 (backlog → feature-rigor promotion seam) RED-first, run the audit protocol over it, and ship it.
