@@ -83,6 +83,38 @@ interface WalkContext {
   stylesheetLinkCount: number;
 }
 
+/**
+ * Block-level containers whose AGGREGATE descendant text gets the
+ * punctuation-density check (AUDIT-20260610-17, round-3 gpt-5-01/-02): a
+ * per-text-node check is defeated by sharding — adjacent inline shards each
+ * below the length floor, or one glyph per table cell. These are the rendered
+ * row/region granularities the shards visually reassemble at. The per-node
+ * check is kept alongside: an inline island inside a letter-diluted block
+ * (prose + one dense button) only trips at the node level.
+ */
+const DENSITY_BLOCK_TAGS: ReadonlySet<string> = new Set([
+  'body', 'main', 'header', 'footer', 'nav', 'section', 'article', 'aside',
+  'div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
+  'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'figure', 'figcaption',
+  'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption',
+]);
+
+/** Concatenated descendant text of an element (template content included). */
+function aggregateText(el: Element): string {
+  let out = '';
+  const visit = (node: AnyNode): void => {
+    if (ta.isTextNode(node)) out += ta.getTextNodeContent(node);
+    if ('content' in node && node.content) {
+      for (const child of node.content.childNodes) visit(child);
+    }
+    if ('childNodes' in node) {
+      for (const child of node.childNodes) visit(child);
+    }
+  };
+  visit(el);
+  return out;
+}
+
 function checkElement(el: Element, ctx: WalkContext): void {
   const { findings } = ctx;
   const tag = ta.getTagName(el).toLowerCase();
@@ -144,6 +176,16 @@ function checkElement(el: Element, ctx: WalkContext): void {
         findings.push({ rule: 'external-resource', tag, attr, message: `external resource URL in ${attr} on <${tag}> is rejected` });
       }
     }
+  }
+
+  // Block-aggregate punctuation density (AUDIT-20260610-17): the rendered
+  // row/region is what sharded punctuation art reassembles at.
+  if (DENSITY_BLOCK_TAGS.has(tag) && isPunctuationDense(aggregateText(el))) {
+    findings.push({
+      rule: 'punctuation-density',
+      tag,
+      message: `aggregate text of <${tag}> is punctuation-dense (imagery-shaped, not copy-shaped) — sharded pixel/ASCII-art channels are rejected; use the .sk-img placeholder for image regions`,
+    });
   }
 
   // Only the pinned sketch-kit stylesheet link is permitted. The rel token set

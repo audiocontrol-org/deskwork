@@ -175,4 +175,57 @@ describe('lintWireframe — punctuation-density imagery channel (AUDIT-20260610-
       'punctuation-density',
     );
   });
+
+  // AUDIT-20260610-17 (round-3 gpt-5-01/-02, HIGH): per-text-node density is
+  // defeated by SHARDING — adjacent <code> shards each below the length floor,
+  // or one glyph per table cell. The density gate also runs over each BLOCK
+  // container's aggregate descendant text (the rendered-row granularity the
+  // shards reassemble at).
+  describe('block-aggregate density (sharding defeats, AUDIT-20260610-17)', () => {
+    it('rejects the sharded code wordmark (round-3 gpt-5-01 defeating input)', () => {
+      const art =
+        `<h1 class="sk-h1"><code>#######</code><code>.......</code><code>#######</code><br>` +
+        `<code>#.....#</code><code>.....#.</code><code>#.....#</code></h1>`;
+      expect(rules(wrap(art))).toContain('punctuation-density');
+    });
+
+    it('rejects the table-cell mosaic (round-3 gpt-5-02 defeating input)', () => {
+      const art =
+        `<table><tbody>` +
+        `<tr><td>#</td><td>#</td><td>#</td><td>.</td><td>.</td><td>#</td><td>#</td><td>#</td></tr>` +
+        `<tr><td>#</td><td>.</td><td>.</td><td>#</td><td>#</td><td>.</td><td>.</td><td>#</td></tr>` +
+        `</tbody></table>`;
+      expect(rules(wrap(art))).toContain('punctuation-density');
+    });
+
+    it('rejects inline-shard art inside a letter-diluted block (per-node floor still matters)', () => {
+      // The parent div's aggregate is diluted by prose; the single dense node
+      // must still be caught by the per-text-node check.
+      const html = `<div><p>Quarterly revenue summary for the northwest region and all subsidiary accounts.</p><button class="sk-btn">###..###..#####</button></div>`;
+      expect(rules(wrap(html))).toContain('punctuation-density');
+    });
+
+    it('accepts an ordinary data table (letters/digits dominate)', () => {
+      const table =
+        `<table><tbody>` +
+        `<tr><th>Plan</th><th>Price</th><th>Seats</th></tr>` +
+        `<tr><td>Basic</td><td>9</td><td>5</td></tr>` +
+        `<tr><td>Team</td><td>49</td><td>25</td></tr>` +
+        `</tbody></table>`;
+      expect(rules(wrap(table))).not.toContain('punctuation-density');
+    });
+
+    it('accepts a short placeholder row (below the aggregate floor)', () => {
+      expect(rules(wrap(`<tr><td>—</td><td>—</td><td>—</td></tr>`))).not.toContain(
+        'punctuation-density',
+      );
+    });
+
+    it('accepts a normal prose page (whole-body aggregate is letter-dominated)', () => {
+      const html =
+        `<main><h1>Checkout</h1><p>Review your order, then continue to payment.</p>` +
+        `<p>(Prices include VAT — see notes…)</p></main>`;
+      expect(rules(wrap(html))).not.toContain('punctuation-density');
+    });
+  });
 });
