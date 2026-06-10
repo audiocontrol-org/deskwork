@@ -28,6 +28,15 @@ Two further constraints, both first-class:
 
 This is **not** a website concern and carries no renderer assumptions; it operates on a project's governed-document tree the same way for any adopter.
 
+## Clarifications
+
+### Session 2026-06-10
+
+- Q: Branch-staleness base resolution (OQ-1) → A: The base is the branch's configured **upstream** if set, else the **repository default branch** (e.g. `origin/main`); when neither resolves, the staleness check skips cleanly (FR-017).
+- Q: session-end closing-gate posture (OQ-2) → A: **Capture-only** for v1. The refuse-to-end gates (`check-disposition-survivor` / `check-open-findings` / bare-TBD refusal) are deferred to the scope-discovery / audit-barrage migrations that own them; session-end here records but never refuses to close.
+- Q: Active-installation selection in a monorepo (OQ-3) → A: **cwd-resolved nearest installation by default, with an explicit override argument** available (a root/installation target, supplied through the surface-agnostic invocation context of FR-020).
+- Q: Journal entry authorship boundary (OQ-4) → A: session-end **auto-derives the mechanical/quantitative sections** (commit counts, files changed, issues touched — re-derived from `git log`) and **leaves the narrative sections** (goal, insights, course corrections) for the agent to compose; the assembled entry is operator-editable before commit.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A fresh agent is oriented at boot and does not start uninvited (Priority: P1) 🎯 MVP
@@ -142,7 +151,7 @@ An agent or human invokes session-start and session-end through the `stackctl` C
 
 #### session-end — capture at close
 
-- **FR-006**: session-end MUST write a development-log journal entry recording the session, appended to the installation's configured journal working file. The entry is always written, even when little progressed (an honest sparse entry beats a skipped one).
+- **FR-006**: session-end MUST write a development-log journal entry recording the session, appended to the installation's configured journal working file. The entry is always written, even when little progressed (an honest sparse entry beats a skipped one). session-end MUST **auto-derive the mechanical/quantitative sections** of the entry (commit counts, files changed, issues touched — re-derived from source, never fabricated) and MUST leave the **narrative sections** (goal, insights, course corrections) for the agent to compose; the assembled entry is operator-editable before commit (Clarification 2026-06-10).
 - **FR-007**: session-end MUST capture any tooling friction that surfaced during the session into the installation's configured tooling-friction log (append-only), and skip cleanly when none surfaced.
 - **FR-008**: session-end MUST run an advisory clone-snapshot over the installation's configured source scope and surface any new duplication. The snapshot is advisory — it MUST NOT block the close.
 - **FR-009**: session-end MUST surface the issues that progressed this session as evidence, and MUST NOT perform the closing transition itself (the operator/issue-author owns closure — never an automated close).
@@ -154,11 +163,11 @@ An agent or human invokes session-start and session-end through the `stackctl` C
 - **FR-012**: Both skills MUST resolve every working file they read or write — governed roadmap, design inbox, journal/development-log, tooling-friction log, program audit log, and the clone-snapshot source scope — through the stack-control installation config + resolution contract, NOT through hardcoded paths, branch names, or feature slugs.
 - **FR-013**: Both skills MUST NOT assume a specific project's journal taxonomy, document model, or renderer; the journal entry's shape MUST follow the project's configured journal template/convention rather than a baked-in deskwork taxonomy.
 - **FR-014**: When invoked outside any installation, both skills MUST fail loudly naming that no installation resolves and directing the operator to set the installation up — never falling back to a plugin-bundled working file.
-- **FR-015**: Both skills MUST resolve the nearest enclosing installation when run inside a monorepo with multiple installations (consistent with the shared resolution contract's nearest-wins), and operate only on that installation's working files.
+- **FR-015**: Both skills MUST resolve the nearest enclosing installation when run inside a monorepo with multiple installations (consistent with the shared resolution contract's nearest-wins), and operate only on that installation's working files. They MUST also accept an **explicit installation/root override** (Clarification 2026-06-10) for the case where the operator's intended installation differs from the cwd-resolved one; the override is supplied through the surface-agnostic invocation context (FR-020).
 
 #### Branch-staleness advisory
 
-- **FR-016**: session-start MUST surface an advisory warning when the working branch is behind its base (naming by how much when determinable), so a stale-branch session does not silently re-implement shipped work. The warning MUST be advisory and MUST NOT block the session from starting.
+- **FR-016**: session-start MUST surface an advisory warning when the working branch is behind its base (naming by how much when determinable), so a stale-branch session does not silently re-implement shipped work. The **base** is the branch's configured upstream if set, else the repository default branch (Clarification 2026-06-10). The warning MUST be advisory and MUST NOT block the session from starting.
 - **FR-017**: session-start MUST skip the staleness check cleanly (no error, session proceeds) when the base cannot be determined (no upstream/remote, detached HEAD).
 
 #### Surface-agnostic distribution (CLI-first)
@@ -205,14 +214,14 @@ An agent or human invokes session-start and session-end through the `stackctl` C
 - **Invocation, not auto-wiring**: the skills/verbs are invocable on demand; per `.claude/rules/enforcement-lives-in-skills.md` the plugin does NOT ship git-hook / SessionStart auto-wiring — wiring the verbs into an automatic trigger is an adopter's own choice.
 - **Capture, not cut** — recorded as out of scope for this feature so they are not silently absorbed: (1) **the dw-lifecycle deskwork-specific closing ceremony** (README status-table + `workplan.md` check-offs) — stack-control tracks work via Spec Kit artifacts + the governed roadmap, not the dw-lifecycle workplan spine; (2) **the dw-lifecycle "refuse-to-end" closing gates** (`check-disposition-survivor` / `check-open-findings` / bare-TBD refusal) — those depend on scope-discovery + audit-barrage being migrated in (`design:feature/migrate-scope-discovery`, `multi:feature/migrate-audit-barrage`) and are owned by that migration, not this feature; session-end here is capture-only, matching the operator's scoping of the close ceremony; (3) **building the installation resolver itself** (009's job); (4) **retiring dw-lifecycle** (`multi:feature/retire-dw-lifecycle`).
 
-## Open Questions
+## Open Questions *(all resolved — Session 2026-06-10)*
 
-Genuine operator-owned forks captured rather than silently defaulted (constitution Principle II). Each carries a recommended default for `/speckit-clarify` to confirm or override.
+These were the genuine operator-owned forks captured rather than silently defaulted (constitution Principle II). **All four resolved** in the `/speckit-clarify` session — see the Clarifications section for the canonical answers; retained here as a resolution ledger:
 
-- **OQ-1 — Branch-staleness base resolution**: what defines "the base" the branch is compared against — the repository's default branch (e.g. `origin/main`), the branch's configured upstream, or a configured target? *Recommended default*: the branch's upstream if set, else the repository default branch; skip cleanly when neither resolves (FR-017).
-- **OQ-2 — session-end closing-gate posture**: session-end is specified capture-only for this feature (the refuse-to-end gates are deferred to the scope-discovery/audit-barrage migrations — see Assumptions). Confirm that capture-only is the intended v1 posture, versus folding a minimal advisory open-findings surface into session-end now. *Recommended default*: capture-only now; the enforcing gates arrive with their owning migrations.
-- **OQ-3 — Active-installation selection when a session spans work**: when the cwd resolves one installation but the operator's intended work is in another (monorepo), does session-start orient strictly by cwd-resolved installation, or accept an explicit installation target? *Recommended default*: cwd-resolved nearest installation, with an explicit override argument available (surface-agnostic context per FR-020).
-- **OQ-4 — Journal entry authorship boundary**: how much of the journal entry does the skill compose automatically (quantitative counts from `git log`, issues touched) versus leave for the operator/agent to fill (goal, insights, course corrections)? *Recommended default*: auto-derive the mechanical/quantitative sections from source; leave the narrative sections for the agent to compose, operator-editable before commit (mirrors the dw-lifecycle hygiene-block pattern).
+- **OQ-1 — Branch-staleness base resolution**: ✅ RESOLVED (Session 2026-06-10) — base = the branch's configured upstream if set, else the repository default branch; skip cleanly when neither resolves (FR-016/FR-017).
+- **OQ-2 — session-end closing-gate posture**: ✅ RESOLVED (Session 2026-06-10) — capture-only for v1; refuse-to-end gates deferred to the scope-discovery / audit-barrage migrations that own them (Assumptions, FR-006..FR-011).
+- **OQ-3 — Active-installation selection when a session spans work**: ✅ RESOLVED (Session 2026-06-10) — cwd-resolved nearest installation by default, with an explicit override argument supplied through the surface-agnostic invocation context (FR-015/FR-020).
+- **OQ-4 — Journal entry authorship boundary**: ✅ RESOLVED (Session 2026-06-10) — auto-derive the mechanical/quantitative sections from source; the agent composes the narrative sections; operator-editable before commit (FR-006).
 
 ## Dependencies
 
