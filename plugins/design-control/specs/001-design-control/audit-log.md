@@ -1291,3 +1291,26 @@ all fixed in f5e6b516:
   compares percent-decode (browser-faithful)
 - AUDIT-20260610-57 (LOW fp): initial-scale=1.0 over-rejected → numeric
   viewport values canonicalize
+
+## 2026-06-10 — lint adversarial barrage ROUND 16 (run 20260610T230257429Z; codex only — claude 0 bytes, 14th consecutive)
+
+Zero-HIGH streak RESET (was 1). 1 HIGH + 1 LOW, both verified, fixed in
+62d578e6.
+
+### AUDIT-20260610-58 — Font pin anchored at baseDir, but CSS url() is stylesheet-relative
+
+Finding-ID: AUDIT-20260610-58 (round-16 gpt-5-01, HIGH)
+Status:     fixed-62d578e6 (2026-06-10; font paths anchor at dirname(resolved stylesheet); tampered + genuine subdirectory-layout fixtures)
+Severity:   high
+Surface:    plugins/design-control/src/lint/stylesheet-pin.ts
+
+A kit linked from a subdirectory (legal under the basename rule) loads fonts
+beside ITSELF; the pin checked baseDir/fonts — a swapped designed font at the
+real location passed green.
+
+### AUDIT-20260610-59 — details/summary over-rejected
+
+Finding-ID: AUDIT-20260610-59 (round-16 gpt-5-02, LOW)
+Status:     fixed-62d578e6 (2026-06-10; disclosure allowlisted; open is structural state)
+Severity:   low
+Direction:  false-positive
