@@ -5759,3 +5759,49 @@ The decision (structural cure vs per-instance disposition) is an operator call. 
 1. **`/speckit-implement` 010** in a **separate implementation session** on `feature/stack-control` (orchestrator/implementation split). Build order: Setup → Foundational boundary (T004/T005) → US1 (prove per-codebase scoping) → US2–US8 → Polish; `after_implement` governance fires there. Watch T051 (gutted-stub), T080 (cross-installation isolation), T072 (dw-lifecycle untouched).
 2. Reconcile the `project-relative-doc-discovery` subsumption (T078) and promote future-expansion items to the roadmap (T077) as part of completion.
 3. Prior 007/008 next-steps still stand.
+
+---
+
+## 2026-06-10: `design/migrate-scope-discovery` (010) — full `/speckit-implement` (all 81 tasks, one delivery)
+### Feature: pluggable-lifecycle-providers
+### Worktree: stack-control (branch `feature/stack-control`)
+
+**Goal:** Implement 010 end-to-end via `/speckit-implement` — vendor the dw-lifecycle scope-discovery surface (clone detector + disposition lifecycle, discovery/widen + agents + synthesis, registry checks, dispatch wrapper, install/doctor/export) into `stack-control` natively, with the one new behavior: **per-codebase clone scoping by default**. Full surface, one delivery (operator decision — no phasing).
+
+**Accomplished — all 81 tasks, TDD throughout:**
+- **Setup + Foundational (myself, T001–T013):** the de-risking spine. `codebase-boundary.ts` (the novel per-codebase resolver — reuses 009 `resolveInstallation` walk-up, nested-child exclusion, fail-loud no-cwd-fallback) + `baseline-path.ts`; `jscpd-runner.ts` **generalized** (boundary+ignore params; resolves the LOCAL pinned jscpd bin via walk-up — `npx jscpd` from a scan cwd outside the repo fetched a flag-incompatible jscpd, a real packaging bug fixed here); clones-yaml family, ajv schema validator, util — verbatim ports with characterization tests.
+- **US1 (myself, T014–T019):** the founding boundary proof. Split `clone-detector.ts` into `detectCodebaseClones()` (pure, testable, replaces dw-lifecycle's `REPO_ROOT = process.cwd()` defect) + `checkClones()` CLI. Intra-codebase reported; cross-codebase + vendored-copy excluded (SC-001/002).
+- **US2 (delegated, T020–T029):** disposition lifecycle (dispose/batch[split 522→298+272]/refresh/survivor/refactor-preconditions), per-codebase baseline.
+- **US3–US6 (delegated, parallel):** discovery+synthesis+inventory+widen (US3); registry checks (US4); dispatch-wrapper+gutted-stub validator (US5); install/sd-config/doctor-subset/customize/export/summary (US6). US3 **severed two out-of-scope couplings deterministically**: `synthesis.ts` mediation→`deriveDiscoveredCandidates` (folds pattern-matrix's in-scope `clusterUnmatchedShapes`; FR-017 preserved), `scope-inventory.ts` + `semantic.ts` llm audit-loop removed.
+- **US7 (myself, T066–T068):** govern `--mode implement` now runs the per-codebase clone step (`govern/clone-step.ts`), advisory, replacing the deferred TODO.
+- **US8 (myself, T069–T071):** `install-drift` advisory (R6, new code).
+- **Polish (myself, T072–T079/T081):** SC-010 (dw-lifecycle 0 files changed, its tests pass), SC-009 (plain-shell reachability), the FR-004 `port-ledger.md`, README scope-discovery section, 5 future-items promoted to backlog (TASK-6..10), subsumption/snapshot reconciliation notes, the all-22-verb flag-validation test.
+- **Verified at every commit** (not trusted from agents): final = tsc strict clean, **152 files / 1044 tests pass**, no out-of-scope import leaks, no file over the 500-line cap.
+
+**Didn't Work / unresolved:**
+- **`after_implement` governance barrage NOT yet run.** Operator chose to **scope it to the novel/risky surface** (boundary resolver + the two decouplings + clone-step) rather than fire 3 model CLIs over the 219-file/37.8k-line diff (a single pass would be budget-truncated + expensive). Was assembling the focused diff when the session pivoted to pull. **This is the open next step.**
+- **The cli.ts no-edit instruction was ignored by the US2 agent** (it needed green subprocess tests). Later agents (US5/US6/US4/US3) complied after I strengthened the instruction; I integrated cli.ts centrally.
+- **tsc caught 5 integration mismatches the 1044-test vitest run did NOT** (US4 simplified `ScanInput`; US3 discovery agents passed the old richer shape; an orphaned `CatalogEntryObservation` after a split). vitest uses tsx (no cross-file typecheck) — running tsc separately is load-bearing.
+
+**Course Corrections:**
+- [PROCESS] Initially planned blind parallel delegation of all phases; pulled back after mapping that US3's `synthesis`/`scope-inventory` leak into out-of-scope `mediation`/`llm` — those needed my decoupling judgment encoded into the agent prompt, not blind copying. Mapped every phase's import-closure + leaks before delegating.
+- [PROCESS] Surfaced the governance-barrage scope decision to the operator (37.8k-line diff) rather than auto-firing the mandatory hook — operator owns the expensive/scope-sensitive call.
+- [COMPLEXITY] Extracted `baseline-path.ts` (shared per-codebase resolver) to avoid duplicating the resolution across detector + dispose verbs.
+
+**Quantitative** (re-derived from `git log ac38fcc5..2512665c`):
+- Commits: **11** (all `feat(010)`), pushed incrementally at phase boundaries.
+- Files: **221 changed, +37,801 / −93**. Code + tests across ~90 migrated modules + ~22 verbs + ~22 skills.
+- Tests: full package suite **152 files / 1044 pass** (was 598 at session start — +446 from this feature). tsc strict clean.
+- Delegation: **5 background sub-agents** (US2, US3, US4, US5, US6), each verified by me (tsc + targeted suite + leak/cap checks) before commit; 2 phases (US7, US8) + Setup/Foundational/US1 + all integration done in-thread.
+- Clone snapshot (session-end): NEW groups in the migrated `check-*` verbs (inherited CLI-scaffold boilerplate from the faithful dw-lifecycle ports) + the intentional `sd-config`↔`config-loader` mirror (spec-mandated, R5). Dedup opportunity filed as **TASK-11**; the mirror is justified.
+- Open findings at session end: **0** (no audit-barrage run yet — scoped/deferred per operator; the deterministic gate is green).
+
+**Insights:**
+- **The boundary is the leverage; the rest is port.** The genuinely-new code (codebase-boundary + baseline-path + the detector split + the two decouplings + clone-step + install-drift) is ~8 files; the other ~80 are port-and-generalize of proven modules. Investing my own attention in the boundary + decouplings and delegating the verbatim ports (with leak-proof prompts) matched effort to risk.
+- **tsx-based test suites need a separate tsc gate.** 1044 passing vitest tests missed 5 cross-file type mismatches at the US3↔US4 seam. tsc strict is not redundant with the suite — it's the integration check the per-file transpile can't do.
+- **Delegation works when the seams are mapped first.** Every agent prompt carried the exact file list, the seam rules (boundary-not-cwd, `.dw-lifecycle`→`.stack-control`, local-bin resolution), the out-of-scope forbidden-import list, and a verify-before-report gate — and I re-verified each. The one instruction agents drifted on (don't-edit-cli.ts) I absorbed by integrating cli.ts centrally.
+
+**Next step (resume here):**
+1. **Run the scoped `after_implement` governance barrage** over the novel/risky surface (boundary resolver, synthesis/scope-inventory decouplings, govern clone-step) — assemble a focused diff, render the implement-mode prompt, fire the 3 model lanes, triage findings TDD-first (one fresh sub-agent per finding) per `/speckit-deskwork-governance-govern`.
+2. 010 is otherwise complete + pushed; deterministic gate green. Operator owns the merge.
+3. Note: 011 (session-skills) landed in parallel and was pulled in cleanly (cli.ts carries both 010 + 011 verbs; SPECKIT marker now points at 011).
