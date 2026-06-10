@@ -586,7 +586,7 @@ re-landed in .stack-control/audit-barrage-config.yaml (b0a8b24f) and re-fired.
 ### AUDIT-20260610-01 — Stylesheet pin is opt-in: bare `lintWireframe(html)` admits any local stylesheet
 
 Finding-ID: AUDIT-20260610-01 (gpt-5-02 + fable-02; cross-model — HIGH-confidence)
-Status:     open
+Status:     fixed-f068e6af (2026-06-10; axis-1 kit-filename + singleton census; RESIDUAL stated in-code: a local non-kit file NAMED sketch-kit.css passes bare axis-1 — identity stays the pin's job)
 Backlog:    TASK-8
 Severity:   high
 Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts (stylesheetPin optional)
@@ -602,7 +602,7 @@ as axis-1-only).
 ### AUDIT-20260610-02 — Kit themes defeat the inertness premise: `class` alone switches designed typography/color/grid imagery under a green PINNED lint
 
 Finding-ID: AUDIT-20260610-02 (fable-01; single-model, behaviorally verified)
-Status:     open
+Status:     acknowledged-mockups/sketch-kit/DECISION.md (2026-06-10; themes are the operator-sanctioned lo-fi surface — invariant wording amended in 3949b6b1; expected-theme pinning is a Phase-4 manifest concern)
 Backlog:    TASK-9
 Severity:   high
 Surface:    plugins/design-control/src/lint/allowlist.ts (class inertness premise) + assets/sketch-kit (theme system)
@@ -620,7 +620,7 @@ authoring-time decision the lint should pin (e.g. expected-theme in the manifest
 ### AUDIT-20260610-03 — Transitive font resources are not identity-pinned
 
 Finding-ID: AUDIT-20260610-03 (gpt-5-01; single-model, behaviorally verified)
-Status:     open
+Status:     fixed-f9abab31 (2026-06-10; pin carries expectedFonts from the shipped kit; present-but-different font rejects, absent falls back)
 Backlog:    TASK-10
 Severity:   high
 Surface:    plugins/design-control/src/lint/stylesheet-pin.ts (pin hashes CSS bytes only)
@@ -634,7 +634,7 @@ paths) and verify on disk at pin-build time.
 ### AUDIT-20260610-04 — ASCII-art imagery channel through `<pre>` (and preserved whitespace generally)
 
 Finding-ID: AUDIT-20260610-04 (gpt-5-03 HIGH + fable-07 low; cross-model on the channel, severity disagreement)
-Status:     open
+Status:     fixed-0bdccc5c (2026-06-10; pre removed from ALLOWED_TAGS — preserved whitespace was THE art channel; inline code stays)
 Backlog:    TASK-11
 Severity:   high
 Surface:    plugins/design-control/src/lint/codepoint.ts (whitespace/punctuation imagery)
