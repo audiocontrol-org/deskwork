@@ -1153,3 +1153,30 @@ Status:     fixed-bdecbd70 (2026-06-10; structural form state, same class as che
 Severity:   low
 Surface:    plugins/design-control/src/lint/allowlist.ts
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 11 (run 20260610T215139738Z; codex only — claude 0 bytes, 9th consecutive)
+
+**FIRST ZERO-HIGH ROUND** (convergence count: 1 of 2). 2 MED + 1 LOW, all
+verified and fixed same round. Codex's clean list re-confirms the closures.
+
+### AUDIT-20260610-41 — viewport content is a rendering channel
+
+Finding-ID: AUDIT-20260610-41 (round-11 gpt-5-01, MED)
+Status:     fixed-c2add705 (2026-06-10; disallowed-viewport — only the canonical responsive declaration, normalized pair-set compare)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts + allowlist.ts
+
+### AUDIT-20260610-42 — prefilled password renders masking bullets
+
+Finding-ID: AUDIT-20260610-42 (round-11 gpt-5-02, MED)
+Status:     fixed-c2add705 (2026-06-10; password-value rule — wireframes don't prefill secrets; placeholder is the copy channel)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/check-mockup-lofi.ts
+
+### AUDIT-20260610-43 — number input over-rejected
+
+Finding-ID: AUDIT-20260610-43 (round-11 gpt-5-03, LOW)
+Status:     fixed-c2add705 (2026-06-10; number joins INPUT_TYPE_ALLOWLIST)
+Severity:   low
+Surface:    plugins/design-control/src/lint/allowlist.ts
+Direction:  false-positive
