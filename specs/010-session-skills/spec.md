@@ -35,21 +35,22 @@ This is **not** a website concern and carries no renderer assumptions; it operat
 - Q: Branch-staleness base resolution (OQ-1) → A: The base is the branch's configured **upstream** if set, else the **repository default branch** (e.g. `origin/main`); when neither resolves, the staleness check skips cleanly (FR-017).
 - Q: session-end closing-gate posture (OQ-2) → A: **Capture-only** for v1. The refuse-to-end gates (`check-disposition-survivor` / `check-open-findings` / bare-TBD refusal) are deferred to the scope-discovery / audit-barrage migrations that own them; session-end here records but never refuses to close.
 - Q: Active-installation selection in a monorepo (OQ-3) → A: **cwd-resolved nearest installation by default, with an explicit override argument** available (a root/installation target, supplied through the surface-agnostic invocation context of FR-020).
-- Q: Journal entry authorship boundary (OQ-4) → A: session-end **auto-derives the mechanical/quantitative sections** (commit counts, files changed, issues touched — re-derived from `git log`) and **leaves the narrative sections** (goal, insights, course corrections) for the agent to compose; the assembled entry is operator-editable before commit.
+- Q: Journal entry authorship boundary (OQ-4) → A: session-end **auto-derives the mechanical/quantitative sections** (commit counts, files changed, backlog items touched — re-derived from `git log`) and **leaves the narrative sections** (goal, insights, course corrections) for the agent to compose; the assembled entry is operator-editable before commit.
+- Q: Work-tracking surface for the session skills (post-clarify refinement) → A: the skills consume the **local backlog** (`design:feature/backlog-surface`, 008), NOT GitHub issues. session-start surfaces open backlog items in its orientation; session-end surfaces backlog items that progressed (and never auto-transitions their status). The skills make **no reference to GitHub issues** at runtime (operator decision 2026-06-10).
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A fresh agent is oriented at boot and does not start uninvited (Priority: P1) 🎯 MVP
 
-A blank-context agent begins a session on a stack-control project. It runs session-start once. Afterward it has a concise, accurate picture of the project's active work — the governed roadmap's ready/next and blocked items, the active spec and **where that spec sits in the authoring chain** (which artifacts exist → the next step in the lifecycle), the latest journal entry, and the open work/issues — and it **reports that picture and stops**, taking no implementation action until the operator confirms a session goal.
+A blank-context agent begins a session on a stack-control project. It runs session-start once. Afterward it has a concise, accurate picture of the project's active work — the governed roadmap's ready/next and blocked items, the active spec and **where that spec sits in the authoring chain** (which artifacts exist → the next step in the lifecycle), the latest journal entry, and the open backlog items — and it **reports that picture and stops**, taking no implementation action until the operator confirms a session goal.
 
 **Why this priority**: This is the feature's reason to exist and the direct mechanization of *"memory loss → durable written artifacts"* + *"an un-oriented agent re-derives settled work."* Without it, every fresh session starts blind. The report-and-stop boundary is what keeps the agent from the "started before the operator finished thinking" failure mode.
 
-**Independent Test**: In a configured installation with a populated roadmap, an active spec partway through its authoring chain, and a prior journal entry, run session-start; assert the report names the next roadmap work, the active spec's chain position (and the next authoring step), the last journal entry, and open issues — and that no implementation action is taken before the operator confirms.
+**Independent Test**: In a configured installation with a populated roadmap, an active spec partway through its authoring chain, and a prior journal entry, run session-start; assert the report names the next roadmap work, the active spec's chain position (and the next authoring step), the last journal entry, and the open backlog items — and that no implementation action is taken before the operator confirms.
 
 **Acceptance Scenarios**:
 
-1. **Given** a configured installation with active work, **When** session-start runs, **Then** it reports the governed roadmap's ready/next + blocked items, the active spec and its position in the authoring chain (with the next step), the latest journal entry, and open issues — in one concise summary.
+1. **Given** a configured installation with active work, **When** session-start runs, **Then** it reports the governed roadmap's ready/next + blocked items, the active spec and its position in the authoring chain (with the next step), the latest journal entry, and the open backlog items — in one concise summary.
 2. **Given** session-start has reported state, **When** the report completes, **Then** the agent takes no implementation action and waits for the operator to confirm the session goal.
 3. **Given** the project sits between features (no single active spec), **When** session-start runs, **Then** it still reports the roadmap's next/blocked work and the latest journal entry, and says plainly that there is no active spec rather than failing.
 4. **Given** session-start is re-run in the same session, **When** it runs, **Then** it produces the same orientation with zero side effects (read-only).
@@ -58,18 +59,18 @@ A blank-context agent begins a session on a stack-control project. It runs sessi
 
 ### User Story 2 - A session's record is captured and durably saved at close (Priority: P1)
 
-At the end of a session the agent runs session-end. It writes a development-log journal entry recording the session (goal, what was accomplished, what failed, course corrections, quantitative counts, insights), captures any tooling friction that surfaced, runs an advisory clone-snapshot to catch duplication written this session, surfaces the issues that progressed (as evidence — never auto-closing them), and **commits and pushes** the documentation changes so the record survives the container being reclaimed.
+At the end of a session the agent runs session-end. It writes a development-log journal entry recording the session (goal, what was accomplished, what failed, course corrections, quantitative counts, insights), captures any tooling friction that surfaced, runs an advisory clone-snapshot to catch duplication written this session, surfaces the backlog items that progressed (as evidence — never auto-transitioning their status), and **commits and pushes** the documentation changes so the record survives the container being reclaimed.
 
 **Why this priority**: The journal is the continuity thread the next session-start consumes; a session that closes without a committed-and-pushed record loses that thread, and an unpushed record is lost when the ephemeral worktree is dismantled. Capture-at-close is co-equal P1 with orient-at-boot — the two are the read and write halves of the same durable-artifact loop.
 
-**Independent Test**: After a session with at least one commit, run session-end; assert a journal entry is appended in the project's configured journal location, the documentation changes are committed AND pushed, the clone-snapshot ran and any new duplication is surfaced, and any progressed issue is surfaced as evidence with no automated closing transition.
+**Independent Test**: After a session with at least one commit, run session-end; assert a journal entry is appended in the project's configured journal location, the documentation changes are committed AND pushed, the clone-snapshot ran and any new duplication is surfaced, and any progressed backlog item is surfaced as evidence with no automated status transition.
 
 **Acceptance Scenarios**:
 
 1. **Given** a session with progress, **When** session-end runs, **Then** a journal entry recording the session is appended to the configured journal working file.
 2. **Given** session-end composed a journal entry, **When** it finishes, **Then** the documentation changes are committed and pushed (pushing is part of "done," not a later step).
 3. **Given** code was written this session, **When** session-end runs, **Then** an advisory clone-snapshot runs over the installation's configured source scope and any new duplication is surfaced (advisory, non-blocking).
-4. **Given** an issue progressed this session, **When** session-end runs, **Then** the issue is surfaced as evidence and the closing transition is left to the operator (never auto-closed).
+4. **Given** a backlog item progressed this session, **When** session-end runs, **Then** the backlog item is surfaced as evidence and its status transition is left to the operator (never auto-transitioned).
 5. **Given** little or nothing changed this session, **When** session-end runs, **Then** it still writes an honest, possibly-sparse journal entry rather than skipping (empty records beat missed records).
 
 ---
@@ -143,7 +144,7 @@ An agent or human invokes session-start and session-end through the `stackctl` C
 
 #### session-start — orientation at boot
 
-- **FR-001**: session-start MUST orient the agent to the project's active work in one concise report: the governed roadmap's ready/next and blocked items, the active spec and its position in the authoring chain (which artifacts exist → the next step), the latest journal entry, and the open work/issues.
+- **FR-001**: session-start MUST orient the agent to the project's active work in one concise report: the governed roadmap's ready/next and blocked items, the active spec and its position in the authoring chain (which artifacts exist → the next step), the latest journal entry, and the open **local backlog** items (`design:feature/backlog-surface`). It MUST NOT reference or query GitHub issues.
 - **FR-002**: session-start MUST report the oriented state and then STOP — it MUST NOT begin any implementation or authoring step until the operator confirms the session goal (the report-and-stop boundary).
 - **FR-003**: session-start MUST determine the active spec's position in the authoring chain from which artifacts are present (and name the next step), without hardcoding a specific feature, branch, or document path.
 - **FR-004**: session-start MUST be read-only and side-effect-free; re-running it MUST change nothing on disk.
@@ -151,10 +152,10 @@ An agent or human invokes session-start and session-end through the `stackctl` C
 
 #### session-end — capture at close
 
-- **FR-006**: session-end MUST write a development-log journal entry recording the session, appended to the installation's configured journal working file. The entry is always written, even when little progressed (an honest sparse entry beats a skipped one). session-end MUST **auto-derive the mechanical/quantitative sections** of the entry (commit counts, files changed, issues touched — re-derived from source, never fabricated) and MUST leave the **narrative sections** (goal, insights, course corrections) for the agent to compose; the assembled entry is operator-editable before commit (Clarification 2026-06-10).
+- **FR-006**: session-end MUST write a development-log journal entry recording the session, appended to the installation's configured journal working file. The entry is always written, even when little progressed (an honest sparse entry beats a skipped one). session-end MUST **auto-derive the mechanical/quantitative sections** of the entry (commit counts, files changed, backlog items touched — re-derived from source, never fabricated) and MUST leave the **narrative sections** (goal, insights, course corrections) for the agent to compose; the assembled entry is operator-editable before commit (Clarification 2026-06-10).
 - **FR-007**: session-end MUST capture any tooling friction that surfaced during the session into the installation's configured tooling-friction log (append-only), and skip cleanly when none surfaced.
 - **FR-008**: session-end MUST run an advisory clone-snapshot over the installation's configured source scope and surface any new duplication. The snapshot is advisory — it MUST NOT block the close.
-- **FR-009**: session-end MUST surface the issues that progressed this session as evidence, and MUST NOT perform the closing transition itself (the operator/issue-author owns closure — never an automated close).
+- **FR-009**: session-end MUST surface the **local backlog** items that progressed this session as evidence, and MUST NOT perform a backlog status transition itself (the operator owns the transition — never an automated complete/close). It MUST NOT reference or query GitHub issues.
 - **FR-010**: session-end MUST commit AND push the documentation changes; an unpushed record is not a completed close (pushing is the final mile).
 - **FR-011**: session-end MUST warn when non-doc changes are uncommitted (so the closing commit stays doc-only), without blocking the close or absorbing those changes into the doc commit.
 
@@ -182,7 +183,8 @@ An agent or human invokes session-start and session-end through the `stackctl` C
 
 ### Key Entities *(include if data involved)*
 
-- **Orientation report**: the concise boot-time state summary session-start produces — roadmap ready/next + blocked, active spec + authoring-chain position + next step, latest journal entry, open issues, and the branch-staleness advisory. Read-only; not persisted.
+- **Orientation report**: the concise boot-time state summary session-start produces — roadmap ready/next + blocked, active spec + authoring-chain position + next step, latest journal entry, open **local backlog** items, and the branch-staleness advisory. Read-only; not persisted. Contains no GitHub-issue data.
+- **Backlog items (open / progressed)**: the local backlog (`design:feature/backlog-surface`, 008) is the work-tracking surface the session skills consume — session-start surfaces the open items; session-end surfaces the items that progressed this session (as evidence, never auto-transitioned). Replaces GitHub issues as the surfaced/tracked work in these skills.
 - **Journal / development-log entry**: the durable per-session record session-end appends to the configured journal working file (goal / accomplished / didn't-work / course-corrections / quantitative / insights, in the project's configured shape). The continuity thread the next session-start reads.
 - **Tooling-friction log**: the append-only record of friction with the tooling/governance/CLI that session-end captures, one friction per entry; the cumulative ship-gate signal for the program's own dogfood.
 - **Clone-snapshot (advisory)**: the duplication report session-end runs over the installation's configured source scope to catch this-session duplication; advisory, non-blocking.
@@ -194,12 +196,12 @@ An agent or human invokes session-start and session-end through the `stackctl` C
 
 ### Measurable Outcomes
 
-- **SC-001**: From a cold start in a configured installation, a single session-start invocation leaves the agent oriented (it can name the next roadmap work, the active spec's chain position and next step, the last journal entry, and open issues), and **zero implementation actions are taken before the operator confirms a goal**.
+- **SC-001**: From a cold start in a configured installation, a single session-start invocation leaves the agent oriented (it can name the next roadmap work, the active spec's chain position and next step, the last journal entry, and the open local backlog items), and **zero implementation actions are taken before the operator confirms a goal**.
 - **SC-002**: Every session that runs session-end ends with a journal entry committed AND pushed — 0 sessions end with the record uncommitted or unpushed (including sparse "little changed" sessions).
 - **SC-003**: In a project whose working-file locations differ from any default, 100% of the skills' reads and writes resolve through the installation config — 0 hardcoded-path accesses, and 0 fallbacks to a plugin-bundled copy.
 - **SC-004**: When invoked outside any installation, both skills fail loudly naming the missing installation in 100% of cases (0 silent bundled-copy fallbacks).
 - **SC-005**: When the working branch is behind its base, session-start surfaces the advisory in 100% of determinable cases; when the branch is current, 0 false staleness warnings; in 0 cases does the advisory block the session from starting.
-- **SC-006**: session-end performs 0 automated issue closures — every progressed issue is surfaced as evidence for the operator to close.
+- **SC-006**: session-end performs 0 automated backlog status transitions — every progressed backlog item is surfaced as evidence for the operator to transition. Neither skill issues any GitHub-issue query or mutation (0 GitHub-issue references at runtime).
 - **SC-007**: Both session-start and session-end run to completion in a plain shell with no Claude Code session present (CLI-first), producing the same report/record as the skill path.
 - **SC-008**: Re-running session-start produces 0 on-disk changes (read-only).
 - **SC-009**: In a monorepo with two installations, a session skill run within one installation's scope resolves the nearest enclosing installation and touches 0 of the sibling installation's working files.
@@ -229,5 +231,6 @@ These were the genuine operator-owned forks captured rather than silently defaul
 - **`multi:feature/project-doc-setup` (009) + `design:gap/project-relative-doc-discovery`** — define and write/resolve the installation config + resolution contract this feature consumes for every working-file read/write. Specified-to-the-contract dependency edge (not coupled to 009's implementation branch).
 - **`design:feature/roadmap-protocol` (006)** — defines the governed roadmap format session-start reads (ready/next/blocked).
 - **`design:feature/insight-capture` (007)** — defines the governed inbox format (when session-start surfaces captured-but-untriaged inbox items).
+- **`design:feature/backlog-surface` (008)** — the **local backlog** is the work-tracking surface these skills consume in place of GitHub issues: session-start surfaces open backlog items; session-end surfaces the items that progressed (operator owns status transitions). The skills make no GitHub-issue references at runtime (operator decision 2026-06-10).
 - **`design:feature/migrate-scope-discovery`** — owns the clone-snapshot capability session-end consumes (today the interim `.dw-lifecycle/scope-discovery/clone-snapshot.sh`; the vendored, per-codebase-scoped detector arrives with that migration) and the refuse-to-end structural gates deferred out of this feature.
 - **`multi:feature/migrate-audit-barrage`** — owns the audit-log/governance working-file shape and the open-findings gate deferred out of this feature's session-end.
