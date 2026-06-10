@@ -1,5 +1,11 @@
 # Roadmap
 
+> **RETIRED as the live forward queue (2026-06-08).** The canonical, **governed** forward roadmap for `stack-control` is now [`plugins/stack-control/ROADMAP.md`](plugins/stack-control/ROADMAP.md) — a heading-keyed dependency DAG you reason over with `/stack-control:roadmap` (`next` / `blocked` / `order` / `graph`). This file is **preserved below as historical and cross-plugin prose**; it is no longer the source of truth for what to build next.
+>
+> **What migrated into the governed roadmap** — the **autonomous implementation loop** arc (see "Autonomous implementation loop" below) → `impl:feature/autonomous-loop` + six gaps (`spec-ambiguity-surface`, `skip-around-blocked-tasks`, `halt-and-resume`, `final-verification-gate`, `loop-reentry-idempotence`, `resource-budget-self-stop`); the **audit-barrage Design B / Design C** arcs (see "Audit-barrage feature shape" below) → `multi:gap/audit-barrage-metaaudit` + `multi:gap/audit-barrage-daemon`. The `stack-control` program itself was migrated earlier, in feature 006.
+>
+> **What is NOT in the governed roadmap** (it lives elsewhere) — released history → [GitHub releases](https://github.com/audiocontrol-org/deskwork/releases); open backlog → [`gh issue list`](https://github.com/audiocontrol-org/deskwork/issues); the **graphical-entries / deskwork editorial product** arc is a **separate plugin**, not `stack-control` work, and stays tracked via [#301](https://github.com/audiocontrol-org/deskwork/issues/301). The "Recently shipped" dw-lifecycle history below is retained for context only.
+
 Forward-looking plan for the deskwork project. Active initiatives, near-term planned work, and the long-term arc the architecture is converging toward. No dates — milestones, not deadlines.
 
 For released history see [GitHub releases](https://github.com/audiocontrol-org/deskwork/releases). For the open backlog see [`gh issue list`](https://github.com/audiocontrol-org/deskwork/issues).
@@ -60,6 +66,29 @@ Extends deskwork beyond longform markdown into image-review surfaces (annotated 
 Serves as the canonical canary for the scope-discovery protocol. Phase 6 dogfood produced [#349](https://github.com/audiocontrol-org/deskwork/issues/349) feedback validating most surfaces; Phase 7 will produce the validation milestone for the [#318](https://github.com/audiocontrol-org/deskwork/issues/318) clustering algorithm against genuinely novel input.
 
 Parent: [#301](https://github.com/audiocontrol-org/deskwork/issues/301) (still open).
+
+### Pluggable lifecycle providers — toward a provider-agnostic govern-AND-execute control plane
+
+Feature docs at `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/` (PRD `Final`; `design.md` is the technical canon). Branch `feature/pluggable-lifecycle-providers`.
+
+**North star (the ideal end-state — every slice ladders toward this):** deskwork as the provider-agnostic control plane that takes ANY authoring provider's dependency-annotated plan (native, Spec Kit, Kiro, whatever ships next) and — branching only on capabilities, never on provider identity — does two things the providers' own tools do not:
+
+1. **Governs it.** Cross-model audit-barrage, the finding state machine (`open → fixed → verified`), and scope/clone/debt governance run over the plan and the work it produces, regardless of who authored it.
+2. **Executes it better than the provider's own single-agent grinder.** A parallel, multi-CLI, worktree-isolated execution engine drops tranches of independent tasks (read from the provider's dependency map) onto **multiple LLM CLIs concurrently** (e.g. claude + codex), each task in its own git worktree, then merges.
+
+The front half (authoring) is commodity; the differentiated value is govern + execute on top of any plan. The Spec-Kit dogfood (2026-06-04) surfaced the execution half as a second, larger differentiator — and prior-art study (MAQA, Fleet) confirmed **nobody else does cross-CLI execution** (they parallelize via one model's subagents). That gap is deskwork's. See PRD § North Star.
+
+**The north star is being realized as a new plugin — `stack-control`.** Per operator decisions (2026-06-04), this work ships as `stack-control` (CLI `stackctl`; brand: stackcontrol.org), a new plugin in this monorepo built as the **successor to `dw-lifecycle`** (absorb the keepers — scope-discovery, audit-barrage, session-start/end, the governance extension — then retire `dw-lifecycle` at parity). Isolation is the point: `dw-lifecycle` is in active use, so `stack-control` is developed and published without destabilizing it. Full program roadmap: `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md`. Settled-decisions rule: `.claude/rules/stack-control-succession.md`.
+
+**Feature sequence (each independently shippable):**
+
+- **Founding — governance on a foreign plan (built).** deskwork governance (audit-barrage + finding lift) packaged as a Spec Kit `after_implement` extension that fires automatically over whatever `/speckit-implement` produces — cross-model, zero provider branching. Spec at `specs/001-speckit-backhalf-slice/`; rehomes into `stack-control`.
+- **Execution (speccing now) — two modes over the same plan source.** (a) **Native Spec Kit execution with extensions** — drive `/speckit-implement` with the extension hooks (governance) firing; (b) **parallel multi-backend engine** — the north-star headline: worktree-isolated, cross-backend fan-out across distinct coding agents (not one vendor's subagents), selecting backends by declared capability so it survives any vendor sunsetting batch/headless CLI mode. Both governed; both drivable by `stackctl` and the future frontend. Spec at `specs/002-parallel-execution-engine/`.
+- **Migrations.** scope-discovery → audit-barrage (governance in-house; one-way seam survives). Session-start/session-end are rebuilt **native** in `stack-control` (not ported — operator decision 2026-06-09), plus post-install project-doc setup for adopters. The live, authoritative sequence is the governed roadmap (`plugins/stack-control/ROADMAP.md`).
+- **Control-plane frontend.** The UI surface for spec creation, the spec → implementation handoff, and scope-discovery + audit-barrage — paired with the `stackctl` CLI over shared interface artifacts.
+- **Substrate (later) — the manifest/port/reconcile** (`design.md` § 8). The normalized `lifecycle-manifest.yaml` as the provider port, `reconcile()` + re-sync, and the tracker capability — the full *provider* pluggability layer. Sequenced after the slices prove the shape (integration-first: build concretely against Spec Kit first, generalize from real instances).
+
+**Methodology — self-hosting dogfood.** This feature is being built by living inside Spec Kit's own native flow (`constitution → specify → clarify → plan → tasks → implement`), with deskwork as the governing/executing control plane on top. Bootstrap friction is captured one-per-entry in the feature's `tooling-feedback.md` (TF-01..08 so far) — that cumulative log IS the bridge's de-facto requirements doc.
 
 ## Audit-barrage feature shape
 

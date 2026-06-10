@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://stackcontrol.org/schema/stackctl-config.yaml.schema.json",
+  "title": "stack-control installation config",
+  "description": "Wire format for .stack-control/config.yaml. The config's presence marks the installation root. Validation is enforced fail-loud in src/config/config-loader.ts (this schema documents the contract; the loader is the runtime oracle). Wire is snake_case; in-memory is camelCase.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema version; required positive integer. An unknown future version is a descriptive error, not a best-effort parse."
+    },
+    "base_dir": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional base for internal stores (backlog, program audit log); default \".stack-control\". Must resolve within the installation root."
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional per-file location overrides; each relative-to-root (or absolute within root).",
+      "properties": {
+        "roadmap": { "type": "string", "minLength": 1 },
+        "inbox": { "type": "string", "minLength": 1 },
+        "backlog": { "type": "string", "minLength": 1 },
+        "audit_log": { "type": "string", "minLength": 1 },
+        "feature_audit_log_pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Per-feature audit-log pattern; MUST contain the literal {feature} placeholder.",
+          "pattern": "\\{feature\\}"
+        },
+        "journal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "session-skills (011): the development journal (human doc); default <root>/DEVELOPMENT-NOTES.md. session-end appends, session-start reads the latest entry."
+        },
+        "tooling_feedback": {
+          "type": "string",
+          "minLength": 1,
+          "description": "session-skills (011): the tooling-friction log (human doc); default <root>/tooling-feedback.md. session-end appends."
+        },
+        "clone_scope": {
+          "type": "string",
+          "minLength": 1,
+          "description": "session-skills (011): the per-codebase clone-detection scope (a directory); default the installation root. session-end's advisory clone-snapshot scans this subtree."
+        }
+      }
+    }
+  }
+}

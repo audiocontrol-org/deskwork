@@ -41,6 +41,17 @@
       },
       "description": "Project lifecycle orchestration; composes superpowers + feature-dev.",
       "version": "0.39.0"
+    },
+    {
+      "name": "stack-control",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/audiocontrol-org/deskwork.git",
+        "path": "plugins/stack-control",
+        "ref": "v0.39.0"
+      },
+      "description": "Provider-agnostic control plane for spec-driven development — define / extend / execute a Spec Kit spec in-session, with cross-model governance firing automatically after native execution. Successor to dw-lifecycle.",
+      "version": "0.39.0"
     }
   ]
 }

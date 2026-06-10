@@ -144,3 +144,9 @@ yarn-error.log*
 .dw-lifecycle/dismantle-worktrees/
 .dw-lifecycle/complete-parent-closure/
 .dw-lifecycle/close-shipped/
+
+# Spec Kit extension catalog cache (transient)
+.specify/extensions/.cache/
+
+# stack-control audit-barrage run outputs (vendored from dw-lifecycle)
+.stack-control/audit-runs/

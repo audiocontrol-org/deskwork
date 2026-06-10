@@ -1,0 +1,25 @@
+{
+  "id": "e246b4b1-cd4d-486c-b714-65949263c04e",
+  "timestamp": "2026-06-04T20:37:44.651Z",
+  "event": "ingest",
+  "slug": "pluggable-lifecycle-providers/prd",
+  "entryId": "e246b4b1-cd4d-486c-b714-65949263c04e",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/prd.md",
+  "frontmatterSnapshot": {
+    "slug": "pluggable-lifecycle-providers",
+    "title": "pluggable-lifecycle-providers",
+    "targetVersion": "1.0",
+    "date": "2026-06-04",
+    "parentIssue": null,
+    "deskwork": {
+      "id": "e246b4b1-cd4d-486c-b714-65949263c04e"
+    }
+  },
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "frontmatter"
+  }
+}

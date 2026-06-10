@@ -1,12 +1,13 @@
 {
-  "languages": ["typescript"],
-  "pattern": "**/*.ts",
+  "format": ["typescript", "tsx", "bash"],
+  "pattern": "**/*.{ts,tsx,sh,bash}",
   "ignore": [
     "**/*.test.ts",
     "**/dist/**",
     "**/node_modules/**",
     "**/.runtime-cache/**",
-    "**/coverage/**"
+    "**/coverage/**",
+    ".specify/**"
   ],
   "minTokens": 50,
   "gitignore": true,

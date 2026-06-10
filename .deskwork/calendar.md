@@ -20,7 +20,9 @@
 
 ## Final
 
-*No entries.*
+| UUID | Slug | Title | Description | Keywords | Source | Updated |
+|------|------|------|------|------|------|------|
+| e246b4b1-cd4d-486c-b714-65949263c04e | pluggable-lifecycle-providers/prd | pluggable-lifecycle-providers |  |  | manual | 2026-06-04T20:52:06.997Z |
 
 ## Published
 

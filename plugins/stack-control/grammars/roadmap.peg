@@ -1,0 +1,87 @@
+---
+id: roadmap
+unit:
+  kind: heading
+  level: 2
+statusVocabulary: [planned, in-flight, shipped, cancelled, retired]
+terminalStatuses: [shipped, cancelled, retired]
+orderKey:
+  field: phase
+  relation: [design, plan, impl, multi]
+identifier:
+  kind: slug
+edgeFields:
+  - { name: depends-on,     references: unit,     acyclic: true,  blocking: true  }
+  - { name: part-of,        references: unit,     acyclic: true,  blocking: false }
+  - { name: deferred-until, references: prose,    acyclic: false, blocking: true  }
+  - { name: spec,           references: external, acyclic: false, blocking: false }
+  - { name: ref,            references: external, acyclic: false, blocking: false }
+reconciliationHook:
+  kind: glob
+  source: "specs/*/spec.md"
+---
+{{
+  // The roadmap is HEADING-KEYED (006 T015, contracts/roadmap-grammar.md): each
+  // `## <identifier>` head at the reserved level 2 starts a Unit; the heading
+  // text IS the identifier. Status lives in a body bullet `- status: <s>`. Edge
+  // fields (`- depends-on:` etc.) are declared in the metadata `edgeFields` and
+  // extracted GENERICALLY by the engine (`edges.ts`) from the Unit body — this
+  // PEG does not parse them. `orderValue` is the phase segment (before `:`),
+  // sorted by the declared relation [design, plan, impl, multi], NOT
+  // lexicographically.
+  //
+  // This grammar DECLARES `identifier.kind: slug` with the concrete shape
+  // `<phase>:<kind>/<slug>`. Per FR-005 the engine enforces only the universal
+  // identifier PROPERTIES (unique / non-ordinal / human-readable); each grammar
+  // owns its own concrete production. A `## heading` that is not a conforming
+  // `<phase>:<kind>/<slug>` identifier is a PARSE FAILURE (the action calls
+  // error()), so no Unit is produced and the engine fails loud per FR-003. The
+  // slug segment may not contain whitespace, `/`, or `:`.
+  const IDENT = /^(design|plan|impl|multi):(feature|primitive|fix|gap)\/[^\s/:]+$/;
+  function statusOf(bodyLines) {
+    for (const b of bodyLines) {
+      const m = /^status:\s*([A-Za-z][A-Za-z-]*)/i.exec(b.text);
+      if (m) return m[1].toLowerCase();
+    }
+    return null;
+  }
+}}
+
+document = preamble units:unit* postamble { return units; }
+
+preamble = (!unitHead anyLine)*
+
+unit = h:unitHead b:bodyLine* {
+  if (!IDENT.test(h.text)) {
+    error(`roadmap identifier '${h.text}' is not a '<phase>:<kind>/<slug>' identifier (e.g. 'impl:feature/execution-engine'); phase ∈ {design,plan,impl,multi}, kind ∈ {feature,primitive,fix,gap}`);
+  }
+  const status = statusOf(b);
+  const phase = h.text.split(':')[0];
+  return {
+    identifier: h.text,
+    status,
+    orderValue: phase,
+    startLine: h.line,
+    endLine: b.length ? b[b.length - 1].line : h.line,
+  };
+}
+
+unitHead = "H2" TAB t:lineText nl { return { text: t, line: location().start.line }; }
+
+bodyLine = !unitHead !shallowHead k:kind TAB t:lineText nl {
+  return { kind: k, text: t, line: location().start.line };
+}
+
+postamble = (!unitHead anyLine)*
+
+// A shallower-or-peer heading (H1) is NOT a valid body line; it terminates the
+// Unit and, if a later Unit head follows, leaves leftover input → parse failure
+// (the two-region model: an interleaved shallow heading is illegal). H3+ are
+// valid body sub-notes (level 2 leaves room for `###` inside an item body).
+shallowHead = "H1" TAB
+
+anyLine = kind TAB lineText nl
+kind = $[A-Za-z0-9]+
+lineText = $[^\n]*
+TAB = "\t"
+nl = "\n" / !.
