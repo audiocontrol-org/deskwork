@@ -22,6 +22,8 @@ export type LintRule =
   | 'theme-placement'
   | 'disallowed-viewport'
   | 'password-value'
+  | 'list-numbering'
+  | 'doctype-required'
   | 'stylesheet-filename-mismatch'
   // axis 2 — text-content codepoint allowlist
   | 'disallowed-codepoint'

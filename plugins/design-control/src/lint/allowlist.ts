@@ -63,8 +63,12 @@ export const ALLOWED_TAGS: ReadonlySet<string> = new Set([
  */
 type AttrKind = 'plain' | 'url';
 
+// `dir` deliberately ABSENT (AUDIT-20260610-53): it flips layout direction —
+// an author-supplied rendering input — and the codepoint axis is Latin-only in
+// v1, so RTL has no legitimate v1 use. Re-add when the text axis
+// internationalizes.
 const GLOBAL_ATTR_SPECS: Readonly<Record<string, AttrKind>> = {
-  class: 'plain', id: 'plain', title: 'plain', lang: 'plain', dir: 'plain', role: 'plain',
+  class: 'plain', id: 'plain', title: 'plain', lang: 'plain', role: 'plain',
 };
 
 const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>>> = {
@@ -189,6 +193,18 @@ export const META_NAME_ALLOWLIST: ReadonlySet<string> = new Set(['viewport', 'de
  */
 export function splitHtmlTokens(value: string): string[] {
   return value.split(/[\t\n\f\r ]+/).filter(Boolean);
+}
+/**
+ * Percent-decode an href segment the way a URL-serving context does
+ * (AUDIT-20260610-56: %73ketch-kit.css names the kit). Invalid sequences are
+ * left as-is (a malformed escape cannot fake a kit name either way).
+ */
+export function percentDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 /**

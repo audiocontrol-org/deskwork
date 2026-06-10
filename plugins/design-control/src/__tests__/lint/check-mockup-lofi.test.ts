@@ -261,6 +261,58 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// Round-15 fixes (AUDIT-20260610-53..57): zero-HIGH round; 2 MED + 3 LOW.
+describe('check-mockup-lofi — round-15 channels', () => {
+  // AUDIT-53 (gpt-5-01, MED): dir flips layout direction — author-supplied
+  // rendering input. The codepoint axis is Latin-only in v1, so RTL has no
+  // legitimate v1 use; dir drops from the global allowlist (re-add with i18n).
+  it('rejects dir (layout-direction channel; Latin-only v1)', () => {
+    expect(rules(wrap(`<div dir="rtl">x</div>`))).toContain('disallowed-attribute');
+  });
+  // AUDIT-54 (gpt-5-02, MED): li value="-1" renders "-1." markers — generated
+  // punctuation columns. List numbering must be digits-only.
+  it('rejects negative list numbering (generated-marker punctuation)', () => {
+    expect(rules(wrap(`<ol><li value="-1"></li><li value="-1"></li></ol>`))).toContain(
+      'list-numbering',
+    );
+  });
+  it('accepts ordinary list numbering', () => {
+    expect(rules(wrap(`<ol start="3"><li>One</li><li value="7">Two</li></ol>`))).toEqual([]);
+  });
+  // AUDIT-55 (gpt-5-03, LOW): a legacy doctype flips the browser to quirks
+  // mode — author-controlled rendering mode. The standards doctype is required.
+  it('rejects a legacy doctype (quirks-mode channel)', () => {
+    const html =
+      `<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"><html lang="en"><head>` +
+      `<meta charset="utf-8"><title>WF</title><link rel="stylesheet" href="sketch-kit.css">` +
+      `</head><body class="sk"><p>x</p></body></html>`;
+    expect(rules(html)).toContain('doctype-required');
+  });
+  it('rejects a missing doctype', () => {
+    const html =
+      `<html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css"></head><body class="sk"><p>x</p></body></html>`;
+    expect(rules(html)).toContain('doctype-required');
+  });
+  // AUDIT-56 (gpt-5-04, LOW fp): browsers percent-decode URLs —
+  // %73ketch-kit.css names the kit. Compare decoded.
+  it('accepts a percent-encoded kit href (browser-equivalent)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="%73ketch-kit.css"></head><body class="sk"><p>x</p></body></html>`;
+    expect(rules(html)).not.toContain('stylesheet-filename-mismatch');
+  });
+  // AUDIT-57 (gpt-5-05, LOW fp): initial-scale=1.0 ≡ 1 — numeric values
+  // normalize before the viewport compare.
+  it('accepts initial-scale=1.0 (numeric-equivalent viewport)', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
+      `<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css"></head><body class="sk"><p>x</p></body></html>`;
+    expect(rules(html)).not.toContain('disallowed-viewport');
+  });
+});
+
 // AUDIT-20260610-50 (round-14 gpt-5-01 + gpt-5-02, both HIGH; one mechanism):
 // whitespace-DEFINITION differential — JS \s matches NBSP but the browser's
 // HTML token lists split on ASCII whitespace only, so rel="stylesheet&nbsp;"

@@ -57,6 +57,7 @@ import {
   VIEWPORT_CONTENT_ALLOWLIST,
   isStylesheetRel,
   splitHtmlTokens,
+  percentDecode,
 } from '@/lint/allowlist';
 
 export { ALLOWED_TAGS } from '@/lint/allowlist';
@@ -110,10 +111,11 @@ function isAllowedAttr(tag: string, attr: string): boolean {
  * not hide (or fake) a kit-named basename.
  */
 function hrefBasename(href: string): string {
-  const noSuffix = href.split(/[?#]/)[0];
+  const noSuffix = percentDecode(href.split(/[?#]/)[0]);
   const segments = noSuffix.split(/[/\\]/);
   return segments[segments.length - 1] ?? '';
 }
+
 
 /** Per-document state threaded through the walk (axis-1 needs a link census). */
 interface WalkContext {
@@ -304,6 +306,17 @@ function checkElement(el: Element, ctx: WalkContext): void {
         message: `input type="${value}" is not in the enumerated structural set (${[...INPUT_TYPE_ALLOWLIST].join(', ')})`,
       });
     }
+    // List numbering is digits-only (AUDIT-20260610-54): li value="-1"
+    // renders "-1." markers — generated punctuation columns the text gates
+    // never see.
+    if (((tag === 'li' && attr === 'value') || (tag === 'ol' && attr === 'start')) && !/^\d+$/.test(value.trim())) {
+      findings.push({
+        rule: 'list-numbering',
+        tag,
+        attr,
+        message: `${attr}="${value}" on <${tag}> is not a non-negative integer — list numbering is structural, and non-numeric markers are a generated-text channel`,
+      });
+    }
     // `meta name` is an enumerated set (AUDIT-20260610-19): theme-color /
     // color-scheme are visual channels carried by NAME.
     if (tag === 'meta' && attr === 'name' && !META_NAME_ALLOWLIST.has(value.toLowerCase())) {
@@ -320,7 +333,12 @@ function checkElement(el: Element, ctx: WalkContext): void {
     if (tag === 'meta' && attr === 'content') {
       const nameValue = ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'name')?.value;
       if (nameValue?.toLowerCase() === 'viewport') {
-        const normalized = value.toLowerCase().split(',').map((p) => p.trim()).filter(Boolean).sort().join(',');
+        const normalized = value.toLowerCase().split(',').map((p) => {
+          // Numeric values canonicalize (1.0 ≡ 1; AUDIT-20260610-57).
+          const [k, v] = p.split('=').map((x) => x.trim());
+          if (v !== undefined && v !== '' && Number.isFinite(Number(v))) return `${k}=${Number(v)}`;
+          return p.trim();
+        }).filter(Boolean).sort().join(',');
         if (!VIEWPORT_CONTENT_ALLOWLIST.has(normalized)) {
           findings.push({
             rule: 'disallowed-viewport',
@@ -503,8 +521,25 @@ function walk(node: AnyNode, ctx: WalkContext): void {
  */
 export function lintWireframeStructural(html: string): LintResult {
   const ctx: WalkContext = { findings: [], stylesheetLinkCount: 0, kitRootPresent: false };
-  walk(parse(html), ctx);
+  const document = parse(html);
+  walk(document, ctx);
   const { findings } = ctx;
+  // The standards doctype is required (AUDIT-20260610-55): a legacy or absent
+  // doctype flips the browser into quirks mode — an author-controlled
+  // RENDERING MODE outside the pinned kit.
+  const doctype = document.childNodes.find((n) => n.nodeName === '#documentType');
+  const isStandards =
+    doctype !== undefined &&
+    'name' in doctype &&
+    doctype.name === 'html' &&
+    (!('publicId' in doctype) || doctype.publicId === '') &&
+    (!('systemId' in doctype) || doctype.systemId === '');
+  if (!isStandards) {
+    findings.push({
+      rule: 'doctype-required',
+      message: `the document must carry the standards doctype <!DOCTYPE html> — a legacy or missing doctype switches the browser to quirks rendering mode`,
+    });
+  }
   // Axis-1 singleton census (AUDIT-20260610-01): more than one stylesheet link
   // is a smuggling channel regardless of what each names. Zero links is NOT an
   // axis-1 violation (an unstyled fragment renders browser-default, not

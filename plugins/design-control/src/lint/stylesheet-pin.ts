@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import { parse, defaultTreeAdapter as ta } from 'parse5';
 import type { DefaultTreeAdapterMap } from 'parse5';
 import type { LintFinding } from '@/lint/types';
-import { isStylesheetRel, splitHtmlTokens } from '@/lint/allowlist';
+import { isStylesheetRel, splitHtmlTokens, percentDecode } from '@/lint/allowlist';
 import {
   SKETCH_KIT_CSS_PATH,
   SKETCH_KIT_DIR,
@@ -193,7 +193,7 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
       message: `stylesheet href "${link.href}" carries a query — a query-aware host can serve different bytes than the file the pin verifies; link the kit without a query`,
     });
   }
-  const hrefPath = link.href.split(/[?#]/)[0].replace(/\\/g, '/');
+  const hrefPath = percentDecode(link.href.split(/[?#]/)[0]).replace(/\\/g, '/');
   const resolved = resolve(pin.baseDir, hrefPath);
   // If the href resolves off the pinned path, the link is already known-wrong;
   // report and STOP without reading. Reading first would let an absolute or
