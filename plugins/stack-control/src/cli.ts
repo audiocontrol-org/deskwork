@@ -34,6 +34,16 @@ import { wrapPrompt } from './subcommands/wrap-prompt.js';
 import { validateReturn } from './subcommands/validate-return.js';
 import { runValidateScopeDiscovery } from './subcommands/validate-scope-discovery.js';
 import { runInstallDrift } from './subcommands/install-drift.js';
+import { runCheckAntiPatterns } from './subcommands/check-anti-patterns.js';
+import { runCheckAdopters } from './subcommands/check-adopters.js';
+import { runCheckModuleSymmetry } from './subcommands/check-module-symmetry.js';
+import { runCheckEditorSymmetry } from './subcommands/check-editor-symmetry.js';
+import { runCheckDeprecations } from './subcommands/check-deprecations.js';
+import { runInstallScopeDiscovery } from './subcommands/install-scope-discovery.js';
+import { runScopeSummary } from './subcommands/scope-summary.js';
+import { runScopeExport } from './subcommands/scope-export.js';
+import { runScopeDoctor } from './subcommands/scope-doctor.js';
+import { runCustomize } from './subcommands/customize.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -77,6 +87,18 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   'validate-scope-discovery': runValidateScopeDiscovery,
   // Scope-discovery: install-drift advisory (010 / US8).
   'install-drift': runInstallDrift,
+  // Scope-discovery: registry-driven checks (010 / US4).
+  'check-anti-patterns': runCheckAntiPatterns,
+  'check-adopters': runCheckAdopters,
+  'check-module-symmetry': runCheckModuleSymmetry,
+  'check-editor-symmetry': runCheckEditorSymmetry, // deprecated alias → check-module-symmetry
+  'check-deprecations': runCheckDeprecations,
+  // Scope-discovery: install / customize / doctor / summary / export (010 / US6).
+  'install-scope-discovery': runInstallScopeDiscovery,
+  customize: runCustomize,
+  'scope-doctor': runScopeDoctor,
+  'scope-summary': runScopeSummary,
+  'scope-export': runScopeExport,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

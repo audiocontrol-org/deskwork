@@ -103,16 +103,16 @@ description: "Task list — Migrate scope-discovery into stack-control"
 
 **Goal**: anti-patterns / adopters / module-symmetry / deprecations; config-activated agents no-op on empty registries. **Independent test**: quickstart Scenario 4.
 
-- [ ] T040 [P] [US4] RED: `__tests__/scope-discovery/check-anti-patterns.test.ts` — empty registry no-ops; seeded glob/regex/ast-grep/ts-morph entry + matching file surfaces holdout at declared severity (FR-019/020; SC-008).
-- [ ] T041 [P] [US4] RED: `__tests__/scope-discovery/check-adopters.test.ts` — non-importing file in an adopter glob flagged; exceptions/holdouts honored (FR-021).
-- [ ] T042 [P] [US4] RED: `__tests__/scope-discovery/symmetry-deprecations.test.ts` — module-symmetry matrix + deprecation+importers reports (FR-022/023).
-- [ ] T043 [US4] GREEN: port `anti-patterns-registry.ts` + `anti-patterns-report.ts` + `check-anti-patterns.ts` (+ the anti-patterns schema) → T040 GREEN.
-- [ ] T044 [US4] GREEN: port `adopter-manifests-registry.ts` + `adopter-manifests-report.ts` + `check-adopters.ts` + `discovery-agents/adopter-manifest-checker.ts` (+ adopter-manifests + migration-map schemas) → T041 GREEN.
-- [ ] T045 [US4] GREEN: port `discovery-agents/regime-holdout-detector.ts` (activates only when registries non-empty) → config-activated no-op test GREEN.
-- [ ] T046 [US4] GREEN: port `module-symmetry-matrix.ts` + `module-symmetry-report.ts` + `check-module-symmetry.ts` with `check-editor-symmetry` deprecation alias → T042 GREEN (FR-022).
-- [ ] T047 [US4] GREEN: port `deprecation-scan.ts` + `deprecation-report.ts` + `check-deprecations.ts` → T042 GREEN (FR-023).
-- [ ] T048 [US4] Add subcommands `check-anti-patterns`, `check-adopters`, `check-module-symmetry`, `check-deprecations` + register in `src/cli.ts`; author the `/stack-control:*` skills.
-- [ ] T049 [US4] Integration: drive quickstart Scenario 4 end-to-end.
+- [X] T040 [P] [US4] RED: `__tests__/scope-discovery/check-anti-patterns.test.ts` — empty registry no-ops; seeded glob/regex/ast-grep/ts-morph entry + matching file surfaces holdout at declared severity (FR-019/020; SC-008).
+- [X] T041 [P] [US4] RED: `__tests__/scope-discovery/check-adopters.test.ts` — non-importing file in an adopter glob flagged; exceptions/holdouts honored (FR-021).
+- [X] T042 [P] [US4] RED: `__tests__/scope-discovery/symmetry-deprecations.test.ts` — module-symmetry matrix + deprecation+importers reports (FR-022/023).
+- [X] T043 [US4] GREEN: port `anti-patterns-registry.ts` + `anti-patterns-report.ts` + `check-anti-patterns.ts` (+ the anti-patterns schema) → T040 GREEN.
+- [X] T044 [US4] GREEN: port `adopter-manifests-registry.ts` + `adopter-manifests-report.ts` + `check-adopters.ts` + `discovery-agents/adopter-manifest-checker.ts` (+ adopter-manifests + migration-map schemas) → T041 GREEN.
+- [X] T045 [US4] GREEN: port `discovery-agents/regime-holdout-detector.ts` (activates only when registries non-empty) → config-activated no-op test GREEN.
+- [X] T046 [US4] GREEN: port `module-symmetry-matrix.ts` + `module-symmetry-report.ts` + `check-module-symmetry.ts` with `check-editor-symmetry` deprecation alias → T042 GREEN (FR-022).
+- [X] T047 [US4] GREEN: port `deprecation-scan.ts` + `deprecation-report.ts` + `check-deprecations.ts` → T042 GREEN (FR-023).
+- [X] T048 [US4] Add subcommands `check-anti-patterns`, `check-adopters`, `check-module-symmetry`, `check-deprecations` + register in `src/cli.ts`; author the `/stack-control:*` skills.
+- [X] T049 [US4] Integration: drive quickstart Scenario 4 end-to-end.
 
 ---
 
@@ -133,17 +133,17 @@ description: "Task list — Migrate scope-discovery into stack-control"
 
 **Goal**: public install into `.stack-control/scope-discovery/`, override seam, summary/export, doctor rules. **Independent test**: quickstart Scenario 6.
 
-- [ ] T056 [P] [US6] RED: `__tests__/scope-discovery/install-scope-discovery.test.ts` — creates empty-but-valid registries + schemas + `config.yaml` under `.stack-control/scope-discovery/`; idempotent + non-destructive (FR-027; SC-003/004).
-- [ ] T057 [P] [US6] RED: `__tests__/scope-discovery/sd-config-loader.test.ts` — loads/validates `.stack-control/scope-discovery/config.yaml` (own schemaVersion), fail-loud on unknown keys (R5).
-- [ ] T058 [P] [US6] RED: `__tests__/scope-discovery/doctor-rules.test.ts` — flags schema-violating registry / refactor-incomplete / override-drift; mutates only with `--fix` (FR-031).
-- [ ] T059 [P] [US6] RED: `__tests__/scope-discovery/customize.test.ts` — runtime resolves a project override over the plugin default (FR-029).
-- [ ] T060 [US6] GREEN: implement `scope-discovery/sd-config.ts` (scope-discovery config loader, mirrors stack-control config-loader idiom) → T057 GREEN.
-- [ ] T061 [US6] GREEN: port `install-scope-discovery.ts` MINUS the hook-install machinery (OQ-6) → T056 GREEN.
-- [ ] T062 [US6] GREEN: port the scope-discovery-relevant `doctor-rules/*` + `doctor-rules/index.ts` + the override-resolver path for `customize` → T058/T059 GREEN.
-- [ ] T063 [US6] GREEN: port `scope-export.ts` + `summary.ts` → export/summary tests GREEN (FR-030).
-- [ ] T064 [US6] Add subcommands `install-scope-discovery`, `customize` (scope-discovery category), `scope-summary`, `scope-export`, and the scope-discovery `doctor` rules wiring + register in `src/cli.ts`; author the `/stack-control:*` skills.
-- [ ] T065 [US6] Integration: drive quickstart Scenario 6 end-to-end.
-- [ ] T080 [P] [US6] RED: `__tests__/scope-discovery/cross-installation-isolation.test.ts` — a `dispose-clone`/`refresh-clones-baseline` (and a registry write) in installation A leaves a sibling installation B's baseline + registries byte-for-byte unchanged (SC-004 clause b; spec § "Edge Cases" concurrent installations). GREEN is satisfied by the boundary-scoped writes from T005/T016/T024/T025 — this task fails first if any write escapes its installation. (Analyze remediation V1.)
+- [X] T056 [P] [US6] RED: `__tests__/scope-discovery/install-scope-discovery.test.ts` — creates empty-but-valid registries + schemas + `config.yaml` under `.stack-control/scope-discovery/`; idempotent + non-destructive (FR-027; SC-003/004).
+- [X] T057 [P] [US6] RED: `__tests__/scope-discovery/sd-config-loader.test.ts` — loads/validates `.stack-control/scope-discovery/config.yaml` (own schemaVersion), fail-loud on unknown keys (R5).
+- [X] T058 [P] [US6] RED: `__tests__/scope-discovery/doctor-rules.test.ts` — flags schema-violating registry / refactor-incomplete / override-drift; mutates only with `--fix` (FR-031).
+- [X] T059 [P] [US6] RED: `__tests__/scope-discovery/customize.test.ts` — runtime resolves a project override over the plugin default (FR-029).
+- [X] T060 [US6] GREEN: implement `scope-discovery/sd-config.ts` (scope-discovery config loader, mirrors stack-control config-loader idiom) → T057 GREEN.
+- [X] T061 [US6] GREEN: port `install-scope-discovery.ts` MINUS the hook-install machinery (OQ-6) → T056 GREEN.
+- [X] T062 [US6] GREEN: port the scope-discovery-relevant `doctor-rules/*` + `doctor-rules/index.ts` + the override-resolver path for `customize` → T058/T059 GREEN.
+- [X] T063 [US6] GREEN: port `scope-export.ts` + `summary.ts` → export/summary tests GREEN (FR-030).
+- [X] T064 [US6] Add subcommands `install-scope-discovery`, `customize` (scope-discovery category), `scope-summary`, `scope-export`, and the scope-discovery `doctor` rules wiring + register in `src/cli.ts`; author the `/stack-control:*` skills.
+- [X] T065 [US6] Integration: drive quickstart Scenario 6 end-to-end.
+- [X] T080 [P] [US6] RED: `__tests__/scope-discovery/cross-installation-isolation.test.ts` — a `dispose-clone`/`refresh-clones-baseline` (and a registry write) in installation A leaves a sibling installation B's baseline + registries byte-for-byte unchanged (SC-004 clause b; spec § "Edge Cases" concurrent installations). GREEN is satisfied by the boundary-scoped writes from T005/T016/T024/T025 — this task fails first if any write escapes its installation. (Analyze remediation V1.)
 
 ---
 
