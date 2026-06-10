@@ -161,9 +161,9 @@ description: "Task list — Migrate scope-discovery into stack-control"
 
 **Goal**: warn on stale locally-sourced `.specify` extension copies (advisory, non-blocking). **Independent test**: quickstart Scenario 8.
 
-- [ ] T069 [P] [US8] RED: `__tests__/scope-discovery/install-drift.test.ts` — drifted extension copy warns naming it; in-sync copy silent (FR-033; R6).
-- [ ] T070 [US8] GREEN: implement `scope-discovery/install-drift.ts` (re-derive manifest hash / content diff vs plugin source) + `src/subcommands/install-drift.ts` + register in `src/cli.ts` → T069 GREEN.
-- [ ] T071 [US8] Author `/stack-control:install-drift` skill; integration drives quickstart Scenario 8.
+- [X] T069 [P] [US8] RED: `__tests__/scope-discovery/install-drift.test.ts` — drifted extension copy warns naming it; in-sync copy silent (FR-033; R6).
+- [X] T070 [US8] GREEN: implement `scope-discovery/install-drift.ts` (re-derive manifest hash / content diff vs plugin source) + `src/subcommands/install-drift.ts` + register in `src/cli.ts` → T069 GREEN.
+- [X] T071 [US8] Author `/stack-control:install-drift` skill; integration drives quickstart Scenario 8.
 
 ---
 
