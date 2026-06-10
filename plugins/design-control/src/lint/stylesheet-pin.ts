@@ -1,9 +1,12 @@
 /**
  * Stylesheet identity-pin — axis 1.5 of the `check-mockup-lofi` lint
  * (round-8(i)). The element/attribute allowlist (axis 1) permits arbitrary
- * `class` VALUES because they are inert; that inertness holds ONLY while the
- * single linked stylesheet is exactly the sketch-kit CSS. This module enforces
- * that precondition: exactly one stylesheet `<link>`, resolving to the canonical
+ * `class` VALUES because, under this pin, a class either binds to nothing
+ * (truly inert) or to the kit's CLOSED, operator-sanctioned `.sk-*` vocabulary
+ * — including the three `.sk-theme-*` lo-fi languages (AUDIT-20260610-02;
+ * mockups/sketch-kit/DECISION.md). That guarantee holds ONLY while the single
+ * linked stylesheet is exactly the sketch-kit CSS. This module enforces that
+ * precondition: exactly one stylesheet `<link>`, resolving to the canonical
  * path, whose CONTENT hash matches the pinned sketch-kit.css — "not merely at
  * most one stylesheet."
  *

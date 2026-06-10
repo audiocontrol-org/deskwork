@@ -10,8 +10,14 @@
  * Scope: this module is axis 1 (which TAGS and ATTRIBUTES may appear). The
  * stylesheet identity-pin (single pinned `<link>` by path+hash) is axis-1.5
  * (task 4); the text codepoint allowlist is axis 2 (task 5). Class *values* are
- * deliberately unconstrained here — they are permitted-but-inert because the
- * pinned stylesheet is the sole CSS source (round-8 invariant).
+ * deliberately unconstrained here — the round-8 invariant, stated precisely
+ * (AUDIT-20260610-02): under a verified pin, a class value either (a) matches
+ * nothing in the kit CSS — truly inert — or (b) is part of the CLOSED `.sk-*`
+ * vocabulary, the kit's operator-sanctioned lo-fi visual surface (including the
+ * three `.sk-theme-*` lo-fi languages per mockups/sketch-kit/DECISION.md).
+ * Theme selection is an authoring decision inside the sanctioned kit, not a
+ * polish leak; pinning an EXPECTED theme per surface is a referee-manifest
+ * concern (Phase 4), not a lint concern.
  */
 
 /** The closed set of structural tags a wireframe may use. */
