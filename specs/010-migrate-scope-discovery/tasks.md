@@ -33,16 +33,16 @@ description: "Task list — Migrate scope-discovery into stack-control"
 
 **Purpose**: the per-codebase boundary resolver, jscpd wrapper, clones.yaml parse/serialize, schema validation, and the not-yet-migrated `util/*` — everything downstream depends on these.
 
-- [ ] T004 [P] RED: `__tests__/scope-discovery/codebase-boundary.test.ts` — boundary resolves to nearest-enclosing `.stack-control` installation, excludes nested child subtrees, and FAILS LOUD (no cwd fallback) when no config is found (FR-007; data-model § CodebaseBoundary).
-- [ ] T005 GREEN: implement `scope-discovery/codebase-boundary.ts` reusing 009 `src/config/resolve-paths.ts` walk-up; derive `excludedChildren`; no `process.cwd()` default → T004 GREEN.
-- [ ] T006 [P] RED: `__tests__/scope-discovery/jscpd-runner.test.ts` — runner invokes jscpd scoped to a given root + ignore-list, parses the JSON report, surfaces engine crashes as exit-2 errors.
-- [ ] T007 GREEN: port `scope-discovery/jscpd-runner.ts` from dw-lifecycle, parameterized by boundary root + ignore (no repo-root assumption) → T006 GREEN.
-- [ ] T008 [P] RED: `__tests__/scope-discovery/clones-yaml.test.ts` — parse/serialize round-trip, stable content-hashed ids, malformed file fails loud (FR-035).
-- [ ] T009 GREEN: port `scope-discovery/clones-yaml.ts` + `clones-yaml.parse.ts` + `clones-yaml.id.ts` → T008 GREEN.
-- [ ] T010 [P] RED: `__tests__/scope-discovery/manifest-validator.test.ts` — ajv validates a good manifest/registry, rejects schema violations naming the offense.
-- [ ] T011 GREEN: port the JSON schemas into `scope-discovery/schema/*.schema.json` + `schema/manifest-validator.ts` (ajv + ajv-formats) → T010 GREEN.
-- [ ] T012 [P] RED: `__tests__/scope-discovery/util.test.ts` — covers the not-yet-migrated helpers (registry-yaml load, glob, modules, git-ancestry, audit-log-parser, catalog-status).
-- [ ] T013 GREEN: port `scope-discovery/util/{registry-yaml,glob,modules,git-ancestry,audit-log-parser,catalog-status}.ts` (reuse already-present `atomic-write-file`, `feature-root`, `typeguards`) → T012 GREEN.
+- [X] T004 [P] RED: `__tests__/scope-discovery/codebase-boundary.test.ts` — boundary resolves to nearest-enclosing `.stack-control` installation, excludes nested child subtrees, and FAILS LOUD (no cwd fallback) when no config is found (FR-007; data-model § CodebaseBoundary).
+- [X] T005 GREEN: implement `scope-discovery/codebase-boundary.ts` reusing 009 `src/config/resolve-paths.ts` walk-up; derive `excludedChildren`; no `process.cwd()` default → T004 GREEN.
+- [X] T006 [P] RED: `__tests__/scope-discovery/jscpd-runner.test.ts` — runner invokes jscpd scoped to a given root + ignore-list, parses the JSON report, surfaces engine crashes as exit-2 errors.
+- [X] T007 GREEN: port `scope-discovery/jscpd-runner.ts` from dw-lifecycle, parameterized by boundary root + ignore (no repo-root assumption) → T006 GREEN.
+- [X] T008 [P] RED: `__tests__/scope-discovery/clones-yaml.test.ts` — parse/serialize round-trip, stable content-hashed ids, malformed file fails loud (FR-035).
+- [X] T009 GREEN: port `scope-discovery/clones-yaml.ts` + `clones-yaml.parse.ts` + `clones-yaml.id.ts` → T008 GREEN.
+- [X] T010 [P] RED: `__tests__/scope-discovery/manifest-validator.test.ts` — ajv validates a good manifest/registry, rejects schema violations naming the offense.
+- [X] T011 GREEN: port the JSON schemas into `scope-discovery/schema/*.schema.json` + `schema/manifest-validator.ts` (ajv + ajv-formats) → T010 GREEN.
+- [X] T012 [P] RED: `__tests__/scope-discovery/util.test.ts` — covers the not-yet-migrated helpers (registry-yaml load, glob, modules, git-ancestry, audit-log-parser, catalog-status).
+- [X] T013 GREEN: port `scope-discovery/util/{registry-yaml,glob,modules,git-ancestry,audit-log-parser,catalog-status}.ts` (reuse already-present `atomic-write-file`, `feature-root`, `typeguards`) → T012 GREEN.
 
 **Checkpoint**: boundary + jscpd + clones parsing + schema validation + util ready; all user stories unblocked.
 

@@ -13,7 +13,7 @@
 // am I in" has a single answer across every governed verb. No cwd fallback:
 // resolution fails loud when no installation is found (FR-007, Principle V).
 
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, type Dirent } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { resolveInstallation, CONFIG_REL_PATH } from '../config/installation.js';
 
@@ -76,7 +76,7 @@ export function resolveCodebaseBoundary(opts: {
 function findNestedInstallations(root: string): string[] {
   const found: string[] = [];
   const walk = (dir: string): void => {
-    let entries: ReturnType<typeof readdirSync>;
+    let entries: Dirent<string>[];
     try {
       entries = readdirSync(dir, { withFileTypes: true });
     } catch {
