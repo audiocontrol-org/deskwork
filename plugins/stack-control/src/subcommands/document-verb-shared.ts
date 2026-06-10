@@ -134,6 +134,10 @@ export interface SubactionGrammar {
   readonly clear?: boolean;
   /** Max positionals consumed beyond the subaction token. */
   readonly positionals: number;
+  /** When true, `positionals` is a floor, not a cap — the subaction accepts an
+   * unbounded list (e.g. backlog `promote` batches N item-ids, 012 D5). The
+   * per-subaction handler enforces any kind-specific arity itself. */
+  readonly unboundedPositionals?: boolean;
 }
 
 /**
@@ -163,7 +167,7 @@ export function validateSubactionFlags(
   if (flags.clear === true && grammar.clear !== true) {
     failUsage(verb, `--clear is not valid for '${subaction}'`);
   }
-  if (flags.positionals.length > grammar.positionals) {
+  if (grammar.unboundedPositionals !== true && flags.positionals.length > grammar.positionals) {
     failUsage(verb, `unexpected positional '${flags.positionals[grammar.positionals]!}' for '${subaction}'`);
   }
 }
