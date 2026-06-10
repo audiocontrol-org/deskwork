@@ -177,3 +177,51 @@ describe('check-mockup-lofi — allowlist surface', () => {
     }
   });
 });
+
+// AUDIT-20260610-01 (gpt-5-02 + fable-02; cross-model HIGH): bare lintWireframe
+// admitted ANY local stylesheet — the pin was the only identity check and it is
+// opt-in. Axis-1 narrowing (filesystem-free): the stylesheet link must be a
+// SINGLETON whose href lexically references the kit filename. RESIDUAL (stated,
+// not hand-waved): a local non-kit file NAMED sketch-kit.css still passes bare
+// axis-1 — byte identity is axis-1.5's job; every pin-consuming call site must
+// pass stylesheetPin.
+describe('check-mockup-lofi — axis-1 stylesheet narrowing (AUDIT-20260610-01)', () => {
+  const head = (links: string): string =>
+    `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>${links}</head>` +
+    `<body class="sk">x</body></html>`;
+
+  it('rejects a foreign-named local stylesheet (fable-02 defeating input)', () => {
+    expect(rules(head(`<link rel="stylesheet" href="theme.css">`))).toContain(
+      'stylesheet-filename-mismatch',
+    );
+  });
+
+  it('rejects a second stylesheet link even when both name the kit (no smuggling via multiples)', () => {
+    const html = head(
+      `<link rel="stylesheet" href="sketch-kit.css"><link rel="stylesheet" href="extra/sketch-kit.css">`,
+    );
+    expect(rules(html)).toContain('stylesheet-not-singleton');
+  });
+
+  it('accepts a subdirectory kit href (basename match, no over-rejection)', () => {
+    const html = head(`<link rel="stylesheet" href="assets/sketch-kit/sketch-kit.css">`);
+    expect(rules(html)).not.toContain('stylesheet-filename-mismatch');
+    expect(rules(html)).not.toContain('stylesheet-not-singleton');
+  });
+
+  it('rejects a backslash-path href whose basename is not the kit', () => {
+    // Backslashes normalize to / in WHATWG URL parsing; basename extraction
+    // must treat them as separators, not as part of a kit-named basename.
+    expect(rules(head(`<link rel="stylesheet" href="themes\\brand.css">`))).toContain(
+      'stylesheet-filename-mismatch',
+    );
+  });
+
+  it('RESIDUAL boundary (documented): a local file NAMED sketch-kit.css passes bare axis-1', () => {
+    // gpt-5-02's deeper variant: axis-1 is filesystem-free and cannot prove the
+    // bytes. This test pins the boundary so the residual is explicit; identity
+    // is the pin's job (see stylesheet-pin tests).
+    const html = head(`<link rel="stylesheet" href="sketch-kit.css">`);
+    expect(rules(html)).toEqual([]);
+  });
+});

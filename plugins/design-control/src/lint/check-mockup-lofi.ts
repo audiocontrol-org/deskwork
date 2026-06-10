@@ -33,6 +33,7 @@ export type { LintRule, LintFinding, LintResult } from '@/lint/types';
 import type { LintFinding, LintResult } from '@/lint/types';
 import { checkStylesheetIdentity, type StylesheetPin } from '@/lint/stylesheet-pin';
 import { findDisallowedCodepoints, formatCodepoint } from '@/lint/codepoint';
+import { SKETCH_KIT_STYLESHEET_FILENAME } from '@/wireframe-kit/sketch-kit';
 
 type AnyNode = DefaultTreeAdapterMap['node'];
 type Element = DefaultTreeAdapterMap['element'];
@@ -60,7 +61,26 @@ function isAllowedAttr(tag: string, attr: string): boolean {
   return TAG_ATTRS[tag]?.has(attr) ?? false;
 }
 
-function checkElement(el: Element, findings: LintFinding[]): void {
+/**
+ * Lexical basename of an href: strip query/fragment, then take the segment
+ * after the last separator. Backslashes count as separators because WHATWG URL
+ * parsing normalizes them to `/` in special-scheme contexts — a `\`-path must
+ * not hide (or fake) a kit-named basename.
+ */
+function hrefBasename(href: string): string {
+  const noSuffix = href.split(/[?#]/)[0];
+  const segments = noSuffix.split(/[/\\]/);
+  return segments[segments.length - 1] ?? '';
+}
+
+/** Per-document state threaded through the walk (axis-1 needs a link census). */
+interface WalkContext {
+  readonly findings: LintFinding[];
+  stylesheetLinkCount: number;
+}
+
+function checkElement(el: Element, ctx: WalkContext): void {
+  const { findings } = ctx;
   const tag = ta.getTagName(el).toLowerCase();
 
   if (!ALLOWED_TAGS.has(tag)) {
@@ -125,11 +145,28 @@ function checkElement(el: Element, findings: LintFinding[]): void {
   // Only the pinned sketch-kit stylesheet link is permitted. The rel token set
   // must be EXACTLY ['stylesheet'] — a mixed rel like "stylesheet icon" still
   // pulls a non-CSS resource (AUDIT-20260606-02/codex-01). The exact path+hash
-  // identity-pin is task 4.
+  // identity-pin is axis 1.5.
   if (tag === 'link') {
-    const relValue = ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'rel')?.value ?? '';
+    const attrs = ta.getAttrList(el);
+    const relValue = attrs.find((a) => a.name.toLowerCase() === 'rel')?.value ?? '';
     if (!isStylesheetRel(relValue)) {
       findings.push({ rule: 'disallowed-link-rel', tag, message: `only rel="stylesheet" <link> is permitted; got rel="${relValue}"` });
+    } else {
+      // Axis-1 stylesheet narrowing (AUDIT-20260610-01, gpt-5-02 + fable-02):
+      // the stylesheet link must lexically reference the kit filename, and the
+      // document census (post-walk) enforces a singleton. Filesystem-free —
+      // byte identity remains axis-1.5's job (the pin); a local non-kit file
+      // NAMED sketch-kit.css passes here by design and only the pin catches it.
+      ctx.stylesheetLinkCount += 1;
+      const href = attrs.find((a) => a.name.toLowerCase() === 'href')?.value ?? '';
+      if (hrefBasename(href) !== SKETCH_KIT_STYLESHEET_FILENAME) {
+        findings.push({
+          rule: 'stylesheet-filename-mismatch',
+          tag,
+          attr: 'href',
+          message: `stylesheet href "${href}" does not reference ${SKETCH_KIT_STYLESHEET_FILENAME} — only the sketch-kit stylesheet may be linked`,
+        });
+      }
     }
   }
 }
@@ -143,18 +180,18 @@ function checkText(node: DefaultTreeAdapterMap['textNode'], findings: LintFindin
   }
 }
 
-function walk(node: AnyNode, findings: LintFinding[]): void {
+function walk(node: AnyNode, ctx: WalkContext): void {
   if (ta.isElementNode(node)) {
-    checkElement(node, findings);
+    checkElement(node, ctx);
     // <template> stows its subtree in .content — descend so nothing hides there
     if ('content' in node && node.content) {
-      for (const child of node.content.childNodes) walk(child, findings);
+      for (const child of node.content.childNodes) walk(child, ctx);
     }
   } else if (ta.isTextNode(node)) {
-    checkText(node, findings);
+    checkText(node, ctx.findings);
   }
   if ('childNodes' in node) {
-    for (const child of node.childNodes) walk(child, findings);
+    for (const child of node.childNodes) walk(child, ctx);
   }
 }
 
@@ -164,8 +201,20 @@ function walk(node: AnyNode, findings: LintFinding[]): void {
  * violation in one pass.
  */
 export function lintWireframe(html: string, options?: LintOptions): LintResult {
-  const findings: LintFinding[] = [];
-  walk(parse(html), findings);
+  const ctx: WalkContext = { findings: [], stylesheetLinkCount: 0 };
+  walk(parse(html), ctx);
+  const { findings } = ctx;
+  // Axis-1 singleton census (AUDIT-20260610-01): more than one stylesheet link
+  // is a smuggling channel regardless of what each names. Zero links is NOT an
+  // axis-1 violation (an unstyled fragment renders browser-default, not
+  // polish); the pin's stylesheet-missing covers presence in pinned mode.
+  if (ctx.stylesheetLinkCount > 1) {
+    findings.push({
+      rule: 'stylesheet-not-singleton',
+      tag: 'link',
+      message: `${ctx.stylesheetLinkCount} stylesheet links found — exactly one (the sketch-kit stylesheet) is permitted`,
+    });
+  }
   if (options?.stylesheetPin) {
     findings.push(...checkStylesheetIdentity(html, options.stylesheetPin));
   }
