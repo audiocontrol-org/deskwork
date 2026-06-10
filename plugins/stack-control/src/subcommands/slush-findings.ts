@@ -125,7 +125,7 @@ export async function runSlushFindings(args: string[]): Promise<void> {
 
   const { root: featureRoot } = await resolveFeatureRoot({ repoRoot, slug: opts.feature });
   if (featureRoot === undefined) {
-    process.stderr.write(`slush-findings: FATAL — feature '${opts.feature}' not found under ${join(repoRoot, 'docs')}/*/001-IN-PROGRESS/.\n`);
+    process.stderr.write(`slush-findings: FATAL — feature '${opts.feature}' not found under ${join(repoRoot, 'specs')}/<NNN>-${opts.feature} (speckit) or ${join(repoRoot, 'docs')}/*/001-IN-PROGRESS/${opts.feature} (legacy-docs).\n`);
     process.exit(2);
   }
   const auditLogPath = join(featureRoot, 'audit-log.md');
