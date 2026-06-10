@@ -33,6 +33,7 @@ export type LintRule =
   | 'stylesheet-unresolvable'
   | 'stylesheet-hash-mismatch'
   | 'stylesheet-sri-mismatch'
+  | 'stylesheet-query'
   | 'font-hash-mismatch'
   | 'font-missing';
 

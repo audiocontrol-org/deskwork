@@ -160,7 +160,9 @@ function checkElement(el: Element, ctx: WalkContext): void {
   const classTokens = (
     ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'class')?.value ?? ''
   ).split(/\s+/).filter(Boolean);
-  const themeTokens = classTokens.filter((t) => t.startsWith('sk-theme-'));
+  // Distinct themes, not raw tokens (AUDIT-20260610-46): duplicate identical
+  // tokens compose nothing.
+  const themeTokens = [...new Set(classTokens.filter((t) => t.startsWith('sk-theme-')))];
   if (tag === 'body') {
     if (classTokens.includes(SKETCH_KIT_ROOT_CLASS)) ctx.kitRootPresent = true;
     if (themeTokens.length > 1) {
@@ -339,12 +341,13 @@ function checkElement(el: Element, ctx: WalkContext): void {
     });
   }
 
-  // Sibling-RUN density (AUDIT-20260610-22, round-5): stacked sibling blocks
-  // each below the per-node floor (7-char rows) reassemble vertically while a
-  // prose sibling dilutes the parent aggregate. Consecutive density-shaped
-  // element children (punctuation ratio >= the gate's ratio, any length) are
-  // accumulated as a run; the length floor applies to the run's combined text.
-  // A prose sibling breaks the run, so interleaved copy stays green.
+  // Sibling-RUN density (AUDIT-20260610-22, round-5; text-node children added
+  // by -44, round-12): stacked rows each below the per-node floor reassemble
+  // vertically while prose dilutes the parent aggregate. Consecutive
+  // density-shaped children — ELEMENT aggregates AND bare TEXT NODES (rows
+  // separated by <br> are text-node siblings) — accumulate as a run; <br> is
+  // transparent (it renders the row separator); the length floor applies to
+  // the run's combined text. A prose child still breaks the run.
   if (DENSITY_BLOCK_TAGS.has(tag)) {
     let run = '';
     const flush = (): void => {
@@ -352,19 +355,26 @@ function checkElement(el: Element, ctx: WalkContext): void {
         findings.push({
           rule: 'punctuation-density',
           tag,
-          message: `a run of consecutive punctuation-dense child blocks of <${tag}> is imagery-shaped (stacked pixel/ASCII-art rows) — use the .sk-img placeholder for image regions`,
+          message: `a run of consecutive punctuation-dense children of <${tag}> is imagery-shaped (stacked pixel/ASCII-art rows) — use the .sk-img placeholder for image regions`,
         });
       }
       run = '';
     };
-    for (const child of el.childNodes) {
-      if (!ta.isElementNode(child)) continue;
-      const text = aggregateText(child);
+    const classify = (text: string): void => {
       const trimmed = text.replace(/[\s]/g, '');
-      if (trimmed.length > 0 && punctuationRatio(text) >= PUNCT_DENSITY_RATIO) {
+      if (trimmed.length === 0) return; // whitespace-only: neither joins nor breaks
+      if (punctuationRatio(text) >= PUNCT_DENSITY_RATIO) {
         run += text;
-      } else if (trimmed.length > 0) {
+      } else {
         flush();
+      }
+    };
+    for (const child of el.childNodes) {
+      if (ta.isTextNode(child)) {
+        classify(ta.getTextNodeContent(child));
+      } else if (ta.isElementNode(child)) {
+        if (ta.getTagName(child).toLowerCase() === 'br') continue; // row separator: transparent
+        classify(aggregateText(child));
       }
     }
     flush();

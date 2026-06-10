@@ -254,6 +254,18 @@ describe('lintWireframe — punctuation-density imagery channel (AUDIT-20260610-
       expect(rules(wrap(art))).toContain('punctuation-density');
     });
 
+    // AUDIT-20260610-44 (round-12 gpt-5-01, HIGH): the run accumulator only
+    // aggregated ELEMENT children — punctuation rows as TEXT-NODE siblings
+    // separated by <br> slipped it while prose diluted the parent aggregate.
+    // Text-node children join the run; <br> is transparent (it renders the
+    // row separator); a prose node/element still breaks the run.
+    it('rejects br-separated TEXT-NODE punctuation rows after diluting prose (round-12 input)', () => {
+      const html =
+        `<p>Ordinary onboarding copy describes the structure and enough narrative text to dilute aggregates well below the threshold.` +
+        `<br>#######<br>#.....#<br>#######<br>#.....#</p>`;
+      expect(rules(wrap(html))).toContain('punctuation-density');
+    });
+
     it('prose siblings break the run (no false positive on interleaved copy)', () => {
       const html =
         `<p>#..#</p><p>Quarterly totals are shown per region.</p><p>#..#</p>`;

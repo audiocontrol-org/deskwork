@@ -156,6 +156,7 @@ export const RESOURCE_URL_ATTRS: Readonly<Record<string, ReadonlySet<string>>> =
 export const INPUT_TYPE_ALLOWLIST: ReadonlySet<string> = new Set([
   'text', 'email', 'search', 'password', 'checkbox', 'radio', 'button', 'submit',
   'number', // AUDIT-20260610-43: quantity fields are structural; spinner is UA baseline
+  'tel', // AUDIT-20260610-47: same structural class as email/search
 ]);
 
 /**

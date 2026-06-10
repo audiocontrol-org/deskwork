@@ -177,12 +177,22 @@ export function checkStylesheetIdentity(html: string, pin: StylesheetPin): LintF
 
   const findings: LintFinding[] = [];
   const link = links[0];
-  // Strip a query/fragment before the lexical compare and the read — a browser
-  // or static host resolves the suffix-less file, and axis-1's basename check
-  // already strips them; the axes must agree (AUDIT-20260610-14, fable5-03's
-  // cache-bust over-rejection). Backslashes normalize to slashes the same way
-  // the WHATWG URL parser does (AUDIT-20260610-34: ".\\sketch-kit.css" is the
-  // kit to a browser, but a literal filename char to POSIX path.resolve).
+  // A QUERY on the kit href is rejected outright (AUDIT-20260610-45,
+  // superseding AUDIT-14's acceptance): the browser requests the suffixed URL,
+  // which a query-aware host can serve DIFFERENT bytes for than the
+  // suffix-less file this pin hashes — a swap channel. The ?v cache-bust
+  // over-rejection is the accepted cost. Fragments stay fine (never sent to
+  // the server) and are stripped before the lexical compare and the read.
+  // Backslashes normalize to slashes the same way the WHATWG URL parser does
+  // (AUDIT-20260610-34: ".\\sketch-kit.css" is the kit to a browser, but a
+  // literal filename char to POSIX path.resolve).
+  if (link.href.includes('?')) {
+    findings.push({
+      rule: 'stylesheet-query',
+      attr: 'href',
+      message: `stylesheet href "${link.href}" carries a query — a query-aware host can serve different bytes than the file the pin verifies; link the kit without a query`,
+    });
+  }
   const hrefPath = link.href.split(/[?#]/)[0].replace(/\\/g, '/');
   const resolved = resolve(pin.baseDir, hrefPath);
   // If the href resolves off the pinned path, the link is already known-wrong;

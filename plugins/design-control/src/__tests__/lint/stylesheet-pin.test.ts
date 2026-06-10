@@ -230,30 +230,30 @@ describe('full lint accepts an authored SRI integrity (AUDIT-20260610-20)', () =
   });
 });
 
-// AUDIT-20260610-14 (round-2 fable5-03, LOW false-positive): a conventional
-// cache-bust query (?v=2) or fragment on the kit href was rejected as
-// stylesheet-path-mismatch because path.resolve kept the suffix — while
-// axis-1's basename check strips it (axes disagreed). A browser/static host
-// resolves the suffix-less file; the pin must compare and read the same way.
-describe('checkStylesheetIdentity — query/fragment on the kit href (AUDIT-20260610-14)', () => {
-  it('accepts a cache-busting query on the kit href', () => {
+// AUDIT-20260610-14 (round-2 fable5-03) SUPERSEDED by AUDIT-20260610-45
+// (round-12 gpt-5-02, HIGH): the browser requests the QUERY-SUFFIXED URL,
+// which a query-aware host can serve different bytes for than the suffix-less
+// file the pin hashes — accepting ?v=2 was a swap channel. Queries on the kit
+// href are REJECTED (stylesheet-query); fragments stay accepted (never sent to
+// the server); the ?v cache-bust over-rejection is the accepted cost.
+describe('checkStylesheetIdentity — query/fragment on the kit href (AUDIT-14 → AUDIT-45)', () => {
+  it('REJECTS a query on the kit href (round-12 swap channel)', () => {
+    const dir = freshDir();
+    const pin = buildSketchKitPin(dir);
+    const html = page(`<link rel="stylesheet" href="sketch-kit.css?variant=finished">`);
+    expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-query');
+  });
+  it('rejects the conventional cache-bust too (accepted cost, on the record)', () => {
     const dir = freshDir();
     const pin = buildSketchKitPin(dir);
     const html = page(`<link rel="stylesheet" href="sketch-kit.css?v=2">`);
-    expect(checkStylesheetIdentity(html, pin)).toEqual([]);
+    expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-query');
   });
-  it('accepts a fragment on the kit href', () => {
+  it('accepts a fragment on the kit href (never sent to the server)', () => {
     const dir = freshDir();
     const pin = buildSketchKitPin(dir);
     const html = page(`<link rel="stylesheet" href="sketch-kit.css#anchor">`);
     expect(checkStylesheetIdentity(html, pin)).toEqual([]);
-  });
-  it('still verifies the suffix-less bytes (tampered file rejects despite ?v)', () => {
-    const dir = freshDir();
-    const pin = buildSketchKitPin(dir);
-    writeFileSync(join(dir, 'sketch-kit.css'), '/* tampered */');
-    const html = page(`<link rel="stylesheet" href="sketch-kit.css?v=2">`);
-    expect(rules(checkStylesheetIdentity(html, pin))).toContain('stylesheet-hash-mismatch');
   });
 
   // AUDIT-20260610-34 (round-8 gpt-5-02, LOW fp): the browser normalizes

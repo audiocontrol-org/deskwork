@@ -301,6 +301,11 @@ describe('check-mockup-lofi — number input (AUDIT-20260610-43)', () => {
   it('accepts input type=number', () => {
     expect(rules(wrap(`<form><label>Seats <input type="number" placeholder="3"></label></form>`))).toEqual([]);
   });
+  // AUDIT-20260610-47 (round-12 gpt-5-04, LOW fp): tel is the same structural
+  // class as email/search.
+  it('accepts input type=tel', () => {
+    expect(rules(wrap(`<form><label for="p">Phone</label><input id="p" type="tel" placeholder="Phone number"></form>`))).toEqual([]);
+  });
 });
 
 // AUDIT-20260610-38 (round-10 gpt-5-01, HIGH): sk-theme-* below body composes
@@ -322,6 +327,15 @@ describe('check-mockup-lofi — theme placement (AUDIT-20260610-38)', () => {
   });
   it('accepts a single body theme (the sanctioned shape)', () => {
     expect(rules(wrap(`<div class="sk-shell">x</div>`))).toEqual([]);
+  });
+  // AUDIT-20260610-46 (round-12 gpt-5-03, LOW fp): duplicate IDENTICAL tokens
+  // compose nothing — count distinct themes, not tokens.
+  it('accepts a duplicated identical theme token', () => {
+    const html =
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>` +
+      `<link rel="stylesheet" href="sketch-kit.css"></head>` +
+      `<body class="sk sk-theme-grayscale sk-theme-grayscale"><div>x</div></body></html>`;
+    expect(rules(html)).toEqual([]);
   });
 });
 
