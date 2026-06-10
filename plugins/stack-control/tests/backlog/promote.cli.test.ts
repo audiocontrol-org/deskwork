@@ -5,14 +5,15 @@
 // filesystem; asserts zero-write on every error path (SC-002).
 
 import { describe, it, expect } from 'vitest';
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCli } from '../../src/__tests__/_run-helpers.js';
 import { createBacklogBackend } from '../../src/backlog/backend.js';
 import { tmpBacklog } from './helpers.js';
 
-function runBacklog(args: string[], dir: string) {
-  return runCli(['backlog', ...args], { env: { STACKCTL_BACKLOG_DIR: dir } });
+function runBacklog(args: string[], dir: string, cwd?: string) {
+  return runCli(['backlog', ...args], { env: { STACKCTL_BACKLOG_DIR: dir }, cwd });
 }
 
 function snapshot(dir: string): string {
@@ -119,5 +120,66 @@ describe('backlog promote — fail-loud exit-code matrix (T010, contract 3/4/5/6
   it('no item-id given → exit 2 (contract: no item-id)', () => {
     const dir = tmpBacklog();
     expect(runBacklog(['promote', '--to', 'spec:specs/012-x'], dir).status).toBe(2);
+  });
+});
+
+describe('backlog promote — batch tasks: + advisory (T013/T014, US2, contract 9/10)', () => {
+  it('batch tasks: with all-valid ids records every item (apply, contract 9)', () => {
+    const dir = tmpBacklog();
+    const backend = createBacklogBackend({ cwd: dir });
+    const a = backend.create({ title: 'a', labels: ['agent-found', 'type:gap'] });
+    const b = backend.create({ title: 'b', labels: ['agent-found', 'type:gap'] });
+
+    const r = runBacklog(['promote', a, b, '--to', 'tasks:specs/008-backlog-surface', '--apply'], dir);
+    expect(r.status).toBe(0);
+    expect(taskFileFor(dir, a)).toMatch(/labels:[\s\S]*promoted/);
+    expect(taskFileFor(dir, b)).toMatch(/labels:[\s\S]*promoted/);
+  });
+
+  it('one invalid id in a batch refuses the WHOLE batch with zero write (contract 9, SC-002)', () => {
+    const dir = tmpBacklog();
+    const backend = createBacklogBackend({ cwd: dir });
+    const a = backend.create({ title: 'a', labels: ['agent-found', 'type:gap'] });
+    const before = snapshot(dir);
+
+    // a is valid, TASK-999 is not → all-or-nothing: nothing is written.
+    const r = runBacklog(['promote', a, 'TASK-999', '--to', 'tasks:specs/008-backlog-surface', '--apply'], dir);
+    expect(r.status).toBe(1);
+    expect(snapshot(dir)).toBe(before);
+  });
+
+  it('one already-promoted id in a batch refuses the whole batch (zero write, FR-006)', () => {
+    const dir = tmpBacklog();
+    const backend = createBacklogBackend({ cwd: dir });
+    const a = backend.create({ title: 'a', labels: ['agent-found', 'type:gap'] });
+    const b = backend.create({ title: 'b', labels: ['agent-found', 'type:gap'] });
+    runBacklog(['promote', a, '--to', 'tasks:specs/008-backlog-surface', '--apply'], dir); // promote a first
+    const afterFirst = snapshot(dir);
+
+    const r = runBacklog(['promote', a, b, '--to', 'tasks:specs/008-backlog-surface', '--apply'], dir);
+    expect(r.status).toBe(2); // already-promoted → usage refusal
+    expect(snapshot(dir)).toBe(afterFirst); // b never got written
+  });
+
+  it('a target path that does not yet exist is recorded with a pending-create advisory, exit 0 (contract 10)', () => {
+    const dir = tmpBacklog();
+    const id = createBacklogBackend({ cwd: dir }).create({ title: 'x', labels: ['agent-found', 'type:gap'] });
+    const cwd = mkdtempSync(join(tmpdir(), 'promote-cwd-')); // no specs/ tree → target absent
+
+    const r = runBacklog(['promote', id, '--to', 'tasks:specs/099-not-yet', '--apply'], dir, cwd);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/does not yet exist/);
+    expect(taskFileFor(dir, id)).toMatch(/labels:[\s\S]*promoted/); // still recorded
+  });
+
+  it('a target path that exists yields NO pending-create advisory (D4)', () => {
+    const dir = tmpBacklog();
+    const id = createBacklogBackend({ cwd: dir }).create({ title: 'x', labels: ['agent-found', 'type:gap'] });
+    const cwd = mkdtempSync(join(tmpdir(), 'promote-cwd-'));
+    mkdirSync(join(cwd, 'specs', '008-backlog-surface'), { recursive: true });
+
+    const r = runBacklog(['promote', id, '--to', 'tasks:specs/008-backlog-surface'], dir, cwd);
+    expect(r.status).toBe(0);
+    expect(r.stdout).not.toMatch(/does not yet exist/);
   });
 });
