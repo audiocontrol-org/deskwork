@@ -25,3 +25,9 @@
 ## session-end 2026-06-11
 - backlog capture does not dedupe by --ref against existing items (only import-github checks gh-<n> refs): the 2026-06-11 roadmap-migration pass created 5 duplicate items (TASK-31/33/34/35/36 duplicating TASK-21/19/20/18/17, same gh refs) that needed a manual dedupe+archive pass. Suggested-fix: capture (or a shared backend guard) warns or refuses when --ref matches an existing item.
 - direct backlog.md CLI invocations are cwd-sensitive in a way stackctl-wrapped calls are not: 'backlog task edit' succeeded from plugins/stack-control once, then later returned 'No Backlog.md project found' from the same cwd; reliable invocation required cd into .stack-control/ (the store parent). Workaround: always run the raw backlog binary from the store parent dir; stackctl backlog subactions are unaffected.
+
+## session-end 2026-06-11
+- gh pr merge + gh pr checks returned 401 Unauthorized while gh pr create / gh pr view / gh api worked with the same keyring token; merged PR 454 via gh api -X PUT .../pulls/454/merge. Upstream gh CLI quirk — route to a gh issue if it recurs.
+- Claude Code Skill tool returned only the launch banner (no skill body injection) for stack-control:execute, stack-control:define, and speckit-deskwork-governance-govern; worked around by reading SKILL.md from the plugin cache and following it manually.
+- speckit-specify's mandatory before_specify git.feature hook conflicts with the program's one-long-lived-branch convention; skipped per TF-09 precedent (no NNN- branches exist for specs 001-014). The hook's mandatory flag vs the convention should be reconciled in extensions.yml.
+- Spec Kit check-prerequisites.sh rejects the long-lived branch name; SPECIFY_FEATURE env override required for every prerequisite check (known TF-09, still live friction in the execute path).

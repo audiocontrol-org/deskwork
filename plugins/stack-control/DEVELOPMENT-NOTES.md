@@ -2,6 +2,77 @@
 
 ---
 
+## 2026-06-11: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 50
+  - chore(roadmap): add installation-isolation + descriptive-naming feature nodes
+  - docs(descriptive-naming): plan (research condensed, D1-D4) + tasks — runnable
+  - docs(installation-isolation): plan + design artifacts + tasks — runnable
+  - docs(descriptive-naming): agents speak in friendly names (operator follow-up directive)
+  - docs(specs): encode 2026-06-10 clarifications — repo-root retired, relocation in scope, grandfather numbers, slug-first backlog
+  - docs(descriptive-naming): spec.md + quality checklist — slugs, not fake ordinals
+  - docs(installation-isolation): spec.md + quality checklist — first descriptive-slug spec
+  - chore(backlog): promote TASK-45 -> spec:specs/015-installation-isolation
+  - Merge pull request #454 from audiocontrol-org/feature/stack-control
+  - Merge remote-tracking branch 'origin/main' into feature/stack-control
+  - chore(backlog): TASK-45 research note — Spec Kit roots at the nearest .specify (upstream)
+  - chore(backlog): TASK-45 note — git anchors at the installation via -C + --relative
+  - chore(backlog): capture TASK-45 — anchor unification (installation over --repo-root)
+  - docs(014): governance close-out — ledger statuses + round-4 residual slush
+  - docs(014): AUDIT-20260611-10 — reconcile the validation ledger to the branch endpoint
+  - fix(014): AUDIT-20260611-12 — ambiguous feature roots exit govern cleanly
+  - fix(014): AUDIT-20260611-11 — severity validated in the pre-pass, no partial misapply
+  - fix(014): AUDIT-20260611-09 — both-present migration advice no longer clobbers the active override
+  - fix(014): AUDIT-20260611-08 — committed arm excludes the backlog store + sibling audit-logs
+  - refactor(014): extract audit-barrage-fleet.ts — line-cap relief
+  - test(014): AUDIT-20260611-07 — R7 probe grammar catches +-concatenation constructions (V5)
+  - fix(014): AUDIT-20260611-06 — exists() answers positively despite malformed files
+  - fix(014): AUDIT-20260611-05 — slush location guard pins finding identity, not just status shape
+  - fix(014): AUDIT-20260611-03 — fleet floor clamps to the CONFIGURED fleet, not the --models subset
+  - fix(014): AUDIT-20260611-04 — govern implement mode refuses on unresolvable feature root
+  - fix(014): AUDIT-20260611-02 — ref-skipped flips get their status rewritten to the existing task
+  - fix(014): AUDIT-20260611-01 — untracked fold scopes EXCLUSIONS, not inclusions
+  - chore(audit-barrage): claude lane timeout 300s -> 900s for protocol-size payloads
+  - docs(014): close-out — T020/T021 validation ledger, all 22 tasks checked, T022 backlog evidence notes
+  - feat(014): US8 — backlog per-file fault isolation (T019)
+  - test(014): US8 RED — backlog per-file fault isolation (T018)
+  - test(014): US7 — R7 legacy-path-construction probe as regression test (T017)
+  - feat(014): US7 — six scope-discovery/doctor consumers route through resolveFeatureRoot (T016)
+  - test(014): US7 RED — layout-aware scope-discovery + doctor (T015)
+  - feat(014): US6 — scope-widen auto-seeds missing scope-discovery state (T014)
+  - test(014): US6 RED — scope-widen auto-seeds missing state (T013)
+  - feat(014): US5 — self-reference-free implement payload (T012)
+  - test(014): US5 RED — self-reference-free implement payload (T011)
+  - feat(014): US4 — slush apply consumes the dampener flips directly (T010)
+  - test(014): US4 RED — slush apply consumes the dampener flips (T009)
+  - feat(014): US3 — heading agreement is the only lift union key (T008)
+  - test(014): US3 RED — mechanism-aware lift clustering (T007)
+  - feat(014): US2 — loud legacy dw-lifecycle barrage-config notice (T006)
+  - test(014): US2 RED — legacy dw-lifecycle barrage config detection (T005)
+  - feat(014): US1 — govern passes barrage fleet floor 2 by default (T004)
+  - test(014): US1 RED — govern passes fleet floor 2 by default (T004)
+  - feat(014): US1 — loud fleet degradation + --require-models floor (T003)
+  - test(014): US1 RED — barrage fleet-degradation loudness + --require-models floor (T002)
+  - chore: release v0.42.0
+  - Merge pull request #452 from audiocontrol-org/feature/stack-control
+- Files changed: 78
+- Backlog touched: TASK-12, TASK-2, TASK-24, TASK-28, TASK-29, TASK-30, TASK-37, TASK-40, TASK-45, TASK-5
+
 ## 2026-06-11: Post-release verification (v0.42.0), tracking consolidation, and authoring spec 014 to runnable
 
 **Goal:** Verify the spec-013 fixes in the formally-installed v0.42.0 release and close their tracking; consolidate all defect tracking into the backlog (GitHub issues + roadmap fix/gap nodes); cultivate a burn-down set and author it as the next Spec Kit feature.
