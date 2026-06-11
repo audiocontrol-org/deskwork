@@ -44,6 +44,10 @@ function section(runId: string, entries: string[]): string {
 
 function makeRepo(slug: string, sections: string[]): string {
   const repo = mkdtempSync(join(tmpdir(), 'slush-single-source-'));
+  // The fixture root is an INSTALLATION (the marker the --at walk-up
+  // resolves; specs/installation-isolation R2 retired --repo-root).
+  mkdirSync(join(repo, '.stack-control'), { recursive: true });
+  writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'audit-log.md'), `# Audit Log\n\n${sections.join('\n')}`, 'utf8');
@@ -91,7 +95,7 @@ describe('US4 — apply consumes the dampener flips (single source of truth)', (
     const backlog = tmpBacklog();
     try {
       const r = runCli(
-        ['slush-findings', '--feature', 's', '--repo-root', repo, '--slush-date', '2026-06-07', '--apply'],
+        ['slush-findings', '--feature', 's', '--at', repo, '--slush-date', '2026-06-07', '--apply'],
         { env: { STACKCTL_BACKLOG_DIR: backlog } },
       );
       expect(r.status).toBe(0);
@@ -115,7 +119,7 @@ describe('US4 — apply consumes the dampener flips (single source of truth)', (
     const backlog = tmpBacklog();
     try {
       const dry = runCli(
-        ['slush-findings', '--feature', 's', '--repo-root', repo, '--slush-date', '2026-06-07'],
+        ['slush-findings', '--feature', 's', '--at', repo, '--slush-date', '2026-06-07'],
         { env: { STACKCTL_BACKLOG_DIR: backlog } },
       );
       expect(dry.status).toBe(0);
@@ -123,7 +127,7 @@ describe('US4 — apply consumes the dampener flips (single source of truth)', (
       expect(dryMatch?.[1]).toBe('1');
 
       const applied = runCli(
-        ['slush-findings', '--feature', 's', '--repo-root', repo, '--slush-date', '2026-06-07', '--apply'],
+        ['slush-findings', '--feature', 's', '--at', repo, '--slush-date', '2026-06-07', '--apply'],
         { env: { STACKCTL_BACKLOG_DIR: backlog } },
       );
       expect(applied.status).toBe(0);
@@ -146,14 +150,14 @@ describe('US4 residual (AUDIT-20260611-02) — ref-idempotency skip must not lea
       // First apply (scope latest, the default): migrates the latest section's
       // entry and creates the audit:<slug>:<id> ref.
       const first = runCli(
-        ['slush-findings', '--feature', 's', '--repo-root', repo, '--slush-date', '2026-06-07', '--apply'],
+        ['slush-findings', '--feature', 's', '--at', repo, '--slush-date', '2026-06-07', '--apply'],
         { env: { STACKCTL_BACKLOG_DIR: backlog } },
       );
       expect(first.status).toBe(0);
 
       // Dry-run over the remaining (earlier) entry with --scope all: 1 flip.
       const dry = runCli(
-        ['slush-findings', '--feature', 's', '--repo-root', repo, '--slush-date', '2026-06-07', '--scope', 'all'],
+        ['slush-findings', '--feature', 's', '--at', repo, '--slush-date', '2026-06-07', '--scope', 'all'],
         { env: { STACKCTL_BACKLOG_DIR: backlog } },
       );
       expect(dry.status).toBe(0);
@@ -164,7 +168,7 @@ describe('US4 residual (AUDIT-20260611-02) — ref-idempotency skip must not lea
       // Pre-fix pathology: the flip was skipped, its status stayed open, stdout
       // said `migrated 0` with no signal, exit 0 — open forever.
       const second = runCli(
-        ['slush-findings', '--feature', 's', '--repo-root', repo, '--slush-date', '2026-06-07', '--scope', 'all', '--apply'],
+        ['slush-findings', '--feature', 's', '--at', repo, '--slush-date', '2026-06-07', '--scope', 'all', '--apply'],
         { env: { STACKCTL_BACKLOG_DIR: backlog } },
       );
       expect(second.status).toBe(0);

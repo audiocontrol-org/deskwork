@@ -38,7 +38,7 @@ function writeRecordingStub(dir: string): string {
     'repo=""; feature=""; output=""',
     'while [ "$#" -gt 0 ]; do',
     '  case "$1" in',
-    '    --repo-root) repo="$2"; shift 2 ;;',
+    '    --at) repo="$2"; shift 2 ;;',
     '    --feature) feature="$2"; shift 2 ;;',
     '    --output) output="$2"; shift 2 ;;',
     '    *) shift ;;',

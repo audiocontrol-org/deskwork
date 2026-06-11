@@ -59,6 +59,10 @@ interface Fixture {
 
 async function makeFixture(): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), 'inv-'));
+  // The fixture root is an INSTALLATION (the marker the --at walk-up
+  // resolves; specs/installation-isolation R2 retired --repo-root).
+  await mkdir(join(root, '.stack-control'), { recursive: true });
+  await writeFile(join(root, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const docsDir = join(root, 'docs', '1.0', '001-IN-PROGRESS', 'inv-fixture');
   await mkdir(docsDir, { recursive: true });
   const prdPath = join(docsDir, 'prd.md');
@@ -99,7 +103,7 @@ describe('scope-inventory — deterministic inventory writes a valid manifest (T
       const code = await scopeInventoryMain([
         '--slug',
         'inv-fixture',
-        '--repo-root',
+        '--at',
         fixture.root,
         '--prd-path',
         fixture.prdPath,

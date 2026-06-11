@@ -24,6 +24,9 @@ function section(runId: string, entries: string[]): string {
 }
 function makeRepo(slug: string, sections: string[]): string {
   const repo = mkdtempSync(join(tmpdir(), 'slush-rewire-'));
+  // Installation marker: --at (R2 retired --repo-root) resolves via walk-up.
+  mkdirSync(join(repo, '.stack-control'), { recursive: true });
+  writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'audit-log.md'), `# Audit Log\n\n${sections.join('\n')}`, 'utf8');
@@ -42,7 +45,7 @@ describe('slush-findings rewire — destination is the backlog (US4, T025)', () 
     const backlog = tmpBacklog();
     try {
       const r = runCli(
-        ['slush-findings', '--feature', 's', '--repo-root', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07', '--apply'],
+        ['slush-findings', '--feature', 's', '--at', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07', '--apply'],
         { env: { STACKCTL_BACKLOG_DIR: backlog } },
       );
       expect(r.status).toBe(0);
@@ -68,7 +71,7 @@ describe('slush-findings rewire — destination is the backlog (US4, T025)', () 
     const before = logText(repo, 's');
     try {
       const r = runCli(
-        ['slush-findings', '--feature', 's', '--repo-root', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07'],
+        ['slush-findings', '--feature', 's', '--at', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07'],
         { env: { STACKCTL_BACKLOG_DIR: backlog } },
       );
       expect(r.status).toBe(0);
@@ -84,7 +87,7 @@ describe('slush-findings rewire — destination is the backlog (US4, T025)', () 
     const backlog = tmpBacklog();
     try {
       const r = runCli(
-        ['slush-findings', '--feature', 's', '--repo-root', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07', '--apply'],
+        ['slush-findings', '--feature', 's', '--at', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07', '--apply'],
         { env: { STACKCTL_BACKLOG_DIR: backlog } },
       );
       expect(r.status).toBe(0);
@@ -99,7 +102,7 @@ describe('slush-findings rewire — destination is the backlog (US4, T025)', () 
   it('--burn-down is removed — rejected as an unknown flag (exit 2)', () => {
     const repo = makeRepo('s', [section('20260607T110000000Z-s-after_clarify', [entry('02', 'medium')])]);
     try {
-      const r = runCli(['slush-findings', '--feature', 's', '--repo-root', repo, '--burn-down', '--apply']);
+      const r = runCli(['slush-findings', '--feature', 's', '--at', repo, '--burn-down', '--apply']);
       expect(r.status).toBe(2);
     } finally {
       rmSync(repo, { recursive: true, force: true });

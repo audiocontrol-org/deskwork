@@ -265,14 +265,14 @@ export async function scopeWidenMain(
 
   // specs/installation-isolation US1 (R1): resolve the installation ONCE
   // at verb entry — cwd is only the default start of the walk-up; an
-  // explicit --repo-root names the installation root directly. All
+  // explicit --at <dir> overrides the start point (US4). All
   // .stack-control/* placement below derives from this record. No
   // enclosing installation -> fail loud (US2; no fallback location).
   let installationRoot: string;
   try {
     installationRoot = resolveCodebaseBoundary({
-      startDir: process.cwd(),
-      explicitRoot: opts.repoRoot ?? null,
+      startDir: opts.at ?? process.cwd(),
+      explicitRoot: null,
     }).installationRoot;
   } catch (err) {
     process.stderr.write(`scope-widen: FATAL — ${errorMessage(err)}\n`);

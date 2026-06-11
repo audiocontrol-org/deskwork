@@ -7,7 +7,7 @@
  *     --feature <slug>
  *     --run-dir <path>
  *     [--date <YYYYMMDD>]      default: today UTC
- *     [--repo-root <path>]
+ *     [--at <dir>]
  *     [--apply]                default is dry-run
  *     [--help]
  *
@@ -35,8 +35,9 @@
 
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
-import { repoRoot } from '../repo.js';
+import { basename, dirname, join } from 'node:path';
+import { resolveCodebaseBoundary } from '../scope-discovery/codebase-boundary.js';
+import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import {
   extractBarrageFindings,
   type ExtractedFinding,
@@ -49,7 +50,8 @@ export interface AuditBarrageLiftCliOptions {
   readonly runDir: string;
   readonly date: string;
   readonly apply: boolean;
-  readonly repoRoot?: string;
+  /** Walk-up start override (`--at <dir>`); default: cwd (R1/R2). */
+  readonly at?: string;
   readonly help?: boolean;
 }
 
@@ -62,7 +64,7 @@ const USAGE = [
   '    --feature <slug>',
   '    --run-dir <path>',
   '    [--date <YYYYMMDD>]',
-  '    [--repo-root <path>]',
+  '    [--at <dir>]',
   '    [--apply]',
   '    [--help]',
   '',
@@ -71,7 +73,7 @@ const USAGE = [
   '--run-dir <path>   Required. Path to the audit-barrage run directory',
   '                   (.stack-control/audit-runs/<stamp>-<slug>/).',
   '--date <YYYYMMDD>  Date stamp used for new AUDIT-<date>-NN IDs. Default: today UTC.',
-  '--repo-root <path> Project root. Default: cwd.',
+  '--at <dir>         Resolve the installation enclosing <dir>. Default: cwd.',
   '--apply            Perform the audit-log write. Default is dry-run.',
   '',
   'Exit codes:',
@@ -84,7 +86,7 @@ const VALUED_FLAGS: ReadonlySet<string> = new Set([
   '--feature',
   '--run-dir',
   '--date',
-  '--repo-root',
+  '--at',
 ]);
 
 const DATE_RE = /^\d{8}$/;
@@ -104,7 +106,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
   let featureSlug: string | undefined;
   let runDir: string | undefined;
   let date: string | undefined;
-  let repoRootOverride: string | undefined;
+  let at: string | undefined;
   let apply = false;
   let help = false;
 
@@ -130,7 +132,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
       if (flag === '--feature') featureSlug = value;
       else if (flag === '--run-dir') runDir = value;
       else if (flag === '--date') date = value;
-      else if (flag === '--repo-root') repoRootOverride = value;
+      else if (flag === '--at') at = value;
       continue;
     }
     return { ok: false, error: `unknown flag: ${flag}` };
@@ -165,7 +167,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
     runDir,
     date: date ?? todayYYYYMMDD(),
     apply,
-    ...(repoRootOverride !== undefined ? { repoRoot: repoRootOverride } : {}),
+    ...(at !== undefined ? { at } : {}),
   };
   return { ok: true, opts };
 }
@@ -292,13 +294,12 @@ export async function runAuditBarrageLift(
   args: RunAuditBarrageLiftArgs,
 ): Promise<number> {
   const { opts, projectRoot, stdout, stderr } = args;
-  const repoRootResolved = opts.repoRoot ?? projectRoot;
-  const feature = await resolveFeatureRoot(repoRootResolved, opts.featureSlug);
+  const feature = await resolveFeatureRoot(projectRoot, opts.featureSlug);
   if (feature === null) {
     stderr.write(
       `audit-barrage-lift: feature '${opts.featureSlug}' not found under ` +
-        `${join(repoRootResolved, 'specs')}/<NNN>-${opts.featureSlug} (speckit) or ` +
-        `${join(repoRootResolved, 'docs')}/*/001-IN-PROGRESS/${opts.featureSlug} (legacy-docs).\n`,
+        `${join(projectRoot, 'specs')}/<NNN>-${opts.featureSlug} (speckit) or ` +
+        `${join(projectRoot, 'docs')}/*/001-IN-PROGRESS/${opts.featureSlug} (legacy-docs).\n`,
     );
     return 2;
   }
@@ -388,13 +389,19 @@ export async function auditBarrageLiftCli(rawArgs: string[]): Promise<void> {
     process.stderr.write(`${parsed.error}\n\n${USAGE}`);
     process.exit(2);
   }
+  // specs/installation-isolation US1 (R1): the lift's anchor is the
+  // nearest-enclosing installation (walk-up from --at <dir>, else the
+  // cwd) — never the git toplevel (an external anchor; FR-004) and
+  // never a free repo-root parameter (R2: retired).
   let projectRoot: string;
-  if (parsed.opts.repoRoot !== undefined) {
-    projectRoot = isAbsolute(parsed.opts.repoRoot)
-      ? parsed.opts.repoRoot
-      : resolve(process.cwd(), parsed.opts.repoRoot);
-  } else {
-    projectRoot = repoRoot();
+  try {
+    projectRoot = resolveCodebaseBoundary({
+      startDir: parsed.opts.at ?? process.cwd(),
+      explicitRoot: null,
+    }).installationRoot;
+  } catch (err) {
+    process.stderr.write(`audit-barrage-lift: FATAL — ${errorMessage(err)}\n`);
+    process.exit(2);
   }
   const exit = await runAuditBarrageLift({
     opts: parsed.opts,

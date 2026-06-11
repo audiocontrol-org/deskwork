@@ -36,6 +36,9 @@ function makeSpeckitRepoWithRun(
   modelFiles: Record<string, string>,
 ): { repo: string; runDir: string; featureRoot: string } {
   const repo = mkdtempSync(join(tmpdir(), 'scaffold-lift-'));
+  // Installation marker: --at (R2 retired --repo-root) resolves via walk-up.
+  mkdirSync(join(repo, '.stack-control'), { recursive: true });
+  writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const featureRoot = join(repo, 'specs', `013-${slug}`);
   mkdirSync(featureRoot, { recursive: true });
   writeFileSync(join(featureRoot, 'spec.md'), `# ${slug}\n`, 'utf8');
@@ -55,7 +58,7 @@ function lift(repo: string, slug: string, runDir: string) {
     slug,
     '--run-dir',
     runDir,
-    '--repo-root',
+    '--at',
     repo,
     '--date',
     '20260610',

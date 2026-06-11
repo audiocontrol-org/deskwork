@@ -45,6 +45,9 @@ describe('disposition persistence across revisions (T026 / SC-004)', () => {
   it('preserves a prior acknowledged finding AND does not let it re-block (only open counts)', () => {
     const slug = 'disp';
     const repo = mkdtempSync(join(tmpdir(), 'disp-persist-'));
+    // Installation marker: --at (R2 retired --repo-root) resolves via walk-up.
+    mkdirSync(join(repo, '.stack-control'), { recursive: true });
+    writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
     const featureDir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
     mkdirSync(featureDir, { recursive: true });
     const auditLogPath = join(featureDir, 'audit-log.md');
@@ -66,7 +69,7 @@ describe('disposition persistence across revisions (T026 / SC-004)', () => {
         slug,
         '--run-dir',
         runDir,
-        '--repo-root',
+        '--at',
         repo,
         '--date',
         '20260606',

@@ -35,12 +35,12 @@ export interface CliOptions {
   /** Explicit `--prd-path` (resolved absolute), or `undefined` (same rule). */
   readonly prdPath: string | undefined;
   /**
-   * Explicit installation root (`--repo-root`, resolved absolute), or
-   * `undefined` when omitted — the orchestrator then resolves the
-   * nearest-enclosing installation from the cwd
-   * (specs/installation-isolation R1).
+   * Walk-up start override (`--at <dir>`, resolved absolute), or
+   * `undefined` when omitted — the orchestrator resolves the
+   * nearest-enclosing installation from <dir>, else the cwd
+   * (specs/installation-isolation R1/R2; `--repo-root` is RETIRED).
    */
-  readonly repoRoot: string | undefined;
+  readonly at: string | undefined;
   readonly moduleRoot: string;
   readonly apply: boolean;
   readonly evidenceTrail: boolean;
@@ -52,7 +52,7 @@ export const USAGE =
   '    --slug <feature-slug> \\\n' +
   '    [--manifest <manifest-path>] \\\n' +
   '    [--prd-path <prd-path>] \\\n' +
-  '    [--repo-root <repo-root>] \\\n' +
+  '    [--at <dir>] \\\n' +
   '    [--module-root <module-root>] \\\n' +
   '    [--apply] \\\n' +
   '    [--evidence-trail on|off] \\\n' +
@@ -66,7 +66,7 @@ const SCALAR_FLAGS: ReadonlySet<string> = new Set([
   '--slug',
   '--manifest',
   '--prd-path',
-  '--repo-root',
+  '--at',
   '--module-root',
   '--evidence-trail',
 ]);
@@ -126,11 +126,11 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
         '+ dashes, no leading/trailing dash, min 2 chars)',
     );
   }
-  const repoRootRaw = scalars.get('--repo-root');
-  const repoRoot = repoRootRaw === undefined ? undefined : resolve(repoRootRaw);
-  // Relative artifact paths resolve against the explicit root when given,
-  // else the cwd (the shell-natural base for paths typed at a prompt).
-  const pathBase = repoRoot ?? process.cwd();
+  const atRaw = scalars.get('--at');
+  const at = atRaw === undefined ? undefined : resolve(atRaw);
+  // Relative artifact paths resolve against the explicit start dir when
+  // given, else the cwd (the shell-natural base for typed paths).
+  const pathBase = at ?? process.cwd();
   // specs/014 US7: when omitted, the defaults resolve in the
   // orchestrator via the layout-aware feature-root resolver.
   const manifestRaw = scalars.get('--manifest');
@@ -156,7 +156,7 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
     complaint: complaintRaw,
     manifestPath,
     prdPath,
-    repoRoot,
+    at,
     moduleRoot: scalars.get('--module-root') ?? DEFAULT_MODULE_ROOT,
     apply,
     evidenceTrail: evidenceFlag === 'on',

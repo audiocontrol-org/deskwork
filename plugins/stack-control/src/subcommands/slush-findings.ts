@@ -18,7 +18,8 @@
 
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { isAbsolute, join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { resolveCodebaseBoundary } from '../scope-discovery/codebase-boundary.js';
 import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
 import { slushRemaining } from '../scope-discovery/promote-findings/slush-remaining.js';
@@ -33,7 +34,8 @@ const STATUS_OPEN_RE = /^Status:\s*open\b/i;
 
 interface SlushOptions {
   readonly feature: string;
-  readonly repoRoot?: string;
+  /** Walk-up start override (`--at <dir>`); default: cwd (R1/R2). */
+  readonly at?: string;
   readonly checkpoint?: string;
   readonly slushDate?: string;
   readonly scope: 'latest' | 'all';
@@ -43,6 +45,7 @@ interface SlushOptions {
 const USAGE = [
   'Usage: stackctl slush-findings',
   '    --feature <slug>          Required.',
+  '    [--at <dir>]              Resolve the installation enclosing <dir> (default: cwd).',
   '    [--checkpoint <name>]     Scope the dampener decision to one checkpoint.',
   '    [--slush-date <YYYY-MM-DD>] Date passed to the dampener decision (default: today UTC).',
   '    [--scope latest|all]      Sections to act on (default: latest).',
@@ -63,7 +66,7 @@ function todayUTC(): string {
 
 function parseArgs(args: string[]): SlushOptions {
   let feature: string | undefined;
-  let repoRoot: string | undefined;
+  let at: string | undefined;
   let checkpoint: string | undefined;
   let slushDate: string | undefined;
   let scope: 'latest' | 'all' | undefined;
@@ -75,7 +78,7 @@ function parseArgs(args: string[]): SlushOptions {
     if (token === '--apply') { apply = true; continue; }
     if (token === '--help' || token === '-h') { process.stdout.write(`${USAGE}\n`); process.exit(0); }
     if (
-      token === '--feature' || token === '--repo-root' || token === '--checkpoint' ||
+      token === '--feature' || token === '--at' || token === '--checkpoint' ||
       token === '--slush-date' || token === '--scope'
     ) {
       const value = args[i + 1];
@@ -85,7 +88,7 @@ function parseArgs(args: string[]): SlushOptions {
       }
       i++;
       if (token === '--feature') feature = value;
-      else if (token === '--repo-root') repoRoot = value;
+      else if (token === '--at') at = value;
       else if (token === '--checkpoint') checkpoint = value;
       else if (token === '--slush-date') slushDate = value;
       else {
@@ -111,7 +114,7 @@ function parseArgs(args: string[]): SlushOptions {
     feature,
     scope: resolvedScope,
     apply,
-    ...(repoRoot !== undefined ? { repoRoot } : {}),
+    ...(at !== undefined ? { at } : {}),
     ...(checkpoint !== undefined ? { checkpoint } : {}),
     ...(slushDate !== undefined ? { slushDate } : {}),
   };
@@ -119,12 +122,19 @@ function parseArgs(args: string[]): SlushOptions {
 
 export async function runSlushFindings(args: string[]): Promise<void> {
   const opts = parseArgs(args);
-  const repoRoot =
-    opts.repoRoot !== undefined
-      ? isAbsolute(opts.repoRoot)
-        ? opts.repoRoot
-        : resolve(process.cwd(), opts.repoRoot)
-      : process.cwd();
+  // specs/installation-isolation US1 (R1): the audit-log target resolves
+  // through the nearest-enclosing installation (walk-up from --at <dir>,
+  // else the cwd); the free repo-root parameter is retired (R2).
+  let repoRoot: string;
+  try {
+    repoRoot = resolveCodebaseBoundary({
+      startDir: opts.at ?? process.cwd(),
+      explicitRoot: null,
+    }).installationRoot;
+  } catch (err) {
+    process.stderr.write(`slush-findings: FATAL — ${errorMessage(err)}\n`);
+    process.exit(2);
+  }
 
   const { root: featureRoot } = await resolveFeatureRoot({ repoRoot, slug: opts.feature });
   if (featureRoot === undefined) {

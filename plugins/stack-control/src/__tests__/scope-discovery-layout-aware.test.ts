@@ -49,6 +49,11 @@ interface Fixture {
 
 async function makeFixture(layout: 'speckit' | 'legacy-docs'): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), `layout-${layout}-`));
+  // The fixture root is an INSTALLATION (the marker the --at walk-up
+  // resolves; specs/installation-isolation R2 retired --repo-root on
+  // scope-widen/scope-inventory; scope-export keeps --repo-root).
+  await mkdir(join(root, '.stack-control'), { recursive: true });
+  await writeFile(join(root, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const featureRoot =
     layout === 'speckit'
       ? join(root, 'specs', `001-${SLUG}`)
@@ -173,7 +178,7 @@ describe('US7 — scope-widen evidence lands under the resolved feature root', (
         'gadget module is also affected by this change',
         '--slug',
         SLUG,
-        '--repo-root',
+        '--at',
         fixture.root,
         '--prd-path',
         fixture.prdPath,
@@ -201,7 +206,7 @@ describe('US7 — scope-widen evidence lands under the resolved feature root', (
         'gadget module is also affected by this change',
         '--slug',
         SLUG,
-        '--repo-root',
+        '--at',
         fixture.root,
         '--evidence-trail',
         'off',
@@ -221,7 +226,7 @@ describe('US7 — scope-widen evidence lands under the resolved feature root', (
         'gadget module is also affected by this change',
         '--slug',
         SLUG,
-        '--repo-root',
+        '--at',
         fixture.root,
         '--evidence-trail',
         'off',
@@ -245,7 +250,7 @@ describe('US7 — scope-inventory defaults + run-dirs are layout-aware', () => {
       const code = await scopeInventoryMain([
         '--slug',
         SLUG,
-        '--repo-root',
+        '--at',
         fixture.root,
         '--quiet',
       ]);
@@ -265,7 +270,7 @@ describe('US7 — scope-inventory defaults + run-dirs are layout-aware', () => {
       const code = await scopeInventoryMain([
         '--slug',
         SLUG,
-        '--repo-root',
+        '--at',
         fixture.root,
         '--quiet',
       ]);

@@ -211,7 +211,7 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       `${args.slug}-${args.checkpoint}`,
       '--prompt-file',
       promptPath,
-      '--repo-root',
+      '--at',
       args.repoRoot,
       '--output-run-dir',
     ];
@@ -244,7 +244,7 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       args.slug,
       '--run-dir',
       runDir,
-      '--repo-root',
+      '--at',
       args.repoRoot,
       '--apply',
     ]);
@@ -269,7 +269,7 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
         'slush-findings',
         '--feature',
         args.slug,
-        '--repo-root',
+        '--at',
         args.repoRoot,
         '--checkpoint',
         args.checkpoint,

@@ -52,6 +52,10 @@ interface Fixture {
  */
 async function makeFreshFixture(): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), 'widen-seed-'));
+  // The fixture root is an INSTALLATION (the marker the --at walk-up
+  // resolves; specs/installation-isolation R2 retired --repo-root).
+  await mkdir(join(root, '.stack-control'), { recursive: true });
+  await writeFile(join(root, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const docsDir = join(root, 'docs', '1.0', '001-IN-PROGRESS', 'widen-fixture');
   await mkdir(docsDir, { recursive: true });
   const prdPath = join(docsDir, 'prd.md');
@@ -126,7 +130,7 @@ function widenArgs(fixture: Fixture): string[] {
     'gadget module is also affected by this change',
     '--slug',
     'widen-fixture',
-    '--repo-root',
+    '--at',
     fixture.root,
     '--prd-path',
     fixture.prdPath,
