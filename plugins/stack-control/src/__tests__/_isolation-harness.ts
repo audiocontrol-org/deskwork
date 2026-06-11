@@ -99,6 +99,42 @@ export function makeNestedFixture(opts?: {
   };
 }
 
+/**
+ * A MARKER-LESS git repo (no `.stack-control/config.yaml` anywhere above
+ * the tmpdir) — the US2 refusal fixture. Shaped as a NestedFixture whose
+ * `installationRel` names a directory that never exists, so the snapshot
+ * helper covers the WHOLE tree (nothing legitimate to exclude: with no
+ * installation, a state-writing verb may write nowhere at all).
+ */
+export function makeMarkerlessFixture(): NestedFixture {
+  const outerRoot = mkdtempSync(join(tmpdir(), 'iso-refusal-'));
+  const installationRel = '__no-installation__';
+
+  const writeAt = (base: string, rel: string, content: string): string => {
+    const abs = join(base, rel);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, content, 'utf8');
+    return abs;
+  };
+
+  gitIn(outerRoot, ['init', '-q']);
+  gitIn(outerRoot, ['config', 'user.email', 'probe@example.invalid']);
+  gitIn(outerRoot, ['config', 'user.name', 'isolation-probe']);
+  writeFileSync(join(outerRoot, 'README.md'), 'marker-less fixture repo\n', 'utf8');
+  gitIn(outerRoot, ['add', '.']);
+  gitIn(outerRoot, ['commit', '-q', '-m', 'seed']);
+
+  return {
+    outerRoot,
+    installationRoot: join(outerRoot, installationRel),
+    installationRel,
+    writeOuter: (rel, content) => writeAt(outerRoot, rel, content),
+    writeInstallation: (rel, content) =>
+      writeAt(join(outerRoot, installationRel), rel, content),
+    cleanup: () => rmSync(outerRoot, { recursive: true, force: true }),
+  };
+}
+
 /** One file's identity in a snapshot: `${size}:${mtimeMs}`. */
 export type Snapshot = Map<string, string>;
 
