@@ -17,10 +17,14 @@
 //
 // RED (T002): audit-barrage writes `<outer>/.stack-control/audit-runs/`
 // and scope-widen auto-seeds `<outer>/.stack-control/scope-discovery/`
-// (research rows 1, 5) — both rows fail until US1's installation
-// threading (T003) lands.
+// (research rows 1, 5) — both rows failed until US1's installation
+// threading (T003) landed. T005 extends the table to the full R5 verb
+// set (lift, slush-findings, scope-inventory, backlog capture/import,
+// install-scope-discovery) plus `--at` anchored rows that additionally
+// pin WHERE the state lands inside the installation (SC-001).
 
 import { describe, expect, it } from 'vitest';
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
@@ -60,14 +64,21 @@ const WIDEN_PRD = [
 ].join('\n');
 
 /**
- * Feature scaffolding for the scope-widen row: a legacy-docs feature root
- * at the OUTER root (the transitional cross-tree layout), a module tree
- * with live pattern signal, and a schema-valid prior manifest synthesized
- * the same way scope-widen-auto-seed.test.ts builds its fixture.
+ * Feature scaffolding for the scope-widen rows: a legacy-docs feature
+ * root + module tree with live pattern signal + a schema-valid prior
+ * manifest (the same shapes scope-widen-auto-seed.test.ts builds), under
+ * `base` — the OUTER root for the no-anchor refusal row (the
+ * transitional cross-tree layout) or the INSTALLATION root for the
+ * `--at` anchored row.
  */
-async function scaffoldWidenFeature(fixture: NestedFixture): Promise<void> {
+async function scaffoldWidenFeature(
+  fixture: NestedFixture,
+  base: 'outer' | 'installation' = 'outer',
+): Promise<void> {
+  const baseRoot =
+    base === 'outer' ? fixture.outerRoot : fixture.installationRoot;
   const featureRoot = join(
-    fixture.outerRoot,
+    baseRoot,
     'docs',
     '1.0',
     '001-IN-PROGRESS',
@@ -77,7 +88,7 @@ async function scaffoldWidenFeature(fixture: NestedFixture): Promise<void> {
   const prdPath = join(featureRoot, 'prd.md');
   await writeFile(prdPath, WIDEN_PRD, 'utf8');
 
-  const widgetDir = join(fixture.outerRoot, 'src', 'widget');
+  const widgetDir = join(baseRoot, 'src', 'widget');
   await mkdir(widgetDir, { recursive: true });
   await writeFile(
     join(widgetDir, 'a.ts'),
@@ -138,6 +149,14 @@ interface ProbeRow {
    * it lives).
    */
   readonly exemptRel: readonly string[];
+  /** Extra env for the spawned verb (e.g. neutralizing seam overrides). */
+  readonly env?: Record<string, string>;
+  /**
+   * Paths (relative to the INSTALLATION root) that must exist after the
+   * run — the positive half of SC-001's acceptance scenarios: anchored
+   * invocations place their state inside the installation.
+   */
+  readonly expectInsideRel?: readonly string[];
 }
 
 const ROWS: readonly ProbeRow[] = [
@@ -183,6 +202,105 @@ const ROWS: readonly ProbeRow[] = [
     ],
     exemptRel: ['docs'],
   },
+  {
+    // SC-001 acceptance scenario 1: a barrage invoked from the outer repo,
+    // explicitly anchored with --at, lands its run dir INSIDE the
+    // installation and touches nothing outside it.
+    name: 'audit-barrage --at (anchored)',
+    setup: async (fixture) => {
+      fixture.writeInstallation(
+        '.stack-control/audit-barrage-config.yaml',
+        STUB_BARRAGE_CONFIG,
+      );
+      fixture.writeInstallation('prompt.md', 'Audit this fixture diff.\n');
+    },
+    args: (fixture) => [
+      'audit-barrage',
+      '--feature',
+      'iso-probe',
+      '--prompt-file',
+      join(fixture.installationRoot, 'prompt.md'),
+      '--at',
+      fixture.installationRoot,
+      '--quiet',
+    ],
+    exemptRel: [],
+    expectInsideRel: ['.stack-control/audit-runs'],
+  },
+  {
+    // SC-001 acceptance scenario 2: the widen auto-seed, anchored with
+    // --at, seeds scope-discovery state under the installation's
+    // .stack-control/ — never the outer root.
+    name: 'scope-widen --at (anchored auto-seed)',
+    setup: (fixture) => scaffoldWidenFeature(fixture, 'installation'),
+    args: (fixture) => [
+      'scope-widen',
+      'gadget module is also affected by this change',
+      '--slug',
+      WIDEN_SLUG,
+      '--at',
+      fixture.installationRoot,
+      '--evidence-trail',
+      'off',
+    ],
+    exemptRel: [],
+    expectInsideRel: ['.stack-control/scope-discovery/clones.yaml'],
+  },
+  {
+    // R5 set: every remaining state-writing verb, invoked from the outer
+    // root with no anchor — no enclosing installation, so each refuses
+    // and the outer tree stays byte-identical (US2's refusal is pinned
+    // in its own suite; the probe pins the zero-write half).
+    name: 'audit-barrage-lift',
+    setup: async () => {},
+    args: (fixture) => [
+      'audit-barrage-lift',
+      '--feature',
+      'iso-probe',
+      '--run-dir',
+      join(fixture.outerRoot, 'no-such-run-dir'),
+    ],
+    exemptRel: [],
+  },
+  {
+    name: 'slush-findings',
+    setup: async () => {},
+    args: () => ['slush-findings', '--feature', 'iso-probe'],
+    exemptRel: [],
+  },
+  {
+    name: 'scope-inventory',
+    setup: async () => {},
+    args: () => ['scope-inventory', '--slug', 'iso-probe'],
+    exemptRel: [],
+  },
+  {
+    name: 'install-scope-discovery',
+    setup: async () => {},
+    args: () => ['install-scope-discovery'],
+    exemptRel: [],
+  },
+  {
+    // The backlog store resolves through the installation (009 seam);
+    // STACKCTL_BACKLOG_DIR is blanked so the walk-up (not the test
+    // session's seam) decides — from the outer root that is a refusal.
+    name: 'backlog capture',
+    setup: async () => {},
+    args: () => ['backlog', 'capture', 'probe-captured item', '--type', 'bug'],
+    exemptRel: [],
+    env: { STACKCTL_BACKLOG_DIR: '' },
+  },
+  {
+    // STACKCTL_GH_ISSUES_FILE is the no-network test seam; the refusal
+    // (no enclosing installation) must fire before any issue read.
+    name: 'backlog import-github',
+    setup: async (fixture) => {
+      fixture.writeOuter('issues.json', '[]\n');
+    },
+    args: () => ['backlog', 'import-github', '--apply'],
+    exemptRel: ['issues.json'],
+    env: { STACKCTL_BACKLOG_DIR: '' },
+  },
 ];
 
 describe('installation-isolation probe (US1/FR-008) — outer tree byte-identical', () => {
@@ -193,12 +311,21 @@ describe('installation-isolation probe (US1/FR-008) — outer tree byte-identica
       try {
         await row.setup(fixture);
         const before = snapshotOutsideInstallation(fixture, row.exemptRel);
-        runCli(row.args(fixture), { cwd: fixture.outerRoot });
+        runCli(row.args(fixture), {
+          cwd: fixture.outerRoot,
+          ...(row.env !== undefined ? { env: row.env } : {}),
+        });
         const after = snapshotOutsideInstallation(fixture, row.exemptRel);
         expect(
           diffSnapshots(before, after),
           'state-writing verb mutated the outer tree (isolation invariant FR-001)',
         ).toEqual([]);
+        for (const rel of row.expectInsideRel ?? []) {
+          expect(
+            existsSync(join(fixture.installationRoot, rel)),
+            `expected ${rel} under the installation after the run`,
+          ).toBe(true);
+        }
       } finally {
         fixture.cleanup();
       }
