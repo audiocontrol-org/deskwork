@@ -12,7 +12,15 @@
  *     spec file; machine-rooted paths are rejected, `../` traversal is allowed
  *     — see {@link isNonPortableCssPath}), the remainder is the selector
  *     (descendant selectors allowed);
- *   - other prose (paragraphs, capitalised-key bullets) is inert.
+ *   - other prose (paragraphs, capitalised-key bullets) is inert;
+ *   - code blocks are inert (AUDIT round-3 claude-02): a fenced block
+ *     (``` or ~~~, ≥3 markers, info string allowed; the closer is a line of
+ *     ONLY the same marker repeated at least the opener's length — pragmatic
+ *     CommonMark, indented/nested-in-list fences not modeled) suspends ALL
+ *     parsing, so a documentation example containing `### rule: phantom`
+ *     never becomes a live rule. Likewise a ≥4-space-indented (or
+ *     tab-indented) NON-bullet line is indented code and skipped; indented
+ *     FIELD BULLETS still record, so nested-list authoring keeps working.
  *
  * Validation per rule: kind from the closed vocabulary; ≥1 css link; ≥1
  * example (structural presence only — this validator does not establish
@@ -71,6 +79,42 @@ const NON_PORTABLE_CSS_PATH_RE = /^(?:[/\\]|~|[a-zA-Z]:[\\/])/;
 /** True iff `path` is machine-rooted (see {@link NON_PORTABLE_CSS_PATH_RE}). */
 export function isNonPortableCssPath(path: string): boolean {
   return NON_PORTABLE_CSS_PATH_RE.test(path);
+}
+
+/** Opening/closing run of a code fence: ≥3 backticks or ≥3 tildes. */
+const FENCE_RUN_RE = /^(`{3,}|~{3,})/;
+/** ≥4-space (or tab) indentation: CommonMark indented code. */
+const INDENTED_CODE_RE = /^(?: {4}|\t)/;
+/** Any bullet shape — indented bullets are list nesting, not indented code. */
+const BULLET_SHAPE_RE = /^[-*]\s/;
+
+/** An open fenced code block: marker char + opener run length. */
+interface OpenFence {
+  readonly char: string;
+  readonly length: number;
+}
+
+/**
+ * Classify `trimmed` as a fence opener. Pragmatic CommonMark: any run of ≥3
+ * backticks/tildes opens a fence; trailing text is the info string (the
+ * CommonMark no-backticks-in-backtick-info-string rule is not modeled).
+ */
+function openingFence(trimmed: string): OpenFence | undefined {
+  const run = FENCE_RUN_RE.exec(trimmed);
+  if (run === null) {
+    return undefined;
+  }
+  return { char: run[1][0], length: run[1].length };
+}
+
+/**
+ * True iff `trimmed` closes `fence`: a line of ONLY the same marker char,
+ * repeated at least the opener's length (CommonMark: closers carry no info
+ * string and must be at least as long as the opener).
+ */
+function closesFence(fence: OpenFence, trimmed: string): boolean {
+  const run = FENCE_RUN_RE.exec(trimmed);
+  return run !== null && run[1] === trimmed && run[1][0] === fence.char && run[1].length >= fence.length;
 }
 
 const KNOWN_KEYS = ['kind', 'css', 'example', 'do', "don't"] as const;
@@ -234,12 +278,34 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
   const throwawaySections: RawRuleSection[] = [];
   const seenIds = new Set<string>();
   let current: RawRuleSection | undefined;
+  let fence: OpenFence | undefined;
 
   const lines = markdown.split('\n');
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i].trimEnd();
     const lineNo = i + 1;
-    const heading = HEADING_RE.exec(line.trim());
+    const trimmed = line.trim();
+    // Code blocks are inert (see module doc): inside a fence, every line —
+    // headings, bullets, attempt shapes, setext lookahead — is skipped.
+    if (fence !== undefined) {
+      if (closesFence(fence, trimmed)) {
+        fence = undefined;
+      }
+      continue;
+    }
+    // A ≥4-space-indented non-bullet line is indented code, also inert
+    // (field bullets are column-0 by convention; indented BULLETS still
+    // parse so nested-list authoring keeps working). Checked before the
+    // fence opener so an indented ``` is code content, not a fence.
+    if (INDENTED_CODE_RE.test(line) && !BULLET_SHAPE_RE.test(trimmed)) {
+      continue;
+    }
+    const opened = openingFence(trimmed);
+    if (opened !== undefined) {
+      fence = opened;
+      continue;
+    }
+    const heading = HEADING_RE.exec(trimmed);
     if (heading !== null) {
       current = undefined;
       const headingText = heading[1].trim();
@@ -286,7 +352,7 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
       sections.push(current);
       continue;
     }
-    const lineAttempt = classifyLineAttempt(line.trim(), lines[i + 1]);
+    const lineAttempt = classifyLineAttempt(trimmed, lines[i + 1]);
     if (lineAttempt !== undefined) {
       // A declaration in the wrong syntax (setext heading / bare paragraph):
       // flag it AND start a throwaway section so its bullets are inspected
@@ -299,7 +365,7 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
     if (current === undefined) {
       continue;
     }
-    const bullet = FIELD_BULLET_RE.exec(line.trim());
+    const bullet = FIELD_BULLET_RE.exec(trimmed);
     if (bullet === null) {
       continue;
     }

@@ -54,7 +54,9 @@ bullets with a closed key set:
 Headings (or line-initial paragraphs / setext headings) that look like rule
 declarations but miss the strict ATX `rule: <id>` form (`Rule: x`, `rule : x`,
 `rule x`) are flagged as `malformed-rule-heading`; prose headings starting
-with "Rule" (e.g. `## Rule of thumb`) are fine.
+with "Rule" (e.g. `## Rule of thumb`) are fine. Fenced and indented code
+blocks are inert — an authoring example like the one above never parses as a
+live rule.
 
 ## Procedure
 

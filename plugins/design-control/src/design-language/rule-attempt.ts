@@ -17,9 +17,13 @@
  * "rule" would structurally forbid ordinary prose headings.
  *
  * Non-heading lines count only when they are line-initial exact-lowercase
- * `rule: <id>` — the unambiguous declaration shape in the wrong syntax
- * (setext heading or bare paragraph). Capitalised prose like "Rule: always X."
- * and mid-line mentions of "rule:" stay inert.
+ * `rule: <id>` with a SINGLE id-shaped token and nothing after — the
+ * unambiguous declaration shape in the wrong syntax (setext heading or bare
+ * paragraph). The id-shape constraint mirrors the heading-level calibration
+ * (AUDIT round-3 claude-03): lowercase prose sentences like
+ * `rule: never introduce raw hex blues outside the tokens.` stay inert —
+ * a multi-word value is guidance prose, not a declaration. Capitalised prose
+ * like "Rule: always X." and mid-line mentions of "rule:" also stay inert.
  */
 
 /** A classified declaration attempt: finding message + attribution id. */
@@ -36,8 +40,12 @@ const COLON_ATTEMPT_RE = /^rule\s*:/i;
 const SPACED_COLON_RE = /^rule\s+:/i;
 /** Exact-lowercase `rule` + exactly one id-shaped token: `rule missing-colon`. */
 const BARE_ID_ATTEMPT_RE = /^rule\s+[\w-]+$/;
-/** Line-initial exact-lowercase declaration shape on a non-heading line. */
-const LINE_ATTEMPT_RE = /^rule\s*:\s*\S/;
+/**
+ * Line-initial exact-lowercase declaration shape on a non-heading line:
+ * exactly one id-shaped token after the colon (`rule: beta`). Multi-word
+ * lowercase prose (`rule: never use raw hex.`) is NOT an attempt.
+ */
+const LINE_ATTEMPT_RE = /^rule\s*:\s*[\w-]+\s*$/;
 /** A setext underline: a line of only `=` or only `-` characters. */
 const SETEXT_UNDERLINE_RE = /^(?:=+|-+)$/;
 
@@ -72,8 +80,10 @@ export function classifyHeadingAttempt(headingText: string): RuleAttempt | undef
 
 /**
  * Classify a non-heading line as a declaration attempt: a line-initial
- * `rule: <id>` rendered as a setext heading (underlined by `---`/`===`) or as
- * a bare paragraph. Both direct the author to the documented ATX syntax.
+ * `rule: <id>` (single id-shaped token, nothing after) rendered as a setext
+ * heading (underlined by `---`/`===`) or as a bare paragraph. Both direct the
+ * author to the documented ATX syntax. Lowercase prose with a multi-word
+ * value stays inert (AUDIT round-3 claude-03).
  */
 export function classifyLineAttempt(lineText: string, nextLine: string | undefined): RuleAttempt | undefined {
   if (!LINE_ATTEMPT_RE.test(lineText)) {

@@ -496,6 +496,129 @@ describe('parseDesignSpec — css-link path portability (AUDIT-round2-codex-02)'
   });
 });
 
+describe('parseDesignSpec — code blocks are inert (AUDIT round-3 claude-02)', () => {
+  const VALID_INK = `### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+`;
+
+  it('a fenced markdown authoring example is inert — phantom rule not parsed, count not inflated', () => {
+    const result = parseDesignSpec(`${VALID_INK}
+An authoring example (documentation, not a live rule):
+
+\`\`\`markdown
+### rule: phantom
+- kind: palette
+- css: styles/phantom.css .ghost
+- example: a phantom example
+- do: never parse me
+\`\`\`
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.spec.rules.map((r) => r.id)).toEqual(['ink']);
+    // The phantom's css link must not leak to the liveness axis either.
+    expect(result.auxiliaryCssLinks).toEqual([]);
+  });
+
+  it('a near-miss "Rule: x" heading inside a fence raises no malformed-rule-heading', () => {
+    const result = parseDesignSpec(`${VALID_INK}
+\`\`\`
+### Rule: x
+rule: y
+\`\`\`
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('a tilde fence (~~~) is recognized as a fence', () => {
+    const result = parseDesignSpec(`${VALID_INK}
+~~~
+### rule: phantom
+~~~
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.spec.rules).toHaveLength(1);
+  });
+
+  it('a shorter inner backtick run does not close a longer opener (closer must be ≥ opener length)', () => {
+    const result = parseDesignSpec(`${VALID_INK}
+\`\`\`\`markdown
+\`\`\`
+### rule: phantom
+\`\`\`
+\`\`\`\`
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.spec.rules).toHaveLength(1);
+  });
+
+  it('an indented code line "    rule: sample" raises no finding (≥4-space non-bullet lines are code)', () => {
+    const result = parseDesignSpec(`${VALID_INK}
+An indented authoring example:
+
+    rule: sample
+    ### rule: phantom
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.spec.rules).toHaveLength(1);
+  });
+
+  it('a ≥4-space-indented field bullet still records (nested-list authoring keeps current behavior)', () => {
+    const result = parseDesignSpec(`### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+    - do: Indented guidance still counts.
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.spec.rules[0].dos).toEqual(['Indented guidance still counts.']);
+  });
+
+  it('a fence line immediately after a paragraph attempt is not a setext underline', () => {
+    const result = parseDesignSpec(`${VALID_INK}
+rule: beta
+\`\`\`
+### rule: phantom
+\`\`\`
+`);
+    const finding = result.findings.find((f) => f.rule === 'malformed-rule-heading');
+    expect(finding).toBeDefined();
+    expect(finding?.message).not.toMatch(/setext/i);
+    expect(result.spec.rules.map((r) => r.id)).toEqual(['ink']);
+  });
+});
+
+describe('parseDesignSpec — line-level attempt calibration (AUDIT round-3 claude-03)', () => {
+  const VALID_INK = `### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+`;
+
+  it('lowercase prose "rule: <sentence>" stays inert — multi-word value is not a declaration', () => {
+    const result = parseDesignSpec(`${VALID_INK}
+rule: never introduce raw hex blues outside the tokens.
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('a paragraph "rule: beta" (single id-shaped token) still flags as an attempted declaration', () => {
+    const result = parseDesignSpec(`${VALID_INK}
+rule: beta
+`);
+    const finding = result.findings.find((f) => f.rule === 'malformed-rule-heading');
+    expect(finding).toBeDefined();
+    expect(finding?.message).toMatch(/rule: beta/);
+  });
+});
+
 describe('parseDesignSpec — rule-declaration attempts outside the ATX form', () => {
   it('flags a setext "rule: beta" heading and does not merge its fields into the prior rule', () => {
     const result = parseDesignSpec(`### rule: alpha
