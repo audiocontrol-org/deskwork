@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:51'
+updated_date: '2026-06-11 00:55'
 labels:
   - agent-found
   - 'type:bug'
@@ -60,3 +60,9 @@ The two compound: a mis-computed stop signal (A) that is also non-binding (B).
 
 Amend `specs/004-spec-governance/spec.md` FR-010 (branch-(a) genuineness / slush ordering) + FR-014 (loop-driver interlock), with RED-first fix-tasks added to `specs/004-spec-governance/tasks.md` when 004 resumes. The gate + loop migrate under `multi/migrate-audit-barrage`, which must carry this forward. Sibling of #431 (audit-barrage payload self-reference). Cross-ref: 005 GRADUATION III in `docs/1.0/001-IN-PROGRESS/document-primitives/audit-log.md`.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Roadmap node design:fix/spec-governance-gate-branch (ref gh-432) was retired 2026-06-11 and migrated here; duplicate capture TASK-35 archived in favor of this item.
+<!-- SECTION:NOTES:END -->
