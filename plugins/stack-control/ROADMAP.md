@@ -99,29 +99,29 @@ Migrate session-start / session-end lifecycle skills into stack-control. Cancell
 Reach parity, then retire the predecessor — the absorb-then-retire endgame.
 
 ## design:gap/roadmap-edge-aware-archival
-- status: planned
+- status: retired
 - depends-on: design:feature/roadmap-protocol
 - part-of: design:feature/roadmap-protocol
 - ref: #436
-curate/archive would archive a shipped item still referenced by a depends-on edge and dangle it; roadmap archival must be edge-aware (skip terminal items that are still depends-on/part-of targets).
+curate/archive would archive a shipped item still referenced by a depends-on edge and dangle it; roadmap archival must be edge-aware (skip terminal items that are still depends-on/part-of targets). Retired 2026-06-11: migrated to backlog TASK-21 (defect tracking lives in the backlog, not the roadmap DAG).
 
 ## design:fix/inbox-migration-drift
-- status: planned
+- status: retired
 - part-of: design:feature/document-primitives
 - ref: #433
-Governed DESIGN-INBOX.md is missing the 13th source entry (the mark-fixed/mark-acknowledged verb); generality T038 is red at HEAD. Re-migrate or reconcile the inbox against its source.
+Governed DESIGN-INBOX.md is missing the 13th source entry (the mark-fixed/mark-acknowledged verb); generality T038 is red at HEAD. Re-migrate or reconcile the inbox against its source. Retired 2026-06-11: migrated to backlog TASK-32.
 
 ## design:gap/governance-graduation-record
-- status: planned
+- status: retired
 - part-of: design:feature/spec-governance
 - ref: #434
-Governance graduation has no on-disk record (the gate prints true/false, persists nothing); roadmap reconcile falls back to tasks-completion as the shipped signal. Persist a per-spec graduation record, then strengthen reconcile to require it.
+Governance graduation has no on-disk record (the gate prints true/false, persists nothing); roadmap reconcile falls back to tasks-completion as the shipped signal. Persist a per-spec graduation record, then strengthen reconcile to require it. Retired 2026-06-11: migrated to backlog TASK-19.
 
 ## design:gap/row-keyed-test-grammar
-- status: planned
+- status: retired
 - part-of: design:feature/document-primitives
 - ref: #435
-Optional cleanup: replace roadmap-legacy.peg with a purpose-named row-keyed test grammar so legacy can be retired. Current decision (kept) is to keep legacy as the canonical row-keyed example grammar.
+Optional cleanup: replace roadmap-legacy.peg with a purpose-named row-keyed test grammar so legacy can be retired. Current decision (kept) is to keep legacy as the canonical row-keyed example grammar. Retired 2026-06-11: migrated to backlog TASK-20.
 
 ## impl:feature/autonomous-loop
 - status: planned
@@ -176,16 +176,16 @@ Meta-audit synthesizer (audit-barrage Design B): one LLM pass over the N raw mod
 Continuous background audit daemon (audit-barrage Design C): watches for new commits and fires audit jobs continuously out-of-band; the orchestrator loop reads accumulated runs per-turn. Exploratory; highest cost and decoupling.
 
 ## design:fix/spec-governance-gate-branch
-- status: planned
+- status: retired
 - part-of: design:feature/spec-governance
 - ref: #432
-spec-governance gate graduates at the first 0-HIGH run instead of FR-010 branch a/b, and the FR-014 loop bound is advisory rather than a code interlock (AUDIT-20260608-01).
+spec-governance gate graduates at the first 0-HIGH run instead of FR-010 branch a/b, and the FR-014 loop bound is advisory rather than a code interlock (AUDIT-20260608-01). Retired 2026-06-11: migrated to backlog TASK-18.
 
 ## design:fix/document-primitives-round9
-- status: planned
+- status: retired
 - part-of: design:feature/document-primitives
 - ref: #430
-Round-9 residual hardening of the document-primitives engine: fence-length handling, prose-as-header rejection, and an engine floor (AUDIT-54/55/56).
+Round-9 residual hardening of the document-primitives engine: fence-length handling, prose-as-header rejection, and an engine floor (AUDIT-54/55/56). Retired 2026-06-11: migrated to backlog TASK-17.
 
 ## multi:gap/session-skills-tailoring
 - status: planned
@@ -206,10 +206,10 @@ session-start branch-staleness detector: warn pre-merge when a feature branch is
 scope-discovery discovery agents act as a pattern inventory and miss novel anti-patterns; a green scope-inventory means no match against the registered catalog, not no novel shapes.
 
 ## multi:fix/audit-barrage-self-referential
-- status: planned
+- status: retired
 - part-of: multi:feature/migrate-audit-barrage
 - ref: #431
-audit-barrage payload includes its own audit-log, generating self-referential findings; the untracked-fold also pulls unrelated parked-feature scaffolds into the diff.
+audit-barrage payload includes its own audit-log, generating self-referential findings; the untracked-fold also pulls unrelated parked-feature scaffolds into the diff. Retired 2026-06-11: migrated to backlog TASK-37.
 
 ## multi:gap/retire-review-audit-skills
 - status: planned
@@ -241,4 +241,9 @@ Native, Spec-Kit-aware session-start / session-end lifecycle skills for stack-co
 - status: planned
 - depends-on: multi:feature/front-door
 Post-install project setup: scaffold the governed documents + config the plugin verbs require (ROADMAP.md, DESIGN-INBOX.md, the backlog store, stack-control config) into a freshly-installed adopter project, so stackctl inbox/roadmap/backlog work without hand-authoring the docs. The create-side complement to design:gap/project-relative-doc-discovery (which resolves an adopter own docs at read time).
+
+## design:feature/backlog-backend-port
+- status: planned
+- depends-on: multi:feature/front-door
+Put a real port between the stack-control backlog frontend (capture / list / import-github / import-slush / promote) and the concrete store: a BacklogStore interface with the current backlog.md CLI as one adapter behind it, so the backend is swappable and its conventions stop leaking. Motivation: backlog.md imposes its own filename convention (spaces and the 'id - title' separator, double .md.md when a title ends in .md), its own archiving model, and its own directory layout on the governed store; the operator has explicit opinions on naming, archiving, and directory layout that the abstraction must make expressible instead of inheriting upstream defaults. Origin: 2026-06-11 session — shell work over the tasks dir broke on the space-laden filenames during the TASK-13/14/25 closure pass.
 

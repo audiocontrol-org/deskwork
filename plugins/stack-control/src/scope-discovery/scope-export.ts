@@ -15,8 +15,11 @@
  * `--at <dir>` overrides the installation walk-up start.
  *
  * Path resolution:
- *   - default: docs/1.0/001-IN-PROGRESS/<slug>/scope-manifest.yaml relative to
- *     the resolved installation root.
+ *   - default: `<feature-root>/scope-manifest.yaml`, where the feature root is
+ *     resolved layout-aware via `resolveFeatureRoot` (specs/014 US7 —
+ *     `specs/<NNN>-<slug>/` or the legacy versioned docs layout) against the
+ *     resolved installation root. Fails loud naming both layouts when the slug
+ *     resolves under neither.
  *   - `--manifest <path>` overrides the resolved path entirely (--slug then
  *     optional).
  *
@@ -31,16 +34,13 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { isAbsolute, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { resolveCodebaseBoundary } from './codebase-boundary.js';
+import { resolveFeatureRoot } from './util/feature-root.js';
 import { errorMessage } from './util/typeguards.js';
 
 const FEATURE_SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
-
-function defaultManifestPath(slug: string): string {
-  return `docs/1.0/001-IN-PROGRESS/${slug}/scope-manifest.yaml`;
-}
 
 interface CliOptions {
   readonly slug: string | null;
@@ -127,8 +127,9 @@ function printHelp(): void {
       'Emit a previously-produced scope-manifest.yaml to stdout.',
       '',
       'Options:',
-      '  --slug <slug>      Feature slug; default manifest path resolves',
-      '                      to docs/1.0/001-IN-PROGRESS/<slug>/scope-manifest.yaml.',
+      '  --slug <slug>      Feature slug; default manifest path resolves to',
+      '                      <feature-root>/scope-manifest.yaml (layout-aware:',
+      '                      specs/<NNN>-<slug> or the legacy docs layout).',
       '  --manifest <path>  Override manifest path explicitly.',
       '  --repo-root <path> Override the base root (default: enclosing installation).',
       '  --at <dir>         Installation walk-up start dir (default: cwd).',
@@ -156,11 +157,32 @@ function resolveBaseRoot(opts: CliOptions): string {
   return boundary.installationRoot;
 }
 
-/** Resolve the on-disk manifest path. Absolute paths honored; relatives resolve against the base root. */
-function resolveManifestPath(opts: CliOptions, baseRoot: string): string {
-  const raw =
-    opts.manifestPath !== null ? opts.manifestPath : defaultManifestPath(opts.slug ?? '');
-  return isAbsolute(raw) ? raw : resolve(baseRoot, raw);
+/**
+ * Resolve the on-disk manifest path. An explicit `--manifest` is
+ * honored verbatim (absolute) or against the base root (relative); the
+ * default routes through the layout-aware feature-root resolver
+ * (specs/014 US7) and fails loud naming both layouts when the slug
+ * resolves under neither.
+ */
+async function resolveManifestPath(
+  opts: CliOptions,
+  baseRoot: string,
+): Promise<string> {
+  if (opts.manifestPath !== null) {
+    return isAbsolute(opts.manifestPath)
+      ? opts.manifestPath
+      : resolve(baseRoot, opts.manifestPath);
+  }
+  const slug = opts.slug ?? '';
+  const { root } = await resolveFeatureRoot({ repoRoot: baseRoot, slug });
+  if (root === undefined) {
+    throw new Error(
+      `feature '${slug}' not found under ${join(baseRoot, 'specs')}/<NNN>-${slug} ` +
+        `(speckit) or ${join(baseRoot, 'docs')}/*/001-IN-PROGRESS/${slug} (legacy-docs); ` +
+        'pass --manifest <path> to name the manifest explicitly',
+    );
+  }
+  return join(root, 'scope-manifest.yaml');
 }
 
 export interface MainResult {
@@ -182,7 +204,7 @@ export async function main(argv: readonly string[]): Promise<MainResult> {
   }
   let path: string;
   try {
-    path = resolveManifestPath(opts, resolveBaseRoot(opts));
+    path = await resolveManifestPath(opts, resolveBaseRoot(opts));
   } catch (err) {
     process.stderr.write(`scope-export: ${errorMessage(err)}\n`);
     return { code: 2 };

@@ -34,6 +34,7 @@ import {
   renderFindingCategoryReport,
 } from './synthesis-report.js';
 import { errorMessage } from './util/typeguards.js';
+import { resolveFeatureRoot } from './util/feature-root.js';
 import {
   extractAjvErrorsFromSynthesisMessage,
   isSchemaValidationError,
@@ -65,21 +66,19 @@ const PHASE4_GATE_FILES = {
 
 /**
  * Allocate a per-run evidence directory at
- *   docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/runs/<stamp>-<runId>/
+ *   <feature-root>/scope-inventory/runs/<stamp>-<runId>/
+ * under the layout-resolved feature root (specs/014 US7 — the legacy
+ * docs path is no longer constructed here).
  *
  * Stamp is ISO-8601 truncated to second + `Z`; runId is 6 hex chars
  * (3 random bytes) so concurrent runs don't collide on the same
  * stamp.
  */
-function makeRunDir(opts: { repoRoot: string; featureSlug: string }): string {
+function makeRunDir(opts: { featureRoot: string }): string {
   const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const runId = randomBytes(3).toString('hex');
   return resolve(
-    opts.repoRoot,
-    'docs',
-    '1.0',
-    '001-IN-PROGRESS',
-    opts.featureSlug,
+    opts.featureRoot,
     'scope-inventory',
     'runs',
     `${now}-${runId}`,
@@ -295,9 +294,34 @@ export async function scopeInventoryMain(
     return 2;
   }
 
+  // specs/014 US7: resolve the feature root layout-aware (specs/NNN-slug
+  // or legacy docs) — it anchors the default --prd-path/--out AND the
+  // per-run evidence dirs.
+  let featureRoot: string;
+  try {
+    const resolved = await resolveFeatureRoot({
+      repoRoot: opts.repoRoot,
+      slug: opts.featureSlug,
+    });
+    if (resolved.root === undefined) {
+      process.stderr.write(
+        `scope-inventory: FATAL — feature '${opts.featureSlug}' not found under ` +
+          `${resolve(opts.repoRoot, 'specs')}/<NNN>-${opts.featureSlug} (speckit) or ` +
+          `${resolve(opts.repoRoot, 'docs')}/*/001-IN-PROGRESS/${opts.featureSlug} (legacy-docs).\n`,
+      );
+      return 2;
+    }
+    featureRoot = resolved.root;
+  } catch (err) {
+    process.stderr.write(`scope-inventory: ${errorMessage(err)}\n`);
+    return 2;
+  }
+  const prdPath = opts.prdPath ?? resolve(featureRoot, 'prd.md');
+  const outPath = opts.outPath ?? resolve(featureRoot, 'scope-manifest.yaml');
+
   const input: DiscoveryAgentInput = {
     featureSlug: opts.featureSlug,
-    prdPath: opts.prdPath,
+    prdPath,
     repoRoot: opts.repoRoot,
     moduleRoot: opts.moduleRoot,
   };
@@ -334,16 +358,16 @@ export async function scopeInventoryMain(
     const output = await synthesize({
       featureSlug: opts.featureSlug,
       findings: agents.map((a) => a.finding),
-      prdPath: opts.prdPath,
-      prdRelPath: relative(opts.repoRoot, opts.prdPath),
+      prdPath,
+      prdRelPath: relative(opts.repoRoot, prdPath),
       moduleRoot: opts.moduleRoot,
       repoRoot: opts.repoRoot,
     });
     // Validation happened inside synthesize(); if we got here, the
     // manifest is schema-valid. Write the YAML to --out.
     const yamlText = stringifyYaml(output.manifest);
-    await mkdir(dirname(opts.outPath), { recursive: true });
-    await writeFile(opts.outPath, yamlText, 'utf8');
+    await mkdir(dirname(outPath), { recursive: true });
+    await writeFile(outPath, yamlText, 'utf8');
 
     // TF-016 (dogfood) — surface a one-line advisory when the manifest
     // emitted an empty `modules:` array. Schema permits it (the TF-016a
@@ -374,10 +398,7 @@ export async function scopeInventoryMain(
     // check-module-symmetry's contract).
     let runDir: string | null = null;
     if (opts.evidenceTrail) {
-      runDir = makeRunDir({
-        repoRoot: opts.repoRoot,
-        featureSlug: opts.featureSlug,
-      });
+      runDir = makeRunDir({ featureRoot });
     }
     if (activations.moduleSymmetry) {
       const defaultPath =
@@ -425,7 +446,7 @@ export async function scopeInventoryMain(
 
     if (!opts.quiet) {
       process.stderr.write(
-        `scope-inventory: wrote ${relative(opts.repoRoot, opts.outPath)} ` +
+        `scope-inventory: wrote ${relative(opts.repoRoot, outPath)} ` +
           `(kind=${output.manifest.kind}, agents=${agents.length}, ` +
           `findings=${output.metadata.findingsCount}, ` +
           `warnings=${output.metadata.warnings.length})\n`,

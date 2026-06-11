@@ -6,6 +6,23 @@
 /** The project label every captured/imported item carries. */
 export const PROJECT_LABEL = 'agent-found';
 
+/**
+ * The label that marks a backlog item as promoted into the feature-rigor tier
+ * (012, D3). Promotion is **orthogonal** to the native To Do/In Progress/Done
+ * status axis — an item can be `In Progress` *and* `promoted`. The terminal
+ * re-promotion guard (FR-006) checks for this label. Carried like the other
+ * provenance labels (`agent-found`, `type:*`, `gh-<n>`), set additively via the
+ * backend `edit()` so existing labels are preserved (FR-013). */
+export const PROMOTED_LABEL = 'promoted';
+
+/** The canonical, machine-greppable linkage line recorded on a promoted item's
+ * body (012, D2) — appended to the task's implementation notes via the backend
+ * `edit()` `--append-notes`. `Promoted-to:` is the greppable token; the bold
+ * bullet form mirrors the inbox `Promoted-to:` precedent. */
+export function promotedToLine(targetRef: string): string {
+  return `- **Promoted-to:** ${targetRef}`;
+}
+
 /** Types a one-move `capture` accepts (FR-002). Import paths set provenance-class
  * types (`imported-issue`/`migrated-finding`) directly, bypassing this guard. */
 export const CAPTURE_TYPES: readonly string[] = ['bug', 'gap'];

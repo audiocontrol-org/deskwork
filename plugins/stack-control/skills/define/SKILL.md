@@ -9,6 +9,15 @@ Author a **new** Spec Kit spec through the stack-control front door (Feature 1, 
 
 > Per `.claude/rules/enforcement-lives-in-skills.md`: the discipline lives in this skill body + the `stackctl` verb it calls, never in a git hook. The skill travels with the plugin install.
 
+> **Where a new feature can originate.** A feature is not always authored from a
+> blank intent — it can **graduate up from the backlog**. When a found-work item
+> in the [backlog](../backlog/SKILL.md) earns the full spec-driven treatment, the
+> operator `backlog promote <id> --to spec:specs/NNN-slug` records the promotion
+> linkage on the item (record-only), then authors the spec here. By convention
+> the new spec notes its originating `TASK-<n>` in its Context, so the promotion
+> is navigable both ways. See [`/stack-control:backlog`](../backlog/SKILL.md)
+> § *Promote into the feature rigor* for the canonical description of the seam.
+
 ## Scope — authoring only
 
 `define` is **spec-authoring only**. It does NOT create a worktree, a docs tree, or any other physical infrastructure — that is a separate concern (mirrors dw-lifecycle's `define` ≠ `setup`, and Constitution Principle IV: providers own authoring intent; physical substrate is a distinct responsibility). If infra is needed, that is the operator's separate call.
