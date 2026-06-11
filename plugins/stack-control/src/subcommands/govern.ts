@@ -63,6 +63,9 @@ const USAGE = [
   '  --repo-root <path>        Project root (else git toplevel / cwd).',
   '  --ceiling <N>             Convergence iteration ceiling.',
   '  --override "<reason>"      Record an explicit override.',
+  '  --require-models <n>      Minimum emitting models for the barrage fleet',
+  '                            (default 2 — the cross-model agreement signal',
+  '                            is what protocol runs exist for; specs/014 US1).',
   '  --no-slush                Disable the slush step (address every finding).',
   '  --json                    Emit the gate verdict JSON only.',
   '  implement: --diff-base <ref>   Diff base (default HEAD~1).',
@@ -81,6 +84,7 @@ interface GovernFlags {
   repoRoot?: string;
   ceiling?: string;
   override?: string;
+  requireModels?: string;
   noSlush: boolean;
   json: boolean;
   diffBase?: string;
@@ -96,6 +100,7 @@ const VALUED = new Set([
   '--repo-root',
   '--ceiling',
   '--override',
+  '--require-models',
   '--diff-base',
   '--spec-path',
   '--plan-path',
@@ -127,6 +132,7 @@ function parseFlags(argv: readonly string[]): { ok: true; flags: GovernFlags } |
       else if (tok === '--repo-root') flags.repoRoot = value;
       else if (tok === '--ceiling') flags.ceiling = value;
       else if (tok === '--override') flags.override = value;
+      else if (tok === '--require-models') flags.requireModels = value;
       else if (tok === '--diff-base') flags.diffBase = value;
       else if (tok === '--spec-path') flags.specPath = value;
       else if (tok === '--plan-path') flags.planPath = value;
@@ -288,6 +294,22 @@ export async function runGovern(args: string[]): Promise<void> {
     process.exit(2);
   }
 
+  // specs/014 US1 (Clarification 2026-06-11): govern-driven barrages default
+  // to a fleet floor of 2 — the cross-model agreement signal is what protocol
+  // runs exist for. --require-models overrides in either direction
+  // (1 = lenient opt-out; >2 = stricter opt-in).
+  let requireModels = 2;
+  if (flags.requireModels !== undefined) {
+    const n = Number(flags.requireModels);
+    if (!Number.isInteger(n) || n < 1) {
+      process.stderr.write(
+        `govern: --require-models requires a positive integer, got '${flags.requireModels}'\n${USAGE}\n`,
+      );
+      process.exit(2);
+    }
+    requireModels = n;
+  }
+
   try {
     const repoRoot = resolveRepoRoot(flags.repoRoot);
     const slug = resolveSlug({
@@ -325,6 +347,7 @@ export async function runGovern(args: string[]): Promise<void> {
       checkpoint: built.checkpoint,
       vars: built.vars,
       models: pick(undefined, process.env.GOVERN_MODELS),
+      requireModels,
       ceiling: pick(flags.ceiling, process.env.GOVERN_CEILING),
       override: pick(flags.override, process.env.GOVERN_OVERRIDE),
       noSlush,
