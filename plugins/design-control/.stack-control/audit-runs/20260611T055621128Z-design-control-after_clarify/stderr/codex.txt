@@ -1,0 +1,886 @@
+Reading prompt from stdin...
+OpenAI Codex v0.136.0
+--------
+workdir: /Users/orion/work/deskwork-work/design-control
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019eb540-cb80-7192-abf9-aa0d161422fa
+--------
+user
+# Audit-barrage — multi-model audit prompt template
+
+You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface the kinds of defects listed under **What to look for** below, in the work product captured under **Under audit**.
+
+You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
+
+## Feature under audit
+
+design-control
+
+## Feature scope (workplan / PRD summary)
+
+Governance pass over the just-implemented work for feature 'design-control', diffed against HEAD~1. The differentiated back half audits a plan it did not author or execute.
+
+## Commit subjects in the audited range
+
+9639b445 feat(design-control): wireframe authoring skill + derived-provenance path — Phase 1 complete
+
+
+## Recent audit-log excerpt (prior findings on this feature)
+
+Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
+
+Finding-ID: AUDIT-20260610-66 (round-20 gpt-5-01 MED + gpt-5-02 LOW)
+Status:     fixed-0e5b4b21 (2026-06-10; fieldset/legend allowlisted; required joins the structural-state attrs)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/allowlist.ts
+Direction:  false-positive
+
+## CONVERGENCE RECORD — 2026-06-10 lint adversarial barrage loop (rounds 1–20)
+
+**Stop criterion met:** two consecutive zero-HIGH rounds (19 + 20), per the
+PRD's operator-set criterion. Twenty rounds fired via the committed
+re-runnable process (audit/run-lint-barrage.sh → stackctl audit-barrage).
+
+**Loop totals:**
+- Findings recorded: AUDIT-20260610-01 .. -66 (66 IDs; same-mechanism
+  cross-model/cross-finding folds applied per the TF-002 rule)
+- Dispositions: every finding fixed-<sha>, acknowledged-<ref>, superseded, or
+  informational — zero open, zero parked-without-record
+- Test corpus: 151 → 286 (every genuine defeat is a deterministic fixture;
+  every accepted boundary/residual is a documented BOUNDARY fixture)
+- Two of the loop's own earlier dispositions were REVERSED on later evidence
+  (AUDIT-14 query acceptance → AUDIT-45; AUDIT-03 absent-fonts-clean →
+  AUDIT-23) — the protocol audited its own fixes, not just the original code
+- Declared scope boundaries (in the lint docstring + the adversarial prompt,
+  each pinned by fixtures): (1) punctuation FLOW art mechanically gated;
+  letter-composed imagery and grid-diluted punctuation = referee's gross-class
+  domain; (2) UA default rendering of semantic HTML = the unstyled baseline;
+  (3) imagery composed by geometric placement of sanctioned atoms = referee's
+  domain
+- Fleet note: claude contributed rounds 1(retry)+2 then was 0-byte for 18
+  consecutive runs (deskwork issue 447); from round 3 the loop ran on codex
+  alone, so cross-model agreement was only available in rounds 1–2. The
+  convergence verdict is correspondingly single-family — re-validation with a
+  restored fleet is the natural post-447 follow-up.
+
+**Verification discipline held throughout:** every defeating input was
+executed against the real lint before recording (zero auditor predictions
+trusted); every fix was RED-first with the verbatim defeating input as the
+fixture; two self-caught transcription errors in fix shas were corrected in
+dedicated commits.
+
+
+## Under audit
+
+The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
+
+diff --git a/plugins/design-control/bin/check-wireframe b/plugins/design-control/bin/check-wireframe
+new file mode 100755
+index 00000000..b5919fb3
+--- /dev/null
++++ b/plugins/design-control/bin/check-wireframe
+@@ -0,0 +1,25 @@
++#!/bin/sh
++# check-wireframe <wireframe.html> — run the full pinned check-mockup-lofi lint
++# against a wireframe file. Exit codes: 0 lint-green, 1 findings/error, 2 usage.
++# Logic lives in src/authoring/lint-file.ts (tested); this shim only locates the
++# workspace tsx runner (hoisted node_modules in the monorepo) and dispatches.
++set -eu
++
++PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
++
++dir="$PLUGIN_ROOT"
++TSX=""
++while [ "$dir" != "/" ]; do
++  if [ -x "$dir/node_modules/.bin/tsx" ]; then
++    TSX="$dir/node_modules/.bin/tsx"
++    break
++  fi
++  dir=$(dirname -- "$dir")
++done
++
++if [ -z "$TSX" ]; then
++  echo "check-wireframe: tsx runner not found in any node_modules/.bin above $PLUGIN_ROOT — run npm install first" >&2
++  exit 1
++fi
++
++exec "$TSX" "$PLUGIN_ROOT/src/authoring/check-wireframe-cli.ts" "$@"
+diff --git a/plugins/design-control/skills/wireframe/SKILL.md b/plugins/design-control/skills/wireframe/SKILL.md
+new file mode 100644
+index 00000000..47f432b3
+--- /dev/null
++++ b/plugins/design-control/skills/wireframe/SKILL.md
+@@ -0,0 +1,86 @@
++---
++name: wireframe
++description: Author a deliberately lo-fi wireframe for a named UI surface change — operator-driven, sketch-kit-based, and lint-enforced (zero check-wireframe findings before the draft may be presented). The optional /frontend-design accelerator routes through the same lint.
++---
++
++# /design-control:wireframe `<change>`
++
++Author the **lo-fi wireframe** for one named surface change. The wireframe is
++the UX-*spirit* artifact of the design-control discipline: it works out
++structure, hierarchy, and flow while being structurally incapable of carrying
++visual-design detail — so stale polish can never ship as if intended. Visual
++identity lives in the design-language spec (Phase 2), never here.
++
++> Per the plugin thesis (`DESIGN-DISCIPLINE-THESIS.md`): policy is enforced by a
++> process, not a rule. The lo-fi property is not a convention the author is
++> trusted to follow — it is mechanically enforced by the `check-mockup-lofi`
++> lint, which every draft MUST pass before it may be presented.
++
++## Arguments
++
++- `<change>` (required) — a short operator-meaningful brief of the surface
++  change (e.g. `regroup the content browser by lane`). If missing, ask for it
++  (one argument, one prompt).
++
++## Procedure
++
++1. **Resolve the target surface.** Confirm with the operator which surface the
++   change addresses (`surface id` — operator-declared granularity, per the spec's
++   Definitions). One wireframe per change; do not batch surfaces.
++
++2. **Set up the wireframe file.** Create `<surface-id>.html` in the operator's
++   chosen wireframes directory, with the shipped sketch-kit copied alongside it:
++   - copy `assets/sketch-kit/sketch-kit.css` (and `assets/sketch-kit/fonts/` if a
++     font-bearing theme is chosen) next to the wireframe;
++   - exactly ONE `<link rel="stylesheet" href="sketch-kit.css">`;
++   - `<body class="sk sk-theme-<theme>">` — theme is the operator's pick among
++     `marker` / `blueprint` / `grayscale` (default `grayscale`);
++   - the kit's WIREFRAME banner (`.sk-banner`) stays — the artifact self-labels.
++
++3. **Author the wireframe — manual path (default, requires NO engine).** The
++   operator (or the agent under operator direction) writes plain structural HTML
++   using only the `.sk-*` vocabulary and the lint's allowed structural tags.
++   Imagery is the fixed `.sk-img` placeholder; icons are text labels, never
++   emoji; copy uses plain Basic-Latin text. This path never calls the engine
++   preflight — it works with no engine installed.
++
++4. **Optional engine accelerator.** Only if the operator asks for it: gate on
++   `preflightEngine` (`@/engine-adapter`, method `author-wireframe`) — absence
++   fails loud naming the remedy — then request a draft via the engine adapter.
++   **Engine output gets zero trust:** it lands in the same file and is judged by
++   the same lint as a manual draft (a `lint-rejected` response is the defined
++   failure mode; fix or discard, never grandfather).
++
++5. **Lint gate — the non-negotiable step.** Run:
++
++   ```bash
++   plugins/design-control/bin/check-wireframe <path/to/wireframe.html>
++   ```
++
++   - Exit `0` (lint green, zero findings) → the draft may be presented.
++   - Exit `1` → fix every finding and re-run. NEVER present a draft with open
++     findings; NEVER hand-wave a finding as "just lo-fi enough". The lint is the
++     boundary of the lo-fi guarantee.
++
++6. **Record provenance.** This skill authors *driving* wireframes (the artifact
++   precedes the implementation): record it via `recordDrivingWireframe`
++   (`@/provenance`) in the wireframe's directory. A wireframe reverse-engineered
++   from an existing surface is the *derived* path — record it with
++   `recordDerivation` at derivation time instead, and note that acceptance will
++   require a non-empty operator edit against the stored snapshot
++   (`checkDerivedAcceptance`) and the artifact never supports a "wireframe drove
++   implementation" claim.
++
++7. **Present and stop.** Show the operator the lint-green wireframe (path +
++   `0 findings` output). The operator picks/iterates; translation into the
++   design language and implementation are separate steps of the loop, not this
++   skill's job.
++
++## What this skill does NOT do
++
++- It does not style anything — no CSS authoring, no presentational attributes
++  (the lint rejects them anyway).
++- It does not translate to the design language (`translate-design-language`),
++  implement, or referee.
++- It does not skip the lint for engine-authored drafts — same gate, same lint,
++  zero findings.
+diff --git a/plugins/design-control/specs/001-design-control/tasks.md b/plugins/design-control/specs/001-design-control/tasks.md
+index 0d69efb4..a65fd485 100644
+--- a/plugins/design-control/specs/001-design-control/tasks.md
++++ b/plugins/design-control/specs/001-design-control/tasks.md
+@@ -139,13 +139,22 @@ verbatim in substance** — when they drift, the PRD wins.
+       Romanian comma-below, multiline placeholders, cache-busting/percent-encoded/subdirectory kit
+       hrefs, data tables, placeholder rows, prose pages, disclosure blocks, and the boundary
+       fixtures. Suite: 151 → 286.
+-- [ ] `/design-control:wireframe <change>` authoring skill (operator-driven + lint-enforced; the
++- [x] `/design-control:wireframe <change>` authoring skill (operator-driven + lint-enforced; the
+       engine `author-wireframe` method is an optional accelerator routed through the same lint).
+-- [ ] Retroactive path: existing surface → `derived` wireframe/spec; **snapshot the auto-derived
++      **Done — 2026-06-10.** `skills/wireframe/SKILL.md` (manual path needs no engine; the
++      accelerator gates on `preflightEngine` and its output is judged by the same lint) +
++      `@/authoring` (`lintWireframeFile` composes the existing pinned pipeline — no parallel lint
++      path) + `bin/check-wireframe` shim (exit contract 0 green / 1 findings-or-error / 2 usage;
++      logic tested as `runCheckWireframe`, the shim only dispatches). TDD: 9 tests RED first.
++- [x] Retroactive path: existing surface → `derived` wireframe/spec; **snapshot the auto-derived
+       draft at derivation time** (stored alongside provenance) so the edit-diff has a baseline;
+       **acceptance of a `derived` artifact requires a recorded operator edit** (non-empty diff
+       between the stored auto-derived snapshot and the accepted version), not just a state
+       transition; does NOT satisfy a "wireframe drove implementation" claim.
++      **Done — 2026-06-10.** `@/provenance` (`recordDerivation` writes snapshot + zod-validated
++      sidecar in one move; `checkDerivedAcceptance` rejects a byte-identical acceptance with
++      `derived-unedited`, fails loud on a tampered baseline via the recorded sha256;
++      `wireframeDroveImplementation` is true only for `driving` mode). TDD: 9 tests RED first.
+ 
+ **Acceptance:** the engine-adapter **preflight fails loud when `/frontend-design` is absent while
+ manual authoring still works**, and the preflight **precedes the first engine-consuming skill**; the
+diff --git a/plugins/design-control/src/__tests__/authoring/lint-file.test.ts b/plugins/design-control/src/__tests__/authoring/lint-file.test.ts
+new file mode 100644
+index 00000000..891ccae0
+--- /dev/null
++++ b/plugins/design-control/src/__tests__/authoring/lint-file.test.ts
+@@ -0,0 +1,105 @@
++import { describe, it, expect, afterEach } from 'vitest';
++import { mkdtempSync, writeFileSync, copyFileSync, readFileSync, rmSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { lintWireframeFile, runCheckWireframe } from '@/authoring/lint-file';
++import { SKETCH_KIT_CSS_PATH, SKETCH_KIT_SAMPLE_PATH } from '@/wireframe-kit/sketch-kit';
++
++const dirs: string[] = [];
++afterEach(() => {
++  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
++});
++
++/** Temp wireframe dir seeded with a genuine copy of the shipped kit CSS. */
++function freshDir(): string {
++  const dir = mkdtempSync(join(tmpdir(), 'dc-lint-file-'));
++  dirs.push(dir);
++  copyFileSync(SKETCH_KIT_CSS_PATH, join(dir, 'sketch-kit.css'));
++  return dir;
++}
++
++const cleanPage =
++  '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>' +
++  '<link rel="stylesheet" href="sketch-kit.css"></head>' +
++  '<body class="sk sk-theme-grayscale"><div class="sk-banner">WIREFRAME</div>' +
++  '<h1>Entry list</h1></body></html>';
++
++describe('lintWireframeFile', () => {
++  it('passes the shipped example wireframe (pin built against its own dir)', () => {
++    const result = lintWireframeFile(SKETCH_KIT_SAMPLE_PATH);
++    expect(result.findings).toEqual([]);
++    expect(result.ok).toBe(true);
++  });
++
++  it('passes a clean wireframe sitting next to a genuine kit copy', () => {
++    const dir = freshDir();
++    const file = join(dir, 'change.html');
++    writeFileSync(file, cleanPage);
++    expect(lintWireframeFile(file).ok).toBe(true);
++  });
++
++  it('rejects a wireframe with an inline style (same axis-1 lint, not a parallel path)', () => {
++    const dir = freshDir();
++    const file = join(dir, 'change.html');
++    writeFileSync(file, cleanPage.replace('<h1>', '<h1 style="color:red">'));
++    const result = lintWireframeFile(file);
++    expect(result.ok).toBe(false);
++    expect(result.findings.map((f) => f.rule)).toContain('inline-style');
++  });
++
++  it('rejects a wireframe whose kit copy is not the shipped bytes (identity pin enforced)', () => {
++    const dir = freshDir();
++    writeFileSync(join(dir, 'sketch-kit.css'), readFileSync(SKETCH_KIT_CSS_PATH, 'utf8') + '\nh1{color:hotpink}');
++    const file = join(dir, 'change.html');
++    writeFileSync(file, cleanPage);
++    const result = lintWireframeFile(file);
++    expect(result.ok).toBe(false);
++    expect(result.findings.map((f) => f.rule)).toContain('stylesheet-hash-mismatch');
++  });
++
++  it('fails loud on a missing file', () => {
++    expect(() => lintWireframeFile(join(tmpdir(), 'dc-lint-file-does-not-exist.html'))).toThrow(
++      /no such file|does not exist|ENOENT/i,
++    );
++  });
++});
++
++describe('runCheckWireframe (CLI core — exit codes are the bin contract)', () => {
++  function capture(): { out: string[]; err: string[]; io: { out(line: string): void; err(line: string): void } } {
++    const out: string[] = [];
++    const err: string[] = [];
++    return { out, err, io: { out: (l) => out.push(l), err: (l) => err.push(l) } };
++  }
++
++  it('exits 0 and reports clean on a passing wireframe', () => {
++    const dir = freshDir();
++    const file = join(dir, 'change.html');
++    writeFileSync(file, cleanPage);
++    const { io, out } = capture();
++    expect(runCheckWireframe([file], io)).toBe(0);
++    expect(out.join('\n')).toMatch(/0 findings/);
++  });
++
++  it('exits 1 and prints one line per finding on a failing wireframe', () => {
++    const dir = freshDir();
++    const file = join(dir, 'change.html');
++    writeFileSync(file, cleanPage.replace('<h1>', '<h1 style="color:red">'));
++    const { io, err } = capture();
++    expect(runCheckWireframe([file], io)).toBe(1);
++    expect(err.some((l) => l.includes('inline-style'))).toBe(true);
++  });
++
++  it('exits 1 with a descriptive error on a missing file (no fabricated verdict)', () => {
++    const { io, err } = capture();
++    expect(runCheckWireframe([join(tmpdir(), 'dc-nope.html')], io)).toBe(1);
++    expect(err.join('\n')).toMatch(/no such file|does not exist|ENOENT/i);
++  });
++
++  it('exits 2 on usage error (no argument / extra arguments)', () => {
++    const a = capture();
++    expect(runCheckWireframe([], a.io)).toBe(2);
++    expect(a.err.join('\n')).toMatch(/usage/i);
++    const b = capture();
++    expect(runCheckWireframe(['x.html', 'y.html'], b.io)).toBe(2);
++  });
++});
+diff --git a/plugins/design-control/src/__tests__/provenance/derived.test.ts b/plugins/design-control/src/__tests__/provenance/derived.test.ts
+new file mode 100644
+index 00000000..97c6fcbb
+--- /dev/null
++++ b/plugins/design-control/src/__tests__/provenance/derived.test.ts
+@@ -0,0 +1,146 @@
++import { describe, it, expect, afterEach } from 'vitest';
++import { mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import {
++  recordDerivation,
++  loadProvenance,
++  checkDerivedAcceptance,
++  wireframeDroveImplementation,
++  recordDrivingWireframe,
++} from '@/provenance/derived';
++
++const dirs: string[] = [];
++afterEach(() => {
++  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
++});
++
++function freshDir(): string {
++  const dir = mkdtempSync(join(tmpdir(), 'dc-prov-'));
++  dirs.push(dir);
++  return dir;
++}
++
++const draftHtml =
++  '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>' +
++  '<link rel="stylesheet" href="sketch-kit.css"></head>' +
++  '<body class="sk sk-theme-grayscale"><h1>Derived from live surface</h1></body></html>';
++
++describe('recordDerivation', () => {
++  it('writes the auto-derived snapshot AND the provenance sidecar at derivation time', () => {
++    const dir = freshDir();
++    const prov = recordDerivation({
++      dir,
++      surfaceId: 'studio-content-browser',
++      derivedHtml: draftHtml,
++      source: 'http://localhost:4321/dev/editorial-studio',
++      derivedAt: new Date('2026-06-10T12:00:00Z'),
++    });
++    expect(prov.mode).toBe('derived');
++    const names = readdirSync(dir);
++    expect(names).toContain('studio-content-browser.derived-snapshot.html');
++    expect(names).toContain('studio-content-browser.provenance.json');
++    expect(readFileSync(join(dir, 'studio-content-browser.derived-snapshot.html'), 'utf8')).toBe(draftHtml);
++  });
++
++  it('round-trips through loadProvenance (zod-validated)', () => {
++    const dir = freshDir();
++    recordDerivation({
++      dir,
++      surfaceId: 'scrapbook-drawer',
++      derivedHtml: draftHtml,
++      source: 'route /dev/scrapbook',
++      derivedAt: new Date('2026-06-10T12:00:00Z'),
++    });
++    const prov = loadProvenance(dir, 'scrapbook-drawer');
++    expect(prov.surfaceId).toBe('scrapbook-drawer');
++    expect(prov.mode).toBe('derived');
++    if (prov.mode !== 'derived') throw new Error('unreachable');
++    expect(prov.derived.source).toBe('route /dev/scrapbook');
++    expect(prov.derived.snapshotSha256).toMatch(/^[0-9a-f]{64}$/);
++  });
++});
++
++describe('loadProvenance fail-loud paths', () => {
++  it('throws a descriptive error when the sidecar is missing', () => {
++    expect(() => loadProvenance(freshDir(), 'nope')).toThrow(/provenance/i);
++  });
++
++  it('throws on a malformed sidecar (no silent fallback)', () => {
++    const dir = freshDir();
++    writeFileSync(join(dir, 'bad.provenance.json'), '{"mode":"derived"}');
++    expect(() => loadProvenance(dir, 'bad')).toThrow();
++  });
++});
++
++describe('checkDerivedAcceptance — acceptance requires a recorded operator edit', () => {
++  it('rejects a byte-identical accepted artifact (state transition alone is not an edit)', () => {
++    const dir = freshDir();
++    recordDerivation({
++      dir,
++      surfaceId: 's1',
++      derivedHtml: draftHtml,
++      source: 'live surface',
++      derivedAt: new Date('2026-06-10T12:00:00Z'),
++    });
++    const result = checkDerivedAcceptance(dir, 's1', draftHtml);
++    expect(result.ok).toBe(false);
++    expect(result.findings.map((f) => f.rule)).toContain('derived-unedited');
++  });
++
++  it('accepts once the operator edit produces a non-empty diff against the stored snapshot', () => {
++    const dir = freshDir();
++    recordDerivation({
++      dir,
++      surfaceId: 's1',
++      derivedHtml: draftHtml,
++      source: 'live surface',
++      derivedAt: new Date('2026-06-10T12:00:00Z'),
++    });
++    const edited = draftHtml.replace('Derived from live surface', 'Entry list, regrouped by lane');
++    expect(checkDerivedAcceptance(dir, 's1', edited).ok).toBe(true);
++  });
++
++  it('fails loud when the stored snapshot was tampered after recording (hash mismatch)', () => {
++    const dir = freshDir();
++    recordDerivation({
++      dir,
++      surfaceId: 's1',
++      derivedHtml: draftHtml,
++      source: 'live surface',
++      derivedAt: new Date('2026-06-10T12:00:00Z'),
++    });
++    writeFileSync(join(dir, 's1.derived-snapshot.html'), draftHtml + '<!-- tampered -->');
++    expect(() => checkDerivedAcceptance(dir, 's1', 'whatever')).toThrow(/snapshot|hash/i);
++  });
++
++  it('does not gate a driving wireframe (the derived gate is mode-scoped)', () => {
++    const dir = freshDir();
++    recordDrivingWireframe({
++      dir,
++      surfaceId: 'fresh',
++      derivedAt: new Date('2026-06-10T12:00:00Z'),
++    });
++    expect(checkDerivedAcceptance(dir, 'fresh', draftHtml).ok).toBe(true);
++  });
++});
++
++describe('wireframeDroveImplementation', () => {
++  it('is true for a driving wireframe and FALSE for a derived one (even an accepted one)', () => {
++    const dir = freshDir();
++    const derived = recordDerivation({
++      dir,
++      surfaceId: 'd',
++      derivedHtml: draftHtml,
++      source: 'live surface',
++      derivedAt: new Date('2026-06-10T12:00:00Z'),
++    });
++    const driving = recordDrivingWireframe({
++      dir,
++      surfaceId: 'w',
++      derivedAt: new Date('2026-06-10T12:00:00Z'),
++    });
++    expect(wireframeDroveImplementation(derived)).toBe(false);
++    expect(wireframeDroveImplementation(driving)).toBe(true);
++  });
++});
+diff --git a/plugins/design-control/src/authoring/check-wireframe-cli.ts b/plugins/design-control/src/authoring/check-wireframe-cli.ts
+new file mode 100644
+index 00000000..3838653a
+--- /dev/null
++++ b/plugins/design-control/src/authoring/check-wireframe-cli.ts
+@@ -0,0 +1,12 @@
++/**
++ * Process entry for `bin/check-wireframe`. All behavior lives in
++ * {@link runCheckWireframe} (tested directly); this file only wires argv and
++ * the process exit code.
++ */
++
++import { runCheckWireframe } from '@/authoring/lint-file';
++
++process.exitCode = runCheckWireframe(process.argv.slice(2), {
++  out: (line) => console.log(line),
++  err: (line) => console.error(line),
++});
+diff --git a/plugins/design-control/src/authoring/index.ts b/plugins/design-control/src/authoring/index.ts
+new file mode 100644
+index 00000000..c6773979
+--- /dev/null
++++ b/plugins/design-control/src/authoring/index.ts
+@@ -0,0 +1,5 @@
++/**
++ * Public surface of the wireframe-authoring path. Import via `@/authoring`.
++ */
++
++export { type CliIo, lintWireframeFile, runCheckWireframe } from '@/authoring/lint-file';
+diff --git a/plugins/design-control/src/authoring/lint-file.ts b/plugins/design-control/src/authoring/lint-file.ts
+new file mode 100644
+index 00000000..310dc89c
+--- /dev/null
++++ b/plugins/design-control/src/authoring/lint-file.ts
+@@ -0,0 +1,68 @@
++/**
++ * File-level entry to the `check-mockup-lofi` lint — the enforcement seam the
++ * `/design-control:wireframe` authoring skill (and the `bin/check-wireframe`
++ * shim) route EVERY wireframe draft through, manual or engine-authored alike.
++ *
++ * This is deliberately a thin composition of the existing axes — axis 1
++ * (element/attribute allowlist) + axis 1.5 (stylesheet identity pin) + the
++ * codepoint allowlist — via `lintWireframe`. No parallel lint path: the skill
++ * and the library agree by construction because they call the same pipeline.
++ */
++
++import { readFileSync } from 'node:fs';
++import { dirname, resolve } from 'node:path';
++import { lintWireframe } from '@/lint/check-mockup-lofi';
++import { buildSketchKitPin } from '@/lint/stylesheet-pin';
++import type { LintResult } from '@/lint/types';
++
++/**
++ * Lint a wireframe FILE: read it, build the sketch-kit identity pin against the
++ * file's own directory (the conventional layout — the kit copy sits next to the
++ * wireframe), and run the full pinned lint. Fails loud on an unreadable file —
++ * a missing wireframe is an error, never a clean verdict.
++ */
++export function lintWireframeFile(filePath: string): LintResult {
++  const absolute = resolve(filePath);
++  const html = readFileSync(absolute, 'utf8');
++  return lintWireframe(html, { stylesheetPin: buildSketchKitPin(dirname(absolute)) });
++}
++
++/** Line-oriented output sink, injected so the CLI core is testable as a function. */
++export interface CliIo {
++  out(line: string): void;
++  err(line: string): void;
++}
++
++const USAGE = 'usage: check-wireframe <wireframe.html>';
++
++/**
++ * CLI core behind `bin/check-wireframe`. Exit-code contract (the skill's gate):
++ *   0 — lint green (zero findings)
++ *   1 — findings present, or the file could not be read (descriptive error;
++ *       never a fabricated verdict)
++ *   2 — usage error
++ */
++export function runCheckWireframe(argv: readonly string[], io: CliIo): number {
++  if (argv.length !== 1) {
++    io.err(USAGE);
++    return 2;
++  }
++  const filePath = argv[0];
++  let result: LintResult;
++  try {
++    result = lintWireframeFile(filePath);
++  } catch (error) {
++    io.err(error instanceof Error ? error.message : String(error));
++    return 1;
++  }
++  if (result.ok) {
++    io.out(`${filePath}: lint green — 0 findings`);
++    return 0;
++  }
++  for (const finding of result.findings) {
++    const where = [finding.tag, finding.attr].filter(Boolean).join(' ');
++    io.err(`${finding.rule}${where ? ` (${where})` : ''}: ${finding.message}`);
++  }
++  io.err(`${filePath}: ${result.findings.length} finding(s)`);
++  return 1;
++}
+diff --git a/plugins/design-control/src/provenance/derived.ts b/plugins/design-control/src/provenance/derived.ts
+new file mode 100644
+index 00000000..6e5c2987
+--- /dev/null
++++ b/plugins/design-control/src/provenance/derived.ts
+@@ -0,0 +1,185 @@
++/**
++ * Wireframe provenance — the retroactive (`derived`) path.
++ *
++ * A wireframe is either DRIVING (authored before the implementation; the
++ * artifact that drove the change) or DERIVED (reverse-engineered from an
++ * already-existing surface). The derived path exists so a legacy surface can be
++ * brought under the discipline, but with two hard properties from the spec:
++ *
++ *  1. The auto-derived draft is SNAPSHOTTED at derivation time, alongside its
++ *     provenance, so acceptance has a baseline to diff against.
++ *  2. Accepting a `derived` artifact REQUIRES a recorded operator edit — a
++ *     non-empty byte diff between the stored snapshot and the accepted version.
++ *     A bare state transition is not an edit.
++ *
++ * And a `derived` artifact NEVER satisfies a "wireframe drove implementation"
++ * claim ({@link wireframeDroveImplementation}) — provenance distinguishes the
++ * two modes precisely so the claim cannot be laundered through acceptance.
++ *
++ * Sidecar layout (per surface, in the operator-chosen provenance dir):
++ *   <surfaceId>.provenance.json          — zod-validated provenance record
++ *   <surfaceId>.derived-snapshot.html    — the auto-derived draft (derived only)
++ */
++
++import { existsSync, readFileSync, writeFileSync } from 'node:fs';
++import { join } from 'node:path';
++import { createHash } from 'node:crypto';
++import { z } from 'zod';
++
++const PROVENANCE_VERSION = 1;
++
++const sha256Hex = (content: string): string => createHash('sha256').update(content).digest('hex');
++
++const drivingSchema = z.object({
++  version: z.literal(PROVENANCE_VERSION),
++  surfaceId: z.string().min(1),
++  mode: z.literal('driving'),
++  createdAt: z.string().datetime(),
++});
++
++const derivedSchema = z.object({
++  version: z.literal(PROVENANCE_VERSION),
++  surfaceId: z.string().min(1),
++  mode: z.literal('derived'),
++  createdAt: z.string().datetime(),
++  derived: z.object({
++    /** Filename (dir-relative) of the snapshot stored at derivation time. */
++    snapshotFile: z.string().min(1),
++    /** sha256 (hex) of the snapshot bytes as recorded — tamper evidence. */
++    snapshotSha256: z.string().regex(/^[0-9a-f]{64}$/),
++    /** What the draft was derived FROM (route, URL, file — operator-meaningful). */
++    source: z.string().min(1),
++  }),
++});
++
++const provenanceSchema = z.discriminatedUnion('mode', [drivingSchema, derivedSchema]);
++
++export type WireframeProvenance = z.infer<typeof provenanceSchema>;
++
++export interface ProvenanceFinding {
++  readonly rule: 'derived-unedited';
++  readonly message: string;
++}
++
++export interface AcceptanceResult {
++  readonly ok: boolean;
++  readonly findings: readonly ProvenanceFinding[];
++}
++
++const sidecarPath = (dir: string, surfaceId: string): string =>
++  join(dir, `${surfaceId}.provenance.json`);
++
++function writeProvenance(dir: string, provenance: WireframeProvenance): void {
++  writeFileSync(
++    sidecarPath(dir, provenance.surfaceId),
++    JSON.stringify(provenance, null, 2) + '\n',
++  );
++}
++
++/** Record a DRIVING wireframe's provenance (the authored-first path). */
++export function recordDrivingWireframe(input: {
++  dir: string;
++  surfaceId: string;
++  derivedAt?: Date;
++}): WireframeProvenance {
++  const provenance: WireframeProvenance = {
++    version: PROVENANCE_VERSION,
++    surfaceId: input.surfaceId,
++    mode: 'driving',
++    createdAt: (input.derivedAt ?? new Date()).toISOString(),
++  };
++  writeProvenance(input.dir, provenance);
++  return provenance;
++}
++
++/**
++ * Record a DERIVED draft at derivation time: store the auto-derived snapshot
++ * AND the provenance sidecar in one move, so the acceptance diff always has its
++ * baseline. The snapshot hash is recorded for tamper evidence.
++ */
++export function recordDerivation(input: {
++  dir: string;
++  surfaceId: string;
++  derivedHtml: string;
++  source: string;
++  derivedAt?: Date;
++}): WireframeProvenance {
++  const snapshotFile = `${input.surfaceId}.derived-snapshot.html`;
++  writeFileSync(join(input.dir, snapshotFile), input.derivedHtml);
++  const provenance: WireframeProvenance = {
++    version: PROVENANCE_VERSION,
++    surfaceId: input.surfaceId,
++    mode: 'derived',
++    createdAt: (input.derivedAt ?? new Date()).toISOString(),
++    derived: {
++      snapshotFile,
++      snapshotSha256: sha256Hex(input.derivedHtml),
++      source: input.source,
++    },
++  };
++  writeProvenance(input.dir, provenance);
++  return provenance;
++}
++
++/** Load + zod-validate a surface's provenance sidecar. Fails loud when absent/malformed. */
++export function loadProvenance(dir: string, surfaceId: string): WireframeProvenance {
++  const path = sidecarPath(dir, surfaceId);
++  if (!existsSync(path)) {
++    throw new Error(
++      `No provenance sidecar for surface "${surfaceId}" at ${path}. ` +
++        `Record provenance at authoring/derivation time (recordDrivingWireframe / recordDerivation).`,
++    );
++  }
++  return provenanceSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
++}
++
++/**
++ * The acceptance gate for `derived` artifacts: the accepted version must carry
++ * a recorded operator edit — a non-empty byte diff against the snapshot stored
++ * at derivation time. Driving wireframes pass through (the gate is mode-scoped).
++ * Fails loud if the stored snapshot no longer matches its recorded hash — a
++ * tampered baseline cannot certify an edit.
++ */
++export function checkDerivedAcceptance(
++  dir: string,
++  surfaceId: string,
++  acceptedHtml: string,
++): AcceptanceResult {
++  const provenance = loadProvenance(dir, surfaceId);
++  if (provenance.mode !== 'derived') {
++    return { ok: true, findings: [] };
++  }
++  const snapshotPath = join(dir, provenance.derived.snapshotFile);
++  const snapshot = readFileSync(snapshotPath, 'utf8');
++  if (sha256Hex(snapshot) !== provenance.derived.snapshotSha256) {
++    throw new Error(
++      `Derived snapshot ${snapshotPath} does not match the hash recorded at derivation time — ` +
++        `the baseline was modified after recording, so the operator-edit diff cannot be trusted. ` +
++        `Re-derive the draft to re-establish a baseline.`,
++    );
++  }
++  if (acceptedHtml === snapshot) {
++    return {
++      ok: false,
++      findings: [
++        {
++          rule: 'derived-unedited',
++          message:
++            `Surface "${surfaceId}": the accepted artifact is byte-identical to the auto-derived ` +
++            `snapshot. Accepting a derived wireframe requires a recorded operator edit ` +
++            `(non-empty diff against the derivation-time snapshot), not just a state transition.`,
++        },
++      ],
++    };
++  }
++  return { ok: true, findings: [] };
++}
++
++/**
++ * Whether this wireframe supports a "wireframe drove implementation" claim.
++ * Only a DRIVING wireframe does; a `derived` one never does, edited or not —
++ * it was reverse-engineered from the surface it would be claiming to have driven.
++ */
++export function wireframeDroveImplementation(provenance: WireframeProvenance): boolean {
++  return provenance.mode === 'driving';
++}
+diff --git a/plugins/design-control/src/provenance/index.ts b/plugins/design-control/src/provenance/index.ts
+new file mode 100644
+index 00000000..3106074f
+--- /dev/null
++++ b/plugins/design-control/src/provenance/index.ts
+@@ -0,0 +1,14 @@
++/**
++ * Public surface of the wireframe-provenance module. Import via `@/provenance`.
++ */
++
++export {
++  type WireframeProvenance,
++  type ProvenanceFinding,
++  type AcceptanceResult,
++  recordDrivingWireframe,
++  recordDerivation,
++  loadProvenance,
++  checkDerivedAcceptance,
++  wireframeDroveImplementation,
++} from '@/provenance/derived';
+
+
+## What to look for
+
+- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
+- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
+- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
+- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
+- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
+- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+
+## Output format
+
+For each finding you surface, emit ONE markdown block in this exact shape:
+
+```
+### <heading: one-line summary of the finding>
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
+Status:     open
+Severity:   <blocking | high | medium | low | informational>
+Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
+
+<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
+```
+
+Number the findings sequentially (`-01`, `-02`, ...).
+
+**Severity — rate each finding by downstream blast-radius:** the consequence if a downstream consumer acts on the audited surface *as written*. The consumer may be an adopter running the code, or — especially for a spec — an AI agent building **unattended** from it, with no human to catch a wrong reading. Rate by what would actually happen if this shipped as-is, **not by how alarming the finding feels**. State the blast-radius reasoning in the finding body for every finding, at every level.
+
+- `blocking` — acting on it as-written breaks the feature's stated goals in obvious ways; OR (for a spec) the more natural reading an agent reaches first is the wrong one, so it will likely be built wrong by default and nothing in the artifact corrects it.
+- `high` — a correctness/safety defect a consumer will hit; OR a spec contradiction/ambiguity where the readings are roughly equally plausible and the artifact doesn't disambiguate — an agent might build either, including the wrong one.
+- `medium` — a design issue that compounds over time; OR a spec inconsistency a reasonable consumer would resolve correctly anyway (readings barely diverge, or context makes the intended one obvious).
+- `low` — hygiene; cosmetic wording with no behavioral or implementation consequence.
+- `informational` — context worth seeing, not itself a defect.
+
+**Calibrate by consequence, not by alarm.** A genuine contradiction a reader would obviously resolve the right way is at most `medium`. A quietly-plausible wrong reading an agent would actually build is `high`/`blocking` even if it looks minor. A spec's internal consistency is load-bearing — it is the input to an unattended build.
+
+## If you find nothing — say so explicitly
+
+If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
+
+```
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+```
+
+**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
+
+## Hard constraints
+
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
+- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
+- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.
+
+codex
+### `recordDerivation` can leave an orphaned snapshot if sidecar write fails
+
+Finding-ID: AUDIT-BARRAGE-codex-01  
+Status:     open  
+Severity:   medium  
+Surface:    `plugins/design-control/src/provenance/derived.ts:102-118`
+
+`recordDerivation` writes `<surfaceId>.derived-snapshot.html` first, then writes `<surfaceId>.provenance.json`. If the process is interrupted, the disk fills, permissions change, or JSON sidecar write otherwise fails after line 104, the directory is left with a snapshot but no valid provenance record. The workplan says `recordDerivation` “writes snapshot + zod-validated sidecar in one move”; this implementation is sequential non-atomic writes.
+
+The blast radius is medium: normal consumers will usually succeed, but the failure mode creates ambiguous provenance state in the operator’s artifact directory. A later unattended agent or operator may see the snapshot and assume derivation was recorded, while `loadProvenance` fails loud because the sidecar is absent. A reasonable fix is to write both artifacts via temporary files and atomic renames, with cleanup on failure, or to write the sidecar first with a temporary snapshot reference and only promote both names once both writes have succeeded.
+tokens used
+23,875
