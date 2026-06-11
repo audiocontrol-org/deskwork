@@ -19,8 +19,8 @@
 
 ## Phase 3: US2 — No installation, no write (P1)
 
-- [ ] T006 [P] [US2] RED: refusal tests (probe harness, marker-less repo fixture) — every state-writing verb exits non-zero naming the start dir + `stackctl setup`; zero new state anywhere (spec US2; contracts §refusal)
-- [ ] T007 [US2] Route every converted verb's no-installation path through the shared resolver's uniform refusal — T006 green
+- [X] T006 [P] [US2] RED: refusal tests (probe harness, marker-less repo fixture) — every state-writing verb exits non-zero naming the start dir + `stackctl setup`; zero new state anywhere (spec US2; contracts §refusal)
+- [X] T007 [US2] Route every converted verb's no-installation path through the shared resolver's uniform refusal — T006 green
 
 ## Phase 4: US3 — Governance anchors at the installation (P2)
 

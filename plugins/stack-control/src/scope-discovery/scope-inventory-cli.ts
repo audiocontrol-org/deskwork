@@ -26,7 +26,13 @@ export interface CliOptions {
   readonly prdPath: string | undefined;
   /** Explicit `--out` (resolved absolute), or `undefined` (same rule). */
   readonly outPath: string | undefined;
-  readonly repoRoot: string;
+  /**
+   * Walk-up start override (`--at <dir>`, resolved absolute), or
+   * `undefined` when omitted — the orchestrator resolves the
+   * nearest-enclosing installation from <dir>, else the cwd
+   * (specs/installation-isolation R1/R2; `--repo-root` is RETIRED).
+   */
+  readonly at: string | undefined;
   readonly moduleRoot: string;
   readonly evidenceTrail: boolean;
   readonly quiet: boolean;
@@ -174,7 +180,7 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
     featureSlug: slug,
     prdPath,
     outPath,
-    repoRoot: root,
+    at,
     moduleRoot: scalars.get('--module-root') ?? DEFAULT_MODULE_ROOT,
     evidenceTrail: evidenceFlag === 'on',
     quiet,
