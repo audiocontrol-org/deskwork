@@ -92,7 +92,7 @@ The new two-layer `resolveFeatureRoot` deliberately lets the feature root resolv
 ### AUDIT-20260611-11 — Constitution amendment states "the repo-root parameter is retired" unqualified, while protocol.ts now load-bears on render's surviving --repo-root
 
 Finding-ID: AUDIT-20260611-11
-Status:     open
+Status:     fixed-5d7c87b6
 Severity:   low
 Surface:    .specify/memory/constitution.md:158-165 (installation-anchor invariant wording) vs src/govern/protocol.ts:190-207 (render threading via `--repo-root`)
 
@@ -104,7 +104,7 @@ The constitution's new Additional Constraint says external-tool anchors are "nev
 ### AUDIT-20260611-12 — govern-spec.sh retired GOVERN_REPO_ROOT but its env-only interface gained no replacement carrier for the advice it gives
 
 Finding-ID: AUDIT-20260611-12
-Status:     open
+Status:     fixed-5d7c87b6
 Severity:   low
 Surface:    spec-kit/spec-governance/scripts/bash/govern-spec.sh:16-23 (env-var interface header)
 
