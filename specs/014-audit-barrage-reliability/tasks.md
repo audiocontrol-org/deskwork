@@ -34,8 +34,8 @@ The terminal-state vocabulary (data-model.md) and config v2 grammar (contracts/b
 - [X] T006 [US1] RED: spawn enforcement suite in plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/spawn-readonly.test.ts — argv assembly injects the lane's `readonly_enforcement` fragment before the prompt placeholder; `none` → result carries `enforcement: 'unenforced'`; fragment lanes carry `enforcement: 'enforced'` (FR-003/FR-004)
 - [X] T007 [US1] GREEN: argv assembly + enforcement marking in plugins/stack-control/src/scope-discovery/audit-barrage/spawn-cli.ts until T006 passes
 - [X] T008 [US1] RED then GREEN: fire-time warning for unenforced lanes in plugins/stack-control/src/subcommands/audit-barrage.ts + INDEX per-model `enforcement` field in plugins/stack-control/src/scope-discovery/audit-barrage/run-artifacts.ts (contracts/run-artifacts-contract.md row fields)
-- [ ] T009 [US1] Hostile-probe verification (SC-002, live): write plugins/stack-control/scripts/probe-readonly-spawn.sh (scratch-clone probe: Write-tool create, `echo >`, `python3` write, `git commit` + push) and run it against the claude fragment (`--permission-mode plan`) AND the codex fragment (`--sandbox read-only`); record per-lane verdicts in the script header comment. FR-005 check: replay a recorded audit prompt under the claude fragment and confirm the output still lifts (plan-mode framing did not break the report shape)
-- [ ] T010 [US1] Update plugins/stack-control/templates/audit-barrage-config.yaml lane `readonly_enforcement` values per T009 verdicts (codex ships `none` if its sandbox fails the probe — never assumed)
+- [X] T009 [US1] Hostile-probe verification (SC-002, live): write plugins/stack-control/scripts/probe-readonly-spawn.sh (scratch-clone probe: Write-tool create, `echo >`, `python3` write, `git commit` + push) and run it against the claude fragment (`--permission-mode plan`) AND the codex fragment (`--sandbox read-only`); record per-lane verdicts in the script header comment. FR-005 check: replay a recorded audit prompt under the claude fragment and confirm the output still lifts (plan-mode framing did not break the report shape)
+- [X] T010 [US1] Update plugins/stack-control/templates/audit-barrage-config.yaml lane `readonly_enforcement` values per T009 verdicts (codex ships `none` if its sandbox fails the probe — never assumed)
 
 **Checkpoint**: US1 independently deliverable — enforced spawns cannot mutate; unenforced lanes are loud.
 
@@ -49,7 +49,7 @@ The terminal-state vocabulary (data-model.md) and config v2 grammar (contracts/b
 - [X] T012 [US2] GREEN: implement plugins/stack-control/src/scope-discovery/audit-barrage/timeout-derivation.ts until T011 passes
 - [X] T013 [US2] RED: model-pin wiring suite in plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/spawn-model-pin.test.ts — `{{model}}` substitution in argv; orchestrator threads rendered-prompt byte size into derivation; effective timeout armed from basis (FR-001/FR-002)
 - [X] T014 [US2] GREEN: wire substitution + payload threading + basis arming in plugins/stack-control/src/scope-discovery/audit-barrage/spawn-cli.ts and plugins/stack-control/src/scope-discovery/audit-barrage/orchestrate-barrage.ts; render `timeout basis` row in run-artifacts.ts until T013 passes
-- [ ] T015 [US2] Migrate plugins/stack-control/templates/audit-barrage-config.yaml to full v2 for ALL lanes including the disabled gemini entry (opus pin, fable override profile documented in comments, calibration numbers from research D5) and migrate the project override .stack-control/audit-barrage-config.yaml; then run quickstart SC-001 replay and record the result
+- [X] T015 [US2] Migrate plugins/stack-control/templates/audit-barrage-config.yaml to full v2 for ALL lanes including the disabled gemini entry (opus pin, fable override profile documented in comments, calibration numbers from research D5) and migrate the project override .stack-control/audit-barrage-config.yaml; then run quickstart SC-001 replay and record the result
 
 **Checkpoint**: US2 independently deliverable — the 17-timeout scenario is structurally dead.
 
@@ -78,14 +78,14 @@ The terminal-state vocabulary (data-model.md) and config v2 grammar (contracts/b
 - [X] T023 [P] [US4] RED: extractor suite in plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/stream-result-extractor.test.ts — NDJSON lines appended to `<model>.events.ndjson`; terminal `result` event text written byte-for-byte as `<model>.md` at settle; stream ending without a result event leaves `<model>.md` absent (no fabrication, FR-010 / Principle V)
 - [X] T024 [US4] GREEN: implement plugins/stack-control/src/scope-discovery/audit-barrage/stream-result-extractor.ts until T023 passes
 - [X] T025 [US4] RED then GREEN: wire watchdog + extractor into plugins/stack-control/src/scope-discovery/audit-barrage/spawn-cli.ts selected by `output_mode`/`liveness_signal` config fields (never by binary name — Principle III); integration test with fake children covering all four terminal states end-to-end through orchestrate-barrage.ts
-- [ ] T026 [US4] Finalize liveness fields in plugins/stack-control/templates/audit-barrage-config.yaml (claude: stream-json/stdout/60s; codex: text/stderr/60s per research D1) and run quickstart SC-004 + SC-005 fixture validations; record results
+- [X] T026 [US4] Finalize liveness fields in plugins/stack-control/templates/audit-barrage-config.yaml (claude: stream-json/stdout/60s; codex: text/stderr/60s per research D1) and run quickstart SC-004 + SC-005 fixture validations; record results
 
 **Checkpoint**: US4 independently deliverable — dead spawns die in seconds, slow thinkers run.
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T027 Full quickstart pass: execute every SC-001..006 scenario from specs/014-audit-barrage-reliability/quickstart.md against the final build; record evidence (commands + observed values) in the feature audit-log or a quickstart-results note in the spec dir
-- [ ] T028 [P] Adopter-facing docs: document config v2 migration in plugins/stack-control/README.md (or MIGRATING note) — field list + refusal behavior; no rot-prone version literals per .claude/rules/documentation.md
+- [X] T027 Full quickstart pass: execute every SC-001..006 scenario from specs/014-audit-barrage-reliability/quickstart.md against the final build; record evidence (commands + observed values) in the feature audit-log or a quickstart-results note in the spec dir
+- [X] T028 [P] Adopter-facing docs: document config v2 migration in plugins/stack-control/README.md (or MIGRATING note) — field list + refusal behavior; no rot-prone version literals per .claude/rules/documentation.md
 - [ ] T029 [P] Closure evidence: run `stackctl roadmap reconcile`; propose `roadmap advance` for multi:gap/audit-barrage-{model-pinning,readonly-enforcement,timeout-observability} and surface backlog TASK-26 progression — evidence only, operator owns the status transitions
 
 ## Dependencies

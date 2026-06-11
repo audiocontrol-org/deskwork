@@ -1,50 +1,112 @@
-# Audit-barrage model battery — defaults shipped by the dw-lifecycle plugin.
+# Audit-barrage model battery — defaults shipped by the stack-control plugin.
 #
 # Project-overridable at:
 #   .stack-control/audit-barrage-config.yaml
 #
-# Each entry registers one CLI to fire as part of the audit barrage. The
-# orchestrator runs all configured entries in parallel against the
-# rendered audit prompt; per-model output is captured under
+# Each entry registers one CLI lane to fire as part of the audit barrage. The
+# orchestrator runs all configured lanes in parallel against the rendered
+# audit prompt; per-model output is captured under
 # `.stack-control/audit-runs/<timestamp>-<feature>/`.
 #
-# Per-entry fields:
-#   name              — operator-visible identifier; used as the per-model
-#                       filename stem in the run dir and to filter via the
-#                       `--models` flag.
-#   binary            — path or PATH-resolvable name of the CLI to spawn.
-#   args_template     — whitespace-delimited argv template; MUST contain
-#                       EITHER the literal `{{prompt}}` placeholder
-#                       (argv substitution) OR the `{{prompt-stdin}}`
-#                       placeholder (stdin delivery — bypasses the OS
-#                       ARG_MAX limit, default since v0.37.0). The
-#                       spawn helper picks the delivery path off the
-#                       placeholder; the two are mutually exclusive
-#                       per entry.
-#   timeout_seconds   — wall-clock budget; on expiry the subprocess is
-#                       sent SIGTERM, then SIGKILL after a 5s grace.
+# Config grammar v2 (specs/014-audit-barrage-reliability). Normative
+# contract: specs/014-audit-barrage-reliability/contracts/barrage-config-schema.md.
+# A lane missing the v2 fields is refused at load with a migration message
+# (FR-011) — copy a lane from this file and adjust.
 #
-# Default invocation patterns mirror the live-probed contracts captured
-# in docs/1.0/001-IN-PROGRESS/scope-discovery/audit-barrage-cli-notes.md.
+# Per-lane fields:
+#   name                    — operator-visible identifier; per-model filename
+#                             stem in the run dir; the `--models` filter key.
+#   binary                  — path or PATH-resolvable name of the CLI to spawn.
+#   model                   — REQUIRED explicit model pin (alias or id). No
+#                             spawn floats on the user's ambient default
+#                             (FR-001). Pin the ALIAS class where the CLI
+#                             supports one — an alias tracks point releases;
+#                             a dated id rots.
+#   args_template           — whitespace-delimited argv template; MUST contain
+#                             `{{model}}` AND exactly one of `{{prompt}}`
+#                             (argv substitution) / `{{prompt-stdin}}` (stdin
+#                             delivery — bypasses the OS ARG_MAX limit; the
+#                             default for every shipped lane).
+#   readonly_enforcement    — REQUIRED. The CLI fragment that makes the spawn
+#                             MECHANICALLY read-only (injected into argv
+#                             before the prompt placeholder when the template
+#                             doesn't already carry it), or the explicit
+#                             sentinel `none` — the lane then runs loudly
+#                             marked write-UNENFORCED at fire time, in run
+#                             artifacts, and at synthesis (FR-003/FR-004).
+#                             Fragments ship only after passing the hostile
+#                             write-probe (scripts/probe-readonly-spawn.sh) —
+#                             never assumed.
+#   output_mode             — text | stream-json. stream-json lanes get their
+#                             final report extracted from the terminal result
+#                             event (the per-model markdown artifact contract
+#                             survives the wire-format change, FR-010) plus a
+#                             forensic <model>.events.ndjson capture.
+#   liveness_signal         — stdout | stderr | none. Which stream carries the
+#                             sign-of-life pulse for the watchdog (FR-008).
+#                             MUST be a signal a healthy run actually produces
+#                             (measured 2026-06-10: claude text mode emits 0
+#                             stdout bytes until completion — its pulse only
+#                             exists in stream-json; codex chatters on stderr).
+#                             `none` → liveness unmonitored, watchdog disarmed.
+#   liveness_window_seconds — staleness threshold; required when the signal is
+#                             monitored. A spawn with no pulse inside the
+#                             window is killed (terminal state
+#                             killed-no-liveness) instead of waiting out the
+#                             full timeout.
+#   timeout_floor_seconds + timeout_secs_per_kb
+#                           — derivation pair (FR-002): effective timeout =
+#                             max(floor, ceil(secs_per_kb × payload_KB)) where
+#                             payload = rendered PROMPT.md bytes. Calibrated
+#                             2026-06-10 on a 69 KB payload (includes ~1.5×
+#                             margin over observed wall time):
+#                               claude/opus  586 s observed → 13 s/KB
+#                               claude/fable 669–750 s      → 17 s/KB
+#                               codex        123–290 s      → 7 s/KB
+#   timeout_seconds         — optional explicit operator override; displaces
+#                             derivation and is recorded as `override` in the
+#                             run artifacts.
 #
-# Why {{prompt-stdin}} is the default (per #397): the audit prompt
-# embeds the full feature diff; on a fresh scope-discovery opt-in the
-# bootstrap range defaults to HEAD~10, which on most branches exceeds
-# the per-arg OS limit (~256KB on macOS, ~128KB MAX_ARG_STRLEN on
-# Linux). The argv path fails with spawn E2BIG; the stdin path is
-# unbounded. Adopters who previously customized to "-p {{prompt}}" /
-# "exec {{prompt}}" / "{{prompt}}" must migrate — see MIGRATING.md.
+# Thoroughness override profile for the claude lane (operator choice): pin
+# `model: fable` with `timeout_secs_per_kb: 17` — most thorough in the
+# 2026-06-10 experiment, at correspondingly higher latency. The shipped
+# default pins `opus` (near-fable quality at 586 s vs 669–750 s). sonnet is
+# excluded by operator verdict (off-task + 2226 s); haiku excluded (zero
+# verification depth).
 
 models:
   - name: claude
     binary: claude
-    args_template: "-p {{prompt-stdin}}"
-    timeout_seconds: 300
+    model: opus
+    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
+    readonly_enforcement: "--permission-mode plan"
+    output_mode: stream-json
+    liveness_signal: stdout
+    liveness_window_seconds: 60
+    timeout_floor_seconds: 300
+    timeout_secs_per_kb: 13
   - name: codex
     binary: codex
-    args_template: "exec {{prompt-stdin}}"
-    timeout_seconds: 300
-  - name: gemini
-    binary: gemini
-    args_template: "{{prompt-stdin}}"
-    timeout_seconds: 300
+    model: gpt-5.5
+    args_template: "exec -m {{model}} --sandbox read-only {{prompt-stdin}}"
+    readonly_enforcement: "--sandbox read-only"
+    output_mode: text
+    liveness_signal: stderr
+    liveness_window_seconds: 60
+    timeout_floor_seconds: 300
+    timeout_secs_per_kb: 7
+  # gemini — DISABLED (commented out). gemini-cli was failing 94.1% of runs
+  # (16 of 17 across the graphical-entries Phase 0 audit cycle) on cascading
+  # ClassifierStrategy JSON-routing failures + quota exhaustion; re-enable
+  # when upstream stabilizes. When re-enabling: keep readonly_enforcement at
+  # `none` until the lane passes scripts/probe-readonly-spawn.sh (the lane
+  # then runs loudly marked write-unenforced), and pin the model explicitly.
+  # - name: gemini
+  #   binary: gemini
+  #   model: gemini-2.5-pro
+  #   args_template: "-m {{model}} {{prompt-stdin}}"
+  #   readonly_enforcement: none
+  #   output_mode: text
+  #   liveness_signal: none
+  #   timeout_floor_seconds: 300
+  #   timeout_secs_per_kb: 7

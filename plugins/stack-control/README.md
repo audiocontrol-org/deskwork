@@ -137,6 +137,39 @@ Both run to completion in a plain shell with **no Claude Code surface** — the 
 
 **Config contract.** Scope-discovery's registries + dispositioned baseline live under the installation's `.stack-control/scope-discovery/` (`clones.yaml`, `anti-patterns.yaml`, `adopter-manifests.yaml`, `migration-map.yaml`, and a `config.yaml` with its own `schemaVersion`). They are **created lazily-and-announced** by the verb that first needs them (or eagerly by `install-scope-discovery`), never pre-scaffolded into the 009 working-file set. Malformed input fails loud and is never treated as empty. Governance `--mode implement` runs the per-codebase clone step and surfaces NEW intra-codebase duplication alongside the gate verdict.
 
+## Audit-barrage config (grammar v2) — migration
+
+The barrage's model battery is configured per project at
+`.stack-control/audit-barrage-config.yaml` (overriding the shipped template at
+[`templates/audit-barrage-config.yaml`](./templates/audit-barrage-config.yaml)).
+Every lane MUST declare, in addition to the original `name` / `binary` /
+`args_template`:
+
+- `model` — an explicit model pin, with a `{{model}}` placeholder in
+  `args_template`. No spawn floats on the user's ambient default.
+- `readonly_enforcement` — the CLI fragment that makes the spawn mechanically
+  read-only (e.g. the shipped claude lane's plan permission mode, the codex
+  lane's read-only sandbox), or the explicit sentinel `none`. A `none` lane
+  runs, loudly marked write-unenforced at fire time, in run artifacts, and at
+  synthesis. There is no default — the choice is conscious.
+- `output_mode` (`text` | `stream-json`) and `liveness_signal`
+  (`stdout` | `stderr` | `none`) + `liveness_window_seconds` — the watchdog's
+  sign-of-life pulse. A spawn with no pulse inside the window is killed early
+  (terminal state `killed-no-liveness`) instead of consuming the full budget.
+- `timeout_floor_seconds` + `timeout_secs_per_kb` — the per-lane timeout
+  derivation (effective budget = `max(floor, ceil(secs_per_kb × payload_KB))`),
+  unless an explicit `timeout_seconds` override is present (recorded as an
+  override in the run artifacts).
+
+**Refusal behavior:** a config predating this grammar is detected at load and
+refused with a migration message naming the file, the missing fields, and the
+template path — no silent compatibility fallback, zero spawns launched.
+Migrate by copying a lane from the shipped template and adjusting. Every run's
+INDEX.md records each lane's terminal state (`completed` / `timed-out` /
+`spawn-failed` / `killed-no-liveness`), enforcement state, liveness state, and
+timeout basis; a run where fewer lanes produced than configured renders a
+fleet report that the lift verb and the govern loop repeat.
+
 ## Governance extension
 
 `stack-control` ships the **deskwork Governance** Spec Kit extension at [`spec-kit/deskwork-governance/`](./spec-kit/deskwork-governance/) (rehomed from `dw-lifecycle`). Installed into a project's `.specify/extensions/`, it registers an `after_implement` hook that automatically gathers the implemented diff, fires deskwork's cross-model `audit-barrage`, and lifts findings into the feature's `audit-log.md` — branching only on the diff, never on provider identity. If a dependency (`dw-lifecycle`, `jq`) is absent it fails loudly; it never silently skips. See its [README](./spec-kit/deskwork-governance/README.md).
