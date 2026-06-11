@@ -47,9 +47,15 @@
 
 ## Phase 8: Polish & feature close-out
 
-- [ ] T019 Full-suite reconciliation: `npx vitest run` green; report N→M with +K new test blocks reconciled against T001 (journal convention AUDIT-04)
-- [ ] T020 Run the quickstart per-story validations end-to-end; record outcomes in this file's notes; `stackctl spec-check --spec <relocated specs>/installation-isolation` all-yes
-- [ ] T021 Append progression evidence to the originating backlog item (anchor unification — TASK-45 alias) with commit hashes; status transition stays the operator's call
+- [X] T019 Full-suite reconciliation: `npx vitest run` green; report N→M with +K new test blocks reconciled against T001 (journal convention AUDIT-04)
+- [X] T020 Run the quickstart per-story validations end-to-end; record outcomes in this file's notes; `stackctl spec-check --spec <relocated specs>/installation-isolation` all-yes
+- [X] T021 Append progression evidence to the originating backlog item (anchor unification — TASK-45 alias) with commit hashes; status transition stays the operator's call
+
+## Validation notes (T019/T020, recorded 2026-06-11)
+
+- **T019 reconciliation:** `npx vitest run` green at every story boundary; final 190 files / 1265 tests vs the T001 baseline of 184 files / 1220 tests. +45 = +40 from 6 new test files (installation-isolation-probe 10, -refusal 8, -cwd 3, -legacy 5, govern-installation-anchor 7, feature-root-installation 7) + 5 retired-flag rows added to subcommand-flag-validation.test.ts. No reverts; arithmetic reconciles exactly.
+- **T020 quickstart validations:** US1–US5 are permanent suite members (the probe + refusal + anchor + cwd + legacy suites named above). US6: `stackctl spec-check --spec specs/installation-isolation` reports `spec=yes plan=yes tasks=yes` on the relocated dir; `check-prerequisites.sh` and `setup-plan.sh` resolve FEATURE_DIR under the installation (an authoring-chain step lands there; the agent-context updater resolved the relocated root but skipped its write on a missing PyYAML in this environment — the marker file it would write is in place). The govern payload's no-cross-tree-arm claim is verified by the after_implement governance run (no R4 announcement expected post-relocation).
+- **Post-relocation finding captured:** Spec Kit `has_git()` misses the enclosing git worktree from the nested `.specify` root (HAS_GIT=false fallbacks) — backlog TASK-46.
 
 ## Dependencies
 
