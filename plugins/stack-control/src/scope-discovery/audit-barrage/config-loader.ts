@@ -6,22 +6,39 @@
  * takes precedence over the plugin's shipped default at
  * `plugins/stack-control/templates/audit-barrage-config.yaml`.
  *
- * Wire format (mirrored by `schema/audit-barrage-config.yaml.schema.json`):
+ * Wire format — config grammar v2 (normative contract:
+ * specs/014-audit-barrage-reliability/contracts/barrage-config-schema.md):
  *
  *   models:
  *     - name: claude
  *       binary: claude
- *       args_template: "-p {{prompt}}"
- *       timeout_seconds: 300
+ *       model: opus
+ *       args_template: "-p --model {{model}} --output-format stream-json --verbose {{prompt-stdin}}"
+ *       readonly_enforcement: "--permission-mode plan"   # or the sentinel: none
+ *       output_mode: stream-json        # text | stream-json
+ *       liveness_signal: stdout         # stdout | stderr | none
+ *       liveness_window_seconds: 60     # required when liveness_signal != none
+ *       timeout_floor_seconds: 300      # derivation pair — required unless
+ *       timeout_secs_per_kb: 13         #   timeout_seconds override is present
+ *       # timeout_seconds: 900          # optional explicit override
  *
  * Validation rules (failure-loud per `.claude/CLAUDE.md`):
  *   - top-level `models:` must be a non-empty array.
- *   - each entry must be an object with the four required fields.
  *   - `name`, `binary`, `args_template` must be non-empty strings.
- *   - `args_template` must contain the literal `{{prompt}}` placeholder
- *     — adopters NEED the substitution gate or the spawn helper would
- *     fire the CLI without a prompt argument.
- *   - `timeout_seconds` must be a positive integer.
+ *   - `args_template` must contain `{{model}}` AND exactly one of
+ *     `{{prompt}}` / `{{prompt-stdin}}`.
+ *   - `model` (explicit pin) and `readonly_enforcement` (fragment or
+ *     `none`) are required with NO default — the choice is conscious
+ *     (FR-001/FR-004).
+ *   - `output_mode` ∈ {text, stream-json}; `liveness_signal` ∈
+ *     {stdout, stderr, none}; `liveness_window_seconds` (positive int)
+ *     required when the signal is monitored (FR-009).
+ *   - the derivation pair (`timeout_floor_seconds` + `timeout_secs_per_kb`)
+ *     is required unless `timeout_seconds` is present (FR-002).
+ *   - an entry missing the v2-required fields is a pre-014 config →
+ *     refused with a migration message naming the file, the missing
+ *     fields, and the template path (FR-011, SC-006). No silent
+ *     compatibility window (Principle V).
  *   - `name` must be unique across entries (duplicates would conflict
  *     in run-dir filename derivation + `--models` filtering).
  *
@@ -201,6 +218,10 @@ export function parseConfig(
   return { models };
 }
 
+const MODEL_PLACEHOLDER = '{{model}}';
+const OUTPUT_MODES = ['text', 'stream-json'] as const;
+const LIVENESS_SIGNALS = ['stdout', 'stderr', 'none'] as const;
+
 function parseEntry(
   raw: unknown,
   index: number,
@@ -236,7 +257,97 @@ function parseEntry(
         `path per entry)`,
     );
   }
-  const timeoutSeconds = requirePositiveInteger(raw, 'timeout_seconds', prefix);
+
+  // specs/014 FR-011 migration gate: collect every missing v2-required
+  // field FIRST and refuse with one message naming the file, the
+  // fields, and the template to copy from. A config that predates 014
+  // (bare v1 shape) hits this in one read instead of field-by-field.
+  const missing: string[] = [];
+  const modelRaw = raw['model'];
+  if (typeof modelRaw !== 'string' || modelRaw.length === 0) {
+    missing.push('model (explicit model pin, FR-001)');
+  }
+  if (!argsTemplate.includes(MODEL_PLACEHOLDER)) {
+    missing.push(`args_template '${MODEL_PLACEHOLDER}' placeholder (FR-001)`);
+  }
+  const enforcementRaw = raw['readonly_enforcement'];
+  if (typeof enforcementRaw !== 'string' || enforcementRaw.length === 0) {
+    missing.push("readonly_enforcement (CLI fragment, or the sentinel 'none')");
+  }
+  if (raw['output_mode'] === undefined || raw['output_mode'] === null) {
+    missing.push('output_mode (text | stream-json)');
+  }
+  if (raw['liveness_signal'] === undefined || raw['liveness_signal'] === null) {
+    missing.push('liveness_signal (stdout | stderr | none)');
+  }
+  const hasOverride =
+    raw['timeout_seconds'] !== undefined && raw['timeout_seconds'] !== null;
+  const hasFloor =
+    raw['timeout_floor_seconds'] !== undefined &&
+    raw['timeout_floor_seconds'] !== null;
+  const hasSlope =
+    raw['timeout_secs_per_kb'] !== undefined && raw['timeout_secs_per_kb'] !== null;
+  if (!hasOverride && !hasFloor && !hasSlope) {
+    missing.push(
+      'timeout derivation (timeout_floor_seconds + timeout_secs_per_kb), or an explicit timeout_seconds',
+    );
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `${prefix} ('${name}') is missing required field(s): ${missing.join('; ')} — ` +
+        `this looks like a pre-014 (v1) barrage config. Migrate the file to the v2 ` +
+        `lane grammar; copy from the shipped template at ${DEFAULT_CONFIG_PATH} ` +
+        `(FR-011)`,
+    );
+  }
+
+  // Field-level value validation (present but invalid).
+  const model = modelRaw as string;
+  const readonlyEnforcement = enforcementRaw as string;
+  const outputMode = requireEnum(raw, 'output_mode', OUTPUT_MODES, prefix);
+  const livenessSignal = requireEnum(raw, 'liveness_signal', LIVENESS_SIGNALS, prefix);
+  let livenessWindowSeconds: number | undefined;
+  if (livenessSignal !== 'none') {
+    livenessWindowSeconds = requirePositiveInteger(
+      raw,
+      'liveness_window_seconds',
+      prefix,
+    );
+  } else if (
+    raw['liveness_window_seconds'] !== undefined &&
+    raw['liveness_window_seconds'] !== null
+  ) {
+    livenessWindowSeconds = requirePositiveInteger(
+      raw,
+      'liveness_window_seconds',
+      prefix,
+    );
+  }
+
+  // FR-002: the override displaces the derivation pair when present; a
+  // half-supplied pair without an override is a config typo, not a shape
+  // the derivation can silently work around.
+  let timeoutSeconds: number | undefined;
+  let timeoutFloorSeconds: number | undefined;
+  let timeoutSecsPerKb: number | undefined;
+  if (hasOverride) {
+    timeoutSeconds = requirePositiveInteger(raw, 'timeout_seconds', prefix);
+  }
+  if (!hasOverride && hasFloor !== hasSlope) {
+    const absent = hasFloor ? 'timeout_secs_per_kb' : 'timeout_floor_seconds';
+    throw new Error(
+      `${prefix}.${absent} missing: the derivation pair (timeout_floor_seconds + ` +
+        `timeout_secs_per_kb) must be complete unless a timeout_seconds override ` +
+        `is present (FR-002)`,
+    );
+  }
+  if (hasFloor) {
+    timeoutFloorSeconds = requirePositiveInteger(raw, 'timeout_floor_seconds', prefix);
+  }
+  if (hasSlope) {
+    timeoutSecsPerKb = requirePositiveNumber(raw, 'timeout_secs_per_kb', prefix);
+  }
+
   if (seen.has(name)) {
     throw new Error(
       `${prefix}.name '${name}' is a duplicate (model names must be unique ` +
@@ -244,7 +355,48 @@ function parseEntry(
     );
   }
   seen.add(name);
-  return { name, binary, argsTemplate, timeoutSeconds };
+  return {
+    name,
+    binary,
+    argsTemplate,
+    model,
+    readonlyEnforcement,
+    outputMode,
+    livenessSignal,
+    ...(livenessWindowSeconds !== undefined ? { livenessWindowSeconds } : {}),
+    ...(timeoutFloorSeconds !== undefined ? { timeoutFloorSeconds } : {}),
+    ...(timeoutSecsPerKb !== undefined ? { timeoutSecsPerKb } : {}),
+    ...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
+  };
+}
+
+function requireEnum<T extends string>(
+  raw: Record<string, unknown>,
+  field: string,
+  allowed: ReadonlyArray<T>,
+  prefix: string,
+): T {
+  const value = raw[field];
+  if (typeof value === 'string' && (allowed as ReadonlyArray<string>).includes(value)) {
+    return value as T;
+  }
+  throw new Error(
+    `${prefix}.${field} must be one of: ${allowed.join(' | ')} (got ${describeValue(value)})`,
+  );
+}
+
+function requirePositiveNumber(
+  raw: Record<string, unknown>,
+  field: string,
+  prefix: string,
+): number {
+  const value = raw[field];
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    throw new Error(
+      `${prefix}.${field} must be a positive number (got ${describeValue(value)})`,
+    );
+  }
+  return value;
 }
 
 function requireNonEmptyString(

@@ -33,6 +33,7 @@ import {
   writePromptFile,
 } from './run-artifacts.js';
 import { spawnCliAgainstModel, type SpawnInput } from './spawn-cli.js';
+import { deriveTimeoutBasis } from './timeout-derivation.js';
 import {
   isModelRunCovering,
   type BarrageInput,
@@ -97,6 +98,11 @@ export async function orchestrateBarrage(
   const tipShaResolver = input.tipShaResolver ?? defaultTipShaResolver;
   const fireTimeTipSha = await tipShaResolver(input.repoRoot);
 
+  // specs/014 FR-002: the payload (rendered PROMPT.md byte size) is known
+  // pre-spawn; every lane's effective timeout derives from its calibration
+  // fields × this payload (or the lane's explicit override) and the basis
+  // travels with the result into the run artifacts.
+  const payloadBytes = Buffer.byteLength(input.prompt, 'utf8');
   const spawnInputs: ReadonlyArray<SpawnInput> = input.models.map((model) => {
     const stem = safeModelName(model.name);
     return {
@@ -104,6 +110,8 @@ export async function orchestrateBarrage(
       prompt: input.prompt,
       stdoutPath: join(runDir, `${stem}.md`),
       stderrPath: join(runDir, 'stderr', `${stem}.txt`),
+      eventsPath: join(runDir, `${stem}.events.ndjson`),
+      timeoutBasis: deriveTimeoutBasis(model, payloadBytes),
     };
   });
 
