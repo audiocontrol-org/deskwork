@@ -34,7 +34,7 @@ describe('recordDerivation', () => {
       surfaceId: 'studio-content-browser',
       derivedHtml: draftHtml,
       source: 'http://localhost:4321/dev/editorial-studio',
-      derivedAt: new Date('2026-06-10T12:00:00Z'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
     });
     expect(prov.mode).toBe('derived');
     const names = readdirSync(dir);
@@ -50,7 +50,7 @@ describe('recordDerivation', () => {
       surfaceId: 'scrapbook-drawer',
       derivedHtml: draftHtml,
       source: 'route /dev/scrapbook',
-      derivedAt: new Date('2026-06-10T12:00:00Z'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
     });
     const prov = loadProvenance(dir, 'scrapbook-drawer');
     expect(prov.surfaceId).toBe('scrapbook-drawer');
@@ -81,7 +81,7 @@ describe('checkDerivedAcceptance — acceptance requires a recorded operator edi
       surfaceId: 's1',
       derivedHtml: draftHtml,
       source: 'live surface',
-      derivedAt: new Date('2026-06-10T12:00:00Z'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
     });
     const result = checkDerivedAcceptance(dir, 's1', draftHtml);
     expect(result.ok).toBe(false);
@@ -95,7 +95,7 @@ describe('checkDerivedAcceptance — acceptance requires a recorded operator edi
       surfaceId: 's1',
       derivedHtml: draftHtml,
       source: 'live surface',
-      derivedAt: new Date('2026-06-10T12:00:00Z'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
     });
     const edited = draftHtml.replace('Derived from live surface', 'Entry list, regrouped by lane');
     expect(checkDerivedAcceptance(dir, 's1', edited).ok).toBe(true);
@@ -108,7 +108,7 @@ describe('checkDerivedAcceptance — acceptance requires a recorded operator edi
       surfaceId: 's1',
       derivedHtml: draftHtml,
       source: 'live surface',
-      derivedAt: new Date('2026-06-10T12:00:00Z'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
     });
     writeFileSync(join(dir, 's1.derived-snapshot.html'), draftHtml + '<!-- tampered -->');
     expect(() => checkDerivedAcceptance(dir, 's1', 'whatever')).toThrow(/snapshot|hash/i);
@@ -119,7 +119,7 @@ describe('checkDerivedAcceptance — acceptance requires a recorded operator edi
     recordDrivingWireframe({
       dir,
       surfaceId: 'fresh',
-      derivedAt: new Date('2026-06-10T12:00:00Z'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
     });
     expect(checkDerivedAcceptance(dir, 'fresh', draftHtml).ok).toBe(true);
   });
@@ -133,12 +133,12 @@ describe('wireframeDroveImplementation', () => {
       surfaceId: 'd',
       derivedHtml: draftHtml,
       source: 'live surface',
-      derivedAt: new Date('2026-06-10T12:00:00Z'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
     });
     const driving = recordDrivingWireframe({
       dir,
       surfaceId: 'w',
-      derivedAt: new Date('2026-06-10T12:00:00Z'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
     });
     expect(wireframeDroveImplementation(derived)).toBe(false);
     expect(wireframeDroveImplementation(driving)).toBe(true);

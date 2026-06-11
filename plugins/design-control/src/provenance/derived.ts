@@ -80,13 +80,13 @@ function writeProvenance(dir: string, provenance: WireframeProvenance): void {
 export function recordDrivingWireframe(input: {
   dir: string;
   surfaceId: string;
-  derivedAt?: Date;
+  createdAt?: Date;
 }): WireframeProvenance {
   const provenance: WireframeProvenance = {
     version: PROVENANCE_VERSION,
     surfaceId: input.surfaceId,
     mode: 'driving',
-    createdAt: (input.derivedAt ?? new Date()).toISOString(),
+    createdAt: (input.createdAt ?? new Date()).toISOString(),
   };
   writeProvenance(input.dir, provenance);
   return provenance;
@@ -102,7 +102,7 @@ export function recordDerivation(input: {
   surfaceId: string;
   derivedHtml: string;
   source: string;
-  derivedAt?: Date;
+  createdAt?: Date;
 }): WireframeProvenance {
   const snapshotFile = `${input.surfaceId}.derived-snapshot.html`;
   writeFileSync(join(input.dir, snapshotFile), input.derivedHtml);
@@ -110,7 +110,7 @@ export function recordDerivation(input: {
     version: PROVENANCE_VERSION,
     surfaceId: input.surfaceId,
     mode: 'derived',
-    createdAt: (input.derivedAt ?? new Date()).toISOString(),
+    createdAt: (input.createdAt ?? new Date()).toISOString(),
     derived: {
       snapshotFile,
       snapshotSha256: sha256Hex(input.derivedHtml),
