@@ -101,6 +101,7 @@
 - **US7 grep probe (operator-runnable form)**: `grep -rn '001-IN-PROGRESS' src --include='*.ts'` outside the resolver + tests yields only both-layouts fail-loud messages, help text, and comments — zero path constructions (also pinned as the T017 regression test).
 - **spec-check**: `stackctl spec-check --spec specs/014-audit-protocol-reliability` → `spec=yes plan=yes tasks=yes`.
 - **RED-first (SC-009)**: git log shows a test-then-fix commit pair per story (5427f49e→bc181afa, 564261e9→1a4296a7, 7c5c745c→e5240167, e15e77a5→6b241c9b, 72fcce80→a1f53321, c5cb3a7b→9927de3a, 04f457d4→65f51790, 4897d7e4→a6323b59 (+518070dd probe), 125b7c9c→e0af5d44).
+- **Post-close-out governance-fix deltas (AUDIT-20260611-10 — the counts above are the close-out anchor at e915b43f; the AUDIT-20260611 fix commits that follow changed them)**: branch endpoint is **184 test files / 1220 tests** (re-derived from `npx vitest run`). Reconciliation against the close-out 183/1200: +1 file (`govern-unresolvable-root.test.ts`, AUDIT-04/-12) and +20 tests — barrage-fleet-degradation 14→20 (AUDIT-03), slush-apply-single-source 4→8 (AUDIT-02/-05/-11), govern-payload-self-reference 3→6 (AUDIT-01/-08), legacy-path-construction-probe 1→3 (AUDIT-07 V5 classifier), backlog-malformed-task-file 4→5 (AUDIT-06 split), govern-unresolvable-root 0→4. barrage-config-legacy-detect stays 4 (AUDIT-09 strengthened assertions in place). 1200 + 20 = 1220 ✓.
 
 ## Dependencies
 
