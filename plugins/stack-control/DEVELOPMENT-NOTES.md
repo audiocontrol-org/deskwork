@@ -2,30 +2,37 @@
 
 ---
 
-## 2026-06-11: <!-- session title -->
+## 2026-06-11: Implement + ship spec 013 — layout-aware audit-protocol resolution
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Implement spec 013 (audit-protocol-hardening) RED-first — widen the shared feature-root resolver to the `specs/NNN-slug/` Spec Kit layout so the audit protocol stops FATAL-ing on spec-structured features — and ship it.
 
 **Accomplished:**
-- <!-- compose -->
+- **US1 (MVP) — layout-aware `resolveFeatureRoot`** (`70f981cf`): a `speckit` branch matches a child of `<repoRoot>/specs` named exactly `<slug>` or `^\d+-<slug>$`, with specs-first precedence (deterministic) and fail-loud on numeric-prefix ambiguity. The legacy `docs/` walk is untouched — the lex-greatest-NOT-semver contract preserved by a ported regression wall. Result now carries `layout`. All four helper-callers (gate/lift/slush/backlog) name BOTH layouts on a miss.
+- **US2 — first-barrage audit-log scaffold** (`0c751113`): `audit-barrage-lift` scaffolds the canonical header (`--- slug / targetVersion ---` + `# Audit log — <slug>`) via `atomicWriteFile` at a resolved root that has none, instead of `return 2`. Idempotent on an existing log; `targetVersion` derived from the legacy-docs path or `""` for speckit.
+- **TASK-25 fixed in-scope** (`01abc18a`): T016/SC-005 surfaced a FIFTH governance consumer the tasks didn't enumerate — `govern.ts` hardcoded `docs/1.0/001-IN-PROGRESS/<slug>/audit-log.md` for the barrage `audit_log_excerpt`, silently empty for `specs/` features (a forbidden fallback). New async `resolveAuditLogExcerpt` routes through the helper; `buildImplementVars`/`buildSpecVars` are now pure (excerpt threaded by `runGovern`).
+- **Shipped:** PR **#452** (`feature/stack-control` → `main`), merged at `ad3e1c4d`. The headline unblock verified live (SC-001): the gate against `specs/013-audit-protocol-hardening` now resolves the feature (error advanced from *"not found under docs/"* to *"audit-log not found at .../specs/013-.../audit-log.md"* — a path only the new branch can produce).
 
 **Didn't Work:**
-- <!-- compose -->
+- **Every lifecycle verb fails from the repo root.** session-start / backlog / session-end all fail-loud because the only `.stack-control/config.yaml` files live under `plugins/<name>/`, not the repo root (the natural agent cwd). Needed `--at plugins/stack-control` or a manual `cd` on every call. (Filed as friction.)
+- **`gh pr merge` 401'd** on a follow-up call (GraphQL/branch-update), while the underlying REST merge PUT succeeded — confirmed `"merged": true` via `gh api -X PUT .../merge`. Same gh-mutation-401 pattern as the 2026-06-10 v0.41.0 ship.
+- **backlog wrapper can't mark an item Done** — TASK-25 is fixed+merged but its board status is still To Do; the wrapper has no `edit -s` verb and native `backlog` isn't wired to the install dir. (Filed as friction.)
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS/UX] Oriented + ran the verb with `--at plugins/stack-control` from the repo root; operator: *"you should stay in plugins/stack-control."* The installation lives in the plugin dir, not the repo root — corrected the working cwd for the rest of the session.
 
 **Insights:**
-- <!-- compose -->
+- The "one shared resolver" extraction (AUDIT-20260530-15) paid off exactly as designed: widening `feature-root.ts` ONCE unblocked all four governance callers at the gate/lift/slush/backlog surface with no per-call edits. The only gap was the consumer that never used the helper at all (`govern.ts`) — which is why the SC-005 grep, not the test suite, is what caught it. A leverage-point refactor is only as good as the audit that confirms every consumer actually routes through it.
+- The tasks.md was authored against dw-lifecycle's test layout (`src/.../__tests__/`), but stack-control's vitest only collects `src/__tests__/**` + `tests/**` — a test placed per the literal task path would silently never run. The vendoring (multi/migrate-audit-barrage) moved the code but not its tests or its collection conventions; faithful task execution required reading the actual `vitest.config.ts`, not the task path.
+- "Watch it fail" caught a spec-vs-reality gap the planning missed: T012/T014 assumed a "no-new-diff guard" that doesn't exist in the vendored lift — the RED test passed on first run, revealing T014 as a no-op rather than a fix. Without the RED step this would have shipped as a fabricated "fixed the stranding guard" claim.
 
-**Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 4
-  - docs(013): mark tasks T001-T017 complete + record deviations
-  - fix(013): route govern audit-log excerpt through the layout-aware helper (TASK-25)
-  - feat(013): scaffold audit-log on first lift instead of aborting (US2)
-  - feat(013): layout-aware feature resolution — resolve specs/NNN-slug (US1 MVP)
-- Files changed: 13
-- Backlog touched: TASK-24, TASK-25
+**Quantitative:**
+- Commits: 4 — US1 (`70f981cf`), US2 (`0c751113`), TASK-25 govern fix (`01abc18a`), tasks.md completion record (`ce64e504`). (Session-end record adds a 5th: `8413c197`.)
+- Files changed: 13 (+643 / −48) across the 4 impl commits.
+- Tests: final stack-control suite **173 files / 1150 cases, all green** (run from `plugins/stack-control` with its own vitest v2). This session added **4 test files / 18 cases**: feature-root (12), spec-governance-gate-resolution (1), audit-log-scaffold (2), govern-audit-log-excerpt (3). A clean pre-session full-suite baseline was not captured, so no N→M delta is asserted (per AUDIT-04 — absence over false precision); the +18 reconciles by summing the new files.
+- Open findings at session end: 0 audit-barrage findings (no barrage fired this session — the change was the resolver that makes barraging `specs/` features possible). Backlog: **TASK-25** created + fixed + merged but still `To Do` (a parked-but-resolved item — needs the operator's close, blocked by the missing `backlog edit -s` verb); **TASK-24** remains the genuinely-deferred scope-discovery direct-path follow-on.
+- Tooling friction captured: 2 (repo-root installation resolution; backlog has no status-edit verb).
+- Corrections: 1.
+- Spec 013: implemented (T001–T017) + shipped via PR #452 (merged `ad3e1c4d`).
 
 ## 2026-06-10: Recover dropped backlog bodies; author + narrow spec 013 (audit-protocol path resolution)
 
