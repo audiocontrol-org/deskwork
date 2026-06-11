@@ -53,7 +53,7 @@
 
 ## Phase 7: US5 — Self-reference-free govern payload (P1) [TASK-37 / gh-431]
 
-**Goal**: feature's own audit-log/governance bookkeeping absent from BOTH diff arms; untracked fold scoped to the feature under audit; `audit_log_excerpt` block unaffected. Contract: cli-contracts §govern; research R5 (committed-diff arm too — fold-only would not extinguish the generator).
+**Goal**: feature's own audit-log/governance bookkeeping absent from BOTH diff arms; untracked fold excludes other features' roots (warned + `skippedOtherFeature`-ledgered) while the feature's own files and non-feature files still fold in (exclusion form per AUDIT-20260611-01 — the original inclusion scoping silently dropped untracked source modules); `audit_log_excerpt` block unaffected. Contract: cli-contracts §govern; research R5 (committed-diff arm too — fold-only would not extinguish the generator).
 
 **Independent test**: payload built over a fixture repo with audit-log prose quoting a fake path + an unrelated feature's untracked scaffold.
 

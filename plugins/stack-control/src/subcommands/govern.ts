@@ -49,7 +49,10 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { readFileSync } from 'node:fs';
-import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
+import {
+  discoverFeatureRoots,
+  resolveFeatureRoot,
+} from '../scope-discovery/util/feature-root.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // src/subcommands → src → plugin root → bin/stackctl
@@ -218,17 +221,23 @@ export function buildImplementVars(
   checkpointFlag: string | undefined,
   auditLogExcerpt: string,
   featureRoot?: string,
+  excludeRoots?: readonly string[],
 ): { vars: BarrageVars; checkpoint: string } {
   const base = diffBaseFlag ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
   const budgetEnv = process.env.GOVERN_PAYLOAD_BUDGET;
   // specs/014 US5: thread the resolved feature root so the payload is
-  // self-reference-free (audit-log excluded from both arms; untracked
-  // fold scoped to the feature). The labeled audit_log_excerpt block
-  // below stays the ONLY audit-log content in the payload (013/TASK-25).
+  // self-reference-free (audit-log excluded from both arms), plus the
+  // repo's full feature-root list (`excludeRoots`, from the async
+  // discoverFeatureRoots — this builder stays sync) so the untracked
+  // fold drops OTHER features' scaffolds while still folding the
+  // feature's own files and new source modules (AUDIT-20260611-01).
+  // The labeled audit_log_excerpt block below stays the ONLY audit-log
+  // content in the payload (013/TASK-25).
   const payload = assembleImplementPayload({
     repoRoot,
     base,
     ...(featureRoot !== undefined ? { featureRoot } : {}),
+    ...(excludeRoots !== undefined ? { excludeRoots } : {}),
     ...(budgetEnv !== undefined && budgetEnv.length > 0
       ? { budgetBytes: Number.parseInt(budgetEnv, 10) }
       : {}),
@@ -332,14 +341,20 @@ export async function runGovern(args: string[]): Promise<void> {
     // var-builders — so a specs/NNN-<slug> feature's audit-log is found
     // instead of silently empty under the old hardcoded docs/ path.
     // specs/014 US5: the implement payload also needs the resolved root
-    // to exclude the audit-log from both diff arms and scope the
-    // untracked fold to the feature under audit.
+    // to exclude the audit-log from both diff arms, plus every feature
+    // root in the repo so the untracked fold can drop OTHER features'
+    // scaffolds without dropping the feature's own uncommitted code
+    // (AUDIT-20260611-01 — exclusion-scoped, not inclusion-scoped).
     const auditLogExcerpt = await resolveAuditLogExcerpt(repoRoot, slug);
     const { root: featureRoot } = await resolveFeatureRoot({ repoRoot, slug });
+    const excludeRoots =
+      flags.mode === 'implement' && featureRoot !== undefined
+        ? await discoverFeatureRoots(repoRoot)
+        : undefined;
     const built =
       flags.mode === 'spec'
         ? buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint, auditLogExcerpt)
-        : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint, auditLogExcerpt, featureRoot);
+        : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint, auditLogExcerpt, featureRoot, excludeRoots);
 
     // US7 (FR-032): implement-mode governance runs the per-codebase clone step,
     // surfacing NEW intra-codebase duplication alongside the gate verdict

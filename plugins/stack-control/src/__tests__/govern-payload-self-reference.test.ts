@@ -10,11 +10,15 @@
 // Contract (cli-contracts §govern; research R5 — BOTH arms; data-model
 // §Govern implement payload): with the resolved feature root supplied,
 // (a) the feature's audit-log.md appears in NEITHER the committed diff
-// NOR the untracked fold; (b) the untracked fold contains only files
-// under the feature under audit; (c) the labeled audit_log_excerpt
-// context block is the ONLY audit-log content in the payload.
-// Without a feature root the assembler's legacy behavior is unchanged
-// (govern-payload-implement.test.ts pins that).
+// NOR the untracked fold; (b) the untracked fold excludes files under
+// OTHER features' roots (threaded via `excludeRoots`; each drop warned
+// + recorded in the `skippedOtherFeature` ledger) while the feature's
+// own files AND non-feature files (new source modules) fold in
+// (AUDIT-20260611-01 — the prior inclusion-scoped filter silently
+// dropped untracked src/** from the payload); (c) the labeled
+// audit_log_excerpt context block is the ONLY audit-log content in the
+// payload. Without a feature root the assembler's legacy behavior is
+// unchanged (govern-payload-implement.test.ts pins that).
 
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
@@ -79,12 +83,14 @@ describe('US5 — self-reference-free implement payload', () => {
     }
   });
 
-  it('untracked fold excludes the audit-log AND an unrelated feature scaffold; the feature own untracked files fold in', () => {
+  it('untracked fold excludes the audit-log AND an unrelated feature scaffold (warned + ledgered); the feature own untracked files fold in', () => {
     const repo = initRepo();
     try {
       // Untracked: the feature's own evidence (must fold), an untracked
       // audit-log variant (must not), an unrelated feature's scaffold
-      // (must not — the recorded parked-feature pull).
+      // (must not — the recorded parked-feature pull; the drop must be
+      // VISIBLE: one warn line + a skippedOtherFeature ledger row, per
+      // AUDIT-20260611-01).
       writeFileSync(join(repo, FEATURE_REL, 'evidence.md'), 'EVIDENCE NOTE for the feature\n');
       mkdirSync(join(repo, 'specs', '002-unrelated'), { recursive: true });
       writeFileSync(
@@ -93,14 +99,48 @@ describe('US5 — self-reference-free implement payload', () => {
       );
       appendFileSync(join(repo, FEATURE_REL, 'audit-log.md'), `\n${LIFTED_PROSE}`);
 
+      const warns: string[] = [];
+      const r = assembleImplementPayload({
+        repoRoot: repo,
+        base: 'HEAD',
+        featureRoot: join(repo, FEATURE_REL),
+        // What runGovern threads from discoverFeatureRoots(repoRoot):
+        // ALL feature roots, the audited one included (the assembler
+        // skips the featureRoot itself).
+        excludeRoots: [join(repo, FEATURE_REL), join(repo, 'specs', '002-unrelated')],
+        warn: (m) => warns.push(m),
+      });
+      expect(r.diff).toContain('EVIDENCE NOTE for the feature');
+      expect(r.diff).not.toContain('UNRELATED PARKED SCAFFOLD');
+      expect(r.diff).not.toContain('AUDIT-FAKE-99');
+      // The drop is announced (no silent scope filtering) …
+      expect(warns.some((m) => m.includes('specs/002-unrelated/scaffold.md'))).toBe(true);
+      // … and ledgered.
+      expect(r.skippedOtherFeature).toContain('specs/002-unrelated/scaffold.md');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('untracked source files OUTSIDE the feature root fold in when featureRoot is set (AUDIT-20260611-01 RED reproduction)', () => {
+    const repo = initRepo();
+    try {
+      // The exact case the fold exists for (AUDIT-20260605-01): a
+      // brand-new uncommitted source module. The feature root is the
+      // spec/docs dir, NOT the code dir — the fold must still carry it.
+      mkdirSync(join(repo, 'src'), { recursive: true });
+      writeFileSync(
+        join(repo, 'src', 'newmod.ts'),
+        'export const NEW_UNCOMMITTED_MODULE = 1;\n',
+      );
+
       const r = assembleImplementPayload({
         repoRoot: repo,
         base: 'HEAD',
         featureRoot: join(repo, FEATURE_REL),
       });
-      expect(r.diff).toContain('EVIDENCE NOTE for the feature');
-      expect(r.diff).not.toContain('UNRELATED PARKED SCAFFOLD');
-      expect(r.diff).not.toContain('AUDIT-FAKE-99');
+      expect(r.diff).toContain('NEW_UNCOMMITTED_MODULE');
+      expect(r.skippedOtherFeature).toEqual([]);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }

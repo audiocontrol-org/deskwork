@@ -30,7 +30,7 @@ No new persistent stores. The feature hardens invariants on existing entities; t
 ## Govern implement payload (existing — `payload-implement.ts:115–183`)
 
 - Composition: committed diff + scoped untracked fold + context blocks.
-- **US5 invariants**: (a) the resolved feature root's `audit-log.md` / governance bookkeeping appears in NEITHER the committed-diff arm NOR the untracked fold; (b) untracked fold ⊆ files under the feature under audit; (c) the labeled `audit_log_excerpt` context block (013/TASK-25) is the ONLY audit-log content in the payload.
+- **US5 invariants**: (a) the resolved feature root's `audit-log.md` / governance bookkeeping appears in NEITHER the committed-diff arm NOR the untracked fold; (b) the untracked fold excludes other features' roots and the feature's audit-log — the feature's own files and non-feature files (new source modules) fold in; each other-feature drop is warned and recorded in the additive `skippedOtherFeature` ledger field (AUDIT-20260611-01 amended the original "fold ⊆ files under the feature under audit" inclusion form, which silently dropped untracked source files); (c) the labeled `audit_log_excerpt` context block (013/TASK-25) is the ONLY audit-log content in the payload.
 
 ## Scope-discovery installation state (existing — `.stack-control/scope-discovery/`)
 

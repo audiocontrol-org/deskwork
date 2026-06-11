@@ -6,7 +6,9 @@
  * Ported verbatim-in-behavior from
  * `spec-kit/deskwork-governance/scripts/bash/govern.sh` (the bash
  * orchestration this consolidation replaces). The audit unit is the diff of
- * the just-implemented work + the feature's untracked-but-not-ignored files.
+ * the just-implemented work + the repo's untracked-but-not-ignored files
+ * (minus the feature's own audit-log and other features' roots when a
+ * feature root is resolved — see ImplementPayloadArgs.featureRoot).
  *
  * Every ported edge-case fix carries its AUDIT-id (do NOT drop these — each
  * was earned by a cross-model audit-barrage finding against the bash):
@@ -71,13 +73,26 @@ export interface ImplementPayloadArgs {
    * TASK-37 / gh-431). When supplied, the payload is made
    * self-reference-free: the feature's `audit-log.md` is excluded from
    * BOTH the committed diff (git pathspec exclusion) and the untracked
-   * fold, and the untracked fold is scoped to files under this root
-   * (FR-007/FR-008 — the recorded generator pulled unrelated features'
-   * parked scaffolds into the audited payload). When absent, behavior
-   * is byte-identical to the pre-014 assembler (the caller has no
-   * resolvable feature root to scope by).
+   * fold, and the untracked fold drops files under OTHER features'
+   * roots (`excludeRoots`) — everything else, including the feature's
+   * own files and new untracked source modules, folds in (FR-007 /
+   * FR-008 as amended by AUDIT-20260611-01; the original
+   * inclusion-scoped filter silently dropped untracked src/** —
+   * exactly the surfaces AUDIT-20260605-01 added the fold for). When
+   * absent, behavior is byte-identical to the pre-014 assembler (the
+   * caller has no resolvable feature root to scope by).
    */
   readonly featureRoot?: string;
+  /**
+   * Absolute paths of EVERY feature root in the repo (the caller
+   * enumerates them via `discoverFeatureRoots(repoRoot)` — runGovern is
+   * async; this assembler stays sync). Untracked files under any root
+   * OTHER than `featureRoot` are excluded from the fold — each drop is
+   * warned and recorded in `skippedOtherFeature` (never silent). The
+   * audited feature's own root may appear in this list; it is skipped.
+   * Only consulted when `featureRoot` is supplied (AUDIT-20260611-01).
+   */
+  readonly excludeRoots?: readonly string[];
 }
 
 export interface ImplementPayload {
@@ -89,6 +104,11 @@ export interface ImplementPayload {
   readonly skippedBinary: readonly string[];
   /** Untracked files skipped because folding them would exceed the budget. */
   readonly skippedOverBudget: readonly string[];
+  /**
+   * Untracked files skipped because they live under ANOTHER feature's
+   * root (specs/014 US5 / FR-008 as amended by AUDIT-20260611-01).
+   */
+  readonly skippedOtherFeature: readonly string[];
 }
 
 function git(repoRoot: string, args: readonly string[]): string {
@@ -153,24 +173,45 @@ export function assembleImplementPayload(
   // is audited too. AUDIT-20260605-06: bounded (binary-skip + byte cap).
   const skippedBinary: string[] = [];
   const skippedOverBudget: string[] = [];
+  const skippedOtherFeature: string[] = [];
   let foldedBytes = 0;
+
+  // specs/014 US5 (FR-008, amended by AUDIT-20260611-01): the fold's
+  // scoping is EXCLUSION-based, not inclusion-based. The feature root
+  // is the spec/docs dir, not the feature's code — an inclusion filter
+  // ("only files under the feature root") silently dropped untracked
+  // source modules (src/**), the very surfaces AUDIT-20260605-01 added
+  // the fold for. With a feature root resolved we exclude only (a) the
+  // feature's own audit-log and (b) files under OTHER features' roots
+  // (the recorded parked-scaffold pull) — each (b) drop warned +
+  // ledgered below. Everything else folds.
+  const otherFeatureRels =
+    featureRel !== undefined
+      ? (args.excludeRoots ?? [])
+          .map((root) => relative(repoRoot, root).split(sep).join('/'))
+          .filter((root) => root.length > 0 && root !== featureRel)
+      : [];
 
   const untracked = git(repoRoot, ['ls-files', '--others', '--exclude-standard'])
     .split('\n')
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
-    // specs/014 US5 (FR-008): with a feature root resolved, the fold is
-    // scoped to files under it — minus the audit-log itself. The
-    // recorded defect swept unrelated features' untracked scaffolds
-    // into the audited payload; the feature's own files still fold.
-    .filter((rel) => {
-      if (featureRel === undefined) return true;
-      if (!rel.startsWith(`${featureRel}/`)) return false;
-      return rel !== `${featureRel}/audit-log.md`;
-    });
+    // specs/014 US5 (FR-007): the feature's own audit-log never folds.
+    .filter((rel) => featureRel === undefined || rel !== `${featureRel}/audit-log.md`);
 
   for (const rel of untracked) {
     const abs = join(repoRoot, rel);
+    if (otherFeatureRels.some((root) => rel.startsWith(`${root}/`))) {
+      // AUDIT-20260611-01: another feature's untracked scaffold — out of
+      // the audited payload, but VISIBLY (warn + ledger; the binary and
+      // budget skips set the style).
+      warn(
+        `govern: skipping untracked file ${rel} (under another feature's root, ` +
+          `not the feature under audit; not folded into the audit diff).`,
+      );
+      skippedOtherFeature.push(rel);
+      continue;
+    }
     if (isBinaryOrEmpty(abs)) {
       // AUDIT-20260605-06: never ship binary blobs off-box.
       warn(`govern: skipping untracked binary/empty file ${rel} (not folded into the audit diff).`);
@@ -215,5 +256,6 @@ export function assembleImplementPayload(
     empty: committedDiffEmpty && foldedBytes === 0,
     skippedBinary,
     skippedOverBudget,
+    skippedOtherFeature,
   };
 }
