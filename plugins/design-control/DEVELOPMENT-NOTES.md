@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-06-11: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 1
+  - docs(design-control): annotate tooling-feedback entries with filed-upstream issue URLs (gh-460, gh-461)
+- Files changed: 1
+- Backlog touched: (none)
+
 ## 2026-06-11: Phase 1 closed out via /stack-control:execute — wireframe skill + derived provenance, then two governed barrage rounds to convergence
 
 **Goal:** Merge latest main, then run the spec through `/stack-control:execute`: finish the two remaining Phase 1 tasks of specs/001-design-control (the `/design-control:wireframe` authoring skill and the retroactive `derived`-provenance path) with governance firing automatically afterward.
