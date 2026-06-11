@@ -86,7 +86,7 @@ The terminal-state vocabulary (data-model.md) and config v2 grammar (contracts/b
 
 - [X] T027 Full quickstart pass: execute every SC-001..006 scenario from specs/014-audit-barrage-reliability/quickstart.md against the final build; record evidence (commands + observed values) in the feature audit-log or a quickstart-results note in the spec dir
 - [X] T028 [P] Adopter-facing docs: document config v2 migration in plugins/stack-control/README.md (or MIGRATING note) — field list + refusal behavior; no rot-prone version literals per .claude/rules/documentation.md
-- [ ] T029 [P] Closure evidence: run `stackctl roadmap reconcile`; propose `roadmap advance` for multi:gap/audit-barrage-{model-pinning,readonly-enforcement,timeout-observability} and surface backlog TASK-26 progression — evidence only, operator owns the status transitions
+- [X] T029 [P] Closure evidence: run `stackctl roadmap reconcile`; propose `roadmap advance` for multi:gap/audit-barrage-{model-pinning,readonly-enforcement,timeout-observability} and surface backlog TASK-26 progression — evidence only, operator owns the status transitions
 
 ## Dependencies
 
