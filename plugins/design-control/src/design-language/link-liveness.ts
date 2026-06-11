@@ -16,17 +16,33 @@
  *
  * "Defined in source" is implemented as: the selector appears, ident-boundary
  * exact, inside some selector prelude of the file — preludes are the text
- * runs that precede `{` after comments and string literals are stripped and
- * at-rule preludes are excluded (their blocks are descended into, so a rule
- * inside `@media` counts; `content: ".ghost"` and commented-out rules do not).
- * Functional pseudo-class ARGUMENTS (`:not(.ghost)`, `:is(...)`, `:where(...)`,
- * `:has(...)`, `:nth-child(...)`) are excluded too — a class that exists only
- * as an exclusion or only inside a matcher argument has no styling of its own,
- * so it must not count as a live anchor.
+ * runs that precede `{` after comments are stripped and at-rule preludes are
+ * excluded (their blocks are descended into, so a rule inside `@media` counts;
+ * `content: ".ghost"` and commented-out rules do not). Both sides are
+ * canonicalized before comparison (AUDIT-round2-codex-01 / -claude-04):
+ * attribute values rewrite to one double-quoted spelling with the value text
+ * PRESERVED, so `input[type=text]` matches `input[type="text"]` while
+ * `[data-state="open"]` never matches `[data-state="closed"]`; functional
+ * pseudo-class arguments (`:not(.ghost)`, `:is(...)`, `:where(...)`,
+ * `:has(...)`, `:nth-child(...)`) are compared when the QUERY names them and
+ * excluded from the scan when it does not — a class that exists only as an
+ * exclusion, matcher argument, or attribute value has no styling of its own,
+ * so it must not count as a live anchor for a query that never named it.
+ * Remaining accepted approximations are stated in `selector-canon.ts`
+ * (verbatim escapes; collapsed-not-erased argument whitespace).
  */
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  blankAttributeValues,
+  canonicalizeAttributeSelectors,
+  copyStringLiteral,
+  isIdentChar,
+  normalizeSelectorWhitespace,
+  stripComments,
+  stripFunctionalPseudoArgs,
+} from '@/design-language/selector-canon';
 import type {
   CssLink,
   DesignSpecFinding,
@@ -48,9 +64,18 @@ export interface LivenessResult {
   readonly skipped: readonly SkippedLink[];
 }
 
-/** Strip CSS comments and the CONTENTS of string literals (delimiters stay). */
-function stripCommentsAndStrings(css: string): string {
-  let out = '';
+/**
+ * Collect selector preludes: text runs preceding `{`, at every nesting depth,
+ * excluding at-rule preludes (which are descended into, not matched against).
+ * Comments are stripped; string-literal CONTENTS are copied verbatim (their
+ * structural characters are content, never braces/semicolons) so attribute
+ * values survive into preludes for canonical comparison. Prelude buffers
+ * reset on `{`, `}`, and `;` so declaration text (`content: ".ghost"`) never
+ * leaks into selector position.
+ */
+function collectSelectorPreludes(css: string): string[] {
+  const preludes: string[] = [];
+  let buffer = '';
   let i = 0;
   while (i < css.length) {
     const ch = css[i];
@@ -60,124 +85,64 @@ function stripCommentsAndStrings(css: string): string {
       continue;
     }
     if (ch === '"' || ch === "'") {
-      out += ch;
-      i += 1;
-      while (i < css.length && css[i] !== ch) {
-        i += css[i] === '\\' ? 2 : 1;
-      }
-      if (i < css.length) {
-        out += ch;
-        i += 1;
-      }
+      const literal = copyStringLiteral(css, i);
+      buffer += literal.copied;
+      i = literal.end;
       continue;
     }
-    out += ch;
-    i += 1;
-  }
-  return out;
-}
-
-/**
- * Collect selector preludes: text runs preceding `{`, at every nesting depth,
- * excluding at-rule preludes (which are descended into, not matched against).
- * Prelude buffers reset on `{`, `}`, and `;` so declaration text never leaks
- * into selector position.
- */
-function collectSelectorPreludes(css: string): string[] {
-  const preludes: string[] = [];
-  let buffer = '';
-  for (const ch of stripCommentsAndStrings(css)) {
     if (ch === '{') {
       const prelude = buffer.trim();
       if (prelude !== '' && !prelude.startsWith('@')) {
         preludes.push(prelude);
       }
       buffer = '';
-      continue;
-    }
-    if (ch === '}' || ch === ';') {
+    } else if (ch === '}' || ch === ';') {
       buffer = '';
-      continue;
+    } else {
+      buffer += ch;
     }
-    buffer += ch;
+    i += 1;
   }
   return preludes;
 }
 
-/** True for characters that extend a CSS ident (would change the selector). */
-function isIdentChar(ch: string | undefined): boolean {
-  return ch !== undefined && /[A-Za-z0-9_-]/.test(ch);
-}
-
-/**
- * Strip the CONTENTS of functional pseudo-class arguments (delimiters stay):
- * `:not(.ghost)` → `:not()`, for any `:<ident>(` / `::<ident>(`, balancing
- * nested parens (`:not(:is(.a))` → `:not()`). A selector that appears only as
- * an exclusion or matcher argument is not styled by the rule, so it must not
- * satisfy a liveness query.
- */
-function stripFunctionalPseudoArgs(text: string): string {
-  let out = '';
-  let i = 0;
-  while (i < text.length) {
-    const ch = text[i];
-    if (ch === ':') {
-      let identStart = i + 1;
-      if (text[identStart] === ':') {
-        identStart += 1;
-      }
-      let identEnd = identStart;
-      while (identEnd < text.length && isIdentChar(text[identEnd])) {
-        identEnd += 1;
-      }
-      if (identEnd > identStart && text[identEnd] === '(') {
-        out += text.slice(i, identEnd + 1);
-        let depth = 1;
-        i = identEnd + 1;
-        while (i < text.length && depth > 0) {
-          if (text[i] === '(') {
-            depth += 1;
-          } else if (text[i] === ')') {
-            depth -= 1;
-          }
-          i += 1;
-        }
-        if (depth === 0) {
-          out += ')';
-        }
-        continue;
-      }
-    }
-    out += ch;
-    i += 1;
-  }
-  return out;
-}
-
 /**
  * True iff `selector` appears ident-boundary exact inside some selector
- * prelude of `css`. Whitespace in a multi-token (descendant) selector is
- * normalized on both sides before matching. String-literal CONTENTS are
- * stripped on both sides identically, so quoted attribute selectors
- * (`input[type="text"]`) match their source rules; the accepted
- * over-approximation is that quoted VALUES are not compared —
- * `[data-state="open"]` matches a source rule for `[data-state="closed"]`.
- * Functional pseudo-class ARGUMENTS are likewise stripped on both sides
- * identically, so `.ghost` does not match `.real:not(.ghost)` (an exclusion
- * is not a definition), while a full-selector query like `.real:not(.ghost)`
- * still matches its source rule; the symmetric accepted over-approximation is
- * that argument CONTENTS are not compared — `.real:not(.ghost)` matches a
- * source rule for `.real:not(.other)`.
+ * prelude of `css`, with both sides canonicalized identically: attribute
+ * values rewrite to one double-quoted spelling with their text PRESERVED
+ * (quote style never diverges; `[data-state="open"]` never matches
+ * `[data-state="closed"]`), and whitespace normalizes (descendant
+ * combinators, argument spacing).
+ *
+ * Two-mode scan, derived from the query (a value or argument the query never
+ * named is not a definition — exclusion is not styling, AUDIT-20260611-18):
+ * - Query WITHOUT functional pseudo args: haystack args are stripped, so
+ *   `.ghost` does not match `.real:not(.ghost)`. A query WITH them compares
+ *   argument text — `.real:not(.ghost)` matches only a `:not(.ghost)` source,
+ *   never `:not(.other)`.
+ * - Query WITHOUT an attribute selector: haystack attribute values are
+ *   blanked, so `.ghost` does not match `[data-icon=".ghost"]` and `ghost`
+ *   does not match `[class~=ghost]`. A query WITH one compares values.
  */
 export function cssDefinesSelector(css: string, selector: string): boolean {
-  const query = stripFunctionalPseudoArgs(stripCommentsAndStrings(selector))
-    .trim()
-    .replace(/\s+/g, ' ');
+  const canonicalQuery = canonicalizeAttributeSelectors(stripComments(selector));
+  const compareArgs = canonicalQuery.includes('(');
+  const compareAttrValues = canonicalQuery.includes('[');
+  // Stripping/blanking the query itself would be a no-op in the modes where
+  // they apply (no parens / no brackets to act on), so normalize directly.
+  const query = normalizeSelectorWhitespace(canonicalQuery);
   if (query === '') {
     return false;
   }
   for (const prelude of collectSelectorPreludes(css)) {
-    const haystack = stripFunctionalPseudoArgs(prelude).replace(/\s+/g, ' ');
+    let haystack = canonicalizeAttributeSelectors(prelude);
+    if (!compareArgs) {
+      haystack = stripFunctionalPseudoArgs(haystack);
+    }
+    if (!compareAttrValues) {
+      haystack = blankAttributeValues(haystack);
+    }
+    haystack = normalizeSelectorWhitespace(haystack);
     let from = 0;
     while (true) {
       const at = haystack.indexOf(query, from);

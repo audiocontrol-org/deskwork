@@ -169,10 +169,80 @@ describe('checkLinkLiveness — dead links flagged (no app boot)', () => {
     expect(checkLinkLiveness(specWithLink('studio.css', '.real'), dir).ok).toBe(true);
   });
 
-  it('a full-selector query with parens matches its source rule — args stripped on both sides', () => {
+  it('a full-selector query with parens matches its source rule — argument text compared', () => {
     const dir = makeFixtureDir();
     writeFileSync(join(dir, 'studio.css'), '.real:not(.ghost) { color: ink; }\n');
     expect(checkLinkLiveness(specWithLink('studio.css', '.real:not(.ghost)'), dir).ok).toBe(true);
+  });
+});
+
+describe('checkLinkLiveness — attribute values compared canonically (AUDIT-round2-codex-01 / -claude-04)', () => {
+  it('a [data-state="open"] query is dead against a source defining only [data-state="closed"]', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.chip[data-state="closed"] { outline: none; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', '.chip[data-state="open"]'), dir);
+    expect(result.ok).toBe(false);
+    expect(result.findings.some((f) => f.rule === 'dead-link-selector')).toBe(true);
+  });
+
+  it('an unquoted query matches a double-quoted source — input[type=text] vs input[type="text"]', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), 'input[type="text"] { border: 1px solid; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', 'input[type=text]'), dir).ok).toBe(true);
+  });
+
+  it('a double-quoted query matches an unquoted source — input[type="text"] vs input[type=text]', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), 'input[type=text] { border: 1px solid; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', 'input[type="text"]'), dir).ok).toBe(true);
+  });
+
+  it('a single-quoted query matches a double-quoted source', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), 'input[type="text"] { border: 1px solid; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', "input[type='text']"), dir).ok).toBe(true);
+  });
+
+  it('a double-quoted query matches a single-quoted source', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), ".chip[data-state='open'] { outline: 2px solid; }\n");
+    expect(
+      checkLinkLiveness(specWithLink('studio.css', '.chip[data-state="open"]'), dir).ok,
+    ).toBe(true);
+  });
+
+  it('a selector appearing only as a quoted attribute VALUE is dead — values are not definitions', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real[data-icon=".ghost"] { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+  });
+
+  it('a selector appearing only as an UNQUOTED attribute value is dead too', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real[class~=ghost] { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', 'ghost'), dir).ok).toBe(false);
+  });
+});
+
+describe('checkLinkLiveness — functional pseudo-class arguments compared (AUDIT-round2-codex-01)', () => {
+  it('a .real:not(.ghost) query is dead against a source defining only .real:not(.other)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not(.other) { color: ink; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', '.real:not(.ghost)'), dir);
+    expect(result.ok).toBe(false);
+    expect(result.findings.some((f) => f.rule === 'dead-link-selector')).toBe(true);
+  });
+
+  it('argument whitespace is normalized — .real:not(.ghost) matches a :not( .ghost ) source', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not( .ghost ) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.real:not(.ghost)'), dir).ok).toBe(true);
+  });
+
+  it('argument-list comma spacing is normalized — :is(.a,.b) matches :is(.a, .b)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:is(.a, .b) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.real:is(.a,.b)'), dir).ok).toBe(true);
   });
 });
 
