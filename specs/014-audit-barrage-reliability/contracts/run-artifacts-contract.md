@@ -22,6 +22,7 @@ Consumers: `run-artifacts.ts` (writer), `audit-barrage-lift` (reader), govern co
 
 Existing: exit code, duration, stdout/stderr bytes, paths, timed out. New (FR-002/FR-006):
 
+- `report bytes: N` — bytes of the final report artifact; readers gate `produced` on this row (`> 0`), never on `<model>.md` existence (text lanes eagerly create the stdout stream, so an empty file can exist for a zero-output lane)
 - `terminal state: completed | timed-out | spawn-failed | killed-no-liveness`
 - `enforcement: enforced | unenforced`
 - `liveness: monitored (window Ns) | unmonitored`; on a liveness kill: staleness at kill
@@ -29,7 +30,7 @@ Existing: exit code, duration, stdout/stderr bytes, paths, timed out. New (FR-00
 
 ## INDEX.md fleet report block
 
-`produced` counts **converged-eligible** lanes (`terminalState === completed` AND `exitCode === 0` AND report artifact present — the `isModelRunConverged` predicate), so a fast non-zero exit (e.g. a CLI-rejected model pin) counts as degradation, not production. When `produced < configured` (FR-007):
+`produced` counts **converged-eligible** lanes (`terminalState === completed` AND `exitCode === 0` AND a non-empty report artifact, `report bytes > 0` — the `isModelRunConverged` predicate), so a fast non-zero exit (e.g. a CLI-rejected model pin) counts as degradation, not production. When `produced < configured` (FR-007):
 
 ```
 ## Fleet report

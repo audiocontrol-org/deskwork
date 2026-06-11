@@ -341,7 +341,7 @@ export async function runAuditBarrageLift(
         .filter((lane) => lane.terminalState === 'completed')
         .map((lane) => safeModelName(lane.name)),
     );
-    fleet = computeFleetReportFromParsedLanes(opts.runDir, lanes);
+    fleet = computeFleetReportFromParsedLanes(lanes);
     if (fleet.produced < fleet.configured) {
       stderr.write(`${renderFleetReportLines(fleet).join('\n')}\n`);
     }

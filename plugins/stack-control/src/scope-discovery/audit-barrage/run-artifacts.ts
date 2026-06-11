@@ -28,7 +28,6 @@
  * over tmpdir fixtures.
  */
 
-import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -192,6 +191,7 @@ export function renderFleetReportLines(fleet: FleetReport): string[] {
 export interface ParsedIndexLane {
   readonly name: string;
   readonly exitCode: number;
+  readonly reportBytes: number;
   readonly terminalState: TerminalState;
   readonly enforcement: EnforcementState;
   readonly liveness: LivenessState;
@@ -221,15 +221,20 @@ export function parseIndexLaneStates(indexText: string): ParsedIndexLane[] | nul
   let current: {
     name: string;
     exitCode?: number;
+    reportBytes?: number;
     terminalState?: TerminalState;
     enforcement?: EnforcementState;
     liveness?: LivenessState;
   } | null = null;
 
+  // `report bytes` is required lane completeness like the other v2 fields:
+  // the v2 writer always renders it, and the reader's `produced` gate reads
+  // it — a lane row missing it must NOT silently count as produced.
   const flush = (): void => {
     if (
       current !== null &&
       current.exitCode !== undefined &&
+      current.reportBytes !== undefined &&
       current.terminalState !== undefined &&
       current.enforcement !== undefined &&
       current.liveness !== undefined
@@ -237,6 +242,7 @@ export function parseIndexLaneStates(indexText: string): ParsedIndexLane[] | nul
       lanes.push({
         name: current.name,
         exitCode: current.exitCode,
+        reportBytes: current.reportBytes,
         terminalState: current.terminalState,
         enforcement: current.enforcement,
         liveness: current.liveness,
@@ -256,6 +262,11 @@ export function parseIndexLaneStates(indexText: string): ParsedIndexLane[] | nul
     const exit = /^- exit code:\s*(-?\d+)\s*$/.exec(line);
     if (exit !== null) {
       current.exitCode = Number.parseInt(exit[1]!, 10);
+      continue;
+    }
+    const reportBytes = /^- report bytes:\s*(\d+)\s*$/.exec(line);
+    if (reportBytes !== null) {
+      current.reportBytes = Number.parseInt(reportBytes[1]!, 10);
       continue;
     }
     const state = /^- terminal state:\s*(\S+)\s*$/.exec(line);
@@ -280,21 +291,25 @@ export function parseIndexLaneStates(indexText: string): ParsedIndexLane[] | nul
 
 /**
  * Reader-side fleet report from parsed INDEX lanes (FR-007). `produced`
- * counts converged-eligible lanes only: completed settle, exit 0, AND the
- * report artifact present on disk — a fast non-zero exit (CLI-rejected
+ * counts converged-eligible lanes only: completed settle, exit 0, AND a
+ * non-empty report artifact (`report bytes > 0`, the row the writer
+ * renders from `reportBytes`) — the writer-side `isModelRunConverged`
+ * semantics. The gate reads the INDEX row, never `existsSync`: spawn-cli
+ * eagerly creates the text-lane stdout stream, so an EMPTY <model>.md
+ * exists on disk even when the lane emitted zero bytes — existence is
+ * not production (AUDIT-20260611-01). A fast non-zero exit (CLI-rejected
  * model pin) or a killed lane is degradation, not production. Shared by
  * the lift verb and the govern loop so both surfaces print the same
  * vocabulary.
  */
 export function computeFleetReportFromParsedLanes(
-  runDir: string,
   lanes: ReadonlyArray<ParsedIndexLane>,
 ): FleetReport {
   const produced = lanes.filter(
     (lane) =>
       lane.terminalState === 'completed' &&
       lane.exitCode === 0 &&
-      existsSync(join(runDir, `${safeModelName(lane.name)}.md`)),
+      lane.reportBytes > 0,
   ).length;
   return {
     configured: lanes.length,

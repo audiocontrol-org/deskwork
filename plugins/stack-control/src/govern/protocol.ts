@@ -137,7 +137,7 @@ export function reportFleetStatus(runDir: string, stderr: (s: string) => void): 
   if (!existsSync(indexPath)) return;
   const lanes = parseIndexLaneStates(readFileSync(indexPath, 'utf8'));
   if (lanes === null) return;
-  const fleet = computeFleetReportFromParsedLanes(runDir, lanes);
+  const fleet = computeFleetReportFromParsedLanes(lanes);
   const degraded = fleet.produced < fleet.configured;
   stderr(
     `govern: fleet — configured ${fleet.configured}, produced ${fleet.produced}${degraded ? '  ⚠ DEGRADED' : ''}\n`,

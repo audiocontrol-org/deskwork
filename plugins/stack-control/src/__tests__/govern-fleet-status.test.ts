@@ -95,6 +95,23 @@ describe('govern round status includes the fleet report (T020 / FR-007)', () => 
     expect(err).toMatch(/0-HIGH.*DEGRADED fleet/);
   });
 
+  it('an empty completed text lane (exit 0, report bytes 0) reads DEGRADED even though <model>.md exists on disk', () => {
+    // spawn-cli eagerly creates the text-lane stdout stream at spawn time, so
+    // a lane that exits 0 with zero output leaves an EMPTY codex.md on disk.
+    // Existence is not production: the reader must gate `produced` on the
+    // INDEX `report bytes` row (writer-side isModelRunConverged semantics) or
+    // the outage masquerades as a healthy fleet (AUDIT-20260611-01).
+    const results = [
+      laneResult({}),
+      laneResult({ name: 'codex', reportBytes: 0, stdoutBytes: 0 }),
+    ];
+    const runDir = makeRunDir(results);
+    writeFileSync(join(runDir, 'codex.md'), '', 'utf8');
+    const err = collect(runDir);
+    expect(err).toContain('govern: fleet — configured 2, produced 1  ⚠ DEGRADED');
+    expect(err).toContain('quorum — cross-model agreement impossible');
+  });
+
   it('a healthy round prints the fleet line without degradation noise', () => {
     const runDir = makeRunDir([laneResult({}), laneResult({ name: 'codex' })]);
     const err = collect(runDir);
