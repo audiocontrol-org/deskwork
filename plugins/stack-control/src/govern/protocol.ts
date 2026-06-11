@@ -187,6 +187,15 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
     writeFileSync(varsPath, JSON.stringify(args.vars), 'utf8');
 
     // --- render (barrage bin) ---
+    // AUDIT-20260611-06: thread the resolved installation into the render.
+    // The render resolves the operator's prompt-template override
+    // (`.stack-control/audit-barrage-prompt.md`) relative to its repoRoot
+    // and defaults that to the spawn cwd — so an unanchored render under
+    // `govern --at <installation>` run from an outer repo would silently
+    // pick the outer/default prompt. render is a read-side verb, so its
+    // surviving `--repo-root` flag is the carrier (installation-isolation
+    // R2 retired --repo-root on state-WRITING verbs only; barrage + lift
+    // below take `--at` instead).
     const render = spawnText(args.barrageBin, [
       'audit-barrage-render',
       '--feature',
@@ -195,6 +204,8 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       varsPath,
       '--output',
       promptPath,
+      '--repo-root',
+      args.repoRoot,
     ]);
     if (render.status !== 0) {
       throw new GovernProtocolError(

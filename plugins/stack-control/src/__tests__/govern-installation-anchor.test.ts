@@ -220,15 +220,20 @@ describe('US3 — govern flag/env retirement (R2)', () => {
 // shipped: no outer-tree leak, and no backlog-store leak even though the
 // cwd has no resolvable backlog store (TASK-40: the exclusion derives from
 // the installation record, never the cwd). The stub also records the args
-// the protocol passed to the barrage verb (--at threading).
+// the protocol passed to the barrage AND render verbs as verb-prefixed
+// lines: --at threading for the barrage, --repo-root threading for the
+// render (AUDIT-20260611-06 — the render resolves the prompt-template
+// override `.stack-control/audit-barrage-prompt.md` relative to its
+// repoRoot, so an unanchored render run from an outer repo silently picks
+// the outer/default prompt instead of the installation's tuned override).
 function writeAnchorStub(dir: string): string {
   const stub = join(dir, 'stub-barrage.sh');
   const body = [
     '#!/usr/bin/env bash',
     'set -euo pipefail',
     'verb="$1"; shift',
-    'if [ "$verb" = "audit-barrage" ]; then',
-    '  printf "%s\\n" "$*" >> "${STUB_ARGS_FILE:?STUB_ARGS_FILE required}"',
+    'if [ "$verb" = "audit-barrage" ] || [ "$verb" = "audit-barrage-render" ]; then',
+    '  printf "%s %s\\n" "$verb" "$*" >> "${STUB_ARGS_FILE:?STUB_ARGS_FILE required}"',
     'fi',
     'repo=""; feature=""; output=""; vars=""',
     'while [ "$#" -gt 0 ]; do',
@@ -323,8 +328,26 @@ describe('US3/US4 — govern end-to-end: --at anchor, no cwd leak, backlog-store
       // the cwd (outer root, no installation) must play no role.
       expect(vars).not.toContain('BACKLOG-STORE-CANARY');
       // The protocol threads the resolved installation into the barrage.
-      const barrageArgs = readFileSync(argsFile, 'utf8');
-      expect(barrageArgs).toContain('--at');
+      const recordedArgs = readFileSync(argsFile, 'utf8').trim().split('\n');
+      const barrageLine = recordedArgs.find((l) => l.startsWith('audit-barrage '));
+      expect(barrageLine, `recorded argv was:\n${recordedArgs.join('\n')}`).toBeDefined();
+      expect(barrageLine).toContain('--at');
+      // AUDIT-20260611-06: the FIRST step — the render — must carry the
+      // anchor too. Without it the render's repoRoot defaults to the spawn
+      // cwd and the prompt-template override resolves against the OUTER
+      // repo (or the plugin default) instead of the installation's tuned
+      // `.stack-control/audit-barrage-prompt.md`. The render verb is
+      // read-side, so its surviving `--repo-root` flag is the carrier
+      // (R2 retired --repo-root on state-WRITING verbs only).
+      const renderLine = recordedArgs.find((l) => l.startsWith('audit-barrage-render '));
+      expect(renderLine, `recorded argv was:\n${recordedArgs.join('\n')}`).toBeDefined();
+      expect(renderLine).toContain('--repo-root');
+      // macOS realpath caveat: the resolved installation may be recorded in
+      // either the /var or /private/var spelling — accept both.
+      const anchorCarried =
+        (renderLine ?? '').includes(fixture.installationRoot) ||
+        (renderLine ?? '').includes(realpathSync(fixture.installationRoot));
+      expect(anchorCarried, `render argv was:\n${renderLine ?? '(none)'}`).toBe(true);
     } finally {
       fixture.cleanup();
       rmSync(fx, { recursive: true, force: true });
