@@ -392,4 +392,99 @@ describe('parseDesignSpec — single-pass defect surfacing (no finding waves)', 
       { ruleId: 'ink', link: { path: 'styles/studio.css', selector: '.ghost' } },
     ]);
   });
+
+  it("inspects a near-miss section's body: typo guard fires, css link reaches auxiliaryCssLinks", () => {
+    const result = parseDesignSpec(`### Rule: masthead
+- exmaple: every page renders the masthead
+- css: styles/studio.css .ghost
+`);
+    const rules = result.findings.map((f) => f.rule);
+    expect(rules).toContain('malformed-rule-heading');
+    expect(rules).toContain('unknown-field');
+    const typo = result.findings.find((f) => f.rule === 'unknown-field');
+    expect(typo?.ruleId).toBe('masthead');
+    expect(result.auxiliaryCssLinks).toEqual([
+      { ruleId: 'masthead', link: { path: 'styles/studio.css', selector: '.ghost' } },
+    ]);
+  });
+});
+
+describe('parseDesignSpec — rule-declaration attempts outside the ATX form', () => {
+  it('flags a setext "rule: beta" heading and does not merge its fields into the prior rule', () => {
+    const result = parseDesignSpec(`### rule: alpha
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+
+rule: beta
+----------
+- kind: component
+- css: styles/studio.css .ghost
+- example: ghost button
+- do: y
+`);
+    expect(result.ok).toBe(false);
+    const finding = result.findings.find((f) => f.rule === 'malformed-rule-heading');
+    expect(finding?.message).toMatch(/setext/i);
+    // beta's section is NOT merged into alpha…
+    expect(result.spec.rules.map((r) => r.id)).toEqual(['alpha']);
+    expect(result.spec.rules[0].cssLinks).toEqual([
+      { path: 'styles/studio.css', selector: '.btn' },
+    ]);
+    expect(result.spec.rules[0].examples).toEqual(['a button']);
+    // …and its css link is still inspected for the liveness axis.
+    expect(result.auxiliaryCssLinks).toEqual([
+      { ruleId: 'beta', link: { path: 'styles/studio.css', selector: '.ghost' } },
+    ]);
+  });
+
+  it('flags a paragraph-line "rule: gamma" (no underline) as an attempted declaration, not inert prose', () => {
+    const result = parseDesignSpec(`rule: gamma
+- kind: palette
+- css: styles/studio.css .ghost
+`);
+    const finding = result.findings.find((f) => f.rule === 'malformed-rule-heading');
+    expect(finding).toBeDefined();
+    expect(finding?.message).toMatch(/heading/i);
+    expect(result.auxiliaryCssLinks).toEqual([
+      { ruleId: 'gamma', link: { path: 'styles/studio.css', selector: '.ghost' } },
+    ]);
+  });
+
+  it('leaves a prose sentence mentioning "rule:" mid-line inert (only line-initial attempts count)', () => {
+    const result = parseDesignSpec(`### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+
+The guiding rule: keep ink primary everywhere.
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('leaves prose headings starting with "Rule" inert ("Rule of thumb", "Rule kinds")', () => {
+    const result = parseDesignSpec(`## Rule of thumb
+
+## Rule kinds
+
+### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.spec.rules.map((r) => r.id)).toEqual(['ink']);
+  });
+
+  it('names the spaced-colon mismatch for "### rule :x" (not "missing the colon")', () => {
+    const result = parseDesignSpec('### rule :x\n');
+    const finding = result.findings.find((f) => f.rule === 'malformed-rule-heading');
+    expect(finding?.message).toMatch(/space/i);
+    expect(finding?.message).not.toMatch(/missing the ":"/);
+  });
 });

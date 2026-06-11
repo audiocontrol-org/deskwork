@@ -18,12 +18,16 @@
  * single-word bullet key outside the closed set is an `unknown-field` finding
  * (typo guard) — silently dropping a misspelled `example:` would otherwise
  * fabricate a missing-example rejection with no visible cause. The same
- * philosophy applies at heading level: a heading whose first word is `rule`
- * but that misses the strict `rule: <id>` form (`Rule: x`, `rule x`) is a
+ * philosophy applies to rule DECLARATIONS: an attempted `rule: <id>` that
+ * misses the strict form — wrong case (`Rule: x`), spaced colon (`rule : x`),
+ * missing colon (`rule x`), setext heading, or bare paragraph line — is a
  * `malformed-rule-heading` finding — never silently demoted to inert
- * structure, which would drop the whole intended rule with zero findings.
+ * structure, which would drop the whole intended rule with zero findings
+ * (or merge its bullets into the preceding rule). The attempt classifiers
+ * live in `@/design-language/rule-attempt`.
  */
 
+import { classifyHeadingAttempt, classifyLineAttempt } from '@/design-language/rule-attempt';
 import {
   RULE_KINDS,
   type CssLink,
@@ -36,13 +40,6 @@ import {
 
 const HEADING_RE = /^#{1,6}\s+(.*)$/;
 const RULE_HEADING_RE = /^rule:\s*(.*)$/;
-/**
- * Heading-level typo guard: a heading whose first word is `rule` (any case,
- * colon or not) is an ATTEMPTED rule heading; if it misses the strict
- * lowercase `rule: <id>` form it is a `malformed-rule-heading` finding, never
- * inert structure. The `\b` keeps unrelated headings (`Ruler settings`) inert.
- */
-const RULE_NEAR_MISS_RE = /^rule\b/i;
 /**
  * A field bullet: lowercase single-word key (apostrophe allowed: `don't`).
  * U+2019 (’) is also admitted — smart-quote editors substitute it in prose —
@@ -71,6 +68,10 @@ interface RawRuleSection {
   readonly examples: string[];
   readonly dos: string[];
   readonly donts: string[];
+}
+
+function newSection(id: string, headingLine: number): RawRuleSection {
+  return { id, headingLine, cssLinks: [], examples: [], dos: [], donts: [] };
 }
 
 interface FieldSink {
@@ -176,20 +177,22 @@ function validateSection(section: RawRuleSection, findings: DesignSpecFinding[])
  *
  * Single-pass surfacing (no finding waves): a section excluded from
  * `spec.rules` is still INSPECTED, never skipped —
- *   - a duplicate-id section is parsed into a throwaway section so its
- *     field-level defects (unknown-field / empty-field / malformed-css-link)
- *     surface alongside `duplicate-rule-id`. Per-rule validation
- *     (missing-kind / missing-example / …) deliberately does NOT fire for
- *     duplicates — the canonical rule owns the per-rule contract; the
- *     duplicate is not a rule;
- *   - syntactically-usable css links of invalid + duplicate sections are
- *     returned as `auxiliaryCssLinks` so the liveness axis can check them in
- *     the same run.
+ *   - every excluded-section kind (duplicate-id, malformed-rule-heading
+ *     near-miss, setext/paragraph declaration attempt) is parsed into a
+ *     throwaway section so its field-level defects (unknown-field /
+ *     empty-field / malformed-css-link) surface alongside the section-level
+ *     finding. Per-rule validation (missing-kind / missing-example / …)
+ *     deliberately does NOT fire for these — they are not rules;
+ *   - syntactically-usable css links of invalid, duplicate, and attempt
+ *     sections are returned as `auxiliaryCssLinks` so the liveness axis can
+ *     check them in the same run.
  */
 export function parseDesignSpec(markdown: string): DesignSpecParseResult {
   const findings: DesignSpecFinding[] = [];
   const sections: RawRuleSection[] = [];
-  const duplicateSections: RawRuleSection[] = [];
+  // Throwaway sections (duplicates + declaration attempts): inspected for
+  // field-level defects + auxiliary css links, excluded from `spec.rules`.
+  const throwawaySections: RawRuleSection[] = [];
   const seenIds = new Set<string>();
   let current: RawRuleSection | undefined;
 
@@ -203,15 +206,12 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
       const headingText = heading[1].trim();
       const ruleHeading = RULE_HEADING_RE.exec(headingText);
       if (ruleHeading === null) {
-        if (RULE_NEAR_MISS_RE.test(headingText)) {
-          const offence = /^rule:/i.test(headingText)
-            ? 'the "rule:" prefix must be lowercase'
-            : 'missing the ":" after "rule"';
-          findings.push({
-            rule: 'malformed-rule-heading',
-            message: `Heading "${headingText}" looks like a rule heading but ${offence} — expected "rule: <id>".`,
-            line: lineNo,
-          });
+        const attempt = classifyHeadingAttempt(headingText);
+        if (attempt !== undefined) {
+          findings.push({ rule: 'malformed-rule-heading', message: attempt.message, line: lineNo });
+          // Inspect the attempt's body too (mirrors the duplicate branch).
+          current = newSection(attempt.attemptedId, lineNo);
+          throwawaySections.push(current);
         }
         continue;
       }
@@ -222,6 +222,9 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
           message: `Rule heading at line ${lineNo} has no id — expected "rule: <id>".`,
           line: lineNo,
         });
+        // Best-effort attribution: the heading text is all the id there is.
+        current = newSection(headingText, lineNo);
+        throwawaySections.push(current);
         continue;
       }
       if (seenIds.has(id)) {
@@ -235,13 +238,23 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
         // `sections`, no `seenIds` effect) so its field bullets are still
         // inspected — field-level findings + auxiliary css links surface in
         // this pass instead of after the author renames the id and reruns.
-        current = { id, headingLine: lineNo, cssLinks: [], examples: [], dos: [], donts: [] };
-        duplicateSections.push(current);
+        current = newSection(id, lineNo);
+        throwawaySections.push(current);
         continue;
       }
       seenIds.add(id);
-      current = { id, headingLine: lineNo, cssLinks: [], examples: [], dos: [], donts: [] };
+      current = newSection(id, lineNo);
       sections.push(current);
+      continue;
+    }
+    const lineAttempt = classifyLineAttempt(line.trim(), lines[i + 1]);
+    if (lineAttempt !== undefined) {
+      // A declaration in the wrong syntax (setext heading / bare paragraph):
+      // flag it AND start a throwaway section so its bullets are inspected
+      // instead of silently merging into the preceding rule's section.
+      findings.push({ rule: 'malformed-rule-heading', message: lineAttempt.message, line: lineNo });
+      current = newSection(lineAttempt.attemptedId, lineNo);
+      throwawaySections.push(current);
       continue;
     }
     if (current === undefined) {
@@ -282,7 +295,7 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
     // Invalid housing, usable links: the liveness axis still checks them.
     auxiliaryCssLinks.push(...section.cssLinks.map((link) => ({ ruleId: section.id, link })));
   }
-  for (const section of duplicateSections) {
+  for (const section of throwawaySections) {
     auxiliaryCssLinks.push(...section.cssLinks.map((link) => ({ ruleId: section.id, link })));
   }
 

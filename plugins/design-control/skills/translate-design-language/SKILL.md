@@ -49,6 +49,11 @@ bullets with a closed key set:
   `spec-truthfulness`, a separate concern this gate does not check.
 - `do:` / `don't:` — ≥1 guidance line per rule.
 
+Headings (or line-initial paragraphs / setext headings) that look like rule
+declarations but miss the strict ATX `rule: <id>` form (`Rule: x`, `rule : x`,
+`rule x`) are flagged as `malformed-rule-heading`; prose headings starting
+with "Rule" (e.g. `## Rule of thumb`) are fine.
+
 ## Procedure
 
 1. **Locate or create the spec file.** One spec per design language; do not
