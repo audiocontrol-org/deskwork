@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:51'
+updated_date: '2026-06-11 00:55'
 labels:
   - agent-found
   - 'type:gap'
@@ -29,3 +29,9 @@ Recovered from #434 (closed NOT_PLANNED during the GitHub->backlog migration, wh
 
 **Scope:** spans 004 (spec-governance) + 006 (roadmap reconcile). Surfaced during 006 US5 implementation.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Roadmap node design:gap/governance-graduation-record (ref gh-434) was retired 2026-06-11 and migrated here; duplicate capture TASK-33 archived in favor of this item.
+<!-- SECTION:NOTES:END -->

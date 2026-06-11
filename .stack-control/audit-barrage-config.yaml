@@ -27,10 +27,16 @@
 # ships {{prompt}} until v0.37.0).
 
 models:
+  # 2026-06-10 (specs/014 dogfood): claude 300 -> 900. The first
+  # governed run of specs/014 carried a 181KB diff prompt; claude timed
+  # out at 301s with zero bytes (run 20260611T023019180Z) and the new
+  # US1 floor (govern requires >= 2 emitting models) correctly refused
+  # the round. 300s was tuned for pre-protocol payload sizes. codex
+  # finished the same prompt in ~2 minutes; left at 300.
   - name: claude
     binary: claude
     args_template: "-p {{prompt-stdin}}"
-    timeout_seconds: 300
+    timeout_seconds: 900
   - name: codex
     binary: codex
     args_template: "exec {{prompt-stdin}}"

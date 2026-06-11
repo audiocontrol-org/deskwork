@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:20'
+updated_date: '2026-06-11 00:55'
 labels:
   - agent-found
   - 'type:gap'
@@ -37,3 +37,9 @@ All three are marginal hardening edges on the document-primitives engine (the fe
 
 Disposition in the feature audit-log: `acknowledged-2026-06-08 (deferred-hardening)`, full context inline.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Roadmap node design:fix/document-primitives-round9 (ref gh-430) was retired 2026-06-11 and migrated here; duplicate capture TASK-36 archived in favor of this item.
+<!-- SECTION:NOTES:END -->

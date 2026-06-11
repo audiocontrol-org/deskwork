@@ -13,16 +13,16 @@
  * `### <heading>` block followed by `Finding-ID:`, `Status:`,
  * `Severity:`, `Surface:` field lines and a free-form body.
  *
- * Agreement heuristic (mirrors the spirit of
- * `cross-reference-audit-run.ts`):
+ * Agreement heuristic (specs/014 US3 — mechanism-aware): union requires
+ * heading substring overlap of ≥ 12 chars (case-insensitive,
+ * punctuation-stripped) — the mechanism proxy that catches paraphrased
+ * findings about the same root cause. A shared repo-relative path token
+ * in the Surface field alone NEVER unions: surface adjacency is not
+ * agreement, and the pre-014 `|| surfacesAgree()` key collapsed five
+ * distinct mechanisms at one surface into a single entry documenting
+ * only one of them (TASK-12 / gh-440).
  *
- *   - heading substring overlap of ≥ 12 chars (case-insensitive,
- *     punctuation-stripped) — catches paraphrased findings about the
- *     same root cause; OR
- *   - shared repo-relative path token in the Surface field — catches
- *     findings that name the same file regardless of heading wording.
- *
- * Two findings cluster transitively: A↔B + B↔C → {A, B, C}.
+ * Same-root-cause findings cluster transitively: A↔B + B↔C → {A, B, C}.
  *
  * `INDEX.md` and `PROMPT.md` are skipped (they're metadata, not model
  * output). Files that fail to parse any finding blocks emit a warning
@@ -36,7 +36,6 @@ import { basename, join } from 'node:path';
 
 const FIELD_LINE_RE = /^([A-Za-z][A-Za-z-]+):\s*(.+?)\s*$/;
 const HEADING_LINE_RE = /^###\s+(.+?)\s*$/;
-const PATH_TOKEN_RE = /[A-Za-z0-9_./-]*\/[A-Za-z0-9_./-]+\.[a-z]{1,5}/g;
 const MIN_HEADING_SUBSTRING_LEN = 12;
 const CANONICAL_SEVERITIES: ReadonlySet<NormalizedSeverity> = new Set([
   'blocking',
@@ -109,11 +108,6 @@ function stripHeading(heading: string): string {
   return heading.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function extractPathTokens(surface: string): Set<string> {
-  const tokens = surface.match(PATH_TOKEN_RE);
-  return new Set(tokens ?? []);
-}
-
 function headingsAgree(a: string, b: string): boolean {
   const sa = stripHeading(a);
   const sb = stripHeading(b);
@@ -124,16 +118,6 @@ function headingsAgree(a: string, b: string): boolean {
   for (let start = 0; start + MIN_HEADING_SUBSTRING_LEN <= shorter.length; start += 1) {
     const window = shorter.slice(start, start + MIN_HEADING_SUBSTRING_LEN);
     if (longer.includes(window)) return true;
-  }
-  return false;
-}
-
-function surfacesAgree(a: string, b: string): boolean {
-  const ta = extractPathTokens(a);
-  if (ta.size === 0) return false;
-  const tb = extractPathTokens(b);
-  for (const tok of ta) {
-    if (tb.has(tok)) return true;
   }
   return false;
 }
@@ -228,7 +212,9 @@ function clusterFindings(
       const fi = rawFindings[i]!;
       const fj = rawFindings[j]!;
       if (fi.model === fj.model) continue;
-      if (headingsAgree(fi.heading, fj.heading) || surfacesAgree(fi.surface, fj.surface)) {
+      // specs/014 US3: heading agreement (the mechanism proxy) is the
+      // ONLY union key — surface agreement alone never merges.
+      if (headingsAgree(fi.heading, fj.heading)) {
         union(i, j);
       }
     }

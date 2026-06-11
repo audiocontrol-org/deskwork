@@ -24,8 +24,16 @@ const DEFAULT_MODULE_ROOT = 'src';
 export interface CliOptions {
   readonly featureSlug: string;
   readonly complaint: string;
-  readonly manifestPath: string;
-  readonly prdPath: string;
+  /**
+   * Explicit `--manifest` (resolved absolute), or `undefined` when the
+   * flag was omitted — the orchestrator then resolves the default
+   * `<feature-root>/scope-manifest.yaml` through the layout-aware
+   * feature-root resolver (specs/014 US7; the parser no longer
+   * constructs the legacy docs path).
+   */
+  readonly manifestPath: string | undefined;
+  /** Explicit `--prd-path` (resolved absolute), or `undefined` (same rule). */
+  readonly prdPath: string | undefined;
   readonly repoRoot: string;
   readonly moduleRoot: string;
   readonly apply: boolean;
@@ -113,15 +121,22 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
     );
   }
   const root = resolve(scalars.get('--repo-root') ?? process.cwd());
-  const manifestRaw =
-    scalars.get('--manifest') ??
-    `docs/1.0/001-IN-PROGRESS/${slug}/scope-manifest.yaml`;
-  const manifestPath = isAbsolute(manifestRaw)
-    ? manifestRaw
-    : resolve(root, manifestRaw);
-  const prdRaw =
-    scalars.get('--prd-path') ?? `docs/1.0/001-IN-PROGRESS/${slug}/prd.md`;
-  const prdPath = isAbsolute(prdRaw) ? prdRaw : resolve(root, prdRaw);
+  // specs/014 US7: when omitted, the defaults resolve in the
+  // orchestrator via the layout-aware feature-root resolver.
+  const manifestRaw = scalars.get('--manifest');
+  const manifestPath =
+    manifestRaw === undefined
+      ? undefined
+      : isAbsolute(manifestRaw)
+        ? manifestRaw
+        : resolve(root, manifestRaw);
+  const prdRaw = scalars.get('--prd-path');
+  const prdPath =
+    prdRaw === undefined
+      ? undefined
+      : isAbsolute(prdRaw)
+        ? prdRaw
+        : resolve(root, prdRaw);
   const evidenceFlag = scalars.get('--evidence-trail') ?? 'on';
   if (evidenceFlag !== 'on' && evidenceFlag !== 'off') {
     throw new Error(`--evidence-trail must be 'on' or 'off' (got '${evidenceFlag}')`);

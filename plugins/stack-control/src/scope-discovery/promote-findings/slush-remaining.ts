@@ -49,6 +49,15 @@ export interface SlushFlip {
   readonly severity?: string;
   /** Whether the matching workplan task was found + flipped. */
   readonly workplanTaskFlipped: boolean;
+  /**
+   * Located Status-line index (in the ORIGINAL `auditLogText`'s split
+   * lines) of THIS entry — specs/014 US4: the dampener decision carries
+   * its own locations so the apply path consumes exactly this set
+   * instead of re-deriving via an independent walk (AUDIT-20260609-19).
+   */
+  readonly statusLineIndex: number;
+  /** The entry's `###` header text — the migrated backlog item's title. */
+  readonly title: string;
 }
 
 export interface SlushRemainingArgs {
@@ -149,6 +158,8 @@ interface OpenFindingRef {
   readonly fullFindingId: string;
   /** Lowercased Severity value; undefined if the entry has no parseable Severity line. */
   readonly severity: string | undefined;
+  /** The entry's `###` header text (specs/014 US4 — flows into the flip). */
+  readonly title: string;
 }
 
 function findOpenFindingsInSections(
@@ -164,6 +175,7 @@ function findOpenFindingsInSections(
         i += 1;
         continue;
       }
+      const title = line.replace(/^###\s+/, '').trim();
       // Walk this entry's field block, capturing severity in
       // addition to status + finding-id (per Issue #380 — HIGHs
       // are never slushed).
@@ -194,6 +206,7 @@ function findOpenFindingsInSections(
           findingId: canonicalAuditId(fullFindingId),
           fullFindingId,
           severity,
+          title,
         });
       }
       i = j;
@@ -298,6 +311,8 @@ export function slushRemaining(args: SlushRemainingArgs): SlushRemainingResult {
         fullFindingId: ref.fullFindingId,
         severity: ref.severity,
         workplanTaskFlipped: false,
+        statusLineIndex: ref.statusLineIndex,
+        title: ref.title,
       });
       continue;
     }
@@ -313,6 +328,8 @@ export function slushRemaining(args: SlushRemainingArgs): SlushRemainingResult {
       fullFindingId: ref.fullFindingId,
       severity: ref.severity,
       workplanTaskFlipped: wpFlipped,
+      statusLineIndex: ref.statusLineIndex,
+      title: ref.title,
     });
   }
   return {

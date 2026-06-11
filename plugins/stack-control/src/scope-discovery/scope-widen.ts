@@ -33,9 +33,13 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { DEFAULT_BASELINE_REL } from './baseline-path.js';
+import { install as installScopeDiscovery } from './install-scope-discovery.js';
+import { resolveFeatureRoot } from './util/feature-root.js';
 import { buildPatternMatrix } from './discovery-agents/pattern-matrix.js';
 import { readCloneDetectorOutput } from './discovery-agents/clone-detector-reader.js';
 import { huntPrdThemes } from './discovery-agents/prd-themed-pattern-hunter.js';
@@ -72,18 +76,17 @@ export type { ScopeWidenDelta } from './scope-widen-delta.js';
 
 /**
  * Compute the per-run evidence directory under `widen-runs/` (sibling
- * to scope-inventory's `runs/`). Stamp is ISO-8601 truncated to second
- * + `Z`; runId is 6 hex chars so concurrent runs don't collide.
+ * to scope-inventory's `runs/`), under the layout-resolved feature
+ * root (specs/014 US7 — the gh-442 instance recreated a `docs/` tree
+ * for evidence when the feature lived under `specs/`). Stamp is
+ * ISO-8601 truncated to second + `Z`; runId is 6 hex chars so
+ * concurrent runs don't collide.
  */
-function makeRunDir(opts: { repoRoot: string; featureSlug: string }): string {
+function makeRunDir(opts: { featureRoot: string }): string {
   const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const runId = randomBytes(3).toString('hex');
   return resolve(
-    opts.repoRoot,
-    'docs',
-    '1.0',
-    '001-IN-PROGRESS',
-    opts.featureSlug,
+    opts.featureRoot,
     'scope-inventory',
     'widen-runs',
     `${now}-${runId}`,
@@ -219,14 +222,13 @@ interface RunArtifacts {
  */
 async function stageRun(
   opts: CliOptions,
+  prdPath: string,
+  featureRoot: string,
 ): Promise<RunArtifacts> {
-  const runDir = makeRunDir({
-    repoRoot: opts.repoRoot,
-    featureSlug: opts.featureSlug,
-  });
+  const runDir = makeRunDir({ featureRoot });
   const augmentedPrdPath = await writeAugmentedPrd({
     runDir,
-    prdPath: opts.prdPath,
+    prdPath,
     complaint: opts.complaint,
   });
   const input: DiscoveryAgentInput = {
@@ -259,17 +261,71 @@ export async function scopeWidenMain(
     return 2;
   }
 
+  // specs/014 US7: resolve the feature root layout-aware (specs/NNN-slug
+  // or legacy docs) — it anchors the default --manifest/--prd-path AND
+  // the widen-run evidence dirs, even when explicit paths were given
+  // (the gh-442 instance recreated a docs/ tree for evidence).
+  let featureRoot: string;
+  try {
+    const resolved = await resolveFeatureRoot({
+      repoRoot: opts.repoRoot,
+      slug: opts.featureSlug,
+    });
+    if (resolved.root === undefined) {
+      process.stderr.write(
+        `scope-widen: FATAL — feature '${opts.featureSlug}' not found under ` +
+          `${resolve(opts.repoRoot, 'specs')}/<NNN>-${opts.featureSlug} (speckit) or ` +
+          `${resolve(opts.repoRoot, 'docs')}/*/001-IN-PROGRESS/${opts.featureSlug} (legacy-docs).\n`,
+      );
+      return 2;
+    }
+    featureRoot = resolved.root;
+  } catch (err) {
+    process.stderr.write(`scope-widen: ${errorMessage(err)}\n`);
+    return 2;
+  }
+  const manifestPath =
+    opts.manifestPath ?? resolve(featureRoot, 'scope-manifest.yaml');
+  const prdPath = opts.prdPath ?? resolve(featureRoot, 'prd.md');
+
   let prior: ScopeManifest;
   try {
-    prior = await loadPriorManifest(opts.manifestPath);
+    prior = await loadPriorManifest(manifestPath);
   } catch (err) {
     process.stderr.write(`scope-widen: ${errorMessage(err)}\n`);
     return 2;
   }
 
+  // specs/014 US6 (FR-009, Clarification 2026-06-11): a missing clone
+  // baseline must not hard-abort the widen — the complaint-driven arms
+  // need no baseline at all. Auto-seed the missing scope-discovery
+  // state via the install-scope-discovery primitive (ANNOUNCED — this
+  // is state creation, not a silent fallback); the seeded clones.yaml
+  // is a legitimate empty baseline, so the clone arm's "no registered
+  // clones" over it is a true result. Post-seed genuine clone failures
+  // keep clone-detector-reader's own loud remediation.
+  if (!existsSync(resolve(opts.repoRoot, DEFAULT_BASELINE_REL))) {
+    process.stderr.write(
+      'scope-widen: scope-discovery state absent — seeding .stack-control/scope-discovery/ (first use)\n',
+    );
+    try {
+      installScopeDiscovery({
+        startDir: opts.repoRoot,
+        at: opts.repoRoot,
+        force: false,
+        dryRun: false,
+      });
+    } catch (err) {
+      process.stderr.write(
+        `scope-widen: auto-seed of scope-discovery state failed: ${errorMessage(err)}\n`,
+      );
+      return 2;
+    }
+  }
+
   let staged: RunArtifacts;
   try {
-    staged = await stageRun(opts);
+    staged = await stageRun(opts, prdPath, featureRoot);
   } catch (err) {
     process.stderr.write(`scope-widen: ${errorMessage(err)}\n`);
     return 2;
@@ -330,7 +386,7 @@ export async function scopeWidenMain(
   }
 
   if (opts.apply) {
-    return applyMergedManifest(opts, prior, delta);
+    return applyMergedManifest(opts, manifestPath, prior, delta);
   }
   if (!opts.quiet && delta.total > 0) {
     process.stderr.write(
@@ -403,6 +459,7 @@ async function persistEvidence(args: {
  */
 async function applyMergedManifest(
   opts: CliOptions,
+  manifestPath: string,
   prior: ScopeManifest,
   delta: ReturnType<typeof computeDelta>,
 ): Promise<number> {
@@ -416,8 +473,8 @@ async function applyMergedManifest(
   }
   const merged = mergeDelta(prior, delta);
   try {
-    await mkdir(dirname(opts.manifestPath), { recursive: true });
-    await writeFile(opts.manifestPath, stringifyYaml(merged), 'utf8');
+    await mkdir(dirname(manifestPath), { recursive: true });
+    await writeFile(manifestPath, stringifyYaml(merged), 'utf8');
   } catch (err) {
     process.stderr.write(
       `scope-widen: manifest write failed: ${errorMessage(err)}\n`,
@@ -426,7 +483,7 @@ async function applyMergedManifest(
   }
   if (!opts.quiet) {
     process.stderr.write(
-      `scope-widen: merged delta into ${relative(opts.repoRoot, opts.manifestPath)}\n`,
+      `scope-widen: merged delta into ${relative(opts.repoRoot, manifestPath)}\n`,
     );
   }
   return 0;

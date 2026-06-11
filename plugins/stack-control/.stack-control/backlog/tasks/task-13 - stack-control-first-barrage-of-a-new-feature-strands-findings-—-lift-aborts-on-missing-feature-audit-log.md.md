@@ -3,10 +3,10 @@ id: TASK-13
 title: >-
   stack-control: first barrage of a new feature strands findings — lift aborts
   on missing feature audit-log.md
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:32'
+updated_date: '2026-06-11 00:27'
 labels:
   - agent-found
   - 'type:bug'
@@ -49,4 +49,6 @@ Logged as TF-001 in https://github.com/audiocontrol-org/deskwork/blob/feature/de
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** tasks:specs/013-audit-protocol-hardening
+
+Verified fixed in the formally-installed v0.42.0 marketplace copy (2026-06-11): first audit-barrage-lift against a specs/NNN-slug feature with NO audit-log.md exits 0, scaffolds the canonical header (slug + targetVersion + title) at the resolved root, and lands the findings (AUDIT-20260611-NN). Old behavior was the exit-2 abort stranding the run. Explicit-run-dir re-lift also verified non-stranding. Closed per operator direction after installed-release verification.
 <!-- SECTION:NOTES:END -->
