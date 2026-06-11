@@ -2,21 +2,31 @@
 
 ---
 
-## 2026-06-11: <!-- session title -->
+## 2026-06-11: audit-protocol-reliability executed + governed to OPEN; merged; installation-isolation + descriptive-naming authored to runnable
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Execute the audit-protocol-reliability spec end-to-end through `/stack-control:execute` (eight silent-failure stories, RED-first), let governance fire and converge; then PR + merge, promote the anchor-unification backlog item, and author the resulting feature(s) to runnable.
 
 **Accomplished:**
-- <!-- compose -->
+- audit-protocol-reliability implemented: all 22 tasks, eight stories each with a RED→fix commit pair; suite 173/1150 → 185/1220, arithmetic reconciled in the validation ledger.
+- The governance loop converged on its own feature: round 1 REFUSED by the new fleet floor (claude lane timed out at 301s with zero bytes — exactly the silent degradation the feature makes loud; lane budget 300→900s); rounds 2–4 lifted 17 findings — 12 fixed RED-first by fresh-context sub-agents and marked fixed-<sha>, 5 residuals slushed to the backlog (TASK-40…44); gate OPEN (dampened, two consecutive 0-HIGH rounds); zero open audit-log entries.
+- PR #454 opened and merged (gh merge endpoint quirk worked around via `gh api -X PUT`); branch re-synced with main.
+- anchor-unification (TASK-45) captured → researched (Spec Kit roots at the nearest `.specify/` by upstream design; git anchors at any dir via `-C`/`--relative`) → promoted → authored to RUNNABLE as `specs/installation-isolation` (spec/plan/research/data-model/contracts/quickstart/tasks; execute-check passes) — the first spec under the new descriptive-slug convention.
+- Operator naming directive captured and authored to RUNNABLE as `specs/descriptive-naming` (slugs not fake ordinals for specs + backlog; agents speak friendly names to the operator — FR-008). Four operator clarifications encoded across both specs (--repo-root retired; Spec Kit relocation in scope; numbered dirs grandfathered; slug-first over backlog.md). Both features added to the roadmap.
 
 **Didn't Work:**
-- <!-- compose -->
+- `gh pr merge` / `gh pr checks` returned 401 with a keyring token that worked for create/view/api — merged via the REST endpoint directly (friction captured).
+- The Claude Code Skill tool repeatedly failed to inject skill bodies (execute/define/governance) — followed the SKILL.md from the plugin cache manually each time (friction captured).
+- Governance round 4's convergence slush failed inside govern (backlog store unresolvable from the repo root — no installation marker there); ran the slush manually with the store seam and captured the cwd-anchoring class as TASK-40, which then seeded the whole anchor-unification thread.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Operator: installations MUST be isolated — writing outside the installation tree by default is unacceptable. Became the governing principle of `specs/installation-isolation` (the repo-root half-installation created by this very session's governance runs is the live evidence).
+- [UX] Operator: fake ordinal numbers in spec dirs and backlog ids are obscurantism — descriptive slugs everywhere; and agents must communicate by friendly names, not counters. Became `specs/descriptive-naming` (applied immediately: both new specs are unnumbered).
+- [PROCESS] Operator refinement during research: git is NOT a repo-root constraint (`git -C <installation> diff --relative`) — removed git from the "legitimate external anchors" list; only Spec Kit's `.specify` convention remains, and it relocates into the installation.
 
 **Insights:**
-- <!-- compose -->
+- The protocol validated itself: the floor the feature added refused the feature's own first governed round, and the self-reference exclusions it added were tested by the loop that audited them. Dogfood-by-construction beats dogfood-by-intention.
+- Convergence-tail findings are largely fix-debt of the fix wave (round 4's five residuals) — the dampener + slush disposition is the right pressure valve; chasing them in-loop would have been the generator-chasing anti-pattern the spec-audit rule warns about.
+- A "half-installation" is what you get when write paths and the installation model disagree — state without a marker. The anchor question ("why does govern run from the repo root?") was worth pulling on: it produced two runnable features from one thread.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 50
