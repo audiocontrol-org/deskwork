@@ -30,7 +30,12 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { BarrageRun, ModelRunResult } from './types.js';
+import {
+  computeFleetReport,
+  type BarrageRun,
+  type FleetReport,
+  type ModelRunResult,
+} from './types.js';
 
 /**
  * Encode a Date as the basic-format UTC stamp embedded in the run-dir
@@ -125,6 +130,11 @@ export async function writeIndexFile(
  * assertions can pin the manifest shape without re-reading the file.
  */
 export function renderIndexBody(run: BarrageRun): string {
+  // specs/014 FR-007: only completed lanes count as attempts — the
+  // "models attempted" framing polluted the dampener accounting when a
+  // lane failed every round (the design-control 17-run incident), so
+  // the header states configured-vs-completed explicitly.
+  const completed = run.results.filter((r) => r.terminalState === 'completed').length;
   const header = [
     '# Audit-barrage run',
     '',
@@ -132,13 +142,53 @@ export function renderIndexBody(run: BarrageRun): string {
     `- feature: ${run.featureSlug}`,
     `- run dir: ${run.runDir}`,
     `- prompt: PROMPT.md`,
-    `- models attempted: ${run.results.length}`,
+    `- models configured: ${run.results.length}`,
+    `- models completed: ${completed}`,
     '',
     '## Per-model results',
     '',
   ].join('\n');
   const rows = run.results.map(renderModelRow).join('\n');
-  return `${header}${rows}\n`;
+  // FR-007: a run where fewer lanes produced than configured renders the
+  // fleet report block so degradation is readable from the artifact alone.
+  const fleet = computeFleetReport(run.results);
+  const fleetBlock =
+    fleet.produced < fleet.configured
+      ? `\n${renderFleetReportLines(fleet).join('\n')}\n`
+      : '';
+  return `${header}${rows}${fleetBlock}\n`;
+}
+
+/**
+ * specs/014 FR-007: the fleet report — the one vocabulary every consumer
+ * (INDEX.md, fire-time stderr, lift output, govern loop status) prints for
+ * configured-vs-produced degradation. The quorum line renders only when
+ * cross-model agreement is structurally impossible (produced ≤ 1).
+ */
+export function renderFleetReportLines(fleet: FleetReport): string[] {
+  const lines: string[] = ['## Fleet report', ''];
+  const degraded = fleet.produced < fleet.configured;
+  lines.push(
+    `- configured: ${fleet.configured}, produced: ${fleet.produced}${degraded ? '  ⚠ DEGRADED' : ''}`,
+  );
+  for (const lane of fleet.perLane) {
+    lines.push(`- ${lane.name}: ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]`);
+  }
+  if (fleet.quorumCollapsed) {
+    lines.push('- quorum: cross-model agreement impossible (produced ≤ 1)');
+  }
+  return lines;
+}
+
+function renderTimeoutBasis(result: ModelRunResult): string {
+  const basis = result.timeoutBasis;
+  if (basis.mode === 'override') {
+    return `override → ${basis.effectiveTimeoutSeconds} s`;
+  }
+  return (
+    `derived (payload ${basis.payloadBytes} bytes × ${basis.secsPerKb} s/KB, ` +
+    `floor ${basis.floorSeconds}) → ${basis.effectiveTimeoutSeconds} s`
+  );
 }
 
 function renderModelRow(result: ModelRunResult): string {
@@ -149,9 +199,25 @@ function renderModelRow(result: ModelRunResult): string {
   lines.push(`- duration: ${result.durationMs} ms`);
   lines.push(`- stdout bytes: ${result.stdoutBytes}`);
   lines.push(`- stderr bytes: ${result.stderrBytes}`);
+  lines.push(`- report bytes: ${result.reportBytes}`);
   lines.push(`- stdout path: ${result.stdoutPath}`);
   lines.push(`- stderr path: ${result.stderrPath}`);
+  if (result.eventsPath !== undefined) {
+    lines.push(`- events path: ${result.eventsPath}`);
+  }
   lines.push(`- timed out: ${result.timedOut ? 'yes' : 'no'}`);
+  // specs/014 FR-002/FR-006 row vocabulary (run-artifacts contract).
+  lines.push(`- terminal state: ${result.terminalState}`);
+  lines.push(`- enforcement: ${result.enforcement}`);
+  lines.push(
+    result.liveness === 'monitored'
+      ? `- liveness: monitored (window ${result.livenessWindowSeconds}s)`
+      : '- liveness: unmonitored',
+  );
+  if (result.stalenessAtKillMs !== undefined) {
+    lines.push(`- staleness at kill: ${(result.stalenessAtKillMs / 1000).toFixed(1)} s`);
+  }
+  lines.push(`- timeout basis: ${renderTimeoutBasis(result)}`);
   if (result.spawnError !== undefined) {
     lines.push(`- spawn error: ${result.spawnError}`);
   }

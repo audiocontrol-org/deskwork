@@ -34,7 +34,9 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { loadAuditBarrageConfig } from '../scope-discovery/audit-barrage/config-loader.js';
 import { orchestrateBarrage } from '../scope-discovery/audit-barrage/orchestrate-barrage.js';
+import { renderFleetReportLines } from '../scope-discovery/audit-barrage/run-artifacts.js';
 import {
+  computeFleetReport,
   isModelRunCovering,
   type BarrageInput,
   type BarrageResult,
@@ -259,6 +261,21 @@ export function resolveModels(
 }
 
 /**
+ * specs/014 FR-004: the fire-time marking for a lane that runs without
+ * mechanical read-only enforcement (`readonly_enforcement: none`). The
+ * warning prints at spawn time, unconditionally — an unenforced lane's
+ * results carry mutation risk and the operator must know BEFORE triaging.
+ * Exported for tests.
+ */
+export function renderUnenforcedWarning(model: ModelConfig): string {
+  return (
+    `audit-barrage: ⚠ lane '${model.name}' runs write-UNENFORCED ` +
+    `(readonly_enforcement: none) — its spawn is not mechanically prevented ` +
+    `from mutating the repository; results carry mutation risk (FR-004)`
+  );
+}
+
+/**
  * Map a BarrageRun's per-model results onto the verb's exit code.
  * Exported for tests; the shim also calls it before exit.
  *
@@ -348,6 +365,15 @@ export async function auditBarrage(args: string[]): Promise<void> {
 
   const prompt = await loadPromptText(flags.promptFilePath);
 
+  // specs/014 FR-004: unenforced lanes are loud at fire time — printed
+  // regardless of --quiet (quiet suppresses the summary, never a safety
+  // marking).
+  for (const model of resolution.models) {
+    if (model.readonlyEnforcement === 'none') {
+      process.stderr.write(`${renderUnenforcedWarning(model)}\n`);
+    }
+  }
+
   const input: BarrageInput = {
     repoRoot,
     featureSlug: flags.featureSlug,
@@ -371,6 +397,12 @@ export async function auditBarrage(args: string[]): Promise<void> {
   process.stdout.write(renderStdoutOutput(run, flags.outputRunDir));
   if (!flags.quiet) {
     process.stderr.write(`${renderSummaryLine(run)}\n`);
+  }
+  // specs/014 FR-007: a degraded fleet prints the fleet report at run end —
+  // unconditionally, so degradation is never hidden behind --quiet.
+  const fleet = computeFleetReport(run.results);
+  if (fleet.produced < fleet.configured) {
+    process.stderr.write(`${renderFleetReportLines(fleet).join('\n')}\n`);
   }
   process.exit(result.exitCode);
 }
