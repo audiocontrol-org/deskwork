@@ -40,10 +40,10 @@
  *
  * # Audit-log discovery
  *
- * The rule walks `docs/<v>/001-IN-PROGRESS/<slug>/audit-log.md` for
- * every in-progress feature in the repo. The path convention matches
- * the workplan / feature-doc convention; each audit-log is parsed
- * independently. Citations resolved across multiple audit-logs union
+ * The rule walks every feature root's `audit-log.md` across both
+ * layouts — `specs/<NNN>-<slug>/` (speckit) and the legacy versioned
+ * docs layout — via the shared `discoverFeatureRoots` enumerator
+ * (specs/014 US7); each audit-log is parsed independently. Citations resolved across multiple audit-logs union
  * by Finding-ID. (A given Finding-ID is namespaced per-feature; the
  * rule treats the union as the lookup surface because feature-cross
  * references shouldn't be common but are not invalid.)
@@ -56,9 +56,10 @@
  * follow-up entry).
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
+import { discoverFeatureRoots } from '../util/feature-root.js';
 import {
   auditFindingIdSet,
   citationEntryId,
@@ -75,8 +76,6 @@ import type {
 
 const RULE_ID = 'provenance-orphaned-entries';
 const CONFIG_DIR_REL = '.stack-control/scope-discovery';
-const DOCS_ROOT_REL = 'docs';
-const IN_PROGRESS_BUCKET = '001-IN-PROGRESS';
 const AUDIT_LOG_FILENAME = 'audit-log.md';
 
 const AUDIT_FINDING_PREFIX = 'audit-finding-';
@@ -141,8 +140,10 @@ export const check: DoctorRuleCheck = async (
     for (const entry of collected) catalogEntries.push(entry);
   }
 
-  // Walk every in-progress feature's audit-log.
-  const auditLogs = discoverAuditLogs(opts.repoRoot);
+  // Walk every feature's audit-log across BOTH layouts (specs/014 US7
+  // — the enumeration routes through the shared layout-aware resolver
+  // module; this rule no longer constructs the legacy path itself).
+  const auditLogs = await discoverAuditLogs(opts.repoRoot);
   const allEntries: ParsedAuditEntry[] = [];
   for (const logPath of auditLogs) {
     let text: string;
@@ -321,38 +322,17 @@ function extractAuditHistory(raw: unknown): readonly string[] {
 }
 
 /**
- * Walk `docs/<v>/001-IN-PROGRESS/<slug>/audit-log.md` for every
- * in-progress feature in the repo. The version dir layer (`1.0`,
- * `0.9`, etc.) is discovered dynamically — adopters' projects have
- * different version cadences and the rule doesn't fix a particular
- * version dir.
+ * Walk every feature root's `audit-log.md` across both physical
+ * layouts (specs/014 US7): `specs/<dir>/` and the legacy versioned
+ * docs layout — enumerated by the shared `discoverFeatureRoots`
+ * resolver, so the layout literals stay in one module (FR-010).
  */
-function discoverAuditLogs(repoRoot: string): readonly string[] {
-  const docsRoot = join(repoRoot, DOCS_ROOT_REL);
-  if (!existsSync(docsRoot)) return [];
-  const versionDirs = readSubDirs(docsRoot);
-  const logs: string[] = [];
-  for (const versionDir of versionDirs) {
-    const inProgress = join(versionDir, IN_PROGRESS_BUCKET);
-    if (!existsSync(inProgress)) continue;
-    const featureDirs = readSubDirs(inProgress);
-    for (const featureDir of featureDirs) {
-      const logPath = join(featureDir, AUDIT_LOG_FILENAME);
-      if (existsSync(logPath)) logs.push(logPath);
-    }
-  }
-  // Deterministic order — sort by absolute path so doctor output is
-  // stable across runs.
-  return logs.slice().sort();
-}
-
-function readSubDirs(parent: string): readonly string[] {
-  try {
-    return readdirSync(parent, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .map((d) => resolve(parent, d.name))
-      .filter((p) => !basename(p).startsWith('.'));
-  } catch {
-    return [];
-  }
+async function discoverAuditLogs(repoRoot: string): Promise<readonly string[]> {
+  const roots = await discoverFeatureRoots(repoRoot);
+  // Deterministic order — discoverFeatureRoots sorts; keep the sort
+  // after filtering so doctor output is stable across runs.
+  return roots
+    .map((root) => join(root, AUDIT_LOG_FILENAME))
+    .filter((logPath) => existsSync(logPath))
+    .sort();
 }

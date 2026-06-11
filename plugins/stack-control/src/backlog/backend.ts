@@ -42,6 +42,16 @@ export interface CaptureSpec {
   readonly priority?: 'high' | 'medium' | 'low';
 }
 
+/** Additive, field-preserving mutations for `edit` (012, D6). Both are append /
+ * add operations — no read-modify-write, so concurrent edits are never clobbered
+ * (FR-013). */
+export interface EditSpec {
+  /** Add a label additively (existing labels preserved). */
+  readonly addLabel?: string;
+  /** Append a line to the task's implementation notes (existing body preserved). */
+  readonly appendNotes?: string;
+}
+
 export interface BacklogBackend {
   /** Create one item via the real binary; returns the assigned id (e.g. TASK-1). */
   create(spec: CaptureSpec): string;
@@ -49,6 +59,9 @@ export interface BacklogBackend {
   list(): readonly BacklogItem[];
   /** Whether any item already carries `ref` (import idempotency). */
   exists(ref: string): boolean;
+  /** Additively edit an existing item (add a label / append notes). Shells the
+   * real binary; a non-zero exit (e.g. unknown id) throws BacklogError (D6). */
+  edit(id: string, spec: EditSpec): void;
 }
 
 export interface BacklogBackendOptions {
@@ -56,6 +69,11 @@ export interface BacklogBackendOptions {
   readonly cwd: string;
   /** Injectable binary path (tests point this at a missing path for fail-loud). */
   readonly binaryPath?: string;
+  /**
+   * Sink for per-file skip warnings on the read path (specs/014 US8).
+   * Default: process.stderr.
+   */
+  readonly warn?: (line: string) => void;
 }
 
 const DEP = 'backlog.md';
@@ -91,6 +109,12 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+/** First line of a (possibly multi-line) parse error — warning brevity. */
+function firstLine(message: string): string {
+  const idx = message.indexOf('\n');
+  return idx < 0 ? message : message.slice(0, idx);
+}
+
 function toStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 }
@@ -122,6 +146,11 @@ function projectTask(text: string): BacklogItem | null {
 export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBackend {
   const { cmd, prefix } = resolveInvocation(opts.binaryPath);
   const tasksDir = join(opts.cwd, 'backlog', 'tasks');
+  const warn =
+    opts.warn ??
+    ((line: string) => {
+      process.stderr.write(line);
+    });
 
   function run(args: readonly string[]): string {
     const res = spawnSync(cmd, [...prefix, ...args], { cwd: opts.cwd, encoding: 'utf8' });
@@ -139,13 +168,45 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
     return res.stdout ?? '';
   }
 
-  function listItems(): readonly BacklogItem[] {
-    if (!existsSync(tasksDir)) return [];
+  /**
+   * Walk the task files with per-file fault isolation (specs/014 US8).
+   * A file whose frontmatter fails to parse is collected as `malformed`
+   * instead of throwing out of the whole walk — the CALLER decides the
+   * policy: read paths skip-with-warning (availability); integrity
+   * paths fail loud (safety).
+   */
+  function readTaskFiles(): {
+    items: readonly BacklogItem[];
+    malformed: readonly { path: string; error: string }[];
+  } {
+    if (!existsSync(tasksDir)) return { items: [], malformed: [] };
     const items: BacklogItem[] = [];
+    const malformed: { path: string; error: string }[] = [];
     for (const file of readdirSync(tasksDir)) {
       if (!file.endsWith('.md')) continue;
-      const item = projectTask(readFileSync(join(tasksDir, file), 'utf8'));
-      if (item !== null) items.push(item);
+      const path = join(tasksDir, file);
+      try {
+        const item = projectTask(readFileSync(path, 'utf8'));
+        if (item !== null) items.push(item);
+      } catch (err) {
+        malformed.push({ path, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    return { items, malformed };
+  }
+
+  /**
+   * Read path: malformed files are skipped with a stderr warning naming
+   * each file (exit stays 0 at the verb layer); healthy items still
+   * list. An all-malformed store yields zero items WITH warnings —
+   * distinguishable from a clean-empty store.
+   */
+  function listItems(): readonly BacklogItem[] {
+    const { items, malformed } = readTaskFiles();
+    for (const bad of malformed) {
+      warn(
+        `backlog: WARNING — skipping malformed task file: ${bad.path} (${firstLine(bad.error)})\n`,
+      );
     }
     return items;
   }
@@ -169,7 +230,35 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
     list: listItems,
 
     exists(ref: string): boolean {
-      return listItems().some((i) => i.refs.includes(ref));
+      // Integrity path (specs/014 US8, AUDIT-20260611-06): the POSITIVE
+      // answer is decidable regardless of malformed files — when `ref`
+      // is found among healthy items, the idempotency check succeeds,
+      // nothing is created, and no duplicate is possible. Only the
+      // NEGATIVE answer is undecidable: a malformed file could be the
+      // very one holding `ref` — reporting "absent" would let an import
+      // create a duplicate. So: return true on a healthy hit; fail loud
+      // naming the file only when the answer would otherwise be
+      // "absent" with malformed files present.
+      const { items, malformed } = readTaskFiles();
+      if (items.some((i) => i.refs.includes(ref))) return true;
+      if (malformed.length > 0) {
+        const first = malformed[0]!;
+        throw new BacklogError(
+          `malformed task file blocks the integrity check: ${first.path} ` +
+            `(${firstLine(first.error)})` +
+            (malformed.length > 1 ? ` — and ${malformed.length - 1} more` : '') +
+            ` — fix or remove the file, then re-run`,
+        );
+      }
+      return false;
+    },
+
+    edit(id: string, spec: EditSpec): void {
+      const args = ['task', 'edit', id];
+      if (spec.addLabel !== undefined) args.push('--add-label', spec.addLabel);
+      if (spec.appendNotes !== undefined) args.push('--append-notes', spec.appendNotes);
+      args.push('--plain');
+      run(args); // non-zero (e.g. unknown id) → BacklogError, never a silent no-op
     },
   };
 }
