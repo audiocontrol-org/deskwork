@@ -42,10 +42,11 @@ bullets with a closed key set:
 - `css: <path> <selector>` — ≥1 per rule; the path is relative to the spec
   file; the selector must be **defined in that author-written CSS source**
   (checked statically — no app boot). Non-CSS targets (CSS-in-JS, utility
-  frameworks, CSS-Modules) are reported as not-validated-in-v1 notes.
+  frameworks, CSS-Modules) are reported as unchecked notes and do not
+  establish link-liveness.
 - `example:` — ≥1 per rule (a rule with zero examples is rejected). Presence
   is structural; whether the example still matches live UI is
-  `spec-truthfulness`, deliberately out of v1 scope.
+  `spec-truthfulness`, a separate concern this gate does not check.
 - `do:` / `don't:` — ≥1 guidance line per rule.
 
 ## Procedure
@@ -78,8 +79,8 @@ bullets with a closed key set:
    ```
 
    - Exit `0` (spec green, zero findings) → the draft may be presented.
-     Read any `not validated in v1` notes aloud to the operator — a skipped
-     link is visible scope, not silent coverage.
+     Read any `does not establish link-liveness` notes aloud to the operator —
+     a skipped link is visible scope, not silent coverage.
    - Exit `1` → fix every finding and re-run. A dead selector means either the
      rule rots (fix the link) or the CSS moved (update the rule) — NEVER
      delete the rule just to silence the finding; that decision is the
@@ -95,6 +96,7 @@ bullets with a closed key set:
 - It does not author wireframes (`/design-control:wireframe`), implement, or
   referee.
 - It does not boot the app, capture screenshots, or verify that examples still
-  match live UI (`spec-truthfulness` is named-deferred).
+  match live UI (that is `spec-truthfulness`, which no step of this skill
+  performs).
 - It does not skip the gate for engine-authored drafts — same gate, same
   checker, zero findings.

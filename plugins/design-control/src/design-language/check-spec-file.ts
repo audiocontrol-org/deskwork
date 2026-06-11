@@ -81,7 +81,7 @@ export function runCheckDesignSpec(argv: readonly string[], io: CliIo): number {
   }
   for (const skip of result.skipped) {
     io.out(
-      `note: rule "${skip.ruleId}" link "${skip.link.path} ${skip.link.selector}" is a non-CSS target — not validated in v1 (CSS-in-JS / utility-framework / CSS-Modules liveness is named-deferred).`,
+      `note: rule "${skip.ruleId}" link "${skip.link.path} ${skip.link.selector}" is a non-CSS target — reported unchecked, does not establish link-liveness (this check validates selectors in author-written .css sources only; CSS-in-JS / utility-framework / CSS-Modules targets are outside its validated scope).`,
     );
   }
   if (result.ok) {

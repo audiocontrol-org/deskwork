@@ -6,13 +6,13 @@
  * reads against source, no app boot, no engine (round-6 M1: "authoring
  * artifacts only / no capture dependency").
  *
- * Scope (v1, named-deferred boundary): only `.css` targets are validated.
- * Utility-framework, CSS-in-JS, and hashed CSS-Modules resolution are NOT
- * validated in v1 — such links are recorded as `skipped` (visible in the
- * result and in CLI output), never silently dropped and never fabricated into
- * a dead-link verdict. Liveness ≠ truthfulness: a resolving selector does not
- * prove the live CSS still matches the rule's described intent
- * (`spec-truthfulness`, named-deferred).
+ * Scope (the spec's named-deferred boundary): only `.css` targets are
+ * validated. Utility-framework, CSS-in-JS, and hashed CSS-Modules links do
+ * not establish link-liveness — they are recorded as `skipped` (visible in
+ * the result and in CLI output), never silently dropped and never fabricated
+ * into a dead-link verdict. Liveness ≠ truthfulness: a resolving selector
+ * does not prove the live CSS still matches the rule's described intent
+ * (`spec-truthfulness`, named-deferred in the spec, is not checked here).
  *
  * "Defined in source" is implemented as: the selector appears, ident-boundary
  * exact, inside some selector prelude of the file — preludes are the text
@@ -34,7 +34,7 @@ import type {
   RuleScopedCssLink,
 } from '@/design-language/types';
 
-/** A link excluded from v1 validation, recorded visibly. */
+/** A link outside the validated .css scope, recorded visibly. */
 export interface SkippedLink {
   readonly ruleId: string;
   readonly link: CssLink;

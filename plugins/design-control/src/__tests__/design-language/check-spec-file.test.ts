@@ -216,6 +216,6 @@ describe('runCheckDesignSpec — exit contract', () => {
     );
     const { out, io } = captureIo();
     expect(runCheckDesignSpec([specPath], io)).toBe(0);
-    expect(out.join('\n')).toContain('not validated in v1');
+    expect(out.join('\n')).toContain('does not establish link-liveness');
   });
 });

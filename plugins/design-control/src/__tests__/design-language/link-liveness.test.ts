@@ -7,9 +7,9 @@
  * "flags a dead selector with no app boot — engine absent" lands here).
  *
  * Scope is author-written CSS only: non-.css targets (CSS-in-JS, hashed
- * CSS-Modules, utility frameworks) are NOT validated in v1 (named-deferred) —
- * they are recorded as skipped, visibly, never silently dropped and never
- * fabricated into a dead-link finding.
+ * CSS-Modules, utility frameworks) do not establish link-liveness — they are
+ * recorded as skipped, visibly, never silently dropped and never fabricated
+ * into a dead-link finding.
  *
  * Real-fs temp fixtures per .claude/rules/testing.md — never mock the fs.
  */
@@ -176,7 +176,7 @@ describe('checkLinkLiveness — dead links flagged (no app boot)', () => {
   });
 });
 
-describe('checkLinkLiveness — v1 scope boundary (named-deferred, visible)', () => {
+describe('checkLinkLiveness — validated-scope boundary (non-CSS targets, visible)', () => {
   it('records a non-.css target as skipped — no finding, never silent', () => {
     const dir = makeFixtureDir();
     writeFileSync(join(dir, 'styles.ts'), 'export const btn = css`color: navy;`;\n');
