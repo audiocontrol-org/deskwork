@@ -8,6 +8,7 @@
 // already consumes. A stream that ends without a result event yields NULL
 // (the artifact is then absent; no partial fabrication — Principle V).
 
+import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -135,5 +136,31 @@ describe('multi-turn assistant-text assembly (FR-005 distortion fix, 2026-06-11 
     x.onChunk(Buffer.from(`${assistantEvent('partial work before the kill')}\n`));
     const { resultText } = await x.settle();
     expect(resultText).toBeNull();
+  });
+});
+
+describe('events-capture honesty (AUDIT-20260611-21)', () => {
+  // The events file is created LAZILY on the first consumed line. A lane
+  // that never delivered a stdout byte (spawn failure, zero-output stream)
+  // must settle reporting that NO capture was written — and the file must
+  // genuinely not exist — so the spawn wrapper never records an eventsPath
+  // naming a nonexistent file (same artifact-honesty posture as the
+  // AUDIT-01 report-bytes fix).
+  it('a settle with zero chunks consumed reports eventsCaptured false and creates NO file', async () => {
+    const path = eventsPath();
+    const x = createStreamResultExtractor(path);
+    const extraction = await x.settle();
+    expect(extraction.resultText).toBeNull();
+    expect(extraction.eventsCaptured).toBe(false);
+    expect(existsSync(path)).toBe(false);
+  });
+
+  it('a settle that consumed at least one line reports eventsCaptured true and the file exists', async () => {
+    const path = eventsPath();
+    const x = createStreamResultExtractor(path);
+    x.onChunk(Buffer.from('{"type":"system","subtype":"init"}\n'));
+    const extraction = await x.settle();
+    expect(extraction.eventsCaptured).toBe(true);
+    expect(existsSync(path)).toBe(true);
   });
 });

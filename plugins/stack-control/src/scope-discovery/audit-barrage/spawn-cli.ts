@@ -140,7 +140,10 @@ const defaultSpawn: BarrageSpawnFn = (binary, args, options) =>
  * `timeoutBasis` is the derived (or operator-override) budget for THIS
  * payload (FR-002) — the spawn arms `effectiveTimeoutSeconds`, never a
  * raw config field. `eventsPath` is the NDJSON forensic capture target
- * for stream-json lanes (unused by text lanes).
+ * for stream-json lanes (unused by text lanes); the extractor creates
+ * the file lazily on the first captured line, and the result records
+ * the path only when a capture was actually written
+ * (AUDIT-20260611-21).
  */
 export interface SpawnInput {
   readonly model: ModelConfig;
@@ -251,11 +254,13 @@ export async function spawnCliAgainstModel(
       terminalState: TerminalState,
     ): Promise<ModelRunResult> {
       let reportBytes = 0;
+      let eventsCaptured = false;
       if (extractor !== null) {
-        const { resultText } = await extractor.settle();
-        if (resultText !== null) {
-          await writeFile(input.stdoutPath, resultText, 'utf8');
-          reportBytes = Buffer.byteLength(resultText, 'utf8');
+        const extraction = await extractor.settle();
+        eventsCaptured = extraction.eventsCaptured;
+        if (extraction.resultText !== null) {
+          await writeFile(input.stdoutPath, extraction.resultText, 'utf8');
+          reportBytes = Buffer.byteLength(extraction.resultText, 'utf8');
         }
       }
       if (stdoutStream !== null) {
@@ -282,7 +287,13 @@ export async function spawnCliAgainstModel(
           : {}),
         ...(stalenessAtKillMs !== undefined ? { stalenessAtKillMs } : {}),
         timeoutBasis: input.timeoutBasis,
-        ...(streamMode ? { eventsPath: input.eventsPath } : {}),
+        // AUDIT-20260611-21: the extractor creates the events file LAZILY
+        // on the first consumed line, so a spawn-failed stream lane (no
+        // chunk ever arrived) or a zero-stdout stream lane has NO file on
+        // disk. Recording eventsPath anyway would make renderModelRow emit
+        // an INDEX `- events path:` row naming a nonexistent file — the
+        // field is present only when a capture was actually written.
+        ...(streamMode && eventsCaptured ? { eventsPath: input.eventsPath } : {}),
       };
     }
 

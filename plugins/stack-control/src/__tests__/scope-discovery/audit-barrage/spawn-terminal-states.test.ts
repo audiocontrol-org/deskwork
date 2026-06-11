@@ -197,6 +197,32 @@ describe('all four terminal states end-to-end through orchestrateBarrage (FR-006
   });
 });
 
+describe('events-path honesty for stream lanes that never wrote a capture (AUDIT-20260611-21)', () => {
+  // The events file is created lazily by the extractor on the first
+  // consumed stdout line. A spawn-failed stream lane (no chunk ever
+  // arrived) must NOT record an eventsPath — renderModelRow gates the
+  // INDEX `- events path:` row on field presence, so an unconditional
+  // eventsPath would publish a path to a file that does not exist.
+  it('a stream-mode spawn failure records NO eventsPath and leaves the events file absent', async () => {
+    const evPath = join(dir, 'spawn-failed-stream.events.ndjson');
+    const result = await spawnCliAgainstModel({
+      model: lane({
+        name: 'spawn-failed-stream-lane',
+        binary: '/nonexistent-binary-stackctl-014-stream',
+        outputMode: 'stream-json',
+      }),
+      prompt: 'p',
+      stdoutPath: join(dir, 'spawn-failed-stream.md'),
+      stderrPath: join(dir, 'spawn-failed-stream.err.txt'),
+      eventsPath: evPath,
+      timeoutBasis: { mode: 'override', payloadBytes: 1, effectiveTimeoutSeconds: 10 },
+    });
+    expect(result.terminalState).toBe('spawn-failed');
+    expect(result.eventsPath).toBeUndefined();
+    expect(existsSync(evPath)).toBe(false);
+  });
+});
+
 class FakeChild extends EventEmitter {
   readonly stdout = new PassThrough();
   readonly stderr = new PassThrough();

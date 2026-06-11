@@ -13,7 +13,10 @@ Consumers: `run-artifacts.ts` (writer), `audit-barrage-lift` (reader), govern co
 │                            # a terminal result event was received; text lanes: stdout non-empty
 │                            # at completed settle). NEVER fabricated for killed/failed lanes.
 ├── <model>.events.ndjson    # NEW — stream-json lanes only: verbatim event capture (forensics,
-│                            # liveness post-mortems). Not consumed by lift.
+│                            # liveness post-mortems). Not consumed by lift. Created lazily on
+│                            # the first captured stdout line — a spawn-failed or zero-stdout
+│                            # stream lane has NO events file, and its INDEX row carries no
+│                            # `events path:` line (AUDIT-20260611-21).
 ├── stderr/<model>.txt       # unchanged
 └── tip.sha                  # unchanged
 ```

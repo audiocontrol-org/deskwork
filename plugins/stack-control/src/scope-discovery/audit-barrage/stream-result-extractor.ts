@@ -37,6 +37,15 @@ import { isPlainObject } from '../util/typeguards.js';
 
 export interface StreamResultExtraction {
   readonly resultText: string | null;
+  /**
+   * True IFF the events capture file was actually written. The file is
+   * created lazily on the first consumed line (or trailing partial), so a
+   * lane that never delivered a stdout byte — spawn failure, zero-output
+   * stream — settles with `eventsCaptured: false` and NO file on disk.
+   * The spawn wrapper gates the result's `eventsPath` on this signal so
+   * no downstream surface names a nonexistent file (AUDIT-20260611-21).
+   */
+  readonly eventsCaptured: boolean;
 }
 
 export interface StreamResultExtractor {
@@ -138,7 +147,10 @@ export function createStreamResultExtractor(
         });
       }
       if (streamError !== null) throw streamError;
-      return { resultText: assembleArtifact() };
+      // eventsStream is non-null exactly when ensureStream() fired — i.e.
+      // when at least one line/partial was consumed and the capture file
+      // was created (AUDIT-20260611-21).
+      return { resultText: assembleArtifact(), eventsCaptured: eventsStream !== null };
     },
   };
 }

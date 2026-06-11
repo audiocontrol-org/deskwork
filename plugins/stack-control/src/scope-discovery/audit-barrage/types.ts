@@ -239,6 +239,10 @@ export function isModelRunCovering(result: ModelRunResult): boolean {
  *   - `stalenessAtKillMs` — present on a `killed-no-liveness` settle:
  *     how stale the pulse was when the watchdog fired.
  *   - `eventsPath` — stream-json lanes: the NDJSON forensic capture.
+ *     Present only when a capture was actually written — the file is
+ *     created lazily on the first captured line, so a spawn-failed
+ *     stream lane or one that settled with zero stdout bytes records
+ *     NO path for a file that does not exist (AUDIT-20260611-21).
  */
 export interface ModelRunResult {
   readonly name: string;
