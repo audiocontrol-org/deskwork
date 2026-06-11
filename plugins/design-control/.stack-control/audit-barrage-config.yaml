@@ -1,7 +1,13 @@
-# Audit-barrage model battery — project override for graphical-entries.
+# Audit-barrage model battery — override for the design-control nested
+# installation (plugins/design-control), seeded 2026-06-10 from the repo-root
+# override after run 20260611T062218157Z hit the fleet floor (claude timed out
+# at the plugin default's 300s on a governed-diff payload; gemini exited 1).
+# The two rationale blocks below are INHERITED from the root override —
+# originally measured on the graphical-entries audit cycle, kept because the
+# same evidence governs the model roster here (AUDIT-20260611-14).
 #
 # Overrides the plugin default at:
-#   plugins/dw-lifecycle/templates/audit-barrage-config.yaml
+#   plugins/stack-control/templates/audit-barrage-config.yaml
 #
 # Disabled gemini effective 2026-06-01 — gemini-cli was failing 94.1% of runs
 # (16 of 17 across the graphical-entries Phase 0 audit cycle) on two cascading
