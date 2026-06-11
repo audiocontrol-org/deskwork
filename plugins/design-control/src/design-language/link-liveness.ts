@@ -107,10 +107,14 @@ function isIdentChar(ch: string | undefined): boolean {
 /**
  * True iff `selector` appears ident-boundary exact inside some selector
  * prelude of `css`. Whitespace in a multi-token (descendant) selector is
- * normalized on both sides before matching.
+ * normalized on both sides before matching. String-literal CONTENTS are
+ * stripped on both sides identically, so quoted attribute selectors
+ * (`input[type="text"]`) match their source rules; the accepted
+ * over-approximation is that quoted VALUES are not compared —
+ * `[data-state="open"]` matches a source rule for `[data-state="closed"]`.
  */
 export function cssDefinesSelector(css: string, selector: string): boolean {
-  const query = selector.trim().replace(/\s+/g, ' ');
+  const query = stripCommentsAndStrings(selector).trim().replace(/\s+/g, ' ');
   if (query === '') {
     return false;
   }

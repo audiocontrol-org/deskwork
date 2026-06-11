@@ -80,6 +80,22 @@ describe('checkLinkLiveness — live selectors pass', () => {
     expect(checkLinkLiveness(specWithLink('studio.css', '.masthead nav a'), dir).ok).toBe(true);
   });
 
+  it('finds a quoted attribute selector — input[type="text"] is live, not fabricated dead', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), 'input[type="text"] { border: 1px solid; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', 'input[type="text"]'), dir);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('finds a class + quoted attribute selector — .chip[data-state="open"] is live', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.chip[data-state="open"] { outline: 2px solid; }\n');
+    expect(
+      checkLinkLiveness(specWithLink('studio.css', '.chip[data-state="open"]'), dir).ok,
+    ).toBe(true);
+  });
+
   it('resolves the css path relative to the spec base dir, including subdirectories', () => {
     const dir = makeFixtureDir();
     mkdirSync(join(dir, 'styles'));
