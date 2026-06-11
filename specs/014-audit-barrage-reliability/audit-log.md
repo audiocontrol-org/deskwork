@@ -169,3 +169,46 @@ Surface:    plugins/stack-control/src/scope-discovery/audit-barrage/config-loade
 `parseEntry()` accepts any `args_template` that merely contains `{{prompt-stdin}}`, because it uses `argsTemplate.includes(PROMPT_STDIN_PLACEHOLDER)` as the validation rule. `spawnCliAgainstModel()` also switches to stdin delivery on the same substring test. But `buildArgs()` only removes tokens equal to the bare placeholder via `.filter((tok) => tok !== PROMPT_STDIN_PLACEHOLDER)`, so a valid-looking template such as `--input={{prompt-stdin}} --model {{model}}` spawns with stdin connected and still passes the literal `--input={{prompt-stdin}}` argv token to the CLI.
 
 Blast radius is medium: shipped configs use the bare token, but adopter configs can pass validation and then fail at spawn time or invoke a CLI with a bogus input argument. This is exactly the sort of config/load mismatch the v2 grammar is trying to eliminate. A reasonable fix is to either reject embedded `{{prompt-stdin}}` during config loading with a clear “bare token only” error, or make argv assembly strip any token containing the stdin placeholder if that is the intended grammar.
+
+## 2026-06-11 — audit-barrage lift (20260611T121233452Z-audit-barrage-reliability-after_clarify)
+
+### AUDIT-20260611-13 — Close-handler drops the `signal` argument — an externally-signal-killed child settles `completed`, leaking its partial output into the lift (defeats FR-007 for the external-kill case)
+
+Finding-ID: AUDIT-20260611-13 (claude-01 + codex-01; cross-model)
+Status:     fixed-8c7766de
+Severity:   high
+Surface:    plugins/stack-control/src/scope-discovery/audit-barrage/spawn-cli.ts (the `child.on('close', ...)` handler, ~lines 470-485 of the new file)
+
+The new close handler is `child.on('close', (code) => { ... })` — it no longer destructures `signal` (the old code was `(code, signal)` and set `timedOut: timedOut || signal !== null`). `terminalState` is now derived purely from `killReason`:
+
+```ts
+const terminalState: TerminalState =
+  killReason === 'timeout' ? 'timed-out'
+  : killReason === 'liveness' ? 'killed-no-liveness'
+  : 'completed';
+```
+
+So any child terminated by a signal that the wrapper did NOT initiate — OOM killer, a system/parent `kill`, an out-of-band SIGTERM — arrives with `killReason === null`, `code === null`, and settles **`terminalState: 'completed'`, `exitCode: -1`, `timedOut: false`**. This is precisely the long, memory-heavy run this feature targets (the SC-001 claude lane ran 727 s and captured ~300 KB of stdout); an OOM-kill of such a lane mid-stream is a realistic trigger, not a theoretical one.
+
+The concrete harm is at the lift: `audit-barrage-lift.ts` builds `includeModels` from `lanes.filter((lane) => lane.terminalState === 'completed')`, so an externally-killed lane is treated as completed and its **partial `.md` output is extracted into the audit-log** — exactly the "a killed lane contributes ZERO findings; its partial output is never presented as a clean run" guarantee FR-007 promises, violated for this kill path. `isModelRunHealthy` (`terminalState === 'completed' && reportBytes > 0`) returns true for it, so partial findings flow through. The fleet `produced` count is still correct (`isModelRunConverged` requires `exitCode === 0`, which `-1` fails, so it stays out of `produced` and the run still reads DEGRADED), which is why I rate this medium rather than high — the operator does see the degradation, but partial findings from a killed lane are silently mixed into the log, and `terminalState` is documented in `types.ts` as "the single source of downstream truth (FR-006)" while this case makes it lie. A reasonable fix: restore the `signal` parameter and classify a close with a non-null signal and no `killReason` as a kill (a distinct state, or at minimum `exitCode`-based so it is excluded from `includeModels`), rather than folding it into `completed`.
+
+For independent signal alongside the other lanes: I separately verified and found CLEAN the kill-vs-kill-vs-close interlocks (single-latch `killReason` + `clearTimers`/`watchdog.disarm` keeping `timed-out` and `killed-no-liveness` disjoint; `close`-first settling `completed`), the enforcement injection (fragment spliced before the prompt, `containsContiguous` correctly suppressing duplicates only for fragments present *before* the prompt, both shipped lanes resolving with no double-injection), the timeout derivation (`max(floor, ceil(secs_per_kb × payload_kb))`, override displacing, linear extrapolation, fail-loud backstop), the writer/reader fleet-count agreement on `reportBytes > 0` (AUDIT-01's fix holds), and `parseIndexLaneStates` not misparsing the `## Fleet report` block's `- <lane>:` lines as model-row fields. The defect above is the one place the settle machine's vocabulary is incomplete.
+
+### AUDIT-20260611-14 — Config loader silently accepts (and stores) a dead `liveness_window_seconds` on a `liveness_signal: none` lane
+
+Finding-ID: AUDIT-20260611-14
+Status:     fixed-8c7766de
+Severity:   low
+Surface:    plugins/stack-control/src/scope-discovery/audit-barrage/config-loader.ts (the `liveness_signal !== 'none'` / `else if` window branch, ~lines 360-380 of the new hunk)
+
+When `liveness_signal` is `none`, the loader still parses and stores a supplied `liveness_window_seconds`:
+
+```ts
+} else if (raw['liveness_window_seconds'] !== undefined && raw['liveness_window_seconds'] !== null) {
+  livenessWindowSeconds = requirePositiveInteger(raw, 'liveness_window_seconds', prefix);
+}
+```
+
+The resulting `ModelConfig` carries `livenessSignal: 'none'` together with a `livenessWindowSeconds`, but `spawn-cli.ts` computes `monitored = livenessSignal !== 'none'` (false), so the watchdog is never armed and the window is inert. The field is accepted with no error and no warning.
+
+This is a small honesty/consistency gap rather than a behavioral bug: the v2 loader is otherwise aggressively fail-loud (it rejects half-pairs, embedded `{{prompt-stdin}}`, invalid enums, and pre-014 shapes), so silently swallowing a meaningless field is the odd one out — a reader who sets a window on a `none` lane will reasonably believe liveness is monitored when it isn't. Blast radius is low: no run misbehaves, the lane simply runs unmonitored as the `none` sentinel dictates. It is plausibly an intentional convenience (keep the window so flipping `none → stdout` is a one-line edit); if so, that intent should be stated, otherwise the loader should reject or at least warn on a window paired with `none`, consistent with the rest of the v2 grammar's fail-loud posture.
