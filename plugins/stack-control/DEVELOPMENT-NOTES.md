@@ -2,27 +2,38 @@
 
 ---
 
-## 2026-06-11: <!-- session title -->
+## 2026-06-11: Post-release verification (v0.42.0), tracking consolidation, and authoring spec 014 to runnable
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Verify the spec-013 fixes in the formally-installed v0.42.0 release and close their tracking; consolidate all defect tracking into the backlog (GitHub issues + roadmap fix/gap nodes); cultivate a burn-down set and author it as the next Spec Kit feature.
 
 **Accomplished:**
-- <!-- compose -->
+- **Installed-release verification of 013** (`c578a5d0`): 16/16 assertions driving the installed marketplace `bin/stackctl` against tmp fixtures — US2 scaffold-on-first-lift, legacy-layout no-regression, fail-loud-both-layouts, specs-first precedence with no split-brain write, gate resolution (SC-001), and a behavioral probe of `resolveAuditLogExcerpt` (TASK-25). TASK-13/14/25 closed Done with evidence appended; closure operator-authorized.
+- **Roadmap item added** (`222b7a26`): `design:feature/backlog-backend-port` — a BacklogStore port between the backlog frontend verbs and the backlog.md backend, motivated by the operator's objection to backlog.md's leaked conventions (space-laden filenames, `.md.md`, archiving model, directory layout).
+- **Tracking consolidation:** migrated the 5 open GitHub issues to the backlog (`a5a7dff0`, TASK-26..30, bodies intact — import-before-close avoided the prior round's body-drop); migrated 7 defect-tracking roadmap nodes to the backlog (`e0008ab9`, nodes retired with pointers; all leaves, graph re-validates); deduped my own 5 duplicate captures against the 2026-06-10 seed imports (`9d809d62`). Repo now has 0 open GitHub issues; the roadmap is a near-pure feature DAG.
+- **Cultivated the burn-down set + closed 2 stale items with evidence** (`6b742769`): TASK-27 (gh-449 doesn't reproduce in v0.42.0) and TASK-32 (T038 green at HEAD) closed; TASK-29 promoted `spec:` lead + TASK-2/5/12/24/28/30/37 promoted `tasks:` toward specs/014.
+- **Authored spec 014 (audit-protocol-reliability) to runnable** through the native chain: specify (`630b1401`) → clarify (`8a008742`, 3 operator decisions) → plan + research/data-model/contracts/quickstart (`baff2a25`) → 22-task RED-first tasks.md (`61414757`). `spec-check`: spec=yes plan=yes tasks=yes. Phase-0 research re-verified all 8 surfaces at file:line and corrected two planning assumptions (US5 must exclude the audit-log from the committed-diff arm, not just the untracked fold; SC-007 probe targets path construction, not message strings).
 
 **Didn't Work:**
-- <!-- compose -->
+- **`backlog capture` created 5 duplicates** during the roadmap migration — capture doesn't dedupe by `--ref` (only `import-github` checks `gh-<n>`), and I didn't check the existing pile first. Needed a dedupe+archive pass and ROADMAP pointer repointing. (Captured as friction + the verb-level gap is TASK-38.)
+- **session-end's auto-derived quantitative section reported 0 commits / no backlog touched** for a 10-commit session — the boundary derivation missed the session window entirely; numbers below re-derived by hand from `git log c437231e..HEAD` per the verify-before-publishing instruction. (Captured as TASK-39.)
+- **Direct backlog.md CLI invocations are cwd-flaky** — `task edit` worked from `plugins/stack-control` once, later failed from the same cwd; reliable only from the store parent (`.stack-control/`). (Captured as friction.)
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Operator: GitHub issues were already closed — the live tracking to close was the **backlog** (the migration comments are the canon: "tracking continues in the backlog"). Adjusted; the verification evidence went onto the backlog items.
+- [PROCESS] Operator recalled the roadmap still carried bug/gap nodes that belong in the backlog — the consolidation pass was operator-driven scope, not agent-proposed.
 
 **Insights:**
-- <!-- compose -->
+- **Two-tier tracking is now actually two-tier.** GitHub issues → backlog (import-github), roadmap defect nodes → backlog (capture + retire + pointer), burn-down → spec (promote seam). Each migration leg preserved bodies + bidirectional refs. The failure mode to watch: `capture` is the only intake without ref-dedupe — exactly the leg where I created duplicates.
+- **Verification-first cultivation pays.** Two of the ten candidate burn-down items (TASK-27, TASK-32) closed with zero implementation — their symptoms were stale claims. Re-verifying before scoping kept dead work out of spec 014.
+- **The 013 research-D5 pattern repeated for 014:** the spec's acceptance probe as literally written (grep-empty) would have condemned the 013-mandated fail-loud messages naming both layouts. Reading the actual grep hits during Phase-0 research — not at implementation time — is what kept SC-007 honest.
 
-**Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 0
-  - (no commits this session)
-- Files changed: 0
-- Backlog touched: (none)
+**Quantitative (re-derived by hand from `git log c437231e..HEAD` — the auto-derivation reported 0, see TASK-39):**
+- Commits: 11 (10 work + this session-end record `58663921`): `c578a5d0`, `222b7a26`, `a5a7dff0`, `e0008ab9`, `9d809d62`, `6b742769`, `630b1401`, `8a008742`, `baff2a25`, `61414757`, `58663921`.
+- Files changed: 37 (+1178 / −28) across the session window.
+- Backlog: 3 closed-verified (TASK-13/14/25), 2 closed-stale (TASK-27/32), 12 created (TASK-26..37), 5 archived as duplicates (TASK-31/33/34/35/36), 8 promoted toward specs/014. Pile at close: 27 To Do / 12 Done / 5 archived.
+- Tests: no production code touched; suite untouched at the 173 files / 1150 cases baseline (verified green for the T038 check: generality file 4/4).
+- Tooling friction captured: 2 via session-end (+2 backlog bugs filed: TASK-38 capture-dedupe, TASK-39 session-end derivation).
+- Corrections: 2.
 
 ## 2026-06-11: Implement + ship spec 013 — layout-aware audit-protocol resolution
 
