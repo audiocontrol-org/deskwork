@@ -43,7 +43,7 @@ No flag changes. Strengthened contract: dry-run "would migrate N" ⇒ apply migr
 
 ## `stackctl govern --mode implement` (US5)
 
-No flag changes. Payload contract: the feature's own audit-log/governance bookkeeping is absent from the audited diff and untracked fold; the untracked fold excludes other features' roots and the feature's audit-log — the feature's own files and non-feature files (e.g. new source modules) fold in (AUDIT-20260611-01: the prior "only files under the feature under audit" inclusion scoping silently dropped untracked source files); each other-feature drop is announced on stderr and recorded in the payload's `skippedOtherFeature` ledger; the labeled `audit_log_excerpt` context block is the only audit-log content.
+No flag changes. Payload contract: the feature's own audit-log/governance bookkeeping is absent from the audited diff and untracked fold; the untracked fold excludes other features' roots and the feature's audit-log — the feature's own files and non-feature files (e.g. new source modules) fold in (AUDIT-20260611-01: the prior "only files under the feature under audit" inclusion scoping silently dropped untracked source files); each other-feature drop is announced on stderr and recorded in the payload's `skippedOtherFeature` ledger; the labeled `audit_log_excerpt` context block is the only audit-log content. AUDIT-20260611-04: implement mode REFUSES to run on an unresolvable feature root — stderr FATAL naming the slug + both probed layouts (speckit + legacy-docs), exit 2, before any payload ships — instead of silently reverting to the pre-014 self-referential repo-wide payload.
 
 ## `stackctl scope-widen` (US6 + US7)
 

@@ -347,6 +347,21 @@ export async function runGovern(args: string[]): Promise<void> {
     // (AUDIT-20260611-01 — exclusion-scoped, not inclusion-scoped).
     const auditLogExcerpt = await resolveAuditLogExcerpt(repoRoot, slug);
     const { root: featureRoot } = await resolveFeatureRoot({ repoRoot, slug });
+    // AUDIT-20260611-04: implement mode REFUSES to run without a resolved
+    // feature root. An undefined root used to revert the assembler to the
+    // pre-014 self-referential repo-wide payload (audit-log in the diff +
+    // repo-wide untracked fold — the AUDIT-28/42/48 generator US5 closed),
+    // silently, with the lift step doomed to fail later anyway AFTER the
+    // payload had shipped off-box. Fail loud at the decision site instead,
+    // mirroring the sibling verbs (slush-findings, scope-widen,
+    // scope-inventory) that FATAL on the identical condition. Spec mode is
+    // untouched — its payload doesn't use the feature root.
+    if (flags.mode === 'implement' && featureRoot === undefined) {
+      process.stderr.write(
+        `govern: FATAL — feature '${slug}' not found under ${join(repoRoot, 'specs')}/<NNN>-${slug} (speckit) or ${join(repoRoot, 'docs')}/*/001-IN-PROGRESS/${slug} (legacy-docs).\n`,
+      );
+      process.exit(2);
+    }
     const excludeRoots =
       flags.mode === 'implement' && featureRoot !== undefined
         ? await discoverFeatureRoots(repoRoot)

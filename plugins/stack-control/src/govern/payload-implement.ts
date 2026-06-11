@@ -79,8 +79,12 @@ export interface ImplementPayloadArgs {
    * FR-008 as amended by AUDIT-20260611-01; the original
    * inclusion-scoped filter silently dropped untracked src/** —
    * exactly the surfaces AUDIT-20260605-01 added the fold for). When
-   * absent, behavior is byte-identical to the pre-014 assembler (the
-   * caller has no resolvable feature root to scope by).
+   * absent, behavior is byte-identical to the pre-014 assembler — but
+   * note govern's implement mode now REFUSES to run without a
+   * resolved feature root (AUDIT-20260611-04: it FATALs at the
+   * decision site instead of silently shipping the self-referential
+   * repo-wide payload), so the absent case exists only for
+   * non-govern/library callers and legacy tests.
    */
   readonly featureRoot?: string;
   /**
