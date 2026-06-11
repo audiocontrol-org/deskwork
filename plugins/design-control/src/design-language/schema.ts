@@ -15,8 +15,10 @@
  *   - other prose (paragraphs, capitalised-key bullets) is inert.
  *
  * Validation per rule: kind from the closed vocabulary; ≥1 css link; ≥1
- * example (structural presence only — example truthfulness is the
- * named-deferred `spec-truthfulness`); ≥1 do/don't guidance line. A lowercase
+ * example (structural presence only — this validator does not establish
+ * example truthfulness; that is the separate `spec-truthfulness` axis,
+ * scope decision recorded in specs/001-design-control/spec.md); ≥1
+ * do/don't guidance line. A lowercase
  * single-word bullet key outside the closed set is an `unknown-field` finding
  * (typo guard) — silently dropping a misspelled `example:` would otherwise
  * fabricate a missing-example rejection with no visible cause. The same

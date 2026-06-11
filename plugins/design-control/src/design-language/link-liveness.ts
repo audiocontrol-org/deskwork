@@ -6,13 +6,14 @@
  * reads against source, no app boot, no engine (round-6 M1: "authoring
  * artifacts only / no capture dependency").
  *
- * Scope (the spec's named-deferred boundary): only `.css` targets are
- * validated. Utility-framework, CSS-in-JS, and hashed CSS-Modules links do
+ * Scope: this check validates selectors in author-written `.css` sources
+ * only. Utility-framework, CSS-in-JS, and hashed CSS-Modules links do
  * not establish link-liveness — they are recorded as `skipped` (visible in
  * the result and in CLI output), never silently dropped and never fabricated
  * into a dead-link verdict. Liveness ≠ truthfulness: a resolving selector
- * does not prove the live CSS still matches the rule's described intent
- * (`spec-truthfulness`, named-deferred in the spec, is not checked here).
+ * does not establish that the live CSS still matches the rule's described
+ * intent — `spec-truthfulness` is a separate axis this check does not
+ * perform (scope decision recorded in specs/001-design-control/spec.md).
  *
  * "Defined in source" is implemented as: the selector appears, ident-boundary
  * exact, inside some selector prelude of the file — preludes are the text

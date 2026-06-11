@@ -5,7 +5,8 @@
  * structural-validation contract: rules declared under `### rule: <id>` headings
  * with bullet fields (`kind:` / `css:` / `example:` / `do:` / `don't:`). The
  * example-presence acceptance is here: a rule with ZERO example references is
- * rejected (structural presence only — example truthfulness is named-deferred).
+ * rejected (structural presence only — the schema axis does not establish
+ * example truthfulness).
  *
  * Nothing in this module touches the engine or the filesystem: the schema is
  * pure text → structure (link-liveness is the separate, fs-backed axis).

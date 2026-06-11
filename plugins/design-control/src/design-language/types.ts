@@ -44,7 +44,7 @@ export interface DesignSpecRule {
   readonly kind: DesignRuleKind;
   /** ≥1 live-CSS link (the link-liveness axis verifies each). */
   readonly cssLinks: readonly CssLink[];
-  /** ≥1 example reference (structural presence only; truthfulness deferred). */
+  /** ≥1 example reference (structural presence only; does not establish example truthfulness). */
   readonly examples: readonly string[];
   /** `do:` guidance lines. */
   readonly dos: readonly string[];

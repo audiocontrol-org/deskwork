@@ -181,8 +181,8 @@ same lint; a `derived` artifact cannot be accepted without a recorded operator e
       appear ident-boundary exact in a selector prelude — comments/string-contents stripped,
       at-rule preludes excluded but descended into, so `@media` rules count and
       `content: ".ghost"` / commented-out rules don't; `.btn-primary` never satisfies `.btn`.
-      Non-.css targets recorded as `skipped` + printed as notes — the named-deferred boundary is
-      visible, never a silent drop or a fabricated dead-link. Plus
+      Non-.css targets recorded as `skipped` + printed as notes — reported unchecked, they do not
+      establish link-liveness; never a silent drop or a fabricated dead-link. Plus
       `@/design-language/check-spec-file` + `bin/check-design-spec` (exit 0/1/2, mirrors
       check-wireframe; shim smoke-verified both directions). TDD: RED first; 20 new tests; suite
       397 → 417.)
@@ -198,7 +198,7 @@ same lint; a `derived` artifact cannot be accepted without a recorded operator e
       as the wireframe skill: manual hand-author path is the default and needs NO engine; the
       accelerator gates on `preflightEngine('translate-design-language')`; engine output gets
       zero trust — judged by the SAME `bin/check-design-spec` gate; skipped non-CSS links are
-      read aloud as visible v1 scope).
+      read aloud — reported unchecked, they do not establish link-liveness).
 
 **Acceptance (two paths):** **(scaffold, required)** an operator can hand-author a spec; static
 link-liveness flags a **dead selector** with **no app boot** — engine absent; **and the schema
