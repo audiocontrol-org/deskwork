@@ -274,6 +274,66 @@ describe('US4 — unlocatable flips fail loud (migrateFindings location guard)',
     expect(backend.list()).toHaveLength(0);
   });
 
+  it('a shift of exactly one entry height lands the recorded index on a DIFFERENT entry\'s open-status line — identity check fails loud, never rewrites the wrong entry (AUDIT-20260611-05)', () => {
+    const backlog = tmpBacklog();
+    const backend = createBacklogBackend({ cwd: backlog });
+    // Insert a FULL extra entry block (same 9-line shape as the original entry)
+    // above the recorded one. The recorded statusLineIndex (7) now lands exactly
+    // on the INSERTED entry's `Status:     open` line, so a shape-only guard
+    // passes — but the finding's fullFindingId belongs to the ORIGINAL entry,
+    // which now lives one entry height further down.
+    const decoy =
+      '### Decoy entry inserted above\n' +
+      '\n' +
+      'Finding-ID: AUDIT-20260607-99\n' +
+      'Status:     open\n' +
+      'Severity:   low\n' +
+      'Surface:    spec.md:9\n' +
+      '\n' +
+      'Decoy body.\n' +
+      '\n';
+    const edited = AUDIT_LOG.replace('### A finding', decoy + '### A finding');
+    // Sanity-pin the fixture: index 7 IS an open-status line (shape check
+    // passes), but it belongs to the decoy entry, not AUDIT-20260607-19.
+    expect(edited.split('\n')[7]).toMatch(/^Status:\s+open/);
+    expect(edited.split('\n')[6]).toBe('Finding-ID: AUDIT-20260607-99');
+
+    let threw: Error | undefined;
+    let line7AfterApply: string | undefined;
+    try {
+      const res = migrateFindings({
+        auditLogText: edited,
+        findings: [
+          {
+            findingId: 'AUDIT-20260607-19',
+            fullFindingId: 'AUDIT-20260607-19',
+            severity: 'low',
+            statusLineIndex: 7, // valid SHAPE against `edited`, wrong ENTRY
+            title: 'A finding',
+          },
+        ],
+        backend,
+        featureSlug: 's',
+        expectedStatusRe: /^Status:\s*open\b/i,
+      });
+      line7AfterApply = res.newAuditLogText.split('\n')[7];
+    } catch (e) {
+      threw = e instanceof Error ? e : new Error(String(e));
+    }
+    // Pre-fix pathology (the RED observation): no throw, and the DECOY entry's
+    // status line was rewritten with the original finding's task-id.
+    expect(
+      line7AfterApply,
+      'wrong-entry misapply: the decoy entry\'s status line was rewritten',
+    ).toBeUndefined();
+    // Post-fix contract: throws naming the finding ID and saying the recorded
+    // location now points at a different entry; nothing created, zero rewrites.
+    expect(threw).toBeDefined();
+    expect(threw?.message).toMatch(/AUDIT-20260607-19/);
+    expect(threw?.message).toMatch(/different entry/);
+    expect(backend.list()).toHaveLength(0);
+  });
+
   it('audit-log changed between flip computation and apply (hand-edit shifting lines) fails loud, never misapplies', () => {
     const backlog = tmpBacklog();
     const backend = createBacklogBackend({ cwd: backlog });

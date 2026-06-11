@@ -38,6 +38,32 @@ function canonical(value: string): string {
   return m !== null ? m[0] : value;
 }
 
+/**
+ * specs/014 AUDIT-20260611-05: a status-line SHAPE match is not an identity
+ * match — audit-log entries are uniform field blocks, so an edit shifting
+ * lines by exactly one entry height lands a recorded index on a DIFFERENT
+ * entry's open-status line. Pin identity: the entry block enclosing
+ * `statusLineIndex` (from the nearest `### ` header above — or the start of
+ * the text — down to the next `### ` header or end) must contain a
+ * `Finding-ID:` line whose value exactly matches the finding's fullFindingId.
+ */
+function entryBlockHasFindingId(
+  lines: readonly string[],
+  statusLineIndex: number,
+  fullFindingId: string,
+): boolean {
+  let start = statusLineIndex;
+  while (start > 0 && !ENTRY_HEADER_RE.test(lines[start] ?? '')) start -= 1;
+  let end = statusLineIndex + 1;
+  while (end < lines.length && !ENTRY_HEADER_RE.test(lines[end] ?? '')) end += 1;
+  const expected = fullFindingId.trim();
+  for (let k = start; k < end; k += 1) {
+    const m = FINDING_ID_RE.exec(lines[k] ?? '');
+    if (m !== null && m[1] !== undefined && m[1].trim() === expected) return true;
+  }
+  return false;
+}
+
 /** The migrated item's backlink ref (traceable to the audit-log entry, FR-016). */
 export function auditRef(featureSlug: string, findingId: string): string {
   return `audit:${featureSlug}:${findingId}`;
@@ -133,6 +159,19 @@ export function migrateFindings(args: {
             `recorded status line (index ${f.statusLineIndex}) — the audit-log ` +
             `changed between the dampener decision and apply. Nothing was ` +
             `migrated; re-run to recompute the decision against the current file.`,
+        );
+      }
+      // AUDIT-20260611-05: the line SHAPE matching is not enough — pin the
+      // finding's identity to the enclosing entry block, or a one-entry-height
+      // shift would rewrite a DIFFERENT entry's status with this task-id.
+      if (!entryBlockHasFindingId(lines, f.statusLineIndex, f.fullFindingId)) {
+        throw new Error(
+          `slush-migrate: finding ${f.findingId} could not be located at its ` +
+            `recorded status line (index ${f.statusLineIndex}) — the recorded ` +
+            `location now points at a different entry (its block does not ` +
+            `contain Finding-ID: ${f.fullFindingId}); the audit-log changed ` +
+            `between the dampener decision and apply. Nothing was migrated; ` +
+            `re-run to recompute the decision against the current file.`,
         );
       }
     }
