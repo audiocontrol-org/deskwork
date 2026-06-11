@@ -8,7 +8,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm suite baseline green and record the count (`npx vitest run` from `plugins/stack-control/`; expect ~185 files / 1220 tests) — the reconciliation anchor
+- [X] T001 Confirm suite baseline green and record the count (`npx vitest run` from `plugins/stack-control/`; expect ~185 files / 1220 tests) — the reconciliation anchor. **Recorded 2026-06-10: 184 files / 1220 tests, all green.**
 
 ## Phase 2: Foundational (US1's shared primitive — blocks all stories)
 
