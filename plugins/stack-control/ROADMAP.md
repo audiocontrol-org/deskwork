@@ -247,3 +247,14 @@ Post-install project setup: scaffold the governed documents + config the plugin 
 - depends-on: multi:feature/front-door
 Put a real port between the stack-control backlog frontend (capture / list / import-github / import-slush / promote) and the concrete store: a BacklogStore interface with the current backlog.md CLI as one adapter behind it, so the backend is swappable and its conventions stop leaking. Motivation: backlog.md imposes its own filename convention (spaces and the 'id - title' separator, double .md.md when a title ends in .md), its own archiving model, and its own directory layout on the governed store; the operator has explicit opinions on naming, archiving, and directory layout that the abstraction must make expressible instead of inheriting upstream defaults. Origin: 2026-06-11 session — shell work over the tasks dir broke on the space-laden filenames during the TASK-13/14/25 closure pass.
 
+## impl:feature/installation-isolation
+- status: planned
+- spec: specs/installation-isolation
+- ref: TASK-45
+Installations are isolated: all stack-control state anchors at the nearest-enclosing installation; --repo-root retired on state-writing verbs; legacy half-installation detection; Spec Kit root relocates into the installation. Operator directive 2026-06-10; promoted from TASK-45 (anchor unification).
+
+## impl:feature/descriptive-naming
+- status: planned
+- spec: specs/descriptive-naming
+Slugs, not fake ordinals: new specs slug-only, backlog interaction slug-first over the adopted tool, agents speak friendly names to the operator, recorded history grandfathered with zero ledger rewrites. Operator directive 2026-06-10.
+
