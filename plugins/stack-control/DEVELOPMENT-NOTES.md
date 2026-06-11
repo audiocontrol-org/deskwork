@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-06-11: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 0
+  - (no commits this session)
+- Files changed: 0
+- Backlog touched: (none)
+
 ## 2026-06-11: Implement + ship spec 013 — layout-aware audit-protocol resolution
 
 **Goal:** Implement spec 013 (audit-protocol-hardening) RED-first — widen the shared feature-root resolver to the `specs/NNN-slug/` Spec Kit layout so the audit protocol stops FATAL-ing on spec-structured features — and ship it.
