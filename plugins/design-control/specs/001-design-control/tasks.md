@@ -117,14 +117,28 @@ verbatim in substance** — when they drift, the PRD wins.
       verify non-vacuous via a payload-lowercasing mutation check before trusting it.
       **Done — `ec6308cb`** (mutation-verified both directions; the case-insensitive-compare
       mutation is caught by exactly this test and nothing else).
-- [ ] Adversarial validator: the lint MUST reject inline-style / `<style>` / `<script>` / `data:`
+- [x] Adversarial validator: the lint MUST reject inline-style / `<style>` / `<script>` / `data:`
       / external-resource / presentational-attr leakage AND emoji-as-icon AND `𝐌𝐚𝐭𝐡`-bold-heading
       text leakage. Grandfather allowlist entries require an issue link + expiry.
-- [ ] **Positive corpus** — a *small corpus of diverse legitimate wireframes* (accented Latin,
+      **Done — 2026-06-10 barrage convergence loop (20 rounds to two consecutive zero-HIGH;
+      audit-log AUDIT-20260610-01..66 + CONVERGENCE RECORD).** Every named leakage class is
+      corpus-fixtured; the loop additionally closed channels the task never imagined (NBSP
+      tokenization differential, decode-ordering, theme placement, kit-root, transitive fonts,
+      density sharding/dilution families) and DECLARED the three referee-domain boundaries with
+      fixtures. No grandfather entries were needed. Caveat carried in the record: claude was
+      0-byte from round 3 (deskwork issue 447), so convergence is single-family (codex);
+      cross-model re-validation is the natural follow-up once 447 lands.
+- [x] **Positive corpus** — a *small corpus of diverse legitimate wireframes* (accented Latin,
       tabs/newlines, `.sk-img`, common structural tags, inert arbitrary `class` values under the
       pinned stylesheet) that the lint must pass — **NOT a single fixture** (an over-strict allowlist
       that passes one hand-picked wireframe but rejects diverse legitimate ones is the characteristic
       allowlist failure).
+      **Done — built adversarially rather than hand-picked:** 20 rounds of false-POSITIVE findings
+      (the specificity arm) contributed acceptance fixtures across forms (label/for, every
+      structural input type, select/option idioms, fieldset/legend, state attrs), accented Latin +
+      Romanian comma-below, multiline placeholders, cache-busting/percent-encoded/subdirectory kit
+      hrefs, data tables, placeholder rows, prose pages, disclosure blocks, and the boundary
+      fixtures. Suite: 151 → 286.
 - [ ] `/design-control:wireframe <change>` authoring skill (operator-driven + lint-enforced; the
       engine `author-wireframe` method is an optional accelerator routed through the same lint).
 - [ ] Retroactive path: existing surface → `derived` wireframe/spec; **snapshot the auto-derived

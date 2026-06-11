@@ -1377,3 +1377,51 @@ Status:     fixed-930a718c (2026-06-10; select.disabled + option.value/disabled 
 Severity:   medium
 Surface:    plugins/design-control/src/lint/allowlist.ts + check-mockup-lofi.ts
 Direction:  false-positive
+
+## 2026-06-10 — lint adversarial barrage ROUND 20 (run 20260610T235555837Z; codex only — claude 0 bytes, 18th consecutive)
+
+**ZERO-HIGH round — SECOND CONSECUTIVE (rounds 19 + 20): CONVERGED.** Codex:
+"I did not find a high-confidence pinned false-negative inside the declared
+scope." Residuals: 2 form-surface false-positives, fixed in 0e5b4b21.
+
+### AUDIT-20260610-66 — fieldset/legend + required over-rejected
+
+Finding-ID: AUDIT-20260610-66 (round-20 gpt-5-01 MED + gpt-5-02 LOW)
+Status:     fixed-0e5b4b21 (2026-06-10; fieldset/legend allowlisted; required joins the structural-state attrs)
+Severity:   medium
+Surface:    plugins/design-control/src/lint/allowlist.ts
+Direction:  false-positive
+
+## CONVERGENCE RECORD — 2026-06-10 lint adversarial barrage loop (rounds 1–20)
+
+**Stop criterion met:** two consecutive zero-HIGH rounds (19 + 20), per the
+PRD's operator-set criterion. Twenty rounds fired via the committed
+re-runnable process (audit/run-lint-barrage.sh → stackctl audit-barrage).
+
+**Loop totals:**
+- Findings recorded: AUDIT-20260610-01 .. -66 (66 IDs; same-mechanism
+  cross-model/cross-finding folds applied per the TF-002 rule)
+- Dispositions: every finding fixed-<sha>, acknowledged-<ref>, superseded, or
+  informational — zero open, zero parked-without-record
+- Test corpus: 151 → 286 (every genuine defeat is a deterministic fixture;
+  every accepted boundary/residual is a documented BOUNDARY fixture)
+- Two of the loop's own earlier dispositions were REVERSED on later evidence
+  (AUDIT-14 query acceptance → AUDIT-45; AUDIT-03 absent-fonts-clean →
+  AUDIT-23) — the protocol audited its own fixes, not just the original code
+- Declared scope boundaries (in the lint docstring + the adversarial prompt,
+  each pinned by fixtures): (1) punctuation FLOW art mechanically gated;
+  letter-composed imagery and grid-diluted punctuation = referee's gross-class
+  domain; (2) UA default rendering of semantic HTML = the unstyled baseline;
+  (3) imagery composed by geometric placement of sanctioned atoms = referee's
+  domain
+- Fleet note: claude contributed rounds 1(retry)+2 then was 0-byte for 18
+  consecutive runs (deskwork issue 447); from round 3 the loop ran on codex
+  alone, so cross-model agreement was only available in rounds 1–2. The
+  convergence verdict is correspondingly single-family — re-validation with a
+  restored fleet is the natural post-447 follow-up.
+
+**Verification discipline held throughout:** every defeating input was
+executed against the real lint before recording (zero auditor predictions
+trusted); every fix was RED-first with the verbatim defeating input as the
+fixture; two self-caught transcription errors in fix shas were corrected in
+dedicated commits.
