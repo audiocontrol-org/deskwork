@@ -1682,7 +1682,7 @@ Blast radius is low because the scope boundary is visible and intentional, and t
 ### AUDIT-20260611-22 — A setext `rule:` heading parses silently green — the rule vanishes and its fields merge into the preceding rule
 
 Finding-ID: AUDIT-20260611-22
-Status:     open
+Status:     fixed-b4284b334e8b464697d912b11afe13db1206c25a
 Severity:   medium
 Surface:    plugins/design-control/src/design-language/schema.ts:36 (`HEADING_RE = /^#{1,6}\s+(.*)$/` — ATX only), :228-241 (near-miss guard fires only inside the ATX-heading branch)
 
@@ -1693,7 +1693,7 @@ Blast radius: medium. The convention doc says ATX, which caps plausibility below
 ### AUDIT-20260611-23 — The heading near-miss guard over-triggers: any prose heading whose first word is "Rule" can no longer appear in a green spec
 
 Finding-ID: AUDIT-20260611-23
-Status:     open
+Status:     fixed-b4284b334e8b464697d912b11afe13db1206c25a
 Severity:   low
 Surface:    plugins/design-control/src/design-language/schema.ts:43 (`RULE_NEAR_MISS_RE = /^rule\b/i`), :228-241 (offence classification)
 
@@ -1704,7 +1704,7 @@ Blast radius: low — the failure direction is a loud false refusal, not a silen
 ### AUDIT-20260611-24 — A near-miss heading's section body is dropped uninspected — the single-pass surfacing built in the same fix round doesn't cover it
 
 Finding-ID: AUDIT-20260611-24
-Status:     open
+Status:     fixed-b4284b334e8b464697d912b11afe13db1206c25a
 Severity:   low
 Surface:    plugins/design-control/src/design-language/schema.ts:227-243 (near-miss branch leaves `current` undefined; no throwaway section)
 
@@ -1715,7 +1715,7 @@ Blast radius: low — the near-miss finding itself gates exit 1, so nothing wron
 ### AUDIT-20260611-25 — Attribute-selector quote-style mismatch still fabricates a dead-link on a live selector — the AUDIT-17 fix only matches identical delimiters
 
 Finding-ID: AUDIT-20260611-25
-Status:     open
+Status:     fixed-ee05786df57241f2089f1ab06ed9b3ab4c659d96
 Severity:   low
 Surface:    plugins/design-control/src/design-language/link-liveness.ts:50-76 (stripCommentsAndStrings preserves delimiters), :169-177 (cssDefinesSelector strips both sides)
 
@@ -1726,7 +1726,7 @@ Blast radius: low — a visible exit-1 false refusal, and the realistic authorin
 ### AUDIT-20260611-26 — AUDIT-21 is dispositioned "fixed" but one of its cited surfaces — tasks.md — still carries the temporal deferral phrasing
 
 Finding-ID: AUDIT-20260611-26
-Status:     open
+Status:     fixed-258d6476fe2bb0eb109af69e139f4d3ac1e53d12
 Severity:   low
 Surface:    plugins/design-control/specs/001-design-control/tasks.md:176-191 ("is **not validated in v1** (named-deferred)", "Runtime dead-CSS + spec-truthfulness are named-deferred", "visible v1 scope"); audit-log disposition for AUDIT-20260611-21
 
@@ -1741,7 +1741,7 @@ Blast radius: low — the two surfaces an operator actually touches at run time 
 ### AUDIT-20260611-27 — Selector argument normalization makes distinct state selectors interchangeable
 
 Finding-ID: AUDIT-20260611-27
-Status:     open
+Status:     fixed-ee05786df57241f2089f1ab06ed9b3ab4c659d96
 Severity:   medium
 Surface:    plugins/design-control/src/design-language/link-liveness.ts:157-180
 
@@ -1752,7 +1752,7 @@ Blast radius is medium: this creates a false green for common component-state se
 ### AUDIT-20260611-28 — Absolute CSS paths can pass even though the spec contract says paths are relative
 
 Finding-ID: AUDIT-20260611-28
-Status:     open
+Status:     fixed-165e69b7bd53cd92945f9dfe8821ff648475de2b
 Severity:   medium
 Surface:    plugins/design-control/src/design-language/schema.ts:96-110; plugins/design-control/src/design-language/link-liveness.ts:211-217; plugins/design-control/skills/translate-design-language/SKILL.md:42-46
 
@@ -1763,7 +1763,7 @@ Blast radius is medium because deskwork artifacts are collection content, not ma
 ### AUDIT-20260611-29 — Temporal scope wording still remains in the audited diff
 
 Finding-ID: AUDIT-20260611-29
-Status:     open
+Status:     fixed-258d6476fe2bb0eb109af69e139f4d3ac1e53d12
 Severity:   low
 Surface:    plugins/design-control/specs/001-design-control/tasks.md:176-191; plugins/design-control/src/design-language/schema.ts:15-18; plugins/design-control/src/design-language/link-liveness.ts:9-15; plugins/design-control/src/design-language/types.ts:42-45
 
