@@ -40,7 +40,11 @@ import { parse as parseYaml } from 'yaml';
 import { errorMessage, isEnoent, isPlainObject } from '../util/typeguards.js';
 import type { ModelConfig } from './types.js';
 
-/** Project-relative override path; resolved against `repoRoot`. */
+/**
+ * Installation-relative override path; resolved against the verb-entry-
+ * resolved installation root (specs/installation-isolation R1 — the
+ * config read is placement-relevant: which battery wins).
+ */
 export const CONFIG_OVERRIDE_PATH = '.stack-control/audit-barrage-config.yaml';
 
 /**
@@ -103,12 +107,12 @@ export interface AuditBarrageConfig {
  *     mistake.
  */
 export async function loadAuditBarrageConfig(
-  repoRoot: string,
+  installationRoot: string,
   warn: (line: string) => void = (line) => {
     process.stderr.write(line);
   },
 ): Promise<AuditBarrageConfig> {
-  const overridePath = resolve(repoRoot, CONFIG_OVERRIDE_PATH);
+  const overridePath = resolve(installationRoot, CONFIG_OVERRIDE_PATH);
   const overrideText = await readIfPresent(overridePath);
   const overrideActive =
     overrideText !== null && hasActiveModelsSection(overrideText, overridePath);
@@ -116,7 +120,7 @@ export async function loadAuditBarrageConfig(
   // the wrong config would silently win — in every legacy-present
   // combination, and never changes which config wins (research R2).
   emitLegacyConfigNotice(
-    repoRoot,
+    installationRoot,
     overrideActive ? overridePath : undefined,
     warn,
   );
@@ -154,11 +158,11 @@ export async function loadAuditBarrageConfig(
  * the active override.
  */
 function emitLegacyConfigNotice(
-  repoRoot: string,
+  installationRoot: string,
   activeOverridePath: string | undefined,
   warn: (line: string) => void,
 ): void {
-  const legacyPath = resolve(repoRoot, LEGACY_DWLIFECYCLE_CONFIG_PATH);
+  const legacyPath = resolve(installationRoot, LEGACY_DWLIFECYCLE_CONFIG_PATH);
   if (!existsSync(legacyPath)) return;
   const reading = activeOverridePath ?? 'built-in defaults';
   warn(
@@ -167,7 +171,7 @@ function emitLegacyConfigNotice(
   warn(`audit-barrage: reading ${reading}\n`);
   if (activeOverridePath === undefined) {
     warn(
-      `audit-barrage: migrate with: mv ${legacyPath} ${resolve(repoRoot, CONFIG_OVERRIDE_PATH)} (then review)\n`,
+      `audit-barrage: migrate with: mv ${legacyPath} ${resolve(installationRoot, CONFIG_OVERRIDE_PATH)} (then review)\n`,
     );
   } else {
     warn(

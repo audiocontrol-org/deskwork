@@ -48,8 +48,12 @@ export interface ModelConfig {
 /**
  * Input to `orchestrateBarrage`.
  *
- * - `repoRoot` anchors the run-dir layout
- *   (`<repoRoot>/.stack-control/audit-runs/`).
+ * - `installationRoot` anchors the run-dir layout
+ *   (`<installation>/.stack-control/audit-runs/`). Per
+ *   specs/installation-isolation R1 this is the verb-entry-resolved
+ *   installation root (009 resolver) — never a free repo-root parameter
+ *   (the pre-isolation `repoRoot` field created this repo's root
+ *   half-installation; research row 1).
  * - `featureSlug` becomes part of the run-dir name so the operator can
  *   eyeball which feature a run targeted.
  * - `prompt` is the rendered audit prompt text; written verbatim to
@@ -59,7 +63,7 @@ export interface ModelConfig {
  *   canonical `.stack-control/audit-runs/` parent.
  */
 export interface BarrageInput {
-  readonly repoRoot: string;
+  readonly installationRoot: string;
   readonly featureSlug: string;
   readonly prompt: string;
   readonly models: ReadonlyArray<ModelConfig>;
@@ -68,12 +72,14 @@ export interface BarrageInput {
    * Per Phase 16 Task 2 (#383): the audit-barrage records HEAD at
    * fire-time so the new-diff guard (`check-barrage-tip`) can decide
    * on the next iteration whether new commits have accumulated since
-   * this run. Defaults to `git rev-parse HEAD` against `repoRoot`;
-   * tests override. Returning `null` (resolver failed) skips the
-   * `tip.sha` write — the next-iteration guard then fail-safes to
-   * fire (NEVER skip on missing tip; that would re-create #383).
+   * this run. Defaults to `git rev-parse HEAD` against the
+   * installation root (git is a derived external anchor — `git -C
+   * <installation>`; spec FR-004); tests override. Returning `null`
+   * (resolver failed) skips the `tip.sha` write — the next-iteration
+   * guard then fail-safes to fire (NEVER skip on missing tip; that
+   * would re-create #383).
    */
-  readonly tipShaResolver?: (repoRoot: string) => Promise<string | null>;
+  readonly tipShaResolver?: (installationRoot: string) => Promise<string | null>;
 }
 
 /**

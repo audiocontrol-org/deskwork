@@ -30,6 +30,7 @@
  */
 
 import { resolve } from 'node:path';
+import { DEFAULT_BASELINE_REL } from '../baseline-path.js';
 import { parseClonesYaml, type CloneGroup } from '../clones-yaml.js';
 import type {
   CloneDetectorFindings,
@@ -44,11 +45,12 @@ import {
 } from './shared.js';
 import { errorMessage, isEnoent } from '../util/typeguards.js';
 
-/**
- * Default path of the committed clone-detector baseline. Migrated to
- * `.stack-control/scope-discovery/` per the Phase 2 audit (Finding 03).
- */
-const DEFAULT_BASELINE = '.stack-control/scope-discovery/clones.yaml';
+// Baseline rel-path is the SHARED constant from baseline-path.ts — the
+// same derivation check-clones resolves through (specs/installation-
+// isolation US1; research row 3: this reader's private literal was the
+// split-brain sibling). `input.repoRoot` carries the verb-entry-resolved
+// installation root (R1), so `resolve(input.repoRoot, DEFAULT_BASELINE_REL)`
+// and check-clones' `resolveBaselinePath` agree by construction.
 
 interface ScopeFilter {
   readonly applied: 'none' | 'modules-in-scope';
@@ -130,7 +132,7 @@ function toFinding(group: CloneGroup): CloneGroupFinding {
 export async function readCloneDetectorOutput(
   input: DiscoveryAgentInput,
 ): Promise<CloneDetectorFindings> {
-  const baselinePath = DEFAULT_BASELINE;
+  const baselinePath = DEFAULT_BASELINE_REL;
   const baselineAbs = resolve(input.repoRoot, baselinePath);
   let yamlText: string;
   try {
