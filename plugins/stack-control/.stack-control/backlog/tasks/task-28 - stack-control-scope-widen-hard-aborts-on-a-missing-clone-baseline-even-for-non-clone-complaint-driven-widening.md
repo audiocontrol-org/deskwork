@@ -6,8 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-11 00:41'
+updated_date: '2026-06-11 01:06'
 labels:
   - 'type:imported-issue'
+  - promoted
 dependencies: []
 references:
   - gh-448
@@ -42,3 +44,9 @@ Either (a) auto-seed the missing scope-discovery state on first use, announced, 
 
 Observed registering the 2026-06-10 design-control lint-barrage leakage classes (deskwork commit b4720f48). Filed per the tooling-friction-to-GitHub-issues policy.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** tasks:specs/014-audit-protocol-reliability
+<!-- SECTION:NOTES:END -->

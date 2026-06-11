@@ -6,8 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-11 00:41'
+updated_date: '2026-06-11 01:06'
 labels:
   - 'type:imported-issue'
+  - promoted
 dependencies: []
 references:
   - gh-446
@@ -35,3 +37,9 @@ stack-control's stance is absorb-then-retire for dw-lifecycle: the config loader
 
 Fixed locally for this repo in deskwork commit b0a8b24f (600s re-landed in the read location, provenance comment pointing at the unread copy). Filed per the tooling-friction-to-GitHub-issues policy.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** tasks:specs/014-audit-protocol-reliability
+<!-- SECTION:NOTES:END -->

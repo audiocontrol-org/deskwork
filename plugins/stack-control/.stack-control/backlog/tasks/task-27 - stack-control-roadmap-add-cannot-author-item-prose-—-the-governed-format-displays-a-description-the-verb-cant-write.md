@@ -3,10 +3,10 @@ id: TASK-27
 title: >-
   stack-control: roadmap add cannot author item prose — the governed format
   displays a description the verb can't write
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-11 00:41'
-updated_date: '2026-06-11 00:42'
+updated_date: '2026-06-11 01:06'
 labels:
   - 'type:imported-issue'
 dependencies: []
@@ -41,4 +41,6 @@ Observed seeding the 7-item design-control phase graph (deskwork commit 9869487a
 
 <!-- SECTION:NOTES:BEGIN -->
 Observation 2026-06-11: in installed v0.42.0, roadmap add --scope wrote full multi-sentence item prose successfully (design:feature/backlog-backend-port landed with its complete description). Either fixed since filing or the defect is narrower than the title suggests — re-verify the exact repro before working this item.
+
+Closed 2026-06-11: does not reproduce in installed v0.42.0 — roadmap add --scope authored the full prose description for design:feature/backlog-backend-port (the governed format's displayed description line). The flag the issue says is missing exists and works. If a subtler variant of the defect exists, re-file with an exact failing invocation.
 <!-- SECTION:NOTES:END -->

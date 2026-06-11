@@ -6,8 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-11 00:41'
+updated_date: '2026-06-11 01:06'
 labels:
   - 'type:imported-issue'
+  - promoted
 dependencies: []
 references:
   - gh-447
@@ -35,3 +37,9 @@ Keep exit 0 (a partial fleet is still a usable run), but make degradation loud: 
 
 Run 20260610T184044970Z-design-control (claude timedOut=true, 0 bytes; codex 169s, findings). Filed per the tooling-friction-to-GitHub-issues policy. Related: #446 (the timeout came from a silently-ignored legacy config; this issue is the separate reporting-shape problem).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** spec:specs/014-audit-protocol-reliability
+<!-- SECTION:NOTES:END -->
