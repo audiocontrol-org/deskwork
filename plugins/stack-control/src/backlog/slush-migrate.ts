@@ -138,9 +138,18 @@ export interface MigrationResult {
  * finding's recorded `statusLineIndex` is validated against the current text
  * BEFORE anything is created — a flip whose location no longer matches (the
  * audit-log changed between flip computation and apply, or the location was
- * never valid) throws naming the finding ID. Validate-first means a stale
- * apply creates zero items and rewrites zero lines: never a partial misapply,
- * never an exit-0 shortfall.
+ * never valid) throws naming the finding ID.
+ *
+ * specs/014 AUDIT-20260611-11: severity is ALSO validated up front — the
+ * severityToPriority call runs for every finding in an unconditional pre-pass
+ * (the backfill / import-slush path passes no expectedStatusRe but can carry
+ * hand-edited arbitrary severities), so an FR-018 throw fires before any
+ * backend.create or line rewrite. Validate-first thus covers location,
+ * identity, AND severity: a failing input creates zero items and rewrites
+ * zero lines — never a partial misapply, never an exit-0 shortfall. The only
+ * remaining mid-loop failures are genuine I/O faults (spawn/store errors),
+ * which on re-run self-heal via the ref-exists rewrite branch
+ * (AUDIT-20260611-02).
  */
 export function migrateFindings(args: {
   auditLogText: string;
@@ -176,9 +185,25 @@ export function migrateFindings(args: {
       }
     }
   }
+  // AUDIT-20260611-11: severity pre-pass — runs unconditionally (the backfill
+  // path has no expectedStatusRe but needs it too) so an FR-018 throw fires
+  // before any create. severityToPriority's own message names the severity but
+  // not the finding; wrap so the offending entry is identifiable. Priorities
+  // are computed once here (index-aligned with args.findings) and reused below.
+  const priorities = args.findings.map((f): 'medium' | 'low' => {
+    try {
+      return severityToPriority(f.severity);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `slush-migrate: finding ${f.findingId}: ${reason}. Nothing was migrated.`,
+      );
+    }
+  });
   const migrated: { findingId: string; taskId: string }[] = [];
   const skipped: { findingId: string; taskId: string }[] = [];
-  for (const f of args.findings) {
+  for (let idx = 0; idx < args.findings.length; idx += 1) {
+    const f = args.findings[idx]!;
     const ref = auditRef(args.featureSlug, f.findingId);
     if (args.backend.exists(ref)) {
       // Already migrated — to an item that already exists. Rewrite the Status
@@ -199,7 +224,7 @@ export function migrateFindings(args: {
     const taskId = args.backend.create({
       title: f.title.length > 0 ? f.title : f.findingId,
       labels: [typeLabel('migrated-finding'), `feature:${args.featureSlug}`, `finding:${f.findingId}`],
-      priority: severityToPriority(f.severity),
+      priority: priorities[idx]!,
       refs: [ref],
     });
     lines[f.statusLineIndex] = `Status: migrated-to-backlog ${taskId}`;

@@ -233,6 +233,66 @@ describe('US4 residual (AUDIT-20260611-02) — ref-idempotency skip must not lea
   });
 });
 
+describe('AUDIT-20260611-11 — severity validated up front (validate-first covers the create loop)', () => {
+  it('backfill shape (no expectedStatusRe), first finding low + second HIGH: throws naming the HIGH finding and creates ZERO items (no partial misapply)', () => {
+    const AUDIT_LOG = [
+      '# Audit Log',
+      '',
+      '## 2026-06-07 — audit-barrage lift (20260607T100000000Z-s-after_clarify)',
+      '',
+      '### First finding (low)',
+      '',
+      'Finding-ID: AUDIT-20260607-19',
+      'Status:     acknowledged-slush-pile-2026-06-07',
+      'Severity:   low',
+      'Surface:    spec.md:1',
+      '',
+      'Body.',
+      '',
+      '### Second finding (hand-edited to high)',
+      '',
+      'Finding-ID: AUDIT-20260607-20',
+      'Status:     acknowledged-slush-pile-2026-06-07',
+      'Severity:   high',
+      'Surface:    spec.md:2',
+      '',
+      'Body.',
+      '',
+    ].join('\n');
+    const backlog = tmpBacklog();
+    const backend = createBacklogBackend({ cwd: backlog });
+    expect(() =>
+      migrateFindings({
+        auditLogText: AUDIT_LOG,
+        findings: [
+          {
+            findingId: 'AUDIT-20260607-19',
+            fullFindingId: 'AUDIT-20260607-19',
+            severity: 'low',
+            statusLineIndex: 7,
+            title: 'First finding (low)',
+          },
+          {
+            findingId: 'AUDIT-20260607-20',
+            fullFindingId: 'AUDIT-20260607-20',
+            severity: 'high',
+            statusLineIndex: 16,
+            title: 'Second finding (hand-edited to high)',
+          },
+        ],
+        backend,
+        featureSlug: 's',
+        // No expectedStatusRe: the import-slush / backfill shape — the severity
+        // pre-pass must fire here too, not only on the guarded rewire path.
+      }),
+    ).toThrow(/AUDIT-20260607-20/);
+    // The FR-018 fail-loud is kept, but it now fires BEFORE any create: the
+    // pre-fix pathology was 1 item created (the low flip) before the HIGH
+    // threw, leaving a partial misapply behind an exit-1 run.
+    expect(backend.list()).toHaveLength(0);
+  });
+});
+
 describe('US4 — unlocatable flips fail loud (migrateFindings location guard)', () => {
   const AUDIT_LOG = [
     '# Audit Log',
