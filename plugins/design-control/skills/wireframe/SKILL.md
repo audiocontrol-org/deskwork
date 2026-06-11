@@ -63,22 +63,50 @@ identity lives in the design-language spec (Phase 2), never here.
      boundary of the lo-fi guarantee.
 
 6. **Record provenance.** This skill authors *driving* wireframes (the artifact
-   precedes the implementation): record it via `recordDrivingWireframe`
-   (`@/provenance`) in the wireframe's directory, passing the lint-green
-   wireframe's filename (`wireframeFile`) — the record binds that artifact by
-   name + sha256, so a later replacement of the wireframe is tamper-evident
-   (`verifyDrivingWireframe` re-hashes and fails loud on mismatch). The file
-   must exist on disk at record time; step 5's lint gate guarantees it does.
-   A wireframe reverse-engineered
-   from an existing surface is the *derived* path — record it with
-   `recordDerivation` at derivation time instead, and note that acceptance will
-   require a non-empty operator edit against the stored snapshot
-   (`checkDerivedAcceptance`) and the artifact never supports a "wireframe drove
-   implementation" claim. Provenance is append-once: if a sidecar already
-   exists for the surface, BOTH recorders refuse to overwrite it (in either
-   mode direction) — re-recording requires explicitly removing or superseding
-   the existing record; never work around the refusal by deleting the sidecar
-   to flip a `derived` surface to `driving`.
+   precedes the implementation): record it in the wireframe's directory by
+   running:
+
+   ```bash
+   plugins/design-control/bin/wireframe-provenance record-driving <wireframes-dir> <surface-id> <wireframe-filename>
+   ```
+
+   (`<wireframe-filename>` is the lint-green wireframe's filename, relative to
+   `<wireframes-dir>`.) Exit `0` → recorded; exit `1` → descriptive refusal or
+   error on stderr — fix and re-run, never skip. The record binds that artifact
+   by name + sha256, so a later replacement of the wireframe is tamper-evident:
+
+   ```bash
+   plugins/design-control/bin/wireframe-provenance verify-driving <wireframes-dir> <surface-id>
+   ```
+
+   re-hashes the bound file and exits `1` on tamper/missing/mode mismatch. The
+   wireframe file must exist on disk at record time; step 5's lint gate
+   guarantees it does.
+
+   A wireframe reverse-engineered from an existing surface is the *derived*
+   path — record it at derivation time instead with:
+
+   ```bash
+   plugins/design-control/bin/wireframe-provenance record-derived <wireframes-dir> <surface-id> <source> --from <derived-draft.html>
+   ```
+
+   (`<source>` is what the draft was derived FROM — route, URL, file;
+   `--from` names the auto-derived draft file, which is snapshotted alongside
+   the sidecar). Acceptance of a derived artifact then requires a non-empty
+   operator edit against the stored snapshot — the acceptance gate is:
+
+   ```bash
+   plugins/design-control/bin/wireframe-provenance check-acceptance <wireframes-dir> <surface-id> <accepted.html>
+   ```
+
+   Exit `0` → ok; exit `1` → the artifact is byte-identical to the
+   derivation-time snapshot (`derived-unedited`) or the baseline was tampered.
+   A derived artifact never supports a "wireframe drove implementation" claim,
+   edited or not. Provenance is append-once: if a sidecar already exists for
+   the surface, BOTH recorders refuse to overwrite it (in either mode
+   direction) — re-recording requires explicitly removing or superseding the
+   existing record; never work around the refusal by deleting the sidecar to
+   flip a `derived` surface to `driving`.
 
 7. **Present and stop.** Show the operator the lint-green wireframe (path +
    `0 findings` output). The operator picks/iterates; translation into the

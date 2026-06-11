@@ -13,3 +13,5 @@ export {
   wireframeDroveImplementation,
   verifyDrivingWireframe,
 } from '@/provenance/derived';
+
+export { runWireframeProvenance } from '@/provenance/cli';
