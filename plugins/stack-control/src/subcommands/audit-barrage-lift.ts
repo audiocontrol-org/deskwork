@@ -50,7 +50,10 @@ import {
   safeModelName,
   type ParsedIndexLane,
 } from '../scope-discovery/audit-barrage/run-artifacts.js';
-import type { FleetReport } from '../scope-discovery/audit-barrage/types.js';
+import {
+  completedNonConvergedAnnotation,
+  type FleetReport,
+} from '../scope-discovery/audit-barrage/types.js';
 import { resolveFeatureRoot as resolveFeatureRootShared } from '../scope-discovery/util/feature-root.js';
 
 export interface AuditBarrageLiftCliOptions {
@@ -350,18 +353,14 @@ export async function runAuditBarrageLift(
       const status = `audit-barrage-lift: lane ${lane.name} — ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]`;
       if (lane.terminalState !== 'completed') {
         stderr.write(`${status} — contributes ZERO findings (non-completed lane)\n`);
-      } else if (lane.exitCode !== 0 || lane.reportBytes === 0) {
+      } else {
         // AUDIT-20260611-09: a lane can settle `completed` yet not be
         // converged-eligible (nonzero exit or empty report) — the fleet
         // report excludes it from `produced`, so the status line must say
         // why, or the operator sees "completed" next to "⚠ DEGRADED" with
-        // nothing connecting them.
-        stderr.write(
-          `${status} — completed but non-converged (exit ${lane.exitCode}, ` +
-            `report bytes ${lane.reportBytes}); not counted as produced\n`,
-        );
-      } else {
-        stderr.write(`${status}\n`);
+        // nothing connecting them. AUDIT-20260611-11: the annotation is the
+        // shared one-vocabulary helper every fleet surface prints from.
+        stderr.write(`${status}${completedNonConvergedAnnotation(lane)}\n`);
       }
     }
     includeModels = new Set(

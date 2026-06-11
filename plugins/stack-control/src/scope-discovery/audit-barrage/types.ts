@@ -275,6 +275,38 @@ export interface FleetLaneStatus {
   readonly terminalState: TerminalState;
   readonly enforcement: EnforcementState;
   readonly liveness: LivenessState;
+  /**
+   * AUDIT-20260611-11: the converged-eligibility inputs travel WITH the
+   * lane status so every consumer of `perLane` (INDEX fleet block,
+   * fire-time stderr, lift output, govern loop status) can annotate a
+   * completed-but-non-converged lane the same way the lift's per-lane
+   * narration does (AUDIT-20260611-09) — without them, a CLI-rejected
+   * pin prints a bare "completed" right next to "⚠ DEGRADED".
+   */
+  readonly exitCode: number;
+  readonly reportBytes: number;
+}
+
+/**
+ * AUDIT-20260611-09 / AUDIT-20260611-11: the ONE annotation vocabulary for
+ * a lane that settled `completed` yet is NOT converged-eligible (nonzero
+ * exit or empty report artifact). The fleet report excludes such a lane
+ * from `produced`, so every per-lane status line must say why — a bare
+ * "completed" beside "⚠ DEGRADED" leaves the operator with nothing
+ * connecting the two. Returns '' for non-completed lanes (their terminal
+ * state already explains the exclusion) and for converged lanes.
+ */
+export function completedNonConvergedAnnotation(lane: {
+  readonly terminalState: TerminalState;
+  readonly exitCode: number;
+  readonly reportBytes: number;
+}): string {
+  if (lane.terminalState !== 'completed') return '';
+  if (lane.exitCode === 0 && lane.reportBytes > 0) return '';
+  return (
+    ` — completed but non-converged (exit ${lane.exitCode}, ` +
+    `report bytes ${lane.reportBytes}); not counted as produced`
+  );
 }
 
 /**
@@ -309,6 +341,8 @@ export function computeFleetReport(
       terminalState: r.terminalState,
       enforcement: r.enforcement,
       liveness: r.liveness,
+      exitCode: r.exitCode,
+      reportBytes: r.reportBytes,
     })),
     quorumCollapsed: produced <= 1,
   };

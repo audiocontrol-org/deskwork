@@ -188,6 +188,36 @@ describe('config v2 — pre-014 migration refusal (FR-011, SC-006)', () => {
   });
 });
 
+describe('config v2 — {{prompt-stdin}} must be a bare token (AUDIT-20260611-12)', () => {
+  it('refuses an embedded {{prompt-stdin}} (e.g. --input={{prompt-stdin}}), naming the lane and the bare-token rule', () => {
+    let message = '';
+    try {
+      parseConfig(
+        laneYaml({
+          args_template: '"-p --model {{model}} --input={{prompt-stdin}}"',
+        }),
+        LABEL,
+      );
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).not.toBe('');
+    // Names the lane…
+    expect(message).toContain('claude');
+    // …states the bare-token-only rule…
+    expect(message).toMatch(/bare/i);
+    expect(message).toContain('{{prompt-stdin}}');
+    // …and explains WHY: stdin delivery has no argv slot to substitute into.
+    expect(message).toMatch(/stdin/i);
+    expect(message).toMatch(/argv/i);
+  });
+
+  it('still accepts the bare whitespace-delimited {{prompt-stdin}} token (baseline fixture)', () => {
+    const config = parseConfig(laneYaml(), LABEL);
+    expect(config.models[0]!.argsTemplate).toMatch(/(^|\s)\{\{prompt-stdin\}\}(\s|$)/);
+  });
+});
+
 describe('config v2 — v1 rules carried forward unchanged', () => {
   it('still refuses a template with neither prompt placeholder', () => {
     expect(() =>

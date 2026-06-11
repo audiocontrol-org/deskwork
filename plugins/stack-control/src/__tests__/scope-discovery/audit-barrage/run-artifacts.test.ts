@@ -149,6 +149,25 @@ describe('INDEX fleet report block (T017 / FR-007)', () => {
     expect(body).not.toContain('DEGRADED');
   });
 
+  it('annotates a completed-but-non-converged lane on its fleet-report line (AUDIT-20260611-11)', () => {
+    // One vocabulary everywhere (FR-007): the same annotation the lift's
+    // per-lane status carries (AUDIT-20260611-09) renders on the fleet
+    // report's per-lane lines, so INDEX.md / fire-time stderr / lift /
+    // govern all connect "completed" to the exclusion from `produced`.
+    const results = [
+      modelResult({}),
+      modelResult({ name: 'codex', exitCode: 1, reportBytes: 28, stdoutBytes: 28 }),
+    ];
+    const text = renderFleetReportLines(computeFleetReport(results)).join('\n');
+    expect(text).toContain('- configured: 2, produced: 1  ⚠ DEGRADED');
+    expect(text).toContain(
+      '- codex: completed [enforced, monitored] — completed but non-converged (exit 1, report bytes 28); not counted as produced',
+    );
+    // The converged lane keeps its bare line shape.
+    expect(text).toContain('- claude: completed [enforced, monitored]');
+    expect(text).not.toMatch(/claude: completed \[enforced, monitored\] — completed but non-converged/);
+  });
+
   it('omits the quorum line when ≥2 lanes produced', () => {
     const results = [
       modelResult({}),

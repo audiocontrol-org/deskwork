@@ -230,6 +230,11 @@ describe('fleet report repeated when degraded (FR-007 / SC-003)', () => {
     expect(err).toMatch(
       /codex — completed \[enforced, monitored\] — completed but non-converged \(exit 1, report bytes 28\); not counted as produced/,
     );
+    // AUDIT-20260611-11: the fleet report block repeats the same annotation
+    // on its per-lane line — one vocabulary across all four surfaces.
+    expect(err).toContain(
+      '- codex: completed [enforced, monitored] — completed but non-converged (exit 1, report bytes 28); not counted as produced',
+    );
   });
 });
 

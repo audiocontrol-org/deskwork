@@ -95,6 +95,25 @@ describe('govern round status includes the fleet report (T020 / FR-007)', () => 
     expect(err).toMatch(/0-HIGH.*DEGRADED fleet/);
   });
 
+  it('a completed-but-non-converged lane (CLI-rejected pin, exit 1) carries the annotation on its govern line (AUDIT-20260611-11)', () => {
+    // The rejected-pin lane settles `completed` with a nonzero exit — the
+    // fleet excludes it from `produced`, so the govern per-lane line must say
+    // why, not print a bare "completed" next to "⚠ DEGRADED" (the same gap
+    // AUDIT-20260611-09 closed on the lift surface).
+    const runDir = makeRunDir([
+      laneResult({}),
+      laneResult({ name: 'codex', exitCode: 1, reportBytes: 28, stdoutBytes: 28 }),
+    ]);
+    const err = collect(runDir);
+    expect(err).toContain('govern: fleet — configured 2, produced 1  ⚠ DEGRADED');
+    expect(err).toContain(
+      'govern:   codex: completed [enforced, monitored] — completed but non-converged (exit 1, report bytes 28); not counted as produced',
+    );
+    // The converged lane keeps its bare line shape.
+    expect(err).toContain('govern:   claude: completed [enforced, monitored]\n');
+    expect(err).not.toMatch(/claude: completed \[enforced, monitored\] — completed but non-converged/);
+  });
+
   it('an empty completed text lane (exit 0, report bytes 0) reads DEGRADED even though <model>.md exists on disk', () => {
     // spawn-cli eagerly creates the text-lane stdout stream at spawn time, so
     // a lane that exits 0 with zero output leaves an EMPTY codex.md on disk.

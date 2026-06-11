@@ -257,6 +257,33 @@ function parseEntry(
         `path per entry)`,
     );
   }
+  // AUDIT-20260611-12: {{prompt-stdin}} must be its own whitespace-delimited
+  // bare token. Unlike {{model}}/{{prompt}}, which are SUBSTITUTED (intra-token
+  // forms like `--model={{model}}` are valid by design), the stdin placeholder
+  // is STRIPPED from argv — the prompt travels via child stdin, so there is no
+  // argv slot to substitute into. An embedded form (e.g. `--input={{prompt-stdin}}`)
+  // would pass the substring checks above, spawn with stdin connected, and leak
+  // the literal placeholder token into the CLI's argv. Reject loudly here
+  // (Principle V): silently stripping the embedded token would hide a config
+  // typo such as an adopter who meant `--input={{prompt}}`.
+  if (hasStdinPlaceholder) {
+    const hasBareStdinToken = argsTemplate
+      .trim()
+      .split(/\s+/)
+      .some((token) => token === PROMPT_STDIN_PLACEHOLDER);
+    if (!hasBareStdinToken) {
+      throw new Error(
+        `${prefix} ('${name}').args_template embeds '${PROMPT_STDIN_PLACEHOLDER}' ` +
+          `inside a larger token — it must appear as its own whitespace-delimited ` +
+          `bare token. Stdin delivery has no argv slot to substitute into: the ` +
+          `spawn helper strips the bare token and writes the prompt to the child's ` +
+          `stdin, so an embedded form (e.g. '--input=${PROMPT_STDIN_PLACEHOLDER}') ` +
+          `would leak the literal placeholder into the CLI's argv. If the CLI takes ` +
+          `the prompt as an option value, use '${PROMPT_PLACEHOLDER}' instead ` +
+          `(e.g. '--input=${PROMPT_PLACEHOLDER}')`,
+      );
+    }
+  }
 
   // specs/014 FR-011 migration gate: collect every missing v2-required
   // field FIRST and refuse with one message naming the file, the

@@ -414,6 +414,12 @@ const PROMPT_STDIN_PLACEHOLDER = '{{prompt-stdin}}';
  *   - Token contains it as a substring (embedded form, e.g.
  *     `--model={{model}}` / `--prompt={{prompt}}`): every occurrence
  *     within the token is replaced literally.
+ *   - `{{prompt-stdin}}` is the exception: it is STRIPPED (stdin
+ *     delivery has nothing to substitute into argv), and only the
+ *     bare-token form exists — the config loader REJECTS embedded
+ *     forms like `--input={{prompt-stdin}}` at load (AUDIT-20260611-12),
+ *     so the equality filter below is exhaustive for loader-validated
+ *     configs.
  *
  * Exported for tests; the orchestrator only calls `spawnCliAgainstModel`.
  */

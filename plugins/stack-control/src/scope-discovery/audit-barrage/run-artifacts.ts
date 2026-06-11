@@ -31,6 +31,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
+  completedNonConvergedAnnotation,
   computeFleetReport,
   type BarrageRun,
   type EnforcementState,
@@ -175,7 +176,12 @@ export function renderFleetReportLines(fleet: FleetReport): string[] {
     `- configured: ${fleet.configured}, produced: ${fleet.produced}${degraded ? '  ⚠ DEGRADED' : ''}`,
   );
   for (const lane of fleet.perLane) {
-    lines.push(`- ${lane.name}: ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]`);
+    // AUDIT-20260611-11: a completed-but-non-converged lane carries the same
+    // annotation the lift's per-lane narration prints (AUDIT-20260611-09),
+    // so "completed" never sits unexplained next to "⚠ DEGRADED".
+    lines.push(
+      `- ${lane.name}: ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]${completedNonConvergedAnnotation(lane)}`,
+    );
   }
   if (fleet.quorumCollapsed) {
     lines.push('- quorum: cross-model agreement impossible (produced ≤ 1)');
@@ -371,6 +377,8 @@ export function computeFleetReportFromParsedLanes(
       terminalState: lane.terminalState,
       enforcement: lane.enforcement,
       liveness: lane.liveness,
+      exitCode: lane.exitCode,
+      reportBytes: lane.reportBytes,
     })),
     quorumCollapsed: produced <= 1,
   };

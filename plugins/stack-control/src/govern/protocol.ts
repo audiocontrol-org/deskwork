@@ -33,6 +33,7 @@ import {
   IndexLaneParseError,
   parseIndexLaneStates,
 } from '../scope-discovery/audit-barrage/run-artifacts.js';
+import { completedNonConvergedAnnotation } from '../scope-discovery/audit-barrage/types.js';
 
 /** Thrown for any fail-loud protocol condition; carries a process exit code. */
 export class GovernProtocolError extends Error {
@@ -157,8 +158,13 @@ export function reportFleetStatus(runDir: string, stderr: (s: string) => void): 
     `govern: fleet — configured ${fleet.configured}, produced ${fleet.produced}${degraded ? '  ⚠ DEGRADED' : ''}\n`,
   );
   for (const lane of fleet.perLane) {
+    // AUDIT-20260611-11: a lane that settled `completed` but is NOT
+    // converged-eligible (nonzero exit / empty report) carries the same
+    // annotation the lift prints (AUDIT-20260611-09) — the govern loop is
+    // the FR-007 / US3-scenario-3 surface where a bare "completed" beside
+    // "⚠ DEGRADED" would be most misleading.
     stderr(
-      `govern:   ${lane.name}: ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]\n`,
+      `govern:   ${lane.name}: ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]${completedNonConvergedAnnotation(lane)}\n`,
     );
   }
   if (degraded && fleet.quorumCollapsed) {
