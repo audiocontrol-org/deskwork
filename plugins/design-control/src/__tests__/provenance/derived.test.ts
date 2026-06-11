@@ -1,5 +1,15 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { copyFileSync, mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+  readdirSync,
+  statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -65,6 +75,58 @@ describe('recordDerivation', () => {
     if (prov.mode !== 'derived') throw new Error('unreachable');
     expect(prov.derived.source).toBe('route /dev/scrapbook');
     expect(prov.derived.snapshotSha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('recordDerivation — all-or-nothing commit (no half-state when a write fails)', () => {
+  it('leaves NEITHER a committed sidecar NOR a committed snapshot when the snapshot write fails', () => {
+    const dir = freshDir();
+    // Deterministic, portable second-write failure: a DIRECTORY planted at the
+    // snapshot target path makes any attempt to place a file there (write or
+    // rename-promote) throw on every platform.
+    mkdirSync(join(dir, 'half.derived-snapshot.html'));
+
+    expect(() =>
+      recordDerivation({
+        dir,
+        surfaceId: 'half',
+        derivedHtml: draftHtml,
+        source: 'live surface',
+        createdAt: new Date('2026-06-10T12:00:00Z'),
+      }),
+    ).toThrow();
+
+    // No committed sidecar may survive the failed pairing — loadProvenance
+    // must fail loud (absent sidecar), not return a record whose snapshot
+    // does not exist.
+    expect(existsSync(join(dir, 'half.provenance.json'))).toBe(false);
+    expect(() => loadProvenance(dir, 'half')).toThrow(/no provenance sidecar/i);
+
+    // The planted blocker is still the directory (no snapshot FILE was
+    // committed over it), and no temp-suffixed staging debris lingers.
+    expect(statSync(join(dir, 'half.derived-snapshot.html')).isDirectory()).toBe(true);
+    expect(readdirSync(dir).filter((n) => n !== 'half.derived-snapshot.html')).toEqual([]);
+  });
+
+  it('happy path commits exactly the sidecar + snapshot pair, with no staging debris', () => {
+    const dir = freshDir();
+    recordDerivation({
+      dir,
+      surfaceId: 'clean',
+      derivedHtml: draftHtml,
+      source: 'live surface',
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    expect(readdirSync(dir).sort()).toEqual([
+      'clean.derived-snapshot.html',
+      'clean.provenance.json',
+    ]);
+    expect(readFileSync(join(dir, 'clean.derived-snapshot.html'), 'utf8')).toBe(draftHtml);
+    const prov = loadProvenance(dir, 'clean');
+    expect(prov.mode).toBe('derived');
+    if (prov.mode !== 'derived') throw new Error('unreachable');
+    expect(prov.derived.snapshotFile).toBe('clean.derived-snapshot.html');
+    expect(prov.derived.source).toBe('live surface');
   });
 });
 

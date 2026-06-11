@@ -26,7 +26,7 @@
  *   <surfaceId>.derived-snapshot.html    — the auto-derived draft (derived only)
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -120,7 +120,7 @@ const sidecarPath = (dir: string, surfaceId: string): string =>
  * Mode transitions are NOT a write-over; they require explicitly removing or
  * superseding the existing record as a separate, deliberate operation.
  */
-function writeProvenance(dir: string, provenance: WireframeProvenance): void {
+function assertAppendOnce(dir: string, provenance: WireframeProvenance): string {
   const path = sidecarPath(dir, provenance.surfaceId);
   if (existsSync(path)) {
     const existing = loadProvenance(dir, provenance.surfaceId);
@@ -131,7 +131,26 @@ function writeProvenance(dir: string, provenance: WireframeProvenance): void {
         `Re-recording requires explicitly removing or superseding the existing record first.`,
     );
   }
+  return path;
+}
+
+function writeProvenance(dir: string, provenance: WireframeProvenance): void {
+  const path = assertAppendOnce(dir, provenance);
   writeFileSync(path, JSON.stringify(provenance, null, 2) + '\n');
+}
+
+/**
+ * Failure-path cleanup for staged temp files. Swallows secondary errors
+ * deliberately: the caller is about to rethrow the ORIGINAL failure, and a
+ * cleanup hiccup (e.g. permissions just changed) must not mask it. This is
+ * cleanup, not a fallback — the operation still fails loud.
+ */
+function bestEffortRemove(path: string): void {
+  try {
+    rmSync(path, { force: true });
+  } catch {
+    // Intentionally swallowed — see doc comment above.
+  }
 }
 
 /**
@@ -198,12 +217,35 @@ export function recordDerivation(input: {
       source: input.source,
     },
   };
-  // Sidecar first: writeProvenance is the append-once chokepoint, so its
-  // refusal must fire BEFORE the snapshot write — otherwise a refused
-  // re-derivation would have already clobbered the existing surface's
-  // derivation-time baseline.
-  writeProvenance(input.dir, provenance);
-  writeFileSync(join(input.dir, snapshotFile), input.derivedHtml);
+  // The append-once refusal fires BEFORE any byte hits disk — otherwise a
+  // refused re-derivation would have already clobbered (or littered next to)
+  // the existing surface's derivation-time baseline.
+  const sidecarTarget = assertAppendOnce(input.dir, provenance);
+  const snapshotTarget = join(input.dir, snapshotFile);
+  // All-or-nothing commit (AUDIT-20260611-07): two sequential writes to the
+  // final paths can be interrupted between them, leaving a committed sidecar
+  // whose snapshot does not exist (or vice versa). Instead, stage BOTH
+  // artifacts as temp files in the same directory, then promote each with an
+  // atomic rename only after both staged writes succeeded.
+  const stagedSnapshot = `${snapshotTarget}.tmp-${process.pid}`;
+  const stagedSidecar = `${sidecarTarget}.tmp-${process.pid}`;
+  try {
+    writeFileSync(stagedSnapshot, input.derivedHtml);
+    writeFileSync(stagedSidecar, JSON.stringify(provenance, null, 2) + '\n');
+    // Promote snapshot first, sidecar last: the sidecar is the commit point.
+    // If the process dies between the two renames, a snapshot without a
+    // sidecar is inert debris at worst — nothing reads it (loadProvenance
+    // fails loud on the absent sidecar, and recording for the surface is
+    // still possible). The inverse ordering would commit a sidecar whose
+    // recorded snapshot does not exist — a live record with a missing
+    // baseline that breaks checkDerivedAcceptance.
+    renameSync(stagedSnapshot, snapshotTarget);
+    renameSync(stagedSidecar, sidecarTarget);
+  } catch (error) {
+    bestEffortRemove(stagedSnapshot);
+    bestEffortRemove(stagedSidecar);
+    throw error;
+  }
   return provenance;
 }
 
