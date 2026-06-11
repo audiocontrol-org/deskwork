@@ -212,3 +212,45 @@ When `liveness_signal` is `none`, the loader still parses and stores a supplied 
 The resulting `ModelConfig` carries `livenessSignal: 'none'` together with a `livenessWindowSeconds`, but `spawn-cli.ts` computes `monitored = livenessSignal !== 'none'` (false), so the watchdog is never armed and the window is inert. The field is accepted with no error and no warning.
 
 This is a small honesty/consistency gap rather than a behavioral bug: the v2 loader is otherwise aggressively fail-loud (it rejects half-pairs, embedded `{{prompt-stdin}}`, invalid enums, and pre-014 shapes), so silently swallowing a meaningless field is the odd one out — a reader who sets a window on a `none` lane will reasonably believe liveness is monitored when it isn't. Blast radius is low: no run misbehaves, the lane simply runs unmonitored as the `none` sentinel dictates. It is plausibly an intentional convenience (keep the window so flipping `none → stdout` is a one-line edit); if so, that intent should be stated, otherwise the loader should reject or at least warn on a window paired with `none`, consistent with the rest of the v2 grammar's fail-loud posture.
+
+## 2026-06-11 — audit-barrage lift (20260611T123302767Z-audit-barrage-reliability-after_clarify)
+
+### AUDIT-20260611-15 — Single-lane (or single-producing-by-config) barrage suppresses the quorum-collapsed signal — a "healthy" fleet report with zero cross-model corroboration possible
+
+Finding-ID: AUDIT-20260611-15 (claude-01 + codex-02; cross-model)
+Status:     fixed-e61e6b9b
+Severity:   medium
+Surface:    plugins/stack-control/src/scope-discovery/audit-barrage/types.ts (`computeFleetReport` → `quorumCollapsed = produced <= 1`); plugins/stack-control/src/scope-discovery/audit-barrage/run-artifacts.ts (`renderFleetReportLines` quorum line + `renderIndexBody` fleet block gated on `fleet.produced < fleet.configured`); plugins/stack-control/src/govern/protocol.ts:170-172 (`reportFleetStatus` quorum line gated on `degraded && fleet.quorumCollapsed`); plugins/stack-control/src/subcommands/audit-barrage-lift.ts and audit-barrage.ts (both call `renderFleetReportLines` only when `produced < configured`)
+
+`quorumCollapsed` (`produced <= 1`) is computed and stored on every `FleetReport`, but it is *only ever rendered inside a degraded context* — every one of the four surfaces gates the fleet block / quorum line on `produced < configured`. The govern surface additionally double-gates: `if (degraded && fleet.quorumCollapsed)`. The consequence: a run with a **single configured lane** that produces (so `produced === configured === 1`, not degraded) reports a clean, undegraded fleet with no surfaced indication that cross-model agreement — the explicitly-stated HIGH-confidence signal of the entire barrage (`agent-discipline.md` § audit-barrage: "Cross-model agreement … is the HIGH-confidence signal") — was structurally impossible. The `quorumCollapsed: true` the code computed is silently dropped.
+
+Blast radius is genuinely small, which is why this is `low`: the shipped template ships two active lanes (claude + codex, gemini disabled), and the common single-model-in-practice cause — one of two lanes spawn-failing or timing out every round — *is* caught, because that yields `produced 1 < configured 2` → degraded → quorum line fires. The gap only manifests when an operator deliberately narrows `--models` to one lane or edits the config down to a single entry; in that case they implicitly know they have one model. But it is a real inconsistency between "the code bothered to compute quorumCollapsed" and "it is unreachable for the one-lane case," and it slightly undercuts the feature's own framing that quorum-impossibility "must be stated wherever agreement is reported" (the `computeFleetReport` doc comment, types.ts). A minimal fix: surface the quorum-collapsed note whenever `quorumCollapsed` holds, independent of `produced < configured` — or document that a single-configured-lane run is intentionally exempt.
+
+### AUDIT-20260611-16 — No further findings — independent clean signal on what I verified
+
+Finding-ID: AUDIT-20260611-16
+Status:     acknowledged-not-a-defect-20260611 (clean-signal record from the auditing lane, not a finding)
+Severity:   informational
+Surface:    (the rest of the diff)
+
+To give the operator independent cross-model signal alongside the other lanes, here is what I checked and found **clean**, with reasoning:
+
+- **AUDIT-13 / AUDIT-14 fixes hold and don't regress.** The close handler now destructures `(code, signal)` and classifies a non-null signal with `killReason === null` as `killed-external` (spawn-cli.ts close handler); `killReason` precedence over `signal` keeps `timed-out`/`killed-no-liveness` correctly dominant when the wrapper's own SIGTERM/SIGKILL lands. The config loader now refuses `liveness_window_seconds` on a `none` lane. Both are exercised by `spawn-terminal-states.test.ts` and `config-loader-v2.test.ts`.
+- **The settle/extractor reportBytes derivation is mutually-exclusive-correct.** `settleCaptures` sets `reportBytes` from the extractor (stream lanes, `stdoutStream === null`) XOR from `stdoutBytes` (text lanes, `extractor === null`); `streamMode` drives both, so the two branches can't both fire. A killed stream lane with no `result` event yields `resultText: null` → no `<model>.md` written → `reportBytes 0` → not healthy/converged → excluded from lift and `produced`. The `barrage-coverage-predicate.test.ts` helper's `{ reportBytes: merged.stdoutBytes, ...merged }` ordering is correct: a pinned `reportBytes` in overrides wins via the spread, else it derives from `stdoutBytes`.
+- **The reader-side `produced` count agrees with the writer.** `computeFleetReportFromParsedLanes` gates on `terminalState === 'completed' && exitCode === 0 && reportBytes > 0`, matching `isModelRunConverged`; for completed lanes `spawnError` is always undefined so the missing `spawnError` clause on the reader side is harmless. `parseIndexLaneStates` does not misparse the `## Fleet report` block's `- <lane>:`/`- configured:`/`- quorum:` lines (the field regexes require `- terminal state:` / `- enforcement:` etc. anchored at line start), so fleet lanes are not double-counted, and the mixed-INDEX path throws `IndexLaneParseError` as designed.
+- **buildArgs enforcement injection** only treats a fragment present *before* the prompt placeholder as already-present (AUDIT-05), injects before the (stripped) `{{prompt-stdin}}` slot, and the `{{prompt-stdin}}` bare-token loader check (AUDIT-12) makes the equality-only strip exhaustive for loader-validated configs.
+- **`liveness: monitored` on a spawn-failed lane is consistent with the spec**, not a defect: data-model.md defines `liveness` as derived "from `liveness_signal`" (config intent), not actual observation, and `terminal state: spawn-failed` is unambiguous on the same row — so I did not flag it.
+- **Timeout derivation, watchdog interlocks, and stream multi-turn assembly** match their tests (max(floor, ceil(secs/KB × KB)), override displacement, linear extrapolation, fail-loud backstop; self-disarming single-fire watchdog; assemble-all-assistant-texts with trailing-result-dedup, FR-005 replay).
+
+My one finding clusters at the *synthesis-vocabulary* seam (a computed signal that's unreachable for the one-lane case), not the spawn/settle core, which I judge sound.
+
+### AUDIT-20260611-17 — Whitespace-only `readonly_enforcement` is accepted but marks an unenforced lane as enforced
+
+Finding-ID: AUDIT-20260611-17
+Status:     fixed-e61e6b9b
+Severity:   high
+Surface:    plugins/stack-control/src/scope-discovery/audit-barrage/config-loader.ts:336-337,438-447; plugins/stack-control/src/scope-discovery/audit-barrage/spawn-cli.ts:168-169,451-464
+
+`requireNonEmptyString()` only checks `value.length === 0`, so a quoted YAML value like `readonly_enforcement: "   "` passes config validation. At spawn time, enforcement state is computed as `model.readonlyEnforcement === 'none' ? 'unenforced' : 'enforced'`, so that lane is recorded as `enforced`. But `buildArgs()` trims and splits the fragment; whitespace becomes `fragment.length === 0`, so no read-only fragment is injected.
+
+Blast radius is high because this violates FR-003/FR-004’s safety contract: an adopter typo can run a lane with no mechanical read-only protection while every downstream surface says `[enforced]`. The same trim-aware validation should be applied to all string fields, and `readonly_enforcement` should specifically reject whitespace-only fragments unless it is exactly the sentinel `none`.
