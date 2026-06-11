@@ -5,9 +5,9 @@
 // `startDir` is a plain directory (CLI cwd today, a client-supplied root later),
 // never a host-specific handle.
 
-import { spawnSync } from 'node:child_process';
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { dirname, join, resolve as resolvePath } from 'node:path';
+import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
 import { loadInstallationConfig } from './config-loader.js';
 import { resolvePaths } from './resolve-paths.js';
 import { InstallationError } from './errors.js';
@@ -41,17 +41,11 @@ export function setInstallationNoticeVerb(verb: string): void {
 
 function maybeEmitLegacyHalfInstallationNotice(installationRoot: string): void {
   if (legacyNoticeFired) return;
-  const r = spawnSync('git', ['-C', installationRoot, 'rev-parse', '--show-toplevel'], {
-    encoding: 'utf8',
-  });
-  if (r.status !== 0 || typeof r.stdout !== 'string') return;
-  const toplevel = r.stdout.trim();
-  if (toplevel.length === 0) return;
-  try {
-    if (realpathSync(toplevel) === realpathSync(installationRoot)) return;
-  } catch {
-    return;
-  }
+  // Shared realpath-aware derivation (AUDIT-20260611-04): null when the
+  // installation root is not in a git work tree OR it IS the toplevel —
+  // either way there is no separate outer layer that could hold debris.
+  const toplevel = deriveDistinctGitToplevel(installationRoot);
+  if (toplevel === null) return;
   const legacyDir = join(toplevel, '.stack-control');
   if (!existsSync(legacyDir)) return;
   // A marker-CARRYING outer .stack-control is a real (outer) installation

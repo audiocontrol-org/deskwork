@@ -36,6 +36,7 @@ import { spawnSync } from 'node:child_process';
 import { realpathSync, statSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { GovernPayloadError } from './payload-spec.js';
+import { deriveGitToplevel } from '../scope-discovery/util/git-toplevel.js';
 
 /** 256 KB soft budget on transmitted untracked working-tree content. */
 const DEFAULT_UNTRACKED_FOLD_BUDGET = 256 * 1024;
@@ -402,14 +403,11 @@ function assembleCrossTreeFeatureArm(args: {
   const { installationRoot, base, featureRoot, budgetBytes, warn } = args;
   let foldedBytes = args.foldedBytes;
   const skippedOverBudget: string[] = [];
-  const top = spawnSync(
-    'git',
-    ['-C', installationRoot, 'rev-parse', '--show-toplevel'],
-    { encoding: 'utf8' },
-  );
-  const toplevel =
-    top.status === 0 && typeof top.stdout === 'string' ? top.stdout.trim() : '';
-  if (toplevel.length === 0) {
+  // Shared raw derivation (AUDIT-20260611-04); the arm needs the
+  // toplevel even when it IS the installation root, so the distinct
+  // variant doesn't apply here.
+  const toplevel = deriveGitToplevel(installationRoot);
+  if (toplevel === null) {
     throw new GovernPayloadError(
       `govern: FATAL — feature root ${featureRoot} lies outside the installation ` +
         `and no git toplevel could be derived to fold it; refusing a payload that ` +

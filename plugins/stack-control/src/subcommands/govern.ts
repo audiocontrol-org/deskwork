@@ -26,7 +26,6 @@
  * advisory alongside the convergence-gate verdict. See govern/clone-step.ts.
  */
 
-import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,6 +57,7 @@ import {
 import { resolveInstallation } from '../config/installation.js';
 import type { Installation } from '../config/types.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
+import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // src/subcommands → src → plugin root → bin/stackctl
@@ -200,8 +200,13 @@ function resolveSpecPath(installationRoot: string, flagValue: string | undefined
   const explicit = pick(flagValue, process.env.GOVERN_SPEC_PATH);
   if (explicit !== undefined) return isAbsolute(explicit) ? explicit : join(installationRoot, explicit);
   const bases = [installationRoot];
-  const top = currentToplevel(installationRoot);
-  if (top !== null && top !== installationRoot) bases.push(top);
+  // Realpath-aware distinctness (AUDIT-20260611-04): the shared helper
+  // returns null when the toplevel IS the installation root, including
+  // through a symlinked spelling (macOS /var vs /private/var) — the old
+  // raw-string `top !== installationRoot` comparison read the same
+  // CLAUDE.md twice via two "distinct" bases.
+  const top = deriveDistinctGitToplevel(installationRoot);
+  if (top !== null) bases.push(top);
   for (const base of bases) {
     const claudeMd = join(base, 'CLAUDE.md');
     if (!existsSync(claudeMd)) continue;
@@ -212,16 +217,6 @@ function resolveSpecPath(installationRoot: string, flagValue: string | undefined
   throw new GovernProtocolError(
     'govern: FATAL — no spec path in --spec-path/GOVERN_SPEC_PATH and no specs/<dir>/*.md in the CLAUDE.md SPECKIT marker.',
   );
-}
-
-/** Derived git toplevel (external anchor; null outside a git tree). */
-function currentToplevel(base: string): string | null {
-  const r = spawnSync('git', ['-C', base, 'rev-parse', '--show-toplevel'], {
-    encoding: 'utf8',
-  });
-  if (r.status !== 0 || typeof r.stdout !== 'string') return null;
-  const t = r.stdout.trim();
-  return t.length > 0 ? t : null;
 }
 
 export function buildImplementVars(

@@ -50,10 +50,10 @@
  * `root` undefined (the caller fails loud, naming both searched layouts).
  */
 
-import { spawnSync } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { deriveDistinctGitToplevel } from './git-toplevel.js';
 
 export interface ResolveFeatureRootArgs {
   /**
@@ -94,28 +94,12 @@ export interface ResolveFeatureRootResult {
   readonly layout?: 'legacy-docs' | 'speckit';
 }
 
-/**
- * Derive the git toplevel enclosing `base` — an EXTERNAL anchor read from
- * git's own marker (specs/installation-isolation FR-004), used here only
- * to keep the transitional legacy spec locations read-resolvable (T015:
- * spec artifacts at the monorepo root while the installation sits below
- * it). Returns null when `base` is not inside a git work tree, or when
- * the toplevel IS `base` (no separate layer to consult).
- */
-function deriveDistinctGitToplevel(base: string): string | null {
-  const r = spawnSync('git', ['-C', base, 'rev-parse', '--show-toplevel'], {
-    encoding: 'utf8',
-  });
-  if (r.status !== 0 || typeof r.stdout !== 'string') return null;
-  const toplevel = r.stdout.trim();
-  if (toplevel.length === 0) return null;
-  try {
-    if (realpathSync(toplevel) === realpathSync(base)) return null;
-  } catch {
-    return null;
-  }
-  return toplevel;
-}
+// The git-toplevel derivation (an EXTERNAL anchor read from git's own
+// marker, specs/installation-isolation FR-004) lives in the shared
+// ./git-toplevel.js helper per AUDIT-20260611-04. It is used here only
+// to keep the transitional legacy spec locations read-resolvable (T015:
+// spec artifacts at the monorepo root while the installation sits below
+// it).
 
 export async function resolveFeatureRoot(
   args: ResolveFeatureRootArgs,
