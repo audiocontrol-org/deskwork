@@ -1,0 +1,26 @@
+#!/bin/sh
+# check-design-spec <design-language-spec.md> — validate a design-language spec:
+# markdown schema (closed kinds, css links, example-presence, do/don't) + static
+# link-liveness against author-written CSS (no app boot). Exit codes: 0 green,
+# 1 findings/error, 2 usage. Logic lives in src/design-language/check-spec-file.ts
+# (tested); this shim only locates the workspace tsx runner and dispatches.
+set -eu
+
+PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+dir="$PLUGIN_ROOT"
+TSX=""
+while [ "$dir" != "/" ]; do
+  if [ -x "$dir/node_modules/.bin/tsx" ]; then
+    TSX="$dir/node_modules/.bin/tsx"
+    break
+  fi
+  dir=$(dirname -- "$dir")
+done
+
+if [ -z "$TSX" ]; then
+  echo "check-design-spec: tsx runner not found in any node_modules/.bin above $PLUGIN_ROOT — run npm install first" >&2
+  exit 1
+fi
+
+exec "$TSX" "$PLUGIN_ROOT/src/design-language/check-design-spec-cli.ts" "$@"
