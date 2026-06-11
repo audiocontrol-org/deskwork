@@ -165,8 +165,18 @@ export async function spawnCliAgainstModel(
   const model = input.model;
   const args = buildArgs(model, input.prompt);
   const streamMode = model.outputMode === 'stream-json';
+  // AUDIT-20260611-17 defense-in-depth: enforcement marking mirrors what
+  // buildArgs ACTUALLY injects, not the sentinel comparison alone. The
+  // config loader refuses whitespace-only fragments at load, but a
+  // ModelConfig constructed outside the loader could still carry one —
+  // buildArgs trims/splits it to zero tokens and injects nothing, so
+  // marking that lane `enforced` would lie on every downstream surface
+  // (FR-004). `enforced` requires >= 1 real fragment token.
   const enforcement: EnforcementState =
-    model.readonlyEnforcement === 'none' ? 'unenforced' : 'enforced';
+    model.readonlyEnforcement !== 'none' &&
+    model.readonlyEnforcement.trim().length > 0
+      ? 'enforced'
+      : 'unenforced';
   const monitored = model.livenessSignal !== 'none';
   if (monitored && model.livenessWindowSeconds === undefined) {
     // The config loader refuses this shape; a lane constructed outside the

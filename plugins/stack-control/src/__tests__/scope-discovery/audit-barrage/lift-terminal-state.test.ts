@@ -271,6 +271,28 @@ describe('fleet report repeated when degraded (FR-007 / SC-003)', () => {
   });
 });
 
+describe('quorum collapse surfaced independent of degradation (AUDIT-20260611-15)', () => {
+  it('a healthy single-lane run prints the quorum line without the DEGRADED marker', async () => {
+    // produced === configured === 1: the fleet is NOT degraded, but
+    // cross-model agreement — the barrage's HIGH-confidence signal — was
+    // structurally impossible. The lift must state the quorum collapse
+    // rather than report a clean fleet with no fleet block at all.
+    const fixture = makeFixture({
+      slug: 'solo',
+      modelFiles: {
+        'claude.md': findingBlock('claude', '01', 'Finding from the only lane', 'src/a.ts:1'),
+      },
+      results: [laneResult({ name: 'claude' })],
+    });
+    const { exit, err } = await lift(fixture, 'solo');
+    expect(exit).toBe(0);
+    expect(err).toContain('Fleet report');
+    expect(err).toContain('- configured: 1, produced: 1');
+    expect(err).toContain('- quorum: cross-model agreement impossible (produced ≤ 1)');
+    expect(err).not.toContain('DEGRADED');
+  });
+});
+
 describe('never "clean" from a killed lane (FR-007)', () => {
   it('a zero-findings degraded run states the degradation, not a bare nothing-to-lift', async () => {
     const fixture = makeFixture({

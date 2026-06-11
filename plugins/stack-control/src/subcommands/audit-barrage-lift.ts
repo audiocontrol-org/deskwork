@@ -369,7 +369,10 @@ export async function runAuditBarrageLift(
         .map((lane) => safeModelName(lane.name)),
     );
     fleet = computeFleetReportFromParsedLanes(lanes);
-    if (fleet.produced < fleet.configured) {
+    // AUDIT-20260611-15: render the fleet report when degraded OR when
+    // quorum collapsed (produced ≤ 1) — a healthy single-lane run must
+    // still state that cross-model agreement was structurally impossible.
+    if (fleet.produced < fleet.configured || fleet.quorumCollapsed) {
       stderr.write(`${renderFleetReportLines(fleet).join('\n')}\n`);
     }
   }

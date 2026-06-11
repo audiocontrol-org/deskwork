@@ -167,7 +167,11 @@ export function reportFleetStatus(runDir: string, stderr: (s: string) => void): 
       `govern:   ${lane.name}: ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]${completedNonConvergedAnnotation(lane)}\n`,
     );
   }
-  if (degraded && fleet.quorumCollapsed) {
+  // AUDIT-20260611-15: the quorum line fires whenever quorumCollapsed holds,
+  // independent of degradation — a healthy single-lane round (produced ===
+  // configured === 1) still cannot deliver cross-model agreement. The
+  // 0-HIGH-over-DEGRADED NOTE below stays degradation-gated.
+  if (fleet.quorumCollapsed) {
     stderr('govern: quorum — cross-model agreement impossible (produced ≤ 1)\n');
   }
   if (degraded) {

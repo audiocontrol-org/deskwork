@@ -24,7 +24,9 @@
  *
  * Validation rules (failure-loud per `.claude/CLAUDE.md`):
  *   - top-level `models:` must be a non-empty array.
- *   - `name`, `binary`, `args_template` must be non-empty strings.
+ *   - `name`, `binary`, `args_template` (and every other string field)
+ *     must be non-BLANK strings — whitespace-only values are rejected,
+ *     trim-aware (AUDIT-20260611-17).
  *   - `args_template` must contain `{{model}}` AND exactly one of
  *     `{{prompt}}` / `{{prompt-stdin}}`.
  *   - `model` (explicit pin) and `readonly_enforcement` (fragment or
@@ -333,8 +335,12 @@ function parseEntry(
   // Field-level value validation (present but invalid). The missing-field
   // gate above already threw when these were absent; re-deriving through the
   // validators keeps the types narrow without a cast.
-  const model = requireNonEmptyString(raw, 'model', prefix);
-  const readonlyEnforcement = requireNonEmptyString(raw, 'readonly_enforcement', prefix);
+  const model = requireNonEmptyString(raw, 'model', `${prefix} ('${name}')`);
+  const readonlyEnforcement = requireNonEmptyString(
+    raw,
+    'readonly_enforcement',
+    `${prefix} ('${name}')`,
+  );
   const outputMode = requireEnum(raw, 'output_mode', OUTPUT_MODES, prefix);
   const livenessSignal = requireEnum(raw, 'liveness_signal', LIVENESS_SIGNALS, prefix);
   let livenessWindowSeconds: number | undefined;
@@ -441,8 +447,18 @@ function requireNonEmptyString(
   prefix: string,
 ): string {
   const value = raw[field];
-  if (typeof value !== 'string' || value.length === 0) {
-    throw new Error(`${prefix}.${field} missing or not a non-empty string`);
+  // AUDIT-20260611-17: trim-aware — a quoted whitespace-only YAML value
+  // (e.g. readonly_enforcement: "   ") passed a bare length check, loaded
+  // as a "real" value, and downstream treated it as substantive: the lane
+  // was marked `enforced` while buildArgs trimmed/split the fragment to
+  // zero tokens and injected NOTHING (FR-003/FR-004 violation). Non-blank
+  // required across every string field; the sentinel 'none' and real
+  // fragments are unaffected.
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(
+      `${prefix}.${field} missing or not a non-blank string ` +
+        `(whitespace-only values are rejected)`,
+    );
   }
   return value;
 }

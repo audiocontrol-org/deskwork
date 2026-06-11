@@ -155,9 +155,13 @@ export function renderIndexBody(run: BarrageRun): string {
   const rows = run.results.map(renderModelRow).join('\n');
   // FR-007: a run where fewer lanes produced than configured renders the
   // fleet report block so degradation is readable from the artifact alone.
+  // AUDIT-20260611-15: a quorum-collapsed fleet (produced ≤ 1) renders the
+  // block even when NOT degraded — a healthy single-lane run gets a fleet
+  // block whose only warning is the quorum line, because quorum
+  // impossibility must be stated wherever agreement is reported.
   const fleet = computeFleetReport(run.results);
   const fleetBlock =
-    fleet.produced < fleet.configured
+    fleet.produced < fleet.configured || fleet.quorumCollapsed
       ? `\n${renderFleetReportLines(fleet).join('\n')}\n`
       : '';
   return `${header}${rows}${fleetBlock}\n`;

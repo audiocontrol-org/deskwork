@@ -168,6 +168,18 @@ describe('INDEX fleet report block (T017 / FR-007)', () => {
     expect(text).not.toMatch(/claude: completed \[enforced, monitored\] — completed but non-converged/);
   });
 
+  it('renders the fleet block with the quorum line for a healthy single-lane run (AUDIT-20260611-15)', () => {
+    // produced === configured === 1: not degraded, but cross-model agreement
+    // is structurally impossible. The quorum collapse must be stated in the
+    // artifact — `quorumCollapsed: true` may never be silently dropped just
+    // because the fleet isn't degraded.
+    const body = renderIndexBody(runWith([modelResult({})]));
+    expect(body).toContain('## Fleet report');
+    expect(body).toContain('- configured: 1, produced: 1');
+    expect(body).toContain('- quorum: cross-model agreement impossible (produced ≤ 1)');
+    expect(body).not.toContain('⚠ DEGRADED');
+  });
+
   it('omits the quorum line when ≥2 lanes produced', () => {
     const results = [
       modelResult({}),

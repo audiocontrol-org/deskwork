@@ -245,6 +245,51 @@ describe('config v2 — {{prompt-stdin}} must be a bare token (AUDIT-20260611-12
   });
 });
 
+describe('config v2 — whitespace-only string fields refused (AUDIT-20260611-17)', () => {
+  // A quoted YAML value like readonly_enforcement: "   " passed the bare
+  // length check, loaded as a "real" fragment, and the lane was marked
+  // `enforced` while buildArgs trimmed/split it to ZERO tokens and injected
+  // nothing — no mechanical read-only protection, every downstream surface
+  // lying [enforced] (FR-003/FR-004). The trim-aware check refuses at load.
+  it('refuses a whitespace-only readonly_enforcement, naming the lane and the field', () => {
+    let message = '';
+    try {
+      parseConfig(laneYaml({ readonly_enforcement: '"   "' }), LABEL);
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).not.toBe('');
+    // Names the lane…
+    expect(message).toContain('claude');
+    // …names the field…
+    expect(message).toContain('readonly_enforcement');
+    // …and states the non-blank requirement.
+    expect(message).toMatch(/non-blank/i);
+  });
+
+  it('refuses a whitespace-only model pin (the trim check is generic across string fields)', () => {
+    let message = '';
+    try {
+      parseConfig(laneYaml({ model: '"   "' }), LABEL);
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).not.toBe('');
+    expect(message).toContain('model');
+    expect(message).toMatch(/non-blank/i);
+  });
+
+  it('still accepts the exact sentinel `none` and a real fragment', () => {
+    expect(
+      parseConfig(laneYaml({ readonly_enforcement: 'none' }), LABEL).models[0]!
+        .readonlyEnforcement,
+    ).toBe('none');
+    expect(
+      parseConfig(laneYaml(), LABEL).models[0]!.readonlyEnforcement,
+    ).toBe('--permission-mode plan');
+  });
+});
+
 describe('config v2 — v1 rules carried forward unchanged', () => {
   it('still refuses a template with neither prompt placeholder', () => {
     expect(() =>

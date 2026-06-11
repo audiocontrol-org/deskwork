@@ -400,8 +400,11 @@ export async function auditBarrage(args: string[]): Promise<void> {
   }
   // specs/014 FR-007: a degraded fleet prints the fleet report at run end —
   // unconditionally, so degradation is never hidden behind --quiet.
+  // AUDIT-20260611-15: a quorum-collapsed fleet (produced ≤ 1) prints it too,
+  // even when healthy — cross-model agreement was structurally impossible and
+  // that must be stated wherever agreement is reported.
   const fleet = computeFleetReport(run.results);
-  if (fleet.produced < fleet.configured) {
+  if (fleet.produced < fleet.configured || fleet.quorumCollapsed) {
     process.stderr.write(`${renderFleetReportLines(fleet).join('\n')}\n`);
   }
   process.exit(result.exitCode);

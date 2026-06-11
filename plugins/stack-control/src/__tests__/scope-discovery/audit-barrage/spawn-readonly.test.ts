@@ -88,6 +88,15 @@ describe('argv assembly injects the enforcement fragment (FR-003)', () => {
     const args = buildArgs(lane({ readonlyEnforcement: 'none' }), 'AUDIT THIS');
     expect(args).toEqual(['-p', 'AUDIT THIS']);
   });
+
+  // AUDIT-20260611-17: a whitespace-only fragment trims/splits to zero
+  // tokens — buildArgs injects nothing. (The config loader refuses this
+  // shape at load; this pins the argv behavior for configs constructed
+  // outside the loader.)
+  it('injects nothing for a whitespace-only fragment (AUDIT-20260611-17)', () => {
+    const args = buildArgs(lane({ readonlyEnforcement: '   ' }), 'AUDIT THIS');
+    expect(args).toEqual(['-p', 'AUDIT THIS']);
+  });
 });
 
 describe('settle record carries the enforcement state (FR-004)', () => {
@@ -135,5 +144,23 @@ describe('settle record carries the enforcement state (FR-004)', () => {
       timeoutBasis: BASIS,
     });
     expect(result.enforcement).toBe('unenforced');
+  });
+
+  // AUDIT-20260611-17 defense-in-depth: a ModelConfig constructed OUTSIDE
+  // the loader with a whitespace-only fragment injects ZERO tokens into
+  // argv; marking that lane `enforced` would lie on every downstream
+  // surface (FR-004). Enforcement is derived from whether the trimmed
+  // fragment carries >= 1 token, not from the sentinel comparison alone.
+  it('a whitespace-only fragment lane settles enforcement: unenforced (AUDIT-20260611-17)', async () => {
+    const result = await spawnCliAgainstModel({
+      model: nodeLane({ readonlyEnforcement: '   ' }),
+      prompt: 'p',
+      stdoutPath: join(dir, 'blank-fragment.md'),
+      stderrPath: join(dir, 'blank-fragment.err.txt'),
+      eventsPath: join(dir, 'blank-fragment.events.ndjson'),
+      timeoutBasis: BASIS,
+    });
+    expect(result.enforcement).toBe('unenforced');
+    expect(result.terminalState).toBe('completed');
   });
 });

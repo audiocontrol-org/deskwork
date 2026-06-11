@@ -139,6 +139,19 @@ describe('govern round status includes the fleet report (T020 / FR-007)', () => 
     expect(err).not.toContain('quorum');
   });
 
+  it('a healthy single-lane round still prints the quorum line, without degradation noise (AUDIT-20260611-15)', () => {
+    // ONE configured lane that produces: produced === configured === 1, so the
+    // round is NOT degraded — but cross-model agreement was structurally
+    // impossible. The quorum line must fire on quorumCollapsed alone; the
+    // 0-HIGH-over-DEGRADED NOTE stays degradation-gated.
+    const runDir = makeRunDir([laneResult({})]);
+    const err = collect(runDir);
+    expect(err).toContain('govern: fleet — configured 1, produced 1');
+    expect(err).not.toContain('DEGRADED');
+    expect(err).toContain('quorum — cross-model agreement impossible');
+    expect(err).not.toMatch(/0-HIGH/);
+  });
+
   it('a mixed v2 INDEX throws a GovernProtocolError naming the lane (AUDIT-20260611-07)', () => {
     const runDir = makeRunDir([
       laneResult({}),
