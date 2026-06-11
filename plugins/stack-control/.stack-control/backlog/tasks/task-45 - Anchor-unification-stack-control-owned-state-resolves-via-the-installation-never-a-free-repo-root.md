@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-11 04:15'
-updated_date: '2026-06-11 05:02'
+updated_date: '2026-06-11 05:11'
 labels:
   - agent-found
   - 'type:gap'
@@ -29,4 +29,6 @@ Refinement (operator, 2026-06-10): git is NOT a legitimate repo-root anchor — 
 Research (2026-06-10): Spec Kit is monorepo-compatible at the script layer — upstream common.sh resolves its root by walking UP to the nearest .specify/ directory, explicitly prioritized over the git toplevel ("prevents using a parent git repo when spec-kit is initialized in a subdirectory"); our v0.9.4 install carries this unmodified. So `specify init --here` inside plugins/stack-control/ re-anchors specs/, templates, memory/, feature.json at the installation — the cross-tree-span concern dissolves if .specify/ + specs/ relocate into the installation. Also upstream: SPECIFY_FEATURE_DIRECTORY env (explicit per-feature dir) > .specify/feature.json feature_directory > branch-prefix lookup; SPECIFY_FEATURE selects the feature without branch matching. NOT configurable: the literal specs/ and .specify names. Upstream weak spot is only the slash-command layer (github/spec-kit issue 1026 — invoking /speckit.* from outside the subfolder; open/stale) which stack-control does not depend on. Unification design: relocating spec-kit into the installation + converting resolveFeatureRoot/CLAUDE.md-marker consumers is one change.
 
 - **Promoted-to:** spec:specs/015-installation-isolation
+
+Spec authored 2026-06-10 at specs/installation-isolation (UNNUMBERED — renamed from the recorded spec:specs/015-installation-isolation target per the operator descriptive-slug naming directive; the companion specs/descriptive-naming feature captures that directive).
 <!-- SECTION:NOTES:END -->
