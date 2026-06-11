@@ -20,6 +20,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -73,6 +74,18 @@ describe('US3 — implement payload anchors at the installation (R3)', () => {
       });
       expect(payload.diff).toContain('u-inner.ts');
       expect(payload.diff).not.toContain('u-outer.ts');
+      // AUDIT-20260611-01: the fold's diff headers must be
+      // installation-relative — `git diff --no-index` echoes its operands
+      // verbatim, so the fold must hand git the repo-relative path, not the
+      // absolute one. No absolute installation path may appear ANYWHERE in
+      // the payload (it would break the installation-relative promise, leak
+      // the operator's filesystem layout off-box, and produce anchors that
+      // don't join with the committed arm's relative paths). macOS caveat:
+      // child processes may see the realpath spelling (/private/var vs
+      // /var), so assert absence of BOTH spellings.
+      expect(payload.diff).toMatch(/diff --git a\/u-inner\.ts b\/u-inner\.ts/);
+      expect(payload.diff).not.toContain(fixture.installationRoot);
+      expect(payload.diff).not.toContain(realpathSync(fixture.installationRoot));
     } finally {
       fixture.cleanup();
     }
@@ -87,6 +100,9 @@ describe('US3 — implement payload anchors at the installation (R3)', () => {
       fixture.writeOuter('specs/feat/audit-log.md', 'SELF-REFERENCE-CANARY\n');
       gitIn(fixture.outerRoot, ['add', '.']);
       gitIn(fixture.outerRoot, ['commit', '-q', '-m', 'spec artifacts']);
+      // UNTRACKED spec artifact under the feature root — exercises the
+      // cross-tree arm's untracked fold (AUDIT-20260611-01).
+      fixture.writeOuter('specs/feat/notes.md', 'untracked spec note\n');
 
       const { lines, warn } = collectWarn();
       const payload = assembleImplementPayload({
@@ -99,6 +115,16 @@ describe('US3 — implement payload anchors at the installation (R3)', () => {
       expect(payload.diff).toContain('The spec promise under audit.');
       expect(payload.diff).not.toContain('SELF-REFERENCE-CANARY');
       expect(lines.join('\n')).toContain(ANNOUNCEMENT);
+      // AUDIT-20260611-01: the cross-tree arm's untracked fold renders the
+      // note with toplevel-relative diff headers. The arm's LABEL names the
+      // absolute featureRoot by design, so the absence assertion targets the
+      // `diff --git a<abs>` header shape (both macOS path spellings).
+      expect(payload.diff).toContain('untracked spec note');
+      expect(payload.diff).toMatch(
+        /diff --git a\/specs\/feat\/notes\.md b\/specs\/feat\/notes\.md/,
+      );
+      expect(payload.diff).not.toContain(`a${fixture.outerRoot}`);
+      expect(payload.diff).not.toContain(`a${realpathSync(fixture.outerRoot)}`);
     } finally {
       fixture.cleanup();
     }

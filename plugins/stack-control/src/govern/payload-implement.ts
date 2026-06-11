@@ -310,9 +310,15 @@ export function assembleImplementPayload(
     }
     // Render the untracked file as an all-added diff via --no-index WITHOUT
     // mutating the index (mirrors the bash `git diff --no-index -- /dev/null`).
+    // AUDIT-20260611-01: pass the repo-relative `rel` (NOT `abs`) — git runs
+    // with `-C installationRoot`, so it resolves `rel` against that cwd and
+    // ECHOES the relative path into the diff headers, keeping the payload
+    // installation-relative (no absolute filesystem paths off-box; anchors
+    // join with the committed arm's --relative paths). `abs` stays for the
+    // isBinaryOrEmpty/fileSize checks above, which run in THIS process.
     const r = spawnSync(
       'git',
-      ['-C', installationRoot, 'diff', '--no-index', '--no-color', '--', '/dev/null', abs],
+      ['-C', installationRoot, 'diff', '--no-index', '--no-color', '--', '/dev/null', rel],
       { encoding: 'utf8' },
     );
     // `git diff --no-index` exits 1 when there IS a difference (always, for an
@@ -459,9 +465,12 @@ function assembleCrossTreeFeatureArm(args: {
       );
       continue;
     }
+    // AUDIT-20260611-01: same relative-operand rule as the installation
+    // fold — git runs with `-C toplevel`, so passing `rel` makes the diff
+    // headers toplevel-relative instead of leaking absolute paths.
     const r = spawnSync(
       'git',
-      ['-C', toplevel, 'diff', '--no-index', '--no-color', '--', '/dev/null', abs],
+      ['-C', toplevel, 'diff', '--no-index', '--no-color', '--', '/dev/null', rel],
       { encoding: 'utf8' },
     );
     const folded = typeof r.stdout === 'string' ? r.stdout : '';
