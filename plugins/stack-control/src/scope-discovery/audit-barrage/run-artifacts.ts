@@ -28,6 +28,7 @@
  * over tmpdir fixtures.
  */
 
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -275,6 +276,37 @@ export function parseIndexLaneStates(indexText: string): ParsedIndexLane[] | nul
   }
   flush();
   return lanes.length > 0 ? lanes : null;
+}
+
+/**
+ * Reader-side fleet report from parsed INDEX lanes (FR-007). `produced`
+ * counts converged-eligible lanes only: completed settle, exit 0, AND the
+ * report artifact present on disk — a fast non-zero exit (CLI-rejected
+ * model pin) or a killed lane is degradation, not production. Shared by
+ * the lift verb and the govern loop so both surfaces print the same
+ * vocabulary.
+ */
+export function computeFleetReportFromParsedLanes(
+  runDir: string,
+  lanes: ReadonlyArray<ParsedIndexLane>,
+): FleetReport {
+  const produced = lanes.filter(
+    (lane) =>
+      lane.terminalState === 'completed' &&
+      lane.exitCode === 0 &&
+      existsSync(join(runDir, `${safeModelName(lane.name)}.md`)),
+  ).length;
+  return {
+    configured: lanes.length,
+    produced,
+    perLane: lanes.map((lane) => ({
+      name: lane.name,
+      terminalState: lane.terminalState,
+      enforcement: lane.enforcement,
+      liveness: lane.liveness,
+    })),
+    quorumCollapsed: produced <= 1,
+  };
 }
 
 function renderTimeoutBasis(result: ModelRunResult): string {

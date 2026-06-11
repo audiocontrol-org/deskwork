@@ -25,9 +25,13 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import {
+  computeFleetReportFromParsedLanes,
+  parseIndexLaneStates,
+} from '../scope-discovery/audit-barrage/run-artifacts.js';
 
 /** Thrown for any fail-loud protocol condition; carries a process exit code. */
 export class GovernProtocolError extends Error {
@@ -117,6 +121,40 @@ export function currentBranch(repoRoot: string): string {
     encoding: 'utf8',
   });
   return r.status === 0 && typeof r.stdout === 'string' ? r.stdout.trim() : '';
+}
+
+/**
+ * specs/014 FR-007 / US3 scenario 3: surface the round's fleet state in the
+ * LOOP's own status lines, read from the run-dir INDEX the barrage just
+ * wrote. Repeated same-lane kills across rounds become visible in govern
+ * output without opening per-run artifact files; a round whose verdict
+ * could be "0 HIGH" over a degraded fleet is annotated as degraded. A
+ * missing or pre-014 INDEX (stub barrage bins, legacy runs) emits nothing —
+ * readers require the new fields only for v2-writer runs.
+ */
+export function reportFleetStatus(runDir: string, stderr: (s: string) => void): void {
+  const indexPath = join(runDir, 'INDEX.md');
+  if (!existsSync(indexPath)) return;
+  const lanes = parseIndexLaneStates(readFileSync(indexPath, 'utf8'));
+  if (lanes === null) return;
+  const fleet = computeFleetReportFromParsedLanes(runDir, lanes);
+  const degraded = fleet.produced < fleet.configured;
+  stderr(
+    `govern: fleet — configured ${fleet.configured}, produced ${fleet.produced}${degraded ? '  ⚠ DEGRADED' : ''}\n`,
+  );
+  for (const lane of fleet.perLane) {
+    stderr(
+      `govern:   ${lane.name}: ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]\n`,
+    );
+  }
+  if (degraded && fleet.quorumCollapsed) {
+    stderr('govern: quorum — cross-model agreement impossible (produced ≤ 1)\n');
+  }
+  if (degraded) {
+    stderr(
+      'govern: NOTE — any 0-HIGH verdict this round is computed over a DEGRADED fleet (FR-007).\n',
+    );
+  }
 }
 
 export interface RunProtocolArgs {
@@ -222,6 +260,9 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
     }
     const runDir = barrage.stdout.trim();
     args.stderr(`govern: barrage run-dir = ${runDir}\n`);
+    // specs/014 FR-007: the round's fleet state belongs to the loop's own
+    // status lines, not only the per-run INDEX.
+    reportFleetStatus(runDir, args.stderr);
 
     // --- lift (barrage bin) ---
     const lift = spawnText(args.barrageBin, [

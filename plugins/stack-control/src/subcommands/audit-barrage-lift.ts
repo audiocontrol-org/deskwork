@@ -43,6 +43,7 @@ import {
 } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
 import {
+  computeFleetReportFromParsedLanes,
   parseIndexLaneStates,
   renderFleetReportLines,
   safeModelName,
@@ -340,26 +341,7 @@ export async function runAuditBarrageLift(
         .filter((lane) => lane.terminalState === 'completed')
         .map((lane) => safeModelName(lane.name)),
     );
-    // `produced` counts converged-eligible lanes only: completed settle,
-    // exit 0, AND the report artifact on disk (a fast non-zero exit — a
-    // CLI-rejected model pin — is degradation, not production).
-    const produced = lanes.filter(
-      (lane) =>
-        lane.terminalState === 'completed' &&
-        lane.exitCode === 0 &&
-        existsSync(join(opts.runDir, `${safeModelName(lane.name)}.md`)),
-    ).length;
-    fleet = {
-      configured: lanes.length,
-      produced,
-      perLane: lanes.map((lane) => ({
-        name: lane.name,
-        terminalState: lane.terminalState,
-        enforcement: lane.enforcement,
-        liveness: lane.liveness,
-      })),
-      quorumCollapsed: produced <= 1,
-    };
+    fleet = computeFleetReportFromParsedLanes(opts.runDir, lanes);
     if (fleet.produced < fleet.configured) {
       stderr.write(`${renderFleetReportLines(fleet).join('\n')}\n`);
     }
