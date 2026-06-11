@@ -16,6 +16,11 @@
  * claim ({@link wireframeDroveImplementation}) — provenance distinguishes the
  * two modes precisely so the claim cannot be laundered through acceptance.
  *
+ * Provenance is APPEND-ONCE: recording over an existing sidecar fails loud in
+ * both modes and both directions, so a `derived` record can never be silently
+ * flipped to `driving` by a later call. Mode transitions require explicitly
+ * removing or superseding the existing record.
+ *
  * Sidecar layout (per surface, in the operator-chosen provenance dir):
  *   <surfaceId>.provenance.json          — zod-validated provenance record
  *   <surfaceId>.derived-snapshot.html    — the auto-derived draft (derived only)
@@ -105,11 +110,28 @@ export interface AcceptanceResult {
 const sidecarPath = (dir: string, surfaceId: string): string =>
   join(dir, `${surfaceId}.provenance.json`);
 
+/**
+ * The single chokepoint both recorders write through. Provenance is
+ * append-once: if a sidecar already exists for the surface — in ANY mode —
+ * writing fails loud. Without this, a later `recordDrivingWireframe` call
+ * could silently flip a `derived` record to `driving` (orphaning the
+ * derivation-time snapshot), after which {@link wireframeDroveImplementation}
+ * returns true — laundering the exact claim this module exists to prevent.
+ * Mode transitions are NOT a write-over; they require explicitly removing or
+ * superseding the existing record as a separate, deliberate operation.
+ */
 function writeProvenance(dir: string, provenance: WireframeProvenance): void {
-  writeFileSync(
-    sidecarPath(dir, provenance.surfaceId),
-    JSON.stringify(provenance, null, 2) + '\n',
-  );
+  const path = sidecarPath(dir, provenance.surfaceId);
+  if (existsSync(path)) {
+    const existing = loadProvenance(dir, provenance.surfaceId);
+    throw new Error(
+      `Refusing to record ${provenance.mode} provenance for surface "${provenance.surfaceId}": ` +
+        `a ${existing.mode} record already exists at ${path}. Provenance is append-once — ` +
+        `overwriting would silently rewrite the surface's mode and its recorded baseline. ` +
+        `Re-recording requires explicitly removing or superseding the existing record first.`,
+    );
+  }
+  writeFileSync(path, JSON.stringify(provenance, null, 2) + '\n');
 }
 
 /**
@@ -165,7 +187,6 @@ export function recordDerivation(input: {
 }): WireframeProvenance {
   assertPortableSurfaceId(input.surfaceId);
   const snapshotFile = `${input.surfaceId}.derived-snapshot.html`;
-  writeFileSync(join(input.dir, snapshotFile), input.derivedHtml);
   const provenance: WireframeProvenance = {
     version: PROVENANCE_VERSION,
     surfaceId: input.surfaceId,
@@ -177,7 +198,12 @@ export function recordDerivation(input: {
       source: input.source,
     },
   };
+  // Sidecar first: writeProvenance is the append-once chokepoint, so its
+  // refusal must fire BEFORE the snapshot write — otherwise a refused
+  // re-derivation would have already clobbered the existing surface's
+  // derivation-time baseline.
   writeProvenance(input.dir, provenance);
+  writeFileSync(join(input.dir, snapshotFile), input.derivedHtml);
   return provenance;
 }
 
@@ -197,7 +223,8 @@ export function loadProvenance(dir: string, surfaceId: string): WireframeProvena
       `Provenance sidecar identity mismatch at ${path}: requested surface "${surfaceId}" but the ` +
         `sidecar records surfaceId "${parsed.surfaceId}". The sidecar was likely copied or renamed ` +
         `to another surface's filename — its snapshot and hash belong to "${parsed.surfaceId}", so ` +
-        `it cannot vouch for "${surfaceId}". Re-record provenance for "${surfaceId}".`,
+        `it cannot vouch for "${surfaceId}". Remove the misplaced sidecar, then record provenance ` +
+        `for "${surfaceId}" (recording refuses to overwrite an existing sidecar).`,
     );
   }
   return parsed;
@@ -225,7 +252,8 @@ export function checkDerivedAcceptance(
     throw new Error(
       `Derived snapshot ${snapshotPath} does not match the hash recorded at derivation time — ` +
         `the baseline was modified after recording, so the operator-edit diff cannot be trusted. ` +
-        `Re-derive the draft to re-establish a baseline.`,
+        `Remove the existing record, then re-derive the draft to re-establish a baseline ` +
+        `(recording refuses to overwrite an existing sidecar).`,
     );
   }
   if (acceptedHtml === snapshot) {
@@ -276,15 +304,17 @@ export function verifyDrivingWireframe(dir: string, surfaceId: string): Wirefram
     throw new Error(
       `Driving provenance for surface "${surfaceId}" binds wireframe file ${wireframePath}, ` +
         `but that file no longer exists — the record cannot certify an artifact that is gone. ` +
-        `Restore the wireframe or re-record provenance.`,
+        `Restore the wireframe, or remove the existing record and re-record provenance ` +
+        `(recording refuses to overwrite an existing sidecar).`,
     );
   }
   if (sha256Hex(readFileSync(wireframePath, 'utf8')) !== provenance.driving.wireframeSha256) {
     throw new Error(
       `Wireframe ${wireframePath} does not match the hash recorded for surface "${surfaceId}" ` +
         `at recording time — the artifact was modified or replaced after the driving record was ` +
-        `written, so the record cannot certify it. Re-lint and re-record provenance for the ` +
-        `current wireframe.`,
+        `written, so the record cannot certify it. Remove the existing record, then re-lint and ` +
+        `re-record provenance for the current wireframe (recording refuses to overwrite an ` +
+        `existing sidecar).`,
     );
   }
   return provenance;

@@ -74,7 +74,11 @@ identity lives in the design-language spec (Phase 2), never here.
    `recordDerivation` at derivation time instead, and note that acceptance will
    require a non-empty operator edit against the stored snapshot
    (`checkDerivedAcceptance`) and the artifact never supports a "wireframe drove
-   implementation" claim.
+   implementation" claim. Provenance is append-once: if a sidecar already
+   exists for the surface, BOTH recorders refuse to overwrite it (in either
+   mode direction) — re-recording requires explicitly removing or superseding
+   the existing record; never work around the refusal by deleting the sidecar
+   to flip a `derived` surface to `driving`.
 
 7. **Present and stop.** Show the operator the lint-green wireframe (path +
    `0 findings` output). The operator picks/iterates; translation into the

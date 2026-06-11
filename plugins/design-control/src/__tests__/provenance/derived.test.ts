@@ -270,6 +270,98 @@ describe('recordDrivingWireframe — binds the wireframe artifact by filename + 
   });
 });
 
+describe('overwrite refusal — an existing record can never be silently re-recorded', () => {
+  it('refuses recordDrivingWireframe over an existing derived record (the laundering direction)', () => {
+    const dir = freshDir();
+    recordDerivation({
+      dir,
+      surfaceId: 'laundered',
+      derivedHtml: draftHtml,
+      source: 'live surface',
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    const wireframeFile = writeWireframe(dir, 'laundered.html');
+    expect(() =>
+      recordDrivingWireframe({ dir, surfaceId: 'laundered', wireframeFile }),
+    ).toThrow(/laundered[\s\S]*derived[\s\S]*(remov|supersed)/i);
+  });
+
+  it('refuses recordDerivation over an existing driving record', () => {
+    const dir = freshDir();
+    recordDrivingWireframe({
+      dir,
+      surfaceId: 'flipped',
+      wireframeFile: writeWireframe(dir, 'flipped.html'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    expect(() =>
+      recordDerivation({ dir, surfaceId: 'flipped', derivedHtml: draftHtml, source: 'live surface' }),
+    ).toThrow(/flipped[\s\S]*driving[\s\S]*(remov|supersed)/i);
+  });
+
+  it('refuses a same-mode driving re-record', () => {
+    const dir = freshDir();
+    const wireframeFile = writeWireframe(dir, 'rerecord.html');
+    recordDrivingWireframe({
+      dir,
+      surfaceId: 'rerecord',
+      wireframeFile,
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    expect(() =>
+      recordDrivingWireframe({ dir, surfaceId: 'rerecord', wireframeFile }),
+    ).toThrow(/rerecord[\s\S]*driving[\s\S]*(remov|supersed)/i);
+  });
+
+  it('refuses a same-mode derived re-record', () => {
+    const dir = freshDir();
+    recordDerivation({
+      dir,
+      surfaceId: 'rederive',
+      derivedHtml: draftHtml,
+      source: 'live surface',
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    expect(() =>
+      recordDerivation({
+        dir,
+        surfaceId: 'rederive',
+        derivedHtml: draftHtml + '<!-- second derivation -->',
+        source: 'another surface',
+      }),
+    ).toThrow(/rederive[\s\S]*derived[\s\S]*(remov|supersed)/i);
+  });
+
+  it('leaves the existing sidecar AND snapshot byte-identical after a refused overwrite', () => {
+    const dir = freshDir();
+    recordDerivation({
+      dir,
+      surfaceId: 'baseline',
+      derivedHtml: draftHtml,
+      source: 'live surface',
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    const sidecarBefore = readFileSync(join(dir, 'baseline.provenance.json'), 'utf8');
+    const snapshotBefore = readFileSync(join(dir, 'baseline.derived-snapshot.html'), 'utf8');
+
+    const wireframeFile = writeWireframe(dir, 'baseline.html');
+    expect(() =>
+      recordDrivingWireframe({ dir, surfaceId: 'baseline', wireframeFile }),
+    ).toThrow();
+    expect(() =>
+      recordDerivation({
+        dir,
+        surfaceId: 'baseline',
+        derivedHtml: draftHtml + '<!-- would replace the snapshot -->',
+        source: 'second derivation',
+      }),
+    ).toThrow();
+
+    expect(readFileSync(join(dir, 'baseline.provenance.json'), 'utf8')).toBe(sidecarBefore);
+    expect(readFileSync(join(dir, 'baseline.derived-snapshot.html'), 'utf8')).toBe(snapshotBefore);
+  });
+});
+
 describe('verifyDrivingWireframe — tamper-checks the bound artifact like checkDerivedAcceptance', () => {
   it('returns the provenance when the wireframe bytes still match the recorded hash', () => {
     const dir = freshDir();
