@@ -267,6 +267,30 @@ describe('parseDesignSpec — structural rejections', () => {
     expect(result.findings.map((f) => f.rule)).toContain('malformed-rule-heading');
   });
 
+  it('captures a curly-apostrophe don’t (U+2019) exactly like ASCII don\'t', () => {
+    const result = parseDesignSpec(`### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: Use the ink palette.
+- don’t: Never introduce raw hex blues.
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.spec.rules[0].donts).toEqual(['Never introduce raw hex blues.']);
+  });
+
+  it('flags an unknown key containing a curly apostrophe (normalized typo guard)', () => {
+    const findings = findingsFor(`### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- can’t: x
+- do: y
+`);
+    expect(findings).toContain('unknown-field');
+  });
+
   it('excludes invalid rules from spec.rules but keeps valid siblings', () => {
     const result = parseDesignSpec(`### rule: broken
 - kind: palette

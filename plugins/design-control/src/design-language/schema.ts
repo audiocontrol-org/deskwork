@@ -6,7 +6,8 @@
  *   - a rule is declared by an ATX heading whose text is `rule: <id>`
  *     (any heading level); the rule's section runs to the next heading;
  *   - fields are single-line bullets `- <key>: <value>` with the CLOSED key set
- *     `kind` / `css` / `example` / `do` / `don't`;
+ *     `kind` / `css` / `example` / `do` / `don't` (a curly apostrophe U+2019 in
+ *     the key is normalized to ASCII `'`, so smart-quoted `don’t:` is accepted);
  *   - `css: <path> <selector>` — first token is the file path, the remainder is
  *     the selector (descendant selectors allowed);
  *   - other prose (paragraphs, capitalised-key bullets) is inert.
@@ -41,8 +42,13 @@ const RULE_HEADING_RE = /^rule:\s*(.*)$/;
  * inert structure. The `\b` keeps unrelated headings (`Ruler settings`) inert.
  */
 const RULE_NEAR_MISS_RE = /^rule\b/i;
-/** A field bullet: lowercase single-word key (apostrophe allowed: `don't`). */
-const FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z']*)\s*:\s*(.*)$/;
+/**
+ * A field bullet: lowercase single-word key (apostrophe allowed: `don't`).
+ * U+2019 (’) is also admitted — smart-quote editors substitute it in prose —
+ * and normalized to ASCII `'` before the known-key check, so `don’t:` records
+ * like `don't:` and a misspelled curly key still hits the typo guard.
+ */
+const FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z'’]*)\s*:\s*(.*)$/;
 
 const KNOWN_KEYS = ['kind', 'css', 'example', 'do', "don't"] as const;
 type FieldKey = (typeof KNOWN_KEYS)[number];
@@ -225,7 +231,7 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
     if (bullet === null) {
       continue;
     }
-    const key = bullet[1];
+    const key = bullet[1].replace(/’/g, "'");
     if (!isKnownKey(key)) {
       findings.push({
         rule: 'unknown-field',
