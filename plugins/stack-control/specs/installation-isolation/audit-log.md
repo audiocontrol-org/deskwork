@@ -10,7 +10,7 @@ targetVersion: ""
 ### AUDIT-20260611-01 — Untracked-fold diff entries carry absolute filesystem paths, breaching the installation-relative payload promise
 
 Finding-ID: AUDIT-20260611-01 (claude-01 + claude-05 + claude-07 + codex-01 + codex-03; cross-model)
-Status:     open
+Status:     fixed-38d80b39
 Severity:   high
 Surface:    src/govern/payload-implement.ts:310-318 (untracked fold `git diff --no-index` invocation)
 
@@ -19,7 +19,7 @@ The committed arm was converted to `git -C <installation> diff --relative` so pa
 ### AUDIT-20260611-02 — govern's own scratch file `.git-govern-base.tmp` folds into the payload it governs — governance plumbing without an exclusion or gitignore entry
 
 Finding-ID: AUDIT-20260611-02 (claude-02 + codex-04; cross-model)
-Status:     open
+Status:     fixed-99b744d4
 Severity:   medium
 Surface:    src/govern/payload-implement.ts:265-272 (untracked enumeration + exclusion filters); evidence: the final hunk of this audited payload (`.git-govern-base.tmp`, one line containing the diff base SHA)
 
@@ -28,7 +28,7 @@ AUDIT-20260611-08 established the principle that governance bookkeeping must not
 ### AUDIT-20260611-03 — Cross-tree feature arm's untracked fold is unbounded, and its comment claims a warn-on-skip that does not exist
 
 Finding-ID: AUDIT-20260611-03
-Status:     open
+Status:     fixed-22f8b606
 Severity:   medium
 Surface:    src/govern/payload-implement.ts:437-462 (`assembleCrossTreeFeatureArm`, untracked fold loop)
 
@@ -37,7 +37,7 @@ The main installation fold enforces `DEFAULT_UNTRACKED_FOLD_BUDGET` (256 KB) wit
 ### AUDIT-20260611-04 — Four independent `git rev-parse --show-toplevel` derivations introduced in one diff, with divergent error/realpath handling
 
 Finding-ID: AUDIT-20260611-04
-Status:     open
+Status:     fixed-4f621846
 Severity:   medium
 Surface:    src/config/installation.ts:42-55; src/scope-discovery/util/feature-root.ts:105-118 (`deriveDistinctGitToplevel`); src/subcommands/govern.ts (`currentToplevel`); src/govern/payload-implement.ts:393-403 (toplevel derivation in `assembleCrossTreeFeatureArm`)
 
@@ -46,7 +46,7 @@ This diff adds the "derived external anchor" pattern (FR-004) in four places, ea
 ### AUDIT-20260611-05 — A single `stackctl govern` run in a legacy-debris repo emits the three-part US5 notice once per spawned child verb, not once per operator invocation
 
 Finding-ID: AUDIT-20260611-05
-Status:     open
+Status:     fixed-54652401
 Severity:   low
 Surface:    src/config/installation.ts:33-34 (`legacyNoticeFired` module-level latch); src/govern/protocol.ts:205-280 (protocol spawns audit-barrage, lift, slush-findings as child processes)
 
@@ -55,7 +55,7 @@ The once-per-invocation guarantee is implemented as a module-level boolean, whic
 ### AUDIT-20260611-06 — Govern render step still inherits cwd for prompt override resolution
 
 Finding-ID: AUDIT-20260611-06
-Status:     open
+Status:     fixed-91210169
 Severity:   medium
 Surface:    src/govern/protocol.ts:189-198; src/subcommands/audit-barrage-render.ts:190-236; src/scope-discovery/audit-barrage/prompt-renderer.ts:109-114
 
