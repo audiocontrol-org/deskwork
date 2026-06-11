@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-11 00:50'
-updated_date: '2026-06-11 01:06'
+updated_date: '2026-06-11 02:29'
 labels:
   - agent-found
   - 'type:bug'
@@ -27,4 +27,6 @@ audit-barrage payload includes its own audit-log, generating self-referential fi
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** tasks:specs/014-audit-protocol-reliability
+
+specs/014 US5 implemented: implement payload excludes the feature root audit-log from BOTH diff arms (pathspec + fold skip) and scopes the untracked fold to the feature under audit. Commits c5cb3a7b/9927de3a (RED/fix).
 <!-- SECTION:NOTES:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 21:59'
-updated_date: '2026-06-11 01:06'
+updated_date: '2026-06-11 02:29'
 labels:
   - agent-found
   - 'type:gap'
@@ -25,4 +25,6 @@ Surfaced by specs/013 research D5. The audit/governance consumers (gate, audit-b
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** tasks:specs/014-audit-protocol-reliability
+
+specs/014 US7 implemented: six construction sites route through resolveFeatureRoot (CLI defaults, run-dirs/EVIDENCE, scope-export default, provenance doctor walk via new discoverFeatureRoots); R7 probe pinned as a regression test. Commits 4897d7e4/a6323b59/518070dd (RED/fix/probe).
 <!-- SECTION:NOTES:END -->

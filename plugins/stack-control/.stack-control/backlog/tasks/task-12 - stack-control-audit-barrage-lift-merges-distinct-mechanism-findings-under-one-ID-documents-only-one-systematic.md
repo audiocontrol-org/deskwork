@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-11 01:06'
+updated_date: '2026-06-11 02:29'
 labels:
   - agent-found
   - 'type:bug'
@@ -52,4 +52,6 @@ Logged as TF-002 in https://github.com/audiocontrol-org/deskwork/blob/feature/de
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** tasks:specs/014-audit-protocol-reliability
+
+specs/014 US3 implemented: lift union key is heading agreement only — surface-only agreement never merges; the recorded 5-into-1 collapse now yields 5 entries. Commits e15e77a5/6b241c9b (RED/fix).
 <!-- SECTION:NOTES:END -->

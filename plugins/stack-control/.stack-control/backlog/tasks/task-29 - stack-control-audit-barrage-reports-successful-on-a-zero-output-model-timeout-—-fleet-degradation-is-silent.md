@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-11 00:41'
-updated_date: '2026-06-11 01:06'
+updated_date: '2026-06-11 02:29'
 labels:
   - 'type:imported-issue'
   - promoted
@@ -42,4 +42,6 @@ Run 20260610T184044970Z-design-control (claude timedOut=true, 0 bytes; codex 169
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** spec:specs/014-audit-protocol-reliability
+
+specs/014 US1 implemented: zero-output models named on stderr with cause + lost-agreement line; --require-models floor (govern defaults 2). Commits 5427f49e/bc181afa + 564261e9/1a4296a7 (RED/fix). Verification before status transition is the operator’s call.
 <!-- SECTION:NOTES:END -->

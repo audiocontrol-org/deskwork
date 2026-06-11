@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-09 19:37'
-updated_date: '2026-06-11 01:06'
+updated_date: '2026-06-11 02:29'
 labels:
   - 'type:migrated-finding'
   - 'feature:pluggable-lifecycle-providers'
@@ -24,4 +24,6 @@ ordinal: 2000
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** tasks:specs/014-audit-protocol-reliability
+
+specs/014 US4 implemented: slush apply consumes the dampener flips (with located status lines) directly; findFindingsByStatus left the apply path; unlocatable flip fails loud (exit 1). Commits 72fcce80/a1f53321 (RED/fix).
 <!-- SECTION:NOTES:END -->

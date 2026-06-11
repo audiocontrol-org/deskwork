@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-11 00:41'
-updated_date: '2026-06-11 01:06'
+updated_date: '2026-06-11 02:29'
 labels:
   - 'type:imported-issue'
   - promoted
@@ -49,4 +49,6 @@ Observed registering the 2026-06-10 design-control lint-barrage leakage classes 
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** tasks:specs/014-audit-protocol-reliability
+
+specs/014 US6 implemented: scope-widen auto-seeds missing scope-discovery state via the install-scope-discovery primitive (announced on stderr) and proceeds; first-use complaint-driven widen completes in one invocation. Commits 04f457d4/65f51790 (RED/fix).
 <!-- SECTION:NOTES:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-11 00:41'
-updated_date: '2026-06-11 01:06'
+updated_date: '2026-06-11 02:29'
 labels:
   - 'type:imported-issue'
   - promoted
@@ -42,4 +42,6 @@ Fixed locally for this repo in deskwork commit b0a8b24f (600s re-landed in the r
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** tasks:specs/014-audit-protocol-reliability
+
+specs/014 US2 implemented: loadAuditBarrageConfig probes the legacy dw-lifecycle path and emits the three-line ignored/read/migrate notice; load semantics unchanged. Commits 7c5c745c/e5240167 (RED/fix).
 <!-- SECTION:NOTES:END -->
