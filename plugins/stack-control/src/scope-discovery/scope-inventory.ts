@@ -35,7 +35,10 @@ import {
 } from './synthesis-report.js';
 import { errorMessage } from './util/typeguards.js';
 import { resolveCodebaseBoundary } from './codebase-boundary.js';
-import { resolveFeatureRoot } from './util/feature-root.js';
+import {
+  isOutsideInstallation,
+  resolveFeatureRoot,
+} from './util/feature-root.js';
 import {
   extractAjvErrorsFromSynthesisMessage,
   isSchemaValidationError,
@@ -331,6 +334,18 @@ export async function scopeInventoryMain(
   } catch (err) {
     process.stderr.write(`scope-inventory: ${errorMessage(err)}\n`);
     return 2;
+  }
+  // AUDIT-20260611-10: the inventory WRITES under the feature root (the
+  // default --out manifest, the per-run evidence dirs). Under the
+  // transitional cross-tree layout that root can resolve OUTSIDE the
+  // installation (FR-008's feature-anchor exemption) — announce it
+  // once, mirroring govern's R4/SC-006 announce-once norm; sanctioned,
+  // never invisible.
+  if (isOutsideInstallation(installationRoot, featureRoot)) {
+    process.stderr.write(
+      `scope-inventory: feature anchor outside the installation: ${featureRoot} ` +
+        `(designated anchor — artifacts land there)\n`,
+    );
   }
   const prdPath = opts.prdPath ?? resolve(featureRoot, 'prd.md');
   const outPath = opts.outPath ?? resolve(featureRoot, 'scope-manifest.yaml');

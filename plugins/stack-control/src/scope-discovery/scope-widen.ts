@@ -40,7 +40,10 @@ import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { DEFAULT_BASELINE_REL } from './baseline-path.js';
 import { resolveCodebaseBoundary } from './codebase-boundary.js';
 import { install as installScopeDiscovery } from './install-scope-discovery.js';
-import { resolveFeatureRoot } from './util/feature-root.js';
+import {
+  isOutsideInstallation,
+  resolveFeatureRoot,
+} from './util/feature-root.js';
 import { buildPatternMatrix } from './discovery-agents/pattern-matrix.js';
 import { readCloneDetectorOutput } from './discovery-agents/clone-detector-reader.js';
 import { huntPrdThemes } from './discovery-agents/prd-themed-pattern-hunter.js';
@@ -301,6 +304,18 @@ export async function scopeWidenMain(
   } catch (err) {
     process.stderr.write(`scope-widen: ${errorMessage(err)}\n`);
     return 2;
+  }
+  // AUDIT-20260611-10: the widen WRITES under the feature root (the
+  // widen-run evidence dirs, the augmented PRD, the default
+  // --manifest/--prd-path). Under the transitional cross-tree layout
+  // that root can resolve OUTSIDE the installation (FR-008's
+  // feature-anchor exemption) — announce it once, mirroring govern's
+  // R4/SC-006 announce-once norm; sanctioned, never invisible.
+  if (isOutsideInstallation(installationRoot, featureRoot)) {
+    process.stderr.write(
+      `scope-widen: feature anchor outside the installation: ${featureRoot} ` +
+        `(designated anchor — artifacts land there)\n`,
+    );
   }
   const manifestPath =
     opts.manifestPath ?? resolve(featureRoot, 'scope-manifest.yaml');

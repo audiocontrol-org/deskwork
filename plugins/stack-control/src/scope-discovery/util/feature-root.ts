@@ -52,7 +52,7 @@
 
 import { existsSync, realpathSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { deriveDistinctGitToplevel } from './git-toplevel.js';
 
 export interface ResolveFeatureRootArgs {
@@ -128,6 +128,40 @@ export async function resolveFeatureRoot(
     };
   }
   return legacy;
+}
+
+/**
+ * True when `path` lies OUTSIDE the `installationRoot` subtree
+ * (AUDIT-20260611-10). Under the transitional cross-tree layout the
+ * two-layer resolver above can legitimately return a feature root at
+ * the derived git toplevel — outside the installation (FR-008's
+ * feature-anchor exemption). Verbs that WRITE under the feature root
+ * (scope-widen / scope-inventory evidence dirs, govern's cross-tree
+ * arm) use this predicate to announce that case once on stderr,
+ * mirroring govern's R4/SC-006 announce-once norm — sanctioned, never
+ * invisible.
+ *
+ * Realpath-tolerant on BOTH sides: git-derived paths carry the
+ * symlink-resolved spelling (macOS /var → /private/var) while the
+ * caller's installation root may carry the unresolved one — either
+ * argument may have either spelling (the `real()` pattern from
+ * payload-implement's assembleCrossTreeFeatureArm). Realpath failure
+ * falls back to the given spelling. An empty rel means the SAME
+ * directory — inside.
+ */
+export function isOutsideInstallation(
+  installationRoot: string,
+  path: string,
+): boolean {
+  const real = (p: string): string => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+  const rel = relative(real(installationRoot), real(path)).split(sep).join('/');
+  return rel === '..' || rel.startsWith('../');
 }
 
 async function resolveFeatureRootAt(
