@@ -50,6 +50,7 @@ const USAGE = [
   '    --prompt-file <path>',
   '    [--repo-root <path>]',
   '    [--models <comma-list>]',
+  '    [--require-models <n>]',
   '    [--quiet]',
   '    [--output-run-dir]',
   '    [--help]',
@@ -64,6 +65,11 @@ const USAGE = [
   '                          audit-runs/<timestamp>-<feature>/`.',
   '--models <comma-list>     Comma-separated subset of the configured models.',
   '                          Defaults to every model in the loaded config.',
+  '--require-models <n>      Minimum number of EMITTING models (stdout bytes',
+  '                          > 0) for the run to pass. The effective floor is',
+  '                          min(n, configured fleet size); a shortfall fails',
+  '                          loudly naming expected vs actual. Default: no',
+  '                          floor (specs/014 US1).',
   '--quiet                   Suppress the stderr summary line.',
   '--output-run-dir          Print JUST the absolute run-dir path on stdout',
   '                          (BarrageRun JSON is suppressed). For bash',
@@ -92,6 +98,12 @@ export interface ParsedFlags {
   readonly modelNames: ReadonlyArray<string> | undefined;
   readonly quiet: boolean;
   readonly outputRunDir: boolean;
+  /**
+   * Minimum number of EMITTING models (stdoutBytes > 0) required for
+   * the run to pass — `--require-models <n>` (specs/014 US1).
+   * `undefined` = no floor (the manual-run default; govern passes 2).
+   */
+  readonly requireModels: number | undefined;
 }
 
 export interface ParseResult {
@@ -118,6 +130,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
   let inlinePrompt: string | undefined;
   let repoRoot: string | undefined;
   let modelsCsv: string | undefined;
+  let requireModelsRaw: string | undefined;
   let quiet = false;
   let outputRunDir = false;
 
@@ -139,7 +152,8 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
       flag === '--prompt-file' ||
       flag === '--prompt' ||
       flag === '--repo-root' ||
-      flag === '--models'
+      flag === '--models' ||
+      flag === '--require-models'
     ) {
       const value = argv[i + 1];
       if (value === undefined) {
@@ -151,6 +165,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
       else if (flag === '--prompt') inlinePrompt = value;
       else if (flag === '--repo-root') repoRoot = value;
       else if (flag === '--models') modelsCsv = value;
+      else if (flag === '--require-models') requireModelsRaw = value;
       continue;
     }
     return { ok: false, error: `unknown flag: ${flag ?? '(empty)'}` };
@@ -184,6 +199,18 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
     modelNames = parts;
   }
 
+  let requireModels: number | undefined;
+  if (requireModelsRaw !== undefined) {
+    const n = Number(requireModelsRaw);
+    if (!Number.isInteger(n) || n < 1) {
+      return {
+        ok: false,
+        error: `--require-models requires a positive integer, got '${requireModelsRaw}'`,
+      };
+    }
+    requireModels = n;
+  }
+
   return {
     ok: true,
     flags: {
@@ -193,6 +220,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
       modelNames,
       quiet,
       outputRunDir,
+      requireModels,
     },
   };
 }
@@ -259,6 +287,118 @@ export function resolveModels(
 }
 
 /**
+ * A configured model is ZERO-OUTPUT DEGRADED iff `stdoutBytes === 0` —
+ * timeout or not (specs/014 US1, research R1). A model with partial
+ * output before a timeout (`stdoutBytes > 0`) is NOT zero-output
+ * degraded. "Emitting model" := `stdoutBytes > 0`.
+ */
+function zeroOutputModels(run: BarrageRun): ReadonlyArray<ModelRunResult> {
+  return run.results.filter((r) => r.stdoutBytes === 0);
+}
+
+function emittingCount(run: BarrageRun): number {
+  return run.results.filter((r) => r.stdoutBytes > 0).length;
+}
+
+function zeroOutputCause(r: ModelRunResult): string {
+  if (r.timedOut) {
+    return `timed out after ${Math.round(r.durationMs / 1000)}s`;
+  }
+  if (r.spawnError !== undefined) {
+    return `spawn failed: ${r.spawnError}`;
+  }
+  return `exited ${r.exitCode}`;
+}
+
+/**
+ * Fleet-floor evaluation (specs/014 US1, research R1). The floor counts
+ * EMITTING models (stdoutBytes > 0) against
+ * `min(requested, configured fleet size)` so a one-model fleet doesn't
+ * make strict mode unsatisfiable nonsense — the clamp itself is named
+ * to the operator as a configured-fleet shortfall.
+ */
+interface FleetFloorEvaluation {
+  readonly requested: number;
+  readonly effectiveFloor: number;
+  readonly emitting: number;
+  readonly fleetSize: number;
+  readonly clamped: boolean;
+  readonly satisfied: boolean;
+}
+
+function evaluateFleetFloor(
+  run: BarrageRun,
+  requested: number,
+): FleetFloorEvaluation {
+  const fleetSize = run.results.length;
+  const effectiveFloor = Math.min(requested, fleetSize);
+  const emitting = emittingCount(run);
+  return {
+    requested,
+    effectiveFloor,
+    emitting,
+    fleetSize,
+    clamped: requested > fleetSize,
+    satisfied: emitting >= effectiveFloor,
+  };
+}
+
+/**
+ * Render the stderr degradation warnings for the run (specs/014 US1 —
+ * TASK-29 / gh-447: a partial fleet must be LOUD at the moment of
+ * failure, not discoverable only in the run JSON).
+ *
+ * Lines emitted, in order:
+ *   1. One WARNING per zero-output model, naming the model and the
+ *      cause (timeout / exit code / spawn failure).
+ *   2. The lost-agreement consequence line when any model is
+ *      zero-output AND fewer than 2 models emitted — cross-model
+ *      agreement is the HIGH-confidence signal the barrage runs for.
+ *   3. With a floor requested: a NOTE when the floor was clamped to the
+ *      configured fleet size, and the loud shortfall line (expected vs
+ *      actual + each non-emitting model) when the floor is unmet.
+ *
+ * A fully-healthy fleet yields [] — no cry-wolf text.
+ */
+export function renderFleetWarnings(
+  run: BarrageRun,
+  requireModels?: number,
+): ReadonlyArray<string> {
+  const lines: string[] = [];
+  const degraded = zeroOutputModels(run);
+  for (const r of degraded) {
+    lines.push(
+      `audit-barrage: WARNING — model '${r.name}' produced no output (${zeroOutputCause(r)})`,
+    );
+  }
+  const emitting = emittingCount(run);
+  if (degraded.length > 0 && emitting < 2) {
+    const noun = emitting === 1 ? 'model' : 'models';
+    lines.push(
+      `audit-barrage: WARNING — only ${emitting} ${noun} emitted findings this round; cross-model agreement (the HIGH-confidence signal) is unavailable`,
+    );
+  }
+  if (requireModels !== undefined) {
+    const floor = evaluateFleetFloor(run, requireModels);
+    if (floor.clamped) {
+      lines.push(
+        `audit-barrage: NOTE — --require-models ${floor.requested} exceeds the configured fleet size ${floor.fleetSize}; effective floor is ${floor.effectiveFloor}`,
+      );
+    }
+    if (!floor.satisfied) {
+      const nonEmitting = run.results
+        .filter((r) => r.stdoutBytes === 0)
+        .map((r) => r.name)
+        .join(', ');
+      lines.push(
+        `audit-barrage: FLOOR SHORTFALL — required ${floor.effectiveFloor} emitting model(s), got ${floor.emitting} (non-emitting: ${nonEmitting})`,
+      );
+    }
+  }
+  return lines;
+}
+
+/**
  * Map a BarrageRun's per-model results onto the verb's exit code.
  * Exported for tests; the shim also calls it before exit.
  *
@@ -280,10 +420,27 @@ export function resolveModels(
  * split closes. Only when EVERY family is non-covering does the run
  * become an OUTAGE (exit 1) → `protocol.ts` fails loud and does NOT
  * auto-lift; the run-dir `.md` artifacts remain for manual triage.
+ *
+ * Floor (specs/014 US1, additive — FR-002/FR-014): when
+ * `requireModels` is supplied, an emitting-model shortfall against the
+ * clamped floor is ALSO exit 1. Default (no floor) semantics are
+ * byte-identical to the pre-014 contract.
  */
-export function deriveBarrageExitCode(run: BarrageRun): 0 | 1 {
+export function deriveBarrageExitCode(
+  run: BarrageRun,
+  requireModels?: number,
+): 0 | 1 {
   const anyCovering = run.results.some(isModelRunCovering);
-  return anyCovering ? 0 : 1;
+  if (!anyCovering) {
+    return 1;
+  }
+  if (
+    requireModels !== undefined &&
+    !evaluateFleetFloor(run, requireModels).satisfied
+  ) {
+    return 1;
+  }
+  return 0;
 }
 
 /**
@@ -310,7 +467,10 @@ export function renderSummaryLine(run: BarrageRun): string {
   if (covering === total) {
     return `audit-barrage: barrage successful — ${covering}/${total} models emitted findings (run dir: ${run.runDir})`;
   }
-  return `audit-barrage: barrage successful — ${covering} of ${total} models emitted findings; auditing as a practice statistically yields better code (run dir: ${run.runDir})`;
+  const degraded = zeroOutputModels(run).map((r) => r.name);
+  const degradedNote =
+    degraded.length > 0 ? `; zero-output: ${degraded.join(', ')}` : '';
+  return `audit-barrage: barrage successful — ${covering} of ${total} models emitted findings${degradedNote}; auditing as a practice statistically yields better code (run dir: ${run.runDir})`;
 }
 
 /**
@@ -365,10 +525,16 @@ export async function auditBarrage(args: string[]): Promise<void> {
 
   const result: BarrageResult = {
     run,
-    exitCode: deriveBarrageExitCode(run),
+    exitCode: deriveBarrageExitCode(run, flags.requireModels),
   };
 
   process.stdout.write(renderStdoutOutput(run, flags.outputRunDir));
+  // Degradation warnings are loudness, not summary chrome — they emit
+  // even under --quiet (specs/014 US1; --quiet suppresses only the
+  // one-line summary).
+  for (const warning of renderFleetWarnings(run, flags.requireModels)) {
+    process.stderr.write(`${warning}\n`);
+  }
   if (!flags.quiet) {
     process.stderr.write(`${renderSummaryLine(run)}\n`);
   }
