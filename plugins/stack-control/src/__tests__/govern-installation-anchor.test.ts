@@ -47,16 +47,27 @@ describe('US3 — implement payload anchors at the installation (R3)', () => {
       fixture.writeInstallation('src/inner.ts', 'export const inner = 1;\n');
       gitIn(fixture.outerRoot, ['add', '.']);
       gitIn(fixture.outerRoot, ['commit', '-q', '-m', 'change both trees']);
+      // AUDIT-20260611-09: a SECOND in-range commit touching ONLY the outer
+      // tree. Its subject must NOT ship in commitSubjects — a subject line
+      // with zero corresponding hunks baits spurious "missing surface"
+      // findings and leaks outer-repo commit messages off-box.
+      fixture.writeOuter('outer-only.txt', 'outer only\n');
+      gitIn(fixture.outerRoot, ['add', '.']);
+      gitIn(fixture.outerRoot, ['commit', '-q', '-m', 'OUTER-ONLY-SUBJECT-CANARY']);
 
       const payload = assembleImplementPayload({
         installationRoot: fixture.installationRoot,
-        base: 'HEAD~1',
+        base: 'HEAD~2',
       });
       // Installation-relative path (not prefixed by the outer-tree dir).
       expect(payload.diff).toContain('a/src/inner.ts');
       expect(payload.diff).not.toContain(`a/${fixture.installationRel}/src/inner.ts`);
       // The outer tree's committed change is NOT part of the audited unit.
       expect(payload.diff).not.toContain('outer-change.txt');
+      // AUDIT-20260611-09: commit-subjects metadata is installation-scoped
+      // like the diff — subjects and hunks stay joined.
+      expect(payload.commitSubjects).toContain('change both trees');
+      expect(payload.commitSubjects).not.toContain('OUTER-ONLY-SUBJECT-CANARY');
     } finally {
       fixture.cleanup();
     }
@@ -125,6 +136,10 @@ describe('US3 — implement payload anchors at the installation (R3)', () => {
       );
       expect(payload.diff).not.toContain(`a${fixture.outerRoot}`);
       expect(payload.diff).not.toContain(`a${realpathSync(fixture.outerRoot)}`);
+      // AUDIT-20260611-09: the cross-tree feature arm's commits KEEP their
+      // subjects — the arm ships their hunks, so subjects and hunks stay
+      // joined (guards against an over-narrow installation-only log fix).
+      expect(payload.commitSubjects).toContain('spec artifacts');
     } finally {
       fixture.cleanup();
     }

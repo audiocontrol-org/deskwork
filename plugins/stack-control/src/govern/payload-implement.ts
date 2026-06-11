@@ -338,6 +338,7 @@ export function assembleImplementPayload(
   // governed payload (FR-005: a payload that cannot carry them is FATAL,
   // not partial). The cross-tree anchor is announced once (R4/SC-006).
   let crossTreeArm = '';
+  let crossTreeSubjects = '';
   if (crossTreeFeatureRoot !== undefined) {
     warn(
       `govern: feature anchor outside the installation: ${crossTreeFeatureRoot} ` +
@@ -356,6 +357,7 @@ export function assembleImplementPayload(
       warn,
     });
     crossTreeArm = arm.arm;
+    crossTreeSubjects = arm.commitSubjects;
     foldedBytes = arm.foldedBytes;
     skippedOverBudget.push(...arm.skippedOverBudget);
     if (crossTreeArm.length > 0) {
@@ -363,7 +365,20 @@ export function assembleImplementPayload(
     }
   }
 
-  const commitSubjects = git(installationRoot, ['log', `${base}..HEAD`, '--oneline']);
+  // AUDIT-20260611-09: the commit-subjects metadata is scoped the same way
+  // the diff arms are. The installation log is path-limited to the subtree
+  // (pathspec `.` is cwd-relative under `-C installationRoot`) — without it,
+  // in-range commits touching ONLY the outer tree shipped their subject
+  // lines with zero corresponding hunks (bait for spurious "missing
+  // surface" findings, and an off-box leak of outer-repo commit messages).
+  // When a cross-tree feature arm exists, its commits keep their subjects
+  // (the arm ships their hunks — subjects and hunks stay joined) via the
+  // arm's own toplevel-anchored log; a commit touching both trees appears
+  // in both logs and is deduped to one copy, recency order preserved.
+  const commitSubjects = mergeSubjectLines(
+    git(installationRoot, ['log', `${base}..HEAD`, '--oneline', '--', '.']),
+    crossTreeSubjects,
+  );
 
   const armEmpty = crossTreeArm.trim().length === 0;
   const empty = committedDiffEmpty && foldedBytes === 0 && armEmpty;
@@ -378,13 +393,36 @@ export function assembleImplementPayload(
 }
 
 /**
+ * Merge `git log --oneline` outputs into one newline-joined subjects
+ * string (AUDIT-20260611-09): concatenate in argument order, dedupe by
+ * line keeping the FIRST occurrence — a commit touching both the
+ * installation and the cross-tree feature root appears in both logs and
+ * must ship once — preserving recency order as git emits it.
+ */
+function mergeSubjectLines(...logs: readonly string[]): string {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const log of logs) {
+    for (const line of log.split('\n')) {
+      if (line.length === 0 || seen.has(line)) continue;
+      seen.add(line);
+      merged.push(line);
+    }
+  }
+  return merged.length === 0 ? '' : `${merged.join('\n')}\n`;
+}
+
+/**
  * Build the labeled cross-tree feature arm (R3): the committed diff +
  * untracked fold scoped to the feature root, anchored at the git
  * toplevel derived FROM the installation (FR-004 — the toplevel is read
  * from git's own marker, never accepted as a parameter). The feature's
  * own audit-log.md stays excluded from both halves (FR-007). Any
  * condition that would silently omit in-range feature artifacts is a
- * loud GovernPayloadError instead (FR-005).
+ * loud GovernPayloadError instead (FR-005). The arm also carries the
+ * feature root's in-range commit subjects (AUDIT-20260611-09 — the
+ * subjects metadata is scoped like the diff; the arm's commits keep
+ * theirs so subjects and hunks stay joined).
  */
 function assembleCrossTreeFeatureArm(args: {
   readonly installationRoot: string;
@@ -397,6 +435,8 @@ function assembleCrossTreeFeatureArm(args: {
   readonly warn: (message: string) => void;
 }): {
   readonly arm: string;
+  /** The feature root's in-range `git log --oneline` (AUDIT-20260611-09). */
+  readonly commitSubjects: string;
   readonly foldedBytes: number;
   readonly skippedOverBudget: readonly string[];
 } {
@@ -513,12 +553,24 @@ function assembleCrossTreeFeatureArm(args: {
       foldedBytes += sz;
     }
   }
+  // AUDIT-20260611-09: the arm's commits keep their subjects — path-limit
+  // the log to the feature root at the same toplevel anchor as the arm's
+  // diff, so the subjects the payload carries always have corresponding
+  // hunks. The caller merges these with the installation-scoped log.
+  const commitSubjects = git(toplevel, [
+    'log',
+    `${base}..HEAD`,
+    '--oneline',
+    '--',
+    featureRelTop,
+  ]);
   const armBody = `${armDiff.stdout}${untrackedFold}`;
   if (armBody.trim().length === 0) {
-    return { arm: '', foldedBytes, skippedOverBudget };
+    return { arm: '', commitSubjects, foldedBytes, skippedOverBudget };
   }
   return {
     arm: `### cross-tree feature arm: ${featureRoot} ###\n${armBody}`,
+    commitSubjects,
     foldedBytes,
     skippedOverBudget,
   };
