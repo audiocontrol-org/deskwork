@@ -97,14 +97,36 @@ export interface MigrationResult {
  * rewrite each finding's Status line to `migrated-to-backlog <task-id>`.
  * Idempotent: a finding whose `audit:<slug>:<id>` ref already exists is skipped.
  * HIGH/blocking severities throw via severityToPriority (FR-018 fail-loud).
+ *
+ * specs/014 US4 location guard: when `expectedStatusRe` is provided, EVERY
+ * finding's recorded `statusLineIndex` is validated against the current text
+ * BEFORE anything is created — a flip whose location no longer matches (the
+ * audit-log changed between flip computation and apply, or the location was
+ * never valid) throws naming the finding ID. Validate-first means a stale
+ * apply creates zero items and rewrites zero lines: never a partial misapply,
+ * never an exit-0 shortfall.
  */
 export function migrateFindings(args: {
   auditLogText: string;
   findings: readonly FoundFinding[];
   backend: BacklogBackend;
   featureSlug: string;
+  expectedStatusRe?: RegExp;
 }): MigrationResult {
   const lines = args.auditLogText.split('\n');
+  if (args.expectedStatusRe !== undefined) {
+    for (const f of args.findings) {
+      const located = lines[f.statusLineIndex];
+      if (located === undefined || !args.expectedStatusRe.test(located)) {
+        throw new Error(
+          `slush-migrate: finding ${f.findingId} could not be located at its ` +
+            `recorded status line (index ${f.statusLineIndex}) — the audit-log ` +
+            `changed between the dampener decision and apply. Nothing was ` +
+            `migrated; re-run to recompute the decision against the current file.`,
+        );
+      }
+    }
+  }
   const migrated: { findingId: string; taskId: string }[] = [];
   const skipped: string[] = [];
   for (const f of args.findings) {
