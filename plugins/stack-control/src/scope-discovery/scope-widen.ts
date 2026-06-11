@@ -33,9 +33,12 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { DEFAULT_BASELINE_REL } from './baseline-path.js';
+import { install as installScopeDiscovery } from './install-scope-discovery.js';
 import { buildPatternMatrix } from './discovery-agents/pattern-matrix.js';
 import { readCloneDetectorOutput } from './discovery-agents/clone-detector-reader.js';
 import { huntPrdThemes } from './discovery-agents/prd-themed-pattern-hunter.js';
@@ -265,6 +268,33 @@ export async function scopeWidenMain(
   } catch (err) {
     process.stderr.write(`scope-widen: ${errorMessage(err)}\n`);
     return 2;
+  }
+
+  // specs/014 US6 (FR-009, Clarification 2026-06-11): a missing clone
+  // baseline must not hard-abort the widen — the complaint-driven arms
+  // need no baseline at all. Auto-seed the missing scope-discovery
+  // state via the install-scope-discovery primitive (ANNOUNCED — this
+  // is state creation, not a silent fallback); the seeded clones.yaml
+  // is a legitimate empty baseline, so the clone arm's "no registered
+  // clones" over it is a true result. Post-seed genuine clone failures
+  // keep clone-detector-reader's own loud remediation.
+  if (!existsSync(resolve(opts.repoRoot, DEFAULT_BASELINE_REL))) {
+    process.stderr.write(
+      'scope-widen: scope-discovery state absent — seeding .stack-control/scope-discovery/ (first use)\n',
+    );
+    try {
+      installScopeDiscovery({
+        startDir: opts.repoRoot,
+        at: opts.repoRoot,
+        force: false,
+        dryRun: false,
+      });
+    } catch (err) {
+      process.stderr.write(
+        `scope-widen: auto-seed of scope-discovery state failed: ${errorMessage(err)}\n`,
+      );
+      return 2;
+    }
   }
 
   let staged: RunArtifacts;
