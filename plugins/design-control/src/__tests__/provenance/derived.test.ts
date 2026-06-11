@@ -125,6 +125,59 @@ describe('checkDerivedAcceptance — acceptance requires a recorded operator edi
   });
 });
 
+describe('surfaceId filename validation — path-traversal and separator rejection', () => {
+  const hostileIds = ['../escape', '..', 'a/b', 'nested/../../etc', 'a\\b', 'space id', ''];
+
+  it.each(hostileIds)('recordDrivingWireframe rejects %j with an error naming the constraint', (id) => {
+    expect(() =>
+      recordDrivingWireframe({ dir: freshDir(), surfaceId: id }),
+    ).toThrow(/portable-filename|\^\[a-z0-9\]/i);
+  });
+
+  it.each(hostileIds)('recordDerivation rejects %j without writing any file', (id) => {
+    const dir = freshDir();
+    expect(() =>
+      recordDerivation({ dir, surfaceId: id, derivedHtml: draftHtml, source: 'live surface' }),
+    ).toThrow(/portable-filename|\^\[a-z0-9\]/i);
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  it.each(hostileIds)('loadProvenance rejects %j before touching the filesystem', (id) => {
+    expect(() => loadProvenance(freshDir(), id)).toThrow(/portable-filename|\^\[a-z0-9\]/i);
+  });
+
+  it('rejects a bare ".." specifically — the pattern requires an alphanumeric first character', () => {
+    // /^[a-z0-9][a-z0-9._-]*$/i cannot match '..' because '.' fails the [a-z0-9] start anchor.
+    expect(() => recordDrivingWireframe({ dir: freshDir(), surfaceId: '..' })).toThrow(
+      /portable-filename|\^\[a-z0-9\]/i,
+    );
+  });
+
+  it('the zod schema rejects a sidecar whose stored surfaceId is non-portable (load-side defense)', () => {
+    const dir = freshDir();
+    const hostile = {
+      version: 1,
+      surfaceId: '../escape',
+      mode: 'driving',
+      createdAt: '2026-06-10T12:00:00.000Z',
+    };
+    writeFileSync(join(dir, 'planted.provenance.json'), JSON.stringify(hostile));
+    expect(() => loadProvenance(dir, 'planted')).toThrow();
+  });
+
+  it('still accepts a normal kebab-case id (and dots/underscores after the first char)', () => {
+    const dir = freshDir();
+    recordDrivingWireframe({
+      dir,
+      surfaceId: 'studio-content_browser.v2',
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    expect(loadProvenance(dir, 'studio-content_browser.v2').surfaceId).toBe(
+      'studio-content_browser.v2',
+    );
+  });
+});
+
 describe('wireframeDroveImplementation', () => {
   it('is true for a driving wireframe and FALSE for a derived one (even an accepted one)', () => {
     const dir = freshDir();

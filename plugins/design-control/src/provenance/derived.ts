@@ -30,16 +30,46 @@ const PROVENANCE_VERSION = 1;
 
 const sha256Hex = (content: string): string => createHash('sha256').update(content).digest('hex');
 
+/**
+ * `surfaceId` is interpolated into filesystem paths (sidecar + snapshot names),
+ * so it MUST be a portable filename: alphanumeric first character, then only
+ * letters, digits, `.`, `_`, `-`. This rejects `..` (the dot fails the
+ * alphanumeric start anchor) and any `/` or `\` (not in the character class),
+ * so an id can never escape the operator-chosen provenance directory or land
+ * in an unintended subdirectory.
+ */
+const SURFACE_ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/i;
+
+const surfaceIdMessage = (surfaceId: string): string =>
+  `Invalid surfaceId ${JSON.stringify(surfaceId)}: surfaceId is used as a filename, so it must ` +
+  `match the portable-filename pattern ${String(SURFACE_ID_PATTERN)} — an alphanumeric first ` +
+  `character, then only letters, digits, ".", "_", "-". Path separators and ".." are rejected ` +
+  `so the sidecar and snapshot cannot escape the provenance directory.`;
+
+const surfaceIdSchema = z
+  .string()
+  .min(1)
+  .refine((id) => SURFACE_ID_PATTERN.test(id), {
+    message: `surfaceId must match the portable-filename pattern ${String(SURFACE_ID_PATTERN)}`,
+  });
+
+/** Fail loud at every path-building entry point — no fallback, no sanitizing. */
+function assertPortableSurfaceId(surfaceId: string): void {
+  if (!SURFACE_ID_PATTERN.test(surfaceId)) {
+    throw new Error(surfaceIdMessage(surfaceId));
+  }
+}
+
 const drivingSchema = z.object({
   version: z.literal(PROVENANCE_VERSION),
-  surfaceId: z.string().min(1),
+  surfaceId: surfaceIdSchema,
   mode: z.literal('driving'),
   createdAt: z.string().datetime(),
 });
 
 const derivedSchema = z.object({
   version: z.literal(PROVENANCE_VERSION),
-  surfaceId: z.string().min(1),
+  surfaceId: surfaceIdSchema,
   mode: z.literal('derived'),
   createdAt: z.string().datetime(),
   derived: z.object({
@@ -82,6 +112,7 @@ export function recordDrivingWireframe(input: {
   surfaceId: string;
   createdAt?: Date;
 }): WireframeProvenance {
+  assertPortableSurfaceId(input.surfaceId);
   const provenance: WireframeProvenance = {
     version: PROVENANCE_VERSION,
     surfaceId: input.surfaceId,
@@ -104,6 +135,7 @@ export function recordDerivation(input: {
   source: string;
   createdAt?: Date;
 }): WireframeProvenance {
+  assertPortableSurfaceId(input.surfaceId);
   const snapshotFile = `${input.surfaceId}.derived-snapshot.html`;
   writeFileSync(join(input.dir, snapshotFile), input.derivedHtml);
   const provenance: WireframeProvenance = {
@@ -123,6 +155,7 @@ export function recordDerivation(input: {
 
 /** Load + zod-validate a surface's provenance sidecar. Fails loud when absent/malformed. */
 export function loadProvenance(dir: string, surfaceId: string): WireframeProvenance {
+  assertPortableSurfaceId(surfaceId);
   const path = sidecarPath(dir, surfaceId);
   if (!existsSync(path)) {
     throw new Error(
