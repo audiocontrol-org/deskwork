@@ -25,11 +25,24 @@ export const CONFIG_REL_PATH = join('.stack-control', 'config.yaml');
 // bitrot (or worse, keep being read) while new state lands in the
 // installation. The notice fires HERE, in the one resolver every verb
 // path bottoms out on (resolveCodebaseBoundary, the backlog root seam,
-// govern's entry, the session verbs), at most once per process
+// govern's entry, the session verbs), at most once per OPERATOR
 // invocation. It never fires when no legacy state exists (no cry-wolf),
 // and the advice is non-destructive: it never names an existing tuned
 // file as an overwrite target (the audit-protocol-reliability
 // AUDIT-09/-15 lesson).
+//
+// Two latches enforce once-per-invocation (AUDIT-20260611-05):
+//   - `legacyNoticeFired` — the cheap in-process boolean (a single process
+//     resolving the installation N times prints once).
+//   - STACKCTL_LEGACY_NOTICE_SEEN — the cross-process carrier. `stackctl
+//     govern` spawns child stackctl processes (audit-barrage / lift /
+//     slush-findings via protocol.ts spawnText, which inherits
+//     process.env); without the env latch each child re-fired the notice,
+//     printing up to four copies per govern run — cry-wolf repetition, the
+//     exact thing R6's no-cry-wolf clause targets. Setting the latch when
+//     the notice fires means every child inherits it and stays silent.
+
+const ENV_LATCH = 'STACKCTL_LEGACY_NOTICE_SEEN';
 
 let legacyNoticeFired = false;
 let noticeVerb = 'stackctl';
@@ -40,7 +53,7 @@ export function setInstallationNoticeVerb(verb: string): void {
 }
 
 function maybeEmitLegacyHalfInstallationNotice(installationRoot: string): void {
-  if (legacyNoticeFired) return;
+  if (legacyNoticeFired || process.env[ENV_LATCH] === '1') return;
   // Shared realpath-aware derivation (AUDIT-20260611-04): null when the
   // installation root is not in a git work tree OR it IS the toplevel —
   // either way there is no separate outer layer that could hold debris.
@@ -52,6 +65,9 @@ function maybeEmitLegacyHalfInstallationNotice(installationRoot: string): void {
   // under the 009 nearest-wins model — not debris.
   if (existsSync(join(legacyDir, 'config.yaml'))) return;
   legacyNoticeFired = true;
+  // Cross-process carrier: children spawned from here on inherit the
+  // latch and stay silent (AUDIT-20260611-05).
+  process.env[ENV_LATCH] = '1';
   process.stderr.write(
     `${noticeVerb}: WARNING — legacy stack-control state present and IGNORED at ${legacyDir} (no config.yaml marker)\n`,
   );

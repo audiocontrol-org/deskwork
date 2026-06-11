@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { runCli } from './_run-helpers.js';
+import { resolveInstallation } from '../config/installation.js';
 import {
   diffSnapshots,
   makeNestedFixture,
@@ -105,6 +106,48 @@ describe('US5 — legacy half-installation notice (R6)', () => {
       expect(res.status).toBe(0);
       expect(res.stderr).not.toMatch(WARNING_RE);
     } finally {
+      fixture.cleanup();
+    }
+  }, 120_000);
+
+  // AUDIT-20260611-05 — "once per invocation" must hold at OPERATOR
+  // granularity, not process granularity: `stackctl govern` spawns child
+  // stackctl processes (audit-barrage / lift / slush — protocol.ts
+  // spawnText, which inherits process.env), and each child re-resolves the
+  // installation. The cross-process carrier is an environment latch: the
+  // resolver SETS STACKCTL_LEGACY_NOTICE_SEEN=1 when the notice fires, and
+  // SKIPS the notice when it arrives already set.
+  it('the env latch suppresses the notice in child processes (AUDIT-20260611-05)', () => {
+    const fixture = makeNestedFixture();
+    try {
+      plantLegacyState(fixture);
+      const res = runCli(['install-scope-discovery'], {
+        cwd: fixture.installationRoot,
+        env: { STACKCTL_LEGACY_NOTICE_SEEN: '1' },
+      });
+      expect(res.status).toBe(0);
+      expect(res.stderr).not.toMatch(WARNING_RE);
+    } finally {
+      fixture.cleanup();
+    }
+  }, 120_000);
+
+  it('the resolver SETS the env latch when the notice fires (AUDIT-20260611-05)', () => {
+    const fixture = makeNestedFixture();
+    const saved = process.env.STACKCTL_LEGACY_NOTICE_SEEN;
+    delete process.env.STACKCTL_LEGACY_NOTICE_SEEN;
+    try {
+      plantLegacyState(fixture);
+      // In-process resolve against the legacy fixture: the notice fires
+      // (first resolve in this vitest process) and must plant the latch
+      // that spawned children will inherit.
+      resolveInstallation(fixture.installationRoot);
+      expect(process.env.STACKCTL_LEGACY_NOTICE_SEEN).toBe('1');
+    } finally {
+      // Restore: later tests in this file spawn children that inherit
+      // process.env — a leaked latch would suppress their notices.
+      if (saved === undefined) delete process.env.STACKCTL_LEGACY_NOTICE_SEEN;
+      else process.env.STACKCTL_LEGACY_NOTICE_SEEN = saved;
       fixture.cleanup();
     }
   }, 120_000);
