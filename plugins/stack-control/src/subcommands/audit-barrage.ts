@@ -67,9 +67,10 @@ const USAGE = [
   '                          Defaults to every model in the loaded config.',
   '--require-models <n>      Minimum number of EMITTING models (stdout bytes',
   '                          > 0) for the run to pass. The effective floor is',
-  '                          min(n, configured fleet size); a shortfall fails',
-  '                          loudly naming expected vs actual. Default: no',
-  '                          floor (specs/014 US1).',
+  '                          min(n, CONFIGURED fleet size) — a --models subset',
+  '                          does not lower it (AUDIT-20260611-03); a',
+  '                          shortfall fails loudly naming expected vs actual.',
+  '                          Default: no floor (specs/014 US1).',
   '--quiet                   Suppress the stderr summary line.',
   '--output-run-dir          Print JUST the absolute run-dir path on stdout',
   '                          (BarrageRun JSON is suppressed). For bash',
@@ -313,15 +314,26 @@ function zeroOutputCause(r: ModelRunResult): string {
 /**
  * Fleet-floor evaluation (specs/014 US1, research R1). The floor counts
  * EMITTING models (stdoutBytes > 0) against
- * `min(requested, configured fleet size)` so a one-model fleet doesn't
+ * `min(requested, CONFIGURED fleet size)` so a one-model fleet doesn't
  * make strict mode unsatisfiable nonsense — the clamp itself is named
  * to the operator as a configured-fleet shortfall.
+ *
+ * `configuredFleetSize` is the size of the LOADED CONFIG's model
+ * battery, NOT the `--models` / `GOVERN_MODELS` subset actually run
+ * (AUDIT-20260611-03): clamping against the subset would let a
+ * single-model selection quietly defeat govern's floor 2 — the
+ * cross-model agreement floor would become opt-out-able via an env var
+ * with no exit-code consequence. The parameter is required so call
+ * sites can't silently reuse the subset; `selected` (the models
+ * actually run) is carried separately so the shortfall message can
+ * name selection — not model health — as the cause.
  */
 interface FleetFloorEvaluation {
   readonly requested: number;
   readonly effectiveFloor: number;
   readonly emitting: number;
   readonly fleetSize: number;
+  readonly selected: number;
   readonly clamped: boolean;
   readonly satisfied: boolean;
 }
@@ -329,16 +341,17 @@ interface FleetFloorEvaluation {
 function evaluateFleetFloor(
   run: BarrageRun,
   requested: number,
+  configuredFleetSize: number,
 ): FleetFloorEvaluation {
-  const fleetSize = run.results.length;
-  const effectiveFloor = Math.min(requested, fleetSize);
+  const effectiveFloor = Math.min(requested, configuredFleetSize);
   const emitting = emittingCount(run);
   return {
     requested,
     effectiveFloor,
     emitting,
-    fleetSize,
-    clamped: requested > fleetSize,
+    fleetSize: configuredFleetSize,
+    selected: run.results.length,
+    clamped: requested > configuredFleetSize,
     satisfied: emitting >= effectiveFloor,
   };
 }
@@ -356,13 +369,23 @@ function evaluateFleetFloor(
  *      agreement is the HIGH-confidence signal the barrage runs for.
  *   3. With a floor requested: a NOTE when the floor was clamped to the
  *      configured fleet size, and the loud shortfall line (expected vs
- *      actual + each non-emitting model) when the floor is unmet.
+ *      actual + each non-emitting model) when the floor is unmet. When
+ *      the SELECTED model count (the --models / GOVERN_MODELS subset
+ *      actually run) is itself below the effective floor, an extra line
+ *      names selection as the cause so the operator knows the floor
+ *      failed by selection, not a sick model (AUDIT-20260611-03).
+ *
+ * `configuredFleetSize` is the loaded config's battery size; when
+ * absent it falls back to `run.results.length` (back-compat for
+ * library callers without subset selection, where the two are equal —
+ * the CLI entry always passes the configured size explicitly).
  *
  * A fully-healthy fleet yields [] — no cry-wolf text.
  */
 export function renderFleetWarnings(
   run: BarrageRun,
   requireModels?: number,
+  configuredFleetSize?: number,
 ): ReadonlyArray<string> {
   const lines: string[] = [];
   const degraded = zeroOutputModels(run);
@@ -379,19 +402,36 @@ export function renderFleetWarnings(
     );
   }
   if (requireModels !== undefined) {
-    const floor = evaluateFleetFloor(run, requireModels);
+    const floor = evaluateFleetFloor(
+      run,
+      requireModels,
+      configuredFleetSize ?? run.results.length,
+    );
     if (floor.clamped) {
       lines.push(
         `audit-barrage: NOTE — --require-models ${floor.requested} exceeds the configured fleet size ${floor.fleetSize}; effective floor is ${floor.effectiveFloor}`,
       );
     }
     if (!floor.satisfied) {
+      // Name the cause: selection (the --models / GOVERN_MODELS subset
+      // is itself below the effective floor — AUDIT-20260611-03) and/or
+      // model health (selected models that emitted nothing). At least
+      // one always applies when the floor is unmet.
+      const causes: string[] = [];
+      if (floor.selected < floor.effectiveFloor) {
+        causes.push(
+          `only ${floor.selected} of ${floor.fleetSize} configured models were selected via --models/GOVERN_MODELS; the floor counts the configured fleet`,
+        );
+      }
       const nonEmitting = run.results
         .filter((r) => r.stdoutBytes === 0)
         .map((r) => r.name)
         .join(', ');
+      if (nonEmitting.length > 0) {
+        causes.push(`non-emitting: ${nonEmitting}`);
+      }
       lines.push(
-        `audit-barrage: FLOOR SHORTFALL — required ${floor.effectiveFloor} emitting model(s), got ${floor.emitting} (non-emitting: ${nonEmitting})`,
+        `audit-barrage: FLOOR SHORTFALL — required ${floor.effectiveFloor} emitting model(s), got ${floor.emitting} (${causes.join('; ')})`,
       );
     }
   }
@@ -423,12 +463,20 @@ export function renderFleetWarnings(
  *
  * Floor (specs/014 US1, additive — FR-002/FR-014): when
  * `requireModels` is supplied, an emitting-model shortfall against the
- * clamped floor is ALSO exit 1. Default (no floor) semantics are
- * byte-identical to the pre-014 contract.
+ * clamped floor is ALSO exit 1. The clamp is against
+ * `configuredFleetSize` — the loaded config's battery, NOT the
+ * `--models` / `GOVERN_MODELS` subset actually run — so subset
+ * selection cannot lower the floor (AUDIT-20260611-03). When the
+ * parameter is absent it falls back to `run.results.length`
+ * (back-compat for library callers without subset selection, where the
+ * two are equal; the CLI entry passes the configured size explicitly).
+ * Default (no floor) semantics are byte-identical to the pre-014
+ * contract.
  */
 export function deriveBarrageExitCode(
   run: BarrageRun,
   requireModels?: number,
+  configuredFleetSize?: number,
 ): 0 | 1 {
   const anyCovering = run.results.some(isModelRunCovering);
   if (!anyCovering) {
@@ -436,7 +484,11 @@ export function deriveBarrageExitCode(
   }
   if (
     requireModels !== undefined &&
-    !evaluateFleetFloor(run, requireModels).satisfied
+    !evaluateFleetFloor(
+      run,
+      requireModels,
+      configuredFleetSize ?? run.results.length,
+    ).satisfied
   ) {
     return 1;
   }
@@ -523,16 +575,19 @@ export async function auditBarrage(args: string[]): Promise<void> {
     process.exit(1);
   }
 
+  // The floor evaluates against the CONFIGURED fleet size — never the
+  // --models subset actually run (AUDIT-20260611-03).
+  const configuredFleetSize = config.models.length;
   const result: BarrageResult = {
     run,
-    exitCode: deriveBarrageExitCode(run, flags.requireModels),
+    exitCode: deriveBarrageExitCode(run, flags.requireModels, configuredFleetSize),
   };
 
   process.stdout.write(renderStdoutOutput(run, flags.outputRunDir));
   // Degradation warnings are loudness, not summary chrome — they emit
   // even under --quiet (specs/014 US1; --quiet suppresses only the
   // one-line summary).
-  for (const warning of renderFleetWarnings(run, flags.requireModels)) {
+  for (const warning of renderFleetWarnings(run, flags.requireModels, configuredFleetSize)) {
     process.stderr.write(`${warning}\n`);
   }
   if (!flags.quiet) {

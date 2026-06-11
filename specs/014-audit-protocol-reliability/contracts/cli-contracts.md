@@ -4,7 +4,7 @@ All deltas are **additive**: no existing exit code changes meaning, no existing 
 
 ## `stackctl audit-barrage` (US1)
 
-**New flag**: `--require-models <n>` — minimum *emitting* models (`stdoutBytes > 0`). Effective floor is `min(n, configured fleet size)`; a shortfall fails loudly naming expected vs actual and each non-emitting model. Default (manual runs): no floor.
+**New flag**: `--require-models <n>` — minimum *emitting* models (`stdoutBytes > 0`). Effective floor is `min(n, CONFIGURED fleet size)` — the loaded config's battery, never the `--models` / `GOVERN_MODELS` subset actually run, so subset selection does not lower the floor (AUDIT-20260611-03). A shortfall fails loudly naming expected vs actual and the cause: each non-emitting model, and/or — when the selected subset is itself below the effective floor — that selection (not model health) caused the shortfall. Default (manual runs): no floor.
 
 **New stderr output** (when any configured model emitted zero bytes):
 

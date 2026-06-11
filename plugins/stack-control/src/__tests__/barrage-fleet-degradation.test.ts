@@ -16,9 +16,11 @@
 //   - when emitting < 2, the consequence line states cross-model
 //     agreement is unavailable.
 //   - --require-models <n>: minimum emitting models; effective floor is
-//     min(n, configured fleet size); shortfall fails loudly naming
-//     expected vs actual and each non-emitting model. Default exit
-//     codes unchanged when no floor is requested (FR-002/FR-014).
+//     min(n, CONFIGURED fleet size) — the loaded config's battery, never
+//     the --models/GOVERN_MODELS subset actually run (AUDIT-20260611-03);
+//     shortfall fails loudly naming expected vs actual and each
+//     non-emitting model. Default exit codes unchanged when no floor is
+//     requested (FR-002/FR-014).
 
 import { describe, it, expect } from 'vitest';
 import type {
@@ -220,5 +222,73 @@ describe('US1 — --require-models fleet floor', () => {
       modelResult({ name: 'solo', stdoutBytes: 0, exitCode: -1, timedOut: true }),
     ]);
     expect(deriveBarrageExitCode(run, 2)).toBe(1);
+  });
+});
+
+// AUDIT-20260611-03: the floor clamps against the CONFIGURED fleet size,
+// not the --models/GOVERN_MODELS subset actually run. A 2-model config
+// narrowed to one model via --models must NOT lower govern's floor 2 to
+// 1 — that would make the cross-model agreement floor opt-out-able via
+// an env var with no exit-code consequence.
+describe('US1 — fleet floor counts the CONFIGURED fleet, not the --models subset (AUDIT-20260611-03)', () => {
+  // Simulates: 2-model config, `--models claude` subset, the selected
+  // model emits cleanly. Only ONE result is in the run.
+  function subsetRun(): BarrageRun {
+    return runWith([
+      modelResult({ name: 'claude', stdoutBytes: 2048, exitCode: 0 }),
+    ]);
+  }
+
+  it('subset of a 2-model config does NOT clamp floor 2: exit 1 despite the selected model emitting', () => {
+    // configuredFleetSize = 2 → effective floor stays 2; only 1 result
+    // can emit → FLOOR SHORTFALL.
+    expect(deriveBarrageExitCode(subsetRun(), 2, 2)).toBe(1);
+  });
+
+  it('subset shortfall line names the effective floor of 2 (not a clamped 1)', () => {
+    const warnings = renderFleetWarnings(subsetRun(), 2, 2);
+    const shortfall = warnings.filter((w) => /FLOOR SHORTFALL/.test(w));
+    expect(shortfall).toHaveLength(1);
+    expect(shortfall[0]).toMatch(/required 2/);
+    // No clamp NOTE — the requested floor does not exceed the
+    // configured fleet size.
+    expect(warnings.filter((w) => /NOTE/.test(w))).toEqual([]);
+  });
+
+  it('subset shortfall names SELECTION as the cause when selected < effective floor', () => {
+    const warnings = renderFleetWarnings(subsetRun(), 2, 2);
+    const selection = warnings.filter((w) => /selected/.test(w));
+    expect(selection.length).toBeGreaterThanOrEqual(1);
+    const line = selection.join('\n');
+    expect(line).toMatch(/1/); // selected count
+    expect(line).toMatch(/2/); // configured fleet size
+    expect(line).toMatch(/configured/);
+  });
+
+  it('genuine 1-model CONFIG still clamps: emitting solo model passes with floor 2', () => {
+    const run = runWith([
+      modelResult({ name: 'solo', stdoutBytes: 64, exitCode: 0 }),
+    ]);
+    expect(deriveBarrageExitCode(run, 2, 1)).toBe(0);
+  });
+
+  it('clamp NOTE truthfully names the CONFIGURED fleet size (1), not the subset', () => {
+    const run = runWith([
+      modelResult({ name: 'solo', stdoutBytes: 64, exitCode: 0 }),
+    ]);
+    const warnings = renderFleetWarnings(run, 2, 1);
+    const clampNote = warnings.filter((w) => /NOTE/.test(w));
+    expect(clampNote).toHaveLength(1);
+    expect(clampNote[0]).toMatch(/configured fleet size 1/);
+    expect(clampNote[0]).toMatch(/effective floor is 1/);
+  });
+
+  it('back-compat: omitting configuredFleetSize falls back to run.results.length (library callers without subset selection)', () => {
+    const run = runWith([
+      modelResult({ name: 'solo', stdoutBytes: 64, exitCode: 0 }),
+    ]);
+    // Without the third arg the fleet size derives from the run — equal
+    // to the configured size when no subset was selected.
+    expect(deriveBarrageExitCode(run, 2)).toBe(0);
   });
 });
