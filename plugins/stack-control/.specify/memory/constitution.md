@@ -162,8 +162,10 @@ built concretely against Spec Kit's `tasks.md` first; the *execution-backend* po
   refuses loudly (`stackctl setup` remediation — no fallback location). The cwd's only
   sanctioned role is the default start point of the walk-up. External-tool anchors — the git
   toplevel, the Spec Kit root — are DERIVED from their own markers, never accepted as free
-  parameters that can place stack-control state (the repo-root parameter is retired). New verbs
-  inherit this invariant by default; the isolation probe
+  parameters that can place stack-control state (the repo-root parameter is retired on
+  STATE-WRITING verbs; read-side verbs may keep a read-only repo-root — e.g.
+  audit-barrage-render's surviving flag is the protocol's carrier for the render anchor).
+  New verbs inherit this invariant by default; the isolation probe
   (`src/__tests__/installation-isolation-probe.test.ts`) is its permanent enforcement.
 - Enforcement discipline lives in skill bodies and CLI verbs, never in git hooks the adopter does not
   receive from installing the plugin.

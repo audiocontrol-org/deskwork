@@ -17,7 +17,11 @@
 #   GOVERN_PLAN_PATH     (optional; when set — the after_plan checkpoint — the plan is folded; FR-013)
 #   GOVERN_CHECKPOINT    (optional; checkpoint label; defaulting GOVERN_CHECKPOINT > after_plan-if-plan > after_clarify)
 #   GOVERN_REPO_ROOT     RETIRED (specs/installation-isolation R2): setting it is a
-#                        loud FATAL; pass `--at <dir>` (the installation enclosing <dir>)
+#                        loud FATAL. Anchoring contract: every argument to this shim is
+#                        forwarded verbatim to `stackctl govern` (the exec below carries
+#                        "$@"), so pass `--at <dir>` (the installation enclosing <dir>)
+#                        as an ARGUMENT — `govern-spec.sh --at <dir>` — or run with the
+#                        cwd inside the installation (the default walk-up start).
 #   GOVERN_MODELS        (optional; comma-list passed to audit-barrage --models)
 #   GOVERN_CEILING       (optional; convergence iteration ceiling, FR-014)
 #   GOVERN_OVERRIDE      (optional; recorded override reason, FR-010)
