@@ -27,6 +27,7 @@ import type {
   CssLink,
   DesignSpecFinding,
   ParsedDesignSpec,
+  RuleScopedCssLink,
 } from '@/design-language/types';
 
 /** A link excluded from v1 validation, recorded visibly. */
@@ -136,39 +137,55 @@ export function cssDefinesSelector(css: string, selector: string): boolean {
 }
 
 /**
- * Check every rule's css links against source. Paths resolve relative to
- * `baseDir` (the spec file's directory). Missing file → `dead-link-file`;
- * selector not defined → `dead-link-selector`; non-.css target → skipped.
+ * Check a flat list of rule-scoped css links against source. This is the
+ * liveness core: it carries no opinion about the HOUSING of a link, so the
+ * file-level check can run it over the valid rules' links AND the parse
+ * result's `auxiliaryCssLinks` (links of structurally-invalid / duplicate
+ * sections) in the same pass. Paths resolve relative to `baseDir` (the spec
+ * file's directory). Missing file → `dead-link-file`; selector not defined →
+ * `dead-link-selector`; non-.css target → skipped.
  */
-export function checkLinkLiveness(spec: ParsedDesignSpec, baseDir: string): LivenessResult {
+export function checkCssLinkLiveness(
+  links: readonly RuleScopedCssLink[],
+  baseDir: string,
+): LivenessResult {
   const findings: DesignSpecFinding[] = [];
   const skipped: SkippedLink[] = [];
-  for (const rule of spec.rules) {
-    for (const link of rule.cssLinks) {
-      if (!link.path.toLowerCase().endsWith('.css')) {
-        skipped.push({ ruleId: rule.id, link, reason: 'non-css-target' });
-        continue;
-      }
-      const absolute = resolve(baseDir, link.path);
-      let css: string;
-      try {
-        css = readFileSync(absolute, 'utf8');
-      } catch {
-        findings.push({
-          rule: 'dead-link-file',
-          message: `Rule "${rule.id}" links to "${link.path}" which does not resolve to a readable file (looked at ${absolute}).`,
-          ruleId: rule.id,
-        });
-        continue;
-      }
-      if (!cssDefinesSelector(css, link.selector)) {
-        findings.push({
-          rule: 'dead-link-selector',
-          message: `Rule "${rule.id}" links to selector "${link.selector}" which is not defined in "${link.path}".`,
-          ruleId: rule.id,
-        });
-      }
+  for (const { ruleId, link } of links) {
+    if (!link.path.toLowerCase().endsWith('.css')) {
+      skipped.push({ ruleId, link, reason: 'non-css-target' });
+      continue;
+    }
+    const absolute = resolve(baseDir, link.path);
+    let css: string;
+    try {
+      css = readFileSync(absolute, 'utf8');
+    } catch {
+      findings.push({
+        rule: 'dead-link-file',
+        message: `Rule "${ruleId}" links to "${link.path}" which does not resolve to a readable file (looked at ${absolute}).`,
+        ruleId,
+      });
+      continue;
+    }
+    if (!cssDefinesSelector(css, link.selector)) {
+      findings.push({
+        rule: 'dead-link-selector',
+        message: `Rule "${ruleId}" links to selector "${link.selector}" which is not defined in "${link.path}".`,
+        ruleId,
+      });
     }
   }
   return { ok: findings.length === 0, findings, skipped };
+}
+
+/**
+ * Check every valid rule's css links against source — the spec-shaped wrapper
+ * over {@link checkCssLinkLiveness} (same per-link contract).
+ */
+export function checkLinkLiveness(spec: ParsedDesignSpec, baseDir: string): LivenessResult {
+  const links = spec.rules.flatMap((rule) =>
+    rule.cssLinks.map((link) => ({ ruleId: rule.id, link })),
+  );
+  return checkCssLinkLiveness(links, baseDir);
 }

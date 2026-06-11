@@ -95,6 +95,72 @@ describe('checkDesignSpecFile', () => {
   it('throws loud on an unreadable spec file (never a clean verdict)', () => {
     expect(() => checkDesignSpecFile(join(makeFixtureDir(), 'absent.md'))).toThrow();
   });
+
+  it('surfaces a schema defect AND a dead link on the SAME rule in one run (no waves)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real { color: ink; }\n');
+    const specPath = join(dir, 'design-language.md');
+    writeFileSync(
+      specPath,
+      `### rule: both-defects
+- kind: palette
+- css: studio.css .ghost
+- do: x
+`,
+    );
+    const result = checkDesignSpecFile(specPath);
+    const rules = result.findings.map((f) => f.rule);
+    expect(rules).toContain('missing-example');
+    expect(rules).toContain('dead-link-selector');
+    expect(result.spec.rules).toEqual([]);
+  });
+
+  it('surfaces a duplicate section’s dead css link in the same run as duplicate-rule-id', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real { color: ink; }\n');
+    const specPath = join(dir, 'design-language.md');
+    writeFileSync(
+      specPath,
+      `### rule: ink
+- kind: palette
+- css: studio.css .real
+- example: a button
+- do: x
+
+### rule: ink
+- kind: palette
+- css: studio.css .ghost
+- example: a button
+- do: x
+`,
+    );
+    const result = checkDesignSpecFile(specPath);
+    const rules = result.findings.map((f) => f.rule);
+    expect(rules).toContain('duplicate-rule-id');
+    expect(rules).toContain('dead-link-selector');
+    expect(result.spec.rules.map((r) => r.id)).toEqual(['ink']);
+  });
+
+  it('records a non-css auxiliary link as skipped, never silently dropped', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'styles.ts'), 'export const x = 1;\n');
+    const specPath = join(dir, 'design-language.md');
+    writeFileSync(
+      specPath,
+      `### rule: invalid-housing
+- kind: palette
+- css: styles.ts .btn
+- do: x
+`,
+    );
+    const result = checkDesignSpecFile(specPath);
+    expect(result.findings.map((f) => f.rule)).toEqual(['missing-example']);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({
+      ruleId: 'invalid-housing',
+      reason: 'non-css-target',
+    });
+  });
 });
 
 describe('runCheckDesignSpec — exit contract', () => {

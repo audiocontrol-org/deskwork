@@ -13,9 +13,11 @@ export {
   type DesignSpecParseResult,
   type DesignSpecRule,
   type ParsedDesignSpec,
+  type RuleScopedCssLink,
 } from '@/design-language/types';
 export { parseDesignSpec } from '@/design-language/schema';
 export {
+  checkCssLinkLiveness,
   checkLinkLiveness,
   cssDefinesSelector,
   type LivenessResult,

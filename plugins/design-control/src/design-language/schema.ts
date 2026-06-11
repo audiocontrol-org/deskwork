@@ -31,6 +31,7 @@ import {
   type DesignSpecFinding,
   type DesignSpecParseResult,
   type DesignSpecRule,
+  type RuleScopedCssLink,
 } from '@/design-language/types';
 
 const HEADING_RE = /^#{1,6}\s+(.*)$/;
@@ -172,10 +173,23 @@ function validateSection(section: RawRuleSection, findings: DesignSpecFinding[])
  * Parse + structurally validate a design-language spec. Pure: text in,
  * structure + findings out. `spec.rules` carries only the structurally-valid
  * rules; every defect is a finding (never a silent drop).
+ *
+ * Single-pass surfacing (no finding waves): a section excluded from
+ * `spec.rules` is still INSPECTED, never skipped —
+ *   - a duplicate-id section is parsed into a throwaway section so its
+ *     field-level defects (unknown-field / empty-field / malformed-css-link)
+ *     surface alongside `duplicate-rule-id`. Per-rule validation
+ *     (missing-kind / missing-example / …) deliberately does NOT fire for
+ *     duplicates — the canonical rule owns the per-rule contract; the
+ *     duplicate is not a rule;
+ *   - syntactically-usable css links of invalid + duplicate sections are
+ *     returned as `auxiliaryCssLinks` so the liveness axis can check them in
+ *     the same run.
  */
 export function parseDesignSpec(markdown: string): DesignSpecParseResult {
   const findings: DesignSpecFinding[] = [];
   const sections: RawRuleSection[] = [];
+  const duplicateSections: RawRuleSection[] = [];
   const seenIds = new Set<string>();
   let current: RawRuleSection | undefined;
 
@@ -217,6 +231,12 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
           ruleId: id,
           line: lineNo,
         });
+        // Parse the duplicate into a throwaway section (NOT pushed to
+        // `sections`, no `seenIds` effect) so its field bullets are still
+        // inspected — field-level findings + auxiliary css links surface in
+        // this pass instead of after the author renames the id and reruns.
+        current = { id, headingLine: lineNo, cssLinks: [], examples: [], dos: [], donts: [] };
+        duplicateSections.push(current);
         continue;
       }
       seenIds.add(id);
@@ -251,9 +271,20 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
     });
   }
 
-  const rules = sections
-    .map((section) => validateSection(section, findings))
-    .filter((rule): rule is DesignSpecRule => rule !== undefined);
+  const rules: DesignSpecRule[] = [];
+  const auxiliaryCssLinks: RuleScopedCssLink[] = [];
+  for (const section of sections) {
+    const rule = validateSection(section, findings);
+    if (rule !== undefined) {
+      rules.push(rule);
+      continue;
+    }
+    // Invalid housing, usable links: the liveness axis still checks them.
+    auxiliaryCssLinks.push(...section.cssLinks.map((link) => ({ ruleId: section.id, link })));
+  }
+  for (const section of duplicateSections) {
+    auxiliaryCssLinks.push(...section.cssLinks.map((link) => ({ ruleId: section.id, link })));
+  }
 
-  return { ok: findings.length === 0, spec: { rules }, findings };
+  return { ok: findings.length === 0, spec: { rules }, findings, auxiliaryCssLinks };
 }

@@ -305,3 +305,91 @@ describe('parseDesignSpec — structural rejections', () => {
     expect(result.spec.rules.map((r) => r.id)).toEqual(['fine']);
   });
 });
+
+describe('parseDesignSpec — single-pass defect surfacing (no finding waves)', () => {
+  const VALID_INK = `### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+`;
+
+  it('a valid spec carries zero auxiliary css links', () => {
+    const result = parseDesignSpec(VALID_SPEC);
+    expect(result.auxiliaryCssLinks).toEqual([]);
+  });
+
+  it('routes a structurally-invalid rule’s css links to auxiliaryCssLinks', () => {
+    const result = parseDesignSpec(`### rule: no-example
+- kind: palette
+- css: styles/studio.css .btn
+- do: x
+`);
+    expect(result.findings.map((f) => f.rule)).toContain('missing-example');
+    expect(result.spec.rules).toEqual([]);
+    expect(result.auxiliaryCssLinks).toEqual([
+      { ruleId: 'no-example', link: { path: 'styles/studio.css', selector: '.btn' } },
+    ]);
+  });
+
+  it('a duplicate section’s field bullets are still inspected — typo guard fires', () => {
+    const result = parseDesignSpec(`${VALID_INK}
+### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- exmaple: a button
+- do: x
+`);
+    const rules = result.findings.map((f) => f.rule);
+    expect(rules).toContain('duplicate-rule-id');
+    expect(rules).toContain('unknown-field');
+    const typo = result.findings.find((f) => f.rule === 'unknown-field');
+    expect(typo?.ruleId).toBe('ink');
+  });
+
+  it('a duplicate section’s empty fields and malformed css links surface in the same pass', () => {
+    const result = parseDesignSpec(`${VALID_INK}
+### rule: ink
+- kind:
+- css: styles/studio.css
+- example: a button
+- do: x
+`);
+    const rules = result.findings.map((f) => f.rule);
+    expect(rules).toContain('duplicate-rule-id');
+    expect(rules).toContain('empty-field');
+    expect(rules).toContain('malformed-css-link');
+  });
+
+  it('routes a duplicate section’s css links to auxiliaryCssLinks, excluded from spec.rules', () => {
+    const result = parseDesignSpec(`${VALID_INK}
+### rule: ink
+- kind: palette
+- css: styles/studio.css .ghost
+- example: a button
+- do: x
+`);
+    expect(result.spec.rules.map((r) => r.id)).toEqual(['ink']);
+    expect(result.spec.rules[0].cssLinks).toEqual([
+      { path: 'styles/studio.css', selector: '.btn' },
+    ]);
+    expect(result.auxiliaryCssLinks).toEqual([
+      { ruleId: 'ink', link: { path: 'styles/studio.css', selector: '.ghost' } },
+    ]);
+  });
+
+  it('a duplicate section does NOT fire per-rule validation (it is not a rule)', () => {
+    // The duplicate carries only `css:` — missing-kind/example/guidance would
+    // fire if it were validated as a rule. Deliberately they do not: the
+    // canonical rule owns the per-rule contract; the duplicate surfaces only
+    // its field-level defects + duplicate-rule-id.
+    const result = parseDesignSpec(`${VALID_INK}
+### rule: ink
+- css: styles/studio.css .ghost
+`);
+    expect(result.findings.map((f) => f.rule)).toEqual(['duplicate-rule-id']);
+    expect(result.auxiliaryCssLinks).toEqual([
+      { ruleId: 'ink', link: { path: 'styles/studio.css', selector: '.ghost' } },
+    ]);
+  });
+});

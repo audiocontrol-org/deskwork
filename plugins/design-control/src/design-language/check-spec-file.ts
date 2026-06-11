@@ -8,7 +8,11 @@
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { checkLinkLiveness, type SkippedLink } from '@/design-language/link-liveness';
+import {
+  checkCssLinkLiveness,
+  checkLinkLiveness,
+  type SkippedLink,
+} from '@/design-language/link-liveness';
 import { parseDesignSpec } from '@/design-language/schema';
 import type { DesignSpecFinding, ParsedDesignSpec } from '@/design-language/types';
 
@@ -24,16 +28,26 @@ export interface DesignSpecCheckResult {
 /**
  * Check a design-language spec FILE: read it, validate the markdown schema,
  * then check link-liveness with css paths resolved against the spec file's
- * own directory. Fails loud on an unreadable file — a missing spec is an
- * error, never a clean verdict.
+ * own directory. Liveness runs over the valid rules AND the parse result's
+ * auxiliary css links (links housed in structurally-invalid / duplicate
+ * sections), so a schema defect and a dead link on the same section surface
+ * in ONE run — never in fix-and-rerun waves. Fails loud on an unreadable
+ * file — a missing spec is an error, never a clean verdict.
  */
 export function checkDesignSpecFile(filePath: string): DesignSpecCheckResult {
   const absolute = resolve(filePath);
   const markdown = readFileSync(absolute, 'utf8');
   const parsed = parseDesignSpec(markdown);
-  const liveness = checkLinkLiveness(parsed.spec, dirname(absolute));
-  const findings = [...parsed.findings, ...liveness.findings];
-  return { ok: findings.length === 0, spec: parsed.spec, findings, skipped: liveness.skipped };
+  const baseDir = dirname(absolute);
+  const liveness = checkLinkLiveness(parsed.spec, baseDir);
+  const auxiliary = checkCssLinkLiveness(parsed.auxiliaryCssLinks, baseDir);
+  const findings = [...parsed.findings, ...liveness.findings, ...auxiliary.findings];
+  return {
+    ok: findings.length === 0,
+    spec: parsed.spec,
+    findings,
+    skipped: [...liveness.skipped, ...auxiliary.skipped],
+  };
 }
 
 /** Line-oriented output sink, injected so the CLI core is testable. */

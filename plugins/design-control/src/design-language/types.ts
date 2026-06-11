@@ -81,9 +81,23 @@ export interface ParsedDesignSpec {
   readonly rules: readonly DesignSpecRule[];
 }
 
+/** A css link paired with the id of the spec section that declared it. */
+export interface RuleScopedCssLink {
+  readonly ruleId: string;
+  readonly link: CssLink;
+}
+
 export interface DesignSpecParseResult {
   /** True iff findings is empty. */
   readonly ok: boolean;
   readonly spec: ParsedDesignSpec;
   readonly findings: readonly DesignSpecFinding[];
+  /**
+   * Syntactically-usable css links housed in sections EXCLUDED from
+   * `spec.rules` (structurally-invalid rules + duplicate-id sections). They
+   * still feed the link-liveness axis so a schema defect and a dead link on
+   * the same section surface in ONE checker run, not in waves — downstream
+   * consumers of `spec.rules` never see the invalid housing.
+   */
+  readonly auxiliaryCssLinks: readonly RuleScopedCssLink[];
 }
