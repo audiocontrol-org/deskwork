@@ -16,7 +16,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveTsx, CLI } from './_run-helpers.js';
@@ -64,6 +64,25 @@ function writeStubBarrage(dir: string): string {
 // returns root: undefined for every slug here.
 function makeRepoWithoutFeatureDirs(): string {
   const repo = mkdtempSync(join(tmpdir(), 'gov-unres-'));
+  writeFileSync(join(repo, 'seed.txt'), 'seed\n', 'utf8');
+  const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
+  git(['init', '-q']);
+  git(['config', 'user.email', 't@e.com']);
+  git(['config', 'user.name', 'T']);
+  git(['add', '-A']);
+  git(['commit', '-q', '-m', 'seed']);
+  return repo;
+}
+
+// A git repo seeded with one commit and TWO Spec Kit dirs matching the same
+// slug — specs/001-amb AND specs/002-amb. resolveFeatureRoot THROWS (plain
+// Error, fail-loud) for slug 'amb' here rather than silently picking one.
+function makeRepoWithAmbiguousFeatureDirs(): string {
+  const repo = mkdtempSync(join(tmpdir(), 'gov-amb-'));
+  mkdirSync(join(repo, 'specs', '001-amb'), { recursive: true });
+  mkdirSync(join(repo, 'specs', '002-amb'), { recursive: true });
+  writeFileSync(join(repo, 'specs', '001-amb', 'spec.md'), 'spec one\n', 'utf8');
+  writeFileSync(join(repo, 'specs', '002-amb', 'spec.md'), 'spec two\n', 'utf8');
   writeFileSync(join(repo, 'seed.txt'), 'seed\n', 'utf8');
   const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
   git(['init', '-q']);
@@ -128,6 +147,70 @@ describe('stackctl govern — unresolvable feature root (AUDIT-20260611-04)', ()
       // Downstream behavior (lift/slush/gate resolution against the absent
       // audit-log) is unchanged by this fix and not pinned here.
       expect(existsSync(runDir)).toBe(true);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
+});
+
+// RED-first (AUDIT-20260611-12): an AMBIGUOUS feature root (two specs/ dirs
+// matching the same slug) escapes runGovern as an uncaught plain-Error stack
+// trace (exit 1) — the catch block only translates GovernProtocolError /
+// GovernPayloadError. The same feature-root decision surface the unresolvable
+// case above hardens must surface ambiguity as a controlled
+// `govern: FATAL — <resolver message>` on stderr with exit 2, before the
+// barrage ever fires. feature-root.ts's throw is correct (fail-loud, names
+// the candidates); the translation belongs at govern's CLI boundary.
+describe('stackctl govern — ambiguous feature root (AUDIT-20260611-12)', () => {
+  it('implement mode surfaces the ambiguity as a controlled FATAL (exit 2) naming both candidates; barrage never fires', () => {
+    const repo = makeRepoWithAmbiguousFeatureDirs();
+    const fx = mkdtempSync(join(tmpdir(), 'gov-amb-stub-'));
+    const stub = writeStubBarrage(fx);
+    const runDir = join(fx, 'run-implement');
+    try {
+      const r = runGovern(
+        ['--mode', 'implement', '--feature', 'amb', '--repo-root', repo, '--diff-base', 'HEAD'],
+        { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: runDir },
+      );
+      expect(r.status).toBe(2);
+      // Controlled operator-facing refusal — same channel as the
+      // unresolvable-root FATAL, carrying the resolver's message verbatim
+      // (it names both candidate dirs).
+      expect(r.stderr).toContain('govern: FATAL');
+      expect(r.stderr).toMatch(/ambiguous slug 'amb' under /);
+      expect(r.stderr).toContain('001-amb');
+      expect(r.stderr).toContain('002-amb');
+      // No raw stack trace leaks to the operator.
+      expect(r.stderr).not.toMatch(/^\s+at /m);
+      // The refusal fires at the decision site — the barrage never runs.
+      expect(existsSync(runDir)).toBe(false);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
+
+  it('spec mode with the same ambiguous slug also exits 2 with the message, not a stack trace (resolveAuditLogExcerpt throws first)', () => {
+    const repo = makeRepoWithAmbiguousFeatureDirs();
+    const fx = mkdtempSync(join(tmpdir(), 'gov-amb-stub-'));
+    const stub = writeStubBarrage(fx);
+    const runDir = join(fx, 'run-spec');
+    const spec = join(repo, 'spec.md');
+    writeFileSync(spec, 'A spec under audit.\n', 'utf8');
+    try {
+      const r = runGovern(
+        ['--mode', 'spec', '--feature', 'amb', '--repo-root', repo, '--spec-path', spec],
+        { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: runDir },
+      );
+      // resolveAuditLogExcerpt resolves the feature root on the spec path
+      // too, so the same ambiguity throw fires — pinned to the same
+      // controlled exit-2 channel, never an uncaught stack.
+      expect(r.status).toBe(2);
+      expect(r.stderr).toContain('govern: FATAL');
+      expect(r.stderr).toMatch(/ambiguous slug 'amb' under /);
+      expect(r.stderr).not.toMatch(/^\s+at /m);
+      expect(existsSync(runDir)).toBe(false);
     } finally {
       rmSync(repo, { recursive: true, force: true });
       rmSync(fx, { recursive: true, force: true });

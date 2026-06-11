@@ -377,8 +377,29 @@ export async function runGovern(args: string[]): Promise<void> {
     // root in the repo so the untracked fold can drop OTHER features'
     // scaffolds without dropping the feature's own uncommitted code
     // (AUDIT-20260611-01 — exclusion-scoped, not inclusion-scoped).
-    const auditLogExcerpt = await resolveAuditLogExcerpt(repoRoot, slug);
-    const { root: featureRoot } = await resolveFeatureRoot({ repoRoot, slug });
+    // AUDIT-20260611-12: the resolver THROWS (plain Error, fail-loud) on an
+    // ambiguous Spec Kit slug (two specs/ dirs matching) — correct at the
+    // resolver, but the outer catch only translates GovernProtocolError /
+    // GovernPayloadError, so the throw used to escape as an uncaught exit-1
+    // instead of a governance refusal. Translate resolver throws into the
+    // same exit-2 operator-facing FATAL channel as the unresolvable-root
+    // refusal below. The catch is deliberately narrow — only the
+    // feature-root resolution cluster, not the protocol.
+    let auditLogExcerpt: string;
+    let featureRoot: string | undefined;
+    let excludeRoots: readonly string[] | undefined;
+    try {
+      auditLogExcerpt = await resolveAuditLogExcerpt(repoRoot, slug);
+      ({ root: featureRoot } = await resolveFeatureRoot({ repoRoot, slug }));
+      excludeRoots =
+        flags.mode === 'implement' && featureRoot !== undefined
+          ? await discoverFeatureRoots(repoRoot)
+          : undefined;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`govern: FATAL — ${msg}\n`);
+      process.exit(2);
+    }
     // AUDIT-20260611-04: implement mode REFUSES to run without a resolved
     // feature root. An undefined root used to revert the assembler to the
     // pre-014 self-referential repo-wide payload (audit-log in the diff +
@@ -394,10 +415,6 @@ export async function runGovern(args: string[]): Promise<void> {
       );
       process.exit(2);
     }
-    const excludeRoots =
-      flags.mode === 'implement' && featureRoot !== undefined
-        ? await discoverFeatureRoots(repoRoot)
-        : undefined;
     // AUDIT-20260611-08: thread the governance backlog store so its
     // bookkeeping commits/files are excluded from both payload arms.
     const excludePaths =
