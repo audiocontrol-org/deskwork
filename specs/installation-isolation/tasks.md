@@ -34,9 +34,9 @@
 
 ## Phase 6: US5 — Legacy half-installation detected (P2)
 
-- [ ] T012 [P] [US5] RED: legacy-notice tests (probe harness fixture: marker-less `.stack-control/` at the outer root + installation below) — three-part notice fires once per invocation from the shared resolver on every resolving verb; absent-legacy fixture is silent (no cry-wolf); advice never names an existing tuned file as an overwrite target (the audit-protocol-reliability AUDIT-09/-15 lesson); writes never target the legacy location (contracts §notices; research R6)
-- [ ] T013 [US5] Implement the legacy probe + notice in the shared resolver (codebase-boundary.ts) — T012 green
-- [ ] T014 [US5] This repo's migration (operator-approved step): move the root `.stack-control/` legacy state (audit-barrage-config.yaml, audit-runs/) into the installation; record the move in the quickstart notes; SC-004's re-runnable probe (no verb recreates root state) green
+- [X] T012 [P] [US5] RED: legacy-notice tests (probe harness fixture: marker-less `.stack-control/` at the outer root + installation below) — three-part notice fires once per invocation from the shared resolver on every resolving verb; absent-legacy fixture is silent (no cry-wolf); advice never names an existing tuned file as an overwrite target (the audit-protocol-reliability AUDIT-09/-15 lesson); writes never target the legacy location (contracts §notices; research R6)
+- [X] T013 [US5] Implement the legacy probe + notice in the shared resolver (codebase-boundary.ts) — T012 green
+- [X] T014 [US5] This repo's migration (operator-approved step): move the root `.stack-control/` legacy state (audit-barrage-config.yaml, audit-runs/) into the installation; record the move in the quickstart notes; SC-004's re-runnable probe (no verb recreates root state) green
 
 ## Phase 7: US6 — Spec Kit root relocates into the installation (P3)
 
