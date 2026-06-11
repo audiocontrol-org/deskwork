@@ -49,7 +49,7 @@ The terminal-state vocabulary (data-model.md) and config v2 grammar (contracts/b
 - [ ] T012 [US2] GREEN: implement plugins/stack-control/src/scope-discovery/audit-barrage/timeout-derivation.ts until T011 passes
 - [ ] T013 [US2] RED: model-pin wiring suite in plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/spawn-model-pin.test.ts — `{{model}}` substitution in argv; orchestrator threads rendered-prompt byte size into derivation; effective timeout armed from basis (FR-001/FR-002)
 - [ ] T014 [US2] GREEN: wire substitution + payload threading + basis arming in plugins/stack-control/src/scope-discovery/audit-barrage/spawn-cli.ts and plugins/stack-control/src/scope-discovery/audit-barrage/orchestrate-barrage.ts; render `timeout basis` row in run-artifacts.ts until T013 passes
-- [ ] T015 [US2] Migrate plugins/stack-control/templates/audit-barrage-config.yaml to full v2 (opus pin, fable override profile documented in comments, calibration numbers from research D5) and migrate the project override .stack-control/audit-barrage-config.yaml; then run quickstart SC-001 replay and record the result
+- [ ] T015 [US2] Migrate plugins/stack-control/templates/audit-barrage-config.yaml to full v2 for ALL lanes including the disabled gemini entry (opus pin, fable override profile documented in comments, calibration numbers from research D5) and migrate the project override .stack-control/audit-barrage-config.yaml; then run quickstart SC-001 replay and record the result
 
 **Checkpoint**: US2 independently deliverable — the 17-timeout scenario is structurally dead.
 
@@ -61,7 +61,7 @@ The terminal-state vocabulary (data-model.md) and config v2 grammar (contracts/b
 
 - [ ] T016 [US3] RED: INDEX rendering suite (extend plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/run-artifacts.test.ts) — per-model `terminal state`/`liveness` rows; fleet report block when produced < configured; quorum line when produced ≤ 1 (FR-007, contracts/run-artifacts-contract.md)
 - [ ] T017 [US3] GREEN: fleet report + state rows in plugins/stack-control/src/scope-discovery/audit-barrage/run-artifacts.ts and orchestrate-barrage.ts until T016 passes
-- [ ] T018 [US3] RED: lift consumption suite (extend the audit-barrage-lift tests under plugins/stack-control/src/__tests__/) — a non-completed lane contributes zero findings and is reported with its state; lift output repeats the fleet report when degraded; never "clean" from a killed lane (FR-007)
+- [ ] T018 [US3] RED: lift consumption suite (extend the audit-barrage-lift tests under plugins/stack-control/src/__tests__/) — a non-completed lane contributes zero findings and is reported with its state; per-lane enforcement state printed UNCONDITIONALLY (FR-004's at-synthesis marking, not only on degradation); `produced` counts converged-eligible lanes only (completed + exit 0 + artifact present); fleet report repeated when degraded; never "clean" from a killed lane (FR-007)
 - [ ] T019 [US3] GREEN: terminal-state consumption in plugins/stack-control/src/subcommands/audit-barrage-lift.ts until T018 passes
 - [ ] T020 [US3] RED then GREEN: govern convergence-loop fleet status in plugins/stack-control/src/govern/ — round status lines include fleet report; 0-HIGH over a degraded fleet annotated; dampener/models-attempted counters count only `completed` lanes (US3 scenario 3)
 

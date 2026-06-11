@@ -116,7 +116,7 @@ A barrage spawn that shows no sign of life is detected and terminated within a s
 
 ### Edge Cases
 
-- **Pinned model unavailable**: the pinned model alias/id is rejected by the CLI (retired, typo, account without access) → spawn failure must surface as a spawn-level terminal state (US3), never as a generic empty output.
+- **Pinned model unavailable**: the pinned model alias/id is rejected by the CLI (retired, typo, account without access). Mechanically this is a fast non-zero *exit*, not a spawn error — it must surface via the recorded exit code plus exclusion from the fleet's produced count (degradation accounting, US3), never as a generic empty output silently counted as a clean run. True spawn errors (missing binary, argv limits) surface as the spawn-failure terminal state.
 - **Payload size unknown or unbounded**: timeout derivation must handle a payload larger than any measured calibration point (extrapolate or cap loudly, never silently truncate the budget below the floor).
 - **Rate-limit throttling**: a throttled-but-alive run slows its pulse; the liveness window must tolerate observed pulse variance (rate-limit events were observed in the experiment) without false kills.
 - **Liveness signal changes the artifact contract**: if the chosen liveness mechanism alters the spawn's stdout format (e.g. event-stream output instead of final markdown), the final-report extraction must still deliver the per-model markdown artifact that lift consumes — the artifact contract survives the observability change.

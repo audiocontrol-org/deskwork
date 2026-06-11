@@ -29,7 +29,7 @@ Existing: exit code, duration, stdout/stderr bytes, paths, timed out. New (FR-00
 
 ## INDEX.md fleet report block
 
-When `produced < configured` (FR-007):
+`produced` counts **converged-eligible** lanes (`terminalState === completed` AND `exitCode === 0` AND report artifact present — the `isModelRunConverged` predicate), so a fast non-zero exit (e.g. a CLI-rejected model pin) counts as degradation, not production. When `produced < configured` (FR-007):
 
 ```
 ## Fleet report
@@ -40,7 +40,7 @@ When `produced < configured` (FR-007):
 
 ## Reader obligations (the part that makes degradation loud)
 
-1. **Lift** (`audit-barrage-lift`): a lane with `terminalState ≠ completed` is reported with its state and contributes ZERO findings — it is never folded in as "clean / no findings". Lift output repeats the fleet report when degraded.
+1. **Lift** (`audit-barrage-lift`): a lane with `terminalState ≠ completed` is reported with its state and contributes ZERO findings — it is never folded in as "clean / no findings". Lift output prints each lane's enforcement state **unconditionally** (FR-004 requires the write-unenforced marking at synthesis always, not only on degradation) and repeats the fleet report when degraded.
 2. **Govern convergence loop**: round status lines include the fleet report; a `0 HIGH` round computed over a degraded fleet is annotated as degraded; repeated same-lane kills across rounds are visible in loop output, not only in per-run INDEX files (US3 scenario 3).
 3. **Dampener / models-attempted accounting**: only `completed` lanes count as attempts (the design-control pollution case).
 4. **Fire-time (barrage verb stdout)**: an `unenforced` lane prints a warning at spawn; a degraded fleet prints the fleet report at run end.

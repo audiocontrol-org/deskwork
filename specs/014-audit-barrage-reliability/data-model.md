@@ -91,7 +91,7 @@ Persisted summary on kill: staleness duration at kill time (in INDEX.md model ro
 | Field | Type | Notes |
 |---|---|---|
 | `configured` | int | lanes in config |
-| `produced` | int | lanes with `terminalState === completed` |
+| `produced` | int | converged-eligible lanes: `terminalState === completed` AND `exitCode === 0` AND report artifact present (the `isModelRunConverged` predicate) — a fast non-zero exit (e.g. CLI-rejected model pin) is degradation, not production |
 | `perLane` | list of {name, terminalState, enforcement, liveness} | the vocabulary every consumer prints |
 | `quorumCollapsed` | boolean | `produced ≤ 1` → cross-model agreement structurally impossible; stated wherever agreement is reported |
 
