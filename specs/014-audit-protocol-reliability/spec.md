@@ -25,6 +25,14 @@ This feature graduated from the stack-control backlog via `backlog promote` (rec
 
 Every defect is **verified against current code or a recorded run** (run JSON, audit-log entries, or a written acceptance probe) — none is speculative.
 
+## Clarifications
+
+### Session 2026-06-11
+
+- Q: US6 — how should scope-widen handle missing scope-discovery state on a fresh install? → A: **Auto-seed, announced** — first use scaffolds the missing state (announced on stderr), matching the established auto-scaffold-on-first-use pattern (backlog store; 013's audit-log scaffold). One invocation always works.
+- Q: US8 — which failure contract for a malformed task file? → A: **Skip reads, fail imports** — list/read paths emit a stderr warning naming the bad file and continue with healthy items; import idempotency checks fail loud with the descriptive named-file error (exit 2), because a skipped file there could cause duplicate creation.
+- Q: US1 — should protocol-driven runs enforce a minimum fleet by default? → A: **Strict for govern** — govern-driven barrages require ≥2 emitting models by default (the agreement signal is the point of protocol runs); manual `audit-barrage` stays lenient (warning only, exit 0). Both overridable by flag.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 — A degraded barrage fleet is loud, never silent (Priority: P1)
@@ -173,16 +181,16 @@ A single backlog task file with malformed YAML frontmatter (hand-edit, partial w
 
 - **FR-001** (US1): The barrage MUST surface, in the human-facing summary and stderr, every configured model that produced zero output (timeout or otherwise), naming the model and stating that cross-model agreement is unavailable when fewer than two models emitted findings.
 - **FR-002** (US1): The default exit code for a partially-degraded fleet MUST remain 0 (frozen adopter contract; the change is additive).
-- **FR-003** (US1): The barrage MUST offer an opt-in strictness mechanism (minimum emitting models) under which a degraded fleet fails loudly, naming expected vs actual.
+- **FR-003** (US1): The barrage MUST offer a strictness mechanism (minimum emitting models) under which a degraded fleet fails loudly, naming expected vs actual. Protocol-driven (govern) runs default to requiring ≥2 emitting models; manual runs default to lenient (warning only). Both defaults are overridable by flag (Clarification 2026-06-11).
 - **FR-004** (US2): Barrage config loading MUST detect a legacy dw-lifecycle config override and announce it loudly — naming the ignored path, the read path, and the migration step — whenever the legacy file exists.
 - **FR-005** (US3): Lift MUST create one audit-log entry per distinct root-cause mechanism; surface-level agreement alone MUST NOT merge findings. Cross-model annotation is recorded only for same-root-cause merges.
 - **FR-006** (US4): The set of findings slush-findings migrates on apply MUST be derived from the same single source of truth as the dry-run report (the dampener decision), such that dry-run N and applied N cannot diverge; any finding that cannot be migrated MUST fail the verb loudly by name.
 - **FR-007** (US5): The implement-mode govern payload MUST exclude the feature's own audit-log and governance-bookkeeping surface from the audited diff and untracked fold.
 - **FR-008** (US5): The untracked fold MUST include only files belonging to the feature under audit.
-- **FR-009** (US6): scope-widen MUST NOT hard-abort on a missing clone baseline when the requested widening has non-clone arms; the clone arm's disposition (auto-seed or skip) MUST be announced. Genuinely clone-dependent requests with no baseline MUST fail loudly with remediation.
+- **FR-009** (US6): scope-widen MUST NOT hard-abort on a missing clone baseline; missing scope-discovery state is auto-seeded on first use, announced on stderr (Clarification 2026-06-11 — matches the auto-scaffold-on-first-use pattern). Genuinely clone-dependent requests that cannot be satisfied even after the seed MUST fail loudly with remediation.
 - **FR-010** (US7): All scope-discovery and doctor feature-file resolution (manifest, prd, widen-run evidence) MUST route through the layout-aware feature-root resolution; no consumer outside the shared resolver (and its tests) may construct the legacy `001-IN-PROGRESS` path.
 - **FR-011** (US7): Legacy-layout resolution behavior MUST remain unchanged for all converted consumers (no regression; ported contract tests).
-- **FR-012** (US8): A malformed task file MUST NOT produce an unhandled exception from backlog list/exists/imports; the failure mode MUST be the verb's documented descriptive-error contract (naming the offending file) or an announced skip.
+- **FR-012** (US8): A malformed task file MUST NOT produce an unhandled exception from backlog list/exists/imports. List/read paths warn on stderr naming the offending file and continue with healthy items; import idempotency paths fail loud with the descriptive named-file error, exit 2 (Clarification 2026-06-11 — a skipped file on the idempotency path could cause duplicate creation).
 - **FR-013** (cross-cutting): Every fix in this feature MUST follow the no-silent-fallbacks rule: degradation is announced, errors are loud, and no code path substitutes a default for missing operator intent without saying so.
 - **FR-014** (cross-cutting): Existing exit-code contracts are frozen adopter contracts; changes MUST be additive (new flags, new warnings on stderr) — no existing exit code changes meaning.
 
@@ -211,12 +219,12 @@ A single backlog task file with malformed YAML frontmatter (hand-edit, partial w
 
 ## Assumptions
 
-- **Partial-fleet exit semantics**: a degraded-but-nonempty fleet keeps exit 0 by default (TASK-29's own suggested fix); strictness is opt-in. If the operator prefers degraded-by-default-fails, that is a one-line scope decision at plan time.
+- **Partial-fleet exit semantics**: DECIDED (Clarifications 2026-06-11) — manual runs keep exit 0 with a loud warning; govern-driven runs require ≥2 emitting models by default; both overridable.
 - **US2 both-files-present behavior**: the active stack-control config wins and the legacy file's presence is still surfaced (drift risk), rather than suppressing the notice on byte-identical copies — surfacing is cheap and the identical case is transient.
 - **US3 merge key**: "same root cause" is judged by the lift's clustering input (mechanism described in the finding), not by file/surface proximity. The exact clustering contract is a plan-time decision; the spec's promise is the user-visible one — distinct mechanisms remain independently closeable, and no entry's body under-documents what was folded into it.
 - **US5 scope**: the exclusion applies to the audited payload (diff + untracked fold). The deliberately-threaded `audit_log_excerpt` context block (013/TASK-25) is prior-findings context, labeled as such, and stays.
-- **US6 disposition choice** (auto-seed vs announced-skip): both satisfy the story; the pick is a plan-time decision. The spec requires only: no hard abort for non-clone work, and the disposition is announced.
+- **US6 disposition choice**: DECIDED (Clarifications 2026-06-11) — auto-seed, announced.
 - **US7 evidence migration**: previously mis-placed widen-run evidence under recreated `docs/` trees is not retroactively migrated; new runs land correctly. (A migration helper would be new scope — capture separately if wanted.)
-- **US8 contract choice** (named-file BacklogError exit 2 vs announced per-file skip): plan-time decision; the spec requires the outcome be within the verb's documented contract and never an unhandled throw. The idempotency-relevant path must fail loud rather than skip (a skipped file could cause duplicate creation).
+- **US8 contract choice**: DECIDED (Clarifications 2026-06-11) — skip-with-warning on read paths; fail-loud named-file error (exit 2) on import idempotency paths.
 - **Exit-code freeze**: all eight fixes treat existing exit codes as frozen adopter contracts (project rule); additive surface only.
 - This feature is **fix-cluster shaped**: eight independently-testable, independently-shippable stories. Story order within the cluster is a plan/tasks-time sequencing decision; the P1 set (US1–US5) is the protocol-trust core.
