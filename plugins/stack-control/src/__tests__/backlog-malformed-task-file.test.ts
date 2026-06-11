@@ -7,10 +7,15 @@
 // R8 — skip-reads / fail-imports split):
 //   - `list` (read path, availability): warns on stderr naming the
 //     file, lists healthy items, exit 0.
-//   - `exists` / import idempotency (write-adjacent, safety): throws
-//     BacklogError naming the file (existing dispatcher mapping →
-//     exit 2) — a skipped file could hide the ref an idempotency check
-//     needs and cause duplicate creation.
+//   - `exists` / import idempotency (write-adjacent, safety): a
+//     POSITIVE answer is decidable regardless of malformed files —
+//     when the ref is found among healthy items, exists returns true
+//     (nothing would be created; no duplicate is possible). Only when
+//     the answer would otherwise be "absent" with malformed files
+//     present does exists throw BacklogError naming the file (existing
+//     dispatcher mapping → exit 2) — a skipped file could hide the ref
+//     an idempotency check needs and cause duplicate creation
+//     (AUDIT-20260611-06).
 //   - All-files-malformed store: list = zero items + warnings
 //     (distinguishable from clean-empty); imports fail loud.
 //   - Never an unhandled stack trace with exit 1.
@@ -79,19 +84,31 @@ describe('US8 — backlog list skips malformed task files with a warning', () =>
 });
 
 describe('US8 — integrity paths fail loud on a malformed task file', () => {
-  it('exists() throws BacklogError naming the file (a skip could hide the idempotency ref)', () => {
+  it('exists() returns true when the ref is present among healthy items despite a malformed file (AUDIT-20260611-06: the positive answer is decidable)', () => {
+    const root = tmpBacklog();
+    const backend = createBacklogBackend({ cwd: root });
+    backend.create({ title: 'A healthy item', labels: ['type:bug'], refs: ['gh-1'] });
+    plantMalformed(root);
+
+    // The idempotency check succeeds: nothing would be created, no
+    // duplicate is possible — the malformed file cannot change a
+    // positive answer.
+    expect(backend.exists('gh-1')).toBe(true);
+  });
+
+  it('exists() throws BacklogError naming the file when the ref is absent (a skip could hide the idempotency ref)', () => {
     const root = tmpBacklog();
     const backend = createBacklogBackend({ cwd: root });
     backend.create({ title: 'A healthy item', labels: ['type:bug'], refs: ['gh-1'] });
     const malformedPath = plantMalformed(root);
 
-    expect(() => backend.exists('gh-1')).toThrowError(BacklogError);
-    expect(() => backend.exists('gh-1')).toThrowError(
+    expect(() => backend.exists('absent-ref')).toThrowError(BacklogError);
+    expect(() => backend.exists('absent-ref')).toThrowError(
       new RegExp(MALFORMED_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
     );
     // Naming the full path (or at least the file) is the remediation surface.
     try {
-      backend.exists('gh-1');
+      backend.exists('absent-ref');
     } catch (err) {
       expect(String(err)).toContain(MALFORMED_NAME);
       expect(malformedPath).toContain(MALFORMED_NAME);

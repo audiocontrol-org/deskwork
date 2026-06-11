@@ -60,5 +60,5 @@ then the widen proceeds (exit 0 for the previously-aborting case). Genuinely uns
 ## `stackctl backlog …` (US8)
 
 - `backlog list`: malformed task file ⇒ stderr `backlog: WARNING — skipping malformed task file: <path> (<parse error summary>)`, healthy items still listed, exit 0.
-- `backlog … ` paths using `exists` / import idempotency: malformed file ⇒ existing `BacklogError` channel, message names the file + remediation, exit 2 (existing mapping at `backlog.ts:304–306`).
+- `backlog … ` paths using `exists` / import idempotency: malformed file ⇒ existing `BacklogError` channel, message names the file + remediation, exit 2 (existing mapping at `backlog.ts:304–306`). AUDIT-20260611-06: a POSITIVE idempotency answer is decidable with malformed files present — when the ref is found among healthy items, `exists` returns true; the loud failure fires only when the answer would otherwise be "absent".
 - Never: an unhandled stack trace with exit 1.

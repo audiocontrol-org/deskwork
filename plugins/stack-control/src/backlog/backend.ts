@@ -230,10 +230,17 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
     list: listItems,
 
     exists(ref: string): boolean {
-      // Integrity path (specs/014 US8): a malformed file could be the
-      // very one holding `ref` — skipping it would report "absent" and
-      // let an import create a duplicate. Fail loud naming the file.
+      // Integrity path (specs/014 US8, AUDIT-20260611-06): the POSITIVE
+      // answer is decidable regardless of malformed files — when `ref`
+      // is found among healthy items, the idempotency check succeeds,
+      // nothing is created, and no duplicate is possible. Only the
+      // NEGATIVE answer is undecidable: a malformed file could be the
+      // very one holding `ref` — reporting "absent" would let an import
+      // create a duplicate. So: return true on a healthy hit; fail loud
+      // naming the file only when the answer would otherwise be
+      // "absent" with malformed files present.
       const { items, malformed } = readTaskFiles();
+      if (items.some((i) => i.refs.includes(ref))) return true;
       if (malformed.length > 0) {
         const first = malformed[0]!;
         throw new BacklogError(
@@ -243,7 +250,7 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
             ` — fix or remove the file, then re-run`,
         );
       }
-      return items.some((i) => i.refs.includes(ref));
+      return false;
     },
 
     edit(id: string, spec: EditSpec): void {
