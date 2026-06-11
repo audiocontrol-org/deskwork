@@ -30,7 +30,7 @@
 **Quantitative (re-derived by hand from `git log c437231e..HEAD` — the auto-derivation reported 0, see TASK-39):**
 - Commits: 11 (10 work + this session-end record `58663921`): `c578a5d0`, `222b7a26`, `a5a7dff0`, `e0008ab9`, `9d809d62`, `6b742769`, `630b1401`, `8a008742`, `baff2a25`, `61414757`, `58663921`.
 - Files changed: 37 (+1178 / −28) across the session window.
-- Backlog: 3 closed-verified (TASK-13/14/25), 2 closed-stale (TASK-27/32), 12 created (TASK-26..37), 5 archived as duplicates (TASK-31/33/34/35/36), 8 promoted toward specs/014. Pile at close: 27 To Do / 12 Done / 5 archived.
+- Backlog: 3 closed-verified (TASK-13/14/25), 2 closed-stale (TASK-27/32), 14 created (TASK-26..39), 5 archived as duplicates (TASK-31/33/34/35/36), 8 promoted toward specs/014. Pile at close: 29 To Do / 12 Done / 5 archived.
 - Tests: no production code touched; suite untouched at the 173 files / 1150 cases baseline (verified green for the T038 check: generality file 4/4).
 - Tooling friction captured: 2 via session-end (+2 backlog bugs filed: TASK-38 capture-dedupe, TASK-39 session-end derivation).
 - Corrections: 2.
