@@ -7,7 +7,7 @@
  * extractor fix lands after a run was recorded — the events capture is the
  * source of truth; the artifact is derived.
  *
- * Usage: npx tsx scripts/rebuild-artifact-from-events.ts <events.ndjson> <out.md>
+ * Usage: tsx scripts/rebuild-artifact-from-events.ts <events.ndjson> <out.md>
  *
  * Exits 1 (artifact stays unwritten) when the recorded stream never
  * delivered a terminal result event — a killed lane is not retroactively
@@ -23,7 +23,7 @@ async function main(): Promise<void> {
   const [eventsPath, outPath] = process.argv.slice(2);
   if (eventsPath === undefined || outPath === undefined) {
     process.stderr.write(
-      'usage: rebuild-artifact-from-events.ts <events.ndjson> <out.md>\n',
+      'usage: tsx scripts/rebuild-artifact-from-events.ts <events.ndjson> <out.md>\n',
     );
     process.exit(2);
   }
