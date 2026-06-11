@@ -70,7 +70,7 @@ describe('US5 — self-reference-free implement payload', () => {
       commit(repo, 'implement + lift');
 
       const r = assembleImplementPayload({
-        repoRoot: repo,
+        installationRoot: repo,
         base: 'HEAD~1',
         featureRoot: join(repo, FEATURE_REL),
       });
@@ -101,7 +101,7 @@ describe('US5 — self-reference-free implement payload', () => {
 
       const warns: string[] = [];
       const r = assembleImplementPayload({
-        repoRoot: repo,
+        installationRoot: repo,
         base: 'HEAD',
         featureRoot: join(repo, FEATURE_REL),
         // What runGovern threads from discoverFeatureRoots(repoRoot):
@@ -135,7 +135,7 @@ describe('US5 — self-reference-free implement payload', () => {
       );
 
       const r = assembleImplementPayload({
-        repoRoot: repo,
+        installationRoot: repo,
         base: 'HEAD',
         featureRoot: join(repo, FEATURE_REL),
       });
@@ -172,7 +172,7 @@ describe('US5 — self-reference-free implement payload', () => {
 
       const warns: string[] = [];
       const r = assembleImplementPayload({
-        repoRoot: repo,
+        installationRoot: repo,
         base: 'HEAD~1',
         featureRoot: join(repo, FEATURE_REL),
         excludePaths: [join(repo, '.stack-control', 'backlog')],
@@ -209,7 +209,7 @@ describe('US5 — self-reference-free implement payload', () => {
       commit(repo, 'implement + sibling lift sharing the range');
 
       const r = assembleImplementPayload({
-        repoRoot: repo,
+        installationRoot: repo,
         base: 'HEAD~1',
         featureRoot: join(repo, FEATURE_REL),
         excludeRoots: [join(repo, FEATURE_REL), sibling],

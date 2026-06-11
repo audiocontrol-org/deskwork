@@ -64,7 +64,11 @@ export const CODE_ARTIFACT_FRAMING =
   'The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn\'t).';
 
 export interface ImplementPayloadArgs {
-  readonly repoRoot: string;
+  /**
+   * The verb-entry-resolved installation root (specs/installation-isolation
+   * R1/R3) — the diff engine's anchor. Never a free repo-root parameter.
+   */
+  readonly installationRoot: string;
   readonly base: string;
   /** Soft byte budget for the untracked fold (override for tests). */
   readonly budgetBytes?: number;
@@ -172,7 +176,7 @@ function fileSize(path: string): number {
 export function assembleImplementPayload(
   args: ImplementPayloadArgs,
 ): ImplementPayload {
-  const { repoRoot, base } = args;
+  const { installationRoot, base } = args;
   const budget = args.budgetBytes ?? DEFAULT_UNTRACKED_FOLD_BUDGET;
   const warn = args.warn ?? ((m: string) => process.stderr.write(`${m}\n`));
 
@@ -180,14 +184,14 @@ export function assembleImplementPayload(
   // pathspecs) when the caller resolved one.
   const featureRel =
     args.featureRoot !== undefined
-      ? relative(repoRoot, args.featureRoot).split(sep).join('/')
+      ? relative(installationRoot, args.featureRoot).split(sep).join('/')
       : undefined;
 
   // Repo-relative rel-ifications shared by both arms. A path that
   // rel-ifies to empty or escapes the repo (`..`) is inert — there is
   // nothing repo-relative to exclude.
   const relify = (abs: string): string =>
-    relative(repoRoot, abs).split(sep).join('/');
+    relative(installationRoot, abs).split(sep).join('/');
   const inRepo = (rel: string): boolean =>
     rel.length > 0 && rel !== '..' && !rel.startsWith('../');
   const otherFeatureRels =
@@ -226,7 +230,7 @@ export function assembleImplementPayload(
           ...excludePathRels.map((rel) => `:(exclude)${rel}`),
         ]
       : ['diff', base];
-  let diff = git(repoRoot, diffArgs);
+  let diff = git(installationRoot, diffArgs);
   const committedDiffEmpty = diff.trim().length === 0;
 
   // AUDIT-20260605-01: fold untracked-but-not-ignored files so newly-added work
@@ -250,7 +254,7 @@ export function assembleImplementPayload(
   const underExcludePath = (rel: string): boolean =>
     excludePathRels.some((p) => rel === p || rel.startsWith(`${p}/`));
 
-  const untracked = git(repoRoot, ['ls-files', '--others', '--exclude-standard'])
+  const untracked = git(installationRoot, ['ls-files', '--others', '--exclude-standard'])
     .split('\n')
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
@@ -261,7 +265,7 @@ export function assembleImplementPayload(
     .filter((rel) => !underExcludePath(rel));
 
   for (const rel of untracked) {
-    const abs = join(repoRoot, rel);
+    const abs = join(installationRoot, rel);
     if (otherFeatureRels.some((root) => rel.startsWith(`${root}/`))) {
       // AUDIT-20260611-01: another feature's untracked scaffold — out of
       // the audited payload, but VISIBLY (warn + ledger; the binary and
@@ -297,7 +301,7 @@ export function assembleImplementPayload(
     // mutating the index (mirrors the bash `git diff --no-index -- /dev/null`).
     const r = spawnSync(
       'git',
-      ['-C', repoRoot, 'diff', '--no-index', '--no-color', '--', '/dev/null', abs],
+      ['-C', installationRoot, 'diff', '--no-index', '--no-color', '--', '/dev/null', abs],
       { encoding: 'utf8' },
     );
     // `git diff --no-index` exits 1 when there IS a difference (always, for an
@@ -309,7 +313,7 @@ export function assembleImplementPayload(
     }
   }
 
-  const commitSubjects = git(repoRoot, ['log', `${base}..HEAD`, '--oneline']);
+  const commitSubjects = git(installationRoot, ['log', `${base}..HEAD`, '--oneline']);
 
   return {
     diff: committedDiffEmpty && foldedBytes === 0 ? '' : diff,

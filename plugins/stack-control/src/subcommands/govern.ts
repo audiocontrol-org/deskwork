@@ -240,7 +240,7 @@ export function buildImplementVars(
   // feature-root pathspec misses). The labeled audit_log_excerpt block
   // below stays the ONLY audit-log content in the payload (013/TASK-25).
   const payload = assembleImplementPayload({
-    repoRoot,
+    installationRoot: repoRoot,
     base,
     ...(featureRoot !== undefined ? { featureRoot } : {}),
     ...(excludeRoots !== undefined ? { excludeRoots } : {}),
