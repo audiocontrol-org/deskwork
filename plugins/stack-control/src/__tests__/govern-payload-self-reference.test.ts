@@ -146,6 +146,85 @@ describe('US5 — self-reference-free implement payload', () => {
     }
   });
 
+  it('committed arm + fold exclude the governance backlog store via excludePaths (AUDIT-20260611-08)', () => {
+    const repo = initRepo();
+    try {
+      // Per-round backlog bookkeeping commits land INSIDE the diff range —
+      // the same lift-commit-in-range mechanism US5 closed for the
+      // audit-log, but through the backlog task store at the repo root
+      // (NOT under the feature root, so the featureRel pathspec misses it).
+      writeFileSync(join(repo, 'src.ts'), 'export const a = 4;\n');
+      const tasksDir = join(repo, '.stack-control', 'backlog', 'tasks');
+      mkdirSync(tasksDir, { recursive: true });
+      writeFileSync(
+        join(tasksDir, 'task-1 - x.md'),
+        '## Notes\n\nAUDIT-FAKE-77 prose quoting a prior finding\n',
+      );
+      commit(repo, 'implement + backlog bookkeeping in range');
+
+      // And an UNTRACKED backlog task: the fold applies the same exclusion,
+      // silently (governance plumbing — mirrors the audit-log's
+      // silent-by-design exclusion; no warn, no ledger row).
+      writeFileSync(
+        join(tasksDir, 'task-2 - y.md'),
+        'AUDIT-FAKE-78 untracked bookkeeping prose\n',
+      );
+
+      const warns: string[] = [];
+      const r = assembleImplementPayload({
+        repoRoot: repo,
+        base: 'HEAD~1',
+        featureRoot: join(repo, FEATURE_REL),
+        excludePaths: [join(repo, '.stack-control', 'backlog')],
+        warn: (m) => warns.push(m),
+      });
+      // The feature's own src change still appears (regression guard) …
+      expect(r.diff).toContain('export const a = 4;');
+      // … the committed backlog bookkeeping does NOT …
+      expect(r.diff).not.toContain('AUDIT-FAKE-77');
+      // … nor the untracked one — and its drop is silent-by-design.
+      expect(r.diff).not.toContain('AUDIT-FAKE-78');
+      expect(warns.some((m) => m.includes('task-2'))).toBe(false);
+      expect(r.skippedOtherFeature).toEqual([]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('committed arm excludes a SIBLING feature root audit-log.md but keeps its other committed files (AUDIT-20260611-08)', () => {
+    const repo = initRepo();
+    try {
+      // Two features' lift commits sharing a diff range: the sibling's
+      // audit-log.md must not re-feed prior findings — but its OTHER
+      // committed files are legitimate diff content (only the fold
+      // excludes other-feature roots wholesale).
+      const sibling = join(repo, 'specs', '002-other');
+      mkdirSync(sibling, { recursive: true });
+      writeFileSync(join(repo, 'src.ts'), 'export const a = 5;\n');
+      writeFileSync(
+        join(sibling, 'audit-log.md'),
+        '# Audit Log\n\nAUDIT-FAKE-66 sibling lift prose\n',
+      );
+      writeFileSync(join(sibling, 'notes.md'), 'SIBLING-LEGIT-COMMITTED-CONTENT\n');
+      commit(repo, 'implement + sibling lift sharing the range');
+
+      const r = assembleImplementPayload({
+        repoRoot: repo,
+        base: 'HEAD~1',
+        featureRoot: join(repo, FEATURE_REL),
+        excludeRoots: [join(repo, FEATURE_REL), sibling],
+      });
+      // The feature's own src change still appears (regression guard) …
+      expect(r.diff).toContain('export const a = 5;');
+      // … the sibling's audit-log does NOT …
+      expect(r.diff).not.toContain('AUDIT-FAKE-66');
+      // … while the sibling's non-audit-log committed change DOES.
+      expect(r.diff).toContain('SIBLING-LEGIT-COMMITTED-CONTENT');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it('the labeled audit_log_excerpt context block still threads while the diff stays clean (013/TASK-25 regression guard)', () => {
     const repo = initRepo();
     try {

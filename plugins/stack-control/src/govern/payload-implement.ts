@@ -7,8 +7,10 @@
  * `spec-kit/deskwork-governance/scripts/bash/govern.sh` (the bash
  * orchestration this consolidation replaces). The audit unit is the diff of
  * the just-implemented work + the repo's untracked-but-not-ignored files
- * (minus the feature's own audit-log and other features' roots when a
- * feature root is resolved — see ImplementPayloadArgs.featureRoot).
+ * (minus the feature's own audit-log, other features' audit-logs/roots,
+ * and caller-threaded governance-bookkeeping paths when a feature root is
+ * resolved — see ImplementPayloadArgs.featureRoot / excludeRoots /
+ * excludePaths; AUDIT-20260611-08).
  *
  * Every ported edge-case fix carries its AUDIT-id (do NOT drop these — each
  * was earned by a cross-model audit-barrage finding against the bash):
@@ -95,8 +97,27 @@ export interface ImplementPayloadArgs {
    * warned and recorded in `skippedOtherFeature` (never silent). The
    * audited feature's own root may appear in this list; it is skipped.
    * Only consulted when `featureRoot` is supplied (AUDIT-20260611-01).
+   * AUDIT-20260611-08: also consulted by the COMMITTED-diff arm — each
+   * other feature root's `audit-log.md` (and ONLY its audit-log.md; a
+   * sibling's other committed files are legitimate diff content) is
+   * pathspec-excluded, closing the sibling-lift-in-shared-range channel.
    */
   readonly excludeRoots?: readonly string[];
+  /**
+   * Absolute paths of governance-bookkeeping directories (or files) to
+   * exclude from BOTH the committed-diff arm and the untracked fold
+   * (AUDIT-20260611-08: the backlog task store lives at the plugin root,
+   * not under the feature root, so the featureRel pathspec misses it —
+   * its per-round bookkeeping commits re-fed prior findings to the model
+   * fleet). The CALLER owns these paths (runGovern threads the backlog
+   * store derived from the backlog root seam; this assembler hardcodes
+   * nothing). Rel-ified the same way `featureRoot` is; paths outside the
+   * repo are inert (nothing repo-relative to exclude). Fold drops are
+   * silent-by-design like the feature's own audit-log — governance
+   * plumbing, not auditable work — unlike the warned+ledgered
+   * other-feature drops. Only consulted when `featureRoot` is supplied.
+   */
+  readonly excludePaths?: readonly string[];
 }
 
 export interface ImplementPayload {
@@ -162,13 +183,48 @@ export function assembleImplementPayload(
       ? relative(repoRoot, args.featureRoot).split(sep).join('/')
       : undefined;
 
+  // Repo-relative rel-ifications shared by both arms. A path that
+  // rel-ifies to empty or escapes the repo (`..`) is inert — there is
+  // nothing repo-relative to exclude.
+  const relify = (abs: string): string =>
+    relative(repoRoot, abs).split(sep).join('/');
+  const inRepo = (rel: string): boolean =>
+    rel.length > 0 && rel !== '..' && !rel.startsWith('../');
+  const otherFeatureRels =
+    featureRel !== undefined
+      ? (args.excludeRoots ?? [])
+          .map(relify)
+          .filter((root) => inRepo(root) && root !== featureRel)
+      : [];
+  const excludePathRels =
+    featureRel !== undefined
+      ? (args.excludePaths ?? []).map(relify).filter(inRepo)
+      : [];
+
   // specs/014 US5 (FR-007): exclude the feature's own audit-log from the
   // committed-diff arm — lift commits land inside the diff range, so
   // without the pathspec exclusion the payload quotes its own findings
   // back to the model fleet (the AUDIT-28/42/48 generator).
+  // AUDIT-20260611-08 widened the exclusion to the FULL governance-
+  // bookkeeping surface FR-007 promises: the backlog task store
+  // (caller-threaded `excludePaths` — per-round bookkeeping commits land
+  // in the range the same way lift commits do) and every OTHER feature
+  // root's audit-log.md (sibling lift commits sharing the diff range).
+  // Decision recorded: only the audit-log.md under each excludeRoot is
+  // excluded from the committed arm — a sibling's other committed files
+  // are legitimate diff content; the FOLD keeps excluding other-feature
+  // roots wholesale (below, unchanged).
   const diffArgs =
     featureRel !== undefined
-      ? ['diff', base, '--', '.', `:(exclude)${featureRel}/audit-log.md`]
+      ? [
+          'diff',
+          base,
+          '--',
+          '.',
+          `:(exclude)${featureRel}/audit-log.md`,
+          ...otherFeatureRels.map((root) => `:(exclude)${root}/audit-log.md`),
+          ...excludePathRels.map((rel) => `:(exclude)${rel}`),
+        ]
       : ['diff', base];
   let diff = git(repoRoot, diffArgs);
   const committedDiffEmpty = diff.trim().length === 0;
@@ -186,22 +242,23 @@ export function assembleImplementPayload(
   // ("only files under the feature root") silently dropped untracked
   // source modules (src/**), the very surfaces AUDIT-20260605-01 added
   // the fold for. With a feature root resolved we exclude only (a) the
-  // feature's own audit-log and (b) files under OTHER features' roots
+  // feature's own audit-log, (b) files under OTHER features' roots
   // (the recorded parked-scaffold pull) — each (b) drop warned +
-  // ledgered below. Everything else folds.
-  const otherFeatureRels =
-    featureRel !== undefined
-      ? (args.excludeRoots ?? [])
-          .map((root) => relative(repoRoot, root).split(sep).join('/'))
-          .filter((root) => root.length > 0 && root !== featureRel)
-      : [];
+  // ledgered below — and (c) the caller-threaded governance-bookkeeping
+  // paths (AUDIT-20260611-08), silent-by-design like (a). Everything
+  // else folds.
+  const underExcludePath = (rel: string): boolean =>
+    excludePathRels.some((p) => rel === p || rel.startsWith(`${p}/`));
 
   const untracked = git(repoRoot, ['ls-files', '--others', '--exclude-standard'])
     .split('\n')
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
     // specs/014 US5 (FR-007): the feature's own audit-log never folds.
-    .filter((rel) => featureRel === undefined || rel !== `${featureRel}/audit-log.md`);
+    .filter((rel) => featureRel === undefined || rel !== `${featureRel}/audit-log.md`)
+    // AUDIT-20260611-08: governance-bookkeeping store never folds
+    // (silent-by-design — governance plumbing, mirrors the audit-log).
+    .filter((rel) => !underExcludePath(rel));
 
   for (const rel of untracked) {
     const abs = join(repoRoot, rel);

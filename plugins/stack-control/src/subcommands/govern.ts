@@ -53,6 +53,7 @@ import {
   discoverFeatureRoots,
   resolveFeatureRoot,
 } from '../scope-discovery/util/feature-root.js';
+import { backlogRoot } from '../backlog/root.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // src/subcommands → src → plugin root → bin/stackctl
@@ -222,6 +223,7 @@ export function buildImplementVars(
   auditLogExcerpt: string,
   featureRoot?: string,
   excludeRoots?: readonly string[],
+  excludePaths?: readonly string[],
 ): { vars: BarrageVars; checkpoint: string } {
   const base = diffBaseFlag ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
   const budgetEnv = process.env.GOVERN_PAYLOAD_BUDGET;
@@ -230,14 +232,19 @@ export function buildImplementVars(
   // repo's full feature-root list (`excludeRoots`, from the async
   // discoverFeatureRoots — this builder stays sync) so the untracked
   // fold drops OTHER features' scaffolds while still folding the
-  // feature's own files and new source modules (AUDIT-20260611-01).
-  // The labeled audit_log_excerpt block below stays the ONLY audit-log
-  // content in the payload (013/TASK-25).
+  // feature's own files and new source modules (AUDIT-20260611-01),
+  // plus the governance-bookkeeping store paths (`excludePaths`, from
+  // the backlog root seam — AUDIT-20260611-08: per-round backlog
+  // bookkeeping commits land in the diff range the same way lift
+  // commits do, re-feeding prior findings through a channel the
+  // feature-root pathspec misses). The labeled audit_log_excerpt block
+  // below stays the ONLY audit-log content in the payload (013/TASK-25).
   const payload = assembleImplementPayload({
     repoRoot,
     base,
     ...(featureRoot !== undefined ? { featureRoot } : {}),
     ...(excludeRoots !== undefined ? { excludeRoots } : {}),
+    ...(excludePaths !== undefined ? { excludePaths } : {}),
     ...(budgetEnv !== undefined && budgetEnv.length > 0
       ? { budgetBytes: Number.parseInt(budgetEnv, 10) }
       : {}),
@@ -259,6 +266,31 @@ export function buildImplementVars(
   const checkpoint =
     checkpointFlag ?? pick(undefined, process.env.GOVERN_CHECKPOINT) ?? 'after_clarify';
   return { vars, checkpoint };
+}
+
+/**
+ * AUDIT-20260611-08: the governance backlog task store rides into the
+ * implement payload's diff range via per-round bookkeeping commits — the
+ * same lift-commit-in-range mechanism US5 closed for the audit-log, but
+ * through a store that lives at the plugin root, outside the feature
+ * root's pathspec. Implement mode threads the store into the assembler's
+ * `excludePaths`; the path is owned HERE, not hardcoded in the assembler:
+ * `backlogRoot()` (src/backlog/root.ts) respects the STACKCTL_BACKLOG_DIR
+ * seam and otherwise resolves through the enclosing installation, and the
+ * `backlog` binary hardcodes the `backlog/` subdir under that root.
+ * Outside any installation (no seam) there IS no backlog store, so there
+ * is nothing to exclude — that skip is announced on stderr, never silent.
+ */
+function resolveGovernExcludePaths(): readonly string[] {
+  try {
+    return [join(backlogRoot(), 'backlog')];
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(
+      `govern: no backlog store resolved (${msg}) — backlog-store payload exclusion skipped (nothing to exclude).\n`,
+    );
+    return [];
+  }
 }
 
 export function buildSpecVars(
@@ -366,10 +398,16 @@ export async function runGovern(args: string[]): Promise<void> {
       flags.mode === 'implement' && featureRoot !== undefined
         ? await discoverFeatureRoots(repoRoot)
         : undefined;
+    // AUDIT-20260611-08: thread the governance backlog store so its
+    // bookkeeping commits/files are excluded from both payload arms.
+    const excludePaths =
+      flags.mode === 'implement' && featureRoot !== undefined
+        ? resolveGovernExcludePaths()
+        : undefined;
     const built =
       flags.mode === 'spec'
         ? buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint, auditLogExcerpt)
-        : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint, auditLogExcerpt, featureRoot, excludeRoots);
+        : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint, auditLogExcerpt, featureRoot, excludeRoots, excludePaths);
 
     // US7 (FR-032): implement-mode governance runs the per-codebase clone step,
     // surfacing NEW intra-codebase duplication alongside the gate verdict
