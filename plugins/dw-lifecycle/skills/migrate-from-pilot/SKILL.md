@@ -1,7 +1,6 @@
 ---
-name: migrate-from-pilot
-description: "Migrate a scope-discovery pilot project's tools/ + docs/ layout into a dw-lifecycle adopter's .dw-lifecycle/scope-discovery/ config dir; emit a per-file contribute-back-vs-customize-override report"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:migrate-from-pilot
 

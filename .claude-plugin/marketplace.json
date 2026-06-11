@@ -39,7 +39,7 @@
         "path": "plugins/dw-lifecycle",
         "ref": "v0.40.0"
       },
-      "description": "Project lifecycle orchestration; composes superpowers + feature-dev.",
+      "description": "[RETIRED — superseded by stack-control] Project lifecycle orchestration; composes superpowers + feature-dev. Preserved for historical reference only.",
       "version": "0.40.0"
     },
     {

@@ -1,7 +1,6 @@
 ---
-name: extend
-description: "Add phases to PRD/workplan; create new GitHub issues for added phases"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:extend
 

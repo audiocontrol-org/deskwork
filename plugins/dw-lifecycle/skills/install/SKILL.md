@@ -1,7 +1,6 @@
 ---
-name: install
-description: "Bootstrap dw-lifecycle in a host project: probe structure, write .dw-lifecycle/config.json"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:install
 

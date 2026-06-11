@@ -1,7 +1,6 @@
 ---
-name: scope-export
-description: "Emit a feature's scope-manifest.yaml to stdout as YAML or JSON"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:scope-export
 

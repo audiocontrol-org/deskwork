@@ -1,7 +1,6 @@
 ---
-name: promote-findings
-description: "Walk audit-log.md for Status: open entries; default disposition is scope-into-workplan with TDD-first task shape; agent cannot pick deferral; substantive-reason validator gates the acknowledged path."
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:promote-findings
 

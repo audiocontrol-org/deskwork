@@ -1,7 +1,6 @@
 ---
-name: promote-deferrals
-description: "Workplan-TBD scanner with promote-to-issue and inline-wontfix dispositions — mechanically enforces the project's 'Just for now is bullshit' rule. Finds TBD / defer / follow-up: / out of scope markers in a target workplan; the agent proposes a disposition per row; approved rows create issues + back-link the workplan, or rewrite the line with a substantive wontfix reason."
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:promote-deferrals
 
