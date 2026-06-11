@@ -1,5 +1,5 @@
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan:
-specs/014-audit-protocol-reliability/plan.md
-<!-- SPECKIT END -->
+The Spec Kit root and the program's spec artifacts live INSIDE the
+stack-control installation (per the installation-isolation feature, US6):
+see plugins/stack-control/CLAUDE.md for the active plan pointer, and
+plugins/stack-control/specs/ for the feature artifacts. Run Spec Kit
+steps with the installation as the working directory.
