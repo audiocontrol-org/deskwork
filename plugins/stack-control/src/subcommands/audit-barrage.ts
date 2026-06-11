@@ -37,6 +37,7 @@ import { orchestrateBarrage } from '../scope-discovery/audit-barrage/orchestrate
 import { renderFleetReportLines } from '../scope-discovery/audit-barrage/run-artifacts.js';
 import {
   computeFleetReport,
+  isLaneEnforced,
   isModelRunCovering,
   type BarrageInput,
   type BarrageResult,
@@ -268,9 +269,16 @@ export function resolveModels(
  * Exported for tests.
  */
 export function renderUnenforcedWarning(model: ModelConfig): string {
+  // AUDIT-20260611-19: a whitespace-only fragment (constructible only
+  // outside the config loader) also lands here via isLaneEnforced — name
+  // the actual shape rather than hardcoding the 'none' sentinel.
+  const reason =
+    model.readonlyEnforcement === 'none'
+      ? 'readonly_enforcement: none'
+      : 'readonly_enforcement is a whitespace-only fragment — injects zero argv tokens';
   return (
     `audit-barrage: ⚠ lane '${model.name}' runs write-UNENFORCED ` +
-    `(readonly_enforcement: none) — its spawn is not mechanically prevented ` +
+    `(${reason}) — its spawn is not mechanically prevented ` +
     `from mutating the repository; results carry mutation risk (FR-004)`
   );
 }
@@ -367,9 +375,12 @@ export async function auditBarrage(args: string[]): Promise<void> {
 
   // specs/014 FR-004: unenforced lanes are loud at fire time — printed
   // regardless of --quiet (quiet suppresses the summary, never a safety
-  // marking).
+  // marking). Warn-when-NOT-enforced via the shared `isLaneEnforced`
+  // predicate (AUDIT-20260611-19) so this loop and spawn-cli's enforcement
+  // derivation cannot diverge — a whitespace-only fragment lane is recorded
+  // `unenforced` downstream and must warn here too.
   for (const model of resolution.models) {
-    if (model.readonlyEnforcement === 'none') {
+    if (!isLaneEnforced(model)) {
       process.stderr.write(`${renderUnenforcedWarning(model)}\n`);
     }
   }

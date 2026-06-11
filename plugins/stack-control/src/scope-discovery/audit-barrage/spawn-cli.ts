@@ -68,13 +68,14 @@ import type { Readable, Writable } from 'node:stream';
 import { errorMessage } from '../util/typeguards.js';
 import { createStreamResultExtractor } from './stream-result-extractor.js';
 import { startWatchdog, type Watchdog } from './watchdog.js';
-import type {
-  EnforcementState,
-  LivenessState,
-  ModelConfig,
-  ModelRunResult,
-  TerminalState,
-  TimeoutBasis,
+import {
+  isLaneEnforced,
+  type EnforcementState,
+  type LivenessState,
+  type ModelConfig,
+  type ModelRunResult,
+  type TerminalState,
+  type TimeoutBasis,
 } from './types.js';
 
 const SIGKILL_GRACE_MS = 5000;
@@ -171,12 +172,12 @@ export async function spawnCliAgainstModel(
   // ModelConfig constructed outside the loader could still carry one —
   // buildArgs trims/splits it to zero tokens and injects nothing, so
   // marking that lane `enforced` would lie on every downstream surface
-  // (FR-004). `enforced` requires >= 1 real fragment token.
-  const enforcement: EnforcementState =
-    model.readonlyEnforcement !== 'none' &&
-    model.readonlyEnforcement.trim().length > 0
-      ? 'enforced'
-      : 'unenforced';
+  // (FR-004). `enforced` requires >= 1 real fragment token. The condition
+  // is the shared `isLaneEnforced` predicate (AUDIT-20260611-19) so this
+  // derivation and the fire-time warning loop cannot diverge.
+  const enforcement: EnforcementState = isLaneEnforced(model)
+    ? 'enforced'
+    : 'unenforced';
   const monitored = model.livenessSignal !== 'none';
   if (monitored && model.livenessWindowSeconds === undefined) {
     // The config loader refuses this shape; a lane constructed outside the

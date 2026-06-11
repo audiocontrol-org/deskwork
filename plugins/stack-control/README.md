@@ -154,8 +154,11 @@ Every lane MUST declare, in addition to the original `name` / `binary` /
   synthesis. There is no default — the choice is conscious.
 - `output_mode` (`text` | `stream-json`) and `liveness_signal`
   (`stdout` | `stderr` | `none`) + `liveness_window_seconds` — the watchdog's
-  sign-of-life pulse. A spawn with no pulse inside the window is killed early
-  (terminal state `killed-no-liveness`) instead of consuming the full budget.
+  sign-of-life pulse. The window is required when `liveness_signal` is
+  `stdout`/`stderr` and refused on a `none` lane (an unmonitored lane has no
+  window to honor). A monitored spawn with no pulse inside the window is
+  killed early (terminal state `killed-no-liveness`) instead of consuming the
+  full budget.
 - `timeout_floor_seconds` + `timeout_secs_per_kb` — the per-lane timeout
   derivation (effective budget = `max(floor, ceil(secs_per_kb × payload_KB))`),
   unless an explicit `timeout_seconds` override is present (recorded as an
@@ -166,7 +169,7 @@ refused with a migration message naming the file, the missing fields, and the
 template path — no silent compatibility fallback, zero spawns launched.
 Migrate by copying a lane from the shipped template and adjusting. Every run's
 INDEX.md records each lane's terminal state (`completed` / `timed-out` /
-`spawn-failed` / `killed-no-liveness`), enforcement state, liveness state, and
+`spawn-failed` / `killed-no-liveness` / `killed-external`), enforcement state, liveness state, and
 timeout basis; a run where fewer lanes produced than configured renders a
 fleet report that the lift verb and the govern loop repeat.
 

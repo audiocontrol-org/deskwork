@@ -18,6 +18,7 @@ import {
 import { renderUnenforcedWarning } from '../../../subcommands/audit-barrage.js';
 import {
   computeFleetReport,
+  isLaneEnforced,
   type BarrageRun,
   type ModelConfig,
   type ModelRunResult,
@@ -272,5 +273,35 @@ describe('fire-time unenforced warning (T008 / FR-004)', () => {
     expect(warning).toContain('gemini');
     expect(warning).toMatch(/UNENFORCED/);
     expect(warning).toContain('readonly_enforcement: none');
+  });
+});
+
+describe('isLaneEnforced — shared enforcement predicate (AUDIT-20260611-19)', () => {
+  // The fire-time warning loop and spawn-cli's enforcement derivation MUST
+  // agree. A whitespace-only fragment (constructible only outside the config
+  // loader) injects zero argv tokens, so it is unenforced — and must warn.
+  function lane(readonlyEnforcement: string): ModelConfig {
+    return {
+      name: 'gemini',
+      binary: 'gemini',
+      argsTemplate: '--model {{model}} {{prompt-stdin}}',
+      model: 'gemini-2.5-pro',
+      readonlyEnforcement,
+      outputMode: 'text',
+      livenessSignal: 'none',
+      timeoutSeconds: 300,
+    };
+  }
+
+  it("treats the explicit sentinel 'none' as unenforced", () => {
+    expect(isLaneEnforced(lane('none'))).toBe(false);
+  });
+
+  it('treats a whitespace-only fragment as unenforced (injects zero argv tokens)', () => {
+    expect(isLaneEnforced(lane('   '))).toBe(false);
+  });
+
+  it('treats a real fragment as enforced', () => {
+    expect(isLaneEnforced(lane('--permission-mode plan'))).toBe(true);
   });
 });

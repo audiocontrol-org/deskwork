@@ -141,6 +141,28 @@ export interface BarrageInput {
 }
 
 /**
+ * ENFORCEMENT predicate — "is this lane mechanically read-only?"
+ *
+ * A lane is enforced iff its `readonlyEnforcement` fragment is not the
+ * sentinel `'none'` AND carries at least one real argv token after
+ * trimming. A whitespace-only fragment (constructible only outside the
+ * config loader, which refuses it at load) injects NOTHING into argv,
+ * so marking it `enforced` would lie on every downstream surface
+ * (FR-003/FR-004).
+ *
+ * Per AUDIT-20260611-19: centralized here so spawn-cli's enforcement
+ * derivation and the fire-time unenforced-warning loop cannot diverge
+ * (one predicate, every call site) — the same structural pattern as
+ * `isModelRunHealthy` below.
+ */
+export function isLaneEnforced(model: ModelConfig): boolean {
+  return (
+    model.readonlyEnforcement !== 'none' &&
+    model.readonlyEnforcement.trim().length > 0
+  );
+}
+
+/**
  * LIFTABILITY predicate — "did this model produce output worth lifting?"
  *
  * Contract (specs/014 FR-006/FR-007 refinement of AUDIT-20260607-42):
