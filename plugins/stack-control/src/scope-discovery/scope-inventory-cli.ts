@@ -16,8 +16,16 @@ export const DEFAULT_MODULE_ROOT = 'src';
 
 export interface CliOptions {
   readonly featureSlug: string;
-  readonly prdPath: string;
-  readonly outPath: string;
+  /**
+   * Explicit `--prd-path` (resolved absolute), or `undefined` when the
+   * flag was omitted — the orchestrator then resolves the default
+   * `<feature-root>/prd.md` through the layout-aware feature-root
+   * resolver (specs/014 US7; the parser no longer constructs the
+   * legacy docs path).
+   */
+  readonly prdPath: string | undefined;
+  /** Explicit `--out` (resolved absolute), or `undefined` (same rule). */
+  readonly outPath: string | undefined;
   readonly repoRoot: string;
   readonly moduleRoot: string;
   readonly evidenceTrail: boolean;
@@ -118,12 +126,22 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
     );
   }
   const root = resolve(scalars.get('--repo-root') ?? process.cwd());
-  const prdPathRaw =
-    scalars.get('--prd-path') ?? `docs/1.0/001-IN-PROGRESS/${slug}/prd.md`;
-  const prdPath = isAbsolute(prdPathRaw) ? prdPathRaw : resolve(root, prdPathRaw);
-  const outPathRaw =
-    scalars.get('--out') ?? `docs/1.0/001-IN-PROGRESS/${slug}/scope-manifest.yaml`;
-  const outPath = isAbsolute(outPathRaw) ? outPathRaw : resolve(root, outPathRaw);
+  // specs/014 US7: when the flag is omitted, the default resolves in
+  // the orchestrator via the layout-aware feature-root resolver.
+  const prdPathRaw = scalars.get('--prd-path');
+  const prdPath =
+    prdPathRaw === undefined
+      ? undefined
+      : isAbsolute(prdPathRaw)
+        ? prdPathRaw
+        : resolve(root, prdPathRaw);
+  const outPathRaw = scalars.get('--out');
+  const outPath =
+    outPathRaw === undefined
+      ? undefined
+      : isAbsolute(outPathRaw)
+        ? outPathRaw
+        : resolve(root, outPathRaw);
   const evidenceFlag = scalars.get('--evidence-trail') ?? 'on';
   if (evidenceFlag !== 'on' && evidenceFlag !== 'off') {
     throw new Error(`--evidence-trail must be 'on' or 'off' (got '${evidenceFlag}')`);
