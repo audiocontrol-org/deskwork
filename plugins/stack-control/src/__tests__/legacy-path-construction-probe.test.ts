@@ -20,7 +20,11 @@
 //   V4 — a template literal that interpolates around the bucket
 //        (`docs/…/001-IN-PROGRESS/${slug}/…`) UNLESS the line names
 //        both layouts ('legacy-docs' / 'speckit' / a `/*/` glob) —
-//        the compliant loud-error shape.
+//        the compliant loud-error shape;
+//   V5 — plain string concatenation (AUDIT-20260611-07): a quoted
+//        literal containing the bucket adjacent to a `+` on either
+//        side (`root + '/docs/1.0/001-IN-PROGRESS/' + slug`), with
+//        the same both-layouts exemption as V4.
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -84,8 +88,51 @@ function isConstruction(line: string): boolean {
   ) {
     return !namesBothLayouts(line);
   }
+  // V5 (AUDIT-20260611-07) — plain string concatenation: a quoted
+  // literal CONTAINING the bucket, adjacent to a `+` on either side
+  // (`root + '/docs/1.0/001-IN-PROGRESS/' + slug`), unless it is the
+  // loud both-layouts error shape (whose fail-loud messages also
+  // +-concatenate across lines).
+  if (
+    new RegExp(`\\+\\s*['"\`][^'"\`]*${LITERAL}`).test(line) ||
+    new RegExp(`${LITERAL}[^'"\`]*['"\`]\\s*\\+`).test(line)
+  ) {
+    return !namesBothLayouts(line);
+  }
   return false;
 }
+
+describe('US7 — isConstruction line classifier (AUDIT-20260611-07 V5 grammar)', () => {
+  it('flags plain string-concatenation path constructions (V5)', () => {
+    expect(
+      isConstruction(`const p = root + '/docs/1.0/001-IN-PROGRESS/' + slug;`),
+    ).toBe(true);
+    expect(
+      isConstruction(`mkdirSync(root + '/docs/1.0/001-IN-PROGRESS/' + slug);`),
+    ).toBe(true);
+  });
+
+  it('does not flag the compliant loud-error / comment / help-text shapes', () => {
+    // Both-layouts fail-loud message with +-concatenation
+    // (scope-export.ts shape).
+    expect(
+      isConstruction(
+        "        `(speckit) or ${join(baseRoot, 'docs')}/*/001-IN-PROGRESS/${slug} (legacy-docs); ` +",
+      ),
+    ).toBe(false);
+    // Comment line.
+    expect(
+      isConstruction(' * the docs/<version>/001-IN-PROGRESS/<slug>/ layout'),
+    ).toBe(false);
+    // Help-text line inside a string array — no + adjacency
+    // (audit-barrage-lift.ts usage-line shape).
+    expect(
+      isConstruction(
+        "  '                   docs/<v>/001-IN-PROGRESS/<slug>/audit-log.md.',",
+      ),
+    ).toBe(false);
+  });
+});
 
 describe('US7 — R7 legacy-path-construction probe (SC-007 as amended)', () => {
   it('no src file outside the shared resolver constructs the legacy 001-IN-PROGRESS path', () => {
