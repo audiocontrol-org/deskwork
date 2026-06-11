@@ -194,7 +194,11 @@ export async function runSlushFindings(args: string[]): Promise<void> {
       statusLineIndex: f.statusLineIndex,
       title: f.title,
     }));
-    const backend = createBacklogBackend({ cwd: backlogRoot() });
+    // specs/installation-isolation US4 (TASK-40 class): the backlog
+    // DESTINATION threads the same resolved installation the audit-log
+    // target used — one anchor for both halves of the operation; the cwd
+    // never re-decides where the migrated items land.
+    const backend = createBacklogBackend({ cwd: backlogRoot(repoRoot) });
     let mig: ReturnType<typeof migrateFindings>;
     try {
       mig = migrateFindings({

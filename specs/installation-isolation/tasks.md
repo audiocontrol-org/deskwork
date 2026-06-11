@@ -29,8 +29,8 @@
 
 ## Phase 5: US4 — cwd never decides placement (P2)
 
-- [ ] T010 [P] [US4] RED: three-cwd invariance in the probe (installation root / subdirectory / outer repo with --at → byte-identical placement, SC-003); backlog/root.ts explicit start-point parameter honored when threaded by govern
-- [ ] T011 [US4] Implement the start-point parameterization (backlog/root.ts + any cwd-walk-up helper) and thread resolved anchors from callers — T010 green
+- [X] T010 [P] [US4] RED: three-cwd invariance in the probe (installation root / subdirectory / outer repo with --at → byte-identical placement, SC-003); backlog/root.ts explicit start-point parameter honored when threaded by govern
+- [X] T011 [US4] Implement the start-point parameterization (backlog/root.ts + any cwd-walk-up helper) and thread resolved anchors from callers — T010 green
 
 ## Phase 6: US5 — Legacy half-installation detected (P2)
 
