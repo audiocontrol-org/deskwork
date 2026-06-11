@@ -33,8 +33,11 @@ import { join } from 'node:path';
 import {
   computeFleetReport,
   type BarrageRun,
+  type EnforcementState,
   type FleetReport,
+  type LivenessState,
   type ModelRunResult,
+  type TerminalState,
 } from './types.js';
 
 /**
@@ -178,6 +181,100 @@ export function renderFleetReportLines(fleet: FleetReport): string[] {
     lines.push('- quorum: cross-model agreement impossible (produced ≤ 1)');
   }
   return lines;
+}
+
+/**
+ * One lane's state as read back from a v2 INDEX.md — the reader-side
+ * vocabulary lift and the govern loop consume (FR-007). Field values
+ * mirror the writer's per-model rows.
+ */
+export interface ParsedIndexLane {
+  readonly name: string;
+  readonly exitCode: number;
+  readonly terminalState: TerminalState;
+  readonly enforcement: EnforcementState;
+  readonly liveness: LivenessState;
+}
+
+function parseTerminalState(raw: string): TerminalState | undefined {
+  switch (raw) {
+    case 'completed':
+    case 'timed-out':
+    case 'spawn-failed':
+    case 'killed-no-liveness':
+      return raw;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Parse the per-model terminal-state rows back out of an INDEX.md body.
+ * Returns `null` for a pre-014 INDEX (no `- terminal state:` rows) — the
+ * compatibility contract: readers require the new fields only for runs
+ * produced by the v2 writer (no synthetic backfill, Constitution V).
+ */
+export function parseIndexLaneStates(indexText: string): ParsedIndexLane[] | null {
+  const lines = indexText.split(/\r?\n/);
+  const lanes: ParsedIndexLane[] = [];
+  let current: {
+    name: string;
+    exitCode?: number;
+    terminalState?: TerminalState;
+    enforcement?: EnforcementState;
+    liveness?: LivenessState;
+  } | null = null;
+
+  const flush = (): void => {
+    if (
+      current !== null &&
+      current.exitCode !== undefined &&
+      current.terminalState !== undefined &&
+      current.enforcement !== undefined &&
+      current.liveness !== undefined
+    ) {
+      lanes.push({
+        name: current.name,
+        exitCode: current.exitCode,
+        terminalState: current.terminalState,
+        enforcement: current.enforcement,
+        liveness: current.liveness,
+      });
+    }
+    current = null;
+  };
+
+  for (const line of lines) {
+    const heading = /^###\s+(.+?)\s*$/.exec(line);
+    if (heading !== null) {
+      flush();
+      current = { name: heading[1]! };
+      continue;
+    }
+    if (current === null) continue;
+    const exit = /^- exit code:\s*(-?\d+)\s*$/.exec(line);
+    if (exit !== null) {
+      current.exitCode = Number.parseInt(exit[1]!, 10);
+      continue;
+    }
+    const state = /^- terminal state:\s*(\S+)\s*$/.exec(line);
+    if (state !== null) {
+      const parsed = parseTerminalState(state[1]!);
+      if (parsed !== undefined) current.terminalState = parsed;
+      continue;
+    }
+    const enforcement = /^- enforcement:\s*(enforced|unenforced)\s*$/.exec(line);
+    if (enforcement !== null) {
+      current.enforcement = enforcement[1] === 'enforced' ? 'enforced' : 'unenforced';
+      continue;
+    }
+    const liveness = /^- liveness:\s*(monitored|unmonitored)/.exec(line);
+    if (liveness !== null) {
+      current.liveness = liveness[1] === 'monitored' ? 'monitored' : 'unmonitored';
+    }
+  }
+  flush();
+  return lanes.length > 0 ? lanes : null;
 }
 
 function renderTimeoutBasis(result: ModelRunResult): string {

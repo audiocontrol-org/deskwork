@@ -83,6 +83,14 @@ export interface ExtractedFinding {
 export interface ExtractBarrageFindingsArgs {
   readonly runDir: string;
   readonly warn?: (message: string) => void;
+  /**
+   * specs/014 FR-007: when provided, only model files whose stem is in
+   * this set are parsed. The lift passes the COMPLETED lanes from the
+   * run's INDEX terminal states — a killed/failed lane's partial capture
+   * is forensics, never findings. Absent → every model file (pre-014
+   * run-dir compatibility).
+   */
+  readonly includeModels?: ReadonlySet<string>;
 }
 
 export function normalizeSeverity(raw: string): NormalizedSeverity {
@@ -281,6 +289,11 @@ export async function extractBarrageFindings(
       const base = basename(name).toLowerCase();
       return base !== 'index.md' && base !== 'prompt.md';
     })
+    .filter(
+      (name) =>
+        args.includeModels === undefined ||
+        args.includeModels.has(name.replace(/\.md$/i, '')),
+    )
     .sort();
 
   const allFindings: RawModelFinding[] = [];

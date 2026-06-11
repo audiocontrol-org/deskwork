@@ -21,6 +21,7 @@
  */
 
 import { createWriteStream, type WriteStream } from 'node:fs';
+import { isPlainObject } from '../util/typeguards.js';
 
 export interface StreamResultExtraction {
   readonly resultText: string | null;
@@ -62,10 +63,10 @@ export function createStreamResultExtractor(
     } catch {
       return; // non-JSON noise: captured verbatim above, never extracted
     }
-    if (typeof parsed !== 'object' || parsed === null) return;
-    const event = parsed as { type?: unknown; result?: unknown };
-    if (event.type === 'result' && typeof event.result === 'string') {
-      resultText = event.result;
+    if (!isPlainObject(parsed)) return;
+    const resultField = parsed['result'];
+    if (parsed['type'] === 'result' && typeof resultField === 'string') {
+      resultText = resultField;
     }
   }
 

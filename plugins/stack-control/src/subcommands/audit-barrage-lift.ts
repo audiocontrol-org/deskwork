@@ -42,6 +42,12 @@ import {
   type ExtractedFinding,
 } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
+import {
+  parseIndexLaneStates,
+  renderFleetReportLines,
+  safeModelName,
+} from '../scope-discovery/audit-barrage/run-artifacts.js';
+import type { FleetReport } from '../scope-discovery/audit-barrage/types.js';
 import { resolveFeatureRoot as resolveFeatureRootShared } from '../scope-discovery/util/feature-root.js';
 
 export interface AuditBarrageLiftCliOptions {
@@ -308,6 +314,56 @@ export async function runAuditBarrageLift(
     );
     return 2;
   }
+
+  // specs/014 FR-007: consume the run's terminal states from the v2 INDEX.
+  // A lane that did not settle `completed` contributes ZERO findings and is
+  // reported with its state; per-lane enforcement prints UNCONDITIONALLY
+  // (FR-004's at-synthesis marking always fires, not only on degradation).
+  // A pre-014 run dir (no v2 rows) keeps the old lift-everything behavior.
+  const indexPath = join(opts.runDir, 'INDEX.md');
+  const lanes = existsSync(indexPath)
+    ? parseIndexLaneStates(await (args.read ?? ((p: string) => readFile(p, 'utf8')))(indexPath))
+    : null;
+  let includeModels: ReadonlySet<string> | undefined;
+  let fleet: FleetReport | undefined;
+  if (lanes !== null) {
+    for (const lane of lanes) {
+      const status = `audit-barrage-lift: lane ${lane.name} — ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]`;
+      stderr.write(
+        lane.terminalState === 'completed'
+          ? `${status}\n`
+          : `${status} — contributes ZERO findings (non-completed lane)\n`,
+      );
+    }
+    includeModels = new Set(
+      lanes
+        .filter((lane) => lane.terminalState === 'completed')
+        .map((lane) => safeModelName(lane.name)),
+    );
+    // `produced` counts converged-eligible lanes only: completed settle,
+    // exit 0, AND the report artifact on disk (a fast non-zero exit — a
+    // CLI-rejected model pin — is degradation, not production).
+    const produced = lanes.filter(
+      (lane) =>
+        lane.terminalState === 'completed' &&
+        lane.exitCode === 0 &&
+        existsSync(join(opts.runDir, `${safeModelName(lane.name)}.md`)),
+    ).length;
+    fleet = {
+      configured: lanes.length,
+      produced,
+      perLane: lanes.map((lane) => ({
+        name: lane.name,
+        terminalState: lane.terminalState,
+        enforcement: lane.enforcement,
+        liveness: lane.liveness,
+      })),
+      quorumCollapsed: produced <= 1,
+    };
+    if (fleet.produced < fleet.configured) {
+      stderr.write(`${renderFleetReportLines(fleet).join('\n')}\n`);
+    }
+  }
   const auditLogPath = join(feature.root, 'audit-log.md');
   // Spec 013 US2: a brand-new feature's first barrage has no audit-log
   // yet. Instead of aborting (the old `return 2`), scaffold the
@@ -319,8 +375,20 @@ export async function runAuditBarrageLift(
   const findings = await extractBarrageFindings({
     runDir: opts.runDir,
     warn: (m) => stderr.write(`${m}\n`),
+    ...(includeModels !== undefined ? { includeModels } : {}),
   });
   if (findings.length === 0) {
+    // FR-007: zero findings over a degraded fleet is NEVER a clean signal —
+    // the killed lanes simply produced nothing.
+    if (fleet !== undefined && fleet.produced < fleet.configured) {
+      stderr.write(
+        `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a ` +
+          `DEGRADED fleet (produced ${fleet.produced} of ${fleet.configured} ` +
+          `configured) — absence of findings from non-completed lanes is NOT a ` +
+          `clean signal.\n`,
+      );
+      return 0;
+    }
     stderr.write(
       `audit-barrage-lift: extracted 0 findings from ${opts.runDir}; nothing to lift.\n`,
     );

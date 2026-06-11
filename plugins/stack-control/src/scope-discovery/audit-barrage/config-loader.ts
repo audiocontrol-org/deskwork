@@ -301,9 +301,11 @@ function parseEntry(
     );
   }
 
-  // Field-level value validation (present but invalid).
-  const model = modelRaw as string;
-  const readonlyEnforcement = enforcementRaw as string;
+  // Field-level value validation (present but invalid). The missing-field
+  // gate above already threw when these were absent; re-deriving through the
+  // validators keeps the types narrow without a cast.
+  const model = requireNonEmptyString(raw, 'model', prefix);
+  const readonlyEnforcement = requireNonEmptyString(raw, 'readonly_enforcement', prefix);
   const outputMode = requireEnum(raw, 'output_mode', OUTPUT_MODES, prefix);
   const livenessSignal = requireEnum(raw, 'liveness_signal', LIVENESS_SIGNALS, prefix);
   let livenessWindowSeconds: number | undefined;
@@ -377,9 +379,8 @@ function requireEnum<T extends string>(
   prefix: string,
 ): T {
   const value = raw[field];
-  if (typeof value === 'string' && (allowed as ReadonlyArray<string>).includes(value)) {
-    return value as T;
-  }
+  const matched = allowed.find((candidate) => candidate === value);
+  if (matched !== undefined) return matched;
   throw new Error(
     `${prefix}.${field} must be one of: ${allowed.join(' | ')} (got ${describeValue(value)})`,
   );

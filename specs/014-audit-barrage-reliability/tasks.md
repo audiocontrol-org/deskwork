@@ -61,8 +61,8 @@ The terminal-state vocabulary (data-model.md) and config v2 grammar (contracts/b
 
 - [X] T016 [US3] RED: INDEX rendering suite (extend plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/run-artifacts.test.ts) — per-model `terminal state`/`liveness` rows; fleet report block when produced < configured; quorum line when produced ≤ 1 (FR-007, contracts/run-artifacts-contract.md)
 - [X] T017 [US3] GREEN: fleet report + state rows in plugins/stack-control/src/scope-discovery/audit-barrage/run-artifacts.ts and orchestrate-barrage.ts until T016 passes
-- [ ] T018 [US3] RED: lift consumption suite (extend the audit-barrage-lift tests under plugins/stack-control/src/__tests__/) — a non-completed lane contributes zero findings and is reported with its state; per-lane enforcement state printed UNCONDITIONALLY (FR-004's at-synthesis marking, not only on degradation); `produced` counts converged-eligible lanes only (completed + exit 0 + artifact present); fleet report repeated when degraded; never "clean" from a killed lane (FR-007)
-- [ ] T019 [US3] GREEN: terminal-state consumption in plugins/stack-control/src/subcommands/audit-barrage-lift.ts until T018 passes
+- [X] T018 [US3] RED: lift consumption suite (extend the audit-barrage-lift tests under plugins/stack-control/src/__tests__/) — a non-completed lane contributes zero findings and is reported with its state; per-lane enforcement state printed UNCONDITIONALLY (FR-004's at-synthesis marking, not only on degradation); `produced` counts converged-eligible lanes only (completed + exit 0 + artifact present); fleet report repeated when degraded; never "clean" from a killed lane (FR-007)
+- [X] T019 [US3] GREEN: terminal-state consumption in plugins/stack-control/src/subcommands/audit-barrage-lift.ts until T018 passes
 - [ ] T020 [US3] RED then GREEN: govern convergence-loop fleet status in plugins/stack-control/src/govern/ — round status lines include fleet report; 0-HIGH over a degraded fleet annotated; dampener/models-attempted counters count only `completed` lanes (US3 scenario 3)
 
 **Checkpoint**: US3 independently deliverable — silent degradation impossible.
