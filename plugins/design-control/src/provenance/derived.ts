@@ -16,17 +16,29 @@
  * claim ({@link wireframeDroveImplementation}) — provenance distinguishes the
  * two modes precisely so the claim cannot be laundered through acceptance.
  *
- * Provenance is APPEND-ONCE: recording over an existing sidecar fails loud in
- * both modes and both directions, so a `derived` record can never be silently
- * flipped to `driving` by a later call. Mode transitions require explicitly
- * removing or superseding the existing record.
+ * Provenance is APPEND-ONCE over BOTH final targets: recording over an
+ * existing sidecar fails loud in both modes and both directions, so a
+ * `derived` record can never be silently flipped to `driving` by a later
+ * call — and a derivation additionally refuses when a lingering snapshot
+ * exists at its target path (AUDIT-20260611-11: an operator who removed only
+ * the sidecar must not have the historical baseline silently overwritten).
+ * Mode transitions require explicitly removing or superseding the existing
+ * record AND, for derived records, its snapshot.
  *
  * Sidecar layout (per surface, in the operator-chosen provenance dir):
  *   <surfaceId>.provenance.json          — zod-validated provenance record
  *   <surfaceId>.derived-snapshot.html    — the auto-derived draft (derived only)
  */
 
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  linkSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -161,7 +173,8 @@ function assertAppendOnce(dir: string, provenance: WireframeProvenance): string 
       `Refusing to record ${provenance.mode} provenance for surface "${provenance.surfaceId}": ` +
         `a ${existing.mode} record already exists at ${path}. Provenance is append-once — ` +
         `overwriting would silently rewrite the surface's mode and its recorded baseline. ` +
-        `Re-recording requires explicitly removing or superseding the existing record first.`,
+        `Re-recording requires explicitly removing or superseding the existing record ` +
+        `(and, for a derived record, its stored snapshot) first.`,
     );
   }
   return path;
@@ -251,31 +264,53 @@ export function recordDerivation(input: {
       source: input.source,
     },
   };
-  // The append-once refusal fires BEFORE any byte hits disk — otherwise a
+  // The append-once refusals fire BEFORE any byte hits disk — otherwise a
   // refused re-derivation would have already clobbered (or littered next to)
   // the existing surface's derivation-time baseline.
   const sidecarTarget = assertAppendOnce(input.dir, provenance);
   const snapshotTarget = join(input.dir, snapshotFile);
+  // Append-once covers the snapshot target too (AUDIT-20260611-11): the
+  // sidecar check alone misses the case where the operator removed the
+  // record but left the historical snapshot — a rename-promote over it would
+  // silently destroy the old baseline before the sidecar commit point.
+  if (existsSync(snapshotTarget)) {
+    throw new Error(
+      `Refusing to record derived provenance for surface "${input.surfaceId}": a derivation-time ` +
+        `snapshot already exists at ${snapshotTarget} with no sidecar referencing it (likely a ` +
+        `previous record was only partially removed). Provenance is append-once for BOTH the ` +
+        `sidecar and the snapshot — promoting over it would silently destroy the historical ` +
+        `baseline. Remove the lingering snapshot too (or move it aside), then re-derive.`,
+    );
+  }
   // All-or-nothing commit (AUDIT-20260611-07): two sequential writes to the
   // final paths can be interrupted between them, leaving a committed sidecar
   // whose snapshot does not exist (or vice versa). Instead, stage BOTH
-  // artifacts as temp files in the same directory, then promote each with an
-  // atomic rename only after both staged writes succeeded.
+  // artifacts as temp files in the same directory, then promote each only
+  // after both staged writes succeeded.
   const stagedSnapshot = `${snapshotTarget}.tmp-${process.pid}`;
   const stagedSidecar = `${sidecarTarget}.tmp-${process.pid}`;
+  let snapshotPromoted = false;
   try {
     writeFileSync(stagedSnapshot, input.derivedHtml);
     writeFileSync(stagedSidecar, JSON.stringify(provenance, null, 2) + '\n');
     // Promote snapshot first, sidecar last: the sidecar is the commit point.
-    // If the process dies between the two renames, a snapshot without a
-    // sidecar is inert debris at worst — nothing reads it (loadProvenance
-    // fails loud on the absent sidecar, and recording for the surface is
-    // still possible). The inverse ordering would commit a sidecar whose
-    // recorded snapshot does not exist — a live record with a missing
-    // baseline that breaks checkDerivedAcceptance.
-    renameSync(stagedSnapshot, snapshotTarget);
+    // The snapshot promote is NO-CLOBBER (linkSync throws EEXIST if the
+    // target appeared between the check above and this point — renameSync
+    // would silently overwrite on POSIX), so a pre-existing baseline can
+    // never be destroyed even under a race. If the process dies between the
+    // two promotes, a snapshot without a sidecar is inert debris at worst —
+    // nothing reads it (loadProvenance fails loud on the absent sidecar).
+    // The inverse ordering would commit a sidecar whose recorded snapshot
+    // does not exist — a live record with a missing baseline that breaks
+    // checkDerivedAcceptance.
+    linkSync(stagedSnapshot, snapshotTarget);
+    snapshotPromoted = true;
+    unlinkSync(stagedSnapshot);
     renameSync(stagedSidecar, sidecarTarget);
   } catch (error) {
+    // Safe to remove the promoted snapshot: linkSync's no-clobber semantics
+    // guarantee THIS call created it, so no pre-existing bytes are touched.
+    if (snapshotPromoted) bestEffortRemove(snapshotTarget);
     bestEffortRemove(stagedSnapshot);
     bestEffortRemove(stagedSidecar);
     throw error;
@@ -328,8 +363,9 @@ export function checkDerivedAcceptance(
     throw new Error(
       `Derived snapshot ${snapshotPath} does not match the hash recorded at derivation time — ` +
         `the baseline was modified after recording, so the operator-edit diff cannot be trusted. ` +
-        `Remove the existing record, then re-derive the draft to re-establish a baseline ` +
-        `(recording refuses to overwrite an existing sidecar).`,
+        `Remove the existing record AND the stored snapshot, then re-derive the draft to ` +
+        `re-establish a baseline (recording refuses to overwrite an existing sidecar or a ` +
+        `lingering snapshot).`,
     );
   }
   if (acceptedHtml === snapshot) {

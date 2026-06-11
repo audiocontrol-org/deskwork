@@ -494,6 +494,81 @@ describe('overwrite refusal — an existing record can never be silently re-reco
   });
 });
 
+describe('lingering-snapshot guard — append-once covers BOTH final targets (AUDIT-20260611-11)', () => {
+  it('refuses re-derivation when only the sidecar was removed (snapshot lingers), naming the snapshot and the remedy', () => {
+    const dir = freshDir();
+    recordDerivation({
+      dir,
+      surfaceId: 'historic',
+      derivedHtml: draftHtml,
+      source: 'live surface',
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    // The documented recovery path, followed partially: the operator removes
+    // the RECORD (sidecar) but leaves the historical snapshot on disk.
+    rmSync(join(dir, 'historic.provenance.json'));
+    const snapshotBefore = readFileSync(join(dir, 'historic.derived-snapshot.html'), 'utf8');
+
+    expect(() =>
+      recordDerivation({
+        dir,
+        surfaceId: 'historic',
+        derivedHtml: draftHtml + '<!-- a DIFFERENT second derivation -->',
+        source: 'another derivation',
+      }),
+    ).toThrow(/historic\.derived-snapshot\.html[\s\S]*(remove|move)/i);
+
+    // The original baseline bytes must be untouched by the refusal — no
+    // silent overwrite, no staging debris.
+    expect(readFileSync(join(dir, 'historic.derived-snapshot.html'), 'utf8')).toBe(snapshotBefore);
+    expect(readdirSync(dir)).toEqual(['historic.derived-snapshot.html']);
+  });
+
+  it('checkDerivedAcceptance tamper-recovery message instructs removing the snapshot too (no contradiction with the refusal)', () => {
+    const dir = freshDir();
+    recordDerivation({
+      dir,
+      surfaceId: 'tampered',
+      derivedHtml: draftHtml,
+      source: 'live surface',
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    writeFileSync(join(dir, 'tampered.derived-snapshot.html'), draftHtml + '<!-- tampered -->');
+    // The remedy must name BOTH artifacts — "remove the record, then re-derive"
+    // alone walks the operator straight into the lingering-snapshot refusal.
+    expect(() => checkDerivedAcceptance(dir, 'tampered', 'whatever')).toThrow(
+      /record[\s\S]*snapshot[\s\S]*re-derive/i,
+    );
+  });
+
+  it('records cleanly once BOTH the sidecar and the snapshot are removed (the full documented recovery)', () => {
+    const dir = freshDir();
+    recordDerivation({
+      dir,
+      surfaceId: 'recovered',
+      derivedHtml: draftHtml,
+      source: 'live surface',
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    rmSync(join(dir, 'recovered.provenance.json'));
+    rmSync(join(dir, 'recovered.derived-snapshot.html'));
+
+    const second = draftHtml + '<!-- second derivation -->';
+    recordDerivation({
+      dir,
+      surfaceId: 'recovered',
+      derivedHtml: second,
+      source: 'second derivation',
+      createdAt: new Date('2026-06-10T13:00:00Z'),
+    });
+    expect(readFileSync(join(dir, 'recovered.derived-snapshot.html'), 'utf8')).toBe(second);
+    const prov = loadProvenance(dir, 'recovered');
+    expect(prov.mode).toBe('derived');
+    if (prov.mode !== 'derived') throw new Error('unreachable');
+    expect(prov.derived.source).toBe('second derivation');
+  });
+});
+
 describe('verifyDrivingWireframe — tamper-checks the bound artifact like checkDerivedAcceptance', () => {
   it('returns the provenance when the wireframe bytes still match the recorded hash', () => {
     const dir = freshDir();
