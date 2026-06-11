@@ -21,6 +21,13 @@ The only legitimate non-installation facts are **external-tool anchors**, and th
 
 While spec artifacts live outside the installation (this monorepo's transitional layout), an installation-scoped diff omits the feature's spec artifacts from the governed payload — so the design must either fold the resolved feature root into the governed payload explicitly, or relocate the Spec Kit root inside the installation (supported upstream).
 
+## Clarifications
+
+### Session 2026-06-10
+
+- Q: What happens to the `--repo-root` flag on state-writing verbs once the installation is the primary anchor? → A: **Retired.** State-writing verbs expose no repo-root parameter; the installation walk-up (cwd as start point) plus the explicit installation-naming flag (`--at`) are the only anchors. External anchors (git toplevel, Spec Kit root) are derived internally from their own markers. Old invocations passing the retired flag get the loud unknown-flag usage error.
+- Q: Is relocating this repo's Spec Kit root (`.specify/` + `specs/` → the installation) in scope? → A: **In scope as the P3 closing story (US6).** US3's explicit cross-tree fold covers the transitional layout until the relocation dissolves it permanently.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - State-writing verbs anchor in the installation (Priority: P1)
@@ -56,7 +63,7 @@ An operator runs a state-writing verb from a directory with **no** enclosing ins
 
 ### User Story 3 - Governance anchors at the installation (Priority: P2)
 
-A govern pass (implement or spec mode) anchors everything it owns at the installation: the diff engine is invoked against the installation subtree with installation-relative paths, the prompt payload, run directories, and barrage configuration all resolve through the installation, and the recorded protocol artifacts (audit-log excerpts, lift targets) reach the feature's own artifact tree. The free `--repo-root` parameter no longer decides where governance state lands: it is either retired or re-defined as a *derived* value validated against the installation — a disagreement between a supplied root and the resolved installation is a loud error, not a preference.
+A govern pass (implement or spec mode) anchors everything it owns at the installation: the diff engine is invoked against the installation subtree with installation-relative paths, the prompt payload, run directories, and barrage configuration all resolve through the installation, and the recorded protocol artifacts (audit-log excerpts, lift targets) reach the feature's own artifact tree. The free `--repo-root` parameter no longer exists on state-writing verbs (Clarification 2026-06-10: retired) — the installation walk-up and the explicit installation-naming flag are the only anchors, and the external anchors (git toplevel, Spec Kit root) are derived internally.
 
 **Why this priority**: Governance is the heaviest writer (run dirs per round, config reads per verb, payload assembly) and the surface where every seam bug so far has been found. It depends on US1's anchor primitive.
 
@@ -66,7 +73,7 @@ A govern pass (implement or spec mode) anchors everything it owns at the install
 
 1. **Given** a nested installation and a committed change inside it, **When** govern runs, **Then** the audited diff covers the installation subtree with installation-relative paths and the run directory lands inside the installation.
 2. **Given** feature spec artifacts that live outside the installation subtree (the transitional monorepo layout), **When** govern assembles the payload, **Then** the spec artifacts are explicitly folded in (or the run fails loud naming the cross-tree gap) — they are never silently dropped from the audit.
-3. **Given** a `--repo-root` that points somewhere other than the enclosing installation, **When** a state-writing verb is invoked with it, **Then** the verb surfaces the disagreement loudly rather than writing where the flag points.
+3. **Given** a legacy invocation passing the retired repo-root flag to a state-writing verb, **When** it runs, **Then** it fails with the loud unknown-flag usage error (never a silent acceptance that places state).
 
 ---
 
@@ -121,7 +128,7 @@ For this repository: the Spec Kit framework (`.specify/`, `specs/`) relocates in
 - **The resolved feature root lies outside the installation** (transitional layout): writes to the feature's own artifact tree (audit-log, evidence) are permitted as the *feature anchor* — a designated, announced anchor — not as a default-write escape hatch. The isolation probe treats them as exempt only when they go to the resolved feature root.
 - **OS temp directories**: exempt from the invariant (ephemeral by contract).
 - **Explicit operator overrides** (e.g. an environment seam pointing the backlog store elsewhere): honored — "by default" is the operative phrase — but the override's effect is announced, not silent.
-- **A supplied `--repo-root`/`--at` that resolves to a different installation than the cwd's enclosing one**: the explicit flag wins (it is an explicit anchor), and the verb states the installation it operates on.
+- **An explicit `--at` naming a different installation than the cwd's enclosing one**: the explicit flag wins (it is an explicit anchor), and the verb states the installation it operates on.
 - **Read-side compatibility window**: legacy out-of-tree state may still be *discoverable* for reads during a transition, behind the US5 notice — never written to.
 - **Worktrees**: a git worktree of an installation is its own filesystem tree; the walk-up resolves the worktree's own copy of the marker, and state lands in the worktree (no cross-worktree writes).
 
@@ -132,7 +139,7 @@ For this repository: the Spec Kit framework (`.specify/`, `specs/`) relocates in
 - **FR-001**: Every verb that creates or mutates stack-control-owned state MUST anchor that state inside the nearest-enclosing installation (or an explicitly named installation). Writing outside the installation tree by default is prohibited.
 - **FR-002**: When no installation encloses the resolved start point and a verb needs to write, the verb MUST refuse loudly, naming the start point and the `stackctl setup` remediation. There is no fallback write location.
 - **FR-003**: The current working directory MUST NOT determine where state lands. Its only sanctioned role is as the default start point of the installation walk-up.
-- **FR-004**: External-tool anchors (the git toplevel; the Spec Kit root) MUST be derived from their own markers, never accepted as free parameters that can place stack-control state. A supplied root that disagrees with the resolved installation is a loud error for state-writing operations.
+- **FR-004**: External-tool anchors (the git toplevel; the Spec Kit root) MUST be derived from their own markers, never accepted as free parameters that can place stack-control state. The repo-root parameter is RETIRED on state-writing verbs (Clarification 2026-06-10); explicit anchoring is expressed only as a named installation.
 - **FR-005**: Governance MUST anchor its diff engine, payload paths, run directories, and configuration at the installation. When the feature's artifacts span outside the installation subtree, the governed payload MUST include them explicitly or the run MUST fail loud — partial payloads are never silent.
 - **FR-006**: Legacy out-of-tree state MUST be detected at the decision site and announced with safe migration advice (never a destructive command targeting existing operator-tuned files; mirroring the established legacy-notice pattern). Writes never target legacy locations.
 - **FR-007**: Explicit overrides (named installation, environment seams) remain honored but MUST be announced in the verb's output — "by default" is the contract; silent redirection is not.

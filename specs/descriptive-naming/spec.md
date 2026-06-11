@@ -23,6 +23,13 @@ Known constraints from the adopted tools (capture, not scope):
 - The backlog tool (backlog.md) owns id assignment (`TASK-n`) as its primary key; its id scheme is not believed to be configurable to slugs. The directive targets the *human-facing interaction* — what stack-control surfaces print, record, and accept — which stack-control owns even where the underlying tool keeps a counter internally.
 - Existing artifacts carry the old names: specs `001`–`014` on disk and in countless recorded references (audit-logs, plans, journals, promotion records, commit messages); backlog dispositions in audit-logs reference `TASK-n`. Recorded history is immutable-by-convention in this program (append-only ledgers).
 
+## Clarifications
+
+### Session 2026-06-10
+
+- Q: What happens to the existing numbered spec dirs (`specs/001`…`specs/014`)? → A: **Grandfathered, forward-only.** Existing numbered dirs stay as-is and resolvers keep accepting them as valid legacy names; only NEW specs are slug-only. Zero churn on recorded references.
+- Q: How do backlog items get descriptive identity, given the adopted tool owns `TASK-n` id assignment? → A: **Slug-first over the tool.** stack-control surfaces lead with a deterministic title-derived slug and accept slugs as input; `TASK-n` remains the tool's internal key, resolvable as an alias. Faithful tool adoption preserved.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - New specs are created with descriptive slugs (Priority: P1)
@@ -113,5 +120,5 @@ The program's history — numbered spec dirs `001`–`014`, `TASK-n` references 
 - The roadmap's `phase:kind/slug` node ids already satisfy the directive and are out of scope.
 - Spec Kit's `specs/` parent directory name (fixed upstream) is acceptable; the directive targets the ordinal prefixes, not the parent dir name.
 - The adopted backlog tool retains its internal id scheme; this feature governs stack-control's surfaces over it, not the tool's storage format (faithful tool adoption).
-- Whether existing numbered spec dirs are *renamed* (migration) or only *grandfathered* (forward-only convention) is an operator scoping decision deliberately left open in this capture; FR-004 guarantees navigability under either choice.
+- Existing numbered spec dirs are grandfathered, forward-only (Clarification 2026-06-10) — no renames, no ledger rewrites; FR-004's navigability guarantee applies to them as permanent legacy names.
 - The `001-IN-PROGRESS` docs bucket is status-named, not ordinal-named, and is retired with the legacy docs layout separately.
