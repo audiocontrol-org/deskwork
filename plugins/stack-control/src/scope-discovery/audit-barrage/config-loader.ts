@@ -32,6 +32,7 @@
  * The translation happens here so callers consume a uniform shape.
  */
 
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,6 +42,16 @@ import type { ModelConfig } from './types.js';
 
 /** Project-relative override path; resolved against `repoRoot`. */
 export const CONFIG_OVERRIDE_PATH = '.stack-control/audit-barrage-config.yaml';
+
+/**
+ * Legacy dw-lifecycle config location (specs/014 US2 — TASK-30 /
+ * gh-446). The loader NEVER reads it; its mere presence triggers a loud
+ * stderr notice so an adopter who migrated from dw-lifecycle learns
+ * their tuned battery stopped applying, instead of silently running on
+ * the built-in defaults.
+ */
+export const LEGACY_DWLIFECYCLE_CONFIG_PATH =
+  '.dw-lifecycle/scope-discovery/audit-barrage-config.yaml';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -93,10 +104,23 @@ export interface AuditBarrageConfig {
  */
 export async function loadAuditBarrageConfig(
   repoRoot: string,
+  warn: (line: string) => void = (line) => {
+    process.stderr.write(line);
+  },
 ): Promise<AuditBarrageConfig> {
   const overridePath = resolve(repoRoot, CONFIG_OVERRIDE_PATH);
   const overrideText = await readIfPresent(overridePath);
-  if (overrideText !== null && hasActiveModelsSection(overrideText, overridePath)) {
+  const overrideActive =
+    overrideText !== null && hasActiveModelsSection(overrideText, overridePath);
+  // specs/014 US2: the notice fires at the decision site — the moment
+  // the wrong config would silently win — in every legacy-present
+  // combination, and never changes which config wins (research R2).
+  emitLegacyConfigNotice(
+    repoRoot,
+    overrideActive ? overridePath : undefined,
+    warn,
+  );
+  if (overrideActive && overrideText !== null) {
     return parseConfig(overrideText, overridePath);
   }
   let defaultText: string;
@@ -110,6 +134,30 @@ export async function loadAuditBarrageConfig(
     );
   }
   return parseConfig(defaultText, DEFAULT_CONFIG_PATH);
+}
+
+/**
+ * Probe for the legacy dw-lifecycle config and announce it (specs/014
+ * US2). Three lines: the ignored legacy path, the source actually read
+ * (the active stack-control override, else the built-in defaults), and
+ * the copy-pasteable migration step. Pure observability — load
+ * semantics are untouched in all presence combinations.
+ */
+function emitLegacyConfigNotice(
+  repoRoot: string,
+  activeOverridePath: string | undefined,
+  warn: (line: string) => void,
+): void {
+  const legacyPath = resolve(repoRoot, LEGACY_DWLIFECYCLE_CONFIG_PATH);
+  if (!existsSync(legacyPath)) return;
+  const reading = activeOverridePath ?? 'built-in defaults';
+  warn(
+    `audit-barrage: WARNING — legacy dw-lifecycle config present and IGNORED: ${legacyPath}\n`,
+  );
+  warn(`audit-barrage: reading ${reading}\n`);
+  warn(
+    `audit-barrage: migrate with: mv ${legacyPath} ${resolve(repoRoot, CONFIG_OVERRIDE_PATH)} (then review)\n`,
+  );
 }
 
 /**
