@@ -163,7 +163,16 @@ export function loadProvenance(dir: string, surfaceId: string): WireframeProvena
         `Record provenance at authoring/derivation time (recordDrivingWireframe / recordDerivation).`,
     );
   }
-  return provenanceSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+  const parsed = provenanceSchema.parse(JSON.parse(readFileSync(path, 'utf8')));
+  if (parsed.surfaceId !== surfaceId) {
+    throw new Error(
+      `Provenance sidecar identity mismatch at ${path}: requested surface "${surfaceId}" but the ` +
+        `sidecar records surfaceId "${parsed.surfaceId}". The sidecar was likely copied or renamed ` +
+        `to another surface's filename — its snapshot and hash belong to "${parsed.surfaceId}", so ` +
+        `it cannot vouch for "${surfaceId}". Re-record provenance for "${surfaceId}".`,
+    );
+  }
+  return parsed;
 }
 
 /**

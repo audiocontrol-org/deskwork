@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -70,6 +70,26 @@ describe('loadProvenance fail-loud paths', () => {
     const dir = freshDir();
     writeFileSync(join(dir, 'bad.provenance.json'), '{"mode":"derived"}');
     expect(() => loadProvenance(dir, 'bad')).toThrow();
+  });
+
+  it('throws, naming BOTH ids, when the sidecar inner surfaceId does not match the requested one', () => {
+    const dir = freshDir();
+    recordDerivation({
+      dir,
+      surfaceId: 'surface-alpha',
+      derivedHtml: draftHtml,
+      source: 'live surface',
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    // Simulate a sidecar copied/renamed to another surface's filename: beta has
+    // no record of its own, but alpha's sidecar now sits at beta's path.
+    copyFileSync(
+      join(dir, 'surface-alpha.provenance.json'),
+      join(dir, 'surface-beta.provenance.json'),
+    );
+    expect(() => loadProvenance(dir, 'surface-beta')).toThrow(
+      /surface-beta[\s\S]*surface-alpha|surface-alpha[\s\S]*surface-beta/,
+    );
   });
 });
 
