@@ -2,9 +2,11 @@ import { describe, it, expect, afterEach } from 'vitest';
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  symlinkSync,
   writeFileSync,
   rmSync,
   readdirSync,
@@ -566,6 +568,67 @@ describe('lingering-snapshot guard — append-once covers BOTH final targets (AU
     expect(prov.mode).toBe('derived');
     if (prov.mode !== 'derived') throw new Error('unreachable');
     expect(prov.derived.source).toBe('second derivation');
+  });
+});
+
+describe('append-once is atomic at the write primitive — TOCTOU hardening (AUDIT-20260611-12)', () => {
+  // The lost-race interleaving itself (a sidecar appearing between the
+  // existsSync pre-check and the write) cannot be produced in synchronous
+  // single-threaded test code. A DANGLING SYMLINK planted at the sidecar path
+  // is the deterministic stand-in for it: existsSync follows symlinks and
+  // reports false — the pre-check is blind to the occupant — but the atomic
+  // primitives the fix mandates refuse it with EEXIST (open with
+  // O_CREAT|O_EXCL, i.e. the 'wx' flag, fails on a symlink regardless of
+  // where it points; linkSync never clobbers an existing destination). The
+  // pre-fix primitives both "succeed": a default-'w' write follows the link
+  // and commits bytes through it; renameSync silently replaces the occupant.
+  // So these tests fail on the check-then-act implementation and pass only
+  // when the write itself is no-clobber — pinning the atomicity property at
+  // the only seam sync tests can reach. The true concurrent-recorder case is
+  // verified by code inspection (see the doc comments on writeProvenance and
+  // the sidecar promote in recordDerivation).
+
+  it('recordDrivingWireframe refuses — committing nothing through the occupant — when the sidecar path is occupied but invisible to the pre-check', () => {
+    const dir = freshDir();
+    const wireframeFile = writeWireframe(dir, 'raced.html');
+    symlinkSync(join(dir, 'elsewhere.json'), join(dir, 'raced.provenance.json'));
+    // Sanity: the pre-check's own probe cannot see the occupant.
+    expect(existsSync(join(dir, 'raced.provenance.json'))).toBe(false);
+
+    expect(() =>
+      recordDrivingWireframe({ dir, surfaceId: 'raced', wireframeFile }),
+    ).toThrow();
+
+    // The 'w'-flag failure mode: the write follows the symlink and commits a
+    // live record at its target. Neither may happen with the atomic write.
+    expect(existsSync(join(dir, 'elsewhere.json'))).toBe(false);
+    expect(() => loadProvenance(dir, 'raced')).toThrow();
+    expect(lstatSync(join(dir, 'raced.provenance.json')).isSymbolicLink()).toBe(true);
+  });
+
+  it('recordDerivation refuses at the sidecar commit point, rolling back the promoted snapshot and leaving no staged debris', () => {
+    const dir = freshDir();
+    symlinkSync(join(dir, 'elsewhere.json'), join(dir, 'raced-d.provenance.json'));
+    expect(existsSync(join(dir, 'raced-d.provenance.json'))).toBe(false);
+
+    expect(() =>
+      recordDerivation({
+        dir,
+        surfaceId: 'raced-d',
+        derivedHtml: draftHtml,
+        source: 'live surface',
+      }),
+    ).toThrow();
+
+    // The renameSync failure mode: the promote replaces the occupant with the
+    // staged sidecar and the record commits. With the no-clobber promote the
+    // occupant is untouched, the already-promoted snapshot is rolled back
+    // (linkSync's no-clobber semantics guarantee this call created it), and
+    // no temp-suffixed staging debris lingers.
+    expect(lstatSync(join(dir, 'raced-d.provenance.json')).isSymbolicLink()).toBe(true);
+    expect(existsSync(join(dir, 'raced-d.derived-snapshot.html'))).toBe(false);
+    expect(existsSync(join(dir, 'elsewhere.json'))).toBe(false);
+    expect(readdirSync(dir)).toEqual(['raced-d.provenance.json']);
   });
 });
 

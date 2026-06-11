@@ -34,7 +34,6 @@ import {
   existsSync,
   linkSync,
   readFileSync,
-  renameSync,
   rmSync,
   unlinkSync,
   writeFileSync,
@@ -155,6 +154,31 @@ export interface AcceptanceResult {
 const sidecarPath = (dir: string, surfaceId: string): string =>
   join(dir, `${surfaceId}.provenance.json`);
 
+/** EEXIST detection for the atomic no-clobber primitives ('wx' write, linkSync promote). */
+const isEexistError = (error: unknown): boolean =>
+  error instanceof Error && 'code' in error && error.code === 'EEXIST';
+
+/**
+ * The single append-once refusal, shared by the pre-check
+ * ({@link assertAppendOnce}) and by the atomic write/promote primitives when
+ * they lose the race the pre-check cannot see (EEXIST from the 'wx' flag or
+ * the linkSync promote) — so the refusal text is identical whichever layer
+ * catches the conflict. Loads the existing record so the message names the
+ * mode being protected (which is itself fail-loud: an occupant that is not a
+ * loadable record surfaces loadProvenance's own error instead).
+ */
+function appendOnceRefusalError(dir: string, provenance: WireframeProvenance): Error {
+  const path = sidecarPath(dir, provenance.surfaceId);
+  const existing = loadProvenance(dir, provenance.surfaceId);
+  return new Error(
+    `Refusing to record ${provenance.mode} provenance for surface "${provenance.surfaceId}": ` +
+      `a ${existing.mode} record already exists at ${path}. Provenance is append-once — ` +
+      `overwriting would silently rewrite the surface's mode and its recorded baseline. ` +
+      `Re-recording requires explicitly removing or superseding the existing record ` +
+      `(and, for a derived record, its stored snapshot) first.`,
+  );
+}
+
 /**
  * The single chokepoint both recorders write through. Provenance is
  * append-once: if a sidecar already exists for the surface — in ANY mode —
@@ -168,21 +192,28 @@ const sidecarPath = (dir: string, surfaceId: string): string =>
 function assertAppendOnce(dir: string, provenance: WireframeProvenance): string {
   const path = sidecarPath(dir, provenance.surfaceId);
   if (existsSync(path)) {
-    const existing = loadProvenance(dir, provenance.surfaceId);
-    throw new Error(
-      `Refusing to record ${provenance.mode} provenance for surface "${provenance.surfaceId}": ` +
-        `a ${existing.mode} record already exists at ${path}. Provenance is append-once — ` +
-        `overwriting would silently rewrite the surface's mode and its recorded baseline. ` +
-        `Re-recording requires explicitly removing or superseding the existing record ` +
-        `(and, for a derived record, its stored snapshot) first.`,
-    );
+    throw appendOnceRefusalError(dir, provenance);
   }
   return path;
 }
 
+/**
+ * Append-once is enforced twice (AUDIT-20260611-12): the existsSync pre-check
+ * above gives the descriptive refusal in the common case, and the 'wx'
+ * (O_CREAT|O_EXCL) flag makes the check-and-write atomic at the fs layer — a
+ * sidecar that appears in the check-then-act window (a concurrent recorder
+ * for the same surface; parallel unattended execution is the explicit target)
+ * surfaces as EEXIST and maps to the same refusal, instead of
+ * last-writer-wins silently flipping the surface's mode.
+ */
 function writeProvenance(dir: string, provenance: WireframeProvenance): void {
   const path = assertAppendOnce(dir, provenance);
-  writeFileSync(path, JSON.stringify(provenance, null, 2) + '\n');
+  try {
+    writeFileSync(path, JSON.stringify(provenance, null, 2) + '\n', { flag: 'wx' });
+  } catch (error) {
+    if (isEexistError(error)) throw appendOnceRefusalError(dir, provenance);
+    throw error;
+  }
 }
 
 /**
@@ -306,7 +337,25 @@ export function recordDerivation(input: {
     linkSync(stagedSnapshot, snapshotTarget);
     snapshotPromoted = true;
     unlinkSync(stagedSnapshot);
-    renameSync(stagedSidecar, sidecarTarget);
+    // The sidecar promote — the commit point — is equally NO-CLOBBER
+    // (AUDIT-20260611-12): a renameSync here would silently overwrite a
+    // sidecar that appeared after assertAppendOnce's check (a concurrent
+    // recorder for the same surface), letting both recorders "succeed"
+    // last-writer-wins — including the derived-over-driving laundering
+    // direction. linkSync makes losing that race fail loud; EEXIST maps to
+    // the same append-once refusal the pre-check raises, and the catch block
+    // below rolls back the just-promoted snapshot + staged temps.
+    try {
+      linkSync(stagedSidecar, sidecarTarget);
+    } catch (error) {
+      if (isEexistError(error)) throw appendOnceRefusalError(input.dir, provenance);
+      throw error;
+    }
+    // The record is committed. The staged sidecar is debris now — its removal
+    // must be best-effort: a raw unlinkSync throw here would unwind into the
+    // catch block below, whose rollback would delete the snapshot of an
+    // already-committed record.
+    bestEffortRemove(stagedSidecar);
   } catch (error) {
     // Safe to remove the promoted snapshot: linkSync's no-clobber semantics
     // guarantee THIS call created it, so no pre-existing bytes are touched.
