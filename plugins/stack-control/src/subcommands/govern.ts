@@ -217,12 +217,18 @@ export function buildImplementVars(
   diffBaseFlag: string | undefined,
   checkpointFlag: string | undefined,
   auditLogExcerpt: string,
+  featureRoot?: string,
 ): { vars: BarrageVars; checkpoint: string } {
   const base = diffBaseFlag ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
   const budgetEnv = process.env.GOVERN_PAYLOAD_BUDGET;
+  // specs/014 US5: thread the resolved feature root so the payload is
+  // self-reference-free (audit-log excluded from both arms; untracked
+  // fold scoped to the feature). The labeled audit_log_excerpt block
+  // below stays the ONLY audit-log content in the payload (013/TASK-25).
   const payload = assembleImplementPayload({
     repoRoot,
     base,
+    ...(featureRoot !== undefined ? { featureRoot } : {}),
     ...(budgetEnv !== undefined && budgetEnv.length > 0
       ? { budgetBytes: Number.parseInt(budgetEnv, 10) }
       : {}),
@@ -325,11 +331,15 @@ export async function runGovern(args: string[]): Promise<void> {
     // layout-aware helper here (async), then thread it into the pure
     // var-builders — so a specs/NNN-<slug> feature's audit-log is found
     // instead of silently empty under the old hardcoded docs/ path.
+    // specs/014 US5: the implement payload also needs the resolved root
+    // to exclude the audit-log from both diff arms and scope the
+    // untracked fold to the feature under audit.
     const auditLogExcerpt = await resolveAuditLogExcerpt(repoRoot, slug);
+    const { root: featureRoot } = await resolveFeatureRoot({ repoRoot, slug });
     const built =
       flags.mode === 'spec'
         ? buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint, auditLogExcerpt)
-        : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint, auditLogExcerpt);
+        : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint, auditLogExcerpt, featureRoot);
 
     // US7 (FR-032): implement-mode governance runs the per-codebase clone step,
     // surfacing NEW intra-codebase duplication alongside the gate verdict

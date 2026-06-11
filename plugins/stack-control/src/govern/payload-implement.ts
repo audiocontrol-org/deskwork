@@ -30,7 +30,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { statSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
 /** 256 KB soft budget on transmitted untracked working-tree content. */
 const DEFAULT_UNTRACKED_FOLD_BUDGET = 256 * 1024;
@@ -66,6 +66,18 @@ export interface ImplementPayloadArgs {
   readonly budgetBytes?: number;
   /** Sink for the human-readable drop/skip notes (default: process.stderr). */
   readonly warn?: (message: string) => void;
+  /**
+   * Absolute path of the resolved feature root (specs/014 US5 —
+   * TASK-37 / gh-431). When supplied, the payload is made
+   * self-reference-free: the feature's `audit-log.md` is excluded from
+   * BOTH the committed diff (git pathspec exclusion) and the untracked
+   * fold, and the untracked fold is scoped to files under this root
+   * (FR-007/FR-008 — the recorded generator pulled unrelated features'
+   * parked scaffolds into the audited payload). When absent, behavior
+   * is byte-identical to the pre-014 assembler (the caller has no
+   * resolvable feature root to scope by).
+   */
+  readonly featureRoot?: string;
 }
 
 export interface ImplementPayload {
@@ -119,7 +131,22 @@ export function assembleImplementPayload(
   const budget = args.budgetBytes ?? DEFAULT_UNTRACKED_FOLD_BUDGET;
   const warn = args.warn ?? ((m: string) => process.stderr.write(`${m}\n`));
 
-  let diff = git(repoRoot, ['diff', base]);
+  // specs/014 US5: repo-relative feature root (POSIX separators for git
+  // pathspecs) when the caller resolved one.
+  const featureRel =
+    args.featureRoot !== undefined
+      ? relative(repoRoot, args.featureRoot).split(sep).join('/')
+      : undefined;
+
+  // specs/014 US5 (FR-007): exclude the feature's own audit-log from the
+  // committed-diff arm — lift commits land inside the diff range, so
+  // without the pathspec exclusion the payload quotes its own findings
+  // back to the model fleet (the AUDIT-28/42/48 generator).
+  const diffArgs =
+    featureRel !== undefined
+      ? ['diff', base, '--', '.', `:(exclude)${featureRel}/audit-log.md`]
+      : ['diff', base];
+  let diff = git(repoRoot, diffArgs);
   const committedDiffEmpty = diff.trim().length === 0;
 
   // AUDIT-20260605-01: fold untracked-but-not-ignored files so newly-added work
@@ -131,7 +158,16 @@ export function assembleImplementPayload(
   const untracked = git(repoRoot, ['ls-files', '--others', '--exclude-standard'])
     .split('\n')
     .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+    .filter((s) => s.length > 0)
+    // specs/014 US5 (FR-008): with a feature root resolved, the fold is
+    // scoped to files under it — minus the audit-log itself. The
+    // recorded defect swept unrelated features' untracked scaffolds
+    // into the audited payload; the feature's own files still fold.
+    .filter((rel) => {
+      if (featureRel === undefined) return true;
+      if (!rel.startsWith(`${featureRel}/`)) return false;
+      return rel !== `${featureRel}/audit-log.md`;
+    });
 
   for (const rel of untracked) {
     const abs = join(repoRoot, rel);
