@@ -28,6 +28,26 @@
  * specification, not a placeholder. Changing the sort changes the
  * contract; both the implementation AND the regression test must
  * change in lockstep.
+ *
+ * Spec 013 (audit-protocol-hardening): the resolver is layout-aware.
+ * Two concrete physical layouts flow through this one helper:
+ *
+ *   - `speckit`     — `<repoRoot>/specs/<NNN>-<slug>/` (or the
+ *                     exact-name `<repoRoot>/specs/<slug>/`), the
+ *                     Spec Kit feature layout.
+ *   - `legacy-docs` — `<docsRoot>/<version>/001-IN-PROGRESS/<slug>/`,
+ *                     the original layout (lex-greatest version pick,
+ *                     unchanged).
+ *
+ * Precedence is specs-first (research D3): the `speckit` branch runs
+ * BEFORE the legacy walk, so when a slug exists under both layouts the
+ * `speckit` root wins deterministically. The `speckit` branch fails
+ * loud — naming the candidates — when two `specs/` dirs both match the
+ * slug (no silent pick). The `speckit` branch only runs when `repoRoot`
+ * is supplied (it derives `<repoRoot>/specs`); a `docsRoot`-only caller
+ * resolves `legacy-docs` exactly as before. The result's `layout` field
+ * records which layout produced `root`; neither layout matching leaves
+ * `root` undefined (the caller fails loud, naming both searched layouts).
  */
 
 import { existsSync } from 'node:fs';
@@ -60,9 +80,17 @@ export interface ResolveFeatureRootResult {
   /**
    * Lex-descending list of version directories the walker
    * considered (those that have a `001-IN-PROGRESS` subdir). Useful
-   * for the gate's not-found error message.
+   * for the gate's not-found error message. Always `[]` for a
+   * `speckit` resolution (no version axis).
    */
   readonly versionsChecked: readonly string[];
+  /**
+   * Which physical layout produced `root` (spec 013). `'speckit'` for
+   * a `specs/<NNN>-<slug>` match, `'legacy-docs'` for the
+   * `docs/<version>/001-IN-PROGRESS/<slug>` walk. Absent when `root`
+   * is `undefined` (neither layout matched).
+   */
+  readonly layout?: 'legacy-docs' | 'speckit';
 }
 
 export async function resolveFeatureRoot(
@@ -81,6 +109,19 @@ export async function resolveFeatureRoot(
       'resolveFeatureRoot: one of `docsRoot` or `repoRoot` must be supplied.',
     );
   }
+
+  // Spec 013: specs-first precedence (research D3). The `speckit`
+  // branch runs BEFORE the legacy walk, so a slug present under both
+  // layouts resolves to the `specs/` root deterministically. It only
+  // runs when `repoRoot` is supplied (it needs `<repoRoot>/specs`);
+  // a `docsRoot`-only caller skips straight to `legacy-docs`.
+  if (args.repoRoot !== undefined) {
+    const speckitRoot = await resolveSpeckitRoot(args.repoRoot, args.slug);
+    if (speckitRoot !== undefined) {
+      return { root: speckitRoot, versionsChecked: [], layout: 'speckit' };
+    }
+  }
+
   if (!existsSync(docsRoot)) {
     return { root: undefined, versionsChecked: [] };
   }
@@ -97,8 +138,91 @@ export async function resolveFeatureRoot(
     versionsChecked.push(version);
     const featureDir = join(inProgress, args.slug);
     if (existsSync(featureDir)) {
-      return { root: featureDir, versionsChecked };
+      return { root: featureDir, versionsChecked, layout: 'legacy-docs' };
     }
   }
   return { root: undefined, versionsChecked };
+}
+
+/**
+ * Enumerate EVERY feature root across both physical layouts (specs/014
+ * US7). Used by consumers that walk all features rather than resolving
+ * one slug — e.g. the provenance doctor rule's audit-log discovery.
+ * Living here keeps the layout literals inside the one shared resolver
+ * module (FR-010: no consumer outside this file constructs the legacy
+ * `001-IN-PROGRESS` path). Hidden (dot-prefixed) directories are
+ * skipped; the result is sorted for deterministic downstream output.
+ */
+export async function discoverFeatureRoots(
+  repoRoot: string,
+): Promise<readonly string[]> {
+  const out: string[] = [];
+  const specsRoot = join(repoRoot, 'specs');
+  if (existsSync(specsRoot)) {
+    for (const child of await readDirNames(specsRoot)) {
+      out.push(join(specsRoot, child));
+    }
+  }
+  const docsRoot = join(repoRoot, 'docs');
+  if (existsSync(docsRoot)) {
+    for (const version of await readDirNames(docsRoot)) {
+      const inProgress = join(docsRoot, version, '001-IN-PROGRESS');
+      if (!existsSync(inProgress)) continue;
+      for (const slug of await readDirNames(inProgress)) {
+        out.push(join(inProgress, slug));
+      }
+    }
+  }
+  return out.sort();
+}
+
+/** Non-hidden subdirectory names of `parent`; [] when unreadable. */
+async function readDirNames(parent: string): Promise<readonly string[]> {
+  try {
+    return (await readdir(parent, { withFileTypes: true }))
+      .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+      .map((d) => d.name);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Resolve a Spec Kit feature under `<repoRoot>/specs/`. A child dir
+ * matches when its name is exactly `<slug>` or `^\d+-<slug>$` (the
+ * NNN-slug Spec Kit convention). Returns the matched absolute root, or
+ * `undefined` when no child matches (the caller falls through to the
+ * legacy walk). Throws fail-loud — naming the candidates — when more
+ * than one child matches, so an ambiguous slug never resolves to a
+ * silently-picked directory (spec 013 FR / Constitution Principle V).
+ */
+async function resolveSpeckitRoot(
+  repoRoot: string,
+  slug: string,
+): Promise<string | undefined> {
+  const specsRoot = join(repoRoot, 'specs');
+  if (!existsSync(specsRoot)) return undefined;
+  let children: ReadonlyArray<string>;
+  try {
+    children = await readdir(specsRoot);
+  } catch {
+    return undefined;
+  }
+  const prefixed = new RegExp(`^\\d+-${escapeRegExp(slug)}$`);
+  const matches = children
+    .filter((name) => name === slug || prefixed.test(name))
+    .sort();
+  if (matches.length === 0) return undefined;
+  if (matches.length > 1) {
+    throw new Error(
+      `resolveFeatureRoot: ambiguous slug '${slug}' under ${specsRoot} — ` +
+        `${matches.length} directories match (${matches.join(', ')}). ` +
+        `Disambiguate the specs/ layout; the resolver will not silently pick one.`,
+    );
+  }
+  return join(specsRoot, matches[0]!);
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

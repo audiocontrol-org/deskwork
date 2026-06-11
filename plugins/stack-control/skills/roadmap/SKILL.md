@@ -77,6 +77,16 @@ leaves the document byte-for-byte unchanged). The kind + phase ride in the
 identifier — there is no separate `--kind` flag; `reclassify` is how you change
 them (it rewrites every referencing edge atomically).
 
+> **Where a roadmap node can originate.** Roadmap work is not only authored fresh
+> here — a node can **graduate up from the backlog**. When a found-work item in
+> the [backlog](../backlog/SKILL.md) earns the full treatment, the operator
+> `backlog promote <id> --to roadmap:<phase>:<kind>/<slug>` records the
+> promotion linkage on the item (record-only), then creates the node here with
+> `roadmap add`. By convention the new node carries the originating `TASK-<n>`
+> ref in its body, so the promotion is navigable both ways. See
+> [`/stack-control:backlog`](../backlog/SKILL.md) § *Promote into the feature
+> rigor* for the canonical description of the seam.
+
 ## Steps (the discipline)
 
 1. **Dry-run first, always.** Run the mutation without `--apply`; it reports the

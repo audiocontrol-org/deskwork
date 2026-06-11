@@ -35,7 +35,7 @@
 
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { basename, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { repoRoot } from '../repo.js';
 import {
   extractBarrageFindings,
@@ -174,10 +174,47 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
 // walker was extracted into the shared `resolveFeatureRoot` helper
 // (in scope-discovery/util/feature-root.ts). Both this file and
 // workplan-aware-gate.ts now call the same function, so any future
-// change to the resolution logic lives in one place.
-async function resolveFeatureRoot(rootDir: string, slug: string): Promise<string | null> {
-  const { root } = await resolveFeatureRootShared({ repoRoot: rootDir, slug });
-  return root ?? null;
+// change to the resolution logic lives in one place. Spec 013: the
+// shared helper now reports which `layout` produced the root, which
+// the scaffold uses to decide the header's `targetVersion`.
+interface ResolvedFeature {
+  readonly root: string;
+  readonly layout?: 'legacy-docs' | 'speckit';
+}
+
+async function resolveFeatureRoot(
+  rootDir: string,
+  slug: string,
+): Promise<ResolvedFeature | null> {
+  const { root, layout } = await resolveFeatureRootShared({ repoRoot: rootDir, slug });
+  if (root === undefined) return null;
+  return { root, ...(layout !== undefined ? { layout } : {}) };
+}
+
+/**
+ * Spec 013 US2: the canonical audit-log header scaffolded at a
+ * resolved feature root that has none yet. `targetVersion` carries the
+ * legacy-docs version axis (derived from the resolved path); a speckit
+ * feature has no version axis, so it is the empty string.
+ */
+function buildAuditLogHeader(slug: string, targetVersion: string): string {
+  return [
+    '---',
+    `slug: ${slug}`,
+    `targetVersion: "${targetVersion}"`,
+    '---',
+    '',
+    `# Audit log — ${slug}`,
+    '',
+  ].join('\n');
+}
+
+/** The legacy-docs version is the dir between `docs/` and `001-IN-PROGRESS`
+ * in `<docs>/<version>/001-IN-PROGRESS/<slug>`; a speckit root has no
+ * version axis (empty string). */
+function deriveTargetVersion(feature: ResolvedFeature): string {
+  if (feature.layout !== 'legacy-docs') return '';
+  return basename(dirname(dirname(feature.root)));
 }
 
 function highestExistingNn(auditLogText: string, date: string): number {
@@ -256,10 +293,12 @@ export async function runAuditBarrageLift(
 ): Promise<number> {
   const { opts, projectRoot, stdout, stderr } = args;
   const repoRootResolved = opts.repoRoot ?? projectRoot;
-  const featureRoot = await resolveFeatureRoot(repoRootResolved, opts.featureSlug);
-  if (featureRoot === null) {
+  const feature = await resolveFeatureRoot(repoRootResolved, opts.featureSlug);
+  if (feature === null) {
     stderr.write(
-      `audit-barrage-lift: feature '${opts.featureSlug}' not found under docs/*/001-IN-PROGRESS/.\n`,
+      `audit-barrage-lift: feature '${opts.featureSlug}' not found under ` +
+        `${join(repoRootResolved, 'specs')}/<NNN>-${opts.featureSlug} (speckit) or ` +
+        `${join(repoRootResolved, 'docs')}/*/001-IN-PROGRESS/${opts.featureSlug} (legacy-docs).\n`,
     );
     return 2;
   }
@@ -269,11 +308,13 @@ export async function runAuditBarrageLift(
     );
     return 2;
   }
-  const auditLogPath = join(featureRoot, 'audit-log.md');
-  if (!existsSync(auditLogPath)) {
-    stderr.write(`audit-barrage-lift: audit-log not found at ${auditLogPath}.\n`);
-    return 2;
-  }
+  const auditLogPath = join(feature.root, 'audit-log.md');
+  // Spec 013 US2: a brand-new feature's first barrage has no audit-log
+  // yet. Instead of aborting (the old `return 2`), scaffold the
+  // canonical header at the resolved root and continue to the append
+  // path. This only triggers once a root RESOLVED — it is not a
+  // fallback for an unresolved feature (which still fails loud above).
+  const auditLogMissing = !existsSync(auditLogPath);
 
   const findings = await extractBarrageFindings({
     runDir: opts.runDir,
@@ -294,7 +335,12 @@ export async function runAuditBarrageLift(
   // supply their own write seam.
   const writer = args.write ?? atomicWriteFile;
 
-  const auditLogText = await reader(auditLogPath);
+  // When the audit-log is absent, the scaffolded canonical header is
+  // the base the run section appends to (and what gets written on
+  // --apply); an existing file keeps its header untouched (idempotent).
+  const auditLogText = auditLogMissing
+    ? buildAuditLogHeader(opts.featureSlug, deriveTargetVersion(feature))
+    : await reader(auditLogPath);
   const highest = highestExistingNn(auditLogText, opts.date);
   const startingNn = highest + 1;
   const { section, assignedIds } = renderSection(

@@ -120,7 +120,10 @@ export async function runSpecGovernanceGate(args: string[]): Promise<void> {
   const { root: featureRoot } = await resolveFeatureRoot({ repoRoot, slug: opts.feature });
   if (featureRoot === undefined) {
     process.stderr.write(
-      `spec-governance-gate: FATAL — feature '${opts.feature}' not found under ${join(repoRoot, 'docs')}/*/001-IN-PROGRESS/ (no decision; spec NOT governed).\n`,
+      `spec-governance-gate: FATAL — feature '${opts.feature}' not found under ` +
+        `${join(repoRoot, 'specs')}/<NNN>-${opts.feature} (speckit) or ` +
+        `${join(repoRoot, 'docs')}/*/001-IN-PROGRESS/${opts.feature} (legacy-docs) ` +
+        `(no decision; spec NOT governed).\n`,
     );
     process.exit(2);
   }

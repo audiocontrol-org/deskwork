@@ -38,6 +38,32 @@ function canonical(value: string): string {
   return m !== null ? m[0] : value;
 }
 
+/**
+ * specs/014 AUDIT-20260611-05: a status-line SHAPE match is not an identity
+ * match — audit-log entries are uniform field blocks, so an edit shifting
+ * lines by exactly one entry height lands a recorded index on a DIFFERENT
+ * entry's open-status line. Pin identity: the entry block enclosing
+ * `statusLineIndex` (from the nearest `### ` header above — or the start of
+ * the text — down to the next `### ` header or end) must contain a
+ * `Finding-ID:` line whose value exactly matches the finding's fullFindingId.
+ */
+function entryBlockHasFindingId(
+  lines: readonly string[],
+  statusLineIndex: number,
+  fullFindingId: string,
+): boolean {
+  let start = statusLineIndex;
+  while (start > 0 && !ENTRY_HEADER_RE.test(lines[start] ?? '')) start -= 1;
+  let end = statusLineIndex + 1;
+  while (end < lines.length && !ENTRY_HEADER_RE.test(lines[end] ?? '')) end += 1;
+  const expected = fullFindingId.trim();
+  for (let k = start; k < end; k += 1) {
+    const m = FINDING_ID_RE.exec(lines[k] ?? '');
+    if (m !== null && m[1] !== undefined && m[1].trim() === expected) return true;
+  }
+  return false;
+}
+
 /** The migrated item's backlink ref (traceable to the audit-log entry, FR-016). */
 export function auditRef(featureSlug: string, findingId: string): string {
   return `audit:${featureSlug}:${findingId}`;
@@ -87,36 +113,118 @@ export function findFindingsByStatus(auditLogText: string, statusMatch: RegExp):
 export interface MigrationResult {
   readonly newAuditLogText: string;
   readonly migrated: readonly { readonly findingId: string; readonly taskId: string }[];
-  /** Finding ids skipped because a backlog item with their ref already exists. */
-  readonly skipped: readonly string[];
+  /**
+   * Findings for which NO new item was created because a backlog item with
+   * their ref already exists — mapped to that existing item's id. Their
+   * Status lines are still rewritten (see AUDIT-20260611-02 below).
+   */
+  readonly skipped: readonly { readonly findingId: string; readonly taskId: string }[];
 }
 
 /**
  * Create one `migrated-finding` backlog item per finding (priority from
  * severity; provenance = feature slug + finding id; ref → audit-log entry) and
  * rewrite each finding's Status line to `migrated-to-backlog <task-id>`.
- * Idempotent: a finding whose `audit:<slug>:<id>` ref already exists is skipped.
+ * Idempotent on item CREATION: a finding whose `audit:<slug>:<id>` ref already
+ * exists creates no new item — but its Status line IS still rewritten, to the
+ * EXISTING item's id (specs/014 AUDIT-20260611-02: the ref is keyed by
+ * canonical AUDIT-id, not by entry, so a same-id entry decided in a later run
+ * must not be left silently open behind an exit-0 apply). Such findings are
+ * recorded in `skipped` (= "no NEW item created"). If the ref exists but no
+ * listed item carries it, the store is inconsistent — fail loud.
  * HIGH/blocking severities throw via severityToPriority (FR-018 fail-loud).
+ *
+ * specs/014 US4 location guard: when `expectedStatusRe` is provided, EVERY
+ * finding's recorded `statusLineIndex` is validated against the current text
+ * BEFORE anything is created — a flip whose location no longer matches (the
+ * audit-log changed between flip computation and apply, or the location was
+ * never valid) throws naming the finding ID.
+ *
+ * specs/014 AUDIT-20260611-11: severity is ALSO validated up front — the
+ * severityToPriority call runs for every finding in an unconditional pre-pass
+ * (the backfill / import-slush path passes no expectedStatusRe but can carry
+ * hand-edited arbitrary severities), so an FR-018 throw fires before any
+ * backend.create or line rewrite. Validate-first thus covers location,
+ * identity, AND severity: a failing input creates zero items and rewrites
+ * zero lines — never a partial misapply, never an exit-0 shortfall. The only
+ * remaining mid-loop failures are genuine I/O faults (spawn/store errors),
+ * which on re-run self-heal via the ref-exists rewrite branch
+ * (AUDIT-20260611-02).
  */
 export function migrateFindings(args: {
   auditLogText: string;
   findings: readonly FoundFinding[];
   backend: BacklogBackend;
   featureSlug: string;
+  expectedStatusRe?: RegExp;
 }): MigrationResult {
   const lines = args.auditLogText.split('\n');
+  if (args.expectedStatusRe !== undefined) {
+    for (const f of args.findings) {
+      const located = lines[f.statusLineIndex];
+      if (located === undefined || !args.expectedStatusRe.test(located)) {
+        throw new Error(
+          `slush-migrate: finding ${f.findingId} could not be located at its ` +
+            `recorded status line (index ${f.statusLineIndex}) — the audit-log ` +
+            `changed between the dampener decision and apply. Nothing was ` +
+            `migrated; re-run to recompute the decision against the current file.`,
+        );
+      }
+      // AUDIT-20260611-05: the line SHAPE matching is not enough — pin the
+      // finding's identity to the enclosing entry block, or a one-entry-height
+      // shift would rewrite a DIFFERENT entry's status with this task-id.
+      if (!entryBlockHasFindingId(lines, f.statusLineIndex, f.fullFindingId)) {
+        throw new Error(
+          `slush-migrate: finding ${f.findingId} could not be located at its ` +
+            `recorded status line (index ${f.statusLineIndex}) — the recorded ` +
+            `location now points at a different entry (its block does not ` +
+            `contain Finding-ID: ${f.fullFindingId}); the audit-log changed ` +
+            `between the dampener decision and apply. Nothing was migrated; ` +
+            `re-run to recompute the decision against the current file.`,
+        );
+      }
+    }
+  }
+  // AUDIT-20260611-11: severity pre-pass — runs unconditionally (the backfill
+  // path has no expectedStatusRe but needs it too) so an FR-018 throw fires
+  // before any create. severityToPriority's own message names the severity but
+  // not the finding; wrap so the offending entry is identifiable. Priorities
+  // are computed once here (index-aligned with args.findings) and reused below.
+  const priorities = args.findings.map((f): 'medium' | 'low' => {
+    try {
+      return severityToPriority(f.severity);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `slush-migrate: finding ${f.findingId}: ${reason}. Nothing was migrated.`,
+      );
+    }
+  });
   const migrated: { findingId: string; taskId: string }[] = [];
-  const skipped: string[] = [];
-  for (const f of args.findings) {
+  const skipped: { findingId: string; taskId: string }[] = [];
+  for (let idx = 0; idx < args.findings.length; idx += 1) {
+    const f = args.findings[idx]!;
     const ref = auditRef(args.featureSlug, f.findingId);
     if (args.backend.exists(ref)) {
-      skipped.push(f.findingId);
+      // Already migrated — to an item that already exists. Rewrite the Status
+      // line anyway (AUDIT-20260611-02): leaving it open would re-decide the
+      // flip every run, skip it every apply, and exit 0 every time.
+      const existing = args.backend.list().find((item) => item.refs.includes(ref));
+      if (existing === undefined) {
+        throw new Error(
+          `slush-migrate: finding ${f.findingId} has an existing backlog ref ` +
+            `(${ref}) per exists(), but no listed item carries it — the backlog ` +
+            `store is inconsistent. Fix or remove the offending task file, then re-run.`,
+        );
+      }
+      lines[f.statusLineIndex] = `Status: migrated-to-backlog ${existing.id}`;
+      skipped.push({ findingId: f.findingId, taskId: existing.id });
       continue;
     }
     const taskId = args.backend.create({
       title: f.title.length > 0 ? f.title : f.findingId,
       labels: [typeLabel('migrated-finding'), `feature:${args.featureSlug}`, `finding:${f.findingId}`],
-      priority: severityToPriority(f.severity),
+      priority: priorities[idx]!,
       refs: [ref],
     });
     lines[f.statusLineIndex] = `Status: migrated-to-backlog ${taskId}`;
@@ -128,7 +236,10 @@ export function migrateFindings(args: {
 /**
  * One-time backfill (US4, FR-021): migrate every `acknowledged-slush-pile-*`
  * entry in the audit-log into the backlog. Dry-run reports the set and writes
- * nothing; apply creates items + rewrites dispositions. Idempotent.
+ * nothing; apply creates items + rewrites dispositions. Idempotent on item
+ * creation; per AUDIT-20260611-02, an already-imported parked entry still gets
+ * its status rewritten to reference the existing item (never left parked
+ * forever behind a ref-idempotency skip).
  */
 export function backfillSlush(args: {
   auditLogText: string;
