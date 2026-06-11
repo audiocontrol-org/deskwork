@@ -22,4 +22,6 @@ if [ -z "$TSX" ]; then
   exit 1
 fi
 
-exec "$TSX" "$PLUGIN_ROOT/src/authoring/check-wireframe-cli.ts" "$@"
+# --tsconfig pins the plugin's own tsconfig (and its @/* alias); without it tsx
+# resolves from the caller's cwd and the documented repo-root invocation crashes.
+exec "$TSX" --tsconfig "$PLUGIN_ROOT/tsconfig.json" "$PLUGIN_ROOT/src/authoring/check-wireframe-cli.ts" "$@"
