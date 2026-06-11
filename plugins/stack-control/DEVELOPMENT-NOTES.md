@@ -2,6 +2,31 @@
 
 ---
 
+## 2026-06-11: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 4
+  - docs(013): mark tasks T001-T017 complete + record deviations
+  - fix(013): route govern audit-log excerpt through the layout-aware helper (TASK-25)
+  - feat(013): scaffold audit-log on first lift instead of aborting (US2)
+  - feat(013): layout-aware feature resolution — resolve specs/NNN-slug (US1 MVP)
+- Files changed: 13
+- Backlog touched: TASK-24, TASK-25
+
 ## 2026-06-10: Recover dropped backlog bodies; author + narrow spec 013 (audit-protocol path resolution)
 
 **Goal:** Triage the backlog's most egregious audit-protocol friction and graduate it into the Spec Kit rigor via the promote seam — and, along the way, recover data lost in a prior GitHub→backlog migration.
