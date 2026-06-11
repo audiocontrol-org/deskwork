@@ -299,3 +299,35 @@ My two findings sit at the README/CLI-warning consistency seams, not the spawn/s
 ---
 
 Note on harness context: this was an audit-barrage review request, not an implementation task, so there is nothing to plan or build — the findings above are the deliverable. I made no edits and took only read-only actions. If you'd like, I can open issues for AUDIT-BARRAGE-claude-01/-02 or fold them into the feature's `audit-log.md` via the normal lift flow.
+
+## 2026-06-11 — audit-barrage lift (20260611T130358943Z-audit-barrage-reliability-after_clarify)
+
+### AUDIT-20260611-21 — Stream-json lanes record an `events path` row pointing at a file that may never exist (spawn-failed / zero-output stream lanes)
+
+Finding-ID: AUDIT-20260611-21 (claude-01 + claude-02 + codex-01; cross-model)
+Status:     fixed-f3fee407
+Severity:   high
+Surface:    plugins/stack-control/src/scope-discovery/audit-barrage/spawn-cli.ts (`settleCaptures`, the `...(streamMode ? { eventsPath: input.eventsPath } : {})` clause) + plugins/stack-control/src/scope-discovery/audit-barrage/stream-result-extractor.ts (`ensureStream` lazy creation) + run-artifacts.ts `renderModelRow` (`- events path:` row)
+
+`settleCaptures` attaches `eventsPath` to the result for **every** stream-json lane, keyed solely on `streamMode` — regardless of terminal state. But `createStreamResultExtractor` creates the events file lazily inside `ensureStream()`, which fires only on the first `consumeLine()` call (i.e. the first newline-terminated chunk). Two real cases therefore record an `eventsPath` for a file that does not exist on disk: (1) a **spawn-failed** stream lane (ENOENT/E2BIG — `reportSpawnError` → `finish(..., 'spawn-failed')` → `settleCaptures`, but no chunk ever arrived so `eventsStream` stayed `null`); and (2) a stream lane that closes `completed` having emitted **zero stdout bytes** (extractor created, never fed). In both, `renderModelRow` then emits `- events path: <runDir>/<model>.events.ndjson` into INDEX.md naming a nonexistent file.
+
+The blast radius is genuinely low: the only consumer that dereferences this path is the forensic utility `rebuild-artifact-from-events.ts`, which does `readFileSync(eventsPath)` and would throw `ENOENT` — but an operator only reaches for that tool on a lane they believe captured events, and a spawn-failed/empty lane has nothing to rebuild. It is nonetheless a small honesty gap inconsistent with the feature's "artifact paths reflect what's on disk" posture (the same principle AUDIT-01 enforced for `produced` via `report bytes` rather than `existsSync`). A clean fix mirrors that principle: only record `eventsPath` when the extractor actually wrote a capture (e.g. have `extractor.settle()` report whether bytes were written, and gate the field + the INDEX row on it), so the manifest never points at a file that was never created.
+
+---
+
+### AUDIT-20260611-22 — Independent clean signal on the spawn/settle/synthesis core, the config v2 grammar, and the synthesis vocabulary
+
+Finding-ID: AUDIT-20260611-22
+Status:     acknowledged-not-a-defect-20260611 (clean-signal record from the auditing lane, not a finding)
+Severity:   informational
+Surface:    (the rest of the diff)
+
+To give the operator cross-model signal alongside any sibling lanes, here is what I checked and judged **clean**, with reasoning:
+
+- **The five-state settle machine and kill interlocks (`spawn-cli.ts`) are correct.** `killReason` is a single latch checked at the top of every kill callback (`if (settled || killReason !== null) return`), so `timed-out` and `killed-no-liveness` are disjoint; the close handler classifies `signal !== null && killReason === null` as `killed-external` (AUDIT-13 holds), and `killReason` takes precedence over `signal` so our own SIGTERM→SIGKILL grace path still classifies as `timed-out`/`killed-no-liveness` regardless of which signal actually reaped the child. `clearTimers()` + `watchdog?.disarm()` fire on every settle path; `finish()`'s `settled` guard makes it single-shot.
+- **`buildArgs` enforcement injection is correct.** `containsContiguous(tokens.slice(0, insertAt), fragment)` suppresses injection only for a fragment present *before* the prompt placeholder (AUDIT-05); the stdin placeholder is stripped via exact-equality `.filter`, exhaustive because the loader rejects embedded `{{prompt-stdin}}` (AUDIT-12); a whitespace-only fragment trims to zero tokens and injects nothing while `isLaneEnforced` marks the lane `unenforced` everywhere including the fire-time warning (AUDIT-17/19, one shared predicate).
+- **`parseIndexLaneStates` does not misparse the `## Fleet report` block.** Because `## Fleet report` is two `#` (heading regex requires `###`), `current` remains the last model lane while scanning the fleet block, but the line-anchored `^- report bytes:` / `^- terminal state:` / `^- enforcement:` / `^- liveness:` regexes match none of `- configured:` / `- <lane>: completed [...]` / `- quorum:`, so fleet lanes are not double-counted; a mixed v2 INDEX throws `IndexLaneParseError` rather than silently lowering `configured` (AUDIT-07).
+- **`settleCaptures` `reportBytes` derivation is mutually exclusive** (extractor XOR `stdoutStream`, both keyed off `streamMode`); a killed stream lane with no `result` event yields `resultText: null` → no `<model>.md` → `reportBytes 0` → excluded from lift and `produced`. **Stream multi-turn assembly** (all assistant texts, dedup only the trailing result duplicate, null on no-result) matches the FR-005 replay tests. **Timeout derivation** (`max(floor, ceil(secs/KB × KB))`, override displacement, linear extrapolation, fail-loud backstop) matches `timeout-derivation.test.ts`, and the calibration reconciles (69234 B × 13 → 879 s in quickstart; 69000 B × 13 → 876 s in the test).
+- **Config v2 fail-loud surface is complete and consistent** — trim-aware non-blank on all string fields, `{{model}}` placeholder required, enum + window refusals, window-on-`none` refusal (AUDIT-14), derivation-pair-or-override, and the pre-014 migration gate naming file + every missing field + template path. The one cosmetic asymmetry — `requireEnum`/`requirePositiveInteger`/`requirePositiveNumber` thread the bare `prefix` while `model`/`readonly_enforcement` thread `${prefix} ('${name}')` — does not lose identifiability because `prefix` already carries the `models[index]` locator, so I did not raise it as a defect.
+
+My two findings sit at the artifact-honesty / DRY seams, not the spawn/settle/synthesis core, which I judge sound. There is nothing to implement here — the findings above are the deliverable; I made no edits and took only read-only actions. The two new items can be folded into `specs/014-audit-barrage-reliability/audit-log.md` via the normal lift flow if you want them tracked.
