@@ -215,6 +215,58 @@ describe('parseDesignSpec — structural rejections', () => {
     expect(findings).toContain('missing-example');
   });
 
+  it('flags a capitalised "Rule:" heading as a near-miss, not inert structure', () => {
+    const result = parseDesignSpec(`### Rule: masthead
+- kind: component
+- css: styles/studio.css .masthead
+- example: every page renders the masthead
+- do: Every page opens with the masthead.
+`);
+    expect(result.ok).toBe(false);
+    expect(result.findings.some((f) => f.rule === 'malformed-rule-heading')).toBe(true);
+    expect(result.spec.rules).toEqual([]);
+  });
+
+  it('flags a colon-less "rule <id>" heading as a near-miss', () => {
+    expect(findingsFor('### rule missing-colon\n- kind: palette\n')).toContain(
+      'malformed-rule-heading',
+    );
+  });
+
+  it('leaves genuinely unrelated headings inert (word boundary: "Ruler" is not "rule")', () => {
+    const result = parseDesignSpec(`## Ruler settings
+
+## Palette
+
+### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.spec.rules.map((r) => r.id)).toEqual(['ink']);
+  });
+
+  it('a near-miss heading alongside a valid rule still flags (no silent green)', () => {
+    const result = parseDesignSpec(`### Rule: masthead
+- kind: component
+- css: styles/studio.css .masthead
+- example: every page renders the masthead
+- do: Every page opens with the masthead.
+
+### rule: fine
+- kind: type
+- css: styles/studio.css .serif
+- example: body copy
+- do: Use the serif stack for prose.
+`);
+    expect(result.ok).toBe(false);
+    expect(result.spec.rules.map((r) => r.id)).toEqual(['fine']);
+    expect(result.findings.map((f) => f.rule)).toContain('malformed-rule-heading');
+  });
+
   it('excludes invalid rules from spec.rules but keeps valid siblings', () => {
     const result = parseDesignSpec(`### rule: broken
 - kind: palette

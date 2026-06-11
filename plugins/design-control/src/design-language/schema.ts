@@ -16,7 +16,11 @@
  * named-deferred `spec-truthfulness`); ≥1 do/don't guidance line. A lowercase
  * single-word bullet key outside the closed set is an `unknown-field` finding
  * (typo guard) — silently dropping a misspelled `example:` would otherwise
- * fabricate a missing-example rejection with no visible cause.
+ * fabricate a missing-example rejection with no visible cause. The same
+ * philosophy applies at heading level: a heading whose first word is `rule`
+ * but that misses the strict `rule: <id>` form (`Rule: x`, `rule x`) is a
+ * `malformed-rule-heading` finding — never silently demoted to inert
+ * structure, which would drop the whole intended rule with zero findings.
  */
 
 import {
@@ -30,6 +34,13 @@ import {
 
 const HEADING_RE = /^#{1,6}\s+(.*)$/;
 const RULE_HEADING_RE = /^rule:\s*(.*)$/;
+/**
+ * Heading-level typo guard: a heading whose first word is `rule` (any case,
+ * colon or not) is an ATTEMPTED rule heading; if it misses the strict
+ * lowercase `rule: <id>` form it is a `malformed-rule-heading` finding, never
+ * inert structure. The `\b` keeps unrelated headings (`Ruler settings`) inert.
+ */
+const RULE_NEAR_MISS_RE = /^rule\b/i;
 /** A field bullet: lowercase single-word key (apostrophe allowed: `don't`). */
 const FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z']*)\s*:\s*(.*)$/;
 
@@ -169,8 +180,19 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
     const heading = HEADING_RE.exec(line.trim());
     if (heading !== null) {
       current = undefined;
-      const ruleHeading = RULE_HEADING_RE.exec(heading[1].trim());
+      const headingText = heading[1].trim();
+      const ruleHeading = RULE_HEADING_RE.exec(headingText);
       if (ruleHeading === null) {
+        if (RULE_NEAR_MISS_RE.test(headingText)) {
+          const offence = /^rule:/i.test(headingText)
+            ? 'the "rule:" prefix must be lowercase'
+            : 'missing the ":" after "rule"';
+          findings.push({
+            rule: 'malformed-rule-heading',
+            message: `Heading "${headingText}" looks like a rule heading but ${offence} — expected "rule: <id>".`,
+            line: lineNo,
+          });
+        }
         continue;
       }
       const id = ruleHeading[1].trim();
