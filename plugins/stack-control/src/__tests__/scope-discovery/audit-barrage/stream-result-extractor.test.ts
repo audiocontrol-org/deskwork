@@ -83,3 +83,57 @@ describe('result-event extraction (FR-010)', () => {
     expect(resultText).toBe('second');
   });
 });
+
+describe('multi-turn assistant-text assembly (FR-005 distortion fix, 2026-06-11 SC-001 replay)', () => {
+  // The live FR-005 verification caught this: a plan-mode agentic run emitted
+  // its 6 finding blocks in a MID-RUN assistant message; the terminal result
+  // event carried only the wrap-up summary (a duplicate of the LAST assistant
+  // text). Last-message-only extraction produced an artifact with zero
+  // finding blocks — unliftable. The artifact must assemble EVERY assistant
+  // text block when the stream completed its protocol.
+  function assistantEvent(text: string): string {
+    return JSON.stringify({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text }] },
+    });
+  }
+
+  it('assembles all assistant text blocks; the result-event duplicate of the final message is not doubled', async () => {
+    const x = createStreamResultExtractor(eventsPath());
+    const findings = '### AUDIT-BARRAGE-claude-01 — mid-run finding\n\nSeverity: high';
+    const summary = 'Bottom line: one finding, see above.';
+    x.onChunk(
+      Buffer.from(
+        [
+          assistantEvent('Starting the audit.'),
+          assistantEvent(findings),
+          assistantEvent(summary),
+          JSON.stringify({ type: 'result', subtype: 'success', result: summary }),
+        ].join('\n') + '\n',
+      ),
+    );
+    const { resultText } = await x.settle();
+    expect(resultText).toBe(`Starting the audit.\n\n${findings}\n\n${summary}`);
+  });
+
+  it('a result text that is NOT a duplicate of the last assistant text is appended, never dropped', async () => {
+    const x = createStreamResultExtractor(eventsPath());
+    x.onChunk(
+      Buffer.from(
+        [
+          assistantEvent('mid-run analysis'),
+          JSON.stringify({ type: 'result', result: 'distinct final text' }),
+        ].join('\n') + '\n',
+      ),
+    );
+    const { resultText } = await x.settle();
+    expect(resultText).toBe('mid-run analysis\n\ndistinct final text');
+  });
+
+  it('a killed stream with assistant texts but NO result event still yields null (artifact stays absent)', async () => {
+    const x = createStreamResultExtractor(eventsPath());
+    x.onChunk(Buffer.from(`${assistantEvent('partial work before the kill')}\n`));
+    const { resultText } = await x.settle();
+    expect(resultText).toBeNull();
+  });
+});
