@@ -395,9 +395,17 @@ const PROMPT_STDIN_PLACEHOLDER = '{{prompt-stdin}}';
  * lane's `readonly_enforcement` fragment immediately before the prompt
  * placeholder (FR-003 — injection makes enforcement mechanical even
  * when the template author forgot it; a fragment the template already
- * carries is NOT duplicated), substitute the `{{model}}` pin (FR-001),
- * strip `{{prompt-stdin}}` tokens (stdin delivery), and substitute
- * `{{prompt}}`.
+ * carries BEFORE the prompt placeholder is NOT duplicated), substitute
+ * the `{{model}}` pin (FR-001), strip `{{prompt-stdin}}` tokens (stdin
+ * delivery), and substitute `{{prompt}}`.
+ *
+ * The already-present check only looks at tokens BEFORE the prompt
+ * placeholder: CLIs may stop option parsing at the prompt/subcommand
+ * boundary, so a fragment positioned after the prompt can be inert —
+ * skipping injection there would mark the lane `enforced` while the
+ * effective argv is NOT mechanically read-only (the FR-003 failure
+ * mode). A benign duplicate after the prompt is acceptable; an
+ * unenforced argv marked enforced is not.
  *
  * Substitution rules (per placeholder):
  *   - Token equals the placeholder (bare-token form): replaced
@@ -427,12 +435,15 @@ export function buildArgs(
       .trim()
       .split(/\s+/)
       .filter((t) => t.length > 0);
-    if (fragment.length > 0 && !containsContiguous(tokens, fragment)) {
-      const promptIndex = tokens.findIndex(
-        (tok) =>
-          tok.includes(PROMPT_PLACEHOLDER) || tok.includes(PROMPT_STDIN_PLACEHOLDER),
-      );
-      const insertAt = promptIndex === -1 ? tokens.length : promptIndex;
+    const promptIndex = tokens.findIndex(
+      (tok) =>
+        tok.includes(PROMPT_PLACEHOLDER) || tok.includes(PROMPT_STDIN_PLACEHOLDER),
+    );
+    const insertAt = promptIndex === -1 ? tokens.length : promptIndex;
+    if (
+      fragment.length > 0 &&
+      !containsContiguous(tokens.slice(0, insertAt), fragment)
+    ) {
       assembled = [
         ...tokens.slice(0, insertAt),
         ...fragment,

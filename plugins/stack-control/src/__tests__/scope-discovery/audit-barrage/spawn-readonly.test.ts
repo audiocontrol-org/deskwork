@@ -64,6 +64,26 @@ describe('argv assembly injects the enforcement fragment (FR-003)', () => {
     expect(args).toEqual(['-p', '--permission-mode', 'plan', 'AUDIT THIS']);
   });
 
+  it('still injects before the prompt when the fragment appears only AFTER it', () => {
+    // AUDIT-20260611-05: a fragment positioned after the prompt placeholder
+    // does NOT count as present — CLIs that stop option parsing at the
+    // prompt boundary would run unenforced while marked `enforced`. The
+    // benign duplicate after the prompt is acceptable; injection before
+    // the prompt is not skippable (FR-003).
+    const args = buildArgs(
+      lane({ argsTemplate: '-p {{prompt}} --permission-mode plan' }),
+      'AUDIT THIS',
+    );
+    expect(args).toEqual([
+      '-p',
+      '--permission-mode',
+      'plan',
+      'AUDIT THIS',
+      '--permission-mode',
+      'plan',
+    ]);
+  });
+
   it('injects nothing for the sentinel `none`', () => {
     const args = buildArgs(lane({ readonlyEnforcement: 'none' }), 'AUDIT THIS');
     expect(args).toEqual(['-p', 'AUDIT THIS']);
