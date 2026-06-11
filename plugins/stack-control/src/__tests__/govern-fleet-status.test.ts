@@ -8,11 +8,11 @@
 // as degraded. Pre-014 run dirs (stub barrage bins, legacy INDEX) emit no
 // fleet lines (compat).
 
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { reportFleetStatus } from '../govern/protocol.js';
+import { GovernProtocolError, reportFleetStatus } from '../govern/protocol.js';
 import {
   renderIndexBody,
   safeModelName,
@@ -118,6 +118,25 @@ describe('govern round status includes the fleet report (T020 / FR-007)', () => 
     expect(err).toContain('govern: fleet — configured 2, produced 2');
     expect(err).not.toContain('DEGRADED');
     expect(err).not.toContain('quorum');
+  });
+
+  it('a mixed v2 INDEX throws a GovernProtocolError naming the lane (AUDIT-20260611-07)', () => {
+    const runDir = makeRunDir([
+      laneResult({}),
+      laneResult({ name: 'codex', reportBytes: 77, stdoutBytes: 77 }),
+    ]);
+    // Writer-drift simulation: strip exactly codex's report-bytes row. The
+    // degraded lane must surface as a loud protocol failure, never as a
+    // silently-smaller `configured`.
+    const indexPath = join(runDir, 'INDEX.md');
+    const corrupted = readFileSync(indexPath, 'utf8')
+      .split('\n')
+      .filter((line) => line !== '- report bytes: 77')
+      .join('\n');
+    writeFileSync(indexPath, corrupted, 'utf8');
+    expect(() => collect(runDir)).toThrow(GovernProtocolError);
+    expect(() => collect(runDir)).toThrow(/codex/);
+    expect(() => collect(runDir)).toThrow(/AUDIT-20260611-07/);
   });
 
   it('a missing or pre-014 INDEX emits nothing (stub/legacy compat)', () => {

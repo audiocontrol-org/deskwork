@@ -44,9 +44,11 @@ import {
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
 import {
   computeFleetReportFromParsedLanes,
+  IndexLaneParseError,
   parseIndexLaneStates,
   renderFleetReportLines,
   safeModelName,
+  type ParsedIndexLane,
 } from '../scope-discovery/audit-barrage/run-artifacts.js';
 import type { FleetReport } from '../scope-discovery/audit-barrage/types.js';
 import { resolveFeatureRoot as resolveFeatureRootShared } from '../scope-discovery/util/feature-root.js';
@@ -322,19 +324,45 @@ export async function runAuditBarrageLift(
   // (FR-004's at-synthesis marking always fires, not only on degradation).
   // A pre-014 run dir (no v2 rows) keeps the old lift-everything behavior.
   const indexPath = join(opts.runDir, 'INDEX.md');
-  const lanes = existsSync(indexPath)
-    ? parseIndexLaneStates(await (args.read ?? ((p: string) => readFile(p, 'utf8')))(indexPath))
-    : null;
+  let lanes: ParsedIndexLane[] | null = null;
+  if (existsSync(indexPath)) {
+    const indexText = await (args.read ?? ((p: string) => readFile(p, 'utf8')))(indexPath);
+    try {
+      lanes = parseIndexLaneStates(indexText);
+    } catch (err) {
+      // AUDIT-20260611-07: a mixed v2 INDEX is a corruption signal — the
+      // barrage's v2 writer never produces one. Abort the lift loudly
+      // instead of lifting over a fleet report whose `configured` count
+      // silently dropped the unparseable lane.
+      if (err instanceof IndexLaneParseError) {
+        stderr.write(
+          `audit-barrage-lift: corrupt INDEX at ${indexPath} — ${err.message}\n`,
+        );
+        return 2;
+      }
+      throw err;
+    }
+  }
   let includeModels: ReadonlySet<string> | undefined;
   let fleet: FleetReport | undefined;
   if (lanes !== null) {
     for (const lane of lanes) {
       const status = `audit-barrage-lift: lane ${lane.name} — ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]`;
-      stderr.write(
-        lane.terminalState === 'completed'
-          ? `${status}\n`
-          : `${status} — contributes ZERO findings (non-completed lane)\n`,
-      );
+      if (lane.terminalState !== 'completed') {
+        stderr.write(`${status} — contributes ZERO findings (non-completed lane)\n`);
+      } else if (lane.exitCode !== 0 || lane.reportBytes === 0) {
+        // AUDIT-20260611-09: a lane can settle `completed` yet not be
+        // converged-eligible (nonzero exit or empty report) — the fleet
+        // report excludes it from `produced`, so the status line must say
+        // why, or the operator sees "completed" next to "⚠ DEGRADED" with
+        // nothing connecting them.
+        stderr.write(
+          `${status} — completed but non-converged (exit ${lane.exitCode}, ` +
+            `report bytes ${lane.reportBytes}); not counted as produced\n`,
+        );
+      } else {
+        stderr.write(`${status}\n`);
+      }
     }
     includeModels = new Set(
       lanes

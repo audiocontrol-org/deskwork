@@ -9,7 +9,7 @@
 // killed lane can never make a run read "clean". Pre-014 run dirs (no v2
 // INDEX) keep the old behavior.
 
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -224,6 +224,12 @@ describe('fleet report repeated when degraded (FR-007 / SC-003)', () => {
     });
     const { err } = await lift(fixture, 'rejected-pin');
     expect(err).toContain('- configured: 2, produced: 1  ⚠ DEGRADED');
+    // AUDIT-20260611-09: the per-lane status line must connect "completed"
+    // to the fleet's exclusion — a bare "completed" next to "produced: 1
+    // of 2" leaves the operator with nothing linking the two.
+    expect(err).toMatch(
+      /codex — completed \[enforced, monitored\] — completed but non-converged \(exit 1, report bytes 28\); not counted as produced/,
+    );
   });
 });
 
@@ -247,6 +253,36 @@ describe('never "clean" from a killed lane (FR-007)', () => {
     expect(exit).toBe(0);
     expect(err).toMatch(/DEGRADED/);
     expect(err).toMatch(/NOT a clean signal/i);
+  });
+});
+
+describe('mixed v2 INDEX fails loud (AUDIT-20260611-07)', () => {
+  it('aborts the lift with exit 2 and a descriptive error naming the degraded lane', async () => {
+    const fixture = makeFixture({
+      slug: 'mixed',
+      modelFiles: {
+        'claude.md': findingBlock('claude', '01', 'Finding from the intact lane', 'src/a.ts:1'),
+        'codex.md': findingBlock('codex', '01', 'Finding from the drifted lane', 'src/b.ts:2'),
+      },
+      results: [
+        laneResult({ name: 'claude' }),
+        laneResult({ name: 'codex', reportBytes: 77, stdoutBytes: 77 }),
+      ],
+    });
+    // Simulate writer drift: strip exactly codex's report-bytes row from the
+    // real writer's INDEX. The dropped lane must NOT silently lower
+    // `configured` until the fleet reads healthy.
+    const indexPath = join(fixture.runDir, 'INDEX.md');
+    const corrupted = readFileSync(indexPath, 'utf8')
+      .split('\n')
+      .filter((line) => line !== '- report bytes: 77')
+      .join('\n');
+    writeFileSync(indexPath, corrupted, 'utf8');
+    const { exit, err } = await lift(fixture, 'mixed');
+    expect(exit).toBe(2);
+    expect(err).toMatch(/codex/);
+    expect(err).toMatch(/report bytes/);
+    expect(err).toMatch(/AUDIT-20260611-07/);
   });
 });
 

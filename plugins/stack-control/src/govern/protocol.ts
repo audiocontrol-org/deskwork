@@ -30,6 +30,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   computeFleetReportFromParsedLanes,
+  IndexLaneParseError,
   parseIndexLaneStates,
 } from '../scope-discovery/audit-barrage/run-artifacts.js';
 
@@ -130,12 +131,25 @@ export function currentBranch(repoRoot: string): string {
  * output without opening per-run artifact files; a round whose verdict
  * could be "0 HIGH" over a degraded fleet is annotated as degraded. A
  * missing or pre-014 INDEX (stub barrage bins, legacy runs) emits nothing —
- * readers require the new fields only for v2-writer runs.
+ * readers require the new fields only for v2-writer runs. A MIXED INDEX
+ * (some lane has v2 rows, some lane fails to parse completely) throws
+ * GovernProtocolError — the round's INDEX is corrupt and the fleet count
+ * would otherwise silently shrink (AUDIT-20260611-07).
  */
 export function reportFleetStatus(runDir: string, stderr: (s: string) => void): void {
   const indexPath = join(runDir, 'INDEX.md');
   if (!existsSync(indexPath)) return;
-  const lanes = parseIndexLaneStates(readFileSync(indexPath, 'utf8'));
+  let lanes;
+  try {
+    lanes = parseIndexLaneStates(readFileSync(indexPath, 'utf8'));
+  } catch (err) {
+    if (err instanceof IndexLaneParseError) {
+      throw new GovernProtocolError(
+        `govern: FATAL — corrupt barrage INDEX at ${indexPath}: ${err.message}`,
+      );
+    }
+    throw err;
+  }
   if (lanes === null) return;
   const fleet = computeFleetReportFromParsedLanes(lanes);
   const degraded = fleet.produced < fleet.configured;

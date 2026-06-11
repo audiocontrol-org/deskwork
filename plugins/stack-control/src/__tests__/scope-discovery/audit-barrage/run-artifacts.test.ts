@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  parseIndexLaneStates,
   renderFleetReportLines,
   renderIndexBody,
 } from '../../../scope-discovery/audit-barrage/run-artifacts.js';
@@ -165,6 +166,62 @@ describe('INDEX fleet report block (T017 / FR-007)', () => {
     const text = lines.join('\n');
     expect(text).toContain('- configured: 3, produced: 2  ⚠ DEGRADED');
     expect(text).not.toContain('quorum');
+  });
+});
+
+describe('parseIndexLaneStates mixed-INDEX fail-loud (AUDIT-20260611-07)', () => {
+  it('round-trips a fully-v2 INDEX (every lane parses)', () => {
+    const body = renderIndexBody(
+      runWith([modelResult({}), modelResult({ name: 'codex', reportBytes: 77, stdoutBytes: 77 })]),
+    );
+    const lanes = parseIndexLaneStates(body);
+    expect(lanes).not.toBeNull();
+    expect(lanes!.map((l) => l.name)).toEqual(['claude', 'codex']);
+    expect(lanes![1]!.reportBytes).toBe(77);
+  });
+
+  it('throws naming the lane + the missing field when one lane lost its report-bytes row', () => {
+    // Writer drift / hand-edit simulation: render the REAL v2 body, then
+    // strip exactly codex's `- report bytes:` row (unique value 77).
+    const body = renderIndexBody(
+      runWith([modelResult({}), modelResult({ name: 'codex', reportBytes: 77, stdoutBytes: 77 })]),
+    );
+    const corrupted = body
+      .split('\n')
+      .filter((line) => line !== '- report bytes: 77')
+      .join('\n');
+    expect(() => parseIndexLaneStates(corrupted)).toThrow(/codex/);
+    expect(() => parseIndexLaneStates(corrupted)).toThrow(/report bytes/);
+    expect(() => parseIndexLaneStates(corrupted)).toThrow(/AUDIT-20260611-07/);
+  });
+
+  it('throws when one lane is full-v2 and another lane carries ZERO v2 rows', () => {
+    // Lane B exists in the manifest but cannot be parsed — that is a mixed
+    // INDEX, not a pre-014 one; returning only lane A would lower
+    // `configured` and mask the degradation.
+    const body =
+      renderIndexBody(runWith([modelResult({})])) +
+      '\n### codex\n\n- exit code: 0\n- duration: 5 ms\n';
+    expect(() => parseIndexLaneStates(body)).toThrow(/codex/);
+    expect(() => parseIndexLaneStates(body)).toThrow(/AUDIT-20260611-07/);
+  });
+
+  it('still returns null for a genuinely pre-014 INDEX (no v2 rows on ANY lane)', () => {
+    const legacy = [
+      '# Audit-barrage run',
+      '',
+      '### claude',
+      '',
+      '- exit code: 0',
+      '- duration: 5 ms',
+      '',
+      '### codex',
+      '',
+      '- exit code: 1',
+      '- duration: 9 ms',
+      '',
+    ].join('\n');
+    expect(parseIndexLaneStates(legacy)).toBeNull();
   });
 });
 

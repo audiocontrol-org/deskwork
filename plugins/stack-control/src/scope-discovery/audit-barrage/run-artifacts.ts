@@ -210,51 +210,78 @@ function parseTerminalState(raw: string): TerminalState | undefined {
 }
 
 /**
+ * Thrown by `parseIndexLaneStates` for a MIXED INDEX — at least one lane
+ * carries v2 rows but some lane fails to parse completely. Named so the
+ * lift verb and the govern loop can wrap it in their own error discipline
+ * (exit-2 stderr line / GovernProtocolError) without matching on message
+ * text (AUDIT-20260611-07).
+ */
+export class IndexLaneParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'IndexLaneParseError';
+  }
+}
+
+/** Lane block under construction while scanning INDEX lines. */
+interface RawIndexLane {
+  readonly name: string;
+  exitCode?: number;
+  reportBytes?: number;
+  terminalState?: TerminalState;
+  enforcement?: EnforcementState;
+  liveness?: LivenessState;
+}
+
+/**
+ * A lane carries v2 vocabulary when ANY of the v2-specific rows parsed.
+ * `exit code` predates the v2 writer, so it does not count toward
+ * v2-ness (only toward completeness).
+ */
+function hasAnyV2Row(lane: RawIndexLane): boolean {
+  return (
+    lane.reportBytes !== undefined ||
+    lane.terminalState !== undefined ||
+    lane.enforcement !== undefined ||
+    lane.liveness !== undefined
+  );
+}
+
+function missingLaneFields(lane: RawIndexLane): string[] {
+  const missing: string[] = [];
+  if (lane.exitCode === undefined) missing.push('exit code');
+  if (lane.reportBytes === undefined) missing.push('report bytes');
+  if (lane.terminalState === undefined) missing.push('terminal state');
+  if (lane.enforcement === undefined) missing.push('enforcement');
+  if (lane.liveness === undefined) missing.push('liveness');
+  return missing;
+}
+
+/**
  * Parse the per-model terminal-state rows back out of an INDEX.md body.
- * Returns `null` for a pre-014 INDEX (no `- terminal state:` rows) — the
+ * Returns `null` for a pre-014 INDEX (no v2 rows on ANY lane) — the
  * compatibility contract: readers require the new fields only for runs
  * produced by the v2 writer (no synthetic backfill, Constitution V).
+ *
+ * MIXED-INDEX constraint (AUDIT-20260611-07): once ANY lane carries a v2
+ * row, EVERY `###` lane block must parse completely (exit code / report
+ * bytes / terminal state / enforcement / liveness). An incomplete lane —
+ * writer drift, hand-edited or forensically-rebuilt INDEX — THROWS
+ * `IndexLaneParseError` naming the lane and the missing field(s).
+ * Silently dropping the lane would lower `configured` in
+ * `computeFleetReportFromParsedLanes` until it equals `produced`, making
+ * a degraded fleet read healthy at the lift and govern surfaces — the
+ * same outage-masquerading shape as AUDIT-20260611-01, one level up.
  */
 export function parseIndexLaneStates(indexText: string): ParsedIndexLane[] | null {
   const lines = indexText.split(/\r?\n/);
-  const lanes: ParsedIndexLane[] = [];
-  let current: {
-    name: string;
-    exitCode?: number;
-    reportBytes?: number;
-    terminalState?: TerminalState;
-    enforcement?: EnforcementState;
-    liveness?: LivenessState;
-  } | null = null;
-
-  // `report bytes` is required lane completeness like the other v2 fields:
-  // the v2 writer always renders it, and the reader's `produced` gate reads
-  // it — a lane row missing it must NOT silently count as produced.
-  const flush = (): void => {
-    if (
-      current !== null &&
-      current.exitCode !== undefined &&
-      current.reportBytes !== undefined &&
-      current.terminalState !== undefined &&
-      current.enforcement !== undefined &&
-      current.liveness !== undefined
-    ) {
-      lanes.push({
-        name: current.name,
-        exitCode: current.exitCode,
-        reportBytes: current.reportBytes,
-        terminalState: current.terminalState,
-        enforcement: current.enforcement,
-        liveness: current.liveness,
-      });
-    }
-    current = null;
-  };
+  const raw: RawIndexLane[] = [];
+  let current: RawIndexLane | null = null;
 
   for (const line of lines) {
     const heading = /^###\s+(.+?)\s*$/.exec(line);
     if (heading !== null) {
-      flush();
+      if (current !== null) raw.push(current);
       current = { name: heading[1]! };
       continue;
     }
@@ -285,8 +312,33 @@ export function parseIndexLaneStates(indexText: string): ParsedIndexLane[] | nul
       current.liveness = liveness[1] === 'monitored' ? 'monitored' : 'unmonitored';
     }
   }
-  flush();
-  return lanes.length > 0 ? lanes : null;
+  if (current !== null) raw.push(current);
+
+  if (raw.length === 0) return null;
+  // Genuinely pre-014: zero v2 rows anywhere in the manifest.
+  if (!raw.some(hasAnyV2Row)) return null;
+
+  // v2 INDEX: every lane block must be complete — fail loud, never drop.
+  const problems = raw
+    .map((lane) => ({ lane, missing: missingLaneFields(lane) }))
+    .filter(({ missing }) => missing.length > 0)
+    .map(({ lane, missing }) => `lane '${lane.name}' is missing: ${missing.join(', ')}`);
+  if (problems.length > 0) {
+    throw new IndexLaneParseError(
+      `mixed v2 INDEX — ${problems.join('; ')}. At least one lane carries v2 rows, ` +
+        `so every lane must parse completely; dropping a lane would lower ` +
+        `'configured' and mask fleet degradation (AUDIT-20260611-07).`,
+    );
+  }
+
+  return raw.map((lane) => ({
+    name: lane.name,
+    exitCode: lane.exitCode!,
+    reportBytes: lane.reportBytes!,
+    terminalState: lane.terminalState!,
+    enforcement: lane.enforcement!,
+    liveness: lane.liveness!,
+  }));
 }
 
 /**
