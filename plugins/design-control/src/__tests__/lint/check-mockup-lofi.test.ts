@@ -261,6 +261,21 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// AUDIT-20260610-66 (round-20 gpt-5-01 MED + gpt-5-02 LOW, fps): fieldset/
+// legend grouping and required state complete the form surface.
+describe('check-mockup-lofi — fieldset/legend + required (AUDIT-20260610-66)', () => {
+  it('accepts fieldset/legend form grouping', () => {
+    expect(
+      rules(wrap(`<form><fieldset><legend>Billing details</legend><label>Email <input type="email" placeholder="Email"></label></fieldset></form>`)),
+    ).toEqual([]);
+  });
+  it('accepts required on input and select', () => {
+    expect(
+      rules(wrap(`<form><input type="email" required placeholder="Email"><select required><option selected>Starter</option></select></form>`)),
+    ).toEqual([]);
+  });
+});
+
 // AUDIT-20260610-65 (round-19 gpt-5-01/-02, LOW+MED fps): select state and
 // option metadata complete the form surface — disabled on select (same state
 // class as button/input), value/disabled on option (value is SUBMISSION

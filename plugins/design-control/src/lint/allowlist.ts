@@ -31,7 +31,7 @@ export const ALLOWED_TAGS: ReadonlySet<string> = new Set([
   // native form flow (AUDIT-20260610-24 + textarea via -32 + select/option
   // via -37 — structure, not polish; input's `type` is value-enumerated via
   // INPUT_TYPE_ALLOWLIST)
-  'form', 'input', 'textarea', 'select', 'option',
+  'form', 'input', 'textarea', 'select', 'option', 'fieldset', 'legend',
   // disclosure structure (AUDIT-20260610-59 — UA-baseline class, like controls)
   'details', 'summary',
   // text-level structure. NOTE: `pre` is deliberately ABSENT (AUDIT-20260610-04,
@@ -87,13 +87,13 @@ const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>
   // Form flow (AUDIT-20260610-24): input.type is plain-kind here but its VALUE
   // is enumerated (INPUT_TYPE_ALLOWLIST) — image loads a resource, color opens
   // a visual picker; both stay rejected.
-  input: { type: 'plain', placeholder: 'plain', value: 'plain', checked: 'plain', disabled: 'plain' },
-  textarea: { placeholder: 'plain' },
+  input: { type: 'plain', placeholder: 'plain', value: 'plain', checked: 'plain', disabled: 'plain', required: 'plain' },
+  textarea: { placeholder: 'plain', required: 'plain' },
   label: { for: 'plain' },
   // option.value is SUBMISSION metadata (AUDIT-20260610-65) — the rendered
   // text is the element's text, which the text gates already scan.
   option: { selected: 'plain', value: 'plain', disabled: 'plain' },
-  select: { disabled: 'plain' },
+  select: { disabled: 'plain', required: 'plain' },
   details: { open: 'plain' },
   ol: { start: 'plain', reversed: 'plain' },
   li: { value: 'plain' },
