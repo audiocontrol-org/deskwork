@@ -83,18 +83,37 @@ const TAG_ATTR_SPECS: Readonly<Record<string, Readonly<Record<string, AttrKind>>
   // unreachable while axis-1 rejected the attr outright.
   link: { rel: 'plain', href: 'url', integrity: 'plain' },
   a: { href: 'url' },
-  button: { type: 'plain', disabled: 'plain' },
+  button: { type: 'plain', disabled: 'plain', name: 'plain', value: 'plain', form: 'plain' },
   // Form flow (AUDIT-20260610-24): input.type is plain-kind here but its VALUE
   // is enumerated (INPUT_TYPE_ALLOWLIST) — image loads a resource, color opens
   // a visual picker; both stay rejected.
-  input: { type: 'plain', placeholder: 'plain', value: 'plain', checked: 'plain', disabled: 'plain', required: 'plain' },
-  textarea: { placeholder: 'plain', required: 'plain' },
+  // AUDIT-20260610-69: name/maxlength/min/max/step/autocomplete/readonly/multiple
+  // are structural behavioral attrs (validation constraints, submission wiring,
+  // browser hints) with no CSS or resource-loading channel.
+  input: {
+    type: 'plain', placeholder: 'plain', value: 'plain', checked: 'plain',
+    disabled: 'plain', required: 'plain', readonly: 'plain', multiple: 'plain',
+    autofocus: 'plain', name: 'plain', maxlength: 'plain',
+    min: 'plain', max: 'plain', step: 'plain', autocomplete: 'plain',
+    pattern: 'plain', form: 'plain',
+  },
+  // AUDIT-20260610-69: rows/cols/name/readonly/maxlength are structural layout
+  // and submission attributes; no CSS/resource channel.
+  textarea: { placeholder: 'plain', required: 'plain', rows: 'plain', cols: 'plain', name: 'plain', readonly: 'plain', maxlength: 'plain', form: 'plain' },
   label: { for: 'plain' },
   // option.value is SUBMISSION metadata (AUDIT-20260610-65) — the rendered
   // text is the element's text, which the text gates already scan.
   option: { selected: 'plain', value: 'plain', disabled: 'plain' },
-  select: { disabled: 'plain', required: 'plain' },
+  // AUDIT-20260610-69: multiple/name are structural; multiple enables multi-select.
+  select: { disabled: 'plain', required: 'plain', multiple: 'plain', name: 'plain', form: 'plain' },
+  // AUDIT-20260610-68: disabled on fieldset groups a block of controls into a
+  // disabled state — same structural-state class as input/button/select disabled.
+  fieldset: { disabled: 'plain', form: 'plain', name: 'plain' },
   details: { open: 'plain' },
+  // AUDIT-20260610-69: action is a navigation URL (same class as a.href — no
+  // resource fetch); method/enctype/target/novalidate/name are submission-wiring
+  // plain attrs.
+  form: { action: 'url', method: 'plain', enctype: 'plain', target: 'plain', novalidate: 'plain', name: 'plain' },
   ol: { start: 'plain', reversed: 'plain' },
   li: { value: 'plain' },
   td: { colspan: 'plain', rowspan: 'plain', headers: 'plain' },

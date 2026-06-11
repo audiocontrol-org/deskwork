@@ -261,6 +261,94 @@ describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
   });
 });
 
+// AUDIT-20260610-67 (post-convergence analysis, CLOSED — existing text-node
+// check already covers): dense text in <summary>/<legend> is caught by the
+// per-text-node isPunctuationDense gate regardless of whether those elements
+// are in DENSITY_BLOCK_TAGS. Sub-8-char text is below the length floor by
+// design (too short to form meaningful imagery). These fixtures pin the
+// already-correct behavior as a regression guard.
+describe('check-mockup-lofi — density coverage for details/summary/fieldset/legend (AUDIT-20260610-67)', () => {
+  it('rejects punctuation-dense summary text (caught by text-node gate, not block gate)', () => {
+    // "##.##.##.##.##" = 14 non-ws, ratio ≈ 0.71 → isPunctuationDense fires on
+    // the TEXT NODE itself — even with prose diluting the grandparent aggregate.
+    expect(
+      rules(wrap(
+        `<main><p>Review the configuration options before proceeding to the next step in your workflow.</p>` +
+        `<details><summary>##.##.##.##.##</summary><p>Select notification frequency here.</p></details></main>`,
+      )),
+    ).toContain('punctuation-density');
+  });
+  it('rejects punctuation-dense legend text (caught by text-node gate)', () => {
+    expect(
+      rules(wrap(
+        `<main><p>Review the configuration options before proceeding to the next step in your workflow.</p>` +
+        `<form><fieldset><legend>##.##.##.##.##</legend><input type="text" placeholder="Value"></fieldset></form></main>`,
+      )),
+    ).toContain('punctuation-density');
+  });
+  it('accepts a legitimate summary label', () => {
+    expect(
+      rules(wrap(`<details><summary>Advanced filters</summary><p>Filter controls appear here.</p></details>`)),
+    ).toEqual([]);
+  });
+  it('accepts a legitimate legend label', () => {
+    expect(
+      rules(wrap(`<form><fieldset><legend>Payment details</legend><input type="text" placeholder="Card number"></fieldset></form>`)),
+    ).toEqual([]);
+  });
+});
+
+// AUDIT-20260610-68 (post-convergence, MED, fp): fieldset.disabled rejected as
+// disallowed-attribute — TAG_ATTR_SPECS has no entry for fieldset.
+describe('check-mockup-lofi — fieldset.disabled (AUDIT-20260610-68)', () => {
+  it('accepts fieldset[disabled] (canonical group-disable pattern)', () => {
+    expect(
+      rules(wrap(`<form><fieldset disabled><legend>Payment details</legend><input type="text" placeholder="Card number"></fieldset></form>`)),
+    ).toEqual([]);
+  });
+});
+
+// AUDIT-20260610-69 (post-convergence, LOW, fp): common structural form attrs
+// absent from TAG_ATTR_SPECS — select.multiple, input.name, textarea.rows, etc.
+describe('check-mockup-lofi — common structural form attrs (AUDIT-20260610-69)', () => {
+  it('accepts select[multiple]', () => {
+    expect(rules(wrap(`<select multiple><option>Design</option><option selected>Engineering</option></select>`))).toEqual([]);
+  });
+  it('accepts select[name]', () => {
+    expect(rules(wrap(`<form><select name="stage"><option>Draft</option></select></form>`))).toEqual([]);
+  });
+  it('accepts input[name]', () => {
+    expect(rules(wrap(`<form><input type="email" name="email" placeholder="you@example.com"></form>`))).toEqual([]);
+  });
+  it('accepts input[maxlength]', () => {
+    expect(rules(wrap(`<form><input type="text" name="code" maxlength="8" placeholder="Code"></form>`))).toEqual([]);
+  });
+  it('accepts input[min][max][step] (number field constraints)', () => {
+    expect(rules(wrap(`<form><input type="number" name="qty" min="1" max="100" step="1"></form>`))).toEqual([]);
+  });
+  it('accepts input[autocomplete]', () => {
+    expect(rules(wrap(`<form><input type="email" name="email" autocomplete="email" placeholder="Email"></form>`))).toEqual([]);
+  });
+  it('accepts input[readonly]', () => {
+    expect(rules(wrap(`<form><input type="text" name="ref" readonly value="REF-001"></form>`))).toEqual([]);
+  });
+  it('accepts textarea[rows][cols][name]', () => {
+    expect(rules(wrap(`<form><textarea name="notes" rows="6" cols="40" placeholder="Add notes here"></textarea></form>`))).toEqual([]);
+  });
+  it('accepts textarea[readonly][maxlength]', () => {
+    expect(rules(wrap(`<form><textarea name="log" readonly maxlength="500" placeholder="Activity log"></textarea></form>`))).toEqual([]);
+  });
+  it('accepts button[name][value]', () => {
+    expect(rules(wrap(`<form><button type="submit" name="action" value="save">Save</button></form>`))).toEqual([]);
+  });
+  it('accepts form[action][method][novalidate]', () => {
+    expect(rules(wrap(`<form action="/submit" method="post" novalidate><input type="text" placeholder="Name"></form>`))).toEqual([]);
+  });
+  it('accepts form[enctype][target]', () => {
+    expect(rules(wrap(`<form action="/upload" method="post" enctype="multipart/form-data" target="_blank"><input type="text"></form>`))).toEqual([]);
+  });
+});
+
 // AUDIT-20260610-66 (round-20 gpt-5-01 MED + gpt-5-02 LOW, fps): fieldset/
 // legend grouping and required state complete the form surface.
 describe('check-mockup-lofi — fieldset/legend + required (AUDIT-20260610-66)', () => {

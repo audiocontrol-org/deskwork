@@ -1425,3 +1425,59 @@ executed against the real lint before recording (zero auditor predictions
 trusted); every fix was RED-first with the verbatim defeating input as the
 fixture; two self-caught transcription errors in fix shas were corrected in
 dedicated commits.
+
+## 2026-06-10 — post-convergence static analysis (sonnet-4-6 direct code review)
+
+Post-barrage pass: three findings surfaced by manual code analysis after
+convergence. AUDIT-67 closed on investigation (false alarm — existing
+text-node gate already covers the case). AUDIT-68 and AUDIT-69 are genuine
+form-surface false-positives fixed in a single commit.
+
+### AUDIT-20260610-67 — density coverage for details/summary/fieldset/legend (false alarm, CLOSED)
+
+Finding-ID: AUDIT-20260610-67 (post-convergence, initial severity MED)
+Status:     closed-false-alarm (2026-06-10; initial analysis wrong — existing
+            per-text-node isPunctuationDense gate fires on dense text regardless
+            of parent element membership in DENSITY_BLOCK_TAGS; sub-8-char text
+            is below the minimum-length floor by design; regression fixtures
+            added confirming correct behavior)
+Severity:   informational
+Direction:  false-negative (initial claim)
+
+Defeating input (proposed): `<summary>##.##.##.##.##</summary>` inside a
+prose-diluted grandparent. Test confirmed the lint ALREADY fires punctuation-
+density on the text node content — the per-block check on the parent element
+is not the operative gate here. The text-node isPunctuationDense check fires
+before any parent-traversal.
+
+### AUDIT-20260610-68 — fieldset.disabled rejected as disallowed-attribute
+
+Finding-ID: AUDIT-20260610-68 (post-convergence, MED)
+Status:     fixed (see commit for sha; fieldset.disabled allowlisted in TAG_ATTR_SPECS)
+Severity:   medium
+Direction:  false-positive
+Surface:    plugins/design-control/src/lint/allowlist.ts (TAG_ATTR_SPECS — no fieldset entry)
+
+`<fieldset disabled>` rejected as disallowed-attribute despite fieldset being
+in ALLOWED_TAGS since AUDIT-66. The `disabled` attribute on fieldset is the
+same structural-state class as input/button/select disabled (all enumerated).
+A `<fieldset disabled>` disables an entire group of controls — a canonical
+wireframe pattern. Fixed by adding `fieldset: { disabled, form, name }` to
+TAG_ATTR_SPECS.
+
+### AUDIT-20260610-69 — common structural form attrs rejected as disallowed-attribute
+
+Finding-ID: AUDIT-20260610-69 (post-convergence, LOW)
+Status:     fixed (see commit for sha; select.{multiple,name,form}, input.{name,maxlength,min,max,step,autocomplete,readonly,multiple,autofocus,pattern,form}, textarea.{rows,cols,name,readonly,maxlength,form}, button.{name,value,form}, form.{action,method,enctype,target,novalidate,name} added)
+Severity:   low
+Direction:  false-positive
+Surface:    plugins/design-control/src/lint/allowlist.ts (TAG_ATTR_SPECS — missing entries)
+
+A meaningful class of legitimate form wireframe attributes was absent from
+TAG_ATTR_SPECS. None carry a CSS or resource-loading channel: they are
+structural/behavioral (validation constraints, submission wiring, browser
+hints). The gap was particularly visible for `select.multiple` (multi-select
+control), `input.name` (ubiquitous field wiring), and `textarea.rows` (layout
+hint). `form.action` allowlisted as `url`-kind (navigation URL, same class as
+`a.href`; scheme-scanned, not in RESOURCE_URL_ATTRS). Thirteen tests, all RED
+before fix, all GREEN after.
