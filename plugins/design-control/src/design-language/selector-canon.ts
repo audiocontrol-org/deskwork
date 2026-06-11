@@ -123,6 +123,18 @@ export function blankAttributeValues(text: string): string {
 }
 
 /**
+ * Blank the NAMES of attribute selectors (`[ghost]` → `[]`, `[a=""]` → `[=""]`).
+ * Companion to {@link blankAttributeValues}, for the same haystack mode: when
+ * the query names no attribute selector, a bare query must not match text
+ * that exists only as an attribute NAME — `ghost` is not defined by
+ * `[ghost] {}` (AUDIT-round4-claude-01). Run AFTER
+ * {@link blankAttributeValues} (its regex keys on the name).
+ */
+export function blankAttributeNames(text: string): string {
+  return text.replace(/\[[A-Za-z0-9_-]+/g, '[');
+}
+
+/**
  * Strip the CONTENTS of functional pseudo-class arguments (delimiters stay):
  * `:not(.ghost)` → `:not()`, for any `:<ident>(` / `::<ident>(`, balancing
  * nested parens (`:not(:is(.a))` → `:not()`) and skipping string literals so

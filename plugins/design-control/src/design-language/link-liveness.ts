@@ -37,6 +37,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { isNonPortableCssPath } from '@/design-language/schema';
 import {
+  blankAttributeNames,
   blankAttributeValues,
   canonicalizeAttributeSelectors,
   copyStringLiteral,
@@ -67,8 +68,48 @@ export interface LivenessResult {
 }
 
 /**
+ * `@keyframes` at-rule names, vendor-prefix tolerant (`@-webkit-keyframes`,
+ * `@-moz-keyframes`, …). Their blocks are skipped wholesale by
+ * {@link collectSelectorPreludes}.
+ */
+const KEYFRAMES_AT_RULE = /^@(?:-[a-z]+-)?keyframes\b/i;
+
+/**
+ * Return the index just past the `}` matching the `{` at `css[open]`,
+ * balancing nested braces and skipping comments and string literals (a brace
+ * inside either is content, not structure). Unclosed input runs to the end.
+ */
+function skipBlock(css: string, open: number): number {
+  let depth = 1;
+  let i = open + 1;
+  while (i < css.length && depth > 0) {
+    const ch = css[i];
+    if (ch === '/' && css[i + 1] === '*') {
+      const end = css.indexOf('*/', i + 2);
+      i = end === -1 ? css.length : end + 2;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      i = copyStringLiteral(css, i).end;
+      continue;
+    }
+    if (ch === '{') {
+      depth += 1;
+    } else if (ch === '}') {
+      depth -= 1;
+    }
+    i += 1;
+  }
+  return i;
+}
+
+/**
  * Collect selector preludes: text runs preceding `{`, at every nesting depth,
- * excluding at-rule preludes (which are descended into, not matched against).
+ * excluding at-rule preludes (which are descended into, not matched against)
+ * — with one descent exception: `@keyframes` blocks (vendor-prefixed forms
+ * included) are skipped WHOLE, contributing no preludes, because their step
+ * "selectors" (`from` / `to` / percentages) are animation waypoints, not
+ * element selectors a design rule can anchor to (AUDIT-round4-claude-04).
  * Comments are stripped; string-literal CONTENTS are copied verbatim (their
  * structural characters are content, never braces/semicolons) so attribute
  * values survive into preludes for canonical comparison. Prelude buffers
@@ -94,10 +135,14 @@ function collectSelectorPreludes(css: string): string[] {
     }
     if (ch === '{') {
       const prelude = buffer.trim();
+      buffer = '';
+      if (KEYFRAMES_AT_RULE.test(prelude)) {
+        i = skipBlock(css, i);
+        continue;
+      }
       if (prelude !== '' && !prelude.startsWith('@')) {
         preludes.push(prelude);
       }
-      buffer = '';
     } else if (ch === '}' || ch === ';') {
       buffer = '';
     } else {
@@ -122,9 +167,17 @@ function collectSelectorPreludes(css: string): string[] {
  *   `.ghost` does not match `.real:not(.ghost)`. A query WITH them compares
  *   argument text — `.real:not(.ghost)` matches only a `:not(.ghost)` source,
  *   never `:not(.other)`.
- * - Query WITHOUT an attribute selector: haystack attribute values are
- *   blanked, so `.ghost` does not match `[data-icon=".ghost"]` and `ghost`
- *   does not match `[class~=ghost]`. A query WITH one compares values.
+ * - Query WITHOUT an attribute selector: haystack attribute values AND names
+ *   are blanked, so `.ghost` does not match `[data-icon=".ghost"]`, `ghost`
+ *   does not match `[class~=ghost]`, and `ghost` does not match `[ghost]`
+ *   (a name is no more a definition than a value, AUDIT-round4-claude-01).
+ *   A query WITH one compares names and values.
+ *
+ * A query that BEGINS with an ident character is a type selector, so a hit
+ * preceded by `.` or `#` in the haystack is a different selector (a class or
+ * id whose name merely echoes the query — the dropped-leading-dot trap) and
+ * is rejected; `header` matches `header {}` but never `.header` / `#header`
+ * (AUDIT-round4-claude-01).
  */
 export function cssDefinesSelector(css: string, selector: string): boolean {
   const canonicalQuery = canonicalizeAttributeSelectors(stripComments(selector));
@@ -136,13 +189,14 @@ export function cssDefinesSelector(css: string, selector: string): boolean {
   if (query === '') {
     return false;
   }
+  const typeSelectorQuery = isIdentChar(query[0]);
   for (const prelude of collectSelectorPreludes(css)) {
     let haystack = canonicalizeAttributeSelectors(prelude);
     if (!compareArgs) {
       haystack = stripFunctionalPseudoArgs(haystack);
     }
     if (!compareAttrValues) {
-      haystack = blankAttributeValues(haystack);
+      haystack = blankAttributeNames(blankAttributeValues(haystack));
     }
     haystack = normalizeSelectorWhitespace(haystack);
     let from = 0;
@@ -151,7 +205,12 @@ export function cssDefinesSelector(css: string, selector: string): boolean {
       if (at === -1) {
         break;
       }
-      if (!isIdentChar(haystack[at - 1]) && !isIdentChar(haystack[at + query.length])) {
+      const before = haystack[at - 1];
+      if (
+        !isIdentChar(before) &&
+        !isIdentChar(haystack[at + query.length]) &&
+        !(typeSelectorQuery && (before === '.' || before === '#'))
+      ) {
         return true;
       }
       from = at + 1;

@@ -354,6 +354,98 @@ describe('checkLinkLiveness — combinator spacing normalized (AUDIT-20260611 co
   });
 });
 
+describe('checkLinkLiveness — leading discriminator required (AUDIT-round4-claude-01)', () => {
+  it('a bare-ident query does not match a class definition — btn-primary vs .btn-primary', () => {
+    // Dropping the dot from a real class name must go DEAD, not silently green:
+    // a class definition does not define the type selector of the same name.
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', 'btn-primary'), dir);
+    expect(result.ok).toBe(false);
+    expect(result.findings.some((f) => f.rule === 'dead-link-selector')).toBe(true);
+  });
+
+  it('a bare-ident query does not match a class definition — header vs .header', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.header { position: sticky; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', 'header'), dir).ok).toBe(false);
+  });
+
+  it('a bare-ident query does not match an id definition — header vs #header', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '#header { position: sticky; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', 'header'), dir).ok).toBe(false);
+  });
+
+  it('a bare-ident query does not match an attribute NAME — ghost vs [ghost]', () => {
+    // Names mirror values (AUDIT-round2): an attribute name is not a selector
+    // definition for a query that never named the bracket.
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '[ghost] { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', 'ghost'), dir).ok).toBe(false);
+  });
+
+  it('a genuine type selector still matches a bare element rule — header vs header', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), 'header { position: sticky; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', 'header'), dir);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('a type selector after a combinator still matches — header vs main > header', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), 'main > header { position: sticky; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', 'header'), dir).ok).toBe(true);
+  });
+
+  it('a class query still matches its class definition — .btn vs .btn (pin)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.btn { color: navy; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.btn'), dir).ok).toBe(true);
+  });
+});
+
+describe('checkLinkLiveness — @keyframes steps are not preludes (AUDIT-round4-claude-04)', () => {
+  it('a "from" query is dead against a @keyframes block — step selectors are not definitions', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(
+      join(dir, 'studio.css'),
+      '@keyframes spin { from { opacity: 0; } to { opacity: 1; } }\n',
+    );
+    const result = checkLinkLiveness(specWithLink('studio.css', 'from'), dir);
+    expect(result.ok).toBe(false);
+    expect(result.findings.some((f) => f.rule === 'dead-link-selector')).toBe(true);
+  });
+
+  it('prefix-tolerant — a "from" query is dead against @-webkit-keyframes too', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(
+      join(dir, 'studio.css'),
+      '@-webkit-keyframes spin { from { opacity: 0; } to { opacity: 1; } }\n',
+    );
+    expect(checkLinkLiveness(specWithLink('studio.css', 'from'), dir).ok).toBe(false);
+  });
+
+  it('a rule following a skipped @keyframes block is still live — the skip is exact', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(
+      join(dir, 'studio.css'),
+      '@keyframes spin { from { opacity: 0; } to { opacity: 1; } }\n.after { color: ink; }\n',
+    );
+    expect(checkLinkLiveness(specWithLink('studio.css', '.after'), dir).ok).toBe(true);
+  });
+
+  it('a rule inside @media remains live — conditional at-rule descent unchanged (pin)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(
+      join(dir, 'studio.css'),
+      '@media (min-width: 80rem) {\n  .rail { width: 16rem; }\n}\n',
+    );
+    expect(checkLinkLiveness(specWithLink('studio.css', '.rail'), dir).ok).toBe(true);
+  });
+});
+
 describe('checkLinkLiveness — validated-scope boundary (non-CSS targets, visible)', () => {
   it('records a non-.css target as skipped — no finding, never silent', () => {
     const dir = makeFixtureDir();
