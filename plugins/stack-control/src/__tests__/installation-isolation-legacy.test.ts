@@ -11,6 +11,7 @@
 // lesson), and writes never land at the legacy location.
 
 import { describe, expect, it } from 'vitest';
+import { realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { runCli } from './_run-helpers.js';
 import {
@@ -71,9 +72,10 @@ describe('US5 — legacy half-installation notice (R6)', () => {
         // Part 1: the legacy location, named and marked IGNORED.
         expect(res.stderr).toMatch(WARNING_RE);
         expect(res.stderr).toContain('.stack-control (no config.yaml marker)');
-        // Part 2: where reads/writes actually go.
+        // Part 2: where reads/writes actually go (realpath: the child
+        // process sees the macOS-resolved /private/… spelling).
         expect(res.stderr).toContain(
-          `reading/writing under ${join(fixture.installationRoot, '.stack-control')}`,
+          `reading/writing under ${join(realpathSync(fixture.installationRoot), '.stack-control')}`,
         );
         // Part 3: safe migration advice — never a destructive command
         // naming an existing tuned file as the destination (AUDIT-09/-15).
