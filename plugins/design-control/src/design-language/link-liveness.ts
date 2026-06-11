@@ -19,6 +19,10 @@
  * runs that precede `{` after comments and string literals are stripped and
  * at-rule preludes are excluded (their blocks are descended into, so a rule
  * inside `@media` counts; `content: ".ghost"` and commented-out rules do not).
+ * Functional pseudo-class ARGUMENTS (`:not(.ghost)`, `:is(...)`, `:where(...)`,
+ * `:has(...)`, `:nth-child(...)`) are excluded too — a class that exists only
+ * as an exclusion or only inside a matcher argument has no styling of its own,
+ * so it must not count as a live anchor.
  */
 
 import { readFileSync } from 'node:fs';
@@ -106,6 +110,51 @@ function isIdentChar(ch: string | undefined): boolean {
 }
 
 /**
+ * Strip the CONTENTS of functional pseudo-class arguments (delimiters stay):
+ * `:not(.ghost)` → `:not()`, for any `:<ident>(` / `::<ident>(`, balancing
+ * nested parens (`:not(:is(.a))` → `:not()`). A selector that appears only as
+ * an exclusion or matcher argument is not styled by the rule, so it must not
+ * satisfy a liveness query.
+ */
+function stripFunctionalPseudoArgs(text: string): string {
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === ':') {
+      let identStart = i + 1;
+      if (text[identStart] === ':') {
+        identStart += 1;
+      }
+      let identEnd = identStart;
+      while (identEnd < text.length && isIdentChar(text[identEnd])) {
+        identEnd += 1;
+      }
+      if (identEnd > identStart && text[identEnd] === '(') {
+        out += text.slice(i, identEnd + 1);
+        let depth = 1;
+        i = identEnd + 1;
+        while (i < text.length && depth > 0) {
+          if (text[i] === '(') {
+            depth += 1;
+          } else if (text[i] === ')') {
+            depth -= 1;
+          }
+          i += 1;
+        }
+        if (depth === 0) {
+          out += ')';
+        }
+        continue;
+      }
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+/**
  * True iff `selector` appears ident-boundary exact inside some selector
  * prelude of `css`. Whitespace in a multi-token (descendant) selector is
  * normalized on both sides before matching. String-literal CONTENTS are
@@ -113,14 +162,22 @@ function isIdentChar(ch: string | undefined): boolean {
  * (`input[type="text"]`) match their source rules; the accepted
  * over-approximation is that quoted VALUES are not compared —
  * `[data-state="open"]` matches a source rule for `[data-state="closed"]`.
+ * Functional pseudo-class ARGUMENTS are likewise stripped on both sides
+ * identically, so `.ghost` does not match `.real:not(.ghost)` (an exclusion
+ * is not a definition), while a full-selector query like `.real:not(.ghost)`
+ * still matches its source rule; the symmetric accepted over-approximation is
+ * that argument CONTENTS are not compared — `.real:not(.ghost)` matches a
+ * source rule for `.real:not(.other)`.
  */
 export function cssDefinesSelector(css: string, selector: string): boolean {
-  const query = stripCommentsAndStrings(selector).trim().replace(/\s+/g, ' ');
+  const query = stripFunctionalPseudoArgs(stripCommentsAndStrings(selector))
+    .trim()
+    .replace(/\s+/g, ' ');
   if (query === '') {
     return false;
   }
   for (const prelude of collectSelectorPreludes(css)) {
-    const haystack = prelude.replace(/\s+/g, ' ');
+    const haystack = stripFunctionalPseudoArgs(prelude).replace(/\s+/g, ' ');
     let from = 0;
     while (true) {
       const at = haystack.indexOf(query, from);

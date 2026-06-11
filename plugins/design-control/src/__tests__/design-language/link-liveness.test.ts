@@ -144,6 +144,36 @@ describe('checkLinkLiveness — dead links flagged (no app boot)', () => {
     writeFileSync(join(dir, 'studio.css'), '.real { background: url(.ghost/x.png); }\n');
     expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
   });
+
+  it('a selector appearing only inside :not(...) is dead — exclusion is not styling', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not(.ghost) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+  });
+
+  it('a selector appearing only inside :is(...) arguments is dead', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:is(.ghost, .other) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+  });
+
+  it('a selector nested inside :not(:is(...)) is dead — parens balance across nesting', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not(:is(.ghost)) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+  });
+
+  it('the subject outside the functional pseudo-class still matches (.real in .real:not(.ghost))', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not(.ghost) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.real'), dir).ok).toBe(true);
+  });
+
+  it('a full-selector query with parens matches its source rule — args stripped on both sides', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not(.ghost) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.real:not(.ghost)'), dir).ok).toBe(true);
+  });
 });
 
 describe('checkLinkLiveness — v1 scope boundary (named-deferred, visible)', () => {
