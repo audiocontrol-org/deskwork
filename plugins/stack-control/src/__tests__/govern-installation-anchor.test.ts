@@ -130,6 +130,46 @@ describe('US3 — implement payload anchors at the installation (R3)', () => {
     }
   });
 
+  it('cross-tree untracked fold applies the soft byte budget: over-budget files are skipped with a warning, smaller files still fold (AUDIT-20260611-03)', () => {
+    const fixture = makeNestedFixture();
+    try {
+      // Committed spec.md so the cross-tree arm exists (same shape as the
+      // labeled-arm test above).
+      fixture.writeOuter('specs/feat/spec.md', 'The spec promise under audit.\n');
+      gitIn(fixture.outerRoot, ['add', '.']);
+      gitIn(fixture.outerRoot, ['commit', '-q', '-m', 'spec artifacts']);
+      // A LARGE untracked text file under the feature root (well over the
+      // 1000-byte budget passed below) plus a SMALL one. ls-files sorts
+      // 'large-blob.md' before 'small-note.md', so this also exercises the
+      // AUDIT-20260605-12 continue-not-break semantics: the over-budget
+      // file is skipped WITHOUT consuming budget, and the later small file
+      // still folds.
+      const largeLines = ['LARGE-BLOB-CANARY', ...Array.from({ length: 50 }, () => 'x'.repeat(60))];
+      fixture.writeOuter('specs/feat/large-blob.md', `${largeLines.join('\n')}\n`);
+      fixture.writeOuter('specs/feat/small-note.md', 'SMALL-NOTE-CANARY\n');
+
+      const { lines, warn } = collectWarn();
+      const payload = assembleImplementPayload({
+        installationRoot: fixture.installationRoot,
+        base: 'HEAD~1',
+        featureRoot: join(fixture.outerRoot, 'specs', 'feat'),
+        budgetBytes: 1000,
+        warn,
+      });
+      // The small untracked file folds in full.
+      expect(payload.diff).toContain('SMALL-NOTE-CANARY');
+      // The over-budget file does NOT fold — its content must be absent.
+      expect(payload.diff).not.toContain('LARGE-BLOB-CANARY');
+      // The skip is warned, never silent, and names the file.
+      expect(lines.join('\n')).toContain('specs/feat/large-blob.md');
+      expect(lines.join('\n')).toMatch(/budget/i);
+      // And ledgered in the payload's skip record.
+      expect(payload.skippedOverBudget).toContain('specs/feat/large-blob.md');
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
   it('a feature root INSIDE the installation produces no cross-tree arm and no announcement', () => {
     const fixture = makeNestedFixture();
     try {

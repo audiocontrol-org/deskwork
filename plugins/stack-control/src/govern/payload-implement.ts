@@ -342,12 +342,21 @@ export function assembleImplementPayload(
       `govern: feature anchor outside the installation: ${crossTreeFeatureRoot} ` +
         `(designated anchor — artifacts land there)`,
     );
-    crossTreeArm = assembleCrossTreeFeatureArm({
+    // AUDIT-20260611-03: the budget is per-PAYLOAD, so the arm shares the
+    // main fold's running total (the main fold runs first; the arm
+    // continues from where it left off) and its over-budget skips land in
+    // the same skippedOverBudget ledger.
+    const arm = assembleCrossTreeFeatureArm({
       installationRoot,
       base,
       featureRoot: crossTreeFeatureRoot,
+      budgetBytes: budget,
+      foldedBytes,
       warn,
     });
+    crossTreeArm = arm.arm;
+    foldedBytes = arm.foldedBytes;
+    skippedOverBudget.push(...arm.skippedOverBudget);
     if (crossTreeArm.length > 0) {
       diff = `${diff}\n${crossTreeArm}`;
     }
@@ -380,9 +389,19 @@ function assembleCrossTreeFeatureArm(args: {
   readonly installationRoot: string;
   readonly base: string;
   readonly featureRoot: string;
+  /** Per-payload soft budget shared with the main fold (AUDIT-20260611-03). */
+  readonly budgetBytes: number;
+  /** Running folded-byte total carried over from the main fold. */
+  readonly foldedBytes: number;
   readonly warn: (message: string) => void;
-}): string {
-  const { installationRoot, base, featureRoot, warn } = args;
+}): {
+  readonly arm: string;
+  readonly foldedBytes: number;
+  readonly skippedOverBudget: readonly string[];
+} {
+  const { installationRoot, base, featureRoot, budgetBytes, warn } = args;
+  let foldedBytes = args.foldedBytes;
+  const skippedOverBudget: string[] = [];
   const top = spawnSync(
     'git',
     ['-C', installationRoot, 'rev-parse', '--show-toplevel'],
@@ -441,10 +460,14 @@ function assembleCrossTreeFeatureArm(args: {
         `feature artifacts (FR-005).`,
     );
   }
-  // Untracked spec artifacts under the feature root fold too (same
-  // binary-skip rule as the installation fold; the feature arm carries
-  // documents, so the 256KB working-tree budget is not re-applied here —
-  // any skip is warned, never silent).
+  // Untracked spec artifacts under the feature root fold too, under the
+  // SAME rules as the installation fold: binary/empty skip + the shared
+  // per-payload soft byte budget (AUDIT-20260611-03 — the arm previously
+  // had no size bound, so an arbitrarily large untracked file under the
+  // feature root folded in full). Over-budget files are skipped with the
+  // AUDIT-20260605-12 semantics (warn + `continue` without consuming
+  // budget, so later smaller files still fold) — every skip is warned,
+  // never silent.
   let untrackedFold = '';
   const untracked = git(toplevel, [
     'ls-files',
@@ -465,6 +488,19 @@ function assembleCrossTreeFeatureArm(args: {
       );
       continue;
     }
+    const sz = fileSize(abs);
+    if (foldedBytes + sz > budgetBytes) {
+      // AUDIT-20260611-03 / AUDIT-20260605-12: skip ONLY this oversized
+      // file and keep packing smaller ones — `continue` (not `break`),
+      // and do NOT increment foldedBytes. Logged (no silent cap).
+      warn(
+        `govern: untracked file ${rel} (${sz} bytes) would exceed the fold budget ` +
+          `(${budgetBytes} bytes); skipping it but continuing with smaller files ` +
+          `(not silently — audit it by committing first; cross-tree feature arm).`,
+      );
+      skippedOverBudget.push(rel);
+      continue;
+    }
     // AUDIT-20260611-01: same relative-operand rule as the installation
     // fold — git runs with `-C toplevel`, so passing `rel` makes the diff
     // headers toplevel-relative instead of leaking absolute paths.
@@ -474,9 +510,18 @@ function assembleCrossTreeFeatureArm(args: {
       { encoding: 'utf8' },
     );
     const folded = typeof r.stdout === 'string' ? r.stdout : '';
-    if (folded.length > 0) untrackedFold += `\n${folded}`;
+    if (folded.length > 0) {
+      untrackedFold += `\n${folded}`;
+      foldedBytes += sz;
+    }
   }
   const armBody = `${armDiff.stdout}${untrackedFold}`;
-  if (armBody.trim().length === 0) return '';
-  return `### cross-tree feature arm: ${featureRoot} ###\n${armBody}`;
+  if (armBody.trim().length === 0) {
+    return { arm: '', foldedBytes, skippedOverBudget };
+  }
+  return {
+    arm: `### cross-tree feature arm: ${featureRoot} ###\n${armBody}`,
+    foldedBytes,
+    skippedOverBudget,
+  };
 }
