@@ -100,7 +100,7 @@ describe('spec-mode audit lens', () => {
     try {
       const spec = join(repo, 'spec.md');
       writeFileSync(spec, 'A spec under audit.\n');
-      const built = buildSpecVars(repo, 'demo', spec, undefined, undefined);
+      const built = buildSpecVars(repo, 'demo', spec, undefined, undefined, '');
       expect(built.vars.audit_lens).toBe(SPEC_AUDIT_LENS);
       expect(built.vars.artifact_framing).toBe(SPEC_ARTIFACT_FRAMING);
     } finally {
@@ -131,7 +131,7 @@ describe('implement-mode audit lens (regression — unchanged behavior)', () => 
   it('implement-mode BarrageVars.audit_lens === CODE_AUDIT_LENS', () => {
     const repo = tmpRepo();
     try {
-      const built = buildImplementVars(repo, 'demo', 'HEAD', undefined);
+      const built = buildImplementVars(repo, 'demo', 'HEAD', undefined, '');
       expect(built.vars.audit_lens).toBe(CODE_AUDIT_LENS);
       expect(built.vars.artifact_framing).toBe(CODE_ARTIFACT_FRAMING);
     } finally {

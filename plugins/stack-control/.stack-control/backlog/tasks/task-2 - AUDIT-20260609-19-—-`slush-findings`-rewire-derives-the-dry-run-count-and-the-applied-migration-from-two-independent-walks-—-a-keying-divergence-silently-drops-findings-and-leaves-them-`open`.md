@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-09 19:37'
+updated_date: '2026-06-10 21:51'
 labels:
   - 'type:migrated-finding'
   - 'feature:pluggable-lifecycle-providers'

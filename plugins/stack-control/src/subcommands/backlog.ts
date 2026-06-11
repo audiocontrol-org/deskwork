@@ -149,15 +149,18 @@ function emitImportGithub(flags: Flags): void {
 }
 
 /** Resolve the feature's audit-log: a test seam reads/writes a file directly;
- * otherwise resolve docs/<v>/001-IN-PROGRESS/<slug>/audit-log.md. */
+ * otherwise resolve the feature root via the shared layout-aware helper
+ * (specs/<NNN>-<slug> or docs/<v>/001-IN-PROGRESS/<slug>) and read its
+ * audit-log.md. */
 async function resolveAuditLog(featureSlug: string): Promise<{ path: string; text: string }> {
   const seam = process.env.STACKCTL_AUDIT_LOG_FILE;
   if (seam !== undefined) {
     if (!existsSync(seam)) failUsage('backlog', `audit-log file not found: ${seam}`);
     return { path: seam, text: readFileSync(seam, 'utf8') };
   }
-  const { root } = await resolveFeatureRoot({ repoRoot: process.cwd(), slug: featureSlug });
-  if (root === undefined) failUsage('backlog', `feature '${featureSlug}' not found under docs/*/001-IN-PROGRESS/`);
+  const cwd = process.cwd();
+  const { root } = await resolveFeatureRoot({ repoRoot: cwd, slug: featureSlug });
+  if (root === undefined) failUsage('backlog', `feature '${featureSlug}' not found under ${join(cwd, 'specs')}/<NNN>-${featureSlug} (speckit) or ${join(cwd, 'docs')}/*/001-IN-PROGRESS/${featureSlug} (legacy-docs)`);
   const path = join(root, 'audit-log.md');
   if (!existsSync(path)) failUsage('backlog', `audit-log not found at ${path}`);
   return { path, text: readFileSync(path, 'utf8') };
