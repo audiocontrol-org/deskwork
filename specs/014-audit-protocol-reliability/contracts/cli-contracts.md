@@ -23,12 +23,22 @@ Govern invokes the barrage with floor 2 by default (protocol runs exist for the 
 
 ## Barrage config loading (US2 — fires in every verb that loads barrage config)
 
-**New stderr notice** whenever `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` exists:
+**New stderr notice** whenever `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` exists. The third line branches on whether a stack-control override is active (AUDIT-20260611-09 — the unconditional mv advice was destructive in the both-present case: its destination was the operator's active, tuned override, and mv overwrites without prompting; the swap is self-concealing because the moved legacy file stops the notice from ever firing again).
+
+Legacy-only (no active override — mv destination doesn't exist, safe):
 
 ```
 audit-barrage: WARNING — legacy dw-lifecycle config present and IGNORED: <legacy-path>
-audit-barrage: reading <active: .stack-control/audit-barrage-config.yaml | built-in defaults>
+audit-barrage: reading built-in defaults
 audit-barrage: migrate with: mv <legacy-path> .stack-control/audit-barrage-config.yaml (then review)
+```
+
+Both present (active override exists — the operator has already migrated; the remediation archives the legacy file and NEVER prints a command whose destination is the active override):
+
+```
+audit-barrage: WARNING — legacy dw-lifecycle config present and IGNORED: <legacy-path>
+audit-barrage: reading .stack-control/audit-barrage-config.yaml
+audit-barrage: the active override already exists — archive the legacy file instead: mv <legacy-path> <legacy-path>.migrated-to-stack-control (or delete it); do NOT mv it over the active override
 ```
 
 Fires in all combinations (legacy-only, legacy+active). Never changes which config wins; never fires when no legacy file exists.

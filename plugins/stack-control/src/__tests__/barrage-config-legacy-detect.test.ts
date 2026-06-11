@@ -80,6 +80,11 @@ describe('US2 — legacy dw-lifecycle barrage config detection', () => {
       expect(warnings).toMatch(/built-in defaults/);
       expect(warnings).toMatch(/migrate with: mv /);
       expect(warnings).toContain(CONFIG_OVERRIDE_PATH);
+      // AUDIT-20260611-09: legacy-only — no active override exists, so
+      // mv-to-override is safe; pin the exact copy-pasteable command.
+      expect(warnings).toContain(
+        `migrate with: mv ${legacyAbs} ${join(repo, CONFIG_OVERRIDE_PATH)} (then review)`,
+      );
 
       // Selection unchanged: the legacy file's battery must NOT load.
       expect(config.models.some((m) => m.name === 'legacy-model')).toBe(false);
@@ -101,6 +106,15 @@ describe('US2 — legacy dw-lifecycle barrage config detection', () => {
       // The "reading" line names the active override, not the defaults.
       expect(warnings).toContain(overrideAbs);
       expect(warnings).not.toMatch(/built-in defaults/);
+      // AUDIT-20260611-09: the remediation must NEVER print an mv whose
+      // destination is the operator's ACTIVE override — pasting it would
+      // clobber the tuned battery with the legacy one (self-concealing:
+      // once moved, this notice never fires again). The both-present
+      // remediation archives/removes the legacy file instead.
+      expect(warnings).not.toContain(`mv ${legacyAbs} ${overrideAbs}`);
+      expect(warnings).toMatch(/archive the legacy file/);
+      expect(warnings).toContain(`mv ${legacyAbs} ${legacyAbs}.migrated-to-stack-control`);
+      expect(warnings).toMatch(/do NOT mv it over the active override/);
 
       expect(config.models).toHaveLength(1);
       expect(config.models[0]?.name).toBe('override-model');

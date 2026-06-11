@@ -140,8 +140,18 @@ export async function loadAuditBarrageConfig(
  * Probe for the legacy dw-lifecycle config and announce it (specs/014
  * US2). Three lines: the ignored legacy path, the source actually read
  * (the active stack-control override, else the built-in defaults), and
- * the copy-pasteable migration step. Pure observability — load
+ * the copy-pasteable remediation step. Pure observability — load
  * semantics are untouched in all presence combinations.
+ *
+ * The third line branches on `activeOverridePath` (AUDIT-20260611-09):
+ * when no stack-control override is active, `mv <legacy> <override>` is
+ * safe (the destination doesn't exist). When the override IS active,
+ * that same mv would silently CLOBBER the operator's tuned battery with
+ * the legacy one — and the swap is self-concealing, because once the
+ * legacy file moves, this notice never fires again. In the both-present
+ * state the operator has already migrated, so the remediation archives
+ * the legacy file and must never print a command whose destination is
+ * the active override.
  */
 function emitLegacyConfigNotice(
   repoRoot: string,
@@ -155,9 +165,17 @@ function emitLegacyConfigNotice(
     `audit-barrage: WARNING — legacy dw-lifecycle config present and IGNORED: ${legacyPath}\n`,
   );
   warn(`audit-barrage: reading ${reading}\n`);
-  warn(
-    `audit-barrage: migrate with: mv ${legacyPath} ${resolve(repoRoot, CONFIG_OVERRIDE_PATH)} (then review)\n`,
-  );
+  if (activeOverridePath === undefined) {
+    warn(
+      `audit-barrage: migrate with: mv ${legacyPath} ${resolve(repoRoot, CONFIG_OVERRIDE_PATH)} (then review)\n`,
+    );
+  } else {
+    warn(
+      `audit-barrage: the active override already exists — archive the legacy file instead: ` +
+        `mv ${legacyPath} ${legacyPath}.migrated-to-stack-control (or delete it); ` +
+        `do NOT mv it over the active override\n`,
+    );
+  }
 }
 
 /**
