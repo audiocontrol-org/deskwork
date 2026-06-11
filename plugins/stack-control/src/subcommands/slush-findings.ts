@@ -199,10 +199,20 @@ export async function runSlushFindings(args: string[]): Promise<void> {
       process.exit(1);
     }
     await atomicWriteFile(auditLogPath, mig.newAuditLogText);
+    // AUDIT-20260611-02: surface BOTH counts — a flip whose ref already exists
+    // (same canonical id migrated earlier from another section) creates no new
+    // item but its status is rewritten to the existing task id. Dry-run N ≡
+    // migrated + already-present N on an unchanged audit-log.
+    const alreadyPresent =
+      mig.skipped.length > 0
+        ? ` (${mig.skipped.length} already present: ${mig.skipped
+            .map((s) => `${s.findingId}→${s.taskId}`)
+            .join(', ')})`
+        : '';
     process.stdout.write(
       `slush-findings: APPLIED — migrated ${mig.migrated.length} finding(s) to the backlog: ${mig.migrated
         .map((m) => `${m.findingId}→${m.taskId}`)
-        .join(', ')}\n`,
+        .join(', ')}${alreadyPresent}\n`,
     );
   } else {
     process.stdout.write(

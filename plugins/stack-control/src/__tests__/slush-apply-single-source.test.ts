@@ -138,6 +138,101 @@ describe('US4 — apply consumes the dampener flips (single source of truth)', (
   });
 });
 
+describe('US4 residual (AUDIT-20260611-02) — ref-idempotency skip must not leave a decided flip open', () => {
+  it('second apply (--scope all) rewrites the earlier same-id entry to the EXISTING task id and surfaces the already-present mapping', () => {
+    const repo = divergenceRepo();
+    const backlog = tmpBacklog();
+    try {
+      // First apply (scope latest, the default): migrates the latest section's
+      // entry and creates the audit:<slug>:<id> ref.
+      const first = runCli(
+        ['slush-findings', '--feature', 's', '--repo-root', repo, '--slush-date', '2026-06-07', '--apply'],
+        { env: { STACKCTL_BACKLOG_DIR: backlog } },
+      );
+      expect(first.status).toBe(0);
+
+      // Dry-run over the remaining (earlier) entry with --scope all: 1 flip.
+      const dry = runCli(
+        ['slush-findings', '--feature', 's', '--repo-root', repo, '--slush-date', '2026-06-07', '--scope', 'all'],
+        { env: { STACKCTL_BACKLOG_DIR: backlog } },
+      );
+      expect(dry.status).toBe(0);
+      expect(/would migrate (\d+) finding/.exec(dry.stdout)?.[1]).toBe('1');
+
+      // Second apply (--scope all) decides the EARLIER same-id entry. Its ref
+      // already exists — the entry is already migrated, to an existing item.
+      // Pre-fix pathology: the flip was skipped, its status stayed open, stdout
+      // said `migrated 0` with no signal, exit 0 — open forever.
+      const second = runCli(
+        ['slush-findings', '--feature', 's', '--repo-root', repo, '--slush-date', '2026-06-07', '--scope', 'all', '--apply'],
+        { env: { STACKCTL_BACKLOG_DIR: backlog } },
+      );
+      expect(second.status).toBe(0);
+
+      const t = logText(repo, 's');
+      // No decided flip remains open after an exit-0 apply (SC-004).
+      expect(t).not.toMatch(/^Status:\s+open/m);
+      // Both same-id entries now reference the SAME (single) task id.
+      const ids = [...t.matchAll(/migrated-to-backlog (TASK-\d+)/g)].map((m) => m[1]);
+      expect(ids).toHaveLength(2);
+      expect(new Set(ids).size).toBe(1);
+      // stdout surfaces the already-present mapping (dry-run 1 ≡ migrated 0 + already-present 1).
+      expect(second.stdout).toMatch(/1 already present: AUDIT-20260607-19→TASK-\d+/);
+      // Still exactly one backlog item — no duplicate created.
+      expect(createBacklogBackend({ cwd: backlog }).list()).toHaveLength(1);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('migrateFindings with the ref already present rewrites the status line to the EXISTING task id; skipped records the mapping; zero new items', () => {
+    const AUDIT_LOG = [
+      '# Audit Log',
+      '',
+      '## 2026-06-07 — audit-barrage lift (20260607T100000000Z-s-after_clarify)',
+      '',
+      '### A finding',
+      '',
+      'Finding-ID: AUDIT-20260607-19',
+      'Status:     open',
+      'Severity:   low',
+      'Surface:    spec.md:1',
+      '',
+      'Body.',
+      '',
+    ].join('\n');
+    const backlog = tmpBacklog();
+    const backend = createBacklogBackend({ cwd: backlog });
+    const existingId = backend.create({
+      title: 'pre-existing item for the same canonical id',
+      labels: ['type:migrated-finding'],
+      refs: ['audit:s:AUDIT-20260607-19'],
+    });
+    const res = migrateFindings({
+      auditLogText: AUDIT_LOG,
+      findings: [
+        {
+          findingId: 'AUDIT-20260607-19',
+          fullFindingId: 'AUDIT-20260607-19',
+          severity: 'low',
+          statusLineIndex: 7,
+          title: 'A finding',
+        },
+      ],
+      backend,
+      featureSlug: 's',
+      expectedStatusRe: /^Status:\s*open\b/i,
+    });
+    // The status line is rewritten anyway — to the EXISTING task id.
+    expect(res.newAuditLogText.split('\n')[7]).toBe(`Status: migrated-to-backlog ${existingId}`);
+    // The ledger records "no NEW item created" with the mapping.
+    expect(res.skipped.map((s) => s.findingId)).toEqual(['AUDIT-20260607-19']);
+    expect(res.skipped.map((s) => s.taskId)).toEqual([existingId]);
+    expect(res.migrated).toHaveLength(0);
+    expect(backend.list()).toHaveLength(1);
+  });
+});
+
 describe('US4 — unlocatable flips fail loud (migrateFindings location guard)', () => {
   const AUDIT_LOG = [
     '# Audit Log',

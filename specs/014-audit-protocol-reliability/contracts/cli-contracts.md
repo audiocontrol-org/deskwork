@@ -39,7 +39,7 @@ No flag/exit changes. Behavioral contract: one audit-log entry per distinct root
 
 ## `stackctl slush-findings` (US4)
 
-No flag changes. Strengthened contract: dry-run "would migrate N" ⇒ apply migrates exactly N on an unchanged audit-log; any flip that cannot be applied fails the verb loudly naming the finding ID (non-zero exit — never exit 0 with a shortfall). Audit-log changed between dry-run and apply ⇒ loud staleness failure.
+No flag changes. Strengthened contract: dry-run "would migrate N" ⇒ apply migrates exactly N on an unchanged audit-log; any flip that cannot be applied fails the verb loudly naming the finding ID (non-zero exit — never exit 0 with a shortfall). Audit-log changed between dry-run and apply ⇒ loud staleness failure. AUDIT-20260611-02: a decided flip whose backlink ref already exists (same canonical AUDIT-id migrated earlier from another section/run) is rewritten to `Status: migrated-to-backlog <existing-task-id>` — never left open — with no new item created; the APPLIED stdout line surfaces the count + mapping (`(M already present: AUDIT-X→TASK-Y, …)`), so dry-run N ≡ migrated + already-present N.
 
 ## `stackctl govern --mode implement` (US5)
 

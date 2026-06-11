@@ -87,15 +87,25 @@ export function findFindingsByStatus(auditLogText: string, statusMatch: RegExp):
 export interface MigrationResult {
   readonly newAuditLogText: string;
   readonly migrated: readonly { readonly findingId: string; readonly taskId: string }[];
-  /** Finding ids skipped because a backlog item with their ref already exists. */
-  readonly skipped: readonly string[];
+  /**
+   * Findings for which NO new item was created because a backlog item with
+   * their ref already exists — mapped to that existing item's id. Their
+   * Status lines are still rewritten (see AUDIT-20260611-02 below).
+   */
+  readonly skipped: readonly { readonly findingId: string; readonly taskId: string }[];
 }
 
 /**
  * Create one `migrated-finding` backlog item per finding (priority from
  * severity; provenance = feature slug + finding id; ref → audit-log entry) and
  * rewrite each finding's Status line to `migrated-to-backlog <task-id>`.
- * Idempotent: a finding whose `audit:<slug>:<id>` ref already exists is skipped.
+ * Idempotent on item CREATION: a finding whose `audit:<slug>:<id>` ref already
+ * exists creates no new item — but its Status line IS still rewritten, to the
+ * EXISTING item's id (specs/014 AUDIT-20260611-02: the ref is keyed by
+ * canonical AUDIT-id, not by entry, so a same-id entry decided in a later run
+ * must not be left silently open behind an exit-0 apply). Such findings are
+ * recorded in `skipped` (= "no NEW item created"). If the ref exists but no
+ * listed item carries it, the store is inconsistent — fail loud.
  * HIGH/blocking severities throw via severityToPriority (FR-018 fail-loud).
  *
  * specs/014 US4 location guard: when `expectedStatusRe` is provided, EVERY
@@ -128,11 +138,23 @@ export function migrateFindings(args: {
     }
   }
   const migrated: { findingId: string; taskId: string }[] = [];
-  const skipped: string[] = [];
+  const skipped: { findingId: string; taskId: string }[] = [];
   for (const f of args.findings) {
     const ref = auditRef(args.featureSlug, f.findingId);
     if (args.backend.exists(ref)) {
-      skipped.push(f.findingId);
+      // Already migrated — to an item that already exists. Rewrite the Status
+      // line anyway (AUDIT-20260611-02): leaving it open would re-decide the
+      // flip every run, skip it every apply, and exit 0 every time.
+      const existing = args.backend.list().find((item) => item.refs.includes(ref));
+      if (existing === undefined) {
+        throw new Error(
+          `slush-migrate: finding ${f.findingId} has an existing backlog ref ` +
+            `(${ref}) per exists(), but no listed item carries it — the backlog ` +
+            `store is inconsistent. Fix or remove the offending task file, then re-run.`,
+        );
+      }
+      lines[f.statusLineIndex] = `Status: migrated-to-backlog ${existing.id}`;
+      skipped.push({ findingId: f.findingId, taskId: existing.id });
       continue;
     }
     const taskId = args.backend.create({
@@ -150,7 +172,10 @@ export function migrateFindings(args: {
 /**
  * One-time backfill (US4, FR-021): migrate every `acknowledged-slush-pile-*`
  * entry in the audit-log into the backlog. Dry-run reports the set and writes
- * nothing; apply creates items + rewrites dispositions. Idempotent.
+ * nothing; apply creates items + rewrites dispositions. Idempotent on item
+ * creation; per AUDIT-20260611-02, an already-imported parked entry still gets
+ * its status rewritten to reference the existing item (never left parked
+ * forever behind a ref-idempotency skip).
  */
 export function backfillSlush(args: {
   auditLogText: string;
