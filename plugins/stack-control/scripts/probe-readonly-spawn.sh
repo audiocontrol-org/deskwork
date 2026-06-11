@@ -40,8 +40,8 @@ set -euo pipefail
 
 PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STACKCTL="$PLUGIN_ROOT/bin/stackctl"
-LANES=("${@:-claude codex}")
-if [ "$#" -eq 0 ]; then LANES=(claude codex); fi
+LANES=("$@")
+if [ "${#LANES[@]}" -eq 0 ]; then LANES=(claude codex); fi
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT

@@ -22,8 +22,11 @@
 # the lane passes the hostile write-probe (it then runs loudly marked
 # write-unenforced), and pin the model explicitly.
 #
-# Thoroughness override (operator choice): pin the claude lane to
-# `model: fable` with `timeout_secs_per_kb: 17` (2026-06-10 calibration).
+# Thoroughness: the claude lane below currently runs the template default
+# (`model: opus` / `timeout_secs_per_kb: 13`). A more-thorough profile is
+# AVAILABLE but NOT applied here: the operator may edit the lane to
+# `model: fable` with `timeout_secs_per_kb: 17` (2026-06-10 calibration) to
+# trade latency for maximum thoroughness.
 
 models:
   - name: claude

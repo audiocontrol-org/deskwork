@@ -14,8 +14,7 @@
  * given an artifact (Principle V).
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createStreamResultExtractor } from '../src/scope-discovery/audit-barrage/stream-result-extractor.js';
