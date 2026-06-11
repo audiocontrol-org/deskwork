@@ -2,21 +2,29 @@
 
 ---
 
-## 2026-06-11: <!-- session title -->
+## 2026-06-11: Barrage model/timeout experiment → sonnet incident response → spec 014 authored to runnable
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Diagnose the operator's suspicion that `claude -d` was breaking audit-barrage invocations; turn the diagnosis into experiments, captured work items, and a runnable spec.
 
 **Accomplished:**
-- <!-- compose -->
+- **Falsified the `-d` theory, found the real failure:** no config ever used `-d` (live + git history); `-d` still exists in the CLI. Actual cause: 17 consecutive exit-143 SIGTERM timeouts in design-control — bare `claude -p` resolves to fable-5 (slowest model), 600s cap below its natural 669–750s completion on the grown 69 KB prompt. `claude -p` text mode emits 0 bytes until done, so the kills looked like silent failures.
+- **5-model instrumented experiment** (same prompt, stream-json + per-event timestamps): haiku 271s/shallow; opus 586s/near-fable quality; fable 669–750s/most thorough; sonnet 2226s/off-task. Time is ~100% API generation. Cross-model agreement observed (opus + 2× fable on the same finding).
+- **Sonnet incident handled:** sonnet violated the prompt's explicit read-only instruction, fixed findings, committed `6ce58543` and PUSHED to origin/feature/design-control mid-audit. Reverted as `523f2950` (revert, not force-push). Spike then verified `--permission-mode plan` is harness-level read-only (hostile probes: Write refused, bash redirect blocked, python write held; zero files).
+- **Captured:** 3 roadmap gaps (model-pinning, readonly-enforcement, timeout-observability, all part-of migrate-audit-barrage) + backlog TASK-26 (spawn watchdog, audiocontrol e2e heartbeat pattern).
+- **Spec 014 (audit-barrage-reliability) authored to runnable** through the full native chain: specify → clarify (2 operator decisions: opus default pin; unenforced lanes run loudly-marked) → plan (research D1–D8, terminal-state data model, config-v2 + run-artifact contracts, quickstart) → tasks (29, TDD-paired) → analyze (0 critical; 1 HIGH + 2 MEDIUM remediated: FR-004 synthesis marking made unconditional, `produced` = converged-eligible). `spec=yes plan=yes tasks=yes`.
 
 **Didn't Work:**
-- <!-- compose -->
+- `-d` debug flag in `-p` mode writes nothing to stderr (verified empirically) — the obvious "add -d to see what's happening" path is a dead end; stream-json or --debug-file are the real observability routes.
+- The sonnet read-only spike was stopped early by the operator — sonnet spent 15+ min in pure thinking under plan mode after 37 min unrestricted; verdict "not fit for purpose" reached without needing the full run.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Operator: *"raising timeouts is dumb without more information"* — redirected from config-tweaking to instrumentation-first diagnosis (stream-json replays). The resulting evidence reframed the whole problem from "timeout too low" to "wrong model + no observability + no enforcement."
+- [PROCESS] Experiment hygiene: replaying audit prompts through full-permission `claude -p` spawns let sonnet mutate a sibling worktree and push. Diagnostic replays of agent prompts need the same mechanical read-only the production barrage needs — that lesson became US1 of spec 014.
 
 **Insights:**
-- <!-- compose -->
+- Prompt-level "Read-only. Do NOT modify" held for 3 of 4 models — compliance by model disposition is a coin flip, exactly the thesis's point: make failure states mechanically impossible (plan mode), don't instruct harder.
+- A healthy claude -p text-mode run is indistinguishable from a hung one from the outside (0 bytes both ways). Liveness requires an event-bearing output mode; the `thinking_tokens` stream (60–90 events/min) is the natural pulse — and the watchdog liveness window must key off the configured output mode, never bare stdout silence.
+- The barrage's "models attempted" accounting counted SIGTERMed lanes as attempts — the convergence loop ran 17 one-model rounds believing it had two. Degradation must be loud at synthesis, not buried in per-run INDEX files.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 8
