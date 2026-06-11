@@ -99,7 +99,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     writeFileSync(spec, 'A spec under audit.\n');
     try {
       const r = runGovern(
-        ['--mode', 'spec', '--feature', 'feat', '--repo-root', repo, '--spec-path', spec],
+        ['--mode', 'spec', '--feature', 'feat', '--at', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-a') },
       );
       expect(`${r.stdout}${r.stderr}`).toMatch(/may graduate|OPEN/);
@@ -131,7 +131,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     git(['commit', '-q', '-m', 'seed']);
     try {
       const r = runGovern(
-        ['--mode', 'implement', '--feature', 'feat', '--repo-root', repo, '--diff-base', 'HEAD'],
+        ['--mode', 'implement', '--feature', 'feat', '--at', repo, '--diff-base', 'HEAD'],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-b') },
       );
       expect(`${r.stdout}${r.stderr}`).toMatch(/governed|OPEN/);
@@ -177,7 +177,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     writeFileSync(spec, 'A spec under audit.\n');
     try {
       const r = runGovern(
-        ['--mode', 'spec', '--feature', 'feat', '--repo-root', repo, '--spec-path', spec],
+        ['--mode', 'spec', '--feature', 'feat', '--at', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-slush') },
       );
       expect(r.status).toBe(0);
@@ -202,7 +202,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     writeFileSync(spec, 'A spec under audit.\n');
     try {
       const r = runGovern(
-        ['--mode', 'spec', '--feature', 'feat', '--repo-root', repo, '--spec-path', spec],
+        ['--mode', 'spec', '--feature', 'feat', '--at', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-c'), STUB_OUTAGE: '1' },
       );
       expect(r.status).toBe(2);
@@ -226,7 +226,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     writeFileSync(spec, 'spec\n');
     try {
       const r = runGovern(
-        ['--mode', 'spec', '--feature', '', '--repo-root', repo, '--spec-path', spec],
+        ['--mode', 'spec', '--feature', '', '--at', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-d') },
       );
       expect(r.status).toBe(2);

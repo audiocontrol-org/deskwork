@@ -33,8 +33,9 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { statSync, readFileSync } from 'node:fs';
+import { realpathSync, statSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { GovernPayloadError } from './payload-spec.js';
 
 /** 256 KB soft budget on transmitted untracked working-tree content. */
 const DEFAULT_UNTRACKED_FOLD_BUDGET = 256 * 1024;
@@ -180,28 +181,32 @@ export function assembleImplementPayload(
   const budget = args.budgetBytes ?? DEFAULT_UNTRACKED_FOLD_BUDGET;
   const warn = args.warn ?? ((m: string) => process.stderr.write(`${m}\n`));
 
-  // specs/014 US5: repo-relative feature root (POSIX separators for git
-  // pathspecs) when the caller resolved one.
-  const featureRel =
-    args.featureRoot !== undefined
-      ? relative(installationRoot, args.featureRoot).split(sep).join('/')
-      : undefined;
-
-  // Repo-relative rel-ifications shared by both arms. A path that
-  // rel-ifies to empty or escapes the repo (`..`) is inert — there is
-  // nothing repo-relative to exclude.
+  // specs/014 US5: installation-relative feature root (POSIX separators
+  // for git pathspecs) when the caller resolved one. Under the isolation
+  // model (specs/installation-isolation R3) the feature root may lie
+  // OUTSIDE the installation subtree (the transitional cross-tree
+  // layout): its rel-ification then escapes (`../…`) and the feature
+  // folds in via the labeled cross-tree arm below instead of arm-1
+  // pathspecs.
   const relify = (abs: string): string =>
     relative(installationRoot, abs).split(sep).join('/');
   const inRepo = (rel: string): boolean =>
     rel.length > 0 && rel !== '..' && !rel.startsWith('../');
+  const featureRel =
+    args.featureRoot !== undefined ? relify(args.featureRoot) : undefined;
+  const featureInside = featureRel !== undefined && inRepo(featureRel);
+  const crossTreeFeatureRoot =
+    args.featureRoot !== undefined && !featureInside
+      ? args.featureRoot
+      : undefined;
   const otherFeatureRels =
-    featureRel !== undefined
+    args.featureRoot !== undefined
       ? (args.excludeRoots ?? [])
           .map(relify)
           .filter((root) => inRepo(root) && root !== featureRel)
       : [];
   const excludePathRels =
-    featureRel !== undefined
+    args.featureRoot !== undefined
       ? (args.excludePaths ?? []).map(relify).filter(inRepo)
       : [];
 
@@ -218,18 +223,24 @@ export function assembleImplementPayload(
   // excluded from the committed arm — a sibling's other committed files
   // are legitimate diff content; the FOLD keeps excluding other-feature
   // roots wholesale (below, unchanged).
+  // specs/installation-isolation R3: the committed arm runs AT the
+  // installation with `--relative` — paths in the payload are
+  // installation-relative and the arm covers only the installation
+  // subtree (at a single-rooted repo the anchor and the toplevel
+  // coincide, so this is byte-compatible with the pre-isolation shape).
   const diffArgs =
-    featureRel !== undefined
+    args.featureRoot !== undefined
       ? [
           'diff',
+          '--relative',
           base,
           '--',
           '.',
-          `:(exclude)${featureRel}/audit-log.md`,
+          ...(featureInside ? [`:(exclude)${featureRel}/audit-log.md`] : []),
           ...otherFeatureRels.map((root) => `:(exclude)${root}/audit-log.md`),
           ...excludePathRels.map((rel) => `:(exclude)${rel}`),
         ]
-      : ['diff', base];
+      : ['diff', '--relative', base];
   let diff = git(installationRoot, diffArgs);
   const committedDiffEmpty = diff.trim().length === 0;
 
@@ -259,7 +270,7 @@ export function assembleImplementPayload(
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
     // specs/014 US5 (FR-007): the feature's own audit-log never folds.
-    .filter((rel) => featureRel === undefined || rel !== `${featureRel}/audit-log.md`)
+    .filter((rel) => !featureInside || rel !== `${featureRel}/audit-log.md`)
     // AUDIT-20260611-08: governance-bookkeeping store never folds
     // (silent-by-design — governance plumbing, mirrors the audit-log).
     .filter((rel) => !underExcludePath(rel));
@@ -313,14 +324,150 @@ export function assembleImplementPayload(
     }
   }
 
+  // specs/installation-isolation R3/R4: when the resolved feature root
+  // lies outside the installation subtree (transitional layout), fold it
+  // in as an explicit, LABELED second diff arm anchored at the derived
+  // git toplevel — spec artifacts are never silently absent from the
+  // governed payload (FR-005: a payload that cannot carry them is FATAL,
+  // not partial). The cross-tree anchor is announced once (R4/SC-006).
+  let crossTreeArm = '';
+  if (crossTreeFeatureRoot !== undefined) {
+    warn(
+      `govern: feature anchor outside the installation: ${crossTreeFeatureRoot} ` +
+        `(designated anchor — artifacts land there)`,
+    );
+    crossTreeArm = assembleCrossTreeFeatureArm({
+      installationRoot,
+      base,
+      featureRoot: crossTreeFeatureRoot,
+      warn,
+    });
+    if (crossTreeArm.length > 0) {
+      diff = `${diff}\n${crossTreeArm}`;
+    }
+  }
+
   const commitSubjects = git(installationRoot, ['log', `${base}..HEAD`, '--oneline']);
 
+  const armEmpty = crossTreeArm.trim().length === 0;
+  const empty = committedDiffEmpty && foldedBytes === 0 && armEmpty;
   return {
-    diff: committedDiffEmpty && foldedBytes === 0 ? '' : diff,
+    diff: empty ? '' : diff,
     commitSubjects,
-    empty: committedDiffEmpty && foldedBytes === 0,
+    empty,
     skippedBinary,
     skippedOverBudget,
     skippedOtherFeature,
   };
+}
+
+/**
+ * Build the labeled cross-tree feature arm (R3): the committed diff +
+ * untracked fold scoped to the feature root, anchored at the git
+ * toplevel derived FROM the installation (FR-004 — the toplevel is read
+ * from git's own marker, never accepted as a parameter). The feature's
+ * own audit-log.md stays excluded from both halves (FR-007). Any
+ * condition that would silently omit in-range feature artifacts is a
+ * loud GovernPayloadError instead (FR-005).
+ */
+function assembleCrossTreeFeatureArm(args: {
+  readonly installationRoot: string;
+  readonly base: string;
+  readonly featureRoot: string;
+  readonly warn: (message: string) => void;
+}): string {
+  const { installationRoot, base, featureRoot, warn } = args;
+  const top = spawnSync(
+    'git',
+    ['-C', installationRoot, 'rev-parse', '--show-toplevel'],
+    { encoding: 'utf8' },
+  );
+  const toplevel =
+    top.status === 0 && typeof top.stdout === 'string' ? top.stdout.trim() : '';
+  if (toplevel.length === 0) {
+    throw new GovernPayloadError(
+      `govern: FATAL — feature root ${featureRoot} lies outside the installation ` +
+        `and no git toplevel could be derived to fold it; refusing a payload that ` +
+        `would silently omit feature artifacts (FR-005).`,
+    );
+  }
+  // Compare realpaths: git prints the symlink-resolved toplevel (macOS
+  // /var → /private/var), while the caller's featureRoot may carry the
+  // unresolved spelling.
+  const real = (p: string): string => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+  const featureRelTop = relative(real(toplevel), real(featureRoot))
+    .split(sep)
+    .join('/');
+  if (
+    featureRelTop.length === 0 ||
+    featureRelTop === '..' ||
+    featureRelTop.startsWith('../')
+  ) {
+    throw new GovernPayloadError(
+      `govern: FATAL — feature root ${featureRoot} lies outside the derived git ` +
+        `toplevel ${toplevel}; refusing a payload that would silently omit feature ` +
+        `artifacts (FR-005).`,
+    );
+  }
+  const armDiff = spawnSync(
+    'git',
+    [
+      '-C',
+      toplevel,
+      'diff',
+      base,
+      '--',
+      featureRelTop,
+      `:(exclude)${featureRelTop}/audit-log.md`,
+    ],
+    { encoding: 'utf8' },
+  );
+  if (armDiff.status !== 0 || typeof armDiff.stdout !== 'string') {
+    throw new GovernPayloadError(
+      `govern: FATAL — cross-tree feature arm diff failed (exit ${armDiff.status}) ` +
+        `for ${featureRoot}; refusing a payload that would silently omit in-range ` +
+        `feature artifacts (FR-005).`,
+    );
+  }
+  // Untracked spec artifacts under the feature root fold too (same
+  // binary-skip rule as the installation fold; the feature arm carries
+  // documents, so the 256KB working-tree budget is not re-applied here —
+  // any skip is warned, never silent).
+  let untrackedFold = '';
+  const untracked = git(toplevel, [
+    'ls-files',
+    '--others',
+    '--exclude-standard',
+    '--',
+    featureRelTop,
+  ])
+    .split('\n')
+    .map((s2) => s2.trim())
+    .filter((s2) => s2.length > 0)
+    .filter((rel) => rel !== `${featureRelTop}/audit-log.md`);
+  for (const rel of untracked) {
+    const abs = join(toplevel, rel);
+    if (isBinaryOrEmpty(abs)) {
+      warn(
+        `govern: skipping untracked binary/empty file ${rel} (cross-tree feature arm).`,
+      );
+      continue;
+    }
+    const r = spawnSync(
+      'git',
+      ['-C', toplevel, 'diff', '--no-index', '--no-color', '--', '/dev/null', abs],
+      { encoding: 'utf8' },
+    );
+    const folded = typeof r.stdout === 'string' ? r.stdout : '';
+    if (folded.length > 0) untrackedFold += `\n${folded}`;
+  }
+  const armBody = `${armDiff.stdout}${untrackedFold}`;
+  if (armBody.trim().length === 0) return '';
+  return `### cross-tree feature arm: ${featureRoot} ###\n${armBody}`;
 }

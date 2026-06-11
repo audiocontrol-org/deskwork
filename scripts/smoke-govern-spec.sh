@@ -48,9 +48,11 @@ case "${verb}" in
     while [ $# -gt 0 ]; do [ "$1" = "--output" ] && { out="$2"; shift; }; shift; done
     printf 'STUB PROMPT\n' > "${out}" ;;
   audit-barrage)
-    feat=""
-    while [ $# -gt 0 ]; do case "$1" in --feature) feat="$2"; shift ;; esac; shift; done
-    rundir="$(pwd)/.stack-control/audit-runs/20260606T000000000Z-${feat}"
+    # Anchor like the real verb: the run dir derives from the --at
+    # installation (specs/installation-isolation US1), never the cwd.
+    feat=""; at="$(pwd)"
+    while [ $# -gt 0 ]; do case "$1" in --feature) feat="$2"; shift ;; --at) at="$2"; shift ;; esac; shift; done
+    rundir="${at}/.stack-control/audit-runs/20260606T000000000Z-${feat}"
     mkdir -p "${rundir}"
     cat > "${rundir}/claude.md" <<'MODEL'
 ### Stubbed low-severity finding from the deterministic smoke
@@ -75,6 +77,10 @@ run_case() {
   local repo="${WORK}/${slug}"
   local feature_dir="${repo}/docs/1.0/001-IN-PROGRESS/${slug}"
   mkdir -p "${feature_dir}"
+  # Installation marker (specs/installation-isolation: govern resolves the
+  # enclosing installation from --at; GOVERN_REPO_ROOT is retired).
+  mkdir -p "${repo}/.stack-control"
+  printf 'version: 1\n' > "${repo}/.stack-control/config.yaml"
   printf '# Audit Log — %s\n' "${slug}" > "${feature_dir}/audit-log.md"
   cp "${fixture_spec}" "${repo}/spec.md"
   # The lift verb resolves the feature root via `git rev-parse --show-toplevel`
@@ -85,12 +91,11 @@ run_case() {
   [ "${SMOKE_LIVE:-0}" = "1" ] && barrage_bin="${STACKCTL_BIN}"
 
   echo "smoke-govern-spec: [${label}] running govern-spec.sh (GOVERN_MODELS='${models_env}', bin=$(basename "${barrage_bin}")) ..." >&2
-  GOVERN_REPO_ROOT="${repo}" \
-  GOVERN_FEATURE_SLUG="${slug}" \
+    GOVERN_FEATURE_SLUG="${slug}" \
   GOVERN_SPEC_PATH="${repo}/spec.md" \
   GOVERN_MODELS="${models_env}" \
   GOVERN_BARRAGE_BIN="${barrage_bin}" \
-    bash "${GOVERN_SPEC_SH}" >"${repo}/out.txt" 2>"${repo}/err.txt" || true
+    bash "${GOVERN_SPEC_SH}" --at "${repo}" >"${repo}/out.txt" 2>"${repo}/err.txt" || true
 
   grep -q 'unbound variable' "${repo}/err.txt" \
     && fail "[${label}] govern-spec.sh hit an unbound-variable error:\n$(cat "${repo}/err.txt")"

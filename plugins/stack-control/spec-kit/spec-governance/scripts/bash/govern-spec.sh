@@ -16,7 +16,8 @@
 #   GOVERN_SPEC_PATH     (optional; else derived from the CLAUDE.md SPECKIT marker)
 #   GOVERN_PLAN_PATH     (optional; when set — the after_plan checkpoint — the plan is folded; FR-013)
 #   GOVERN_CHECKPOINT    (optional; checkpoint label; defaulting GOVERN_CHECKPOINT > after_plan-if-plan > after_clarify)
-#   GOVERN_REPO_ROOT     (optional; else git toplevel) — testability
+#   GOVERN_REPO_ROOT     RETIRED (specs/installation-isolation R2): setting it is a
+#                        loud FATAL; pass `--at <dir>` (the installation enclosing <dir>)
 #   GOVERN_MODELS        (optional; comma-list passed to audit-barrage --models)
 #   GOVERN_CEILING       (optional; convergence iteration ceiling, FR-014)
 #   GOVERN_OVERRIDE      (optional; recorded override reason, FR-010)

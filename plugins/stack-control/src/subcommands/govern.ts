@@ -12,8 +12,9 @@
  * Env parity (preserved for the shims; flags win over env when both are set):
  *   GOVERN_FEATURE_SLUG, GOVERN_DIFF_BASE, GOVERN_SPEC_PATH, GOVERN_PLAN_PATH,
  *   GOVERN_CHECKPOINT, GOVERN_CEILING, GOVERN_OVERRIDE, GOVERN_MODELS,
- *   GOVERN_REPO_ROOT, GOVERN_BARRAGE_BIN (test stub), GOVERN_NO_SLUSH,
- *   GOVERN_PAYLOAD_BUDGET.
+ *   GOVERN_BARRAGE_BIN (test stub), GOVERN_NO_SLUSH, GOVERN_PAYLOAD_BUDGET.
+ *   GOVERN_REPO_ROOT is RETIRED (specs/installation-isolation R2): setting it
+ *   is a loud FATAL naming the --at replacement — never a silent no-op.
  *
  * Exit codes: govern relays the gate's single decision (#432) — 0 when the gate
  * is OPEN (may graduate), 1 when the gate is BLOCKED (graduation refused), 2
@@ -25,6 +26,7 @@
  * advisory alongside the convergence-gate verdict. See govern/clone-step.ts.
  */
 
+import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,7 +55,9 @@ import {
   discoverFeatureRoots,
   resolveFeatureRoot,
 } from '../scope-discovery/util/feature-root.js';
-import { backlogRoot } from '../backlog/root.js';
+import { resolveInstallation } from '../config/installation.js';
+import type { Installation } from '../config/types.js';
+import { errorMessage } from '../scope-discovery/util/typeguards.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // src/subcommands → src → plugin root → bin/stackctl
@@ -64,7 +68,7 @@ const USAGE = [
   '',
   '  --mode <implement|spec>   Required.',
   '  --feature <slug>          Feature slug (else derived from feature/<slug>).',
-  '  --repo-root <path>        Project root (else git toplevel / cwd).',
+  '  --at <dir>                Resolve the installation enclosing <dir> (default: cwd).',
   '  --ceiling <N>             Convergence iteration ceiling.',
   '  --override "<reason>"      Record an explicit override.',
   '  --require-models <n>      Minimum emitting models for the barrage fleet',
@@ -85,7 +89,7 @@ type Mode = 'implement' | 'spec';
 interface GovernFlags {
   mode?: Mode;
   feature?: string;
-  repoRoot?: string;
+  at?: string;
   ceiling?: string;
   override?: string;
   requireModels?: string;
@@ -101,7 +105,7 @@ interface GovernFlags {
 const VALUED = new Set([
   '--mode',
   '--feature',
-  '--repo-root',
+  '--at',
   '--ceiling',
   '--override',
   '--require-models',
@@ -133,7 +137,7 @@ function parseFlags(argv: readonly string[]): { ok: true; flags: GovernFlags } |
         }
         flags.mode = value;
       } else if (tok === '--feature') flags.feature = value;
-      else if (tok === '--repo-root') flags.repoRoot = value;
+      else if (tok === '--at') flags.at = value;
       else if (tok === '--ceiling') flags.ceiling = value;
       else if (tok === '--override') flags.override = value;
       else if (tok === '--require-models') flags.requireModels = value;
@@ -153,14 +157,6 @@ function pick(flag: string | undefined, env: string | undefined): string | undef
   if (flag !== undefined) return flag;
   if (env !== undefined && env.length > 0) return env;
   return undefined;
-}
-
-function resolveRepoRoot(flagValue: string | undefined): string {
-  const raw = pick(flagValue, process.env.GOVERN_REPO_ROOT);
-  if (raw !== undefined) {
-    return isAbsolute(raw) ? raw : resolve(process.cwd(), raw);
-  }
-  return process.cwd();
 }
 
 function resolveBarrageBin(): string {
@@ -194,25 +190,38 @@ export async function resolveAuditLogExcerpt(
   return existsSync(auditLog) ? tail(readFileSync(auditLog, 'utf8'), tailLines) : '';
 }
 
-/** Resolve the spec path from --spec-path/env, else the CLAUDE.md SPECKIT marker. */
-function resolveSpecPath(repoRoot: string, flagValue: string | undefined): string {
+/**
+ * Resolve the spec path from --spec-path/env, else the CLAUDE.md SPECKIT
+ * marker — read at the installation root first, then at the derived git
+ * toplevel (the transitional layout keeps the agent-context file at the
+ * monorepo root; specs/installation-isolation R3's external-anchor rule).
+ */
+function resolveSpecPath(installationRoot: string, flagValue: string | undefined): string {
   const explicit = pick(flagValue, process.env.GOVERN_SPEC_PATH);
-  if (explicit !== undefined) return isAbsolute(explicit) ? explicit : join(repoRoot, explicit);
-  // Derive from the CLAUDE.md SPECKIT marker (the active plan path); the spec is
-  // its sibling spec.md.
-  const claudeMd = join(repoRoot, 'CLAUDE.md');
-  let markerPath: string | undefined;
-  if (existsSync(claudeMd)) {
+  if (explicit !== undefined) return isAbsolute(explicit) ? explicit : join(installationRoot, explicit);
+  const bases = [installationRoot];
+  const top = currentToplevel(installationRoot);
+  if (top !== null && top !== installationRoot) bases.push(top);
+  for (const base of bases) {
+    const claudeMd = join(base, 'CLAUDE.md');
+    if (!existsSync(claudeMd)) continue;
     const text = readFileSync(claudeMd, 'utf8');
     const m = /specs\/[^\s]+\.md/.exec(text);
-    if (m !== null) markerPath = m[0];
+    if (m !== null) return join(base, dirname(m[0]), 'spec.md');
   }
-  if (markerPath === undefined) {
-    throw new GovernProtocolError(
-      'govern: FATAL — no spec path in --spec-path/GOVERN_SPEC_PATH and no specs/<dir>/*.md in the CLAUDE.md SPECKIT marker.',
-    );
-  }
-  return join(repoRoot, dirname(markerPath), 'spec.md');
+  throw new GovernProtocolError(
+    'govern: FATAL — no spec path in --spec-path/GOVERN_SPEC_PATH and no specs/<dir>/*.md in the CLAUDE.md SPECKIT marker.',
+  );
+}
+
+/** Derived git toplevel (external anchor; null outside a git tree). */
+function currentToplevel(base: string): string | null {
+  const r = spawnSync('git', ['-C', base, 'rev-parse', '--show-toplevel'], {
+    encoding: 'utf8',
+  });
+  if (r.status !== 0 || typeof r.stdout !== 'string') return null;
+  const t = r.stdout.trim();
+  return t.length > 0 ? t : null;
 }
 
 export function buildImplementVars(
@@ -272,25 +281,23 @@ export function buildImplementVars(
  * AUDIT-20260611-08: the governance backlog task store rides into the
  * implement payload's diff range via per-round bookkeeping commits — the
  * same lift-commit-in-range mechanism US5 closed for the audit-log, but
- * through a store that lives at the plugin root, outside the feature
- * root's pathspec. Implement mode threads the store into the assembler's
- * `excludePaths`; the path is owned HERE, not hardcoded in the assembler:
- * `backlogRoot()` (src/backlog/root.ts) respects the STACKCTL_BACKLOG_DIR
- * seam and otherwise resolves through the enclosing installation, and the
- * `backlog` binary hardcodes the `backlog/` subdir under that root.
- * Outside any installation (no seam) there IS no backlog store, so there
- * is nothing to exclude — that skip is announced on stderr, never silent.
+ * through a store that lives outside the feature root's pathspec.
+ * Implement mode threads the store into the assembler's `excludePaths`.
+ *
+ * specs/installation-isolation US3 (TASK-40 / AUDIT-20260611-13): the
+ * store derives from the RESOLVED INSTALLATION RECORD, never the cwd —
+ * the recorded seam bug was exactly this exclusion silently diverging
+ * from the payload's anchor when govern ran from a different shell
+ * directory. The STACKCTL_BACKLOG_DIR seam still wins when set (an
+ * explicit operator override; the `backlog` binary hardcodes the
+ * `backlog/` subdir under whichever root applies).
  */
-function resolveGovernExcludePaths(): readonly string[] {
-  try {
-    return [join(backlogRoot(), 'backlog')];
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    process.stderr.write(
-      `govern: no backlog store resolved (${msg}) — backlog-store payload exclusion skipped (nothing to exclude).\n`,
-    );
-    return [];
+function resolveGovernExcludePaths(installation: Installation): readonly string[] {
+  const seam = process.env.STACKCTL_BACKLOG_DIR;
+  if (seam !== undefined && seam !== '') {
+    return [join(seam, 'backlog')];
   }
+  return [join(dirname(installation.resolved.backlog), 'backlog')];
 }
 
 export function buildSpecVars(
@@ -357,8 +364,32 @@ export async function runGovern(args: string[]): Promise<void> {
     requireModels = n;
   }
 
+  // specs/installation-isolation R2: GOVERN_REPO_ROOT is retired. An
+  // ignored variable would be a silent no-op, so a set variable is a
+  // loud refusal naming the replacement.
+  const legacyEnvRoot = process.env.GOVERN_REPO_ROOT;
+  if (legacyEnvRoot !== undefined && legacyEnvRoot.length > 0) {
+    process.stderr.write(
+      'govern: FATAL — GOVERN_REPO_ROOT is retired (specs/installation-isolation R2); ' +
+        'use --at <dir> to name the installation enclosing <dir> explicitly.\n',
+    );
+    process.exit(2);
+  }
+
+  // specs/installation-isolation US3 (R1): resolve the installation ONCE
+  // at verb entry — the diff engine, run dirs, config reads, and the
+  // bookkeeping exclusions all derive from this record. No enclosing
+  // installation -> uniform loud refusal (US2).
+  let installation: Installation;
   try {
-    const repoRoot = resolveRepoRoot(flags.repoRoot);
+    installation = resolveInstallation(flags.at ?? process.cwd());
+  } catch (err) {
+    process.stderr.write(`govern: FATAL — ${errorMessage(err)}\n`);
+    process.exit(2);
+  }
+
+  try {
+    const repoRoot = installation.root;
     const slug = resolveSlug({
       explicit: pick(flags.feature, process.env.GOVERN_FEATURE_SLUG),
       branch: currentBranch(repoRoot),
@@ -419,7 +450,7 @@ export async function runGovern(args: string[]): Promise<void> {
     // bookkeeping commits/files are excluded from both payload arms.
     const excludePaths =
       flags.mode === 'implement' && featureRoot !== undefined
-        ? resolveGovernExcludePaths()
+        ? resolveGovernExcludePaths(installation)
         : undefined;
     const built =
       flags.mode === 'spec'
