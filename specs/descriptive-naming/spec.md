@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: Operator directive (2026-06-10, verbatim): *"There is absolutely no reason to use fake ordinal numbers instead of descriptive slugs in either one [backlog items or specs]. The numbers are misleading since they imply a false order and they hide information about what the task or feature is actually about. It's obscurantism masquerading as precision. This isn't a relational database that needs efficient primary and foreign key calculation. This is human-facing interaction with a text processing robot."*
+**Input**: Operator directive (2026-06-10, verbatim): *"There is absolutely no reason to use fake ordinal numbers instead of descriptive slugs in either one [backlog items or specs]. The numbers are misleading since they imply a false order and they hide information about what the task or feature is actually about. It's obscurantism masquerading as precision. This isn't a relational database that needs efficient primary and foreign key calculation. This is human-facing interaction with a text processing robot."* Follow-up directive (same session): *"I want to make sure that agents communicate with the operator by the friendly names, not the obscured fake number bullshit"* — the convention governs not only what tools print but how **agents speak**: session reports, orientation, governance summaries, and any reference to a spec or backlog item lead with the friendly name.
 
 ## Context
 
@@ -64,7 +64,23 @@ Every human-facing backlog surface — capture confirmation, list output, promot
 
 ---
 
-### User Story 3 - Existing artifacts and recorded references stay navigable (Priority: P2)
+### User Story 3 - Agents speak in friendly names (Priority: P1)
+
+Every agent-to-operator communication — session-start orientation, end-of-turn summaries, governance reports, skill outputs, journal entries — refers to specs and backlog items by their friendly names. A counter or ordinal appears at most as a secondary parenthetical alias when cross-referencing recorded history requires it, never as the leading identity. The skills that drive these surfaces carry the discipline in their bodies (the project's enforcement-lives-in-skills rule), and the verb outputs agents quote are slug-first so the friendly name is the path of least resistance.
+
+**Why this priority**: The operator's follow-up directive verbatim — the whole point of descriptive names is the human-robot conversation; a slug-first store narrated in counters changes nothing.
+
+**Independent Test**: Read a session-start orientation, a governance report, and a backlog summary produced after this feature ships: every referenced artifact is identifiable from the name used, with zero counter-dereferencing.
+
+**Acceptance Scenarios**:
+
+1. **Given** a session-start orientation over a populated backlog, **When** it reports open items, **Then** each item leads with its friendly name (title/slug), not a counter.
+2. **Given** an agent reporting a governance outcome that parked findings to the backlog, **When** it names the parked items, **Then** the operator can tell what each one is about from the report alone.
+3. **Given** recorded history that only knows an old counter, **When** an agent must reference it, **Then** the agent resolves and leads with the friendly name, keeping the counter as a parenthetical alias.
+
+---
+
+### User Story 4 - Existing artifacts and recorded references stay navigable (Priority: P2)
 
 The program's history — numbered spec dirs `001`–`014`, `TASK-n` references in audit-logs, journals, promotion records — remains navigable after the convention change. Tools resolve old identifiers wherever they appear in recorded history; nothing breaks by virtue of carrying an old name.
 
@@ -99,6 +115,7 @@ The program's history — numbered spec dirs `001`–`014`, `TASK-n` references 
 - **FR-005**: The promotion-target grammar and every resolver that currently pattern-matches numbered forms MUST accept slug-only forms with unchanged fail-loud semantics for ambiguity.
 - **FR-006**: Listing surfaces MUST provide an explicit, documented ordering so the loss of accidental ordinal sorting does not degrade scanability.
 - **FR-007**: The naming convention MUST be recorded as a governance-level principle (constitution or equivalent) so future artifact families (new stores, new ledgers) inherit slug-first naming by default.
+- **FR-008**: Agent-to-operator communication surfaces (session orientation, reports, summaries, the skill bodies that produce them) MUST lead with friendly names for every spec and backlog item referenced; counters appear only as secondary aliases for recorded-history cross-reference. The discipline lives in the skill bodies and the slug-first verb outputs they quote (enforcement-lives-in-skills).
 
 ### Key Entities
 
@@ -114,6 +131,7 @@ The program's history — numbered spec dirs `001`–`014`, `TASK-n` references 
 - **SC-002**: An operator reading any new backlog surface (capture confirmation, list, promotion record, audit-log disposition) can state what the item is about from the identifier alone — zero dereference steps.
 - **SC-003**: Every recorded historical reference (numbered spec dirs, `TASK-n` ledger lines) still resolves through the standard tools after the change; zero ledger rewrites.
 - **SC-004**: Slug input is accepted by every identifier-accepting verb; ambiguous input fails loud listing candidates in 100% of collision cases.
+- **SC-005**: An operator reading any agent-produced report (orientation, governance summary, session journal) can identify every referenced spec and backlog item from the name used — zero counter-dereferencing — verified by reviewing the surfaces the skills produce.
 
 ## Assumptions
 
