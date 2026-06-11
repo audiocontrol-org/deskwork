@@ -65,14 +65,47 @@ function assertPortableSurfaceId(surfaceId: string): void {
   }
 }
 
+/**
+ * Sidecar-stored filenames (`driving.wireframeFile`, `derived.snapshotFile`)
+ * are joined back onto the operator-chosen directory, so they get the same
+ * portable-filename defense as {@link SURFACE_ID_PATTERN} (AUDIT-20260611-10 —
+ * the surfaceId fix's sibling). The pattern's alphanumeric start anchor rejects
+ * `..`, and `/` / `\` are not in the character class, so a stored filename can
+ * never escape the directory or land in a subdirectory; extension dots after
+ * the first character pass (`my-surface.html`).
+ */
+const PORTABLE_FILENAME_PATTERN = /^[a-z0-9][a-z0-9._-]*$/i;
+
+const wireframeFileMessage = (field: string, value: string): string =>
+  `Invalid ${field} ${JSON.stringify(value)}: ${field} is joined onto the provenance directory ` +
+  `as a filename, so it must match the portable-filename pattern ` +
+  `${String(PORTABLE_FILENAME_PATTERN)} — an alphanumeric first character, then only letters, ` +
+  `digits, ".", "_", "-". Path separators and ".." are rejected so the bound artifact cannot ` +
+  `escape the operator-chosen directory.`;
+
+const portableFilenameSchema = (field: string) =>
+  z
+    .string()
+    .min(1)
+    .refine((name) => PORTABLE_FILENAME_PATTERN.test(name), {
+      message: `${field} must match the portable-filename pattern ${String(PORTABLE_FILENAME_PATTERN)}`,
+    });
+
+/** Fail loud at record time — the both-sides mirror of {@link assertPortableSurfaceId}. */
+function assertPortableWireframeFile(wireframeFile: string): void {
+  if (!PORTABLE_FILENAME_PATTERN.test(wireframeFile)) {
+    throw new Error(wireframeFileMessage('wireframeFile', wireframeFile));
+  }
+}
+
 const drivingSchema = z.object({
   version: z.literal(PROVENANCE_VERSION),
   surfaceId: surfaceIdSchema,
   mode: z.literal('driving'),
   createdAt: z.string().datetime(),
   driving: z.object({
-    /** Filename (dir-relative) of the wireframe this record certifies. */
-    wireframeFile: z.string().min(1),
+    /** Filename (dir-relative, portable — never a path) of the wireframe this record certifies. */
+    wireframeFile: portableFilenameSchema('wireframeFile'),
     /** sha256 (hex) of the wireframe bytes as recorded — tamper evidence. */
     wireframeSha256: z.string().regex(/^[0-9a-f]{64}$/),
   }),
@@ -84,8 +117,8 @@ const derivedSchema = z.object({
   mode: z.literal('derived'),
   createdAt: z.string().datetime(),
   derived: z.object({
-    /** Filename (dir-relative) of the snapshot stored at derivation time. */
-    snapshotFile: z.string().min(1),
+    /** Filename (dir-relative, portable — never a path) of the snapshot stored at derivation time. */
+    snapshotFile: portableFilenameSchema('snapshotFile'),
     /** sha256 (hex) of the snapshot bytes as recorded — tamper evidence. */
     snapshotSha256: z.string().regex(/^[0-9a-f]{64}$/),
     /** What the draft was derived FROM (route, URL, file — operator-meaningful). */
@@ -169,6 +202,7 @@ export function recordDrivingWireframe(input: {
   createdAt?: Date;
 }): WireframeProvenance {
   assertPortableSurfaceId(input.surfaceId);
+  assertPortableWireframeFile(input.wireframeFile);
   const wireframePath = join(input.dir, input.wireframeFile);
   if (!existsSync(wireframePath)) {
     throw new Error(

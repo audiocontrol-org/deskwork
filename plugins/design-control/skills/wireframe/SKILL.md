@@ -70,8 +70,9 @@ identity lives in the design-language spec (Phase 2), never here.
    plugins/design-control/bin/wireframe-provenance record-driving <wireframes-dir> <surface-id> <wireframe-filename>
    ```
 
-   (`<wireframe-filename>` is the lint-green wireframe's filename, relative to
-   `<wireframes-dir>`.) Exit `0` → recorded; exit `1` → descriptive refusal or
+   (`<wireframe-filename>` is the lint-green wireframe's bare filename inside
+   `<wireframes-dir>` — a portable filename, enforced at record time: no path
+   separators, no `..`, no subdirectories.) Exit `0` → recorded; exit `1` → descriptive refusal or
    error on stderr — fix and re-run, never skip. The record binds that artifact
    by name + sha256, so a later replacement of the wireframe is tamper-evident:
 

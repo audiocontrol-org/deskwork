@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import {
   recordDerivation,
   loadProvenance,
@@ -268,6 +269,75 @@ describe('surfaceId filename validation — path-traversal and separator rejecti
     expect(loadProvenance(dir, 'studio-content_browser.v2').surfaceId).toBe(
       'studio-content_browser.v2',
     );
+  });
+});
+
+describe('wireframeFile filename validation — path-traversal and separator rejection (AUDIT-20260611-10)', () => {
+  const hostileFiles = ['../outside.html', 'sub/file.html', 'a\\b.html', '..', ''];
+
+  it.each(hostileFiles)(
+    'recordDrivingWireframe rejects wireframeFile %j with an error naming the constraint, writing nothing',
+    (wireframeFile) => {
+      const dir = freshDir();
+      expect(() =>
+        recordDrivingWireframe({ dir, surfaceId: 'victim', wireframeFile }),
+      ).toThrow(/portable-filename|\^\[a-z0-9\]/i);
+      expect(readdirSync(dir)).toEqual([]);
+    },
+  );
+
+  it('verifyDrivingWireframe rejects a planted sidecar whose stored wireframeFile carries a traversal path (zod-side defense)', () => {
+    // Make the traversal REAL: an artifact exists OUTSIDE the provenance dir
+    // with a matching hash, so without the schema defense verification would
+    // succeed against a file the operator never placed in the wireframes dir.
+    const parent = freshDir();
+    const dir = join(parent, 'prov');
+    mkdirSync(dir);
+    const outsideHtml = '<!DOCTYPE html><html><body>outside</body></html>';
+    writeFileSync(join(parent, 'outside.html'), outsideHtml);
+    const planted = {
+      version: 1,
+      surfaceId: 'planted',
+      mode: 'driving',
+      createdAt: '2026-06-10T12:00:00.000Z',
+      driving: {
+        wireframeFile: '../outside.html',
+        wireframeSha256: createHash('sha256').update(outsideHtml).digest('hex'),
+      },
+    };
+    writeFileSync(join(dir, 'planted.provenance.json'), JSON.stringify(planted));
+    expect(() => verifyDrivingWireframe(dir, 'planted')).toThrow(/portable-filename|wireframeFile/i);
+  });
+
+  it('the zod schema rejects a planted derived sidecar whose stored snapshotFile carries a traversal path', () => {
+    const dir = freshDir();
+    const planted = {
+      version: 1,
+      surfaceId: 'planted-derived',
+      mode: 'derived',
+      createdAt: '2026-06-10T12:00:00.000Z',
+      derived: {
+        snapshotFile: '../outside.html',
+        snapshotSha256: 'a'.repeat(64),
+        source: 'live surface',
+      },
+    };
+    writeFileSync(join(dir, 'planted-derived.provenance.json'), JSON.stringify(planted));
+    expect(() => loadProvenance(dir, 'planted-derived')).toThrow();
+  });
+
+  it('still records + verifies a normal dir-relative filename like "my-surface.html"', () => {
+    const dir = freshDir();
+    recordDrivingWireframe({
+      dir,
+      surfaceId: 'my-surface',
+      wireframeFile: writeWireframe(dir, 'my-surface.html'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    const prov = verifyDrivingWireframe(dir, 'my-surface');
+    expect(prov.mode).toBe('driving');
+    if (prov.mode !== 'driving') throw new Error('unreachable');
+    expect(prov.driving.wireframeFile).toBe('my-surface.html');
   });
 });
 
