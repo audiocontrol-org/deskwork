@@ -50,7 +50,8 @@
  * `root` undefined (the caller fails loud, naming both searched layouts).
  */
 
-import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, realpathSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -93,7 +94,59 @@ export interface ResolveFeatureRootResult {
   readonly layout?: 'legacy-docs' | 'speckit';
 }
 
+/**
+ * Derive the git toplevel enclosing `base` — an EXTERNAL anchor read from
+ * git's own marker (specs/installation-isolation FR-004), used here only
+ * to keep the transitional legacy spec locations read-resolvable (T015:
+ * spec artifacts at the monorepo root while the installation sits below
+ * it). Returns null when `base` is not inside a git work tree, or when
+ * the toplevel IS `base` (no separate layer to consult).
+ */
+function deriveDistinctGitToplevel(base: string): string | null {
+  const r = spawnSync('git', ['-C', base, 'rev-parse', '--show-toplevel'], {
+    encoding: 'utf8',
+  });
+  if (r.status !== 0 || typeof r.stdout !== 'string') return null;
+  const toplevel = r.stdout.trim();
+  if (toplevel.length === 0) return null;
+  try {
+    if (realpathSync(toplevel) === realpathSync(base)) return null;
+  } catch {
+    return null;
+  }
+  return toplevel;
+}
+
 export async function resolveFeatureRoot(
+  args: ResolveFeatureRootArgs,
+): Promise<ResolveFeatureRootResult> {
+  // Layer 1: the caller's base (the installation root under the isolation
+  // model). Layer 2 (only when layer 1 misses and `repoRoot` was
+  // supplied): the same two layouts at the derived git toplevel — the
+  // transitional legacy locations (T015; installation layers always win).
+  const primary = await resolveFeatureRootAt(args);
+  if (primary.root !== undefined || args.repoRoot === undefined) {
+    return primary;
+  }
+  const toplevel = deriveDistinctGitToplevel(args.repoRoot);
+  if (toplevel === null) return primary;
+  const legacy = await resolveFeatureRootAt({
+    repoRoot: toplevel,
+    slug: args.slug,
+  });
+  if (legacy.root === undefined) {
+    return {
+      root: undefined,
+      versionsChecked: [
+        ...primary.versionsChecked,
+        ...legacy.versionsChecked,
+      ],
+    };
+  }
+  return legacy;
+}
+
+async function resolveFeatureRootAt(
   args: ResolveFeatureRootArgs,
 ): Promise<ResolveFeatureRootResult> {
   // Per AUDIT-20260531-05: accept either `docsRoot` (the legacy
@@ -154,6 +207,35 @@ export async function resolveFeatureRoot(
  * skipped; the result is sorted for deterministic downstream output.
  */
 export async function discoverFeatureRoots(
+  repoRoot: string,
+): Promise<readonly string[]> {
+  // Union of the caller's base layer + the derived-toplevel legacy layer
+  // (T015), deduped by realpath so a base that IS the toplevel (or a
+  // symlinked variant) contributes each root once.
+  const bases = [repoRoot];
+  const toplevel = deriveDistinctGitToplevel(repoRoot);
+  if (toplevel !== null) bases.push(toplevel);
+
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const base of bases) {
+    for (const root of await discoverFeatureRootsAt(base)) {
+      let key: string;
+      try {
+        key = realpathSync(root);
+      } catch {
+        key = root;
+      }
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(root);
+    }
+  }
+  return out.sort();
+}
+
+/** Single-base enumeration (the pre-T015 body of discoverFeatureRoots). */
+async function discoverFeatureRootsAt(
   repoRoot: string,
 ): Promise<readonly string[]> {
   const out: string[] = [];
