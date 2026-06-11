@@ -1,7 +1,6 @@
 ---
-name: check-deprecations
-description: "Informational scan surfacing @deprecated files plus the importers still holding them in place"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:check-deprecations
 

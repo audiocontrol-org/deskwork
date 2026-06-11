@@ -1,7 +1,6 @@
 ---
-name: triage-issues
-description: "Operator-triggered batched-proposal cycle for stale GitHub issues — fetches a bucket of issues, the agent proposes a disposition per row, the operator approves the batch (or a subset), approved rows apply via gh"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:triage-issues
 

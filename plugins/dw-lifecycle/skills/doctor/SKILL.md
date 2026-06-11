@@ -1,7 +1,6 @@
 ---
-name: doctor
-description: "Audit binding metadata + scope-discovery state across calendar/journal/docs/issues; opt-in --fix"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:doctor
 

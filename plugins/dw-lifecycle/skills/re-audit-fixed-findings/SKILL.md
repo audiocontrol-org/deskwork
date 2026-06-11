@@ -1,7 +1,6 @@
 ---
-name: re-audit-fixed-findings
-description: "Post-release verification — fire audit-barrage against the feature, cross-reference new findings against fixed-<sha> entries, propose verified-<date> for those that no longer surface; flag re-surfacing fixes as did-not-actually-fix"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:re-audit-fixed-findings
 

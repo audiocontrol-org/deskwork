@@ -1,7 +1,6 @@
 ---
-name: check-module-symmetry
-description: "Cross-module fleet matrix of canonical-primitive adoption across parallel top-level modules"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:check-module-symmetry
 

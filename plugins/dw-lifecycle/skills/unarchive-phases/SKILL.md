@@ -1,7 +1,6 @@
 ---
-name: unarchive-phases
-description: "Move phase sections from workplan-archive.md back to workplan.md at the correct numeric position; update the workplan-archive-ledger comment"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:unarchive-phases
 
