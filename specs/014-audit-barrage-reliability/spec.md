@@ -39,6 +39,13 @@ Time is ~100% API generation for every compliant model (`duration_api_ms ≈ dur
 - Incident commits: `6ce58543` (unauthorized) / `523f2950` (revert) on `feature/design-control`.
 - Experiment artifacts: `/tmp/barrage-model-exp-T8szA4/` (ephemeral; load-bearing numbers restated above).
 
+## Clarifications
+
+### Session 2026-06-10
+
+- Q: Which model should the shipped barrage config pin for the claude lane by default? → A: Opus class (projects override; fable remains the thoroughness override).
+- Q: What does the barrage do with a backend lane that offers no mechanical read-only capability? → A: Run it, marked loudly write-unenforced (fire time, run artifacts, synthesis); refusing remains an operator-set strictness option.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Barrage spawns cannot mutate the repository (Priority: P1)
@@ -156,9 +163,9 @@ A barrage spawn that shows no sign of life is detected and terminated within a s
 
 ## Assumptions
 
-- **Default pinned model**: the shipped template default pins the claude lane to the opus class (measured: 586s on the 69 KB calibration prompt, near-top quality at substantially lower latency than fable's 669–750s). Projects wanting maximum thoroughness override to fable with the correspondingly larger derived timeout. The sonnet class is excluded per operator verdict (off-task behavior + 2226s latency); the haiku class is excluded as audit teeth (zero verification depth).
+- **Default pinned model (clarified 2026-06-10)**: the shipped template default pins the claude lane to the opus class (measured: 586s on the 69 KB calibration prompt, near-top quality at substantially lower latency than fable's 669–750s). Projects wanting maximum thoroughness override to fable with the correspondingly larger derived timeout. The sonnet class is excluded per operator verdict (off-task behavior + 2226s latency); the haiku class is excluded as audit teeth (zero verification depth).
 - **Timeout derivation calibration**: the 2026-06-10 measurements (271s / 586s / 669–750s on a 69 KB payload) are the initial calibration points for the model-speed classes; the derivation formula and its extrapolation behavior are design-phase decisions.
-- **Unenforceable backends run, loudly marked**: where a backend lacks mechanical read-only capability, the default policy is to run it and mark spawn + results write-unenforced (preserves fleet diversity for the cross-model signal) rather than refuse the lane. Refusing remains available as an operator-set strictness option. *(Default chosen to protect the barrage's core purpose; flagged for interrogation at clarify.)*
+- **Unenforceable backends run, loudly marked (clarified 2026-06-10)**: where a backend lacks mechanical read-only capability, the policy is to run it and mark spawn + results write-unenforced (preserves fleet diversity for the cross-model signal) rather than refuse the lane. Refusing remains available as an operator-set strictness option.
 - **Liveness mechanism choice deferred to plan**: the spec promises a valid measured liveness signal (FR-009); whether that is event-stream output (with result-event extraction per FR-010) or stderr/debug-stream activity in text mode is a design-phase decision. Both were measured viable signals in the experiment.
 - **Watchdog provenance**: an existing watchdog implementation in the audiocontrol repo's e2e testing infrastructure is available to borrow/adapt (per TASK-26); if it proves unsuitable, the FRs stand on their own.
 - **Plan-mode framing risk is testable**: FR-005's "liftable report under enforcement" is verified by replaying a recorded prompt under enforcement and lifting the result — no new infrastructure is assumed.
