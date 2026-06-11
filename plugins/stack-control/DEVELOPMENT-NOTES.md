@@ -2,6 +2,35 @@
 
 ---
 
+## 2026-06-11: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 8
+  - docs(014): analyze remediation — FR-004 enforcement marking at synthesis is unconditional; fleet 'produced' = converged-eligible; clarify model-rejected-vs-spawn-failed surfacing; gemini lane in template migration
+  - docs(014): tasks — 29 tasks across foundational + 4 story phases, TDD-paired, US1/US2 parallelizable after foundation
+  - docs(014): plan audit-barrage-reliability — research D1-D8, data model (terminal states), config v2 + run-artifact contracts, quickstart; point agent context at 014
+  - docs(014): clarify session 2026-06-10 — default claude pin = opus class; unenforceable backends run loudly-marked (refuse = strictness option)
+  - docs(014): specify audit-barrage-reliability — model pinning + derived timeouts, mechanical read-only, fleet observability, spawn watchdog (promotes TASK-26)
+  - chore(backlog): promote TASK-26 (spawn watchdog) into spec:specs/014-audit-barrage-reliability
+  - chore(backlog): capture TASK-26 — barrage spawn watchdog, fail fast on no sign-of-life (borrow audiocontrol e2e watchdog)
+  - docs(roadmap): capture three audit-barrage gaps from the 2026-06-10 model/timeout experiment (model pinning, read-only enforcement, timeout observability)
+- Files changed: 13
+- Backlog touched: TASK-26
+
 ## 2026-06-10: Recover dropped backlog bodies; author + narrow spec 013 (audit-protocol path resolution)
 
 **Goal:** Triage the backlog's most egregious audit-protocol friction and graduate it into the Spec Kit rigor via the promote seam — and, along the way, recover data lost in a prior GitHub→backlog migration.

@@ -17,3 +17,7 @@
 - backlog promote has no inverse (un-promote / re-home) verb; correcting a mis-promote requires native 'backlog task edit --remove-label promoted --notes' by hand. Filed TASK-23.
 - backlog promote pending-create advisory resolves target.path against cwd, not the install root: a false 'does not yet exist' when run from plugins/stack-control for a specs/ dir at repo root. TASK-22.
 - stackctl backlog verbs fail 'no installation found' when cwd is the repo root (installation is plugins/stack-control); had to cd into the installation dir to run promote. Resolution is cwd-enclosing-only.
+
+## session-end 2026-06-11
+- stackctl roadmap/backlog fail from repo root: <repo>/.stack-control/ holds audit-barrage-config.yaml but no config.yaml, so nearest-installation resolution only succeeds under plugins/stack-control — dual-layout (repo-root scope-discovery config vs plugin-dir installation) is confusing; repro: run 'stackctl roadmap add ...' from repo root → exit 1 'no stack-control installation found'
+- Spec Kit check-prerequisites.sh rejects the long-lived program branch name (TF-09 recurrence at /speckit-analyze): 'ERROR: Not on a feature branch. Current branch: feature/audit-protocol' — worked around via .specify/feature.json resolution per the documented convention; the script's branch gate keeps fighting the one-branch-per-program layout
