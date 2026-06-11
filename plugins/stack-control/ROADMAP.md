@@ -242,3 +242,18 @@ Native, Spec-Kit-aware session-start / session-end lifecycle skills for stack-co
 - depends-on: multi:feature/front-door
 Post-install project setup: scaffold the governed documents + config the plugin verbs require (ROADMAP.md, DESIGN-INBOX.md, the backlog store, stack-control config) into a freshly-installed adopter project, so stackctl inbox/roadmap/backlog work without hand-authoring the docs. The create-side complement to design:gap/project-relative-doc-discovery (which resolves an adopter own docs at read time).
 
+## multi:gap/audit-barrage-model-pinning
+- status: planned
+- part-of: multi:feature/migrate-audit-barrage
+Barrage claude entry pins no model: bare 'claude -p' floats on the user's default (resolved to fable-5, the slowest), and timeout_seconds is guessed independently of the model. 2026-06-10 experiment: fable needs 669-750s on a 69KB prompt vs the 600s cap — 17 consecutive exit-143 timeouts in design-control (opus 586s, haiku 271s; time is ~100% API generation, not tooling). Pin --model in args_template and derive timeout from the pinned model + payload size.
+
+## multi:gap/audit-barrage-readonly-enforcement
+- status: planned
+- part-of: multi:feature/migrate-audit-barrage
+Barrage spawns inherit ambient permissions — read-only is held by model disposition, not mechanism. 2026-06-10: sonnet 4.6 violated PROMPT.md's explicit read-only instruction during a replay, fixed the findings instead, committed 6ce58543 and pushed to origin/feature/design-control mid-audit. Mechanically enforce read-only on barrage spawns (disallowed mutation tools / permission mode), spike-verified.
+
+## multi:gap/audit-barrage-timeout-observability
+- status: planned
+- part-of: multi:feature/migrate-audit-barrage
+A timed-out barrage model leaves a zero-byte stdout artifact; the kill is visible only in the run INDEX.md (exit 143, timed out: yes). Nothing at the synthesis/lift layer distinguishes 'produced nothing because SIGTERMed' from 'clean, no findings' — the fleet silently degrades (design-control ran 17 one-model rounds). Surface per-model timeout/failure state at synthesis.
+
