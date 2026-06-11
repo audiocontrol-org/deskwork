@@ -26,7 +26,10 @@ export type DesignRuleKind = (typeof RULE_KINDS)[number];
  * A rule's link to live CSS: a path to an author-written CSS file (relative to
  * the spec file) plus the selector the rule is anchored to. The selector may be
  * multi-token (descendant combinators); the path is the first whitespace-free
- * token of the `css:` field value.
+ * token of the `css:` field value. Machine-rooted paths (absolute, drive-letter,
+ * UNC, `~`-prefixed) never appear here — the schema rejects them as
+ * `malformed-css-link` (portability: the spec travels with its collection);
+ * `../` traversal within the repository is allowed.
  */
 export interface CssLink {
   readonly path: string;

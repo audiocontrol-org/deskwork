@@ -40,7 +40,9 @@ bullets with a closed key set:
 - `kind:` — one of `palette` / `type` / `spacing` / `component` (the closed
   vocabulary; `component` is the signature-component class).
 - `css: <path> <selector>` — ≥1 per rule; the path is relative to the spec
-  file; the selector must be **defined in that author-written CSS source**
+  file (absolute or `~`-rooted paths are rejected as malformed — they only
+  resolve on the author's machine; `../` traversal within the repository is
+  fine); the selector must be **defined in that author-written CSS source**
   (checked statically — no app boot). Non-CSS targets (CSS-in-JS, utility
   frameworks, CSS-Modules) are reported as unchecked notes and do not
   establish link-liveness.

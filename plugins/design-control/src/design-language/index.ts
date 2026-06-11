@@ -15,7 +15,7 @@ export {
   type ParsedDesignSpec,
   type RuleScopedCssLink,
 } from '@/design-language/types';
-export { parseDesignSpec } from '@/design-language/schema';
+export { isNonPortableCssPath, parseDesignSpec } from '@/design-language/schema';
 export {
   checkCssLinkLiveness,
   checkLinkLiveness,

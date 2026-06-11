@@ -18,7 +18,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { checkLinkLiveness } from '@/design-language/link-liveness';
+import { checkCssLinkLiveness, checkLinkLiveness } from '@/design-language/link-liveness';
 import type { ParsedDesignSpec } from '@/design-language/types';
 
 const tempDirs: string[] = [];
@@ -101,6 +101,46 @@ describe('checkLinkLiveness — live selectors pass', () => {
     mkdirSync(join(dir, 'styles'));
     writeFileSync(join(dir, 'styles', 'chrome.css'), '.masthead-rule { border-top: 2px solid; }\n');
     expect(checkLinkLiveness(specWithLink('styles/chrome.css', '.masthead-rule'), dir).ok).toBe(true);
+  });
+
+  it('resolves parent traversal — a subdir spec referencing ../ css is live', () => {
+    // Deliberate (AUDIT-round2-codex-02): `../` stays accepted — a spec
+    // legitimately references author CSS elsewhere in the repository tree;
+    // the portability boundary is the repository/collection, not the spec's
+    // own directory.
+    const dir = makeFixtureDir();
+    mkdirSync(join(dir, 'specs'));
+    writeFileSync(join(dir, 'shared.css'), '.btn-primary { color: navy; }\n');
+    const result = checkLinkLiveness(specWithLink('../shared.css', '.btn-primary'), join(dir, 'specs'));
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe('checkCssLinkLiveness — public-seam portability defense (AUDIT-round2-codex-02)', () => {
+  it('throws on a machine-rooted link path instead of fabricating a machine-local verdict', () => {
+    // The path EXISTS on this machine — exactly the trap: resolve() would
+    // ignore baseDir and the check would go green here while the spec is
+    // nonportable. The schema never emits such a link; a hand-built one at
+    // this public seam is a caller contract violation → fail loud.
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.btn { color: navy; }\n');
+    expect(() =>
+      checkCssLinkLiveness(
+        [{ ruleId: 'probe', link: { path: join(dir, 'studio.css'), selector: '.btn' } }],
+        dir,
+      ),
+    ).toThrow(/relative to the spec file/);
+  });
+
+  it('throws on a ~-prefixed link path too (home expansion is machine-local)', () => {
+    const dir = makeFixtureDir();
+    expect(() =>
+      checkCssLinkLiveness(
+        [{ ruleId: 'probe', link: { path: '~/styles/studio.css', selector: '.btn' } }],
+        dir,
+      ),
+    ).toThrow(/relative to the spec file/);
   });
 });
 

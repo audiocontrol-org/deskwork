@@ -8,8 +8,10 @@
  *   - fields are single-line bullets `- <key>: <value>` with the CLOSED key set
  *     `kind` / `css` / `example` / `do` / `don't` (a curly apostrophe U+2019 in
  *     the key is normalized to ASCII `'`, so smart-quoted `don’t:` is accepted);
- *   - `css: <path> <selector>` — first token is the file path, the remainder is
- *     the selector (descendant selectors allowed);
+ *   - `css: <path> <selector>` — first token is the file path (relative to the
+ *     spec file; machine-rooted paths are rejected, `../` traversal is allowed
+ *     — see {@link isNonPortableCssPath}), the remainder is the selector
+ *     (descendant selectors allowed);
  *   - other prose (paragraphs, capitalised-key bullets) is inert.
  *
  * Validation per rule: kind from the closed vocabulary; ≥1 css link; ≥1
@@ -47,6 +49,27 @@ const RULE_HEADING_RE = /^rule:\s*(.*)$/;
  * like `don't:` and a misspelled curly key still hits the typo guard.
  */
 const FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z'’]*)\s*:\s*(.*)$/;
+
+/**
+ * `css:` paths are RELATIVE TO THE SPEC FILE — the portability contract
+ * (AUDIT-round2-codex-02). A machine-rooted path (POSIX `/...`, Windows
+ * `C:\...` / `C:/...`, UNC `\\...` or root-relative `\...`, `~`-expanded
+ * home) goes green on its author's machine — `resolve(baseDir, path)`
+ * IGNORES baseDir for an absolute path — while the spec it lives in is
+ * collection content that travels; everywhere else the link misleads or
+ * breaks. Such a path is rejected at the SCHEMA level as `malformed-css-link`
+ * (a structurally-rejected token, like the missing-selector case — it never
+ * enters cssLinks/auxiliaryCssLinks). Parent traversal (`../`) is
+ * DELIBERATELY accepted: a spec legitimately references author CSS elsewhere
+ * in the repository tree — the portability boundary is the
+ * repository/collection, not the spec's own directory.
+ */
+const NON_PORTABLE_CSS_PATH_RE = /^(?:[/\\]|~|[a-zA-Z]:[\\/])/;
+
+/** True iff `path` is machine-rooted (see {@link NON_PORTABLE_CSS_PATH_RE}). */
+export function isNonPortableCssPath(path: string): boolean {
+  return NON_PORTABLE_CSS_PATH_RE.test(path);
+}
 
 const KNOWN_KEYS = ['kind', 'css', 'example', 'do', "don't"] as const;
 type FieldKey = (typeof KNOWN_KEYS)[number];
@@ -105,8 +128,22 @@ function recordField(sink: FieldSink, key: FieldKey, value: string, line: number
         });
         return;
       }
+      const path = value.slice(0, spaceAt);
+      if (isNonPortableCssPath(path)) {
+        findings.push({
+          rule: 'malformed-css-link',
+          message:
+            `css link path "${path}" is machine-rooted — paths are relative to the spec file, ` +
+            `so the spec stays portable with its collection; an absolute (or ~-prefixed) path ` +
+            `resolves only on its author's machine. Use a spec-relative path ("../" traversal ` +
+            `within the repository is allowed).`,
+          ruleId: section.id,
+          line,
+        });
+        return;
+      }
       section.cssLinks.push({
-        path: value.slice(0, spaceAt),
+        path,
         selector: value.slice(spaceAt).trim(),
       });
       return;

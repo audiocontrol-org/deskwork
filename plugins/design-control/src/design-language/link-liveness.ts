@@ -34,6 +34,7 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { isNonPortableCssPath } from '@/design-language/schema';
 import {
   blankAttributeValues,
   canonicalizeAttributeSelectors,
@@ -166,6 +167,14 @@ export function cssDefinesSelector(css: string, selector: string): boolean {
  * sections) in the same pass. Paths resolve relative to `baseDir` (the spec
  * file's directory). Missing file → `dead-link-file`; selector not defined →
  * `dead-link-selector`; non-.css target → skipped.
+ *
+ * Machine-rooted paths THROW (AUDIT-round2-codex-02): `resolve(baseDir, path)`
+ * ignores baseDir for an absolute path, so the check would read the author's
+ * machine-local file and fabricate a verdict that does not travel.
+ * {@link parseDesignSpec} rejects such paths as `malformed-css-link` before
+ * they reach this seam, so a machine-rooted link arriving here is a caller
+ * contract violation (this function is exported and callable with hand-built
+ * links) — fail loud rather than return a nonportable green/red.
  */
 export function checkCssLinkLiveness(
   links: readonly RuleScopedCssLink[],
@@ -174,6 +183,15 @@ export function checkCssLinkLiveness(
   const findings: DesignSpecFinding[] = [];
   const skipped: SkippedLink[] = [];
   for (const { ruleId, link } of links) {
+    if (isNonPortableCssPath(link.path)) {
+      throw new Error(
+        `Rule "${ruleId}" css link path ${JSON.stringify(link.path)} is machine-rooted — ` +
+          `css link paths are relative to the spec file, and resolve() would ignore baseDir for ` +
+          `an absolute path, checking a machine-local file the spec cannot portably name. ` +
+          `parseDesignSpec rejects these as malformed-css-link; fix the call site to pass ` +
+          `spec-relative paths ("../" traversal within the repository is allowed).`,
+      );
+    }
     if (!link.path.toLowerCase().endsWith('.css')) {
       skipped.push({ ruleId, link, reason: 'non-css-target' });
       continue;

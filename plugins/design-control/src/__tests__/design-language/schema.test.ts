@@ -409,6 +409,92 @@ describe('parseDesignSpec — single-pass defect surfacing (no finding waves)', 
   });
 });
 
+describe('parseDesignSpec — css-link path portability (AUDIT-round2-codex-02)', () => {
+  it('rejects a POSIX-absolute css path as malformed — it never enters cssLinks', () => {
+    const result = parseDesignSpec(`### rule: ink
+- kind: palette
+- css: /Users/alice/project/styles/studio.css .btn
+- example: a button
+- do: x
+`);
+    expect(result.ok).toBe(false);
+    const finding = result.findings.find((f) => f.rule === 'malformed-css-link');
+    expect(finding?.message).toMatch(/relative to the spec file/);
+    expect(result.spec.rules).toEqual([]);
+    expect(result.auxiliaryCssLinks).toEqual([]);
+  });
+
+  it('rejects a Windows drive-letter css path (backslash spelling)', () => {
+    const findings = findingsFor(`### rule: ink
+- kind: palette
+- css: C:\\styles\\studio.css .btn
+- example: a button
+- do: x
+`);
+    expect(findings).toContain('malformed-css-link');
+  });
+
+  it('rejects a Windows drive-letter css path (forward-slash spelling)', () => {
+    const findings = findingsFor(`### rule: ink
+- kind: palette
+- css: C:/styles/studio.css .btn
+- example: a button
+- do: x
+`);
+    expect(findings).toContain('malformed-css-link');
+  });
+
+  it('rejects a UNC css path', () => {
+    const findings = findingsFor(`### rule: ink
+- kind: palette
+- css: \\\\server\\share\\studio.css .btn
+- example: a button
+- do: x
+`);
+    expect(findings).toContain('malformed-css-link');
+  });
+
+  it('rejects a ~-prefixed css path (home expansion is machine-local)', () => {
+    const findings = findingsFor(`### rule: ink
+- kind: palette
+- css: ~/project/styles/studio.css .btn
+- example: a button
+- do: x
+`);
+    expect(findings).toContain('malformed-css-link');
+  });
+
+  it('an absolute css path in a structurally-invalid section never reaches auxiliaryCssLinks', () => {
+    const result = parseDesignSpec(`### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+
+### rule: ink
+- css: /Users/alice/project/styles/studio.css .ghost
+`);
+    const rules = result.findings.map((f) => f.rule);
+    expect(rules).toContain('duplicate-rule-id');
+    expect(rules).toContain('malformed-css-link');
+    expect(result.auxiliaryCssLinks).toEqual([]);
+  });
+
+  it('accepts parent traversal — ../shared/styles.css is a portable repository-tree reference', () => {
+    const result = parseDesignSpec(`### rule: ink
+- kind: palette
+- css: ../shared/styles.css .btn
+- example: a button
+- do: x
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.spec.rules[0].cssLinks).toEqual([
+      { path: '../shared/styles.css', selector: '.btn' },
+    ]);
+  });
+});
+
 describe('parseDesignSpec — rule-declaration attempts outside the ATX form', () => {
   it('flags a setext "rule: beta" heading and does not merge its fields into the prior rule', () => {
     const result = parseDesignSpec(`### rule: alpha
