@@ -280,6 +280,30 @@ describe('kill-vs-close interlocks (data-model state machine)', () => {
     expect(result.timedOut).toBe(false);
   });
 
+  it('an external signal kill (no wrapper kill) settles killed-external, never completed (AUDIT-20260611-13)', async () => {
+    // The 014 rewrite dropped the close handler's `signal` argument, so a
+    // child terminated by a signal the wrapper did NOT send (OOM killer,
+    // out-of-band SIGTERM/SIGKILL) arrived with killReason === null and
+    // settled `completed` — letting its PARTIAL capture into the lift
+    // (FR-007 violation). The wrapper sent no kill, yet close carries a
+    // non-null signal: that is the killed-external state.
+    vi.useFakeTimers();
+    const child = new FakeChild();
+    const promise = spawnWithFake(
+      child,
+      lane({ livenessSignal: 'none', timeoutSeconds: 600 }),
+      { mode: 'override', payloadBytes: 1, effectiveTimeoutSeconds: 600 },
+    );
+    child.stdout.write('partial capture before the OOM kill');
+    vi.advanceTimersByTime(1_000); // well inside the budget; no wrapper kill
+    expect(child.kills).toEqual([]);
+    child.emit('close', null, 'SIGKILL');
+    const result = await promise;
+    expect(result.terminalState).toBe('killed-external');
+    expect(result.timedOut).toBe(false);
+    expect(result.exitCode).toBe(-1);
+  });
+
   it('liveness_signal none NEVER arms the watchdog', async () => {
     vi.useFakeTimers();
     const child = new FakeChild();

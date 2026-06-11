@@ -14,7 +14,7 @@ models:
     readonly_enforcement: "--permission-mode plan"   # REQUIRED — CLI fragment, or the sentinel: none
     output_mode: stream-json          # REQUIRED — text | stream-json
     liveness_signal: stdout           # REQUIRED — stdout | stderr | none
-    liveness_window_seconds: 60       # required when liveness_signal != none
+    liveness_window_seconds: 60       # required when liveness_signal != none; refused when none
     timeout_floor_seconds: 300        # derivation pair — required unless timeout_seconds present
     timeout_secs_per_kb: 13
     # timeout_seconds: 900            # optional explicit override; recorded as override
@@ -38,6 +38,7 @@ A fable thoroughness-override profile is documented in the template comments: `m
 | `readonly_enforcement` absent | refuse: pre-014 config — migration message names file, missing fields, template path (FR-011, SC-006) |
 | `output_mode` / `liveness_signal` absent or invalid enum | refuse, naming the lane + allowed values |
 | `liveness_signal != none` and no `liveness_window_seconds` | refuse |
+| `liveness_signal: none` WITH a `liveness_window_seconds` | refuse: an unmonitored lane has no window to honor — set the signal to stdout/stderr to monitor, or remove the window (AUDIT-20260611-14) |
 | neither (`timeout_floor_seconds` + `timeout_secs_per_kb`) nor `timeout_seconds` | refuse (FR-002) |
 | `readonly_enforcement: none` | LOAD OK — lane runs; fire-time warning + `unenforced` marking everywhere (clarified 2026-06-10) |
 | prompt-placeholder rules | unchanged from v1 (exactly one of `{{prompt}}`/`{{prompt-stdin}}`) |

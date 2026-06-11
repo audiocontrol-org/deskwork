@@ -23,7 +23,7 @@ Consumers: `run-artifacts.ts` (writer), `audit-barrage-lift` (reader), govern co
 Existing: exit code, duration, stdout/stderr bytes, paths, timed out. New (FR-002/FR-006):
 
 - `report bytes: N` — bytes of the final report artifact; readers gate `produced` on this row (`> 0`), never on `<model>.md` existence (text lanes eagerly create the stdout stream, so an empty file can exist for a zero-output lane)
-- `terminal state: completed | timed-out | spawn-failed | killed-no-liveness`
+- `terminal state: completed | timed-out | spawn-failed | killed-no-liveness | killed-external` (`killed-external`: terminated by a signal the wrapper did not send — AUDIT-20260611-13)
 - `enforcement: enforced | unenforced`
 - `liveness: monitored (window Ns) | unmonitored`; on a liveness kill: staleness at kill
 - `timeout basis: derived (payload N bytes × S s/KB, floor F) → T s` or `override → T s`

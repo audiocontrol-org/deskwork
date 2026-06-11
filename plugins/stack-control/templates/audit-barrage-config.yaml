@@ -53,7 +53,9 @@
 #                             monitored. A spawn with no pulse inside the
 #                             window is killed (terminal state
 #                             killed-no-liveness) instead of waiting out the
-#                             full timeout.
+#                             full timeout. REFUSED on a `liveness_signal:
+#                             none` lane — an unmonitored lane has no window
+#                             to honor (AUDIT-20260611-14).
 #   timeout_floor_seconds + timeout_secs_per_kb
 #                           — derivation pair (FR-002): effective timeout =
 #                             max(floor, ceil(secs_per_kb × payload_KB)) where

@@ -164,6 +164,39 @@ describe('non-completed lanes contribute ZERO findings (FR-007)', () => {
   });
 });
 
+describe('killed-external lanes contribute ZERO findings (AUDIT-20260611-13)', () => {
+  it('excludes an externally-killed lane’s partial capture from extraction and reports its state', async () => {
+    // A lane killed by a signal the wrapper did NOT send (OOM killer,
+    // out-of-band SIGTERM/SIGKILL) settles killed-external. Before the
+    // fix it settled `completed` and its partial .md silently mixed into
+    // the audit-log — the FR-007 "a killed lane contributes ZERO
+    // findings" violation this finding names.
+    const fixture = makeFixture({
+      slug: 'ext-kill',
+      modelFiles: {
+        'claude.md': findingBlock('claude', '01', 'Healthy lane finding', 'src/a.ts:1'),
+        // The externally-killed lane left a partial capture — forensics, never findings.
+        'codex.md': findingBlock('codex', '01', 'Partial capture from an externally killed lane', 'src/b.ts:2'),
+      },
+      results: [
+        laneResult({ name: 'claude' }),
+        laneResult({
+          name: 'codex',
+          terminalState: 'killed-external',
+          exitCode: -1,
+          reportBytes: 0,
+        }),
+      ],
+    });
+    const { exit, out, err } = await lift(fixture, 'ext-kill');
+    expect(exit).toBe(0);
+    expect(out).toContain('Healthy lane finding');
+    expect(out).not.toContain('Partial capture from an externally killed lane');
+    expect(err).toMatch(/codex — killed-external/);
+    expect(err).toMatch(/ZERO findings/i);
+  });
+});
+
 describe('per-lane enforcement printed UNCONDITIONALLY (FR-004 at-synthesis)', () => {
   it('prints every lane’s enforcement state even on a healthy, undegraded run', async () => {
     const fixture = makeFixture({

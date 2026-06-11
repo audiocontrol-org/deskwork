@@ -21,8 +21,11 @@
  *     SIGTERM/SIGKILL and the `killed-no-liveness` terminal state.
  *     The watchdog disarms when the timeout kill begins, and vice
  *     versa — `timed-out` and `killed-no-liveness` are disjoint by
- *     construction; a `close` arriving first settles `completed`
- *     (single-settle `finish()`).
+ *     construction; a clean `close` arriving first settles `completed`
+ *     (single-settle `finish()`). A close carrying a non-null signal
+ *     with NO wrapper kill in flight settles `killed-external` — the
+ *     child was terminated out-of-band (OOM killer, external
+ *     SIGTERM/SIGKILL; AUDIT-20260611-13) and is never `completed`.
  *   - text lanes stream stdout to `stdoutPath` (the per-model markdown
  *     artifact). stream-json lanes feed stdout through the result
  *     extractor: NDJSON lines land in `eventsPath` (forensics) and the
@@ -373,14 +376,23 @@ export async function spawnCliAgainstModel(
     // have fully drained before we snapshot byte counters / close
     // capture streams. First settle wins: a close that beats every
     // kill records `completed` (data-model race rule).
-    child.on('close', (code) => {
+    //
+    // AUDIT-20260611-13: a close carrying a non-null `signal` when the
+    // wrapper sent NO kill (killReason === null) means the child was
+    // terminated out-of-band (OOM killer, external SIGTERM/SIGKILL).
+    // Settling that as `completed` would let the lane's PARTIAL capture
+    // into the lift — `killed-external` keeps FR-007's "a killed lane
+    // contributes ZERO findings" true for this kill path.
+    child.on('close', (code, signal) => {
       const exitCode = code !== null ? code : -1;
       const terminalState: TerminalState =
         killReason === 'timeout'
           ? 'timed-out'
           : killReason === 'liveness'
             ? 'killed-no-liveness'
-            : 'completed';
+            : signal !== null
+              ? 'killed-external'
+              : 'completed';
       finish({ exitCode }, terminalState);
     });
   });

@@ -46,12 +46,13 @@ function result(overrides: Partial<ModelRunResult>): ModelRunResult {
 }
 
 describe('terminalState union (T003 / FR-006)', () => {
-  it('admits exactly the four states', () => {
+  it('admits exactly the five states', () => {
     const states: TerminalState[] = [
       'completed',
       'timed-out',
       'spawn-failed',
       'killed-no-liveness',
+      'killed-external',
     ];
     for (const s of states) {
       expect(result({ terminalState: s }).terminalState).toBe(s);
@@ -76,6 +77,14 @@ describe('predicates require terminalState === completed (FR-006/FR-007)', () =>
 
   it('a killed-no-liveness lane is NOT liftable and NOT converged', () => {
     const r = result({ terminalState: 'killed-no-liveness', exitCode: -1 });
+    expect(isModelRunHealthy(r)).toBe(false);
+    expect(isModelRunConverged(r)).toBe(false);
+  });
+
+  it('a killed-external lane (out-of-band signal, no wrapper kill) is NOT liftable and NOT converged (AUDIT-20260611-13)', () => {
+    // The partial capture on disk is forensics, never findings — same
+    // FR-007 contract as the wrapper's own kills.
+    const r = result({ terminalState: 'killed-external', exitCode: -1 });
     expect(isModelRunHealthy(r)).toBe(false);
     expect(isModelRunConverged(r)).toBe(false);
   });

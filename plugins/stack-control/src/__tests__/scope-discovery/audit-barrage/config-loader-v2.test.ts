@@ -135,6 +135,33 @@ describe('config v2 — enum + window refusals', () => {
       parseConfig(laneYaml({ liveness_window_seconds: undefined }), LABEL),
     ).toThrowError(/liveness_window_seconds/);
   });
+
+  // AUDIT-20260611-14: a window on an unmonitored lane is inert — spawn-cli
+  // computes monitored = signal !== 'none', so the watchdog never arms and a
+  // reader who set a window believes liveness is monitored when it isn't.
+  // Fail-loud, consistent with the rest of the v2 grammar.
+  it('refuses liveness_signal none WITH a window (AUDIT-20260611-14)', () => {
+    let message = '';
+    try {
+      parseConfig(
+        laneYaml({ liveness_signal: 'none', liveness_window_seconds: 60 }),
+        LABEL,
+      );
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).not.toBe('');
+    // Names the lane…
+    expect(message).toContain('claude');
+    // …names both fields in tension…
+    expect(message).toContain('liveness_window_seconds');
+    expect(message).toMatch(/liveness_signal.*none|none.*liveness_signal/s);
+    // …states the unmonitored-lane consequence and the two ways out.
+    expect(message).toMatch(/unmonitored/i);
+    expect(message).toMatch(/stdout/);
+    expect(message).toMatch(/stderr/);
+    expect(message).toMatch(/remove/i);
+  });
 });
 
 describe('config v2 — timeout derivation refusals (FR-002)', () => {

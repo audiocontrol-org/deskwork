@@ -209,6 +209,7 @@ function parseTerminalState(raw: string): TerminalState | undefined {
     case 'timed-out':
     case 'spawn-failed':
     case 'killed-no-liveness':
+    case 'killed-external': // out-of-band kill (AUDIT-20260611-13)
       return raw;
     default:
       return undefined;

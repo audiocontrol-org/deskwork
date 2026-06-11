@@ -30,12 +30,20 @@
  *      the operator's triage walk has a stable place to start.
  */
 
-/** specs/014 FR-006: the single settled outcome of one model invocation. */
+/**
+ * specs/014 FR-006: the single settled outcome of one model invocation.
+ * `killed-external` (AUDIT-20260611-13): the child terminated on a signal
+ * the wrapper did NOT send (OOM killer, out-of-band SIGTERM/SIGKILL) —
+ * neither our timeout kill, nor our watchdog kill, nor a spawn failure,
+ * nor a completion. Without it such a lane settled `completed` and its
+ * partial capture leaked into the lift (FR-007 violation).
+ */
 export type TerminalState =
   | 'completed'
   | 'timed-out'
   | 'spawn-failed'
-  | 'killed-no-liveness';
+  | 'killed-no-liveness'
+  | 'killed-external';
 
 /** specs/014 FR-004: whether the spawn ran under a mechanical read-only fragment. */
 export type EnforcementState = 'enforced' | 'unenforced';
@@ -138,9 +146,9 @@ export interface BarrageInput {
  * Contract (specs/014 FR-006/FR-007 refinement of AUDIT-20260607-42):
  * a model produced liftable output iff it SETTLED `completed` AND its
  * final report artifact has bytes AND no spawn failure. A killed lane
- * (timed-out / killed-no-liveness / spawn-failed) contributes ZERO
- * findings — its empty-or-partial output is never presented as a clean
- * no-findings run. Liftability follows the ARTIFACT (`reportBytes`,
+ * (timed-out / killed-no-liveness / killed-external / spawn-failed)
+ * contributes ZERO findings — its empty-or-partial output is never
+ * presented as a clean no-findings run. Liftability follows the ARTIFACT (`reportBytes`,
  * the per-model `.md` lift consumes), not raw wire traffic: a
  * stream-json lane whose NDJSON capture had bytes but whose terminal
  * `result` event never arrived has no artifact (FR-010).
@@ -188,9 +196,10 @@ export function isModelRunCovering(result: ModelRunResult): boolean {
  *
  * Exit-code sentinels:
  *   - Non-negative integers — the CLI's own exit code.
- *   - `-1` — the process was terminated by a signal (timeout kill
- *     path, watchdog kill path, or external kill); `terminalState`
- *     distinguishes them.
+ *   - `-1` — the process was terminated by a signal (timeout kill →
+ *     `timed-out`, watchdog kill → `killed-no-liveness`, external
+ *     out-of-band kill → `killed-external`); `terminalState`
+ *     distinguishes them (AUDIT-20260611-13).
  *   - `-2` — the spawn itself failed (binary not found, ENOENT, etc.).
  *     `spawnError` carries the human-readable cause.
  *

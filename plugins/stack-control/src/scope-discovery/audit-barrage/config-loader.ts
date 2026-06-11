@@ -32,7 +32,9 @@
  *     (FR-001/FR-004).
  *   - `output_mode` ∈ {text, stream-json}; `liveness_signal` ∈
  *     {stdout, stderr, none}; `liveness_window_seconds` (positive int)
- *     required when the signal is monitored (FR-009).
+ *     required when the signal is monitored (FR-009) and REFUSED when
+ *     the signal is `none` — an unmonitored lane has no window to honor
+ *     (AUDIT-20260611-14).
  *   - the derivation pair (`timeout_floor_seconds` + `timeout_secs_per_kb`)
  *     is required unless `timeout_seconds` is present (FR-002).
  *   - an entry missing the v2-required fields is a pre-014 config →
@@ -346,10 +348,16 @@ function parseEntry(
     raw['liveness_window_seconds'] !== undefined &&
     raw['liveness_window_seconds'] !== null
   ) {
-    livenessWindowSeconds = requirePositiveInteger(
-      raw,
-      'liveness_window_seconds',
-      prefix,
+    // AUDIT-20260611-14: a window on a `none` lane is inert — the spawn
+    // helper computes monitored = signal !== 'none', so the watchdog never
+    // arms and the field would be silently swallowed. Refuse loudly
+    // (Principle V): a reader who set a window on a `none` lane believes
+    // liveness is monitored when it isn't.
+    throw new Error(
+      `${prefix} ('${name}').liveness_window_seconds is set but ` +
+        `liveness_signal is 'none' — an unmonitored lane has no window to ` +
+        `honor (the watchdog never arms). Set liveness_signal to stdout or ` +
+        `stderr to monitor liveness, or remove liveness_window_seconds`,
     );
   }
 
