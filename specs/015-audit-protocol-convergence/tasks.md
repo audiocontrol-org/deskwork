@@ -51,7 +51,7 @@
 - [ ] T007 [US1] Implement `computeClusterSeverity` (agreement rule, single-model passthrough) in `plugins/stack-control/src/scope-discovery/promote-findings/cluster-severity.ts` — make T006 green
 - [ ] T008 [P] [US1] RED: unit tests for `adjudicate` (single-lane HIGH + "currently unreachable" + fix-debt → ≤medium with non-empty basis; reachable data-loss HIGH → stays high) in `plugins/stack-control/src/__tests__/scope-discovery/promote-findings/adjudicate-findings.test.ts`
 - [ ] T009 [US1] Implement `adjudicate` (blast-radius/reachability/fix-debt re-score, mandatory basis) in `plugins/stack-control/src/scope-discovery/promote-findings/adjudicate-findings.ts` — make T008 green
-- [ ] T010 [US1] RED: test that `extractBarrageFindings` populates `perLaneSeverities` + `severityDecision` and sets `severity = gateCountedSeverity` (not max) in `plugins/stack-control/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts`
+- [ ] T010 [US1] RED: test that `extractBarrageFindings` populates `perLaneSeverities` + `severityDecision` and sets `severity = gateCountedSeverity` (not max), AND that `crossModelAgreement` stays `sourceModels.length>=2` independent of the de-inflated severity (FR-003 orthogonality) in `plugins/stack-control/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts`
 - [ ] T011 [US1] Modify `mergeCluster` in `plugins/stack-control/src/scope-discovery/promote-findings/extract-barrage-findings.ts` to delegate severity to `computeClusterSeverity` + route residuals through `adjudicate`; add `perLaneSeverities`/`severityDecision` to `ExtractedFinding` — make T010 green
 - [ ] T012 [US1] RED: test the lift persists the gate-counted `Severity:` line + the per-lane breakdown + `rule` (+ basis) to the audit-log (FR-002 / SC-002) in `plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/audit-barrage-lift.test.ts`
 - [ ] T013 [US1] Modify `plugins/stack-control/src/subcommands/audit-barrage-lift.ts` to write the per-lane breakdown + decision alongside the unchanged `Severity:` line — make T012 green
@@ -63,11 +63,11 @@
 
 ## Phase 4: User Story 2 — Loop termination is enforced by code, not agent discretion (P1)
 
-**Goal**: lift the convergence loop out of skill prose into a code driver owning iterate/stop + the FR-014 ceiling (thread 2; FR-004/005).
+**Goal**: lift the convergence loop out of skill prose into a code driver owning iterate/stop + the ceiling (004 FR-014, the per-checkpoint iteration ceiling — not a 015 requirement) (thread 2; FR-004/005).
 
 **Independent test**: drive `runConvergenceLoop` with a stub gate across all branches and confirm deterministic termination with no agent decision (SC-004).
 
-- [ ] T015 [P] [US2] RED: unit tests for `runConvergenceLoop` per `contracts/convergence-loop.md` (OPEN-pass-1→converged/0 fixes; always-BLOCKED ceiling 5→non-converged/4 fixes; BLOCKED×2→converged/2 fixes; override→overridden) in `plugins/stack-control/src/__tests__/govern/convergence-loop.test.ts`
+- [ ] T015 [P] [US2] RED: unit tests for `runConvergenceLoop` per `contracts/convergence-loop.md` (OPEN-pass-1→converged/0 fixes; always-BLOCKED ceiling 5→non-converged/4 fixes; BLOCKED×2→converged/2 fixes; override→overridden), AND that the driver itself writes nothing to the audited tree — `dispatchFix` is the only mutation seam (FR-005 no-auto-edit) in `plugins/stack-control/src/__tests__/govern/convergence-loop.test.ts`
 - [ ] T016 [US2] Extract the single `render→barrage→lift→slush→gate` pass in `plugins/stack-control/src/govern/protocol.ts` behind a step API the driver can call (no behavior change to the pass)
 - [ ] T017 [US2] Implement `runConvergenceLoop` (rounds, ceiling, override short-circuit, `ConvergenceOutcome`) in `plugins/stack-control/src/govern/convergence-loop.ts` — make T015 green
 - [ ] T018 [US2] Modify `plugins/stack-control/src/subcommands/govern.ts` to delegate the loop to `runConvergenceLoop` (build `runPass`/`dispatchFix`/`ceiling`; map outcome→exit) — the agent no longer holds the re-run decision
@@ -97,7 +97,7 @@
 
 **Independent test**: resolve one phase of the multi-phase fixture (T002) to a diff-scoped unit and confirm the payload is phase-scoped, governed by the same loop (SC-006).
 
-- [ ] T023 [P] [US4] RED: tests for `resolvePhaseUnit` (diff-scope is one phase's files only; SC-006) and `resolveComposingFeatureUnit` (excludes converged-unchanged phases, includes changed/cross-cutting) in `plugins/stack-control/src/__tests__/govern/incremental-audit.test.ts`
+- [ ] T023 [P] [US4] RED: tests for `resolvePhaseUnit` (diff-scope is one phase's files only; SC-006), `resolveComposingFeatureUnit` (excludes converged-unchanged phases, includes changed/cross-cutting), AND that a phase unit appends its findings to the same per-feature audit-log section as whole-feature governance (FR-008 same store) in `plugins/stack-control/src/__tests__/govern/incremental-audit.test.ts`
 - [ ] T024 [US4] Implement `resolvePhaseUnit` + `resolveComposingFeatureUnit` (tasks.md `## Phase N` grammar → `AuditUnit`) in `plugins/stack-control/src/govern/incremental-audit.ts` — make T023 green
 - [ ] T025 [US4] Wire an `AuditUnit`-scoped invocation through `protocol.ts`/`govern.ts` so a phase unit flows the same `runConvergenceLoop` path as a feature unit (FR-007); add a `--phase <id>` selector to the govern verb
 - [ ] T026 [US4] RED→GREEN: assert a per-phase payload's derived timeout for the slowest admitted lane is < the whole-feature payload's, and the watchdog/terminal-state path is unchanged (FR-009) in `plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/per-phase-timeout.test.ts`
@@ -134,6 +134,7 @@
 ## Phase 9: Polish & Cross-Cutting
 
 - [ ] T032 [P] Verify every touched/new file is within the 300–500 line cap; split if `extract-barrage-findings.ts` or `protocol.ts` exceeded it (Constitution VI)
+- [ ] T035 [P] Guard the isolation constraint (FR-012): assert no `plugins/dw-lifecycle/` path was modified by this feature's diff (the dw-lifecycle barrage copy stays untouched — succession isolation)
 - [ ] T033 [P] Roadmap/backlog hygiene: close TASK-18 Facet A (resolved + guarded), link TASK-27 / #431 / the adjudication inbox capture to this feature, and add the `multi/audit-protocol-convergence` roadmap item in `plugins/stack-control/ROADMAP.md`
 - [ ] T034 Run the full suite green (`npm --workspace @deskwork/plugin-stack-control test`) and the SC-001..008 quickstart runbook; record results in `specs/015-audit-protocol-convergence/quickstart-results.md`
 
