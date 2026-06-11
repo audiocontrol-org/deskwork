@@ -1,0 +1,25 @@
+#!/bin/sh
+# check-wireframe <wireframe.html> — run the full pinned check-mockup-lofi lint
+# against a wireframe file. Exit codes: 0 lint-green, 1 findings/error, 2 usage.
+# Logic lives in src/authoring/lint-file.ts (tested); this shim only locates the
+# workspace tsx runner (hoisted node_modules in the monorepo) and dispatches.
+set -eu
+
+PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+dir="$PLUGIN_ROOT"
+TSX=""
+while [ "$dir" != "/" ]; do
+  if [ -x "$dir/node_modules/.bin/tsx" ]; then
+    TSX="$dir/node_modules/.bin/tsx"
+    break
+  fi
+  dir=$(dirname -- "$dir")
+done
+
+if [ -z "$TSX" ]; then
+  echo "check-wireframe: tsx runner not found in any node_modules/.bin above $PLUGIN_ROOT — run npm install first" >&2
+  exit 1
+fi
+
+exec "$TSX" "$PLUGIN_ROOT/src/authoring/check-wireframe-cli.ts" "$@"

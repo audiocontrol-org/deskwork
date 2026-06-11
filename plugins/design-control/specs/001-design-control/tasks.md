@@ -139,13 +139,22 @@ verbatim in substance** — when they drift, the PRD wins.
       Romanian comma-below, multiline placeholders, cache-busting/percent-encoded/subdirectory kit
       hrefs, data tables, placeholder rows, prose pages, disclosure blocks, and the boundary
       fixtures. Suite: 151 → 286.
-- [ ] `/design-control:wireframe <change>` authoring skill (operator-driven + lint-enforced; the
+- [x] `/design-control:wireframe <change>` authoring skill (operator-driven + lint-enforced; the
       engine `author-wireframe` method is an optional accelerator routed through the same lint).
-- [ ] Retroactive path: existing surface → `derived` wireframe/spec; **snapshot the auto-derived
+      **Done — 2026-06-10.** `skills/wireframe/SKILL.md` (manual path needs no engine; the
+      accelerator gates on `preflightEngine` and its output is judged by the same lint) +
+      `@/authoring` (`lintWireframeFile` composes the existing pinned pipeline — no parallel lint
+      path) + `bin/check-wireframe` shim (exit contract 0 green / 1 findings-or-error / 2 usage;
+      logic tested as `runCheckWireframe`, the shim only dispatches). TDD: 9 tests RED first.
+- [x] Retroactive path: existing surface → `derived` wireframe/spec; **snapshot the auto-derived
       draft at derivation time** (stored alongside provenance) so the edit-diff has a baseline;
       **acceptance of a `derived` artifact requires a recorded operator edit** (non-empty diff
       between the stored auto-derived snapshot and the accepted version), not just a state
       transition; does NOT satisfy a "wireframe drove implementation" claim.
+      **Done — 2026-06-10.** `@/provenance` (`recordDerivation` writes snapshot + zod-validated
+      sidecar in one move; `checkDerivedAcceptance` rejects a byte-identical acceptance with
+      `derived-unedited`, fails loud on a tampered baseline via the recorded sha256;
+      `wireframeDroveImplementation` is true only for `driving` mode). TDD: 9 tests RED first.
 
 **Acceptance:** the engine-adapter **preflight fails loud when `/frontend-design` is absent while
 manual authoring still works**, and the preflight **precedes the first engine-consuming skill**; the
