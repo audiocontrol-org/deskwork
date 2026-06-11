@@ -13,7 +13,7 @@ graph with `stackctl roadmap` — do not hand-edit.
 - spec: specs/001-design-control
 
 ## impl:feature/phase-2-design-language-spec
-- status: planned
+- status: in-flight
 - spec: specs/001-design-control
 
 ## impl:feature/phase-3-archive-status

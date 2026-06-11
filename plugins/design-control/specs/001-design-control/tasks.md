@@ -165,19 +165,40 @@ same lint; a `derived` artifact cannot be accepted without a recorded operator e
 
 ## Phase 2 — Design-language spec convention (v1-scaffold)
 
-- [ ] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
+- [x] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
       do/don't), each rule linked to a live CSS file/class + ≥1 current example. The spec is a
       **hand-authorable markdown artifact** — **scaffold completion does NOT require the engine.**
-- [ ] **Static** link-liveness check (selector/class must be *defined in author-written source*;
+      **Done — `b2659452`** (`@/design-language/{types,schema}`: rules under `rule: <id>` ATX
+      headings; closed RULE_KINDS palette/type/spacing/component; closed field-bullet set
+      kind/css/example/do/don't with an `unknown-field` typo guard; `css: <path> <selector>`
+      links; invalid rules become findings, never silently kept or dropped. TDD: RED on the
+      unresolvable module first; 17 new tests).
+- [x] **Static** link-liveness check (selector/class must be *defined in author-written source*;
       **no app boot**). Scoped to author-written CSS selectors/classes; utility-framework / CSS-in-JS
       / hashed CSS-Modules resolution is **not validated in v1** (named-deferred). Runtime dead-CSS +
       spec-truthfulness are named-deferred.
-- [ ] **Example-presence validation:** the schema rejects a rule with **zero example references**
+      **Done — `5853f83f`** (`@/design-language/link-liveness`: pure file reads, selector must
+      appear ident-boundary exact in a selector prelude — comments/string-contents stripped,
+      at-rule preludes excluded but descended into, so `@media` rules count and
+      `content: ".ghost"` / commented-out rules don't; `.btn-primary` never satisfies `.btn`.
+      Non-.css targets recorded as `skipped` + printed as notes — the named-deferred boundary is
+      visible, never a silent drop or a fabricated dead-link. Plus
+      `@/design-language/check-spec-file` + `bin/check-design-spec` (exit 0/1/2, mirrors
+      check-wireframe; shim smoke-verified both directions). TDD: RED first; 20 new tests; suite
+      397 → 417.)
+- [x] **Example-presence validation:** the schema rejects a rule with **zero example references**
       (each rule carries ≥1 example). Structural-presence only — verifying the example still matches
       live UI is `spec-truthfulness` (named-deferred).
-- [ ] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
+      **Done — `b2659452`** (`missing-example` finding; an empty `example:` value does NOT
+      satisfy presence — it surfaces as `empty-field` + `missing-example`, both tested).
+- [x] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
       drafts/maintains the spec from approved wireframe intent; its engine conformance is exercised
       **only when `/frontend-design` is present.**
+      **Done — `4650ee66`** (`skills/translate-design-language/SKILL.md`, same enforcement shape
+      as the wireframe skill: manual hand-author path is the default and needs NO engine; the
+      accelerator gates on `preflightEngine('translate-design-language')`; engine output gets
+      zero trust — judged by the SAME `bin/check-design-spec` gate; skipped non-CSS links are
+      read aloud as visible v1 scope).
 
 **Acceptance (two paths):** **(scaffold, required)** an operator can hand-author a spec; static
 link-liveness flags a **dead selector** with **no app boot** — engine absent; **and the schema
