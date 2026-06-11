@@ -11,4 +11,5 @@ export {
   loadProvenance,
   checkDerivedAcceptance,
   wireframeDroveImplementation,
+  verifyDrivingWireframe,
 } from '@/provenance/derived';

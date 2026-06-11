@@ -65,6 +65,12 @@ const drivingSchema = z.object({
   surfaceId: surfaceIdSchema,
   mode: z.literal('driving'),
   createdAt: z.string().datetime(),
+  driving: z.object({
+    /** Filename (dir-relative) of the wireframe this record certifies. */
+    wireframeFile: z.string().min(1),
+    /** sha256 (hex) of the wireframe bytes as recorded — tamper evidence. */
+    wireframeSha256: z.string().regex(/^[0-9a-f]{64}$/),
+  }),
 });
 
 const derivedSchema = z.object({
@@ -106,18 +112,40 @@ function writeProvenance(dir: string, provenance: WireframeProvenance): void {
   );
 }
 
-/** Record a DRIVING wireframe's provenance (the authored-first path). */
+/**
+ * Record a DRIVING wireframe's provenance (the authored-first path). The record
+ * binds the artifact it certifies: `wireframeFile` (dir-relative filename of
+ * the lint-green wireframe, which exists by this point — lint precedes
+ * provenance in the skill's step ordering) is read and hashed at record time,
+ * so a later wholesale replacement of the wireframe is tamper-evident
+ * ({@link verifyDrivingWireframe}), mirroring the derived path's snapshot hash.
+ */
 export function recordDrivingWireframe(input: {
   dir: string;
   surfaceId: string;
+  /** Filename (within dir) of the wireframe HTML this record certifies. */
+  wireframeFile: string;
   createdAt?: Date;
 }): WireframeProvenance {
   assertPortableSurfaceId(input.surfaceId);
+  const wireframePath = join(input.dir, input.wireframeFile);
+  if (!existsSync(wireframePath)) {
+    throw new Error(
+      `Cannot record driving provenance for surface "${input.surfaceId}": wireframe file ` +
+        `${wireframePath} does not exist. The driving record binds the artifact it certifies ` +
+        `by filename + hash, so the lint-green wireframe must be on disk at record time ` +
+        `(lint precedes provenance — see the wireframe skill's step ordering).`,
+    );
+  }
   const provenance: WireframeProvenance = {
     version: PROVENANCE_VERSION,
     surfaceId: input.surfaceId,
     mode: 'driving',
     createdAt: (input.createdAt ?? new Date()).toISOString(),
+    driving: {
+      wireframeFile: input.wireframeFile,
+      wireframeSha256: sha256Hex(readFileSync(wireframePath, 'utf8')),
+    },
   };
   writeProvenance(input.dir, provenance);
   return provenance;
@@ -224,4 +252,40 @@ export function checkDerivedAcceptance(
  */
 export function wireframeDroveImplementation(provenance: WireframeProvenance): boolean {
   return provenance.mode === 'driving';
+}
+
+/**
+ * Verify a DRIVING record against the artifact it certifies, the way
+ * {@link checkDerivedAcceptance} checks the derived snapshot: load the
+ * provenance, require `mode === 'driving'`, re-hash the bound wireframe file,
+ * and fail loud on a mismatch — a record whose wireframe was replaced after
+ * recording cannot certify the "wireframe drove implementation" claim.
+ * Returns the (now hash-verified) provenance.
+ */
+export function verifyDrivingWireframe(dir: string, surfaceId: string): WireframeProvenance {
+  const provenance = loadProvenance(dir, surfaceId);
+  if (provenance.mode !== 'driving') {
+    throw new Error(
+      `Surface "${surfaceId}" has ${provenance.mode} provenance, not driving — a derived ` +
+        `artifact never supports a "wireframe drove implementation" claim, so there is no ` +
+        `driving binding to verify.`,
+    );
+  }
+  const wireframePath = join(dir, provenance.driving.wireframeFile);
+  if (!existsSync(wireframePath)) {
+    throw new Error(
+      `Driving provenance for surface "${surfaceId}" binds wireframe file ${wireframePath}, ` +
+        `but that file no longer exists — the record cannot certify an artifact that is gone. ` +
+        `Restore the wireframe or re-record provenance.`,
+    );
+  }
+  if (sha256Hex(readFileSync(wireframePath, 'utf8')) !== provenance.driving.wireframeSha256) {
+    throw new Error(
+      `Wireframe ${wireframePath} does not match the hash recorded for surface "${surfaceId}" ` +
+        `at recording time — the artifact was modified or replaced after the driving record was ` +
+        `written, so the record cannot certify it. Re-lint and re-record provenance for the ` +
+        `current wireframe.`,
+    );
+  }
+  return provenance;
 }

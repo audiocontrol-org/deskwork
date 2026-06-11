@@ -64,7 +64,12 @@ identity lives in the design-language spec (Phase 2), never here.
 
 6. **Record provenance.** This skill authors *driving* wireframes (the artifact
    precedes the implementation): record it via `recordDrivingWireframe`
-   (`@/provenance`) in the wireframe's directory. A wireframe reverse-engineered
+   (`@/provenance`) in the wireframe's directory, passing the lint-green
+   wireframe's filename (`wireframeFile`) — the record binds that artifact by
+   name + sha256, so a later replacement of the wireframe is tamper-evident
+   (`verifyDrivingWireframe` re-hashes and fails loud on mismatch). The file
+   must exist on disk at record time; step 5's lint gate guarantees it does.
+   A wireframe reverse-engineered
    from an existing surface is the *derived* path — record it with
    `recordDerivation` at derivation time instead, and note that acceptance will
    require a non-empty operator edit against the stored snapshot

@@ -8,6 +8,7 @@ import {
   checkDerivedAcceptance,
   wireframeDroveImplementation,
   recordDrivingWireframe,
+  verifyDrivingWireframe,
 } from '@/provenance/derived';
 
 const dirs: string[] = [];
@@ -25,6 +26,12 @@ const draftHtml =
   '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>WF</title>' +
   '<link rel="stylesheet" href="sketch-kit.css"></head>' +
   '<body class="sk sk-theme-grayscale"><h1>Derived from live surface</h1></body></html>';
+
+/** Write a lint-green-stand-in wireframe file into dir; returns its filename. */
+function writeWireframe(dir: string, name = 'wireframe.html', html = draftHtml): string {
+  writeFileSync(join(dir, name), html);
+  return name;
+}
 
 describe('recordDerivation', () => {
   it('writes the auto-derived snapshot AND the provenance sidecar at derivation time', () => {
@@ -139,6 +146,7 @@ describe('checkDerivedAcceptance — acceptance requires a recorded operator edi
     recordDrivingWireframe({
       dir,
       surfaceId: 'fresh',
+      wireframeFile: writeWireframe(dir),
       createdAt: new Date('2026-06-10T12:00:00Z'),
     });
     expect(checkDerivedAcceptance(dir, 'fresh', draftHtml).ok).toBe(true);
@@ -149,8 +157,9 @@ describe('surfaceId filename validation — path-traversal and separator rejecti
   const hostileIds = ['../escape', '..', 'a/b', 'nested/../../etc', 'a\\b', 'space id', ''];
 
   it.each(hostileIds)('recordDrivingWireframe rejects %j with an error naming the constraint', (id) => {
+    const dir = freshDir();
     expect(() =>
-      recordDrivingWireframe({ dir: freshDir(), surfaceId: id }),
+      recordDrivingWireframe({ dir, surfaceId: id, wireframeFile: writeWireframe(dir) }),
     ).toThrow(/portable-filename|\^\[a-z0-9\]/i);
   });
 
@@ -168,9 +177,10 @@ describe('surfaceId filename validation — path-traversal and separator rejecti
 
   it('rejects a bare ".." specifically — the pattern requires an alphanumeric first character', () => {
     // /^[a-z0-9][a-z0-9._-]*$/i cannot match '..' because '.' fails the [a-z0-9] start anchor.
-    expect(() => recordDrivingWireframe({ dir: freshDir(), surfaceId: '..' })).toThrow(
-      /portable-filename|\^\[a-z0-9\]/i,
-    );
+    const dir = freshDir();
+    expect(() =>
+      recordDrivingWireframe({ dir, surfaceId: '..', wireframeFile: writeWireframe(dir) }),
+    ).toThrow(/portable-filename|\^\[a-z0-9\]/i);
   });
 
   it('the zod schema rejects a sidecar whose stored surfaceId is non-portable (load-side defense)', () => {
@@ -190,6 +200,7 @@ describe('surfaceId filename validation — path-traversal and separator rejecti
     recordDrivingWireframe({
       dir,
       surfaceId: 'studio-content_browser.v2',
+      wireframeFile: writeWireframe(dir),
       createdAt: new Date('2026-06-10T12:00:00Z'),
     });
     expect(loadProvenance(dir, 'studio-content_browser.v2').surfaceId).toBe(
@@ -211,9 +222,103 @@ describe('wireframeDroveImplementation', () => {
     const driving = recordDrivingWireframe({
       dir,
       surfaceId: 'w',
+      wireframeFile: writeWireframe(dir),
       createdAt: new Date('2026-06-10T12:00:00Z'),
     });
     expect(wireframeDroveImplementation(derived)).toBe(false);
     expect(wireframeDroveImplementation(driving)).toBe(true);
+  });
+});
+
+describe('recordDrivingWireframe — binds the wireframe artifact by filename + hash', () => {
+  it('records driving.wireframeFile and a sha256 hex of the wireframe bytes', () => {
+    const dir = freshDir();
+    const wireframeFile = writeWireframe(dir, 'studio-content-browser.html');
+    const prov = recordDrivingWireframe({
+      dir,
+      surfaceId: 'studio-content-browser',
+      wireframeFile,
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    expect(prov.mode).toBe('driving');
+    if (prov.mode !== 'driving') throw new Error('unreachable');
+    expect(prov.driving.wireframeFile).toBe('studio-content-browser.html');
+    expect(prov.driving.wireframeSha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('round-trips the driving binding through loadProvenance (zod-validated)', () => {
+    const dir = freshDir();
+    recordDrivingWireframe({
+      dir,
+      surfaceId: 'wf-bound',
+      wireframeFile: writeWireframe(dir, 'wf-bound.html'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    const prov = loadProvenance(dir, 'wf-bound');
+    expect(prov.mode).toBe('driving');
+    if (prov.mode !== 'driving') throw new Error('unreachable');
+    expect(prov.driving.wireframeFile).toBe('wf-bound.html');
+    expect(prov.driving.wireframeSha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('fails loud when the named wireframe file does not exist at record time', () => {
+    const dir = freshDir();
+    expect(() =>
+      recordDrivingWireframe({ dir, surfaceId: 'ghost', wireframeFile: 'ghost.html' }),
+    ).toThrow(/wireframe/i);
+    expect(readdirSync(dir)).toEqual([]);
+  });
+});
+
+describe('verifyDrivingWireframe — tamper-checks the bound artifact like checkDerivedAcceptance', () => {
+  it('returns the provenance when the wireframe bytes still match the recorded hash', () => {
+    const dir = freshDir();
+    recordDrivingWireframe({
+      dir,
+      surfaceId: 'intact',
+      wireframeFile: writeWireframe(dir, 'intact.html'),
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    const prov = verifyDrivingWireframe(dir, 'intact');
+    expect(prov.mode).toBe('driving');
+    expect(prov.surfaceId).toBe('intact');
+  });
+
+  it('throws when the wireframe bytes were replaced after recording (hash mismatch)', () => {
+    const dir = freshDir();
+    const wireframeFile = writeWireframe(dir, 'swapped.html');
+    recordDrivingWireframe({
+      dir,
+      surfaceId: 'swapped',
+      wireframeFile,
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    writeFileSync(join(dir, wireframeFile), draftHtml + '<!-- wholesale replacement -->');
+    expect(() => verifyDrivingWireframe(dir, 'swapped')).toThrow(/hash|wireframe/i);
+  });
+
+  it('throws when the bound wireframe file has gone missing', () => {
+    const dir = freshDir();
+    const wireframeFile = writeWireframe(dir, 'vanished.html');
+    recordDrivingWireframe({
+      dir,
+      surfaceId: 'vanished',
+      wireframeFile,
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    rmSync(join(dir, wireframeFile));
+    expect(() => verifyDrivingWireframe(dir, 'vanished')).toThrow(/wireframe/i);
+  });
+
+  it('throws on a derived record — a derived artifact never certifies the driving claim', () => {
+    const dir = freshDir();
+    recordDerivation({
+      dir,
+      surfaceId: 'reverse-engineered',
+      derivedHtml: draftHtml,
+      source: 'live surface',
+      createdAt: new Date('2026-06-10T12:00:00Z'),
+    });
+    expect(() => verifyDrivingWireframe(dir, 'reverse-engineered')).toThrow(/driving|derived/i);
   });
 });
