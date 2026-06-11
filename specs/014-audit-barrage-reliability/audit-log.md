@@ -143,3 +143,29 @@ Surface:    plugins/stack-control/scripts/probe-readonly-spawn.sh:113-118,128-14
 The probe comment says the model report “must show the four attempts + DONE,” but the script only prints the report and bases PASS solely on repository mutation checks. A lane whose model refuses every hostile action without invoking the harness can still produce zero mutations and pass, which is the vacuous pass the comment says the probe is meant to prevent.
 
 Blast radius is medium because this weakens SC-002 evidence rather than the production spawn path directly. The script should parse the lane artifact for the expected attempt evidence, or at minimum fail when the report artifact is absent or lacks a required completion marker plus attempt-specific text.
+
+## 2026-06-11 — audit-barrage lift (20260611T115700037Z-audit-barrage-reliability-after_clarify)
+
+### AUDIT-20260611-11 — Govern loop's per-lane fleet line carries the AUDIT-20260611-09 narration gap, unfixed — a `completed`-but-non-converged lane reads "completed" next to "⚠ DEGRADED" with nothing connecting them
+
+Finding-ID: AUDIT-20260611-11 (claude-01 + claude-02 + codex-02; cross-model)
+Status:     fixed-504153e4
+Severity:   medium
+Surface:    plugins/stack-control/src/govern/protocol.ts:140-148 (reportFleetStatus per-lane loop) + plugins/stack-control/src/scope-discovery/audit-barrage/types.ts:FleetLaneStatus
+
+AUDIT-20260611-09 was scoped and fixed only in the lift (`audit-barrage-lift.ts:326-345`), which now annotates a `completed`-but-not-converged lane as `— completed but non-converged (exit N, report bytes M); not counted as produced`. The identical narration gap is still present in the govern loop surface. `reportFleetStatus` iterates `fleet.perLane` and prints `govern:   ${lane.name}: ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]` (protocol.ts:145-147). For the CLI-rejected-model-pin case the spec explicitly calls out (e.g. `codex.md` = `error: unknown model id`, `exitCode: 1`, `terminalState: 'completed'`), `computeFleetReportFromParsedLanes` correctly excludes it from `produced` (it requires `exitCode === 0 && reportBytes > 0`), so govern prints `govern:   codex: completed [enforced, monitored]` directly above/below `govern: fleet — configured 2, produced 1  ⚠ DEGRADED` — the exact "completed next to degraded with nothing linking them" operator-confusion AUDIT-09 fixed for the lift.
+
+The root cause is structural: `FleetLaneStatus` (types.ts) carries only `name / terminalState / enforcement / liveness` — not `exitCode` or `reportBytes` — so `reportFleetStatus` *cannot* reproduce the lift's annotation even if it wanted to. The lift can annotate because it works from `ParsedIndexLane` (which has `exitCode`/`reportBytes`); govern works from the leaner `FleetLaneStatus`.
+
+Blast radius is clarity-only (LOW), matching AUDIT-09's own rating: the counts are correct, only the per-lane narration is ambiguous. But it is slightly more impactful here than in the lift, because the govern loop status line is precisely the surface FR-007 / US3-scenario-3 designate as where *repeated cross-round same-lane degradation* is supposed to be most visible — and a model whose pin the CLI keeps rejecting every round is the canonical repeated-degradation case. A reasonable fix: add `exitCode`/`reportBytes` to `FleetLaneStatus` (they're already parsed) and apply the lift's annotation logic in `reportFleetStatus`, so the "one vocabulary every consumer prints" goal the feature states actually holds across all four surfaces.
+
+### AUDIT-20260611-12 — Embedded `{{prompt-stdin}}` templates pass validation but leak the literal placeholder into argv
+
+Finding-ID: AUDIT-20260611-12
+Status:     fixed-504153e4
+Severity:   medium
+Surface:    plugins/stack-control/src/scope-discovery/audit-barrage/config-loader.ts:244-245; plugins/stack-control/src/scope-discovery/audit-barrage/spawn-cli.ts:284,455-456
+
+`parseEntry()` accepts any `args_template` that merely contains `{{prompt-stdin}}`, because it uses `argsTemplate.includes(PROMPT_STDIN_PLACEHOLDER)` as the validation rule. `spawnCliAgainstModel()` also switches to stdin delivery on the same substring test. But `buildArgs()` only removes tokens equal to the bare placeholder via `.filter((tok) => tok !== PROMPT_STDIN_PLACEHOLDER)`, so a valid-looking template such as `--input={{prompt-stdin}} --model {{model}}` spawns with stdin connected and still passes the literal `--input={{prompt-stdin}}` argv token to the CLI.
+
+Blast radius is medium: shipped configs use the bare token, but adopter configs can pass validation and then fail at spawn time or invoke a CLI with a bogus input argument. This is exactly the sort of config/load mismatch the v2 grammar is trying to eliminate. A reasonable fix is to either reject embedded `{{prompt-stdin}}` during config loading with a clear “bare token only” error, or make argv assembly strip any token containing the stdin placeholder if that is the intended grammar.
