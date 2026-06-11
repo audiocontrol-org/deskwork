@@ -43,7 +43,7 @@
 - [X] T015 [P] [US6] RED: installation-aware feature-root resolution in src/__tests__/feature-root-installation.test.ts — `<installation>/specs/<slug>` resolves first (exact slug + grandfathered `NNN-slug`); legacy root-level specs/ + docs layouts stay read-resolvable byte-compatibly (descriptive-naming forward-only decision)
 - [X] T016 [US6] Implement the installation-first lookup in scope-discovery/util/feature-root.ts (+ discoverFeatureRoots) — T015 green
 - [X] T017 [US6] The tree move (this repo): `git mv .specify specs plugins/stack-control/`; update the repo-root CLAUDE.md SPECKIT pointer + .specify/feature.json validity + extension wiring paths; verify per quickstart (spec-check all-yes on the relocated dir; one authoring step lands under the installation; govern payload carries spec artifacts with no cross-tree arm) — full suite green after the move
-- [ ] T018 [US6] Record the installation-anchor principle at governance level (FR-010): constitution amendment (Additional Constraints) naming the isolation invariant + derived external anchors; cite this spec
+- [X] T018 [US6] Record the installation-anchor principle at governance level (FR-010): constitution amendment (Additional Constraints) naming the isolation invariant + derived external anchors; cite this spec
 
 ## Phase 8: Polish & feature close-out
 

@@ -1,12 +1,17 @@
 <!--
 Sync Impact Report
+- Version change: 1.2.0 → 1.3.0 (MINOR — new Additional Constraint: the installation-anchor
+  invariant (specs/installation-isolation FR-010). Every state-writing verb anchors
+  stack-control-owned state in the nearest-enclosing — or explicitly named — installation;
+  external-tool anchors (git toplevel, Spec Kit root) are derived from their own markers,
+  never accepted as free placement parameters. No principle added/removed; no template impact.)
 - Version change: 1.1.1 → 1.2.0 (MINOR — new "Thesis & Motivating Context" section grounding all
   principles in the stack-control thesis + the motivating blog post; foundational-doc grounding pass,
   operator decision 2026-06-06. No principle added/removed; no template impact.)
 - Version change: 1.1.0 → 1.1.1 (PATCH — version-line constraint reversed: stack-control shares the
   repo's single lockstep version, no longer "its own version line"; operator decision 2026-06-05)
 - Version change: 1.0.0 → 1.1.0 (MINOR — new principle IX + reframe to the stack-control program)
-- Ratification: initial adoption 2026-06-04; amended 2026-06-04, 2026-06-05, 2026-06-06
+- Ratification: initial adoption 2026-06-04; amended 2026-06-04, 2026-06-05, 2026-06-06, 2026-06-11
 - Amendment 1.1.0 (2026-06-04): reframed preamble + title around the stack-control program
   (successor to dw-lifecycle); added Principle IX (Execution-Backend Pluggability); qualified the
   Additional Constraints (manifest port DEFERRED to substrate; plan source is Spec Kit tasks.md;
@@ -150,6 +155,16 @@ built concretely against Spec Kit's `tasks.md` first; the *execution-backend* po
   when present, are a thin overlay referencing tasks by id.)
 - **Isolation invariant:** `stack-control` is developed and published WITHOUT destabilizing
   `dw-lifecycle`, which is in active use doing real work.
+- **Installation-anchor invariant (specs/installation-isolation, FR-010):** every verb that
+  creates or mutates stack-control-owned state MUST anchor that state inside the
+  nearest-enclosing installation (or an explicitly named one via `--at <dir>`); writing outside
+  the installation tree by default is prohibited, and with no enclosing installation the verb
+  refuses loudly (`stackctl setup` remediation — no fallback location). The cwd's only
+  sanctioned role is the default start point of the walk-up. External-tool anchors — the git
+  toplevel, the Spec Kit root — are DERIVED from their own markers, never accepted as free
+  parameters that can place stack-control state (the repo-root parameter is retired). New verbs
+  inherit this invariant by default; the isolation probe
+  (`src/__tests__/installation-isolation-probe.test.ts`) is its permanent enforcement.
 - Enforcement discipline lives in skill bodies and CLI verbs, never in git hooks the adopter does not
   receive from installing the plugin.
 - Provider/version pinning is treated as one unit; a version change is a recorded event, never a
@@ -177,4 +192,4 @@ Versioning policy (semantic):
 - MINOR: a new principle/section added or materially expanded guidance.
 - PATCH: clarifications, wording, non-semantic refinements.
 
-**Version**: 1.2.0 | **Ratified**: 2026-06-04 | **Last Amended**: 2026-06-06
+**Version**: 1.3.0 | **Ratified**: 2026-06-04 | **Last Amended**: 2026-06-11
