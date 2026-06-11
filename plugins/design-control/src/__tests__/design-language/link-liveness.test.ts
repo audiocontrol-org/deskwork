@@ -142,6 +142,16 @@ describe('checkCssLinkLiveness — public-seam portability defense (AUDIT-round2
       ),
     ).toThrow(/relative to the spec file/);
   });
+
+  it('throws on a drive-RELATIVE Windows link path (C:styles.css — machine-contextual on Windows)', () => {
+    const dir = makeFixtureDir();
+    expect(() =>
+      checkCssLinkLiveness(
+        [{ ruleId: 'probe', link: { path: 'C:styles.css', selector: '.btn' } }],
+        dir,
+      ),
+    ).toThrow(/relative to the spec file/);
+  });
 });
 
 describe('checkLinkLiveness — dead links flagged (no app boot)', () => {
@@ -283,6 +293,64 @@ describe('checkLinkLiveness — functional pseudo-class arguments compared (AUDI
     const dir = makeFixtureDir();
     writeFileSync(join(dir, 'studio.css'), '.real:is(.a, .b) { color: ink; }\n');
     expect(checkLinkLiveness(specWithLink('studio.css', '.real:is(.a,.b)'), dir).ok).toBe(true);
+  });
+});
+
+describe('checkLinkLiveness — combinator spacing normalized (AUDIT-20260611 combinator finding)', () => {
+  it('a spaced child query matches an unspaced source — .a > .b vs .a>.b', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.a>.b { color: ink; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', '.a > .b'), dir);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('an unspaced adjacent-sibling query matches a spaced source — .c+.d vs .c + .d', () => {
+    // Prettier writes spaced combinators, so a CSS reformat must not flip a
+    // green link dead.
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.c + .d { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.c+.d'), dir).ok).toBe(true);
+  });
+
+  it('a spaced general-sibling query matches an unspaced source — .x ~ .y vs .x~.y', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.x~.y { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.x ~ .y'), dir).ok).toBe(true);
+  });
+
+  it('an unspaced column-combinator query matches a spaced source — .col||.cell vs .col || .cell', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.col || .cell { width: 4rem; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.col||.cell'), dir).ok).toBe(true);
+  });
+
+  it('combinator unification never fabricates a green — .a>.b is dead against a descendant .a .b source', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.a .b { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.a>.b'), dir).ok).toBe(false);
+  });
+
+  it('descendant combinators keep their single-space normalization alongside the combinator pass', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.list   >   .item   .label { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.list > .item .label'), dir).ok).toBe(true);
+  });
+
+  it('the ~= attribute operator is untouched — [a~="x"] matches a spaced [a ~= "x"] source', () => {
+    // Attribute canonicalization owns operator spacing (the ~ there is part of
+    // ~=); the combinator pass must not corrupt it.
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real[a ~= "x"] { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.real[a~="x"]'), dir).ok).toBe(true);
+  });
+
+  it('nth-child + spelling unifies as a consequence — :nth-child(2n+1) matches :nth-child(2n + 1)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.row:nth-child(2n + 1) { background: paper; }\n');
+    expect(
+      checkLinkLiveness(specWithLink('studio.css', '.row:nth-child(2n+1)'), dir).ok,
+    ).toBe(true);
   });
 });
 

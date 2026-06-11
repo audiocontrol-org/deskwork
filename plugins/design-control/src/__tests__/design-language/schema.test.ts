@@ -445,6 +445,29 @@ describe('parseDesignSpec — css-link path portability (AUDIT-round2-codex-02)'
     expect(findings).toContain('malformed-css-link');
   });
 
+  it('rejects a drive-RELATIVE Windows css path (C:styles.css — no slash after the colon)', () => {
+    // Drive-relative paths resolve against the drive's current directory on
+    // Windows (machine-contextual) and as a literal filename on POSIX — a css
+    // path has no legitimate single-letter-colon prefix.
+    const findings = findingsFor(`### rule: ink
+- kind: palette
+- css: C:styles.css .btn
+- example: a button
+- do: x
+`);
+    expect(findings).toContain('malformed-css-link');
+  });
+
+  it('rejects a lowercase drive-relative css path too (c:styles.css)', () => {
+    const findings = findingsFor(`### rule: ink
+- kind: palette
+- css: c:styles.css .btn
+- example: a button
+- do: x
+`);
+    expect(findings).toContain('malformed-css-link');
+  });
+
   it('rejects a UNC css path', () => {
     const findings = findingsFor(`### rule: ink
 - kind: palette

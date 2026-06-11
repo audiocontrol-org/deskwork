@@ -15,8 +15,10 @@
  * - Escape sequences inside quoted values are kept verbatim, not decoded —
  *   `[a='it\'s']` and `[a="it's"]` spell the same value but do not unify.
  * - Whitespace inside functional-pseudo arguments is collapsed to single
- *   spaces (and trimmed at parens/commas), not erased — `:nth-child(2n+1)`
- *   and `:nth-child(2n + 1)` do not unify.
+ *   spaces (and trimmed at parens/commas/combinator-shaped characters), not
+ *   erased — the combinator pass strips spacing around `+`, so
+ *   `:nth-child(2n+1)` and `:nth-child(2n + 1)` DO unify, while the
+ *   `-`-spelled forms (`:nth-child(2n-1)` vs `(2n - 1)`) do not.
  * - Attribute names are matched as plain idents; namespaced attribute
  *   selectors (`[svg|href]`) are left un-canonicalized (compared verbatim).
  */
@@ -178,9 +180,15 @@ export function stripFunctionalPseudoArgs(text: string): string {
 
 /**
  * Normalize selector whitespace for textual comparison: runs collapse to one
- * space, spaces inside paren delimiters and around commas drop, ends trim.
- * Applied identically to query and haystack, so descendant-combinator and
- * argument-list spacing differences never produce a false dead.
+ * space; spaces inside paren delimiters, around commas, and around the
+ * non-descendant combinators (`>` `+` `~` `||`) drop; ends trim. Prettier
+ * writes spaced combinators, so `.a>.b` and `.a > .b` must compare equal — a
+ * CSS reformat must never flip a green link dead. The `~` of the `~=`
+ * attribute operator is safe here: {@link canonicalizeAttributeSelectors}
+ * runs first and emits `[a~="x"]` with no surrounding spaces, so the
+ * combinator pass is an identity on it. Applied identically to query and
+ * haystack, so descendant-combinator, combinator, and argument-list spacing
+ * differences never produce a false dead.
  */
 export function normalizeSelectorWhitespace(text: string): string {
   return text
@@ -188,5 +196,6 @@ export function normalizeSelectorWhitespace(text: string): string {
     .replace(/\(\s+/g, '(')
     .replace(/\s+\)/g, ')')
     .replace(/\s*,\s*/g, ',')
+    .replace(/\s*(\|\||[>+~])\s*/g, '$1')
     .trim();
 }
