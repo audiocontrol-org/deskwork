@@ -254,3 +254,48 @@ Surface:    plugins/stack-control/src/scope-discovery/audit-barrage/config-loade
 `requireNonEmptyString()` only checks `value.length === 0`, so a quoted YAML value like `readonly_enforcement: "   "` passes config validation. At spawn time, enforcement state is computed as `model.readonlyEnforcement === 'none' ? 'unenforced' : 'enforced'`, so that lane is recorded as `enforced`. But `buildArgs()` trims and splits the fragment; whitespace becomes `fragment.length === 0`, so no read-only fragment is injected.
 
 Blast radius is high because this violates FR-003/FR-004’s safety contract: an adopter typo can run a lane with no mechanical read-only protection while every downstream surface says `[enforced]`. The same trim-aware validation should be applied to all string fields, and `readonly_enforcement` should specifically reject whitespace-only fragments unless it is exactly the sentinel `none`.
+
+## 2026-06-11 — audit-barrage lift (20260611T125045363Z-audit-barrage-reliability-after_clarify)
+
+### AUDIT-20260611-18 — Adopter README terminal-state list is missing `killed-external` — drift from the union it documents
+
+Finding-ID: AUDIT-20260611-18
+Status:     fixed-4816a4a2
+Severity:   low
+Surface:    plugins/stack-control/README.md (the new `## Audit-barrage config (grammar v2) — migration` block — the "Every run's INDEX.md records each lane's terminal state (…)" sentence)
+
+The README section added in this diff enumerates the terminal states an INDEX records as exactly four: `` `completed` / `timed-out` / `spawn-failed` / `killed-no-liveness` ``. But the `TerminalState` union (types.ts), `parseTerminalState` (run-artifacts.ts), `data-model.md`, `contracts/run-artifacts-contract.md`, and `spec.md` FR-006 were all updated within this same feature range (AUDIT-20260611-13 fix, commit 8c7766de) to include a FIFTH state, `killed-external`. The adopter-facing README is the one straggler that was not updated when the state was added — classic intra-feature documentation drift.
+
+Blast radius is low because the *normative* artifacts (data-model.md, run-artifacts-contract.md) do list `killed-external`, and those are the canonical source for anyone writing INDEX-parsing tooling. The harm is bounded to an adopter (or an agent generating tooling from the README summary alone) who builds a terminal-state enumeration from the README's four-item list and then trips over a `killed-external` row in a real INDEX — an incomplete enum rather than a runtime break. Fix: add `killed-external` to the README's parenthetical list, matching the union it summarizes.
+
+### AUDIT-20260611-19 — Fire-time unenforced warning uses the bare `=== 'none'` test, diverging from spawn-cli's trim-aware enforcement derivation (AUDIT-17 made spawn-cli trim-aware but left this surface behind)
+
+Finding-ID: AUDIT-20260611-19 (claude-02 + codex-01; cross-model)
+Status:     fixed-4816a4a2
+Severity:   high
+Surface:    plugins/stack-control/src/subcommands/audit-barrage.ts (the fire-time warning loop, `if (model.readonlyEnforcement === 'none')`) vs plugins/stack-control/src/scope-discovery/audit-barrage/spawn-cli.ts (the `enforcement` derivation: `readonlyEnforcement !== 'none' && readonlyEnforcement.trim().length > 0 ? 'enforced' : 'unenforced'`)
+
+AUDIT-20260611-17's fix established the principle that enforcement state must be derived from whether the *trimmed* fragment carries ≥ 1 token, not from the sentinel comparison alone — and applied it as defense-in-depth in spawn-cli.ts (`spawn-readonly.test.ts` › "a whitespace-only fragment lane settles enforcement: unenforced") precisely for `ModelConfig`s constructed outside the loader. The fire-time warning loop in `auditBarrage` was NOT given the same treatment: it still gates on `model.readonlyEnforcement === 'none'`. A lane carrying a whitespace-only fragment would therefore be marked `unenforced` everywhere downstream (spawn-cli, INDEX, lift, govern) but would emit NO fire-time `⚠ … write-UNENFORCED` warning — a divergence between what fires at fire-time and what the run records.
+
+Blast radius is genuinely low/latent: in the CLI path, `resolution.models` always originate from `loadAuditBarrageConfig`, whose trim-aware `requireNonEmptyString` (AUDIT-17 fix) now rejects whitespace-only fragments at load, so this case is unreachable via the public CLI today. It becomes reachable only if model construction ever moves off the loader (a programmatic API, a future caller). The cost of consistency is one line — reuse the same `!== 'none' && trim().length > 0` predicate (or extract a shared `isEnforced(model)` helper) so the fire-time surface can't silently diverge from the recorded `enforcement` state the way AUDIT-09/11 showed two surfaces diverging on the completed-vs-converged annotation. I flag it at low precisely because it is currently unreachable, not because the inconsistency is cosmetic.
+
+### AUDIT-20260611-20 — Independent clean signal on the spawn/settle/synthesis core
+
+Finding-ID: AUDIT-20260611-20
+Status:     acknowledged-not-a-defect-20260611 (clean-signal record from the auditing lane, not a finding)
+Severity:   informational
+Surface:    (the rest of the diff)
+
+To give the operator independent cross-model signal alongside the other lanes, here is what I checked and found **clean**, with reasoning:
+
+- **The four/five-state settle machine and kill interlocks (spawn-cli.ts) are correct and fully exercised.** `killReason` single-latch + `clearTimers()` + `watchdog.disarm()` keep `timed-out` and `killed-no-liveness` disjoint; the close handler now destructures `(code, signal)` and classifies a non-null signal with `killReason === null` as `killed-external` (AUDIT-13 holds, exercised by `spawn-terminal-states.test.ts` including the OOM-kill fake-child case). `function disarm()` is a hoisted declaration so the `setInterval` callback's forward reference in `watchdog.ts` is not a TDZ hazard.
+- **Reader/writer `produced` agreement holds (AUDIT-01 fix).** `computeFleetReportFromParsedLanes` parses `- report bytes:` and gates on `terminalState === 'completed' && exitCode === 0 && reportBytes > 0`, matching the writer's `isModelRunConverged`; the eager text-lane stdout stream no longer masquerades as production via `existsSync`.
+- **`parseIndexLaneStates` mixed-INDEX fail-loud is sound (AUDIT-07).** The `### ` heading regex and the line-anchored field regexes do not capture the `## Fleet report` block's `- configured:` / `- <lane>:` / `- quorum:` lines, so fleet lanes are not double-counted; an incomplete v2 lane throws `IndexLaneParseError` rather than silently lowering `configured`.
+- **`buildArgs` enforcement injection (AUDIT-05/17) is correct.** `containsContiguous(tokens.slice(0, insertAt), fragment)` only suppresses injection for a fragment present *before* the prompt placeholder; both shipped lanes (claude `--permission-mode plan`, codex `--sandbox read-only`) carry their fragment pre-prompt and resolve with no double-injection; a whitespace-only fragment trims to zero tokens and injects nothing; the `{{prompt-stdin}}` equality-strip is exhaustive because the loader rejects embedded forms (AUDIT-12).
+- **`settleCaptures` reportBytes derivation is mutually exclusive** (extractor XOR stdoutStream, both keyed off `streamMode`); a killed stream lane with no result event yields `resultText: null` → no `<model>.md` → `reportBytes 0` → excluded from lift and `produced`. **Stream multi-turn assembly** (assemble all assistant texts, dedup only the trailing result duplicate, null on no-result) matches the FR-005 replay tests. **Timeout derivation** (`max(floor, ceil(secs/KB × KB))`, override displacement, linear extrapolation, fail-loud backstop) matches `timeout-derivation.test.ts`, and the calibration numbers reconcile (69234 B × 13 → 879 s in `quickstart-results.md`; 69000 B × 13 → 876 s in the test).
+
+My two findings sit at the README/CLI-warning consistency seams, not the spawn/settle/synthesis core, which I judge sound.
+
+---
+
+Note on harness context: this was an audit-barrage review request, not an implementation task, so there is nothing to plan or build — the findings above are the deliverable. I made no edits and took only read-only actions. If you'd like, I can open issues for AUDIT-BARRAGE-claude-01/-02 or fold them into the feature's `audit-log.md` via the normal lift flow.
