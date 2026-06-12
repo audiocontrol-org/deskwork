@@ -90,7 +90,7 @@ States of one `convergence-loop` run:
 - **RUN-PASS** = one `render → barrage → lift → slush → gate` protocol pass (the existing chain, now behind a step API the driver calls).
 - **READ-GATE** consumes the gate's single OPEN/BLOCKED boolean — the driver never re-derives policy.
 - **DISPATCH-FIX** is the only state where the agent acts (fix the surfaced findings); the iterate/stop transition is the driver's, not the agent's.
-- The ceiling is the FR-014 per-checkpoint ceiling (default 5), counted in `rounds`.
+- The ceiling is caller-supplied, counted in `rounds`: FR-014's per-checkpoint convergence ceiling is **5** (the autonomous-loop target), but `govern` currently passes **1** — it applies no in-process fix between rounds, so a higher ceiling would only re-barrage an unchanged tree (AUDIT-20260612-03/-04). The cross-round loop (fix → re-invoke govern) is agent-paced until a real in-process fixer lands.
 - A recorded override (`GOVERN_OVERRIDE` / `--override`) is handled by the gate (returns OPEN → `converged` with a record), NOT a driver short-circuit (AUDIT-20260612-05).
 
 ## Relationships

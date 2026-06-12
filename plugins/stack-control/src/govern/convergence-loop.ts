@@ -28,7 +28,14 @@
 import type { ConvergenceOutcome } from './convergence-types.js';
 
 export interface RunConvergenceLoopArgs {
-  /** The FR-014 per-checkpoint iteration ceiling (default caller supplies 5). */
+  /**
+   * The iteration ceiling the caller supplies. FR-014's per-checkpoint
+   * convergence ceiling is 5 (the target for an autonomous in-process loop), but
+   * the current sole caller — `govern` — passes 1, because it applies NO
+   * in-process fix between rounds (govern.ts:resolveCeiling), so a higher ceiling
+   * would only re-barrage an unchanged tree. The driver bounds the loop at
+   * whatever it is handed; it does not pick the value.
+   */
   readonly ceiling: number;
   /** One render→barrage→lift→slush→gate pass; resolves the gate's boolean. */
   readonly runPass: () => Promise<{ gateOpen: boolean }>;

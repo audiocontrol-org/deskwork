@@ -8,7 +8,9 @@ Lifts the multi-round loop out of skill-body prose into code. The gate (`spec-go
 
 ```text
 args:
-  ceiling: number                 // FR-014 per-checkpoint ceiling (default 5)
+  ceiling: number                 // caller-supplied. FR-014's per-checkpoint ceiling is 5
+                                  // (autonomous-loop target); govern passes 1 (no in-process
+                                  // fixer → >1 just re-barrages an unchanged tree).
   runPass: () => Promise<{ gateOpen: boolean }>   // one render→barrage→lift→slush→gate pass
   dispatchFix: () => Promise<void>                // the agent's only in-loop action
 ```

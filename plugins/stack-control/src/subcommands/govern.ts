@@ -431,9 +431,11 @@ export async function runGovern(args: string[]): Promise<void> {
       },
     });
 
-    // Map the recorded terminal to govern's exit: converged/overridden may
-    // graduate (exit 0); non-converged is a bounded refusal (exit 1). The agent
-    // never held the iterate/stop decision (SC-004).
+    // Map the recorded terminal to govern's exit: `converged` may graduate
+    // (exit 0) — an operator `--override` reaches here as `converged` because it
+    // is routed through the gate (records the reason, returns OPEN with a barrage
+    // record), not a driver terminal; `non-converged` is a bounded refusal
+    // (exit 1). The agent never held the iterate/stop decision (SC-004).
     if (outcome.kind === 'non-converged') {
       process.stderr.write(
         (flags.mode === 'spec'
