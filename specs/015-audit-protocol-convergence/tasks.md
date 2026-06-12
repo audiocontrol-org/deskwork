@@ -112,9 +112,9 @@
 
 **Independent test**: hostile-write-probe sonnet under `--permission-mode plan`; record latency/depth/on-task vs the bar; record the decision (SC-007).
 
-- [ ] T027 [P] [US5] RED: reuse the 014 hostile-write-probe harness to assert a sonnet spawn under `--permission-mode plan` produces zero new files / zero commits / zero pushes (SC-007) in `plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/sonnet-readonly-probe.test.ts`
-- [ ] T028 [US5] Run the sonnet calibration experiment on a representative per-phase payload (latency vs derived timeout, finding depth, on-task) and record the evidence in `specs/015-audit-protocol-convergence/quickstart-results.md` (experiment artifact, not production code — Constitution I)
-- [ ] T029 [US5] Add the sonnet override-profile lane (commented, mirroring the fable thoroughness override) to `plugins/stack-control/templates/audit-barrage-config.yaml` with the recorded admit/reject decision + evidence reference
+- [X] T027 [P] [US5] RED: reuse the 014 hostile-write-probe harness to assert a sonnet spawn under `--permission-mode plan` produces zero new files / zero commits / zero pushes (SC-007) in `plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/sonnet-readonly-probe.test.ts`
+- [X] T028 [US5] Run the sonnet calibration experiment on a representative per-phase payload (latency vs derived timeout, finding depth, on-task) and record the evidence in `specs/015-audit-protocol-convergence/quickstart-results.md` (experiment artifact, not production code — Constitution I)
+- [X] T029 [US5] Add the sonnet override-profile lane (commented, mirroring the fable thoroughness override) to `plugins/stack-control/templates/audit-barrage-config.yaml` with the recorded admit/reject decision + evidence reference
 
 **Checkpoint**: model diversity restored cheaply on small units, or sonnet recorded-rejected with evidence — either way no silent fleet change.
 
@@ -126,8 +126,8 @@
 
 **Independent test**: a slushed-MED run does not engage branch (a); a fixed-HIGH run does not count 0-HIGH for branch (b); mutation to open-count goes RED (SC-008).
 
-- [ ] T030 [P] [US6] RED: regression test for `checkBarrageDampener` raw counting (slushed MED still counts against branch (a); fixed HIGH still non-0-HIGH for branch (b)) in `plugins/stack-control/src/__tests__/scope-discovery/promote-findings/dampener-raw-counting.test.ts`
-- [ ] T031 [US6] Confirm the test passes against the current code unchanged AND fails under a mutation that reverts raw→open counting (record the mutation check in the test file comment) — SC-008
+- [X] T030 [P] [US6] RED: regression test for `checkBarrageDampener` raw counting (slushed MED still counts against branch (a); fixed HIGH still non-0-HIGH for branch (b)) in `plugins/stack-control/src/__tests__/scope-discovery/promote-findings/dampener-raw-counting.test.ts`
+- [X] T031 [US6] Confirm the test passes against the current code unchanged AND fails under a mutation that reverts raw→open counting (record the mutation check in the test file comment) — SC-008
 
 ---
 

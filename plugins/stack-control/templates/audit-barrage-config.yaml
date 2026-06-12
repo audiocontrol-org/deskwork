@@ -72,9 +72,30 @@
 # Thoroughness override profile for the claude lane (operator choice): pin
 # `model: fable` with `timeout_secs_per_kb: 17` — most thorough in the
 # 2026-06-10 experiment, at correspondingly higher latency. The shipped
-# default pins `opus` (near-fable quality at 586 s vs 669–750 s). sonnet is
-# excluded by operator verdict (off-task + 2226 s); haiku excluded (zero
-# verification depth).
+# default pins `opus` (near-fable quality at 586 s vs 669–750 s). haiku is
+# excluded (zero verification depth).
+#
+# sonnet override profile (specs/015 US5 / FR-011 / D8) — COMMENTED, opt-in:
+# sonnet was excluded on the 69 KB whole-feature unit (off-task + 2226 s, and a
+# read-only violation). Both disqualifiers are coupled to payload size +
+# enforcement — the exact levers specs/015 moves: the per-phase unit (`govern
+# --phase`) shrinks the payload and `--permission-mode plan` makes the spawn
+# mechanically read-only. The read-only bar is MET (sonnet-readonly-probe test,
+# SC-007); the latency + finding-depth bars are PENDING a live calibration on a
+# host with the claude CLI (specs/015 quickstart-results.md § US5 — not run in a
+# CLI-less CI, no fabricated numbers). Uncomment ONLY after recording a live run
+# that meets all three FR-011 bars. This is the override-profile-first path: the
+# default fleet stays opus + codex; sonnet is operator opt-in pending evidence.
+#  - name: sonnet
+#    binary: claude
+#    model: claude-sonnet-4-6
+#    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
+#    readonly_enforcement: "--permission-mode plan"
+#    output_mode: stream-json
+#    liveness_signal: stdout
+#    liveness_window_seconds: 60
+#    timeout_floor_seconds: 300
+#    timeout_secs_per_kb: 13
 
 models:
   - name: claude
