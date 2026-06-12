@@ -6,6 +6,10 @@ export type ValidateVersionResult =
 
 const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)$/;
 
+function isExactReleaseVersion(version: string): boolean {
+  return SEMVER_RE.test(version);
+}
+
 export function validateVersion(version: string, lastTag: string): ValidateVersionResult {
   const match = SEMVER_RE.exec(version);
   if (!match) {
@@ -145,14 +149,23 @@ export const DESKWORK_PACKAGES = [
   '@deskwork/studio',
 ] as const;
 
-export type NpmViewer = (pkgAtVersion: string) => boolean;
+export type NpmLookupResult =
+  | { readonly kind: 'published' }
+  | { readonly kind: 'unpublished' }
+  | { readonly kind: 'error'; readonly message: string };
+
+export type NpmViewer = (pkgAtVersion: string) => NpmLookupResult;
 
 export const realNpmViewer: NpmViewer = (spec) => {
   try {
     execFileSync('npm', ['view', spec, 'version', '--json'], { stdio: 'pipe' });
-    return true;
-  } catch {
-    return false;
+    return { kind: 'published' };
+  } catch (err) {
+    const message = extractChildProcessMessage(err);
+    if (/\bE404\b|No match found for version|is not in this registry/i.test(message)) {
+      return { kind: 'unpublished' };
+    }
+    return { kind: 'error', message: `npm view failed for ${spec}: ${message}` };
   }
 };
 
@@ -169,10 +182,13 @@ export function verifyNpmStatus(
   const published: string[] = [];
   const unpublished: string[] = [];
   for (const pkg of DESKWORK_PACKAGES) {
-    if (viewer(`${pkg}@${version}`)) {
+    const result = viewer(`${pkg}@${version}`);
+    if (result.kind === 'published') {
       published.push(pkg);
-    } else {
+    } else if (result.kind === 'unpublished') {
       unpublished.push(pkg);
+    } else {
+      throw new Error(result.message);
     }
   }
   return { version, published, unpublished };
@@ -218,14 +234,38 @@ export interface AtomicPushOptions {
 
 export async function atomicPush(opts: AtomicPushOptions): Promise<void> {
   const cwd = opts.cwd ?? process.cwd();
+  const headSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  })
+    .toString()
+    .trim();
+  let tagSha: string;
+  try {
+    tagSha = execFileSync('git', ['rev-parse', `${opts.tag}^{commit}`], {
+      cwd,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+      .toString()
+      .trim();
+  } catch (err) {
+    throw new Error(`atomicPush preflight failed: required local tag '${opts.tag}' is missing.\n${extractChildProcessMessage(err)}`);
+  }
+  if (tagSha !== headSha) {
+    throw new Error(
+      `atomicPush preflight failed: tag '${opts.tag}' points to ${tagSha}, but HEAD is ${headSha}. ` +
+        'Refuse to push a release tag that does not match the commit being released.',
+    );
+  }
+  const tagRef = `refs/tags/${opts.tag}:refs/tags/${opts.tag}`;
   const refspecs =
     opts.branch === 'main'
-      ? ['HEAD:main']
-      : ['HEAD:main', `HEAD:refs/heads/${opts.branch}`];
+      ? ['HEAD:main', tagRef]
+      : ['HEAD:main', `HEAD:refs/heads/${opts.branch}`, tagRef];
   try {
     execFileSync(
       'git',
-      ['push', '--atomic', '--follow-tags', 'origin', ...refspecs],
+      ['push', '--atomic', 'origin', ...refspecs],
       { cwd, stdio: ['pipe', 'pipe', 'pipe'] },
     );
   } catch (err) {
@@ -266,6 +306,15 @@ function formatPreconditionReport(report: PreconditionReport): string {
   return lines.join('\n');
 }
 
+function extractChildProcessMessage(err: unknown): string {
+  if (err instanceof Error && 'stderr' in err && err.stderr !== undefined && err.stderr !== null) {
+    const raw = err.stderr;
+    const text = Buffer.isBuffer(raw) ? raw.toString() : String(raw);
+    if (text.trim().length > 0) return text.trim();
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
 export async function dispatchReleaseHelper(argv: readonly string[]): Promise<number> {
   const [subcommand, ...args] = argv;
   switch (subcommand) {
@@ -290,6 +339,12 @@ export async function dispatchReleaseHelper(argv: readonly string[]): Promise<nu
         process.stderr.write('usage: assert-not-published <version>\n');
         return 2;
       }
+      if (!isExactReleaseVersion(version)) {
+        process.stderr.write(
+          `Version "${version}" is not in MAJOR.MINOR.PATCH format (regex: ${SEMVER_RE}).\n`,
+        );
+        return 1;
+      }
       const report = verifyNpmStatus(version);
       if (report.published.length > 0) {
         process.stderr.write(
@@ -308,6 +363,12 @@ export async function dispatchReleaseHelper(argv: readonly string[]): Promise<nu
       if (!version) {
         process.stderr.write('usage: assert-published <version>\n');
         return 2;
+      }
+      if (!isExactReleaseVersion(version)) {
+        process.stderr.write(
+          `Version "${version}" is not in MAJOR.MINOR.PATCH format (regex: ${SEMVER_RE}).\n`,
+        );
+        return 1;
       }
       const report = await verifyNpmStatusUntilPublished(version);
       if (report.unpublished.length > 0) {
