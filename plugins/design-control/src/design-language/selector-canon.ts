@@ -21,6 +21,11 @@
  *   `-`-spelled forms (`:nth-child(2n-1)` vs `(2n - 1)`) do not.
  * - Attribute names are matched as plain idents; namespaced attribute
  *   selectors (`[svg|href]`) are left un-canonicalized (compared verbatim).
+ * - CSS nesting is not composed: the liveness matcher sees each nested
+ *   prelude FLAT at its own depth (see `collectSelectorPreludes` in
+ *   link-liveness.ts), so on nested sources rules must anchor to the leaf
+ *   selector — a composed query like `.btn .icon` never matches
+ *   `.btn { .icon {} }` (AUDIT-round4-claude-02).
  */
 
 /** True for characters that extend a CSS ident (would change the selector). */

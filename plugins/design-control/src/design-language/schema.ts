@@ -4,8 +4,11 @@
  *
  * Convention (hand-authorable):
  *   - a rule is declared by an ATX heading whose text is `rule: <id>`
- *     (any heading level); the rule's section runs to the next heading;
- *   - fields are single-line bullets `- <key>: <value>` with the CLOSED key set
+ *     (any heading level; a CommonMark closing hash sequence —
+ *     `### rule: <id> ###` — is stripped before the id is read); the rule's
+ *     section runs to the next heading;
+ *   - fields are single-line bullets `- <key>: <value>` (any CommonMark
+ *     bullet marker: `-` / `*` / `+`) with the CLOSED key set
  *     `kind` / `css` / `example` / `do` / `don't` (a curly apostrophe U+2019 in
  *     the key is normalized to ASCII `'`, so smart-quoted `don’t:` is accepted);
  *   - `css: <path> <selector>` — first token is the file path (relative to the
@@ -52,13 +55,33 @@ import {
 
 const HEADING_RE = /^#{1,6}\s+(.*)$/;
 const RULE_HEADING_RE = /^rule:\s*(.*)$/;
+
+/**
+ * Strip a valid ATX closing sequence from heading text (CommonMark): a
+ * trailing run of `#` preceded by a space (`rule: ink ###` → `rule: ink`),
+ * or a text of ONLY hashes (`### ###` has empty text). A `#` glued to text
+ * (`rule: a#b`) is content, not a closing sequence. Runs BEFORE all rule /
+ * near-miss classification, so the spelling never leaks into a rule id —
+ * `### rule: ink ###` and `### rule: ink` name the SAME id and the
+ * duplicate-id guard sees them collide (AUDIT-round4-codex-01).
+ */
+function stripAtxClosingSequence(text: string): string {
+  if (/^#+$/.test(text)) {
+    return '';
+  }
+  return text.replace(/\s+#+$/, '');
+}
+
 /**
  * A field bullet: lowercase single-word key (apostrophe allowed: `don't`).
  * U+2019 (’) is also admitted — smart-quote editors substitute it in prose —
  * and normalized to ASCII `'` before the known-key check, so `don’t:` records
  * like `don't:` and a misspelled curly key still hits the typo guard.
+ * All three CommonMark bullet markers (`-` / `*` / `+`) are admitted — a
+ * `+`-bulleted rule must parse like a `-`-bulleted one, never drop its fields
+ * as inert prose (AUDIT-round4-claude-03).
  */
-const FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z'’]*)\s*:\s*(.*)$/;
+const FIELD_BULLET_RE = /^[-*+]\s+([a-z][a-z'’]*)\s*:\s*(.*)$/;
 
 /**
  * `css:` paths are RELATIVE TO THE SPEC FILE — the portability contract
@@ -87,8 +110,8 @@ export function isNonPortableCssPath(path: string): boolean {
 const FENCE_RUN_RE = /^(`{3,}|~{3,})/;
 /** ≥4-space (or tab) indentation: CommonMark indented code. */
 const INDENTED_CODE_RE = /^(?: {4}|\t)/;
-/** Any bullet shape — indented bullets are list nesting, not indented code. */
-const BULLET_SHAPE_RE = /^[-*]\s/;
+/** Any bullet shape (`-` / `*` / `+`) — indented bullets are list nesting, not indented code. */
+const BULLET_SHAPE_RE = /^[-*+]\s/;
 
 /** An open fenced code block: marker char + opener run length. */
 interface OpenFence {
@@ -310,7 +333,7 @@ export function parseDesignSpec(markdown: string): DesignSpecParseResult {
     const heading = HEADING_RE.exec(trimmed);
     if (heading !== null) {
       current = undefined;
-      const headingText = heading[1].trim();
+      const headingText = stripAtxClosingSequence(heading[1].trim());
       const ruleHeading = RULE_HEADING_RE.exec(headingText);
       if (ruleHeading === null) {
         const attempt = classifyHeadingAttempt(headingText);

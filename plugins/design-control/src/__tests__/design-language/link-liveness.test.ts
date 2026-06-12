@@ -446,6 +446,29 @@ describe('checkLinkLiveness — @keyframes steps are not preludes (AUDIT-round4-
   });
 });
 
+describe('checkLinkLiveness — CSS nesting matched flat, not ancestor-composed (AUDIT-round4-claude-02 pins)', () => {
+  // These two tests PIN the stated approximation (they pass against current
+  // behavior): preludes are collected flat at their own nesting depth, never
+  // composed with ancestors — on nested sources, rules anchor to the LEAF
+  // selector. The approximation is documented in selector-canon.ts and
+  // collectSelectorPreludes, not discovered by an author's dead link.
+  it('a composed query is dead against a nested source — .btn .icon vs .btn { .icon {} } (pin)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.btn { color: navy; .icon { width: 1rem; } }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', '.btn .icon'), dir);
+    expect(result.ok).toBe(false);
+    expect(result.findings.some((f) => f.rule === 'dead-link-selector')).toBe(true);
+  });
+
+  it('the leaf query is live against the same nested source — anchor to the leaf selector (pin)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.btn { color: navy; .icon { width: 1rem; } }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', '.icon'), dir);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+});
+
 describe('checkLinkLiveness — validated-scope boundary (non-CSS targets, visible)', () => {
   it('records a non-.css target as skipped — no finding, never silent', () => {
     const dir = makeFixtureDir();

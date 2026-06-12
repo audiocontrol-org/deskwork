@@ -616,6 +616,88 @@ rule: beta
   });
 });
 
+describe('parseDesignSpec — ATX closing sequences stripped (AUDIT-round4-codex-01)', () => {
+  it('a closing hash sequence is stripped — "### rule: ink-primary ###" yields id "ink-primary", zero findings', () => {
+    const result = parseDesignSpec(`### rule: ink-primary ###
+- kind: palette
+- css: styles/studio.css .btn-primary
+- example: a button
+- do: x
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.spec.rules.map((r) => r.id)).toEqual(['ink-primary']);
+  });
+
+  it('mixed spellings collide — "### rule: ink" then "### rule: ink ###" is a duplicate id', () => {
+    expect(
+      findingsFor(`### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+
+### rule: ink ###
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+`),
+    ).toContain('duplicate-rule-id');
+  });
+
+  it('a glued hash is id text, not a closing sequence — "### rule: a#b" keeps id "a#b" (pin)', () => {
+    const result = parseDesignSpec(`### rule: a#b
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.spec.rules.map((r) => r.id)).toEqual(['a#b']);
+  });
+});
+
+describe('parseDesignSpec — + bullet marker parses like - and * (AUDIT-round4-claude-03)', () => {
+  const DASH_SPELLING = `### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+- do: x
+- don't: y
+`;
+  const PLUS_SPELLING = DASH_SPELLING.replace(/^- /gm, '+ ');
+
+  it('a fully +-bulleted rule parses identically to its --bulleted spelling (zero findings, fields populated)', () => {
+    const plus = parseDesignSpec(PLUS_SPELLING);
+    expect(plus.findings).toEqual([]);
+    expect(plus.ok).toBe(true);
+    expect(plus.spec.rules).toEqual(parseDesignSpec(DASH_SPELLING).spec.rules);
+  });
+
+  it('an unknown key on a + bullet hits the typo guard, never silent inert prose', () => {
+    const findings = findingsFor(`### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
++ exmaple: a button
+- do: x
+`);
+    expect(findings).toContain('unknown-field');
+    expect(findings).toContain('missing-example');
+  });
+
+  it('a ≥4-space-indented + bullet still records (indented-bullet carve-out covers all three markers)', () => {
+    const result = parseDesignSpec(`### rule: ink
+- kind: palette
+- css: styles/studio.css .btn
+- example: a button
+    + do: Indented guidance still counts.
+`);
+    expect(result.findings).toEqual([]);
+    expect(result.spec.rules[0].dos).toEqual(['Indented guidance still counts.']);
+  });
+});
+
 describe('parseDesignSpec — line-level attempt calibration (AUDIT round-3 claude-03)', () => {
   const VALID_INK = `### rule: ink
 - kind: palette

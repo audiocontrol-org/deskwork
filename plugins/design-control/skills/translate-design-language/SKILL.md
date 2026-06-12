@@ -45,7 +45,9 @@ bullets with a closed key set:
   fine); the selector must be **defined in that author-written CSS source**
   (checked statically — no app boot). Non-CSS targets (CSS-in-JS, utility
   frameworks, CSS-Modules) are reported as unchecked notes and do not
-  establish link-liveness.
+  establish link-liveness. For nested CSS rules link the leaf selector —
+  composed selectors like `.btn .icon` written via nesting do not match
+  (preludes are checked flat, not ancestor-composed).
 - `example:` — ≥1 per rule (a rule with zero examples is rejected). Presence
   is structural; whether the example still matches live UI is
   `spec-truthfulness`, a separate concern this gate does not check.

@@ -110,6 +110,10 @@ function skipBlock(css: string, open: number): number {
  * included) are skipped WHOLE, contributing no preludes, because their step
  * "selectors" (`from` / `to` / percentages) are animation waypoints, not
  * element selectors a design rule can anchor to (AUDIT-round4-claude-04).
+ * Preludes are matched FLAT, not ancestor-composed (AUDIT-round4-claude-02):
+ * a nested source `.btn { .icon {} }` contributes the preludes `.btn` and
+ * `.icon` — never the composed `.btn .icon` — and `&:hover` stays `&:hover`,
+ * never `.btn:hover`; on nested sources anchor rules to the leaf selector.
  * Comments are stripped; string-literal CONTENTS are copied verbatim (their
  * structural characters are content, never braces/semicolons) so attribute
  * values survive into preludes for canonical comparison. Prelude buffers
