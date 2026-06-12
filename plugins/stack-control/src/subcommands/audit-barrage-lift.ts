@@ -247,6 +247,28 @@ function formatSourceSuffix(sourceFindingIds: readonly string[]): string {
   return stripped.join(' + ');
 }
 
+/**
+ * specs/015 (T013 / FR-002): render the per-lane raw severities and the decision
+ * rule alongside the gate-counted `Severity:` line. The dampener reads ONLY the
+ * `Severity:` line (its contract is unchanged); these lines make the
+ * de-inflation auditable (SC-002) — the raw inputs and the rule that produced
+ * the gate-counted result are recoverable on disk.
+ */
+function renderDecisionLines(finding: ExtractedFinding): string[] {
+  const perLane = finding.perLaneSeverities
+    .map((p) => `${p.model}=${p.severity}`)
+    .join(', ');
+  const decision = finding.severityDecision;
+  const basis =
+    decision.rule === 'adjudicated' && decision.adjudicationBasis !== undefined
+      ? ` — ${decision.adjudicationBasis}`
+      : '';
+  return [
+    `Per-lane:   ${perLane}`,
+    `Decision:   ${decision.rule} (gate-counted ${decision.gateCountedSeverity})${basis}`,
+  ];
+}
+
 function renderEntry(
   finding: ExtractedFinding,
   date: string,
@@ -264,6 +286,7 @@ function renderEntry(
     `Finding-ID: ${fullId}${suffix}`,
     `Status:     open`,
     `Severity:   ${finding.severity}`,
+    ...renderDecisionLines(finding),
     `Surface:    ${finding.surface}`,
     '',
     body,

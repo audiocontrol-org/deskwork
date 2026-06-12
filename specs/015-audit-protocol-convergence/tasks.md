@@ -26,8 +26,8 @@
 
 **Purpose**: fixtures the RED-first suites need; no project scaffolding (in-tree plugin already exists).
 
-- [ ] T001 [P] Add a fixture audit-log replaying the 014 rounds-4–7 finding stream (one cluster per round: `[{opus,high},{codex,medium}]`) under `plugins/stack-control/src/__tests__/fixtures/convergence/rounds-4-7-audit-log.md`
-- [ ] T002 [P] Add a fixture multi-phase `tasks.md` tree (≥2 phases with distinct file scopes) under `plugins/stack-control/src/__tests__/fixtures/convergence/multi-phase-feature/`
+- [X] T001 [P] Add a fixture audit-log replaying the 014 rounds-4–7 finding stream (one cluster per round: `[{opus,high},{codex,medium}]`) under `plugins/stack-control/src/__tests__/fixtures/convergence/rounds-4-7-audit-log.md`
+- [X] T002 [P] Add a fixture multi-phase `tasks.md` tree (≥2 phases with distinct file scopes) under `plugins/stack-control/src/__tests__/fixtures/convergence/multi-phase-feature/`
 
 ---
 
@@ -35,9 +35,9 @@
 
 **Purpose**: shared types consumed by US1, US2, US4. MUST complete before those stories.
 
-- [ ] T003 Define `PerLaneSeverity` and `ClusterSeverityDecision` types (per data-model.md) in `plugins/stack-control/src/scope-discovery/promote-findings/cluster-severity-types.ts`
-- [ ] T004 Define `AuditUnit` + `DiffScope` types in `plugins/stack-control/src/govern/audit-unit-types.ts`
-- [ ] T005 Define the `ConvergenceOutcome` discriminated union (`converged | overridden | non-converged`) in `plugins/stack-control/src/govern/convergence-types.ts`
+- [X] T003 Define `PerLaneSeverity` and `ClusterSeverityDecision` types (per data-model.md) in `plugins/stack-control/src/scope-discovery/promote-findings/cluster-severity-types.ts`
+- [X] T004 Define `AuditUnit` + `DiffScope` types in `plugins/stack-control/src/govern/audit-unit-types.ts`
+- [X] T005 Define the `ConvergenceOutcome` discriminated union (`converged | overridden | non-converged`) in `plugins/stack-control/src/govern/convergence-types.ts`
 
 ---
 
@@ -47,15 +47,15 @@
 
 **Independent test**: replay the rounds-4–7 stream (T001) through the lift + dampener and confirm clusters gate-count `medium` and the dampener engages — where max-of-cluster left it disengaged (SC-001 at the gate level).
 
-- [ ] T006 [P] [US1] RED: unit tests for `computeClusterSeverity` covering every invariant in `contracts/cluster-severity.md` (`[high,medium]→medium`, `[high,high]→high`, `[high,medium,medium]→medium`, `[blocking,high]→high`, single `[high]→high`, never-raise) in `plugins/stack-control/src/__tests__/scope-discovery/promote-findings/cluster-severity.test.ts`
-- [ ] T007 [US1] Implement `computeClusterSeverity` (agreement rule, single-model passthrough) in `plugins/stack-control/src/scope-discovery/promote-findings/cluster-severity.ts` — make T006 green
-- [ ] T008 [P] [US1] RED: unit tests for `adjudicate` (single-lane HIGH + "currently unreachable" + fix-debt → ≤medium with non-empty basis; reachable data-loss HIGH → stays high) in `plugins/stack-control/src/__tests__/scope-discovery/promote-findings/adjudicate-findings.test.ts`
-- [ ] T009 [US1] Implement `adjudicate` (blast-radius/reachability/fix-debt re-score, mandatory basis) in `plugins/stack-control/src/scope-discovery/promote-findings/adjudicate-findings.ts` — make T008 green
-- [ ] T010 [US1] RED: test that `extractBarrageFindings` populates `perLaneSeverities` + `severityDecision` and sets `severity = gateCountedSeverity` (not max), AND that `crossModelAgreement` stays `sourceModels.length>=2` independent of the de-inflated severity (FR-003 orthogonality) in `plugins/stack-control/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts`
-- [ ] T011 [US1] Modify `mergeCluster` in `plugins/stack-control/src/scope-discovery/promote-findings/extract-barrage-findings.ts` to delegate severity to `computeClusterSeverity` + route residuals through `adjudicate`; add `perLaneSeverities`/`severityDecision` to `ExtractedFinding` — make T010 green
-- [ ] T012 [US1] RED: test the lift persists the gate-counted `Severity:` line + the per-lane breakdown + `rule` (+ basis) to the audit-log (FR-002 / SC-002) in `plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/audit-barrage-lift.test.ts`
-- [ ] T013 [US1] Modify `plugins/stack-control/src/subcommands/audit-barrage-lift.ts` to write the per-lane breakdown + decision alongside the unchanged `Severity:` line — make T012 green
-- [ ] T014 [US1] RED→GREEN integration: feed the rounds-4–7 fixture (T001) through lift→dampener and assert the dampener engages (gate OPEN) where max-of-cluster left it BLOCKED (SC-001) in `plugins/stack-control/src/__tests__/govern/convergence-sc001.test.ts`
+- [X] T006 [P] [US1] RED: unit tests for `computeClusterSeverity` covering every invariant in `contracts/cluster-severity.md` (`[high,medium]→medium`, `[high,high]→high`, `[high,medium,medium]→medium`, `[blocking,high]→high`, single `[high]→high`, never-raise) in `plugins/stack-control/src/__tests__/scope-discovery/promote-findings/cluster-severity.test.ts`
+- [X] T007 [US1] Implement `computeClusterSeverity` (agreement rule, single-model passthrough) in `plugins/stack-control/src/scope-discovery/promote-findings/cluster-severity.ts` — make T006 green
+- [X] T008 [P] [US1] RED: unit tests for `adjudicate` (single-lane HIGH + "currently unreachable" + fix-debt → ≤medium with non-empty basis; reachable data-loss HIGH → stays high) in `plugins/stack-control/src/__tests__/scope-discovery/promote-findings/adjudicate-findings.test.ts`
+- [X] T009 [US1] Implement `adjudicate` (blast-radius/reachability/fix-debt re-score, mandatory basis) in `plugins/stack-control/src/scope-discovery/promote-findings/adjudicate-findings.ts` — make T008 green
+- [X] T010 [US1] RED: test that `extractBarrageFindings` populates `perLaneSeverities` + `severityDecision` and sets `severity = gateCountedSeverity` (not max), AND that `crossModelAgreement` stays `sourceModels.length>=2` independent of the de-inflated severity (FR-003 orthogonality) in `plugins/stack-control/src/__tests__/scope-discovery/promote-findings/extract-barrage-findings.test.ts`
+- [X] T011 [US1] Modify `mergeCluster` in `plugins/stack-control/src/scope-discovery/promote-findings/extract-barrage-findings.ts` to delegate severity to `computeClusterSeverity` + route residuals through `adjudicate`; add `perLaneSeverities`/`severityDecision` to `ExtractedFinding` — make T010 green
+- [X] T012 [US1] RED: test the lift persists the gate-counted `Severity:` line + the per-lane breakdown + `rule` (+ basis) to the audit-log (FR-002 / SC-002) in `plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/audit-barrage-lift.test.ts`
+- [X] T013 [US1] Modify `plugins/stack-control/src/subcommands/audit-barrage-lift.ts` to write the per-lane breakdown + decision alongside the unchanged `Severity:` line — make T012 green
+- [X] T014 [US1] RED→GREEN integration: feed the rounds-4–7 fixture (T001) through lift→dampener and assert the dampener engages (gate OPEN) where max-of-cluster left it BLOCKED (SC-001) in `plugins/stack-control/src/__tests__/govern/convergence-sc001.test.ts`
 
 **Checkpoint**: severity de-inflation works; a genuine ≥2-lane HIGH still blocks (SC-003 asserted in T006).
 

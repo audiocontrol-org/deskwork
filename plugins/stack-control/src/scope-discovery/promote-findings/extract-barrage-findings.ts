@@ -33,6 +33,12 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { computeClusterSeverity, SEVERITY_RANK } from './cluster-severity.js';
+import { adjudicate } from './adjudicate-findings.js';
+import type {
+  ClusterSeverityDecision,
+  PerLaneSeverity,
+} from './cluster-severity-types.js';
 
 const FIELD_LINE_RE = /^([A-Za-z][A-Za-z-]+):\s*(.+?)\s*$/;
 const HEADING_LINE_RE = /^###\s+(.+?)\s*$/;
@@ -45,13 +51,11 @@ const CANONICAL_SEVERITIES: ReadonlySet<NormalizedSeverity> = new Set([
   'low',
   'informational',
 ]);
-const SEVERITY_RANK: Record<NormalizedSeverity, number> = {
-  blocking: 4,
-  high: 3,
-  medium: 2,
-  low: 1,
-  informational: 0,
-};
+// specs/015 (T011): a finding whose prose names a consistency seam / prior-round
+// fix-code is a candidate for the adjudication re-score (D2) when it survives D1
+// as a single-lane HIGH+.
+const RESIDUAL_INFLATION_RE =
+  /\b(seam|consistency|fix.?code|prior round|previous round|round \d+|the fix)\b/i;
 
 export type NormalizedSeverity =
   | 'blocking'
@@ -72,12 +76,22 @@ export interface RawModelFinding {
 
 export interface ExtractedFinding {
   readonly heading: string;
+  /**
+   * specs/015 (FR-001): now the cluster's GATE-COUNTED severity (cross-lane
+   * agreement + adjudication), NOT max-of-cluster. The dampener reads this line
+   * unchanged; only how it is computed changed.
+   */
   readonly severity: NormalizedSeverity;
   readonly surface: string;
   readonly body: string;
   readonly sourceModels: readonly string[];
   readonly sourceFindingIds: readonly string[];
+  /** Existence clustering (≥2 lanes flagged it) — ORTHOGONAL to severity (FR-003). */
   readonly crossModelAgreement: boolean;
+  /** specs/015 (FR-002): every covering lane's raw severity, preserved on disk. */
+  readonly perLaneSeverities: readonly PerLaneSeverity[];
+  /** specs/015 (FR-002): how `severity` was derived (rule + per-lane inputs + basis). */
+  readonly severityDecision: ClusterSeverityDecision;
 }
 
 export interface ExtractBarrageFindingsArgs {
@@ -252,6 +266,31 @@ function clusterFindings(
   return Array.from(clusters.values());
 }
 
+/**
+ * Collapse a cluster to one per-lane severity each: a lane that raised several
+ * findings in the cluster contributes its HIGHEST label (the lane's own
+ * worst-case assessment is its vote). Ordered by model for a stable record.
+ */
+function perLaneSeverities(cluster: readonly RawModelFinding[]): PerLaneSeverity[] {
+  const byModel = new Map<string, NormalizedSeverity>();
+  for (const f of cluster) {
+    const prev = byModel.get(f.model);
+    if (prev === undefined || SEVERITY_RANK[f.severity] > SEVERITY_RANK[prev]) {
+      byModel.set(f.model, f.severity);
+    }
+  }
+  return Array.from(byModel.entries())
+    .sort((a, b) => (a[0] === b[0] ? 0 : a[0] < b[0] ? -1 : 1))
+    .map(([model, severity]) => ({ model, severity }));
+}
+
+/**
+ * specs/015 (T011 / FR-001): the cluster's gate-counted severity is computed by
+ * cross-lane agreement (D1), then a residual single-lane HIGH+ on a
+ * consistency-seam / fix-code finding is re-scored by adjudication (D2). The
+ * per-lane inputs and the decision are preserved on the finding (FR-002). The
+ * retired behavior (max-of-cluster, per-lane discarded) is gone.
+ */
 function mergeCluster(cluster: readonly RawModelFinding[]): ExtractedFinding {
   const sortedCluster = [...cluster].sort((a, b) =>
     a.model === b.model ? 0 : a.model < b.model ? -1 : 1,
@@ -259,20 +298,32 @@ function mergeCluster(cluster: readonly RawModelFinding[]): ExtractedFinding {
   const sourceModels = Array.from(new Set(sortedCluster.map((f) => f.model)));
   const sourceFindingIds = sortedCluster.map((f) => f.findingId);
   const representative = cluster[0]!;
-  let highestSeverity: NormalizedSeverity = representative.severity;
-  for (const f of cluster) {
-    if (SEVERITY_RANK[f.severity] > SEVERITY_RANK[highestSeverity]) {
-      highestSeverity = f.severity;
-    }
+
+  const perLane = perLaneSeverities(cluster);
+  let decision = computeClusterSeverity(perLane);
+  // D2: a single-lane HIGH+ that survived agreement and reads as a
+  // consistency-seam / prior-round fix-code finding is re-scored on its own
+  // blast-radius / reachability / fix-debt evidence (the 014 AUDIT-19/-21 shape).
+  // A genuine ≥2-lane agreed HIGH (rule === 'agreement') is NOT adjudicated — it
+  // must keep blocking (SC-003).
+  if (
+    decision.rule === 'single-model' &&
+    SEVERITY_RANK[decision.gateCountedSeverity] >= SEVERITY_RANK.high &&
+    RESIDUAL_INFLATION_RE.test(representative.body)
+  ) {
+    decision = adjudicate({ perLane, body: representative.body });
   }
+
   return {
     heading: representative.heading,
-    severity: highestSeverity,
+    severity: decision.gateCountedSeverity,
     surface: representative.surface,
     body: representative.body,
     sourceModels,
     sourceFindingIds,
     crossModelAgreement: sourceModels.length >= 2,
+    perLaneSeverities: perLane,
+    severityDecision: decision,
   };
 }
 
