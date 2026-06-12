@@ -24,6 +24,11 @@ fail() { echo "smoke-fail-loud: FAIL — $1" >&2; exit 1; }
 work="$(mktemp -d "${TMPDIR:-/tmp}/smoke-fail-loud.XXXXXX")"
 trap 'rm -rf "${work}"' EXIT
 slug="spec-gov-failloud"
+# The work tree is a stack-control INSTALLATION (specs/installation-isolation:
+# GOVERN_REPO_ROOT is retired; govern resolves the enclosing installation from
+# the --at start dir).
+mkdir -p "${work}/.stack-control"
+printf 'version: 1\n' > "${work}/.stack-control/config.yaml"
 feature_dir="${work}/docs/1.0/001-IN-PROGRESS/${slug}"
 mkdir -p "${feature_dir}"
 audit_log="${feature_dir}/audit-log.md"
@@ -32,11 +37,10 @@ cp "${FIXTURES}/high-finding/spec.md" "${work}/spec.md"
 before_hash="$(shasum "${audit_log}" | awk '{print $1}')"
 
 set +e
-GOVERN_REPO_ROOT="${work}" \
 GOVERN_FEATURE_SLUG="${slug}" \
 GOVERN_SPEC_PATH="${work}/spec.md" \
 GOVERN_BARRAGE_BIN="dw-lifecycle-does-not-exist-$$" \
-  bash "${GOVERN_SPEC_SH}" >"${work}/out.txt" 2>"${work}/err.txt"
+  bash "${GOVERN_SPEC_SH}" --at "${work}" >"${work}/out.txt" 2>"${work}/err.txt"
 rc=$?
 set -e
 
@@ -56,9 +60,9 @@ echo "smoke-fail-loud: T012 OK — exit 2, actionable message, audit-log untouch
 if command -v dw-lifecycle >/dev/null 2>&1; then
   before_hash="$(shasum "${audit_log}" | awk '{print $1}')"
   set +e
-  GOVERN_REPO_ROOT="${work}" GOVERN_FEATURE_SLUG="${slug}" GOVERN_SPEC_PATH="${work}/spec.md" \
+  GOVERN_FEATURE_SLUG="${slug}" GOVERN_SPEC_PATH="${work}/spec.md" \
   GOVERN_PLAN_PATH="${work}/does-not-exist-plan.md" \
-    bash "${GOVERN_SPEC_SH}" >"${work}/out2.txt" 2>"${work}/err2.txt"
+    bash "${GOVERN_SPEC_SH}" --at "${work}" >"${work}/out2.txt" 2>"${work}/err2.txt"
   rc=$?
   set -e
   [ "${rc}" -eq 2 ] || fail "AUDIT-15 expected exit 2 on a bad GOVERN_PLAN_PATH, got ${rc}"
@@ -70,9 +74,9 @@ if command -v dw-lifecycle >/dev/null 2>&1; then
 
   # ---- AUDIT-20260607-14: an over-budget SPEC fails loud (not plan-only) ----
   set +e
-  GOVERN_REPO_ROOT="${work}" GOVERN_FEATURE_SLUG="${slug}" GOVERN_SPEC_PATH="${work}/spec.md" \
+  GOVERN_FEATURE_SLUG="${slug}" GOVERN_SPEC_PATH="${work}/spec.md" \
   GOVERN_PAYLOAD_BUDGET="5" \
-    bash "${GOVERN_SPEC_SH}" >"${work}/out3.txt" 2>"${work}/err3.txt"
+    bash "${GOVERN_SPEC_SH}" --at "${work}" >"${work}/out3.txt" 2>"${work}/err3.txt"
   rc=$?
   set -e
   [ "${rc}" -eq 2 ] || fail "AUDIT-14 expected exit 2 when the spec exceeds the payload budget, got ${rc}"
@@ -100,9 +104,9 @@ STUBEOF
   chmod +x "${outage_stub}"
   before_hash="$(shasum "${audit_log}" | awk '{print $1}')"
   set +e
-  GOVERN_REPO_ROOT="${work}" GOVERN_FEATURE_SLUG="${slug}" GOVERN_SPEC_PATH="${work}/spec.md" \
+  GOVERN_FEATURE_SLUG="${slug}" GOVERN_SPEC_PATH="${work}/spec.md" \
   GOVERN_BARRAGE_BIN="${outage_stub}" \
-    bash "${GOVERN_SPEC_SH}" >"${work}/out4.txt" 2>"${work}/err4.txt"
+    bash "${GOVERN_SPEC_SH}" --at "${work}" >"${work}/out4.txt" 2>"${work}/err4.txt"
   rc=$?
   set -e
   [ "${rc}" -eq 2 ] || fail "AUDIT-07 expected exit 2 on a zero-healthy barrage, got ${rc}"
@@ -122,6 +126,8 @@ if [ -z "${PINNED_MODEL}" ]; then
 fi
 
 cw2="$(mktemp -d "${TMPDIR:-/tmp}/smoke-fail-loud-cov.XXXXXX")"
+mkdir -p "${cw2}/.stack-control"
+printf 'version: 1\n' > "${cw2}/.stack-control/config.yaml"
 slug2="spec-gov-coverage"
 fd2="${cw2}/docs/1.0/001-IN-PROGRESS/${slug2}"
 mkdir -p "${fd2}"
@@ -129,9 +135,9 @@ printf '# Audit Log — %s\n' "${slug2}" > "${fd2}/audit-log.md"
 cp "${FIXTURES}/clean/spec.md" "${cw2}/spec.md"
 
 echo "smoke-fail-loud: T013 firing single lane '${PINNED_MODEL}' of the configured battery ..." >&2
-GOVERN_REPO_ROOT="${cw2}" GOVERN_FEATURE_SLUG="${slug2}" \
+GOVERN_FEATURE_SLUG="${slug2}" \
 GOVERN_SPEC_PATH="${cw2}/spec.md" GOVERN_MODELS="${PINNED_MODEL}" \
-  bash "${GOVERN_SPEC_SH}" || true
+  bash "${GOVERN_SPEC_SH}" --at "${cw2}" || true
 
 runs="${cw2}/.stack-control/audit-runs"
 [ -d "${runs}" ] || fail "T013 no run-dir produced"

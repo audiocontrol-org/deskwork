@@ -70,7 +70,7 @@ describe('US5 — self-reference-free implement payload', () => {
       commit(repo, 'implement + lift');
 
       const r = assembleImplementPayload({
-        repoRoot: repo,
+        installationRoot: repo,
         base: 'HEAD~1',
         featureRoot: join(repo, FEATURE_REL),
       });
@@ -101,7 +101,7 @@ describe('US5 — self-reference-free implement payload', () => {
 
       const warns: string[] = [];
       const r = assembleImplementPayload({
-        repoRoot: repo,
+        installationRoot: repo,
         base: 'HEAD',
         featureRoot: join(repo, FEATURE_REL),
         // What runGovern threads from discoverFeatureRoots(repoRoot):
@@ -135,7 +135,7 @@ describe('US5 — self-reference-free implement payload', () => {
       );
 
       const r = assembleImplementPayload({
-        repoRoot: repo,
+        installationRoot: repo,
         base: 'HEAD',
         featureRoot: join(repo, FEATURE_REL),
       });
@@ -172,7 +172,7 @@ describe('US5 — self-reference-free implement payload', () => {
 
       const warns: string[] = [];
       const r = assembleImplementPayload({
-        repoRoot: repo,
+        installationRoot: repo,
         base: 'HEAD~1',
         featureRoot: join(repo, FEATURE_REL),
         excludePaths: [join(repo, '.stack-control', 'backlog')],
@@ -209,7 +209,7 @@ describe('US5 — self-reference-free implement payload', () => {
       commit(repo, 'implement + sibling lift sharing the range');
 
       const r = assembleImplementPayload({
-        repoRoot: repo,
+        installationRoot: repo,
         base: 'HEAD~1',
         featureRoot: join(repo, FEATURE_REL),
         excludeRoots: [join(repo, FEATURE_REL), sibling],
@@ -225,7 +225,15 @@ describe('US5 — self-reference-free implement payload', () => {
     }
   });
 
-  it('the labeled audit_log_excerpt context block still threads while the diff stays clean (013/TASK-25 regression guard)', () => {
+  it('the implement payload carries NO audit-log excerpt while the diff stays clean (015 SC-005 supersedes the 013/TASK-25 excerpt threading)', () => {
+    // specs/015 SC-005 dropped the audit_log_excerpt from the implement
+    // payload entirely (buildImplementVars no longer accepts one; the var
+    // is always '') — prior findings must reach the fleet through NO
+    // channel. The diff-side cleanliness guard is unchanged. NOTE: the
+    // pre-merge version of this test asserted the old excerpt threading
+    // against the post-015 signature (the excerpt string landed in the
+    // pathScope parameter) and was red on origin/main; this is the
+    // reconciled, semantics-faithful replacement.
     const repo = initRepo();
     try {
       writeFileSync(join(repo, 'src.ts'), 'export const a = 3;\n');
@@ -237,10 +245,10 @@ describe('US5 — self-reference-free implement payload', () => {
         'feat',
         'HEAD~1',
         undefined,
-        'THE-PRIOR-FINDINGS-EXCERPT',
+        undefined,
         join(repo, FEATURE_REL),
       );
-      expect(built.vars.audit_log_excerpt).toBe('THE-PRIOR-FINDINGS-EXCERPT');
+      expect(built.vars.audit_log_excerpt).toBe('');
       expect(built.vars.diff).toContain('export const a = 3;');
       expect(built.vars.diff).not.toContain('AUDIT-FAKE-99');
     } finally {

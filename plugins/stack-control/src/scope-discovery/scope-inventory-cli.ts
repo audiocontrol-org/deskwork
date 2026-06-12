@@ -26,7 +26,13 @@ export interface CliOptions {
   readonly prdPath: string | undefined;
   /** Explicit `--out` (resolved absolute), or `undefined` (same rule). */
   readonly outPath: string | undefined;
-  readonly repoRoot: string;
+  /**
+   * Walk-up start override (`--at <dir>`, resolved absolute), or
+   * `undefined` when omitted — the orchestrator resolves the
+   * nearest-enclosing installation from <dir>, else the cwd
+   * (specs/installation-isolation R1/R2; `--repo-root` is RETIRED).
+   */
+  readonly at: string | undefined;
   readonly moduleRoot: string;
   readonly evidenceTrail: boolean;
   readonly quiet: boolean;
@@ -63,7 +69,7 @@ export const USAGE =
   '    --slug <feature-slug> \\\n' +
   '    [--out <manifest-path>] \\\n' +
   '    [--prd-path <prd-path>] \\\n' +
-  '    [--repo-root <repo-root>] \\\n' +
+  '    [--at <dir>] \\\n' +
   '    [--module-root <module-root>] \\\n' +
   '    [--evidence-trail on|off] \\\n' +
   '    [--module-symmetry-out <path>] \\\n' +
@@ -76,7 +82,7 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
     '--slug',
     '--out',
     '--prd-path',
-    '--repo-root',
+    '--at',
     '--module-root',
     '--evidence-trail',
     // `--module-symmetry-out` is the Phase 25 Task 5 canonical name;
@@ -125,7 +131,11 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
         '+ dashes, no leading/trailing dash, min 2 chars)',
     );
   }
-  const root = resolve(scalars.get('--repo-root') ?? process.cwd());
+  const atRaw = scalars.get('--at');
+  const at = atRaw === undefined ? undefined : resolve(atRaw);
+  // Relative artifact paths resolve against the explicit start dir when
+  // given, else the cwd (the shell-natural base for typed paths).
+  const root = at ?? process.cwd();
   // specs/014 US7: when the flag is omitted, the default resolves in
   // the orchestrator via the layout-aware feature-root resolver.
   const prdPathRaw = scalars.get('--prd-path');
@@ -170,7 +180,7 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
     featureSlug: slug,
     prdPath,
     outPath,
-    repoRoot: root,
+    at,
     moduleRoot: scalars.get('--module-root') ?? DEFAULT_MODULE_ROOT,
     evidenceTrail: evidenceFlag === 'on',
     quiet,

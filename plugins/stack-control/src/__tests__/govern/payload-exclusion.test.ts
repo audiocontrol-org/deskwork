@@ -101,7 +101,7 @@ describe('untracked fold is bounded to the unit path scope (SC-005, parked scaff
       'export const PARKED_SCAFFOLD = true;\n',
     );
     const r = assembleImplementPayload({
-      repoRoot: repo,
+      installationRoot: repo,
       base: 'HEAD',
       pathScope: ['src/feature-a'],
     });
@@ -116,7 +116,7 @@ describe('untracked fold is bounded to the unit path scope (SC-005, parked scaff
     spawnSync('git', ['-C', repo, 'init', '-q'], { encoding: 'utf8' });
     writeFileSync(join(repo, 'a.ts'), 'export const A = 1;\n');
     writeFileSync(join(repo, 'b.ts'), 'export const B = 2;\n');
-    const r = assembleImplementPayload({ repoRoot: repo, base: 'HEAD' });
+    const r = assembleImplementPayload({ installationRoot: repo, base: 'HEAD' });
     expect(r.diff).toContain('export const A = 1;');
     expect(r.diff).toContain('export const B = 2;');
     expect(r.skippedOutOfScope).toEqual([]);
@@ -157,7 +157,7 @@ describe('committed diff is scoped to the unit path scope (AUDIT-20260612-01)', 
     gitCommitAll(repo, 'phase 2 + drive-by phase 1 edit');
 
     const r = assembleImplementPayload({
-      repoRoot: repo,
+      installationRoot: repo,
       base,
       pathScope: ['src/phase-2/feature.ts'],
     });
@@ -175,7 +175,7 @@ describe('committed diff is scoped to the unit path scope (AUDIT-20260612-01)', 
     // name in a task line — the phase scope is its named files, so it is out.
     writeFileSync(join(repo, 'src', 'phase-2', 'unnamed.ts'), 'export const UNNAMED = true;\n');
     const r = assembleImplementPayload({
-      repoRoot: repo,
+      installationRoot: repo,
       base: 'HEAD',
       pathScope: ['src/phase-2/feature.ts'],
     });

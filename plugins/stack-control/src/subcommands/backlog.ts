@@ -298,7 +298,11 @@ export async function runBacklogCli(args: string[]): Promise<void> {
     }
   } catch (err) {
     if (err instanceof InstallationError) {
-      process.stderr.write(`backlog: ${err.message}\n`);
+      // specs/installation-isolation US2: the no-installation refusal uses
+      // the uniform wording class (`<verb>: FATAL — …`); other installation
+      // errors keep their existing wording + codes (frozen contracts).
+      const prefix = err.code === 'not-found' ? 'FATAL — ' : '';
+      process.stderr.write(`backlog: ${prefix}${err.message}\n`);
       process.exit(err.code === 'escape' || err.code === 'collision' ? 2 : 1);
     }
     if (err instanceof BacklogError) {

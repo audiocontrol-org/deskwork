@@ -32,6 +32,9 @@ function makeRepoWithRun(
   auditLog = '# Audit Log\n',
 ): { repo: string; runDir: string; auditLogPath: string } {
   const repo = mkdtempSync(join(tmpdir(), 'xmodel-lift-'));
+  // Installation marker: --at (R2 retired --repo-root) resolves via walk-up.
+  mkdirSync(join(repo, '.stack-control'), { recursive: true });
+  writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const featureDir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
   mkdirSync(featureDir, { recursive: true });
   const auditLogPath = join(featureDir, 'audit-log.md');
@@ -53,7 +56,7 @@ function lift(repo: string, slug: string, runDir: string) {
     slug,
     '--run-dir',
     runDir,
-    '--repo-root',
+    '--at',
     repo,
     '--date',
     '20260606',
