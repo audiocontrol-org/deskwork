@@ -75,31 +75,23 @@
 # default pins `opus` (near-fable quality at 586 s vs 669–750 s). haiku is
 # excluded (zero verification depth).
 #
-# sonnet override profile (specs/015 US5 / FR-011 / D8) — COMMENTED, opt-in:
+# sonnet (specs/015 US5 / FR-011 / D8) — PROMOTED TO DEFAULT FLEET 2026-06-12:
 # sonnet was excluded on the 69 KB whole-feature unit (off-task + 2226 s, and a
 # read-only violation). Both disqualifiers are coupled to payload size +
 # enforcement — the exact levers specs/015 moves: the per-phase unit (`govern
 # --phase`) shrinks the payload and `--permission-mode plan` makes the spawn
 # mechanically read-only.
-# CALIBRATION PASSED — live run 2026-06-12 (specs/015 quickstart-results.md § US5):
-# on a 12.4 KB per-phase payload all three FR-011 bars were met — latency 224 s
-# (< 300 s derived timeout; ~10x under the 2226 s big-unit disqualifier), 4
-# file:line-anchored depth-findings (one corroborating an opus finding), and 4 tool
-# calls + zero repo mutations (read-only held). You may now uncomment this lane to
-# opt in. It stays commented by deliberate choice: override-profile-first, and the
-# evidence is a SINGLE per-phase sample — the default fleet stays opus + codex;
-# default-fleet promotion is the operator's separate, later decision (broaden the
-# payload-size sample first — the latency margin tightens toward ~23 KB).
-#  - name: sonnet
-#    binary: claude
-#    model: claude-sonnet-4-6
-#    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
-#    readonly_enforcement: "--permission-mode plan"
-#    output_mode: stream-json
-#    liveness_signal: stdout
-#    liveness_window_seconds: 60
-#    timeout_floor_seconds: 300
-#    timeout_secs_per_kb: 13
+# Live calibration 2026-06-12 (specs/015 quickstart-results.md § US5) met all three
+# FR-011 bars on a 12.4 KB per-phase payload — latency 224 s (< 300 s derived
+# timeout; ~10x under the 2226 s big-unit disqualifier), 4 file:line-anchored
+# depth-findings (one corroborating an opus finding), 4 tool calls + zero repo
+# mutations (read-only held). Operator decision (2026-06-12): promote to the DEFAULT
+# fleet now — three models (opus + codex + sonnet) restore cross-model genetic
+# diversity, and live field-testing across many real change sets is the broader
+# sample (rather than gating promotion on more pre-promotion calibration runs). The
+# active lane is in `models:` below. Watch latency on larger per-phase units: the
+# 13 s/KB slope hits the 300 s floor near ~23 KB; a unit beyond that derives a
+# proportionally larger budget (timeout-derivation is linear by design).
 
 models:
   - name: claude
@@ -122,6 +114,19 @@ models:
     liveness_window_seconds: 60
     timeout_floor_seconds: 300
     timeout_secs_per_kb: 7
+  # sonnet — PROMOTED to the default fleet 2026-06-12 (operator decision; calibration
+  # evidence in specs/015 quickstart-results.md § US5). Third lane = cross-model
+  # diversity at lower cost; under field evaluation across change sets.
+  - name: sonnet
+    binary: claude
+    model: claude-sonnet-4-6
+    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
+    readonly_enforcement: "--permission-mode plan"
+    output_mode: stream-json
+    liveness_signal: stdout
+    liveness_window_seconds: 60
+    timeout_floor_seconds: 300
+    timeout_secs_per_kb: 13
   # gemini — DISABLED (commented out). gemini-cli was failing 94.1% of runs
   # (16 of 17 across the graphical-entries Phase 0 audit cycle) on cascading
   # ClassifierStrategy JSON-routing failures + quota exhaustion; re-enable
