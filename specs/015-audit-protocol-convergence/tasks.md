@@ -97,10 +97,10 @@
 
 **Independent test**: resolve one phase of the multi-phase fixture (T002) to a diff-scoped unit and confirm the payload is phase-scoped, governed by the same loop (SC-006).
 
-- [ ] T023 [P] [US4] RED: tests for `resolvePhaseUnit` (diff-scope is one phase's files only; SC-006), `resolveComposingFeatureUnit` (excludes converged-unchanged phases, includes changed/cross-cutting), AND that a phase unit appends its findings to the same per-feature audit-log section as whole-feature governance (FR-008 same store) in `plugins/stack-control/src/__tests__/govern/incremental-audit.test.ts`
-- [ ] T024 [US4] Implement `resolvePhaseUnit` + `resolveComposingFeatureUnit` (tasks.md `## Phase N` grammar → `AuditUnit`) in `plugins/stack-control/src/govern/incremental-audit.ts` — make T023 green
-- [ ] T025 [US4] Wire an `AuditUnit`-scoped invocation through `protocol.ts`/`govern.ts` so a phase unit flows the same `runConvergenceLoop` path as a feature unit (FR-007); add a `--phase <id>` selector to the govern verb
-- [ ] T026 [US4] RED→GREEN: assert a per-phase payload's derived timeout for the slowest admitted lane is < the whole-feature payload's, and the watchdog/terminal-state path is unchanged (FR-009) in `plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/per-phase-timeout.test.ts`
+- [X] T023 [P] [US4] RED: tests for `resolvePhaseUnit` (diff-scope is one phase's files only; SC-006), `resolveComposingFeatureUnit` (excludes converged-unchanged phases, includes changed/cross-cutting), AND that a phase unit appends its findings to the same per-feature audit-log section as whole-feature governance (FR-008 same store) in `plugins/stack-control/src/__tests__/govern/incremental-audit.test.ts`
+- [X] T024 [US4] Implement `resolvePhaseUnit` + `resolveComposingFeatureUnit` (tasks.md `## Phase N` grammar → `AuditUnit`) in `plugins/stack-control/src/govern/incremental-audit.ts` — make T023 green
+- [X] T025 [US4] Wire an `AuditUnit`-scoped invocation through `protocol.ts`/`govern.ts` so a phase unit flows the same `runConvergenceLoop` path as a feature unit (FR-007); add a `--phase <id>` selector to the govern verb
+- [X] T026 [US4] RED→GREEN: assert a per-phase payload's derived timeout for the slowest admitted lane is < the whole-feature payload's, and the watchdog/terminal-state path is unchanged (FR-009) in `plugins/stack-control/src/__tests__/scope-discovery/audit-barrage/per-phase-timeout.test.ts`
 
 **Checkpoint**: incremental units shrink payload, findings/round, and fix-debt — feeding the convergence gains from US1.
 

@@ -49,6 +49,7 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
+import { resolvePhaseUnit } from '../govern/incremental-audit.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
@@ -85,6 +86,8 @@ const USAGE = [
   '  --no-slush                Disable the slush step (address every finding).',
   '  --json                    Emit the gate verdict JSON only.',
   '  implement: --diff-base <ref>   Diff base (default HEAD~1).',
+  '             --phase <id>        Audit ONE tasks.md phase (per-phase unit, FR-007);',
+  '                                 scopes the payload to the phase files + checkpoint phase-<id>.',
   '  spec:      --spec-path <p>      Spec under audit (else CLAUDE.md SPECKIT marker).',
   '             --plan-path <p>      Fold the plan (the after_plan checkpoint).',
   '             --checkpoint <name>  Override the checkpoint label.',
@@ -106,6 +109,7 @@ interface GovernFlags {
   specPath?: string;
   planPath?: string;
   checkpoint?: string;
+  phase?: string;
   help: boolean;
 }
 
@@ -119,6 +123,7 @@ const VALUED = new Set([
   '--spec-path',
   '--plan-path',
   '--checkpoint',
+  '--phase',
 ]);
 
 function parseFlags(argv: readonly string[]): { ok: true; flags: GovernFlags } | { ok: false; error: string } {
@@ -150,6 +155,7 @@ function parseFlags(argv: readonly string[]): { ok: true; flags: GovernFlags } |
       else if (tok === '--spec-path') flags.specPath = value;
       else if (tok === '--plan-path') flags.planPath = value;
       else if (tok === '--checkpoint') flags.checkpoint = value;
+      else if (tok === '--phase') flags.phase = value;
       continue;
     }
     return { ok: false, error: `unknown flag: ${tok}` };
@@ -327,6 +333,32 @@ export async function runGovern(args: string[]): Promise<void> {
     assertBarrageBinPresent(barrageBin);
     const stackctl = join(PLUGIN_ROOT, 'bin', 'stackctl');
 
+    // specs/015 US4 (FR-007 / T025): a `--phase <id>` selector audits ONE
+    // tasks.md phase as a bounded unit — the SAME convergence protocol/loop, a
+    // smaller payload. Resolve the phase unit from the feature's tasks.md, scope
+    // the untracked fold to the phase's files, and run the loop under the
+    // per-phase checkpoint (`phase-<id>`) so the gate evaluates that phase's
+    // convergence independently (per-checkpoint loops). `--phase` is implement
+    // mode only.
+    let phaseUnit: AuditUnit | undefined;
+    if (flags.mode === 'implement' && flags.phase !== undefined) {
+      const { root } = await resolveFeatureRoot({ repoRoot, slug });
+      if (root === undefined) {
+        throw new GovernProtocolError(
+          `govern: FATAL — --phase given but feature '${slug}' root not found (cannot resolve tasks.md).`,
+        );
+      }
+      const tasksPath = join(root, 'tasks.md');
+      if (!existsSync(tasksPath)) {
+        throw new GovernProtocolError(
+          `govern: FATAL — --phase given but tasks.md not found at ${tasksPath}.`,
+        );
+      }
+      const diffBase =
+        flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
+      phaseUnit = resolvePhaseUnit({ tasksPath, phaseId: flags.phase, diffBase });
+    }
+
     // Spec 013 (TASK-25): the spec-mode excerpt is resolved through the
     // layout-aware helper so a specs/NNN-<slug> feature's audit-log is found
     // instead of silently empty under the old hardcoded docs/ path. specs/015
@@ -342,7 +374,13 @@ export async function runGovern(args: string[]): Promise<void> {
             flags.checkpoint,
             await resolveAuditLogExcerpt(repoRoot, slug),
           )
-        : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint);
+        : buildImplementVars(
+            repoRoot,
+            slug,
+            flags.diffBase,
+            phaseUnit !== undefined ? phaseUnit.auditLogSection : flags.checkpoint,
+            phaseUnit?.diffScope.files,
+          );
 
     // US7 (FR-032): implement-mode governance runs the per-codebase clone step,
     // surfacing NEW intra-codebase duplication alongside the gate verdict
@@ -382,11 +420,12 @@ export async function runGovern(args: string[]): Promise<void> {
       flags.mode === 'implement'
         ? (flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1')
         : 'HEAD';
-    const unit: AuditUnit = {
-      granularity: 'feature',
-      diffScope: { base: diffBase, files: [] },
-      auditLogSection: built.checkpoint,
-    };
+    const unit: AuditUnit =
+      phaseUnit ?? {
+        granularity: 'feature',
+        diffScope: { base: diffBase, files: [] },
+        auditLogSection: built.checkpoint,
+      };
     const outcome: ConvergenceOutcome = await runConvergenceLoop({
       unit,
       ceiling,
