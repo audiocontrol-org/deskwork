@@ -48,8 +48,27 @@ import {
   SPEC_ARTIFACT_FRAMING,
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
+import { runConvergenceLoop } from '../govern/convergence-loop.js';
+import type { AuditUnit } from '../govern/audit-unit-types.js';
+import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
 import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
+
+/**
+ * specs/015 US2 (FR-004): the per-invocation convergence ceiling govern hands the
+ * loop driver. Default 1 — govern runs a SINGLE barrage pass per invocation
+ * because its `dispatchFix` cannot edit code in-process (FR-005, no auto-edit);
+ * the agent is the cross-invocation fixer (fix the surfaced findings, re-invoke
+ * govern → a fresh bounded driver run). Raising --ceiling / GOVERN_CEILING lets
+ * the driver run multiple in-process rounds, which is only useful once a real
+ * in-process fixer is wired (the future autonomous loop). The driver — not skill
+ * prose — owns the iterate/stop decision in every case.
+ */
+function resolveCeiling(raw: string | undefined): number {
+  if (raw === undefined) return 1;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 // src/subcommands → src → plugin root → bin/stackctl
@@ -317,7 +336,7 @@ export async function runGovern(args: string[]): Promise<void> {
     }
 
     const noSlush = flags.noSlush || process.env.GOVERN_NO_SLUSH === '1';
-    const result = runProtocol({
+    const protocolArgs = {
       stackctl,
       barrageBin,
       repoRoot,
@@ -329,16 +348,50 @@ export async function runGovern(args: string[]): Promise<void> {
       override: pick(flags.override, process.env.GOVERN_OVERRIDE),
       noSlush,
       emitJson: flags.json,
-      stdout: (s) => process.stdout.write(s),
-      stderr: (s) => process.stderr.write(s),
+      stdout: (s: string) => process.stdout.write(s),
+      stderr: (s: string) => process.stderr.write(s),
+    };
+
+    // specs/015 US2 (FR-004/005 / D4): delegate the convergence loop to the code
+    // driver. govern builds the three behavioral inputs — runPass (the existing
+    // protocol pass, unchanged), dispatchFix (surface the BLOCKED findings; the
+    // agent's only in-loop action — never an auto-edit), and the ceiling — then
+    // the driver owns the iterate/stop decision and the bound. A runProtocol
+    // rejection (e.g. barrage OUTAGE) propagates loud through the driver to the
+    // catch below (no silent stop). The `--override` path stays routed through
+    // the gate (it records the override in the audit trail and returns gateOpen),
+    // so an overridden run still produces a barrage record.
+    const ceiling = resolveCeiling(pick(flags.ceiling, process.env.GOVERN_CEILING));
+    const diffBase =
+      flags.mode === 'implement'
+        ? (flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1')
+        : 'HEAD';
+    const unit: AuditUnit = {
+      granularity: 'feature',
+      diffScope: { base: diffBase, files: [] },
+      auditLogSection: built.checkpoint,
+    };
+    const outcome: ConvergenceOutcome = await runConvergenceLoop({
+      unit,
+      ceiling,
+      runPass: async () => ({ gateOpen: runProtocol(protocolArgs).gateOpen }),
+      dispatchFix: async () => {
+        process.stderr.write(
+          'govern: convergence gate BLOCKED — fix the surfaced findings; the loop ' +
+            're-barrages on the next round and never auto-edits the work (FR-005).\n',
+        );
+      },
     });
 
-    // Obey the gate's single decision (#432); never re-derive policy here.
-    if (!result.gateOpen) {
+    // Map the recorded terminal to govern's exit: converged/overridden may
+    // graduate (exit 0); non-converged is a bounded refusal (exit 1). The agent
+    // never held the iterate/stop decision (SC-004).
+    if (outcome.kind === 'non-converged') {
       process.stderr.write(
-        flags.mode === 'spec'
-          ? 'govern: spec graduation REFUSED — convergence gate BLOCKED (fix findings & re-govern, or record --override).\n'
-          : 'govern: implementation NOT done — convergence gate BLOCKED (fix findings & re-govern, or record --override).\n',
+        (flags.mode === 'spec'
+          ? 'govern: spec graduation REFUSED — convergence gate BLOCKED'
+          : 'govern: implementation NOT done — convergence gate BLOCKED') +
+          ` after ${outcome.rounds} round(s) (ceiling ${outcome.ceiling}); fix findings & re-govern, or record --override.\n`,
       );
       process.exit(1);
     }

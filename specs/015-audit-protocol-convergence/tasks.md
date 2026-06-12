@@ -67,12 +67,12 @@
 
 **Independent test**: drive `runConvergenceLoop` with a stub gate across all branches and confirm deterministic termination with no agent decision (SC-004).
 
-- [ ] T015 [P] [US2] RED: unit tests for `runConvergenceLoop` per `contracts/convergence-loop.md` (OPEN-pass-1→converged/0 fixes; always-BLOCKED ceiling 5→non-converged/4 fixes; BLOCKED×2→converged/2 fixes; override→overridden), AND that the driver itself writes nothing to the audited tree — `dispatchFix` is the only mutation seam (FR-005 no-auto-edit) in `plugins/stack-control/src/__tests__/govern/convergence-loop.test.ts`
-- [ ] T016 [US2] Extract the single `render→barrage→lift→slush→gate` pass in `plugins/stack-control/src/govern/protocol.ts` behind a step API the driver can call (no behavior change to the pass)
-- [ ] T017 [US2] Implement `runConvergenceLoop` (rounds, ceiling, override short-circuit, `ConvergenceOutcome`) in `plugins/stack-control/src/govern/convergence-loop.ts` — make T015 green
-- [ ] T018 [US2] Modify `plugins/stack-control/src/subcommands/govern.ts` to delegate the loop to `runConvergenceLoop` (build `runPass`/`dispatchFix`/`ceiling`; map outcome→exit) — the agent no longer holds the re-run decision
-- [ ] T019 [US2] Update the govern skill body (`plugins/stack-control/skills/*govern*/SKILL.md` / spec-kit `deskwork-governance` command prose) to remove the "re-run until clean" prose loop and point at the code driver — enforcement lives in the verb, not prose
-- [ ] T020 [US2] RED→GREEN integration: `govern` over a stub feature reaches a recorded terminal (converged/non-converged) with no agent-held loop step (SC-004 end-to-end) in `plugins/stack-control/src/__tests__/govern/govern-loop-driver.test.ts`
+- [X] T015 [P] [US2] RED: unit tests for `runConvergenceLoop` per `contracts/convergence-loop.md` (OPEN-pass-1→converged/0 fixes; always-BLOCKED ceiling 5→non-converged/4 fixes; BLOCKED×2→converged/2 fixes; override→overridden), AND that the driver itself writes nothing to the audited tree — `dispatchFix` is the only mutation seam (FR-005 no-auto-edit) in `plugins/stack-control/src/__tests__/govern/convergence-loop.test.ts`
+- [X] T016 [US2] Extract the single `render→barrage→lift→slush→gate` pass in `plugins/stack-control/src/govern/protocol.ts` behind a step API the driver can call (no behavior change to the pass)
+- [X] T017 [US2] Implement `runConvergenceLoop` (rounds, ceiling, override short-circuit, `ConvergenceOutcome`) in `plugins/stack-control/src/govern/convergence-loop.ts` — make T015 green
+- [X] T018 [US2] Modify `plugins/stack-control/src/subcommands/govern.ts` to delegate the loop to `runConvergenceLoop` (build `runPass`/`dispatchFix`/`ceiling`; map outcome→exit) — the agent no longer holds the re-run decision
+- [X] T019 [US2] Update the govern skill body (`plugins/stack-control/skills/*govern*/SKILL.md` / spec-kit `deskwork-governance` command prose) to remove the "re-run until clean" prose loop and point at the code driver — enforcement lives in the verb, not prose
+- [X] T020 [US2] RED→GREEN integration: `govern` over a stub feature reaches a recorded terminal (converged/non-converged) with no agent-held loop step (SC-004 end-to-end) in `plugins/stack-control/src/__tests__/govern/govern-loop-driver.test.ts`
 
 **Checkpoint** (MVP complete): convergence is mechanically correct (US1) AND mechanically bounded (US2).
 

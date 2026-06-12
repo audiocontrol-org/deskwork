@@ -209,6 +209,16 @@ export interface ProtocolResult {
   readonly gateOpen: boolean;
 }
 
+/**
+ * specs/015 US2 (T016): the single render→barrage→lift→slush→gate pass, exposed
+ * as the step the convergence-loop driver calls. `runProtocol` IS this step
+ * (unchanged behavior); the driver wraps it as
+ * `runPass: async () => ({ gateOpen: runProtocol(args).gateOpen })`. Extracting
+ * the contract as a named type keeps "who drives the loop" (the driver) separate
+ * from "what one pass does" (this function) without changing the pass itself.
+ */
+export type ProtocolStep = () => ProtocolResult;
+
 function spawnText(
   bin: string,
   args: readonly string[],
