@@ -2,27 +2,39 @@
 
 ---
 
-## 2026-06-12: <!-- session title -->
+## 2026-06-12: 015 implementation → governance → dampener fix → sonnet promotion → port onto main → merge
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Execute spec 015 (audit-protocol-convergence), carry it through real governance, and land it on `main`.
 
 **Accomplished:**
-- <!-- compose -->
+- **Implemented all 35 tasks of spec 015 (US1–US6)** via native `/speckit-implement`: cross-lane severity-agreement + adjudication (US1), the code-driven convergence loop driver (US2), payload self-reference exclusion (US3), per-phase incremental audit units (US4), sonnet read-only re-admission (US5), dampener raw-count regression guard (US6).
+- **Ran single-lane governance (opus)** on the implementation — 6 findings (1 HIGH), all fixed TDD-first; re-govern rounds 2–3 converged the residue.
+- **Fixed a real dampener defect** (operator-reported): a fully-clean run (0 findings of *any* severity) wrote no lift section → invisible to the dampener → the loop could never reach `converged` after clean runs. Fixed so a healthy clean run records a quiet section; a degraded run records nothing (FR-007). Proven by lift + end-to-end dampener tests.
+- **Ran the live sonnet calibration** — the recorded "no CLI installed" blocker was false (the CLI is present). All three FR-011 bars met (224 s < 300 s, 4 anchored depth-findings, 0 mutations) → **promoted sonnet to the default fleet** (operator decision).
+- **Ported 014+015 onto current `main`.** #462 wouldn't merge: `main` had diverged at v0.42.0 into a *parallel* `014-audit-protocol-reliability` + studio + v0.43.0 + dw-lifecycle mothball. Merged `main` in and reconciled — 3 TS conflicts combining both 014 exclusion/scope systems, and migrated `main`'s released fleet/config *tests* onto this branch's superseding (richer) 014 model.
+- **Dogfooded the reconciliation through a real `stackctl govern` pass** (the discipline gap the operator caught): 0 HIGH, 5 hygiene findings, all fixed.
+- **Merged #462 into `main`** (`f805e4f`).
 
 **Didn't Work:**
-- <!-- compose -->
+- First govern attempts misfired — single-lane `--require-models` floor shortfall, then **sonnet timed out** at 300 s on a 2.9 KB payload (240 KB events; ran long/deep), degrading the audit to one producing lane.
+- Audit scope was forced narrow: the merge makes any spanning diff-base ~911 KB (past opus's derived timeout), so only the test-migration diff was tractably govern-able.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Operator caught that I'd called `/stack-control:execute` "done" without running the actual govern barrage — dogfood discipline ("packaging IS UX"). Ran the real govern.
+- [PROCESS] Operator corrected my wrong read that `main` already had the 014 foundation (it had a *different*, parallel 014) — re-planned the port.
+- [PROCESS] Operator directed the dampener fix directly ("the dampener logic is broken, fix it while you have the context").
+- [PROCESS] Operator promoted sonnet to default for live field-testing, overriding my single-sample caution.
 
 **Insights:**
-- <!-- compose -->
+- The merge — not the 015 port — was the bulk of the work: two parallel 014-reliability *reimaginings* (mine: config-v2/timeouts/terminal-states; main's: silent-failure hardening) that compete in the same files and can't both be true.
+- The dogfood govern surfaced signal abstract review missed: **opus+sonnet are same-vendor** (correlated failure modes) → the promotion is reachability *coverage*, not true cross-model *diversity*; and sonnet timing out on a tiny payload is a real field-eval signal on the promotion.
+- The dampener defect (clean runs invisible to the gate) would have silently blocked every future convergence — caught only because the operator pushed on "why won't the gate close."
 
-**Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 0
-  - (no commits this session)
-- Files changed: 0
-- Backlog touched: (none)
+**Quantitative (re-derived; AUDIT-04):**
+- Commits: **18 this session** (`7772ad5..df5b78a`). The `678093f..df5b78a` range shows 43 / 286 files, but that double-counts `main`'s merged-in v0.43.0 commits — not this session's work.
+- PR #462 **merged** into `main` (`f805e4f`).
+- Test state at session end: **1376 passed / 8 skipped / 11 failed** — all 11 failures are pre-existing environment-only (sandbox commit-signing 400); `tsc --noEmit` clean.
+- Corrections: 4 (all [PROCESS]).
 
 ## 2026-06-11: Audit-protocol convergence — investigate, then author spec 015 to analyze-clean
 
