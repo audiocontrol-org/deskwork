@@ -10,7 +10,7 @@ targetVersion: ""
 ### AUDIT-20260611-01 — Untracked-fold diff entries carry absolute filesystem paths, breaching the installation-relative payload promise
 
 Finding-ID: AUDIT-20260611-01 (claude-01 + claude-05 + claude-07 + codex-01 + codex-03; cross-model)
-Status:     fixed-38d80b39
+Status:     fixed-36847495
 Severity:   high
 Surface:    src/govern/payload-implement.ts:310-318 (untracked fold `git diff --no-index` invocation)
 
@@ -19,7 +19,7 @@ The committed arm was converted to `git -C <installation> diff --relative` so pa
 ### AUDIT-20260611-02 — govern's own scratch file `.git-govern-base.tmp` folds into the payload it governs — governance plumbing without an exclusion or gitignore entry
 
 Finding-ID: AUDIT-20260611-02 (claude-02 + codex-04; cross-model)
-Status:     fixed-99b744d4
+Status:     fixed-9c78581c
 Severity:   medium
 Surface:    src/govern/payload-implement.ts:265-272 (untracked enumeration + exclusion filters); evidence: the final hunk of this audited payload (`.git-govern-base.tmp`, one line containing the diff base SHA)
 
@@ -28,7 +28,7 @@ AUDIT-20260611-08 established the principle that governance bookkeeping must not
 ### AUDIT-20260611-03 — Cross-tree feature arm's untracked fold is unbounded, and its comment claims a warn-on-skip that does not exist
 
 Finding-ID: AUDIT-20260611-03
-Status:     fixed-22f8b606
+Status:     fixed-af928a1f
 Severity:   medium
 Surface:    src/govern/payload-implement.ts:437-462 (`assembleCrossTreeFeatureArm`, untracked fold loop)
 
@@ -37,7 +37,7 @@ The main installation fold enforces `DEFAULT_UNTRACKED_FOLD_BUDGET` (256 KB) wit
 ### AUDIT-20260611-04 — Four independent `git rev-parse --show-toplevel` derivations introduced in one diff, with divergent error/realpath handling
 
 Finding-ID: AUDIT-20260611-04
-Status:     fixed-4f621846
+Status:     fixed-d108a6c7
 Severity:   medium
 Surface:    src/config/installation.ts:42-55; src/scope-discovery/util/feature-root.ts:105-118 (`deriveDistinctGitToplevel`); src/subcommands/govern.ts (`currentToplevel`); src/govern/payload-implement.ts:393-403 (toplevel derivation in `assembleCrossTreeFeatureArm`)
 
@@ -46,7 +46,7 @@ This diff adds the "derived external anchor" pattern (FR-004) in four places, ea
 ### AUDIT-20260611-05 — A single `stackctl govern` run in a legacy-debris repo emits the three-part US5 notice once per spawned child verb, not once per operator invocation
 
 Finding-ID: AUDIT-20260611-05
-Status:     fixed-54652401
+Status:     fixed-1b47e470
 Severity:   low
 Surface:    src/config/installation.ts:33-34 (`legacyNoticeFired` module-level latch); src/govern/protocol.ts:205-280 (protocol spawns audit-barrage, lift, slush-findings as child processes)
 
@@ -55,7 +55,7 @@ The once-per-invocation guarantee is implemented as a module-level boolean, whic
 ### AUDIT-20260611-06 — Govern render step still inherits cwd for prompt override resolution
 
 Finding-ID: AUDIT-20260611-06
-Status:     fixed-91210169
+Status:     fixed-ba6b3feb
 Severity:   medium
 Surface:    src/govern/protocol.ts:189-198; src/subcommands/audit-barrage-render.ts:190-236; src/scope-discovery/audit-barrage/prompt-renderer.ts:109-114
 
@@ -68,7 +68,7 @@ The blast radius is medium: this does not directly write state outside the insta
 ### AUDIT-20260611-09 — Commit-subjects metadata is not installation-scoped — outer-repo commits leak into the governed payload and invite spurious model findings
 
 Finding-ID: AUDIT-20260611-09 (claude-01 + claude-03 + codex-02; cross-model)
-Status:     fixed-ac1c1185
+Status:     fixed-3a6c27bd
 Severity:   medium
 Surface:    src/govern/payload-implement.ts:334 (`const commitSubjects = git(installationRoot, ['log', `${base}..HEAD`, '--oneline'])`)
 
@@ -80,7 +80,7 @@ The committed arm was correctly re-anchored: `git -C <installation> diff --relat
 ### AUDIT-20260611-10 — scope-widen / scope-inventory write evidence under a cross-tree feature root with no announcement — the R4 announce norm applies only to govern
 
 Finding-ID: AUDIT-20260611-10 (claude-02 + claude-05 + codex-01; cross-model)
-Status:     fixed-dd2bc7ed
+Status:     fixed-af90b3f7
 Severity:   medium
 Surface:    src/scope-discovery/scope-widen.ts:286-343 (featureRoot resolution + `stageRun` → `makeRunDir({featureRoot})`); src/scope-discovery/scope-inventory.ts:309-330; src/scope-discovery/util/feature-root.ts:103-130 (the new derived-toplevel layer 2)
 
@@ -92,7 +92,7 @@ The new two-layer `resolveFeatureRoot` deliberately lets the feature root resolv
 ### AUDIT-20260611-11 — Constitution amendment states "the repo-root parameter is retired" unqualified, while protocol.ts now load-bears on render's surviving --repo-root
 
 Finding-ID: AUDIT-20260611-11
-Status:     fixed-5d7c87b6
+Status:     fixed-47a46c83
 Severity:   low
 Surface:    .specify/memory/constitution.md:158-165 (installation-anchor invariant wording) vs src/govern/protocol.ts:190-207 (render threading via `--repo-root`)
 
@@ -104,7 +104,7 @@ The constitution's new Additional Constraint says external-tool anchors are "nev
 ### AUDIT-20260611-12 — govern-spec.sh retired GOVERN_REPO_ROOT but its env-only interface gained no replacement carrier for the advice it gives
 
 Finding-ID: AUDIT-20260611-12
-Status:     fixed-5d7c87b6
+Status:     fixed-47a46c83
 Severity:   low
 Surface:    spec-kit/spec-governance/scripts/bash/govern-spec.sh:16-23 (env-var interface header)
 

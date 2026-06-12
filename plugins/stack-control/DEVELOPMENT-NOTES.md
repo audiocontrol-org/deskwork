@@ -14,8 +14,8 @@
 
 **Didn't Work:**
 - The after_implement govern run could not audit the relocation commit directly: the endpoint diff under the `--relative` installation arm breaks rename pairing for the moved-in spec tree (~1.8MB of pre-existing text as adds — past model context). Worked around with a local rename-neutralized synthetic diff base (worktree at the base + the same `git mv`, never pushed); captured as TASK-47.
-- Commit 237271c6 accidentally committed ~300k lines of gitignored audit-run history (the root-anchored `.stack-control/audit-runs/` pattern stopped matching post-migration); fixed forward (untracked + `**/`-pattern) but both commits are pushed — permanent history weight unless the operator authorizes a rewrite.
-- A root-level umbrella `npx vitest run` and `npm --workspaces test` both proved unusable as a whole-tree health check (phantom failures / hung behind stale day-old vitest processes); cross-package isolation was proven by `git diff --stat <base> -- packages plugins/dw-lifecycle` (empty) instead.
+- Commit f8255d51 accidentally committed ~300k lines of gitignored audit-run history (the root-anchored `.stack-control/audit-runs/` pattern stopped matching post-migration); fixed forward (untracked + `**/`-pattern) but both commits are pushed — permanent history weight unless the operator authorizes a rewrite.
+- A root-level umbrella `npx vitest run` and `npm --workspaces test` both proved unusable as a whole-tree health check (phantom failures / hung behind stale day-new vitest processes); cross-package isolation was proven by `git diff --stat <base> -- packages plugins/dw-lifecycle` (empty) instead.
 - One governance fix sub-agent died mid-fix on a session limit (AUDIT-05); the orchestrator completed the remaining two guard lines against the agent's own RED tests.
 
 **Course Corrections:**
@@ -68,7 +68,7 @@
   - fix(014): trim-aware config validation + honest enforcement marking + quorum visibility (AUDIT-20260611-15/-17)
   - docs(014): audit-log — round-4 findings dispositioned fixed-8c7766de (AUDIT-20260611-13/-14)
   - fix(014): killed-external terminal state + none-lane window refusal (AUDIT-20260611-13/-14)
-  - docs(installation-isolation): flip AUDIT-20260611-11/-12 to fixed-5d7c87b6
+  - docs(installation-isolation): flip AUDIT-20260611-11/-12 to fixed-47a46c83
   - fix(installation-isolation): doc fixes for AUDIT-20260611-11/-12 + flip round-2 code findings
   - fix(installation-isolation): widen + inventory announce the cross-tree feature anchor (AUDIT-20260611-10)
   - fix(installation-isolation): commit-subjects metadata is installation-scoped (AUDIT-20260611-09)

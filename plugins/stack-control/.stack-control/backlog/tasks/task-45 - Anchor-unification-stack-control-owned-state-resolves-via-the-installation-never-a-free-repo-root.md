@@ -34,11 +34,11 @@ Spec authored 2026-06-10 at specs/installation-isolation (UNNUMBERED — renamed
 
 Progression evidence (2026-06-11, implementation executed via /stack-control:execute; status transition stays the operator's call):
 
-- US1 isolation probe RED→green + installation threading: de0d611a (RED), fd67b8d8 (T003), fd4f2fd2/e4992976 (T004 flag retirement), 690e6040 (T005 full verb table).
-- US2 uniform refusal: d04bc725 (RED), 528203ce (T007).
-- US3 govern anchoring + cross-tree fold: fbae22da (RED), 968bd235 (T009; TASK-40 excludePaths-from-record closed).
-- US4 cwd invariance + slush destination: 15ac6172 (RED), b0e235cd (T011).
-- US5 legacy half-installation notice: 4ff7079a (RED), 001f5824 (T013); this repo's root half-installation retired: 237271c6 + 5bfe71d9 (T014; gitignore depth fix).
-- US6 installation-aware feature-root resolver: 7ada5ba6 (RED), b036733c (T016); Spec Kit root relocated into the installation: 47f2606c (T017); constitution 1.3.0 installation-anchor invariant: 3c25dd08 (T018).
+- US1 isolation probe RED→green + installation threading: 2d6807d5 (RED), 6b9cfa38 (T003), e0399339/2a53ccb3 (T004 flag retirement), b3311458 (T005 full verb table).
+- US2 uniform refusal: 4d072352 (RED), fcf04440 (T007).
+- US3 govern anchoring + cross-tree fold: 9c0cc5b2 (RED), bc3da087 (T009; TASK-40 excludePaths-from-record closed).
+- US4 cwd invariance + slush destination: a1b61946 (RED), c04d7282 (T011).
+- US5 legacy half-installation notice: 247e8515 (RED), 1f9112b2 (T013); this repo's root half-installation retired: f8255d51 + fc4869da (T014; gitignore depth fix).
+- US6 installation-aware feature-root resolver: 8e38252a (RED), b619aea6 (T016); Spec Kit root relocated into the installation: a586a84e (T017); constitution 1.3.0 installation-anchor invariant: bd4cc9e5 (T018).
 - Suite reconciliation: 184 files/1220 tests → 190 files/1265 tests (+6 new test files / +40 tests, +5 retired-flag rows in subcommand-flag-validation; arithmetic reconciles exactly).
 <!-- SECTION:NOTES:END -->
