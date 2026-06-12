@@ -22,9 +22,9 @@ description: "Task list for portability — portable stack-control workflow acro
 
 **Purpose**: Establish the portability feature scaffold and test targets.
 
-- [ ] T001 Audit the current portability seams in `plugins/stack-control/skills/` and `plugins/stack-control/src/subcommands/` against the `017-portability` contracts.
-- [ ] T002 [P] Identify Claude-owned release/update assets in `.claude/skills/release/` and map the shared behaviors that must move behind a host-neutral surface.
-- [ ] T003 [P] Identify backlog backend leakage points in `plugins/stack-control/skills/backlog/SKILL.md`, `plugins/stack-control/README.md`, and `plugins/stack-control/src/backlog/`.
+- [X] T001 Audit the current portability seams in `plugins/stack-control/skills/` and `plugins/stack-control/src/subcommands/` against the `017-portability` contracts.
+- [X] T002 [P] Identify Claude-owned release/update assets in `.claude/skills/release/` and map the shared behaviors that must move behind a host-neutral surface.
+- [X] T003 [P] Identify backlog backend leakage points in `plugins/stack-control/skills/backlog/SKILL.md`, `plugins/stack-control/README.md`, and `plugins/stack-control/src/backlog/`.
 
 ---
 
@@ -35,9 +35,9 @@ description: "Task list for portability — portable stack-control workflow acro
 **⚠️ CRITICAL**: No host-specific front-door or release portability work should proceed until this seam exists and is tested.
 
 - [ ] T004 [P] RED: add shared-core portability contract tests in `plugins/stack-control/src/__tests__/` for front-door invocation ownership, host limitation fail-loud behavior, and backlog abstraction invariants.
-- [ ] T005 [P] RED: add release portability tests covering lockstep monorepo release invariants and same-version distribution semantics.
-- [ ] T006 Implement or tighten the shared-core portability seam in `plugins/stack-control/src/subcommands/` so workflow behavior is owned by `stackctl`.
-- [ ] T007 Implement or tighten the backlog abstraction seam in `plugins/stack-control/src/backlog/` so backend details are hidden from the stable workflow contract.
+- [X] T005 [P] RED: add release portability tests covering lockstep monorepo release invariants and same-version distribution semantics.
+- [X] T006 Implement or tighten the shared-core portability seam in `plugins/stack-control/src/subcommands/` so workflow behavior is owned by `stackctl`.
+- [X] T007 Implement or tighten the backlog abstraction seam in `plugins/stack-control/src/backlog/` so backend details are hidden from the stable workflow contract.
 - [ ] T008 Rehome or wrap release orchestration behind a host-neutral surface while preserving current lockstep semantics.
 
 **Checkpoint**: Shared portability contract exists; host adapters can now bind to it.
@@ -57,10 +57,10 @@ description: "Task list for portability — portable stack-control workflow acro
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Refactor `plugins/stack-control/skills/define/SKILL.md` to rely on the shared-core contract instead of Claude-specific assumptions.
-- [ ] T012 [US1] Refactor `plugins/stack-control/skills/extend/SKILL.md` to rely on the shared-core contract instead of Claude-specific assumptions.
-- [ ] T013 [US1] Refactor `plugins/stack-control/skills/execute/SKILL.md` to rely on the shared-core contract instead of Claude-specific assumptions.
-- [ ] T014 [US1] Add or update Codex-facing workflow adapter assets for the front door in the appropriate stack-control host-facing surface.
+- [X] T011 [US1] Refactor `plugins/stack-control/skills/define/SKILL.md` to rely on the shared-core contract instead of Claude-specific assumptions.
+- [X] T012 [US1] Refactor `plugins/stack-control/skills/extend/SKILL.md` to rely on the shared-core contract instead of Claude-specific assumptions.
+- [X] T013 [US1] Refactor `plugins/stack-control/skills/execute/SKILL.md` to rely on the shared-core contract instead of Claude-specific assumptions.
+- [X] T014 [US1] Add or update Codex-facing workflow adapter assets for the front door in the appropriate stack-control host-facing surface.
 - [ ] T015 [US1] Verify shared-core front-door behavior remains host-neutral and fail-loud on explicit host limitations.
 
 **Checkpoint**: Front door is usable from Claude Code and Codex without manual translation.
@@ -76,13 +76,13 @@ description: "Task list for portability — portable stack-control workflow acro
 ### Tests for User Story 2 ⚠️
 
 - [ ] T016 [P] [US2] RED: add backlog workflow tests proving backend invisibility and stack-control error translation in `plugins/stack-control/src/__tests__/`.
-- [ ] T017 [P] [US2] RED: add documentation/contract tests or assertions preventing required user-facing `backlog.md` references where the stable contract should hide them.
+- [X] T017 [P] [US2] RED: add documentation/contract tests or assertions preventing required user-facing `backlog.md` references where the stable contract should hide them.
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Refactor `plugins/stack-control/skills/backlog/SKILL.md` to remove backend-specific user-contract leakage.
-- [ ] T019 [US2] Refactor `plugins/stack-control/README.md` backlog sections to describe a backend-agnostic workflow contract.
-- [ ] T020 [US2] Tighten `plugins/stack-control/src/backlog/` error translation and interface boundaries so backend details remain internal.
+- [X] T018 [US2] Refactor `plugins/stack-control/skills/backlog/SKILL.md` to remove backend-specific user-contract leakage.
+- [X] T019 [US2] Refactor `plugins/stack-control/README.md` backlog sections to describe a backend-agnostic workflow contract.
+- [X] T020 [US2] Tighten `plugins/stack-control/src/backlog/` error translation and interface boundaries so backend details remain internal.
 
 **Checkpoint**: Backlog feels like a stack-control capability, not a wrapper over a named backend.
 
@@ -115,14 +115,14 @@ description: "Task list for portability — portable stack-control workflow acro
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T024 [P] [US4] RED: add release portability tests for lockstep artifact/version behavior and same-version distribution-channel mapping.
-- [ ] T025 [P] [US4] RED: add tests verifying the host-neutral release surface preserves current atomic semantics rather than introducing host-specific flows.
+- [X] T024 [P] [US4] RED: add release portability tests for lockstep artifact/version behavior and same-version distribution-channel mapping.
+- [X] T025 [P] [US4] RED: add tests verifying the host-neutral release surface preserves current atomic semantics rather than introducing host-specific flows.
 
 ### Implementation for User Story 4
 
 - [ ] T026 [US4] Rehome or wrap `.claude/skills/release/` helpers behind the host-neutral release surface identified in T008.
-- [ ] T027 [US4] Add Codex-consumable install/update path documentation and contract wiring tied to the same release version line.
-- [ ] T028 [US4] Update `.agents/skills/release/SKILL.md` and any relevant stack-control or repo docs to point at the portable release contract.
+- [X] T027 [US4] Add Codex-consumable install/update path documentation and contract wiring tied to the same release version line.
+- [X] T028 [US4] Update `.agents/skills/release/SKILL.md` and any relevant stack-control or repo docs to point at the portable release contract.
 
 **Checkpoint**: Release/update portability is additive to hosts and preserves lockstep monorepo release behavior.
 
@@ -136,13 +136,13 @@ description: "Task list for portability — portable stack-control workflow acro
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T029 [P] [US5] RED: add guidance/entry-point assertions that fail if deprecated repo-wide feature workflow references remain active without deprecation or redirect language.
+- [X] T029 [P] [US5] RED: add guidance/entry-point assertions that fail if deprecated repo-wide feature workflow references remain active without deprecation or redirect language.
 
 ### Implementation for User Story 5
 
-- [ ] T030 [US5] Update repo guidance files that currently present the old repo-wide feature workflow as active so they point to `stack-control` instead.
-- [ ] T031 [US5] Deprecate, redirect, or remove old repo-wide feature workflow entry points in `.agents/` and related docs so operators are not routed there by accident.
-- [ ] T032 [US5] Verify the deprecation path is explicit and fail-loud where removal is not yet possible.
+- [X] T030 [US5] Update repo guidance files that currently present the old repo-wide feature workflow as active so they point to `stack-control` instead.
+- [X] T031 [US5] Deprecate, redirect, or remove old repo-wide feature workflow entry points in `.agents/` and related docs so operators are not routed there by accident.
+- [X] T032 [US5] Verify the deprecation path is explicit and fail-loud where removal is not yet possible.
 
 **Checkpoint**: Starting feature work now exposes one clear canonical workflow path.
 
