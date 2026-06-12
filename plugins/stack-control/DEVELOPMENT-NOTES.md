@@ -2,6 +2,135 @@
 
 ---
 
+## 2026-06-12: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 108
+  - merge: bring origin/main (v0.44.0 — barrage reliability 014 + convergence 015) into feature/stack-control
+  - docs(installation-isolation): governance converged — gate OPEN (round 3, 0 HIGH)
+  - chore: release v0.44.0
+  - feat(stack-control): audit-barrage reliability (014) + audit-protocol convergence (015) (#462)
+  - fix(stack-control): address govern audit findings on the merge reconciliation (AUDIT-BARRAGE-claude-01..05)
+  - chore(deskwork): add sonnet to deskwork's own dogfood barrage override
+  - test(stack-control): migrate main's-014 reliability tests to my-014's model (merge reconciliation)
+  - merge: bring origin/main (v0.43.0) into feature/audit-protocol — WIP, 015 layer integrated
+  - feat(stack-control): promote sonnet to the default audit-barrage fleet (operator decision)
+  - docs(stack-control): record live sonnet calibration — all 3 FR-011 bars MET (SC-007)
+  - fix(stack-control): record clean runs so the convergence dampener can engage (operator bug)
+  - refactor(stack-control): test the scope-exclusion summary line + make it extractable (round-3 residue)
+  - feat(stack-control): thread skippedOutOfScope to the govern verdict surface (claude-20260612-03)
+  - docs(stack-control): reconcile ceiling-default drift + stale overridden comment (re-govern round 2)
+  - fix(stack-control): resolve single-lane governance findings (AUDIT-20260612-01..06)
+  - chore(stack-control): polish + hygiene for 015 audit-protocol convergence (Phase 9)
+  - fix(015): relocate quickstart-results.md to the repo-root spec dir
+  - feat(stack-control): sonnet read-only re-admission + dampener raw-count guard (015 US5/US6)
+  - feat(stack-control): per-phase incremental audit units (015 US4)
+  - feat(stack-control): barrage payload excludes own audit-log + parked scaffolds (015 US3)
+  - feat(stack-control): code-driven convergence loop replaces agent-held prose loop (015 US2)
+  - feat(stack-control): severity de-inflation via cross-lane agreement + adjudication (015 US1)
+  - docs(session): session-end record
+  - tasks(015): analyze remediation — tighten coverage on FR-003/005/008/012
+  - tasks(015): dependency-ordered RED-first task breakdown
+  - plan(015): design artifacts for audit-protocol convergence
+  - spec(015): clarify — resolve the three convergence design forks
+  - spec(015): audit-protocol convergence correctness + incremental audit units
+  - chore(inbox): capture — govern adjudication step when the convergence loop plateaus (014 dogfood, rounds 4-7; pairs with backlog TASK-27)
+  - chore(backlog): TASK-27 — gate cluster-max severity inflation can stall two-consecutive-0-HIGH convergence (014 govern-loop dogfood, rounds 4-7)
+  - docs(014): audit-log — round-7 findings dispositioned (21 fixed-f3fee407; 22 acknowledged clean-signal record)
+  - fix(014): eventsPath recorded only when a capture was actually written (AUDIT-20260611-21)
+  - docs(014): audit-log — round-6 findings dispositioned (18/19 fixed-4816a4a2; 20 acknowledged clean-signal record)
+  - fix(014): shared isLaneEnforced predicate + README five-state list (AUDIT-20260611-18/-19)
+  - docs(014): audit-log — round-5 findings dispositioned (15/17 fixed-e61e6b9b; 16 acknowledged clean-signal record)
+  - fix(014): trim-aware config validation + honest enforcement marking + quorum visibility (AUDIT-20260611-15/-17)
+  - docs(014): audit-log — round-4 findings dispositioned fixed-8c7766de (AUDIT-20260611-13/-14)
+  - fix(014): killed-external terminal state + none-lane window refusal (AUDIT-20260611-13/-14)
+  - docs(installation-isolation): flip AUDIT-20260611-11/-12 to fixed-5d7c87b6
+  - fix(installation-isolation): doc fixes for AUDIT-20260611-11/-12 + flip round-2 code findings
+  - fix(installation-isolation): widen + inventory announce the cross-tree feature anchor (AUDIT-20260611-10)
+  - fix(installation-isolation): commit-subjects metadata is installation-scoped (AUDIT-20260611-09)
+  - docs(014): audit-log — round-3 findings dispositioned fixed-504153e4 (AUDIT-20260611-11/-12)
+  - fix(014): one fleet vocabulary on every surface + bare-token stdin placeholder (AUDIT-20260611-11/-12)
+  - docs(installation-isolation): flip round-1 findings to fixed-<sha> in the audit-log
+  - fix(installation-isolation): protocol threads the anchor into the render step (AUDIT-20260611-06)
+  - fix(installation-isolation): legacy notice fires once per OPERATOR invocation (AUDIT-20260611-05)
+  - docs(014): audit-log — round-2 findings dispositioned (AUDIT-06 false-premise acknowledged with evidence; 07/09 fixed-d202a7ca; 08/10 fixed-9c214fda)
+  - fix(014): probe attempt-evidence verdicts + tsx usage convention (AUDIT-20260611-08/-10)
+  - fix(014): mixed v2 INDEX fails loud + non-converged lane annotation (AUDIT-20260611-07/-09)
+  - refactor(installation-isolation): one shared git-toplevel derivation (AUDIT-20260611-04)
+  - fix(installation-isolation): cross-tree fold honors the per-payload byte budget (AUDIT-20260611-03)
+  - fix(installation-isolation): untracked fold emits installation-relative paths (AUDIT-20260611-01)
+  - chore(installation-isolation): gitignore .git-govern-base.tmp (AUDIT-20260611-02)
+  - chore(installation-isolation): untrack the Spec Kit extension catalog cache
+  - docs(014): audit-log — round-1 barrage findings lifted + dispositioned fixed-<sha> (AUDIT-20260611-01..05)
+  - fix(014): config-comment honesty + script hygiene (AUDIT-20260611-02/-03/-04)
+  - fix(014): enforcement dedupe only counts a fragment BEFORE the prompt placeholder (AUDIT-20260611-05)
+  - fix(014): reader-side fleet `produced` gates on report bytes, not file existence (AUDIT-20260611-01)
+  - docs(installation-isolation): polish close-out — reconciliation + quickstart validation notes, TASK-45 evidence (T019-T021)
+  - docs(installation-isolation): constitution 1.3.0 — record the installation-anchor invariant (T018, FR-010)
+  - feat(installation-isolation): relocate the Spec Kit root into the installation (T017, US6)
+  - chore(installation-isolation): untrack the migrated audit-run history; depth-agnostic ignore pattern
+  - chore(installation-isolation): retire this repo's root half-installation into the installation (T014, US5)
+  - feat(installation-isolation): legacy half-installation notice in the shared resolver (T013, US5)
+  - test(installation-isolation): RED — legacy half-installation notice (T012, US5)
+  - docs(014): T029 closure evidence — reconcile run, advance proposals surfaced, all 29 tasks complete
+  - feat(installation-isolation): explicit start-point on the backlog walk-up; slush threads its anchor (T011, US4)
+  - feat(014): config v2 templates + probe-verified enforcement + quickstart evidence
+  - test(installation-isolation): RED — cwd never decides placement (T010, US4)
+  - chore(dw-lifecycle): mothball plugin — retired in favor of stack-control (#457)
+  - fix(014): stream artifact assembles ALL assistant texts — FR-005 distortion found live and fixed
+  - chore(installation-isolation): remove smoke-leaked artifacts from the real installation
+  - feat(installation-isolation): govern anchors at the installation (T009, US3; T015/T016 resolver pulled forward)
+  - feat(installation-isolation): installation-first feature-root lookup with derived-toplevel legacy layer (T016, US6)
+  - test(installation-isolation): RED — installation-aware feature-root resolution (T015, US6 pulled forward)
+  - test(installation-isolation): RED — govern anchors at the installation (T008, US3)
+  - feat(installation-isolation): uniform no-installation refusal on every state-writing verb (T007, US2)
+  - test(installation-isolation): RED — uniform no-installation refusal on every state-writing verb (T006, US2)
+  - feat(014): govern loop fleet status — per-round fleet report + degraded 0-HIGH annotation
+  - test(installation-isolation): probe covers the full R5 verb set + anchored --at rows (T005, US1)
+  - feat(014): lift consumes terminal states — non-completed lanes lift zero findings, fleet report at synthesis
+  - feat(installation-isolation): retire --repo-root on 5 state-writing verbs; add --at (T004, US1)
+  - Merge pull request #456 from audiocontrol-org/feature/deskwork-studio
+  - feat(014): INDEX terminal-state rows + fleet report + fire-time unenforced warning
+  - feat(014): barrage foundation — config v2, terminal states, derived timeouts, enforcement injection, watchdog + stream extractor
+  - test(installation-isolation): RED — --repo-root rejected on 5 state-writing verbs (T004)
+  - fix(dw-lifecycle): resolve the locally-installed jscpd instead of npx — gitignore gate green again
+  - fix(deskwork-studio): wrap blob bytes in Uint8Array before subtle.digest — CI green on Node 20
+  - chore: sync package-lock version refs to v0.43.0 after merging origin/main
+  - feat(installation-isolation): thread the resolved installation through barrage + widen (T003, US1)
+  - test(installation-isolation): RED isolation probe — barrage + widen write at the outer root (T002)
+  - fix(speckit): check-prerequisites honors the feature.json branch-check bypass
+  - docs(journal): compose 2026-06-11 narrative — barrage experiment, sonnet incident, spec 014 to runnable
+  - docs(session): session-end record
+  - docs(014): analyze remediation — FR-004 enforcement marking at synthesis is unconditional; fleet 'produced' = converged-eligible; clarify model-rejected-vs-spawn-failed surfacing; gemini lane in template migration
+  - Merge remote-tracking branch 'origin/main' into feature/deskwork-studio
+  - docs(014): tasks — 29 tasks across foundational + 4 story phases, TDD-paired, US1/US2 parallelizable after foundation
+  - docs(014): plan audit-barrage-reliability — research D1-D8, data model (terminal states), config v2 + run-artifact contracts, quickstart; point agent context at 014
+  - chore: release v0.43.0
+  - docs(014): clarify session 2026-06-10 — default claude pin = opus class; unenforceable backends run loudly-marked (refuse = strictness option)
+  - docs(014): specify audit-barrage-reliability — model pinning + derived timeouts, mechanical read-only, fleet observability, spawn watchdog (promotes TASK-26)
+  - chore(backlog): promote TASK-26 (spawn watchdog) into spec:specs/014-audit-barrage-reliability
+  - chore(backlog): capture TASK-26 — barrage spawn watchdog, fail fast on no sign-of-life (borrow audiocontrol e2e watchdog)
+  - docs(roadmap): capture three audit-barrage gaps from the 2026-06-10 model/timeout experiment (model pinning, read-only enforcement, timeout observability)
+  - chore(deskwork-studio): fill session-end journal narrative (2026-06-10)
+  - docs(session): session-end record
+  - chore(deskwork-studio): seed backlog with 44 open deskwork-studio GitHub issues
+- Files changed: 507
+- Backlog touched: TASK-18, TASK-26, TASK-26, TASK-27, TASK-27, TASK-40, TASK-45, TASK-46, TASK-47, TASK-48, TASK-53
+
 ## 2026-06-11: audit-protocol-reliability executed + governed to OPEN; merged; installation-isolation + descriptive-naming authored to runnable
 
 **Goal:** Execute the audit-protocol-reliability spec end-to-end through `/stack-control:execute` (eight silent-failure stories, RED-first), let governance fire and converge; then PR + merge, promote the anchor-unification backlog item, and author the resulting feature(s) to runnable.
