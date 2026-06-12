@@ -5,20 +5,14 @@ description: "Show the canonical feature lifecycle and summarize the current sta
 
 # Feature Help
 
-Report the lifecycle:
+The old repo-wide `.agents/skills/feature-*` lifecycle is deprecated.
 
-1. `feature-define`
-2. `feature-setup`
-3. operator PRD/workplan review in-repo
-4. `feature-issues`
-5. `feature-implement`
-6. `feature-review`
-7. `feature-ship`
-8. `feature-complete`
-9. `feature-teardown`
+Canonical feature lifecycle for this repository:
 
-Also report:
+1. `plugins/stack-control/skills/define/SKILL.md`
+2. `plugins/stack-control/skills/extend/SKILL.md`
+3. `plugins/stack-control/skills/execute/SKILL.md`
+4. Supporting workflow through stack-control backlog, roadmap, session, and release surfaces
 
-- current worktree and branch
-- in-progress features under `docs/1.0/001-IN-PROGRESS/`
-- pending feature-definition drafts under `.agents/.tmp/`
+Use this skill only to point operators away from the deprecated repo-wide path
+and toward the stack-control workflow.

@@ -157,7 +157,10 @@ Plugins are self-contained — no cross-plugin `../` imports. The plugin shells 
 
 ### Development
 
-See `docs/1.0/001-IN-PROGRESS/` for active feature work. The repo uses the feature lifecycle skills under `.claude/skills/feature-*` — run `/feature-help` for an overview.
+See `plugins/stack-control/specs/` for active stack-control feature work. The
+old repo-wide feature lifecycle skills are deprecated; use the stack-control
+front door (`define`, `extend`, `execute`) and the plugin-local Spec Kit
+installation as the canonical development workflow.
 
 ### License
 

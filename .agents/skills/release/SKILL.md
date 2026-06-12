@@ -5,19 +5,13 @@ description: "Run the hard-gated deskwork monorepo release flow: preconditions, 
 
 # Release
 
-Use `RELEASING.md` and the helper scripts under `.claude/skills/release/` as the canonical release implementation.
+DEPRECATED as a canonical repo-level release entry point. The current release
+implementation still lives under `.claude/skills/release/`, but `016/017-portability`
+is rehoming release/update semantics behind a host-neutral stack-control-facing
+surface while preserving lockstep monorepo release behavior.
 
-Required pauses:
+Until that work lands fully:
 
-1. Preconditions + version choice
-2. Post-bump diff review
-3. Operator-side `make publish` in their own terminal
-4. Smoke + tag message
-5. Final push confirmation
-
-Rules:
-
-- no force flags
-- no skipping smoke
-- no agent-run interactive OTP publish
-- preserve the manual/operator handoff where the flow requires it
+1. Treat `.claude/skills/release/` as legacy implementation detail, not the desired long-term surface.
+2. Preserve the current lockstep monorepo release behavior across all shipped plugins/packages.
+3. Do not invent a separate Codex-only release stream.
