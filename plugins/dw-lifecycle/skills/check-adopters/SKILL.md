@@ -1,7 +1,6 @@
 ---
-name: check-adopters
-description: "Find files that should import a canonical primitive but don't, per adopter-manifests.yaml"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:check-adopters
 

@@ -1,7 +1,6 @@
 ---
-name: dismantle-worktrees
-description: Batched propose+apply for removing stale + orphan worktrees. Sibling of :triage-issues and :promote-deferrals. Mutation companion to :worktree-report.
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:dismantle-worktrees
 

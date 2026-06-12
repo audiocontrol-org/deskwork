@@ -43,9 +43,18 @@ import {
   type BarrageResult,
   type BarrageRun,
   type ModelConfig,
-  type ModelRunResult,
 } from '../scope-discovery/audit-barrage/types.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
+import {
+  deriveBarrageExitCode,
+  renderFleetWarnings,
+  zeroOutputModels,
+} from './audit-barrage-fleet.js';
+
+// Fleet-degradation/floor logic lives in audit-barrage-fleet.ts
+// (extracted for the 300–500 line cap); re-exported here so existing
+// import paths — including the test suites — keep working unchanged.
+export { deriveBarrageExitCode, renderFleetWarnings } from './audit-barrage-fleet.js';
 
 const USAGE = [
   'Usage: stackctl audit-barrage',
@@ -53,6 +62,7 @@ const USAGE = [
   '    --prompt-file <path>',
   '    [--repo-root <path>]',
   '    [--models <comma-list>]',
+  '    [--require-models <n>]',
   '    [--quiet]',
   '    [--output-run-dir]',
   '    [--help]',
@@ -67,6 +77,12 @@ const USAGE = [
   '                          audit-runs/<timestamp>-<feature>/`.',
   '--models <comma-list>     Comma-separated subset of the configured models.',
   '                          Defaults to every model in the loaded config.',
+  '--require-models <n>      Minimum number of EMITTING models (stdout bytes',
+  '                          > 0) for the run to pass. The effective floor is',
+  '                          min(n, CONFIGURED fleet size) — a --models subset',
+  '                          does not lower it (AUDIT-20260611-03); a',
+  '                          shortfall fails loudly naming expected vs actual.',
+  '                          Default: no floor (specs/014 US1).',
   '--quiet                   Suppress the stderr summary line.',
   '--output-run-dir          Print JUST the absolute run-dir path on stdout',
   '                          (BarrageRun JSON is suppressed). For bash',
@@ -95,6 +111,12 @@ export interface ParsedFlags {
   readonly modelNames: ReadonlyArray<string> | undefined;
   readonly quiet: boolean;
   readonly outputRunDir: boolean;
+  /**
+   * Minimum number of EMITTING models (stdoutBytes > 0) required for
+   * the run to pass — `--require-models <n>` (specs/014 US1).
+   * `undefined` = no floor (the manual-run default; govern passes 2).
+   */
+  readonly requireModels: number | undefined;
 }
 
 export interface ParseResult {
@@ -121,6 +143,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
   let inlinePrompt: string | undefined;
   let repoRoot: string | undefined;
   let modelsCsv: string | undefined;
+  let requireModelsRaw: string | undefined;
   let quiet = false;
   let outputRunDir = false;
 
@@ -142,7 +165,8 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
       flag === '--prompt-file' ||
       flag === '--prompt' ||
       flag === '--repo-root' ||
-      flag === '--models'
+      flag === '--models' ||
+      flag === '--require-models'
     ) {
       const value = argv[i + 1];
       if (value === undefined) {
@@ -154,6 +178,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
       else if (flag === '--prompt') inlinePrompt = value;
       else if (flag === '--repo-root') repoRoot = value;
       else if (flag === '--models') modelsCsv = value;
+      else if (flag === '--require-models') requireModelsRaw = value;
       continue;
     }
     return { ok: false, error: `unknown flag: ${flag ?? '(empty)'}` };
@@ -187,6 +212,18 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
     modelNames = parts;
   }
 
+  let requireModels: number | undefined;
+  if (requireModelsRaw !== undefined) {
+    const n = Number(requireModelsRaw);
+    if (!Number.isInteger(n) || n < 1) {
+      return {
+        ok: false,
+        error: `--require-models requires a positive integer, got '${requireModelsRaw}'`,
+      };
+    }
+    requireModels = n;
+  }
+
   return {
     ok: true,
     flags: {
@@ -196,6 +233,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
       modelNames,
       quiet,
       outputRunDir,
+      requireModels,
     },
   };
 }
@@ -283,33 +321,13 @@ export function renderUnenforcedWarning(model: ModelConfig): string {
   );
 }
 
-/**
- * Map a BarrageRun's per-model results onto the verb's exit code.
- * Exported for tests; the shim also calls it before exit.
- *
- * Contract (gated on COVERAGE — AUDIT-20260607-42):
- *   - `0` if AT LEAST ONE COVERING family exists (positive-byte stdout,
- *     no spawn failure, AND exit 0).
- *   - `1` (OUTAGE) if zero families cover — every family was a spawn
- *     error, a timeout, a non-zero exit, OR emitted zero bytes.
- *
- * Coverage, not liftability, is the gate. A non-zero-exit family that
- * emitted bytes is still LIFTED for findings (the lift reads each
- * model's `.md` by file presence) whenever the run has coverage from
- * some other family — so its findings are never discarded. But it does
- * NOT itself count as a covering family: for the LLM CLIs this barrage
- * drives, a non-zero exit usually signals a failure (rate-limit, auth
- * expiry, mid-stream drop). Counting a crash-after-banner family as
- * "clean" would let an OUTAGE masquerade as governed-clean in the
- * single-family floor case (FR-005/US3/SC-003) — the exact hole this
- * split closes. Only when EVERY family is non-covering does the run
- * become an OUTAGE (exit 1) → `protocol.ts` fails loud and does NOT
- * auto-lift; the run-dir `.md` artifacts remain for manual triage.
- */
-export function deriveBarrageExitCode(run: BarrageRun): 0 | 1 {
-  const anyCovering = run.results.some(isModelRunCovering);
-  return anyCovering ? 0 : 1;
-}
+// NOTE (specs/015+014 merge): `deriveBarrageExitCode` was EXTRACTED to
+// audit-barrage-fleet.ts on main with a more evolved signature
+// `(run, requireModels, configuredFleetSize)` — the coverage gate PLUS the
+// --require-models floor (AUDIT-20260611-03). It is imported + re-exported above;
+// this branch's older inline 1-arg coverage-only version was dropped in favor of it.
+// `renderUnenforcedWarning` (014 FR-004, above) has no fleet-module equivalent and
+// stays inline.
 
 /**
  * Render the one-line stderr summary describing the run outcome.
@@ -335,7 +353,10 @@ export function renderSummaryLine(run: BarrageRun): string {
   if (covering === total) {
     return `audit-barrage: barrage successful — ${covering}/${total} models emitted findings (run dir: ${run.runDir})`;
   }
-  return `audit-barrage: barrage successful — ${covering} of ${total} models emitted findings; auditing as a practice statistically yields better code (run dir: ${run.runDir})`;
+  const degraded = zeroOutputModels(run).map((r) => r.name);
+  const degradedNote =
+    degraded.length > 0 ? `; zero-output: ${degraded.join(', ')}` : '';
+  return `audit-barrage: barrage successful — ${covering} of ${total} models emitted findings${degradedNote}; auditing as a practice statistically yields better code (run dir: ${run.runDir})`;
 }
 
 /**
@@ -400,12 +421,21 @@ export async function auditBarrage(args: string[]): Promise<void> {
     process.exit(1);
   }
 
+  // The floor evaluates against the CONFIGURED fleet size — never the
+  // --models subset actually run (AUDIT-20260611-03).
+  const configuredFleetSize = config.models.length;
   const result: BarrageResult = {
     run,
-    exitCode: deriveBarrageExitCode(run),
+    exitCode: deriveBarrageExitCode(run, flags.requireModels, configuredFleetSize),
   };
 
   process.stdout.write(renderStdoutOutput(run, flags.outputRunDir));
+  // Degradation warnings are loudness, not summary chrome — they emit
+  // even under --quiet (specs/014 US1; --quiet suppresses only the
+  // one-line summary).
+  for (const warning of renderFleetWarnings(run, flags.requireModels, configuredFleetSize)) {
+    process.stderr.write(`${warning}\n`);
+  }
   if (!flags.quiet) {
     process.stderr.write(`${renderSummaryLine(run)}\n`);
   }

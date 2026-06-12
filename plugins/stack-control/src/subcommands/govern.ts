@@ -53,7 +53,11 @@ import { resolvePhaseUnit } from '../govern/incremental-audit.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
-import { resolveFeatureRoot } from '../scope-discovery/util/feature-root.js';
+import {
+  discoverFeatureRoots,
+  resolveFeatureRoot,
+} from '../scope-discovery/util/feature-root.js';
+import { backlogRoot } from '../backlog/root.js';
 
 /**
  * specs/015 US2 (FR-004): the per-invocation convergence ceiling govern hands the
@@ -87,6 +91,9 @@ const USAGE = [
   '                            stays BLOCKED — useful only once a real in-process fixer',
   '                            lands. Cross-round fixing is agent-paced: fix, re-invoke.',
   '  --override "<reason>"      Record an explicit override.',
+  '  --require-models <n>      Minimum emitting models for the barrage fleet',
+  '                            (default 2 — the cross-model agreement signal',
+  '                            is what protocol runs exist for; specs/014 US1).',
   '  --no-slush                Disable the slush step (address every finding).',
   '  --json                    Emit the gate verdict JSON only.',
   '  implement: --diff-base <ref>   Diff base (default HEAD~1).',
@@ -107,6 +114,7 @@ interface GovernFlags {
   repoRoot?: string;
   ceiling?: string;
   override?: string;
+  requireModels?: string;
   noSlush: boolean;
   json: boolean;
   diffBase?: string;
@@ -123,6 +131,7 @@ const VALUED = new Set([
   '--repo-root',
   '--ceiling',
   '--override',
+  '--require-models',
   '--diff-base',
   '--spec-path',
   '--plan-path',
@@ -155,6 +164,7 @@ function parseFlags(argv: readonly string[]): { ok: true; flags: GovernFlags } |
       else if (tok === '--repo-root') flags.repoRoot = value;
       else if (tok === '--ceiling') flags.ceiling = value;
       else if (tok === '--override') flags.override = value;
+      else if (tok === '--require-models') flags.requireModels = value;
       else if (tok === '--diff-base') flags.diffBase = value;
       else if (tok === '--spec-path') flags.specPath = value;
       else if (tok === '--plan-path') flags.planPath = value;
@@ -258,13 +268,36 @@ export function buildImplementVars(
   slug: string,
   diffBaseFlag: string | undefined,
   checkpointFlag: string | undefined,
+  // specs/015 + 014 merge: pathScope (per-phase inclusion, 015) AND
+  // featureRoot/excludeRoots/excludePaths (self-reference/cross-feature/bookkeeping
+  // exclusion, 014 US5) are threaded together into the assembler. `auditLogExcerpt`
+  // is GONE: 015 SC-005 drops the excerpt from the implement payload entirely
+  // (the body sets audit_log_excerpt: ''), so there is no excerpt to pass.
   pathScope?: readonly string[],
+  featureRoot?: string,
+  excludeRoots?: readonly string[],
+  excludePaths?: readonly string[],
 ): { vars: BarrageVars; checkpoint: string; skippedOutOfScope: readonly string[] } {
   const base = diffBaseFlag ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
   const budgetEnv = process.env.GOVERN_PAYLOAD_BUDGET;
+  // specs/014 US5: thread the resolved feature root so the payload is
+  // self-reference-free (audit-log excluded from both arms), plus the
+  // repo's full feature-root list (`excludeRoots`, from the async
+  // discoverFeatureRoots — this builder stays sync) so the untracked
+  // fold drops OTHER features' scaffolds while still folding the
+  // feature's own files and new source modules (AUDIT-20260611-01),
+  // plus the governance-bookkeeping store paths (`excludePaths`, from
+  // the backlog root seam — AUDIT-20260611-08: per-round backlog
+  // bookkeeping commits land in the diff range the same way lift
+  // commits do, re-feeding prior findings through a channel the
+  // feature-root pathspec misses). The labeled audit_log_excerpt block
+  // below stays the ONLY audit-log content in the payload (013/TASK-25).
   const payload = assembleImplementPayload({
     repoRoot,
     base,
+    ...(featureRoot !== undefined ? { featureRoot } : {}),
+    ...(excludeRoots !== undefined ? { excludeRoots } : {}),
+    ...(excludePaths !== undefined ? { excludePaths } : {}),
     ...(budgetEnv !== undefined && budgetEnv.length > 0
       ? { budgetBytes: Number.parseInt(budgetEnv, 10) }
       : {}),
@@ -298,6 +331,31 @@ export function buildImplementVars(
   // the govern verdict surface as a consolidated, machine-greppable summary — not
   // only as the interleaved per-file stderr warns assembleImplementPayload emits.
   return { vars, checkpoint, skippedOutOfScope: payload.skippedOutOfScope };
+}
+
+/**
+ * AUDIT-20260611-08: the governance backlog task store rides into the
+ * implement payload's diff range via per-round bookkeeping commits — the
+ * same lift-commit-in-range mechanism US5 closed for the audit-log, but
+ * through a store that lives at the plugin root, outside the feature
+ * root's pathspec. Implement mode threads the store into the assembler's
+ * `excludePaths`; the path is owned HERE, not hardcoded in the assembler:
+ * `backlogRoot()` (src/backlog/root.ts) respects the STACKCTL_BACKLOG_DIR
+ * seam and otherwise resolves through the enclosing installation, and the
+ * `backlog` binary hardcodes the `backlog/` subdir under that root.
+ * Outside any installation (no seam) there IS no backlog store, so there
+ * is nothing to exclude — that skip is announced on stderr, never silent.
+ */
+function resolveGovernExcludePaths(): readonly string[] {
+  try {
+    return [join(backlogRoot(), 'backlog')];
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(
+      `govern: no backlog store resolved (${msg}) — backlog-store payload exclusion skipped (nothing to exclude).\n`,
+    );
+    return [];
+  }
 }
 
 export function buildSpecVars(
@@ -350,6 +408,22 @@ export async function runGovern(args: string[]): Promise<void> {
     process.exit(2);
   }
 
+  // specs/014 US1 (Clarification 2026-06-11): govern-driven barrages default
+  // to a fleet floor of 2 — the cross-model agreement signal is what protocol
+  // runs exist for. --require-models overrides in either direction
+  // (1 = lenient opt-out; >2 = stricter opt-in).
+  let requireModels = 2;
+  if (flags.requireModels !== undefined) {
+    const n = Number(flags.requireModels);
+    if (!Number.isInteger(n) || n < 1) {
+      process.stderr.write(
+        `govern: --require-models requires a positive integer, got '${flags.requireModels}'\n${USAGE}\n`,
+      );
+      process.exit(2);
+    }
+    requireModels = n;
+  }
+
   try {
     const repoRoot = resolveRepoRoot(flags.repoRoot);
     const slug = resolveSlug({
@@ -364,10 +438,8 @@ export async function runGovern(args: string[]): Promise<void> {
     // specs/015 US4 (FR-007 / T025): a `--phase <id>` selector audits ONE
     // tasks.md phase as a bounded unit — the SAME convergence protocol/loop, a
     // smaller payload. Resolve the phase unit from the feature's tasks.md, scope
-    // the untracked fold to the phase's files, and run the loop under the
-    // per-phase checkpoint (`phase-<id>`) so the gate evaluates that phase's
-    // convergence independently (per-checkpoint loops). `--phase` is implement
-    // mode only.
+    // the untracked fold + committed diff to the phase's files, and run the loop
+    // under the per-phase checkpoint (`phase-<id>`). `--phase` is implement only.
     let phaseUnit: AuditUnit | undefined;
     if (flags.mode === 'implement' && flags.phase !== undefined) {
       const { root } = await resolveFeatureRoot({ repoRoot, slug });
@@ -387,27 +459,60 @@ export async function runGovern(args: string[]): Promise<void> {
       phaseUnit = resolvePhaseUnit({ tasksPath, phaseId: flags.phase, diffBase });
     }
 
-    // Spec 013 (TASK-25): the spec-mode excerpt is resolved through the
-    // layout-aware helper so a specs/NNN-<slug> feature's audit-log is found
-    // instead of silently empty under the old hardcoded docs/ path. specs/015
-    // (FR-006/D7): implement mode DROPS the excerpt entirely (the self-referential
-    // fold), so it is resolved ONLY for spec mode.
+    // specs/014 US5: resolve the audit-log excerpt (spec mode), the feature root
+    // and the full feature-root list (excludeRoots) so the implement payload is
+    // self-reference-free + cross-feature-clean, plus the governance backlog store
+    // (excludePaths). AUDIT-20260611-12: the resolver THROWS on an ambiguous Spec
+    // Kit slug — translate into the same exit-2 FATAL channel as the
+    // unresolvable-root refusal below (the outer catch only handles
+    // GovernProtocolError/GovernPayloadError). specs/015 SC-005: implement mode
+    // drops the excerpt from its OWN payload, but the excerpt is still resolved
+    // here for spec mode + the root is still needed for the exclusions.
+    let auditLogExcerpt: string;
+    let featureRoot: string | undefined;
+    let excludeRoots: readonly string[] | undefined;
+    try {
+      auditLogExcerpt = await resolveAuditLogExcerpt(repoRoot, slug);
+      ({ root: featureRoot } = await resolveFeatureRoot({ repoRoot, slug }));
+      excludeRoots =
+        flags.mode === 'implement' && featureRoot !== undefined
+          ? await discoverFeatureRoots(repoRoot)
+          : undefined;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`govern: FATAL — ${msg}\n`);
+      process.exit(2);
+    }
+    // AUDIT-20260611-04: implement mode REFUSES to run without a resolved feature
+    // root (an undefined root used to revert the assembler to the pre-014
+    // self-referential repo-wide payload, silently). Fail loud at the decision site.
+    if (flags.mode === 'implement' && featureRoot === undefined) {
+      process.stderr.write(
+        `govern: FATAL — feature '${slug}' not found under ${join(repoRoot, 'specs')}/<NNN>-${slug} (speckit) or ${join(repoRoot, 'docs')}/*/001-IN-PROGRESS/${slug} (legacy-docs).\n`,
+      );
+      process.exit(2);
+    }
+    // AUDIT-20260611-08: thread the governance backlog store so its bookkeeping
+    // commits/files are excluded from both payload arms.
+    const excludePaths =
+      flags.mode === 'implement' && featureRoot !== undefined
+        ? resolveGovernExcludePaths()
+        : undefined;
+    // specs/015 + 014 merge: buildImplementVars threads BOTH the per-phase
+    // pathScope (015 US4 — phaseUnit's files, and its `phase-<id>` checkpoint when
+    // present) AND the 014 US5 exclusion inputs (featureRoot/excludeRoots/excludePaths).
     const built =
       flags.mode === 'spec'
-        ? buildSpecVars(
-            repoRoot,
-            slug,
-            flags.specPath,
-            flags.planPath,
-            flags.checkpoint,
-            await resolveAuditLogExcerpt(repoRoot, slug),
-          )
+        ? buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint, auditLogExcerpt)
         : buildImplementVars(
             repoRoot,
             slug,
             flags.diffBase,
             phaseUnit !== undefined ? phaseUnit.auditLogSection : flags.checkpoint,
             phaseUnit?.diffScope.files,
+            featureRoot,
+            excludeRoots,
+            excludePaths,
           );
 
     // US7 (FR-032): implement-mode governance runs the per-codebase clone step,
@@ -437,6 +542,7 @@ export async function runGovern(args: string[]): Promise<void> {
       checkpoint: built.checkpoint,
       vars: built.vars,
       models: pick(undefined, process.env.GOVERN_MODELS),
+      requireModels,
       ceiling: pick(flags.ceiling, process.env.GOVERN_CEILING),
       override: pick(flags.override, process.env.GOVERN_OVERRIDE),
       noSlush,

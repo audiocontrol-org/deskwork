@@ -1,7 +1,6 @@
 ---
-name: customize
-description: "Copy a built-in dw-lifecycle template (markdown) or scope-discovery default (TS / YAML) into .dw-lifecycle/ so the project can tailor it."
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:customize
 

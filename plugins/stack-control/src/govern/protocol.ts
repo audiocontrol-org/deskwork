@@ -191,6 +191,13 @@ export interface RunProtocolArgs {
   readonly checkpoint: string;
   readonly vars: BarrageVars;
   readonly models?: string | undefined;
+  /**
+   * Minimum emitting models passed to the barrage as
+   * `--require-models <n>` (specs/014 US1). Govern defaults this to 2 —
+   * protocol runs exist for the cross-model agreement signal
+   * (Clarification 2026-06-11). `undefined` = no floor.
+   */
+  readonly requireModels?: number | undefined;
   readonly ceiling?: string | undefined;
   readonly override?: string | undefined;
   readonly noSlush: boolean;
@@ -283,13 +290,20 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
     if (args.models !== undefined && args.models.length > 0) {
       barrageArgs.push('--models', args.models);
     }
+    if (args.requireModels !== undefined) {
+      barrageArgs.push('--require-models', String(args.requireModels));
+    }
     const barrage = spawnText(args.barrageBin, barrageArgs);
     // AUDIT-20260607-07: a non-zero barrage exit is an OUTAGE (zero healthy
-    // model families) → fail loud and do NOT lift.
+    // model families) — or, with a floor requested (specs/014 US1), a
+    // fleet-floor shortfall → fail loud and do NOT lift. The barrage's own
+    // stderr names which (OUTAGE summary vs FLOOR SHORTFALL line).
     if (barrage.status !== 0) {
+      const barrageNote = barrage.stderr.trim();
       throw new GovernProtocolError(
-        `govern: FATAL — audit-barrage OUTAGE (exit ${barrage.status}): zero model families were healthy. ` +
-          'The work is NOT recorded as governed (FR-005). Check that the configured model-family CLIs are installed and reachable.',
+        `govern: FATAL — audit-barrage OUTAGE or fleet-floor shortfall (exit ${barrage.status}). ` +
+          'The work is NOT recorded as governed (FR-005). Check that the configured model-family CLIs are installed and reachable.' +
+          (barrageNote.length > 0 ? `\n${barrageNote}` : ''),
       );
     }
     const runDir = barrage.stdout.trim();

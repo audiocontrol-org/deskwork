@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:20'
+updated_date: '2026-06-11 00:55'
 labels:
   - agent-found
   - 'type:bug'
@@ -31,3 +31,9 @@ Recovered from #436 (closed NOT_PLANNED during the GitHub->backlog migration, wh
 
 Tracked as roadmap item `design:gap/roadmap-edge-aware-archival` (part-of design:feature/roadmap-protocol).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Roadmap node design:gap/roadmap-edge-aware-archival (ref gh-436) was retired 2026-06-11 and migrated here; a duplicate capture (TASK-31) was created in that pass and archived in favor of this item.
+<!-- SECTION:NOTES:END -->

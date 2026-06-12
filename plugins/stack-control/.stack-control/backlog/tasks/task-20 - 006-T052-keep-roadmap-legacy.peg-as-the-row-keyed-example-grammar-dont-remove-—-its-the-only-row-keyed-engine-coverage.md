@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:20'
+updated_date: '2026-06-11 00:55'
 labels:
   - agent-found
   - 'type:gap'
@@ -31,3 +31,9 @@ Recovered from #435 (closed NOT_PLANNED during the GitHub->backlog migration, wh
 
 Option 1 is the lower-churn, coverage-preserving call and is the current implemented state. Filing so the choice is explicit rather than a silently-skipped task. Surfaced during 006 US6.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Roadmap node design:gap/row-keyed-test-grammar (ref gh-435) was retired 2026-06-11 and migrated here; duplicate capture TASK-34 archived in favor of this item.
+<!-- SECTION:NOTES:END -->

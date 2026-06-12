@@ -75,6 +75,70 @@
   - docs(roadmap): capture three audit-barrage gaps from the 2026-06-10 model/timeout experiment (model pinning, read-only enforcement, timeout observability)
 - Files changed: 13
 - Backlog touched: TASK-26
+## 2026-06-11: Post-release verification (v0.42.0), tracking consolidation, and authoring spec 014 to runnable
+
+**Goal:** Verify the spec-013 fixes in the formally-installed v0.42.0 release and close their tracking; consolidate all defect tracking into the backlog (GitHub issues + roadmap fix/gap nodes); cultivate a burn-down set and author it as the next Spec Kit feature.
+
+**Accomplished:**
+- **Installed-release verification of 013** (`c578a5d0`): 16/16 assertions driving the installed marketplace `bin/stackctl` against tmp fixtures — US2 scaffold-on-first-lift, legacy-layout no-regression, fail-loud-both-layouts, specs-first precedence with no split-brain write, gate resolution (SC-001), and a behavioral probe of `resolveAuditLogExcerpt` (TASK-25). TASK-13/14/25 closed Done with evidence appended; closure operator-authorized.
+- **Roadmap item added** (`222b7a26`): `design:feature/backlog-backend-port` — a BacklogStore port between the backlog frontend verbs and the backlog.md backend, motivated by the operator's objection to backlog.md's leaked conventions (space-laden filenames, `.md.md`, archiving model, directory layout).
+- **Tracking consolidation:** migrated the 5 open GitHub issues to the backlog (`a5a7dff0`, TASK-26..30, bodies intact — import-before-close avoided the prior round's body-drop); migrated 7 defect-tracking roadmap nodes to the backlog (`e0008ab9`, nodes retired with pointers; all leaves, graph re-validates); deduped my own 5 duplicate captures against the 2026-06-10 seed imports (`9d809d62`). Repo now has 0 open GitHub issues; the roadmap is a near-pure feature DAG.
+- **Cultivated the burn-down set + closed 2 stale items with evidence** (`6b742769`): TASK-27 (gh-449 doesn't reproduce in v0.42.0) and TASK-32 (T038 green at HEAD) closed; TASK-29 promoted `spec:` lead + TASK-2/5/12/24/28/30/37 promoted `tasks:` toward specs/014.
+- **Authored spec 014 (audit-protocol-reliability) to runnable** through the native chain: specify (`630b1401`) → clarify (`8a008742`, 3 operator decisions) → plan + research/data-model/contracts/quickstart (`baff2a25`) → 22-task RED-first tasks.md (`61414757`). `spec-check`: spec=yes plan=yes tasks=yes. Phase-0 research re-verified all 8 surfaces at file:line and corrected two planning assumptions (US5 must exclude the audit-log from the committed-diff arm, not just the untracked fold; SC-007 probe targets path construction, not message strings).
+
+**Didn't Work:**
+- **`backlog capture` created 5 duplicates** during the roadmap migration — capture doesn't dedupe by `--ref` (only `import-github` checks `gh-<n>`), and I didn't check the existing pile first. Needed a dedupe+archive pass and ROADMAP pointer repointing. (Captured as friction + the verb-level gap is TASK-38.)
+- **session-end's auto-derived quantitative section reported 0 commits / no backlog touched** for a 10-commit session — the boundary derivation missed the session window entirely; numbers below re-derived by hand from `git log c437231e..HEAD` per the verify-before-publishing instruction. (Captured as TASK-39.)
+- **Direct backlog.md CLI invocations are cwd-flaky** — `task edit` worked from `plugins/stack-control` once, later failed from the same cwd; reliable only from the store parent (`.stack-control/`). (Captured as friction.)
+
+**Course Corrections:**
+- [PROCESS] Operator: GitHub issues were already closed — the live tracking to close was the **backlog** (the migration comments are the canon: "tracking continues in the backlog"). Adjusted; the verification evidence went onto the backlog items.
+- [PROCESS] Operator recalled the roadmap still carried bug/gap nodes that belong in the backlog — the consolidation pass was operator-driven scope, not agent-proposed.
+
+**Insights:**
+- **Two-tier tracking is now actually two-tier.** GitHub issues → backlog (import-github), roadmap defect nodes → backlog (capture + retire + pointer), burn-down → spec (promote seam). Each migration leg preserved bodies + bidirectional refs. The failure mode to watch: `capture` is the only intake without ref-dedupe — exactly the leg where I created duplicates.
+- **Verification-first cultivation pays.** Two of the ten candidate burn-down items (TASK-27, TASK-32) closed with zero implementation — their symptoms were stale claims. Re-verifying before scoping kept dead work out of spec 014.
+- **The 013 research-D5 pattern repeated for 014:** the spec's acceptance probe as literally written (grep-empty) would have condemned the 013-mandated fail-loud messages naming both layouts. Reading the actual grep hits during Phase-0 research — not at implementation time — is what kept SC-007 honest.
+
+**Quantitative (re-derived by hand from `git log c437231e..HEAD` — the auto-derivation reported 0, see TASK-39):**
+- Commits: 11 (10 work + this session-end record `58663921`): `c578a5d0`, `222b7a26`, `a5a7dff0`, `e0008ab9`, `9d809d62`, `6b742769`, `630b1401`, `8a008742`, `baff2a25`, `61414757`, `58663921`.
+- Files changed: 37 (+1178 / −28) across the session window.
+- Backlog: 3 closed-verified (TASK-13/14/25), 2 closed-stale (TASK-27/32), 14 created (TASK-26..39), 5 archived as duplicates (TASK-31/33/34/35/36), 8 promoted toward specs/014. Pile at close: 29 To Do / 12 Done / 5 archived.
+- Tests: no production code touched; suite untouched at the 173 files / 1150 cases baseline (verified green for the T038 check: generality file 4/4).
+- Tooling friction captured: 2 via session-end (+2 backlog bugs filed: TASK-38 capture-dedupe, TASK-39 session-end derivation).
+- Corrections: 2.
+
+## 2026-06-11: Implement + ship spec 013 — layout-aware audit-protocol resolution
+
+**Goal:** Implement spec 013 (audit-protocol-hardening) RED-first — widen the shared feature-root resolver to the `specs/NNN-slug/` Spec Kit layout so the audit protocol stops FATAL-ing on spec-structured features — and ship it.
+
+**Accomplished:**
+- **US1 (MVP) — layout-aware `resolveFeatureRoot`** (`70f981cf`): a `speckit` branch matches a child of `<repoRoot>/specs` named exactly `<slug>` or `^\d+-<slug>$`, with specs-first precedence (deterministic) and fail-loud on numeric-prefix ambiguity. The legacy `docs/` walk is untouched — the lex-greatest-NOT-semver contract preserved by a ported regression wall. Result now carries `layout`. All four helper-callers (gate/lift/slush/backlog) name BOTH layouts on a miss.
+- **US2 — first-barrage audit-log scaffold** (`0c751113`): `audit-barrage-lift` scaffolds the canonical header (`--- slug / targetVersion ---` + `# Audit log — <slug>`) via `atomicWriteFile` at a resolved root that has none, instead of `return 2`. Idempotent on an existing log; `targetVersion` derived from the legacy-docs path or `""` for speckit.
+- **TASK-25 fixed in-scope** (`01abc18a`): T016/SC-005 surfaced a FIFTH governance consumer the tasks didn't enumerate — `govern.ts` hardcoded `docs/1.0/001-IN-PROGRESS/<slug>/audit-log.md` for the barrage `audit_log_excerpt`, silently empty for `specs/` features (a forbidden fallback). New async `resolveAuditLogExcerpt` routes through the helper; `buildImplementVars`/`buildSpecVars` are now pure (excerpt threaded by `runGovern`).
+- **Shipped:** PR **#452** (`feature/stack-control` → `main`), merged at `ad3e1c4d`. The headline unblock verified live (SC-001): the gate against `specs/013-audit-protocol-hardening` now resolves the feature (error advanced from *"not found under docs/"* to *"audit-log not found at .../specs/013-.../audit-log.md"* — a path only the new branch can produce).
+
+**Didn't Work:**
+- **Every lifecycle verb fails from the repo root.** session-start / backlog / session-end all fail-loud because the only `.stack-control/config.yaml` files live under `plugins/<name>/`, not the repo root (the natural agent cwd). Needed `--at plugins/stack-control` or a manual `cd` on every call. (Filed as friction.)
+- **`gh pr merge` 401'd** on a follow-up call (GraphQL/branch-update), while the underlying REST merge PUT succeeded — confirmed `"merged": true` via `gh api -X PUT .../merge`. Same gh-mutation-401 pattern as the 2026-06-10 v0.41.0 ship.
+- **backlog wrapper can't mark an item Done** — TASK-25 is fixed+merged but its board status is still To Do; the wrapper has no `edit -s` verb and native `backlog` isn't wired to the install dir. (Filed as friction.)
+
+**Course Corrections:**
+- [PROCESS/UX] Oriented + ran the verb with `--at plugins/stack-control` from the repo root; operator: *"you should stay in plugins/stack-control."* The installation lives in the plugin dir, not the repo root — corrected the working cwd for the rest of the session.
+
+**Insights:**
+- The "one shared resolver" extraction (AUDIT-20260530-15) paid off exactly as designed: widening `feature-root.ts` ONCE unblocked all four governance callers at the gate/lift/slush/backlog surface with no per-call edits. The only gap was the consumer that never used the helper at all (`govern.ts`) — which is why the SC-005 grep, not the test suite, is what caught it. A leverage-point refactor is only as good as the audit that confirms every consumer actually routes through it.
+- The tasks.md was authored against dw-lifecycle's test layout (`src/.../__tests__/`), but stack-control's vitest only collects `src/__tests__/**` + `tests/**` — a test placed per the literal task path would silently never run. The vendoring (multi/migrate-audit-barrage) moved the code but not its tests or its collection conventions; faithful task execution required reading the actual `vitest.config.ts`, not the task path.
+- "Watch it fail" caught a spec-vs-reality gap the planning missed: T012/T014 assumed a "no-new-diff guard" that doesn't exist in the vendored lift — the RED test passed on first run, revealing T014 as a no-op rather than a fix. Without the RED step this would have shipped as a fabricated "fixed the stranding guard" claim.
+
+**Quantitative:**
+- Commits: 4 — US1 (`70f981cf`), US2 (`0c751113`), TASK-25 govern fix (`01abc18a`), tasks.md completion record (`ce64e504`). (Session-end record adds a 5th: `8413c197`.)
+- Files changed: 13 (+643 / −48) across the 4 impl commits.
+- Tests: final stack-control suite **173 files / 1150 cases, all green** (run from `plugins/stack-control` with its own vitest v2). This session added **4 test files / 18 cases**: feature-root (12), spec-governance-gate-resolution (1), audit-log-scaffold (2), govern-audit-log-excerpt (3). A clean pre-session full-suite baseline was not captured, so no N→M delta is asserted (per AUDIT-04 — absence over false precision); the +18 reconciles by summing the new files.
+- Open findings at session end: 0 audit-barrage findings (no barrage fired this session — the change was the resolver that makes barraging `specs/` features possible). Backlog: **TASK-25** created + fixed + merged but still `To Do` (a parked-but-resolved item — needs the operator's close, blocked by the missing `backlog edit -s` verb); **TASK-24** remains the genuinely-deferred scope-discovery direct-path follow-on.
+- Tooling friction captured: 2 (repo-root installation resolution; backlog has no status-edit verb).
+- Corrections: 1.
+- Spec 013: implemented (T001–T017) + shipped via PR #452 (merged `ad3e1c4d`).
 
 ## 2026-06-10: Recover dropped backlog bodies; author + narrow spec 013 (audit-protocol path resolution)
 

@@ -3,10 +3,10 @@ id: TASK-14
 title: >-
   stack-control: feature resolution is docs-layout-only —
   import-slush/scope-widen/scope-inventory cannot see specs/NNN-slug features
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:51'
+updated_date: '2026-06-11 00:28'
 labels:
   - agent-found
   - 'type:bug'
@@ -55,4 +55,6 @@ Discovered live; local backlog ref: design-control installation TASK-5. Filed pe
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** spec:specs/013-audit-protocol-hardening
+
+Verified fixed in the formally-installed v0.42.0 marketplace copy (2026-06-11), 16/16 installed-surface assertions: (1) lift + spec-governance-gate resolve a specs/NNN-slug feature and read/write its audit-log there; (2) legacy docs/1.0/001-IN-PROGRESS layout resolves unchanged (no regression); (3) neither-layout fails loud with an error naming BOTH searched layouts (exit 2); (4) a slug under both layouts resolves specs-first deterministically — findings landed only in the specs/ audit-log, docs/ copy untouched (no split-brain). Closed per operator direction after installed-release verification. Residual scope-widen EVIDENCE-path surface (gh-442 follow-up comment) is tracked separately as TASK-24.
 <!-- SECTION:NOTES:END -->

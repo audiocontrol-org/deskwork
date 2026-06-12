@@ -70,12 +70,23 @@ describe('scope-export — base-root resolution', () => {
     expect(result.resolvedPath).toBe(manifestPath);
   });
 
-  it('exits 2 on a missing manifest', async () => {
+  it('exits 2 on an unresolvable feature (specs/014 US7: failure moves from read time to layout-aware resolution time)', async () => {
     const f = fx();
     const root = f.install('.');
     const result = await main(['--slug', 'absent', '--at', root, '--quiet']);
     expect(result.code).toBe(2);
-    expect(result.resolvedPath).toBe(join(root, 'docs/1.0/001-IN-PROGRESS/absent/scope-manifest.yaml'));
+    // Pre-014 this constructed a legacy docs path and failed at read
+    // time; under FR-010 the default routes through resolveFeatureRoot,
+    // which fails loud before any path exists to report.
+    expect(result.resolvedPath).toBeUndefined();
+  });
+
+  it('exits 2 on a missing manifest at an explicitly-named path (read-time failure keeps the resolved path)', async () => {
+    const f = fx();
+    const root = f.install('.');
+    const result = await main(['--manifest', 'custom/absent.yaml', '--at', root, '--quiet']);
+    expect(result.code).toBe(2);
+    expect(result.resolvedPath).toBe(join(root, 'custom/absent.yaml'));
   });
 
   it('exits 2 when neither --slug nor --manifest is given', async () => {

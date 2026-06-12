@@ -1,7 +1,6 @@
 ---
-name: archive-phases
-description: "Move completed phase sections from a feature's workplan.md to workplan-archive.md; update the workplan-archive-ledger comment so the auto-positioner doesn't collide with archived fix-task IDs"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:archive-phases
 

@@ -1,7 +1,6 @@
 ---
-name: issues
-description: "Create parent + per-phase GitHub issues from workplan; back-fill issue links"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:issues
 

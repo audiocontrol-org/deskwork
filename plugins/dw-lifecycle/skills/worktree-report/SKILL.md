@@ -1,7 +1,6 @@
 ---
-name: worktree-report
-description: Read-only snapshot of all git-registered worktrees + orphan directories with per-criterion staleness verdicts. Sibling of /dw-lifecycle:debt-report.
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:worktree-report
 

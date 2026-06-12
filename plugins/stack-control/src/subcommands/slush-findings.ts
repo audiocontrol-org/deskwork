@@ -25,9 +25,10 @@ import { slushRemaining } from '../scope-discovery/promote-findings/slush-remain
 import { filterByCheckpoint } from '../scope-discovery/promote-findings/checkpoint-filter.js';
 import { createBacklogBackend } from '../backlog/backend.js';
 import { backlogRoot } from '../backlog/root.js';
-import { findFindingsByStatus, migrateFindings } from '../backlog/slush-migrate.js';
+import { migrateFindings } from '../backlog/slush-migrate.js';
+import { errorMessage } from '../scope-discovery/util/typeguards.js';
 
-/** Open-status predicate for locating the flipped findings to migrate. */
+/** Expected status at each flip's recorded location (specs/014 US4 guard). */
 const STATUS_OPEN_RE = /^Status:\s*open\b/i;
 
 interface SlushOptions {
@@ -48,7 +49,9 @@ const USAGE = [
   '    [--apply]                 Write the change (default: dry-run).',
   '    [--help]',
   '',
-  'Exit: 0 proposed/applied/no-op; 2 config error (missing flag, feature not found).',
+  'Exit: 0 proposed/applied/no-op; 1 apply failure (a decided flip could not',
+  '      be located — audit-log changed between decision and apply; nothing',
+  '      written); 2 config error (missing flag, feature not found).',
 ].join('\n');
 
 function todayUTC(): string {
@@ -167,16 +170,49 @@ export async function runSlushFindings(args: string[]): Promise<void> {
   // entry — NOT `acknowledged-slush-pile`. We deliberately do NOT consume
   // res.newAuditLogText (which carries the old parked status); slush-remaining
   // stays frozen, we just stop using that one output.
+  //
+  // specs/014 US4 (AUDIT-20260609-19): the apply set IS the flips set — the
+  // dampener decision carries each flip's located status line, and apply
+  // consumes exactly that set. The old findFindingsByStatus re-walk keyed
+  // independently and could migrate a same-id entry in a DIFFERENT section,
+  // leaving the decided flip silently open behind an exit-0 apply.
   if (opts.apply) {
-    const flipIds = new Set(res.flips.map((f) => f.findingId));
-    const findings = findFindingsByStatus(text, STATUS_OPEN_RE).filter((f) => flipIds.has(f.findingId));
+    const findings = res.flips.map((f) => ({
+      findingId: f.findingId,
+      fullFindingId: f.fullFindingId,
+      severity: f.severity,
+      statusLineIndex: f.statusLineIndex,
+      title: f.title,
+    }));
     const backend = createBacklogBackend({ cwd: backlogRoot() });
-    const mig = migrateFindings({ auditLogText: text, findings, backend, featureSlug: opts.feature });
+    let mig: ReturnType<typeof migrateFindings>;
+    try {
+      mig = migrateFindings({
+        auditLogText: text,
+        findings,
+        backend,
+        featureSlug: opts.feature,
+        expectedStatusRe: STATUS_OPEN_RE,
+      });
+    } catch (err) {
+      process.stderr.write(`slush-findings: FATAL — ${errorMessage(err)}\n`);
+      process.exit(1);
+    }
     await atomicWriteFile(auditLogPath, mig.newAuditLogText);
+    // AUDIT-20260611-02: surface BOTH counts — a flip whose ref already exists
+    // (same canonical id migrated earlier from another section) creates no new
+    // item but its status is rewritten to the existing task id. Dry-run N ≡
+    // migrated + already-present N on an unchanged audit-log.
+    const alreadyPresent =
+      mig.skipped.length > 0
+        ? ` (${mig.skipped.length} already present: ${mig.skipped
+            .map((s) => `${s.findingId}→${s.taskId}`)
+            .join(', ')})`
+        : '';
     process.stdout.write(
       `slush-findings: APPLIED — migrated ${mig.migrated.length} finding(s) to the backlog: ${mig.migrated
         .map((m) => `${m.findingId}→${m.taskId}`)
-        .join(', ')}\n`,
+        .join(', ')}${alreadyPresent}\n`,
     );
   } else {
     process.stdout.write(

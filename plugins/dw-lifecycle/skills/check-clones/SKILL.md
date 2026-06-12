@@ -1,7 +1,6 @@
 ---
-name: check-clones
-description: "Run the jscpd-backed clone detector against the project; surface NEW clone groups against the committed baseline"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:check-clones
 

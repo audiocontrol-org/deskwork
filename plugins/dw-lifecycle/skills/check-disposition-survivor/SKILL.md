@@ -1,7 +1,6 @@
 ---
-name: check-disposition-survivor
-description: "Pre-commit gate detecting silent non-pending → pending disposition transitions in clones.yaml"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:check-disposition-survivor
 

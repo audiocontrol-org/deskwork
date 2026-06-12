@@ -1,7 +1,6 @@
 ---
-name: check-refactor-preconditions
-description: "Commit-msg gate verifying Step 0a/0b refactor preconditions for `Closes clones.yaml <id>` commits"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:check-refactor-preconditions
 

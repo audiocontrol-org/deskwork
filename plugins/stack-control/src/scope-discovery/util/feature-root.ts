@@ -145,6 +145,49 @@ export async function resolveFeatureRoot(
 }
 
 /**
+ * Enumerate EVERY feature root across both physical layouts (specs/014
+ * US7). Used by consumers that walk all features rather than resolving
+ * one slug — e.g. the provenance doctor rule's audit-log discovery.
+ * Living here keeps the layout literals inside the one shared resolver
+ * module (FR-010: no consumer outside this file constructs the legacy
+ * `001-IN-PROGRESS` path). Hidden (dot-prefixed) directories are
+ * skipped; the result is sorted for deterministic downstream output.
+ */
+export async function discoverFeatureRoots(
+  repoRoot: string,
+): Promise<readonly string[]> {
+  const out: string[] = [];
+  const specsRoot = join(repoRoot, 'specs');
+  if (existsSync(specsRoot)) {
+    for (const child of await readDirNames(specsRoot)) {
+      out.push(join(specsRoot, child));
+    }
+  }
+  const docsRoot = join(repoRoot, 'docs');
+  if (existsSync(docsRoot)) {
+    for (const version of await readDirNames(docsRoot)) {
+      const inProgress = join(docsRoot, version, '001-IN-PROGRESS');
+      if (!existsSync(inProgress)) continue;
+      for (const slug of await readDirNames(inProgress)) {
+        out.push(join(inProgress, slug));
+      }
+    }
+  }
+  return out.sort();
+}
+
+/** Non-hidden subdirectory names of `parent`; [] when unreadable. */
+async function readDirNames(parent: string): Promise<readonly string[]> {
+  try {
+    return (await readdir(parent, { withFileTypes: true }))
+      .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+      .map((d) => d.name);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Resolve a Spec Kit feature under `<repoRoot>/specs/`. A child dir
  * matches when its name is exactly `<slug>` or `^\d+-<slug>$` (the
  * NNN-slug Spec Kit convention). Returns the matched absolute root, or

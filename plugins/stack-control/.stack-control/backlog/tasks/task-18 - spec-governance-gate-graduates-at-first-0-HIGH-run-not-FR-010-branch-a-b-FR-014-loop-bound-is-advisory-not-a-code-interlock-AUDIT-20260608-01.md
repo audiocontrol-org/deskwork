@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:51'
+updated_date: '2026-06-11 00:55'
 labels:
   - agent-found
   - 'type:bug'
@@ -80,4 +80,5 @@ The separate specs/004 spec-text amendments (FR-010 branch-(a) genuineness wordi
 / FR-014 interlock prose) remain for 004 when it resumes. Status left To Do pending
 release verification (operator closes). Sibling #431 (payload self-reference) is
 addressed by US3 / FR-006 (the implement-mode payload drops the audit-log excerpt).
+Roadmap node design:fix/spec-governance-gate-branch (ref gh-432) was retired 2026-06-11 and migrated here; duplicate capture TASK-35 archived in favor of this item.
 <!-- SECTION:NOTES:END -->

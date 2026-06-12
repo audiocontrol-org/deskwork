@@ -6,10 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:51'
+updated_date: '2026-06-11 02:29'
 labels:
   - agent-found
   - 'type:bug'
+  - promoted
 dependencies: []
 references:
   - gh-440
@@ -46,3 +47,11 @@ Do not fold distinct-mechanism findings even when cross-model at the same surfac
 
 Logged as TF-002 in https://github.com/audiocontrol-org/deskwork/blob/feature/design-control/plugins/design-control/specs/001-design-control/tooling-feedback.md — filed per the new policy: tooling friction goes to GitHub issues (reliably cross-project). Local backlog ref: design-control installation TASK-4.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** tasks:specs/014-audit-protocol-reliability
+
+specs/014 US3 implemented: lift union key is heading agreement only — surface-only agreement never merges; the recorded 5-into-1 collapse now yields 5 entries. Commits e15e77a5/6b241c9b (RED/fix).
+<!-- SECTION:NOTES:END -->
