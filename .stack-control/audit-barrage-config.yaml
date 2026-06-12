@@ -49,3 +49,18 @@ models:
     liveness_window_seconds: 60
     timeout_floor_seconds: 300
     timeout_secs_per_kb: 7
+  # sonnet — promoted to the default fleet 2026-06-12 (specs/015 US5 / FR-011;
+  # live calibration in specs/015-audit-protocol-convergence/quickstart-results.md).
+  # Added to deskwork's own dogfood override to match the shipped template promotion;
+  # gives a reachable second claude-family lane (opus + sonnet) for cross-model
+  # agreement when codex's binary is unavailable.
+  - name: sonnet
+    binary: claude
+    model: claude-sonnet-4-6
+    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
+    readonly_enforcement: "--permission-mode plan"
+    output_mode: stream-json
+    liveness_signal: stdout
+    liveness_window_seconds: 60
+    timeout_floor_seconds: 300
+    timeout_secs_per_kb: 13
