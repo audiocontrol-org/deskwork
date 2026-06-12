@@ -110,3 +110,71 @@ Surface:    spec-kit/spec-governance/scripts/bash/govern-spec.sh:16-23 (env-var 
 
 The header now reads `GOVERN_REPO_ROOT RETIRED … pass --at <dir>` — but the script's documented interface is environment variables (GOVERN_SPEC_PATH, GOVERN_PLAN_PATH, GOVERN_CHECKPOINT, …), and no GOVERN_AT (or pass-through argument) was added in this diff. A caller of the shim that previously used GOVERN_REPO_ROOT for testability/explicit anchoring has no env-level way to follow the header's own remediation; the only working path is "cd into the installation first", which the header does not say. Blast radius is mild: setting the retired variable produces the loud FATAL from govern.ts (good — never a silent no-op), and the normal Spec Kit flow already runs with the installation as cwd per this repo's conventions, so the in-tree flow is unaffected — hence low. Fix: either document "run with cwd inside the installation" as the shim's anchoring contract in the same header block, or add an explicit pass-through (the shim forwarding `--at "$GOVERN_AT"` when set) so the remediation the header names is actually expressible through the interface the header documents.
 ```
+
+## 2026-06-12 — audit-barrage lift (20260612T053439377Z-installation-isolation-after_clarify)
+
+### AUDIT-20260612-01 — `payload-implement.ts` grew to 577 lines — past the project's hard 300–500-line refactor cap
+
+Finding-ID: AUDIT-20260612-01
+Status: migrated-to-backlog TASK-48
+Severity:   low
+Surface:    src/govern/payload-implement.ts (whole file, 577 lines; the diff adds ~250 lines: `mergeSubjectLines` + `assembleCrossTreeFeatureArm` + the cross-tree integration block at 334-370)
+
+The project's CLAUDE.md states "Files must be under 300–500 lines — refactor larger files." This diff pushes `payload-implement.ts` from ~340 to 577 lines (verified with `wc -l`), and the file now carries two separable units: the installation-arm assembler and the entire cross-tree feature arm (`assembleCrossTreeFeatureArm`, ~140 lines, with its own toplevel derivation, its own untracked fold, and its own subjects log — a near-clone of the main fold's loop structure at lines 270-330 vs 470-540). `src/subcommands/govern.ts` also sits at 503, just over the cap. Blast radius: maintainability debt that compounds — the duplicated fold loop (binary skip + budget skip + `--no-index` render appears twice with slightly different filters) is exactly the divergence shape AUDIT-20260611-04 just closed for git-toplevel derivations; the next budget-semantics fix has to land in two places or silently diverge. A reasonable fix: extract the cross-tree arm (and ideally the shared untracked-fold loop) into `src/govern/payload-cross-tree.ts`, parameterizing the per-file filters.
+
+---
+
+### AUDIT-20260612-02 — Isolation fixtures' walk-up is unbounded — a real installation above the OS tmpdir silently re-anchors "refusal" rows into writes against real operator state
+
+Finding-ID: AUDIT-20260612-02 (claude-02 + claude-03 + claude-07 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-49
+Severity:   medium
+Surface:    src/__tests__/_isolation-harness.ts:100-104 (`makeMarkerlessFixture` comment "no `.stack-control/config.yaml` anywhere above the tmpdir"); src/config/installation.ts:92-113 (walk-up terminates only at the filesystem root)
+
+`resolveInstallation` walks from `startDir` all the way to `/` (verified: the loop breaks only when `parent === dir`). The marker-less and nested fixtures live under `mkdtempSync(join(tmpdir(), …))`, and the harness *asserts in a comment* — but never verifies — that no installation exists above the tmpdir. On a machine where any ancestor of the tmpdir carries `.stack-control/config.yaml` (e.g. a developer who once ran `stackctl setup` in `/tmp` on Linux, or a misplaced marker at `$HOME` if tmpdir ever resolves under it), every US2 refusal row resolves that real installation instead: the refusal tests fail loudly (good), but the verbs first **write real state into that operator installation** — `backlog capture` creates a task file, `install-scope-discovery` seeds scope-discovery state — which is precisely the "state lands somewhere the operator didn't watch" shape this feature exists to prevent, now produced by its own test suite. Blast radius is gated on an unlikely host configuration, hence low — but the failure mode mutates non-fixture state, which is worse than a flake. Fix: in `makeMarkerlessFixture` (and `makeNestedFixture`), assert `findInstallation(tmpdir()) === null` and fail with an explanatory message before running any verb, or write a marker-less sentinel that a test-only walk-up boundary respects.
+
+---
+
+### AUDIT-20260612-03 — `resolveSpecPath`'s unanchored regex joins a mid-string `specs/…` match against the wrong base — the new toplevel layer widens the exposure to exactly the transitional layout this feature supports
+
+Finding-ID: AUDIT-20260612-03
+Status: migrated-to-backlog TASK-50
+Severity:   medium
+Surface:    src/subcommands/govern.ts:193-219 (the two-base loop + `/specs\/[^\s]+\.md/` at line 214, `join(base, dirname(m[0]), 'spec.md')` at 215)
+
+The regex matches anywhere in the line, so a SPECKIT marker that points *into* the installation — `plugins/stack-control/specs/<feat>/plan.md`, the natural pointer shape for a monorepo-root CLAUDE.md after a US6 relocation — matches starting at `specs/`, dropping the `plugins/stack-control/` prefix, and line 215 joins the truncated path against the *toplevel* base, yielding `<toplevel>/specs/<feat>/spec.md`. The pre-diff code had the same regex, but the new loop (lines 202-216) is what adds the toplevel CLAUDE.md as a consulted base, so the wrong-base join is newly reachable whenever the installation itself lacks a CLAUDE.md (mid-transition: relocated specs, root pointer updated to the full nested path, installation pointer not yet written — a state T017 passed through). Blast radius: in the common case the joined path doesn't exist and govern fails loudly downstream with a confusing ENOENT naming a path nobody wrote; in the bad case — an adopter who *copied* rather than `git mv`'d during migration, leaving a stale pre-relocation `specs/<feat>/spec.md` at the toplevel — `govern --mode spec` resolves cleanly and the barrage **audits the stale spec revision** with no signal anything is wrong, in a flow explicitly designed for unattended convergence loops. Fix: validate the match resolves to an existing file before accepting it (falling through to the next base / the FATAL otherwise), and anchor the regex so the matched path is taken whole (e.g. match the full token between whitespace and verify it starts the path you join).
+
+---
+
+### AUDIT-20260612-04 — `backlog capture`/`import-github` are in the R5 state-writing set but expose no `--at` — the constitution's "explicitly named via `--at <dir>`" contract is unimplementable for them
+
+Finding-ID: AUDIT-20260612-04
+Status: migrated-to-backlog TASK-51
+Severity:   low
+Surface:    .specify/memory/constitution.md:158-167 (installation-anchor invariant wording) vs src/__tests__/installation-isolation-cwd.test.ts:131 ("backlog has no --at by contract"); src/subcommands/backlog.ts
+
+The constitution 1.3.0 amendment states every state-writing verb anchors state "inside the nearest-enclosing installation (or an explicitly named one via `--at <dir>`)" with no per-verb qualifier — and names the isolation probe as the invariant's "permanent enforcement." But the backlog verbs, which the probe and refusal suites both treat as state-writing rows, accept no `--at`; the cwd test codifies the gap as contract ("backlog has no --at by contract") and quietly runs only two of the three cwd variants for it. An operator — or an unattended agent reading the constitution as the inheritance document it announces itself to be ("new verbs inherit this invariant by default") — has no way to anchor a capture from an outer repo except `cd`, and an agent that tries `backlog capture --at <dir>` per the constitution hits an unknown-flag error. Blast radius is contained because the failure is loud (unknown flag / refusal), never a misplaced write — hence low. Fix: either add `--at` to the backlog dispatcher (it already threads `startDir` through `backlogRoot()`/`resolveInstallationBacklog()`, so the plumbing landed in this very diff at src/backlog/root.ts:30-44) or add the same one-clause qualifier to the constitution that AUDIT-20260611-11 added for read-side repo-root.
+
+---
+
+### AUDIT-20260612-05 — The `FATAL —` wording class is gated on `not-found` in two verbs but applied to *every* resolver error in five others
+
+Finding-ID: AUDIT-20260612-05
+Status: migrated-to-backlog TASK-52
+Severity:   low
+Surface:    src/subcommands/backlog.ts:301-305 and src/scope-discovery/install-scope-discovery.ts:221-228 (gated) vs src/scope-discovery/scope-widen.ts:281, src/scope-discovery/scope-inventory.ts:312, src/subcommands/slush-findings.ts:135, src/subcommands/audit-barrage.ts:365, src/subcommands/audit-barrage-lift.ts:403 (unconditional)
+
+Two of the converted verbs carefully scope the new US2 wording: backlog.ts checks `err.code === 'not-found'` with the explicit comment "other installation errors keep their existing wording + codes (frozen contracts)," and install-scope-discovery does the same. The other five catch blocks wrap **whatever** `resolveCodebaseBoundary` throws — including malformed-config parse errors, escape/collision errors, anything from `loadInstallationConfig` — in the same `<verb>: FATAL — ` prefix. So the same underlying condition (say, a corrupt `config.yaml`) renders as `backlog: <message>` from one verb and `scope-widen: FATAL — <message>` from another, and the "uniform wording class" the US2 tests pin is uniform only for the not-found case the tests happen to exercise. Blast radius: cosmetic-to-mild — no placement or exit-code consequence, but any tooling or skill body that pattern-matches `FATAL — ` as "no installation, run stackctl setup" will mis-classify config-corruption errors from five verbs, and the two-verbs-gate/five-verbs-don't split is the same divergent-sibling shape AUDIT-20260611-04 closed for git derivations. Fix: lift the `not-found → 'FATAL — '` prefix decision into one shared helper next to `resolveCodebaseBoundary` and use it at all seven sites.
+
+---
+
+### AUDIT-20260612-06 — `backlog import-slush` still resolves its audit log from raw cwd
+
+Finding-ID: AUDIT-20260612-06
+Status: migrated-to-backlog TASK-53
+Severity:   medium
+Surface:    src/subcommands/backlog.ts:89-96,155-177
+
+The backlog store side now resolves through `resolveInstallationBacklog()` in `ensureBacklogProject()`, but `import-slush` then resolves the feature audit log with `const cwd = process.cwd(); resolveFeatureRoot({ repoRoot: cwd, ... })`. From an installation subdirectory, the store will be scaffolded/written under the enclosing installation, while the audit-log lookup searches only under the subdirectory and fails to find normal installation-root `specs/` or `docs/` features. That leaves one state-writing backlog import path outside the “cwd never decides placement” model.
+
+The blast radius is medium: the common installation-root invocation works, and the failure is loud rather than an outer-tree write, but the same command no longer behaves invariantly from subdirectories, and `import-slush` is a mutating backlog import surface. Reasonable fix: have `ensureBacklogProject` expose the resolved installation/start root, or resolve it once in `runBacklogCli`, and pass that root into `resolveAuditLog` instead of using `process.cwd()`.
