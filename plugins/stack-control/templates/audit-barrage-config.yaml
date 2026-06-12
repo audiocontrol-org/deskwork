@@ -80,12 +80,16 @@
 # read-only violation). Both disqualifiers are coupled to payload size +
 # enforcement — the exact levers specs/015 moves: the per-phase unit (`govern
 # --phase`) shrinks the payload and `--permission-mode plan` makes the spawn
-# mechanically read-only. The read-only bar is MET (sonnet-readonly-probe test,
-# SC-007); the latency + finding-depth bars are PENDING a live calibration on a
-# host with the claude CLI (specs/015 quickstart-results.md § US5 — not run in a
-# CLI-less CI, no fabricated numbers). Uncomment ONLY after recording a live run
-# that meets all three FR-011 bars. This is the override-profile-first path: the
-# default fleet stays opus + codex; sonnet is operator opt-in pending evidence.
+# mechanically read-only.
+# CALIBRATION PASSED — live run 2026-06-12 (specs/015 quickstart-results.md § US5):
+# on a 12.4 KB per-phase payload all three FR-011 bars were met — latency 224 s
+# (< 300 s derived timeout; ~10x under the 2226 s big-unit disqualifier), 4
+# file:line-anchored depth-findings (one corroborating an opus finding), and 4 tool
+# calls + zero repo mutations (read-only held). You may now uncomment this lane to
+# opt in. It stays commented by deliberate choice: override-profile-first, and the
+# evidence is a SINGLE per-phase sample — the default fleet stays opus + codex;
+# default-fleet promotion is the operator's separate, later decision (broaden the
+# payload-size sample first — the latency margin tightens toward ~23 KB).
 #  - name: sonnet
 #    binary: claude
 #    model: claude-sonnet-4-6
