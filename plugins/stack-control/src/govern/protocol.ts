@@ -25,9 +25,15 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import {
+  computeFleetReportFromParsedLanes,
+  IndexLaneParseError,
+  parseIndexLaneStates,
+} from '../scope-discovery/audit-barrage/run-artifacts.js';
+import { completedNonConvergedAnnotation } from '../scope-discovery/audit-barrage/types.js';
 
 /** Thrown for any fail-loud protocol condition; carries a process exit code. */
 export class GovernProtocolError extends Error {
@@ -119,6 +125,62 @@ export function currentBranch(repoRoot: string): string {
   return r.status === 0 && typeof r.stdout === 'string' ? r.stdout.trim() : '';
 }
 
+/**
+ * specs/014 FR-007 / US3 scenario 3: surface the round's fleet state in the
+ * LOOP's own status lines, read from the run-dir INDEX the barrage just
+ * wrote. Repeated same-lane kills across rounds become visible in govern
+ * output without opening per-run artifact files; a round whose verdict
+ * could be "0 HIGH" over a degraded fleet is annotated as degraded. A
+ * missing or pre-014 INDEX (stub barrage bins, legacy runs) emits nothing —
+ * readers require the new fields only for v2-writer runs. A MIXED INDEX
+ * (some lane has v2 rows, some lane fails to parse completely) throws
+ * GovernProtocolError — the round's INDEX is corrupt and the fleet count
+ * would otherwise silently shrink (AUDIT-20260611-07).
+ */
+export function reportFleetStatus(runDir: string, stderr: (s: string) => void): void {
+  const indexPath = join(runDir, 'INDEX.md');
+  if (!existsSync(indexPath)) return;
+  let lanes;
+  try {
+    lanes = parseIndexLaneStates(readFileSync(indexPath, 'utf8'));
+  } catch (err) {
+    if (err instanceof IndexLaneParseError) {
+      throw new GovernProtocolError(
+        `govern: FATAL — corrupt barrage INDEX at ${indexPath}: ${err.message}`,
+      );
+    }
+    throw err;
+  }
+  if (lanes === null) return;
+  const fleet = computeFleetReportFromParsedLanes(lanes);
+  const degraded = fleet.produced < fleet.configured;
+  stderr(
+    `govern: fleet — configured ${fleet.configured}, produced ${fleet.produced}${degraded ? '  ⚠ DEGRADED' : ''}\n`,
+  );
+  for (const lane of fleet.perLane) {
+    // AUDIT-20260611-11: a lane that settled `completed` but is NOT
+    // converged-eligible (nonzero exit / empty report) carries the same
+    // annotation the lift prints (AUDIT-20260611-09) — the govern loop is
+    // the FR-007 / US3-scenario-3 surface where a bare "completed" beside
+    // "⚠ DEGRADED" would be most misleading.
+    stderr(
+      `govern:   ${lane.name}: ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]${completedNonConvergedAnnotation(lane)}\n`,
+    );
+  }
+  // AUDIT-20260611-15: the quorum line fires whenever quorumCollapsed holds,
+  // independent of degradation — a healthy single-lane round (produced ===
+  // configured === 1) still cannot deliver cross-model agreement. The
+  // 0-HIGH-over-DEGRADED NOTE below stays degradation-gated.
+  if (fleet.quorumCollapsed) {
+    stderr('govern: quorum — cross-model agreement impossible (produced ≤ 1)\n');
+  }
+  if (degraded) {
+    stderr(
+      'govern: NOTE — any 0-HIGH verdict this round is computed over a DEGRADED fleet (FR-007).\n',
+    );
+  }
+}
+
 export interface RunProtocolArgs {
   /** The bundled stackctl (real) — used for slush + gate. */
   readonly stackctl: string;
@@ -153,6 +215,16 @@ export interface ProtocolResult {
    */
   readonly gateOpen: boolean;
 }
+
+/**
+ * specs/015 US2 (T016): the single render→barrage→lift→slush→gate pass, exposed
+ * as the step the convergence-loop driver calls. `runProtocol` IS this step
+ * (unchanged behavior); the driver wraps it as
+ * `runPass: async () => ({ gateOpen: runProtocol(args).gateOpen })`. Extracting
+ * the contract as a named type keeps "who drives the loop" (the driver) separate
+ * from "what one pass does" (this function) without changing the pass itself.
+ */
+export type ProtocolStep = () => ProtocolResult;
 
 function spawnText(
   bin: string,
@@ -236,6 +308,9 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
     }
     const runDir = barrage.stdout.trim();
     args.stderr(`govern: barrage run-dir = ${runDir}\n`);
+    // specs/014 FR-007: the round's fleet state belongs to the loop's own
+    // status lines, not only the per-run INDEX.
+    reportFleetStatus(runDir, args.stderr);
 
     // --- lift (barrage bin) ---
     const lift = spawnText(args.barrageBin, [

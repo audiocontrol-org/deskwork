@@ -71,6 +71,16 @@ export interface ImplementPayloadArgs {
   /** Sink for the human-readable drop/skip notes (default: process.stderr). */
   readonly warn?: (message: string) => void;
   /**
+   * specs/015 (FR-006/D7): the AuditUnit's path scope. When provided and
+   * non-empty, only untracked files UNDER one of these repo-relative prefixes are
+   * folded — unrelated parked-feature scaffolds are excluded by a bounded,
+   * explicit inclusion rule (not a wholesale sweep). Absent/empty → fold every
+   * untracked file (the pre-015 whole-feature behavior). Composes with the
+   * 014 exclusion fields below: a file folds iff it is in-pathScope AND not
+   * excluded by featureRoot/excludeRoots/excludePaths.
+   */
+  readonly pathScope?: readonly string[];
+  /**
    * Absolute path of the resolved feature root (specs/014 US5 —
    * TASK-37 / gh-431). When supplied, the payload is made
    * self-reference-free: the feature's `audit-log.md` is excluded from
@@ -130,10 +140,29 @@ export interface ImplementPayload {
   /** Untracked files skipped because folding them would exceed the budget. */
   readonly skippedOverBudget: readonly string[];
   /**
+   * specs/015 (FR-006): untracked files skipped because they fell OUTSIDE the
+   * unit's path scope (unrelated parked-feature scaffolds). Empty when no path
+   * scope was supplied.
+   */
+  readonly skippedOutOfScope: readonly string[];
+  /**
    * Untracked files skipped because they live under ANOTHER feature's
    * root (specs/014 US5 / FR-008 as amended by AUDIT-20260611-01).
    */
   readonly skippedOtherFeature: readonly string[];
+}
+
+/**
+ * specs/015 (FR-006): is `rel` within the unit's path scope? A prefix is a
+ * directory or file path; `rel` matches when it equals a prefix or sits under a
+ * prefix directory. An empty scope means "no bound" (every file is in scope).
+ */
+function inPathScope(rel: string, pathScope: readonly string[] | undefined): boolean {
+  if (pathScope === undefined || pathScope.length === 0) return true;
+  return pathScope.some((p) => {
+    const prefix = p.replace(/\/+$/, '');
+    return rel === prefix || rel.startsWith(`${prefix}/`);
+  });
 }
 
 function git(repoRoot: string, args: readonly string[]): string {
@@ -177,7 +206,7 @@ export function assembleImplementPayload(
   const warn = args.warn ?? ((m: string) => process.stderr.write(`${m}\n`));
 
   // specs/014 US5: repo-relative feature root (POSIX separators for git
-  // pathspecs) when the caller resolved one.
+  // pathspecs) when the caller resolved one. Shared by both arms.
   const featureRel =
     args.featureRoot !== undefined
       ? relative(repoRoot, args.featureRoot).split(sep).join('/')
@@ -201,30 +230,36 @@ export function assembleImplementPayload(
       ? (args.excludePaths ?? []).map(relify).filter(inRepo)
       : [];
 
-  // specs/014 US5 (FR-007): exclude the feature's own audit-log from the
-  // committed-diff arm — lift commits land inside the diff range, so
-  // without the pathspec exclusion the payload quotes its own findings
-  // back to the model fleet (the AUDIT-28/42/48 generator).
-  // AUDIT-20260611-08 widened the exclusion to the FULL governance-
-  // bookkeeping surface FR-007 promises: the backlog task store
-  // (caller-threaded `excludePaths` — per-round bookkeeping commits land
-  // in the range the same way lift commits do) and every OTHER feature
-  // root's audit-log.md (sibling lift commits sharing the diff range).
-  // Decision recorded: only the audit-log.md under each excludeRoot is
-  // excluded from the committed arm — a sibling's other committed files
-  // are legitimate diff content; the FOLD keeps excluding other-feature
-  // roots wholesale (below, unchanged).
-  const diffArgs =
+  // Committed-diff arm — COMBINES two scoping systems (the specs/015 + 014 merge):
+  //  • specs/015 AUDIT-20260612-01 INCLUSION: scope the committed diff to the
+  //    unit's pathScope so a `--phase` audit of committed work shrinks the unit
+  //    (SC-006) instead of folding the whole-feature `git diff base`.
+  //  • specs/014 US5 EXCLUSION (FR-007, AUDIT-20260611-08): drop the feature's own
+  //    audit-log, every OTHER feature root's audit-log.md, and the caller-threaded
+  //    governance-bookkeeping paths — lift/bookkeeping commits land in the diff
+  //    range and would quote prior findings back to the fleet (the self-reference
+  //    generator).
+  // The include set is the pathScope when present, else '.' (whole tree) when a
+  // feature root is resolved; the :(exclude) pathspecs always apply when a feature
+  // root is resolved. A file contributes iff it is in the include set AND not
+  // excluded — the two compose.
+  const hasPathScope = args.pathScope !== undefined && args.pathScope.length > 0;
+  const includeTokens = hasPathScope
+    ? [...args.pathScope!]
+    : featureRel !== undefined
+      ? ['.']
+      : [];
+  const excludeTokens =
     featureRel !== undefined
       ? [
-          'diff',
-          base,
-          '--',
-          '.',
           `:(exclude)${featureRel}/audit-log.md`,
           ...otherFeatureRels.map((root) => `:(exclude)${root}/audit-log.md`),
           ...excludePathRels.map((rel) => `:(exclude)${rel}`),
         ]
+      : [];
+  const diffArgs =
+    includeTokens.length > 0 || excludeTokens.length > 0
+      ? ['diff', base, '--', ...includeTokens, ...excludeTokens]
       : ['diff', base];
   let diff = git(repoRoot, diffArgs);
   const committedDiffEmpty = diff.trim().length === 0;
@@ -233,6 +268,7 @@ export function assembleImplementPayload(
   // is audited too. AUDIT-20260605-06: bounded (binary-skip + byte cap).
   const skippedBinary: string[] = [];
   const skippedOverBudget: string[] = [];
+  const skippedOutOfScope: string[] = [];
   const skippedOtherFeature: string[] = [];
   let foldedBytes = 0;
 
@@ -262,10 +298,20 @@ export function assembleImplementPayload(
 
   for (const rel of untracked) {
     const abs = join(repoRoot, rel);
+    // specs/015 FR-006/D7: bound the untracked fold to the unit's path scope — an
+    // unrelated parked-feature scaffold (outside the scope) is excluded, not swept in.
+    if (!inPathScope(rel, args.pathScope)) {
+      warn(
+        `govern: untracked file ${rel} is outside the audit unit's path scope; ` +
+          `excluding it from the folded payload (FR-006, parked-scaffold exclusion).`,
+      );
+      skippedOutOfScope.push(rel);
+      continue;
+    }
+    // specs/014 AUDIT-20260611-01: another feature's untracked scaffold — out of
+    // the audited payload, but VISIBLY (warn + ledger; the binary and budget skips
+    // set the style).
     if (otherFeatureRels.some((root) => rel.startsWith(`${root}/`))) {
-      // AUDIT-20260611-01: another feature's untracked scaffold — out of
-      // the audited payload, but VISIBLY (warn + ledger; the binary and
-      // budget skips set the style).
       warn(
         `govern: skipping untracked file ${rel} (under another feature's root, ` +
           `not the feature under audit; not folded into the audit diff).`,
@@ -317,6 +363,7 @@ export function assembleImplementPayload(
     empty: committedDiffEmpty && foldedBytes === 0,
     skippedBinary,
     skippedOverBudget,
+    skippedOutOfScope,
     skippedOtherFeature,
   };
 }

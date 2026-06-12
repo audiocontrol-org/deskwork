@@ -3,26 +3,47 @@
  *
  * Wraps `child_process.spawn` for a single CLI model invocation.
  *
- * Behavior contract (per audit-barrage-cli-notes.md):
+ * Behavior contract (specs/014-audit-barrage-reliability + the original
+ * audit-barrage-cli-notes.md):
  *
- *   - stdin is closed (`stdio: ['ignore', ...]`); every supported CLI
- *     (`claude -p`, `codex exec`, `gemini`) waits on open stdin and
- *     emits warnings otherwise. Closing it matches the documented
- *     contract.
- *   - stdout streams to `stdoutPath` (per-model markdown).
- *   - stderr streams to `stderrPath` (per-model stderr capture).
- *   - On timeout: SIGTERM, then SIGKILL after a 5-second grace.
- *   - Spawn failure (ENOENT, etc.) returns `exitCode: -2` with
- *     `spawnError` populated. The orchestrator surfaces the failure
- *     in the INDEX without aborting siblings.
+ *   - stdin is closed (`stdio: ['ignore', ...]`) unless the lane uses
+ *     `{{prompt-stdin}}` delivery; every supported CLI waits on open
+ *     stdin and emits warnings otherwise.
+ *   - argv assembly substitutes the lane's explicit `{{model}}` pin
+ *     (FR-001) and injects the lane's `readonly_enforcement` fragment
+ *     before the prompt placeholder (FR-003) — selected by config
+ *     capability fields, never by binary name (Principle III).
+ *   - the timeout budget is ARMED FROM THE CALLER-SUPPLIED basis
+ *     (`SpawnInput.timeoutBasis`, derived per FR-002); on expiry:
+ *     SIGTERM, then SIGKILL after a 5-second grace.
+ *   - a monitored lane (liveness_signal != none) runs under the
+ *     in-process watchdog (FR-008): no pulse inside the window →
+ *     SIGTERM/SIGKILL and the `killed-no-liveness` terminal state.
+ *     The watchdog disarms when the timeout kill begins, and vice
+ *     versa — `timed-out` and `killed-no-liveness` are disjoint by
+ *     construction; a clean `close` arriving first settles `completed`
+ *     (single-settle `finish()`). A close carrying a non-null signal
+ *     with NO wrapper kill in flight settles `killed-external` — the
+ *     child was terminated out-of-band (OOM killer, external
+ *     SIGTERM/SIGKILL; AUDIT-20260611-13) and is never `completed`.
+ *   - text lanes stream stdout to `stdoutPath` (the per-model markdown
+ *     artifact). stream-json lanes feed stdout through the result
+ *     extractor: NDJSON lines land in `eventsPath` (forensics) and the
+ *     terminal result event's text is written to `stdoutPath` at a
+ *     completed settle — byte-for-byte the artifact lift consumes
+ *     (FR-010). A killed stream lane leaves the artifact ABSENT.
+ *   - stderr always streams to `stderrPath`.
+ *   - Spawn failure (ENOENT, etc.) settles `spawn-failed` with
+ *     `exitCode: -2` and `spawnError` populated. The orchestrator
+ *     surfaces the failure in the INDEX without aborting siblings.
  *
  * Argument substitution: `argsTemplate` is split on whitespace BEFORE
- * `{{prompt}}` is replaced. Splitting after would mangle prompts that
+ * placeholders are replaced. Splitting after would mangle prompts that
  * contain whitespace; splitting before keeps the prompt as a single
- * argv element regardless of its content. Tokens that EQUAL
- * `{{prompt}}` become the prompt verbatim; tokens that CONTAIN
- * `{{prompt}}` as a substring (e.g. `--prompt={{prompt}}`) get
- * intra-token literal replacement.
+ * argv element regardless of its content. Tokens that EQUAL a
+ * placeholder become the substitution verbatim; tokens that CONTAIN
+ * one as a substring (e.g. `--model={{model}}`) get intra-token
+ * literal replacement.
  *
  * Stream-write failures (disk full, permission, etc.) propagate as
  * thrown errors — filesystem corruption is fatal and the orchestrator
@@ -35,15 +56,27 @@
  * stdio pipes may still have undelivered buffered data; `'close'`
  * fires only after all stdio streams have closed — which is the
  * event we need to be sure no in-flight stdout chunk is dropped.
- * Every settle path (timeout, signal, spawn-error, normal exit)
- * clears both timers via `finish()` so no timer leaks past the
- * resolution of the returned Promise.
+ * Every settle path (timeout, liveness kill, spawn-error, normal
+ * exit) clears both timers and disarms the watchdog via `finish()`
+ * so no timer leaks past the resolution of the returned Promise.
  */
 
 import { spawn } from 'node:child_process';
 import { createWriteStream, type WriteStream } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
+import type { Readable, Writable } from 'node:stream';
 import { errorMessage } from '../util/typeguards.js';
-import type { ModelConfig, ModelRunResult } from './types.js';
+import { createStreamResultExtractor } from './stream-result-extractor.js';
+import { startWatchdog, type Watchdog } from './watchdog.js';
+import {
+  isLaneEnforced,
+  type EnforcementState,
+  type LivenessState,
+  type ModelConfig,
+  type ModelRunResult,
+  type TerminalState,
+  type TimeoutBasis,
+} from './types.js';
 
 const SIGKILL_GRACE_MS = 5000;
 
@@ -74,14 +107,52 @@ function isE2BIG(err: unknown): boolean {
 }
 
 /**
+ * The structural slice of `ChildProcess` the spawn wrapper consumes.
+ * Tests inject fake children through `SpawnInput.spawnImpl` to pin the
+ * kill-vs-close interlocks deterministically (fake timers); the real
+ * `spawn` return satisfies this shape.
+ */
+export interface BarrageChild {
+  readonly stdin: Writable | null;
+  readonly stdout: Readable | null;
+  readonly stderr: Readable | null;
+  kill(signal?: NodeJS.Signals): boolean;
+  on(event: 'error', listener: (err: Error) => void): this;
+  on(
+    event: 'close',
+    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
+  ): this;
+}
+
+export type BarrageSpawnFn = (
+  binary: string,
+  args: ReadonlyArray<string>,
+  options: { readonly stdio: ['pipe' | 'ignore', 'pipe', 'pipe'] },
+) => BarrageChild;
+
+const defaultSpawn: BarrageSpawnFn = (binary, args, options) =>
+  spawn(binary, [...args], { stdio: options.stdio });
+
+/**
  * Inputs to a single CLI subprocess invocation. The orchestrator
  * constructs one of these per model per run.
+ *
+ * `timeoutBasis` is the derived (or operator-override) budget for THIS
+ * payload (FR-002) — the spawn arms `effectiveTimeoutSeconds`, never a
+ * raw config field. `eventsPath` is the NDJSON forensic capture target
+ * for stream-json lanes (unused by text lanes); the extractor creates
+ * the file lazily on the first captured line, and the result records
+ * the path only when a capture was actually written
+ * (AUDIT-20260611-21).
  */
 export interface SpawnInput {
   readonly model: ModelConfig;
   readonly prompt: string;
   readonly stdoutPath: string;
   readonly stderrPath: string;
+  readonly eventsPath: string;
+  readonly timeoutBasis: TimeoutBasis;
+  readonly spawnImpl?: BarrageSpawnFn;
 }
 
 /**
@@ -95,17 +166,49 @@ export interface SpawnInput {
 export async function spawnCliAgainstModel(
   input: SpawnInput,
 ): Promise<ModelRunResult> {
-  const args = buildArgs(input.model.argsTemplate, input.prompt);
-  const stdoutStream = createWriteStream(input.stdoutPath);
+  const model = input.model;
+  const args = buildArgs(model, input.prompt);
+  const streamMode = model.outputMode === 'stream-json';
+  // AUDIT-20260611-17 defense-in-depth: enforcement marking mirrors what
+  // buildArgs ACTUALLY injects, not the sentinel comparison alone. The
+  // config loader refuses whitespace-only fragments at load, but a
+  // ModelConfig constructed outside the loader could still carry one —
+  // buildArgs trims/splits it to zero tokens and injects nothing, so
+  // marking that lane `enforced` would lie on every downstream surface
+  // (FR-004). `enforced` requires >= 1 real fragment token. The condition
+  // is the shared `isLaneEnforced` predicate (AUDIT-20260611-19) so this
+  // derivation and the fire-time warning loop cannot diverge.
+  const enforcement: EnforcementState = isLaneEnforced(model)
+    ? 'enforced'
+    : 'unenforced';
+  const monitored = model.livenessSignal !== 'none';
+  if (monitored && model.livenessWindowSeconds === undefined) {
+    // The config loader refuses this shape; a lane constructed outside the
+    // loader without a window cannot be monitored honestly (Principle V).
+    throw new Error(
+      `audit-barrage spawn: lane '${model.name}' declares liveness_signal ` +
+        `'${model.livenessSignal}' without liveness_window_seconds — cannot arm ` +
+        `the watchdog (FR-008)`,
+    );
+  }
+  const liveness: LivenessState = monitored ? 'monitored' : 'unmonitored';
+
+  // Text lanes stream stdout straight to the artifact path. Stream lanes
+  // defer the artifact write to settle (result-event extraction) so a
+  // killed lane leaves NO fabricated <model>.md (FR-010 / Principle V).
+  const stdoutStream = streamMode ? null : createWriteStream(input.stdoutPath);
   const stderrStream = createWriteStream(input.stderrPath);
+  const extractor = streamMode ? createStreamResultExtractor(input.eventsPath) : null;
   const start = Date.now();
 
   return new Promise<ModelRunResult>((resolveResult, rejectResult) => {
     let stdoutBytes = 0;
     let stderrBytes = 0;
-    let timedOut = false;
+    let killReason: 'timeout' | 'liveness' | null = null;
+    let stalenessAtKillMs: number | undefined;
     let sigkillTimer: NodeJS.Timeout | null = null;
     let timeoutTimer: NodeJS.Timeout | null = null;
+    let watchdog: Watchdog | null = null;
     let settled = false;
 
     // Attach stream `'error'` handlers immediately after stream
@@ -115,16 +218,14 @@ export async function spawnCliAgainstModel(
     const onStreamError = (err: Error): void => {
       if (settled) return;
       settled = true;
-      if (sigkillTimer !== null) clearTimeout(sigkillTimer);
-      if (timeoutTimer !== null) clearTimeout(timeoutTimer);
+      clearTimers();
+      watchdog?.disarm();
       rejectResult(err);
     };
-    stdoutStream.on('error', onStreamError);
+    stdoutStream?.on('error', onStreamError);
     stderrStream.on('error', onStreamError);
 
-    const finish = (partial: Omit<ModelRunResult, 'name'>) => {
-      if (settled) return;
-      settled = true;
+    function clearTimers(): void {
       if (sigkillTimer !== null) {
         clearTimeout(sigkillTimer);
         sigkillTimer = null;
@@ -133,180 +234,281 @@ export async function spawnCliAgainstModel(
         clearTimeout(timeoutTimer);
         timeoutTimer = null;
       }
-      void closeStreams(stdoutStream, stderrStream)
-        .then(() => {
-          resolveResult({
-            name: input.model.name,
-            ...partial,
-          });
-        })
-        .catch(rejectResult);
+    }
+
+    interface SettleCore {
+      readonly exitCode: number;
+      readonly spawnError?: string;
+    }
+
+    const finish = (core: SettleCore, terminalState: TerminalState) => {
+      if (settled) return;
+      settled = true;
+      clearTimers();
+      watchdog?.disarm();
+      void settleCaptures(core, terminalState).then(resolveResult).catch(rejectResult);
     };
 
-    // Phase 19 Task 1 (GH #386): detect whether the argsTemplate
-    // uses {{prompt-stdin}}. When yes, the prompt is delivered via
-    // child.stdin instead of argv — bypasses the OS ARG_MAX limit
-    // (~256KB on macOS) that would otherwise fail with spawn E2BIG
-    // on large diffs. The stdin path requires `pipe` for stdio[0]
-    // so we can write to it. The two branches are written as
-    // separate `spawn` calls to preserve the literal stdio tuple
-    // shape, which lets TypeScript narrow `child.stdout` /
-    // `child.stderr` to non-null on both paths.
+    async function settleCaptures(
+      core: SettleCore,
+      terminalState: TerminalState,
+    ): Promise<ModelRunResult> {
+      let reportBytes = 0;
+      let eventsCaptured = false;
+      if (extractor !== null) {
+        const extraction = await extractor.settle();
+        eventsCaptured = extraction.eventsCaptured;
+        if (extraction.resultText !== null) {
+          await writeFile(input.stdoutPath, extraction.resultText, 'utf8');
+          reportBytes = Buffer.byteLength(extraction.resultText, 'utf8');
+        }
+      }
+      if (stdoutStream !== null) {
+        await endStream(stdoutStream);
+        reportBytes = stdoutBytes;
+      }
+      await endStream(stderrStream);
+      return {
+        name: model.name,
+        exitCode: core.exitCode,
+        durationMs: Date.now() - start,
+        stdoutBytes,
+        stderrBytes,
+        reportBytes,
+        stdoutPath: input.stdoutPath,
+        stderrPath: input.stderrPath,
+        timedOut: killReason === 'timeout',
+        ...(core.spawnError !== undefined ? { spawnError: core.spawnError } : {}),
+        terminalState,
+        enforcement,
+        liveness,
+        ...(model.livenessWindowSeconds !== undefined
+          ? { livenessWindowSeconds: model.livenessWindowSeconds }
+          : {}),
+        ...(stalenessAtKillMs !== undefined ? { stalenessAtKillMs } : {}),
+        timeoutBasis: input.timeoutBasis,
+        // AUDIT-20260611-21: the extractor creates the events file LAZILY
+        // on the first consumed line, so a spawn-failed stream lane (no
+        // chunk ever arrived) or a zero-stdout stream lane has NO file on
+        // disk. Recording eventsPath anyway would make renderModelRow emit
+        // an INDEX `- events path:` row naming a nonexistent file — the
+        // field is present only when a capture was actually written.
+        ...(streamMode && eventsCaptured ? { eventsPath: input.eventsPath } : {}),
+      };
+    }
+
+    // Phase 19 Task 1 (GH #386): {{prompt-stdin}} delivers the prompt
+    // via child.stdin instead of argv — bypasses the OS ARG_MAX limit
+    // (~256KB on macOS) that would otherwise fail with spawn E2BIG on
+    // large diffs.
     //
     // Phase 12 Task 8 (#397): wrap spawn in try/catch — when the OS
     // rejects argv+env before the child is created (E2BIG, EMFILE,
     // ENAMETOOLONG), `spawn()` throws SYNCHRONOUSLY. The async
     // `child.on('error', ...)` handler does NOT catch these cases.
-    // For E2BIG specifically we surface a structured classifier that
-    // points adopters at the {{prompt-stdin}} migration path.
-    const useStdin = input.model.argsTemplate.includes('{{prompt-stdin}}');
-    let child;
+    const useStdin = model.argsTemplate.includes('{{prompt-stdin}}');
+    const spawnImpl = input.spawnImpl ?? defaultSpawn;
+    let child: BarrageChild;
     try {
-      child = useStdin
-        ? spawn(input.model.binary, args, {
-            stdio: ['pipe', 'pipe', 'pipe'],
-          })
-        : spawn(input.model.binary, args, {
-            stdio: ['ignore', 'pipe', 'pipe'],
-          });
+      child = spawnImpl(model.binary, args, {
+        stdio: [useStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+      });
     } catch (err) {
       reportSpawnError(err);
       return;
     }
     if (useStdin && child.stdin !== null) {
-      // Write the prompt to stdin and close. Per Phase 19 Task 1:
-      // back-pressure aware via `write` callback would be more
-      // correct for multi-GB prompts, but the OS pipe buffer is
-      // ~64KB and Node node-stream handles back-pressure
-      // automatically — `end()` waits until the write drains.
-      child.stdin.on('error', (err) => {
-        // EPIPE if the child exits before reading the prompt — common
-        // when the child rejects the prompt or crashes early. Don't
-        // crash the orchestrator; the close event will surface the
-        // child's actual outcome via exitCode.
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const _ = err;
-      });
+      // EPIPE if the child exits before reading the prompt — common
+      // when the child rejects the prompt or crashes early. Don't
+      // crash the orchestrator; the close event will surface the
+      // child's actual outcome via exitCode.
+      child.stdin.on('error', () => {});
       child.stdin.end(input.prompt);
     }
 
     // ENOENT / permission denied / etc. — record as spawn error and
-    // return without aborting siblings. `finish()` clears every timer
-    // on this path; without it, a timeout timer scheduled ~300s out
-    // would survive past the result resolution (silent dangling
-    // handle).
-    //
-    // Phase 12 Task 8 (#397): defense-in-depth — E2BIG normally
-    // throws synchronously from spawn() (handled above), but some
-    // Node versions or platforms may surface it asynchronously.
-    // Classify here too so the operator gets the migration cue
-    // regardless of which path the OS takes.
+    // return without aborting siblings. Both spawn-error paths
+    // (synchronous throw from spawn(), and async child.on('error')
+    // emission) produce a structurally identical settle; classify
+    // E2BIG specifically so the operator gets the {{prompt-stdin}}
+    // migration cue regardless of which path the OS uses (#397).
     child.on('error', reportSpawnError);
 
-    // Both spawn-error paths (synchronous throw from spawn(), and
-    // async child.on('error') emission) produce a structurally
-    // identical -2 result; classify E2BIG specifically so the
-    // operator gets the {{prompt-stdin}} migration cue regardless
-    // of which path the OS uses to surface the failure.
     function reportSpawnError(err: unknown): void {
       const classified = isE2BIG(err)
         ? classifyE2BIGSpawnError(Buffer.byteLength(input.prompt, 'utf8'), errorMessage(err))
         : errorMessage(err);
-      finish({
-        exitCode: -2,
-        durationMs: Date.now() - start,
-        stdoutBytes,
-        stderrBytes,
-        stdoutPath: input.stdoutPath,
-        stderrPath: input.stderrPath,
-        timedOut: false,
-        spawnError: classified,
-      });
+      finish({ exitCode: -2, spawnError: classified }, 'spawn-failed');
     }
 
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdoutBytes += chunk.length;
-      stdoutStream.write(chunk);
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderrBytes += chunk.length;
-      stderrStream.write(chunk);
-    });
-
-    timeoutTimer = setTimeout(() => {
-      timedOut = true;
+    function killChild(): void {
       child.kill('SIGTERM');
       sigkillTimer = setTimeout(() => {
         child.kill('SIGKILL');
       }, SIGKILL_GRACE_MS);
-    }, input.model.timeoutSeconds * 1000);
+    }
+
+    if (child.stdout === null || child.stderr === null) {
+      // Unreachable with our stdio tuple; guard for injected children.
+      finish(
+        { exitCode: -2, spawnError: 'spawn returned a child without piped stdio' },
+        'spawn-failed',
+      );
+      return;
+    }
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      stdoutBytes += chunk.length;
+      if (extractor !== null) extractor.onChunk(chunk);
+      else stdoutStream?.write(chunk);
+      if (model.livenessSignal === 'stdout') watchdog?.activity();
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderrBytes += chunk.length;
+      stderrStream.write(chunk);
+      if (model.livenessSignal === 'stderr') watchdog?.activity();
+    });
+
+    // FR-002: the budget is the caller-derived basis, never a raw
+    // config field. The timeout kill disarms the watchdog so
+    // `timed-out` and `killed-no-liveness` stay disjoint.
+    timeoutTimer = setTimeout(() => {
+      if (settled || killReason !== null) return;
+      killReason = 'timeout';
+      watchdog?.disarm();
+      killChild();
+    }, input.timeoutBasis.effectiveTimeoutSeconds * 1000);
+
+    // FR-008: arm the watchdog AFTER the pulse handlers exist. A stale
+    // pulse kills early and disarms the timeout path.
+    if (monitored && model.livenessWindowSeconds !== undefined) {
+      watchdog = startWatchdog({
+        windowSeconds: model.livenessWindowSeconds,
+        onStale: (stalenessMs) => {
+          if (settled || killReason !== null) return;
+          killReason = 'liveness';
+          stalenessAtKillMs = stalenessMs;
+          clearTimers();
+          killChild();
+        },
+      });
+    }
 
     // Settle on `'close'` (not `'exit'`) so the child's stdio pipes
     // have fully drained before we snapshot byte counters / close
-    // capture streams. `'exit'` fires when the process terminates but
-    // can leave in-flight buffered chunks unaccounted for; `'close'`
-    // fires only after every stdio pipe has closed.
+    // capture streams. First settle wins: a close that beats every
+    // kill records `completed` (data-model race rule).
+    //
+    // AUDIT-20260611-13: a close carrying a non-null `signal` when the
+    // wrapper sent NO kill (killReason === null) means the child was
+    // terminated out-of-band (OOM killer, external SIGTERM/SIGKILL).
+    // Settling that as `completed` would let the lane's PARTIAL capture
+    // into the lift — `killed-external` keeps FR-007's "a killed lane
+    // contributes ZERO findings" true for this kill path.
     child.on('close', (code, signal) => {
       const exitCode = code !== null ? code : -1;
-      finish({
-        exitCode,
-        durationMs: Date.now() - start,
-        stdoutBytes,
-        stderrBytes,
-        stdoutPath: input.stdoutPath,
-        stderrPath: input.stderrPath,
-        timedOut: timedOut || signal !== null,
-      });
+      const terminalState: TerminalState =
+        killReason === 'timeout'
+          ? 'timed-out'
+          : killReason === 'liveness'
+            ? 'killed-no-liveness'
+            : signal !== null
+              ? 'killed-external'
+              : 'completed';
+      finish({ exitCode }, terminalState);
     });
   });
 }
 
+const MODEL_PLACEHOLDER = '{{model}}';
+const PROMPT_PLACEHOLDER = '{{prompt}}';
+const PROMPT_STDIN_PLACEHOLDER = '{{prompt-stdin}}';
+
 /**
- * Split `argsTemplate` on whitespace, then substitute `{{prompt}}`
- * inside each token via literal `split().join()` replacement.
+ * Assemble a lane's argv: split the template on whitespace, inject the
+ * lane's `readonly_enforcement` fragment immediately before the prompt
+ * placeholder (FR-003 — injection makes enforcement mechanical even
+ * when the template author forgot it; a fragment the template already
+ * carries BEFORE the prompt placeholder is NOT duplicated), substitute
+ * the `{{model}}` pin (FR-001), strip `{{prompt-stdin}}` tokens (stdin
+ * delivery), and substitute `{{prompt}}`.
  *
- * Substitution rules:
- *   - Token equals `{{prompt}}` (bare-token form): replaced wholesale
- *     by the prompt string; a prompt with embedded whitespace lands
- *     as a single argv element because the split happens before the
- *     substitution.
- *   - Token contains `{{prompt}}` as a substring (embedded form,
- *     e.g. `--prompt={{prompt}}`): every occurrence within the token
- *     is replaced literally. Multiple `{{prompt}}` substrings in one
- *     token are all replaced (idempotent literal replace).
- *   - Token does not contain `{{prompt}}`: passed through verbatim.
+ * The already-present check only looks at tokens BEFORE the prompt
+ * placeholder: CLIs may stop option parsing at the prompt/subcommand
+ * boundary, so a fragment positioned after the prompt can be inert —
+ * skipping injection there would mark the lane `enforced` while the
+ * effective argv is NOT mechanically read-only (the FR-003 failure
+ * mode). A benign duplicate after the prompt is acceptable; an
+ * unenforced argv marked enforced is not.
  *
- * The intra-token form is the back-compatible fix for adopter configs
- * that pass `args_template: "--prompt={{prompt}}"` through the
- * config-loader's substring-tolerant validation (`args_template`
- * needs only to contain `{{prompt}}` somewhere). Before this change,
- * such a config would survive validation, fail at spawn time (the
- * CLI receives the literal `--prompt={{prompt}}` token, never the
- * rendered prompt), and silently produce an empty-output run.
+ * Substitution rules (per placeholder):
+ *   - Token equals the placeholder (bare-token form): replaced
+ *     wholesale; a prompt with embedded whitespace lands as a single
+ *     argv element because the split happens before the substitution.
+ *   - Token contains it as a substring (embedded form, e.g.
+ *     `--model={{model}}` / `--prompt={{prompt}}`): every occurrence
+ *     within the token is replaced literally.
+ *   - `{{prompt-stdin}}` is the exception: it is STRIPPED (stdin
+ *     delivery has nothing to substitute into argv), and only the
+ *     bare-token form exists — the config loader REJECTS embedded
+ *     forms like `--input={{prompt-stdin}}` at load (AUDIT-20260611-12),
+ *     so the equality filter below is exhaustive for loader-validated
+ *     configs.
  *
  * Exported for tests; the orchestrator only calls `spawnCliAgainstModel`.
  */
 export function buildArgs(
-  argsTemplate: string,
+  model: ModelConfig,
   prompt: string,
 ): ReadonlyArray<string> {
-  const tokens = argsTemplate.trim().split(/\s+/).filter((t) => t.length > 0);
-  // Phase 19 Task 1 (GH #386): tokens containing {{prompt-stdin}} are
-  // STRIPPED from args entirely (the prompt is delivered via stdin
-  // by spawnCliAgainstModel). The bare-token form is the common
-  // case; the intra-token form (e.g. `--input={{prompt-stdin}}`)
-  // would be unusable since stdin doesn't appear in argv. Stripping
-  // bare-token-only matches the practical config shape and is
-  // strictly safer than substituting an empty string into argv.
-  const stdinFiltered = tokens.filter((tok) => tok !== '{{prompt-stdin}}');
-  return stdinFiltered.map((tok) => tok.split('{{prompt}}').join(prompt));
+  const tokens = model.argsTemplate
+    .trim()
+    .split(/\s+/)
+    .filter((t) => t.length > 0);
+
+  // Enforcement injection happens on RAW tokens (before substitution)
+  // so the already-present check compares template text to fragment
+  // text directly.
+  let assembled = tokens;
+  if (model.readonlyEnforcement !== 'none') {
+    const fragment = model.readonlyEnforcement
+      .trim()
+      .split(/\s+/)
+      .filter((t) => t.length > 0);
+    const promptIndex = tokens.findIndex(
+      (tok) =>
+        tok.includes(PROMPT_PLACEHOLDER) || tok.includes(PROMPT_STDIN_PLACEHOLDER),
+    );
+    const insertAt = promptIndex === -1 ? tokens.length : promptIndex;
+    if (
+      fragment.length > 0 &&
+      !containsContiguous(tokens.slice(0, insertAt), fragment)
+    ) {
+      assembled = [
+        ...tokens.slice(0, insertAt),
+        ...fragment,
+        ...tokens.slice(insertAt),
+      ];
+    }
+  }
+
+  return assembled
+    .filter((tok) => tok !== PROMPT_STDIN_PLACEHOLDER)
+    .map((tok) => tok.split(MODEL_PLACEHOLDER).join(model.model))
+    .map((tok) => tok.split(PROMPT_PLACEHOLDER).join(prompt));
 }
 
-async function closeStreams(
-  stdoutStream: WriteStream,
-  stderrStream: WriteStream,
-): Promise<void> {
-  await Promise.all([endStream(stdoutStream), endStream(stderrStream)]);
+function containsContiguous(
+  haystack: ReadonlyArray<string>,
+  needle: ReadonlyArray<string>,
+): boolean {
+  outer: for (let i = 0; i + needle.length <= haystack.length; i += 1) {
+    for (let j = 0; j < needle.length; j += 1) {
+      if (haystack[i + j] !== needle[j]) continue outer;
+    }
+    return true;
+  }
+  return false;
 }
 
 function endStream(stream: WriteStream): Promise<void> {
