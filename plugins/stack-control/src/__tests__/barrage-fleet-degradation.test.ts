@@ -34,7 +34,16 @@ import {
   renderSummaryLine,
 } from '../subcommands/audit-barrage.js';
 
+// specs/015+014 merge: this branch's 014 coverage model is the canonical one
+// (terminalState + reportBytes + exitCode), superseding main's-014 stdoutBytes-only
+// shape. `isModelRunCovering` reads `terminalState === 'completed' && reportBytes > 0
+// && exitCode === 0`. main's US1 fixtures predate those fields, so the helper now
+// MIRRORS them from the main-era inputs: reportBytes ← stdoutBytes, and terminalState
+// ← timed-out when `timedOut`, else completed. renderFleetWarnings still reads
+// stdoutBytes (unchanged); only the coverage predicate needed the canonical fields.
 function modelResult(overrides: Partial<ModelRunResult>): ModelRunResult {
+  const stdoutBytes = overrides.stdoutBytes ?? 0;
+  const timedOut = overrides.timedOut ?? false;
   return {
     name: 'm',
     exitCode: 0,
@@ -45,6 +54,8 @@ function modelResult(overrides: Partial<ModelRunResult>): ModelRunResult {
     stderrPath: '/tmp/stderr/m.txt',
     timedOut: false,
     spawnError: undefined,
+    reportBytes: stdoutBytes,
+    terminalState: timedOut ? 'timed-out' : 'completed',
     ...overrides,
   };
 }
