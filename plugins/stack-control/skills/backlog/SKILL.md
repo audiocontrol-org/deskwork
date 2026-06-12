@@ -1,13 +1,18 @@
 ---
 name: backlog
-description: "Structured slush pile for found-mid-work bugs/gaps, kept deliberately separate from the curated ROADMAP.md. Capture a found bug/gap in ONE move (capture ≠ scope) and return to your task; list the pile; seed it once from open GitHub issues; route audit-barrage parked residuals into it; promote an item into the feature-rigor tier (record-only) when it earns the full spec-driven treatment. Triage/inspection delegate to backlog.md's native board/show/cleanup. Wraps `stackctl backlog` (backed by backlog.md)."
+description: "Structured slush pile for found-mid-work bugs/gaps, kept deliberately separate from the curated ROADMAP.md. Capture a found bug/gap in ONE move (capture ≠ scope) and return to your task; list the pile; seed it once from open GitHub issues; route audit-barrage parked residuals into it; promote an item into the feature-rigor tier (record-only) when it earns the full spec-driven treatment. Triage/inspection use the configured backlog backend when needed. Wraps `stackctl backlog`."
 ---
 
 # /stack-control:backlog
 
 A low-friction, structured **slush pile** for work you trip over mid-task — a bug, a gap, a follow-up that is real but out of the current scope. It is deliberately **separate from the curated `ROADMAP.md`**: the roadmap stays a small, hand-curated DAG; the backlog absorbs the flood of found work so the roadmap never has to.
 
-Unlike `inbox`/`roadmap` (in-tree governed documents), `backlog` is an **external-backend adapter** verb: it shells out to **backlog.md** (the `backlog` binary, pinned in the plugin), which owns the task-file format (git-diffable YAML-frontmatter markdown under `backlog/`) and the native triage/inspection surface. The verb stamps project conventions (type, labels, provenance) and otherwise gets out of the way.
+Unlike `inbox`/`roadmap` (in-tree governed documents), `backlog` is an
+**external-backend adapter** verb over the configured backlog store. The stable
+workflow contract is stack-control's: capture, list, import, and promote.
+Concrete storage layout and any backend-native triage UI are implementation
+details behind that contract. The verb stamps project conventions (type,
+labels, provenance) and otherwise gets out of the way.
 
 > Per `.claude/rules/enforcement-lives-in-skills.md`, the capture discipline lives in this skill body + the `stackctl backlog` verb — not in a rule or a git hook.
 
@@ -32,7 +37,8 @@ plugins/stack-control/bin/stackctl backlog capture "<title>" \
 ```
 
 - `<title>` is required (non-empty); `--type` is required and must be `bug` or `gap`.
-- Stamps the project label `agent-found` + a `type:<value>` label (backlog.md has no native type field), records `--ref` if given, and applies **no priority** (capture ≠ scope).
+- Stamps the project label `agent-found` + a `type:<value>` label, records
+  `--ref` if given, and applies **no priority** (capture ≠ scope).
 - Exit 0 prints the created item id; an empty title or an invalid `--type` is refused (exit 2) with nothing written; `ROADMAP.md` and every pre-existing item are left byte-for-byte unchanged.
 
 ## Review the pile (read-only)
@@ -43,13 +49,10 @@ plugins/stack-control/bin/stackctl backlog list
 
 Prints each item's id + status + type and **writes nothing**, presented as a tier distinct from `ROADMAP.md`.
 
-**Triage / detailed inspection are delegated to backlog.md's native commands — NOT re-wrapped** (faithful tool adoption):
-
-```bash
-backlog board            # kanban view
-backlog task <id> --plain # show one item
-backlog cleanup          # archive completed items
-```
+**Detailed triage / inspection are backend-native concerns, not part of the
+stable stack-control workflow contract.** When the configured backend exposes
+its own inspection surface, use it as an implementation detail rather than as a
+required part of the portable contract.
 
 ## Seed from open GitHub issues (one-time, idempotent)
 

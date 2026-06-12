@@ -11,7 +11,9 @@ Refine an **existing** Spec Kit spec through the stack-control front door (Featu
 
 ## Preconditions
 
-- You are in an interactive Claude Code session (the loop drives the in-session agent — no headless/batch CLI dependency; FR-006/007).
+- You are in an interactive coding-agent session whose host can drive the local
+  Spec Kit iteration chain for this installation (Claude Code and Codex are the
+  current portability targets; no headless/batch CLI dependency; FR-006/007).
 - The spec dir already exists (this is `extend`, not `define`).
 
 ## Steps

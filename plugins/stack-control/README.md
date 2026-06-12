@@ -1,6 +1,12 @@
 # stack-control
 
-Provider-agnostic **control plane** for spec-driven development, built as a plugin for [Claude Code](https://claude.com/claude-code). It takes a dependency-annotated spec from an authoring provider (today: GitHub [Spec Kit](https://github.com/github/spec-kit)) and both **governs** it (cross-model audit-barrage + finding lift, firing automatically after execution) and **runs** it — branching only on capabilities, never on which tool authored or executed the plan.
+Provider-agnostic **control plane** for spec-driven development, portable
+across coding-agent hosts including Claude Code and Codex. It takes a
+dependency-annotated spec from an authoring provider (today: GitHub [Spec
+Kit](https://github.com/github/spec-kit)) and both **governs** it
+(cross-model audit-barrage + finding lift, firing automatically after
+execution) and **runs** it — branching only on capabilities, never on which
+tool authored or executed the plan.
 
 > **Thesis:** *invest heavily in up-front design and tooling; industrialize execution.* The full grounding — hard-won principles + the origin story — is the devlog: [stackcontrol.org/blog](https://stackcontrol.org/blog/the-lifecycle-and-why-agents-need-one/) (and, in-repo for contributors, [`stack-control-thesis.md`](../../docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-thesis.md)).
 
@@ -60,7 +66,7 @@ The deterministic primitive the skills call (`bin/stackctl <verb>`, in-tree Type
 | `stackctl inbox drop "<title>" --reason "<why>" [--apply]` | Triage: discard a captured entry with a recorded reason (status → `dropped`). Dry-run by default. |
 | `stackctl inbox list [--doc <path>]` | Read-only: list each inbox entry's identifier + status. |
 | `stackctl backlog capture "<title>" --type bug\|gap [--ref/--body]` | Capture found work into the slush pile in one move — stamps `agent-found` + `type:<v>` labels, applies **no priority** (capture ≠ scope). Exit 0 prints the id; bad input → exit 2, nothing written; `ROADMAP.md` untouched. |
-| `stackctl backlog list` | Read-only: list each item's id + status + type (a tier distinct from `ROADMAP.md`). Triage/inspection delegate to backlog.md's native `board`/`task <id>`/`cleanup`. |
+| `stackctl backlog list` | Read-only: list each item's id + status + type (a tier distinct from `ROADMAP.md`). |
 | `stackctl backlog import-github [--apply]` | One-time, idempotent snapshot of open GitHub issues → `imported-issue` items (backlinked `gh-<n>`, labels + body carried). GitHub never mutated; dry-run by default; fail-loud on a missing/unauthenticated `gh`. |
 | `stackctl backlog import-slush --feature <slug> [--apply]` | One-time backfill of existing `acknowledged-slush-pile` audit-log entries → `migrated-finding` items; rewrites each to `migrated-to-backlog <task-id>`. HIGHs never migrated; idempotent; dry-run by default. |
 
@@ -111,7 +117,7 @@ Both run to completion in a plain shell with **no Claude Code surface** — the 
 
 ## Backlog slush pile — intake: three sources, one pile
 
-`stackctl backlog` is a structured, agent-easy **slush pile** for found-mid-work bugs/gaps, kept deliberately **separate from the curated `ROADMAP.md`** so the roadmap stays a small hand-curated DAG while the backlog absorbs the flood. Unlike `inbox`/`roadmap` (in-tree governed documents), `backlog` is the plugin's first **external-backend adapter** verb: it shells to **backlog.md** (the `backlog` binary, pinned in the plugin), which owns the git-diffable YAML-frontmatter task files under `backlog/` and the native triage surface. The verb stamps project conventions (type, labels, provenance) and delegates triage/inspection to backlog.md's native `board` / `task <id>` / `cleanup` (faithful tool adoption — not re-wrapped). The agent-facing skill is [`/stack-control:backlog`](./skills/backlog/SKILL.md).
+`stackctl backlog` is a structured, agent-easy **slush pile** for found-mid-work bugs/gaps, kept deliberately **separate from the curated `ROADMAP.md`** so the roadmap stays a small hand-curated DAG while the backlog absorbs the flood. Unlike `inbox`/`roadmap` (in-tree governed documents), `backlog` is the plugin's first **external-backend adapter** verb over the configured backlog store. The stable workflow contract stays in stack-control terms (capture, list, import, promote); backend storage shape and backend-native triage surfaces are implementation details behind that seam. The agent-facing skill is [`/stack-control:backlog`](./skills/backlog/SKILL.md).
 
 **Capture ≠ scope.** A plain `capture` records found work in one move with no priority/triage; classifying, prioritizing, and any promotion to `ROADMAP.md` is a separate, later, operator-driven pass.
 
@@ -121,7 +127,7 @@ Both run to completion in a plain shell with **no Claude Code surface** — the 
 2. **A one-time GitHub-issue snapshot** (`backlog import-github`) — open issues imported read-only and idempotently (GitHub never mutated; backlinked `gh-<n>`).
 3. **Audit-barrage parked residuals** — when the convergence dampener parks a MEDIUM/LOW finding, it routes into the pile. `stackctl slush-findings` was **rewired**: a parked flip now becomes a `migrated-finding` backlog item and its audit-log entry records `migrated-to-backlog <task-id>` instead of an indefinitely-held `acknowledged-slush-pile` status — leaving the audit-log a clean open/fixed convergence ledger. The dampener **decision** stays in governance (`slush-remaining.ts`, unchanged); only the destination moved. HIGHs are **never** slushed. `backlog import-slush` backfills existing parked entries. The old **`--burn-down` flag is removed — working the backlog IS the burn-down queue.**
 
-> **Which backlog does the verb target?** When `STACKCTL_BACKLOG_DIR` is unset, the verb resolves the enclosing **stack-control installation** (the nearest ancestor with `.stack-control/config.yaml`) and operates on its configured backlog store — run [`/stack-control:setup`](./skills/setup/SKILL.md) once to create one. A missing store is auto-scaffolded on first use; outside any installation the verb fails loud directing you to `stackctl setup`. `STACKCTL_BACKLOG_DIR` remains the explicit override. See [Project setup](#project-setup) above. The backend (`backlog.md`) is pinned in the plugin's `package.json`; a missing binary fails loud with remediation.
+> **Which backlog does the verb target?** When `STACKCTL_BACKLOG_DIR` is unset, the verb resolves the enclosing **stack-control installation** (the nearest ancestor with `.stack-control/config.yaml`) and operates on its configured backlog store — run [`/stack-control:setup`](./skills/setup/SKILL.md) once to create one. A missing store is auto-scaffolded on first use; outside any installation the verb fails loud directing you to `stackctl setup`. `STACKCTL_BACKLOG_DIR` remains the explicit override. See [Project setup](#project-setup) above. The configured backend is an implementation detail behind that store; missing backend capabilities fail loud with remediation.
 
 ## Scope discovery — per-codebase duplication + drift gates
 
