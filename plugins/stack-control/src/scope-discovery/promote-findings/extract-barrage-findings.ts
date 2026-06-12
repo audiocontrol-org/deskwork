@@ -284,6 +284,15 @@ function perLaneSeverities(cluster: readonly RawModelFinding[]): PerLaneSeverity
     .map(([model, severity]) => ({ model, severity }));
 }
 
+/** The dominant (highest) severity any covering lane assigned the cluster. */
+function dominantLaneSeverity(perLane: readonly PerLaneSeverity[]): NormalizedSeverity {
+  let top: NormalizedSeverity = 'informational';
+  for (const p of perLane) {
+    if (SEVERITY_RANK[p.severity] > SEVERITY_RANK[top]) top = p.severity;
+  }
+  return top;
+}
+
 /**
  * specs/015 (T011 / FR-001): the cluster's gate-counted severity is computed by
  * cross-lane agreement (D1), then a residual single-lane HIGH+ on a
@@ -312,6 +321,29 @@ function mergeCluster(cluster: readonly RawModelFinding[]): ExtractedFinding {
     RESIDUAL_INFLATION_RE.test(representative.body)
   ) {
     decision = adjudicate({ perLane, body: representative.body });
+  } else if (
+    // AUDIT-20260612-02 (disagreement floor): agreement de-inflates intra-cluster
+    // DISagreement, but a WIDE spread — the dominant lane ≥2 severity levels above
+    // the agreement floor, e.g. [high, informational] → informational — can erase
+    // a genuine HIGH one lane caught and another rated near-absent. That is the
+    // inverse of SC-003 (unbounded LOWERING into an unattended gate). Route the
+    // wide-spread clusters through adjudication so the dominant severity is
+    // re-scored on the body's blast-radius / reachability / fix-debt evidence
+    // (kept when the body reads reachable+high-blast; calibrated to ≤medium only on
+    // low-blast/unreachable/fix-debt) — never silently floored to informational.
+    // A 1-level spread ([high, medium] → medium) is intentional agreement and is
+    // NOT adjudicated. D1's "don't over-suppress a real HIGH another lane missed."
+    decision.rule === 'agreement' &&
+    SEVERITY_RANK[dominantLaneSeverity(perLane)] - SEVERITY_RANK[decision.gateCountedSeverity] >= 2
+  ) {
+    // Re-score on the DOMINANT lane's body — the prose justifying the HIGH claim
+    // under scrutiny — not cluster[0] (whose order is read-dependent). A dismissive
+    // lower lane's prose must not be the evidence that suppresses a real HIGH.
+    const dominant = cluster.reduce(
+      (best, f) => (SEVERITY_RANK[f.severity] > SEVERITY_RANK[best.severity] ? f : best),
+      cluster[0]!,
+    );
+    decision = adjudicate({ perLane, body: dominant.body });
   }
 
   return {

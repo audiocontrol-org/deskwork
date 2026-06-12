@@ -24,6 +24,17 @@ Pure function. No I/O.
 - `[blocking, high]` → `high` (≥2 at high — both are ≥ high; not ≥2 at blocking).
 - single `[high]` → `high` (single-model preserved).
 
+### Disagreement floor (AUDIT-20260612-02)
+
+The agreement rule de-inflates intra-cluster DISagreement, but a **wide spread** — the dominant lane ≥2 severity levels above the agreement floor, e.g. `[high, informational] → informational` — would let a genuine HIGH one lane caught and another rated near-absent collapse to `informational`. That is the *inverse* of SC-003 (unbounded LOWERING into a gate that may feed an unattended build), and it tensions with D1's "don't over-suppress a real HIGH another lane missed."
+
+So `mergeCluster` routes a wide-spread `agreement` cluster (where `rank(dominant lane) − rank(agreement floor) ≥ 2`) through `adjudicate` on the **dominant lane's** body, instead of accepting the floor. A 1-level spread (`[high, medium] → medium`) is intentional agreement and is NOT routed. This bounds the lowering at adjudication (kept when the body reads reachable+high-blast; calibrated to ≤ medium only on low-blast/unreachable/fix-debt) — never a silent floor to `informational`.
+
+**Invariants (tested RED-first):**
+- `[high, informational]` with a neutral body → adjudicated, severity stays `high` (NOT `informational`); `rule === 'adjudicated'`.
+- `[high, informational]` on low-blast/unreachable evidence → adjudicated DOWN to `medium` (not `informational`, not `high`).
+- `[high, medium]` (1-level spread) → stays the agreement floor `medium`; `rule === 'agreement'` (not routed).
+
 ## `adjudicate-findings.ts`
 
 ### `adjudicate(finding: ExtractedFinding): ClusterSeverityDecision`

@@ -64,14 +64,15 @@ The terminal result of one convergence-loop attempt over an `AuditUnit`. Discrim
 | Variant | Fields | Meaning |
 |---------|--------|---------|
 | `converged` | `rounds: number` | the gate returned OPEN; the unit may graduate |
-| `overridden` | `rounds: number`, `reason: string` | an operator override was recorded (mandatory reason) |
 | `non-converged` | `rounds: number`, `ceiling: number` | the ceiling was reached without OPEN (bounded termination, FR-014) |
 
 **Invariant**: every loop attempt ends in exactly one variant; the loop NEVER returns control without one (SC-004, deterministic termination).
 
+There is **no `overridden` driver terminal** (AUDIT-20260612-05). An operator `--override` is routed through the **gate**, not the driver: the gate records the reason in the audit trail and returns OPEN, so an overridden run reaches the driver as a normal `converged` pass **with a barrage record** — a driver-level short-circuit would have skipped that record. The driver therefore drives passes only; it does not carry the `AuditUnit` (findings are recorded by the lift, not the loop).
+
 ## State Machine: convergence loop driver (D4)
 
-States of one `convergence-loop` run over an `AuditUnit`:
+States of one `convergence-loop` run:
 
 ```text
         ┌─────────────────────────────────────────────────────┐
@@ -80,8 +81,7 @@ States of one `convergence-loop` run over an `AuditUnit`:
         ▲       │                      │
         │       │                      ├─ BLOCKED & rounds<ceiling ─▶ DISPATCH-FIX ─┐
         │       │                      │        (agent's only in-loop action)       │
-        │       │                      ├─ BLOCKED & rounds==ceiling ─▶ non-converged │ (terminal)
-        │       │                      └─ OVERRIDE recorded ─────────▶ overridden    │ (terminal)
+        │       │                      └─ BLOCKED & rounds==ceiling ─▶ non-converged │ (terminal)
         │       │                                                                    │
         └───────┴────────────────────────────────────────────────────────────────┘
                          (DISPATCH-FIX returns → RUN-PASS, rounds += 1)
@@ -91,7 +91,7 @@ States of one `convergence-loop` run over an `AuditUnit`:
 - **READ-GATE** consumes the gate's single OPEN/BLOCKED boolean — the driver never re-derives policy.
 - **DISPATCH-FIX** is the only state where the agent acts (fix the surfaced findings); the iterate/stop transition is the driver's, not the agent's.
 - The ceiling is the FR-014 per-checkpoint ceiling (default 5), counted in `rounds`.
-- A recorded override (`GOVERN_OVERRIDE` / `--override`) is checked each READ-GATE and short-circuits to `overridden`.
+- A recorded override (`GOVERN_OVERRIDE` / `--override`) is handled by the gate (returns OPEN → `converged` with a record), NOT a driver short-circuit (AUDIT-20260612-05).
 
 ## Relationships
 

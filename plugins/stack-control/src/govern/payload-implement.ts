@@ -146,7 +146,17 @@ export function assembleImplementPayload(
   const budget = args.budgetBytes ?? DEFAULT_UNTRACKED_FOLD_BUDGET;
   const warn = args.warn ?? ((m: string) => process.stderr.write(`${m}\n`));
 
-  let diff = git(repoRoot, ['diff', base]);
+  // AUDIT-20260612-01: scope the COMMITTED diff to the unit's path scope too —
+  // not just the untracked fold below. Without this, a `--phase` audit of
+  // committed work (the normal commit-per-task flow) folded the whole-feature
+  // `git diff base`, defeating SC-006's "shrink the audited unit." When a scope
+  // is present the path tokens become `git diff base -- <pathspec…>` so only the
+  // phase's files contribute. Absent scope → unconditional whole-feature diff.
+  const committedDiffArgs =
+    args.pathScope !== undefined && args.pathScope.length > 0
+      ? ['diff', base, '--', ...args.pathScope]
+      : ['diff', base];
+  let diff = git(repoRoot, committedDiffArgs);
   const committedDiffEmpty = diff.trim().length === 0;
 
   // AUDIT-20260605-01: fold untracked-but-not-ignored files so newly-added work

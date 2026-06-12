@@ -18,6 +18,13 @@
  * and is imported by `extract-barrage-findings.ts`, so there is no runtime import
  * cycle: this module's only import from `extract-barrage-findings.ts` is the
  * type-only `NormalizedSeverity` (erased at compile time).
+ *
+ * The agreement rule's WIDE-spread case (e.g. [high, informational] → informational,
+ * an unbounded LOWERING) is bounded downstream in `mergeCluster`, not here: a
+ * cluster whose dominant lane is ≥2 levels above the agreement floor is routed
+ * through `adjudicate` rather than accepting the floor (AUDIT-20260612-02 /
+ * contracts/cluster-severity.md § Disagreement floor). This function stays pure —
+ * it computes the floor; the routing decision needs the finding body.
  */
 
 import type { NormalizedSeverity } from './extract-barrage-findings.js';

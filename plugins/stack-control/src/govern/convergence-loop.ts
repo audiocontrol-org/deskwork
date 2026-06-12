@@ -16,38 +16,35 @@
  * in-loop action is `dispatchFix` — the sole mutation seam; the driver never
  * auto-edits the work under audit. The state machine is in
  * data-model.md § "State Machine: convergence loop driver".
+ *
+ * An operator `--override` is NOT a driver concern (AUDIT-20260612-05): govern
+ * routes it through the gate so an overridden run still produces a barrage record
+ * (the gate records the reason in the audit trail and returns OPEN → the driver
+ * sees `converged`). The driver therefore has exactly two terminals — converged
+ * and non-converged — and does not carry the audit unit (findings are recorded by
+ * the lift, not the loop; the driver only sequences passes).
  */
 
-import type { AuditUnit } from './audit-unit-types.js';
 import type { ConvergenceOutcome } from './convergence-types.js';
 
 export interface RunConvergenceLoopArgs {
-  /** What is being audited (phase | feature) — carried for the per-attempt record. */
-  readonly unit: AuditUnit;
   /** The FR-014 per-checkpoint iteration ceiling (default caller supplies 5). */
   readonly ceiling: number;
   /** One render→barrage→lift→slush→gate pass; resolves the gate's boolean. */
   readonly runPass: () => Promise<{ gateOpen: boolean }>;
   /** The agent's only in-loop action: fix the surfaced findings. */
   readonly dispatchFix: () => Promise<void>;
-  /** A recorded operator override (mandatory reason); short-circuits to overridden. */
-  readonly override?: { readonly reason: string };
 }
 
 /**
- * Run the convergence loop over one `AuditUnit` and resolve to exactly one
- * `ConvergenceOutcome`. The function ALWAYS resolves to a terminal variant — it
- * never returns control without one (SC-004). A `runPass` rejection propagates as
- * a loud failure rather than a silent stop (an OUTAGE is not convergence).
+ * Run the convergence loop and resolve to exactly one `ConvergenceOutcome`. The
+ * function ALWAYS resolves to a terminal variant — it never returns control
+ * without one (SC-004). A `runPass` rejection propagates as a loud failure rather
+ * than a silent stop (an OUTAGE is not convergence).
  */
 export async function runConvergenceLoop(
   args: RunConvergenceLoopArgs,
 ): Promise<ConvergenceOutcome> {
-  // A recorded override short-circuits before any pass (graduate-with-reason).
-  if (args.override !== undefined) {
-    return { kind: 'overridden', rounds: 0, reason: args.override.reason };
-  }
-
   let rounds = 0;
   // The ceiling bounds the loop (FR-014); below it, a BLOCKED gate dispatches a
   // fix and re-runs. The iterate/stop transition is the driver's, never the

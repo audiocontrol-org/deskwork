@@ -15,14 +15,6 @@ export interface ConvergedOutcome {
   readonly rounds: number;
 }
 
-export interface OverriddenOutcome {
-  readonly kind: 'overridden';
-  /** Rounds run before the override short-circuited (0 if recorded at entry). */
-  readonly rounds: number;
-  /** The mandatory recorded override reason (Constitution V — never silent). */
-  readonly reason: string;
-}
-
 export interface NonConvergedOutcome {
   readonly kind: 'non-converged';
   /** Rounds run (== ceiling at termination). */
@@ -34,11 +26,12 @@ export interface NonConvergedOutcome {
 /**
  * The terminal outcome of a convergence-loop run:
  *   - `converged`     — the gate returned OPEN; the unit may graduate.
- *   - `overridden`    — an operator override was recorded (mandatory reason).
  *   - `non-converged` — the ceiling was reached without OPEN (bounded
  *                       termination, FR-014); never an unbounded grind.
+ *
+ * There is no `overridden` driver terminal (AUDIT-20260612-05): an operator
+ * `--override` is routed through the gate (it records the reason in the audit
+ * trail and returns OPEN), so an overridden run graduates as `converged` with a
+ * barrage record — the driver never needs a separate override short-circuit.
  */
-export type ConvergenceOutcome =
-  | ConvergedOutcome
-  | OverriddenOutcome
-  | NonConvergedOutcome;
+export type ConvergenceOutcome = ConvergedOutcome | NonConvergedOutcome;

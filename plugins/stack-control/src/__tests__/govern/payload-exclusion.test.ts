@@ -74,3 +74,65 @@ describe('untracked fold is bounded to the unit path scope (SC-005, parked scaff
     expect(r.skippedOutOfScope).toEqual([]);
   });
 });
+
+describe('committed diff is scoped to the unit path scope (AUDIT-20260612-01)', () => {
+  // The pre-fix gap: pathScope gated ONLY the untracked fold; the committed
+  // `git diff base` was unconditional. So a `--phase` audit of COMMITTED work
+  // (the normal commit-per-task flow) folded the whole-feature committed diff,
+  // not the phase — contradicting SC-006. This block exercises a COMMITTED
+  // phase, which the untracked-only tests above never reached.
+  function gitCommitAll(repo: string, message: string): string {
+    spawnSync('git', ['-C', repo, 'add', '-A'], { encoding: 'utf8' });
+    spawnSync(
+      'git',
+      [
+        '-C', repo,
+        '-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false',
+        'commit', '-q', '--no-gpg-sign', '-m', message,
+      ],
+      { encoding: 'utf8' },
+    );
+    return spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+  }
+
+  it('a committed in-scope change is audited; a committed out-of-scope change is excluded', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'payload-committed-'));
+    dirs.push(repo);
+    spawnSync('git', ['-C', repo, 'init', '-q'], { encoding: 'utf8' });
+    mkdirSync(join(repo, 'src', 'phase-2'), { recursive: true });
+    mkdirSync(join(repo, 'src', 'phase-1'), { recursive: true });
+    writeFileSync(join(repo, 'src', 'phase-1', 'old.ts'), 'export const OLD = 1;\n');
+    const base = gitCommitAll(repo, 'base');
+    // Phase-2 work AND an unrelated phase-1 edit both land as committed changes.
+    writeFileSync(join(repo, 'src', 'phase-2', 'feature.ts'), 'export const PHASE_TWO = true;\n');
+    writeFileSync(join(repo, 'src', 'phase-1', 'old.ts'), 'export const OLD = 999;\n');
+    gitCommitAll(repo, 'phase 2 + drive-by phase 1 edit');
+
+    const r = assembleImplementPayload({
+      repoRoot: repo,
+      base,
+      pathScope: ['src/phase-2/feature.ts'],
+    });
+    expect(r.diff).toContain('PHASE_TWO');
+    expect(r.diff).not.toContain('OLD = 999');
+  });
+
+  it('an untracked sibling NOT named in the phase scope is excluded (per-phase contract)', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'payload-sibling-'));
+    dirs.push(repo);
+    spawnSync('git', ['-C', repo, 'init', '-q'], { encoding: 'utf8' });
+    mkdirSync(join(repo, 'src', 'phase-2'), { recursive: true });
+    writeFileSync(join(repo, 'src', 'phase-2', 'feature.ts'), 'export const NAMED = true;\n');
+    // A sibling under the same directory the implementer created but did NOT
+    // name in a task line — the phase scope is its named files, so it is out.
+    writeFileSync(join(repo, 'src', 'phase-2', 'unnamed.ts'), 'export const UNNAMED = true;\n');
+    const r = assembleImplementPayload({
+      repoRoot: repo,
+      base: 'HEAD',
+      pathScope: ['src/phase-2/feature.ts'],
+    });
+    expect(r.diff).toContain('NAMED');
+    expect(r.diff).not.toContain('UNNAMED');
+    expect(r.skippedOutOfScope).toContain('src/phase-2/unnamed.ts');
+  });
+});

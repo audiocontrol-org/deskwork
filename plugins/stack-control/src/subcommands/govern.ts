@@ -81,7 +81,11 @@ const USAGE = [
   '  --mode <implement|spec>   Required.',
   '  --feature <slug>          Feature slug (else derived from feature/<slug>).',
   '  --repo-root <path>        Project root (else git toplevel / cwd).',
-  '  --ceiling <N>             Convergence iteration ceiling.',
+  '  --ceiling <N>             Convergence iteration ceiling (default 1). NOTE: govern',
+  '                            applies NO in-process fix between rounds, so N>1 re-runs',
+  '                            N identical barrage passes against an unchanged tree and',
+  '                            stays BLOCKED — useful only once a real in-process fixer',
+  '                            lands. Cross-round fixing is agent-paced: fix, re-invoke.',
   '  --override "<reason>"      Record an explicit override.',
   '  --no-slush                Disable the slush step (address every finding).',
   '  --json                    Emit the gate verdict JSON only.',
@@ -416,18 +420,7 @@ export async function runGovern(args: string[]): Promise<void> {
     // the gate (it records the override in the audit trail and returns gateOpen),
     // so an overridden run still produces a barrage record.
     const ceiling = resolveCeiling(pick(flags.ceiling, process.env.GOVERN_CEILING));
-    const diffBase =
-      flags.mode === 'implement'
-        ? (flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1')
-        : 'HEAD';
-    const unit: AuditUnit =
-      phaseUnit ?? {
-        granularity: 'feature',
-        diffScope: { base: diffBase, files: [] },
-        auditLogSection: built.checkpoint,
-      };
     const outcome: ConvergenceOutcome = await runConvergenceLoop({
-      unit,
       ceiling,
       runPass: async () => ({ gateOpen: runProtocol(protocolArgs).gateOpen }),
       dispatchFix: async () => {

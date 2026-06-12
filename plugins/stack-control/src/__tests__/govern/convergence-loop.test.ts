@@ -7,19 +7,12 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { runConvergenceLoop } from '../../govern/convergence-loop.js';
-import type { AuditUnit } from '../../govern/audit-unit-types.js';
-
-const unit: AuditUnit = {
-  granularity: 'feature',
-  diffScope: { base: 'HEAD~1', files: [] },
-  auditLogSection: 'after_implement',
-};
 
 describe('runConvergenceLoop (mechanical termination, FR-004/005)', () => {
   it('OPEN on pass 1 → converged at rounds:1, dispatchFix never called', async () => {
     const runPass = vi.fn(async () => ({ gateOpen: true }));
     const dispatchFix = vi.fn(async () => {});
-    const outcome = await runConvergenceLoop({ unit, ceiling: 5, runPass, dispatchFix });
+    const outcome = await runConvergenceLoop({ ceiling: 5, runPass, dispatchFix });
     expect(outcome).toEqual({ kind: 'converged', rounds: 1 });
     expect(runPass).toHaveBeenCalledTimes(1);
     expect(dispatchFix).not.toHaveBeenCalled();
@@ -28,7 +21,7 @@ describe('runConvergenceLoop (mechanical termination, FR-004/005)', () => {
   it('always BLOCKED, ceiling 5 → non-converged at rounds:5; dispatchFix called exactly 4 times', async () => {
     const runPass = vi.fn(async () => ({ gateOpen: false }));
     const dispatchFix = vi.fn(async () => {});
-    const outcome = await runConvergenceLoop({ unit, ceiling: 5, runPass, dispatchFix });
+    const outcome = await runConvergenceLoop({ ceiling: 5, runPass, dispatchFix });
     expect(outcome).toEqual({ kind: 'non-converged', rounds: 5, ceiling: 5 });
     expect(runPass).toHaveBeenCalledTimes(5);
     // No fix-dispatch on the final ceiling round — the loop stops, it does not fix.
@@ -39,28 +32,16 @@ describe('runConvergenceLoop (mechanical termination, FR-004/005)', () => {
     const gates = [false, false, true];
     const runPass = vi.fn(async () => ({ gateOpen: gates.shift() ?? true }));
     const dispatchFix = vi.fn(async () => {});
-    const outcome = await runConvergenceLoop({ unit, ceiling: 5, runPass, dispatchFix });
+    const outcome = await runConvergenceLoop({ ceiling: 5, runPass, dispatchFix });
     expect(outcome).toEqual({ kind: 'converged', rounds: 3 });
     expect(dispatchFix).toHaveBeenCalledTimes(2);
   });
 
-  it('override set → overridden regardless of the gate; runPass not required to run', async () => {
-    const runPass = vi.fn(async () => ({ gateOpen: false }));
-    const dispatchFix = vi.fn(async () => {});
-    const outcome = await runConvergenceLoop({
-      unit,
-      ceiling: 5,
-      runPass,
-      dispatchFix,
-      override: { reason: 'residual findings are implementation-altitude (operator call)' },
-    });
-    expect(outcome.kind).toBe('overridden');
-    if (outcome.kind === 'overridden') {
-      expect(outcome.reason).toMatch(/implementation-altitude/);
-    }
-    expect(runPass).not.toHaveBeenCalled();
-    expect(dispatchFix).not.toHaveBeenCalled();
-  });
+  // AUDIT-20260612-05: there is no driver-level override terminal. An operator
+  // `--override` is routed through the gate (govern), which records the reason and
+  // returns OPEN, so an overridden run reaches the driver as a normal `converged`
+  // pass with a barrage record. The driver's only terminals are converged /
+  // non-converged — asserted by the cases above.
 
   it('dispatchFix is the ONLY mutation seam — the driver invokes no other callback (FR-005)', async () => {
     // The driver receives exactly two behavioral callbacks (runPass, dispatchFix).
@@ -69,7 +50,7 @@ describe('runConvergenceLoop (mechanical termination, FR-004/005)', () => {
     const gates = [false, true];
     const runPass = vi.fn(async () => ({ gateOpen: gates.shift() ?? true }));
     const dispatchFix = vi.fn(async () => {});
-    await runConvergenceLoop({ unit, ceiling: 5, runPass, dispatchFix });
+    await runConvergenceLoop({ ceiling: 5, runPass, dispatchFix });
     expect(runPass).toHaveBeenCalledTimes(2);
     expect(dispatchFix).toHaveBeenCalledTimes(1);
   });
@@ -80,7 +61,7 @@ describe('runConvergenceLoop (mechanical termination, FR-004/005)', () => {
     });
     const dispatchFix = vi.fn(async () => {});
     await expect(
-      runConvergenceLoop({ unit, ceiling: 5, runPass, dispatchFix }),
+      runConvergenceLoop({ ceiling: 5, runPass, dispatchFix }),
     ).rejects.toThrow(/OUTAGE/);
   });
 });
