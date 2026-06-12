@@ -2,24 +2,34 @@
 
 ---
 
-## 2026-06-12: <!-- session title -->
+## 2026-06-12: installation-isolation executed + governed to OPEN; v0.44.0 merged in and reconciled
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Execute the installation-isolation spec end-to-end through `/stack-control:execute` (six stories: the isolation invariant, uniform refusal, govern anchoring, cwd-independence, legacy detection + this repo's migration, Spec Kit relocation), let governance fire and converge; then bring origin/main (v0.44.0 — the parallel barrage-reliability 014 + audit-protocol-convergence 015 line) into the branch and reconcile the two anchor models.
 
 **Accomplished:**
-- <!-- compose -->
+- All 21/21 tasks of specs/installation-isolation, every behavioral change RED-first. US1–US5: one verb-entry-resolved installation anchors barrage run-dirs, config reads, the clone baseline, the widen auto-seed; `--repo-root`/`GOVERN_REPO_ROOT` retired (loud unknown-flag/FATAL); uniform `FATAL — … run stackctl setup` refusal with zero-write proof; govern's diff engine, untracked fold, commit subjects, run dirs, and the TASK-40 backlog-store exclusion all derive from the installation record; three-cwd invariance (SC-003); the legacy half-installation notice (once per OPERATOR invocation via an env latch). The isolation probe (10 verb rows) is a permanent suite member.
+- US5/US6 dogfood on this repo: the root half-installation is GONE (tuned battery + run history migrated into the installation; a state-writing verb from the bare monorepo root refuses and recreates nothing — SC-004), and `.specify/` + `specs/` relocated into the installation (history-preserving `git mv`; Spec Kit re-rooted via its own nearest-`.specify` walk-up; installation-first feature-root resolution with a derived-toplevel legacy layer). Constitution 1.3.0 records the installation-anchor invariant (FR-010).
+- Governance converged in three cross-model rounds (claude+codex, 2/2 lanes each): round 1 lifted 6 findings (1 HIGH ×5-lane cross-model — the untracked fold leaked absolute paths off-box); round 2 lifted 4 (0 HIGH); all ten fixed RED-first via fresh sub-agents, one commit each; round 3 was the second consecutive 0-HIGH → dampener engaged → gate OPEN; 6 MED/LOW residuals slushed to backlog TASK-48..53.
+- Merged origin/main (v0.44.0) and reconciled: main's v2 config grammar / timeout derivation / terminal states / code-driven convergence loop / per-phase pathScope units now run on the installation anchor; main's new spec dirs relocated into the installation; main's new tests migrated to the isolation model (installationRoot field, --at, markers, v2 stub batteries).
 
 **Didn't Work:**
-- <!-- compose -->
+- The after_implement govern run could not audit the relocation commit directly: the endpoint diff under the `--relative` installation arm breaks rename pairing for the moved-in spec tree (~1.8MB of pre-existing text as adds — past model context). Worked around with a local rename-neutralized synthetic diff base (worktree at the base + the same `git mv`, never pushed); captured as TASK-47.
+- Commit 237271c6 accidentally committed ~300k lines of gitignored audit-run history (the root-anchored `.stack-control/audit-runs/` pattern stopped matching post-migration); fixed forward (untracked + `**/`-pattern) but both commits are pushed — permanent history weight unless the operator authorizes a rewrite.
+- A root-level umbrella `npx vitest run` and `npm --workspaces test` both proved unusable as a whole-tree health check (phantom failures / hung behind stale day-old vitest processes); cross-package isolation was proven by `git diff --stat <base> -- packages plugins/dw-lifecycle` (empty) instead.
+- One governance fix sub-agent died mid-fix on a session limit (AUDIT-05); the orchestrator completed the remaining two guard lines against the agent's own RED tests.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Operator caught the dead background test run ("that test run is almost certainly stuck or dead") — the npm --workspaces run sat behind stale vitest strays at ~0% CPU while I waited on its notification; the by-construction diff proof was both faster and stronger.
+- [PROCESS] The govern-spec smoke's first post-retirement run leaked stub run-dirs + slush backlog items into the REAL installation via `$(pwd)`/cwd anchoring — a live demonstration of the exact US4 defect the feature fixes; artifacts removed, smoke stub re-anchored on `--at`.
 
 **Insights:**
-- <!-- compose -->
+- The feature's own governance loop found defects in the feature's own mechanism (absolute-path leak in the fold, the render step's missing anchor, cwd-anchored slush destination) — the isolation invariant is exactly the kind of cross-cutting promise a cross-model barrage verifies better than a single review pass.
+- Pristine origin/main ships `govern-payload-self-reference`'s excerpt test red (it asserts pre-015 excerpt threading against the post-015 signature — the string lands in `pathScope`); verified in a clean worktree before reconciling the test to 015 semantics rather than preserving a broken assertion.
+- Suite reconciliation (AUDIT-04 convention): pre-feature baseline 184 files / 1220 tests → 192/1278 at feature close (+6 new test files / +40 tests, +5 retired-flag rows, +9 from governance-round fixes — arithmetic reconciles) → 216/1453 after the v0.44.0 merge (the delta is main's 014/015 suites, migrated to the isolation model).
+- Open findings at session end: 0 open in the feature audit-log (10 fixed-<sha>, 6 migrated-to-backlog TASK-48..53 — parked real defects in the burn-down queue, not resolutions).
 
 **Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 108
+- Commits: 108 in the `--since` range, of which 37 first-parent on this branch this session (35 feature/governance/bookkeeping + the merge + this record); the remaining 71 arrived via the origin/main (v0.44.0) merge
   - merge: bring origin/main (v0.44.0 — barrage reliability 014 + convergence 015) into feature/stack-control
   - docs(installation-isolation): governance converged — gate OPEN (round 3, 0 HIGH)
   - chore: release v0.44.0
