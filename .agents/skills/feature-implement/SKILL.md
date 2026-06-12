@@ -5,21 +5,11 @@ description: "Drive the implementation loop by selecting the next workplan task,
 
 # Feature Implement
 
-## Strict Gate
+DEPRECATED. Implementation should proceed through the stack-control front door,
+not the old repo-wide workplan loop.
 
-Before implementation:
+Canonical replacement:
 
-1. Identify the feature slug.
-2. Read the PRD and workplan.
-3. Verify the PRD/workplan have been explicitly approved for implementation.
-4. If approval is missing or ambiguous, refuse to proceed and ask for confirmation instead of routing through deskwork-plugin dogfooding.
-
-## Loop
-
-1. Find the next unchecked workplan item.
-2. Read the relevant code and tests.
-3. Implement locally by default.
-4. If the user explicitly asked for delegation, split bounded tasks into safe worker/explorer chunks.
-5. Run relevant tests.
-6. Update the workplan and README.
-7. Commit and push when the chunk is complete.
+1. Use the active stack-control feature under `plugins/stack-control/specs/`
+2. Drive runnable specs through `plugins/stack-control/skills/execute/SKILL.md`
+3. Use stack-control backlog, roadmap, and session surfaces for supporting workflow

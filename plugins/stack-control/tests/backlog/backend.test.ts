@@ -12,7 +12,7 @@ import { createBacklogBackend, BacklogError } from '../../src/backlog/backend.js
 import { tmpBacklog } from './helpers.js';
 
 describe('backlog backend adapter — fail-loud (T005, Principle V)', () => {
-  it('a missing binary throws a descriptive error naming the dependency + remediation', () => {
+  it('a missing binary throws a stack-control backlog-backend error without leaking the backend product name', () => {
     const backend = createBacklogBackend({
       cwd: tmpBacklog(),
       binaryPath: '/nonexistent/path/to/backlog',
@@ -24,7 +24,8 @@ describe('backlog backend adapter — fail-loud (T005, Principle V)', () => {
       thrown = err;
     }
     expect(thrown).toBeInstanceOf(BacklogError);
-    expect((thrown as Error).message).toMatch(/backlog\.md/);
+    expect((thrown as Error).message).toMatch(/backlog backend/i);
+    expect((thrown as Error).message).not.toMatch(/backlog\.md/);
     expect((thrown as Error).message).toMatch(/install/i);
   });
 

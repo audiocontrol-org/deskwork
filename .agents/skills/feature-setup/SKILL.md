@@ -5,13 +5,11 @@ description: "Create feature infrastructure: branch, worktree, and docs files fr
 
 # Feature Setup
 
-1. Resolve the slug and read `.agents/.tmp/feature-definition-<slug>.md` if present.
-2. Create the branch and worktree.
-3. Create `docs/1.0/001-IN-PROGRESS/<slug>/`.
-4. Create:
-   - `prd.md`
-   - `workplan.md`
-   - `README.md`
-   - `implementation-summary.md`
-5. Seed the PRD and workplan from the approved feature-definition draft.
-6. Report the created paths and the next required operator action: review and approve the PRD/workplan in-repo before `feature-issues` or `feature-implement`.
+DEPRECATED. The old repo-wide branch/worktree/docs feature setup flow is no
+longer canonical.
+
+Use the stack-control Spec Kit workflow instead:
+
+1. Keep feature artifacts under `plugins/stack-control/specs/`
+2. Use `plugins/stack-control/skills/define/SKILL.md` and `extend/SKILL.md`
+3. Do not create new repo-wide `docs/1.0/001-IN-PROGRESS/<slug>/` feature scaffolds through this path

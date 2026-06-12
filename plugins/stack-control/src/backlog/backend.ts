@@ -77,8 +77,9 @@ export interface BacklogBackendOptions {
 }
 
 const DEP = 'backlog.md';
+const BACKEND_LABEL = 'configured backlog backend';
 const INSTALL_HINT =
-  `install it with \`npm install\` (the stack-control plugin pins ${DEP}@1.46.0)`;
+  'run `npm install` in the stack-control plugin root to restore the configured backlog backend dependency';
 
 /** Resolve how to invoke backlog: an injected path, or node + the resolved cli.js. */
 function resolveInvocation(binaryPath: string | undefined): { cmd: string; prefix: string[] } {
@@ -88,7 +89,7 @@ function resolveInvocation(binaryPath: string | undefined): { cmd: string; prefi
   try {
     pkgJsonPath = req.resolve(`${DEP}/package.json`);
   } catch {
-    throw new BacklogError(`required dependency '${DEP}' is not installed — ${INSTALL_HINT}`);
+    throw new BacklogError(`${BACKEND_LABEL} is not installed — ${INSTALL_HINT}`);
   }
   const binRel = readBinRel(pkgJsonPath);
   return { cmd: process.execPath, prefix: [resolve(dirname(pkgJsonPath), binRel)] };
@@ -157,13 +158,13 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
     if (res.error !== undefined) {
       const code = (isRecord(res.error) && res.error.code) || '';
       if (code === 'ENOENT') {
-        throw new BacklogError(`required dependency '${DEP}' binary not found — ${INSTALL_HINT}`);
+        throw new BacklogError(`${BACKEND_LABEL} executable not found — ${INSTALL_HINT}`);
       }
-      throw new BacklogError(`failed to spawn ${DEP}: ${res.error.message}`);
+      throw new BacklogError(`failed to spawn the ${BACKEND_LABEL}: ${res.error.message}`);
     }
     if (res.status !== 0) {
       const detail = (res.stderr || res.stdout || '').trim();
-      throw new BacklogError(`${DEP} exited ${res.status}: ${detail}`);
+      throw new BacklogError(`${BACKEND_LABEL} exited ${res.status}: ${detail}`);
     }
     return res.stdout ?? '';
   }
@@ -222,7 +223,9 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
       const stdout = run(args);
       const m = /^Task\s+(\S+)\s+-/m.exec(stdout);
       if (m === null) {
-        throw new BacklogError(`could not parse the created item id from ${DEP} output:\n${stdout}`);
+        throw new BacklogError(
+          `could not parse the created item id from the ${BACKEND_LABEL} output:\n${stdout}`,
+        );
       }
       return m[1]!;
     },

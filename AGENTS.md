@@ -35,7 +35,9 @@ Implications:
 4. Report context and confirm the session goal.
 5. Do not start coding until the user confirms if the work is a planning/resume flow.
 
-Use `.agents/skills/session-start/` or `.agents/skills/feature-pickup/` as the canonical Codex workflows.
+Use the `stack-control` workflow as the canonical path. For session pickup in the
+active stack-control installation, prefer `plugins/stack-control/skills/session-start/`
+and the active plugin-local Spec Kit feature under `plugins/stack-control/specs/`.
 
 ### End
 
@@ -49,16 +51,18 @@ Use `.agents/skills/session-end/`.
 
 ## Feature Lifecycle
 
-1. `feature-define` — interview and write a feature definition draft under `.agents/.tmp/feature-definition-<slug>.md`
-2. `feature-setup` — create branch, worktree, and feature docs from the approved definition draft
-3. Operator reviews and approves the PRD/workplan directly in the repo before implementation begins
-4. `feature-issues` — file GitHub issues from the stable workplan
-5. `feature-implement` — implementation begins only after PRD approval
-6. `feature-extend` — add phases mid-implementation, then get PRD/workplan approval again before filing new issues
-7. `feature-review` / `feature-ship`
-8. `feature-complete` — move docs to `003-COMPLETE` before merge
+The old repo-wide `.agents/skills/feature-*` workflow is deprecated and should
+not be used for new feature work.
 
-The PRD/workplan approval gate is strict. Do not treat deskwork-plugin workflow state as a prerequisite for `/feature-*` skills.
+Canonical feature path:
+
+1. Use `plugins/stack-control/skills/define/` to author a new Spec Kit feature
+   in the active stack-control installation.
+2. Use `plugins/stack-control/skills/extend/` to iterate the spec to runnable.
+3. Use `plugins/stack-control/skills/execute/` to drive implementation through
+   the front door.
+4. Use the stack-control backlog, roadmap, session, and release surfaces for
+   supporting workflow management.
 
 For non-feature documents, use the deskwork lifecycle directly.
 
