@@ -40,4 +40,11 @@ describe('portability-facing docs and skills', () => {
     expect(readRepo('.agents/skills/feature-define/SKILL.md')).toContain('DEPRECATED');
     expect(readRepo('.agents/skills/release/SKILL.md')).toContain('DEPRECATED');
   });
+
+  it('portable host-facing assets include a Codex manifest and a stack-control-owned release skill', () => {
+    expect(read('.codex-plugin/plugin.json')).toContain('"name": "stack-control"');
+    expect(read('.codex-plugin/plugin.json')).toContain('"skills": "./skills/"');
+    expect(read('skills/release/SKILL.md')).toContain('stackctl release-check');
+    expect(read('skills/release/SKILL.md')).toContain('Codex');
+  });
 });

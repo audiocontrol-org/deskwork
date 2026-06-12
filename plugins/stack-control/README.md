@@ -23,7 +23,8 @@ Feature docs live in the deskwork repo:
 
 ## Install
 
-Install via the deskwork marketplace (pin to a tag from the releases page):
+Claude Code consumes the released plugin through the deskwork marketplace (pin
+to a tag from the releases page):
 
 ```
 /plugin marketplace add https://github.com/audiocontrol-org/deskwork
@@ -35,6 +36,11 @@ For local development against this workspace, point Claude Code at the plugin di
 ```
 claude --plugin-dir plugins/stack-control
 ```
+
+Codex consumes the same plugin version line through the plugin-local Codex
+manifest at [`plugins/stack-control/.codex-plugin/plugin.json`](./.codex-plugin/plugin.json).
+That Codex surface points at the same `skills/` tree and is versioned in
+lockstep with the monorepo release and the Claude marketplace entry.
 
 ## Front-door skills
 
@@ -69,6 +75,7 @@ The deterministic primitive the skills call (`bin/stackctl <verb>`, in-tree Type
 | `stackctl backlog list` | Read-only: list each item's id + status + type (a tier distinct from `ROADMAP.md`). |
 | `stackctl backlog import-github [--apply]` | One-time, idempotent snapshot of open GitHub issues → `imported-issue` items (backlinked `gh-<n>`, labels + body carried). GitHub never mutated; dry-run by default; fail-loud on a missing/unauthenticated `gh`. |
 | `stackctl backlog import-slush --feature <slug> [--apply]` | One-time backfill of existing `acknowledged-slush-pile` audit-log entries → `migrated-finding` items; rewrites each to `migrated-to-backlog <task-id>`. HIGHs never migrated; idempotent; dry-run by default. |
+| `stackctl release-check [--json]` | Read-only portable release contract check. Verifies the monorepo's shipped artifacts remain on one version line and that the stack-control Claude marketplace and Codex plugin distributions consume the same release. |
 
 ## Document primitives
 

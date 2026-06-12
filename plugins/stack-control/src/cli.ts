@@ -49,6 +49,7 @@ import { runScopeInventory } from './subcommands/scope-inventory.js';
 import { runScopeWiden } from './subcommands/scope-widen.js';
 import { runSessionStartCli } from './subcommands/session-start.js';
 import { runSessionEndCli } from './subcommands/session-end.js';
+import { runReleaseCheck } from './subcommands/release-check.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -110,6 +111,8 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // Native session lifecycle skills (011 / session-skills).
   'session-start': runSessionStartCli,
   'session-end': runSessionEndCli,
+  // Portable release/update contract checks (017 / portability).
+  'release-check': runReleaseCheck,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

@@ -2,7 +2,7 @@
   "name": "@deskwork/plugin-stack-control",
   "version": "0.44.0",
   "private": true,
-  "description": "Workspace package for the stack-control Claude Code plugin",
+  "description": "Workspace package for the stack-control Claude Code and Codex plugin",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
