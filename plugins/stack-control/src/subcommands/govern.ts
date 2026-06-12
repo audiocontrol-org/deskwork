@@ -234,6 +234,25 @@ function resolveSpecPath(repoRoot: string, flagValue: string | undefined): strin
   return join(repoRoot, dirname(markerPath), 'spec.md');
 }
 
+/**
+ * claude-20260612-r3-01/-02: the verdict-surface summary of the audit-unit's
+ * path-scope exclusions (claude-20260612-03), as a pure function so it is
+ * unit-tested without spinning the protocol. Returns `undefined` when nothing was
+ * excluded (no line emitted). The excluded file list is placed LAST, after a
+ * single `: `, so a consumer can extract it cleanly (`sed 's/^.*: //'`) — the prose
+ * rationale precedes it rather than trailing it.
+ */
+export function formatScopeExclusionSummary(
+  skippedOutOfScope: readonly string[],
+): string | undefined {
+  if (skippedOutOfScope.length === 0) return undefined;
+  return (
+    `govern: audit-unit path-scope excluded ${skippedOutOfScope.length} untracked ` +
+    `file(s) from the folded payload (FR-006 parked-scaffold/out-of-phase exclusion — ` +
+    `audit them by widening the scope or committing first): ${skippedOutOfScope.join(', ')}`
+  );
+}
+
 export function buildImplementVars(
   repoRoot: string,
   slug: string,
@@ -399,16 +418,14 @@ export async function runGovern(args: string[]): Promise<void> {
     }
 
     // claude-20260612-03: surface the audit-unit's path-scope exclusions as ONE
-    // consolidated, machine-greppable summary at the verdict surface — not only as
-    // the interleaved per-file warns. A `--phase` run that silently dropped an
-    // untracked sibling (the intentional per-phase contract) is now auditable in a
-    // single line instead of buried mid-stream.
-    if (built.skippedOutOfScope.length > 0) {
-      process.stderr.write(
-        `govern: audit-unit path-scope excluded ${built.skippedOutOfScope.length} untracked ` +
-          `file(s) from the folded payload: ${built.skippedOutOfScope.join(', ')} ` +
-          `(FR-006 parked-scaffold/out-of-phase exclusion — audit them by widening the scope or committing first).\n`,
-      );
+    // consolidated, greppable summary at the verdict surface — not only as the
+    // interleaved per-file warns. A `--phase` run that silently dropped an untracked
+    // sibling (the intentional per-phase contract) is now auditable in a single line
+    // instead of buried mid-stream. (claude-20260612-r3-01: the line is built by the
+    // pure `formatScopeExclusionSummary` so it is unit-tested without the protocol.)
+    const exclusionSummary = formatScopeExclusionSummary(built.skippedOutOfScope);
+    if (exclusionSummary !== undefined) {
+      process.stderr.write(`${exclusionSummary}\n`);
     }
 
     const noSlush = flags.noSlush || process.env.GOVERN_NO_SLUSH === '1';

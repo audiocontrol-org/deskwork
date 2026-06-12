@@ -14,7 +14,10 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { assembleImplementPayload } from '../../govern/payload-implement.js';
-import { buildImplementVars } from '../../subcommands/govern.js';
+import {
+  buildImplementVars,
+  formatScopeExclusionSummary,
+} from '../../subcommands/govern.js';
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -61,6 +64,27 @@ describe('buildImplementVars surfaces the path-scope exclusions structurally (cl
     writeFileSync(join(repo, 'a.ts'), 'export const A = 1;\n');
     const built = buildImplementVars(repo, 'feat', 'HEAD', undefined);
     expect(built.skippedOutOfScope).toEqual([]);
+  });
+});
+
+describe('formatScopeExclusionSummary — the verdict-surface line (claude-20260612-r3-01/-02)', () => {
+  it('emits nothing when no files were excluded', () => {
+    expect(formatScopeExclusionSummary([])).toBeUndefined();
+  });
+
+  it('emits one consolidated line naming every excluded file and the count', () => {
+    const line = formatScopeExclusionSummary(['src/parked/a.ts', 'src/parked/b.ts']);
+    expect(line).toBeDefined();
+    expect(line).toContain('excluded 2 untracked');
+    expect(line).toContain('src/parked/a.ts');
+    expect(line).toContain('src/parked/b.ts');
+  });
+
+  it('places the file list LAST after a single ": " so a consumer can extract it cleanly (claude-r3-02)', () => {
+    const line = formatScopeExclusionSummary(['src/parked/a.ts', 'src/parked/b.ts'])!;
+    // The trailing segment after the final ": " is exactly the comma-joined list.
+    const extracted = line.slice(line.lastIndexOf(': ') + 2);
+    expect(extracted).toBe('src/parked/a.ts, src/parked/b.ts');
   });
 });
 

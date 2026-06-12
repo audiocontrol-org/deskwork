@@ -95,3 +95,57 @@ This run was **single-lane (claude/opus only)** — fleet configured 1, produced
 - **AUDIT-20260612-06 — FIXED.** The T034 criterion states "green except the named pre-existing env failures" rather than an unqualified "green"; `quickstart-results.md` carries the `1297→1301 (+4)` reconciliation.
 
 Full suite after fixes: **1301 passed, 8 skipped, 7 failed** (the 7 are the same pre-existing env-only trio — git commit-signing 400 + a hardcoded SHA absent in a fresh clone — verified in isolation). `tsc --noEmit` clean. Closing transition (open→resolved) is the operator's call per project discipline; the evidence is above + in the branch diff.
+
+## 2026-06-12 — audit-barrage lift (20260612T022215287Z-audit-protocol-convergence-after_clarify)
+
+### AUDIT-20260612-07 — Test claims it verifies "exclusions reach the verdict surface" but only asserts the builder return value
+
+Finding-ID: AUDIT-20260612-07
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/src/__tests__/govern/payload-exclusion.test.ts:43-64 + plugins/stack-control/src/subcommands/govern.ts:401-412
+
+The added `describe` block is titled *"buildImplementVars surfaces the path-scope exclusions structurally"* and its first `it` asserts the exclusions *"reach the verdict surface, not just per-file stderr warns."* But both test cases assert only `buildImplementVars(...).skippedOutOfScope` — the **builder return value**. The actual new behavior the diff exists to add — the consolidated stderr summary emitted in `runGovern` at lines 406-411 (`govern: audit-unit path-scope excluded N untracked file(s)...`) — is never exercised. I confirmed the summary string appears only in `govern.ts:408`; it exists nowhere under `__tests__/`.
+
+The blast radius: the "reach the verdict surface" contract is precisely the part left untested, so the summary line can silently regress (wrong count, wrong guard, accidental removal during a refactor) with the suite still green. This is the "tests that don't test the contract they claim to test" lookout. A reasonable fix exercises `runGovern` (or extracts the summary into a testable pure helper), captures stderr, and asserts the line fires for a path-scoped run and is absent for a whole-feature/spec run. Medium rather than high because the surface is advisory logging, not the gate verdict or exit code.
+
+---
+
+### AUDIT-20260612-08 — "machine-greppable" summary embeds the file list in prose — detection-greppable, not cleanly parseable
+
+Finding-ID: AUDIT-20260612-08
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/src/subcommands/govern.ts:407-411
+
+The comment (lines 401-405) and commit subject promise a *"consolidated, machine-greppable summary,"* but the format interpolates the comma-joined file list immediately before a free-prose parenthetical: `...folded payload: a.ts, b.ts (FR-006 parked-scaffold/out-of-phase exclusion — audit them by...)`. The stable `govern: audit-unit path-scope excluded` prefix makes the event detectable and the integer count extractable, but the **file list itself** is not cleanly machine-extractable — a `split(': ')` captures the trailing parenthetical, and a filename containing a comma (rare but legal in git) corrupts the list. The "machine-greppable" wording overstates what the format affords. Low blast radius: a human reader is unaffected and a machine consumer can still detect/count; only structured extraction of the paths is fragile. A bracketed list or one-path-per-line would make it robust.
+
+---
+
+### AUDIT-20260612-09 — Exclusions are stderr-only and never reach the `--json` verdict output
+
+Finding-ID: AUDIT-20260612-09
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    plugins/stack-control/src/subcommands/govern.ts:401-412, 426; plugins/stack-control/src/govern/protocol.ts:197
+
+The stated goal is to deliver exclusions to *"the verdict surface as a consolidated, machine-greppable summary."* The summary is written to **stderr only**; a `--json` consumer parsing stdout never sees `skippedOutOfScope`. I downgraded this to informational because `emitJson` (protocol.ts:197, fed from `flags.json` at govern.ts:426) is declared in the protocol args but never actually consumed in `protocol.ts` — there is no structured JSON verdict object today to thread the field into, so this is a pre-existing gap rather than a regression introduced here. Flagging it as the one place the "verdict surface" framing is incomplete: when/if the JSON verdict is wired, `skippedOutOfScope` belongs as a field in that object, not as stderr prose. No action required from this diff.
+
+---
+
+**Verified clean:** the unconditional `built.skippedOutOfScope.length` at govern.ts:406 cannot throw — the field is non-optional `readonly string[]` in `payload-implement.ts:93` and always returned (line 230); spec mode returns `[]` (govern.ts:315). The `length > 0` guard prevents a spurious summary in spec mode, and `built` is assigned from one of the two builders on every path (govern.ts:376-392), so there is no undefined access. The return-shape widening is symmetric and type-safe.
+
+The audit is complete — the three findings above are the deliverable for operator triage. This was a read-only review task (no implementation plan to approve), so I'm not invoking ExitPlanMode; per its own guidance it's reserved for planning code changes, and an audit-barrage produces findings, not an implementation plan.
+
+Summary for triage:
+- **AUDIT-BARRAGE-claude-01 (medium)** — the new `runGovern` consolidated summary line is untested; the test asserts only the builder return value despite claiming it verifies the exclusions "reach the verdict surface."
+- **AUDIT-BARRAGE-claude-02 (low)** — "machine-greppable" overstates the format; the file list is detection-greppable but not cleanly extractable.
+- **AUDIT-BARRAGE-claude-03 (informational)** — exclusions are stderr-only; a `--json` consumer won't see them (pre-existing gap, since `emitJson` is currently unconsumed).
+
+The return-shape widening and the `.length` access are verified type-safe and clean. Findings are also saved to `/root/.claude/plans/audit-barrage-multi-model-fizzy-sun.md`.
