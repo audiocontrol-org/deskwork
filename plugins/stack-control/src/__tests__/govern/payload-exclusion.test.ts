@@ -40,6 +40,30 @@ describe('payload excludes the feature own audit-log (SC-005, self-reference rem
   });
 });
 
+describe('buildImplementVars surfaces the path-scope exclusions structurally (claude-20260612-03)', () => {
+  it('returns skippedOutOfScope so the exclusions reach the verdict surface, not just per-file stderr warns', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'payload-skip-surface-'));
+    dirs.push(repo);
+    spawnSync('git', ['-C', repo, 'init', '-q'], { encoding: 'utf8' });
+    mkdirSync(join(repo, 'src', 'phase-2'), { recursive: true });
+    mkdirSync(join(repo, 'src', 'parked'), { recursive: true });
+    writeFileSync(join(repo, 'src', 'phase-2', 'in.ts'), 'export const IN = true;\n');
+    writeFileSync(join(repo, 'src', 'parked', 'out.ts'), 'export const OUT = true;\n');
+    const built = buildImplementVars(repo, 'feat', 'HEAD', undefined, ['src/phase-2/in.ts']);
+    expect(built.skippedOutOfScope).toContain('src/parked/out.ts');
+    expect(built.skippedOutOfScope).not.toContain('src/phase-2/in.ts');
+  });
+
+  it('returns an empty skippedOutOfScope for a whole-feature unit (no path scope)', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'payload-skip-none-'));
+    dirs.push(repo);
+    spawnSync('git', ['-C', repo, 'init', '-q'], { encoding: 'utf8' });
+    writeFileSync(join(repo, 'a.ts'), 'export const A = 1;\n');
+    const built = buildImplementVars(repo, 'feat', 'HEAD', undefined);
+    expect(built.skippedOutOfScope).toEqual([]);
+  });
+});
+
 describe('untracked fold is bounded to the unit path scope (SC-005, parked scaffold excluded)', () => {
   it('folds an in-scope untracked file but excludes an unrelated parked scaffold', () => {
     const repo = mkdtempSync(join(tmpdir(), 'payload-scope-'));

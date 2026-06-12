@@ -240,7 +240,7 @@ export function buildImplementVars(
   diffBaseFlag: string | undefined,
   checkpointFlag: string | undefined,
   pathScope?: readonly string[],
-): { vars: BarrageVars; checkpoint: string } {
+): { vars: BarrageVars; checkpoint: string; skippedOutOfScope: readonly string[] } {
   const base = diffBaseFlag ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
   const budgetEnv = process.env.GOVERN_PAYLOAD_BUDGET;
   const payload = assembleImplementPayload({
@@ -275,7 +275,10 @@ export function buildImplementVars(
   };
   const checkpoint =
     checkpointFlag ?? pick(undefined, process.env.GOVERN_CHECKPOINT) ?? 'after_clarify';
-  return { vars, checkpoint };
+  // claude-20260612-03: return the structured path-scope exclusions so they reach
+  // the govern verdict surface as a consolidated, machine-greppable summary — not
+  // only as the interleaved per-file stderr warns assembleImplementPayload emits.
+  return { vars, checkpoint, skippedOutOfScope: payload.skippedOutOfScope };
 }
 
 export function buildSpecVars(
@@ -285,7 +288,7 @@ export function buildSpecVars(
   planPathFlag: string | undefined,
   checkpointFlag: string | undefined,
   auditLogExcerpt: string,
-): { vars: BarrageVars; checkpoint: string } {
+): { vars: BarrageVars; checkpoint: string; skippedOutOfScope: readonly string[] } {
   const specPath = resolveSpecPath(repoRoot, specPathFlag);
   const planPath = pick(planPathFlag, process.env.GOVERN_PLAN_PATH);
   const checkpoint = pick(checkpointFlag, process.env.GOVERN_CHECKPOINT);
@@ -307,7 +310,9 @@ export function buildSpecVars(
     audit_lens: SPEC_AUDIT_LENS,
     artifact_framing: SPEC_ARTIFACT_FRAMING,
   };
-  return { vars, checkpoint: payload.checkpoint };
+  // Spec mode folds the spec + plan, not a path-scoped untracked tree — no
+  // path-scope exclusions apply (claude-20260612-03: uniform return shape).
+  return { vars, checkpoint: payload.checkpoint, skippedOutOfScope: [] };
 }
 
 export async function runGovern(args: string[]): Promise<void> {
@@ -391,6 +396,19 @@ export async function runGovern(args: string[]): Promise<void> {
     // (advisory — does not override the convergence gate, #432).
     if (flags.mode === 'implement') {
       await runCloneDetectionStep({ repoRoot, write: (s) => process.stderr.write(s) });
+    }
+
+    // claude-20260612-03: surface the audit-unit's path-scope exclusions as ONE
+    // consolidated, machine-greppable summary at the verdict surface — not only as
+    // the interleaved per-file warns. A `--phase` run that silently dropped an
+    // untracked sibling (the intentional per-phase contract) is now auditable in a
+    // single line instead of buried mid-stream.
+    if (built.skippedOutOfScope.length > 0) {
+      process.stderr.write(
+        `govern: audit-unit path-scope excluded ${built.skippedOutOfScope.length} untracked ` +
+          `file(s) from the folded payload: ${built.skippedOutOfScope.join(', ')} ` +
+          `(FR-006 parked-scaffold/out-of-phase exclusion — audit them by widening the scope or committing first).\n`,
+      );
     }
 
     const noSlush = flags.noSlush || process.env.GOVERN_NO_SLUSH === '1';
