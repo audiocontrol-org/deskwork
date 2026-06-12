@@ -84,8 +84,8 @@
 
 **Independent test**: render the implement payload for a feature with a populated audit-log + a parked untracked scaffold; confirm both are excluded (SC-005).
 
-- [ ] T021 [P] [US3] RED: test the rendered payload contains zero bytes of the feature's own audit-log content and excludes an unrelated untracked parked scaffold while folding an in-scope untracked file (SC-005) in `plugins/stack-control/src/__tests__/govern/payload-exclusion.test.ts`
-- [ ] T022 [US3] Modify `plugins/stack-control/src/govern/payload-implement.ts` to drop the `audit_log_excerpt` fold from the audited material and bound the untracked fold to the unit's path scope — make T021 green
+- [X] T021 [P] [US3] RED: test the rendered payload contains zero bytes of the feature's own audit-log content and excludes an unrelated untracked parked scaffold while folding an in-scope untracked file (SC-005) in `plugins/stack-control/src/__tests__/govern/payload-exclusion.test.ts`
+- [X] T022 [US3] Modify `plugins/stack-control/src/govern/payload-implement.ts` to drop the `audit_log_excerpt` fold from the audited material and bound the untracked fold to the unit's path scope — make T021 green
 
 **Checkpoint**: the convergence loop (US1/US2) now runs on real signal, not self-reference.
 

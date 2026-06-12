@@ -66,6 +66,14 @@ export interface ImplementPayloadArgs {
   readonly budgetBytes?: number;
   /** Sink for the human-readable drop/skip notes (default: process.stderr). */
   readonly warn?: (message: string) => void;
+  /**
+   * specs/015 (FR-006/D7): the AuditUnit's path scope. When provided and
+   * non-empty, only untracked files UNDER one of these repo-relative prefixes are
+   * folded — unrelated parked-feature scaffolds are excluded by a bounded,
+   * explicit inclusion rule (not a wholesale sweep). Absent/empty → fold every
+   * untracked file (the pre-015 whole-feature behavior).
+   */
+  readonly pathScope?: readonly string[];
 }
 
 export interface ImplementPayload {
@@ -77,6 +85,25 @@ export interface ImplementPayload {
   readonly skippedBinary: readonly string[];
   /** Untracked files skipped because folding them would exceed the budget. */
   readonly skippedOverBudget: readonly string[];
+  /**
+   * specs/015 (FR-006): untracked files skipped because they fell OUTSIDE the
+   * unit's path scope (unrelated parked-feature scaffolds). Empty when no path
+   * scope was supplied.
+   */
+  readonly skippedOutOfScope: readonly string[];
+}
+
+/**
+ * specs/015 (FR-006): is `rel` within the unit's path scope? A prefix is a
+ * directory or file path; `rel` matches when it equals a prefix or sits under a
+ * prefix directory. An empty scope means "no bound" (every file is in scope).
+ */
+function inPathScope(rel: string, pathScope: readonly string[] | undefined): boolean {
+  if (pathScope === undefined || pathScope.length === 0) return true;
+  return pathScope.some((p) => {
+    const prefix = p.replace(/\/+$/, '');
+    return rel === prefix || rel.startsWith(`${prefix}/`);
+  });
 }
 
 function git(repoRoot: string, args: readonly string[]): string {
@@ -126,6 +153,7 @@ export function assembleImplementPayload(
   // is audited too. AUDIT-20260605-06: bounded (binary-skip + byte cap).
   const skippedBinary: string[] = [];
   const skippedOverBudget: string[] = [];
+  const skippedOutOfScope: string[] = [];
   let foldedBytes = 0;
 
   const untracked = git(repoRoot, ['ls-files', '--others', '--exclude-standard'])
@@ -135,6 +163,16 @@ export function assembleImplementPayload(
 
   for (const rel of untracked) {
     const abs = join(repoRoot, rel);
+    // FR-006/D7: bound the untracked fold to the unit's path scope — an unrelated
+    // parked-feature scaffold (outside the scope) is excluded, not swept in.
+    if (!inPathScope(rel, args.pathScope)) {
+      warn(
+        `govern: untracked file ${rel} is outside the audit unit's path scope; ` +
+          `excluding it from the folded payload (FR-006, parked-scaffold exclusion).`,
+      );
+      skippedOutOfScope.push(rel);
+      continue;
+    }
     if (isBinaryOrEmpty(abs)) {
       // AUDIT-20260605-06: never ship binary blobs off-box.
       warn(`govern: skipping untracked binary/empty file ${rel} (not folded into the audit diff).`);
@@ -179,5 +217,6 @@ export function assembleImplementPayload(
     empty: committedDiffEmpty && foldedBytes === 0,
     skippedBinary,
     skippedOverBudget,
+    skippedOutOfScope,
   };
 }

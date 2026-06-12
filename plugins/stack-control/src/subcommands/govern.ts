@@ -229,7 +229,7 @@ export function buildImplementVars(
   slug: string,
   diffBaseFlag: string | undefined,
   checkpointFlag: string | undefined,
-  auditLogExcerpt: string,
+  pathScope?: readonly string[],
 ): { vars: BarrageVars; checkpoint: string } {
   const base = diffBaseFlag ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
   const budgetEnv = process.env.GOVERN_PAYLOAD_BUDGET;
@@ -239,6 +239,10 @@ export function buildImplementVars(
     ...(budgetEnv !== undefined && budgetEnv.length > 0
       ? { budgetBytes: Number.parseInt(budgetEnv, 10) }
       : {}),
+    // specs/015 (FR-006/D7): bound the untracked fold to the audit unit's path
+    // scope so unrelated parked-feature scaffolds are excluded. Empty/undefined
+    // for a whole-feature unit (folds all untracked — pre-015 behavior).
+    ...(pathScope !== undefined && pathScope.length > 0 ? { pathScope } : {}),
   });
   if (payload.empty) {
     process.stderr.write(
@@ -249,7 +253,12 @@ export function buildImplementVars(
     feature_slug: slug,
     workplan_summary: `Governance pass over the just-implemented work for feature '${slug}', diffed against ${base}. The differentiated back half audits a plan it did not author or execute.`,
     diff: payload.diff,
-    audit_log_excerpt: auditLogExcerpt,
+    // specs/015 (FR-006/D7/SC-005): the implement-mode payload DROPS the feature's
+    // own prior audit-log excerpt — the self-referential generator that
+    // manufactured findings about the audit-log's own prose. The dampener/gate
+    // still read the audit-log FILE directly for findings; only the audited
+    // payload the models read excludes it.
+    audit_log_excerpt: '',
     commit_subjects: payload.commitSubjects,
     audit_lens: CODE_AUDIT_LENS,
     artifact_framing: CODE_ARTIFACT_FRAMING,
@@ -318,15 +327,22 @@ export async function runGovern(args: string[]): Promise<void> {
     assertBarrageBinPresent(barrageBin);
     const stackctl = join(PLUGIN_ROOT, 'bin', 'stackctl');
 
-    // Spec 013 (TASK-25): resolve the audit-log excerpt through the
-    // layout-aware helper here (async), then thread it into the pure
-    // var-builders — so a specs/NNN-<slug> feature's audit-log is found
-    // instead of silently empty under the old hardcoded docs/ path.
-    const auditLogExcerpt = await resolveAuditLogExcerpt(repoRoot, slug);
+    // Spec 013 (TASK-25): the spec-mode excerpt is resolved through the
+    // layout-aware helper so a specs/NNN-<slug> feature's audit-log is found
+    // instead of silently empty under the old hardcoded docs/ path. specs/015
+    // (FR-006/D7): implement mode DROPS the excerpt entirely (the self-referential
+    // fold), so it is resolved ONLY for spec mode.
     const built =
       flags.mode === 'spec'
-        ? buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint, auditLogExcerpt)
-        : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint, auditLogExcerpt);
+        ? buildSpecVars(
+            repoRoot,
+            slug,
+            flags.specPath,
+            flags.planPath,
+            flags.checkpoint,
+            await resolveAuditLogExcerpt(repoRoot, slug),
+          )
+        : buildImplementVars(repoRoot, slug, flags.diffBase, flags.checkpoint);
 
     // US7 (FR-032): implement-mode governance runs the per-codebase clone step,
     // surfacing NEW intra-codebase duplication alongside the gate verdict
