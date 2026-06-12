@@ -60,3 +60,24 @@ The two compound: a mis-computed stop signal (A) that is also non-binding (B).
 
 Amend `specs/004-spec-governance/spec.md` FR-010 (branch-(a) genuineness / slush ordering) + FR-014 (loop-driver interlock), with RED-first fix-tasks added to `specs/004-spec-governance/tasks.md` when 004 resumes. The gate + loop migrate under `multi/migrate-audit-barrage`, which must carry this forward. Sibling of #431 (audit-barrage payload self-reference). Cross-ref: 005 GRADUATION III in `docs/1.0/001-IN-PROGRESS/document-primitives/audit-log.md`.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Addressed by spec 015-audit-protocol-convergence:
+- **Facet A (raw-counting / slush-before-dampener collapse)** was already fixed in
+  code (the dampener counts RAW-surfaced `Severity:` lines regardless of `Status:`)
+  and is now GUARDED against silent reversion by US6 / FR-010 — see
+  `__tests__/scope-discovery/promote-findings/dampener-raw-counting.test.ts`
+  (SC-008; verified RED under the open-counting revert mutation).
+- **Facet B (FR-014 loop bound is advisory, not a code interlock)** is resolved by
+  US2 / FR-004: the convergence loop is now a CODE DRIVER
+  (`govern/convergence-loop.ts`) that owns the iterate/stop decision and the
+  ceiling; the agent only performs fix-dispatch inside a not-yet-converged loop —
+  see `__tests__/govern/govern-loop-driver.test.ts` (SC-004).
+
+The separate specs/004 spec-text amendments (FR-010 branch-(a) genuineness wording
+/ FR-014 interlock prose) remain for 004 when it resumes. Status left To Do pending
+release verification (operator closes). Sibling #431 (payload self-reference) is
+addressed by US3 / FR-006 (the implement-mode payload drops the audit-log excerpt).
+<!-- SECTION:NOTES:END -->

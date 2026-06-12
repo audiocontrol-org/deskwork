@@ -37,10 +37,11 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { repoRoot } from '../repo.js';
+import { extractBarrageFindings } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
 import {
-  extractBarrageFindings,
-  type ExtractedFinding,
-} from '../scope-discovery/promote-findings/extract-barrage-findings.js';
+  buildAuditLogHeader,
+  renderSection,
+} from './audit-barrage-lift-render.js';
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
 import {
   computeFleetReportFromParsedLanes,
@@ -106,10 +107,6 @@ function todayYYYYMMDD(now: Date = new Date()): string {
   const m = (now.getUTCMonth() + 1).toString().padStart(2, '0');
   const d = now.getUTCDate().toString().padStart(2, '0');
   return `${y}${m}${d}`;
-}
-
-function isoDate(yyyymmdd: string): string {
-  return `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`;
 }
 
 export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
@@ -203,24 +200,6 @@ async function resolveFeatureRoot(
   return { root, ...(layout !== undefined ? { layout } : {}) };
 }
 
-/**
- * Spec 013 US2: the canonical audit-log header scaffolded at a
- * resolved feature root that has none yet. `targetVersion` carries the
- * legacy-docs version axis (derived from the resolved path); a speckit
- * feature has no version axis, so it is the empty string.
- */
-function buildAuditLogHeader(slug: string, targetVersion: string): string {
-  return [
-    '---',
-    `slug: ${slug}`,
-    `targetVersion: "${targetVersion}"`,
-    '---',
-    '',
-    `# Audit log — ${slug}`,
-    '',
-  ].join('\n');
-}
-
 /** The legacy-docs version is the dir between `docs/` and `001-IN-PROGRESS`
  * in `<docs>/<version>/001-IN-PROGRESS/<slug>`; a speckit root has no
  * version axis (empty string). */
@@ -238,80 +217,6 @@ function highestExistingNn(auditLogText: string, date: string): number {
     if (Number.isFinite(n) && n > highest) highest = n;
   }
   return highest;
-}
-
-function formatSourceSuffix(sourceFindingIds: readonly string[]): string {
-  const stripped = sourceFindingIds.map((id) =>
-    id.replace(/^AUDIT-BARRAGE-/i, ''),
-  );
-  return stripped.join(' + ');
-}
-
-/**
- * specs/015 (T013 / FR-002): render the per-lane raw severities and the decision
- * rule alongside the gate-counted `Severity:` line. The dampener reads ONLY the
- * `Severity:` line (its contract is unchanged); these lines make the
- * de-inflation auditable (SC-002) — the raw inputs and the rule that produced
- * the gate-counted result are recoverable on disk.
- */
-function renderDecisionLines(finding: ExtractedFinding): string[] {
-  const perLane = finding.perLaneSeverities
-    .map((p) => `${p.model}=${p.severity}`)
-    .join(', ');
-  const decision = finding.severityDecision;
-  const basis =
-    decision.rule === 'adjudicated' && decision.adjudicationBasis !== undefined
-      ? ` — ${decision.adjudicationBasis}`
-      : '';
-  return [
-    `Per-lane:   ${perLane}`,
-    `Decision:   ${decision.rule} (gate-counted ${decision.gateCountedSeverity})${basis}`,
-  ];
-}
-
-function renderEntry(
-  finding: ExtractedFinding,
-  date: string,
-  nn: number,
-): string {
-  const idPadded = nn.toString().padStart(2, '0');
-  const fullId = `AUDIT-${date}-${idPadded}`;
-  const suffix = finding.crossModelAgreement
-    ? ` (${formatSourceSuffix(finding.sourceFindingIds)}; cross-model)`
-    : '';
-  const body = finding.body.length > 0 ? finding.body : '_(no body captured)_';
-  return [
-    `### ${fullId} — ${finding.heading}`,
-    '',
-    `Finding-ID: ${fullId}${suffix}`,
-    `Status:     open`,
-    `Severity:   ${finding.severity}`,
-    ...renderDecisionLines(finding),
-    `Surface:    ${finding.surface}`,
-    '',
-    body,
-    '',
-  ].join('\n');
-}
-
-function renderSection(
-  findings: readonly ExtractedFinding[],
-  date: string,
-  startingNn: number,
-  runDirBasename: string,
-): { section: string; assignedIds: readonly string[] } {
-  const isoDateStr = isoDate(date);
-  const heading = `## ${isoDateStr} — audit-barrage lift (${runDirBasename})\n\n`;
-  const assignedIds: string[] = [];
-  const entries: string[] = [];
-  for (let i = 0; i < findings.length; i += 1) {
-    const nn = startingNn + i;
-    const finding = findings[i]!;
-    const idPadded = nn.toString().padStart(2, '0');
-    assignedIds.push(`AUDIT-${date}-${idPadded}`);
-    entries.push(renderEntry(finding, date, nn));
-  }
-  return { section: heading + entries.join('\n'), assignedIds };
 }
 
 export interface RunAuditBarrageLiftArgs {

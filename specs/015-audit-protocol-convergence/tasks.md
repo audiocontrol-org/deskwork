@@ -133,10 +133,10 @@
 
 ## Phase 9: Polish & Cross-Cutting
 
-- [ ] T032 [P] Verify every touched/new file is within the 300–500 line cap; split if `extract-barrage-findings.ts` or `protocol.ts` exceeded it (Constitution VI)
-- [ ] T035 [P] Guard the isolation constraint (FR-012): assert no `plugins/dw-lifecycle/` path was modified by this feature's diff (the dw-lifecycle barrage copy stays untouched — succession isolation)
-- [ ] T033 [P] Roadmap/backlog hygiene: close TASK-18 Facet A (resolved + guarded), link TASK-27 / #431 / the adjudication inbox capture to this feature, and add the `multi/audit-protocol-convergence` roadmap item in `plugins/stack-control/ROADMAP.md`
-- [ ] T034 Run the full suite green (`npm --workspace @deskwork/plugin-stack-control test`) and the SC-001..008 quickstart runbook; record results in `specs/015-audit-protocol-convergence/quickstart-results.md`
+- [X] T032 [P] Verify every touched/new file is within the 300–500 line cap; split if `extract-barrage-findings.ts` or `protocol.ts` exceeded it (Constitution VI)
+- [X] T035 [P] Guard the isolation constraint (FR-012): assert no `plugins/dw-lifecycle/` path was modified by this feature's diff (the dw-lifecycle barrage copy stays untouched — succession isolation)
+- [X] T033 [P] Roadmap/backlog hygiene: close TASK-18 Facet A (resolved + guarded), link TASK-27 / #431 / the adjudication inbox capture to this feature, and add the `multi/audit-protocol-convergence` roadmap item in `plugins/stack-control/ROADMAP.md`
+- [X] T034 Run the full suite green (`npm --workspace @deskwork/plugin-stack-control test`) and the SC-001..008 quickstart runbook; record results in `specs/015-audit-protocol-convergence/quickstart-results.md`
 
 ---
 

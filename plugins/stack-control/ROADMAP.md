@@ -88,6 +88,11 @@ The self-hosting bootstrap: plugin + stackctl + native Spec Kit execution. The t
 - depends-on: multi:feature/front-door
 Migrate audit-barrage + the audit protocol (convergence criterion + finding state machine) in-house; the one-way execution→governance seam survives.
 
+## multi:feature/audit-protocol-convergence
+- status: in-flight
+- depends-on: multi:feature/migrate-audit-barrage
+Make the cross-model audit-barrage convergence loop mechanically terminate and shrink the unit of work it audits (specs/015-audit-protocol-convergence). Five threads: cross-lane severity AGREEMENT + adjudication replace max-of-cluster so the dampener's two-consecutive-0-HIGH branch is reachable (US1); a code loop driver owns the iterate/stop decision + ceiling, not skill prose (US2); the implement payload drops its own audit-log excerpt + parked scaffolds (US3); a per-phase `--phase` audit unit shrinks the payload, governed by the same loop (US4); sonnet re-calibrated to an operator-selectable read-only override profile on the smaller units (US5); the #432 raw-counting guarded against regression (US6). Resolves backlog TASK-27 + TASK-18 (both facets) + the DESIGN-INBOX adjudication capture; sibling #431 payload self-reference addressed by US3.
+
 ## multi:feature/migrate-session-skills
 - status: cancelled
 - depends-on: multi:feature/front-door

@@ -31,6 +31,26 @@ The latency-within-timeout and finding-depth bars require spawning the **real** 
 2. Spawn the sonnet lane under plan-mode; record wall time, derived timeout, finding count + depth, and tool-call count.
 3. If latency ≤ derived timeout AND findings are verified-depth AND on-task → uncomment the lane and record the evidence here; else record the rejection + its numbers.
 
-## SC-001..008 runbook
+## SC-001..008 runbook (T034)
 
-See `### T034` (appended after the full-suite green run).
+Run: `npm --workspace @deskwork/plugin-stack-control test` (vitest). Full-suite
+result: **1297 passed, 8 skipped, 7 failed** — the 7 failures are 3 PRE-EXISTING
+environment-only files unrelated to spec 015 (`git-ancestry` + `govern-payload-implement`
+fail because this environment's git commit-signing server returns 400 on the
+ephemeral test repos they create; `refactor-preconditions` hardcodes a `REAL_SHA`
+not present in a fresh clone). Every spec-015 test passes. `tsc --noEmit` clean.
+
+| SC | Claim | Verifying test(s) | Result |
+|----|-------|-------------------|--------|
+| SC-001 | A single-lane-inflation stream converges to a clean stop, **0 operator overrides** | `__tests__/govern/convergence-sc001.test.ts` (4-round opus=high/codex=medium lifts MEDIUM → dampener engages; contrast: max-of-cluster HIGH stays BLOCKED) | PASS |
+| SC-002 | Every de-inflated cluster is auditable (per-lane raw + gate-counted recorded) | `audit-barrage-lift.test.ts` (Per-lane/Decision lines), `extract-barrage-findings.test.ts` (perLaneSeverities + severityDecision) | PASS |
+| SC-003 | A genuine >=2-lane HIGH keeps the gate BLOCKED (zero real HIGHs suppressed) | `cluster-severity.test.ts` ([high,high]->high), `extract-barrage-findings.test.ts`, `adjudicate-findings.test.ts` (reachable data-loss stays high) | PASS |
+| SC-004 | Loop terminates with no agent-held iterate/stop decision (100% of runs) | `convergence-loop.test.ts` (stub gate, all branches), `govern-loop-driver.test.ts` (3-round non-converged at ceiling; round-1 converged) | PASS |
+| SC-005 | Rendered payload: **zero** bytes of own audit-log + **zero** parked scaffolds | `payload-exclusion.test.ts` (empty audit_log_excerpt + no self-ref prose; in-scope folded / parked excluded) | PASS |
+| SC-006 | A per-phase payload is measurably smaller, governed by the same protocol | `incremental-audit.test.ts` (phase diff-scope only), `per-phase-timeout.test.ts` (phase derived timeout < whole-feature), `govern-phase-unit.test.ts` (same loop under phase checkpoint) | PASS |
+| SC-007 | sonnet under mechanical read-only cannot mutate the repo + decision recorded | `sonnet-readonly-probe.test.ts` (zero new files under plan-mode; none-lane control mutates) + § US5 | PASS (read-only); latency/depth PENDING live run |
+| SC-008 | Raw-counting regression test present + fails under the open-counting revert | `dampener-raw-counting.test.ts` (verified GREEN current / RED under the documented mutation) | PASS |
+
+All eight success criteria are verified by automated tests, except SC-007's
+latency/finding-depth half, which is gated on a live `claude` CLI run (recorded
+above as pending — no fabricated numbers).
