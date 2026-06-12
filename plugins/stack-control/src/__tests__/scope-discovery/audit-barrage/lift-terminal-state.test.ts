@@ -360,3 +360,70 @@ describe('pre-014 compatibility', () => {
     expect(err).not.toContain('Fleet report');
   });
 });
+
+// claude-20260612-r3 (operator bug report): a clean (0-finding) run currently
+// returns WITHOUT writing a lift section, so it leaves no trace in the audit-log.
+// The convergence dampener counts lift SECTIONS — so a fully-clean run is invisible
+// to it, and the prior HIGH section stays in the consecutive-quiet / single-run
+// window forever. The gate can then never reach OPEN even after two genuinely-clean
+// runs. Fix: a HEALTHY-fleet clean run records a quiet section (0 Severity lines);
+// a DEGRADED clean run still records nothing (FR-007 — absence over killed lanes is
+// not a clean signal).
+async function liftApply(fixture: Fixture, slug: string): Promise<{ exit: number; log: string }> {
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  stdout.resume();
+  stderr.resume();
+  const exit = await runAuditBarrageLift({
+    opts: { featureSlug: slug, runDir: fixture.runDir, date: '20260611', apply: true },
+    projectRoot: fixture.repo,
+    stdout,
+    stderr,
+  });
+  const log = readFileSync(
+    join(fixture.repo, 'docs', '1.0', '001-IN-PROGRESS', slug, 'audit-log.md'),
+    'utf8',
+  );
+  return { exit, log };
+}
+
+describe('a clean HEALTHY run records a quiet lift section so the dampener counts it (claude-20260612-r3)', () => {
+  it('writes a 0-findings lift section (header matches the dampener regex, no Severity lines)', async () => {
+    const fixture = makeFixture({
+      slug: 'clean-healthy',
+      modelFiles: { 'claude.md': 'All clear — no defects found in this diff.\n' },
+      results: [laneResult({ name: 'claude' })],
+    });
+    const { exit, log } = await liftApply(fixture, 'clean-healthy');
+    expect(exit).toBe(0);
+    // The dampener's section regex (## DATE — audit-barrage lift (...)) must match.
+    expect(log).toMatch(/^##\s+\d{4}-\d{2}-\d{2}\s+—\s+audit-barrage\s+lift\s+\(/m);
+    // It is a QUIET section — no Severity lines, so the dampener counts 0 HIGH+, 0 MEDIUM.
+    expect(log).not.toMatch(/^Severity:/m);
+  });
+
+  it('a DEGRADED clean run still records NO section (FR-007 — absence over killed lanes is not clean)', async () => {
+    const fixture = makeFixture({
+      slug: 'clean-degraded',
+      modelFiles: {},
+      results: [
+        laneResult({ name: 'claude' }),
+        laneResult({
+          name: 'codex',
+          terminalState: 'timed-out',
+          exitCode: -1,
+          timedOut: true,
+          reportBytes: 0,
+          stdoutBytes: 0,
+        }),
+      ],
+    });
+    const logPath = join(fixture.repo, 'docs', '1.0', '001-IN-PROGRESS', 'clean-degraded', 'audit-log.md');
+    const before = readFileSync(logPath, 'utf8');
+    const { exit, log } = await liftApply(fixture, 'clean-degraded');
+    expect(exit).toBe(0);
+    // No section appended — the degraded clean run is not recorded as a quiet run.
+    expect(log).toBe(before);
+    expect(log).not.toMatch(/audit-barrage\s+lift/);
+  });
+});

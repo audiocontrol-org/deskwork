@@ -20,6 +20,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { checkBarrageDampener } from '../../../scope-discovery/promote-findings/check-barrage-dampener.js';
+import { renderQuietSection } from '../../../subcommands/audit-barrage-lift-render.js';
 
 function section(runLabel: string, entries: string): string {
   return `## 2026-06-11 — audit-barrage lift (${runLabel})\n\n${entries}`;
@@ -68,5 +69,36 @@ describe('dampener RAW counting regression guard (US6 / SC-008)', () => {
     ].join('\n');
     const r = checkBarrageDampener({ auditLogText: log, threshold: 2 });
     expect(r.dampened).toBe(true);
+  });
+
+  // claude-20260612-r3 (operator bug): the lift now records a QUIET section for a
+  // fully-clean run (0 findings of ANY severity). This proves the recorded section
+  // makes the dampener engage — where before, with NO section, the prior HIGH stayed
+  // the most-recent section forever and the gate could never reach OPEN.
+  it('a real renderQuietSection after a HIGH run DAMPENS (single-run-clean: 0 HIGH+ AND 0 MEDIUM)', () => {
+    const log = [
+      '# Audit Log',
+      '',
+      section('run-with-high-after_clarify', entry('AUDIT-0', 'high', 'open')),
+      '',
+      renderQuietSection('20260612', 'run-fully-clean-after_clarify'),
+    ].join('\n');
+    const r = checkBarrageDampener({ auditLogText: log, threshold: 2 });
+    // The most-recent section is the quiet run: 0 HIGH+, 0 MEDIUM → Rule 2 engages.
+    expect(r.recentRunCounts[0]!.rawHighPlusCount).toBe(0);
+    expect(r.recentRunCounts[0]!.rawMediumCount).toBe(0);
+    expect(r.dampened).toBe(true);
+  });
+
+  it('regression: the SAME history WITHOUT the quiet section stays BLOCKED (the bug)', () => {
+    // Before the fix a fully-clean run wrote nothing, so the HIGH section remained
+    // the most-recent (and only) section — the dampener could never engage.
+    const log = [
+      '# Audit Log',
+      '',
+      section('run-with-high-after_clarify', entry('AUDIT-0', 'high', 'open')),
+    ].join('\n');
+    const r = checkBarrageDampener({ auditLogText: log, threshold: 2 });
+    expect(r.dampened).toBe(false);
   });
 });

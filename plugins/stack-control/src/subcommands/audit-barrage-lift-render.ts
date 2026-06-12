@@ -78,6 +78,27 @@ function renderEntry(finding: ExtractedFinding, date: string, nn: number): strin
   ].join('\n');
 }
 
+/**
+ * A clean-run lift section — header + an explicit 0-findings body — recorded when
+ * a HEALTHY-fleet barrage surfaces nothing (claude-20260612-r3). The convergence
+ * dampener counts lift SECTIONS, so a clean run that leaves no section is invisible
+ * to its consecutive-quiet / single-run-clean rules — the prior HIGH section would
+ * stay in the window forever and the gate could never reach OPEN after genuinely
+ * clean runs. This section matches the dampener's header regex and carries ZERO
+ * `Severity:` lines, so the dampener counts it as a quiet run (0 HIGH+, 0 MEDIUM).
+ * (Degraded clean runs are NOT recorded — FR-007: absence over killed lanes is not
+ * a clean signal; that branch is gated in the lift, not here.)
+ */
+export function renderQuietSection(date: string, runDirBasename: string): string {
+  return (
+    `## ${isoDate(date)} — audit-barrage lift (${runDirBasename})\n\n` +
+    `_No findings surfaced — a clean barrage run over a healthy fleet (0 HIGH+, ` +
+    `0 MEDIUM, 0 total). Recorded so the convergence dampener counts it as a quiet ` +
+    `run (claude-20260612-r3); a clean run that left no section was invisible to the ` +
+    `consecutive-quiet / single-run-clean rules._\n`
+  );
+}
+
 export function renderSection(
   findings: readonly ExtractedFinding[],
   date: string,

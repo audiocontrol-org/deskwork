@@ -41,6 +41,7 @@ import { extractBarrageFindings } from '../scope-discovery/promote-findings/extr
 import {
   buildAuditLogHeader,
   renderSection,
+  renderQuietSection,
 } from './audit-barrage-lift-render.js';
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
 import {
@@ -317,20 +318,16 @@ export async function runAuditBarrageLift(
     warn: (m) => stderr.write(`${m}\n`),
     ...(includeModels !== undefined ? { includeModels } : {}),
   });
-  if (findings.length === 0) {
-    // FR-007: zero findings over a degraded fleet is NEVER a clean signal —
-    // the killed lanes simply produced nothing.
-    if (fleet !== undefined && fleet.produced < fleet.configured) {
-      stderr.write(
-        `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a ` +
-          `DEGRADED fleet (produced ${fleet.produced} of ${fleet.configured} ` +
-          `configured) — absence of findings from non-completed lanes is NOT a ` +
-          `clean signal.\n`,
-      );
-      return 0;
-    }
+  // FR-007: zero findings over a DEGRADED fleet is NEVER a clean signal — the
+  // killed lanes simply produced nothing. Record NOTHING (not even a quiet
+  // section): a degraded run must never be counted as a converged-eligible quiet
+  // run by the dampener (claude-20260612-r3 keeps this branch unrecorded).
+  if (findings.length === 0 && fleet !== undefined && fleet.produced < fleet.configured) {
     stderr.write(
-      `audit-barrage-lift: extracted 0 findings from ${opts.runDir}; nothing to lift.\n`,
+      `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a ` +
+        `DEGRADED fleet (produced ${fleet.produced} of ${fleet.configured} ` +
+        `configured) — absence of findings from non-completed lanes is NOT a ` +
+        `clean signal.\n`,
     );
     return 0;
   }
@@ -349,6 +346,31 @@ export async function runAuditBarrageLift(
   const auditLogText = auditLogMissing
     ? buildAuditLogHeader(opts.featureSlug, deriveTargetVersion(feature))
     : await reader(auditLogPath);
+
+  // claude-20260612-r3: a clean run over a HEALTHY fleet (or a pre-014 run with no
+  // INDEX) records a QUIET lift section so the convergence dampener counts it. The
+  // dampener counts lift SECTIONS; a clean run that left no section was invisible to
+  // its consecutive-quiet / single-run-clean rules, so a prior HIGH section stayed
+  // in the window forever and the gate could never reach OPEN after genuinely-clean
+  // runs. The degraded case returned above; only healthy/pre-014 clean runs reach here.
+  if (findings.length === 0) {
+    stderr.write(
+      `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a healthy ` +
+        `fleet; recording a quiet run section so the convergence dampener counts it.\n`,
+    );
+    if (!opts.apply) {
+      stderr.write('audit-barrage-lift: dry-run (re-run with --apply to write).\n');
+      return 0;
+    }
+    const trimmedExisting = auditLogText.replace(/\s+$/, '');
+    const separator = trimmedExisting.length > 0 ? '\n\n' : '\n';
+    const quiet = renderQuietSection(opts.date, basename(opts.runDir.replace(/\/$/, '')));
+    const quietContent = `${trimmedExisting}${separator}${quiet}`;
+    await writer(auditLogPath, quietContent.endsWith('\n') ? quietContent : `${quietContent}\n`);
+    stderr.write(`audit-barrage-lift: recorded a quiet run section in ${auditLogPath}.\n`);
+    return 0;
+  }
+
   const highest = highestExistingNn(auditLogText, opts.date);
   const startingNn = highest + 1;
   const { section, assignedIds } = renderSection(

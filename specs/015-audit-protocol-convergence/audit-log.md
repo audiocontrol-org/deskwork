@@ -149,3 +149,21 @@ Summary for triage:
 - **AUDIT-BARRAGE-claude-03 (informational)** — exclusions are stderr-only; a `--json` consumer won't see them (pre-existing gap, since `emitJson` is currently unconsumed).
 
 The return-shape widening and the `.length` access are verified type-safe and clean. Findings are also saved to `/root/.claude/plans/audit-barrage-multi-model-fizzy-sun.md`.
+
+---
+
+## 2026-06-12 — disposition (round 3 residue + dampener root-cause fix)
+
+**Round 3 residue (all about the round-2 fix commit, 0 HIGH — opus: "return-shape widening + .length access verified type-safe and clean"):**
+
+- **r3-01 (med) — FIXED.** The `runGovern` consolidated path-scope summary line was untested (the claude-03 test asserted only the builder return). Extracted the line into the pure `formatScopeExclusionSummary(skipped)` helper, now covered by 3 unit tests without spinning the protocol.
+- **r3-02 (low) — FIXED.** The excluded-file list is now placed LAST after a single `: ` so a consumer can extract it (`sed 's/^.*: //'`); "machine-greppable" softened to "greppable".
+- **r3-03 (informational) — BACKLOG.** Exclusions are stderr-only; a `--json` consumer won't see them. This is a pre-existing gap — `emitJson` is accepted-and-ignored (no JSON verdict object exists today). Building a full `--json` verdict is out of scope; recorded as a follow-up. When the JSON verdict is wired, `skippedOutOfScope` belongs as a field on it.
+
+**Dampener root-cause fix (operator bug report) — FIXED.**
+
+The single-lane re-govern rounds exposed a real defect in the convergence machinery itself: the gate's dampener counts audit-log lift SECTIONS, but `audit-barrage-lift.ts` returned early on a 0-finding run WITHOUT writing a section. So a **fully-clean run (0 findings of ANY severity)** left no record and was invisible to the dampener — a prior HIGH section stayed in its consecutive-quiet / single-run-clean window forever, and the loop could never reach `converged` after genuinely-clean runs. (A 0-HIGH run with some medium/low already wrote a section; only the 0-of-any-severity case was dropped.)
+
+Fix (TDD-first): a clean run over a **healthy** fleet now records a *quiet lift section* (`renderQuietSection` — matches the dampener header regex, 0 `Severity:` lines → counted as 0 HIGH+, 0 MEDIUM). A **degraded** clean run still records nothing (FR-007). Proven by 6 tests: lift writes/withholds the section correctly (healthy vs degraded), and the end-to-end dampener test (`[HIGH section] + real quiet section → dampens`) plus its regression (same history WITHOUT the quiet section stays BLOCKED). Spec note added to `data-model.md` § convergence-loop state machine.
+
+**Status:** the original AUDIT-20260612-01..06 and the round-3 residue are addressed; the dampener defect that prevented the loop from ever converging on clean runs is fixed at the root. Per operator decision, no further re-govern this pass — the fix is proven by unit + integration tests. Closing transition is the operator's call.

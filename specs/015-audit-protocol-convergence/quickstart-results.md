@@ -34,7 +34,7 @@ The latency-within-timeout and finding-depth bars require spawning the **real** 
 ## SC-001..008 runbook (T034)
 
 Run: `npm --workspace @deskwork/plugin-stack-control test` (vitest). Full-suite
-result: **1301 passed, 8 skipped, 7 failed** — the 7 failures are 3 PRE-EXISTING
+result: **1310 passed, 8 skipped, 7 failed** — the 7 failures are 3 PRE-EXISTING
 environment-only files unrelated to spec 015 (`git-ancestry` + `govern-payload-implement`
 fail because this environment's git commit-signing server returns 400 on the
 ephemeral test repos they create; `refactor-preconditions` hardcodes a `REAL_SHA`
@@ -46,8 +46,13 @@ Arithmetic (AUDIT-04 discipline): the post-implementation `1297 passed` rose to
 `1301` (+4 net) after the single-lane governance round's fixes — `+2` from the
 AUDIT-20260612-01 committed-diff-scope tests, `+3` from the AUDIT-20260612-02
 disagreement-floor tests, `−1` from retiring the AUDIT-20260612-05 driver-override
-test (the override short-circuit was removed). The failed count is unchanged at 7
-(same env-only trio); no spec-015 regression.
+test (the override short-circuit was removed). The later re-govern rounds + dampener
+fix took `1301 → 1310` (+9): `+2` claude-03 `skippedOutOfScope` propagation, `+3` the
+round-3 `formatScopeExclusionSummary` helper, `+4` the dampener root-cause fix (lift
+quiet-section ×2 healthy/degraded, dampener end-to-end + regression ×2). The failed
+count is unchanged at 7 across all rounds (same env-only trio: git commit-signing 400
+in `git-ancestry` + `govern-payload-implement`, hardcoded SHA in `refactor-preconditions`);
+no spec-015 regression at any step.
 
 | SC | Claim | Verifying test(s) | Result |
 |----|-------|-------------------|--------|
