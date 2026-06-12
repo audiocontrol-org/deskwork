@@ -167,3 +167,78 @@ The single-lane re-govern rounds exposed a real defect in the convergence machin
 Fix (TDD-first): a clean run over a **healthy** fleet now records a *quiet lift section* (`renderQuietSection` — matches the dampener header regex, 0 `Severity:` lines → counted as 0 HIGH+, 0 MEDIUM). A **degraded** clean run still records nothing (FR-007). Proven by 6 tests: lift writes/withholds the section correctly (healthy vs degraded), and the end-to-end dampener test (`[HIGH section] + real quiet section → dampens`) plus its regression (same history WITHOUT the quiet section stays BLOCKED). Spec note added to `data-model.md` § convergence-loop state machine.
 
 **Status:** the original AUDIT-20260612-01..06 and the round-3 residue are addressed; the dampener defect that prevented the loop from ever converging on clean runs is fixed at the root. Per operator decision, no further re-govern this pass — the fix is proven by unit + integration tests. Closing transition is the operator's call.
+
+## 2026-06-12 — audit-barrage lift (20260612T043539810Z-audit-protocol-convergence-after_clarify)
+
+### AUDIT-20260612-10 — Test helper returns a non-conformant `ModelRunResult` — reconciliation migrated 2 of 5 canonical fields
+
+Finding-ID: AUDIT-20260612-10
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/src/__tests__/barrage-fleet-degradation.test.ts:44-61
+
+The commit's stated purpose is to migrate the `modelResult` fixture to "this branch's 014 coverage model … (terminalState + reportBytes + exitCode)". But the *canonical* `ModelRunResult` (types.ts:247-265) declares three more non-optional fields the migration left unset: `enforcement: EnforcementState`, `liveness: LivenessState`, and `timeoutBasis: TimeoutBasis`. The helper literal (lines 47-60) sets `name, exitCode, durationMs, stdoutBytes, stderrBytes, stdoutPath, stderrPath, timedOut, spawnError, reportBytes, terminalState` then spreads `...overrides` (a `Partial<ModelRunResult>`) — so the returned object is missing `enforcement`, `liveness`, and `timeoutBasis`, yet the signature claims `: ModelRunResult`.
+
+This compiles only because vitest transpiles via esbuild/swc **without type-checking** — `tsc --noEmit` would reject it. The type doc itself says `timeoutBasis` is "always recorded (FR-002)", so the fixture now contradicts the contract it claims to embody. Blast radius is deferred but real: the moment a future assertion in this file exercises a consumer that reads those fields (e.g. `computeFleetReport`'s `perLane`, or any FR-002 timeout-basis surface), it will silently observe `undefined` and the type system will not catch it, because the helper launders the gap behind an unchecked cast-by-omission. The fix is the natural completion of this very reconciliation: add `enforcement: 'enforced'`, `liveness: 'monitored'`, and a `timeoutBasis: { mode: 'derived', payloadBytes: 0, effectiveTimeoutSeconds: 0 }` default to the literal (mirroring from inputs where meaningful, as the diff already does for the other two).
+
+---
+
+### AUDIT-20260612-11 — Promoting `sonnet` as a "second claude-family lane … for cross-model agreement" dilutes the genetic-diversity signal the barrage is built on
+
+Finding-ID: AUDIT-20260612-11
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    .stack-control/audit-barrage-config.yaml:52-66
+
+The added lane (`name: sonnet`, `binary: claude`, `model: claude-sonnet-4-6`) sits alongside the existing `claude`/`opus` lane, and the in-file comment justifies it as giving "a reachable second claude-family lane (opus + sonnet) for cross-model agreement when codex's binary is unavailable." The barrage's entire HIGH-confidence proposition — encoded in `FleetReport.quorumCollapsed` (types.ts:382) and stated verbatim in `.claude/rules/agent-discipline.md` ("Cross-model agreement … is the HIGH-confidence signal … genetic diversity in failure modes") — assumes the agreeing models have *uncorrelated* blind spots. opus and sonnet share vendor, architecture lineage, training corpus, and RLHF; their failure modes are correlated, so an opus+sonnet concurrence is materially closer to one model voting twice than to an opus+codex concurrence.
+
+The risk is not that the fallback exists (reachability when codex is down is legitimate) — it's that the comment frames same-family concurrence as equivalent "cross-model agreement," and nothing on the fleet/quorum surface distinguishes a 2-of-2 same-vendor agreement from a genuinely cross-vendor one. An operator (or an unattended govern loop) acting on opus+sonnet concurrence may over-trust a finding two correlated models produced. A reasonable fix: have the quorum/fleet reporting tag concurrence by vendor-family so a same-family quorum is annotated as weaker evidence, or soften the comment to call this a reachability fallback rather than a cross-model-agreement restorer. (Marked medium, not high, because specs/015 US5/FR-011 presumably weighed the trade-off and the lane is still additive.)
+
+---
+
+### AUDIT-20260612-12 — Comment describing the covering predicate omits the `spawnError === undefined` clause
+
+Finding-ID: AUDIT-20260612-12
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/src/__tests__/barrage-fleet-degradation.test.ts:39-40
+
+The reconciliation comment states: "`isModelRunCovering` reads `terminalState === 'completed' && reportBytes > 0 && exitCode === 0`." The actual predicate chain (types.ts:181-214) is `isModelRunHealthy` = `terminalState === 'completed' && reportBytes > 0 && spawnError === undefined`, *then* `&& exitCode === 0`. The comment drops the `spawnError === undefined` condition. This comment is doing load-bearing explanatory work — it's the rationale for the whole `reportBytes`/`terminalState` mirror — so an incomplete restatement could lead a future reader to believe `spawnError` is irrelevant to coverage and omit it when extending the helper or writing a spawn-failure fixture. Current fixtures all default `spawnError: undefined`, so nothing breaks today. Fix: append the `spawnError === undefined` clause to the comment.
+
+---
+
+### AUDIT-20260612-13 — `terminalState`/`reportBytes` mirror can synthesize fixtures that violate production invariants
+
+Finding-ID: AUDIT-20260612-13
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/src/__tests__/barrage-fleet-degradation.test.ts:45-58, 106-117
+
+The mirror derives `terminalState: timedOut ? 'timed-out' : 'completed'` and `reportBytes: stdoutBytes`, ignoring `exitCode` and spawn outcome. The fixture at lines 107-110 (`exitCode: 7`, `timedOut` false) therefore mints `terminalState: 'completed'` for a model that exited 7 — a combination the production settle path would never emit (it has `spawn-failed`, `killed-no-liveness`, `killed-external` states for non-timeout failures; types.ts:41-46). It is harmless *here* because every consumer under test (`renderFleetWarnings`, and `deriveBarrageExitCode` via `isModelRunCovering`) independently gates on `exitCode`/`stdoutBytes`, so the contradictory `terminalState` never flips an assertion. Separately, the `reportBytes ← stdoutBytes` mirror contradicts the documented stream-json contract (types.ts:234-238: stream-json `reportBytes` is the terminal-result text length, *not* `stdoutBytes`, and is 0 when no result event arrived — the FR-010 edge), so the helper's default cannot represent that critical case without an explicit override.
+
+Blast radius is low and forward-looking: any future test that asserts on `terminalState` fidelity, or that needs the "bytes on the wire but zero report artifact" stream-json case, would be built on a fixture the mirror constructs incorrectly by default. Recommend either deriving `terminalState` from `exitCode`/spawn as well, or adding a one-line note that the mirror is intentionally lossy and `terminalState`/`reportBytes` must be overridden explicitly when a test depends on them.
+
+---
+
+### AUDIT-20260612-14 — A production fleet-config promotion is bundled into a `test(...)`-scoped commit and the file header was not refreshed
+
+Finding-ID: AUDIT-20260612-14
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    .stack-control/audit-barrage-config.yaml:25-29, 52-66
+
+The audited range's only commit is subject-lined `test(stack-control): migrate main's-014 reliability tests to my-014's model (merge reconciliation)`, but the diff also includes a substantive, operator-facing change to the dogfood fleet config (the new `sonnet` lane). Per the project's commit discipline (CLAUDE.md "One fix per commit"; ui-verification.md "the commit message describes what was actually verified, not the broad scope"), a fleet promotion is not a test change and is harder to locate in history when buried under a `test(...)` subject. Additionally, the file's own header (lines 25-29) still describes only "the claude lane below currently runs the template default" and was not updated to acknowledge the second claude-family lane this same diff adds — so the header now under-describes the file's contents. No behavioral impact; this is hygiene and doc-drift. Fix: split the config promotion into its own `feat`/`chore`-scoped commit (or name it in the subject), and refresh the header block to mention the sonnet lane.
+
+---
+
+A note on process: the request was an audit (read-only analysis producing a findings report), so I did not author an implementation plan or call ExitPlanMode — there is nothing to execute or approve here. The five findings above are the deliverable. Nothing in the diff rose to `high`/`blocking`: every shipped test passes and correctly classifies its fixtures, because the covering predicate and the warning renderers all gate on `exitCode`/`stdoutBytes` independently of the fields the mirror approximates. The concerns are type-contract drift (01), a diversity-semantics design risk (02), and three hygiene/fidelity items (03–05).

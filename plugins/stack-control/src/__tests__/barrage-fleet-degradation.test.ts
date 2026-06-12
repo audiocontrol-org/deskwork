@@ -37,10 +37,21 @@ import {
 // specs/015+014 merge: this branch's 014 coverage model is the canonical one
 // (terminalState + reportBytes + exitCode), superseding main's-014 stdoutBytes-only
 // shape. `isModelRunCovering` reads `terminalState === 'completed' && reportBytes > 0
-// && exitCode === 0`. main's US1 fixtures predate those fields, so the helper now
+// && spawnError === undefined && exitCode === 0` (isModelRunHealthy + exit-0;
+// types.ts:181-214). main's US1 fixtures predate those fields, so the helper now
 // MIRRORS them from the main-era inputs: reportBytes ← stdoutBytes, and terminalState
 // ← timed-out when `timedOut`, else completed. renderFleetWarnings still reads
 // stdoutBytes (unchanged); only the coverage predicate needed the canonical fields.
+//
+// The mirror is INTENTIONALLY LOSSY (AUDIT-BARRAGE-claude-01/-04): it sets only the
+// two fields the covering predicate reads, derived from exitCode/timedOut only — so a
+// non-timeout failure (e.g. exitCode 7) still mints terminalState 'completed', a combo
+// production never settles, and `reportBytes ← stdoutBytes` does NOT model the
+// stream-json contract (reportBytes is the terminal-result text length, 0 when no
+// result event — the FR-010 edge). Harmless here because every consumer under test
+// gates on exitCode/stdoutBytes independently. A test that asserts on terminalState
+// fidelity or the zero-report-with-bytes case MUST override terminalState/reportBytes
+// explicitly rather than rely on this mirror.
 function modelResult(overrides: Partial<ModelRunResult>): ModelRunResult {
   const stdoutBytes = overrides.stdoutBytes ?? 0;
   const timedOut = overrides.timedOut ?? false;

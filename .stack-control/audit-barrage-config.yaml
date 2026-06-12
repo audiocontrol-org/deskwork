@@ -27,6 +27,11 @@
 # AVAILABLE but NOT applied here: the operator may edit the lane to
 # `model: fable` with `timeout_secs_per_kb: 17` (2026-06-10 calibration) to
 # trade latency for maximum thoroughness.
+#
+# Fleet (2026-06-12): three lanes — claude(opus), codex(gpt-5.5), and sonnet
+# (claude-sonnet-4-6, promoted per specs/015 US5). NOTE that opus + sonnet are the
+# same vendor (see the sonnet lane comment below): a same-family quorum is weaker
+# evidence than a cross-vendor (opus+codex) one.
 
 models:
   - name: claude
@@ -51,9 +56,16 @@ models:
     timeout_secs_per_kb: 7
   # sonnet — promoted to the default fleet 2026-06-12 (specs/015 US5 / FR-011;
   # live calibration in specs/015-audit-protocol-convergence/quickstart-results.md).
-  # Added to deskwork's own dogfood override to match the shipped template promotion;
-  # gives a reachable second claude-family lane (opus + sonnet) for cross-model
-  # agreement when codex's binary is unavailable.
+  # Added to deskwork's own dogfood override to match the shipped template promotion.
+  # IMPORTANT (AUDIT-BARRAGE-claude-02): opus + sonnet are SAME-VENDOR (Anthropic,
+  # shared architecture lineage + training + RLHF), so their failure modes are
+  # CORRELATED. An opus+sonnet concurrence is therefore a REACHABILITY fallback when
+  # codex is down — NOT the genuine cross-vendor genetic-diversity signal the barrage
+  # is built on (`.claude/rules/agent-discipline.md`: "genetic diversity in failure
+  # modes"). Treat a same-family 2-of-2 agreement as WEAKER evidence than an
+  # opus+codex one; restore a non-Anthropic lane (codex) for real cross-model
+  # agreement. (Open follow-up: tag quorum by vendor-family so the fleet surface
+  # distinguishes same-family from cross-vendor concurrence.)
   - name: sonnet
     binary: claude
     model: claude-sonnet-4-6
