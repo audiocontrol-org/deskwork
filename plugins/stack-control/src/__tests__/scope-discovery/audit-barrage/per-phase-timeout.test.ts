@@ -47,8 +47,8 @@ describe('per-phase payload yields a smaller derived timeout (SC-006 / FR-009)',
     writeFileSync(join(repo, 'src', 'phase1', 'a.ts'), `// p1\n${'x'.repeat(4000)}\n`);
     writeFileSync(join(repo, 'src', 'phase2', 'b.ts'), `// p2\n${'y'.repeat(4000)}\n`);
 
-    const feature = assembleImplementPayload({ repoRoot: repo, base: 'HEAD' });
-    const phase = assembleImplementPayload({ repoRoot: repo, base: 'HEAD', pathScope: ['src/phase1'] });
+    const feature = assembleImplementPayload({ installationRoot: repo, base: 'HEAD' });
+    const phase = assembleImplementPayload({ installationRoot: repo, base: 'HEAD', pathScope: ['src/phase1'] });
 
     // The phase payload is smaller (it folds one phase's file, not both).
     expect(phase.diff.length).toBeLessThan(feature.diff.length);

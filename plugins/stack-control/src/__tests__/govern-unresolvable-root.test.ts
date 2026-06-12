@@ -64,6 +64,10 @@ function writeStubBarrage(dir: string): string {
 // returns root: undefined for every slug here.
 function makeRepoWithoutFeatureDirs(): string {
   const repo = mkdtempSync(join(tmpdir(), 'gov-unres-'));
+  // Installation marker (specs/installation-isolation): govern resolves
+  // the enclosing installation from --at.
+  mkdirSync(join(repo, '.stack-control'), { recursive: true });
+  writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   writeFileSync(join(repo, 'seed.txt'), 'seed\n', 'utf8');
   const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
   git(['init', '-q']);
@@ -79,6 +83,8 @@ function makeRepoWithoutFeatureDirs(): string {
 // Error, fail-loud) for slug 'amb' here rather than silently picking one.
 function makeRepoWithAmbiguousFeatureDirs(): string {
   const repo = mkdtempSync(join(tmpdir(), 'gov-amb-'));
+  mkdirSync(join(repo, '.stack-control'), { recursive: true });
+  writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   mkdirSync(join(repo, 'specs', '001-amb'), { recursive: true });
   mkdirSync(join(repo, 'specs', '002-amb'), { recursive: true });
   writeFileSync(join(repo, 'specs', '001-amb', 'spec.md'), 'spec one\n', 'utf8');
@@ -110,7 +116,7 @@ describe('stackctl govern — unresolvable feature root (AUDIT-20260611-04)', ()
     const runDir = join(fx, 'run-implement');
     try {
       const r = runGovern(
-        ['--mode', 'implement', '--feature', 'nonexistent', '--repo-root', repo, '--diff-base', 'HEAD'],
+        ['--mode', 'implement', '--feature', 'nonexistent', '--at', repo, '--diff-base', 'HEAD'],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: runDir },
       );
       expect(r.status).toBe(2);
@@ -137,7 +143,7 @@ describe('stackctl govern — unresolvable feature root (AUDIT-20260611-04)', ()
     writeFileSync(spec, 'A spec under audit.\n', 'utf8');
     try {
       const r = runGovern(
-        ['--mode', 'spec', '--feature', 'nonexistent', '--repo-root', repo, '--spec-path', spec],
+        ['--mode', 'spec', '--feature', 'nonexistent', '--at', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: runDir },
       );
       // The implement-only refusal never fires for spec mode (its payload
@@ -170,7 +176,7 @@ describe('stackctl govern — ambiguous feature root (AUDIT-20260611-12)', () =>
     const runDir = join(fx, 'run-implement');
     try {
       const r = runGovern(
-        ['--mode', 'implement', '--feature', 'amb', '--repo-root', repo, '--diff-base', 'HEAD'],
+        ['--mode', 'implement', '--feature', 'amb', '--at', repo, '--diff-base', 'HEAD'],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: runDir },
       );
       expect(r.status).toBe(2);
@@ -200,7 +206,7 @@ describe('stackctl govern — ambiguous feature root (AUDIT-20260611-12)', () =>
     writeFileSync(spec, 'A spec under audit.\n', 'utf8');
     try {
       const r = runGovern(
-        ['--mode', 'spec', '--feature', 'amb', '--repo-root', repo, '--spec-path', spec],
+        ['--mode', 'spec', '--feature', 'amb', '--at', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: runDir },
       );
       // resolveAuditLogExcerpt resolves the feature root on the spec path

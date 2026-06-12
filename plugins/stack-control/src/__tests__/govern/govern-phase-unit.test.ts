@@ -21,7 +21,7 @@ function writeStubBarrage(dir: string): string {
     'verb="$1"; shift',
     'repo=""; feature=""; output=""',
     'while [ "$#" -gt 0 ]; do case "$1" in',
-    '  --repo-root) repo="$2"; shift 2 ;;',
+    '  --at) repo="$2"; shift 2 ;;',
     '  --feature) feature="$2"; shift 2 ;;',
     '  --output) output="$2"; shift 2 ;;',
     '  --output-run-dir) shift ;;',
@@ -61,9 +61,21 @@ const TASKS_MD = [
 
 function makeRepo(seedAuditLog: string): string {
   const repo = mkdtempSync(join(tmpdir(), 'gov-phase-'));
+  // Installation marker (specs/installation-isolation): govern resolves
+  // the enclosing installation from --at.
+  mkdirSync(join(repo, '.stack-control'), { recursive: true });
+  writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', 'feat');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'audit-log.md'), seedAuditLog, 'utf8');
+  // Substantive source files: the fixture is an installation now, so the
+  // implement-mode clone step actually runs jscpd here, and jscpd v4
+  // writes no JSON report over a source-less tree.
+  mkdirSync(join(repo, 'src'), { recursive: true });
+  for (const n of [0, 1]) {
+    const lines = Array.from({ length: 30 }, (_, i) => `export const v${n}_${i} = ${i} * ${n + 2};`);
+    writeFileSync(join(repo, 'src', `f${n}.ts`), `${lines.join('\n')}\n`, 'utf8');
+  }
   spawnSync('git', ['-C', repo, 'init', '-q'], { encoding: 'utf8' });
   return repo;
 }
@@ -100,7 +112,7 @@ describe('govern --phase audits one tasks.md phase under its own checkpoint (FR-
     const stub = writeStubBarrage(fx);
     try {
       const r = runGovern(
-        ['--mode', 'implement', '--feature', 'feat', '--repo-root', repo, '--diff-base', 'HEAD', '--phase', '2'],
+        ['--mode', 'implement', '--feature', 'feat', '--at', repo, '--diff-base', 'HEAD', '--phase', '2'],
         {
           GOVERN_BARRAGE_BIN: stub,
           STUB_RUN_DIR: join(fx, 'run-phase-2'),
@@ -124,7 +136,7 @@ describe('govern --phase audits one tasks.md phase under its own checkpoint (FR-
     const stub = writeStubBarrage(fx);
     try {
       const r = runGovern(
-        ['--mode', 'implement', '--feature', 'feat', '--repo-root', repo, '--diff-base', 'HEAD', '--phase', '2'],
+        ['--mode', 'implement', '--feature', 'feat', '--at', repo, '--diff-base', 'HEAD', '--phase', '2'],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-phase-2'), STUB_LABEL: 'run-phase-2', STUB_SEVERITY: 'low' },
       );
       expect(r.status).toBe(2);

@@ -34,7 +34,13 @@ export interface CliOptions {
   readonly manifestPath: string | undefined;
   /** Explicit `--prd-path` (resolved absolute), or `undefined` (same rule). */
   readonly prdPath: string | undefined;
-  readonly repoRoot: string;
+  /**
+   * Walk-up start override (`--at <dir>`, resolved absolute), or
+   * `undefined` when omitted — the orchestrator resolves the
+   * nearest-enclosing installation from <dir>, else the cwd
+   * (specs/installation-isolation R1/R2; `--repo-root` is RETIRED).
+   */
+  readonly at: string | undefined;
   readonly moduleRoot: string;
   readonly apply: boolean;
   readonly evidenceTrail: boolean;
@@ -46,7 +52,7 @@ export const USAGE =
   '    --slug <feature-slug> \\\n' +
   '    [--manifest <manifest-path>] \\\n' +
   '    [--prd-path <prd-path>] \\\n' +
-  '    [--repo-root <repo-root>] \\\n' +
+  '    [--at <dir>] \\\n' +
   '    [--module-root <module-root>] \\\n' +
   '    [--apply] \\\n' +
   '    [--evidence-trail on|off] \\\n' +
@@ -60,7 +66,7 @@ const SCALAR_FLAGS: ReadonlySet<string> = new Set([
   '--slug',
   '--manifest',
   '--prd-path',
-  '--repo-root',
+  '--at',
   '--module-root',
   '--evidence-trail',
 ]);
@@ -120,7 +126,11 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
         '+ dashes, no leading/trailing dash, min 2 chars)',
     );
   }
-  const root = resolve(scalars.get('--repo-root') ?? process.cwd());
+  const atRaw = scalars.get('--at');
+  const at = atRaw === undefined ? undefined : resolve(atRaw);
+  // Relative artifact paths resolve against the explicit start dir when
+  // given, else the cwd (the shell-natural base for typed paths).
+  const pathBase = at ?? process.cwd();
   // specs/014 US7: when omitted, the defaults resolve in the
   // orchestrator via the layout-aware feature-root resolver.
   const manifestRaw = scalars.get('--manifest');
@@ -129,14 +139,14 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
       ? undefined
       : isAbsolute(manifestRaw)
         ? manifestRaw
-        : resolve(root, manifestRaw);
+        : resolve(pathBase, manifestRaw);
   const prdRaw = scalars.get('--prd-path');
   const prdPath =
     prdRaw === undefined
       ? undefined
       : isAbsolute(prdRaw)
         ? prdRaw
-        : resolve(root, prdRaw);
+        : resolve(pathBase, prdRaw);
   const evidenceFlag = scalars.get('--evidence-trail') ?? 'on';
   if (evidenceFlag !== 'on' && evidenceFlag !== 'off') {
     throw new Error(`--evidence-trail must be 'on' or 'off' (got '${evidenceFlag}')`);
@@ -146,7 +156,7 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
     complaint: complaintRaw,
     manifestPath,
     prdPath,
-    repoRoot: root,
+    at,
     moduleRoot: scalars.get('--module-root') ?? DEFAULT_MODULE_ROOT,
     apply,
     evidenceTrail: evidenceFlag === 'on',

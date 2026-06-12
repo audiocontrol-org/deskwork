@@ -39,7 +39,7 @@ describe('assembleImplementPayload (port of govern.sh diff+untracked-fold)', () 
     try {
       writeFileSync(join(repo, 'src.ts'), 'export const a = 1;\n');
       commit(repo, 'add src');
-      const r = assembleImplementPayload({ repoRoot: repo, base: 'HEAD~1' });
+      const r = assembleImplementPayload({ installationRoot: repo, base: 'HEAD~1' });
       expect(r.diff).toContain('export const a = 1;');
       expect(r.commitSubjects).toMatch(/add src/);
     } finally {
@@ -51,7 +51,7 @@ describe('assembleImplementPayload (port of govern.sh diff+untracked-fold)', () 
     const repo = initRepo();
     try {
       writeFileSync(join(repo, 'newmod.ts'), 'export const fresh = true;\n');
-      const r = assembleImplementPayload({ repoRoot: repo, base: 'HEAD~1' });
+      const r = assembleImplementPayload({ installationRoot: repo, base: 'HEAD~1' });
       expect(r.diff).toContain('export const fresh = true;');
     } finally {
       rmSync(repo, { recursive: true, force: true });
@@ -64,7 +64,7 @@ describe('assembleImplementPayload (port of govern.sh diff+untracked-fold)', () 
       // A NUL byte makes grep -I treat the file as binary.
       writeFileSync(join(repo, 'blob.bin'), Buffer.from([0x00, 0x01, 0x02, 0xff]));
       writeFileSync(join(repo, 'text.ts'), 'export const t = 1;\n');
-      const r = assembleImplementPayload({ repoRoot: repo, base: 'HEAD~1' });
+      const r = assembleImplementPayload({ installationRoot: repo, base: 'HEAD~1' });
       expect(r.diff).toContain('export const t = 1;');
       expect(r.skippedBinary).toContain('blob.bin');
     } finally {
@@ -78,7 +78,7 @@ describe('assembleImplementPayload (port of govern.sh diff+untracked-fold)', () 
       // `git ls-files --others` emits sorted paths: a-big sorts before z-small.
       writeFileSync(join(repo, 'a-big.ts'), 'x'.repeat(200) + '\n');
       writeFileSync(join(repo, 'z-small.ts'), 'export const small = 1;\n');
-      const r = assembleImplementPayload({ repoRoot: repo, base: 'HEAD~1', budgetBytes: 100 });
+      const r = assembleImplementPayload({ installationRoot: repo, base: 'HEAD~1', budgetBytes: 100 });
       // The big file is over the 100-byte budget → skipped (logged, not silent).
       expect(r.skippedOverBudget).toContain('a-big.ts');
       // The smaller later file still folds (continue, not break).
@@ -91,7 +91,7 @@ describe('assembleImplementPayload (port of govern.sh diff+untracked-fold)', () 
   it('empty diff (no changes against base) is reported, not fatal', () => {
     const repo = initRepo();
     try {
-      const r = assembleImplementPayload({ repoRoot: repo, base: 'HEAD' });
+      const r = assembleImplementPayload({ installationRoot: repo, base: 'HEAD' });
       expect(r.diff).toBe('');
       expect(r.empty).toBe(true);
     } finally {

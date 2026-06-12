@@ -45,14 +45,15 @@ const DEFAULT_RUNS_ROOT = '.stack-control/audit-runs';
 
 /**
  * Phase 16 Task 2 default: read HEAD via `git rev-parse HEAD` against
- * `repoRoot`. Returns `null` on any failure (no git repo, detached
+ * the installation root (git is a derived external anchor — spec
+ * FR-004). Returns `null` on any failure (no git repo, detached
  * worktree, etc.); the orchestrator then skips the `tip.sha` write and
  * the next-iteration guard fail-safes to fire.
  */
-async function defaultTipShaResolver(repoRoot: string): Promise<string | null> {
+async function defaultTipShaResolver(installationRoot: string): Promise<string | null> {
   try {
     const stdout = execFileSync('git', ['rev-parse', 'HEAD'], {
-      cwd: repoRoot,
+      cwd: installationRoot,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -78,7 +79,10 @@ export async function orchestrateBarrage(
   const now = new Date();
   const timestamp = encodeTimestamp(now);
   const runDirName = generateRunDirName(now, input.featureSlug);
-  const parentRunsDir = input.runDirOverride ?? join(input.repoRoot, DEFAULT_RUNS_ROOT);
+  // specs/installation-isolation US1: run-dirs derive from the
+  // verb-entry-resolved installation root (R1) — never a free repo root.
+  const parentRunsDir =
+    input.runDirOverride ?? join(input.installationRoot, DEFAULT_RUNS_ROOT);
   const runDir = await createRunDir(parentRunsDir, runDirName);
   const promptPath = await writePromptFile(runDir, input.prompt);
 
@@ -96,7 +100,7 @@ export async function orchestrateBarrage(
   // is wrapped in try/catch — a write failure degrades to "no tip
   // recorded" rather than crashing the barrage.
   const tipShaResolver = input.tipShaResolver ?? defaultTipShaResolver;
-  const fireTimeTipSha = await tipShaResolver(input.repoRoot);
+  const fireTimeTipSha = await tipShaResolver(input.installationRoot);
 
   // specs/014 FR-002: the payload (rendered PROMPT.md byte size) is known
   // pre-spawn; every lane's effective timeout derives from its calibration

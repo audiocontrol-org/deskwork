@@ -38,7 +38,7 @@ function writeRecordingStub(dir: string): string {
     'repo=""; feature=""; output=""',
     'while [ "$#" -gt 0 ]; do',
     '  case "$1" in',
-    '    --repo-root) repo="$2"; shift 2 ;;',
+    '    --at) repo="$2"; shift 2 ;;',
     '    --feature) feature="$2"; shift 2 ;;',
     '    --output) output="$2"; shift 2 ;;',
     '    *) shift ;;',
@@ -73,6 +73,10 @@ function writeRecordingStub(dir: string): string {
 
 function makeRepo(slug: string): string {
   const repo = mkdtempSync(join(tmpdir(), 'gov-floor-'));
+  // Installation marker (specs/installation-isolation): govern resolves
+  // the enclosing installation from --at.
+  mkdirSync(join(repo, '.stack-control'), { recursive: true });
+  writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'audit-log.md'), `# Audit Log — ${slug}\n`, 'utf8');
@@ -100,7 +104,7 @@ describe('US1 — govern fleet floor (T004)', () => {
     writeFileSync(spec, 'A spec under audit.\n');
     try {
       const r = runGovern(
-        ['--mode', 'spec', '--feature', 'feat', '--repo-root', repo, '--spec-path', spec],
+        ['--mode', 'spec', '--feature', 'feat', '--at', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-a'), STUB_ARGS_FILE: argsFile },
       );
       expect(r.status).toBe(0);
@@ -126,7 +130,7 @@ describe('US1 — govern fleet floor (T004)', () => {
           'spec',
           '--feature',
           'feat',
-          '--repo-root',
+          '--at',
           repo,
           '--spec-path',
           spec,

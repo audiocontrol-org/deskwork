@@ -8,6 +8,7 @@
 //   - --help/-h/help → usage to stdout, exit 0
 //   - no flag silently ignored (each subcommand validates its own flags)
 
+import { setInstallationNoticeVerb } from './config/installation.js';
 import { runVersion } from './subcommands/version.js';
 import { runExecuteCheck } from './subcommands/execute-check.js';
 import { runSpecCheck } from './subcommands/spec-check.js';
@@ -136,6 +137,9 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
+  // The shared resolver's legacy half-installation notice carries the
+  // dispatched verb as its prefix (specs/installation-isolation US5).
+  setInstallationNoticeVerb(verb);
   await handler(args);
 }
 

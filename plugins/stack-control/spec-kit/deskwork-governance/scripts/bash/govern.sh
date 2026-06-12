@@ -15,6 +15,12 @@
 #   GOVERN_FEATURE_SLUG  (optional override; else derived from feature/<slug>)
 #   GOVERN_DIFF_BASE     (default: HEAD~1) — git ref the implemented work is diffed against
 #   GOVERN_BARRAGE_BIN   (optional; the barrage entrypoint; default: bundled stackctl) — test seam
+#
+# Anchoring contract (specs/installation-isolation): every argument is forwarded
+# verbatim to `stackctl govern` ("$@" below) — pass `--at <dir>` (the installation
+# enclosing <dir>) to anchor explicitly, or run with the cwd inside the
+# installation (the default walk-up start). GOVERN_REPO_ROOT is retired (R2):
+# setting it is a loud FATAL, never a silent no-op.
 set -euo pipefail
 
 # Resolve the bundled stackctl from the repo root so this shim works BOTH in the

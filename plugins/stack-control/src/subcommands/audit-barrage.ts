@@ -31,8 +31,8 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { loadAuditBarrageConfig } from '../scope-discovery/audit-barrage/config-loader.js';
+import { resolveCodebaseBoundary } from '../scope-discovery/codebase-boundary.js';
 import { orchestrateBarrage } from '../scope-discovery/audit-barrage/orchestrate-barrage.js';
 import { renderFleetReportLines } from '../scope-discovery/audit-barrage/run-artifacts.js';
 import {
@@ -60,7 +60,7 @@ const USAGE = [
   'Usage: stackctl audit-barrage',
   '    --feature <slug>',
   '    --prompt-file <path>',
-  '    [--repo-root <path>]',
+  '    [--at <dir>]',
   '    [--models <comma-list>]',
   '    [--require-models <n>]',
   '    [--quiet]',
@@ -72,8 +72,9 @@ const USAGE = [
   '--prompt-file <path>      Path to a file containing the audit prompt.',
   '                          Required — the prompt is the unit each CLI',
   '                          receives.',
-  '--repo-root <path>        Defaults to cwd. The run dir lands under',
-  '                          `<repo-root>/.stack-control/',
+  '--at <dir>                Resolve the installation enclosing <dir> instead',
+  '                          of the cwd. The run dir lands under',
+  '                          `<installation>/.stack-control/',
   '                          audit-runs/<timestamp>-<feature>/`.',
   '--models <comma-list>     Comma-separated subset of the configured models.',
   '                          Defaults to every model in the loaded config.',
@@ -105,7 +106,12 @@ const USAGE = [
  * names are caught downstream against the loaded config.
  */
 export interface ParsedFlags {
-  readonly repoRoot: string;
+  /**
+   * Walk-up start override (`--at <dir>`): resolve the installation
+   * enclosing <dir> instead of the cwd. `undefined` = walk up from the
+   * cwd (specs/installation-isolation R1/R2; `--repo-root` is RETIRED).
+   */
+  readonly at: string | undefined;
   readonly featureSlug: string;
   readonly promptFilePath: string;
   readonly modelNames: ReadonlyArray<string> | undefined;
@@ -141,7 +147,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
   let featureSlug: string | undefined;
   let promptFilePath: string | undefined;
   let inlinePrompt: string | undefined;
-  let repoRoot: string | undefined;
+  let at: string | undefined;
   let modelsCsv: string | undefined;
   let requireModelsRaw: string | undefined;
   let quiet = false;
@@ -164,7 +170,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
       flag === '--feature' ||
       flag === '--prompt-file' ||
       flag === '--prompt' ||
-      flag === '--repo-root' ||
+      flag === '--at' ||
       flag === '--models' ||
       flag === '--require-models'
     ) {
@@ -176,7 +182,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
       if (flag === '--feature') featureSlug = value;
       else if (flag === '--prompt-file') promptFilePath = value;
       else if (flag === '--prompt') inlinePrompt = value;
-      else if (flag === '--repo-root') repoRoot = value;
+      else if (flag === '--at') at = value;
       else if (flag === '--models') modelsCsv = value;
       else if (flag === '--require-models') requireModelsRaw = value;
       continue;
@@ -227,7 +233,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
   return {
     ok: true,
     flags: {
-      repoRoot: repoRoot ?? process.cwd(),
+      at,
       featureSlug,
       promptFilePath,
       modelNames,
@@ -376,11 +382,26 @@ export async function auditBarrage(args: string[]): Promise<void> {
   }
 
   const flags = parsed.flags;
-  const repoRoot = resolve(flags.repoRoot);
+
+  // specs/installation-isolation US1 (R1): resolve the installation ONCE
+  // at verb entry; run-dirs + config reads derive from it. `--at <dir>`
+  // overrides the walk-up start point; cwd is only the default start
+  // (US4). No enclosing installation → fail loud (US2; no fallback
+  // write location).
+  let installationRoot: string;
+  try {
+    installationRoot = resolveCodebaseBoundary({
+      startDir: flags.at ?? process.cwd(),
+      explicitRoot: null,
+    }).installationRoot;
+  } catch (err) {
+    process.stderr.write(`audit-barrage: FATAL — ${errorMessage(err)}\n`);
+    process.exit(2);
+  }
 
   let config: Awaited<ReturnType<typeof loadAuditBarrageConfig>>;
   try {
-    config = await loadAuditBarrageConfig(repoRoot);
+    config = await loadAuditBarrageConfig(installationRoot);
   } catch (err) {
     process.stderr.write(`audit-barrage: ${errorMessage(err)}\n`);
     process.exit(2);
@@ -407,7 +428,7 @@ export async function auditBarrage(args: string[]): Promise<void> {
   }
 
   const input: BarrageInput = {
-    repoRoot,
+    installationRoot,
     featureSlug: flags.featureSlug,
     prompt,
     models: resolution.models,

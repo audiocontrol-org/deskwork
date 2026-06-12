@@ -25,6 +25,9 @@ function section(runId: string, entries: string[]): string {
 }
 function makeRepo(slug: string, sections: string[]): string {
   const repo = mkdtempSync(join(tmpdir(), 'slush-'));
+  // Installation marker: --at (R2 retired --repo-root) resolves via walk-up.
+  mkdirSync(join(repo, '.stack-control'), { recursive: true });
+  writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'audit-log.md'), `# Audit Log\n\n${sections.join('\n')}`, 'utf8');
@@ -43,7 +46,7 @@ describe('slush-findings (ported slush pile, 008 rewire)', () => {
     const repo = makeRepo('s', [section('20260607T100000000Z-s-after_clarify', [entry('01', 'high')])]);
     const before = logText(repo, 's');
     try {
-      const r = runSlush(['--feature', 's', '--repo-root', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07', '--apply']);
+      const r = runSlush(['--feature', 's', '--at', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07', '--apply']);
       expect(r.status).toBe(0);
       expect(logText(repo, 's')).toBe(before); // not engaged → nothing migrated
     } finally {
@@ -57,7 +60,7 @@ describe('slush-findings (ported slush pile, 008 rewire)', () => {
       section('20260607T110000000Z-s-after_clarify', [entry('02', 'medium'), entry('03', 'low')]),
     ]);
     try {
-      const r = runSlush(['--feature', 's', '--repo-root', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07', '--apply']);
+      const r = runSlush(['--feature', 's', '--at', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07', '--apply']);
       expect(r.status).toBe(0);
       const t = logText(repo, 's');
       // latest section's MED + LOW are migrated to the backlog (not acknowledged-slush-pile)
@@ -77,7 +80,7 @@ describe('slush-findings (ported slush pile, 008 rewire)', () => {
       section('20260607T110000000Z-s-after_clarify', [entry('03', 'medium')]),
     ]);
     try {
-      const r = runSlush(['--feature', 's', '--repo-root', repo, '--checkpoint', 'after_clarify', '--scope', 'all', '--slush-date', '2026-06-07', '--apply']);
+      const r = runSlush(['--feature', 's', '--at', repo, '--checkpoint', 'after_clarify', '--scope', 'all', '--slush-date', '2026-06-07', '--apply']);
       expect(r.status).toBe(0);
       const t = logText(repo, 's');
       expect(t).toMatch(/AUDIT-20260607-01[\s\S]*?Status:\s+migrated-to-backlog TASK-\d+/);
@@ -96,7 +99,7 @@ describe('slush-findings (ported slush pile, 008 rewire)', () => {
     ]);
     const before = logText(repo, 's');
     try {
-      const r = runSlush(['--feature', 's', '--repo-root', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07']);
+      const r = runSlush(['--feature', 's', '--at', repo, '--checkpoint', 'after_clarify', '--slush-date', '2026-06-07']);
       expect(r.status).toBe(0);
       expect(logText(repo, 's')).toBe(before);
     } finally {
@@ -106,8 +109,10 @@ describe('slush-findings (ported slush pile, 008 rewire)', () => {
 
   it('feature not found → exit 2', () => {
     const repo = mkdtempSync(join(tmpdir(), 'slush-empty-'));
+    mkdirSync(join(repo, '.stack-control'), { recursive: true });
+    writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
     try {
-      const r = runSlush(['--feature', 'nope', '--repo-root', repo, '--apply']);
+      const r = runSlush(['--feature', 'nope', '--at', repo, '--apply']);
       expect(r.status).toBe(2);
     } finally {
       rmSync(repo, { recursive: true, force: true });

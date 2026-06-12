@@ -111,8 +111,12 @@ if $PATHS_ONLY; then
     exit 0
 fi
 
-# Validate branch name
-check_feature_branch "$CURRENT_BRANCH" "$HAS_GIT" || exit 1
+# Validate branch name.
+# If feature.json pins an existing feature directory, branch naming is not required
+# (same bypass as setup-plan.sh / setup-tasks.sh).
+if ! feature_json_matches_feature_dir "$REPO_ROOT" "$FEATURE_DIR"; then
+    check_feature_branch "$CURRENT_BRANCH" "$HAS_GIT" || exit 1
+fi
 
 # Validate required directories and files
 if [[ ! -d "$FEATURE_DIR" ]]; then
