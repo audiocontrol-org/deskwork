@@ -29,7 +29,7 @@ import {
 import type { BarrageRun } from '../scope-discovery/audit-barrage/types.js';
 
 function modelResult(overrides: Partial<ModelRunResult>): ModelRunResult {
-  return {
+  const merged = {
     name: 'm',
     exitCode: 0,
     durationMs: 100,
@@ -39,8 +39,19 @@ function modelResult(overrides: Partial<ModelRunResult>): ModelRunResult {
     stderrPath: '/tmp/stderr/m.txt',
     timedOut: false,
     spawnError: undefined,
+    terminalState: 'completed' as const,
+    enforcement: 'enforced' as const,
+    liveness: 'unmonitored' as const,
+    timeoutBasis: {
+      mode: 'override' as const,
+      payloadBytes: 1,
+      effectiveTimeoutSeconds: 300,
+    },
     ...overrides,
   };
+  // specs/014: reportBytes (the artifact) tracks stdoutBytes for text
+  // lanes; derive it unless the case pins it explicitly.
+  return { reportBytes: merged.stdoutBytes, ...merged };
 }
 
 function runWith(results: ReadonlyArray<ModelRunResult>): BarrageRun {
@@ -72,14 +83,20 @@ describe('liftability vs coverage predicates (AUDIT-20260607-42)', () => {
       stdoutBytes: 0,
       exitCode: -2,
       spawnError: 'ENOENT: binary not found',
+      terminalState: 'spawn-failed',
     });
     expect(isModelRunHealthy(r)).toBe(false);
     expect(isModelRunCovering(r)).toBe(false);
   });
 
-  it('timeout (exitCode -1) WITH bytes is liftable but NOT covering', () => {
-    const r = modelResult({ stdoutBytes: 256, exitCode: -1, timedOut: true });
-    expect(isModelRunHealthy(r)).toBe(true);
+  it('timeout WITH bytes is NEITHER liftable nor covering (specs/014 FR-006/FR-007 supersedes the old lift-partial rule)', () => {
+    const r = modelResult({
+      stdoutBytes: 256,
+      exitCode: -1,
+      timedOut: true,
+      terminalState: 'timed-out',
+    });
+    expect(isModelRunHealthy(r)).toBe(false);
     expect(isModelRunCovering(r)).toBe(false);
   });
 

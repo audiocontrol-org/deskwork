@@ -1,7 +1,6 @@
 ---
-name: tooling-feedback-import
-description: "Promote closure-marked TF entries from per-feature tooling-feedback.md files into the scope-discovery audit-log"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:tooling-feedback-import
 

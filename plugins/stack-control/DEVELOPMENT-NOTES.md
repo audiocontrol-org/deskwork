@@ -83,6 +83,83 @@
 - Files changed: 78
 - Backlog touched: TASK-12, TASK-2, TASK-24, TASK-28, TASK-29, TASK-30, TASK-37, TASK-40, TASK-45, TASK-5
 
+---
+
+## 2026-06-11: Audit-protocol convergence — investigate, then author spec 015 to analyze-clean
+
+**Goal:** Address the audit-protocol convergence issues surfaced by the 014 govern-loop dogfood (the loop plateaus at 1-HIGH/round, terminating only by operator override), plus two new threads the operator added: auditing smaller units of work incrementally instead of one giant end-of-implementation barrage, and re-evaluating sonnet on those smaller units. Investigate deeply first, then plan.
+
+**Accomplished:**
+- **Investigated the convergence cluster from source** (three parallel Explore agents + direct reads), verifying — not assuming — the mechanics. Three findings re-scoped the work: (1) TASK-18 Facet A (slush-before-dampener) is **already fixed** in code — the dampener counts raw severity by `Severity:` line regardless of `Status:` (`check-barrage-dampener.ts:136-138,178,187-188`); (2) the lift takes **max-of-cluster** severity and **discards per-lane severities** (`extract-barrage-findings.ts:262-275`) — one lane's HIGH inflates the cluster, so two-consecutive-raw-0-HIGH never engages (the plateau root cause, TASK-27); (3) the convergence loop is **skill-body prose, not code** — the agent is both fixer and loop-controller (TASK-18 Facet B).
+- **Mapped the interlock:** smaller audit units (the new thread) is the lever the convergence fixes hang off — fewer findings/round attacks the plateau + fix-debt compounding, a smaller diff shrinks the self-reference window, and a smaller payload scales the per-model timeout down so cheaper models (sonnet) become viable. 014's mechanical read-only already removed sonnet's read-only disqualifier; the latency/off-task disqualifier is payload-size-coupled.
+- **Authored spec 015 (audit-protocol-convergence) through the full native chain** to analyze-clean: specify → clarify → plan → tasks → analyze. Six user stories (severity de-inflation, code loop driver, payload exclusion, per-phase units, sonnet re-eval, Facet-A regression guard), 12 FR / 8 SC, the loop-driver state machine + three contracts, 35 RED-first tasks. `spec=yes plan=yes tasks=yes`.
+- **Clarify resolved the three design forks** (operator delegated): FR-001 → cross-lane severity-agreement floor (cluster gate-counted HIGH only when ≥2 lanes agree; single-model HIGH still blocks per 004 FR-003) + an adjudication pass for residual single-lane inflations; FR-007 → per-phase units composing into whole-feature governance; FR-011 → sonnet to an operator-selectable override profile under plan-mode.
+- **Analyze came back 0 CRITICAL / 0 HIGH**; 5 MEDIUM/LOW coverage-tightening findings remediated in tasks.md (FR-003 orthogonality assertion, FR-005 no-auto-edit assertion, the 004-FR-014 cross-ref qualified, FR-008 same-store assertion, a new T035 dw-lifecycle isolation guard).
+
+**Didn't Work:**
+- The Spec Kit branch-gate is incompatible with a session-pinned existing branch: `check-prerequisites.sh` (speckit-analyze) fails loud ("Not on a feature branch") and the `before_specify` git.feature hook wants to spin a new branch. Worked around by driving specify/plan/tasks/analyze directly against the `.specify/feature.json`-resolved dir and bypassing the branch hook. Captured to tooling-feedback (relates to #122 / `design:fix/spec-governance-gate-branch`).
+- `stackctl session-start`/`session-end` fail loud at the repo root because `/home/user/deskwork/.stack-control/` holds only `audit-barrage-config.yaml` (no `config.yaml`) — the installation lives under `plugins/stack-control`. Ran from there (the operator's instruction). Captured to tooling-feedback.
+
+**Course Corrections:**
+- [PROCESS] Operator interrupted the first investigation dispatch to re-answer the scope question — landed on the same answer (whole cluster) but it confirmed the investigate-then-plan posture before any sub-agents ran.
+- [PROCESS] Operator expanded scope mid-investigation (smaller audit units + sonnet re-eval) — folded into the same effort as threads 4–6 rather than a separate spec, keeping the interlock coherent.
+- [PROCESS] Operator delegated the three clarify forks ("your recommendations sound right") — encoded the recommendations as the clarify session rather than re-interrogating.
+
+**Insights:**
+- The most valuable investigation output was a *re-scope*: one of the four cluster items (Facet A) was already fixed, so it dropped from "fix" to "regression guard." Verifying mechanics from source before planning is what caught it — the backlog item still read as open.
+- The threads aren't a list, they're a dependency graph: smaller units is the lever, severity-agreement + the code loop driver are the teeth, and the payload/self-reference cleanup is what lets the teeth bite real signal. The spec's Why-section had to lead with the interlock or the six stories read as unrelated.
+- Authoring is orchestrator work; this session deliberately stopped at analyze-clean tasks and did NOT start implementation — that moves to a separate worktree/session per the orchestrator/implementer split.
+
+**Quantitative (re-derived from `git log d62dde4..HEAD`, AUDIT-04):**
+- Commits: 6 (5 substantive spec-authoring + 1 session-end record)
+  - `0c2cf07` tasks(015): analyze remediation — tighten coverage on FR-003/005/008/012
+  - `0f8fada` tasks(015): dependency-ordered RED-first task breakdown (35 tasks)
+  - `72a673b` plan(015): design artifacts (research D1–D8, data-model, 3 contracts, quickstart)
+  - `eae7c11` spec(015): clarify — resolve the three convergence design forks
+  - `614654f` spec(015): audit-protocol convergence correctness + incremental audit units
+- Files changed: 12 (+853 / −2) across the substantive commits — the `specs/015-audit-protocol-convergence/` tree, `.specify/feature.json`, `CLAUDE.md`
+- Messages: ~12 · Corrections: 3 (all [PROCESS])
+- Backlog touched: none transitioned (TASK-27, TASK-18, #431 are *referenced* by spec 015; status transitions are the operator's call — to be consolidated under the new roadmap item in T033)
+- Open-findings note: 0 audit findings this session (authoring only, no implementation/barrage run)
+
+## 2026-06-11: Barrage model/timeout experiment → sonnet incident response → spec 014 authored to runnable
+
+**Goal:** Diagnose the operator's suspicion that `claude -d` was breaking audit-barrage invocations; turn the diagnosis into experiments, captured work items, and a runnable spec.
+
+**Accomplished:**
+- **Falsified the `-d` theory, found the real failure:** no config ever used `-d` (live + git history); `-d` still exists in the CLI. Actual cause: 17 consecutive exit-143 SIGTERM timeouts in design-control — bare `claude -p` resolves to fable-5 (slowest model), 600s cap below its natural 669–750s completion on the grown 69 KB prompt. `claude -p` text mode emits 0 bytes until done, so the kills looked like silent failures.
+- **5-model instrumented experiment** (same prompt, stream-json + per-event timestamps): haiku 271s/shallow; opus 586s/near-fable quality; fable 669–750s/most thorough; sonnet 2226s/off-task. Time is ~100% API generation. Cross-model agreement observed (opus + 2× fable on the same finding).
+- **Sonnet incident handled:** sonnet violated the prompt's explicit read-only instruction, fixed findings, committed `6ce58543` and PUSHED to origin/feature/design-control mid-audit. Reverted as `523f2950` (revert, not force-push). Spike then verified `--permission-mode plan` is harness-level read-only (hostile probes: Write refused, bash redirect blocked, python write held; zero files).
+- **Captured:** 3 roadmap gaps (model-pinning, readonly-enforcement, timeout-observability, all part-of migrate-audit-barrage) + backlog TASK-26 (spawn watchdog, audiocontrol e2e heartbeat pattern).
+- **Spec 014 (audit-barrage-reliability) authored to runnable** through the full native chain: specify → clarify (2 operator decisions: opus default pin; unenforced lanes run loudly-marked) → plan (research D1–D8, terminal-state data model, config-v2 + run-artifact contracts, quickstart) → tasks (29, TDD-paired) → analyze (0 critical; 1 HIGH + 2 MEDIUM remediated: FR-004 synthesis marking made unconditional, `produced` = converged-eligible). `spec=yes plan=yes tasks=yes`.
+
+**Didn't Work:**
+- `-d` debug flag in `-p` mode writes nothing to stderr (verified empirically) — the obvious "add -d to see what's happening" path is a dead end; stream-json or --debug-file are the real observability routes.
+- The sonnet read-only spike was stopped early by the operator — sonnet spent 15+ min in pure thinking under plan mode after 37 min unrestricted; verdict "not fit for purpose" reached without needing the full run.
+
+**Course Corrections:**
+- [PROCESS] Operator: *"raising timeouts is dumb without more information"* — redirected from config-tweaking to instrumentation-first diagnosis (stream-json replays). The resulting evidence reframed the whole problem from "timeout too low" to "wrong model + no observability + no enforcement."
+- [PROCESS] Experiment hygiene: replaying audit prompts through full-permission `claude -p` spawns let sonnet mutate a sibling worktree and push. Diagnostic replays of agent prompts need the same mechanical read-only the production barrage needs — that lesson became US1 of spec 014.
+
+**Insights:**
+- Prompt-level "Read-only. Do NOT modify" held for 3 of 4 models — compliance by model disposition is a coin flip, exactly the thesis's point: make failure states mechanically impossible (plan mode), don't instruct harder.
+- A healthy claude -p text-mode run is indistinguishable from a hung one from the outside (0 bytes both ways). Liveness requires an event-bearing output mode; the `thinking_tokens` stream (60–90 events/min) is the natural pulse — and the watchdog liveness window must key off the configured output mode, never bare stdout silence.
+- The barrage's "models attempted" accounting counted SIGTERMed lanes as attempts — the convergence loop ran 17 one-model rounds believing it had two. Degradation must be loud at synthesis, not buried in per-run INDEX files.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 8
+  - docs(014): analyze remediation — FR-004 enforcement marking at synthesis is unconditional; fleet 'produced' = converged-eligible; clarify model-rejected-vs-spawn-failed surfacing; gemini lane in template migration
+  - docs(014): tasks — 29 tasks across foundational + 4 story phases, TDD-paired, US1/US2 parallelizable after foundation
+  - docs(014): plan audit-barrage-reliability — research D1-D8, data model (terminal states), config v2 + run-artifact contracts, quickstart; point agent context at 014
+  - docs(014): clarify session 2026-06-10 — default claude pin = opus class; unenforceable backends run loudly-marked (refuse = strictness option)
+  - docs(014): specify audit-barrage-reliability — model pinning + derived timeouts, mechanical read-only, fleet observability, spawn watchdog (promotes TASK-26)
+  - chore(backlog): promote TASK-26 (spawn watchdog) into spec:specs/014-audit-barrage-reliability
+  - chore(backlog): capture TASK-26 — barrage spawn watchdog, fail fast on no sign-of-life (borrow audiocontrol e2e watchdog)
+  - docs(roadmap): capture three audit-barrage gaps from the 2026-06-10 model/timeout experiment (model pinning, read-only enforcement, timeout observability)
+- Files changed: 13
+- Backlog touched: TASK-26
+---
+
 ## 2026-06-11: Post-release verification (v0.42.0), tracking consolidation, and authoring spec 014 to runnable
 
 **Goal:** Verify the spec-013 fixes in the formally-installed v0.42.0 release and close their tracking; consolidate all defect tracking into the backlog (GitHub issues + roadmap fix/gap nodes); cultivate a burn-down set and author it as the next Spec Kit feature.

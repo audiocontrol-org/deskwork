@@ -1,7 +1,6 @@
 ---
-name: validate-scope-discovery
-description: "Run the full scope-discovery adversarial harness suite via vitest"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:validate-scope-discovery
 

@@ -1,7 +1,6 @@
 ---
-name: session-end
-description: "Append journal entry; update feature docs; commit documentation changes"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:session-end
 

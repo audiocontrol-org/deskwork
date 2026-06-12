@@ -1,7 +1,6 @@
 ---
-name: debt-report
-description: "Read-only cross-source debt snapshot: open issues bucketed by label/age, workplan TBD totals per in-progress feature, parked branches with ahead/behind"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:debt-report
 

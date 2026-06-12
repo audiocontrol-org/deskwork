@@ -47,7 +47,11 @@ const STUB_BARRAGE_CONFIG = [
   'models:',
   '  - name: stub',
   '    binary: echo',
-  '    args_template: "stub-audit {{prompt}}"',
+  '    model: stub-pin',
+  '    args_template: "{{model}} stub-audit {{prompt}}"',
+  '    readonly_enforcement: none',
+  '    output_mode: text',
+  '    liveness_signal: none',
   '    timeout_seconds: 60',
   '',
 ].join('\n');

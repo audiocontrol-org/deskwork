@@ -19,17 +19,22 @@
  * three files sharing the same fragment is one site, not three.
  *
  * Invocation note (dw-lifecycle port): the audiocontrol pilot shelled
- * out via `pnpm exec jscpd`; this port uses `npx jscpd` so the runner
- * works regardless of the adopter project's package manager. jscpd is
- * a devDependency of @deskwork/plugin-dw-lifecycle and is also expected
- * to be present (or resolvable via npx) in the adopter project — the
- * `install-scope-discovery` skill (Phase 8) is responsible for making
- * that true.
+ * out via `pnpm exec jscpd`; this port resolves the LOCALLY-INSTALLED
+ * jscpd (pinned ^4, a dependency of @deskwork/plugin-dw-lifecycle) by
+ * walking up from this module — NOT `npx jscpd`, which from a scan cwd
+ * outside the repo (test fixtures in tmpdir, adopter trees without a
+ * local jscpd) silently fetches the LATEST jscpd from the registry. A
+ * registry-latest jscpd is a different major (5.x changed gitignore
+ * handling) and rots the gate's behavior with zero changes on our
+ * side. Mirrors stack-control's jscpd-runner `resolveJscpdBin`. Fail
+ * loud if absent — never fall back to a registry fetch.
  */
 
+import { existsSync } from 'node:fs';
 import { mkdir, rm, stat } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { type CloneGroup, makeCloneGroup, sha1HexOfText } from './clones-yaml.js';
 import { isEnoent, isPlainObject } from './util/typeguards.js';
 
@@ -64,24 +69,18 @@ export async function runJscpd(opts: {
   // passing the path as a positional argument AFTER --config. jscpd's
   // CLI accepts `<path ...>` positional after options. The config still
   // contributes thresholds/ignores/reporters; only the scan root changes.
-  //
-  // `--yes` is the first arg to npx so it doesn't prompt to install
-  // jscpd in non-TTY contexts (pre-commit hooks, CI, sub-agent
-  // dispatches). stdin is `'ignore'` below, so a prompt would hang
-  // indefinitely with no operator-visible indication of why.
-  const jscpdArgs = ['--yes', 'jscpd', '--config', '.jscpd.json'];
+  const jscpdArgs = [resolveJscpdBin(), '--config', '.jscpd.json'];
   if (opts.rootOverride !== null) {
     jscpdArgs.push(opts.rootOverride);
   }
   // stderr is collected by the spawn promise but also surfaced in the
   // ENOENT-on-stat branch below. Lifting the binding to outer scope lets
-  // the "ran but wrote no report" error name the actual failure (e.g.
-  // jscpd not installed, network failure during `npx --yes` fetch)
-  // instead of pointing at the .jscpd.json reporters list, which is
-  // actively misleading when the real cause is upstream of jscpd.
+  // the "ran but wrote no report" error name the actual failure instead
+  // of pointing at the .jscpd.json reporters list, which is actively
+  // misleading when the real cause is upstream of jscpd.
   let stderr = '';
   await new Promise<void>((resolvePromise, rejectPromise) => {
-    const proc = spawn('npx', jscpdArgs, {
+    const proc = spawn(process.execPath, jscpdArgs, {
       cwd: opts.repoRoot,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -106,12 +105,35 @@ export async function runJscpd(opts: {
     if (isEnoent(err)) {
       throw new Error(
         `jscpd ran but did not write ${JSCPD_REPORT_PATH}.\n` +
-          `stderr from npx:\n${stderr || '(empty)'}\n` +
+          `stderr from jscpd:\n${stderr || '(empty)'}\n` +
           `If stderr is empty, verify .jscpd.json includes "json" in reporters.`,
       );
     }
     throw err;
   }
+}
+
+/**
+ * Resolve the locally-installed jscpd JS entry by walking up from this
+ * module to the nearest `node_modules/jscpd/bin/jscpd` — works whether
+ * npm hoisted the dep to the monorepo root or nested it plugin-local.
+ * Mirrors stack-control's jscpd-runner. Fail loud if absent — never
+ * silently fall back to a registry fetch that could be a different
+ * (flag- and behavior-incompatible) jscpd major.
+ */
+function resolveJscpdBin(): string {
+  let cur = dirname(fileURLToPath(import.meta.url));
+  for (;;) {
+    const candidate = join(cur, 'node_modules', 'jscpd', 'bin', 'jscpd');
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  throw new Error(
+    'jscpd not found: no node_modules/jscpd/bin/jscpd at or above the scope-discovery ' +
+      'module. Run `npm install` (jscpd is a declared dependency of @deskwork/plugin-dw-lifecycle).',
+  );
 }
 
 interface RawPair {

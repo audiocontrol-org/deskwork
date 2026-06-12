@@ -38,11 +38,25 @@ import { readFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { resolveCodebaseBoundary } from '../scope-discovery/codebase-boundary.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
+import { extractBarrageFindings } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
 import {
-  extractBarrageFindings,
-  type ExtractedFinding,
-} from '../scope-discovery/promote-findings/extract-barrage-findings.js';
+  buildAuditLogHeader,
+  renderSection,
+  renderQuietSection,
+} from './audit-barrage-lift-render.js';
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
+import {
+  computeFleetReportFromParsedLanes,
+  IndexLaneParseError,
+  parseIndexLaneStates,
+  renderFleetReportLines,
+  safeModelName,
+  type ParsedIndexLane,
+} from '../scope-discovery/audit-barrage/run-artifacts.js';
+import {
+  completedNonConvergedAnnotation,
+  type FleetReport,
+} from '../scope-discovery/audit-barrage/types.js';
 import { resolveFeatureRoot as resolveFeatureRootShared } from '../scope-discovery/util/feature-root.js';
 
 export interface AuditBarrageLiftCliOptions {
@@ -96,10 +110,6 @@ function todayYYYYMMDD(now: Date = new Date()): string {
   const m = (now.getUTCMonth() + 1).toString().padStart(2, '0');
   const d = now.getUTCDate().toString().padStart(2, '0');
   return `${y}${m}${d}`;
-}
-
-function isoDate(yyyymmdd: string): string {
-  return `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`;
 }
 
 export function parseFlags(argv: ReadonlyArray<string>): ParseFlagsResult {
@@ -193,24 +203,6 @@ async function resolveFeatureRoot(
   return { root, ...(layout !== undefined ? { layout } : {}) };
 }
 
-/**
- * Spec 013 US2: the canonical audit-log header scaffolded at a
- * resolved feature root that has none yet. `targetVersion` carries the
- * legacy-docs version axis (derived from the resolved path); a speckit
- * feature has no version axis, so it is the empty string.
- */
-function buildAuditLogHeader(slug: string, targetVersion: string): string {
-  return [
-    '---',
-    `slug: ${slug}`,
-    `targetVersion: "${targetVersion}"`,
-    '---',
-    '',
-    `# Audit log — ${slug}`,
-    '',
-  ].join('\n');
-}
-
 /** The legacy-docs version is the dir between `docs/` and `001-IN-PROGRESS`
  * in `<docs>/<version>/001-IN-PROGRESS/<slug>`; a speckit root has no
  * version axis (empty string). */
@@ -228,57 +220,6 @@ function highestExistingNn(auditLogText: string, date: string): number {
     if (Number.isFinite(n) && n > highest) highest = n;
   }
   return highest;
-}
-
-function formatSourceSuffix(sourceFindingIds: readonly string[]): string {
-  const stripped = sourceFindingIds.map((id) =>
-    id.replace(/^AUDIT-BARRAGE-/i, ''),
-  );
-  return stripped.join(' + ');
-}
-
-function renderEntry(
-  finding: ExtractedFinding,
-  date: string,
-  nn: number,
-): string {
-  const idPadded = nn.toString().padStart(2, '0');
-  const fullId = `AUDIT-${date}-${idPadded}`;
-  const suffix = finding.crossModelAgreement
-    ? ` (${formatSourceSuffix(finding.sourceFindingIds)}; cross-model)`
-    : '';
-  const body = finding.body.length > 0 ? finding.body : '_(no body captured)_';
-  return [
-    `### ${fullId} — ${finding.heading}`,
-    '',
-    `Finding-ID: ${fullId}${suffix}`,
-    `Status:     open`,
-    `Severity:   ${finding.severity}`,
-    `Surface:    ${finding.surface}`,
-    '',
-    body,
-    '',
-  ].join('\n');
-}
-
-function renderSection(
-  findings: readonly ExtractedFinding[],
-  date: string,
-  startingNn: number,
-  runDirBasename: string,
-): { section: string; assignedIds: readonly string[] } {
-  const isoDateStr = isoDate(date);
-  const heading = `## ${isoDateStr} — audit-barrage lift (${runDirBasename})\n\n`;
-  const assignedIds: string[] = [];
-  const entries: string[] = [];
-  for (let i = 0; i < findings.length; i += 1) {
-    const nn = startingNn + i;
-    const finding = findings[i]!;
-    const idPadded = nn.toString().padStart(2, '0');
-    assignedIds.push(`AUDIT-${date}-${idPadded}`);
-    entries.push(renderEntry(finding, date, nn));
-  }
-  return { section: heading + entries.join('\n'), assignedIds };
 }
 
 export interface RunAuditBarrageLiftArgs {
@@ -309,6 +250,62 @@ export async function runAuditBarrageLift(
     );
     return 2;
   }
+
+  // specs/014 FR-007: consume the run's terminal states from the v2 INDEX.
+  // A lane that did not settle `completed` contributes ZERO findings and is
+  // reported with its state; per-lane enforcement prints UNCONDITIONALLY
+  // (FR-004's at-synthesis marking always fires, not only on degradation).
+  // A pre-014 run dir (no v2 rows) keeps the old lift-everything behavior.
+  const indexPath = join(opts.runDir, 'INDEX.md');
+  let lanes: ParsedIndexLane[] | null = null;
+  if (existsSync(indexPath)) {
+    const indexText = await (args.read ?? ((p: string) => readFile(p, 'utf8')))(indexPath);
+    try {
+      lanes = parseIndexLaneStates(indexText);
+    } catch (err) {
+      // AUDIT-20260611-07: a mixed v2 INDEX is a corruption signal — the
+      // barrage's v2 writer never produces one. Abort the lift loudly
+      // instead of lifting over a fleet report whose `configured` count
+      // silently dropped the unparseable lane.
+      if (err instanceof IndexLaneParseError) {
+        stderr.write(
+          `audit-barrage-lift: corrupt INDEX at ${indexPath} — ${err.message}\n`,
+        );
+        return 2;
+      }
+      throw err;
+    }
+  }
+  let includeModels: ReadonlySet<string> | undefined;
+  let fleet: FleetReport | undefined;
+  if (lanes !== null) {
+    for (const lane of lanes) {
+      const status = `audit-barrage-lift: lane ${lane.name} — ${lane.terminalState} [${lane.enforcement}, ${lane.liveness}]`;
+      if (lane.terminalState !== 'completed') {
+        stderr.write(`${status} — contributes ZERO findings (non-completed lane)\n`);
+      } else {
+        // AUDIT-20260611-09: a lane can settle `completed` yet not be
+        // converged-eligible (nonzero exit or empty report) — the fleet
+        // report excludes it from `produced`, so the status line must say
+        // why, or the operator sees "completed" next to "⚠ DEGRADED" with
+        // nothing connecting them. AUDIT-20260611-11: the annotation is the
+        // shared one-vocabulary helper every fleet surface prints from.
+        stderr.write(`${status}${completedNonConvergedAnnotation(lane)}\n`);
+      }
+    }
+    includeModels = new Set(
+      lanes
+        .filter((lane) => lane.terminalState === 'completed')
+        .map((lane) => safeModelName(lane.name)),
+    );
+    fleet = computeFleetReportFromParsedLanes(lanes);
+    // AUDIT-20260611-15: render the fleet report when degraded OR when
+    // quorum collapsed (produced ≤ 1) — a healthy single-lane run must
+    // still state that cross-model agreement was structurally impossible.
+    if (fleet.produced < fleet.configured || fleet.quorumCollapsed) {
+      stderr.write(`${renderFleetReportLines(fleet).join('\n')}\n`);
+    }
+  }
   const auditLogPath = join(feature.root, 'audit-log.md');
   // Spec 013 US2: a brand-new feature's first barrage has no audit-log
   // yet. Instead of aborting (the old `return 2`), scaffold the
@@ -320,10 +317,18 @@ export async function runAuditBarrageLift(
   const findings = await extractBarrageFindings({
     runDir: opts.runDir,
     warn: (m) => stderr.write(`${m}\n`),
+    ...(includeModels !== undefined ? { includeModels } : {}),
   });
-  if (findings.length === 0) {
+  // FR-007: zero findings over a DEGRADED fleet is NEVER a clean signal — the
+  // killed lanes simply produced nothing. Record NOTHING (not even a quiet
+  // section): a degraded run must never be counted as a converged-eligible quiet
+  // run by the dampener (claude-20260612-r3 keeps this branch unrecorded).
+  if (findings.length === 0 && fleet !== undefined && fleet.produced < fleet.configured) {
     stderr.write(
-      `audit-barrage-lift: extracted 0 findings from ${opts.runDir}; nothing to lift.\n`,
+      `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a ` +
+        `DEGRADED fleet (produced ${fleet.produced} of ${fleet.configured} ` +
+        `configured) — absence of findings from non-completed lanes is NOT a ` +
+        `clean signal.\n`,
     );
     return 0;
   }
@@ -342,6 +347,31 @@ export async function runAuditBarrageLift(
   const auditLogText = auditLogMissing
     ? buildAuditLogHeader(opts.featureSlug, deriveTargetVersion(feature))
     : await reader(auditLogPath);
+
+  // claude-20260612-r3: a clean run over a HEALTHY fleet (or a pre-014 run with no
+  // INDEX) records a QUIET lift section so the convergence dampener counts it. The
+  // dampener counts lift SECTIONS; a clean run that left no section was invisible to
+  // its consecutive-quiet / single-run-clean rules, so a prior HIGH section stayed
+  // in the window forever and the gate could never reach OPEN after genuinely-clean
+  // runs. The degraded case returned above; only healthy/pre-014 clean runs reach here.
+  if (findings.length === 0) {
+    stderr.write(
+      `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a healthy ` +
+        `fleet; recording a quiet run section so the convergence dampener counts it.\n`,
+    );
+    if (!opts.apply) {
+      stderr.write('audit-barrage-lift: dry-run (re-run with --apply to write).\n');
+      return 0;
+    }
+    const trimmedExisting = auditLogText.replace(/\s+$/, '');
+    const separator = trimmedExisting.length > 0 ? '\n\n' : '\n';
+    const quiet = renderQuietSection(opts.date, basename(opts.runDir.replace(/\/$/, '')));
+    const quietContent = `${trimmedExisting}${separator}${quiet}`;
+    await writer(auditLogPath, quietContent.endsWith('\n') ? quietContent : `${quietContent}\n`);
+    stderr.write(`audit-barrage-lift: recorded a quiet run section in ${auditLogPath}.\n`);
+    return 0;
+  }
+
   const highest = highestExistingNn(auditLogText, opts.date);
   const startingNn = highest + 1;
   const { section, assignedIds } = renderSection(

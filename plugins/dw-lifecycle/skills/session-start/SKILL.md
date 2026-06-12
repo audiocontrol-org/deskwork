@@ -1,7 +1,6 @@
 ---
-name: session-start
-description: "Bootstrap session: read workplan + journal + open issues; report context"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:session-start
 

@@ -1,7 +1,6 @@
 ---
-name: close-shipped
-description: "Release-time pending-verification labeling. Phase 15 redesign: mechanical narrowing → per-candidate Agent dispatch (parallel, via the Agent tool from within the agent's Claude Code session) → operator-curated propose | apply. Does NOT close the issue — closure waits for operator verification per the project rule."
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:close-shipped
 
