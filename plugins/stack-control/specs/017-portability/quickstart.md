@@ -10,6 +10,12 @@
 6. Use `execute` and confirm the workflow completes without Claude-specific
    workaround steps.
 
+Result:
+Covered by `src/__tests__/front-door-portability.test.ts` and
+`src/__tests__/portability-contract-docs.test.ts`, which assert the front-door
+skills stay thin, quote the shared-core checks, and do not require an
+interactive Claude Code-only session model.
+
 ## Scenario B: Front door from Codex
 
 1. Start in the same repo through Codex.
@@ -17,6 +23,11 @@
    adapter or direct shared-core path.
 3. Confirm the same `stackctl spec-check` progression and runnable result as in
    Scenario A.
+
+Result:
+Covered by the shared skill-tree + Codex manifest assertions in
+`src/__tests__/front-door-portability.test.ts` and
+`src/__tests__/portability-contract-docs.test.ts`.
 
 ## Scenario C: Backlog workflow with backend invisibility
 
@@ -27,12 +38,21 @@
 5. Swap or stub the concrete backend in tests and confirm the workflow contract
    does not change.
 
+Result:
+Covered by `src/__tests__/backlog-portability-runtime.test.ts`,
+`tests/backlog/backend.test.ts`, and
+`src/__tests__/portability-contract-docs.test.ts`.
+
 ## Scenario D: Host limitation fails loudly
 
 1. Force one host adapter into a missing-capability condition.
 2. Invoke a portable workflow step.
 3. Confirm the user receives an explicit host limitation error rather than a
    silent workaround or fabricated success.
+
+Result:
+Covered by `src/__tests__/front-door-portability.test.ts`, which asserts the
+front-door skills surface fail-loud wording rather than silent fallback paths.
 
 ## Scenario E: Lockstep portable release
 
@@ -42,9 +62,16 @@
 3. Confirm Claude-facing and Codex-consumable distribution metadata point to
    the same released version.
 
+Result:
+Covered by `src/__tests__/release-portability.test.ts` and
+`src/__tests__/release-helper-portability.test.ts`.
+
 ## Scenario F: Deprecated repo-wide workflow is no longer an active path
 
 1. Start from repository guidance for beginning feature work.
 2. Attempt to follow the old repo-wide feature workflow entry point.
 3. Confirm the repository redirects to or explicitly deprecates that path.
 4. Confirm `stack-control` is the clear active feature workflow.
+
+Result:
+Covered by `src/__tests__/portability-contract-docs.test.ts`.

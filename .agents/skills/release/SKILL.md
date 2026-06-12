@@ -7,10 +7,10 @@ description: "Run the hard-gated deskwork monorepo release flow: preconditions, 
 
 DEPRECATED as a canonical repo-level release entry point. The portable release
 contract now lives under `plugins/stack-control/skills/release/` and is checked
-through `plugins/stack-control/bin/stackctl release-check`. The older
-`.claude/skills/release/` flow is legacy implementation detail while
-`016/017-portability` finishes rehoming release/update semantics behind the
-host-neutral stack-control surface.
+through `plugins/stack-control/bin/stackctl release-check`. The portable helper
+subcommands also live behind `plugins/stack-control/bin/stackctl release-helper
+...`. The older `.claude/skills/release/` flow is now only a host adapter over
+that shared implementation.
 
 Until that work lands fully:
 

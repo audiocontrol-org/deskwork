@@ -17,6 +17,16 @@ Start with the shared-core check:
 plugins/stack-control/bin/stackctl release-check
 ```
 
+The portable helper subcommands also live behind `stackctl` now:
+
+```bash
+plugins/stack-control/bin/stackctl release-helper check-preconditions
+plugins/stack-control/bin/stackctl release-helper validate-version <version> <last-tag>
+plugins/stack-control/bin/stackctl release-helper assert-not-published <version>
+plugins/stack-control/bin/stackctl release-helper assert-published <version>
+plugins/stack-control/bin/stackctl release-helper atomic-push <tag> <branch>
+```
+
 This is the authoritative preflight for portability:
 
 1. It verifies the shipped monorepo artifacts remain in lockstep.
@@ -27,9 +37,9 @@ This is the authoritative preflight for portability:
 ## Current migration state
 
 The historical operator procedure still lives in
-[`/.claude/skills/release/`](../../../.claude/skills/release/) while
-`017-portability` rehomes the release helpers behind stack-control-owned
-surfaces. Treat that Claude-owned path as legacy implementation detail, not the
+[`/.claude/skills/release/`](../../../.claude/skills/release/), but its helper
+implementation is now a compatibility wrapper over the stack-control-owned
+release helper module. Treat the Claude-owned path as a host adapter, not the
 portable source of truth.
 
 ## Adapter rule

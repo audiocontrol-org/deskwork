@@ -13,7 +13,7 @@ Pass `--skip-publish-wait` when the operator handled publish manually via `make 
 
 ## Pre-1.0 maturity stance
 
-This skill pushes directly to `origin/main` (no PR-merge, no CI gate). Deliberate pre-1.0 velocity choice. Revisit at 1.0 stabilization — see `RELEASING.md` § "Maturity stance" and the JSDoc on `atomicPush` in `lib/release-helpers.ts`.
+This skill pushes directly to `origin/main` (no PR-merge, no CI gate). Deliberate pre-1.0 velocity choice. Revisit at 1.0 stabilization — see `RELEASING.md` § "Maturity stance" and the JSDoc on `atomicPush` in the portable `stackctl release-helper` implementation.
 
 ## Steps for the agent
 
@@ -21,7 +21,7 @@ The agent invokes the helper subcommands listed below and surfaces operator prom
 
 ### Pause 1 — Precondition + version
 
-1. Run: `tsx .claude/skills/release/lib/release-helpers.ts check-preconditions`
+1. Run: `plugins/stack-control/bin/stackctl release-helper check-preconditions`
 2. If exit code is non-zero, surface the failure list and abort. Operator must fix the underlying state and re-run.
 3. If exit code is 0, surface the report (HEAD, relative-to-origin/main, working-tree state, tracking-remote state, last release tag). Then prompt:
 
@@ -30,7 +30,7 @@ The agent invokes the helper subcommands listed below and surfaces operator prom
    >
    ```
 
-4. Validate via: `tsx .claude/skills/release/lib/release-helpers.ts validate-version <version> <last-release-tag>`
+4. Validate via: `plugins/stack-control/bin/stackctl release-helper validate-version <version> <last-release-tag>`
 5. On non-zero, surface the stderr reason and abort. Operator re-runs with a corrected version.
 
 ### Pause 2 — Post-bump diff review
@@ -57,7 +57,7 @@ Publish is no longer a Pause-3 manual step. `.github/workflows/publish-npm.yml` 
 1. Verify no package is already at the new version (catches the "version already published" case before the tag goes out — npm rejects the workflow's publish step otherwise):
 
    ```
-   tsx .claude/skills/release/lib/release-helpers.ts assert-not-published <version>
+   plugins/stack-control/bin/stackctl release-helper assert-not-published <version>
    ```
 
 2. On non-zero exit: surface stderr (lists which package(s) are already at `<version>`) and abort. The chore-release commit stays in place. Operator must bump to a new version (`git reset --soft HEAD~1`, then re-run `/release` with a new version) — npm forbids republishing the same version.
@@ -84,7 +84,7 @@ Publish is no longer a Pause-3 manual step. `.github/workflows/publish-npm.yml` 
 
    ```
    About to run:
-     tsx .claude/skills/release/lib/release-helpers.ts atomic-push v<version> <current-branch>
+     plugins/stack-control/bin/stackctl release-helper atomic-push v<version> <current-branch>
 
    This pushes (in one --follow-tags RPC):
      - HEAD (<sha>) → origin/main
@@ -102,14 +102,14 @@ Publish is no longer a Pause-3 manual step. `.github/workflows/publish-npm.yml` 
    >
    ```
 
-4. On `y`: `tsx .claude/skills/release/lib/release-helpers.ts atomic-push v<version> <current-branch>`.
+4. On `y`: `plugins/stack-control/bin/stackctl release-helper atomic-push v<version> <current-branch>`.
 
 5. On push success: wait for npm visibility, then smoke locally (skip both when `--skip-publish-wait` was passed):
 
    **5a. Assert all three packages reach npm:**
 
    ```
-   tsx .claude/skills/release/lib/release-helpers.ts assert-published <version>
+   plugins/stack-control/bin/stackctl release-helper assert-published <version>
    ```
 
    The helper polls `npm view @deskwork/<pkg>@<version>` with retry-with-backoff (initial 5s, exponential to 30s cap, 6 attempts, ~2-min total). This rides out npm's CDN propagation lag between the workflow's publish step accepting the PUT and the read API seeing the new version. The skill does NOT poll the GH Action — npm visibility is the ground truth for "publish succeeded."
@@ -144,7 +144,7 @@ When the `publish-npm.yml` workflow fails (npm outage, OIDC misconfiguration, tr
    ```
 2. **Nothing published yet** (workflow failed before publish step): the chore-release commit + tag are still local-only IF you haven't pushed yet. If you HAVE pushed, the tag is on origin but no npm artifacts ship. Revert the bump commit (`git reset --soft HEAD~1`), fix the underlying issue, re-run `/release`.
 3. **Partial publish** (e.g. core succeeded, cli failed mid-flight): the safest path is to bump to v<next-patch> + re-run `/release`. The half-published version stays orphaned on npm (npm forbids republishing the same version anyway). Document the orphaned version in the release notes.
-4. **All three published, but assert-published or smoke failed locally** (substeps 5a/5b): the workflow's publish step succeeded; the gate that failed is the operator's local verification. If assert-published failed: re-run it manually (`tsx .claude/skills/release/lib/release-helpers.ts assert-published <ver>`); CDN propagation usually resolves within 1-2 minutes of publish. If smoke failed: read the smoke log tail, identify the broken route/asset, file an issue. The artifacts are on npm and adopters will get them — only the gate behind a known-good ship blocked.
+4. **All three published, but assert-published or smoke failed locally** (substeps 5a/5b): the workflow's publish step succeeded; the gate that failed is the operator's local verification. If assert-published failed: re-run it manually (`plugins/stack-control/bin/stackctl release-helper assert-published <ver>`); CDN propagation usually resolves within 1-2 minutes of publish. If smoke failed: read the smoke log tail, identify the broken route/asset, file an issue. The artifacts are on npm and adopters will get them — only the gate behind a known-good ship blocked.
 5. **Manual publish flow** (used during recovery OR for one-off out-of-band publishes):
    ```
    make publish      # token-auth, prompts for 2FA OTP per package
@@ -162,7 +162,7 @@ The `--skip-publish-wait` flag is the recovery escape hatch: pass it when the op
 
 ## Helper subcommands
 
-All helpers live in `.claude/skills/release/lib/release-helpers.ts` and are invoked via tsx:
+The shared release helpers now live behind `plugins/stack-control/bin/stackctl release-helper`:
 
 | Subcommand | Purpose | Exit codes |
 |---|---|---|

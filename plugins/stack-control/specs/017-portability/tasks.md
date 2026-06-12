@@ -34,11 +34,11 @@ description: "Task list for portability — portable stack-control workflow acro
 
 **⚠️ CRITICAL**: No host-specific front-door or release portability work should proceed until this seam exists and is tested.
 
-- [ ] T004 [P] RED: add shared-core portability contract tests in `plugins/stack-control/src/__tests__/` for front-door invocation ownership, host limitation fail-loud behavior, and backlog abstraction invariants.
+- [X] T004 [P] RED: add shared-core portability contract tests in `plugins/stack-control/src/__tests__/` for front-door invocation ownership, host limitation fail-loud behavior, and backlog abstraction invariants.
 - [X] T005 [P] RED: add release portability tests covering lockstep monorepo release invariants and same-version distribution semantics.
 - [X] T006 Implement or tighten the shared-core portability seam in `plugins/stack-control/src/subcommands/` so workflow behavior is owned by `stackctl`.
 - [X] T007 Implement or tighten the backlog abstraction seam in `plugins/stack-control/src/backlog/` so backend details are hidden from the stable workflow contract.
-- [ ] T008 Rehome or wrap release orchestration behind a host-neutral surface while preserving current lockstep semantics.
+- [X] T008 Rehome or wrap release orchestration behind a host-neutral surface while preserving current lockstep semantics.
 
 **Checkpoint**: Shared portability contract exists; host adapters can now bind to it.
 
@@ -52,8 +52,8 @@ description: "Task list for portability — portable stack-control workflow acro
 
 ### Tests for User Story 1 ⚠️
 
-- [ ] T009 [P] [US1] RED: add Claude Code adapter invocation tests for front-door parity in `plugins/stack-control/src/__tests__/`.
-- [ ] T010 [P] [US1] RED: add Codex adapter invocation tests for front-door parity in `plugins/stack-control/src/__tests__/`.
+- [X] T009 [P] [US1] RED: add Claude Code adapter invocation tests for front-door parity in `plugins/stack-control/src/__tests__/`.
+- [X] T010 [P] [US1] RED: add Codex adapter invocation tests for front-door parity in `plugins/stack-control/src/__tests__/`.
 
 ### Implementation for User Story 1
 
@@ -61,7 +61,7 @@ description: "Task list for portability — portable stack-control workflow acro
 - [X] T012 [US1] Refactor `plugins/stack-control/skills/extend/SKILL.md` to rely on the shared-core contract instead of Claude-specific assumptions.
 - [X] T013 [US1] Refactor `plugins/stack-control/skills/execute/SKILL.md` to rely on the shared-core contract instead of Claude-specific assumptions.
 - [X] T014 [US1] Add or update Codex-facing workflow adapter assets for the front door in the appropriate stack-control host-facing surface.
-- [ ] T015 [US1] Verify shared-core front-door behavior remains host-neutral and fail-loud on explicit host limitations.
+- [X] T015 [US1] Verify shared-core front-door behavior remains host-neutral and fail-loud on explicit host limitations.
 
 **Checkpoint**: Front door is usable from Claude Code and Codex without manual translation.
 
@@ -75,7 +75,7 @@ description: "Task list for portability — portable stack-control workflow acro
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T016 [P] [US2] RED: add backlog workflow tests proving backend invisibility and stack-control error translation in `plugins/stack-control/src/__tests__/`.
+- [X] T016 [P] [US2] RED: add backlog workflow tests proving backend invisibility and stack-control error translation in `plugins/stack-control/src/__tests__/`.
 - [X] T017 [P] [US2] RED: add documentation/contract tests or assertions preventing required user-facing `backlog.md` references where the stable contract should hide them.
 
 ### Implementation for User Story 2
@@ -96,12 +96,12 @@ description: "Task list for portability — portable stack-control workflow acro
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T021 [P] [US3] RED: add parity-verdict tests showing adapter tests assert invocation/presentation only and reject adapter-only business logic.
+- [X] T021 [P] [US3] RED: add parity-verdict tests showing adapter tests assert invocation/presentation only and reject adapter-only business logic.
 
 ### Implementation for User Story 3
 
-- [ ] T022 [US3] Introduce or refine portability verification helpers in `plugins/stack-control/src/__tests__/` for shared-core vs adapter responsibility boundaries.
-- [ ] T023 [US3] Update portability-facing docs to make the shared-core/adapter split explicit for future feature work.
+- [X] T022 [US3] Introduce or refine portability verification helpers in `plugins/stack-control/src/__tests__/` for shared-core vs adapter responsibility boundaries.
+- [X] T023 [US3] Update portability-facing docs to make the shared-core/adapter split explicit for future feature work.
 
 **Checkpoint**: Future portability work has a mechanical parity guardrail.
 
@@ -120,7 +120,7 @@ description: "Task list for portability — portable stack-control workflow acro
 
 ### Implementation for User Story 4
 
-- [ ] T026 [US4] Rehome or wrap `.claude/skills/release/` helpers behind the host-neutral release surface identified in T008.
+- [X] T026 [US4] Rehome or wrap `.claude/skills/release/` helpers behind the host-neutral release surface identified in T008.
 - [X] T027 [US4] Add Codex-consumable install/update path documentation and contract wiring tied to the same release version line.
 - [X] T028 [US4] Update `.agents/skills/release/SKILL.md` and any relevant stack-control or repo docs to point at the portable release contract.
 
@@ -152,9 +152,9 @@ description: "Task list for portability — portable stack-control workflow acro
 
 **Purpose**: Final documentation, verification, and regression cleanup across all stories.
 
-- [ ] T033 [P] Run the quickstart scenarios in `specs/017-portability/quickstart.md` and record results.
-- [ ] T034 [P] Update `CLAUDE.md` managed plan pointer and any active portability references once implementation planning is complete.
-- [ ] T035 Review remaining Claude-only wording, host-coupled release/backlog references, or stale deprecated-workflow references in stack-control docs and remove or scope them deliberately.
+- [X] T033 [P] Run the quickstart scenarios in `specs/017-portability/quickstart.md` and record results.
+- [X] T034 [P] Update `CLAUDE.md` managed plan pointer and any active portability references once implementation planning is complete.
+- [X] T035 Review remaining Claude-only wording, host-coupled release/backlog references, or stale deprecated-workflow references in stack-control docs and remove or scope them deliberately.
 
 ---
 

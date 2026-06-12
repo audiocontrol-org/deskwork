@@ -47,6 +47,7 @@ export function createRig(opts: RigOptions = {}): Rig {
     execSync(cmd, { cwd: localPath, stdio: ['pipe', 'pipe', 'pipe'] }).toString();
   sh(`git config user.email "rig@example.com"`);
   sh(`git config user.name "Rig User"`);
+  sh(`git config commit.gpgsign false`);
   writeFileSync(join(localPath, 'README.md'), '# rig\n');
   sh(`git add README.md`);
   sh(`git commit -m "${initialMessage}"`);

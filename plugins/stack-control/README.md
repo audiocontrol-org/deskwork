@@ -12,6 +12,19 @@ tool authored or executed the plan.
 
 `stack-control` (CLI `stackctl`; brand: stackcontrol.org) is the **successor to `dw-lifecycle`**, built alongside it via absorb-then-retire: keepers move out of `dw-lifecycle` into `stack-control` over successive features, and `dw-lifecycle` is retired once `stack-control` reaches parity. It is developed without destabilizing `dw-lifecycle`, which stays in active use until then.
 
+## Shared Core
+
+`stackctl` is the authoritative shared core. Host-facing assets for Claude Code
+and Codex are adapters over that core:
+
+- adapters may change prompt phrasing and in-host ergonomics
+- adapters must not own business logic, validation rules, or release semantics
+- when a host cannot support a required step, the adapter fails loudly instead
+  of inventing a workaround path
+
+For portability work, add behavior to `stackctl` first, then let the host
+surfaces expose it.
+
 ## Status
 
 In development — the **front door** (Feature 1) is the self-hosting bootstrap: author / refine / run a Spec Kit spec in-session, with governance firing automatically after native execution. Per-release notes on the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases).
