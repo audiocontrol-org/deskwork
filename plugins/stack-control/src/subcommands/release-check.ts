@@ -27,6 +27,7 @@ export async function runReleaseCheck(args: string[]): Promise<void> {
     'portable release: stack-control distribution channels ' +
       `claude-plugin=${state.stackControlDistributions.claudePluginVersion}, ` +
       `codex-plugin=${state.stackControlDistributions.codexPluginVersion}, ` +
-      `claude-marketplace=${state.stackControlDistributions.claudeMarketplaceVersion}\n`,
+      `claude-marketplace=${state.stackControlDistributions.claudeMarketplaceVersion}, ` +
+      `codex-marketplace=${state.stackControlDistributions.codexMarketplaceName}\n`,
   );
 }

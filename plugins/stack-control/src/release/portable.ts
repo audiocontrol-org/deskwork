@@ -8,6 +8,7 @@ export type ReleaseArtifactKind =
   | 'claude-plugin'
   | 'codex-plugin'
   | 'claude-marketplace'
+  | 'codex-marketplace'
   | 'extension-manifest';
 
 export interface ReleaseArtifact {
@@ -24,6 +25,7 @@ export interface PortableReleaseState {
     readonly claudePluginVersion: string;
     readonly codexPluginVersion: string;
     readonly claudeMarketplaceVersion: string;
+    readonly codexMarketplaceName: string;
   };
 }
 
@@ -66,6 +68,44 @@ function readMarketplaceVersion(repoRoot: string, pluginName: string): string {
     throw new Error(`release-check: missing marketplace version for plugin '${pluginName}' in ${path}`);
   }
   return match.version;
+}
+
+function readCodexMarketplaceEntry(
+  repoRoot: string,
+  pluginName: string,
+): { marketplaceName: string; pluginPath: string } {
+  const path = resolve(repoRoot, '.agents/plugins/marketplace.json');
+  const parsed = readJson(path);
+  if (typeof parsed.name !== 'string' || parsed.name === '') {
+    throw new Error(`release-check: missing marketplace name in ${path}`);
+  }
+  const plugins = parsed.plugins;
+  if (!Array.isArray(plugins)) {
+    throw new Error(`release-check: missing plugins[] in ${path}`);
+  }
+  const match = plugins.find(
+    (entry): entry is Record<string, unknown> =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      typeof entry.name === 'string' &&
+      entry.name === pluginName,
+  );
+  if (match === undefined) {
+    throw new Error(`release-check: missing Codex marketplace entry for plugin '${pluginName}' in ${path}`);
+  }
+  const source = match.source;
+  if (typeof source !== 'object' || source === null) {
+    throw new Error(`release-check: missing source object for Codex marketplace entry '${pluginName}' in ${path}`);
+  }
+  if (source.source !== 'local' || source.path !== './plugins/stack-control') {
+    throw new Error(
+      `release-check: Codex marketplace entry '${pluginName}' in ${path} must point at ./plugins/stack-control`,
+    );
+  }
+  return {
+    marketplaceName: parsed.name,
+    pluginPath: String(source.path),
+  };
 }
 
 function readExtensionVersion(path: string): string {
@@ -150,6 +190,15 @@ const RELEASE_ARTIFACTS: readonly ReleaseArtifactSpec[] = [
     readVersion: (repoRoot) => readMarketplaceVersion(repoRoot, 'stack-control'),
   },
   {
+    name: 'stack-control codex marketplace entry',
+    path: '.agents/plugins/marketplace.json#plugins[name=stack-control]',
+    kind: 'codex-marketplace',
+    readVersion: (repoRoot) => {
+      readCodexMarketplaceEntry(repoRoot, 'stack-control');
+      return readJsonVersion(resolve(repoRoot, 'plugins/stack-control/.codex-plugin/plugin.json'));
+    },
+  },
+  {
     name: 'spec-governance extension manifest',
     path: 'plugins/stack-control/spec-kit/spec-governance/extension.yml',
     kind: 'extension-manifest',
@@ -179,6 +228,7 @@ export function collectPortableReleaseState(repoRoot: string = DEFAULT_REPO_ROOT
   const claudeMarketplaceVersion = artifacts.find(
     (artifact) => artifact.kind === 'claude-marketplace',
   )!.version;
+  const codexMarketplaceName = readCodexMarketplaceEntry(repoRoot, 'stack-control').marketplaceName;
   return {
     canonicalVersion,
     artifacts,
@@ -186,6 +236,7 @@ export function collectPortableReleaseState(repoRoot: string = DEFAULT_REPO_ROOT
       claudePluginVersion,
       codexPluginVersion,
       claudeMarketplaceVersion,
+      codexMarketplaceName,
     },
   };
 }
@@ -204,4 +255,3 @@ export function verifyPortableReleaseState(artifacts: readonly ReleaseArtifact[]
   }
   return canonicalVersion;
 }
-

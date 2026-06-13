@@ -36,6 +36,8 @@ Feature docs live in the deskwork repo:
 
 ## Install
 
+### Claude Code
+
 Claude Code consumes the released plugin through the deskwork marketplace (pin
 to a tag from the releases page):
 
@@ -50,10 +52,39 @@ For local development against this workspace, point Claude Code at the plugin di
 claude --plugin-dir plugins/stack-control
 ```
 
-Codex consumes the same plugin version line through the plugin-local Codex
-manifest at [`plugins/stack-control/.codex-plugin/plugin.json`](./.codex-plugin/plugin.json).
-That Codex surface points at the same `skills/` tree and is versioned in
-lockstep with the monorepo release and the Claude marketplace entry.
+### Codex
+
+Codex adopters consume the same released plugin version line through the
+deskwork Codex marketplace published at
+[`/.agents/plugins/marketplace.json`](../../.agents/plugins/marketplace.json).
+Register the released Git marketplace snapshot once, then install the plugin
+from that marketplace:
+
+```bash
+codex plugin marketplace add audiocontrol-org/deskwork@<release-tag> \
+  --sparse .agents/plugins \
+  --sparse plugins/stack-control
+codex plugin add stack-control@deskwork
+```
+
+The marketplace source is pinned to a released Git ref, so Codex adopters
+consume released plugin artifacts rather than mutable `main`. Use a release tag
+from the GitHub releases page, for example `v0.45.0`.
+
+To move to a newer released version, replace the marketplace snapshot with the
+next release tag and reinstall:
+
+```bash
+codex plugin marketplace remove deskwork
+codex plugin marketplace add audiocontrol-org/deskwork@<next-release-tag> \
+  --sparse .agents/plugins \
+  --sparse plugins/stack-control
+codex plugin add stack-control@deskwork
+```
+
+For local development against this workspace, the repo-local Codex manifest
+still exists at [`plugins/stack-control/.codex-plugin/plugin.json`](./.codex-plugin/plugin.json),
+but that is the maintainer path, not the adopter distribution story.
 
 ## Front-door skills
 
@@ -88,7 +119,7 @@ The deterministic primitive the skills call (`bin/stackctl <verb>`, in-tree Type
 | `stackctl backlog list` | Read-only: list each item's id + status + type (a tier distinct from `ROADMAP.md`). |
 | `stackctl backlog import-github [--apply]` | One-time, idempotent snapshot of open GitHub issues → `imported-issue` items (backlinked `gh-<n>`, labels + body carried). GitHub never mutated; dry-run by default; fail-loud on a missing/unauthenticated `gh`. |
 | `stackctl backlog import-slush --feature <slug> [--apply]` | One-time backfill of existing `acknowledged-slush-pile` audit-log entries → `migrated-finding` items; rewrites each to `migrated-to-backlog <task-id>`. HIGHs never migrated; idempotent; dry-run by default. |
-| `stackctl release-check [--json]` | Read-only portable release contract check. Verifies the monorepo's shipped artifacts remain on one version line and that the stack-control Claude marketplace and Codex plugin distributions consume the same release. |
+| `stackctl release-check [--json]` | Read-only portable release contract check. Verifies the monorepo's shipped artifacts remain on one version line and that the stack-control Claude marketplace, Codex plugin manifest, and Codex adopter marketplace wiring resolve to the same release line. |
 
 ## Document primitives
 

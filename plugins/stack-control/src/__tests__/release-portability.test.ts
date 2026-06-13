@@ -10,6 +10,7 @@ describe('portable release contract', () => {
     expect(state.stackControlDistributions.claudePluginVersion).toBe(state.canonicalVersion);
     expect(state.stackControlDistributions.codexPluginVersion).toBe(state.canonicalVersion);
     expect(state.stackControlDistributions.claudeMarketplaceVersion).toBe(state.canonicalVersion);
+    expect(state.stackControlDistributions.codexMarketplaceName).toBe('deskwork');
   });
 
   it('fails loud on version drift instead of tolerating host-specific release streams', () => {
@@ -41,5 +42,6 @@ describe('portable release contract', () => {
     expect(stdout).toContain('portable release: lockstep version');
     expect(stdout).toContain('codex-plugin=');
     expect(stdout).toContain('claude-marketplace=');
+    expect(stdout).toContain('codex-marketplace=deskwork');
   });
 });

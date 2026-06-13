@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/017-portability/plan.md
-Verification scenarios and implemented portability evidence live in:
-specs/017-portability/quickstart.md
+specs/019-codex-adopter-distribution/plan.md
+Verification scenarios and implemented Codex distribution evidence live in:
+specs/019-codex-adopter-distribution/quickstart.md
 <!-- SPECKIT END -->

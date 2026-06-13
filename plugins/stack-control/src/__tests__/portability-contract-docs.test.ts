@@ -47,4 +47,14 @@ describe('portability-facing docs and skills', () => {
     expect(read('skills/release/SKILL.md')).toContain('stackctl release-check');
     expect(read('skills/release/SKILL.md')).toContain('Codex');
   });
+
+  it('publishes adopter-facing Codex marketplace metadata and install guidance', () => {
+    expect(readRepo('.agents/plugins/marketplace.json')).toContain('"name": "deskwork"');
+    expect(readRepo('.agents/plugins/marketplace.json')).toContain('"name": "stack-control"');
+    expect(readRepo('.agents/plugins/marketplace.json')).toContain('"path": "./plugins/stack-control"');
+    expect(read('README.md')).toContain('codex plugin marketplace add');
+    expect(read('README.md')).toContain('codex plugin add stack-control@deskwork');
+    expect(read('README.md')).toContain('codex plugin marketplace remove deskwork');
+    expect(read('README.md')).toContain('For local development against this workspace');
+  });
 });
