@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-06-13: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 0
+  - (no commits this session)
+- Files changed: 0
+- Backlog touched: (none)
+
 ## 2026-06-12: installation-isolation executed + governed to OPEN; v0.44.0 merged in and reconciled
 
 **Goal:** Execute the installation-isolation spec end-to-end through `/stack-control:execute` (six stories: the isolation invariant, uniform refusal, govern anchoring, cwd-independence, legacy detection + this repo's migration, Spec Kit relocation), let governance fire and converge; then bring origin/main (v0.44.0 — the parallel barrage-reliability 014 + audit-protocol-convergence 015 line) into the branch and reconcile the two anchor models.
