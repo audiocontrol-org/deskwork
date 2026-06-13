@@ -1,50 +1,90 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+# design-control Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Process-Enforced Discipline
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+The project assumes agents are capable-but-unreliable. Quality is enforced by
+processes, governed artifacts, and fail-loud tools rather than by advisory
+reminders. Any workflow change MUST prefer mechanical enforcement in
+stack-control verbs, skills, or deterministic checks over host-specific tribal
+knowledge.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Orchestrate Existing Engines
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+design-control MUST orchestrate existing engines rather than invent new visual
+verification engines. `/frontend-design` is the engine for authoring concerns.
+The referee MUST reuse the stack-control audit-barrage and existing pixel-diff
+tools rather than shipping a bespoke runtime comparison engine.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. Spirit-Letter Separation
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+UX spirit and visual letter are separate artifacts and MUST stay separate. The
+wireframe is the durable lo-fi UX artifact. The design-language spec is the
+durable visual-language artifact. A wireframe MUST NOT become the source of
+visual styling truth, and visual identity MUST NOT depend on disposable mockup
+detail.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. Scaffold-First, Engine-Optional Authoring
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+The `v1-scaffold` path MUST remain usable with zero referee dependency and zero
+required engine presence. Wireframes and design-language specs MUST be
+hand-authorable. Any engine-backed authoring step is an optional accelerator,
+never a scaffold prerequisite. Engine absence MUST fail loudly only on
+engine-execution paths, while manual authoring paths remain usable.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### V. Fail-Loud, Evidence-First Verification
+
+No silent fallbacks, fabricated verdicts, or hidden state. Missing inputs,
+malformed manifests, unresolvable selectors, absent engines, and invalid
+capture contracts MUST fail with actionable errors. Verification claims MUST be
+backed by concrete artifacts, adversarial evidence, or deterministic tests, not
+by narrative assurance.
+
+### VI. Stochastic Correctness and Registered Discoveries
+
+Cross-model agreement is the design-review signal when the referee is in play.
+New leakage classes, drift patterns, or adoption gaps discovered during work
+MUST be codified into deterministic tests and the stack-control scope-discovery
+catalogs rather than left in prose or memory.
+
+## Additional Constraints
+
+- TypeScript is strict; `any`, unchecked `as`, and `@ts-ignore` are forbidden.
+- Files should stay within the repo's 300-500 line guidance unless a narrower
+  split would reduce clarity.
+- Enforcement lives in skills and CLI verbs, never git hooks.
+- `v1-scaffold` and `v1-referee-preview` are separate deliverables; scaffold
+  acceptance MUST NOT depend on referee-preview artifacts.
+- The plugin-local stack-control installation under `plugins/design-control/`
+  is the authority for roadmap, inbox, backlog, journal, tooling feedback, and
+  feature audit logs.
+- Codex and Claude are both first-class operator hosts for this installation.
+  Host guidance may differ in wording, but governed behavior MUST resolve
+  through the same stack-control and Spec Kit artifacts.
+
+## Workflow and Quality Gates
+
+- Session bootstrap and wrap-up use stack-control session workflows for this
+  installation.
+- Spec Kit chain order is preserved: specify, clarify, plan, checklist, tasks,
+  analyze, implement.
+- `/speckit-analyze` is read-only and MUST be treated as a real gate: critical
+  issues are resolved before implementation proceeds.
+- Implementation is TDD-shaped: failing tests first, then minimal
+  implementation, then refactor.
+- Work surfaced mid-session is captured in the local stack-control backlog
+  unless it is upstream tooling friction that belongs in a tool repo issue.
+- Adopter-facing claims require direct evidence in this installation or in the
+  shipped plugin artifacts; implied portability claims are not enough.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution governs the design-control stack-control installation and
+supersedes conflicting local habits or stale template content. Amendments
+require an explicit committed edit to this file plus corresponding updates to
+any affected spec, plan, tasks, or workflow guidance. Analyze and implement
+steps MUST treat constitution conflicts as defects in the governed artifacts,
+not as optional interpretation.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2026-06-13 | **Last Amended**: 2026-06-13
