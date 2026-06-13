@@ -47,7 +47,7 @@ and the active plugin-local Spec Kit feature under `plugins/stack-control/specs/
 4. Update or close GitHub issues as appropriate.
 5. Commit documentation changes.
 
-Use `.agents/skills/session-end/`.
+Use `plugins/stack-control/skills/session-end/`.
 
 ## Feature Lifecycle
 
