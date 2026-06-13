@@ -44,4 +44,33 @@ describe('dw-lifecycle isolation from the rehomed governance extension (T028 / V
       existsSync(join(repoRoot, 'plugins', 'dw-lifecycle', 'spec-kit', 'deskwork-governance')),
     ).toBe(false);
   });
+
+  // specs/015-audit-protocol-convergence — T035 (FR-012, succession isolation):
+  // this feature's convergence work lives ENTIRELY in stack-control; the
+  // dw-lifecycle barrage copy is not touched. A git-diff-against-a-base check is
+  // brittle (a stale base SHA fails to resolve in a fresh clone — the
+  // refactor-preconditions lesson), so the durable form is: dw-lifecycle's
+  // runtime must never reference any of this feature's NEW stack-control modules.
+  // A re-introduced reference (coupling) fails this test, not a code review.
+  it('dw-lifecycle does not reference any 015 convergence module (FR-012 isolation)', () => {
+    const present = RUNTIME_DIRS.filter((d) => existsSync(join(repoRoot, d)));
+    expect(present.length).toBeGreaterThan(0);
+    const NEW_015_MODULES = [
+      'cluster-severity',
+      'adjudicate-findings',
+      'convergence-loop',
+      'convergence-types',
+      'incremental-audit',
+      'audit-unit-types',
+    ].join('|');
+    const r = spawnSync('grep', ['-rnE', NEW_015_MODULES, ...present], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    if (r.status === 0) {
+      throw new Error(`dw-lifecycle references a stack-control 015 module:\n${r.stdout}`);
+    }
+    expect(r.status).toBe(1);
+    expect(r.stdout).toBe('');
+  });
 });

@@ -1,0 +1,36 @@
+{
+  "name": "stack-control",
+  "version": "0.45.2",
+  "description": "Provider-agnostic control plane for spec-driven development across Claude Code and Codex.",
+  "author": {
+    "name": "audiocontrol.org",
+    "url": "https://github.com/audiocontrol-org/deskwork"
+  },
+  "homepage": "https://github.com/audiocontrol-org/deskwork/tree/main/plugins/stack-control",
+  "repository": "https://github.com/audiocontrol-org/deskwork",
+  "license": "GPL-3.0-or-later",
+  "keywords": [
+    "stack-control",
+    "spec-kit",
+    "governance",
+    "claude-code",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Stack Control",
+    "shortDescription": "Portable spec-driven workflow control plane",
+    "longDescription": "Use stack-control to define, extend, execute, govern, and manage backlog and release workflows through a shared CLI-first core across Claude Code and Codex.",
+    "developerName": "audiocontrol.org",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/audiocontrol-org/deskwork/tree/main/plugins/stack-control",
+    "defaultPrompt": [
+      "Use stack-control to drive define, extend, execute, govern, backlog, or release workflow steps"
+    ],
+    "brandColor": "#1F5C4A"
+  }
+}

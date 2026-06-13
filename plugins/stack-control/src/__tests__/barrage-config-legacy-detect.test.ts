@@ -31,12 +31,23 @@ const LEGACY_BODY = [
   '',
 ].join('\n');
 
+// specs/015+014 merge: the stack-control OVERRIDE must be a valid v2 lane (my-014's
+// config grammar — model pin + read-only + derivation pair). The LEGACY dw-lifecycle
+// file stays v1: it is only PROBED for existence to fire the ignored-config notice,
+// never parsed for loading, so its grammar is irrelevant. (The pre-merge fixture was
+// v1 and tripped the v2 validator before the legacy-notice path completed.)
 const OVERRIDE_BODY = [
   'models:',
   '  - name: override-model',
   '    binary: override-bin',
-  '    args_template: "-p {{prompt}}"',
-  '    timeout_seconds: 120',
+  '    model: override-pin',
+  '    args_template: "-p --model {{model}} --permission-mode plan {{prompt-stdin}}"',
+  '    readonly_enforcement: "--permission-mode plan"',
+  '    output_mode: stream-json',
+  '    liveness_signal: stdout',
+  '    liveness_window_seconds: 60',
+  '    timeout_floor_seconds: 300',
+  '    timeout_secs_per_kb: 13',
   '',
 ].join('\n');
 

@@ -22,7 +22,7 @@ import { tmpBacklog } from '../../tests/backlog/helpers.js';
 //                                    real slush+gate see a converged history.
 function writeStubBarrage(dir: string): string {
   const stub = join(dir, 'stub-barrage.sh');
-  // The lift appends to the audit-log resolved from --repo-root + --feature.
+  // The lift appends to the audit-log resolved from --at + --feature.
   // We resolve the feature dir the same way the real verbs do: docs/1.0/...
   const body = [
     '#!/usr/bin/env bash',
@@ -31,7 +31,7 @@ function writeStubBarrage(dir: string): string {
     'repo=""; feature=""; output=""',
     'while [ "$#" -gt 0 ]; do',
     '  case "$1" in',
-    '    --repo-root) repo="$2"; shift 2 ;;',
+    '    --at) repo="$2"; shift 2 ;;',
     '    --feature) feature="$2"; shift 2 ;;',
     '    --output) output="$2"; shift 2 ;;',
     '    --output-run-dir) shift ;;',
@@ -69,6 +69,11 @@ function writeStubBarrage(dir: string): string {
 
 function makeRepo(slug: string): string {
   const repo = mkdtempSync(join(tmpdir(), 'gov-orch-'));
+  // The repo is a stack-control INSTALLATION (specs/installation-isolation):
+  // the retired-flag verbs the protocol spawns (slush-findings) resolve it
+  // via the marker walk-up from the threaded --at start dir.
+  mkdirSync(join(repo, '.stack-control'), { recursive: true });
+  writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
   mkdirSync(dir, { recursive: true });
   // Seed an audit-log so lift/slush/gate can resolve it.
@@ -94,7 +99,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     writeFileSync(spec, 'A spec under audit.\n');
     try {
       const r = runGovern(
-        ['--mode', 'spec', '--feature', 'feat', '--repo-root', repo, '--spec-path', spec],
+        ['--mode', 'spec', '--feature', 'feat', '--at', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-a') },
       );
       expect(`${r.stdout}${r.stderr}`).toMatch(/may graduate|OPEN/);
@@ -109,7 +114,15 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     const repo = makeRepo('feat');
     const fx = mkdtempSync(join(tmpdir(), 'gov-stub-'));
     const stub = writeStubBarrage(fx);
-    // implement mode needs a git tree for the diff base.
+    // implement mode needs a git tree for the diff base — and substantive
+    // source files: the fixture is an installation now (marker above), so
+    // the implement-mode clone step actually runs jscpd here, and jscpd v4
+    // only writes its JSON report when it analyzed at least one real file.
+    mkdirSync(join(repo, 'src'), { recursive: true });
+    for (const n of [0, 1]) {
+      const lines = Array.from({ length: 30 }, (_, i) => `export const v${n}_${i} = ${i} * ${n + 2};`);
+      writeFileSync(join(repo, 'src', `f${n}.ts`), `${lines.join('\n')}\n`, 'utf8');
+    }
     const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
     git(['init', '-q']);
     git(['config', 'user.email', 't@e.com']);
@@ -118,7 +131,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     git(['commit', '-q', '-m', 'seed']);
     try {
       const r = runGovern(
-        ['--mode', 'implement', '--feature', 'feat', '--repo-root', repo, '--diff-base', 'HEAD'],
+        ['--mode', 'implement', '--feature', 'feat', '--at', repo, '--diff-base', 'HEAD'],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-b') },
       );
       expect(`${r.stdout}${r.stderr}`).toMatch(/governed|OPEN/);
@@ -164,7 +177,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     writeFileSync(spec, 'A spec under audit.\n');
     try {
       const r = runGovern(
-        ['--mode', 'spec', '--feature', 'feat', '--repo-root', repo, '--spec-path', spec],
+        ['--mode', 'spec', '--feature', 'feat', '--at', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-slush') },
       );
       expect(r.status).toBe(0);
@@ -189,7 +202,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     writeFileSync(spec, 'A spec under audit.\n');
     try {
       const r = runGovern(
-        ['--mode', 'spec', '--feature', 'feat', '--repo-root', repo, '--spec-path', spec],
+        ['--mode', 'spec', '--feature', 'feat', '--at', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-c'), STUB_OUTAGE: '1' },
       );
       expect(r.status).toBe(2);
@@ -213,7 +226,7 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     writeFileSync(spec, 'spec\n');
     try {
       const r = runGovern(
-        ['--mode', 'spec', '--feature', '', '--repo-root', repo, '--spec-path', spec],
+        ['--mode', 'spec', '--feature', '', '--at', repo, '--spec-path', spec],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-d') },
       );
       expect(r.status).toBe(2);

@@ -1,10 +1,18 @@
 # dw-lifecycle
 
+> **RETIRED.** `dw-lifecycle` has been superseded by [`stack-control`](../stack-control/). No further development will happen here. Install `stack-control` instead:
+>
+> ```
+> /plugin install stack-control@deskwork
+> ```
+>
+> This plugin is preserved in the monorepo for historical reference. Skills still load but are no longer maintained.
+
 Project lifecycle orchestration plugin for [Claude Code](https://claude.com/claude-code). Drives a managed-project feature through the full arc — **define → setup → issues → implement → review/audit → ship → complete** — by composing two canonical Anthropic-shipped plugins (`superpowers` for process disciplines, `feature-dev` for specialist agents) instead of duplicating the practices they embody. The plugin owns the project-management substrate the canonical layer doesn't cover: PRD/workplan/README scaffolding, status-organized docs under `docs/<version>/<status>/<slug>/`, GitHub issue patterns, branch + worktree conventions, session journal lifecycle, and feature-local audit logs.
 
 ## Status
 
-Shipping. Per-release notes on the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases).
+**Retired.** Superseded by `stack-control`. Per-release notes on the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases).
 
 Design and workplan live in the deskwork repo:
 
@@ -386,4 +394,4 @@ GPL-3.0-or-later. See the monorepo `LICENSE`.
 
 ---
 
-Status: Shipping. Per-release notes on the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases).
+Status: **Retired.** Superseded by `stack-control`. Per-release notes on the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases).

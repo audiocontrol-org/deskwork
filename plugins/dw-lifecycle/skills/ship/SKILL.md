@@ -1,7 +1,6 @@
 ---
-name: ship
-description: "Verify acceptance criteria; open PR; stop at PR creation (operator owns merge)"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:ship
 

@@ -1,0 +1,20 @@
+{
+  "name": "deskwork",
+  "interface": {
+    "displayName": "Deskwork"
+  },
+  "plugins": [
+    {
+      "name": "stack-control",
+      "source": {
+        "source": "local",
+        "path": "./plugins/stack-control"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

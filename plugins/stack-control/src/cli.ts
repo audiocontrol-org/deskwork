@@ -8,6 +8,7 @@
 //   - --help/-h/help → usage to stdout, exit 0
 //   - no flag silently ignored (each subcommand validates its own flags)
 
+import { setInstallationNoticeVerb } from './config/installation.js';
 import { runVersion } from './subcommands/version.js';
 import { runExecuteCheck } from './subcommands/execute-check.js';
 import { runSpecCheck } from './subcommands/spec-check.js';
@@ -48,6 +49,9 @@ import { runScopeInventory } from './subcommands/scope-inventory.js';
 import { runScopeWiden } from './subcommands/scope-widen.js';
 import { runSessionStartCli } from './subcommands/session-start.js';
 import { runSessionEndCli } from './subcommands/session-end.js';
+import { runReleaseCheck } from './subcommands/release-check.js';
+import { runReleaseHelperCli } from './subcommands/release-helper.js';
+import { runConfigDomainCli } from './subcommands/config-domain.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -109,6 +113,10 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // Native session lifecycle skills (011 / session-skills).
   'session-start': runSessionStartCli,
   'session-end': runSessionEndCli,
+  'config-domain': runConfigDomainCli,
+  // Portable release/update contract checks (017 / portability).
+  'release-check': runReleaseCheck,
+  'release-helper': runReleaseHelperCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
@@ -136,6 +144,9 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
+  // The shared resolver's legacy half-installation notice carries the
+  // dispatched verb as its prefix (specs/installation-isolation US5).
+  setInstallationNoticeVerb(verb);
   await handler(args);
 }
 

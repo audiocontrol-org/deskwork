@@ -7,10 +7,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-11 03:53'
+updated_date: '2026-06-12 06:30'
 labels:
   - 'type:migrated-finding'
   - 'feature:audit-protocol-reliability'
   - 'finding:AUDIT-20260611-13'
+  - promoted
 dependencies: []
 references:
   - 'audit:audit-protocol-reliability:AUDIT-20260611-13'
@@ -18,4 +20,8 @@ priority: medium
 ordinal: 40000
 ---
 
+## Implementation Notes
 
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** tasks:specs/016-anchor-unification
+<!-- SECTION:NOTES:END -->

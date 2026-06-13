@@ -1,7 +1,6 @@
 ---
-name: check-anti-patterns
-description: "Scan the source tree for legacy shapes registered in anti-patterns.yaml and report findings"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:check-anti-patterns
 

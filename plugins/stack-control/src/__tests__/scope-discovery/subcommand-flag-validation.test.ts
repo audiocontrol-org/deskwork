@@ -52,3 +52,29 @@ describe('migrated subcommand flag validation (no flag silently ignored)', () =>
     }, 60_000);
   }
 });
+
+// specs/installation-isolation US1 (R2 — Clarification 2026-06-10): the
+// repo-root parameter is RETIRED on the state-writing verbs. A legacy
+// invocation passing the retired flag hits the verb's EXISTING
+// unknown-flag usage error (exit 2, stderr naming the flag) — loud per
+// the operator decision, never a silent acceptance that places state.
+// Explicit anchoring is expressed ONLY as `--at <dir>` (the installation
+// enclosing <dir>).
+const RETIRED_REPO_ROOT_VERBS = [
+  'audit-barrage',
+  'audit-barrage-lift',
+  'scope-widen',
+  'scope-inventory',
+  'slush-findings',
+];
+
+describe('retired --repo-root on state-writing verbs (installation-isolation R2)', () => {
+  for (const verb of RETIRED_REPO_ROOT_VERBS) {
+    it(`${verb} rejects --repo-root with the unknown-flag usage error`, () => {
+      const res = runCli([verb, '--repo-root', '/tmp']);
+      expect(res.status).toBe(2);
+      expect(res.stderr).toContain('--repo-root');
+      expect(res.stderr).toMatch(/unknown flag|unknown arg|unexpected argument/i);
+    }, 60_000);
+  }
+});

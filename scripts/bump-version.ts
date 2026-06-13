@@ -12,6 +12,7 @@
  *   - packages/{core,cli,studio}/package.json
  *   - plugins/{deskwork,deskwork-studio,dw-lifecycle,stack-control}/package.json
  *   - plugins/{deskwork,deskwork-studio,dw-lifecycle,stack-control}/.claude-plugin/plugin.json
+ *   - plugins/stack-control/.codex-plugin/plugin.json
  *   - .claude-plugin/marketplace.json (top-level metadata.version + each
  *     plugin entry's version)
  *
@@ -66,6 +67,7 @@ const MANIFESTS: readonly VersionedManifest[] = [
   { path: 'plugins/deskwork-studio/.claude-plugin/plugin.json', label: 'deskwork-studio plugin.json', kind: 'plugin-json' },
   { path: 'plugins/dw-lifecycle/.claude-plugin/plugin.json', label: 'dw-lifecycle plugin.json', kind: 'plugin-json' },
   { path: 'plugins/stack-control/.claude-plugin/plugin.json', label: 'stack-control plugin.json', kind: 'plugin-json' },
+  { path: 'plugins/stack-control/.codex-plugin/plugin.json', label: 'stack-control codex plugin.json', kind: 'plugin-json' },
   // Spec Kit extension manifest — lockstep with the monorepo. Wired here so the
   // next bump doesn't freeze it (AUDIT-20260607-13). A Vitest assertion
   // (hook-wiring.test.ts) turns any future drift into a red test, not silent rot.

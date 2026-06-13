@@ -168,12 +168,13 @@ import {
   verifyNpmStatus,
   verifyNpmStatusUntilPublished,
   DESKWORK_PACKAGES,
+  type NpmLookupResult,
   type NpmViewer,
 } from '../lib/release-helpers.js';
 
 describe('verifyNpmStatus', () => {
   it('reports all unpublished when viewer returns false for every spec', () => {
-    const viewer: NpmViewer = () => false;
+    const viewer: NpmViewer = () => ({ kind: 'unpublished' });
     const r = verifyNpmStatus('0.9.6', viewer);
     expect(r.version).toBe('0.9.6');
     expect(r.published).toEqual([]);
@@ -181,14 +182,15 @@ describe('verifyNpmStatus', () => {
   });
 
   it('reports all published when viewer returns true for every spec', () => {
-    const viewer: NpmViewer = () => true;
+    const viewer: NpmViewer = () => ({ kind: 'published' });
     const r = verifyNpmStatus('0.9.5', viewer);
     expect(r.published).toEqual([...DESKWORK_PACKAGES]);
     expect(r.unpublished).toEqual([]);
   });
 
   it('reports a mixed state when only some packages are published', () => {
-    const viewer: NpmViewer = (spec) => spec.startsWith('@deskwork/core@');
+    const viewer: NpmViewer = (spec) =>
+      spec.startsWith('@deskwork/core@') ? { kind: 'published' } : { kind: 'unpublished' };
     const r = verifyNpmStatus('0.9.6', viewer);
     expect(r.published).toEqual(['@deskwork/core']);
     expect(r.unpublished).toEqual(['@deskwork/cli', '@deskwork/studio']);
@@ -198,7 +200,7 @@ describe('verifyNpmStatus', () => {
     const seen: string[] = [];
     const viewer: NpmViewer = (spec) => {
       seen.push(spec);
-      return false;
+      return { kind: 'unpublished' };
     };
     verifyNpmStatus('0.9.6', viewer);
     expect(seen).toEqual([
@@ -211,7 +213,7 @@ describe('verifyNpmStatus', () => {
 
 describe('verifyNpmStatusUntilPublished', () => {
   it('returns on the first attempt when every spec is already visible', async () => {
-    const viewer: NpmViewer = () => true;
+    const viewer: NpmViewer = () => ({ kind: 'published' });
     const sleeps: number[] = [];
     const sleep = (ms: number) => {
       sleeps.push(ms);
@@ -229,9 +231,9 @@ describe('verifyNpmStatusUntilPublished', () => {
     const viewer: NpmViewer = (spec) => {
       if (spec.startsWith('@deskwork/studio@')) {
         probes += 1;
-        return probes >= 3;
+        return probes >= 3 ? { kind: 'published' } : { kind: 'unpublished' };
       }
-      return true;
+      return { kind: 'published' };
     };
     const sleeps: number[] = [];
     const sleep = (ms: number) => {
@@ -251,7 +253,7 @@ describe('verifyNpmStatusUntilPublished', () => {
   });
 
   it('caps backoff at maxBackoffMs', async () => {
-    const viewer: NpmViewer = () => false;
+    const viewer: NpmViewer = () => ({ kind: 'unpublished' });
     const sleeps: number[] = [];
     const sleep = (ms: number) => {
       sleeps.push(ms);

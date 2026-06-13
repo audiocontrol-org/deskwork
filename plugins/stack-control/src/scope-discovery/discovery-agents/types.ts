@@ -25,6 +25,12 @@ import { isPlainObject } from '../util/typeguards.js';
 export interface DiscoveryAgentInput {
   readonly featureSlug: string;
   readonly prdPath: string;
+  /**
+   * The codebase anchor every agent scans/reads against. Per
+   * specs/installation-isolation R1 the calling verb resolves this ONCE
+   * at entry (the nearest-enclosing installation root, or an explicitly
+   * named one) and threads it down — agents never re-derive placement.
+   */
   readonly repoRoot: string;
   /**
    * Module-root directory name (relative to repoRoot). Default `'src'`.

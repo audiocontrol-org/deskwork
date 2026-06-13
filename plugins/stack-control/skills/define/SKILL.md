@@ -24,7 +24,10 @@ Author a **new** Spec Kit spec through the stack-control front door (Feature 1, 
 
 ## Preconditions
 
-- You are in an interactive Claude Code session (the authoring chain drives the in-session agent — there is **no headless/batch CLI dependency**, by design; FR-006/007).
+- You are in an interactive coding-agent session whose host can drive the local
+  Spec Kit authoring chain for this installation (Claude Code and Codex are the
+  current portability targets; there is **no headless/batch CLI dependency**,
+  by design; FR-006/007).
 - The GitHub Spec Kit framework (`.specify/`) is present.
 
 ## Steps

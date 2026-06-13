@@ -1,7 +1,6 @@
 ---
-name: install-scope-discovery
-description: "Bootstrap .dw-lifecycle/scope-discovery/ in the adopting project; copy templates and seed empty registries"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:install-scope-discovery
 

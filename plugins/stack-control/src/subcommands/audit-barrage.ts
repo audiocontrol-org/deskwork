@@ -31,10 +31,13 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { loadAuditBarrageConfig } from '../scope-discovery/audit-barrage/config-loader.js';
+import { resolveCodebaseBoundary } from '../scope-discovery/codebase-boundary.js';
 import { orchestrateBarrage } from '../scope-discovery/audit-barrage/orchestrate-barrage.js';
+import { renderFleetReportLines } from '../scope-discovery/audit-barrage/run-artifacts.js';
 import {
+  computeFleetReport,
+  isLaneEnforced,
   isModelRunCovering,
   type BarrageInput,
   type BarrageResult,
@@ -57,7 +60,7 @@ const USAGE = [
   'Usage: stackctl audit-barrage',
   '    --feature <slug>',
   '    --prompt-file <path>',
-  '    [--repo-root <path>]',
+  '    [--at <dir>]',
   '    [--models <comma-list>]',
   '    [--require-models <n>]',
   '    [--quiet]',
@@ -69,8 +72,9 @@ const USAGE = [
   '--prompt-file <path>      Path to a file containing the audit prompt.',
   '                          Required — the prompt is the unit each CLI',
   '                          receives.',
-  '--repo-root <path>        Defaults to cwd. The run dir lands under',
-  '                          `<repo-root>/.stack-control/',
+  '--at <dir>                Resolve the installation enclosing <dir> instead',
+  '                          of the cwd. The run dir lands under',
+  '                          `<installation>/.stack-control/',
   '                          audit-runs/<timestamp>-<feature>/`.',
   '--models <comma-list>     Comma-separated subset of the configured models.',
   '                          Defaults to every model in the loaded config.',
@@ -102,7 +106,12 @@ const USAGE = [
  * names are caught downstream against the loaded config.
  */
 export interface ParsedFlags {
-  readonly repoRoot: string;
+  /**
+   * Walk-up start override (`--at <dir>`): resolve the installation
+   * enclosing <dir> instead of the cwd. `undefined` = walk up from the
+   * cwd (specs/installation-isolation R1/R2; `--repo-root` is RETIRED).
+   */
+  readonly at: string | undefined;
   readonly featureSlug: string;
   readonly promptFilePath: string;
   readonly modelNames: ReadonlyArray<string> | undefined;
@@ -138,7 +147,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
   let featureSlug: string | undefined;
   let promptFilePath: string | undefined;
   let inlinePrompt: string | undefined;
-  let repoRoot: string | undefined;
+  let at: string | undefined;
   let modelsCsv: string | undefined;
   let requireModelsRaw: string | undefined;
   let quiet = false;
@@ -161,7 +170,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
       flag === '--feature' ||
       flag === '--prompt-file' ||
       flag === '--prompt' ||
-      flag === '--repo-root' ||
+      flag === '--at' ||
       flag === '--models' ||
       flag === '--require-models'
     ) {
@@ -173,7 +182,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
       if (flag === '--feature') featureSlug = value;
       else if (flag === '--prompt-file') promptFilePath = value;
       else if (flag === '--prompt') inlinePrompt = value;
-      else if (flag === '--repo-root') repoRoot = value;
+      else if (flag === '--at') at = value;
       else if (flag === '--models') modelsCsv = value;
       else if (flag === '--require-models') requireModelsRaw = value;
       continue;
@@ -224,7 +233,7 @@ export function parseFlags(argv: ReadonlyArray<string>): ParseResult {
   return {
     ok: true,
     flags: {
-      repoRoot: repoRoot ?? process.cwd(),
+      at,
       featureSlug,
       promptFilePath,
       modelNames,
@@ -297,6 +306,36 @@ export function resolveModels(
 }
 
 /**
+ * specs/014 FR-004: the fire-time marking for a lane that runs without
+ * mechanical read-only enforcement (`readonly_enforcement: none`). The
+ * warning prints at spawn time, unconditionally — an unenforced lane's
+ * results carry mutation risk and the operator must know BEFORE triaging.
+ * Exported for tests.
+ */
+export function renderUnenforcedWarning(model: ModelConfig): string {
+  // AUDIT-20260611-19: a whitespace-only fragment (constructible only
+  // outside the config loader) also lands here via isLaneEnforced — name
+  // the actual shape rather than hardcoding the 'none' sentinel.
+  const reason =
+    model.readonlyEnforcement === 'none'
+      ? 'readonly_enforcement: none'
+      : 'readonly_enforcement is a whitespace-only fragment — injects zero argv tokens';
+  return (
+    `audit-barrage: ⚠ lane '${model.name}' runs write-UNENFORCED ` +
+    `(${reason}) — its spawn is not mechanically prevented ` +
+    `from mutating the repository; results carry mutation risk (FR-004)`
+  );
+}
+
+// NOTE (specs/015+014 merge): `deriveBarrageExitCode` was EXTRACTED to
+// audit-barrage-fleet.ts on main with a more evolved signature
+// `(run, requireModels, configuredFleetSize)` — the coverage gate PLUS the
+// --require-models floor (AUDIT-20260611-03). It is imported + re-exported above;
+// this branch's older inline 1-arg coverage-only version was dropped in favor of it.
+// `renderUnenforcedWarning` (014 FR-004, above) has no fleet-module equivalent and
+// stays inline.
+
+/**
  * Render the one-line stderr summary describing the run outcome.
  *
  * Per Phase 18 Task 5 (operator directive 2026-06-01): a 1-covering-
@@ -343,11 +382,26 @@ export async function auditBarrage(args: string[]): Promise<void> {
   }
 
   const flags = parsed.flags;
-  const repoRoot = resolve(flags.repoRoot);
+
+  // specs/installation-isolation US1 (R1): resolve the installation ONCE
+  // at verb entry; run-dirs + config reads derive from it. `--at <dir>`
+  // overrides the walk-up start point; cwd is only the default start
+  // (US4). No enclosing installation → fail loud (US2; no fallback
+  // write location).
+  let installationRoot: string;
+  try {
+    installationRoot = resolveCodebaseBoundary({
+      startDir: flags.at ?? process.cwd(),
+      explicitRoot: null,
+    }).installationRoot;
+  } catch (err) {
+    process.stderr.write(`audit-barrage: FATAL — ${errorMessage(err)}\n`);
+    process.exit(2);
+  }
 
   let config: Awaited<ReturnType<typeof loadAuditBarrageConfig>>;
   try {
-    config = await loadAuditBarrageConfig(repoRoot);
+    config = await loadAuditBarrageConfig(installationRoot);
   } catch (err) {
     process.stderr.write(`audit-barrage: ${errorMessage(err)}\n`);
     process.exit(2);
@@ -361,8 +415,20 @@ export async function auditBarrage(args: string[]): Promise<void> {
 
   const prompt = await loadPromptText(flags.promptFilePath);
 
+  // specs/014 FR-004: unenforced lanes are loud at fire time — printed
+  // regardless of --quiet (quiet suppresses the summary, never a safety
+  // marking). Warn-when-NOT-enforced via the shared `isLaneEnforced`
+  // predicate (AUDIT-20260611-19) so this loop and spawn-cli's enforcement
+  // derivation cannot diverge — a whitespace-only fragment lane is recorded
+  // `unenforced` downstream and must warn here too.
+  for (const model of resolution.models) {
+    if (!isLaneEnforced(model)) {
+      process.stderr.write(`${renderUnenforcedWarning(model)}\n`);
+    }
+  }
+
   const input: BarrageInput = {
-    repoRoot,
+    installationRoot,
     featureSlug: flags.featureSlug,
     prompt,
     models: resolution.models,
@@ -393,6 +459,15 @@ export async function auditBarrage(args: string[]): Promise<void> {
   }
   if (!flags.quiet) {
     process.stderr.write(`${renderSummaryLine(run)}\n`);
+  }
+  // specs/014 FR-007: a degraded fleet prints the fleet report at run end —
+  // unconditionally, so degradation is never hidden behind --quiet.
+  // AUDIT-20260611-15: a quorum-collapsed fleet (produced ≤ 1) prints it too,
+  // even when healthy — cross-model agreement was structurally impossible and
+  // that must be stated wherever agreement is reported.
+  const fleet = computeFleetReport(run.results);
+  if (fleet.produced < fleet.configured || fleet.quorumCollapsed) {
+    process.stderr.write(`${renderFleetReportLines(fleet).join('\n')}\n`);
   }
   process.exit(result.exitCode);
 }

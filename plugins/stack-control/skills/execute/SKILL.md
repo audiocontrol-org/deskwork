@@ -11,7 +11,10 @@ Run a Spec Kit spec through **native** `/speckit-implement` — driven by the in
 
 ## Preconditions
 
-- You are in an interactive Claude Code session (the execution path drives the in-session agent — there is **no headless/batch CLI dependency**, by design; FR-006).
+- You are in an interactive coding-agent session whose host can drive the local
+  Spec Kit execution chain for this installation (Claude Code and Codex are the
+  current portability targets; there is **no headless/batch CLI dependency**,
+  by design; FR-006).
 - The GitHub Spec Kit framework (`.specify/`) is present and the `deskwork-governance` extension is installed and enabled (`specify extension list`).
 
 ## Steps

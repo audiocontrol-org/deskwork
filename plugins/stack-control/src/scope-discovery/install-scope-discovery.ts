@@ -31,6 +31,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { InstallationError } from '../config/errors.js';
 import { resolveCodebaseBoundary } from './codebase-boundary.js';
 import { DEFAULT_SD_CONFIG_BODY } from './sd-config.js';
 import { errorMessage } from './util/typeguards.js';
@@ -217,7 +218,14 @@ export async function main(argv: readonly string[]): Promise<{ code: 0 | 2 }> {
     reportActions(result, opts.dryRun);
     return { code: 0 };
   } catch (err) {
-    process.stderr.write(`install-scope-discovery: ${errorMessage(err)}\n`);
+    // specs/installation-isolation US2: the no-installation refusal uses
+    // the uniform wording class (`<verb>: FATAL — …` + the resolver's
+    // start-dir + `stackctl setup` message).
+    const prefix =
+      err instanceof InstallationError && err.code === 'not-found'
+        ? 'FATAL — '
+        : '';
+    process.stderr.write(`install-scope-discovery: ${prefix}${errorMessage(err)}\n`);
     return { code: 2 };
   }
 }

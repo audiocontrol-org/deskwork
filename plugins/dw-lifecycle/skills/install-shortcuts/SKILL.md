@@ -1,7 +1,6 @@
 ---
-name: install-shortcuts
-description: "Install user-level slash-command shortcuts for /dw-lifecycle:* commands"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:install-shortcuts
 

@@ -124,7 +124,9 @@ export function filesystemSafeIsoTimestamp(date: Date): string {
  * suite — the controller doesn't call this directly.
  */
 export async function shortHashOfBlob(blob: Blob): Promise<string> {
-  const buf = await blob.arrayBuffer();
+  // Wrap in a same-realm Uint8Array view: under jsdom on Node 20 the blob's
+  // ArrayBuffer comes from another realm and fails webcrypto's brand check.
+  const buf = new Uint8Array(await blob.arrayBuffer());
   const digest = await crypto.subtle.digest('SHA-256', buf);
   const view = new Uint8Array(digest);
   let hex = '';

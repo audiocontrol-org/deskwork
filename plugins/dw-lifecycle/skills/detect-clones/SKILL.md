@@ -1,7 +1,6 @@
 ---
-name: detect-clones
-description: "Legacy alias for /dw-lifecycle:check-clones — runs the jscpd clone detector against the project"
----
+
+> **RETIRED.** `dw-lifecycle` has been superseded by `stack-control`. This skill is preserved for historical reference only and is no longer maintained. Use [stack-control](../../../stack-control/) skills instead.
 
 # /dw-lifecycle:detect-clones (legacy alias)
 

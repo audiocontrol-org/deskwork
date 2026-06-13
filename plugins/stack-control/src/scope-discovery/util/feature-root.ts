@@ -50,9 +50,10 @@
  * `root` undefined (the caller fails loud, naming both searched layouts).
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
+import { deriveDistinctGitToplevel } from './git-toplevel.js';
 
 export interface ResolveFeatureRootArgs {
   /**
@@ -93,7 +94,77 @@ export interface ResolveFeatureRootResult {
   readonly layout?: 'legacy-docs' | 'speckit';
 }
 
+// The git-toplevel derivation (an EXTERNAL anchor read from git's own
+// marker, specs/installation-isolation FR-004) lives in the shared
+// ./git-toplevel.js helper per AUDIT-20260611-04. It is used here only
+// to keep the transitional legacy spec locations read-resolvable (T015:
+// spec artifacts at the monorepo root while the installation sits below
+// it).
+
 export async function resolveFeatureRoot(
+  args: ResolveFeatureRootArgs,
+): Promise<ResolveFeatureRootResult> {
+  // Layer 1: the caller's base (the installation root under the isolation
+  // model). Layer 2 (only when layer 1 misses and `repoRoot` was
+  // supplied): the same two layouts at the derived git toplevel — the
+  // transitional legacy locations (T015; installation layers always win).
+  const primary = await resolveFeatureRootAt(args);
+  if (primary.root !== undefined || args.repoRoot === undefined) {
+    return primary;
+  }
+  const toplevel = deriveDistinctGitToplevel(args.repoRoot);
+  if (toplevel === null) return primary;
+  const legacy = await resolveFeatureRootAt({
+    repoRoot: toplevel,
+    slug: args.slug,
+  });
+  if (legacy.root === undefined) {
+    return {
+      root: undefined,
+      versionsChecked: [
+        ...primary.versionsChecked,
+        ...legacy.versionsChecked,
+      ],
+    };
+  }
+  return legacy;
+}
+
+/**
+ * True when `path` lies OUTSIDE the `installationRoot` subtree
+ * (AUDIT-20260611-10). Under the transitional cross-tree layout the
+ * two-layer resolver above can legitimately return a feature root at
+ * the derived git toplevel — outside the installation (FR-008's
+ * feature-anchor exemption). Verbs that WRITE under the feature root
+ * (scope-widen / scope-inventory evidence dirs, govern's cross-tree
+ * arm) use this predicate to announce that case once on stderr,
+ * mirroring govern's R4/SC-006 announce-once norm — sanctioned, never
+ * invisible.
+ *
+ * Realpath-tolerant on BOTH sides: git-derived paths carry the
+ * symlink-resolved spelling (macOS /var → /private/var) while the
+ * caller's installation root may carry the unresolved one — either
+ * argument may have either spelling (the `real()` pattern from
+ * payload-implement's assembleCrossTreeFeatureArm). Realpath failure
+ * falls back to the given spelling. An empty rel means the SAME
+ * directory — inside.
+ */
+export function isOutsideInstallation(
+  installationRoot: string,
+  path: string,
+): boolean {
+  const real = (p: string): string => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+  const rel = relative(real(installationRoot), real(path)).split(sep).join('/');
+  return rel === '..' || rel.startsWith('../');
+}
+
+async function resolveFeatureRootAt(
   args: ResolveFeatureRootArgs,
 ): Promise<ResolveFeatureRootResult> {
   // Per AUDIT-20260531-05: accept either `docsRoot` (the legacy
@@ -154,6 +225,35 @@ export async function resolveFeatureRoot(
  * skipped; the result is sorted for deterministic downstream output.
  */
 export async function discoverFeatureRoots(
+  repoRoot: string,
+): Promise<readonly string[]> {
+  // Union of the caller's base layer + the derived-toplevel legacy layer
+  // (T015), deduped by realpath so a base that IS the toplevel (or a
+  // symlinked variant) contributes each root once.
+  const bases = [repoRoot];
+  const toplevel = deriveDistinctGitToplevel(repoRoot);
+  if (toplevel !== null) bases.push(toplevel);
+
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const base of bases) {
+    for (const root of await discoverFeatureRootsAt(base)) {
+      let key: string;
+      try {
+        key = realpathSync(root);
+      } catch {
+        key = root;
+      }
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(root);
+    }
+  }
+  return out.sort();
+}
+
+/** Single-base enumeration (the pre-T015 body of discoverFeatureRoots). */
+async function discoverFeatureRootsAt(
   repoRoot: string,
 ): Promise<readonly string[]> {
   const out: string[] = [];

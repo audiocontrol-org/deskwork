@@ -5,16 +5,11 @@ description: "Interview the user to define a feature, then write a structured fe
 
 # Feature Define
 
-Do not create branches, worktrees, or docs directories here.
+DEPRECATED. Do not use the old repo-wide `.agents` feature workflow for new
+feature work in this repository.
 
-1. Interview for:
-   - problem statement
-   - proposed slug
-   - acceptance criteria
-   - out-of-scope items
-   - technical approach
-   - affected files/components
-   - dependencies and open questions
-2. Propose implementation phases with deliverables and acceptance criteria.
-3. Write the draft to `.agents/.tmp/feature-definition-<slug>.md`.
-4. Report the path and direct the next step to `feature-setup`.
+Use the stack-control front door instead:
+
+1. Author the feature through `plugins/stack-control/skills/define/SKILL.md`
+2. Keep the active spec under `plugins/stack-control/specs/`
+3. Continue through `extend` and `execute`

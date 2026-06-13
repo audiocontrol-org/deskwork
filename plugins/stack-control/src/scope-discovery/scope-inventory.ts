@@ -34,7 +34,11 @@ import {
   renderFindingCategoryReport,
 } from './synthesis-report.js';
 import { errorMessage } from './util/typeguards.js';
-import { resolveFeatureRoot } from './util/feature-root.js';
+import { resolveCodebaseBoundary } from './codebase-boundary.js';
+import {
+  isOutsideInstallation,
+  resolveFeatureRoot,
+} from './util/feature-root.js';
 import {
   extractAjvErrorsFromSynthesisMessage,
   isSchemaValidationError,
@@ -294,20 +298,35 @@ export async function scopeInventoryMain(
     return 2;
   }
 
+  // specs/installation-isolation US1/US2 (R1): resolve the installation
+  // ONCE at verb entry — cwd is only the default start of the walk-up;
+  // --at <dir> overrides the start point. No enclosing installation ->
+  // fail loud (no fallback location).
+  let installationRoot: string;
+  try {
+    installationRoot = resolveCodebaseBoundary({
+      startDir: opts.at ?? process.cwd(),
+      explicitRoot: null,
+    }).installationRoot;
+  } catch (err) {
+    process.stderr.write(`scope-inventory: FATAL — ${errorMessage(err)}\n`);
+    return 2;
+  }
+
   // specs/014 US7: resolve the feature root layout-aware (specs/NNN-slug
   // or legacy docs) — it anchors the default --prd-path/--out AND the
   // per-run evidence dirs.
   let featureRoot: string;
   try {
     const resolved = await resolveFeatureRoot({
-      repoRoot: opts.repoRoot,
+      repoRoot: installationRoot,
       slug: opts.featureSlug,
     });
     if (resolved.root === undefined) {
       process.stderr.write(
         `scope-inventory: FATAL — feature '${opts.featureSlug}' not found under ` +
-          `${resolve(opts.repoRoot, 'specs')}/<NNN>-${opts.featureSlug} (speckit) or ` +
-          `${resolve(opts.repoRoot, 'docs')}/*/001-IN-PROGRESS/${opts.featureSlug} (legacy-docs).\n`,
+          `${resolve(installationRoot, 'specs')}/<NNN>-${opts.featureSlug} (speckit) or ` +
+          `${resolve(installationRoot, 'docs')}/*/001-IN-PROGRESS/${opts.featureSlug} (legacy-docs).\n`,
       );
       return 2;
     }
@@ -316,17 +335,29 @@ export async function scopeInventoryMain(
     process.stderr.write(`scope-inventory: ${errorMessage(err)}\n`);
     return 2;
   }
+  // AUDIT-20260611-10: the inventory WRITES under the feature root (the
+  // default --out manifest, the per-run evidence dirs). Under the
+  // transitional cross-tree layout that root can resolve OUTSIDE the
+  // installation (FR-008's feature-anchor exemption) — announce it
+  // once, mirroring govern's R4/SC-006 announce-once norm; sanctioned,
+  // never invisible.
+  if (isOutsideInstallation(installationRoot, featureRoot)) {
+    process.stderr.write(
+      `scope-inventory: feature anchor outside the installation: ${featureRoot} ` +
+        `(designated anchor — artifacts land there)\n`,
+    );
+  }
   const prdPath = opts.prdPath ?? resolve(featureRoot, 'prd.md');
   const outPath = opts.outPath ?? resolve(featureRoot, 'scope-manifest.yaml');
 
   const input: DiscoveryAgentInput = {
     featureSlug: opts.featureSlug,
     prdPath,
-    repoRoot: opts.repoRoot,
+    repoRoot: installationRoot,
     moduleRoot: opts.moduleRoot,
   };
 
-  const activations = decideActivations(opts.repoRoot);
+  const activations = decideActivations(installationRoot);
   const skipNotes: string[] = [];
   const emitSkipNote = (msg: string): void => {
     skipNotes.push(msg);
@@ -359,9 +390,9 @@ export async function scopeInventoryMain(
       featureSlug: opts.featureSlug,
       findings: agents.map((a) => a.finding),
       prdPath,
-      prdRelPath: relative(opts.repoRoot, prdPath),
+      prdRelPath: relative(installationRoot, prdPath),
       moduleRoot: opts.moduleRoot,
-      repoRoot: opts.repoRoot,
+      repoRoot: installationRoot,
     });
     // Validation happened inside synthesize(); if we got here, the
     // manifest is schema-valid. Write the YAML to --out.
@@ -404,16 +435,16 @@ export async function scopeInventoryMain(
       const defaultPath =
         runDir !== null
           ? resolve(runDir, 'editor-symmetry.md')
-          : resolve(opts.repoRoot, PHASE4_GATE_FILES.moduleSymmetryArtifact);
+          : resolve(installationRoot, PHASE4_GATE_FILES.moduleSymmetryArtifact);
       const symmetryOut = opts.moduleSymmetryOut ?? defaultPath;
       const written = await writeModuleSymmetryArtifact({
-        repoRoot: opts.repoRoot,
+        repoRoot: installationRoot,
         moduleRoot: opts.moduleRoot,
         outPath: symmetryOut,
       });
       if (!opts.quiet) {
         process.stderr.write(
-          `scope-inventory: module-symmetry matrix at ${relative(opts.repoRoot, written)}\n`,
+          `scope-inventory: module-symmetry matrix at ${relative(installationRoot, written)}\n`,
         );
       }
     } else {
@@ -439,14 +470,14 @@ export async function scopeInventoryMain(
       await writeEvidenceTrail({ runDir, agents, notes, args: opts });
       if (!opts.quiet) {
         process.stderr.write(
-          `scope-inventory: evidence trail at ${relative(opts.repoRoot, runDir)}/\n`,
+          `scope-inventory: evidence trail at ${relative(installationRoot, runDir)}/\n`,
         );
       }
     }
 
     if (!opts.quiet) {
       process.stderr.write(
-        `scope-inventory: wrote ${relative(opts.repoRoot, outPath)} ` +
+        `scope-inventory: wrote ${relative(installationRoot, outPath)} ` +
           `(kind=${output.manifest.kind}, agents=${agents.length}, ` +
           `findings=${output.metadata.findingsCount}, ` +
           `warnings=${output.metadata.warnings.length})\n`,
