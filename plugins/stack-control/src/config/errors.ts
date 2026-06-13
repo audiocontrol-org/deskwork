@@ -11,7 +11,13 @@
 //   - collision    → two keys (or two installations) resolve to the same path
 //                    (FR-024) → setup exit 2 (config refusal).
 
-export type InstallationErrorCode = 'not-found' | 'invalid-config' | 'escape' | 'collision';
+export type InstallationErrorCode =
+  | 'not-found'
+  | 'invalid-config'
+  | 'escape'
+  | 'collision'
+  | 'ambiguous-domain'
+  | 'invalid-preference';
 
 export class InstallationError extends Error {
   readonly code: InstallationErrorCode;

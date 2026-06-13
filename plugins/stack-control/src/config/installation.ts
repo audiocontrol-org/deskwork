@@ -5,13 +5,15 @@
 // `startDir` is a plain directory (CLI cwd today, a client-supplied root later),
 // never a host-specific handle.
 
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve as resolvePath } from 'node:path';
 import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
 import { loadInstallationConfig } from './config-loader.js';
 import { resolvePaths } from './resolve-paths.js';
 import { InstallationError } from './errors.js';
 import type { Installation } from './types.js';
+import { discoverCandidateDomains } from './domain-discovery.js';
+import { readApplicableDomainPreference } from './domain-preference.js';
 
 /** The config marker, relative to an installation root. Its presence marks the root. */
 export const CONFIG_REL_PATH = join('.stack-control', 'config.yaml');
@@ -105,6 +107,8 @@ export function resolveInstallation(startDir: string): Installation {
     if (parent === dir) break; // filesystem root
     dir = parent;
   }
+  const discovered = resolveDiscoveredInstallation(start);
+  if (discovered !== null) return discovered;
   throw new InstallationError(
     'not-found',
     `no stack-control installation found from ${start} ` +
@@ -119,5 +123,49 @@ export function findInstallation(startDir: string): Installation | null {
   } catch (err) {
     if (err instanceof InstallationError && err.code === 'not-found') return null;
     throw err;
+  }
+}
+
+function resolveDiscoveredInstallation(startDir: string): Installation | null {
+  const candidates = discoverCandidateDomains(startDir);
+  if (candidates.length === 0) return null;
+
+  const pref = readApplicableDomainPreference(startDir);
+  if (pref !== null) {
+    const match = candidates.find((candidate) => samePath(candidate, pref.path));
+    if (match === undefined) {
+      throw new InstallationError(
+        'invalid-preference',
+        `stored ${pref.scope} config-domain preference ${pref.path} does not resolve ` +
+          `to a valid installation from ${startDir}. Candidates:\n  - ${candidates.join('\n  - ')}`,
+      );
+    }
+    return installationFromRoot(match);
+  }
+
+  if (candidates.length === 1) return installationFromRoot(candidates[0]!);
+
+  throw new InstallationError(
+    'ambiguous-domain',
+    `multiple stack-control installation domains found from ${startDir}:\n  - ${candidates.join(
+      '\n  - ',
+    )}\nchoose one with \`stackctl config-domain use <dir> --scope branch\` ` +
+      'or re-run the verb with `--at <dir>`',
+  );
+}
+
+function installationFromRoot(root: string): Installation {
+  const configPath = configPathFor(root);
+  const config = loadInstallationConfig(configPath);
+  const resolved = resolvePaths(root, config);
+  maybeEmitLegacyHalfInstallationNotice(root);
+  return { root, configPath, config, resolved };
+}
+
+function samePath(a: string, b: string): boolean {
+  try {
+    return realpathSync(a) === realpathSync(b);
+  } catch {
+    return false;
   }
 }
