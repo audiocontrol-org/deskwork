@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -537,6 +537,82 @@ describe('getSurfaceStatus', () => {
 
     expect(getSurfaceStatus(manifestPath).findings.map((item) => item.rule)).toContain('stale-surface-unmapped');
   });
+
+  it('rejects a symlinked artifact that escapes the collection root (AUDIT-20260614-16)', () => {
+    const collection = freshDir();
+    const outside = freshDir();
+    const outsideFile = join(outside, 'real.html');
+    writeFileSync(outsideFile, '<html><body><h1>Outside</h1></body></html>');
+    // A collection-relative-looking symlink whose target resolves outside the root.
+    symlinkSync(outsideFile, join(collection, 'surface.html'));
+
+    const manifestPath = writeManifest(collection, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex('wireframe') },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec') },
+      archive: { path: 'surface.archive.json' },
+    });
+
+    const result = getSurfaceStatus(manifestPath);
+    expect(result.complete).toBe(false);
+    expect(result.findings.map((item) => item.rule)).toContain('malformed-manifest');
+    expect(result.findings[0].message).toContain('must stay within the collection root');
+  });
+
+  it('returns a structured finding when the wireframe artifact is unreadable instead of crashing (AUDIT-20260614-15)', () => {
+    const dir = freshDir();
+    // existsSync is true but readFileSync throws (EISDIR) — simulates a concurrent
+    // replace/unreadable artifact between the presence check and the hash read.
+    mkdirSync(join(dir, 'surface.html'));
+    writeGreenSpec(dir);
+
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex('wireframe') },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(join(dir, 'design-language.md'), 'utf8')) },
+      archive: { path: 'surface.archive.json' },
+    });
+
+    const result = getSurfaceStatus(manifestPath);
+    expect(result.complete).toBe(false);
+    const wireframeFinding = result.findings.find((item) => item.rule === 'missing-wireframe');
+    expect(wireframeFinding?.message).toContain('could not be read');
+  });
+
+  it('returns a structured finding when the design spec is unreadable instead of crashing (AUDIT-20260614-15)', () => {
+    const dir = freshDir();
+    const wireframeHtml = '<html><body><h1>Wireframe</h1></body></html>';
+    writeFileSync(join(dir, 'surface.html'), wireframeHtml);
+    // existsSync true, readFileSync throws (EISDIR).
+    mkdirSync(join(dir, 'design-language.md'));
+
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec') },
+      archive: { path: 'surface.archive.json' },
+    });
+
+    const result = getSurfaceStatus(manifestPath);
+    expect(result.complete).toBe(false);
+    const specFinding = result.findings.find((item) => item.rule === 'missing-design-spec');
+    expect(specFinding?.message).toContain('could not be read');
+  });
 });
 
 describe('runDesignControlStatus', () => {
@@ -623,5 +699,23 @@ describe('runDesignControlStatus', () => {
     const { err, io } = capture();
     expect(runDesignControlStatus([manifestPath], io)).toBe(1);
     expect(err.join('\n')).toContain('must stay within the collection root');
+  });
+
+  it('returns 1 for a manifest using a Windows drive-rooted artifact path (AUDIT-20260614-12/-13)', () => {
+    const dir = freshDir();
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'C:\\Users\\surface.html', sha256: sha256Hex('wireframe') },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec') },
+      archive: { path: 'surface.archive.json' },
+    });
+    const { err, io } = capture();
+    expect(runDesignControlStatus([manifestPath], io)).toBe(1);
+    expect(err.join('\n')).toContain('collection-relative');
   });
 });

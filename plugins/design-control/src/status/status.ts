@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { loadArchiveEntry } from '@/archive/store';
 import { checkDesignSpecFile, type CliIo } from '@/design-language/check-spec-file';
@@ -144,9 +144,30 @@ function resolveAgainstManifest(manifestPath: string, target: string): string {
   return resolve(dirname(resolve(manifestPath)), target);
 }
 
+// Resolve symlinks on the deepest existing prefix of `absoluteTarget`, then
+// re-append the not-yet-existing remainder. This lets a not-yet-authored
+// artifact validate (its existing ancestors are realpath'd) while a symlink at
+// any existing level that escapes the collection root is followed and caught.
+function realpathOfExistingPrefix(absoluteTarget: string): string {
+  let current = absoluteTarget;
+  const trailing: string[] = [];
+  while (!existsSync(current)) {
+    const parent = dirname(current);
+    if (parent === current) {
+      return absoluteTarget;
+    }
+    trailing.unshift(basename(current));
+    current = parent;
+  }
+  const realBase = realpathSync(current);
+  return trailing.length === 0 ? realBase : join(realBase, ...trailing);
+}
+
 function assertWithinCollection(manifestPath: string, field: string, target: string): void {
-  const collectionRoot = dirname(resolve(manifestPath));
-  const absolute = resolveAgainstManifest(manifestPath, target);
+  // realpath the root too, so a collection living under a symlinked parent is
+  // compared on the same (resolved) basis as the realpath'd target.
+  const collectionRoot = realpathOfExistingPrefix(dirname(resolve(manifestPath)));
+  const absolute = realpathOfExistingPrefix(resolveAgainstManifest(manifestPath, target));
   const rel = relative(collectionRoot, absolute);
   if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) {
     return;
@@ -154,8 +175,17 @@ function assertWithinCollection(manifestPath: string, field: string, target: str
   throw new Error(`${field} must stay within the collection root; got ${JSON.stringify(target)}`);
 }
 
-function fileHashMatches(path: string, expectedSha256: string): boolean {
-  return sha256Hex(readFileSync(path, 'utf8')) === expectedSha256;
+type HashCheck = { readonly ok: true; readonly matches: boolean } | { readonly ok: false; readonly error: string };
+
+// Read-and-hash that never throws on an unreadable / concurrently-changed
+// artifact: a file that passes existsSync but fails to read (EISDIR, EACCES,
+// raced unlink) becomes a structured result, not an unhandled crash.
+function checkFileHash(path: string, expectedSha256: string): HashCheck {
+  try {
+    return { ok: true, matches: sha256Hex(readFileSync(path, 'utf8')) === expectedSha256 };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export function loadSurfaceStatusManifest(manifestPath: string): SurfaceStatusManifest {
@@ -194,18 +224,30 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
         `Accepted wireframe artifact missing at ${wireframePath}. Status cannot call the surface complete without it.`,
       ),
     );
-  } else if (!fileHashMatches(wireframePath, manifest.wireframe.sha256)) {
-    findings.push(
-      finding(
-        'missing-wireframe',
-        `Accepted wireframe at ${wireframePath} no longer matches the manifest sha256; refresh the artifact or manifest.`,
-      ),
-    );
   } else {
-    wireframeArtifactOk = true;
+    const wireframeHash = checkFileHash(wireframePath, manifest.wireframe.sha256);
+    if (!wireframeHash.ok) {
+      findings.push(
+        finding(
+          'missing-wireframe',
+          `Accepted wireframe at ${wireframePath} could not be read: ${wireframeHash.error}`,
+        ),
+      );
+    } else if (!wireframeHash.matches) {
+      findings.push(
+        finding(
+          'missing-wireframe',
+          `Accepted wireframe at ${wireframePath} no longer matches the manifest sha256; refresh the artifact or manifest.`,
+        ),
+      );
+    } else {
+      wireframeArtifactOk = true;
+    }
   }
 
   const specPath = resolveAgainstManifest(manifestPath, manifest.designSpec.path);
+  const specHash = existsSync(specPath) ? checkFileHash(specPath, manifest.designSpec.sha256) : null;
+  let specResult: ReturnType<typeof checkDesignSpecFile> | null = null;
   if (!existsSync(specPath)) {
     findings.push(
       finding(
@@ -213,7 +255,14 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
         `Design-language spec missing at ${specPath}. Status cannot call the surface complete without it.`,
       ),
     );
-  } else if (!fileHashMatches(specPath, manifest.designSpec.sha256)) {
+  } else if (specHash && !specHash.ok) {
+    findings.push(
+      finding(
+        'missing-design-spec',
+        `Design-language spec at ${specPath} could not be read: ${specHash.error}`,
+      ),
+    );
+  } else if (specHash && !specHash.matches) {
     findings.push(
       finding(
         'missing-design-spec',
@@ -221,7 +270,18 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
       ),
     );
   } else {
-    const specResult = checkDesignSpecFile(specPath);
+    try {
+      specResult = checkDesignSpecFile(specPath);
+    } catch (error) {
+      findings.push(
+        finding(
+          'invalid-design-spec',
+          `Design-language spec at ${specPath} could not be analyzed: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+    }
+  }
+  if (specResult) {
     for (const specFinding of specResult.findings) {
       if (specFinding.rule === 'dead-link-file' || specFinding.rule === 'dead-link-selector') {
         findings.push(
@@ -341,7 +401,15 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
         );
         continue;
       }
-      if (!fileHashMatches(sourcePath, source.sha256)) {
+      const sourceHash = checkFileHash(sourcePath, source.sha256);
+      if (!sourceHash.ok) {
+        findings.push(
+          finding(
+            'stale-surface',
+            `Mapped source ${sourcePath} could not be read: ${sourceHash.error}`,
+          ),
+        );
+      } else if (!sourceHash.matches) {
         findings.push(
           finding(
             'stale-surface',
