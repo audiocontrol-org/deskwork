@@ -53,6 +53,18 @@ Follow the marketplace install path documented on the
 [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases) —
 the release list is the source of truth for the current tag.
 
+When you install only this plugin (a marketplace git-subdir clone of
+`plugins/design-control/`, with no monorepo `node_modules`), the `bin/` shims
+bootstrap their own runtime on first use: the first time you run any verb
+(`check-wireframe`, `check-design-spec`, `wireframe-provenance`,
+`design-control-status`), the shim runs `npm install` into the plugin's own
+`node_modules/` to fetch its runtime deps (`parse5`, `tsx`, `zod`), then
+dispatches. Subsequent runs skip the install — the shared resolver
+(`bin/_resolve-tsx.sh`) probes that every declared dep is present and only
+re-installs if one is missing. No separate setup step is required. (In the
+monorepo workspace, the shims resolve the hoisted `tsx` from an ancestor
+`node_modules/` and never install, mirroring the sibling plugins.)
+
 ## Development
 
 This plugin is an in-tree TypeScript workspace package
