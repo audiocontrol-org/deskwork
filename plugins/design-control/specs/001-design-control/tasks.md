@@ -41,7 +41,7 @@ verbatim in substance** — when they drift, the PRD wins.
 > ship **before** Phase 5 begins; that is what "ship the scaffold first" means. Phase 5 (referee) and
 > the Phase 6 referee arm are the gated, last-built track.
 
-## Phase 1 — Engine-adapter seam + lo-fi wireframe kit + allowlist lint (v1-scaffold)
+## Phase 1: Engine-adapter seam + lo-fi wireframe kit + allowlist lint (v1-scaffold)
 
 - [x] **Engine-adapter interface declaration + fail-loud preflight — FIRST, before any engine-
       consuming skill.** Declare the interface (`author-wireframe`, `translate-design-language`,
@@ -163,7 +163,7 @@ adversarial validator's leakage cases (incl. emoji-as-icon + `𝐌𝐚𝐭𝐡`-
 positive corpus** passes (not a single fixture); the engine-authored wireframe is constrained by the
 same lint; a `derived` artifact cannot be accepted without a recorded operator edit.
 
-## Phase 2 — Design-language spec convention (v1-scaffold)
+## Phase 2: Design-language spec convention (v1-scaffold)
 
 - [x] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
       do/don't), each rule linked to a live CSS file/class + ≥1 current example. The spec is a
@@ -206,7 +206,7 @@ rejects a rule with zero example references** (≥1 example per rule, structural
 **(accelerator, when present)** the `translate-design-language` skill produces a spec linked to live
 source and passes adapter conformance. Scaffold completion never depends on engine presence.
 
-## Phase 3 — Archive primitive + `design-control status` (v1-scaffold)
+## Phase 3: Archive primitive + `design-control status` (v1-scaffold)
 
 - [x] ACCEPTED/REJECTED exploration archive primitive (briefs + lo-fi wireframe visual; decision
       states/links: proposal, accepted wireframe, impl commit, rejected rationale, supersedes).
@@ -243,7 +243,7 @@ OR the workplan records an explicit operator-approved descope of stale-surface d
 dead-link gate ships either way). The two conditions (dead-link vs stale-surface) are separately
 testable.
 
-## Phase 4 — Referee-request manifest schema validation (v1-scaffold)
+## Phase 4: Referee-request manifest schema validation (v1-scaffold)
 
 - [ ] Referee-request manifest **schema**. **Scaffold-required** fields: surface id, route/state,
       viewport(s) desktop≥1280 + phone≤390, wireframe path+hash, spec path+version+hash, impl
@@ -262,7 +262,7 @@ referee-control field in malformed shape is rejected; a **scaffold-mode manifest
 referee-control fields is **accepted as valid** (the `v1-scaffold` "NO capture/baseline" boundary is
 preserved); a **referee-preview manifest** that omits a required referee field is rejected.
 
-## Phase 5 — `v1-referee-preview` evidence-spike (GATED; advisory only)
+## Phase 5: `v1-referee-preview` evidence-spike (GATED; advisory only)
 
 > **Per the PRD DESIGN AMENDMENT (2026-06-06): the referee is a cross-model audit-barrage**, not a
 > single Claude-vision shim. It REUSES the stack-control audit-barrage + audit-protocol (declared
@@ -329,7 +329,7 @@ oversized-dynamic-region are caught or escalated, and a **gross** design-languag
 or escalated. Until this set passes, referee output is optional evidence and no "catches these" claim
 ships.
 
-## Phase 6 — Dogfood + packaging
+## Phase 6: Dogfood + packaging
 
 > **Realizes the inversion:** the scaffold ship gate (plugin shell + scaffold arm) depends only on
 > Phases 1–4 and is intended to ship **before** Phase 5; the referee arm is the gated, last track.

@@ -71,6 +71,11 @@ catalogs rather than left in prose or memory.
   analyze, implement.
 - `/speckit-analyze` is read-only and MUST be treated as a real gate: critical
   issues are resolved before implementation proceeds.
+- Implementation phases MUST be governed incrementally: once a `tasks.md`
+  phase is completed, that phase's work MUST go through stack-control's
+  per-phase audit-barrage path before later phases proceed. Whole-feature
+  `after_implement` governance remains required, but it does not replace the
+  per-phase governance requirement.
 - Implementation is TDD-shaped: failing tests first, then minimal
   implementation, then refactor.
 - Work surfaced mid-session is captured in the local stack-control backlog

@@ -1,49 +1,66 @@
 # Audit-barrage model battery — override for the design-control nested
-# installation (plugins/design-control), seeded 2026-06-10 from the repo-root
-# override after run 20260611T062218157Z hit the fleet floor (claude timed out
-# at the plugin default's 300s on a governed-diff payload; gemini exited 1).
-# The two rationale blocks below are INHERITED from the root override —
-# originally measured on the graphical-entries audit cycle, kept because the
-# same evidence governs the model roster here (AUDIT-20260611-14).
+# installation (`plugins/design-control`).
 #
-# Overrides the plugin default at:
-#   plugins/stack-control/templates/audit-barrage-config.yaml
+# This installation pins an explicit two-lane default fleet:
+#   - codex / gpt-5.5
+#   - sonnet / claude-sonnet-4-6
+#
+# Rationale:
+# - design-control's constitution now requires per-phase governance before later
+#   phases proceed, so the fleet must be a durable local policy, not whatever
+#   ambient defaults happen to be configured in each CLI.
+# - the prior local override was pre-v2 and did not pin explicit models, which
+#   defeats the "persistent set of models" requirement and risks loader refusal
+#   as the barrage config contract evolves.
+# - opus is intentionally disabled here: current operator usage pressure makes
+#   the heavier Claude lane a poor default, and sonnet is materially faster on
+#   the smaller per-phase payloads this installation now requires.
+# - gemini remains disabled here until its CLI reliability and quota floor are
+#   restored; see the inherited notes below.
 #
 # Disabled gemini effective 2026-06-01 — gemini-cli was failing 94.1% of runs
 # (16 of 17 across the graphical-entries Phase 0 audit cycle) on two cascading
 # error modes: (1) ClassifierStrategy JSON-routing failures in
 # @google/gemini-cli-core/.../baseLlmClient.js#generateJson (retry exhaustion
 # on empty/unparsable JSON); (2) "exhausted your capacity on this model" API
-# quota errors after the routing failure. Stderrs captured under
-# audit-runs/*/stderr/gemini.txt show the consistent pattern. The audit-barrage
-# was effectively a 2/3 fleet (claude + codex) in practice; making that explicit
-# here so the orchestrator's "models attempted" count and the dampener counter
-# don't get polluted by a model that always fails.
+# quota errors after the routing failure. Re-enable only after sustained
+# upstream reliability and quota.
 #
-# Re-enable when the gemini-cli upstream fixes the JSON-mode routing
-# reliability OR our gemini account has sustained quota. See
-# https://github.com/audiocontrol-org/deskwork/issues (the LLM-CLI-failure
-# tooling-feedback context).
-
-# Phase 12 Task 8 (#397, 2026-06-04): migrated to {{prompt-stdin}} for
-# both active models. The argv path failed with spawn E2BIG on bootstrap
-# HEAD~N ranges; stdin delivery bypasses the OS per-arg limit. Phase 19's
-# verb path supports {{prompt-stdin}} since v0.32.1 (the cached v0.36.0
-# binary respects this override even though its own plugin default still
-# ships {{prompt}} until v0.37.0).
+# The explicit timeout overrides are retained from the earlier design-control
+# nested-installation override: this installation has already observed claude's
+# default 300 s budget timing out on governed payloads, and codex's 600 s
+# budget has been stable in practice.
 
 models:
-  # 2026-06-10 (specs/014 dogfood): claude 300 -> 900. The first
-  # governed run of specs/014 carried a 181KB diff prompt; claude timed
-  # out at 301s with zero bytes (run 20260611T023019180Z) and the new
-  # US1 floor (govern requires >= 2 emitting models) correctly refused
-  # the round. 300s was tuned for pre-protocol payload sizes. codex
-  # finished the same prompt in ~2 minutes; left at 300.
-  - name: claude
-    binary: claude
-    args_template: "-p {{prompt-stdin}}"
-    timeout_seconds: 900
   - name: codex
     binary: codex
-    args_template: "exec {{prompt-stdin}}"
+    model: gpt-5.5
+    args_template: "exec -m {{model}} --sandbox read-only {{prompt-stdin}}"
+    readonly_enforcement: "--sandbox read-only"
+    output_mode: text
+    liveness_signal: stderr
+    liveness_window_seconds: 60
     timeout_seconds: 600
+
+  - name: sonnet
+    binary: claude
+    model: claude-sonnet-4-6
+    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
+    readonly_enforcement: "--permission-mode plan"
+    output_mode: stream-json
+    liveness_signal: stdout
+    liveness_window_seconds: 60
+    timeout_seconds: 900
+
+  # gemini — deliberately disabled in this installation. Re-enable only after
+  # verifying CLI reliability, quota stability, and readonly enforcement for the
+  # specific account/environment used here.
+  # - name: gemini
+  #   binary: gemini
+  #   model: gemini-2.5-pro
+  #   args_template: "-m {{model}} {{prompt-stdin}}"
+  #   readonly_enforcement: none
+  #   output_mode: text
+  #   liveness_signal: none
+  #   timeout_floor_seconds: 300
+  #   timeout_secs_per_kb: 7
