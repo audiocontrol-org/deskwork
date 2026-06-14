@@ -2435,7 +2435,7 @@ _No findings surfaced — a clean barrage run over a healthy fleet (0 HIGH+, 0 M
 ### AUDIT-20260614-31 — Marketplace shell has no adopter bootstrap, so a fresh install can’t run its own verbs
 
 Finding-ID: AUDIT-20260614-31
-Status:     open
+Status:     fixed-c99d005b
 Severity:   high
 Per-lane:   codex-gpt5=high
 Decision:   single-model (gate-counted high)
@@ -2567,3 +2567,44 @@ The workplan marks the plugin shell complete and explicitly says it was “regis
 The blast radius is high because marketplace discoverability/installability is part of the stated ship gate. If the file exists elsewhere, it needs to be included in the audited change; otherwise add the marketplace registration and keep the workplan note aligned with the actual committed surface.
 
 **Disposition (wontfix-false-premise, 2026-06-14):** the registration DOES exist — `.claude-plugin/marketplace.json` at the REPO ROOT carries the `design-control` git-subdir entry (added in commit `bf6a11d2`, verified). The barrage's diff window is scoped to `plugins/design-control/`, so the repo-root manifest is simply outside the audited range (same scoping artifact as AUDIT-34/-36's "package-lock.json missing from audited diff" note). The workplan claim is accurate; no change needed.
+
+## 2026-06-14 — audit-barrage lift (20260614T225018669Z-design-control-after_clarify)
+
+### AUDIT-20260614-41 — Ancestor `node_modules` can silently satisfy the bootstrap probe, so adopter installs may run against unrelated dependency trees instead of the plugin’s own runtime
+
+Finding-ID: AUDIT-20260614-41 (codex-01 + codex-01; cross-model)
+Status:     override-backlog-TASK-36 (ancestor-vs-local distinction — same hardening family)
+Severity:   medium
+Per-lane:   codex=medium, codex-gpt5=high
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/design-control/bin/_resolve-tsx.sh:15-24,41-64,83-96; plugins/design-control/README.md:56-66
+
+`_dc_all_deps_resolve()` does not verify that `parse5`, `tsx`, and `zod` come from `plugins/design-control/node_modules`; it calls `createRequire("$PLUGIN_ROOT/package.json").resolve(...)`, which still follows Node’s normal upward `node_modules` walk. `_dc_find_tsx()` then also walks upward and accepts the first ancestor `node_modules/.bin/tsx`. In a sparse-clone or project-local install nested under some other Node project, an unrelated ancestor tree that happens to contain all three packages will make the probe pass and skip the advertised local bootstrap entirely.
+
+That matters because the shipped contract in [plugins/design-control/README.md](/Users/orion/work/deskwork-work/design-control/plugins/design-control/README.md:56) says first use bootstraps “the plugin’s own `node_modules/`” and later uses only skip when that runtime is already present. As written, the plugin can instead bind to arbitrary ancestor versions, including stale ones after a plugin upgrade, with no warning. The downstream blast radius is high because adopters can get silently wrong runtime selection rather than an explicit failure. A reasonable fix is to make the skip condition plugin-local: resolve/package-check under `$PLUGIN_ROOT/node_modules` only, or compare the resolved paths against `$PLUGIN_ROOT/node_modules/` before declaring the install complete.
+
+### AUDIT-20260614-42 — The Node resolver probe breaks on valid install paths containing a single quote
+
+Finding-ID: AUDIT-20260614-42
+Status:     fixed-d1c3fd24
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/design-control/bin/_resolve-tsx.sh:57-60; plugins/design-control/src/__tests__/authoring/adopter-bootstrap-shim.test.ts:70-72,198-203
+
+The dependency probe interpolates `$PLUGIN_ROOT` directly into a JavaScript single-quoted literal: `node -e "require('node:module').createRequire('$PLUGIN_ROOT/package.json').resolve('$_dc_dep')"`. If the plugin is installed under a path containing `'` (for example a home directory or project folder with an apostrophe), that inline script becomes syntactically invalid and every shim fails before bootstrap logic can do anything useful.
+
+This is a correctness defect, not just hygiene, because affected adopters cannot run any verb at all even though the filesystem path is valid. The current smoke test never exercises that case: both temp roots are created with fixed prefixes under `tmpdir()`, so the suite only covers quote-safe paths. The blast radius is medium because the failure is total for impacted users but path-shaped. The fix is straightforward: stop embedding raw paths into JS source. Pass the path through an environment variable or `process.argv`, then read it inside `node -e` without string-literal interpolation.
+
+### AUDIT-20260614-43 — Resolver comment embeds a parked bootstrap-gap disposition
+
+Finding-ID: AUDIT-20260614-43
+Status:     fixed-d1c3fd24
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/design-control/bin/_resolve-tsx.sh:28-32
+
+The resolver documents known bootstrap gaps, then parks them in a stack-control-wide backlog item: version-gated reinstall, transitive integrity, and concurrency locking. The audit prompt explicitly rejects this shape because it turns a known operational fragility into a future-management note inside the code artifact instead of either implementing the behavior or stating the shipped contract plainly.
+
+The blast radius is low because the current runtime behavior is fail-loud for many damaged installs, and the comment does not itself alter execution. Still, unattended agents reading this file can treat the named gaps as intentionally out of scope and preserve a fragile bootstrap path. A reasonable fix is to remove the backlog disposition from the code comment and keep only the bounded behavior contract, or encode the relevant checks in the resolver.
