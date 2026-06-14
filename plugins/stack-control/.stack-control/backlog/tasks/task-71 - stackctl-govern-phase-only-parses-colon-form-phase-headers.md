@@ -1,7 +1,7 @@
 ---
 id: TASK-71
 title: stackctl govern --phase only parses colon-form phase headers
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 01:39'
 updated_date: '2026-06-14 01:54'
@@ -62,4 +62,5 @@ Relevant files:
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** tasks:specs/021-audit-protocol-friction-burndown
+- **Resolved by 021 T022:** `PHASE_HEADER_RE` in `incremental-audit.ts` now accepts colon / dash / en-dash / em-dash / bare headers with a digit-led id guard. Covered by `src/__tests__/govern/govern-phase-header-grammar.test.ts` (incl. the `## Phase N — ...` em-dash repro). Pending verification in a formally-installed release.
 <!-- SECTION:NOTES:END -->

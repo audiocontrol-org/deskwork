@@ -44,7 +44,7 @@
 - [X] T007 [P] [US1] RED: add fixture tests proving a required phase cannot be skipped, and that stale checkpoints are rejected, in `plugins/stack-control/src/__tests__/govern/phase-checkpoints.test.ts`
 - [X] T008 [US1] Implement required-phase checkpoint enforcement in `plugins/stack-control/src/govern/incremental-audit.ts`
 - [X] T009 [US1] Wire checkpoint freshness validation into `plugins/stack-control/src/subcommands/govern.ts`
-- [ ] T010 [US1] RED→GREEN integration: prove whole-feature govern composes from required phase checkpoints instead of erasing them in `plugins/stack-control/src/__tests__/govern/govern-phase-composition.test.ts`
+- [X] T010 [US1] RED→GREEN integration: prove whole-feature govern composes from required phase checkpoints instead of erasing them in `plugins/stack-control/src/__tests__/govern/govern-phase-composition.test.ts`
 
 ---
 
@@ -56,7 +56,7 @@
 
 - [X] T011 [P] [US2] RED: add tests for prospective sizing recommendations in `plugins/stack-control/src/__tests__/govern/phase-boundary-sizing.test.ts`
 - [X] T012 [US2] Implement prospective boundary estimation in `plugins/stack-control/src/govern/phase-boundary-sizing.ts`
-- [ ] T013 [P] [US2] RED: add tests for actual payload measurement against fleet envelopes in `plugins/stack-control/src/__tests__/govern/actual-payload-fit.test.ts`
+- [X] T013 [P] [US2] RED: add tests for actual payload measurement against fleet envelopes in `plugins/stack-control/src/__tests__/govern/actual-payload-fit.test.ts`
 - [X] T014 [US2] Implement actual payload fit checks in `plugins/stack-control/src/govern/phase-boundary-sizing.ts` and `plugins/stack-control/src/govern/payload-implement.ts`
 - [X] T015 [US2] Wire `boundary-too-large` govern failure through `plugins/stack-control/src/subcommands/govern.ts`
 
@@ -82,12 +82,12 @@
 
 **Independent Test**: nested-installation, non-colon phase headers, and rename-heavy diffs resolve correctly.
 
-- [ ] T021 [P] [US4] RED: add tests for non-colon / richer phase headers in `plugins/stack-control/src/__tests__/govern/govern-phase-header-grammar.test.ts`
-- [ ] T022 [US4] Replace brittle phase parsing with authoritative boundary resolution in `plugins/stack-control/src/govern/incremental-audit.ts`
-- [ ] T023 [P] [US4] RED: add nested-installation and anchor-consistency tests spanning govern, slush, and backlog seams in `plugins/stack-control/src/__tests__/govern/govern-anchor-unification-021.test.ts`
-- [ ] T024 [US4] Complete one-anchor resolution across govern sub-steps in `plugins/stack-control/src/govern/protocol.ts` and related helper seams
-- [ ] T025 [P] [US4] RED: add rename / tree-move scope retention tests in `plugins/stack-control/src/__tests__/govern/govern-rename-scope.test.ts`
-- [ ] T026 [US4] Implement rename-aware payload scoping in `plugins/stack-control/src/govern/payload-implement.ts`
+- [X] T021 [P] [US4] RED: add tests for non-colon / richer phase headers in `plugins/stack-control/src/__tests__/govern/govern-phase-header-grammar.test.ts`
+- [X] T022 [US4] Replace brittle phase parsing with authoritative boundary resolution in `plugins/stack-control/src/govern/incremental-audit.ts`
+- [X] T023 [P] [US4] RED: add nested-installation and anchor-consistency tests spanning govern, slush, and backlog seams in `plugins/stack-control/src/__tests__/govern/govern-anchor-unification-021.test.ts`
+- [X] T024 [US4] Complete one-anchor resolution across govern sub-steps in `plugins/stack-control/src/govern/protocol.ts` and related helper seams (verified-satisfied + locked by the T023 regression test)
+- [X] T025 [P] [US4] RED: add rename / tree-move scope retention tests in `plugins/stack-control/src/__tests__/govern/govern-rename-scope.test.ts`
+- [X] T026 [US4] Implement rename-aware payload scoping in `plugins/stack-control/src/govern/payload-implement.ts`
 
 ---
 
@@ -97,16 +97,16 @@
 
 **Independent Test**: floor shortfall, negotiation failure, coverage degradation, and boundary-too-large each produce unique terminal reporting.
 
-- [ ] T027 [P] [US5] RED: add terminal-state reporting tests in `plugins/stack-control/src/__tests__/govern/govern-terminal-outcomes.test.ts`
-- [ ] T028 [US5] Extend `plugins/stack-control/src/subcommands/audit-barrage-fleet.ts` and `plugins/stack-control/src/subcommands/govern.ts` to surface explicit terminal outcomes
-- [ ] T029 [US5] Trim control-plane noise from remediation payloads in `plugins/stack-control/src/govern/protocol.ts`
+- [X] T027 [P] [US5] RED: add terminal-state reporting tests in `plugins/stack-control/src/__tests__/govern/govern-terminal-outcomes.test.ts` (graduated / blocked / negotiation-failed; boundary-too-large found structurally unreachable — see TASK-117)
+- [X] T028 [US5] Surface explicit machine-readable terminal outcomes (`govern: terminal-outcome=<kind>`) via `GovernTerminalKind` in `protocol.ts` + the emit sites in `plugins/stack-control/src/subcommands/govern.ts`
+- [X] T029 [US5] Trim control-plane noise (the `.stack-control/audit-runs` run-artifact dir) from remediation payloads via `resolveGovernExcludePaths` in `plugins/stack-control/src/subcommands/govern.ts` (TASK-57)
 
 ---
 
 ## Phase 8: Polish & Cross-Cutting
 
 - [X] T030 [P] Update quickstart validation evidence in `specs/021-audit-protocol-friction-burndown/quickstart.md`
-- [ ] T031 [P] Reconcile and close or re-scope linked backlog items touched by this feature
+- [X] T031 [P] Reconcile and close or re-scope linked backlog items touched by this feature (closed TASK-71 via T022, TASK-57 via T029; TASK-47 partially addressed by T026 and kept open for the cross-boundary residual; new findings TASK-116 hermetic-fixtures, TASK-117 boundary-too-large-unreachable)
 - [ ] T032 Run targeted Vitest suites plus the plugin test umbrella and record any pre-existing unrelated failures
 
 ## Dependencies & Execution Order

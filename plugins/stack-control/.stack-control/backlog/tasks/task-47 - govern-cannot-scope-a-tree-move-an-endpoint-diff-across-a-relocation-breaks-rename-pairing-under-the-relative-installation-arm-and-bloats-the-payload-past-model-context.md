@@ -26,4 +26,5 @@ Found at the installation-isolation after_implement governance pass: the feature
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** tasks:specs/021-audit-protocol-friction-burndown
+- **Partially addressed by 021 T026 (NOT fully resolved — stays open):** the committed + cross-tree diff arms now force `git diff --find-renames`, so an IN-SCOPE tree-move pairs as a rename (small payload) independent of the operator's `diff.renames` config — covered by `govern-rename-scope.test.ts`. The ORIGINAL repro here is harder: a relocation whose delete side lies OUTSIDE the `--relative` installation arm cannot be paired by `--find-renames` (git sees only the add endpoint within the scope). That residual — rename-pair across the installation boundary, or a payload-size FATAL with actionable advice — is still open.
 <!-- SECTION:NOTES:END -->
