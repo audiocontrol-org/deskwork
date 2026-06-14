@@ -12,20 +12,24 @@
 # Contract: the caller exports SHIM_NAME (for messages) and PLUGIN_ROOT, then
 # `. "$PLUGIN_ROOT/bin/_resolve-tsx.sh"`, then `resolve_tsx` sets $TSX.
 #
-# Skip signal — the AUTHORITATIVE runnability check (not a path-existence probe):
-#   Every declared runtime dep must RESOLVE via Node's own module resolution
-#   FROM $PLUGIN_ROOT. This is correct in BOTH environments without any
+# Skip signal — each declared runtime dep must RESOLVE via Node's own module
+#   resolution FROM $PLUGIN_ROOT. This is correct in BOTH environments without any
 #   "ancestor tsx == workspace" heuristic:
 #     - Monorepo workspace dev: hoisted deps resolve from $PLUGIN_ROOT via Node's
 #       upward node_modules lookup → probe passes → NO install, dispatch directly.
 #     - Adopter sparse-clone (incl. a stray-ancestor node_modules/.bin/tsx that
 #       does NOT carry parse5/zod): the plugin's own deps do NOT resolve →
 #       probe fails → local `npm install --omit=dev --workspaces=false`.
-#   A mere on-disk path probe ($PLUGIN_ROOT/node_modules/<dep>/package.json) is
-#   NOT sufficient: an interrupted first-run install can leave direct metadata +
-#   .bin/tsx while missing transitive packages, after which the next run would
-#   skip reinstall and dispatch into a broken tree. Node resolution proves the
-#   dep (and its transitive closure) is actually loadable.
+#   Honest scope of this check: it resolves each declared dep's ENTRY by name from
+#   $PLUGIN_ROOT. It is stronger than a bare on-disk path probe, but it does NOT
+#   prove the dep's full transitive closure is intact — a corrupted or interrupted
+#   install that leaves a resolvable entry but a damaged sub-tree is not detected
+#   here; it surfaces fail-loud when tsx is exec'd and the module load crashes.
+#   Likewise this is NOT version-aware: deps that resolve by name but are stale
+#   after a plugin upgrade are not reinstalled. Both are accepted bounded limits
+#   shared with the sibling plugin shims (stack-control); hardening the bootstrap
+#   (transitive-integrity / version-gated reinstall / concurrency lock) is tracked
+#   as a stack-control-wide backlog item, not a design-control-local mechanism.
 #
 # Declared runtime deps — keep in sync with package.json "dependencies".
 RUNTIME_DEPS="parse5 tsx zod"
@@ -47,9 +51,9 @@ _dc_find_tsx() {
 }
 
 # Probe whether every declared runtime dep RESOLVES via Node from $PLUGIN_ROOT.
-# Uses Node's own resolver (createRequire(...).resolve) so the check proves the
-# dep — and its transitive closure entry — is genuinely loadable, not merely
-# present on disk. Returns 0 only if ALL deps resolve.
+# Uses Node's own resolver (createRequire(...).resolve), which resolves each dep's
+# entry by name — stronger than an on-disk path check, but not a transitive-closure
+# integrity proof (see the header note). Returns 0 only if ALL deps resolve.
 _dc_all_deps_resolve() {
   for _dc_dep in $RUNTIME_DEPS; do
     if ! node -e "require('node:module').createRequire('$PLUGIN_ROOT/package.json').resolve('$_dc_dep')" >/dev/null 2>&1; then

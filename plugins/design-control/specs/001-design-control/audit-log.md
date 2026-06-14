@@ -2429,3 +2429,141 @@ Blast radius is high because status is the completion gate surface. A downstream
 ## 2026-06-14 — audit-barrage lift (20260614T201108363Z-design-control-after_clarify)
 
 _No findings surfaced — a clean barrage run over a healthy fleet (0 HIGH+, 0 MEDIUM, 0 total). Recorded so the convergence dampener counts it as a quiet run (claude-20260612-r3); a clean run that left no section was invisible to the consecutive-quiet / single-run-clean rules._
+
+## 2026-06-14 — audit-barrage lift (20260614T203837670Z-design-control-after_clarify)
+
+### AUDIT-20260614-31 — Marketplace shell has no adopter bootstrap, so a fresh install can’t run its own verbs
+
+Finding-ID: AUDIT-20260614-31
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/design-control/README.md:38-60; plugins/design-control/package.json:1-25; missing first-run/bootstrap surface for marketplace installs
+
+The new shell is documented as a deskwork marketplace plugin and its only adopter-facing install guidance is “follow the marketplace install path” in [plugins/design-control/README.md:50-54](/Users/orion/work/deskwork-work/design-control/plugins/design-control/README.md:50), while the same README says the shipped verbs dispatch through a `tsx`-based TypeScript core in [README.md:38-48](/Users/orion/work/deskwork-work/design-control/plugins/design-control/README.md:38). But the matching package surface added here is only a private workspace package with raw TypeScript dependencies in [package.json:1-25](/Users/orion/work/deskwork-work/design-control/plugins/design-control/package.json:1): there is no bootstrap hook, no first-run installer, no published runtime package dependency, and no precompiled bundle. In other words, the diff marks the plugin shell complete and marketplace-registered, but it does not add any mechanism that would make a fresh marketplace install runnable.
+
+That gap matters because the consumer blast radius is immediate: a new adopter who installs `design-control` through the marketplace is naturally going to invoke one of the documented verbs first, but the shell has no guaranteed way to have `tsx` and the source dependencies present at that point. The existing deskwork shell establishes the repo’s working pattern here: it documents a first-run install path and depends on a released runtime package rather than assuming a dev workspace. As written, this shell is still a maintainer/workspace surface, not a standalone adopter surface, so the advertised marketplace path is likely to fail on first use. A reasonable fix is to ship an actual adopter bootstrap in the plugin shell itself (for example the same kind of first-run dependency install used by sibling plugins, or a precompiled runtime), and update the README to describe that concrete runtime path rather than only pointing at the releases page.
+
+## 2026-06-14 — audit-barrage lift (20260614T204838564Z-design-control-after_clarify)
+
+### AUDIT-20260614-32 — Ancestor `tsx` short-circuits bootstrap for non-monorepo adopters
+
+Finding-ID: AUDIT-20260614-32
+Status:     fixed-0bd1abed
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    `plugins/design-control/bin/_resolve-tsx.sh:15-23,34-45,78-86`; `plugins/design-control/src/__tests__/authoring/adopter-bootstrap-shim.test.ts:11-19,63-68,129-168`
+
+The new resolver treats any executable `node_modules/.bin/tsx` in any ancestor directory as the "workspace dev path" and returns early without probing or bootstrapping local dependencies. That logic is in `_dc_find_tsx()` plus the early return at lines 78-81: if `TSX` is non-empty and not exactly `$PLUGIN_ROOT/node_modules/.bin/tsx`, the helper assumes "the monorepo owns deps" and skips `_dc_all_deps_installed()`. That assumption is only valid for this repo's hoisted workspace root, not for arbitrary parent directories.
+
+Blast radius is high because the advertised install path is "git-subdir clone of `plugins/design-control/`, no separate setup step required" ([README.md](plugins/design-control/README.md:56)). A real adopter can easily place that clone under some unrelated directory that already has a `node_modules/.bin/tsx`; in that layout the shim will silently skip `npm install`, then dispatch against a parent toolchain that may not contain `parse5`/`zod` at all or may contain incompatible versions. The new smoke test does not cover this mixed environment: it deliberately builds the fixture "OUTSIDE the monorepo" so that "the shim's upward walk finds no hoisted tsx" (test lines 11-19, 63-68), which proves only the no-ancestor case. A reasonable fix is to distinguish the repo-hoist case from arbitrary ancestors before returning early, or to require a full dependency probe even when `tsx` is inherited from a parent directory.
+
+### AUDIT-20260614-33 — The standalone README ships broken relative links
+
+Finding-ID: AUDIT-20260614-33
+Status:     fixed-0bd1abed
+Severity:   low
+Per-lane:   codex-gpt5=low
+Decision:   single-model (gate-counted low)
+Surface:    `plugins/design-control/README.md:4-12,56-64`
+
+The README says this plugin is installed as a marketplace git-subdir clone of `plugins/design-control/` with no monorepo around it (lines 56-64), but the very top of the same README links to `../stack-control/README.md` and `../../DESIGN-DISCIPLINE-THESIS.md` (lines 4-12). In the packaged subtree those paths do not exist, so the first explanatory links an adopter sees are dead.
+
+Blast radius is low because the runtime still works, but this is still user-facing documentation drift in the exact surface the commit is adding. A standalone plugin README needs links that survive the standalone layout: absolute GitHub URLs, release-tagged docs links, or copied local documentation that is actually included in the shipped subtree.
+
+### AUDIT-20260614-34 — The lockstep version bump is incomplete: `package-lock.json` still records `0.37.0`
+
+Finding-ID: AUDIT-20260614-34
+Status:     fixed-0bd1abed
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/design-control/package.json:1-4`; `plugins/design-control/specs/001-design-control/tasks.md:409-413`; `package-lock.json:8193-8200` (missing from the audited diff)
+
+The package shell was bumped to `0.45.2` in `plugins/design-control/package.json:1-4`, and the workplan note explicitly says the plugin "joined the version lockstep" and that "`version:bump` [is] idempotent across all manifests including the new design-control entries" (`tasks.md:409-413`). But the repository lockfile still records the workspace entry `plugins/design-control` as version `0.37.0` at `package-lock.json:8193-8200`, and that file is absent from the audited range.
+
+Blast radius is medium because this does not immediately break the plugin shell, but it does leave the repository's versioned surfaces internally inconsistent while the docs claim they were verified clean. Downstream consumers relying on the lockfile for reproducible installs, and unattended agents relying on the workplan's verification note, will read conflicting version truths. The fix is to regenerate or update the lockfile entry as part of the same lockstep sweep, or narrow the verification claim so it no longer says all manifests were updated when the lockfile still lags.
+
+### AUDIT-20260614-35 — Local bootstrap can accept an interrupted install as complete
+
+Finding-ID: AUDIT-20260614-35
+Status:     override-backlog-TASK-36
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/design-control/bin/_resolve-tsx.sh:53-59,84-90; plugins/design-control/src/__tests__/authoring/adopter-bootstrap-shim.test.ts:112-121
+
+`_dc_all_deps_installed` treats the presence of `node_modules/<dep>/package.json` for `parse5`, `tsx`, and `zod` as the authoritative skip signal. That does not prove the local install is runnable: `tsx` has its own runtime deps (`esbuild`, `get-tsconfig`), and an interrupted or damaged first-run `npm install` can leave direct package metadata and `.bin/tsx` behind while missing transitive packages. On the next invocation, lines 84-86 skip reinstall and the shim dispatches into a broken local tree instead of repairing it.
+
+The new test accidentally encodes the same weak proof: its fake npm writes only direct dep `package.json` files and symlinks `.bin/tsx` to the monorepo’s real runner, so it does not exercise whether an adopter-local `tsx` installation is self-contained. Blast radius is medium because normal completed installs work, but the bootstrap path explicitly claims to handle partial installs and this fails on a realistic operator interrupt or disk/cache failure. A reasonable fix is to add a version-keyed install-complete sentinel written only after `npm install` returns and the runnable probe passes, then require both the direct-dep probe and sentinel before skipping install; the test should use a local runner shape that fails when transitive deps are absent.
+
+### AUDIT-20260614-36 — Version lockstep update left the root lockfile stale
+
+Finding-ID: AUDIT-20260614-36
+Status:     fixed-0bd1abed
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    package-lock.json:8193-8200 (missing from audited diff), plugins/design-control/package.json:1-6
+
+`plugins/design-control/package.json` was bumped from `0.37.0` to `0.45.2`, and the workplan claims version lockstep was verified, but the root `package-lock.json` still records the workspace package as `0.37.0` at `packages["plugins/design-control"].version`. That means the repo’s committed npm metadata disagrees with the manifest that release and workspace tooling consume.
+
+Blast radius is medium: this is unlikely to break the marketplace git-subdir payload directly, but it makes the release surface non-reproducible and causes the next `npm install`/lockfile refresh to produce unrelated churn or expose the drift during CI/release checks. The fix is to refresh and commit the lockfile entry so `plugins/design-control/package.json`, `.claude-plugin/plugin.json`, marketplace metadata, and `package-lock.json` all report `0.45.2`.
+
+## 2026-06-14 — audit-barrage lift (20260614T205716447Z-design-control-after_clarify)
+
+### AUDIT-20260614-37 — Bootstrap never reinstalls on plugin upgrades, so adopters can keep stale runtime deps indefinitely
+
+Finding-ID: AUDIT-20260614-37
+Status:     override-backlog-TASK-36
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/design-control/bin/_resolve-tsx.sh:30-31,53-59,79-91; plugins/design-control/package.json:13-16; plugins/design-control/README.md:56-64
+
+The new helper only asks “do `parse5`, `tsx`, and `zod` resolve from `PLUGIN_ROOT`?” (`RUNTIME_DEPS` at lines 30-31, `_dc_all_deps_resolve()` at lines 53-59). If they do, `resolve_tsx()` returns immediately at lines 82-85. There is no version check against `package.json`’s declared ranges (lines 13-16), no plugin-version sentinel, and no reinstall path for an upgrade where the deps are present but stale.
+
+That leaves the upgrade path broken in exactly the way the README now advertises as handled: after a marketplace update, an adopter who already has `node_modules/` will silently keep the old runtime tree as long as those package names still resolve. The blast radius is high because the next release that bumps `parse5`/`tsx`/`zod` or starts depending on behavior from the newer versions will execute new plugin source against old runtime code, with no self-healing install and no diagnostic that points at version drift. A reasonable fix is to make the bootstrap version-aware, as sibling shims already do: compare installed versions against the manifest (or a version-keyed sentinel derived from the plugin/dependency set) and force reinstall when they drift.
+
+### AUDIT-20260614-38 — The “authoritative” dependency probe does not detect broken transitive installs
+
+Finding-ID: AUDIT-20260614-38 (codex-01 + codex-02; cross-model)
+Status:     override-backlog-TASK-36 (comment over-claim corrected; deeper load-integrity deferred)
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=high
+Decision:   agreement (gate-counted high)
+Surface:    plugins/design-control/bin/_resolve-tsx.sh:24-28,49-59; plugins/design-control/src/__tests__/authoring/adopter-bootstrap-shim.test.ts:114-128
+
+The helper’s core claim is wrong. Its comments say `createRequire(...).resolve()` “proves the dep (and its transitive closure) is actually loadable” (lines 24-28, 49-52), but the implementation at line 55 only resolves the package entry path. `require.resolve('parse5')` succeeding does not prove that `parse5`’s own imports are present; it only proves Node can find the top-level module specifier.
+
+The new test hard-codes that mistaken contract instead of catching it. In `stubNpmDir()`, lines 114-128 fabricate each dependency as nothing more than a `package.json` plus a dummy `index.js`, and the suite treats that as a successful “real dep set.” That means an interrupted install that leaves a direct package stub while omitting a nested dependency will still satisfy `_dc_all_deps_resolve()`, skip reinstall on the next run, and then crash only when the CLI actually imports the module. The blast radius is high because this patch explicitly claims to close the partial-install hole, but the shipped check still lets that exact failure mode through. The fix needs a stronger health check than `resolve()` alone, such as actually loading the modules (or another integrity signal tied to a completed install) before declaring the tree runnable.
+
+### AUDIT-20260614-39 — First-run bootstrap is not serialized, so concurrent verb invocations race on the same `node_modules/`
+
+Finding-ID: AUDIT-20260614-39
+Status:     override-backlog-TASK-36
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/design-control/bin/_resolve-tsx.sh:66-99; plugins/design-control/README.md:58-64
+
+All four shipped verbs now source the same helper, and the README says the first time you run “any verb” it will bootstrap `node_modules/` automatically. But `_dc_run_install()` at lines 66-69 is called directly from `resolve_tsx()` at line 91 with no lock, no stale-lock recovery, and no recheck inside a critical section. Two first-use invocations in parallel will both decide deps are absent and both run `npm install` into the same plugin root.
+
+That is a real edge case for unattended consumers: a CI job or agent flow can easily fire `check-wireframe` and `check-design-spec` at the same time on a fresh install. The blast radius is medium because this is limited to first run / damaged trees, but when it happens it can leave one command failing nondeterministically or a partially written install that then triggers the weaker probe issue above. A reasonable fix is to add the same directory-lock pattern already used by sibling plugin shims before mutating `PLUGIN_ROOT/node_modules/`.
+
+### AUDIT-20260614-40 — Marketplace registration is claimed but absent from the audited diff
+
+Finding-ID: AUDIT-20260614-40
+Status:     wontfix-false-premise
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    missing `.claude-plugin/marketplace.json`; specs/001-design-control/tasks.md:404-411; README.md:49-63
+
+The workplan marks the plugin shell complete and explicitly says it was “registered in `.claude-plugin/marketplace.json`,” but the audited diff only adds `.claude-plugin/plugin.json`; no marketplace registration file appears. The README also directs users to the marketplace release path, so downstream consumers are being told to install through a surface this diff does not actually provide.
+
+The blast radius is high because marketplace discoverability/installability is part of the stated ship gate. If the file exists elsewhere, it needs to be included in the audited change; otherwise add the marketplace registration and keep the workplan note aligned with the actual committed surface.
+
+**Disposition (wontfix-false-premise, 2026-06-14):** the registration DOES exist — `.claude-plugin/marketplace.json` at the REPO ROOT carries the `design-control` git-subdir entry (added in commit `bf6a11d2`, verified). The barrage's diff window is scoped to `plugins/design-control/`, so the repo-root manifest is simply outside the audited range (same scoping artifact as AUDIT-34/-36's "package-lock.json missing from audited diff" note). The workplan claim is accurate; no change needed.
