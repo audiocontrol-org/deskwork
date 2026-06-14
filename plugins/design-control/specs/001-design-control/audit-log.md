@@ -1985,7 +1985,8 @@ The blast radius is medium because this can become a silent green in the non-CSS
 ### AUDIT-20260614-01 — `translate-design-language` means two different things in the skill and the engine-adapter contract
 
 Finding-ID: AUDIT-20260614-01
-Status:     open
+Status:     fixed-3ba37e77
+Disposition: fixed — engine-adapter/types.ts now documents `translate-design-language` as "drafts the design-language spec artifact from approved wireframe intent + operator-named live CSS," single-sourcing the contract with SKILL.md.
 Severity:   high
 Per-lane:   codex-gpt5=high
 Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
@@ -1998,7 +1999,8 @@ This is not just prose drift inside one file. The feature spec and the new skill
 ### AUDIT-20260614-02 — Green specs can still contain rules with no live CSS anchor
 
 Finding-ID: AUDIT-20260614-02
-Status:     open
+Status:     fixed-3ba37e77
+Disposition: fixed — SKILL.md presentation now distinguishes "fully link-live" (exit 0, no unchecked notes) from "structurally green with unchecked scope," and forbids calling the latter fully link-live.
 Severity:   high
 Per-lane:   codex=high
 Decision:   single-model (gate-counted high)
@@ -2007,3 +2009,209 @@ Surface:    plugins/design-control/skills/translate-design-language/SKILL.md:42-
 The skill says every rule binds to a live CSS file and selector, and describes `css:` as “≥1 per rule” with non-CSS targets reported as unchecked notes that “do not establish link-liveness” at lines 42-48. But the validation step then treats exit `0` as “spec green, zero findings” and allows presentation while merely reading those skipped-link notes aloud at lines 92-94; line 100 also tells the agent to present the green spec as `0 findings`. In the current checker contract, skipped non-CSS links stay green, so a rule whose only `css:` entry points at CSS-in-JS, Tailwind, or a CSS Module can pass the skill’s gate while having no mechanically validated live CSS anchor.
 
 The blast radius is high because an unattended consumer will naturally equate “spec green — 0 findings” with the invariant promised earlier: every rule is bound to live CSS. That can produce accepted design-language specs whose rules are structurally present but not link-live, undermining the feature’s stated goal of preventing visual-spec drift. A reasonable fix would make the skill’s presentation rule distinguish “green with skipped links” from fully link-live, or require at least one validated `.css` link per rule before the draft may be presented as a green design-language spec.
+
+## 2026-06-14 — audit-barrage lift (20260614T021015085Z-design-control-phase-2C)
+
+### AUDIT-20260614-03 — `design-control status` still treats unchecked non-CSS links as fully green completion
+
+Finding-ID: AUDIT-20260614-03
+Status:     fixed-29dbf462
+Disposition: fixed — getSurfaceStatus now emits `unchecked-link-spec` for every skipped non-CSS link, blocking completion (status.test.ts "flags an unchecked-link spec as incomplete").
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    Missing companion update to `plugins/design-control/src/status/status.ts:160-170` and `plugins/design-control/src/__tests__/status/status.test.ts:53-90`
+
+This diff explicitly changes the checker/skill contract to distinguish two green states: `plugins/design-control/src/design-language/check-spec-file.ts:64-93` now says skipped non-CSS links are only "unchecked scope" and the new skill text at `plugins/design-control/skills/translate-design-language/SKILL.md:94-108` forbids describing that result as "fully link-live." But `design-control status` was not updated alongside that contract change: it still looks only for `dead-link-file` / `dead-link-selector` findings at `plugins/design-control/src/status/status.ts:160-170`, ignores `specResult.skipped` entirely, and therefore will still report the surface complete for a spec whose only anchors are unchecked CSS-in-JS / utility / CSS-Modules links.
+
+The blast radius is high because `status` is the surface that answers whether a surface is complete. After this diff, an unattended consumer can be told both "status complete" and, elsewhere, "not fully link-live" for the same artifact. That is not just wording drift; it reintroduces the exact bad state this patch is trying to name: a spec accepted as complete without any mechanically validated live CSS anchor. A reasonable fix is to decide one contract and encode it everywhere: either `status` must fail completion when `checkDesignSpecFile(...).skipped.length > 0`, or the spec/workplan must explicitly state that unchecked scope is still completion-green and then stop calling the fully validated state "complete" in operator-facing surfaces.
+
+## 2026-06-14 — audit-barrage lift (20260614T021332137Z-design-control-phase-2C)
+
+### AUDIT-20260614-04 — `design-control status` has no implementable descope path for infeasible stale-surface mapping
+
+Finding-ID: AUDIT-20260614-04
+Status:     fixed-08672d73
+Disposition: fixed — staleSurfaceSchema now accepts `{mode:'operator-approved-descope', rationale}`, a manifest-readable descope path; spec.md/tasks.md updated in 8fb7b609 (status.test.ts "accepts an explicit operator-approved stale-surface descope").
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/design-control/src/status/status.ts:43-47, plugins/design-control/src/status/status.ts:225-231, plugins/design-control/src/__tests__/status/status.test.ts:280-307
+
+The new status surface hard-fails whenever `staleSurface` is absent: the schema makes it merely optional at lines 43-47, but `getSurfaceStatus()` unconditionally emits `stale-surface-unmapped` at lines 225-231, and the new test at lines 280-307 locks that behavior in. The problem is that the feature spec for this phase explicitly allows two valid outcomes for stale-surface detection: either ship graph-derived mapping, or record an operator-approved descope when that mapping is infeasible. This implementation mentions that descope in `nextAction` text, but there is no manifest field, no workplan hook, and no other input that can actually represent the approved descope.
+
+Blast radius is high because this is a hard false-negative on the exact branch the spec says must remain valid: any adopter who takes the approved-descope path can never reach `complete`, even with every other artifact green. A reasonable fix is to encode the descope as data that `design-control status` can read and validate, or to stop advertising descope as a supported completion path until that representation exists.
+
+### AUDIT-20260614-05 — The status manifest schema does not enforce the required viewport contract
+
+Finding-ID: AUDIT-20260614-05
+Status:     fixed-08672d73
+Disposition: fixed — surfaceStatusManifestSchema.superRefine now requires a desktop (>=1280) and a phone (<=390) viewport (status.test.ts "returns 1 for a manifest missing the required phone viewport").
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    plugins/design-control/src/status/status.ts:15-18, plugins/design-control/src/status/status.ts:25-48, plugins/design-control/src/__tests__/status/status.test.ts:75-85
+
+The manifest schema only requires `viewports` to be a non-empty array of positive widths. It does not enforce the scaffold contract the spec names for this manifest shape: desktop `>= 1280` and phone `<= 390`. The tests reinforce the under-validation by treating a manifest with a single desktop viewport as the happy-path complete case at lines 75-85. As written, a manifest with one arbitrary viewport, or with no phone coverage at all, still parses cleanly and can be reported complete.
+
+Blast radius is high because downstream consumers are told this manifest is structurally valid when it omits one of the load-bearing axes the rest of the discipline depends on. An unattended agent can legitimately conclude the surface is complete without ever carrying the phone viewport the spec requires. The fix is to tighten `surfaceStatusManifestSchema` to require the named viewport set and threshold bounds, then add negative tests for single-viewport and wrong-width manifests.
+
+### AUDIT-20260614-06 — Status ignores non-link spec findings
+
+Finding-ID: AUDIT-20260614-06
+Status:     fixed-08672d73
+Disposition: fixed — every non-dead-link spec finding now surfaces as `invalid-design-spec` and blocks completion (status.test.ts "flags non-link design-spec findings as incomplete").
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/design-control/src/status/status.ts:163-181
+
+`getSurfaceStatus` calls `checkDesignSpecFile`, but only converts `dead-link-file`, `dead-link-selector`, and skipped non-CSS links into status findings. Any schema-level failure from the same checker, such as `missing-example`, `duplicate-rule-id`, malformed rule headings, malformed paths, or invalid `kind`, is silently ignored by the completion gate.
+
+Blast radius is high because `design-control-status` can report `complete: true` for a design-language spec that `check-design-spec` itself rejects. The reasonable fix is to treat every `specResult.findings` entry as status-blocking, with special wording for dead links only if needed.
+
+### AUDIT-20260614-07 — Driving provenance is loaded but not verified
+
+Finding-ID: AUDIT-20260614-07
+Status:     fixed-08672d73
+Disposition: fixed — the driving branch now calls verifyDrivingWireframe and converts its failure into a blocking finding (status.test.ts "flags driving provenance that no longer matches the wireframe artifact").
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/design-control/src/status/status.ts:204-215
+
+The provenance gate uses `loadProvenance(...)` and only performs an acceptance check when `provenance.mode === 'derived'`. For driving wireframes, it never calls the existing `verifyDrivingWireframe` helper, so it does not verify that the driving sidecar still binds the current wireframe file and recorded hash.
+
+Blast radius is high because an operator or agent can update the manifest wireframe hash after replacing the wireframe, while leaving stale driving provenance in place, and status will still call the surface complete. A reasonable fix is to call `verifyDrivingWireframe` for driving provenance and convert its failure into a blocking status finding.
+
+### AUDIT-20260614-08 — Archive acceptance is not bound to the manifest surface
+
+Finding-ID: AUDIT-20260614-08
+Status:     fixed-08672d73
+Disposition: fixed — archive acceptance is now bound to the manifest surfaceId, accepted wireframe path, and implementation commit (status.test.ts "flags an archive entry whose accepted wireframe does not match the manifest").
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    plugins/design-control/src/status/status.ts:184-194
+
+The archive gate only checks that `loadArchiveEntry(archivePath)` succeeds and that `archive.accepted` exists. It never verifies that `archive.surfaceId` matches `manifest.surfaceId`, or that `archive.accepted.wireframePath` matches the manifest’s accepted wireframe path.
+
+Blast radius is high because a copied or stale manifest can point at an accepted archive entry for a different surface or a different wireframe and still pass this completion gate. The fix should bind the archive record to the manifest identity and accepted artifact before treating archive acceptance as green.
+
+## 2026-06-14 — audit-barrage lift (20260614T024327606Z-design-control-phase-2C)
+
+### AUDIT-20260614-09 — `design-control status` can report complete even when the archive never records the implementation commit
+
+Finding-ID: AUDIT-20260614-09 (codex-03 + codex-01; cross-model)
+Status:     fixed-670c48a9
+Disposition: fixed — status now requires archive.accepted.implementationCommit and that it match the manifest implementationCommit (670c48a9; archive binding hardened in 8fb7b609).
+Severity:   medium
+Per-lane:   codex=medium, codex-gpt5=high
+Decision:   agreement (gate-counted medium)
+Surface:    [plugins/design-control/src/status/status.ts](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:40) and [plugins/design-control/src/__tests__/status/status.test.ts](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/__tests__/status/status.test.ts:59)
+
+The new manifest schema requires `implementationCommit` at [status.ts:59](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:59), but `getSurfaceStatus()` never uses that field after parsing. In the archive check at [status.ts:225-256](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:225), it verifies only acceptance presence, `surfaceId`, and wireframe paths. The green-path test at [status.test.ts:68-98](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/__tests__/status/status.test.ts:68) locks this in by expecting `complete: true` even though the accepted archive entry is created without any `implementationCommit`.
+
+That breaks the archive contract stated in the spec: each archive entry is supposed to carry “proposal, accepted wireframe, impl commit” at [spec.md:280-285](/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/spec.md:280). Downstream blast radius is high because a surface can now be declared complete while the archive lacks the commit link that is supposed to bind the accepted design decision to the implementation. A reasonable fix is to require `archive.accepted.implementationCommit`, and either make it match `manifest.implementationCommit` or collapse to one single source of truth instead of storing the commit independently in two places.
+
+### AUDIT-20260614-10 — The status gate rejects valid archive entries where the proposal wireframe differs from the accepted wireframe
+
+Finding-ID: AUDIT-20260614-10 (codex-01 + codex-02; cross-model)
+Status:     fixed-8fb7b609
+Disposition: fixed — the gate now binds only to archive.accepted.wireframePath (+ surfaceId), not the proposal path, so a proposal!=accepted entry is valid (status.test.ts "flags an archive entry whose accepted wireframe does not match the manifest" + the green-path test uses distinct proposal/accepted).
+Severity:   medium
+Per-lane:   codex=high, codex-gpt5=medium
+Decision:   agreement (gate-counted medium)
+Surface:    [plugins/design-control/src/status/status.ts](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:242)
+
+`getSurfaceStatus()` correctly checks that the archive’s accepted wireframe matches the manifest at [status.ts:242-247](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:242), but then it also requires `archive.proposal.wireframePath` to equal that same manifest wireframe at [status.ts:249-254](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:249). That is stricter than the archive model itself: [archive/store.ts:26-35](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/archive/store.ts:26) stores proposal and accepted as distinct links, and the archive round-trip test already uses different values for them at [archive/store.test.ts:25-27](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/__tests__/archive/store.test.ts:25).
+
+The consequence is a false negative completion gate: a perfectly sensible flow where a proposal artifact is superseded by a different accepted artifact will be rejected as `unaccepted-decision` even though the archive is internally consistent. Blast radius is medium because this blocks valid operator workflows rather than silently green-lighting a bad state, but it still turns a documented archive shape into an unusable one. The fix is to bind status only to `archive.accepted.wireframePath` (plus `surfaceId`), not to the proposal path.
+
+### AUDIT-20260614-11 — The new `operator-approved-descope` manifest field changes the authoritative descope contract without updating the spec/workplan
+
+Finding-ID: AUDIT-20260614-11
+Status:     fixed-08672d73
+Disposition: fixed — spec.md and tasks.md were updated (8fb7b609) to record the manifest `operator-approved-descope` field as the authoritative descope surface, ending the code-vs-docs drift.
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    [plugins/design-control/src/status/status.ts](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:29), [plugins/design-control/src/__tests__/status/status.test.ts](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/__tests__/status/status.test.ts:355), and missing updates in [plugins/design-control/specs/001-design-control/spec.md](/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/spec.md:303) / [plugins/design-control/specs/001-design-control/tasks.md](/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/tasks.md:258)
+
+The implementation now treats stale-surface descope as manifest data via `staleSurface: { mode: 'operator-approved-descope', rationale }` at [status.ts:29-37](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:29), and the test at [status.test.ts:355-386](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/__tests__/status/status.test.ts:355) marks that manifest-local descope as a green completion path. But the authoritative spec still says the infeasible-path descope is “recorded in the workplan” at [spec.md:305-308](/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/spec.md:305), and the task acceptance repeats that at [tasks.md:264-266](/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/tasks.md:264).
+
+That is contract drift, not just missing prose. An operator following the spec can record the approved descope in the workplan exactly as directed and still fail `design-control-status`, because the code only looks in the manifest. Blast radius is high because this is the kind of mismatch an unattended agent or a human operator will hit directly during completion gating. The fix is to pick one authoritative recording surface and update both code and docs to match; if the manifest is the new source of truth, the spec/workplan need to be changed in the same diff.
+
+### AUDIT-20260614-12 — Status manifests can green-light machine-local absolute paths
+
+Finding-ID: AUDIT-20260614-12
+Status:     fixed-8b842c3a
+Disposition: fixed — pathSchema rejects `~`, POSIX-absolute, Windows-drive (`C:`), and leading-backslash roots; assertWithinCollection enforces the collection boundary. Non-vacuous negative test added in 8b842c3a ("returns 1 for a manifest using a Windows drive-rooted artifact path").
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/status/status.ts:17-25, src/status/status.ts:138-140, src/status/status.ts:164-225, src/status/status.ts:297-308
+
+The status manifest path schema is only `z.string().min(1)`, and `resolveAgainstManifest()` uses `resolve(dirname(manifest), target)`. For absolute `target` values, `resolve()` ignores the manifest directory, so `wireframe.path`, `designSpec.path`, `archive.path`, and stale source paths can point anywhere on the author’s machine. That undermines the same portability rule enforced for design-spec CSS links: the status artifact can pass locally while naming files that are not part of the collection.
+
+Blast radius is high because downstream consumers can act on a `complete` status that cannot travel with the markdown collection. The fix should reject machine-rooted paths in the status schema, or enforce a repository/collection root boundary before hashing and loading artifacts.
+
+## 2026-06-14 — audit-barrage lift (20260614T061804583Z-design-control-phase-2C)
+
+### AUDIT-20260614-13 — Status manifest paths are not actually constrained to the declared “collection-relative” contract
+
+Finding-ID: AUDIT-20260614-13 (codex-01 + codex-01 + codex-02; cross-model)
+Status:     fixed-8b842c3a
+Disposition: fixed — Windows-rooted paths are rejected by pathSchema and assertWithinCollection contains targets to the collection root (manifest dir); both holes named here are closed (fed59290 containment + 8b842c3a Windows-root test + realpath). Note: the manifest directory is the collection root rather than an explicitly-declared root field — narrower than the finding's proposal but a defensible portable contract.
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=high
+Decision:   agreement (gate-counted high)
+Surface:    plugins/design-control/src/status/status.ts:17-22, 143-145
+
+`pathSchema` says manifest paths must be “collection-relative,” but the implementation only rejects `~` and `path.isAbsolute()` at [status.ts:17-22](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:17). That leaves two holes. First, on non-Windows hosts `isAbsolute()` does not reject Windows-style machine-rooted inputs like `C:foo`, `C:\foo`, or `\foo`, so a manifest can carry author-machine paths and still parse cleanly. Second, `resolveAgainstManifest()` resolves every target relative to the manifest file’s directory at [status.ts:143-145](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:143), not relative to any collection root, so `../` escapes and subdirectory-local manifests both change what file a supposedly “collection-relative” path names.
+
+That is a real contract bug, not just wording drift: an unattended agent or adopter can produce a manifest that looks portable and passes schema validation, while `design-control-status` evaluates the wrong files or follows machine-specific paths. The blast radius is high because this command is a completion gate; a green or red verdict against the wrong artifact undermines the feature’s stated governance goal. A reasonable fix is to make the root explicit in the manifest contract and validate paths against that root, using the same non-portable path rejection discipline already applied in the design-spec checker.
+
+### AUDIT-20260614-14 — Missing or drifted wireframes can produce a second, misleading `missing-wireframe-provenance` finding even when provenance is fine
+
+Finding-ID: AUDIT-20260614-14
+Status:     fixed-fed59290
+Disposition: fixed — provenance verification is now gated on `wireframeArtifactOk`, so a missing/drifted wireframe no longer also manufactures a spurious `missing-wireframe-provenance` finding (status.test.ts "does not emit a provenance finding when the wireframe artifact is already missing").
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/design-control/src/status/status.ts:168-184, 278-299
+
+`getSurfaceStatus()` correctly records `missing-wireframe` when the accepted artifact is absent or its manifest hash no longer matches at [status.ts:168-184](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:168). But it then runs provenance verification unconditionally at [status.ts:278-299](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:278). In the derived branch, a missing wireframe falls through to `verifyDrivingWireframe()` because `existsSync(wireframePath)` is false; that throws a mode-mismatch error, which is then reported as `missing-wireframe-provenance`. In the driving branch, the same missing file causes `verifyDrivingWireframe()` to throw “bound wireframe file ... no longer exists,” and that too is recast as `missing-wireframe-provenance`. The result is a second finding that blames provenance even when the actual problem is only the artifact path or hash.
+
+The blast radius is medium because this surface is supposed to give one actionable next gate, and here it manufactures a false secondary defect from the first one. An operator or unattended agent can waste effort repairing provenance records that were never wrong. A reasonable fix is to skip provenance verification unless the accepted wireframe artifact both exists and matches the manifest hash; provenance is about how to interpret a valid artifact, not about re-diagnosing an already-failed artifact lookup.
+
+## 2026-06-14 — audit-barrage lift (20260614T093832363Z-design-control-phase-2C)
+
+### AUDIT-20260614-15 — `design-control-status` can crash on unreadable or concurrently-changed artifacts instead of returning a structured finding
+
+Finding-ID: AUDIT-20260614-15 (codex-02 + codex-03 + codex-01; cross-model)
+Status:     fixed-8b842c3a
+Disposition: fixed — wireframe/spec hash reads, checkDesignSpecFile, and the mapped stale-source read are now guarded; an artifact that passes existsSync then fails to read yields a structured `missing-wireframe`/`missing-design-spec`/`invalid-design-spec`/`stale-surface` finding ("could not be read") instead of crashing (status.test.ts two crash-safety tests, RED-first).
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=high
+Decision:   agreement (gate-counted high)
+Surface:    `src/status/status.ts:121-124`, `src/status/status.ts:154-165`, `src/status/status.ts:175-184`, `src/status/status.ts:316-331`
+
+`getSurfaceStatus` only uses `existsSync(...)` before hashing or re-reading files, then calls `readFileSync(...)` through `fileHashMatches` and `checkDesignSpecFile(...)` without any local error handling. That means a spec, wireframe, or mapped source that becomes unreadable between the existence check and the read, or that has permissions problems despite existing, will throw out of `getSurfaceStatus`. `runDesignControlStatus` also has no catch, so the CLI stops emitting its documented `rule: ...` findings / `next-action:` contract and instead aborts.
+
+The blast radius is high because this command is a completion gate. A downstream script or operator relying on `design-control-status` to always return a machine-usable incomplete verdict on bad artifact state instead gets a process crash on exactly the failure paths the gate is supposed to explain. A reasonable fix is to wrap artifact hashing and `checkDesignSpecFile(specPath)` in the same kind of structured error-to-finding conversion already used for manifest loading and archive loading, so unreadable artifacts become `missing-*` / `invalid-*` findings rather than uncaught exceptions.
+
+### AUDIT-20260614-16 — The “stay within the collection root” check is bypassable through symlinks
+
+Finding-ID: AUDIT-20260614-16 (codex-01 + codex-02; cross-model)
+Status:     fixed-8b842c3a
+Disposition: fixed — assertWithinCollection now realpaths the deepest existing prefix of both the collection root and the target before the containment test, so a symlinked path segment escaping the root is followed and rejected; a not-yet-authored artifact still validates (status.test.ts "rejects a symlinked artifact that escapes the collection root", RED-first).
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=high
+Decision:   agreement (gate-counted high)
+Surface:    `src/status/status.ts:109-119`, `src/status/status.ts:125-136`
+
+The new containment check is purely lexical: `assertWithinCollection(...)` resolves the manifest-relative path with `resolve(...)`, compares it to the manifest directory with `relative(...)`, and accepts it if the resulting string does not traverse `..`. That blocks literal `../outside/...` paths, but it does not canonicalize symlinks. A manifest path like `artifacts/spec-link.md` can pass this check even when `artifacts/` is a symlink to a location outside the collection root, and the later `readFileSync(...)` calls will happily follow it.
+
+The blast radius is high because the feature’s stated goal here is to contain status artifacts to portable, collection-local paths. As written, a manifest can still validate against external files while looking collection-relative on paper, which lets a non-portable setup report `complete: true` and defeats the contract the operator is relying on. The fix is to compare canonicalized paths (`realpath`) where the target exists, or otherwise reject symlinked path segments for artifact fields that are meant to be collection-contained.
