@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -471,6 +471,41 @@ describe('getSurfaceStatus', () => {
     expect(getSurfaceStatus(manifestPath).findings.map((item) => item.rule)).toContain('missing-wireframe-provenance');
   });
 
+  it('does not emit a provenance finding when the wireframe artifact is already missing', () => {
+    const dir = freshDir();
+    writeFileSync(join(dir, 'surface.html'), '<html><body><h1>Wireframe</h1></body></html>');
+    recordDrivingWireframe({ dir, surfaceId: 'surface', wireframeFile: 'surface.html' });
+    unlinkSync(join(dir, 'surface.html'));
+    const specPath = writeGreenSpec(dir);
+    const archivePath = join(dir, 'surface.archive.json');
+    writeArchiveEntry(
+      archivePath,
+      createArchiveEntry({
+        surfaceId: 'surface',
+        brief: 'Regroup the layout',
+        proposalWireframePath: 'surface.html',
+        acceptedWireframePath: 'surface.html',
+        implementationCommit: 'abc1234',
+      }),
+    );
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex('wireframe') },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
+      archive: { path: 'surface.archive.json' },
+      staleSurface: { mode: 'operator-approved-descope', rationale: 'Not needed for this test.' },
+    });
+
+    const rules = getSurfaceStatus(manifestPath).findings.map((item) => item.rule);
+    expect(rules).toContain('missing-wireframe');
+    expect(rules).not.toContain('missing-wireframe-provenance');
+  });
+
   it('flags missing stale-surface mapping as a separate gate', () => {
     const dir = freshDir();
     const wireframeHtml = '<html><body><h1>Wireframe</h1></body></html>';
@@ -570,5 +605,23 @@ describe('runDesignControlStatus', () => {
     const { err, io } = capture();
     expect(runDesignControlStatus([manifestPath], io)).toBe(1);
     expect(err.join('\n')).toContain('collection-relative');
+  });
+
+  it('returns 1 for a manifest using a path that escapes the collection root', () => {
+    const dir = freshDir();
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: '../outside/surface.html', sha256: sha256Hex('wireframe') },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec') },
+      archive: { path: 'surface.archive.json' },
+    });
+    const { err, io } = capture();
+    expect(runDesignControlStatus([manifestPath], io)).toBe(1);
+    expect(err.join('\n')).toContain('must stay within the collection root');
   });
 });

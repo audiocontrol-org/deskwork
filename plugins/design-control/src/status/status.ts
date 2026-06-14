@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { loadArchiveEntry } from '@/archive/store';
 import { checkDesignSpecFile, type CliIo } from '@/design-language/check-spec-file';
@@ -17,8 +17,8 @@ const sha256Hex = (content: string): string => createHash('sha256').update(conte
 const pathSchema = z
   .string()
   .min(1)
-  .refine((value) => !value.startsWith('~') && !isAbsolute(value), {
-    message: 'paths must be collection-relative; "~" and absolute paths are not portable',
+  .refine((value) => !value.startsWith('~') && !isAbsolute(value) && !/^[A-Za-z]:/.test(value) && !value.startsWith('\\'), {
+    message: 'paths must be collection-relative; "~", absolute, and machine-rooted paths are not portable',
   });
 
 const viewportSchema = z.object({
@@ -144,13 +144,32 @@ function resolveAgainstManifest(manifestPath: string, target: string): string {
   return resolve(dirname(resolve(manifestPath)), target);
 }
 
+function assertWithinCollection(manifestPath: string, field: string, target: string): void {
+  const collectionRoot = dirname(resolve(manifestPath));
+  const absolute = resolveAgainstManifest(manifestPath, target);
+  const rel = relative(collectionRoot, absolute);
+  if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) {
+    return;
+  }
+  throw new Error(`${field} must stay within the collection root; got ${JSON.stringify(target)}`);
+}
+
 function fileHashMatches(path: string, expectedSha256: string): boolean {
   return sha256Hex(readFileSync(path, 'utf8')) === expectedSha256;
 }
 
 export function loadSurfaceStatusManifest(manifestPath: string): SurfaceStatusManifest {
   const absolute = resolve(manifestPath);
-  return surfaceStatusManifestSchema.parse(JSON.parse(readFileSync(absolute, 'utf8')) as unknown);
+  const parsed = surfaceStatusManifestSchema.parse(JSON.parse(readFileSync(absolute, 'utf8')) as unknown);
+  assertWithinCollection(absolute, 'wireframe.path', parsed.wireframe.path);
+  assertWithinCollection(absolute, 'designSpec.path', parsed.designSpec.path);
+  assertWithinCollection(absolute, 'archive.path', parsed.archive.path);
+  if (parsed.staleSurface?.mode === 'mapped') {
+    for (const [index, source] of parsed.staleSurface.sourceFiles.entries()) {
+      assertWithinCollection(absolute, `staleSurface.sourceFiles[${index}].path`, source.path);
+    }
+  }
+  return parsed;
 }
 
 export function getSurfaceStatus(manifestPath: string): DesignControlStatusResult {
@@ -167,6 +186,7 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
 
   const findings: DesignControlStatusFinding[] = [];
   const wireframePath = resolveAgainstManifest(manifestPath, manifest.wireframe.path);
+  let wireframeArtifactOk = false;
   if (!existsSync(wireframePath)) {
     findings.push(
       finding(
@@ -181,6 +201,8 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
         `Accepted wireframe at ${wireframePath} no longer matches the manifest sha256; refresh the artifact or manifest.`,
       ),
     );
+  } else {
+    wireframeArtifactOk = true;
   }
 
   const specPath = resolveAgainstManifest(manifestPath, manifest.designSpec.path);
@@ -276,18 +298,20 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
   }
 
   try {
-    const provenance = loadProvenance(dirname(wireframePath), manifest.surfaceId);
-    if (provenance.mode === 'derived' && existsSync(wireframePath)) {
-      const acceptance = checkDerivedAcceptance(
-        dirname(wireframePath),
-        manifest.surfaceId,
-        readFileSync(wireframePath, 'utf8'),
-      );
-      if (!acceptance.ok) {
-        findings.push(...acceptance.findings.map((item) => finding('derived-unedited', item.message)));
+    if (wireframeArtifactOk) {
+      const provenance = loadProvenance(dirname(wireframePath), manifest.surfaceId);
+      if (provenance.mode === 'derived') {
+        const acceptance = checkDerivedAcceptance(
+          dirname(wireframePath),
+          manifest.surfaceId,
+          readFileSync(wireframePath, 'utf8'),
+        );
+        if (!acceptance.ok) {
+          findings.push(...acceptance.findings.map((item) => finding('derived-unedited', item.message)));
+        }
+      } else {
+        verifyDrivingWireframe(dirname(wireframePath), manifest.surfaceId);
       }
-    } else {
-      verifyDrivingWireframe(dirname(wireframePath), manifest.surfaceId);
     }
   } catch (error) {
     findings.push(
