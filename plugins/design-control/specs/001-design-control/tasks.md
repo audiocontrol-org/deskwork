@@ -43,6 +43,8 @@ verbatim in substance** — when they drift, the PRD wins.
 
 ## Phase 1: Engine-adapter seam + lo-fi wireframe kit + allowlist lint (v1-scaffold)
 
+**Per-phase govern file scope (authoritative):** `src/engine-adapter/types.ts`, `src/engine-adapter/conformance.ts`, `src/engine-adapter/preflight.ts`, `src/engine-adapter/index.ts`, `src/wireframe-kit/sketch-kit.ts`, `src/wireframe-kit/index.ts`, `src/lint/allowlist.ts`, `src/lint/check-mockup-lofi.ts`, `src/lint/stylesheet-pin.ts`, `src/lint/codepoint.ts`, `src/lint/types.ts`, `src/lint/index.ts`, `src/authoring/lint-file.ts`, `src/authoring/check-wireframe-cli.ts`, `src/authoring/index.ts`, `src/provenance/derived.ts`, `src/provenance/cli.ts`, `src/provenance/wireframe-provenance-cli.ts`, `src/provenance/index.ts`, `bin/check-wireframe`, `bin/wireframe-provenance`, `skills/wireframe/SKILL.md`, `assets/sketch-kit/sketch-kit.css`, `assets/sketch-kit/example-wireframe.html`, `src/__tests__/engine-adapter/types.test.ts`, `src/__tests__/engine-adapter/types.binding.test.ts`, `src/__tests__/engine-adapter/conformance.test.ts`, `src/__tests__/engine-adapter/preflight.test.ts`, `src/__tests__/wireframe-kit/sketch-kit.test.ts`, `src/__tests__/lint/check-mockup-lofi.test.ts`, `src/__tests__/lint/stylesheet-pin.test.ts`, `src/__tests__/lint/codepoint.test.ts`, `src/__tests__/lint/allowlist-url-derivation.test.ts`, `src/__tests__/authoring/lint-file.test.ts`, `src/__tests__/authoring/check-wireframe-shim.test.ts`, `src/__tests__/provenance/derived.test.ts`, `src/__tests__/provenance/cli.test.ts`, `src/__tests__/provenance/wireframe-provenance-shim.test.ts`.
+
 - [x] **Engine-adapter interface declaration + fail-loud preflight — FIRST, before any engine-
       consuming skill.** Declare the interface (`author-wireframe`, `translate-design-language`,
       `referee-screenshot`) with conformance JSON request/response schemas (adapter echoes manifest
@@ -165,6 +167,8 @@ same lint; a `derived` artifact cannot be accepted without a recorded operator e
 
 ## Phase 2: Design-language spec convention (v1-scaffold)
 
+**Per-phase govern file scope (authoritative):** `src/design-language/types.ts`, `src/design-language/schema.ts`, `src/design-language/link-liveness.ts`, `src/design-language/check-spec-file.ts`, `src/design-language/check-design-spec-cli.ts`, `src/design-language/selector-canon.ts`, `src/design-language/rule-attempt.ts`, `src/design-language/index.ts`, `bin/check-design-spec`, `skills/translate-design-language/SKILL.md`, `src/__tests__/design-language/schema.test.ts`, `src/__tests__/design-language/link-liveness.test.ts`, `src/__tests__/design-language/check-spec-file.test.ts`, `src/__tests__/design-language/check-design-spec-shim.test.ts`.
+
 - [x] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
       do/don't), each rule linked to a live CSS file/class + ≥1 current example. The spec is a
       **hand-authorable markdown artifact** — **scaffold completion does NOT require the engine.**
@@ -207,6 +211,8 @@ rejects a rule with zero example references** (≥1 example per rule, structural
 source and passes adapter conformance. Scaffold completion never depends on engine presence.
 
 ## Phase 3: Archive primitive + `design-control status` (v1-scaffold)
+
+**Per-phase govern file scope (authoritative):** `src/archive/store.ts`, `src/archive/index.ts`, `src/status/status.ts`, `src/status/design-control-status-cli.ts`, `src/status/index.ts`, `bin/design-control-status`, `src/__tests__/archive/store.test.ts`, `src/__tests__/status/status.test.ts`, `src/__tests__/status/design-control-status-shim.test.ts`.
 
 - [x] ACCEPTED/REJECTED exploration archive primitive (briefs + lo-fi wireframe visual; decision
       states/links: proposal, accepted wireframe, impl commit, rejected rationale, supersedes).
