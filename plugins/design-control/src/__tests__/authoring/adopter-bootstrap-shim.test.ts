@@ -147,6 +147,25 @@ function seedAncestorTsx(parentDir: string): void {
   symlinkSync(realTsxBin, join(ancestorBin, 'tsx'));
 }
 
+/**
+ * Seed a RESOLVABLE local dep set directly under PLUGIN_ROOT/node_modules (no
+ * npm), so the resolution probe passes on the first try and NO install is
+ * needed. Used to isolate the quoted-path behavior of the probe itself.
+ */
+function seedResolvableDeps(root: string): void {
+  const nm = join(root, 'node_modules');
+  mkdirSync(join(nm, '.bin'), { recursive: true });
+  symlinkSync(realTsxBin, join(nm, '.bin', 'tsx'));
+  for (const dep of ['parse5', 'tsx', 'zod']) {
+    mkdirSync(join(nm, dep), { recursive: true });
+    writeFileSync(
+      join(nm, dep, 'package.json'),
+      JSON.stringify({ name: dep, version: '0.0.0', main: 'index.js' }),
+    );
+    writeFileSync(join(nm, dep, 'index.js'), 'module.exports = {};\n');
+  }
+}
+
 describe('bin shims — adopter (sparse-clone) bootstrap', () => {
   it('runs npm install on first run then dispatches when no hoisted tsx exists', () => {
     expect(existsSync(realTsxBin), `expected a real tsx at ${realTsxBin}`).toBe(
@@ -225,5 +244,46 @@ describe('bin shims — adopter (sparse-clone) bootstrap', () => {
     expect(result.stderr).not.toContain('run npm install first');
     expect(result.status, `stderr: ${result.stderr}`).toBe(0);
     expect(result.stdout).toContain('DISPATCHED-OK');
+  }, 60_000);
+
+  it('resolves and dispatches when the plugin path contains a single quote (AUDIT-20260614-42)', () => {
+    expect(existsSync(realTsxBin), `expected a real tsx at ${realTsxBin}`).toBe(
+      true,
+    );
+
+    // A valid path that contains a single quote. Pre-fix, the probe interpolated
+    // $PLUGIN_ROOT into a JS single-quoted literal, so the inline `node -e`
+    // became a syntax error and every verb failed before bootstrap could help.
+    const parent = mkdtempSync(join(realpathSync(tmpdir()), "dc-o'brien-"));
+    dirs.push(parent);
+    const root = buildIsolatedPlugin(parent);
+
+    // Deps already resolvable -> a quote-safe probe passes WITHOUT install.
+    seedResolvableDeps(root);
+    const npmDir = stubNpmDir(root); // safety net; must NOT be invoked
+    const shim = join(root, 'bin', SHIM_NAME);
+    const marker = join(root, '.stub-npm-ran');
+
+    const env = {
+      ...process.env,
+      PATH: `${npmDir}${delimiter}${process.env.PATH ?? ''}`,
+    };
+
+    const result = spawnSync(shim, ['--noop'], {
+      cwd: root,
+      encoding: 'utf8',
+      env,
+    });
+    if (result.error) throw result.error;
+
+    expect(result.status, `stderr: ${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain('DISPATCHED-OK');
+    // The probe resolved on the quoted path WITHOUT crashing, so no install
+    // should have fired. (Pre-fix the broken probe forces the install branch and
+    // then re-fails the re-probe -> exit 1.)
+    expect(
+      existsSync(marker),
+      `install ran on a quoted path -> the probe failed on the single quote; stderr: ${result.stderr}`,
+    ).toBe(false);
   }, 60_000);
 });

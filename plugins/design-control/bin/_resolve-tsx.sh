@@ -20,16 +20,11 @@
 #     - Adopter sparse-clone (incl. a stray-ancestor node_modules/.bin/tsx that
 #       does NOT carry parse5/zod): the plugin's own deps do NOT resolve →
 #       probe fails → local `npm install --omit=dev --workspaces=false`.
-#   Honest scope of this check: it resolves each declared dep's ENTRY by name from
-#   $PLUGIN_ROOT. It is stronger than a bare on-disk path probe, but it does NOT
-#   prove the dep's full transitive closure is intact — a corrupted or interrupted
-#   install that leaves a resolvable entry but a damaged sub-tree is not detected
-#   here; it surfaces fail-loud when tsx is exec'd and the module load crashes.
-#   Likewise this is NOT version-aware: deps that resolve by name but are stale
-#   after a plugin upgrade are not reinstalled. Both are accepted bounded limits
-#   shared with the sibling plugin shims (stack-control); hardening the bootstrap
-#   (transitive-integrity / version-gated reinstall / concurrency lock) is tracked
-#   as a stack-control-wide backlog item, not a design-control-local mechanism.
+#   Bounded contract of this check: it resolves each declared dep's ENTRY by name
+#   from $PLUGIN_ROOT — stronger than a bare on-disk path probe, but NOT a
+#   transitive-closure integrity proof and NOT version-aware. A corrupted/partial
+#   install, or a stale tree after a plugin upgrade, resolves here and then
+#   surfaces fail-loud when tsx is exec'd and the module load crashes.
 #
 # Declared runtime deps — keep in sync with package.json "dependencies".
 RUNTIME_DEPS="parse5 tsx zod"
@@ -55,8 +50,11 @@ _dc_find_tsx() {
 # entry by name — stronger than an on-disk path check, but not a transitive-closure
 # integrity proof (see the header note). Returns 0 only if ALL deps resolve.
 _dc_all_deps_resolve() {
+  # Pass the path + dep name via the environment, never interpolated into JS
+  # source — a $PLUGIN_ROOT containing a single quote (a valid path) would
+  # otherwise break the inline script and fail every verb before bootstrap.
   for _dc_dep in $RUNTIME_DEPS; do
-    if ! node -e "require('node:module').createRequire('$PLUGIN_ROOT/package.json').resolve('$_dc_dep')" >/dev/null 2>&1; then
+    if ! DC_ROOT="$PLUGIN_ROOT" DC_DEP="$_dc_dep" node -e 'require("node:module").createRequire(process.env.DC_ROOT + "/package.json").resolve(process.env.DC_DEP)' >/dev/null 2>&1; then
       return 1
     fi
   done
