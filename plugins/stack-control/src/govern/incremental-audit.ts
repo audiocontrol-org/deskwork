@@ -106,45 +106,10 @@ export function resolvePhaseUnit(args: ResolvePhaseUnitArgs): AuditUnit {
   };
 }
 
-/** One phase's convergence/change status, supplied by the composing caller. */
-export interface PhaseStatus {
-  readonly phaseId: string;
-  /** Did this phase's unit-audit already reach `converged`? */
-  readonly converged: boolean;
-  /** Has the phase's code changed since that convergence? */
-  readonly changed: boolean;
-}
-
-export interface ResolveComposingFeatureUnitArgs {
-  readonly tasksPath: string;
-  readonly diffBase: string;
-  /** Per-phase convergence/change status (FR-008 composition inputs). */
-  readonly phases: readonly PhaseStatus[];
-}
-
-/**
- * Resolve the whole-feature `after_implement` unit by COMPOSITION (FR-008): its
- * `diffScope` EXCLUDES any phase whose code is unchanged since that phase's
- * unit-audit converged (carried), and INCLUDES changed phases (and any phase
- * with no recorded convergence — cross-cutting / never-audited code). The
- * composing pass is the final safety net, not a from-scratch re-audit.
- */
-export function resolveComposingFeatureUnit(
-  args: ResolveComposingFeatureUnitArgs,
-): AuditUnit {
-  const parsed = parsePhases(readFileSync(args.tasksPath, 'utf8'));
-  const statusOf = new Map(args.phases.map((s) => [s.phaseId, s]));
-  const files: string[] = [];
-  for (const phase of parsed) {
-    const status = statusOf.get(phase.phaseId);
-    // Carry a phase ONLY when it converged AND is unchanged since; otherwise its
-    // code is changed or never-converged (cross-cutting) → re-audit it.
-    const carried = status !== undefined && status.converged && !status.changed;
-    if (!carried) files.push(...phase.files);
-  }
-  return {
-    granularity: 'feature',
-    diffScope: { base: args.diffBase, files: Array.from(new Set(files)) },
-    auditLogSection: 'after_implement',
-  };
-}
+// NOTE: the whole-feature `after_implement` unit is composed EXCLUSION-side by the
+// govern command itself (specs/021 US1 true-composition): it carries converged +
+// unchanged phases by adding their files to the payload `excludePaths`, so the
+// audited scope is "the diff minus carried files" (re-audited phases + cross-cutting
+// code). The earlier inclusion-based `resolveComposingFeatureUnit` primitive was
+// removed (021 phase-2 audit AUDIT-BARRAGE-codex-01) — it returned an inclusion file
+// list the command discarded, and inclusion silently dropped cross-cutting code.

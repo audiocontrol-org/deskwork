@@ -11,11 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  resolvePhaseUnit,
-  resolveComposingFeatureUnit,
-  parsePhases,
-} from '../../govern/incremental-audit.js';
+import { resolvePhaseUnit, parsePhases } from '../../govern/incremental-audit.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TASKS = join(HERE, '..', 'fixtures', 'convergence', 'multi-phase-feature', 'tasks.md');
@@ -57,35 +53,14 @@ describe('resolvePhaseUnit (per-phase diff scope, SC-006)', () => {
   });
 });
 
-describe('resolveComposingFeatureUnit (FR-008 composition)', () => {
-  it('excludes a converged-and-unchanged phase, includes a changed phase', () => {
-    const unit = resolveComposingFeatureUnit({
-      tasksPath: TASKS,
-      diffBase: 'HEAD~6',
-      phases: [
-        { phaseId: '1', converged: true, changed: false }, // carried → excluded
-        { phaseId: '2', converged: true, changed: true }, // changed → included
-        { phaseId: '3', converged: false, changed: false }, // never-converged → included
-      ],
-    });
-    expect(unit.granularity).toBe('feature');
-    expect(unit.phaseId).toBeUndefined();
-    // Phase 1 carried (converged + unchanged) → its files excluded.
-    expect(unit.diffScope.files).not.toContain('plugins/stack-control/src/fixture/alpha-setup.ts');
-    // Phase 2 changed → included.
-    expect(unit.diffScope.files).toContain('plugins/stack-control/src/fixture/alpha-resolver.ts');
-    // Phase 3 never converged (cross-cutting) → included.
-    expect(unit.diffScope.files).toContain('plugins/stack-control/src/fixture/beta-resolver.ts');
-  });
-});
+// NOTE: the whole-feature `after_implement` composition is now EXCLUSION-based and
+// lives in the govern command (specs/021 US1 true-composition); the old inclusion
+// primitive `resolveComposingFeatureUnit` was removed (021 phase-2 audit). CLI
+// composition behavior is covered by phase-checkpoints.test.ts.
 
-describe('phase + feature units record under the same per-feature store (FR-008)', () => {
-  it('a phase unit uses a per-phase section label; the feature unit uses after_implement', () => {
+describe('phase units record under the per-feature store (FR-008)', () => {
+  it('a phase unit uses a per-phase section label', () => {
     const phaseUnit = resolvePhaseUnit({ tasksPath: TASKS, phaseId: '2', diffBase: 'HEAD' });
-    const featureUnit = resolveComposingFeatureUnit({ tasksPath: TASKS, diffBase: 'HEAD', phases: [] });
-    // Distinct sections (the gate scopes per-checkpoint), but both are sections
-    // of the ONE per-feature audit-log the lift always writes to.
     expect(phaseUnit.auditLogSection).toBe('phase-2');
-    expect(featureUnit.auditLogSection).toBe('after_implement');
   });
 });

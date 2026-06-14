@@ -1213,3 +1213,121 @@ The blast radius is low because `stackctl setup` can still create the file throu
 ## 2026-06-14 — audit-barrage lift (20260614T183124634Z-audit-protocol-friction-burndown-phase-1)
 
 _No findings surfaced — a clean barrage run over a healthy fleet (0 HIGH+, 0 MEDIUM, 0 total). Recorded so the convergence dampener counts it as a quiet run (claude-20260612-r3); a clean run that left no section was invisible to the consecutive-quiet / single-run-clean rules._
+
+## 2026-06-14 — audit-barrage lift (20260614T200955133Z-audit-protocol-friction-burndown-phase-2)
+
+### AUDIT-20260614-90 — “Every exit emits exactly one terminal-outcome” is not true for multiple existing govern exits
+
+Finding-ID: AUDIT-20260614-90 (codex-01 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=high
+Decision:   agreement (gate-counted high)
+Surface:    `src/govern/protocol.ts:43-49`; `src/subcommands/govern.ts:546-600`
+
+The new contract says govern emits exactly one `govern: terminal-outcome=<kind>` line “at every exit” (`protocol.ts:43-49`), but the implementation only adds tags on the convergence/gated branches and on `GovernProtocolError` / `GovernPayloadError` in the main `catch`. Several real exits in `runGovern` still bypass that machinery entirely: parse failure (`govern.ts:552-555`), missing `--mode` (`557-560`), invalid `--require-models` (`567-574`), retired `GOVERN_REPO_ROOT` (`581-588`), and installation-resolution failure (`595-600`) all call `process.exit(2)` without emitting any terminal-outcome line.
+
+The blast radius is high because US5 is explicitly adding a machine-readable terminal surface for consumers/tests to key on. Any unattended caller that trusts the new “every exit” contract will still fall back to brittle stderr parsing or misclassify these common failure modes as “missing signal.” A reasonable fix is to centralize all govern exits behind one emitter, or at minimum route these preflight failures through `GovernProtocolError` so the same tagged-exit path is used consistently.
+
+## 2026-06-14 — audit-barrage lift (20260614T201526023Z-audit-protocol-friction-burndown-phase-2)
+
+### AUDIT-20260614-91 — `--help` exits without the promised terminal outcome marker
+
+Finding-ID: AUDIT-20260614-91 (codex-01 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-118
+Severity:   medium
+Per-lane:   codex=high, codex-gpt5=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/subcommands/govern.ts:559-565
+
+The new contract in this diff says govern now emits exactly one `govern: terminal-outcome=<kind>` line at every exit, and the implementation adds explicit emission on the usage and fatal `process.exit(2)` paths plus the success/blocking exits. The `--help` path is still a bare `return` after `process.stdout.write(USAGE)` at `runGovern(...)`'s top, so that invocation terminates with no terminal-outcome line at all.
+
+The blast radius is moderate because this is not a rare internal branch: unattended wrappers often probe CLIs with `--help` or validate invocation shape before real work. A consumer that takes the new “exactly one line at every exit” contract literally will now see a silent hole in one of the standard exits and has no machine-readable way to distinguish “clean help exit” from “the contract was not honored.” A reasonable fix is to either emit a dedicated terminal kind for help or narrow the documented contract so it only promises markers for non-help execution paths.
+
+### AUDIT-20260614-92 — Fleet-floor vs outage classification still depends on a fragile stderr substring
+
+Finding-ID: AUDIT-20260614-92 (codex-02 + codex-02; cross-model)
+Status: migrated-to-backlog TASK-119
+Severity:   medium
+Per-lane:   codex=medium, codex-gpt5=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/govern/protocol.ts:395-412
+
+This change’s stated goal is to make terminal outcomes machine-distinguishable without “fragile message-substring matching,” but the split between `fleet-floor-shortfall` and `barrage-outage` is still derived from `barrage.stderr.includes('FLOOR SHORTFALL')`. That couples govern’s machine-readable contract to the exact human wording emitted by the downstream barrage process.
+
+The consequence is a quiet misclassification if the barrage text changes spelling, casing, formatting, or phrasing while still returning the same nonzero status. In that case govern will emit the wrong terminal kind and point operators toward the wrong recovery path, which undermines the feature’s main value for automation. A more durable fix would be a structured signal from the barrage layer itself, such as distinct exit codes or a dedicated machine-readable marker line that govern can parse without depending on prose.
+
+## 2026-06-14 — audit-barrage lift (20260614T201929793Z-audit-protocol-friction-burndown-phase-2)
+
+_No findings surfaced — a clean barrage run over a healthy fleet (0 HIGH+, 0 MEDIUM, 0 total). Recorded so the convergence dampener counts it as a quiet run (claude-20260612-r3); a clean run that left no section was invisible to the consecutive-quiet / single-run-clean rules._
+
+## 2026-06-14 — audit-barrage lift (20260614T202121807Z-audit-protocol-friction-burndown-phase-3)
+
+### AUDIT-20260614-93 — Whole-feature govern still fatals on stale or missing phase checkpoints, so the new composition path is unreachable
+
+Finding-ID: AUDIT-20260614-93
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/subcommands/govern.ts:684-694`
+
+The new helper and test in this diff define the `after_implement` contract as: unchanged converged phases are carried, while changed or never-converged phases are re-audited. But the implement-mode caller still does `assertWholeFeatureCheckpointsCurrent(phaseCheckpointStatuses)` before it builds the composing unit, then maps `changed: status.state !== 'current'` into `resolveComposingFeatureUnit(...)` at `src/subcommands/govern.ts:684-694`. Any `missing` or `stale` checkpoint now aborts the run before composition can happen.
+
+That means the exact cases the new test calls out as re-auditable in `src/__tests__/govern/govern-phase-composition.test.ts:38-79` never reach the composition logic in the real command. Downstream blast radius is high because an adopter invoking whole-feature govern after touching a previously converged phase will get a fatal refusal instead of the intended narrowed re-audit, so the feature’s stated “compose from checkpoints” behavior does not actually ship at the CLI boundary. A reasonable fix is to stop requiring all statuses to be `current` for whole-feature govern and instead let `resolveComposingFeatureUnit` consume `current`/`stale`/`missing` exactly as the new contract describes.
+
+### AUDIT-20260614-94 — When every phase is carried, govern falls back to the full feature payload and discards the “minimal re-audit” contract
+
+Finding-ID: AUDIT-20260614-94
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/subcommands/govern.ts:695-700`
+
+The new unit test explicitly locks in that if every phase converged and is unchanged, `resolveComposingFeatureUnit(...).diffScope.files` is `[]` as the minimal re-audit case (`src/__tests__/govern/govern-phase-composition.test.ts:60-72`). But the command-layer code immediately overrides that result: after normalizing `phaseUnit.diffScope.files`, it sets `payloadPathScope = normalizedFiles.length > 0 ? normalizedFiles : undefined` at `src/subcommands/govern.ts:698-700`, with a comment saying the safety net “must never collapse to a no-op.”
+
+In `buildImplementVars`, `undefined` path scope means “whole-feature pre-015 behavior,” not “audit nothing.” So the all-carried case silently reverts to a full feature audit, which is the opposite of the composition behavior the helper and test claim to guarantee. The blast radius is high because consumers relying on per-phase convergence to suppress redundant final-pass noise will still get a full barrage over unchanged work, recreating the protocol friction this feature is supposed to burn down. A reasonable fix is to preserve an explicit empty scope end-to-end and teach the protocol what a legitimate zero-file `after_implement` unit means, rather than widening it back to the whole feature.
+
+## 2026-06-14 — audit-barrage lift (20260614T203823310Z-audit-protocol-friction-burndown-phase-2)
+
+### AUDIT-20260614-95 — Unexpected govern exceptions now advertise `fatal` but still exit with code 1
+
+Finding-ID: AUDIT-20260614-95
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/subcommands/govern.ts:861-877`, `src/cli.ts:153-156`
+
+The new terminal-outcome contract says unexpected exceptions are covered and should emit a `fatal` terminal (`src/subcommands/govern.ts:872-877`). But that branch only writes `govern: terminal-outcome=fatal` and then rethrows. The top-level CLI wrapper catches that rethrow in `src/cli.ts:153-156` and exits `1`, not `2`.
+
+That leaves `govern` in an internally contradictory state for the exact failures this change is trying to mechanize: the machine-readable tag says `fatal`, while the process exit code says "bounded refusal/other nonfatal command failure" rather than the documented govern fatal code. Downstream automation that keys on exit status first will misclassify real infrastructure failures like checkpoint-write errors or uncaught child-process faults. A reasonable fix is to convert the unexpected branch into a `GovernProtocolError`/`process.exit(2)` path instead of rethrowing into the generic CLI catch.
+
+### AUDIT-20260614-96 — `boundary-too-large` is exported as a terminal kind, but this code path cannot currently emit it
+
+Finding-ID: AUDIT-20260614-96
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/govern/protocol.ts:43-63`, `src/govern/protocol.ts:344-370`, `src/govern/fleet-negotiation.ts:25-49`
+
+This diff promotes `boundary-too-large` into the public `GovernTerminalKind` enum and documents it as a distinct execution outcome with its own recovery (`src/govern/protocol.ts:43-49`, `54-63`). In the actual control flow, though, `runProtocol` calls `negotiateFleet(renderedPromptBytes, ...)` first (`src/govern/protocol.ts:344-357`), and `negotiateFleet` already rejects every lane whose `maxPromptBytes` is smaller than the rendered prompt (`src/govern/fleet-negotiation.ts:25-49`). Only after that accepted-fleet check does the code call `assertBoundaryFits(...)` (`src/govern/protocol.ts:358-370`).
+
+So an oversized prompt does not surface as `boundary-too-large`; it collapses into `negotiation-failed` before the boundary check is reachable. The blast radius is medium because consumers still get a fatal outcome, but the new machine contract is inaccurate: any automation branching on `boundary-too-large` will never observe that state, and the recovery guidance in the comment is misleading as shipped. The fix is either to remove the dead terminal from the exported contract or reorder/refactor the checks so `boundary-too-large` can actually occur.
+
+### AUDIT-20260614-97 — Whole-feature composition still feeds all phase files into `resolveComposingFeatureUnit`
+
+Finding-ID: AUDIT-20260614-97
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/govern.ts:686-703
+
+The new whole-feature path claims composition is now exclusion-based: current phases are carried by excluding their files, while the remaining whole-feature payload keeps cross-cutting files visible. But the call to `resolveComposingFeatureUnit` still passes every non-current phase as `changed: true` and every current phase as `changed: false` at lines 686-693, even though its returned `diffScope.files` is discarded immediately after in favor of `payloadPathScope = undefined` and `compositionExcludePaths` at lines 695-703.
+
+That makes `resolveComposingFeatureUnit` a misleading no-op for whole-feature payload scoping: its documented contract says it computes the composing unit’s included files, but this caller now uses only `auditLogSection`. The downstream blast radius is medium because current behavior can still be correct through `excludePaths`, but the duplicated and contradictory composition primitive will compound: future code or tests can reasonably trust `phaseUnit.diffScope.files` as the actual audited scope and get the wrong answer for cross-cutting remainder audits.
+
+A reasonable fix is to either stop calling the scope-computing helper here and construct the feature audit unit explicitly for the `after_implement` label, or update/extract the primitive so its returned `diffScope` represents the exclusion-based whole-feature composition actually used by this caller.

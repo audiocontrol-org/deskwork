@@ -112,8 +112,13 @@ function makeRepo(): string {
     'utf8',
   );
   mkdirSync(join(repo, 'src'), { recursive: true });
-  writeFileSync(join(repo, 'src', 'a.ts'), 'export const A = 1;\n', 'utf8');
-  writeFileSync(join(repo, 'src', 'b.ts'), 'export const B = 2;\n', 'utf8');
+  // Substantive source so the whole-feature clone-step's jscpd run produces a
+  // report (it errors over a trivial tree); the per-phase gate tests never reach
+  // the clone-step (they FATAL at the gate first), but the composition test does.
+  for (const [name, mul] of [['a', 2], ['b', 3]] as const) {
+    const lines = Array.from({ length: 30 }, (_, i) => `export const ${name}${i} = ${i} * ${mul};`);
+    writeFileSync(join(repo, 'src', `${name}.ts`), `${lines.join('\n')}\n`, 'utf8');
+  }
   spawnSync('git', ['-C', repo, 'init', '-q'], { encoding: 'utf8' });
   commitAll(repo, 'base');
   return repo;

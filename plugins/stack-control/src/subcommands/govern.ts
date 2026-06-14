@@ -52,11 +52,7 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
-import {
-  parsePhases,
-  resolveComposingFeatureUnit,
-  resolvePhaseUnit,
-} from '../govern/incremental-audit.js';
+import { parsePhases, resolvePhaseUnit } from '../govern/incremental-audit.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
@@ -683,15 +679,15 @@ export async function runGovern(args: string[]): Promise<void> {
           // makes the cross-cutting remainder visible, so all-carried audits ONLY
           // the cross-cutting diff (the whole diff minus every phase's files),
           // never the whole feature.
-          phaseUnit = resolveComposingFeatureUnit({
-            tasksPath,
-            diffBase,
-            phases: phaseCheckpointStatuses.map((status) => ({
-              phaseId: status.phaseId,
-              converged: status.state === 'current',
-              changed: status.state !== 'current',
-            })),
-          });
+          // The after_implement unit is the whole-feature payload (exclusion-based
+          // scope, below) under the `after_implement` checkpoint label. Construct
+          // it explicitly — the scope it audits is "the diff minus carried files",
+          // expressed via compositionExcludePaths, not an inclusion file list.
+          phaseUnit = {
+            granularity: 'feature',
+            diffScope: { base: diffBase, files: [] },
+            auditLogSection: 'after_implement',
+          };
           const carriedFiles = phaseCheckpointStatuses
             .filter((status) => status.state === 'current')
             .flatMap((status) => status.files);
@@ -869,11 +865,13 @@ export async function runGovern(args: string[]): Promise<void> {
       const code = err instanceof GovernProtocolError ? err.exitCode : 2;
       process.exit(code);
     }
-    // AUDIT-BARRAGE-codex-01 (021 phase-2 cross-model HIGH): an UNEXPECTED
-    // exception (fs failure, checkpoint-write failure, uncaught child error) must
-    // still emit the promised `fatal` terminal before it propagates — the
-    // "every exit" contract covers this class too.
+    // AUDIT-BARRAGE-codex-01 (021 phase-2 HIGH): an UNEXPECTED exception (fs
+    // failure, checkpoint-write failure, uncaught child error) is a govern FATAL.
+    // Emit the `fatal` terminal AND exit 2 — rethrowing let the generic CLI
+    // wrapper exit 1, contradicting the tag (machine-readable `fatal` vs a
+    // non-fatal exit code). Print the message so the failure is still diagnosable.
+    process.stderr.write(`govern: FATAL — ${errorMessage(err)}\n`);
     emitTerminalOutcome('fatal');
-    throw err;
+    process.exit(2);
   }
 }

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "featureSlug": "audit-protocol-friction-burndown",
+  "phaseId": "2",
+  "checkpoint": "phase-2",
+  "auditLogSection": "phase-2",
+  "scopeFingerprint": "27fe287be6c1d97ad6079dea406a83f8e08d5a70d0b1954ad6ac467644377c60",
+  "passedAt": "2026-06-14T20:20:49.247Z",
+  "governedPaths": [
+    "src/subcommands/govern.ts",
+    "src/govern/protocol.ts",
+    "src/govern/checkpoint-state.ts",
+    "src/govern/lane-capabilities.ts"
+  ]
+}

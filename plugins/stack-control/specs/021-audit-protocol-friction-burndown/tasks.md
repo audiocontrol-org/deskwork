@@ -44,7 +44,7 @@
 - [X] T007 [P] [US1] RED: add fixture tests proving a required phase cannot be skipped, and that stale checkpoints are rejected, in `plugins/stack-control/src/__tests__/govern/phase-checkpoints.test.ts`
 - [X] T008 [US1] Implement required-phase checkpoint enforcement in `plugins/stack-control/src/govern/incremental-audit.ts`
 - [X] T009 [US1] Wire checkpoint freshness validation into `plugins/stack-control/src/subcommands/govern.ts`
-- [X] T010 [US1] RED→GREEN integration: prove whole-feature govern composes from required phase checkpoints instead of erasing them in `plugins/stack-control/src/__tests__/govern/govern-phase-composition.test.ts`
+- [X] T010 [US1] RED→GREEN integration: prove whole-feature govern composes from required phase checkpoints instead of erasing them. (Coverage moved to the CLI level — `phase-checkpoints.test.ts` "whole-feature govern composes instead of gating on a missing phase checkpoint" — after the 021 phase-2 audit retired the inclusion-based `resolveComposingFeatureUnit` primitive in favor of exclusion-based composition in `govern.ts`.)
 
 ---
 
