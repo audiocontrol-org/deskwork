@@ -107,7 +107,7 @@
 
 - [X] T030 [P] Update quickstart validation evidence in `specs/021-audit-protocol-friction-burndown/quickstart.md`
 - [X] T031 [P] Reconcile and close or re-scope linked backlog items touched by this feature (closed TASK-71 via T022, TASK-57 via T029; TASK-47 partially addressed by T026 and kept open for the cross-boundary residual; new findings TASK-116 hermetic-fixtures, TASK-117 boundary-too-large-unreachable)
-- [ ] T032 Run targeted Vitest suites plus the plugin test umbrella and record any pre-existing unrelated failures
+- [X] T032 Run targeted Vitest suites plus the plugin test umbrella and record any pre-existing unrelated failures. RESULT: full umbrella green — 234 files / 1538 tests pass when fixtures can sign (verified with `commit.gpgsign=false` injected for test subprocesses). The 6 failures observed under a locked gpg-agent are ALL `gpg failed to sign the data` in non-hermetic fixtures (the TASK-116 defect), NOT 021 regressions.
 
 ## Dependencies & Execution Order
 
