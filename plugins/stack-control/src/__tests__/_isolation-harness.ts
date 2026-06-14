@@ -113,6 +113,11 @@ export function makeNestedFixture(opts?: {
   gitIn(outerRoot, ['init', '-q']);
   gitIn(outerRoot, ['config', 'user.email', 'probe@example.invalid']);
   gitIn(outerRoot, ['config', 'user.name', 'isolation-probe']);
+  // Hermetic fixtures: throwaway tmpdir repos must NOT sign — a global
+  // `commit.gpgsign=true` (operator setup) would otherwise make these fixtures
+  // depend on an unlocked gpg key and fail in any keyless CI environment.
+  gitIn(outerRoot, ['config', 'commit.gpgsign', 'false']);
+  gitIn(outerRoot, ['config', 'tag.gpgsign', 'false']);
   writeFileSync(join(outerRoot, 'README.md'), 'outer fixture repo\n', 'utf8');
   gitIn(outerRoot, ['add', '.']);
   gitIn(outerRoot, ['commit', '-q', '-m', 'seed']);
@@ -148,6 +153,11 @@ export function makeMarkerlessFixture(): NestedFixture {
   gitIn(outerRoot, ['init', '-q']);
   gitIn(outerRoot, ['config', 'user.email', 'probe@example.invalid']);
   gitIn(outerRoot, ['config', 'user.name', 'isolation-probe']);
+  // Hermetic fixtures: throwaway tmpdir repos must NOT sign — a global
+  // `commit.gpgsign=true` (operator setup) would otherwise make these fixtures
+  // depend on an unlocked gpg key and fail in any keyless CI environment.
+  gitIn(outerRoot, ['config', 'commit.gpgsign', 'false']);
+  gitIn(outerRoot, ['config', 'tag.gpgsign', 'false']);
   writeFileSync(join(outerRoot, 'README.md'), 'marker-less fixture repo\n', 'utf8');
   gitIn(outerRoot, ['add', '.']);
   gitIn(outerRoot, ['commit', '-q', '-m', 'seed']);
