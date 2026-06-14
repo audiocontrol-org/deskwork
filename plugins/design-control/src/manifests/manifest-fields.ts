@@ -54,8 +54,14 @@ function escapesOwnRoot(value: string): boolean {
 /** Lowercase-hex sha256 digest. */
 export const sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/, 'must be a lowercase hex sha256 digest');
 
-/** A captured viewport: an id and a positive integer pixel width. */
-export const viewportSchema = z.object({
-  id: z.string().min(1),
-  width: z.number().int().positive(),
-});
+/**
+ * A captured viewport: an id and a positive integer pixel width. STRICT so an
+ * unknown key (e.g. a typo'd field) fails validation rather than being silently
+ * stripped — shared by the referee-request and surface-status manifests.
+ */
+export const viewportSchema = z
+  .object({
+    id: z.string().min(1),
+    width: z.number().int().positive(),
+  })
+  .strict();

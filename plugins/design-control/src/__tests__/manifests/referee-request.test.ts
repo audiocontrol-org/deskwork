@@ -230,6 +230,64 @@ describe('refereeRequestManifestSchema', () => {
     expect(() => parseRefereeRequestManifest(validRefereePreview({ referee }))).toThrow();
   });
 
+  it('rejects a misspelled top-level `refree` block on a scaffold manifest (AUDIT-20260614-22)', () => {
+    // A typo'd referee key must FAIL — not be silently stripped and treated as
+    // "referee omitted". Strictness across the whole manifest is what makes this
+    // a rejection rather than a silent drop.
+    const manifest = { ...validScaffold(), refree: validRefereeControl() };
+    expect(() => parseRefereeRequestManifest(manifest)).toThrow();
+    expect(refereeRequestManifestSchema.safeParse(manifest).success).toBe(false);
+  });
+
+  it('rejects an unknown secret-bearing extra key at the manifest top level (AUDIT-20260614-23)', () => {
+    const manifest = { ...validScaffold(), secretToken: 'leak-me' };
+    expect(() => parseRefereeRequestManifest(manifest)).toThrow();
+    expect(refereeRequestManifestSchema.safeParse(manifest).success).toBe(false);
+  });
+
+  it('rejects an unknown key inside the nested wireframe object (AUDIT-20260614-23)', () => {
+    const manifest = validScaffold({
+      wireframe: { path: 'surface.html', sha256: sha256Hex('wireframe'), token: 'leak' },
+    });
+    expect(() => parseRefereeRequestManifest(manifest)).toThrow();
+    expect(refereeRequestManifestSchema.safeParse(manifest).success).toBe(false);
+  });
+
+  it('rejects an unknown key inside a nested stableRegions entry (AUDIT-20260614-23)', () => {
+    const referee: Record<string, unknown> = {
+      ...validRefereeControl(),
+      stableRegions: [
+        { id: 'masthead', locator: 'header.masthead', captureStep: 'default', token: 'leak' },
+      ],
+    };
+    expect(() => parseRefereeRequestManifest(validRefereePreview({ referee }))).toThrow();
+  });
+
+  it('rejects an unknown key inside the nested designSpec object (AUDIT-20260614-23)', () => {
+    const manifest = validScaffold({
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec'), token: 'leak' },
+    });
+    expect(() => parseRefereeRequestManifest(manifest)).toThrow();
+  });
+
+  it('rejects two declared viewports that share the same id (AUDIT-20260614-21 — duplicate viewport id)', () => {
+    // Both viewports claim id "desktop"; the duplicate must be reported as the
+    // root problem (not masked into a false identity-coverage match).
+    const manifest = validRefereePreview({
+      viewports: [
+        { id: 'desktop', width: 1280 },
+        { id: 'desktop', width: 390 },
+      ],
+    });
+    expect(() => parseRefereeRequestManifest(manifest)).toThrow(/duplicate.*viewport/i);
+    expect(refereeRequestManifestSchema.safeParse(manifest).success).toBe(false);
+  });
+
+  it('still accepts distinct desktop/phone viewport ids (AUDIT-20260614-21 — no over-rejection)', () => {
+    const manifest = parseRefereeRequestManifest(validRefereePreview());
+    expect(manifest.viewports.map((viewport) => viewport.id).sort()).toEqual(['desktop', 'phone']);
+  });
+
   it('exposes the schema for callers that want a non-throwing safeParse', () => {
     expect(refereeRequestManifestSchema.safeParse(validScaffold()).success).toBe(true);
     expect(refereeRequestManifestSchema.safeParse({ mode: 'scaffold' }).success).toBe(false);
