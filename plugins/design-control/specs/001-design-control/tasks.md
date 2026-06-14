@@ -41,9 +41,9 @@ verbatim in substance** — when they drift, the PRD wins.
 > ship **before** Phase 5 begins; that is what "ship the scaffold first" means. Phase 5 (referee) and
 > the Phase 6 referee arm are the gated, last-built track.
 
-## Phase 1: Engine-adapter seam + lo-fi wireframe kit + allowlist lint (v1-scaffold)
+## Phase 1A: Engine-adapter seam + lo-fi wireframe kit (v1-scaffold)
 
-**Per-phase govern file scope (authoritative):** `src/engine-adapter/types.ts`, `src/engine-adapter/conformance.ts`, `src/engine-adapter/preflight.ts`, `src/engine-adapter/index.ts`, `src/wireframe-kit/sketch-kit.ts`, `src/wireframe-kit/index.ts`, `src/lint/allowlist.ts`, `src/lint/check-mockup-lofi.ts`, `src/lint/stylesheet-pin.ts`, `src/lint/codepoint.ts`, `src/lint/types.ts`, `src/lint/index.ts`, `src/authoring/lint-file.ts`, `src/authoring/check-wireframe-cli.ts`, `src/authoring/index.ts`, `src/provenance/derived.ts`, `src/provenance/cli.ts`, `src/provenance/wireframe-provenance-cli.ts`, `src/provenance/index.ts`, `bin/check-wireframe`, `bin/wireframe-provenance`, `skills/wireframe/SKILL.md`, `assets/sketch-kit/sketch-kit.css`, `assets/sketch-kit/example-wireframe.html`, `src/__tests__/engine-adapter/types.test.ts`, `src/__tests__/engine-adapter/types.binding.test.ts`, `src/__tests__/engine-adapter/conformance.test.ts`, `src/__tests__/engine-adapter/preflight.test.ts`, `src/__tests__/wireframe-kit/sketch-kit.test.ts`, `src/__tests__/lint/check-mockup-lofi.test.ts`, `src/__tests__/lint/stylesheet-pin.test.ts`, `src/__tests__/lint/codepoint.test.ts`, `src/__tests__/lint/allowlist-url-derivation.test.ts`, `src/__tests__/authoring/lint-file.test.ts`, `src/__tests__/authoring/check-wireframe-shim.test.ts`, `src/__tests__/provenance/derived.test.ts`, `src/__tests__/provenance/cli.test.ts`, `src/__tests__/provenance/wireframe-provenance-shim.test.ts`.
+**Per-phase govern file scope (authoritative):** `src/engine-adapter/types.ts`, `src/engine-adapter/conformance.ts`, `src/engine-adapter/preflight.ts`, `src/engine-adapter/index.ts`, `src/wireframe-kit/sketch-kit.ts`, `src/wireframe-kit/index.ts`, `assets/sketch-kit/sketch-kit.css`, `assets/sketch-kit/example-wireframe.html`, `src/__tests__/engine-adapter/types.test.ts`, `src/__tests__/engine-adapter/types.binding.test.ts`, `src/__tests__/engine-adapter/conformance.test.ts`, `src/__tests__/engine-adapter/preflight.test.ts`, `src/__tests__/wireframe-kit/sketch-kit.test.ts`, `mockups/sketch-kit/DECISION.md`.
 
 - [x] **Engine-adapter interface declaration + fail-loud preflight — FIRST, before any engine-
       consuming skill.** Declare the interface (`author-wireframe`, `translate-design-language`,
@@ -64,6 +64,10 @@ verbatim in substance** — when they drift, the PRD wins.
       stack. SSOT module `@/wireframe-kit/sketch-kit` exports the asset paths, closed vocabulary,
       and theme/font manifests. 21 tests (self-contained: no http/https/data:/`@import`, all
       `url()`s + fonts resolve on disk, one `<link>`, example uses only vocabulary tokens).
+
+## Phase 1B: Lo-fi lint closure + adversarial corpus (v1-scaffold)
+
+**Per-phase govern file scope (authoritative):** `src/lint/allowlist.ts`, `src/lint/check-mockup-lofi.ts`, `src/lint/stylesheet-pin.ts`, `src/lint/codepoint.ts`, `src/lint/types.ts`, `src/lint/index.ts`, `src/__tests__/lint/check-mockup-lofi.test.ts`, `src/__tests__/lint/stylesheet-pin.test.ts`, `src/__tests__/lint/codepoint.test.ts`, `src/__tests__/lint/allowlist-url-derivation.test.ts`.
 - [x] `check-mockup-lofi` lint as an **element/attribute allowlist** (permit only the pinned
       sketch-kit `<link>`, `.sk-*` tags **including `.sk-theme-{marker,blueprint,grayscale}`**,
       `.sk-img`, a closed set of plain structural tags; reject
@@ -141,6 +145,10 @@ verbatim in substance** — when they drift, the PRD wins.
       Romanian comma-below, multiline placeholders, cache-busting/percent-encoded/subdirectory kit
       hrefs, data tables, placeholder rows, prose pages, disclosure blocks, and the boundary
       fixtures. Suite: 151 → 286.
+
+## Phase 1C: Authoring skill + derived provenance gate (v1-scaffold)
+
+**Per-phase govern file scope (authoritative):** `src/authoring/lint-file.ts`, `src/authoring/check-wireframe-cli.ts`, `src/authoring/index.ts`, `src/provenance/derived.ts`, `src/provenance/cli.ts`, `src/provenance/wireframe-provenance-cli.ts`, `src/provenance/index.ts`, `bin/check-wireframe`, `bin/wireframe-provenance`, `skills/wireframe/SKILL.md`, `src/__tests__/authoring/lint-file.test.ts`, `src/__tests__/authoring/check-wireframe-shim.test.ts`, `src/__tests__/provenance/derived.test.ts`, `src/__tests__/provenance/cli.test.ts`, `src/__tests__/provenance/wireframe-provenance-shim.test.ts`.
 - [x] `/design-control:wireframe <change>` authoring skill (operator-driven + lint-enforced; the
       engine `author-wireframe` method is an optional accelerator routed through the same lint).
       **Done — 2026-06-10.** `skills/wireframe/SKILL.md` (manual path needs no engine; the
@@ -165,9 +173,9 @@ adversarial validator's leakage cases (incl. emoji-as-icon + `𝐌𝐚𝐭𝐡`-
 positive corpus** passes (not a single fixture); the engine-authored wireframe is constrained by the
 same lint; a `derived` artifact cannot be accepted without a recorded operator edit.
 
-## Phase 2: Design-language spec convention (v1-scaffold)
+## Phase 2A: Design-language schema + example-presence (v1-scaffold)
 
-**Per-phase govern file scope (authoritative):** `src/design-language/types.ts`, `src/design-language/schema.ts`, `src/design-language/link-liveness.ts`, `src/design-language/check-spec-file.ts`, `src/design-language/check-design-spec-cli.ts`, `src/design-language/selector-canon.ts`, `src/design-language/rule-attempt.ts`, `src/design-language/index.ts`, `bin/check-design-spec`, `skills/translate-design-language/SKILL.md`, `src/__tests__/design-language/schema.test.ts`, `src/__tests__/design-language/link-liveness.test.ts`, `src/__tests__/design-language/check-spec-file.test.ts`, `src/__tests__/design-language/check-design-spec-shim.test.ts`.
+**Per-phase govern file scope (authoritative):** `src/design-language/types.ts`, `src/design-language/schema.ts`, `src/__tests__/design-language/schema.test.ts`.
 
 - [x] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
       do/don't), each rule linked to a live CSS file/class + ≥1 current example. The spec is a
@@ -177,6 +185,16 @@ same lint; a `derived` artifact cannot be accepted without a recorded operator e
       kind/css/example/do/don't with an `unknown-field` typo guard; `css: <path> <selector>`
       links; invalid rules become findings, never silently kept or dropped. TDD: RED on the
       unresolvable module first; 17 new tests).
+- [x] **Example-presence validation:** the schema rejects a rule with **zero example references**
+      (each rule carries ≥1 example). Structural-presence only — verifying the example still matches
+      live UI is `spec-truthfulness` (named-deferred).
+      **Done — `b2659452`** (`missing-example` finding; an empty `example:` value does NOT
+      satisfy presence — it surfaces as `empty-field` + `missing-example`, both tested).
+
+## Phase 2B: Static link-liveness + design-spec file gate (v1-scaffold)
+
+**Per-phase govern file scope (authoritative):** `src/design-language/link-liveness.ts`, `src/design-language/check-spec-file.ts`, `src/design-language/check-design-spec-cli.ts`, `src/design-language/selector-canon.ts`, `src/design-language/rule-attempt.ts`, `src/design-language/index.ts`, `bin/check-design-spec`, `src/__tests__/design-language/link-liveness.test.ts`, `src/__tests__/design-language/check-spec-file.test.ts`, `src/__tests__/design-language/check-design-spec-shim.test.ts`.
+
 - [x] **Static** link-liveness check (selector/class must be *defined in author-written source*;
       **no app boot**). Scoped to author-written CSS selectors/classes; utility-framework / CSS-in-JS
       / hashed CSS-Modules resolution is **not validated in v1** (named-deferred). Runtime dead-CSS +
@@ -190,11 +208,10 @@ same lint; a `derived` artifact cannot be accepted without a recorded operator e
       `@/design-language/check-spec-file` + `bin/check-design-spec` (exit 0/1/2, mirrors
       check-wireframe; shim smoke-verified both directions). TDD: RED first; 20 new tests; suite
       397 → 417.)
-- [x] **Example-presence validation:** the schema rejects a rule with **zero example references**
-      (each rule carries ≥1 example). Structural-presence only — verifying the example still matches
-      live UI is `spec-truthfulness` (named-deferred).
-      **Done — `b2659452`** (`missing-example` finding; an empty `example:` value does NOT
-      satisfy presence — it surfaces as `empty-field` + `missing-example`, both tested).
+
+## Phase 2C: `translate-design-language` authoring skill (v1-scaffold)
+
+**Per-phase govern file scope (authoritative):** `skills/translate-design-language/SKILL.md`.
 - [x] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
       drafts/maintains the spec from approved wireframe intent; its engine conformance is exercised
       **only when `/frontend-design` is present.**
