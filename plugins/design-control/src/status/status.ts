@@ -56,6 +56,7 @@ const surfaceStatusManifestSchema = z
     archive: z.object({
       path: pathSchema,
     }),
+    implementationCommit: z.string().min(1),
     staleSurface: staleSurfaceSchema.optional(),
   })
   .superRefine((value, ctx) => {

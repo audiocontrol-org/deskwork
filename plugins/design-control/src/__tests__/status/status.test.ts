@@ -81,6 +81,7 @@ describe('getSurfaceStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
@@ -119,6 +120,7 @@ describe('getSurfaceStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
@@ -156,6 +158,7 @@ describe('getSurfaceStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
@@ -202,6 +205,7 @@ describe('getSurfaceStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
@@ -247,6 +251,7 @@ describe('getSurfaceStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
@@ -293,6 +298,7 @@ describe('getSurfaceStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
@@ -331,6 +337,7 @@ describe('getSurfaceStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
@@ -365,6 +372,7 @@ describe('getSurfaceStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
@@ -401,6 +409,7 @@ describe('getSurfaceStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
@@ -438,6 +447,7 @@ describe('getSurfaceStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(readFileSync(wireframePath, 'utf8')) },
@@ -472,6 +482,7 @@ describe('getSurfaceStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
@@ -504,6 +515,7 @@ describe('runDesignControlStatus', () => {
       version: 1,
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
       routeState: '/studio/default',
       viewports: [{ id: 'desktop', width: 1280 }],
       wireframe: { path: 'surface.html', sha256: sha256Hex('wireframe') },
@@ -513,5 +525,22 @@ describe('runDesignControlStatus', () => {
     const { err, io } = capture();
     expect(runDesignControlStatus([manifestPath], io)).toBe(1);
     expect(err.join('\n')).toContain('phone viewport');
+  });
+
+  it('returns 1 for a manifest missing the implementation commit', () => {
+    const dir = freshDir();
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex('wireframe') },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec') },
+      archive: { path: 'surface.archive.json' },
+    });
+    const { err, io } = capture();
+    expect(runDesignControlStatus([manifestPath], io)).toBe(1);
+    expect(err.join('\n')).toContain('implementationCommit');
   });
 });
