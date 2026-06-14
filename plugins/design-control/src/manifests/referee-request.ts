@@ -9,11 +9,14 @@
  *
  * The manifest is mode-aware (a zod discriminated union on `mode`):
  *
- * - `scaffold`        — the referee-control block is OPTIONAL. A scaffold
- *                       manifest that omits it is valid (the v1-scaffold "NO
- *                       capture/baseline" boundary). When it IS supplied it is
- *                       fully validated (validated-when-present), so a malformed
- *                       referee-control field is still rejected.
+ * - `scaffold`        — the referee-control block is OPTIONAL, and its fields are
+ *                       INDIVIDUALLY optional. A scaffold manifest that omits the
+ *                       block is valid (the v1-scaffold "NO capture/baseline"
+ *                       boundary); one that supplies a PARTIAL block (e.g. just
+ *                       `stableRegions`, or just `baseline`) is also valid. Each
+ *                       supplied field is validated-when-present, so a malformed
+ *                       referee-control field is still rejected, and unknown keys
+ *                       still fail (strictness holds).
  * - `referee-preview` — the referee-control block is REQUIRED. A referee-preview
  *                       manifest that omits it (or supplies it malformed) is
  *                       rejected.
@@ -131,6 +134,20 @@ const refereeControlSchema = z
 
 export type RefereeControl = z.infer<typeof refereeControlSchema>;
 
+/**
+ * The scaffold-mode variant of the referee-control block. Per the spec, the
+ * referee fields are INDIVIDUALLY optional in scaffold mode: a scaffold manifest
+ * may supply some referee metadata incrementally (e.g. just `stableRegions`, or
+ * just `baseline`) and omit the rest, and each supplied field is validated WHEN
+ * present. `.partial()` makes every TOP-LEVEL referee key optional; it is shallow
+ * (nested objects keep their own required-internally + strict contracts, which is
+ * exactly what we want — only the top-level referee keys become optional). We
+ * re-apply `.strict()` afterwards so unknown keys inside a partial referee block
+ * still fail. The fully-required {@link refereeControlSchema} is unchanged and
+ * remains the referee-preview branch's contract.
+ */
+const scaffoldRefereeControlSchema = refereeControlSchema.partial().strict();
+
 const baseManifestShape = {
   version: z.literal(REFEREE_REQUEST_MANIFEST_VERSION),
   surfaceId: z.string().min(1),
@@ -242,8 +259,10 @@ const scaffoldManifestSchema = z
   .object({
     mode: z.literal('scaffold'),
     ...baseManifestShape,
-    // OPTIONAL in scaffold mode; fully validated WHEN present.
-    referee: refereeControlSchema.optional(),
+    // OPTIONAL in scaffold mode, AND individually-optional WHEN present: a
+    // scaffold manifest may supply a partial referee block (some fields, omit the
+    // rest); each supplied field is still validated, and unknown keys still fail.
+    referee: scaffoldRefereeControlSchema.optional(),
   })
   .strict();
 
@@ -266,9 +285,12 @@ export const refereeRequestManifestSchema = z
     // of identity coverage so a duplicate can't masquerade as a coverage match.
     requireUniqueViewportIds(value.viewports, ctx);
     requireDesktopAndPhone(value.viewports, ctx);
-    // Referential integrity applies whenever a referee block is present — on the
-    // referee-preview branch (always) and the scaffold branch (when supplied).
-    if (value.referee) {
+    // Referential integrity applies whenever a referee block supplies a
+    // perViewportIdentity array — on the referee-preview branch (always; the field
+    // is required there) and the scaffold branch (only when the partial referee
+    // block actually supplies perViewportIdentity). A scaffold manifest that omits
+    // perViewportIdentity does NOT require coverage.
+    if (value.referee?.perViewportIdentity) {
       requirePerViewportIdentityCoverage(value.viewports, value.referee.perViewportIdentity, ctx);
     }
   });

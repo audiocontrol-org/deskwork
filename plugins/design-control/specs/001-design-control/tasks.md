@@ -281,6 +281,18 @@ testable.
 
 ## Phase 4: Referee-request manifest schema validation (v1-scaffold)
 
+**Per-phase govern file scope (authoritative):** `src/manifests/referee-request.ts`, `src/manifests/manifest-fields.ts`, `src/manifests/index.ts`, `src/__tests__/manifests/referee-request.test.ts`.
+
+> **Phase-4 ↔ Phase-5 boundary (baseline matrix).** Phase 4 DEFINES `baseline` and `candidate`
+> as single structure-only artifact refs (`{path, sha256}`) — matching the spec's field list
+> ("baseline + candidate **paths**", spec.md § The manifest). The per-viewport / per-cell
+> **baseline matrix** keyed by `surface id + route/state + viewport + capture-step` is NOT a
+> Phase-4 schema concern: per spec.md (§ Baseline & capture) "referee-preview **status** refuses
+> completion when candidate screenshots don't cover the required matrix" — matrix-coverage
+> enforcement is **Phase 5 referee-preview status**, not Phase-4 schema validation. Phase 4
+> promises the fields exist and are shaped; Phase 5 owns the capture mechanism that fills and
+> checks the matrix. (AUDIT-20260614-27: a documented boundary, not a missing schema feature.)
+
 - [x] Referee-request manifest **schema**. **Scaffold-required** fields: surface id, route/state,
       viewport(s) desktop≥1280 + phone≤390, wireframe path+hash, spec path+version+hash, impl
       commit, change-intent brief. **Schema validation only** (no execution, no capture). *(The
@@ -301,11 +313,15 @@ testable.
       **Done — 2026-06-14.** `refereeControlSchema` defines baseline/candidate `{path,sha256}`,
       `stableRegions` (locator + optional captureStep), governed `dynamicRegions` (locator +
       required justification), `captureConfig` (identityHash + recipe, non-secret), per-viewport
-      identity, and non-secret `principal` metadata — structure-only. It is `.optional()` on the
-      `scaffold` branch (validated-when-present) and required on the `referee-preview` branch. 13
-      tests cover all four acceptance cases: malformed base rejected; supplied-but-malformed referee
-      field rejected; scaffold omitting referee accepted; referee-preview omitting/under-filling
-      referee rejected. Suite 535 -> 548.
+      identity, and non-secret `principal` metadata — structure-only. **Mode-aware optionality
+      (AUDIT-20260614-25):** on the `scaffold` branch the referee block is `.optional()` AND, when
+      supplied, its fields are **individually** optional (`refereeControlSchema.partial().strict()`)
+      — a scaffold author may record partial referee metadata incrementally; each supplied field is
+      still validated-when-present and unknown keys still fail (whole-manifest `.strict()`). On the
+      `referee-preview` branch every field is required. The per-viewport identity coverage check is
+      gated on `referee?.perViewportIdentity` being present, so a partial scaffold referee that omits
+      it is accepted. Tests cover all four acceptance cases plus the partial-scaffold / malformed-
+      when-present / unknown-key / referee-preview-still-complete matrix. Suite 535 -> 574.
 
 **Acceptance:** a malformed manifest is rejected by schema; a manifest that **supplies** a
 referee-control field in malformed shape is rejected; a **scaffold-mode manifest that omits** the

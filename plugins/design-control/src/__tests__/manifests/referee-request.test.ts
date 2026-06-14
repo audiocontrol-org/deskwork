@@ -66,7 +66,7 @@ describe('refereeRequestManifestSchema', () => {
   it('accepts a scaffold manifest that supplies a well-formed referee-control field (validated-when-present)', () => {
     const manifest = parseRefereeRequestManifest(validScaffold({ referee: validRefereeControl() }));
     expect(manifest.mode).toBe('scaffold');
-    expect(manifest.referee?.stableRegions[0].locator).toBe('header.masthead');
+    expect(manifest.referee?.stableRegions?.[0].locator).toBe('header.masthead');
   });
 
   it('rejects a scaffold manifest that supplies a referee-control field in malformed shape (acceptance 2)', () => {
@@ -76,10 +76,72 @@ describe('refereeRequestManifestSchema', () => {
     expect(() => parseRefereeRequestManifest(validScaffold({ referee: bad }))).toThrow();
   });
 
+  it('accepts a scaffold manifest supplying a PARTIAL referee block (only stableRegions) (AUDIT-20260614-25)', () => {
+    // Scaffold-mode referee fields are INDIVIDUALLY optional: a scaffold manifest
+    // may supply some referee metadata incrementally (here only stableRegions) and
+    // omit baseline/candidate/captureConfig/perViewportIdentity/principal/dynamicRegions.
+    const manifest = parseRefereeRequestManifest(
+      validScaffold({
+        referee: {
+          stableRegions: [{ id: 'masthead', locator: 'header.masthead', captureStep: 'default' }],
+        },
+      }),
+    );
+    expect(manifest.mode).toBe('scaffold');
+    expect(manifest.referee?.stableRegions?.[0].locator).toBe('header.masthead');
+    // The omitted referee fields are simply absent — not required in scaffold mode.
+    expect(manifest.referee?.baseline).toBeUndefined();
+    expect(manifest.referee?.perViewportIdentity).toBeUndefined();
+  });
+
+  it('accepts a scaffold manifest supplying only a referee baseline (partial, different field) (AUDIT-20260614-25)', () => {
+    const manifest = parseRefereeRequestManifest(
+      validScaffold({
+        referee: { baseline: { path: 'baselines/desktop.png', sha256: sha256Hex('baseline') } },
+      }),
+    );
+    expect(manifest.referee?.baseline?.path).toBe('baselines/desktop.png');
+    expect(manifest.referee?.stableRegions).toBeUndefined();
+  });
+
+  it('rejects a scaffold manifest whose PARTIAL referee block supplies a malformed field (validated-when-present) (AUDIT-20260614-25)', () => {
+    // Only stableRegions supplied, but its locator is empty — supplied-field validation still fires.
+    expect(() =>
+      parseRefereeRequestManifest(
+        validScaffold({ referee: { stableRegions: [{ id: 'x', locator: '' }] } }),
+      ),
+    ).toThrow();
+  });
+
+  it('rejects a scaffold manifest whose PARTIAL referee block carries an unknown key (strictness holds) (AUDIT-20260614-25)', () => {
+    const manifest = validScaffold({
+      referee: {
+        stableRegions: [{ id: 'masthead', locator: 'header.masthead', captureStep: 'default' }],
+        token: 'leak-me',
+      },
+    });
+    expect(() => parseRefereeRequestManifest(manifest)).toThrow();
+    expect(refereeRequestManifestSchema.safeParse(manifest).success).toBe(false);
+  });
+
+  it('accepts a scaffold manifest whose partial referee omits perViewportIdentity (coverage check is gated) (AUDIT-20260614-25)', () => {
+    // The post-union perViewportIdentity coverage check must NOT fire when the
+    // scaffold referee omits perViewportIdentity.
+    const manifest = parseRefereeRequestManifest(
+      validScaffold({
+        referee: { stableRegions: [{ id: 'masthead', locator: 'header.masthead' }] },
+      }),
+    );
+    expect(manifest.referee?.perViewportIdentity).toBeUndefined();
+  });
+
   it('accepts a well-formed referee-preview manifest', () => {
     const manifest = parseRefereeRequestManifest(validRefereePreview());
     expect(manifest.mode).toBe('referee-preview');
-    expect(manifest.referee?.baseline.path).toBe('baselines/desktop.png');
+    // Narrow on mode: in the referee-preview branch the referee block and all its
+    // fields are REQUIRED (baseline is non-optional), so no `?.` is needed here.
+    if (manifest.mode !== 'referee-preview') throw new Error('expected referee-preview manifest');
+    expect(manifest.referee.baseline.path).toBe('baselines/desktop.png');
   });
 
   it('rejects a referee-preview manifest that omits the referee field (acceptance 4)', () => {
@@ -208,7 +270,9 @@ describe('refereeRequestManifestSchema', () => {
 
   it('accepts a referee whose perViewportIdentity matches the declared viewports exactly (AUDIT-20260614-19)', () => {
     const manifest = parseRefereeRequestManifest(validRefereePreview());
-    expect(manifest.referee?.perViewportIdentity.map((entry) => entry.viewportId).sort()).toEqual([
+    // referee-preview: perViewportIdentity is required — narrow on mode to access it.
+    if (manifest.mode !== 'referee-preview') throw new Error('expected referee-preview manifest');
+    expect(manifest.referee.perViewportIdentity.map((entry) => entry.viewportId).sort()).toEqual([
       'desktop',
       'phone',
     ]);
