@@ -12,7 +12,7 @@ deskwork:
 
 **Feature Branch**: `feature/design-control`
 **Created**: 2026-06-05
-**Status**: In implementation (Phase 1 of 6 — see `tasks.md`)
+**Status**: Specified; implementation remains gated on `/speckit-analyze` and `/stack-control:execute` (see `tasks.md`)
 **Input**: Ported 2026-06-10 from the dw-lifecycle feature docs (`docs/1.0/001-IN-PROGRESS/design-control/prd.md`; git history preserves the original) into the stack-control regime. The content below is the operator-approved PRD verbatim — the design-of-record converged via 11 adversarial audit-barrage rounds. Port adjustments, in full: this header; relative links whose depth changed; and a same-day amendment renaming the referee's declared cross-plugin dependency and the implement-session verb from the deprecated dw-lifecycle plugin to its stack-control successor (byte-equivalent verb interface; operator decision 2026-06-10). Provenance mentions of dw-lifecycle (e.g. the `.dw-lifecycle/scope-discovery/audit-runs` convergence records) are left verbatim.
 
 > **Design-of-record.** This PRD is the self-standing design for the feature. It absorbs the
@@ -150,7 +150,7 @@ Spirit and letter are **two separate questions that never cross** — the wirefr
 ugly, so it can never be read as a visual-design source; the design language is the only home for
 visual identity.
 
-### Engine-adapter seam (conformance-tested; Claude-only in v1)
+### Engine-adapter seam (conformance-tested; cross-model referee in v1)
 
 A declared interface — **`author-wireframe`, `translate-design-language`, `referee-screenshot`** —
 with **`/frontend-design` as the default Claude adapter**. A **declared cross-plugin dependency**
@@ -480,11 +480,13 @@ on the deskwork studio**.
   `toHaveScreenshot` / Percy / Argos / Chromatic). *(Boundary to draw in implementation: static
   text/DOM allowlisting and capture-recipe hashing are **configuration validation**, not a
   determinism **engine**; the prohibited thing is runtime visual/pixel comparison logic.)*
-- **Cross-family referee quorum / design-barrage engine battery** — phase 2, **gated on demonstrating
-  per-family *vision*-adapter conformance** (the text-diff audit-barrage harness does **not**
-  generalize to image ingestion).
-- **Cross-agent portability** — render-framework-independent, **NOT** agent-independent; a referee
-  engine is required (v1 ships one conformant Claude adapter).
+- **Expanded referee battery beyond the v1 barrage roster** — phase 2, gated on demonstrating
+  additional per-family *vision*-adapter conformance beyond the initial v1 families. The v1
+  referee already ships as a cross-model barrage; the deferred work is widening that roster, not
+  inventing it later.
+- **Broad cross-agent portability claims** beyond the validated v1 barrage roster — render-
+  framework-independent, **NOT** agent-independent; a qualifying referee engine is still required,
+  and portability claims ship only for the families proven in the v1 barrage.
 - **Runtime dead-CSS detection** and **spec-truthfulness** (link-liveness ≠ truthfulness) — named-
   deferred.
 - **Link-liveness on non-author-written CSS** — utility frameworks (Tailwind: classes are *composed*,

@@ -80,6 +80,15 @@ plugins/design-control/specs/001-design-control/
 plugins/design-control/
 ├── src/wireframe-kit/    # sketch-kit SSOT module (assets, vocabulary, themes)
 ├── src/lint/             # check-mockup-lofi: dual-axis allowlist lint
+├── src/design-language/  # spec schema, link-liveness, and spec-file validation
+├── src/archive/          # ACCEPTED/REJECTED archive primitives + persistence
+├── src/status/           # design-control status gates over artifact/manifest state
+├── src/manifests/        # referee-request manifest schema + validators
+├── src/referee/          # barrage prompt/templates + preview-mode orchestration seams
+├── src/capture/          # baseline/capture contracts and stable-region helpers
+├── src/provenance/       # driving-vs-derived artifact provenance and acceptance checks
+├── skills/               # operator-facing skill surfaces shipped with the plugin
+├── bin/                  # public command shims and validation entrypoints
 ├── assets/               # sketch-kit.css + bundled OFL webfonts
 └── audit/                # re-runnable lint adversarial-barrage prompt + script
 ```

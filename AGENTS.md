@@ -35,6 +35,12 @@ Implications:
 4. Report context and confirm the session goal.
 5. Do not start coding until the user confirms if the work is a planning/resume flow.
 
+When reporting workflow state or answering "what's the next step", name the
+single immediate next action only. Do not bundle the following step into the
+same answer unless the operator explicitly asks for the sequence. If later
+steps are mentioned for context, label them as later and do not execute them
+from a generic "do it."
+
 Use the `stack-control` workflow as the canonical path. For session pickup in the
 active stack-control installation, prefer `plugins/stack-control/skills/session-start/`
 and the active plugin-local Spec Kit feature under `plugins/stack-control/specs/`.
