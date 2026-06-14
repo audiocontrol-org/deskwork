@@ -256,13 +256,14 @@ source and passes adapter conformance. Scaffold completion never depends on engi
 - [ ] **Stale-surface** map: `surface-id → source-files/routes` derived from the import/route graph.
       **Feasibility-gated** — if feasible it ships **with its own acceptance** (`status` flags a
       surface whose mapped source drifted); if infeasible it is an **explicit operator-approved
-      descope recorded here**, never a silent implementer cut. The **dead-link half ships
+      descope recorded in the status manifest** (`staleSurface.mode:
+      operator-approved-descope` + rationale), never a silent implementer cut. The **dead-link half ships
       regardless.**
 
 **Acceptance:** `status` refuses "complete" on a missing wireframe; refuses to accept an unedited
 `derived` artifact; an archive decision round-trips with its links; `status` never reads referee
 verdicts. **Staleness:** EITHER `status` flags a surface with drifted mapped source (feasible path)
-OR the workplan records an explicit operator-approved descope of stale-surface detection (the
+OR the status manifest records an explicit operator-approved descope of stale-surface detection (the
 dead-link gate ships either way). The two conditions (dead-link vs stale-surface) are separately
 testable.
 

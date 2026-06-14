@@ -72,6 +72,7 @@ describe('getSurfaceStatus', () => {
         brief: 'Regroup the layout',
         proposalWireframePath: 'surface.html',
         acceptedWireframePath: 'surface.html',
+        implementationCommit: 'abc1234',
       }),
     );
     const sourcePath = join(dir, 'ui-source.ts');
@@ -150,6 +151,7 @@ describe('getSurfaceStatus', () => {
         brief: 'Regroup the layout',
         proposalWireframePath: 'surface.html',
         acceptedWireframePath: 'surface.html',
+        implementationCommit: 'abc1234',
       }),
     );
     const sourcePath = join(dir, 'ui-source.ts');
@@ -197,6 +199,7 @@ describe('getSurfaceStatus', () => {
         brief: 'Regroup the layout',
         proposalWireframePath: 'surface.html',
         acceptedWireframePath: 'surface.html',
+        implementationCommit: 'abc1234',
       }),
     );
     const sourcePath = join(dir, 'ui-source.ts');
@@ -243,6 +246,7 @@ describe('getSurfaceStatus', () => {
         brief: 'Regroup the layout',
         proposalWireframePath: 'surface.html',
         acceptedWireframePath: 'surface.html',
+        implementationCommit: 'abc1234',
       }),
     );
     const sourcePath = join(dir, 'ui-source.ts');
@@ -290,6 +294,7 @@ describe('getSurfaceStatus', () => {
         brief: 'Regroup the layout',
         proposalWireframePath: 'surface.html',
         acceptedWireframePath: 'surface.html',
+        implementationCommit: 'abc1234',
       }),
     );
     const sourcePath = join(dir, 'ui-source.ts');
@@ -329,6 +334,7 @@ describe('getSurfaceStatus', () => {
         brief: 'Regroup the layout',
         proposalWireframePath: 'surface.html',
         acceptedWireframePath: 'surface.html',
+        implementationCommit: 'abc1234',
       }),
     );
     const sourcePath = join(dir, 'ui-source.ts');
@@ -366,6 +372,7 @@ describe('getSurfaceStatus', () => {
         brief: 'Regroup the layout',
         proposalWireframePath: 'surface.html',
         acceptedWireframePath: 'surface.html',
+        implementationCommit: 'abc1234',
       }),
     );
     const manifestPath = writeManifest(dir, {
@@ -401,6 +408,7 @@ describe('getSurfaceStatus', () => {
         brief: 'Regroup the layout',
         proposalWireframePath: 'other.html',
         acceptedWireframePath: 'other.html',
+        implementationCommit: 'abc1234',
       }),
     );
     const sourcePath = join(dir, 'ui-source.ts');
@@ -439,6 +447,7 @@ describe('getSurfaceStatus', () => {
         brief: 'Regroup the layout',
         proposalWireframePath: 'surface.html',
         acceptedWireframePath: 'surface.html',
+        implementationCommit: 'abc1234',
       }),
     );
     const sourcePath = join(dir, 'ui-source.ts');
@@ -476,6 +485,7 @@ describe('getSurfaceStatus', () => {
         brief: 'Regroup the layout',
         proposalWireframePath: 'surface.html',
         acceptedWireframePath: 'surface.html',
+        implementationCommit: 'abc1234',
       }),
     );
     const manifestPath = writeManifest(dir, {
@@ -542,5 +552,23 @@ describe('runDesignControlStatus', () => {
     const { err, io } = capture();
     expect(runDesignControlStatus([manifestPath], io)).toBe(1);
     expect(err.join('\n')).toContain('implementationCommit');
+  });
+
+  it('returns 1 for a manifest using an absolute artifact path', () => {
+    const dir = freshDir();
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: '/tmp/surface.html', sha256: sha256Hex('wireframe') },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec') },
+      archive: { path: 'surface.archive.json' },
+    });
+    const { err, io } = capture();
+    expect(runDesignControlStatus([manifestPath], io)).toBe(1);
+    expect(err.join('\n')).toContain('collection-relative');
   });
 });

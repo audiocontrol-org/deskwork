@@ -304,8 +304,9 @@ are missing. It keys on **manifest structure / artifact presence**, **never on r
 deliverable, **derived from the import/route graph** (not hand-authored, which rots). It is
 **feasibility-gated**: if the graph derivation is feasible it ships **with its own acceptance**
 (`status` flags a surface whose mapped source drifted); if it is **not** feasible, it is an
-**explicit operator-approved descope recorded in the workplan** — never an implementer's silent
-mid-build cut. The **dead-link half always ships regardless.**
+**explicit operator-approved descope recorded in the status manifest** (`staleSurface.mode:
+operator-approved-descope` + rationale) — never an implementer's silent mid-build cut. The
+**dead-link half always ships regardless.**
 
 ### Referee-request manifest schema (scaffold = schema validation only)
 

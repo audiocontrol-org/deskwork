@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
 import { loadArchiveEntry } from '@/archive/store';
 import { checkDesignSpecFile, type CliIo } from '@/design-language/check-spec-file';
@@ -14,7 +14,12 @@ const STATUS_MANIFEST_VERSION = 1;
 
 const sha256Hex = (content: string): string => createHash('sha256').update(content).digest('hex');
 
-const pathSchema = z.string().min(1);
+const pathSchema = z
+  .string()
+  .min(1)
+  .refine((value) => !value.startsWith('~') && !isAbsolute(value), {
+    message: 'paths must be collection-relative; "~" and absolute paths are not portable',
+  });
 
 const viewportSchema = z.object({
   id: z.string().min(1),
@@ -239,18 +244,25 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
           `Archive entry ${archivePath} is for surface "${archive.surfaceId}", not manifest surface "${manifest.surfaceId}".`,
         ),
       );
+    } else if (!archive.accepted.implementationCommit) {
+      findings.push(
+        finding(
+          'unaccepted-decision',
+          `Archive entry ${archivePath} has no accepted implementation commit for surface "${manifest.surfaceId}".`,
+        ),
+      );
+    } else if (archive.accepted.implementationCommit !== manifest.implementationCommit) {
+      findings.push(
+        finding(
+          'unaccepted-decision',
+          `Archive entry ${archivePath} records implementation commit ${archive.accepted.implementationCommit}, which does not match manifest implementation commit ${manifest.implementationCommit}.`,
+        ),
+      );
     } else if (resolveAgainstManifest(manifestPath, archive.accepted.wireframePath) !== wireframePath) {
       findings.push(
         finding(
           'unaccepted-decision',
           `Archive entry ${archivePath} accepts wireframe ${archive.accepted.wireframePath}, which does not match manifest wireframe ${manifest.wireframe.path}.`,
-        ),
-      );
-    } else if (resolveAgainstManifest(manifestPath, archive.proposal.wireframePath) !== wireframePath) {
-      findings.push(
-        finding(
-          'unaccepted-decision',
-          `Archive entry ${archivePath} proposes wireframe ${archive.proposal.wireframePath}, which does not match manifest wireframe ${manifest.wireframe.path}.`,
         ),
       );
     }
