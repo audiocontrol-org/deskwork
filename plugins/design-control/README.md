@@ -2,13 +2,13 @@
 
 Portable **UX/UI surface-change discipline**, packaged as a deskwork
 marketplace plugin. It is the UX/UI-surface specialization of the sibling
-[`stack-control`](../stack-control/README.md) plugin's stance: agents are
+[`stack-control`](https://github.com/audiocontrol-org/deskwork/blob/main/plugins/stack-control/README.md) plugin's stance: agents are
 capable-but-unreliable, so you get good design outcomes by engineering the
 process so the bad outcome can't happen — not by lecturing the agent.
 
 > **Read the thesis first.** Every change to a UI surface flows through a
 > wireframe → design-language → implement → archive lifecycle. The WHY beneath
-> every decision is [`DESIGN-DISCIPLINE-THESIS.md`](../../DESIGN-DISCIPLINE-THESIS.md),
+> every decision is [`DESIGN-DISCIPLINE-THESIS.md`](https://github.com/audiocontrol-org/deskwork/blob/main/DESIGN-DISCIPLINE-THESIS.md),
 > starting with *"Why a discipline at all — the lifecycle philosophy."*
 
 ## What it does

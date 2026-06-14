@@ -408,9 +408,12 @@ ships.
       `wireframe-provenance`, `design-control-status`) already shipped and tested;
       registered in `.claude-plugin/marketplace.json`; joined the version lockstep
       (`package.json` 0.37.0 → 0.45.2, wired into `scripts/bump-version.ts`). Verified:
-      `claude plugin validate` passes, 575 tests pass, `tsc --noEmit` clean,
-      `version:bump` idempotent across all manifests including the new design-control
-      entries. The own archive primitive is `src/archive/`.)*
+      `claude plugin validate` passes, `tsc --noEmit` clean, and the design-control
+      manifests (`package.json`, `.claude-plugin/plugin.json`) report 0.45.2. The root
+      `package-lock.json` lagged at 0.37.0 after the bump and was refreshed to 0.45.2
+      separately (AUDIT-20260614 Finding 3); the `version:bump` idempotency check did NOT
+      cover the lockfile at the time of this note. The own archive primitive is
+      `src/archive/`.)*
 - [ ] **Scaffold arm (the `v1-scaffold` ship gate; no Phase-5 dependency):** run the sites→lanes
       studio content-browser + scrapbook redesign through **wireframe → pick → spec → implement →
       archive — NO referee** — across **≥2 diverse surfaces**; the plugin loads via the marketplace.

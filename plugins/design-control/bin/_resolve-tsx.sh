@@ -12,23 +12,22 @@
 # Contract: the caller exports SHIM_NAME (for messages) and PLUGIN_ROOT, then
 # `. "$PLUGIN_ROOT/bin/_resolve-tsx.sh"`, then `resolve_tsx` sets $TSX.
 #
-# Resolution order (first match wins):
-#   1. Workspace dev path: tsx resolves from an ANCESTOR's node_modules/.bin/
-#      (npm workspace hoist). The monorepo owns the full dep set, so dispatch
-#      directly — NO probe, NO install (hoisted deps resolve from PLUGIN_ROOT
-#      via Node's upward lookup).
-#   2. Adopter post-install: tsx exists at $PLUGIN_ROOT/node_modules/.bin/tsx
-#      AND every declared runtime dep is present under $PLUGIN_ROOT/node_modules.
-#      Dispatch via the local tsx.
-#   3. First run / partial install: npm install in $PLUGIN_ROOT, then dispatch.
-#      The dependency PROBE (every declared runtime dep present on disk) is the
-#      AUTHORITATIVE skip signal; install runs whenever any declared dep is
-#      actually missing.
+# Skip signal — the AUTHORITATIVE runnability check (not a path-existence probe):
+#   Every declared runtime dep must RESOLVE via Node's own module resolution
+#   FROM $PLUGIN_ROOT. This is correct in BOTH environments without any
+#   "ancestor tsx == workspace" heuristic:
+#     - Monorepo workspace dev: hoisted deps resolve from $PLUGIN_ROOT via Node's
+#       upward node_modules lookup → probe passes → NO install, dispatch directly.
+#     - Adopter sparse-clone (incl. a stray-ancestor node_modules/.bin/tsx that
+#       does NOT carry parse5/zod): the plugin's own deps do NOT resolve →
+#       probe fails → local `npm install --omit=dev --workspaces=false`.
+#   A mere on-disk path probe ($PLUGIN_ROOT/node_modules/<dep>/package.json) is
+#   NOT sufficient: an interrupted first-run install can leave direct metadata +
+#   .bin/tsx while missing transitive packages, after which the next run would
+#   skip reinstall and dispatch into a broken tree. Node resolution proves the
+#   dep (and its transitive closure) is actually loadable.
 #
-# Declared runtime deps — keep in sync with package.json "dependencies". A
-# probe that only checked tsx would skip npm install on a partial adopter
-# install (tsx present, parse5/zod missing) and then crash on Node module
-# resolution at first dispatch.
+# Declared runtime deps — keep in sync with package.json "dependencies".
 RUNTIME_DEPS="parse5 tsx zod"
 
 # Walk up from PLUGIN_ROOT for a usable tsx bin. Handles the workspace-hoist
@@ -47,12 +46,13 @@ _dc_find_tsx() {
   return 1
 }
 
-# Probe whether a declared runtime dep is installed in the plugin's own
-# node_modules/ (test the dep's package.json, not just the dir, so a partial
-# install where the dir exists but metadata never landed is caught).
-_dc_all_deps_installed() {
+# Probe whether every declared runtime dep RESOLVES via Node from $PLUGIN_ROOT.
+# Uses Node's own resolver (createRequire(...).resolve) so the check proves the
+# dep — and its transitive closure entry — is genuinely loadable, not merely
+# present on disk. Returns 0 only if ALL deps resolve.
+_dc_all_deps_resolve() {
   for _dc_dep in $RUNTIME_DEPS; do
-    if [ ! -f "$PLUGIN_ROOT/node_modules/$_dc_dep/package.json" ]; then
+    if ! node -e "require('node:module').createRequire('$PLUGIN_ROOT/package.json').resolve('$_dc_dep')" >/dev/null 2>&1; then
       return 1
     fi
   done
@@ -70,31 +70,32 @@ _dc_run_install() {
 }
 
 # resolve_tsx — sets TSX to a usable tsx path, bootstrapping (npm install) when
-# in adopter mode and the dep probe fails. Exits non-zero with a descriptive
-# message on unrecoverable failure (no silent fallback).
+# the declared runtime deps do not resolve from $PLUGIN_ROOT. The resolution
+# probe is the single source of truth and runs UNCONDITIONALLY — there is no
+# "ancestor tsx == workspace, skip the probe" short-circuit (that wrongly let a
+# stray-ancestor tsx suppress the install for non-monorepo adopters). Exits
+# non-zero with a descriptive message on unrecoverable failure (no silent
+# fallback).
 resolve_tsx() {
-  TSX=$(_dc_find_tsx || true)
-
-  # Workspace dev path: tsx resolved from an ANCESTOR (not from
-  # $PLUGIN_ROOT/node_modules). The monorepo owns deps; do not probe/install.
-  if [ -n "$TSX" ] && [ "$TSX" != "$PLUGIN_ROOT/node_modules/.bin/tsx" ]; then
-    return 0
+  # Already runnable (monorepo hoist OR a complete prior adopter install)?
+  # Dispatch via whatever tsx the upward walk finds — no install.
+  if _dc_all_deps_resolve; then
+    TSX=$(_dc_find_tsx || true)
+    if [ -n "$TSX" ]; then
+      return 0
+    fi
   fi
 
-  # Adopter post-install: local tsx present AND every dep present → dispatch.
-  if [ -n "$TSX" ] && _dc_all_deps_installed; then
-    return 0
-  fi
-
-  # First run / partial install: bootstrap, then re-resolve + re-probe.
+  # Deps don't resolve (fresh/partial adopter clone): bootstrap, then re-locate
+  # tsx (now local) and re-run the resolution probe.
   _dc_run_install
   TSX=$(_dc_find_tsx || true)
   if [ -z "$TSX" ]; then
     echo "${SHIM_NAME:-design-control}: npm install completed but tsx is still not resolvable from $PLUGIN_ROOT. Aborting." >&2
     exit 1
   fi
-  if ! _dc_all_deps_installed; then
-    echo "${SHIM_NAME:-design-control}: npm install completed but a declared runtime dep ($RUNTIME_DEPS) is still missing under $PLUGIN_ROOT/node_modules. Aborting." >&2
+  if ! _dc_all_deps_resolve; then
+    echo "${SHIM_NAME:-design-control}: npm install completed but a declared runtime dep ($RUNTIME_DEPS) still does not resolve from $PLUGIN_ROOT. Aborting." >&2
     exit 1
   fi
   return 0

@@ -35,6 +35,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -66,9 +67,10 @@ const CLI_REL = 'src/authoring/check-wireframe-cli.ts';
  * + helper so we exercise the shipped logic, and substitutes a trivial CLI
  * target that prints a sentinel (avoids dragging the full src/ + its deps).
  */
-function buildIsolatedPlugin(): string {
-  const root = mkdtempSync(join(realpathSync(tmpdir()), 'dc-adopter-'));
-  dirs.push(root);
+function buildIsolatedPlugin(parentDir?: string): string {
+  const base = parentDir ?? realpathSync(tmpdir());
+  const root = mkdtempSync(join(base, 'dc-adopter-'));
+  if (!parentDir) dirs.push(root);
 
   mkdirSync(join(root, 'bin'), { recursive: true });
   copyFileSync(join(realTsx, SHIM_NAME), join(root, 'bin', SHIM_NAME));
@@ -109,6 +111,11 @@ function stubNpmDir(pluginRoot: string): string {
   dirs.push(binDir);
   const marker = join(pluginRoot, '.stub-npm-ran');
   const nm = join(pluginRoot, 'node_modules');
+  // The faked install lays down a RESOLVABLE dep set: real node_modules/<dep>
+  // dirs with package.json "main", so the helper's Node-resolution probe (which
+  // calls require(...).resolve('<dep>') from PLUGIN_ROOT) actually resolves
+  // parse5 / zod locally. tsx is symlinked into .bin AND given a resolvable
+  // package so the probe + the exec both succeed.
   const script = [
     '#!/bin/sh',
     'set -eu',
@@ -117,13 +124,27 @@ function stubNpmDir(pluginRoot: string): string {
     `ln -sf "${realTsxBin}" "${nm}/.bin/tsx"`,
     `for dep in parse5 tsx zod; do`,
     `  mkdir -p "${nm}/$dep"`,
-    `  printf '{"name":"%s","version":"0.0.0"}' "$dep" > "${nm}/$dep/package.json"`,
+    `  printf '{"name":"%s","version":"0.0.0","main":"index.js"}' "$dep" > "${nm}/$dep/package.json"`,
+    `  printf 'module.exports = {};\\n' > "${nm}/$dep/index.js"`,
     `done`,
   ].join('\n');
   const npmPath = join(binDir, 'npm');
   writeFileSync(npmPath, `${script}\n`);
   chmodSync(npmPath, 0o755);
   return binDir;
+}
+
+/**
+ * Seed an ANCESTOR node_modules/.bin/tsx above the isolated plugin root, so the
+ * shim's upward walk finds an inherited tsx (the mixed-environment case in
+ * AUDIT-20260614 Finding 1). The plugin's OWN parse5/zod are deliberately NOT
+ * placed here — only tsx — so the resolution probe must still fail and fire the
+ * install. The ancestor tsx is the real binary symlinked in.
+ */
+function seedAncestorTsx(parentDir: string): void {
+  const ancestorBin = join(parentDir, 'node_modules', '.bin');
+  mkdirSync(ancestorBin, { recursive: true });
+  symlinkSync(realTsxBin, join(ancestorBin, 'tsx'));
 }
 
 describe('bin shims — adopter (sparse-clone) bootstrap', () => {
@@ -165,5 +186,44 @@ describe('bin shims — adopter (sparse-clone) bootstrap', () => {
       'utf8',
     );
     expect(installed).toContain('"name":"zod"');
+  }, 60_000);
+
+  it('still bootstraps when an ANCESTOR tsx exists but the plugin deps do not resolve (mixed env)', () => {
+    expect(existsSync(realTsxBin), `expected a real tsx at ${realTsxBin}`).toBe(
+      true,
+    );
+
+    // Parent dir carries a node_modules/.bin/tsx (inherited tsx), but NONE of
+    // the plugin's own runtime deps. The isolated plugin lives UNDER it.
+    const parent = mkdtempSync(join(realpathSync(tmpdir()), 'dc-ancestor-'));
+    dirs.push(parent);
+    seedAncestorTsx(parent);
+
+    const root = buildIsolatedPlugin(parent);
+    const npmDir = stubNpmDir(root);
+    const shim = join(root, 'bin', SHIM_NAME);
+    const marker = join(root, '.stub-npm-ran');
+
+    const env = {
+      ...process.env,
+      PATH: `${npmDir}${delimiter}${process.env.PATH ?? ''}`,
+    };
+
+    const result = spawnSync(shim, ['--noop'], {
+      cwd: root,
+      encoding: 'utf8',
+      env,
+    });
+    if (result.error) throw result.error;
+
+    // The ancestor tsx must NOT short-circuit the bootstrap: with parse5/zod
+    // unresolvable from PLUGIN_ROOT, the resolution probe fails and install runs.
+    expect(
+      existsSync(marker),
+      `ancestor tsx short-circuited the bootstrap; stub npm never ran. stderr: ${result.stderr}`,
+    ).toBe(true);
+    expect(result.stderr).not.toContain('run npm install first');
+    expect(result.status, `stderr: ${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain('DISPATCHED-OK');
   }, 60_000);
 });
