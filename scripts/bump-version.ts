@@ -63,11 +63,13 @@ const MANIFESTS: readonly VersionedManifest[] = [
   { path: 'plugins/deskwork-studio/package.json', label: 'deskwork-studio plugin shell', kind: 'lockstep-package-json' },
   { path: 'plugins/dw-lifecycle/package.json', label: 'dw-lifecycle plugin shell', kind: 'package-json' },
   { path: 'plugins/stack-control/package.json', label: 'stack-control plugin shell', kind: 'package-json' },
+  { path: 'plugins/design-control/package.json', label: 'design-control plugin shell', kind: 'package-json' },
   { path: 'plugins/deskwork/.claude-plugin/plugin.json', label: 'deskwork plugin.json', kind: 'plugin-json' },
   { path: 'plugins/deskwork-studio/.claude-plugin/plugin.json', label: 'deskwork-studio plugin.json', kind: 'plugin-json' },
   { path: 'plugins/dw-lifecycle/.claude-plugin/plugin.json', label: 'dw-lifecycle plugin.json', kind: 'plugin-json' },
   { path: 'plugins/stack-control/.claude-plugin/plugin.json', label: 'stack-control plugin.json', kind: 'plugin-json' },
   { path: 'plugins/stack-control/.codex-plugin/plugin.json', label: 'stack-control codex plugin.json', kind: 'plugin-json' },
+  { path: 'plugins/design-control/.claude-plugin/plugin.json', label: 'design-control plugin.json', kind: 'plugin-json' },
   // Spec Kit extension manifest — lockstep with the monorepo. Wired here so the
   // next bump doesn't freeze it (AUDIT-20260607-13). A Vitest assertion
   // (hook-wiring.test.ts) turns any future drift into a red test, not silent rot.

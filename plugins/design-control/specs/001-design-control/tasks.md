@@ -400,9 +400,17 @@ ships.
 > **Realizes the inversion:** the scaffold ship gate (plugin shell + scaffold arm) depends only on
 > Phases 1–4 and is intended to ship **before** Phase 5; the referee arm is the gated, last track.
 
-- [ ] **Plugin shell (scaffold ship gate; depends only on Phases 1–4, NOT Phase 5):**
+- [X] **Plugin shell (scaffold ship gate; depends only on Phases 1–4, NOT Phase 5):**
       `plugins/design-control/` — `.claude-plugin/plugin.json`, bin shim, README,
       marketplace.json registration; standalone (own archive primitive).
+      *(2026-06-14: `.claude-plugin/plugin.json` + plugin-root `README.md` created; the
+      four per-verb `bin/` shims (`check-wireframe`, `check-design-spec`,
+      `wireframe-provenance`, `design-control-status`) already shipped and tested;
+      registered in `.claude-plugin/marketplace.json`; joined the version lockstep
+      (`package.json` 0.37.0 → 0.45.2, wired into `scripts/bump-version.ts`). Verified:
+      `claude plugin validate` passes, 575 tests pass, `tsc --noEmit` clean,
+      `version:bump` idempotent across all manifests including the new design-control
+      entries. The own archive primitive is `src/archive/`.)*
 - [ ] **Scaffold arm (the `v1-scaffold` ship gate; no Phase-5 dependency):** run the sites→lanes
       studio content-browser + scrapbook redesign through **wireframe → pick → spec → implement →
       archive — NO referee** — across **≥2 diverse surfaces**; the plugin loads via the marketplace.
