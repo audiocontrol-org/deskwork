@@ -2608,3 +2608,18 @@ Surface:    plugins/design-control/bin/_resolve-tsx.sh:28-32
 The resolver documents known bootstrap gaps, then parks them in a stack-control-wide backlog item: version-gated reinstall, transitive integrity, and concurrency locking. The audit prompt explicitly rejects this shape because it turns a known operational fragility into a future-management note inside the code artifact instead of either implementing the behavior or stating the shipped contract plainly.
 
 The blast radius is low because the current runtime behavior is fail-loud for many damaged installs, and the comment does not itself alter execution. Still, unattended agents reading this file can treat the named gaps as intentionally out of scope and preserve a fragile bootstrap path. A reasonable fix is to remove the backlog disposition from the code comment and keep only the bounded behavior contract, or encode the relevant checks in the resolver.
+
+## 2026-06-14 — audit-barrage lift (20260614T225839091Z-design-control-after_clarify)
+
+### AUDIT-20260614-44 — Tagged plugin releases are not reproducible because first-run install floats dependency versions
+
+Finding-ID: AUDIT-20260614-44
+Status: migrated-to-backlog TASK-37
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/design-control/README.md:50-64; plugins/design-control/package.json:10-14; missing plugin-local lockfile/shrinkwrap in `plugins/design-control/`
+
+The new README now sells a standalone marketplace install path: install the tagged `design-control` plugin, then let the shim run `npm install` on first use ([README.md] lines 50-64). But the only dependency source shipped with that git-subdir payload is `plugins/design-control/package.json`, and its runtime deps are all semver ranges (`parse5`, `tsx`, `zod` at lines 10-14), not exact pins. A marketplace git-subdir clone of `plugins/design-control/` does not include the repo-root lockfile, and this diff does not add a plugin-local `package-lock.json` or `npm-shrinkwrap.json`, so the exact runtime an adopter gets for tag `v0.45.2` depends on whatever compatible versions are in the npm registry at install time.
+
+The blast radius is medium because the default consumer path now relies on this behavior: two adopters installing the same tagged plugin can run different code under the same `design-control` version, and a later upstream patch/minor release can change or break first-run bootstrap without any repo change or new plugin tag. That does not guarantee an immediate failure, so it is not blocking, but it does undermine the “release tag is the source of truth” contract the new README establishes. A reasonable fix is to ship a plugin-local lock surface for the sparse-clone install path and switch the shim to a reproducible install (`npm ci` against that lock, or an equivalent pinned mechanism).
