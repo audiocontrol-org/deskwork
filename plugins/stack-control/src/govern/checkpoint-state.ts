@@ -103,8 +103,18 @@ export function computeScopeFingerprint(
   installationRoot: string,
   paths: readonly string[],
 ): string {
+  const canonical = canonicalizeScopePaths(paths);
+  if (canonical.length === 0) {
+    // An empty scope hashes to the stable SHA-256 of nothing — a checkpoint bound
+    // to it can never go stale against implementation edits, silently bypassing the
+    // freshness contract (AUDIT-BARRAGE-codex-01). Reject it loudly instead.
+    throw new Error(
+      'phase checkpoint scope requires at least one governed path; ' +
+        'an empty scope cannot produce a meaningful fingerprint',
+    );
+  }
   const digest = createHash('sha256');
-  for (const rel of canonicalizeScopePaths(paths)) {
+  for (const rel of canonical) {
     digestScopedPath(digest, installationRoot, rel);
   }
   return digest.digest('hex');

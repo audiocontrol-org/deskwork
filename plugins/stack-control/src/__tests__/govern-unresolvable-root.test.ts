@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync, chmodSync, rmSync } 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveTsx, CLI } from './_run-helpers.js';
+import { seedDefaultFleetKnowledge } from './_isolation-harness.js';
 import { tmpBacklog } from '../../tests/backlog/helpers.js';
 
 // Minimal stub barrage bin (same seam as govern-orchestration.test.ts —
@@ -68,6 +69,7 @@ function makeRepoWithoutFeatureDirs(): string {
   // the enclosing installation from --at.
   mkdirSync(join(repo, '.stack-control'), { recursive: true });
   writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
+  seedDefaultFleetKnowledge(repo);
   writeFileSync(join(repo, 'seed.txt'), 'seed\n', 'utf8');
   const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
   git(['init', '-q']);
@@ -85,6 +87,7 @@ function makeRepoWithAmbiguousFeatureDirs(): string {
   const repo = mkdtempSync(join(tmpdir(), 'gov-amb-'));
   mkdirSync(join(repo, '.stack-control'), { recursive: true });
   writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
+  seedDefaultFleetKnowledge(repo);
   mkdirSync(join(repo, 'specs', '001-amb'), { recursive: true });
   mkdirSync(join(repo, 'specs', '002-amb'), { recursive: true });
   writeFileSync(join(repo, 'specs', '001-amb', 'spec.md'), 'spec one\n', 'utf8');

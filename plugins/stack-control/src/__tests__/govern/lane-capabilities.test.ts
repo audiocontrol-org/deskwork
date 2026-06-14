@@ -3,7 +3,7 @@ import { cpSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadLaneCapabilities } from '../../govern/lane-capabilities.js';
+import { classifyBinaryProbe, loadLaneCapabilities } from '../../govern/lane-capabilities.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = join(
@@ -36,15 +36,16 @@ describe('loadLaneCapabilities', () => {
     }
   });
 
-  it('falls back to the shipped fleet-knowledge template when no installation override is present', async () => {
+  it('fails loud when the installation has no fleet-knowledge file (no bundled-template fallback)', async () => {
+    // A fresh checkout with no .stack-control/fleet-knowledge.yaml must NOT silently
+    // substitute the repo-bundled template — governance would then admit fleets against
+    // checked-in defaults instead of operator-owned capacity data (AUDIT-BARRAGE-codex-01).
+    // setup seeds the file; runtime requires it.
     const root = mkdtempSync(join(tmpdir(), 'lane-capabilities-'));
     try {
-      const lanes = await loadLaneCapabilities(root, () => true);
-      expect(lanes.map((lane) => lane.name)).toEqual(['claude', 'codex', 'sonnet']);
-      expect(lanes[0]?.envelope).toEqual({
-        maxPromptBytes: 65536,
-        source: 'fleet-knowledge',
-      });
+      await expect(loadLaneCapabilities(root, () => true)).rejects.toThrow(
+        /fleet-knowledge\.yaml.*not found|stackctl setup/,
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -117,7 +118,7 @@ describe('loadLaneCapabilities', () => {
         'utf8',
       );
       await expect(loadLaneCapabilities(root, () => true)).rejects.toThrow(
-        /fleet-knowledge lanes must exactly match configured barrage lanes/,
+        /fleet-knowledge\.yaml not found|stackctl setup/,
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -258,6 +259,18 @@ describe('loadLaneCapabilities', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('classifies binary probe results: present, absent, and infra-failure', () => {
+    // `which foo` exits 0 → present.
+    expect(classifyBinaryProbe('codex', { status: 0, error: undefined })).toBe(true);
+    // `which foo` exits nonzero with no spawn error → genuinely absent.
+    expect(classifyBinaryProbe('codex', { status: 1, error: undefined })).toBe(false);
+    // spawnSync itself failed (e.g. `which` not on PATH) → must NOT masquerade as
+    // lane unavailability; surface the probe-infrastructure failure (AUDIT-BARRAGE-codex-02).
+    expect(() =>
+      classifyBinaryProbe('codex', { status: null, error: new Error('spawn which ENOENT') }),
+    ).toThrow(/probe.*failed|which/i);
   });
 
   it('marks a configured lane unavailable when its binary probe fails', async () => {

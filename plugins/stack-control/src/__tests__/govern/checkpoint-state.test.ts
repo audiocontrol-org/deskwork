@@ -155,6 +155,16 @@ describe('phase checkpoint persistence', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  it('rejects an empty governed path set instead of producing a reusable fingerprint', () => {
+    const root = mkdtempSync(join(tmpdir(), 'checkpoint-state-'));
+    expect(() => computeScopeFingerprint(root, [])).toThrow(/at least one governed path/);
+    // Entries that canonicalize away (empty strings, bare separators) collapse to
+    // an empty scope and must fail the same way — never hash to the stable digest of nothing.
+    expect(() => computeScopeFingerprint(root, [''])).toThrow(/at least one governed path/);
+    expect(() => computeScopeFingerprint(root, ['/', ''])).toThrow(/at least one governed path/);
+    rmSync(root, { recursive: true, force: true });
+  });
+
   it('dedupes descendant paths when an ancestor directory is already governed', () => {
     const root = mkdtempSync(join(tmpdir(), 'checkpoint-state-'));
     mkdirSync(join(root, 'docs'), { recursive: true });

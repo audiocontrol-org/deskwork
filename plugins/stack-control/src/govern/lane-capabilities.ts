@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
 import { loadInstallationConfig } from '../config/config-loader.js';
 import { configPathFor } from '../config/installation.js';
@@ -46,9 +45,6 @@ interface FleetKnowledgeLane {
   readonly name?: unknown;
   readonly max_prompt_bytes?: unknown;
 }
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_KNOWLEDGE_PATH = join(HERE, '..', '..', 'templates', 'fleet-knowledge.yaml');
 
 export async function loadLaneCapabilities(
   installationRoot: string,
@@ -107,9 +103,16 @@ function readFleetKnowledge(
   installationRoot: string,
   expectedLaneNames: readonly string[],
 ): ReadonlyMap<string, number> {
-  const overridePath = resolveFleetKnowledgePath(installationRoot);
-  const sourcePath = existsSync(overridePath) ? overridePath : DEFAULT_KNOWLEDGE_PATH;
-  if (!existsSync(sourcePath)) return new Map();
+  const sourcePath = resolveFleetKnowledgePath(installationRoot);
+  if (!existsSync(sourcePath)) {
+    // No bundled-template fallback: governance must decide over operator-owned
+    // capacity data, not checked-in defaults (AUDIT-BARRAGE-codex-01). setup seeds
+    // this file; a missing one is an actionable configuration error, not a silent default.
+    throw new Error(
+      `fleet-knowledge.yaml not found at ${sourcePath}; run \`stackctl setup\` to seed it ` +
+        '(the bundled template is a setup seed, never a runtime fallback)',
+    );
+  }
   const parsed = parseYaml(readFileSync(sourcePath, 'utf8')) as FleetKnowledgeDoc | null;
   if (parsed === null || parsed === undefined) return new Map();
   if (!Array.isArray(parsed.lanes)) {
@@ -163,5 +166,26 @@ function resolveFleetKnowledgePath(installationRoot: string): string {
 
 function binaryExistsOnPath(binary: string): boolean {
   const result = spawnSync('which', [binary], { encoding: 'utf8' });
+  return classifyBinaryProbe(binary, result);
+}
+
+/**
+ * Reduce a `which <binary>` probe to availability. A clean exit-0 is present;
+ * a clean nonzero exit is genuinely absent. But a spawn-level error (e.g. `which`
+ * itself not on PATH) means the probe INFRASTRUCTURE failed — we must not report
+ * that as lane unavailability, or every lane gets falsely rejected on a stripped
+ * environment and the failure is misattributed to model availability
+ * (AUDIT-BARRAGE-codex-02). Surface it instead.
+ */
+export function classifyBinaryProbe(
+  binary: string,
+  result: { readonly status: number | null; readonly error?: Error },
+): boolean {
+  if (result.error) {
+    throw new Error(
+      `binary availability probe failed for '${binary}': ${result.error.message}; ` +
+        'cannot distinguish a missing binary from a broken probe environment',
+    );
+  }
   return result.status === 0;
 }

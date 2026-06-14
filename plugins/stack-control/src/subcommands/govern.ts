@@ -416,6 +416,13 @@ function resolvePhaseCheckpointStatuses(
 ): readonly PhaseCheckpointStatus[] {
   return parsePhases(readFileSync(tasksPath, 'utf8')).map((phase) => {
     const governedPaths = normalizeGovernedPaths(installationRoot, phase.files);
+    if (governedPaths.length === 0) {
+      throw new Error(
+        `phase '${phase.phaseId}' in ${tasksPath} has no governed file list; ` +
+          'a phase checkpoint cannot be scoped to an empty path set ' +
+          '(add the phase\'s authoritative files to tasks.md)',
+      );
+    }
     const scopeFingerprint = computeScopeFingerprint(installationRoot, governedPaths);
     const record = readPhaseCheckpoint(installationRoot, slug, phase.phaseId);
     if (record === null) {
