@@ -48,6 +48,28 @@ export class GovernProtocolError extends Error {
   }
 }
 
+/**
+ * Load lane capabilities, routing fleet-knowledge read + binary-probe failures
+ * onto the governed FATAL channel. `loadLaneCapabilities()` raises plain `Error`s
+ * (missing fleet-knowledge.yaml, probe-infrastructure failure); govern's outer
+ * catch only converts `GovernProtocolError` / `GovernPayloadError`, so an
+ * unwrapped throw escapes as an uncaught exception instead of the actionable
+ * `govern: FATAL —` surface (AUDIT-BARRAGE-codex-01). Both lane-loading call
+ * sites (implement-mode preflight + the spec/loop path) go through here.
+ */
+export async function loadLaneCapabilitiesGoverned(
+  installationRoot: string,
+): Promise<readonly LaneCapabilityProfile[]> {
+  try {
+    return await loadLaneCapabilities(installationRoot);
+  } catch (err) {
+    if (err instanceof GovernProtocolError) throw err;
+    throw new GovernProtocolError(
+      `govern: FATAL — ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
 export interface ResolveSlugArgs {
   readonly explicit?: string | undefined;
   readonly branch?: string | undefined;
@@ -291,7 +313,7 @@ export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult
     }
     const renderedPromptBytes = readFileSync(promptPath).byteLength;
     const laneCapabilities = selectRequestedLaneCapabilities(
-      args.laneCapabilities ?? (await loadLaneCapabilities(args.installationRoot)),
+      args.laneCapabilities ?? (await loadLaneCapabilitiesGoverned(args.installationRoot)),
       args.models,
     );
     const negotiatedFleet = negotiateFleet(

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifyBinaryProbe, loadLaneCapabilities } from '../../govern/lane-capabilities.js';
+import { GovernProtocolError, loadLaneCapabilitiesGoverned } from '../../govern/protocol.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = join(
@@ -271,6 +272,28 @@ describe('loadLaneCapabilities', () => {
     expect(() =>
       classifyBinaryProbe('codex', { status: null, error: new Error('spawn which ENOENT') }),
     ).toThrow(/probe.*failed|which/i);
+    // A signal-killed probe arrives as status:null with NO error object — still a
+    // probe-infrastructure failure, not a genuinely-absent binary (round-2 MEDIUM).
+    expect(() =>
+      classifyBinaryProbe('codex', { status: null, signal: 'SIGKILL', error: undefined }),
+    ).toThrow(/probe.*failed|SIGKILL/i);
+  });
+
+  it('routes lane-capability load failures through the governed FATAL channel', async () => {
+    // A missing fleet-knowledge file (or a probe-infra failure) raises a plain Error
+    // deep in lane loading; govern's outer catch only converts GovernProtocolError /
+    // GovernPayloadError, so an unwrapped throw escapes as an uncaught exception
+    // instead of the actionable `govern: FATAL —` surface (AUDIT-BARRAGE-codex-01,
+    // round 2). The governed loader must normalize it.
+    const root = mkdtempSync(join(tmpdir(), 'lane-capabilities-'));
+    try {
+      await expect(loadLaneCapabilitiesGoverned(root)).rejects.toBeInstanceOf(GovernProtocolError);
+      await expect(loadLaneCapabilitiesGoverned(root)).rejects.toThrow(
+        /govern: FATAL —.*fleet-knowledge/,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('marks a configured lane unavailable when its binary probe fails', async () => {

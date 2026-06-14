@@ -105,12 +105,12 @@ function readFleetKnowledge(
 ): ReadonlyMap<string, number> {
   const sourcePath = resolveFleetKnowledgePath(installationRoot);
   if (!existsSync(sourcePath)) {
-    // No bundled-template fallback: governance must decide over operator-owned
-    // capacity data, not checked-in defaults (AUDIT-BARRAGE-codex-01). setup seeds
-    // this file; a missing one is an actionable configuration error, not a silent default.
+    // No runtime fallback: governance must decide over operator-owned capacity
+    // data, not checked-in defaults (AUDIT-BARRAGE-codex-01). `stackctl setup`
+    // seeds this file as a governed installation artifact; a missing one is an
+    // actionable configuration error, not a silent default.
     throw new Error(
-      `fleet-knowledge.yaml not found at ${sourcePath}; run \`stackctl setup\` to seed it ` +
-        '(the bundled template is a setup seed, never a runtime fallback)',
+      `fleet-knowledge.yaml not found at ${sourcePath}; run \`stackctl setup\` to seed it`,
     );
   }
   const parsed = parseYaml(readFileSync(sourcePath, 'utf8')) as FleetKnowledgeDoc | null;
@@ -171,19 +171,28 @@ function binaryExistsOnPath(binary: string): boolean {
 
 /**
  * Reduce a `which <binary>` probe to availability. A clean exit-0 is present;
- * a clean nonzero exit is genuinely absent. But a spawn-level error (e.g. `which`
- * itself not on PATH) means the probe INFRASTRUCTURE failed — we must not report
- * that as lane unavailability, or every lane gets falsely rejected on a stripped
- * environment and the failure is misattributed to model availability
- * (AUDIT-BARRAGE-codex-02). Surface it instead.
+ * a clean nonzero exit is genuinely absent. But anything that prevents `which`
+ * from returning a real exit status means the probe INFRASTRUCTURE failed — a
+ * spawn-level error (e.g. `which` itself not on PATH) OR a `status: null` from an
+ * abnormal/​signal-killed termination. We must not report either as lane
+ * unavailability, or every lane gets falsely rejected on a stripped environment
+ * and the failure is misattributed to model availability (AUDIT-BARRAGE-codex-02).
+ * Surface it instead.
  */
 export function classifyBinaryProbe(
   binary: string,
-  result: { readonly status: number | null; readonly error?: Error },
+  result: {
+    readonly status: number | null;
+    readonly signal?: NodeJS.Signals | null;
+    readonly error?: Error;
+  },
 ): boolean {
-  if (result.error) {
+  if (result.error || result.status === null) {
+    const reason = result.error
+      ? result.error.message
+      : `\`which\` terminated without an exit status${result.signal ? ` (signal ${result.signal})` : ''}`;
     throw new Error(
-      `binary availability probe failed for '${binary}': ${result.error.message}; ` +
+      `binary availability probe failed for '${binary}': ${reason}; ` +
         'cannot distinguish a missing binary from a broken probe environment',
     );
   }

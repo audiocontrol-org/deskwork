@@ -33,6 +33,7 @@ import {
   GovernProtocolError,
   assertBarrageBinPresent,
   currentBranch,
+  loadLaneCapabilitiesGoverned,
   resolveSlug,
   runProtocol,
   type BarrageVars,
@@ -72,7 +73,7 @@ import {
   readPhaseCheckpoint,
   writePhaseCheckpoint,
 } from '../govern/checkpoint-state.js';
-import { loadLaneCapabilities, type LaneCapabilityProfile } from '../govern/lane-capabilities.js';
+import { type LaneCapabilityProfile } from '../govern/lane-capabilities.js';
 import { negotiateFleet } from '../govern/fleet-negotiation.js';
 import { selectRequestedLaneCapabilities } from '../govern/protocol.js';
 
@@ -611,7 +612,7 @@ export async function runGovern(args: string[]): Promise<void> {
     const laneCapabilities =
       flags.mode === 'implement'
         ? preflightNegotiatedFleet(
-            await loadLaneCapabilities(repoRoot),
+            await loadLaneCapabilitiesGoverned(repoRoot),
             requestedModels,
             requireModels,
           )

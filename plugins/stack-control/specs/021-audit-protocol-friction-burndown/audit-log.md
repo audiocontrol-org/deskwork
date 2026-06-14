@@ -1168,3 +1168,44 @@ Surface:    src/govern/checkpoint-state.ts:102-110, src/govern/checkpoint-state.
 `computeScopeFingerprint()` accepts an empty `paths` array, and `canonicalizeScopePaths()` also filters empty strings without checking whether anything remains. The result is the SHA-256 digest of no scoped content, which is stable forever. If a phase scope discovery bug, malformed tasks file, or caller mistake passes `[]`, the checkpoint can be marked fresh without any governed file participating in the staleness decision.
 
 The blast radius is high because this is a governance bypass for the feature’s checkpoint contract: downstream code can persist or compare a checkpoint that never changes with implementation edits. A reasonable fix is to reject empty canonical governed path sets before hashing, with an error that identifies the feature/phase caller context where possible.
+
+## 2026-06-14 — audit-barrage lift (20260614T182330192Z-audit-protocol-friction-burndown-phase-1)
+
+### AUDIT-20260614-87 — New lane-capability failures now escape the govern CLI's fatal-error channel as uncaught exceptions
+
+Finding-ID: AUDIT-20260614-87
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/lane-capabilities.ts:107-116,180-190
+
+This diff changes `readFleetKnowledge()` and `classifyBinaryProbe()` to throw plain `Error`s on two common operator-facing failures: missing `.stack-control/fleet-knowledge.yaml` and probe-infrastructure failure. The new throws are at `src/govern/lane-capabilities.ts:107-116` and `:180-190`. That matters because the govern entrypoint only converts `GovernProtocolError` and `GovernPayloadError` into the command's normal `govern: FATAL — ...` exit path; other exceptions are rethrown. In other words, this commit moves real runtime failures onto the raw exception path instead of the governed refusal surface.
+
+The blast radius is high because these are not obscure branches. A fresh or mis-seeded installation now hits the missing-file throw before payload assembly, and a stripped environment can hit the probe throw before negotiation. Downstream consumers acting on this as written will see an uncaught exception/stack-trace path where the feature otherwise promises actionable fatal messaging. A reasonable fix is to wrap these new failure modes in `GovernProtocolError` at the point they are raised, or normalize them at the `loadLaneCapabilities()`/`preflightNegotiatedFleet()` call site before they reach the outer catch.
+
+### AUDIT-20260614-88 — `classifyBinaryProbe()` still misclassifies signaled probe failures as "binary unavailable"
+
+Finding-ID: AUDIT-20260614-88
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/lane-capabilities.ts:180-190
+
+The new helper's comment says probe-infrastructure failures must be surfaced distinctly from a genuinely missing binary, but the implementation only checks `result.error`. In `spawnSync`, an abnormal child termination can also arrive as `status: null` without an `error` object, for example when the `which` subprocess is killed by a signal. Under the current code at `src/govern/lane-capabilities.ts:180-190`, that case falls through to `return result.status === 0`, which reports `false` and therefore marks the lane merely "unavailable."
+
+The blast radius is medium because the trigger is narrower than the missing-file path, but when it happens the diagnosis is wrong in exactly the way the new comment says must not happen: infrastructure failure is attributed to model/binary availability, and every lane can be rejected for the wrong reason. The fix is to treat `status === null` (and ideally a populated `signal`, if that field is threaded through) as a hard probe failure alongside `result.error`, not as ordinary absence.
+
+### AUDIT-20260614-89 — The required fleet-knowledge seed is no longer documented as a setup artifact
+
+Finding-ID: AUDIT-20260614-89
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/govern/lane-capabilities.ts:107-114, templates/fleet-knowledge.yaml:1-7, missing docs surfaces README.md and skills/setup/SKILL.md
+
+`readFleetKnowledge()` now hard-fails when the resolved `fleet-knowledge.yaml` is absent and tells the operator to run `stackctl setup` because the “bundled template is a setup seed” (`src/govern/lane-capabilities.ts:107-114`). In the same diff, the only actual `templates/fleet-knowledge.yaml` file is deleted (`templates/fleet-knowledge.yaml:1-7`). Local setup code does appear to seed an equivalent hardcoded skeleton, so this is not a fresh-install runtime break, but the operator-facing contract is now confusing: the error names a bundled-template seed that no longer exists as a template surface.
+
+The blast radius is low because `stackctl setup` can still create the file through the managed setup path, but consumers reading the docs or investigating the error do not get a clear list of setup-managed files. The README and `skills/setup/SKILL.md` should be updated to include `.stack-control/fleet-knowledge.yaml` as a governed setup artifact, and the runtime error/comment should stop referring to a bundled template unless that template remains a real shipped surface.
