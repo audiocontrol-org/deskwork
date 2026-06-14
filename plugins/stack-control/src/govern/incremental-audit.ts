@@ -18,8 +18,14 @@
 import { readFileSync } from 'node:fs';
 import type { AuditUnit } from './audit-unit-types.js';
 
-/** `## Phase <id>: …` header grammar (verified present in every tasks.md). */
-const PHASE_HEADER_RE = /^##\s+Phase\s+([^:\n]+?)\s*:/;
+/**
+ * `## Phase <id>[<sep> <title>]` header grammar (US4 / TASK-71). The id is the
+ * digit-led token after `Phase`; the optional title may follow a colon, dash,
+ * en-dash, or em-dash separator — or nothing at all. A colon appearing inside the
+ * TITLE never splits the id (the id stops at the first non-`[0-9A-Za-z.]` char),
+ * and a digit-led id keeps a prose `## Phase notes` line from being selectable.
+ */
+const PHASE_HEADER_RE = /^##\s+Phase\s+([0-9][0-9A-Za-z.]*)\b.*$/;
 const TOP_HEADER_RE = /^##\s+/;
 /** Backticked path-like tokens from tasks prose; directories carry a slash. */
 const BACKTICK_TOKEN_RE = /`([^`\n]+)`/g;
@@ -71,7 +77,7 @@ function nextTopHeaderOrEnd(lines: readonly string[], from: number): number {
 
 export interface ResolvePhaseUnitArgs {
   readonly tasksPath: string;
-  /** A `## Phase N: …` header id (the trimmed token between `Phase` and `:`). */
+  /** A `## Phase N …` header id (the digit-led token after `Phase`, any separator). */
   readonly phaseId: string;
   /** The ref the phase's work started from. */
   readonly diffBase: string;
