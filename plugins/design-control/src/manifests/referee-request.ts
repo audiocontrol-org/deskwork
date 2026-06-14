@@ -38,6 +38,8 @@
 import { z } from 'zod';
 import {
   collectionRelativePathSchema,
+  requireDesktopAndPhoneViewports,
+  requireUniqueViewportIds,
   sha256HexSchema,
   viewportSchema,
 } from '@/manifests/manifest-fields';
@@ -165,48 +167,6 @@ const baseManifestShape = {
   changeIntentBrief: z.string().min(1),
 } as const;
 
-/** The scaffold-required viewport contract: at least one desktop (>=1280) and one phone (<=390). */
-function requireDesktopAndPhone(viewports: readonly { readonly width: number }[], ctx: z.RefinementCtx): void {
-  if (!viewports.some((viewport) => viewport.width >= 1280)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['viewports'],
-      message: 'viewports must include at least one desktop viewport with width >= 1280',
-    });
-  }
-  if (!viewports.some((viewport) => viewport.width <= 390)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['viewports'],
-      message: 'viewports must include at least one phone viewport with width <= 390',
-    });
-  }
-}
-
-/**
- * Reject any manifest whose declared `viewports[*].id` contains a duplicate
- * (AUDIT-20260614-21). Two viewports sharing an id (e.g. both `"desktop"`)
- * would collapse to one Set member and let `requirePerViewportIdentityCoverage`
- * report a FALSE exact-coverage match — so the duplicate is the root problem and
- * must be flagged independently, before identity coverage is evaluated.
- */
-function requireUniqueViewportIds(
-  viewports: readonly { readonly id: string }[],
-  ctx: z.RefinementCtx,
-): void {
-  const seen = new Set<string>();
-  for (const viewport of viewports) {
-    if (seen.has(viewport.id)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['viewports'],
-        message: `duplicate viewport id "${viewport.id}"; each declared viewport must have a unique id`,
-      });
-    }
-    seen.add(viewport.id);
-  }
-}
-
 /**
  * Per-viewport-identity referential integrity (AUDIT-20260614-19). When a
  * referee-control block is present, the set of `perViewportIdentity[*].viewportId`
@@ -284,7 +244,7 @@ export const refereeRequestManifestSchema = z
     // Duplicate viewport ids are the root problem — flag them BEFORE/independent
     // of identity coverage so a duplicate can't masquerade as a coverage match.
     requireUniqueViewportIds(value.viewports, ctx);
-    requireDesktopAndPhone(value.viewports, ctx);
+    requireDesktopAndPhoneViewports(value.viewports, ctx);
     // Referential integrity applies whenever a referee block supplies a
     // perViewportIdentity array — on the referee-preview branch (always; the field
     // is required there) and the scaffold branch (only when the partial referee

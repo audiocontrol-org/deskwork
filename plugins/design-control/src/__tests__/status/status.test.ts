@@ -648,6 +648,28 @@ describe('runDesignControlStatus', () => {
     expect(err.join('\n')).toContain('phone viewport');
   });
 
+  it('returns 1 for a manifest with duplicate viewport ids (AUDIT-20260614-30)', () => {
+    const dir = freshDir();
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
+      routeState: '/studio/default',
+      viewports: [
+        { id: 'desktop', width: 1280 },
+        { id: 'desktop', width: 390 },
+      ],
+      wireframe: { path: 'surface.html', sha256: sha256Hex('wireframe') },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec') },
+      archive: { path: 'surface.archive.json' },
+    });
+    const { err, io } = capture();
+    expect(runDesignControlStatus([manifestPath], io)).toBe(1);
+    expect(err.join('\n')).toContain('malformed-manifest');
+    expect(err.join('\n')).toContain('duplicate viewport id');
+  });
+
   it('returns 1 for a manifest missing the implementation commit', () => {
     const dir = freshDir();
     const manifestPath = writeManifest(dir, {

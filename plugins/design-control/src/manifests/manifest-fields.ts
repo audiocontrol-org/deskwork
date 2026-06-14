@@ -65,3 +65,62 @@ export const viewportSchema = z
     width: z.number().int().positive(),
   })
   .strict();
+
+/**
+ * Structural shape passed to the shared viewport-contract refinements. The
+ * refinements only inspect `id` and `width`, so they accept any array of
+ * objects bearing those two readonly fields — the full {@link viewportSchema}
+ * value satisfies this.
+ */
+type ViewportContractEntry = { readonly id: string; readonly width: number };
+
+/**
+ * The shared scaffold-required viewport contract: at least one desktop
+ * (width >= 1280) and one phone (width <= 390). Single-sourced here so the
+ * referee-request and surface-status manifests cannot silently diverge on what
+ * "desktop + phone" means (AUDIT-20260614-30).
+ */
+export function requireDesktopAndPhoneViewports(
+  viewports: ReadonlyArray<ViewportContractEntry>,
+  ctx: z.RefinementCtx,
+): void {
+  if (!viewports.some((viewport) => viewport.width >= 1280)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['viewports'],
+      message: 'viewports must include at least one desktop viewport with width >= 1280',
+    });
+  }
+  if (!viewports.some((viewport) => viewport.width <= 390)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['viewports'],
+      message: 'viewports must include at least one phone viewport with width <= 390',
+    });
+  }
+}
+
+/**
+ * Reject any manifest whose declared `viewports[*].id` contains a duplicate
+ * (AUDIT-20260614-21, AUDIT-20260614-30). Two viewports sharing an id (e.g.
+ * both `"desktop"`) collapse to one identity, which both defeats per-viewport
+ * identity coverage (referee-request) and erases the distinct desktop/phone
+ * identity the status completion gate depends on. Single-sourced here so both
+ * manifests enforce it identically.
+ */
+export function requireUniqueViewportIds(
+  viewports: ReadonlyArray<ViewportContractEntry>,
+  ctx: z.RefinementCtx,
+): void {
+  const seen = new Set<string>();
+  for (const viewport of viewports) {
+    if (seen.has(viewport.id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['viewports'],
+        message: `duplicate viewport id "${viewport.id}"; each declared viewport must have a unique id`,
+      });
+    }
+    seen.add(viewport.id);
+  }
+}

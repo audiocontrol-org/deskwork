@@ -11,6 +11,8 @@ import {
 } from '@/provenance/derived';
 import {
   collectionRelativePathSchema,
+  requireDesktopAndPhoneViewports,
+  requireUniqueViewportIds,
   sha256HexSchema,
   viewportSchema,
 } from '@/manifests/manifest-fields';
@@ -82,22 +84,13 @@ const surfaceStatusManifestSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
-    const hasDesktop = value.viewports.some((viewport) => viewport.width >= 1280);
-    const hasPhone = value.viewports.some((viewport) => viewport.width <= 390);
-    if (!hasDesktop) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['viewports'],
-        message: 'viewports must include at least one desktop viewport with width >= 1280',
-      });
-    }
-    if (!hasPhone) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['viewports'],
-        message: 'viewports must include at least one phone viewport with width <= 390',
-      });
-    }
+    // Single-sourced viewport contract (AUDIT-20260614-30): reject duplicate
+    // viewport ids AND enforce desktop(>=1280)/phone(<=390), identically to the
+    // sibling referee-request manifest. Without the duplicate-id check a status
+    // manifest could declare two viewports sharing one id (e.g. both "desktop")
+    // and lose its distinct phone identity while still passing the completion gate.
+    requireUniqueViewportIds(value.viewports, ctx);
+    requireDesktopAndPhoneViewports(value.viewports, ctx);
   });
 
 export type SurfaceStatusManifest = z.infer<typeof surfaceStatusManifestSchema>;
