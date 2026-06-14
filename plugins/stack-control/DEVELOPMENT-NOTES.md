@@ -2,27 +2,42 @@
 
 ---
 
-## 2026-06-13: <!-- session title -->
+## 2026-06-13: backlog triage + audit-protocol-friction spec 021 defined to runnable
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Bring the branch-local backlog back into a trustworthy state, absorb the newest audit-protocol friction intake, and move that cluster through the stack-control front door into a runnable Spec Kit spec.
 
 **Accomplished:**
-- <!-- compose -->
+- Imported and then safely closed the newly-filed stack-control GitHub issues into the local backlog, adding TASK-70/71 first and later TASK-73/74/75/76 as the newer audit-protocol-friction umbrella and its decomposed edges.
+- Added TASK-72 to retire roadmap and insight capture in favor of backlog as the single system of record, then characterized the backlog as a mostly-open hardening queue with duplicate-ID hygiene debt at TASK-26/TASK-27.
+- Verified backlog status freshness instead of trusting stale `To Do` labels: TASK-18, TASK-27, TASK-29, and TASK-37 were proven by targeted Vitest coverage and marked `Done` with implementation notes updated in place.
+- Promoted the audit-protocol cluster from backlog into the new front-door target `specs/021-audit-protocol-friction-burndown`, then authored `021` through the native stack-control seam to a runnable state (`spec=yes plan=yes tasks=yes`) with spec, plan, research, data model, contracts, checklist, quickstart, and tasks.
+- Repointed the active Spec Kit marker (`.specify/feature.json` + `CLAUDE.md`) from 020 to 021 so the branch now resumes on the audit-protocol-friction work rather than the earlier config-domain slice.
 
 **Didn't Work:**
-- <!-- compose -->
+- The installed Spec Kit surface in this repo still does not expose a clean Codex-native `/speckit-*` execution path for defining a new spec; the project is initialized for `claude`, and the mandatory git feature-branch hook still conflicts with the one-long-lived-branch program layout. `021` had to be created by following the skill contract manually: direct feature-dir creation, pointer updates, authored artifacts, and `stackctl spec-check` confirmation after each stage.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Instead of treating the audit-protocol queue as a loose pile of bugs, promoted it into one explicit front-door feature body (`021`) so payload scope, per-phase teeth, fleet negotiation, and boundary sizing can be implemented as one protocol change rather than as disconnected patchwork.
+- [DOCUMENTATION] Treated the backlog as the canonical intake surface and captured the operator's “three edges” refinement directly into TASK-75/TASK-76 before defining the spec, so the feature body started from the sharpened model rather than from a fuzzy umbrella issue.
+- [PROCESS] Performed a status-audit pass before further promotion work; stale backlog items that were already implemented were closed first so the remaining queue better represents actual unfinished audit-protocol debt.
 
 **Insights:**
-- <!-- compose -->
+- The most important audit-protocol work is now clearly a trust-boundary problem, not a throughput problem: mechanical per-phase teeth, real payload fit, and pre-remediation fleet negotiation are the seams that decide whether the protocol is genuinely operator-light.
+- The backlog-to-spec seam works well when the backlog is healthy, but duplicate IDs and stale status undermine that seam immediately; backlog hygiene is not clerical overhead here, it directly affects whether promoted work is safe to reason about.
+- Defining `021` made the current architecture gap explicit: stack-control can prove runnable spec state with `spec-check`, but the authoring path still has portability friction as long as Spec Kit's branch-hook / integration assumptions remain `claude`-centric.
 
 **Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 0
-  - (no commits this session)
-- Files changed: 0
-- Backlog touched: (none)
+- Commits: 7
+  - chore(stack-control): define audit protocol friction spec
+  - chore(stack-control): refine audit boundary and fleet tasks
+  - chore(stack-control): intake per-phase audit protocol friction
+  - chore(stack-control): close verified audit protocol backlog items
+  - chore(stack-control): promote audit protocol backlog cluster
+  - chore(stack-control): capture backlog-system-of-record item
+  - chore(stack-control): import open github issues into backlog
+- Files changed: 29
+- Backlog touched: TASK-18, TASK-27, TASK-29, TASK-37, TASK-41, TASK-47, TASK-54, TASK-57, TASK-58, TASK-60, TASK-70, TASK-71, TASK-72, TASK-73, TASK-74, TASK-75, TASK-76
+- Next step: start `021` execution at Phase 1 / Phase 2 (`T001`-`T006`) through the stack-control front door.
 
 ## 2026-06-12: installation-isolation executed + governed to OPEN; v0.44.0 merged in and reconciled
 
