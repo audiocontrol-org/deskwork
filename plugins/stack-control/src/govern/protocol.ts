@@ -40,13 +40,16 @@ import { assertBoundaryFits, BoundaryTooLargeError } from './phase-boundary-sizi
 
 /** Thrown for any fail-loud protocol condition; carries a process exit code. */
 /**
- * Machine-distinguishable terminal outcomes (specs/021 US5 / T028). govern emits
- * exactly one `govern: terminal-outcome=<kind>` line at every exit so a consumer
- * (or test) can tell the degraded states apart without fragile message-substring
- * matching: a fleet that could not be negotiated, a phase whose payload exceeds
- * the active envelope, a barrage that produced no covering family (outage), and a
- * barrage that produced coverage but missed the cross-model floor are FOUR
- * different failures with four different recoveries.
+ * Machine-distinguishable terminal outcomes (specs/021 US5 / T028). Every govern
+ * EXECUTION exit — an invocation that resolves flags and attempts governance —
+ * emits exactly one `govern: terminal-outcome=<kind>` line so a consumer can tell
+ * the degraded states apart without fragile message-substring matching: a fleet
+ * that could not be negotiated, a phase whose payload exceeds the active
+ * envelope, a barrage that produced no covering family (outage), and a barrage
+ * that produced coverage but missed the cross-model floor are different failures
+ * with different recoveries. The `--help` / usage-info early return is NOT a
+ * governed run and deliberately emits no terminal-outcome (it does no work and
+ * has no outcome to report); that boundary is locked by a test.
  */
 export type GovernTerminalKind =
   | 'graduated'
@@ -399,9 +402,12 @@ export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult
       // kinds. A FLOOR SHORTFALL means the barrage produced coverage but fewer
       // emitting families than the cross-model floor demands (recovery: widen the
       // fleet / lower --require-models); an OUTAGE means zero covering families
-      // (recovery: the model CLIs are missing/unreachable). The barrage's own
-      // stderr names which via the `FLOOR SHORTFALL` line.
-      const isFloorShortfall = barrageNote.includes('FLOOR SHORTFALL');
+      // (recovery: the model CLIs are missing/unreachable). Match the barrage's
+      // OWN diagnostic LINE — `audit-barrage: FLOOR SHORTFALL — …` — anchored to a
+      // line start, not a blob substring, so incidental stderr text (echoed
+      // prompts, prior findings, command traces) can't misclassify an outage
+      // (AUDIT-BARRAGE-codex-02).
+      const isFloorShortfall = /^audit-barrage: FLOOR SHORTFALL\b/m.test(barrageNote);
       throw new GovernProtocolError(
         `govern: FATAL — ${isFloorShortfall ? 'fleet-floor shortfall' : 'audit-barrage OUTAGE'} (exit ${barrage.status}). ` +
           'The work is NOT recorded as governed (FR-005). Check that the configured model-family CLIs are installed and reachable.' +

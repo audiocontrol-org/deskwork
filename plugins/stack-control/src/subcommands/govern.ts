@@ -546,10 +546,12 @@ export function buildSpecVars(
 
 /**
  * Emit the single machine-readable terminal line (T028 / US5 — AUDIT-BARRAGE-codex-01,
- * 021 phase-2 cross-model HIGH). EVERY govern exit routes through here so a
- * consumer keying on `govern: terminal-outcome=<kind>` sees exactly one line at
- * every exit — including the pre-try usage/preflight `process.exit(2)` paths and
- * the unexpected-exception fallthrough that previously emitted nothing.
+ * 021 phase-2 cross-model finding). Every govern EXECUTION exit routes through
+ * here so a consumer keying on `govern: terminal-outcome=<kind>` sees exactly one
+ * line — the pre-try usage/preflight `process.exit(2)` paths, the gated
+ * success/blocked exits, and the unexpected-exception fallthrough. The `--help`
+ * early return below is the ONE deliberate non-emitter (it does no governance
+ * work, so it has no outcome to report).
  */
 function emitTerminalOutcome(kind: GovernTerminalKind): void {
   process.stderr.write(`govern: terminal-outcome=${kind}\n`);
@@ -558,6 +560,9 @@ function emitTerminalOutcome(kind: GovernTerminalKind): void {
 export async function runGovern(args: string[]): Promise<void> {
   const parsed = parseFlags(args);
   if (parsed.ok && parsed.flags.help) {
+    // Usage-info early return — NOT a governed run, so no terminal-outcome by
+    // design (the "every exit" contract is scoped to execution exits; locked by
+    // the `--help emits no terminal-outcome` test).
     process.stdout.write(`${USAGE}\n`);
     return;
   }
