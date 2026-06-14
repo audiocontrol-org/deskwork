@@ -48,13 +48,15 @@ An adopting agent executes a multi-phase spec. For every phase that is marked co
 
 **Why this priority**: This is the trust boundary. Without teeth, "per-phase audit" is advisory prose that can be skipped under schedule pressure or tool drift.
 
-**Independent Test**: Attempt to run whole-feature govern or phase advancement with one required phase lacking a recorded passing checkpoint; the command must fail loud and name the missing checkpoint.
+**Independent Test**: Attempt **per-phase advancement** (`--phase N`) with an earlier required phase lacking a current checkpoint; the command must fail loud and name the missing checkpoint. **Whole-feature** govern, by contrast, must NOT fail loud on a missing/stale checkpoint — it composes (carries the current phases, re-audits the rest).
+
+> **Operator decision (2026-06-14, TASK-120/121):** whole-feature govern uses TRUE COMPOSITION, not a strict gate. The earlier "fail loud on any non-current checkpoint, then re-audit the whole feature" behavior was retired because it *erased* the per-phase savings the feature exists to deliver (and contradicted "composes … instead of erasing"). Per-phase `--phase N` advancement keeps its sequential gate (you cannot audit phase N before phases 1..N-1 are current); only whole-feature substitution was relaxed.
 
 **Acceptance Scenarios**:
 
-1. **Given** a tasks file with multiple phases, **When** implementation proceeds past a phase that requires governance, **Then** the system refuses to treat that phase as accepted unless a passing phase checkpoint exists for that phase.
+1. **Given** a tasks file with multiple phases, **When** `--phase N` advancement is attempted with an earlier phase lacking a current checkpoint, **Then** the command fails loud and names the missing/stale earlier checkpoint (sequential per-phase gate).
 2. **Given** a phase checkpoint exists but is stale because the phase files changed afterward, **When** the next govern decision is made, **Then** the checkpoint is invalidated and the phase must be re-audited.
-3. **Given** all required phase checkpoints are present and current, **When** whole-feature govern runs, **Then** it composes from those checkpoints instead of pretending they never mattered.
+3. **Given** a mix of current and missing/stale phase checkpoints, **When** whole-feature govern runs, **Then** it COMPOSES: it excludes (carries) the current phases' files and re-audits everything else — the changed/missing/stale phases AND cross-cutting code owned by no phase. When every phase is carried, it audits ONLY the cross-cutting diff (the whole diff minus every phase's files), never the full feature.
 
 ---
 

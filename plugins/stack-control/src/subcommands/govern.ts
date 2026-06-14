@@ -469,17 +469,6 @@ function assertPriorPhaseCheckpointsCurrent(
   }
 }
 
-function assertWholeFeatureCheckpointsCurrent(
-  statuses: readonly PhaseCheckpointStatus[],
-): void {
-  const unmet = statuses.filter((status) => status.state !== 'current');
-  if (unmet.length > 0) {
-    throw new GovernProtocolError(
-      `govern: FATAL — whole-feature govern requires current per-phase checkpoints: ${renderCheckpointRequirements(unmet)}.`,
-    );
-  }
-}
-
 function preflightNegotiatedFleet(
   laneCapabilities: readonly LaneCapabilityProfile[],
   requestedModels: string | undefined,
@@ -650,6 +639,10 @@ export async function runGovern(args: string[]): Promise<void> {
     let phaseUnit: AuditUnit | undefined;
     let payloadPathScope: readonly string[] | undefined;
     let phaseCheckpointStatuses: readonly PhaseCheckpointStatus[] | undefined;
+    // US1 true-composition (operator decision 2026-06-14): whole-feature govern
+    // EXCLUDES the files of converged-and-unchanged phases from the payload (it
+    // carries them) — absolute paths threaded into the assembler's excludePaths.
+    let compositionExcludePaths: readonly string[] = [];
     if (flags.mode === 'implement' && flags.phase !== undefined) {
       const { root } = await resolveGovernFeatureRoot(repoRoot, slug);
       if (root === undefined) {
@@ -682,7 +675,14 @@ export async function runGovern(args: string[]): Promise<void> {
           const diffBase =
             flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
           phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, slug, tasksPath);
-          assertWholeFeatureCheckpointsCurrent(phaseCheckpointStatuses);
+          // TRUE COMPOSITION (operator decision 2026-06-14, US1 — TASK-120/121):
+          // whole-feature govern does NOT gate on missing/stale checkpoints. It
+          // CARRIES converged-and-unchanged phases (excludes their files) and
+          // re-audits everything else — changed / missing / stale phases AND
+          // cross-cutting code owned by no phase. EXCLUSION (not inclusion) is what
+          // makes the cross-cutting remainder visible, so all-carried audits ONLY
+          // the cross-cutting diff (the whole diff minus every phase's files),
+          // never the whole feature.
           phaseUnit = resolveComposingFeatureUnit({
             tasksPath,
             diffBase,
@@ -692,12 +692,15 @@ export async function runGovern(args: string[]): Promise<void> {
               changed: status.state !== 'current',
             })),
           });
-          // The composing safety-net must never collapse to a no-op. When every
-          // phase is already carried, keep the `after_implement` checkpoint label
-          // but fall back to the whole-feature payload instead of an empty scope.
-          const normalizedFiles = normalizeGovernedPaths(repoRoot, phaseUnit.diffScope.files);
-          payloadPathScope =
-            normalizedFiles.length > 0 ? normalizedFiles : undefined;
+          const carriedFiles = phaseCheckpointStatuses
+            .filter((status) => status.state === 'current')
+            .flatMap((status) => status.files);
+          compositionExcludePaths = Array.from(new Set(carriedFiles)).map((rel) =>
+            join(repoRoot, rel),
+          );
+          // Whole-feature payload (undefined scope) MINUS the carried phase files
+          // (compositionExcludePaths, merged into excludePaths below).
+          payloadPathScope = undefined;
         }
       }
     }
@@ -741,7 +744,7 @@ export async function runGovern(args: string[]): Promise<void> {
     // commits/files are excluded from both payload arms.
     const excludePaths =
       flags.mode === 'implement' && featureRoot !== undefined
-        ? resolveGovernExcludePaths(installation)
+        ? [...resolveGovernExcludePaths(installation), ...compositionExcludePaths]
         : undefined;
     // specs/015 + 014 merge: buildImplementVars threads BOTH the per-phase
     // pathScope (015 US4 — phaseUnit's files, and its `phase-<id>` checkpoint when

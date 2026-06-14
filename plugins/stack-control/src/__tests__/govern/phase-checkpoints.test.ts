@@ -196,4 +196,38 @@ describe('phase checkpoint enforcement (US1)', () => {
       rmSync(fx, { recursive: true, force: true });
     }
   });
+
+  // US1 true-composition (operator decision 2026-06-14, TASK-120/121): WHOLE-feature
+  // govern (no --phase) does NOT gate on a missing/stale checkpoint. It carries the
+  // current phases and re-audits the rest — so a missing phase-2 checkpoint must NOT
+  // produce the retired strict-gate FATAL. (The per-phase --phase gate above is
+  // unchanged; only whole-feature composition was relaxed.)
+  it('whole-feature govern composes instead of gating on a missing phase checkpoint', () => {
+    const repo = makeRepo();
+    const fx = mkdtempSync(join(tmpdir(), 'gov-phase-stub-'));
+    const stub = writeStubBarrage(fx);
+    try {
+      // Phase 1 current; phase 2 has NO checkpoint (missing).
+      writePhaseCheckpoint(repo, {
+        version: 1,
+        featureSlug: 'feat',
+        phaseId: '1',
+        checkpoint: 'phase-1',
+        auditLogSection: 'phase-1',
+        scopeFingerprint: computeScopeFingerprint(repo, ['src/a.ts']),
+        passedAt: '2026-06-13T00:00:00.000Z',
+        governedPaths: ['src/a.ts'],
+      });
+      const r = runGovern(repo, stub, [
+        '--mode', 'implement', '--feature', 'feat', '--at', repo, '--diff-base', 'HEAD', '--require-models', '1',
+      ]);
+      const out = `${r.stdout}${r.stderr}`;
+      // The retired strict whole-feature gate must NOT fire.
+      expect(out).not.toMatch(/whole-feature govern requires current per-phase checkpoints/);
+      expect(r.status).not.toBe(2);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
 });
