@@ -19,6 +19,38 @@
 - <!-- compose -->
 
 **Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 11
+  - docs(design-control): converge Phase-4 govern loop — disposition findings -17..-30
+  - fix(design-control): reject duplicate viewport ids in status manifest (sibling consistency)
+  - fix(design-control): scaffold referee fields individually optional; phase-4 govern scope + matrix boundary
+  - fix(design-control): make status manifest strict (sibling consistency)
+  - fix(design-control): whole-manifest strict + viewport-id uniqueness
+  - fix(design-control): tighten referee-request schema (secrets, backslash, per-viewport)
+  - fix(design-control): reject ../-escaping manifest paths; dedupe path schema
+  - feat(design-control): Phase 4 referee-request manifest schema
+  - docs(design-control): mark Phase 3 stale-surface complete (acceptance met)
+  - docs(design-control): record phase-3 status barrage + flip 16 dispositions to fixed
+  - fix(design-control): crash-safe status reads and symlink-tight collection root
+- Files changed: 14
+- Backlog touched: TASK-30
+
+## 2026-06-14: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 0
   - (no commits this session)
 - Files changed: 0
