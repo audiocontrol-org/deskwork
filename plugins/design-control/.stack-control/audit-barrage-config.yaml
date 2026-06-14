@@ -3,7 +3,7 @@
 #
 # This installation pins an explicit two-lane temporary backfill fleet:
 #   - codex / gpt-5.5
-#   - codex-gpt5 / gpt-5
+#   - codex-gpt5 / gpt-5.4
 #
 # Rationale:
 # - design-control's constitution now requires per-phase governance before later
@@ -18,10 +18,11 @@
 #   it has twice stalled at thinking-only/no-final-report on real stack-control
 #   runs here, including a bounded `phase 2C` payload (~16.8 KB prompt), causing
 #   fleet-floor refusal before the work can be recorded as governed.
-# - a second Codex/OpenAI lane is used as the temporary substitute because this
-#   repo has prior barrage history for `codex` on `gpt-5`, and the local goal is
-#   to keep the protocol moving on bounded backfill units while the Sonnet lane
-#   is operationally unreliable in this environment.
+# - a second Codex/OpenAI lane is used as the temporary substitute because the
+#   original `gpt-5` candidate is unsupported on this ChatGPT-backed Codex
+#   account, while `gpt-5.4` is available locally and keeps the protocol moving
+#   on bounded backfill units while the Sonnet lane is operationally unreliable
+#   in this environment.
 # - gemini remains disabled here until its CLI reliability and quota floor are
 #   restored; see the inherited notes below.
 #
@@ -51,7 +52,7 @@ models:
 
   - name: codex-gpt5
     binary: codex
-    model: gpt-5
+    model: gpt-5.4
     args_template: "exec -m {{model}} --sandbox read-only {{prompt-stdin}}"
     readonly_enforcement: "--sandbox read-only"
     output_mode: text
