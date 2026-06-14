@@ -2215,3 +2215,217 @@ Surface:    `src/status/status.ts:109-119`, `src/status/status.ts:125-136`
 The new containment check is purely lexical: `assertWithinCollection(...)` resolves the manifest-relative path with `resolve(...)`, compares it to the manifest directory with `relative(...)`, and accepts it if the resulting string does not traverse `..`. That blocks literal `../outside/...` paths, but it does not canonicalize symlinks. A manifest path like `artifacts/spec-link.md` can pass this check even when `artifacts/` is a symlink to a location outside the collection root, and the later `readFileSync(...)` calls will happily follow it.
 
 The blast radius is high because the feature’s stated goal here is to contain status artifacts to portable, collection-local paths. As written, a manifest can still validate against external files while looking collection-relative on paper, which lets a non-portable setup report `complete: true` and defeats the contract the operator is relying on. The fix is to compare canonicalized paths (`realpath`) where the target exists, or otherwise reject symlinked path segments for artifact fields that are meant to be collection-contained.
+
+## 2026-06-14 — audit-barrage lift (20260614T183809103Z-design-control-after_clarify)
+
+### AUDIT-20260614-17 — Referee-request path validation still permits `../` escapes outside the collection
+
+Finding-ID: AUDIT-20260614-17 (codex-01 + codex-01; cross-model)
+Status:     fixed-41466a84
+Disposition: fixed — `collectionRelativePathSchema` now rejects `../`-normalized escapes at the string level, and the path schema was deduped into `@/manifests/manifest-fields` (shared by both manifests). Tests: two `../`-escape cases (wireframe + referee baseline). Load-time symlink/realpath containment is a Phase-5 capture concern (see AUDIT-20260614-28 boundary).
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=high
+Decision:   agreement (gate-counted high)
+Surface:    plugins/design-control/src/manifests/referee-request.ts:32-49,114-177
+
+The new schema says these artifact references are "collection-relative" paths, but the actual guard only rejects machine-rooted forms: `~`, POSIX absolute, Windows drive, and leading backslash paths (`pathSchema` at lines 32-43). A manifest like `wireframe.path: "../other-project/secret.html"` or `referee.baseline.path: "../../outside.png"` still passes `parseRefereeRequestManifest` because `../` is relative, even though it escapes the collection and is not actually collection-relative in the repo’s own terminology.
+
+That matters because this module exposes only a context-free parser (`parseRefereeRequestManifest(value)` at lines 176-177). Unlike the existing status surface, which follows schema parse with `assertWithinCollection(...)` checks tied to the manifest file path (`plugins/design-control/src/status/status.ts:166-202`), the referee-request surface has no loader that can enforce containment. Downstream consumers can therefore accept a manifest as valid and later resolve artifact paths outside the collection root. The blast radius is high because an unattended Phase 5 consumer acting on this contract can read or capture against the wrong artifacts by default, and nothing in this surface corrects that reading. A reasonable fix is to add a manifest-path-aware load/parse entrypoint that performs the same containment check as status, and add a regression test that `../` escapes are rejected.
+
+## 2026-06-14 — audit-barrage lift (20260614T184356699Z-design-control-after_clarify)
+
+### AUDIT-20260614-18 — Backslash paths still bypass the new “collection-relative” escape check
+
+Finding-ID: AUDIT-20260614-18 (codex-02 + codex-01; cross-model)
+Status:     fixed-c3afe2b1 (supersedes migrated-to-backlog TASK-30 — fixed in-loop before backlog selection; close TASK-30 as already-fixed)
+Disposition: fixed — `collectionRelativePathSchema` now rejects ANY backslash, so embedded `\..\` escapes and UNC roots fail regardless of host `path.normalize` semantics. Test: `nested\..\outside.html` rejected; forward-slash subdir paths still pass.
+Severity:   medium
+Per-lane:   codex=medium, codex-gpt5=high
+Decision:   agreement (gate-counted medium)
+Surface:    `src/manifests/manifest-fields.ts:14-44`
+
+The new shared `collectionRelativePathSchema` promises to reject paths that are not portable or that escape the collection root, but the implementation only normalizes with the host platform’s `path.normalize()` and then checks for `../` or `..\\` prefixes. On a POSIX host, a path like `nested\\..\\outside.html` is not treated as traversing directories, so `escapesOwnRoot()` returns false and the manifest passes validation. That same string is a real parent escape for any Windows consumer, and it also becomes ambiguous if later code ever uses `path.win32` semantics explicitly.
+
+The blast radius is high because this primitive was intentionally centralized and is now shared by both the new referee-request manifest and the existing status manifest (`src/manifests/referee-request.ts`, `src/status/status.ts`). A manifest can therefore satisfy the schema while still carrying a cross-platform root escape, which defeats the stated “portable collection-relative” contract. A reasonable fix is to make the schema platform-independent: either reject any backslash in manifest paths outright, or normalize/check with both POSIX and Windows path semantics before accepting the value.
+
+### AUDIT-20260614-19 — `perViewportIdentity` is not actually enforced per viewport
+
+Finding-ID: AUDIT-20260614-19
+Status:     fixed-c3afe2b1 (supersedes migrated-to-backlog TASK-31 — fixed in-loop; close TASK-31 as already-fixed)
+Disposition: fixed — `requirePerViewportIdentityCoverage` ties `perViewportIdentity` to the declared `viewports` (coverage + no extras + no duplicates), gated on presence. Tests: missing/duplicate/undeclared-viewport cases rejected.
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/manifests/referee-request.ts:83-91`, `src/manifests/referee-request.ts:109-150`, `src/__tests__/manifests/referee-request.test.ts:27-42`
+
+The Phase 4 task text says the schema defines “per-viewport identity,” but the implementation only requires `perViewportIdentity` to be a non-empty array (`z.array(perViewportIdentitySchema).min(1)`). There is no refinement that every declared viewport in `viewports` has a corresponding identity entry, nor any check for duplicate `viewportId`s. As written, a `referee-preview` manifest with both desktop and phone viewports can validate while supplying identity metadata for only one of them.
+
+This matters because the same file already performs cross-field validation for the desktop/phone viewport contract via `superRefine`, so consumers will reasonably assume other viewport-scoped referee data is also complete when the schema accepts it. The blast radius is medium: downstream Phase 5 code is likely to discover the omission only when it tries to capture or authenticate a missing viewport, at which point behavior becomes consumer-defined rather than governed by the manifest contract. A fix would add a post-parse refinement tying `referee.perViewportIdentity[*].viewportId` to the declared `viewports[*].id`, with uniqueness enforced as well.
+
+### AUDIT-20260614-20 — Secret-bearing auth metadata is accepted instead of rejected
+
+Finding-ID: AUDIT-20260614-20
+Status:     fixed-c3afe2b1
+Disposition: fixed — `principalSchema` + `captureConfigSchema` made strict (c3afe2b1), extended to whole-manifest strict in 943c6d11; secret-bearing extra keys now fail validation instead of silently dropping. Tests: token-bearing principal/captureConfig rejected.
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/manifests/referee-request.ts:71-81
+
+`principalSchema` is described as “Non-secret principal / auth metadata” and the comment says secret tokens are not part of the manifest contract, but the schema is a plain `z.object({ id, storageStateRef })`. Zod objects strip unknown keys by default, so `{ principal: { id: "editor", token: "secret" } }` validates successfully and silently drops `token` from the parsed value.
+
+That matters because the schema is the validation boundary for a manifest format. A downstream caller or unattended agent can reasonably rely on “schema validation passed” to mean the manifest did not contain forbidden secret-bearing fields, but as written it only means those fields were ignored. The fix is to make the relevant manifest objects strict, at least `principalSchema` and likely the surrounding referee-control/base manifest objects, so unexpected fields fail validation instead of being accepted.
+
+## 2026-06-14 — audit-barrage lift (20260614T185007835Z-design-control-after_clarify)
+
+### AUDIT-20260614-21 — Duplicate viewport ids make the new per-viewport identity check report a false exact match
+
+Finding-ID: AUDIT-20260614-21
+Status:     fixed-943c6d11 (supersedes migrated-to-backlog TASK-32 — fixed in-loop; close TASK-32 as already-fixed)
+Disposition: fixed — `requireUniqueViewportIds` rejects duplicate viewport ids before identity-coverage is evaluated (later shared into `@/manifests/manifest-fields`, 3d13d5e0). Test: two same-id viewports rejected.
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/design-control/src/manifests/referee-request.ts:122-123,160-192
+
+`requirePerViewportIdentityCoverage()` builds `declared` with `new Set(viewports.map((viewport) => viewport.id))` and then compares `perViewportIdentity[*].viewportId` against that deduplicated set. Because `viewports` itself is only `z.array(viewportSchema).min(1)` with no uniqueness check on `id`, a manifest can declare the same viewport id twice and still pass the refinement with only one identity entry. For example, two declared viewports both named `"desktop"` collapse to one set member, so the code reports an “exact” coverage match even though the manifest is internally ambiguous.
+
+The blast radius is the Phase 5 consumer of this contract: per-viewport capture identity is keyed by `viewportId`, so duplicate ids make baseline/candidate selection ambiguous while still passing Phase 4 schema validation. That is a structural correctness bug in the contract itself, not just a missing test. A reasonable fix is to reject duplicate `viewports[*].id` in the same `superRefine()` pass and add a test that proves a duplicate declared viewport id is rejected before identity coverage is evaluated.
+
+### AUDIT-20260614-22 — Scaffold mode silently accepts a misspelled optional `referee` block instead of rejecting it
+
+Finding-ID: AUDIT-20260614-22
+Status:     fixed-943c6d11 (supersedes migrated-to-backlog TASK-33 — fixed in-loop; close TASK-33 as already-fixed)
+Disposition: fixed — whole-manifest strict; a misspelled top-level `refree` key is now rejected, not silently dropped and treated as "referee omitted." Test: misspelled scaffold `refree` block rejected.
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/design-control/src/manifests/referee-request.ts:12-19,74-76,195-213
+
+The module promises that scaffold manifests validate the referee block “when it IS supplied” (`referee` is optional in scaffold mode, but malformed supplied data should still be rejected). The actual schema uses plain `z.object(...)` for both union branches and only makes `captureConfig` and `principal` strict. In Zod, non-strict objects strip unknown keys by default, so a scaffold manifest with a typo like `"refree": { ... }` is accepted as a valid scaffold manifest that simply omits `referee`. That is not “validated-when-present”; it is silent data loss on the one branch where omission is legal.
+
+The blast radius is limited to scaffold manifests, but it is still real: an operator or unattended generator can believe it provided referee metadata, get a passing schema result, and only discover much later that the block was discarded. This diff already treats silent stripping as unacceptable for secret-bearing objects, and the same problem exists here because `referee` is semantically load-bearing when present. A reasonable fix is to make the top-level manifest objects strict, or otherwise explicitly reject unknown top-level keys on the scaffold branch, and add a test for a misspelled `referee` property.
+
+### AUDIT-20260614-23 — Extra secret-bearing keys still validate outside `principal` and `captureConfig`
+
+Finding-ID: AUDIT-20260614-23
+Status:     fixed-943c6d11
+Disposition: fixed — structural whole-manifest strict (every object `.strict()`); extra secret-bearing keys anywhere in the referee tree (top-level, nested baseline/stableRegions, etc.) now fail. Tests: top-level + nested unknown-key rejection.
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/design-control/src/manifests/referee-request.ts:39-114
+
+The schema is strict only for `captureConfigSchema` and `principalSchema` at lines 78-103, but every surrounding referee object remains a default Zod object: `artifactRefSchema`, `stableRegionSchema`, `dynamicRegionSchema`, `perViewportIdentitySchema`, and the parent `refereeControlSchema` at lines 39-114. Zod strips unknown keys by default, so a manifest containing `referee.token`, `referee.baseline.token`, or `referee.stableRegions[0].token` will parse successfully rather than being rejected.
+
+That conflicts with the documented contract in this same file that the manifest keeps secrets out, and with the new tests’ intent at lines 223-230, which only proves rejection for two narrow locations. The blast radius is high because downstream validation can report “schema passed” for a checked-in manifest that still contains secret-bearing fields in other referee-control locations. A reasonable fix is to make the full referee-control tree strict where it is part of the committed manifest contract, or add a recursive forbidden-key refinement if forward-compatible extra fields are still desired for non-secret metadata.
+
+## 2026-06-14 — audit-barrage lift (20260614T185857096Z-design-control-after_clarify)
+
+### AUDIT-20260614-24 — `surface-status` still silently strips unknown keys, so the shared manifest contract is only half-applied
+
+Finding-ID: AUDIT-20260614-24
+Status:     fixed-938a6973 (supersedes migrated-to-backlog TASK-34 — fixed in-loop; close TASK-34 as already-fixed)
+Disposition: fixed — `surfaceStatusManifestSchema` made strict at every object layer (sourceFile, both staleSurface branches, nested wireframe/designSpec/archive, top-level), mirroring the referee-request strictness. Tests: 3 unknown-key cases (top-level, nested, staleSurface).
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/design-control/src/status/status.ts:24-61`
+
+This diff centralizes shared field rules in [`manifest-fields.ts`](</Users/orion/work/deskwork-work/design-control/plugins/design-control/src/manifests/manifest-fields.ts:1>) and makes the new referee-request manifest explicitly “whole-manifest strict” ([`referee-request.ts:27-33`](</Users/orion/work/deskwork-work/design-control/plugins/design-control/src/manifests/referee-request.ts:27>)). But the `surfaceStatusManifestSchema` path still leaves most objects non-strict: `sourceFileSchema`, both `staleSurface` branches, the top-level manifest object, and nested `wireframe` / `designSpec` / `archive` objects are all plain `z.object(...)` without `.strict()` ([`status.ts:24-61`](</Users/orion/work/deskwork-work/design-control/plugins/design-control/src/status/status.ts:24>)). As written, a typo like `secretToken`, `refree`, or an accidental nested extra key in a status manifest will be silently dropped instead of rejected.
+
+The blast radius is moderate because `loadSurfaceStatusManifest()` is a consumer-facing validation entrypoint, and downstream operators will reasonably read this refactor as “shared manifest validation is now canonical.” In practice, the status surface still accepts malformed author intent and proceeds with a different manifest than the one written, which is exactly the class of hidden-schema drift the referee-request strictness work was trying to remove. A reasonable fix is to make the status manifest strict at every object layer and add regression tests in `src/__tests__/status/status.test.ts` mirroring the new unknown-key rejection coverage added for referee-request.
+
+## 2026-06-14 — audit-barrage lift (20260614T190515991Z-design-control-after_clarify)
+
+### AUDIT-20260614-25 — Scaffold mode is implemented as all-or-nothing, but the spec says the later referee fields are individually optional
+
+Finding-ID: AUDIT-20260614-25
+Status:     fixed-ffb05d70
+Disposition: fixed — scaffold referee fields are now individually optional (`refereeControlSchema.partial().strict()`); referee-preview still requires all; the per-viewport-identity coverage check is gated on `referee?.perViewportIdentity` presence. Matches spec.md's field-level "OPTIONAL in scaffold mode." Tests: 5 cases (partial accepted, malformed-when-present rejected, unknown-key rejected, referee-preview still complete).
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/design-control/src/manifests/referee-request.ts:120-130,241-247; plugins/design-control/specs/001-design-control/spec.md:317-323; plugins/design-control/specs/001-design-control/tasks.md:295-305
+
+The spec text says the later referee-control fields are “defined-and-validated-when-present” and “OPTIONAL in scaffold mode” ([spec.md:317-323](/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/spec.md:317), [tasks.md:295-305](/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/tasks.md:295)). The implementation does something narrower: `refereeControlSchema` requires every nested field (`baseline`, `candidate`, `stableRegions`, `dynamicRegions`, `captureConfig`, `perViewportIdentity`, `principal`) at [referee-request.ts:120-130](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/manifests/referee-request.ts:120), and scaffold mode only makes the whole `referee` block optional at [referee-request.ts:241-247](/Users/orion/work/deskwork-work/design-control/plugins/design-control/src/manifests/referee-request.ts:241). A scaffold manifest that supplies only some future-facing referee metadata therefore fails, even though the more natural reading of the spec is that omitted Phase-5 fields remain allowed until `referee-preview`.
+
+This matters because the Phase 4 contract is supposed to let Phase 5 grow into the same manifest without breaking scaffold authors. As written, a downstream consumer that incrementally records referee data during scaffold mode will get schema rejections that contradict the governing text. The blast radius is high because the spec and implementation support different authoring patterns, and an unattended agent could plausibly choose the spec-shaped one first. A reasonable fix is to decide which contract is intended and make the artifacts agree: either make scaffold-mode nested referee fields individually optional, or tighten the spec/tasks text to say the `referee` block itself is optional but, when present, must be complete.
+
+### AUDIT-20260614-26 — Phase 4 landed new governed files without adding a Phase 4 authoritative file-scope block
+
+Finding-ID: AUDIT-20260614-26
+Status:     fixed-ffb05d70 (supersedes migrated-to-backlog TASK-35 — fixed in-loop; close TASK-35 as already-fixed)
+Disposition: fixed — added the Phase-4 "Per-phase govern file scope (authoritative)" line naming `src/manifests/{referee-request,manifest-fields,index}.ts` + the manifests test, matching the earlier phases' governance-boundary convention.
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/design-control/specs/001-design-control/tasks.md:282-313 (missing govern-scope declaration for `src/manifests/*` and `src/__tests__/manifests/referee-request.test.ts`)
+
+This repo uses `Per-phase govern file scope (authoritative): ...` lines as the explicit audit/governance boundary; earlier phases have them, for example at [tasks.md:214](/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/tasks.md:214) and [tasks.md:232](/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/tasks.md:232). Phase 4’s updated section at [tasks.md:282-313](/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/tasks.md:282) records completion of `src/manifests/referee-request.ts`, `src/manifests/manifest-fields.ts`, `src/manifests/index.ts`, and `src/__tests__/manifests/referee-request.test.ts`, but it never adds the corresponding authoritative scope block.
+
+The runtime code still works, so this is not a blocking correctness defect. The blast radius is governance: later scope-limited audits, barrage prompts, or operator reviews can legitimately omit the new manifest surfaces because the workplan never names them as Phase 4’s governed files. In this repository, that is load-bearing process metadata, not cosmetic documentation. A reasonable fix is to add the missing Phase 4 govern-scope line naming the new manifest modules and tests explicitly.
+
+### AUDIT-20260614-27 — Referee-preview validates per-viewport identity but not per-viewport artifacts
+
+Finding-ID: AUDIT-20260614-27
+Status:     boundary-phase5-ffb05d70
+Disposition: documented Phase-4/Phase-5 boundary (NOT a schema defect). Phase 4 defines `baseline`/`candidate` as single structure-only refs per the spec's field list ("baseline + candidate **paths**"); the per-viewport / per-cell baseline MATRIX coverage is **referee-preview status** scope in Phase 5 (spec.md § Baseline & capture: "referee-preview status refuses completion when candidate screenshots don't cover the required matrix"). The boundary is recorded in tasks.md Phase 4. Promises-before-mechanism: Phase 4 promises the fields exist + are shaped; Phase 5 owns the matrix-coverage mechanism.
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/design-control/src/manifests/referee-request.ts:120-128,262-273; plugins/design-control/src/__tests__/manifests/referee-request.test.ts:30-45,79-83; missing schema surface for baseline/candidate matrix coverage
+
+The `referee-preview` branch requires a `referee` block and now checks `perViewportIdentity` exactly against declared `viewports`, but `baseline` and `candidate` are still single scalar artifact refs: `baseline: artifactRefSchema` and `candidate: artifactRefSchema`. The happy-path fixture declares desktop and phone viewports, supplies identity for both, but only one baseline path and one candidate path, both named `desktop.png`, and the test accepts that as well formed.
+
+This conflicts with the feature contract that referee-preview evidence covers both viewports and that baselines are a matrix keyed by `surface id + route/state + viewport + capture-step` (`spec.md:137`, `spec.md:402-404`, `spec.md:470-471`). The blast radius is high because a downstream Phase 5 consumer can treat this schema as complete and then either lack phone artifacts at execution time or incorrectly reuse a desktop artifact for the phone cell. A reasonable fix is to make baseline/candidate artifacts viewport keyed, or add a matrix/cell schema that enforces coverage for every declared viewport and required capture step.
+
+## 2026-06-14 — audit-barrage lift (20260614T191740993Z-design-control-after_clarify)
+
+### AUDIT-20260614-28 — Referee-request still has no manifest-path-aware containment pass, so symlink escapes remain unverifiable
+
+Finding-ID: AUDIT-20260614-28
+Status:     boundary-phase5
+Disposition: documented Phase-4/Phase-5 boundary (NOT a schema defect). Phase 4's referee-request surface is schema-validation-only (`parseRefereeRequestManifest` takes a value, not a path); its portable-path contract is the string-level guards (reject `~`/absolute/Windows-drive/backslash/`../`-escape). Symlink/realpath containment requires resolving paths against a manifest FILE location — that is Phase-5 capture's job (where artifacts are actually resolved + read), mirroring status's load-time `assertWithinCollection`. Same boundary class as AUDIT-20260614-27; recorded in tasks.md Phase 4. A manifest-path-aware referee loader belongs to Phase 5, not the Phase-4 schema.
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/design-control/src/manifests/manifest-fields.ts:10-13; plugins/design-control/src/manifests/referee-request.ts:300-307; contrast plugins/design-control/src/status/status.ts:183-219
+
+The new shared path primitive now explicitly documents a two-layer contract: string-level validation first, then a load-time containment check that follows symlinks and enforces subdirectory-manifest boundaries (`manifest-fields.ts:10-13`). That second layer exists for the status surface via `loadSurfaceStatusManifest()` and `assertWithinCollection()` (`status.ts:183-219`), but the new referee surface still exports only `parseRefereeRequestManifest(value)` (`referee-request.ts:300-307`), which has no access to the manifest file path and therefore cannot perform the documented containment pass. The lexical `../` fix closes one class of escape, but a path like `artifacts/spec-link.md` can still be schema-valid while traversing out of the collection through an existing symlink.
+
+The blast radius is high because Phase 5 consumers will treat this schema as the validation boundary for capture/baseline artifacts. If they act on it as written, they can accept a “valid” referee manifest and then read or capture against artifacts outside the collection root by default. A reasonable fix is to add a manifest-path-aware referee loader, mirroring the status surface’s post-parse containment checks, and cover it with a symlink-escape regression test.
+
+### AUDIT-20260614-29 — `status.ts` keeps a now-unused `isAbsolute` import
+
+Finding-ID: AUDIT-20260614-29
+Status:     wontfix-false-premise
+Disposition: FALSE PREMISE — `isAbsolute` is NOT unused. It is used in `assertWithinCollection` (status.ts:189, `!isAbsolute(rel)`). The package compiles clean under `noUnusedLocals` — `tsc --noEmit` passes and 575 tests are green — which directly disproves the finding's "build will fail" claim. No change made; removing the import would break the symlink-containment check. (Per the govern protocol, a false-premise finding is recorded as an acknowledgment, not invented code.)
+Severity:   blocking
+Per-lane:   codex=blocking
+Decision:   single-model (gate-counted blocking)
+Surface:    src/status/status.ts:3
+
+`status.ts` now delegates path validation to `collectionRelativePathSchema`, but the existing `isAbsolute` import remains on line 3: `import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';`. The audited package has `noUnusedLocals: true` in `plugins/design-control/tsconfig.json`, so this is not just hygiene: a TypeScript build/check will fail before consumers can use the feature.
+
+The reasonable fix is to remove `isAbsolute` from the import list in `src/status/status.ts`. Blast radius is blocking because the shipped diff makes the package fail its strict TypeScript compile gate even though the runtime schema logic is otherwise reachable.
+
+## 2026-06-14 — audit-barrage lift (20260614T200519289Z-design-control-after_clarify)
+
+### AUDIT-20260614-30 — Surface-status viewports can still duplicate ids
+
+Finding-ID: AUDIT-20260614-30
+Status:     fixed-3d13d5e0
+Disposition: fixed — `requireUniqueViewportIds` (and `requireDesktopAndPhoneViewports`) extracted into `@/manifests/manifest-fields` and applied to BOTH `surfaceStatusManifestSchema` and the referee-request schema; the status manifest now rejects duplicate viewport ids (sibling consistency, single-sourced viewport contract). Test: status duplicate-id manifest rejected.
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/design-control/src/status/status.ts:84-100; plugins/design-control/src/__tests__/status/status.test.ts:709-767
+
+`surfaceStatusManifestSchema` validates the desktop/phone contract only by width: one viewport `>=1280` and one `<=390`. Unlike the new referee-request schema, it does not reject duplicate `viewports[*].id` values. A status manifest with `[{ id: "desktop", width: 1280 }, { id: "desktop", width: 390 }]` will satisfy lines 85-100 even though the manifest has no distinct phone viewport identity. The new status tests cover strict extra-key rejection, but not duplicate viewport ids.
+
+Blast radius is high because status is the completion gate surface. A downstream agent or adopter can act on a status manifest as complete while the viewport identity matrix is ambiguous or collapsed, exactly the shape the referee-request schema now rejects at `referee-request.ts:193-208`. A reasonable repair is to share/apply the same unique-viewport-id refinement to `surfaceStatusManifestSchema` and add a status negative test for duplicate ids.
+
+## 2026-06-14 — audit-barrage lift (20260614T201108363Z-design-control-after_clarify)
+
+_No findings surfaced — a clean barrage run over a healthy fleet (0 HIGH+, 0 MEDIUM, 0 total). Recorded so the convergence dampener counts it as a quiet run (claude-20260612-r3); a clean run that left no section was invisible to the consecutive-quiet / single-run-clean rules._
