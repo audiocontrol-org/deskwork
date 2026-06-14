@@ -698,7 +698,12 @@ describe('runDesignControlStatus', () => {
     });
     const { err, io } = capture();
     expect(runDesignControlStatus([manifestPath], io)).toBe(1);
-    expect(err.join('\n')).toContain('must stay within the collection root');
+    // A `../`-escaping path is now rejected EARLIER at schema-parse time (it is
+    // provably not collection-relative by pure-string inspection) rather than at
+    // resolution time. assertWithinCollection still guards resolution-context
+    // escapes (symlinks, subdirectory manifests) the string check cannot see —
+    // see the AUDIT-20260614-16 symlink case above.
+    expect(err.join('\n')).toContain('collection-relative');
   });
 
   it('returns 1 for a manifest using a Windows drive-rooted artifact path (AUDIT-20260614-12/-13)', () => {

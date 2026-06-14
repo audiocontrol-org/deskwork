@@ -9,26 +9,21 @@ import {
   loadProvenance,
   verifyDrivingWireframe,
 } from '@/provenance/derived';
+import {
+  collectionRelativePathSchema,
+  sha256HexSchema,
+  viewportSchema,
+} from '@/manifests/manifest-fields';
 
 const STATUS_MANIFEST_VERSION = 1;
 
 const sha256Hex = (content: string): string => createHash('sha256').update(content).digest('hex');
 
-const pathSchema = z
-  .string()
-  .min(1)
-  .refine((value) => !value.startsWith('~') && !isAbsolute(value) && !/^[A-Za-z]:/.test(value) && !value.startsWith('\\'), {
-    message: 'paths must be collection-relative; "~", absolute, and machine-rooted paths are not portable',
-  });
-
-const viewportSchema = z.object({
-  id: z.string().min(1),
-  width: z.number().int().positive(),
-});
+const pathSchema = collectionRelativePathSchema;
 
 const sourceFileSchema = z.object({
   path: pathSchema,
-  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  sha256: sha256HexSchema,
 });
 
 const staleSurfaceSchema = z.union([
@@ -51,12 +46,12 @@ const surfaceStatusManifestSchema = z
     viewports: z.array(viewportSchema).min(1),
     wireframe: z.object({
       path: pathSchema,
-      sha256: z.string().regex(/^[0-9a-f]{64}$/),
+      sha256: sha256HexSchema,
     }),
     designSpec: z.object({
       path: pathSchema,
       version: z.string().min(1),
-      sha256: z.string().regex(/^[0-9a-f]{64}$/),
+      sha256: sha256HexSchema,
     }),
     archive: z.object({
       path: pathSchema,

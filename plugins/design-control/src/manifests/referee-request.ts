@@ -24,34 +24,21 @@
  * secret-token classification, baseline promotion) belong to Phase 5 execution,
  * not to this schema.
  */
-import { isAbsolute } from 'node:path';
 import { z } from 'zod';
+import {
+  collectionRelativePathSchema,
+  sha256HexSchema,
+  viewportSchema,
+} from '@/manifests/manifest-fields';
 
 const REFEREE_REQUEST_MANIFEST_VERSION = 1;
 
-/** Collection-relative path: reject `~`, POSIX-absolute, Windows-drive, and UNC roots. */
-const pathSchema = z
-  .string()
-  .min(1)
-  .refine(
-    (value) =>
-      !value.startsWith('~') &&
-      !isAbsolute(value) &&
-      !/^[A-Za-z]:/.test(value) &&
-      !value.startsWith('\\'),
-    { message: 'paths must be collection-relative; "~", absolute, and machine-rooted paths are not portable' },
-  );
-
-const sha256Schema = z.string().regex(/^[0-9a-f]{64}$/, 'must be a lowercase hex sha256 digest');
+const pathSchema = collectionRelativePathSchema;
+const sha256Schema = sha256HexSchema;
 
 const artifactRefSchema = z.object({
   path: pathSchema,
   sha256: sha256Schema,
-});
-
-const viewportSchema = z.object({
-  id: z.string().min(1),
-  width: z.number().int().positive(),
 });
 
 /**

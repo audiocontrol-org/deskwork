@@ -123,6 +123,25 @@ describe('refereeRequestManifestSchema', () => {
     ).toThrow();
   });
 
+  it('rejects a wireframe path that escapes the collection root via `../` (AUDIT-20260614-17)', () => {
+    expect(() =>
+      parseRefereeRequestManifest(
+        validScaffold({ wireframe: { path: '../outside/surface.html', sha256: sha256Hex('wireframe') } }),
+      ),
+    ).toThrow();
+    expect(
+      refereeRequestManifestSchema.safeParse(
+        validScaffold({ wireframe: { path: '../outside/surface.html', sha256: sha256Hex('wireframe') } }),
+      ).success,
+    ).toBe(false);
+  });
+
+  it('rejects a referee baseline path that escapes the collection root via `../../` (AUDIT-20260614-17)', () => {
+    const referee = validRefereeControl();
+    referee.baseline = { path: '../../outside.png', sha256: sha256Hex('baseline') };
+    expect(() => parseRefereeRequestManifest(validRefereePreview({ referee }))).toThrow();
+  });
+
   it('rejects an unknown mode', () => {
     expect(() => parseRefereeRequestManifest({ ...baseFields(), mode: 'capture' })).toThrow();
   });
