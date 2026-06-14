@@ -56,6 +56,7 @@ export type DesignControlStatusRule =
   | 'missing-wireframe-provenance'
   | 'unaccepted-decision'
   | 'dead-link-spec'
+  | 'unchecked-link-spec'
   | 'derived-unedited'
   | 'stale-surface'
   | 'stale-surface-unmapped';
@@ -89,6 +90,8 @@ function firstNextAction(rule: DesignControlStatusRule): string {
       return 'Record an accepted wireframe decision in the exploration archive.';
     case 'dead-link-spec':
       return 'Fix the design-language spec so all CSS links resolve live and the spec goes green.';
+    case 'unchecked-link-spec':
+      return 'Add at least one validated author-written .css link per rule before calling the spec complete.';
     case 'derived-unedited':
       return 'Edit the derived wireframe before acceptance, or replace it with a driving wireframe.';
     case 'stale-surface':
@@ -167,6 +170,14 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
           ),
         );
       }
+    }
+    for (const skipped of specResult.skipped) {
+      findings.push(
+        finding(
+          'unchecked-link-spec',
+          `rule "${skipped.ruleId}" has unchecked non-CSS link "${skipped.link.path} ${skipped.link.selector}"; status cannot call the surface complete without a validated author-written .css anchor.`,
+        ),
+      );
     }
   }
 

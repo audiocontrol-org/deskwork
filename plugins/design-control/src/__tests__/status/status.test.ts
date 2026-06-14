@@ -199,6 +199,51 @@ describe('getSurfaceStatus', () => {
     expect(getSurfaceStatus(manifestPath).findings.map((item) => item.rule)).toContain('dead-link-spec');
   });
 
+  it('flags an unchecked-link spec as incomplete', () => {
+    const dir = freshDir();
+    const wireframeHtml = '<html><body><h1>Wireframe</h1></body></html>';
+    writeFileSync(join(dir, 'surface.html'), wireframeHtml);
+    recordDrivingWireframe({ dir, surfaceId: 'surface', wireframeFile: 'surface.html' });
+    writeFileSync(join(dir, 'styles.ts'), 'export const btn = ".btn";\n');
+    const specPath = join(dir, 'design-language.md');
+    writeFileSync(
+      specPath,
+      `### rule: ink-primary
+- kind: palette
+- css: styles.ts .btn
+- example: compose button
+- do: Use the ink palette for primary actions.
+`,
+    );
+    const archivePath = join(dir, 'surface.archive.json');
+    writeArchiveEntry(
+      archivePath,
+      createArchiveEntry({
+        surfaceId: 'surface',
+        brief: 'Regroup the layout',
+        proposalWireframePath: 'surface.html',
+        acceptedWireframePath: 'surface.html',
+      }),
+    );
+    const sourcePath = join(dir, 'ui-source.ts');
+    writeFileSync(sourcePath, 'export const UI = "stable";\n');
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      routeState: '/studio/default',
+      viewports: [{ id: 'desktop', width: 1280 }],
+      wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
+      archive: { path: 'surface.archive.json' },
+      staleSurface: { sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }] },
+    });
+
+    const result = getSurfaceStatus(manifestPath);
+    expect(result.complete).toBe(false);
+    expect(result.findings.map((item) => item.rule)).toContain('unchecked-link-spec');
+  });
+
   it('flags stale mapped source drift', () => {
     const dir = freshDir();
     const wireframeHtml = '<html><body><h1>Wireframe</h1></body></html>';

@@ -211,7 +211,7 @@ same lint; a `derived` artifact cannot be accepted without a recorded operator e
 
 ## Phase 2C: `translate-design-language` authoring skill (v1-scaffold)
 
-**Per-phase govern file scope (authoritative):** `skills/translate-design-language/SKILL.md`, `src/engine-adapter/types.ts`, `src/design-language/check-spec-file.ts`, `src/__tests__/design-language/check-spec-file.test.ts`.
+**Per-phase govern file scope (authoritative):** `skills/translate-design-language/SKILL.md`, `src/engine-adapter/types.ts`, `src/design-language/check-spec-file.ts`, `src/status/status.ts`, `src/__tests__/design-language/check-spec-file.test.ts`, `src/__tests__/status/status.test.ts`.
 - [x] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
       drafts/maintains the spec from approved wireframe intent; its engine conformance is exercised
       **only when `/frontend-design` is present.**
