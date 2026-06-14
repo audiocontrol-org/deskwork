@@ -226,7 +226,7 @@ This diff also changes `assembleImplementPayload()` so an explicit empty `pathSc
 ### AUDIT-20260614-17 — New checkpoint bookkeeping files are not excluded from implement-mode payloads
 
 Finding-ID: AUDIT-20260614-17
-Status:     open
+Status: migrated-to-backlog TASK-78
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -267,7 +267,7 @@ This is high because callers and future agents will naturally rely on the docume
 ### AUDIT-20260614-20 — Whole-feature govern falls back to a full payload once every phase checkpoint is current
 
 Finding-ID: AUDIT-20260614-20 (codex-02 + codex-01; cross-model)
-Status:     open
+Status: migrated-to-backlog TASK-79
 Severity:   medium
 Per-lane:   codex=medium, codex-gpt5=high
 Decision:   agreement (gate-counted medium)
@@ -293,7 +293,7 @@ That breaks the feature’s main control-plane promise: the system still assembl
 ### AUDIT-20260614-22 — Prospective boundary sizing exists only as an isolated helper and is never used by the govern path
 
 Finding-ID: AUDIT-20260614-22
-Status:     open
+Status: migrated-to-backlog TASK-80
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -306,7 +306,7 @@ The blast radius is medium rather than high because the post-render hard gate st
 ### AUDIT-20260614-23 — Fleet capability load errors bypass govern’s FATAL exit channel
 
 Finding-ID: AUDIT-20260614-23
-Status:     open
+Status: migrated-to-backlog TASK-81
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -347,7 +347,7 @@ Blast radius is high because the tracked work product is internally incomplete: 
 ### AUDIT-20260614-26 — The new lane-selection path advertises `--models`, but `govern` still rejects that flag at parse time
 
 Finding-ID: AUDIT-20260614-26
-Status:     open
+Status: migrated-to-backlog TASK-82
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -375,7 +375,7 @@ The blast radius is high because an unattended phase audit can converge and writ
 ### AUDIT-20260614-28 — Backtick scope extraction now accepts whole code spans, not just path substrings
 
 Finding-ID: AUDIT-20260614-28
-Status:     open
+Status: migrated-to-backlog TASK-83
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -388,7 +388,7 @@ That matters because these parsed values feed both payload scoping and checkpoin
 ### AUDIT-20260614-29 — Phase IDs accepted by `tasks.md` parsing can crash when checkpoint files are written
 
 Finding-ID: AUDIT-20260614-29
-Status:     open
+Status: migrated-to-backlog TASK-84
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -468,7 +468,7 @@ Because downstream freshness currently hinges only on the stored fingerprint, th
 ### AUDIT-20260614-35 — `fleet-knowledge.yaml` silently allows duplicate lane names, so the last entry wins without any error
 
 Finding-ID: AUDIT-20260614-35
-Status:     open
+Status: migrated-to-backlog TASK-85
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -494,7 +494,7 @@ The blast radius is high because this code is governance state: a downstream pha
 ### AUDIT-20260614-37 — Scope fingerprinting allows governed paths to escape the installation root
 
 Finding-ID: AUDIT-20260614-37
-Status:     open
+Status: migrated-to-backlog TASK-86
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -522,7 +522,7 @@ The blast radius is high because checkpoint freshness is on the critical path fo
 ### AUDIT-20260614-39 — Overlapping governed paths make the checkpoint fingerprint unstable for the same content
 
 Finding-ID: AUDIT-20260614-39 (codex-02 + codex-01; cross-model)
-Status:     open
+Status: migrated-to-backlog TASK-87
 Severity:   medium
 Per-lane:   codex=medium, codex-gpt5=medium
 Decision:   agreement (gate-counted medium)
@@ -548,7 +548,7 @@ The blast radius is high because this creates a false-clean governance state: do
 ### AUDIT-20260614-41 — The new governance primitives ship without direct tests in this diff
 
 Finding-ID: AUDIT-20260614-41
-Status:     open
+Status: migrated-to-backlog TASK-88
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -574,7 +574,7 @@ This is high severity because the feature is about audit protocol enforcement an
 ### AUDIT-20260614-43 — Boundary sizing treats invalid byte counts as valid measurements
 
 Finding-ID: AUDIT-20260614-43
-Status:     open
+Status: migrated-to-backlog TASK-89
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -615,7 +615,7 @@ That leaves a bad partial-failure mode: if the process is interrupted, the disk 
 ### AUDIT-20260614-46 — Fleet negotiation accepts invalid requested prompt sizes
 
 Finding-ID: AUDIT-20260614-46
-Status:     open
+Status: migrated-to-backlog TASK-90
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -628,7 +628,7 @@ The blast radius is medium because downstream callers relying on this as a gate 
 ### AUDIT-20260614-47 — Boundary sizing treats invalid byte counts as valid measurements
 
 Finding-ID: AUDIT-20260614-47
-Status:     open
+Status: migrated-to-backlog TASK-91
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -656,7 +656,7 @@ The blast radius is feature-blocking on upgrades and partial rollouts: a repo th
 ### AUDIT-20260614-49 — Checkpoint scope canonicalization is not path-separator stable, so Windows-style paths hash as different scopes
 
 Finding-ID: AUDIT-20260614-49
-Status:     open
+Status: migrated-to-backlog TASK-92
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -669,7 +669,7 @@ The blast radius is persistent false checkpoint invalidation on a supported cros
 ### AUDIT-20260614-50 — Fleet negotiation accepts nonsensical prompt sizes
 
 Finding-ID: AUDIT-20260614-50
-Status:     open
+Status: migrated-to-backlog TASK-93
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -684,7 +684,7 @@ Blast radius is medium: normal callers with valid measured byte counts will work
 ### AUDIT-20260614-51 — Missing fleet-knowledge entries silently fall back to derived envelopes instead of failing
 
 Finding-ID: AUDIT-20260614-51 (codex-01 + codex-01; cross-model)
-Status:     open
+Status: migrated-to-backlog TASK-94
 Severity:   medium
 Per-lane:   codex=medium, codex-gpt5=high
 Decision:   agreement (gate-counted medium)
@@ -697,7 +697,7 @@ The blast radius is high because this is governance code deciding whether a prom
 ### AUDIT-20260614-52 — Phase checkpoint writes are racy within a single process
 
 Finding-ID: AUDIT-20260614-52 (codex-03 + codex-02; cross-model)
-Status:     open
+Status: migrated-to-backlog TASK-95
 Severity:   medium
 Per-lane:   codex=medium, codex-gpt5=medium
 Decision:   agreement (gate-counted medium)
@@ -710,7 +710,7 @@ The blast radius is medium because this does not break the happy path for strict
 ### AUDIT-20260614-53 — Boundary sizing accepts nonsensical byte counts without validation
 
 Finding-ID: AUDIT-20260614-53 (codex-02 + codex-03; cross-model)
-Status:     open
+Status: migrated-to-backlog TASK-96
 Severity:   medium
 Per-lane:   codex=medium, codex-gpt5=medium
 Decision:   agreement (gate-counted medium)
@@ -738,7 +738,7 @@ The blast radius is concrete: a fresh install with no `.stack-control/fleet-know
 ### AUDIT-20260614-55 — Checkpoint records can claim stale governed paths while freshness only checks the hash
 
 Finding-ID: AUDIT-20260614-55
-Status:     open
+Status: migrated-to-backlog TASK-97
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -751,7 +751,7 @@ The blast radius is medium: the hash check may still protect the actual gate if 
 ### AUDIT-20260614-56 — Fleet knowledge accepts fractional byte limits
 
 Finding-ID: AUDIT-20260614-56
-Status:     open
+Status: migrated-to-backlog TASK-98
 Severity:   low
 Per-lane:   codex=low
 Decision:   single-model (gate-counted low)
@@ -764,7 +764,7 @@ The blast radius is low because fractional thresholds only affect edge compariso
 ### AUDIT-20260614-57 — Boundary sizing can produce unsafe integer estimates
 
 Finding-ID: AUDIT-20260614-57
-Status:     open
+Status: migrated-to-backlog TASK-99
 Severity:   low
 Per-lane:   codex=low
 Decision:   single-model (gate-counted low)
@@ -820,7 +820,7 @@ The downstream blast radius is feature-visible, not cosmetic. `runProtocol()` an
 ### AUDIT-20260614-61 — Phase checkpoint storage trusts symlinked state roots outside the installation
 
 Finding-ID: AUDIT-20260614-61
-Status:     open
+Status: migrated-to-backlog TASK-100
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -833,7 +833,7 @@ That matters because these records are later used to decide whether earlier phas
 ### AUDIT-20260614-62 — Fleet knowledge accepts fractional byte limits
 
 Finding-ID: AUDIT-20260614-62
-Status:     open
+Status: migrated-to-backlog TASK-101
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -887,7 +887,7 @@ The blast radius is high because the feature scope explicitly calls for autonomo
 ### AUDIT-20260614-66 — Checkpoint files can be redirected through symlinked governance directories
 
 Finding-ID: AUDIT-20260614-66
-Status:     open
+Status: migrated-to-backlog TASK-102
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -943,7 +943,7 @@ That matters because the feature is explicitly about fleet negotiation across mo
 ### AUDIT-20260614-70 — New required `fleet-knowledge.yaml` has no upgrade/bootstrap path, so existing installs hard-fail on first use
 
 Finding-ID: AUDIT-20260614-70 (codex-02 + codex-01; cross-model)
-Status:     open
+Status: migrated-to-backlog TASK-103
 Severity:   medium
 Per-lane:   codex=medium, codex-gpt5=high
 Decision:   agreement (gate-counted medium)
@@ -969,7 +969,7 @@ The consequence is that a malformed config with the same lane listed twice can p
 ### AUDIT-20260614-72 — Phase checkpoint fingerprints ignore executable-bit and mode changes
 
 Finding-ID: AUDIT-20260614-72
-Status:     open
+Status: migrated-to-backlog TASK-104
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -982,7 +982,7 @@ The blast radius is medium because it creates a false “no material change” r
 ### AUDIT-20260614-73 — Checkpoint writes can leave orphan temp files on failure
 
 Finding-ID: AUDIT-20260614-73
-Status:     open
+Status: migrated-to-backlog TASK-105
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -1010,7 +1010,7 @@ The blast radius is high because this is a hard startup failure on the main path
 ### AUDIT-20260614-75 — Empty rendered phases are treated as invalid instead of as a valid zero-byte boundary
 
 Finding-ID: AUDIT-20260614-75
-Status:     open
+Status: migrated-to-backlog TASK-106
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -1023,7 +1023,7 @@ The blast radius is medium: it does not break every run, but unattended governan
 ### AUDIT-20260614-76 — The new persisted-governance primitives land without executable coverage in the same diff
 
 Finding-ID: AUDIT-20260614-76
-Status:     open
+Status: migrated-to-backlog TASK-107
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -1064,7 +1064,7 @@ That leaves a gap in the very surface meant to gate phase advancement. A symlink
 ### AUDIT-20260614-79 — Boundary estimates can silently approve an empty phase
 
 Finding-ID: AUDIT-20260614-79
-Status:     open
+Status: migrated-to-backlog TASK-108
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -1092,7 +1092,7 @@ The blast radius is blocking because a fresh install or upgrade that has not man
 ### AUDIT-20260614-81 — Checkpoint writes can leave torn temp files on failure
 
 Finding-ID: AUDIT-20260614-81
-Status:     open
+Status: migrated-to-backlog TASK-109
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -1105,7 +1105,7 @@ The blast radius is medium because the primary checkpoint file remains protected
 ### AUDIT-20260614-82 — Governed path hashing reads non-regular filesystem entries as files
 
 Finding-ID: AUDIT-20260614-82
-Status:     open
+Status: migrated-to-backlog TASK-110
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -1120,7 +1120,7 @@ The blast radius is medium because `computeScopeFingerprint()` is intended to ga
 ### AUDIT-20260614-83 — Missing installation `fleet-knowledge` silently falls back to the repo template
 
 Finding-ID: AUDIT-20260614-83 (codex-02 + codex-01; cross-model)
-Status:     open
+Status: migrated-to-backlog TASK-111
 Severity:   medium
 Per-lane:   codex=medium, codex-gpt5=high
 Decision:   agreement (gate-counted medium)
@@ -1133,7 +1133,7 @@ The blast radius is high because the rest of the governance flow treats these by
 ### AUDIT-20260614-84 — Lane probing converts probe-tool failure into fake lane unavailability
 
 Finding-ID: AUDIT-20260614-84
-Status:     open
+Status: migrated-to-backlog TASK-112
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -1146,7 +1146,7 @@ The consequence is a false governance outcome that looks like a real fleet-capab
 ### AUDIT-20260614-85 — New persisted governance artifacts ship without any matching doctor/schema surface
 
 Finding-ID: AUDIT-20260614-85
-Status:     open
+Status: migrated-to-backlog TASK-113
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -1187,7 +1187,7 @@ The blast radius is high because these are not obscure branches. A fresh or mis-
 ### AUDIT-20260614-88 — `classifyBinaryProbe()` still misclassifies signaled probe failures as "binary unavailable"
 
 Finding-ID: AUDIT-20260614-88
-Status:     open
+Status: migrated-to-backlog TASK-114
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
@@ -1200,7 +1200,7 @@ The blast radius is medium because the trigger is narrower than the missing-file
 ### AUDIT-20260614-89 — The required fleet-knowledge seed is no longer documented as a setup artifact
 
 Finding-ID: AUDIT-20260614-89
-Status:     open
+Status: migrated-to-backlog TASK-115
 Severity:   low
 Per-lane:   codex=low
 Decision:   single-model (gate-counted low)
@@ -1209,3 +1209,7 @@ Surface:    src/govern/lane-capabilities.ts:107-114, templates/fleet-knowledge.y
 `readFleetKnowledge()` now hard-fails when the resolved `fleet-knowledge.yaml` is absent and tells the operator to run `stackctl setup` because the “bundled template is a setup seed” (`src/govern/lane-capabilities.ts:107-114`). In the same diff, the only actual `templates/fleet-knowledge.yaml` file is deleted (`templates/fleet-knowledge.yaml:1-7`). Local setup code does appear to seed an equivalent hardcoded skeleton, so this is not a fresh-install runtime break, but the operator-facing contract is now confusing: the error names a bundled-template seed that no longer exists as a template surface.
 
 The blast radius is low because `stackctl setup` can still create the file through the managed setup path, but consumers reading the docs or investigating the error do not get a clear list of setup-managed files. The README and `skills/setup/SKILL.md` should be updated to include `.stack-control/fleet-knowledge.yaml` as a governed setup artifact, and the runtime error/comment should stop referring to a bundled template unless that template remains a real shipped surface.
+
+## 2026-06-14 — audit-barrage lift (20260614T183124634Z-audit-protocol-friction-burndown-phase-1)
+
+_No findings surfaced — a clean barrage run over a healthy fleet (0 HIGH+, 0 MEDIUM, 0 total). Recorded so the convergence dampener counts it as a quiet run (claude-20260612-r3); a clean run that left no section was invisible to the consecutive-quiet / single-run-clean rules._

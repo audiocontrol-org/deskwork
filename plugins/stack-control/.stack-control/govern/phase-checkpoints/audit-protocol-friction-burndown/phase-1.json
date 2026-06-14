@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "featureSlug": "audit-protocol-friction-burndown",
+  "phaseId": "1",
+  "checkpoint": "phase-1",
+  "auditLogSection": "phase-1",
+  "scopeFingerprint": "5cb8e63928cf4fe310eccf6bf85fca17990f713b3031a7f1e0cbc54e98eb768e",
+  "passedAt": "2026-06-14T18:32:24.252Z",
+  "governedPaths": [
+    "src/__tests__/fixtures/govern/021-audit-protocol",
+    "src/__tests__/fixtures/govern/021-fleet",
+    "templates/fleet-knowledge.yaml",
+    "src/govern/checkpoint-state.ts",
+    "src/govern/phase-boundary-sizing.ts",
+    "src/govern/lane-capabilities.ts",
+    "src/govern/fleet-negotiation.ts"
+  ]
+}
