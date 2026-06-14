@@ -32,6 +32,20 @@
       },
       "registered_skills": [],
       "installed_at": "2026-06-10T17:17:10.457420+00:00"
+    },
+    "deskwork-governance": {
+      "version": "0.1.0",
+      "source": "local",
+      "manifest_hash": "sha256:4e08f5dfa5fac0d23de1f310a5b88d7bec4e7a21cdf477dca6f509faa3e803f0",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.deskwork-governance.govern"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-06-14T00:37:26.321394+00:00"
     }
   }
 }

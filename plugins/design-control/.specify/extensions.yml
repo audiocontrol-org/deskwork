@@ -1,5 +1,6 @@
 installed:
 - agent-context
+- deskwork-governance
 - git
 settings:
   auto_execute_hooks: true
@@ -137,6 +138,14 @@ hooks:
     optional: true
     prompt: Commit implementation changes?
     description: Auto-commit after implementation
+    condition: null
+  - extension: deskwork-governance
+    command: speckit.deskwork-governance.govern
+    enabled: true
+    optional: false
+    prompt: Execute speckit.deskwork-governance.govern?
+    description: Run deskwork governance (cross-model audit-barrage + finding lift)
+      over the implemented work
     condition: null
   after_checklist:
   - extension: git
