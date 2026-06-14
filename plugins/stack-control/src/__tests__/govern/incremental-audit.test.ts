@@ -48,6 +48,13 @@ describe('resolvePhaseUnit (per-phase diff scope, SC-006)', () => {
     expect(phases[0]!.files).toEqual(['src/a.ts']);
     expect(phases[1]!.files).toEqual(['src/b.ts']);
   });
+
+  it('parsePhases preserves directory scopes named in backticks', () => {
+    const phases = parsePhases(
+      '## Phase 1: A\n\n- T in `plugins/stack-control/src/govern/`\n',
+    );
+    expect(phases[0]!.files).toEqual(['plugins/stack-control/src/govern']);
+  });
 });
 
 describe('resolveComposingFeatureUnit (FR-008 composition)', () => {

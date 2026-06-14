@@ -27,7 +27,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   GovernProtocolError,
@@ -50,7 +50,11 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
-import { resolvePhaseUnit } from '../govern/incremental-audit.js';
+import {
+  parsePhases,
+  resolveComposingFeatureUnit,
+  resolvePhaseUnit,
+} from '../govern/incremental-audit.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
@@ -62,6 +66,15 @@ import { resolveInstallation } from '../config/installation.js';
 import type { Installation } from '../config/types.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
+import {
+  computeScopeFingerprint,
+  isCheckpointFresh,
+  readPhaseCheckpoint,
+  writePhaseCheckpoint,
+} from '../govern/checkpoint-state.js';
+import { loadLaneCapabilities, type LaneCapabilityProfile } from '../govern/lane-capabilities.js';
+import { negotiateFleet } from '../govern/fleet-negotiation.js';
+import { selectRequestedLaneCapabilities } from '../govern/protocol.js';
 
 /**
  * specs/015 US2 (FR-004): the per-invocation convergence ceiling govern hands the
@@ -305,9 +318,8 @@ export function buildImplementVars(
     ...(budgetEnv !== undefined && budgetEnv.length > 0
       ? { budgetBytes: Number.parseInt(budgetEnv, 10) }
       : {}),
-    // specs/015 (FR-006/D7): bound the untracked fold to the audit unit's path
-    // scope so unrelated parked-feature scaffolds are excluded. Empty/undefined
-    // for a whole-feature unit (folds all untracked — pre-015 behavior).
+    // specs/015 (FR-006/D7): bound the fold to the audit unit's explicit path
+    // scope when one exists; otherwise keep the whole-feature pre-015 behavior.
     ...(pathScope !== undefined && pathScope.length > 0 ? { pathScope } : {}),
   });
   if (payload.empty) {
@@ -354,10 +366,114 @@ export function buildImplementVars(
  */
 function resolveGovernExcludePaths(installation: Installation): readonly string[] {
   const seam = process.env.STACKCTL_BACKLOG_DIR;
-  if (seam !== undefined && seam !== '') {
-    return [join(seam, 'backlog')];
+  const excludes = [
+    seam !== undefined && seam !== ''
+      ? join(seam, 'backlog')
+      : join(dirname(installation.resolved.backlog), 'backlog'),
+    join(installation.root, '.stack-control', 'govern', 'phase-checkpoints'),
+  ];
+  return excludes;
+}
+
+interface PhaseCheckpointStatus {
+  readonly phaseId: string;
+  readonly files: readonly string[];
+  readonly scopeFingerprint: string;
+  readonly state: 'current' | 'missing' | 'stale';
+}
+
+function normalizeGovernedPaths(
+  installationRoot: string,
+  paths: readonly string[],
+): readonly string[] {
+  const top = deriveDistinctGitToplevel(installationRoot);
+  const installationRel =
+    top !== null ? relative(top, installationRoot).split('\\').join('/') : null;
+  return Array.from(
+    new Set(
+      paths.map((path) => {
+        const normalized = path.split('\\').join('/');
+        if (existsSync(join(installationRoot, normalized))) {
+          return normalized;
+        }
+        if (
+          installationRel !== null &&
+          installationRel.length > 0 &&
+          (normalized === installationRel || normalized.startsWith(`${installationRel}/`))
+        ) {
+          return normalized.slice(installationRel.length + 1);
+        }
+        return normalized;
+      }),
+    ),
+  );
+}
+
+function resolvePhaseCheckpointStatuses(
+  installationRoot: string,
+  slug: string,
+  tasksPath: string,
+): readonly PhaseCheckpointStatus[] {
+  return parsePhases(readFileSync(tasksPath, 'utf8')).map((phase) => {
+    const governedPaths = normalizeGovernedPaths(installationRoot, phase.files);
+    const scopeFingerprint = computeScopeFingerprint(installationRoot, governedPaths);
+    const record = readPhaseCheckpoint(installationRoot, slug, phase.phaseId);
+    if (record === null) {
+      return { phaseId: phase.phaseId, files: governedPaths, scopeFingerprint, state: 'missing' };
+    }
+    return {
+      phaseId: phase.phaseId,
+      files: governedPaths,
+      scopeFingerprint,
+      state: isCheckpointFresh(record, scopeFingerprint) ? 'current' : 'stale',
+    };
+  });
+}
+
+function renderCheckpointRequirements(statuses: readonly PhaseCheckpointStatus[]): string {
+  return statuses.map((status) => `${status.state} phase-${status.phaseId}`).join(', ');
+}
+
+function assertPriorPhaseCheckpointsCurrent(
+  statuses: readonly PhaseCheckpointStatus[],
+  phaseId: string,
+): void {
+  const phaseIndex = statuses.findIndex((status) => status.phaseId === phaseId);
+  if (phaseIndex < 0) return;
+  const unmet = statuses.slice(0, phaseIndex).filter((status) => status.state !== 'current');
+  if (unmet.length > 0) {
+    throw new GovernProtocolError(
+      `govern: FATAL — phase '${phaseId}' cannot advance until earlier required checkpoints are current: ${renderCheckpointRequirements(unmet)}.`,
+    );
   }
-  return [join(dirname(installation.resolved.backlog), 'backlog')];
+}
+
+function assertWholeFeatureCheckpointsCurrent(
+  statuses: readonly PhaseCheckpointStatus[],
+): void {
+  const unmet = statuses.filter((status) => status.state !== 'current');
+  if (unmet.length > 0) {
+    throw new GovernProtocolError(
+      `govern: FATAL — whole-feature govern requires current per-phase checkpoints: ${renderCheckpointRequirements(unmet)}.`,
+    );
+  }
+}
+
+function preflightNegotiatedFleet(
+  laneCapabilities: readonly LaneCapabilityProfile[],
+  requestedModels: string | undefined,
+  requireModels: number,
+): readonly LaneCapabilityProfile[] {
+  const selected = selectRequestedLaneCapabilities(laneCapabilities, requestedModels);
+  const negotiation = negotiateFleet(selected, 1, requireModels);
+  if (negotiation.disposition !== 'accepted') {
+    throw new GovernProtocolError(
+      `govern: FATAL — fleet negotiation failed before payload assembly; ` +
+        `accepted ${negotiation.acceptedFleet.length}/${requireModels} viable lane(s). ` +
+        `Rejected lanes: ${negotiation.rejectedLanes.join(', ') || 'none'}.`,
+    );
+  }
+  return selected;
 }
 
 export function buildSpecVars(
@@ -466,7 +582,19 @@ export async function runGovern(args: string[]): Promise<void> {
     // smaller payload. Resolve the phase unit from the feature's tasks.md, scope
     // the untracked fold + committed diff to the phase's files, and run the loop
     // under the per-phase checkpoint (`phase-<id>`). `--phase` is implement only.
+    const requestedModels = pick(undefined, process.env.GOVERN_MODELS);
+    const laneCapabilities =
+      flags.mode === 'implement'
+        ? preflightNegotiatedFleet(
+            await loadLaneCapabilities(repoRoot),
+            requestedModels,
+            requireModels,
+          )
+        : undefined;
+
     let phaseUnit: AuditUnit | undefined;
+    let payloadPathScope: readonly string[] | undefined;
+    let phaseCheckpointStatuses: readonly PhaseCheckpointStatus[] | undefined;
     if (flags.mode === 'implement' && flags.phase !== undefined) {
       const { root } = await resolveFeatureRoot({ repoRoot, slug });
       if (root === undefined) {
@@ -482,7 +610,41 @@ export async function runGovern(args: string[]): Promise<void> {
       }
       const diffBase =
         flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
+      phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, slug, tasksPath);
+      assertPriorPhaseCheckpointsCurrent(phaseCheckpointStatuses, flags.phase);
       phaseUnit = resolvePhaseUnit({ tasksPath, phaseId: flags.phase, diffBase });
+      payloadPathScope = normalizeGovernedPaths(repoRoot, phaseUnit.diffScope.files);
+      if (payloadPathScope.length === 0) {
+        throw new GovernProtocolError(
+          `govern: FATAL — phase '${flags.phase}' resolved to an empty path scope; refine tasks.md boundaries before governing this phase.`,
+        );
+      }
+    } else if (flags.mode === 'implement') {
+      const { root } = await resolveFeatureRoot({ repoRoot, slug });
+      if (root !== undefined) {
+        const tasksPath = join(root, 'tasks.md');
+        if (existsSync(tasksPath)) {
+          const diffBase =
+            flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
+          phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, slug, tasksPath);
+          assertWholeFeatureCheckpointsCurrent(phaseCheckpointStatuses);
+          phaseUnit = resolveComposingFeatureUnit({
+            tasksPath,
+            diffBase,
+            phases: phaseCheckpointStatuses.map((status) => ({
+              phaseId: status.phaseId,
+              converged: status.state === 'current',
+              changed: status.state !== 'current',
+            })),
+          });
+          // The composing safety-net must never collapse to a no-op. When every
+          // phase is already carried, keep the `after_implement` checkpoint label
+          // but fall back to the whole-feature payload instead of an empty scope.
+          const normalizedFiles = normalizeGovernedPaths(repoRoot, phaseUnit.diffScope.files);
+          payloadPathScope =
+            normalizedFiles.length > 0 ? normalizedFiles : undefined;
+        }
+      }
     }
 
     // specs/014 US5: resolve the audit-log excerpt (spec mode), the feature root
@@ -535,7 +697,7 @@ export async function runGovern(args: string[]): Promise<void> {
             slug,
             flags.diffBase,
             phaseUnit !== undefined ? phaseUnit.auditLogSection : flags.checkpoint,
-            phaseUnit?.diffScope.files,
+            payloadPathScope,
             featureRoot,
             excludeRoots,
             excludePaths,
@@ -563,11 +725,12 @@ export async function runGovern(args: string[]): Promise<void> {
     const protocolArgs = {
       stackctl,
       barrageBin,
-      repoRoot,
+      installationRoot: repoRoot,
       slug,
       checkpoint: built.checkpoint,
       vars: built.vars,
-      models: pick(undefined, process.env.GOVERN_MODELS),
+      laneCapabilities,
+      models: requestedModels,
       requireModels,
       ceiling: pick(flags.ceiling, process.env.GOVERN_CEILING),
       override: pick(flags.override, process.env.GOVERN_OVERRIDE),
@@ -589,7 +752,7 @@ export async function runGovern(args: string[]): Promise<void> {
     const ceiling = resolveCeiling(pick(flags.ceiling, process.env.GOVERN_CEILING));
     const outcome: ConvergenceOutcome = await runConvergenceLoop({
       ceiling,
-      runPass: async () => ({ gateOpen: runProtocol(protocolArgs).gateOpen }),
+      runPass: async () => ({ gateOpen: (await runProtocol(protocolArgs)).gateOpen }),
       dispatchFix: async () => {
         process.stderr.write(
           'govern: convergence gate BLOCKED — fix the surfaced findings; the loop ' +
@@ -611,6 +774,21 @@ export async function runGovern(args: string[]): Promise<void> {
           ` after ${outcome.rounds} round(s) (ceiling ${outcome.ceiling}); fix findings & re-govern, or record --override.\n`,
       );
       process.exit(1);
+    }
+    if (phaseUnit?.granularity === 'phase' && phaseCheckpointStatuses !== undefined) {
+      const phaseStatus = phaseCheckpointStatuses.find((status) => status.phaseId === phaseUnit.phaseId);
+      if (phaseStatus !== undefined) {
+        writePhaseCheckpoint(repoRoot, {
+          version: 1,
+          featureSlug: slug,
+          phaseId: phaseUnit.phaseId,
+          checkpoint: built.checkpoint,
+          auditLogSection: phaseUnit.auditLogSection,
+          scopeFingerprint: phaseStatus.scopeFingerprint,
+          passedAt: new Date().toISOString(),
+          governedPaths: phaseStatus.files,
+        });
+      }
     }
     process.stderr.write(
       flags.mode === 'spec'

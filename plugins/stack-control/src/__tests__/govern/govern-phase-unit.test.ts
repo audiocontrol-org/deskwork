@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveTsx, CLI } from '../_run-helpers.js';
 import { tmpBacklog } from '../../../tests/backlog/helpers.js';
+import { computeScopeFingerprint, writePhaseCheckpoint } from '../../govern/checkpoint-state.js';
 
 /** Stub barrage: lift appends one finding under a fixed section label (STUB_LABEL). */
 function writeStubBarrage(dir: string): string {
@@ -65,6 +66,24 @@ function makeRepo(seedAuditLog: string): string {
   // the enclosing installation from --at.
   mkdirSync(join(repo, '.stack-control'), { recursive: true });
   writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
+  writeFileSync(
+    join(repo, '.stack-control', 'audit-barrage-config.yaml'),
+    [
+      'models:',
+      '  - name: codex',
+      '    binary: codex',
+      '    model: gpt-5.5',
+      '    args_template: "exec -m {{model}} --sandbox read-only {{prompt-stdin}}"',
+      '    readonly_enforcement: "--sandbox read-only"',
+      '    output_mode: text',
+      '    liveness_signal: stderr',
+      '    liveness_window_seconds: 60',
+      '    timeout_floor_seconds: 300',
+      '    timeout_secs_per_kb: 7',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
   const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', 'feat');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'audit-log.md'), seedAuditLog, 'utf8');
@@ -77,6 +96,26 @@ function makeRepo(seedAuditLog: string): string {
     writeFileSync(join(repo, 'src', `f${n}.ts`), `${lines.join('\n')}\n`, 'utf8');
   }
   spawnSync('git', ['-C', repo, 'init', '-q'], { encoding: 'utf8' });
+  spawnSync('git', ['-C', repo, 'add', '-A'], { encoding: 'utf8' });
+  spawnSync(
+    'git',
+    [
+      '-C',
+      repo,
+      '-c',
+      'user.email=t@t',
+      '-c',
+      'user.name=t',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '-q',
+      '--no-gpg-sign',
+      '-m',
+      'base',
+    ],
+    { encoding: 'utf8' },
+  );
   return repo;
 }
 
@@ -108,11 +147,21 @@ describe('govern --phase audits one tasks.md phase under its own checkpoint (FR-
     ].join('\n');
     const repo = makeRepo(seed);
     writeFileSync(join(repo, 'docs', '1.0', '001-IN-PROGRESS', 'feat', 'tasks.md'), TASKS_MD, 'utf8');
+    writePhaseCheckpoint(repo, {
+      version: 1,
+      featureSlug: 'feat',
+      phaseId: '1',
+      checkpoint: 'phase-1',
+      auditLogSection: 'phase-1',
+      scopeFingerprint: computeScopeFingerprint(repo, ['src/a.ts']),
+      passedAt: '2026-06-13T00:00:00.000Z',
+      governedPaths: ['src/a.ts'],
+    });
     const fx = mkdtempSync(join(tmpdir(), 'gov-phase-stub-'));
     const stub = writeStubBarrage(fx);
     try {
       const r = runGovern(
-        ['--mode', 'implement', '--feature', 'feat', '--at', repo, '--diff-base', 'HEAD', '--phase', '2'],
+        ['--mode', 'implement', '--feature', 'feat', '--at', repo, '--diff-base', 'HEAD', '--phase', '2', '--require-models', '1'],
         {
           GOVERN_BARRAGE_BIN: stub,
           STUB_RUN_DIR: join(fx, 'run-phase-2'),
@@ -136,7 +185,7 @@ describe('govern --phase audits one tasks.md phase under its own checkpoint (FR-
     const stub = writeStubBarrage(fx);
     try {
       const r = runGovern(
-        ['--mode', 'implement', '--feature', 'feat', '--at', repo, '--diff-base', 'HEAD', '--phase', '2'],
+        ['--mode', 'implement', '--feature', 'feat', '--at', repo, '--diff-base', 'HEAD', '--phase', '2', '--require-models', '1'],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-phase-2'), STUB_LABEL: 'run-phase-2', STUB_SEVERITY: 'low' },
       );
       expect(r.status).toBe(2);

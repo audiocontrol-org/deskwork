@@ -21,8 +21,8 @@ import type { AuditUnit } from './audit-unit-types.js';
 /** `## Phase <id>: …` header grammar (verified present in every tasks.md). */
 const PHASE_HEADER_RE = /^##\s+Phase\s+([^:\n]+?)\s*:/;
 const TOP_HEADER_RE = /^##\s+/;
-/** A repo-relative path token (mirrors extract-barrage-findings' surface tokens). */
-const PATH_TOKEN_RE = /[A-Za-z0-9_./-]*\/[A-Za-z0-9_./-]+\.[a-z]{1,5}/g;
+/** Backticked path-like tokens from tasks prose; directories carry a slash. */
+const BACKTICK_TOKEN_RE = /`([^`\n]+)`/g;
 
 interface ParsedPhase {
   readonly phaseId: string;
@@ -47,9 +47,19 @@ export function parsePhases(tasksText: string): ParsedPhase[] {
         ? phases[idx + 1]!.start
         : nextTopHeaderOrEnd(lines, p.start + 1);
     const body = lines.slice(p.start + 1, end).join('\n');
-    const files = Array.from(new Set(body.match(PATH_TOKEN_RE) ?? []));
+    const files = Array.from(new Set(extractScopedPaths(body)));
     return { phaseId: p.phaseId, files };
   });
+}
+
+function extractScopedPaths(body: string): readonly string[] {
+  const matches: string[] = [];
+  for (const match of body.matchAll(BACKTICK_TOKEN_RE)) {
+    const token = match[1]?.trim();
+    if (token === undefined || !token.includes('/')) continue;
+    matches.push(token.replace(/\/+$/, ''));
+  }
+  return matches;
 }
 
 function nextTopHeaderOrEnd(lines: readonly string[], from: number): number {

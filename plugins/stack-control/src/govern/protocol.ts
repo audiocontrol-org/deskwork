@@ -34,6 +34,9 @@ import {
   parseIndexLaneStates,
 } from '../scope-discovery/audit-barrage/run-artifacts.js';
 import { completedNonConvergedAnnotation } from '../scope-discovery/audit-barrage/types.js';
+import { loadLaneCapabilities, type LaneCapabilityProfile } from './lane-capabilities.js';
+import { negotiateFleet } from './fleet-negotiation.js';
+import { assertBoundaryFits, BoundaryTooLargeError } from './phase-boundary-sizing.js';
 
 /** Thrown for any fail-loud protocol condition; carries a process exit code. */
 export class GovernProtocolError extends Error {
@@ -186,10 +189,12 @@ export interface RunProtocolArgs {
   readonly stackctl: string;
   /** The barrage entrypoint (GOVERN_BARRAGE_BIN seam) — render/barrage/lift. */
   readonly barrageBin: string;
-  readonly repoRoot: string;
+  /** Authoritative installation anchor for this govern run. */
+  readonly installationRoot: string;
   readonly slug: string;
   readonly checkpoint: string;
   readonly vars: BarrageVars;
+  readonly laneCapabilities?: readonly LaneCapabilityProfile[] | undefined;
   readonly models?: string | undefined;
   /**
    * Minimum emitting models passed to the barrage as
@@ -224,7 +229,7 @@ export interface ProtocolResult {
  * the contract as a named type keeps "who drives the loop" (the driver) separate
  * from "what one pass does" (this function) without changing the pass itself.
  */
-export type ProtocolStep = () => ProtocolResult;
+export type ProtocolStep = () => Promise<ProtocolResult>;
 
 function spawnText(
   bin: string,
@@ -249,7 +254,7 @@ function spawnText(
  * in implement mode from `subcommands/govern.ts` (see govern/clone-step.ts),
  * before this gate chain — it is advisory and does not affect the gate verdict.
  */
-export function runProtocol(args: RunProtocolArgs): ProtocolResult {
+export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult> {
   const work = mkdtempSync(join(tmpdir(), 'govern.'));
   try {
     const varsPath = join(work, 'vars.json');
@@ -277,30 +282,59 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       '--output',
       promptPath,
       '--repo-root',
-      args.repoRoot,
+      args.installationRoot,
     ]);
     if (render.status !== 0) {
       throw new GovernProtocolError(
         `govern: FATAL — audit-barrage-render failed (exit ${render.status}): ${render.stderr.trim()}`,
       );
     }
+    const renderedPromptBytes = readFileSync(promptPath).byteLength;
+    const laneCapabilities = selectRequestedLaneCapabilities(
+      args.laneCapabilities ?? (await loadLaneCapabilities(args.installationRoot)),
+      args.models,
+    );
+    const negotiatedFleet = negotiateFleet(
+      laneCapabilities,
+      renderedPromptBytes,
+      args.requireModels ?? 1,
+    );
+    if (negotiatedFleet.disposition !== 'accepted') {
+      throw new GovernProtocolError(
+        `govern: FATAL — fleet negotiation failed for ${renderedPromptBytes} prompt bytes; ` +
+          `accepted ${negotiatedFleet.acceptedFleet.length}/${args.requireModels ?? 1} lane(s). ` +
+          `Rejected lanes: ${negotiatedFleet.rejectedLanes.join(', ') || 'none'}.`,
+      );
+    }
+    const activeEnvelope = Math.min(
+      ...laneCapabilities
+        .filter((lane) => negotiatedFleet.acceptedFleet.includes(lane.name))
+        .map((lane) => lane.envelope.maxPromptBytes),
+    );
+    try {
+      assertBoundaryFits(args.checkpoint, renderedPromptBytes, activeEnvelope);
+    } catch (err) {
+      if (err instanceof BoundaryTooLargeError) {
+        throw new GovernProtocolError(`govern: FATAL — boundary-too-large: ${err.message}`);
+      }
+      throw err;
+    }
 
     // --- barrage (barrage bin); tag the run-dir label with the checkpoint so
     // the gate can scope per-checkpoint (AUDIT-20260607-05). The lift + slush +
     // gate keep the bare slug for audit-log resolution. ---
-    const barrageArgs = [
+    const barrageArgs: string[] = [
       'audit-barrage',
       '--feature',
       `${args.slug}-${args.checkpoint}`,
       '--prompt-file',
       promptPath,
       '--at',
-      args.repoRoot,
+      args.installationRoot,
       '--output-run-dir',
+      '--models',
+      negotiatedFleet.acceptedFleet.join(','),
     ];
-    if (args.models !== undefined && args.models.length > 0) {
-      barrageArgs.push('--models', args.models);
-    }
     if (args.requireModels !== undefined) {
       barrageArgs.push('--require-models', String(args.requireModels));
     }
@@ -331,7 +365,7 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       '--run-dir',
       runDir,
       '--at',
-      args.repoRoot,
+      args.installationRoot,
       '--apply',
     ]);
     if (lift.status !== 0) {
@@ -356,7 +390,7 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
         '--feature',
         args.slug,
         '--at',
-        args.repoRoot,
+        args.installationRoot,
         '--checkpoint',
         args.checkpoint,
         '--scope',
@@ -378,7 +412,7 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       '--feature',
       args.slug,
       '--repo-root',
-      args.repoRoot,
+      args.installationRoot,
       '--checkpoint',
       args.checkpoint,
     ];
@@ -400,4 +434,28 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
+}
+
+export function selectRequestedLaneCapabilities(
+  lanes: readonly LaneCapabilityProfile[],
+  requestedModels: string | undefined,
+): readonly LaneCapabilityProfile[] {
+  if (requestedModels === undefined || requestedModels.trim().length === 0) {
+    return lanes;
+  }
+  const requested = requestedModels
+    .split(',')
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0);
+  if (requested.length === 0) {
+    throw new GovernProtocolError('govern: FATAL — GOVERN_MODELS/--models resolved to zero lane names.');
+  }
+  const selected = lanes.filter((lane) => requested.includes(lane.name));
+  const missing = requested.filter((name) => !selected.some((lane) => lane.name === name));
+  if (missing.length > 0) {
+    throw new GovernProtocolError(
+      `govern: FATAL — requested lane(s) not configured: ${missing.join(', ')}`,
+    );
+  }
+  return selected;
 }
