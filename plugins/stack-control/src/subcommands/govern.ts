@@ -37,6 +37,7 @@ import {
   resolveSlug,
   runProtocol,
   type BarrageVars,
+  type GovernTerminalKind,
 } from '../govern/protocol.js';
 import {
   assembleImplementPayload,
@@ -543,6 +544,17 @@ export function buildSpecVars(
   return { vars, checkpoint: payload.checkpoint, skippedOutOfScope: [] };
 }
 
+/**
+ * Emit the single machine-readable terminal line (T028 / US5 — AUDIT-BARRAGE-codex-01,
+ * 021 phase-2 cross-model HIGH). EVERY govern exit routes through here so a
+ * consumer keying on `govern: terminal-outcome=<kind>` sees exactly one line at
+ * every exit — including the pre-try usage/preflight `process.exit(2)` paths and
+ * the unexpected-exception fallthrough that previously emitted nothing.
+ */
+function emitTerminalOutcome(kind: GovernTerminalKind): void {
+  process.stderr.write(`govern: terminal-outcome=${kind}\n`);
+}
+
 export async function runGovern(args: string[]): Promise<void> {
   const parsed = parseFlags(args);
   if (parsed.ok && parsed.flags.help) {
@@ -551,11 +563,13 @@ export async function runGovern(args: string[]): Promise<void> {
   }
   if (!parsed.ok) {
     process.stderr.write(`govern: ${parsed.error}\n${USAGE}\n`);
+    emitTerminalOutcome('usage');
     process.exit(2);
   }
   const flags = parsed.flags;
   if (flags.mode === undefined) {
     process.stderr.write(`govern: --mode <implement|spec> is required\n${USAGE}\n`);
+    emitTerminalOutcome('usage');
     process.exit(2);
   }
 
@@ -570,6 +584,7 @@ export async function runGovern(args: string[]): Promise<void> {
       process.stderr.write(
         `govern: --require-models requires a positive integer, got '${flags.requireModels}'\n${USAGE}\n`,
       );
+      emitTerminalOutcome('usage');
       process.exit(2);
     }
     requireModels = n;
@@ -584,6 +599,7 @@ export async function runGovern(args: string[]): Promise<void> {
       'govern: FATAL — GOVERN_REPO_ROOT is retired (specs/installation-isolation R2); ' +
         'use --at <dir> to name the installation enclosing <dir> explicitly.\n',
     );
+    emitTerminalOutcome('fatal');
     process.exit(2);
   }
 
@@ -596,6 +612,7 @@ export async function runGovern(args: string[]): Promise<void> {
     installation = resolveInstallation(flags.at ?? process.cwd());
   } catch (err) {
     process.stderr.write(`govern: FATAL — ${errorMessage(err)}\n`);
+    emitTerminalOutcome('fatal');
     process.exit(2);
   }
 
@@ -702,6 +719,7 @@ export async function runGovern(args: string[]): Promise<void> {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(`govern: FATAL — ${msg}\n`);
+      emitTerminalOutcome('fatal');
       process.exit(2);
     }
     // AUDIT-20260611-04: implement mode REFUSES to run without a resolved feature
@@ -711,6 +729,7 @@ export async function runGovern(args: string[]): Promise<void> {
       process.stderr.write(
         `govern: FATAL — feature '${slug}' not found under ${join(repoRoot, 'specs')}/<NNN>-${slug} (speckit) or ${join(repoRoot, 'docs')}/*/001-IN-PROGRESS/${slug} (legacy-docs).\n`,
       );
+      emitTerminalOutcome('fatal');
       process.exit(2);
     }
     // AUDIT-20260611-08: thread the governance backlog store so its bookkeeping
@@ -806,7 +825,7 @@ export async function runGovern(args: string[]): Promise<void> {
           : 'govern: implementation NOT done — convergence gate BLOCKED') +
           ` after ${outcome.rounds} round(s) (ceiling ${outcome.ceiling}); fix findings & re-govern, or record --override.\n`,
       );
-      process.stderr.write('govern: terminal-outcome=blocked\n');
+      emitTerminalOutcome('blocked');
       process.exit(1);
     }
     if (phaseUnit?.granularity === 'phase' && phaseCheckpointStatuses !== undefined) {
@@ -829,7 +848,7 @@ export async function runGovern(args: string[]): Promise<void> {
         ? 'govern: spec may graduate (convergence gate satisfied or overridden).\n'
         : 'govern: implementation governed (convergence gate satisfied or overridden).\n',
     );
-    process.stderr.write('govern: terminal-outcome=graduated\n');
+    emitTerminalOutcome('graduated');
     process.exit(0);
   } catch (err) {
     if (err instanceof GovernProtocolError || err instanceof GovernPayloadError) {
@@ -838,10 +857,15 @@ export async function runGovern(args: string[]): Promise<void> {
       // failure is its own kind; a protocol error carries the specific kind it
       // was thrown with (negotiation-failed / boundary-too-large / etc.).
       const kind = err instanceof GovernProtocolError ? err.terminalKind : 'payload-error';
-      process.stderr.write(`govern: terminal-outcome=${kind}\n`);
+      emitTerminalOutcome(kind);
       const code = err instanceof GovernProtocolError ? err.exitCode : 2;
       process.exit(code);
     }
+    // AUDIT-BARRAGE-codex-01 (021 phase-2 cross-model HIGH): an UNEXPECTED
+    // exception (fs failure, checkpoint-write failure, uncaught child error) must
+    // still emit the promised `fatal` terminal before it propagates — the
+    // "every exit" contract covers this class too.
+    emitTerminalOutcome('fatal');
     throw err;
   }
 }

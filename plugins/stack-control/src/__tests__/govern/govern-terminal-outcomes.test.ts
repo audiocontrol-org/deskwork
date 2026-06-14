@@ -173,10 +173,35 @@ describe('US5 — machine-readable govern terminal outcomes (T027/T028)', () => 
     try {
       const r = runGovern(repo, fx, ['--require-models', '1', '--ceiling', '1'], 'high');
       expect(r.status).toBe(1);
-      expect(`${r.stdout}${r.stderr}`).toContain('govern: terminal-outcome=blocked');
+      const out = `${r.stdout}${r.stderr}`;
+      expect(out).toContain('govern: terminal-outcome=blocked');
+      // "exactly one" part of the contract.
+      expect(out.match(/govern: terminal-outcome=/g) ?? []).toHaveLength(1);
     } finally {
       rmSync(repo, { recursive: true, force: true });
       rmSync(fx, { recursive: true, force: true });
     }
+  });
+
+  // AUDIT-BARRAGE-codex-01 (021 phase-2 round, cross-model HIGH): the contract is
+  // "EVERY exit emits exactly one terminal-outcome line" — including the pre-try
+  // usage/preflight `process.exit(2)` paths that previously emitted nothing.
+  it('usage exits (missing --mode, bad --require-models) emit exactly one usage terminal-outcome', () => {
+    const env = { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog() };
+    const noMode = spawnSync(resolveTsx(), [CLI, 'govern', '--feature', 'x'], { encoding: 'utf8', env });
+    expect(noMode.status).toBe(2);
+    const out1 = `${noMode.stdout}${noMode.stderr}`;
+    expect(out1).toContain('govern: terminal-outcome=usage');
+    expect(out1.match(/govern: terminal-outcome=/g) ?? []).toHaveLength(1);
+
+    const badN = spawnSync(
+      resolveTsx(),
+      [CLI, 'govern', '--mode', 'implement', '--require-models', 'nope'],
+      { encoding: 'utf8', env },
+    );
+    expect(badN.status).toBe(2);
+    const out2 = `${badN.stdout}${badN.stderr}`;
+    expect(out2).toContain('govern: terminal-outcome=usage');
+    expect(out2.match(/govern: terminal-outcome=/g) ?? []).toHaveLength(1);
   });
 });

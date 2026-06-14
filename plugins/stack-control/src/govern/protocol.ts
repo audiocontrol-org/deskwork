@@ -56,6 +56,7 @@ export type GovernTerminalKind =
   | 'fleet-floor-shortfall'
   | 'barrage-outage'
   | 'payload-error'
+  | 'usage'
   | 'fatal';
 
 export class GovernProtocolError extends Error {
