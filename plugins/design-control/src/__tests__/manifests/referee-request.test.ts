@@ -142,13 +142,91 @@ describe('refereeRequestManifestSchema', () => {
     expect(() => parseRefereeRequestManifest(validRefereePreview({ referee }))).toThrow();
   });
 
+  it('rejects a wireframe path with an embedded backslash escape `nested\\..\\outside.html` (AUDIT-20260614-18)', () => {
+    expect(() =>
+      parseRefereeRequestManifest(
+        validScaffold({ wireframe: { path: 'nested\\..\\outside.html', sha256: sha256Hex('wireframe') } }),
+      ),
+    ).toThrow();
+    expect(
+      refereeRequestManifestSchema.safeParse(
+        validScaffold({ wireframe: { path: 'nested\\..\\outside.html', sha256: sha256Hex('wireframe') } }),
+      ).success,
+    ).toBe(false);
+  });
+
+  it('still accepts a normal forward-slash subdirectory path (AUDIT-20260614-18 — no over-rejection)', () => {
+    const manifest = parseRefereeRequestManifest(
+      validScaffold({ wireframe: { path: 'baselines/desktop.png', sha256: sha256Hex('wireframe') } }),
+    );
+    expect(manifest.wireframe.path).toBe('baselines/desktop.png');
+  });
+
   it('rejects an unknown mode', () => {
     expect(() => parseRefereeRequestManifest({ ...baseFields(), mode: 'capture' })).toThrow();
+  });
+
+  it('rejects a referee-preview manifest whose perViewportIdentity misses a declared viewport (AUDIT-20260614-19)', () => {
+    const referee = {
+      ...validRefereeControl(),
+      perViewportIdentity: [{ viewportId: 'desktop', identityHash: sha256Hex('desktop-identity') }],
+    };
+    // viewports declare desktop + phone, but identity covers only desktop.
+    expect(() => parseRefereeRequestManifest(validRefereePreview({ referee }))).toThrow();
+  });
+
+  it('rejects a duplicate viewportId in perViewportIdentity (AUDIT-20260614-19)', () => {
+    const referee = {
+      ...validRefereeControl(),
+      perViewportIdentity: [
+        { viewportId: 'desktop', identityHash: sha256Hex('desktop-identity') },
+        { viewportId: 'desktop', identityHash: sha256Hex('desktop-identity-2') },
+      ],
+    };
+    expect(() => parseRefereeRequestManifest(validRefereePreview({ referee }))).toThrow();
+  });
+
+  it('rejects perViewportIdentity referencing an undeclared viewport (AUDIT-20260614-19)', () => {
+    const referee = {
+      ...validRefereeControl(),
+      perViewportIdentity: [
+        { viewportId: 'desktop', identityHash: sha256Hex('desktop-identity') },
+        { viewportId: 'phone', identityHash: sha256Hex('phone-identity') },
+        { viewportId: 'tablet', identityHash: sha256Hex('tablet-identity') },
+      ],
+    };
+    expect(() => parseRefereeRequestManifest(validRefereePreview({ referee }))).toThrow();
+  });
+
+  it('rejects a scaffold manifest whose supplied referee identity misses a declared viewport (AUDIT-20260614-19)', () => {
+    const referee = {
+      ...validRefereeControl(),
+      perViewportIdentity: [{ viewportId: 'desktop', identityHash: sha256Hex('desktop-identity') }],
+    };
+    expect(() => parseRefereeRequestManifest(validScaffold({ referee }))).toThrow();
+  });
+
+  it('accepts a referee whose perViewportIdentity matches the declared viewports exactly (AUDIT-20260614-19)', () => {
+    const manifest = parseRefereeRequestManifest(validRefereePreview());
+    expect(manifest.referee?.perViewportIdentity.map((entry) => entry.viewportId).sort()).toEqual([
+      'desktop',
+      'phone',
+    ]);
   });
 
   it('rejects a malformed sha256 on a referee baseline', () => {
     const referee = validRefereeControl();
     referee.baseline = { path: 'baselines/desktop.png', sha256: 'not-a-hash' };
+    expect(() => parseRefereeRequestManifest(validRefereePreview({ referee }))).toThrow();
+  });
+
+  it('rejects a principal carrying an extra secret-bearing key like `token` (AUDIT-20260614-20)', () => {
+    const referee = { ...validRefereeControl(), principal: { id: 'editor', storageStateRef: 'editor-session', token: 'secret' } };
+    expect(() => parseRefereeRequestManifest(validRefereePreview({ referee }))).toThrow();
+  });
+
+  it('rejects a captureConfig carrying an unexpected extra key (AUDIT-20260614-20)', () => {
+    const referee = { ...validRefereeControl(), captureConfig: { identityHash: sha256Hex('recipe'), recipe: 'studio:default', token: 'secret' } };
     expect(() => parseRefereeRequestManifest(validRefereePreview({ referee }))).toThrow();
   });
 

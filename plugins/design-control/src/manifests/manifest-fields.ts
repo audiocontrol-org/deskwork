@@ -20,7 +20,11 @@ import { z } from 'zod';
  *  - `~` (home-rooted),
  *  - POSIX-absolute (`/...`),
  *  - Windows drive-rooted (`C:...`),
- *  - leading backslash / UNC (`\...`),
+ *  - ANY backslash (`\`) — a portable collection-relative path uses `/` only.
+ *    This rejects leading-backslash / UNC roots AND embedded `\..\` escapes,
+ *    which the host's `path.normalize()` cannot see on a POSIX host (so
+ *    `nested\..\outside.html` would otherwise pass yet is a real parent-escape
+ *    for a Windows consumer).
  *  - and any path whose normalized form escapes its own root (starts with
  *    `..`) — a `../`-escape is provably not collection-relative regardless of
  *    resolution context.
@@ -33,11 +37,11 @@ export const collectionRelativePathSchema = z
       !value.startsWith('~') &&
       !isAbsolute(value) &&
       !/^[A-Za-z]:/.test(value) &&
-      !value.startsWith('\\') &&
+      !value.includes('\\') &&
       !escapesOwnRoot(value),
     {
       message:
-        'paths must be collection-relative; "~", absolute, machine-rooted, and "../"-escaping paths are not portable',
+        'paths must be collection-relative; "~", absolute, machine-rooted, backslash-bearing, and "../"-escaping paths are not portable',
     },
   );
 

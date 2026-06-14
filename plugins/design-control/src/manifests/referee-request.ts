@@ -64,11 +64,23 @@ const dynamicRegionSchema = z.object({
   justification: z.string().min(1),
 });
 
-/** Deterministic capture recipe + its identity hash. Non-secret only. */
-const captureConfigSchema = z.object({
-  identityHash: sha256Schema,
-  recipe: z.string().min(1),
-});
+/**
+ * Deterministic capture recipe + its identity hash. Non-secret only.
+ *
+ * STRICT by contract: an unexpected key fails validation rather than being
+ * silently stripped. This object's contract is explicitly "secrets out", so a
+ * stray secret-bearing field (e.g. a token) must be REJECTED, not ignored —
+ * "schema passed" must mean "no forbidden extra fields". (Strictness is applied
+ * only to the two secrets-out objects, not blanket across the manifest: the
+ * base manifest fields are not secret-bearing and version-gated forward-compat
+ * is a separate decision.)
+ */
+const captureConfigSchema = z
+  .object({
+    identityHash: sha256Schema,
+    recipe: z.string().min(1),
+  })
+  .strict();
 
 const perViewportIdentitySchema = z.object({
   viewportId: z.string().min(1),
@@ -79,11 +91,16 @@ const perViewportIdentitySchema = z.object({
  * Non-secret principal / auth metadata. A reference to a named storage-state is
  * allowed; secret tokens are NOT part of the manifest contract (default-deny is
  * a Phase-5 execution concern, but the schema only ever names a reference).
+ *
+ * STRICT by contract (same rationale as captureConfigSchema): a stray
+ * secret-bearing key (e.g. a token) must be REJECTED, not silently stripped.
  */
-const principalSchema = z.object({
-  id: z.string().min(1),
-  storageStateRef: z.string().min(1).optional(),
-});
+const principalSchema = z
+  .object({
+    id: z.string().min(1),
+    storageStateRef: z.string().min(1).optional(),
+  })
+  .strict();
 
 /** The referee-control block — the Phase-5 fields, defined here, structure-only. */
 const refereeControlSchema = z.object({
@@ -131,6 +148,50 @@ function requireDesktopAndPhone(viewports: readonly { readonly width: number }[]
   }
 }
 
+/**
+ * Per-viewport-identity referential integrity (AUDIT-20260614-19). When a
+ * referee-control block is present, the set of `perViewportIdentity[*].viewportId`
+ * must correspond EXACTLY to the set of declared `viewports[*].id`: every
+ * declared viewport has an identity entry, there are no duplicate viewportIds,
+ * and there is no identity entry for an undeclared viewport. Structure-only —
+ * referential integrity over the manifest's own fields; no filesystem, no
+ * execution.
+ */
+function requirePerViewportIdentityCoverage(
+  viewports: readonly { readonly id: string }[],
+  perViewportIdentity: readonly { readonly viewportId: string }[],
+  ctx: z.RefinementCtx,
+): void {
+  const declared = new Set(viewports.map((viewport) => viewport.id));
+  const seen = new Set<string>();
+  for (const entry of perViewportIdentity) {
+    if (seen.has(entry.viewportId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['referee', 'perViewportIdentity'],
+        message: `duplicate perViewportIdentity entry for viewport "${entry.viewportId}"`,
+      });
+    }
+    seen.add(entry.viewportId);
+    if (!declared.has(entry.viewportId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['referee', 'perViewportIdentity'],
+        message: `perViewportIdentity references undeclared viewport "${entry.viewportId}"`,
+      });
+    }
+  }
+  for (const id of declared) {
+    if (!seen.has(id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['referee', 'perViewportIdentity'],
+        message: `declared viewport "${id}" has no perViewportIdentity entry`,
+      });
+    }
+  }
+}
+
 const scaffoldManifestSchema = z.object({
   mode: z.literal('scaffold'),
   ...baseManifestShape,
@@ -150,7 +211,14 @@ const refereePreviewManifestSchema = z.object({
 // branches carry `viewports`).
 export const refereeRequestManifestSchema = z
   .discriminatedUnion('mode', [scaffoldManifestSchema, refereePreviewManifestSchema])
-  .superRefine((value, ctx) => requireDesktopAndPhone(value.viewports, ctx));
+  .superRefine((value, ctx) => {
+    requireDesktopAndPhone(value.viewports, ctx);
+    // Referential integrity applies whenever a referee block is present — on the
+    // referee-preview branch (always) and the scaffold branch (when supplied).
+    if (value.referee) {
+      requirePerViewportIdentityCoverage(value.viewports, value.referee.perViewportIdentity, ctx);
+    }
+  });
 
 export type RefereeRequestManifest = z.infer<typeof refereeRequestManifestSchema>;
 
