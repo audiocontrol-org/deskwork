@@ -21,22 +21,37 @@ const sha256Hex = (content: string): string => createHash('sha256').update(conte
 
 const pathSchema = collectionRelativePathSchema;
 
-const sourceFileSchema = z.object({
-  path: pathSchema,
-  sha256: sha256HexSchema,
-});
+const sourceFileSchema = z
+  .object({
+    path: pathSchema,
+    sha256: sha256HexSchema,
+  })
+  .strict();
 
+// Both branches are STRICT (AUDIT-20260614-24): a misspelled or stray extra key
+// (e.g. `token`, `refree`) on either stale-surface branch fails validation rather
+// than being silently stripped. A plain union of two strict objects still
+// validates correctly — no discriminated union is required.
 const staleSurfaceSchema = z.union([
-  z.object({
-    mode: z.literal('mapped'),
-    sourceFiles: z.array(sourceFileSchema).min(1),
-  }),
-  z.object({
-    mode: z.literal('operator-approved-descope'),
-    rationale: z.string().min(1),
-  }),
+  z
+    .object({
+      mode: z.literal('mapped'),
+      sourceFiles: z.array(sourceFileSchema).min(1),
+    })
+    .strict(),
+  z
+    .object({
+      mode: z.literal('operator-approved-descope'),
+      rationale: z.string().min(1),
+    })
+    .strict(),
 ]);
 
+// STRICT at every object layer (AUDIT-20260614-24), mirroring the sibling
+// referee-request manifest: a typo'd top-level key (e.g. `secretToken`) or a
+// stray nested key never silently drops — it fails validation. `.strict()` is
+// applied BEFORE `.superRefine(...)` so the desktop/phone viewport refinement is
+// preserved.
 const surfaceStatusManifestSchema = z
   .object({
     version: z.literal(STATUS_MANIFEST_VERSION),
@@ -44,21 +59,28 @@ const surfaceStatusManifestSchema = z
     changeIntentBrief: z.string().min(1),
     routeState: z.string().min(1),
     viewports: z.array(viewportSchema).min(1),
-    wireframe: z.object({
-      path: pathSchema,
-      sha256: sha256HexSchema,
-    }),
-    designSpec: z.object({
-      path: pathSchema,
-      version: z.string().min(1),
-      sha256: sha256HexSchema,
-    }),
-    archive: z.object({
-      path: pathSchema,
-    }),
+    wireframe: z
+      .object({
+        path: pathSchema,
+        sha256: sha256HexSchema,
+      })
+      .strict(),
+    designSpec: z
+      .object({
+        path: pathSchema,
+        version: z.string().min(1),
+        sha256: sha256HexSchema,
+      })
+      .strict(),
+    archive: z
+      .object({
+        path: pathSchema,
+      })
+      .strict(),
     implementationCommit: z.string().min(1),
     staleSurface: staleSurfaceSchema.optional(),
   })
+  .strict()
   .superRefine((value, ctx) => {
     const hasDesktop = value.viewports.some((viewport) => viewport.width >= 1280);
     const hasPhone = value.viewports.some((viewport) => viewport.width <= 390);

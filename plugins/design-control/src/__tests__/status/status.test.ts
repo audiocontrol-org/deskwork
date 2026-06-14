@@ -706,6 +706,66 @@ describe('runDesignControlStatus', () => {
     expect(err.join('\n')).toContain('collection-relative');
   });
 
+  it('returns 1 for a manifest with an unknown extra key at the top level (AUDIT-20260614-24)', () => {
+    const dir = freshDir();
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex('wireframe') },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec') },
+      archive: { path: 'surface.archive.json' },
+      secretToken: 'leak-me',
+    });
+    const { err, io } = capture();
+    expect(runDesignControlStatus([manifestPath], io)).toBe(1);
+    expect(err.join('\n')).toContain('malformed-manifest');
+  });
+
+  it('returns 1 for a manifest with an unknown key inside the nested wireframe object (AUDIT-20260614-24)', () => {
+    const dir = freshDir();
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex('wireframe'), token: 'leak' },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec') },
+      archive: { path: 'surface.archive.json' },
+    });
+    const { err, io } = capture();
+    expect(runDesignControlStatus([manifestPath], io)).toBe(1);
+    expect(err.join('\n')).toContain('malformed-manifest');
+  });
+
+  it('returns 1 for a manifest with an unknown key inside a mapped staleSurface branch (AUDIT-20260614-24)', () => {
+    const dir = freshDir();
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      implementationCommit: 'abc1234',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex('wireframe') },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec') },
+      archive: { path: 'surface.archive.json' },
+      staleSurface: {
+        mode: 'mapped',
+        sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex('stable') }],
+        token: 'leak',
+      },
+    });
+    const { err, io } = capture();
+    expect(runDesignControlStatus([manifestPath], io)).toBe(1);
+    expect(err.join('\n')).toContain('malformed-manifest');
+  });
+
   it('returns 1 for a manifest using a Windows drive-rooted artifact path (AUDIT-20260614-12/-13)', () => {
     const dir = freshDir();
     const manifestPath = writeManifest(dir, {
