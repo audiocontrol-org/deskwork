@@ -316,6 +316,16 @@ describe('US3/US4 — govern end-to-end: --at anchor, no cwd leak, backlog-store
         'BACKLOG-STORE-CANARY\n',
         'utf8',
       );
+      // T029 / TASK-57: an untracked barrage run artifact (control-plane noise)
+      // must NOT fold into the payload — folding it compounds prior rounds.
+      mkdirSync(join(fixture.installationRoot, '.stack-control', 'audit-runs', 'run1'), {
+        recursive: true,
+      });
+      writeFileSync(
+        join(fixture.installationRoot, '.stack-control', 'audit-runs', 'run1', 'codex.md'),
+        'AUDIT-RUNS-CANARY finding prose from a prior round\n',
+        'utf8',
+      );
 
       const stub = writeAnchorStub(fx);
       const varsCopy = join(fx, 'vars-copy.json');
@@ -342,6 +352,8 @@ describe('US3/US4 — govern end-to-end: --at anchor, no cwd leak, backlog-store
       // TASK-40: the store exclusion derives from the installation record;
       // the cwd (outer root, no installation) must play no role.
       expect(vars).not.toContain('BACKLOG-STORE-CANARY');
+      // T029 / TASK-57: the barrage run-artifact dir is trimmed from the payload.
+      expect(vars).not.toContain('AUDIT-RUNS-CANARY');
       // The protocol threads the resolved installation into the barrage.
       const recordedArgs = readFileSync(argsFile, 'utf8').trim().split('\n');
       const barrageLine = recordedArgs.find((l) => l.startsWith('audit-barrage '));

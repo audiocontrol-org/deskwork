@@ -39,12 +39,33 @@ import { negotiateFleet } from './fleet-negotiation.js';
 import { assertBoundaryFits, BoundaryTooLargeError } from './phase-boundary-sizing.js';
 
 /** Thrown for any fail-loud protocol condition; carries a process exit code. */
+/**
+ * Machine-distinguishable terminal outcomes (specs/021 US5 / T028). govern emits
+ * exactly one `govern: terminal-outcome=<kind>` line at every exit so a consumer
+ * (or test) can tell the degraded states apart without fragile message-substring
+ * matching: a fleet that could not be negotiated, a phase whose payload exceeds
+ * the active envelope, a barrage that produced no covering family (outage), and a
+ * barrage that produced coverage but missed the cross-model floor are FOUR
+ * different failures with four different recoveries.
+ */
+export type GovernTerminalKind =
+  | 'graduated'
+  | 'blocked'
+  | 'boundary-too-large'
+  | 'negotiation-failed'
+  | 'fleet-floor-shortfall'
+  | 'barrage-outage'
+  | 'payload-error'
+  | 'fatal';
+
 export class GovernProtocolError extends Error {
   readonly exitCode: number;
-  constructor(message: string, exitCode = 2) {
+  readonly terminalKind: GovernTerminalKind;
+  constructor(message: string, exitCode = 2, terminalKind: GovernTerminalKind = 'fatal') {
     super(message);
     this.name = 'GovernProtocolError';
     this.exitCode = exitCode;
+    this.terminalKind = terminalKind;
   }
 }
 
@@ -326,6 +347,8 @@ export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult
         `govern: FATAL — fleet negotiation failed for ${renderedPromptBytes} prompt bytes; ` +
           `accepted ${negotiatedFleet.acceptedFleet.length}/${args.requireModels ?? 1} lane(s). ` +
           `Rejected lanes: ${negotiatedFleet.rejectedLanes.join(', ') || 'none'}.`,
+        2,
+        'negotiation-failed',
       );
     }
     const activeEnvelope = Math.min(
@@ -337,7 +360,11 @@ export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult
       assertBoundaryFits(args.checkpoint, renderedPromptBytes, activeEnvelope);
     } catch (err) {
       if (err instanceof BoundaryTooLargeError) {
-        throw new GovernProtocolError(`govern: FATAL — boundary-too-large: ${err.message}`);
+        throw new GovernProtocolError(
+          `govern: FATAL — boundary-too-large: ${err.message}`,
+          2,
+          'boundary-too-large',
+        );
       }
       throw err;
     }
@@ -367,10 +394,19 @@ export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult
     // stderr names which (OUTAGE summary vs FLOOR SHORTFALL line).
     if (barrage.status !== 0) {
       const barrageNote = barrage.stderr.trim();
+      // T028 (US5): split the bundled terminal into two machine-distinguishable
+      // kinds. A FLOOR SHORTFALL means the barrage produced coverage but fewer
+      // emitting families than the cross-model floor demands (recovery: widen the
+      // fleet / lower --require-models); an OUTAGE means zero covering families
+      // (recovery: the model CLIs are missing/unreachable). The barrage's own
+      // stderr names which via the `FLOOR SHORTFALL` line.
+      const isFloorShortfall = barrageNote.includes('FLOOR SHORTFALL');
       throw new GovernProtocolError(
-        `govern: FATAL — audit-barrage OUTAGE or fleet-floor shortfall (exit ${barrage.status}). ` +
+        `govern: FATAL — ${isFloorShortfall ? 'fleet-floor shortfall' : 'audit-barrage OUTAGE'} (exit ${barrage.status}). ` +
           'The work is NOT recorded as governed (FR-005). Check that the configured model-family CLIs are installed and reachable.' +
           (barrageNote.length > 0 ? `\n${barrageNote}` : ''),
+        2,
+        isFloorShortfall ? 'fleet-floor-shortfall' : 'barrage-outage',
       );
     }
     const runDir = barrage.stdout.trim();

@@ -372,6 +372,11 @@ function resolveGovernExcludePaths(installation: Installation): readonly string[
       ? join(seam, 'backlog')
       : join(dirname(installation.resolved.backlog), 'backlog'),
     join(installation.root, '.stack-control', 'govern', 'phase-checkpoints'),
+    // T029 / TASK-57: the barrage's own run artifacts are control-plane noise.
+    // Folding them re-feeds prior rounds' prompts + findings to the fleet, so the
+    // payload compounds recursively each round. Exclude as defense-in-depth —
+    // independent of whether the installation gitignores the dir.
+    join(installation.root, '.stack-control', 'audit-runs'),
   ];
   return excludes;
 }
@@ -486,6 +491,8 @@ function preflightNegotiatedFleet(
       `govern: FATAL — fleet negotiation failed before payload assembly; ` +
         `accepted ${negotiation.acceptedFleet.length}/${requireModels} viable lane(s). ` +
         `Rejected lanes: ${negotiation.rejectedLanes.join(', ') || 'none'}.`,
+      2,
+      'negotiation-failed',
     );
   }
   return selected;
@@ -799,6 +806,7 @@ export async function runGovern(args: string[]): Promise<void> {
           : 'govern: implementation NOT done — convergence gate BLOCKED') +
           ` after ${outcome.rounds} round(s) (ceiling ${outcome.ceiling}); fix findings & re-govern, or record --override.\n`,
       );
+      process.stderr.write('govern: terminal-outcome=blocked\n');
       process.exit(1);
     }
     if (phaseUnit?.granularity === 'phase' && phaseCheckpointStatuses !== undefined) {
@@ -821,10 +829,16 @@ export async function runGovern(args: string[]): Promise<void> {
         ? 'govern: spec may graduate (convergence gate satisfied or overridden).\n'
         : 'govern: implementation governed (convergence gate satisfied or overridden).\n',
     );
+    process.stderr.write('govern: terminal-outcome=graduated\n');
     process.exit(0);
   } catch (err) {
     if (err instanceof GovernProtocolError || err instanceof GovernPayloadError) {
       process.stderr.write(`${err.message}\n`);
+      // T028 (US5): one machine-readable terminal tag per exit. A payload-spec
+      // failure is its own kind; a protocol error carries the specific kind it
+      // was thrown with (negotiation-failed / boundary-too-large / etc.).
+      const kind = err instanceof GovernProtocolError ? err.terminalKind : 'payload-error';
+      process.stderr.write(`govern: terminal-outcome=${kind}\n`);
       const code = err instanceof GovernProtocolError ? err.exitCode : 2;
       process.exit(code);
     }
