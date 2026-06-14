@@ -61,7 +61,8 @@ const USAGE = 'usage: check-design-spec <design-language-spec.md>';
 /**
  * CLI core behind `bin/check-design-spec`. Exit-code contract (the skill's
  * gate, same shape as check-wireframe):
- *   0 — spec green (zero findings; skipped links are reported but green)
+ *   0 — spec green (zero findings; skipped links stay green but are reported
+ *       as unchecked scope, not as established link-liveness)
  *   1 — findings present, or the file could not be read (descriptive error;
  *       never a fabricated verdict)
  *   2 — usage error
@@ -85,7 +86,11 @@ export function runCheckDesignSpec(argv: readonly string[], io: CliIo): number {
     );
   }
   if (result.ok) {
-    io.out(`${filePath}: spec green — 0 findings (${result.spec.rules.length} rule(s))`);
+    const scope =
+      result.skipped.length === 0
+        ? 'fully link-live'
+        : `with ${result.skipped.length} unchecked non-CSS link(s)`;
+    io.out(`${filePath}: spec green (${scope}) — 0 findings (${result.spec.rules.length} rule(s))`);
     return 0;
   }
   for (const finding of result.findings) {

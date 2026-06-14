@@ -42,12 +42,13 @@ bullets with a closed key set:
 - `css: <path> <selector>` — ≥1 per rule; the path is relative to the spec
   file (absolute or `~`-rooted paths are rejected as malformed — they only
   resolve on the author's machine; `../` traversal within the repository is
-  fine); the selector must be **defined in that author-written CSS source**
-  (checked statically — no app boot). Non-CSS targets (CSS-in-JS, utility
-  frameworks, CSS-Modules) are reported as unchecked notes and do not
-  establish link-liveness. For nested CSS rules link the leaf selector —
-  composed selectors like `.btn .icon` written via nesting do not match
-  (preludes are checked flat, not ancestor-composed).
+  fine). A rule is only **mechanically link-live** when it has at least one
+  selector defined in an author-written `.css` source (checked statically —
+  no app boot). Non-CSS targets (CSS-in-JS, utility frameworks, CSS-Modules)
+  are reported as unchecked notes and do not establish link-liveness on their
+  own. For nested CSS rules link the leaf selector — composed selectors like
+  `.btn .icon` written via nesting do not match (preludes are checked flat,
+  not ancestor-composed).
 - `example:` — ≥1 per rule (a rule with zero examples is rejected). Presence
   is structural; whether the example still matches live UI is
   `spec-truthfulness`, a separate concern this gate does not check.
@@ -76,12 +77,13 @@ live rule.
 
 3. **Optional engine accelerator.** Only if the operator asks for it: gate on
    `preflightEngine` (`@/engine-adapter`, method `translate-design-language`)
-   — absence fails loud naming the remedy — then request a draft from the
-   engine (input: the approved wireframe intent + the live CSS files the
-   operator names). **Engine output gets zero trust:** it lands in the same
-   file and is judged by the same gate as a hand-authored draft. Engine
-   conformance (`@/engine-adapter/conformance`) is exercised only when the
-   engine is present — never stub it to simulate presence.
+   — absence fails loud naming the remedy — then request a draft of the
+   **design-language spec artifact itself** from the engine (input: the
+   approved wireframe intent + the live CSS files the operator names).
+   **Engine output gets zero trust:** it lands in the same file and is judged
+   by the same gate as a hand-authored draft. Engine conformance
+   (`@/engine-adapter/conformance`) is exercised only when the engine is
+   present — never stub it to simulate presence.
 
 4. **Validation gate — the non-negotiable step.** Run:
 
@@ -89,18 +91,23 @@ live rule.
    plugins/design-control/bin/check-design-spec <path/to/design-language.md>
    ```
 
-   - Exit `0` (spec green, zero findings) → the draft may be presented.
-     Read any `does not establish link-liveness` notes aloud to the operator —
-     a skipped link is visible scope, not silent coverage.
+   - Exit `0` with **no unchecked-link notes** → the draft may be presented as
+     fully link-live.
+   - Exit `0` **with unchecked-link notes** → the draft may be presented only
+     as structurally green with visible unchecked scope; read every `does not
+     establish link-liveness` note aloud to the operator. Do not describe that
+     result as fully link-live.
    - Exit `1` → fix every finding and re-run. A dead selector means either the
      rule rots (fix the link) or the CSS moved (update the rule) — NEVER
      delete the rule just to silence the finding; that decision is the
      operator's.
 
-5. **Present and stop.** Show the operator the green spec (path + `0 findings`
-   output + rule count). The operator owns acceptance; implementation against
-   the spec and refereeing are separate steps of the loop, not this skill's
-   job.
+5. **Present and stop.** Show the operator the validated spec:
+   - fully link-live path: `0 findings` output + rule count
+   - unchecked-link path: `0 findings` output + unchecked-link notes + rule
+     count
+   The operator owns acceptance; implementation against the spec and
+   refereeing are separate steps of the loop, not this skill's job.
 
 ## What this skill does NOT do
 

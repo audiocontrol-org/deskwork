@@ -2,7 +2,7 @@
  * Engine-adapter interface declaration for design-control.
  *
  * The engine-adapter is the contract between the design-control plugin's
- * execution paths (wireframe authoring, design-language translation, screenshot
+ * execution paths (wireframe authoring, design-language spec drafting, screenshot
  * refereeing) and a concrete design engine. The default engine is the Claude
  * `/frontend-design` plugin (see {@link DEFAULT_CLAUDE_ADAPTER_ID}). This module
  * declares ONLY the interface + supporting value types; concrete adapters that
@@ -17,11 +17,13 @@
  * The three engine methods design-control invokes. Each corresponds to one
  * execution path that requires an engine to be present (see preflight).
  *
- * - `author-wireframe`        — engine authors a wireframe from a manifest.
- * - `translate-design-language` — engine translates a design-language spec into
- *                                concrete styling/markup decisions.
- * - `referee-screenshot`      — engine referees a rendered screenshot against a
- *                                rubric (rubric-item ids are load-bearing here).
+ * - `author-wireframe`          — engine authors a wireframe from a manifest.
+ * - `translate-design-language` — engine drafts the design-language spec
+ *                                  artifact from approved wireframe intent and
+ *                                  operator-named live CSS sources.
+ * - `referee-screenshot`        — engine referees a rendered screenshot against
+ *                                  a rubric (rubric-item ids are load-bearing
+ *                                  here).
  *
  * Single-sourced as a `const [...] as const` array (mirroring {@link FAILURE_MODES})
  * so the {@link EngineMethod} type, the zod method enum, and any method-iteration

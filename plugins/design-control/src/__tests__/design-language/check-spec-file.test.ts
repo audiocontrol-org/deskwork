@@ -168,7 +168,7 @@ describe('runCheckDesignSpec — exit contract', () => {
     const specPath = writeGreenFixture(makeFixtureDir());
     const { out, io } = captureIo();
     expect(runCheckDesignSpec([specPath], io)).toBe(0);
-    expect(out.join('\n')).toContain('0 findings');
+    expect(out.join('\n')).toContain('spec green (fully link-live) — 0 findings');
   });
 
   it('exit 1 + findings on stderr for a dead selector', () => {
@@ -217,5 +217,6 @@ describe('runCheckDesignSpec — exit contract', () => {
     const { out, io } = captureIo();
     expect(runCheckDesignSpec([specPath], io)).toBe(0);
     expect(out.join('\n')).toContain('does not establish link-liveness');
+    expect(out.join('\n')).toContain('spec green (with 1 unchecked non-CSS link(s)) — 0 findings');
   });
 });
