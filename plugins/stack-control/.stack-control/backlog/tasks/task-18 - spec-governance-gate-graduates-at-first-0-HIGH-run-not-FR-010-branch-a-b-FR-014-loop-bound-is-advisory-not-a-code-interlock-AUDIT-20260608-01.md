@@ -6,10 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-11 00:55'
+updated_date: '2026-06-14 01:54'
 labels:
   - agent-found
   - 'type:bug'
+  - promoted
 dependencies: []
 references:
   - gh-432
@@ -81,4 +82,6 @@ The separate specs/004 spec-text amendments (FR-010 branch-(a) genuineness wordi
 release verification (operator closes). Sibling #431 (payload self-reference) is
 addressed by US3 / FR-006 (the implement-mode payload drops the audit-log excerpt).
 Roadmap node design:fix/spec-governance-gate-branch (ref gh-432) was retired 2026-06-11 and migrated here; duplicate capture TASK-35 archived in favor of this item.
+
+- **Promoted-to:** tasks:specs/021-audit-protocol-friction-burndown
 <!-- SECTION:NOTES:END -->

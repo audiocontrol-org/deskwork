@@ -7,8 +7,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-12 06:26'
+updated_date: '2026-06-14 01:54'
 labels:
   - 'type:imported-issue'
+  - promoted
 dependencies: []
 references:
   - gh-453
@@ -46,3 +48,9 @@ Have stack-control think up protocol-level mitigations for the myopia. Candidate
 
 design-control lint barrage loop, 2026-06-10, rounds 1-20 (run dirs under .stack-control/audit-runs/2026061*-design-control on the feature branch). Convergence reached but single-family (codex); cross-model re-validation pending #447. Filed per the tooling-friction-to-GitHub-issues policy. Related: #447 (silent fleet degradation), #444 (friction-routing policy).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** spec:specs/021-audit-protocol-friction-burndown
+<!-- SECTION:NOTES:END -->

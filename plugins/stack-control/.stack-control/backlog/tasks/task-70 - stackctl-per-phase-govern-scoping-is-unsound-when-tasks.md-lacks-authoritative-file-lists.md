@@ -6,9 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-14 01:39'
+updated_date: '2026-06-14 01:54'
 labels:
   - 'type:imported-issue'
   - bug
+  - promoted
 dependencies: []
 references:
   - gh-468
@@ -72,3 +74,9 @@ Relevant files:
 - `plugins/stack-control/src/govern/payload-implement.ts`
 - `plugins/design-control/specs/001-design-control/tasks.md`
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** tasks:specs/021-audit-protocol-friction-burndown
+<!-- SECTION:NOTES:END -->

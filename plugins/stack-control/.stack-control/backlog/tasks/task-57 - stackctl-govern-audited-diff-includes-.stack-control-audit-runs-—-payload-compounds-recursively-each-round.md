@@ -6,8 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-12 06:26'
+updated_date: '2026-06-14 01:54'
 labels:
   - 'type:imported-issue'
+  - promoted
 dependencies: []
 references:
   - gh-459
@@ -35,3 +37,9 @@ Exclude `.stack-control/audit-runs/` (and governance bookkeeping generally) from
 
 Provenance: design-control feature audit-log AUDIT-20260611-13, run-dir `plugins/design-control/.stack-control/audit-runs/20260611T062812148Z-design-control-after_clarify`.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** tasks:specs/021-audit-protocol-friction-burndown
+<!-- SECTION:NOTES:END -->

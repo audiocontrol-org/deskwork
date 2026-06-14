@@ -6,9 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-12 06:26'
+updated_date: '2026-06-14 01:54'
 labels:
   - 'type:imported-issue'
   - bug
+  - promoted
 dependencies: []
 references:
   - gh-463
@@ -48,3 +50,9 @@ Earlier rounds the same day with the SAME flags (runs `20260611T123117674Z`, `20
 - Make the diff step fail loud (or report "diff truncated at N bytes") instead of reporting empty when a subprocess buffer/limit overflows.
 - Consider excluding the configured audit-runs dir from the governed diff payload (the run artifacts are the protocol's own output, not the work under audit).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** tasks:specs/021-audit-protocol-friction-burndown
+<!-- SECTION:NOTES:END -->
