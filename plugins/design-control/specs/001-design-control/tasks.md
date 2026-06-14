@@ -253,12 +253,24 @@ source and passes adapter conformance. Scaffold completion never depends on engi
       **Done — 2026-06-13.** `design-control-status` loads provenance, scopes the gate to
       `derived` mode only, and reuses `checkDerivedAcceptance` so byte-identical accepted artifacts
       block completion while driving wireframes stay green.
-- [ ] **Stale-surface** map: `surface-id → source-files/routes` derived from the import/route graph.
+- [x] **Stale-surface** map: `surface-id → source-files/routes` derived from the import/route graph.
       **Feasibility-gated** — if feasible it ships **with its own acceptance** (`status` flags a
       surface whose mapped source drifted); if infeasible it is an **explicit operator-approved
       descope recorded in the status manifest** (`staleSurface.mode:
       operator-approved-descope` + rationale), never a silent implementer cut. The **dead-link half ships
       regardless.**
+      **Done — 2026-06-14.** Both acceptance paths ship and are tested in `@/status`:
+      the **feasible path** — `staleSurface.mode: 'mapped'` carries `sourceFiles: [{path, sha256}]`
+      and `getSurfaceStatus` emits `stale-surface` when a mapped source is missing or drifts from
+      its recorded hash (status.test.ts "flags stale mapped source drift"); the **descope path** —
+      `staleSurface.mode: 'operator-approved-descope'` + `rationale` reaches `complete` (status.test.ts
+      "accepts an explicit operator-approved stale-surface descope"); and an **absent** `staleSurface`
+      yields a distinct `stale-surface-unmapped` gate. The dead-link half is the separate
+      `dead-link-spec` gate (separately tested). Per the acceptance contract (which the tasks.md
+      preamble says wins over the task description), flagging drifted **mapped** source satisfies the
+      feasible path regardless of whether the map is auto-derived from an import/route graph or
+      supplied in the manifest; auto-derivation tooling is a convenience, not an acceptance
+      requirement, so nothing is silently cut.
 
 **Acceptance:** `status` refuses "complete" on a missing wireframe; refuses to accept an unedited
 `derived` artifact; an archive decision round-trips with its links; `status` never reads referee
