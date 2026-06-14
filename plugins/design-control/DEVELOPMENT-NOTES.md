@@ -2,21 +2,68 @@
 
 ---
 
-## 2026-06-14: <!-- session title -->
+## 2026-06-14: Phase 3 audit pickup + Phase 4 manifest schema to cross-model convergence
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up the Phase 3 audit protocol and drive `/stack-control:execute` until the
+spec task list is burned down and fully audited.
 
 **Accomplished:**
-- <!-- compose -->
+- Reconciled the 16 open Phase-3 status findings: 12 were already fixed by prior commits
+  (dispositions flipped); 4 genuinely-open ones fixed TDD-first — crash-safe artifact reads
+  (`checkFileHash`), symlink-tight collection root (`realpathOfExistingPrefix`), and
+  non-vacuous Windows-rooted-path coverage. Marked the Phase-3 stale-surface task complete
+  (acceptance met via the feasible mapped-source drift-flagging path).
+- Built Phase 4 (`@/manifests/referee-request`) TDD-first: a mode-aware zod discriminated
+  union (`scaffold` / `referee-preview`), whole-manifest `.strict()`, with the
+  collection-relative path schema and the desktop/phone + unique-viewport-id contract
+  extracted into a shared `@/manifests/manifest-fields` consumed by both the referee-request
+  and status manifests.
+- Drove the govern loop to genuine convergence: **8 cross-model rounds (codex + codex-gpt5),
+  11 code fixes, gate OPEN at round 8 (0 HIGH / 0 MEDIUM)**.
+- Dispositioned all of AUDIT-...-17..-30: fixed (TDD), with -27/-28 resolved as documented
+  Phase-4/Phase-5 boundaries (baseline matrix + symlink containment are Phase-5 capture, not
+  the schema-only surface) and -29 recorded as a false premise (`isAbsolute` is used;
+  `noUnusedLocals` passes). Closed the 6 stale backlog tasks (TASK-30..35) the dampener
+  auto-created for already-fixed work. Filed 2 upstream tooling issues (#471, #472).
+- Suite 531 → 575; tsc clean throughout. v1-scaffold track (Phases 1–4) complete + audited.
 
 **Didn't Work:**
-- <!-- compose -->
+- GPG commit signing broke mid-session (gpg-agent passphrase cache expired; no TTY for
+  pinentry). A background commit+govern run silently failed to commit, so govern round 6
+  barraged a STALE tree (without the -25 fix) and produced an invalid "2 HIGH" round — caught
+  by checking HEAD before trusting the result. Operator authorized `--no-gpg-sign` for the
+  rest of the session (6+ unsigned commits; re-enable later).
+- The govern dampener auto-migrated MED findings to the backlog *while they were being fixed
+  in the same loop*, creating stale already-fixed tasks (→ #471).
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] First leaned toward a "block-atomic" reading of scaffold referee optionality
+  (-25); re-reading spec.md showed field-level optionality is intended — corrected the impl
+  (`refereeControlSchema.partial().strict()`) to match the spec rather than tightening the
+  spec to match the impl.
+- [COMPLEXITY] Round 3's whole-manifest-strict was a *structural* fix after rounds 2–3 showed
+  the barrage chasing a per-object "strictness" generator one object at a time — applied the
+  diminishing-returns discipline (remove the generator, don't patch instances).
+- [COMPLEXITY] Resolved -27/-28 as documented Phase-4/Phase-5 boundaries rather than building
+  Phase-5 vision/matrix machinery into the Phase-4 schema (promises-before-mechanism).
+- [PROCESS] Verified each subagent fix independently (suite + grep) before committing, and
+  verified HEAD before trusting background govern output.
 
 **Insights:**
-- <!-- compose -->
+- The govern loop's HIGHs were *real defects every round* (not plateau noise) until round 8 —
+  edge-heavy schema code (strictness, path portability, viewport contracts, mode-aware
+  optionality, sibling consistency) genuinely benefits from cross-model audit. The two
+  altitude-shifted findings (-27/-28) were boundaries, and one (-29) was a hallucination.
+- The dampener-vs-fix race (#471) means "migrated-to-backlog" and "fixed-in-loop" can both be
+  true for one finding; the audit-log disposition has to be reconciled at convergence.
+- Sibling-consistency is a recurring generator: status vs referee-request diverged on
+  strictness (-24) and viewport-uniqueness (-30); single-sourcing shared contracts in
+  `manifest-fields.ts` is what finally closes it.
+
+**Open findings at session end:** 0 open in the Phase-4 govern loop (all of -17..-30
+dispositioned: fixed / boundary-phase5 / wontfix-false-premise). The pre-session backlog
+(TASK-14..28, from the 2026-06-10/-12 lint/liveness work) still carries ~13 parked MED/LOW
+defects — untouched this session, out of scope.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 11
