@@ -4,7 +4,11 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { loadArchiveEntry } from '@/archive/store';
 import { checkDesignSpecFile, type CliIo } from '@/design-language/check-spec-file';
-import { checkDerivedAcceptance, loadProvenance } from '@/provenance/derived';
+import {
+  checkDerivedAcceptance,
+  loadProvenance,
+  verifyDrivingWireframe,
+} from '@/provenance/derived';
 
 const STATUS_MANIFEST_VERSION = 1;
 
@@ -22,30 +26,56 @@ const sourceFileSchema = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
 });
 
-const surfaceStatusManifestSchema = z.object({
-  version: z.literal(STATUS_MANIFEST_VERSION),
-  surfaceId: z.string().min(1),
-  changeIntentBrief: z.string().min(1),
-  routeState: z.string().min(1),
-  viewports: z.array(viewportSchema).min(1),
-  wireframe: z.object({
-    path: pathSchema,
-    sha256: z.string().regex(/^[0-9a-f]{64}$/),
+const staleSurfaceSchema = z.union([
+  z.object({
+    mode: z.literal('mapped'),
+    sourceFiles: z.array(sourceFileSchema).min(1),
   }),
-  designSpec: z.object({
-    path: pathSchema,
-    version: z.string().min(1),
-    sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  z.object({
+    mode: z.literal('operator-approved-descope'),
+    rationale: z.string().min(1),
   }),
-  archive: z.object({
-    path: pathSchema,
-  }),
-  staleSurface: z
-    .object({
-      sourceFiles: z.array(sourceFileSchema).min(1),
-    })
-    .optional(),
-});
+]);
+
+const surfaceStatusManifestSchema = z
+  .object({
+    version: z.literal(STATUS_MANIFEST_VERSION),
+    surfaceId: z.string().min(1),
+    changeIntentBrief: z.string().min(1),
+    routeState: z.string().min(1),
+    viewports: z.array(viewportSchema).min(1),
+    wireframe: z.object({
+      path: pathSchema,
+      sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    }),
+    designSpec: z.object({
+      path: pathSchema,
+      version: z.string().min(1),
+      sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    }),
+    archive: z.object({
+      path: pathSchema,
+    }),
+    staleSurface: staleSurfaceSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    const hasDesktop = value.viewports.some((viewport) => viewport.width >= 1280);
+    const hasPhone = value.viewports.some((viewport) => viewport.width <= 390);
+    if (!hasDesktop) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['viewports'],
+        message: 'viewports must include at least one desktop viewport with width >= 1280',
+      });
+    }
+    if (!hasPhone) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['viewports'],
+        message: 'viewports must include at least one phone viewport with width <= 390',
+      });
+    }
+  });
 
 export type SurfaceStatusManifest = z.infer<typeof surfaceStatusManifestSchema>;
 
@@ -55,6 +85,7 @@ export type DesignControlStatusRule =
   | 'missing-design-spec'
   | 'missing-wireframe-provenance'
   | 'unaccepted-decision'
+  | 'invalid-design-spec'
   | 'dead-link-spec'
   | 'unchecked-link-spec'
   | 'derived-unedited'
@@ -88,6 +119,8 @@ function firstNextAction(rule: DesignControlStatusRule): string {
       return 'Record wireframe provenance so status can distinguish driving vs derived artifacts.';
     case 'unaccepted-decision':
       return 'Record an accepted wireframe decision in the exploration archive.';
+    case 'invalid-design-spec':
+      return 'Fix the design-language spec so the spec gate passes before calling the surface complete.';
     case 'dead-link-spec':
       return 'Fix the design-language spec so all CSS links resolve live and the spec goes green.';
     case 'unchecked-link-spec':
@@ -169,6 +202,13 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
             `${specFinding.rule}${specFinding.ruleId ? ` (${specFinding.ruleId})` : ''}: ${specFinding.message}`,
           ),
         );
+      } else {
+        findings.push(
+          finding(
+            'invalid-design-spec',
+            `${specFinding.rule}${specFinding.ruleId ? ` (${specFinding.ruleId})` : ''}: ${specFinding.message}`,
+          ),
+        );
       }
     }
     for (const skipped of specResult.skipped) {
@@ -189,6 +229,27 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
         finding(
           'unaccepted-decision',
           `Archive entry ${archivePath} has no accepted wireframe decision for surface "${manifest.surfaceId}".`,
+        ),
+      );
+    } else if (archive.surfaceId !== manifest.surfaceId) {
+      findings.push(
+        finding(
+          'unaccepted-decision',
+          `Archive entry ${archivePath} is for surface "${archive.surfaceId}", not manifest surface "${manifest.surfaceId}".`,
+        ),
+      );
+    } else if (resolveAgainstManifest(manifestPath, archive.accepted.wireframePath) !== wireframePath) {
+      findings.push(
+        finding(
+          'unaccepted-decision',
+          `Archive entry ${archivePath} accepts wireframe ${archive.accepted.wireframePath}, which does not match manifest wireframe ${manifest.wireframe.path}.`,
+        ),
+      );
+    } else if (resolveAgainstManifest(manifestPath, archive.proposal.wireframePath) !== wireframePath) {
+      findings.push(
+        finding(
+          'unaccepted-decision',
+          `Archive entry ${archivePath} proposes wireframe ${archive.proposal.wireframePath}, which does not match manifest wireframe ${manifest.wireframe.path}.`,
         ),
       );
     }
@@ -212,6 +273,8 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
       if (!acceptance.ok) {
         findings.push(...acceptance.findings.map((item) => finding('derived-unedited', item.message)));
       }
+    } else {
+      verifyDrivingWireframe(dirname(wireframePath), manifest.surfaceId);
     }
   } catch (error) {
     findings.push(
@@ -229,7 +292,7 @@ export function getSurfaceStatus(manifestPath: string): DesignControlStatusResul
         `No stale-surface mapping is present for surface "${manifest.surfaceId}". Add one or record an operator-approved descope before completion.`,
       ),
     );
-  } else {
+  } else if (manifest.staleSurface.mode === 'mapped') {
     for (const source of manifest.staleSurface.sourceFiles) {
       const sourcePath = resolveAgainstManifest(manifestPath, source.path);
       if (!existsSync(sourcePath)) {

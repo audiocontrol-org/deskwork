@@ -50,6 +50,11 @@ function writeManifest(dir: string, payload: unknown): string {
   return file;
 }
 
+const DEFAULT_VIEWPORTS = [
+  { id: 'desktop', width: 1280 },
+  { id: 'phone', width: 390 },
+];
+
 describe('getSurfaceStatus', () => {
   it('reports complete when archive acceptance, spec, provenance, and stale map are all green', () => {
     const dir = freshDir();
@@ -77,11 +82,14 @@ describe('getSurfaceStatus', () => {
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
       routeState: '/studio/default',
-      viewports: [{ id: 'desktop', width: 1280 }],
+      viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
       designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
       archive: { path: 'surface.archive.json' },
-      staleSurface: { sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }] },
+      staleSurface: {
+        mode: 'mapped',
+        sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }],
+      },
     });
 
     const result = getSurfaceStatus(manifestPath);
@@ -112,11 +120,14 @@ describe('getSurfaceStatus', () => {
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
       routeState: '/studio/default',
-      viewports: [{ id: 'desktop', width: 1280 }],
+      viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
       designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
       archive: { path: 'surface.archive.json' },
-      staleSurface: { sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }] },
+      staleSurface: {
+        mode: 'mapped',
+        sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }],
+      },
     });
 
     expect(getSurfaceStatus(manifestPath).findings.map((item) => item.rule)).toContain('unaccepted-decision');
@@ -146,11 +157,14 @@ describe('getSurfaceStatus', () => {
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
       routeState: '/studio/default',
-      viewports: [{ id: 'desktop', width: 1280 }],
+      viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
       designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
       archive: { path: 'surface.archive.json' },
-      staleSurface: { sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }] },
+      staleSurface: {
+        mode: 'mapped',
+        sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }],
+      },
     });
 
     expect(getSurfaceStatus(manifestPath).findings.map((item) => item.rule)).toContain('derived-unedited');
@@ -189,14 +203,62 @@ describe('getSurfaceStatus', () => {
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
       routeState: '/studio/default',
-      viewports: [{ id: 'desktop', width: 1280 }],
+      viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
       designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
       archive: { path: 'surface.archive.json' },
-      staleSurface: { sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }] },
+      staleSurface: {
+        mode: 'mapped',
+        sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }],
+      },
     });
 
     expect(getSurfaceStatus(manifestPath).findings.map((item) => item.rule)).toContain('dead-link-spec');
+  });
+
+  it('flags non-link design-spec findings as incomplete', () => {
+    const dir = freshDir();
+    const wireframeHtml = '<html><body><h1>Wireframe</h1></body></html>';
+    writeFileSync(join(dir, 'surface.html'), wireframeHtml);
+    recordDrivingWireframe({ dir, surfaceId: 'surface', wireframeFile: 'surface.html' });
+    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+    const specPath = join(dir, 'design-language.md');
+    writeFileSync(
+      specPath,
+      `### rule: ink-primary
+- kind: palette
+- css: studio.css .btn-primary
+- do: Use the ink palette for primary actions.
+`,
+    );
+    const archivePath = join(dir, 'surface.archive.json');
+    writeArchiveEntry(
+      archivePath,
+      createArchiveEntry({
+        surfaceId: 'surface',
+        brief: 'Regroup the layout',
+        proposalWireframePath: 'surface.html',
+        acceptedWireframePath: 'surface.html',
+      }),
+    );
+    const sourcePath = join(dir, 'ui-source.ts');
+    writeFileSync(sourcePath, 'export const UI = "stable";\n');
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
+      archive: { path: 'surface.archive.json' },
+      staleSurface: {
+        mode: 'mapped',
+        sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }],
+      },
+    });
+
+    expect(getSurfaceStatus(manifestPath).findings.map((item) => item.rule)).toContain('invalid-design-spec');
   });
 
   it('flags an unchecked-link spec as incomplete', () => {
@@ -232,11 +294,14 @@ describe('getSurfaceStatus', () => {
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
       routeState: '/studio/default',
-      viewports: [{ id: 'desktop', width: 1280 }],
+      viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
       designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
       archive: { path: 'surface.archive.json' },
-      staleSurface: { sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }] },
+      staleSurface: {
+        mode: 'mapped',
+        sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }],
+      },
     });
 
     const result = getSurfaceStatus(manifestPath);
@@ -267,14 +332,124 @@ describe('getSurfaceStatus', () => {
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
       routeState: '/studio/default',
-      viewports: [{ id: 'desktop', width: 1280 }],
+      viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
       designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
       archive: { path: 'surface.archive.json' },
-      staleSurface: { sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex('export const UI = "stable";\n') }] },
+      staleSurface: {
+        mode: 'mapped',
+        sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex('export const UI = "stable";\n') }],
+      },
     });
 
     expect(getSurfaceStatus(manifestPath).findings.map((item) => item.rule)).toContain('stale-surface');
+  });
+
+  it('accepts an explicit operator-approved stale-surface descope', () => {
+    const dir = freshDir();
+    const wireframeHtml = '<html><body><h1>Wireframe</h1></body></html>';
+    writeFileSync(join(dir, 'surface.html'), wireframeHtml);
+    recordDrivingWireframe({ dir, surfaceId: 'surface', wireframeFile: 'surface.html' });
+    const specPath = writeGreenSpec(dir);
+    const archivePath = join(dir, 'surface.archive.json');
+    writeArchiveEntry(
+      archivePath,
+      createArchiveEntry({
+        surfaceId: 'surface',
+        brief: 'Regroup the layout',
+        proposalWireframePath: 'surface.html',
+        acceptedWireframePath: 'surface.html',
+      }),
+    );
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
+      archive: { path: 'surface.archive.json' },
+      staleSurface: { mode: 'operator-approved-descope', rationale: 'Graph-derived source mapping is not feasible for this surface.' },
+    });
+
+    const result = getSurfaceStatus(manifestPath);
+    expect(result.complete).toBe(true);
+    expect(result.findings).toEqual([]);
+  });
+
+  it('flags an archive entry whose accepted wireframe does not match the manifest', () => {
+    const dir = freshDir();
+    const wireframeHtml = '<html><body><h1>Wireframe</h1></body></html>';
+    writeFileSync(join(dir, 'surface.html'), wireframeHtml);
+    writeFileSync(join(dir, 'other.html'), wireframeHtml);
+    recordDrivingWireframe({ dir, surfaceId: 'surface', wireframeFile: 'surface.html' });
+    const specPath = writeGreenSpec(dir);
+    const archivePath = join(dir, 'surface.archive.json');
+    writeArchiveEntry(
+      archivePath,
+      createArchiveEntry({
+        surfaceId: 'surface',
+        brief: 'Regroup the layout',
+        proposalWireframePath: 'other.html',
+        acceptedWireframePath: 'other.html',
+      }),
+    );
+    const sourcePath = join(dir, 'ui-source.ts');
+    writeFileSync(sourcePath, 'export const UI = "stable";\n');
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
+      archive: { path: 'surface.archive.json' },
+      staleSurface: {
+        mode: 'mapped',
+        sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }],
+      },
+    });
+
+    expect(getSurfaceStatus(manifestPath).findings.map((item) => item.rule)).toContain('unaccepted-decision');
+  });
+
+  it('flags driving provenance that no longer matches the wireframe artifact', () => {
+    const dir = freshDir();
+    const wireframePath = join(dir, 'surface.html');
+    writeFileSync(wireframePath, '<html><body><h1>Wireframe</h1></body></html>');
+    recordDrivingWireframe({ dir, surfaceId: 'surface', wireframeFile: 'surface.html' });
+    writeFileSync(wireframePath, '<html><body><h1>Changed</h1></body></html>');
+    const specPath = writeGreenSpec(dir);
+    const archivePath = join(dir, 'surface.archive.json');
+    writeArchiveEntry(
+      archivePath,
+      createArchiveEntry({
+        surfaceId: 'surface',
+        brief: 'Regroup the layout',
+        proposalWireframePath: 'surface.html',
+        acceptedWireframePath: 'surface.html',
+      }),
+    );
+    const sourcePath = join(dir, 'ui-source.ts');
+    writeFileSync(sourcePath, 'export const UI = "stable";\n');
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      routeState: '/studio/default',
+      viewports: DEFAULT_VIEWPORTS,
+      wireframe: { path: 'surface.html', sha256: sha256Hex(readFileSync(wireframePath, 'utf8')) },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
+      archive: { path: 'surface.archive.json' },
+      staleSurface: {
+        mode: 'mapped',
+        sourceFiles: [{ path: 'ui-source.ts', sha256: sha256Hex(readFileSync(sourcePath, 'utf8')) }],
+      },
+    });
+
+    expect(getSurfaceStatus(manifestPath).findings.map((item) => item.rule)).toContain('missing-wireframe-provenance');
   });
 
   it('flags missing stale-surface mapping as a separate gate', () => {
@@ -298,7 +473,7 @@ describe('getSurfaceStatus', () => {
       surfaceId: 'surface',
       changeIntentBrief: 'Regroup the layout',
       routeState: '/studio/default',
-      viewports: [{ id: 'desktop', width: 1280 }],
+      viewports: DEFAULT_VIEWPORTS,
       wireframe: { path: 'surface.html', sha256: sha256Hex(wireframeHtml) },
       designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex(readFileSync(specPath, 'utf8')) },
       archive: { path: 'surface.archive.json' },
@@ -321,5 +496,22 @@ describe('runDesignControlStatus', () => {
     const { err, io } = capture();
     expect(runDesignControlStatus([manifestPath], io)).toBe(1);
     expect(err.join('\n')).toContain('malformed-manifest');
+  });
+
+  it('returns 1 for a manifest missing the required phone viewport', () => {
+    const dir = freshDir();
+    const manifestPath = writeManifest(dir, {
+      version: 1,
+      surfaceId: 'surface',
+      changeIntentBrief: 'Regroup the layout',
+      routeState: '/studio/default',
+      viewports: [{ id: 'desktop', width: 1280 }],
+      wireframe: { path: 'surface.html', sha256: sha256Hex('wireframe') },
+      designSpec: { path: 'design-language.md', version: 'v1', sha256: sha256Hex('spec') },
+      archive: { path: 'surface.archive.json' },
+    });
+    const { err, io } = capture();
+    expect(runDesignControlStatus([manifestPath], io)).toBe(1);
+    expect(err.join('\n')).toContain('phone viewport');
   });
 });
