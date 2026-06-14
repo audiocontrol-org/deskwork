@@ -1979,3 +1979,31 @@ Surface:    plugins/design-control/src/design-language/schema.ts:192-219; plugin
 `recordField` only treats a `css:` value as missing its selector when `value.search(/\s/)` returns `-1`. If the author writes `- css: styles.ts   ` or `- css: studio.css   `, the first whitespace exists, so the parser records `{ path: "styles.ts", selector: "" }` at lines 216-219 instead of emitting `malformed-css-link`. That also makes `validateSection` consider the rule to have a css link because `section.cssLinks.length > 0`.
 
 The blast radius is medium because this can become a silent green in the non-CSS path: `checkCssLinkLiveness` skips non-`.css` targets before validating selector content at lines 259-261, and skipped links do not fail the file check. A rule with `kind`, `example`, `do`, and only `css: styles.ts   ` can therefore pass schema and liveness with an empty selector, despite the documented `css: <path> <selector>` contract. The reasonable fix is to compute `const selector = value.slice(spaceAt).trim()` and reject it as `malformed-css-link` when empty, with tests for both `.css` and skipped non-CSS targets carrying trailing whitespace but no selector.
+
+## 2026-06-14 — audit-barrage lift (20260614T020201830Z-design-control-phase-2C)
+
+### AUDIT-20260614-01 — `translate-design-language` means two different things in the skill and the engine-adapter contract
+
+Finding-ID: AUDIT-20260614-01
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    plugins/design-control/skills/translate-design-language/SKILL.md:75-83; missing companion update to plugins/design-control/src/engine-adapter/types.ts:18-23
+
+The new skill defines the optional engine path as “request a draft from the engine” using “the approved wireframe intent + the live CSS files the operator names” so the engine drafts the **design-language spec itself** ([SKILL.md:75-83]). But the public engine-adapter contract still documents `translate-design-language` as the method where “engine translates a design-language spec into concrete styling/markup decisions” ([types.ts:18-23]). Those are different phases with different inputs and outputs: one creates the spec artifact, the other consumes an existing spec to drive implementation.
+
+This is not just prose drift inside one file. The feature spec and the new skill align on “optional accelerator that drafts the spec from wireframe intent,” so the diff effectively changes the meaning of the method without updating the adapter surface that other code and agents are supposed to rely on. A downstream consumer following the adapter docs can build the wrong request shape or invoke the method at the wrong point in the workflow, and nothing in the audited diff resolves that contradiction. Blast radius is high because both readings are plausible and load-bearing; an unattended agent could reasonably pick either contract and perform the wrong stage of work. The fix is to make the contract single-sourced again: either update `engine-adapter/types.ts` (and any related conformance docs/tests) so `translate-design-language` explicitly means “draft the spec from approved wireframe intent,” or rename/split the method so spec-authoring and implementation-translation are no longer competing interpretations of the same API.
+
+### AUDIT-20260614-02 — Green specs can still contain rules with no live CSS anchor
+
+Finding-ID: AUDIT-20260614-02
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/design-control/skills/translate-design-language/SKILL.md:42-48, plugins/design-control/skills/translate-design-language/SKILL.md:92-100
+
+The skill says every rule binds to a live CSS file and selector, and describes `css:` as “≥1 per rule” with non-CSS targets reported as unchecked notes that “do not establish link-liveness” at lines 42-48. But the validation step then treats exit `0` as “spec green, zero findings” and allows presentation while merely reading those skipped-link notes aloud at lines 92-94; line 100 also tells the agent to present the green spec as `0 findings`. In the current checker contract, skipped non-CSS links stay green, so a rule whose only `css:` entry points at CSS-in-JS, Tailwind, or a CSS Module can pass the skill’s gate while having no mechanically validated live CSS anchor.
+
+The blast radius is high because an unattended consumer will naturally equate “spec green — 0 findings” with the invariant promised earlier: every rule is bound to live CSS. That can produce accepted design-language specs whose rules are structurally present but not link-live, undermining the feature’s stated goal of preventing visual-spec drift. A reasonable fix would make the skill’s presentation rule distinguish “green with skipped links” from fully link-live, or require at least one validated `.css` link per rule before the draft may be presented as a green design-language spec.
