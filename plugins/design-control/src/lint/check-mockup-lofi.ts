@@ -276,12 +276,15 @@ function checkElement(el: Element, ctx: WalkContext): void {
     // `value` renders ONLY on input controls whose value is the field
     // content / label (AUDIT-20260610-49; option/li per -65: submission and
     // numbering metadata respectively — their rendered text is elsewhere).
+    const inputTypeValue =
+      tag === 'input'
+        ? (ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'type')?.value ?? '')
+            .trim()
+            .toLowerCase()
+        : '';
     const valueIsRendered =
       attr !== 'value' ||
-      (tag === 'input' &&
-        !['checkbox', 'radio'].includes(
-          (ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'type')?.value ?? '').toLowerCase(),
-        ));
+      (tag === 'input' && !['checkbox', 'radio'].includes(inputTypeValue));
     if ((attr === 'title' || attr === 'placeholder' || attr === 'value' || attr.startsWith('aria-')) && valueIsRendered) {
       for (const { codepoint, char } of findDisallowedCodepoints(value)) {
         findings.push({
@@ -307,7 +310,7 @@ function checkElement(el: Element, ctx: WalkContext): void {
     }
     // `input type` is an enumerated structural set (AUDIT-20260610-24):
     // image loads a resource; color/file/range open visual chrome.
-    if (tag === 'input' && attr === 'type' && !INPUT_TYPE_ALLOWLIST.has(value.trim().toLowerCase())) {
+    if (tag === 'input' && attr === 'type' && !INPUT_TYPE_ALLOWLIST.has(inputTypeValue)) {
       findings.push({
         rule: 'disallowed-input-type',
         tag,
@@ -361,8 +364,7 @@ function checkElement(el: Element, ctx: WalkContext): void {
     // A password value renders as masking BULLETS (AUDIT-20260610-42) —
     // author-controlled glyph substitution; wireframes don't prefill secrets.
     if (tag === 'input' && attr === 'value') {
-      const typeValue = ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'type')?.value;
-      if (typeValue?.toLowerCase() === 'password' && value !== '') {
+      if (inputTypeValue === 'password' && value !== '') {
         findings.push({
           rule: 'password-value',
           tag,

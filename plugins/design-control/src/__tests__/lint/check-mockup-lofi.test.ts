@@ -253,6 +253,14 @@ describe('check-mockup-lofi — textarea (AUDIT-20260610-32)', () => {
   });
 });
 
+describe('check-mockup-lofi — password value gating', () => {
+  it('rejects a prefilled password input even when the type is padded with browser-equivalent whitespace', () => {
+    expect(rules(wrap(`<form><label>Password <input type=" password " value="hunter2"></label></form>`))).toContain(
+      'password-value',
+    );
+  });
+});
+
 // AUDIT-20260610-35 (round-8 gpt-5-03, LOW fp): checked is structural state
 // for a form wireframe (default-selected checkbox/radio), not styling.
 describe('check-mockup-lofi — checked state (AUDIT-20260610-35)', () => {
