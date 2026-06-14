@@ -1,9 +1,9 @@
 # Audit-barrage model battery — override for the design-control nested
 # installation (`plugins/design-control`).
 #
-# This installation pins an explicit two-lane default fleet:
+# This installation pins an explicit two-lane temporary backfill fleet:
 #   - codex / gpt-5.5
-#   - sonnet / claude-sonnet-4-6
+#   - codex-gpt5 / gpt-5
 #
 # Rationale:
 # - design-control's constitution now requires per-phase governance before later
@@ -13,8 +13,15 @@
 #   defeats the "persistent set of models" requirement and risks loader refusal
 #   as the barrage config contract evolves.
 # - opus is intentionally disabled here: current operator usage pressure makes
-#   the heavier Claude lane a poor default, and sonnet is materially faster on
-#   the smaller per-phase payloads this installation now requires.
+#   the heavier Claude lane a poor default.
+# - sonnet is temporarily disabled for governance backfill in this installation:
+#   it has twice stalled at thinking-only/no-final-report on real stack-control
+#   runs here, including a bounded `phase 2C` payload (~16.8 KB prompt), causing
+#   fleet-floor refusal before the work can be recorded as governed.
+# - a second Codex/OpenAI lane is used as the temporary substitute because this
+#   repo has prior barrage history for `codex` on `gpt-5`, and the local goal is
+#   to keep the protocol moving on bounded backfill units while the Sonnet lane
+#   is operationally unreliable in this environment.
 # - gemini remains disabled here until its CLI reliability and quota floor are
 #   restored; see the inherited notes below.
 #
@@ -42,15 +49,15 @@ models:
     liveness_window_seconds: 60
     timeout_seconds: 600
 
-  - name: sonnet
-    binary: claude
-    model: claude-sonnet-4-6
-    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
-    readonly_enforcement: "--permission-mode plan"
-    output_mode: stream-json
-    liveness_signal: stdout
+  - name: codex-gpt5
+    binary: codex
+    model: gpt-5
+    args_template: "exec -m {{model}} --sandbox read-only {{prompt-stdin}}"
+    readonly_enforcement: "--sandbox read-only"
+    output_mode: text
+    liveness_signal: stderr
     liveness_window_seconds: 60
-    timeout_seconds: 900
+    timeout_seconds: 600
 
   # gemini — deliberately disabled in this installation. Re-enable only after
   # verifying CLI reliability, quota stability, and readonly enforcement for the
