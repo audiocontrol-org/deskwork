@@ -3,10 +3,10 @@ id: TASK-37
 title: >-
   audit-barrage payload includes its own audit-log -> self-referential findings;
   untracked-fold pulls unrelated parked-feature scaffolds
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-11 00:50'
-updated_date: '2026-06-11 02:29'
+updated_date: '2026-06-13 19:03'
 labels:
   - agent-found
   - 'type:bug'
@@ -29,4 +29,6 @@ audit-barrage payload includes its own audit-log, generating self-referential fi
 - **Promoted-to:** tasks:specs/014-audit-protocol-reliability
 
 specs/014 US5 implemented: implement payload excludes the feature root audit-log from BOTH diff arms (pathspec + fold skip) and scopes the untracked fold to the feature under audit. Commits c5cb3a7b/9927de3a (RED/fix).
+
+Verified 2026-06-13 in the current stack-control worktree: `npx vitest run src/__tests__/govern-payload-self-reference.test.ts src/__tests__/govern/payload-exclusion.test.ts` passed (16 tests). Marked Done on that basis.
 <!-- SECTION:NOTES:END -->

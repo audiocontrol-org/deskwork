@@ -3,10 +3,10 @@ id: TASK-29
 title: >-
   stack-control: audit-barrage reports 'successful' on a zero-output model
   timeout — fleet degradation is silent
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-11 00:41'
-updated_date: '2026-06-11 02:29'
+updated_date: '2026-06-13 19:03'
 labels:
   - 'type:imported-issue'
   - promoted
@@ -44,4 +44,6 @@ Run 20260610T184044970Z-design-control (claude timedOut=true, 0 bytes; codex 169
 - **Promoted-to:** spec:specs/014-audit-protocol-reliability
 
 specs/014 US1 implemented: zero-output models named on stderr with cause + lost-agreement line; --require-models floor (govern defaults 2). Commits 5427f49e/bc181afa + 564261e9/1a4296a7 (RED/fix). Verification before status transition is the operator’s call.
+
+Verified 2026-06-13 in the current stack-control worktree: `npx vitest run src/__tests__/barrage-fleet-degradation.test.ts` passed (20 tests). Marked Done on that basis.
 <!-- SECTION:NOTES:END -->

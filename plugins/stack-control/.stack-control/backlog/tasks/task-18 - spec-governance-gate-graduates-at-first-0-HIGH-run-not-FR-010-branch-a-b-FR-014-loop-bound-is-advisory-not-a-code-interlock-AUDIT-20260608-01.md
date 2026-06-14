@@ -3,10 +3,10 @@ id: TASK-18
 title: >-
   spec-governance gate: graduates at first 0-HIGH run (not FR-010 branch a/b) +
   FR-014 loop bound is advisory not a code interlock (AUDIT-20260608-01)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-14 01:54'
+updated_date: '2026-06-13 19:03'
 labels:
   - agent-found
   - 'type:bug'
@@ -84,4 +84,6 @@ addressed by US3 / FR-006 (the implement-mode payload drops the audit-log excerp
 Roadmap node design:fix/spec-governance-gate-branch (ref gh-432) was retired 2026-06-11 and migrated here; duplicate capture TASK-35 archived in favor of this item.
 
 - **Promoted-to:** tasks:specs/021-audit-protocol-friction-burndown
+
+Verified 2026-06-13 in the current stack-control worktree: `npx vitest run src/__tests__/scope-discovery/promote-findings/dampener-raw-counting.test.ts src/__tests__/govern/convergence-loop.test.ts src/__tests__/govern/convergence-sc001.test.ts` passed (13 tests). Marked Done on that basis; any remaining 004 spec-text cleanup is a separate follow-on, not an open instance of this defect.
 <!-- SECTION:NOTES:END -->
