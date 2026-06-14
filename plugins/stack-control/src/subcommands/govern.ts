@@ -425,7 +425,14 @@ function resolvePhaseCheckpointStatuses(
       phaseId: phase.phaseId,
       files: governedPaths,
       scopeFingerprint,
-      state: isCheckpointFresh(record, scopeFingerprint) ? 'current' : 'stale',
+      state: isCheckpointFresh(record, {
+        version: 1,
+        checkpoint: `phase-${phase.phaseId}`,
+        auditLogSection: `phase-${phase.phaseId}`,
+        scopeFingerprint,
+      })
+        ? 'current'
+        : 'stale',
     };
   });
 }
@@ -474,6 +481,17 @@ function preflightNegotiatedFleet(
     );
   }
   return selected;
+}
+
+async function resolveGovernFeatureRoot(
+  repoRoot: string,
+  slug: string,
+): Promise<Awaited<ReturnType<typeof resolveFeatureRoot>>> {
+  try {
+    return await resolveFeatureRoot({ repoRoot, slug });
+  } catch (err) {
+    throw new GovernProtocolError(`govern: FATAL — ${errorMessage(err)}`);
+  }
 }
 
 export function buildSpecVars(
@@ -596,7 +614,7 @@ export async function runGovern(args: string[]): Promise<void> {
     let payloadPathScope: readonly string[] | undefined;
     let phaseCheckpointStatuses: readonly PhaseCheckpointStatus[] | undefined;
     if (flags.mode === 'implement' && flags.phase !== undefined) {
-      const { root } = await resolveFeatureRoot({ repoRoot, slug });
+      const { root } = await resolveGovernFeatureRoot(repoRoot, slug);
       if (root === undefined) {
         throw new GovernProtocolError(
           `govern: FATAL — --phase given but feature '${slug}' root not found (cannot resolve tasks.md).`,
@@ -620,7 +638,7 @@ export async function runGovern(args: string[]): Promise<void> {
         );
       }
     } else if (flags.mode === 'implement') {
-      const { root } = await resolveFeatureRoot({ repoRoot, slug });
+      const { root } = await resolveGovernFeatureRoot(repoRoot, slug);
       if (root !== undefined) {
         const tasksPath = join(root, 'tasks.md');
         if (existsSync(tasksPath)) {

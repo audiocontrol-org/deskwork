@@ -5,6 +5,7 @@ import {
   readFileSync,
   readlinkSync,
   readdirSync,
+  realpathSync,
   renameSync,
   writeFileSync,
 } from 'node:fs';
@@ -55,6 +56,7 @@ export function writePhaseCheckpoint(
   record: PhaseCheckpointRecord,
 ): string {
   const path = checkpointPath(installationRoot, record.featureSlug, record.phaseId);
+  assertCheckpointStoragePath(installationRoot, path);
   mkdirSync(dirname(path), { recursive: true });
   const tempPath = `${path}.tmp-${process.pid}-${randomUUID()}`;
   writeFileSync(tempPath, `${JSON.stringify(record, null, 2)}\n`, 'utf8');
@@ -68,6 +70,7 @@ export function readPhaseCheckpoint(
   phaseId: string,
 ): PhaseCheckpointRecord | null {
   const path = checkpointPath(installationRoot, featureSlug, phaseId);
+  assertCheckpointStoragePath(installationRoot, path);
   if (!existsSync(path)) return null;
   let parsed: ParsedCheckpointRecord;
   try {
@@ -81,9 +84,19 @@ export function readPhaseCheckpoint(
 
 export function isCheckpointFresh(
   record: PhaseCheckpointRecord,
-  scopeFingerprint: string,
+  current: {
+    readonly version: number;
+    readonly checkpoint: string;
+    readonly auditLogSection: string;
+    readonly scopeFingerprint: string;
+  },
 ): boolean {
-  return record.scopeFingerprint === scopeFingerprint;
+  return (
+    record.version === current.version &&
+    record.checkpoint === current.checkpoint &&
+    record.auditLogSection === current.auditLogSection &&
+    record.scopeFingerprint === current.scopeFingerprint
+  );
 }
 
 export function computeScopeFingerprint(
@@ -161,7 +174,71 @@ function resolveScopedPath(installationRoot: string, rel: string): string {
   if (relToRoot === '..' || relToRoot.startsWith('../')) {
     throw new Error(`phase checkpoint governed path escapes the installation root: ${rel}`);
   }
+  const rootReal = realpathSync(installationRoot);
+  const currentSegments: string[] = [];
+  for (const component of components) {
+    currentSegments.push(component);
+    const candidate = resolve(installationRoot, currentSegments.join('/'));
+    if (!existsSync(candidate)) {
+      continue;
+    }
+    const stat = lstatSync(candidate);
+    if (stat.isSymbolicLink()) {
+      throw new Error(
+        `phase checkpoint governed path must not be a symlink: ${currentSegments.join('/')}` +
+          ` -> ${readlinkSync(candidate)}`,
+      );
+    }
+    const candidateReal = realpathSync(candidate);
+    const relToRealRoot = relative(rootReal, candidateReal).split('\\').join('/');
+    if (relToRealRoot === '..' || relToRealRoot.startsWith('../')) {
+      throw new Error(`phase checkpoint governed path escapes the installation root: ${rel}`);
+    }
+  }
   return abs;
+}
+
+function assertCheckpointStoragePath(
+  installationRoot: string,
+  checkpointFile: string,
+): void {
+  const rootReal = realpathSync(installationRoot);
+  const rel = relative(installationRoot, checkpointFile).split('\\').join('/');
+  const components = rel.split('/').filter((component) => component.length > 0);
+  const existingPrefixes = components.slice(0, -1);
+  const walked: string[] = [];
+  for (const component of existingPrefixes) {
+    walked.push(component);
+    const candidate = resolve(installationRoot, walked.join('/'));
+    if (!existsSync(candidate)) {
+      continue;
+    }
+    const stat = lstatSync(candidate);
+    if (stat.isSymbolicLink()) {
+      throw new Error(
+        `phase checkpoint storage path must not be a symlink: ${walked.join('/')} -> ${readlinkSync(candidate)}`,
+      );
+    }
+    const candidateReal = realpathSync(candidate);
+    const relToRealRoot = relative(rootReal, candidateReal).split('\\').join('/');
+    if (relToRealRoot === '..' || relToRealRoot.startsWith('../')) {
+      throw new Error(`phase checkpoint storage path escapes the installation root: ${rel}`);
+    }
+  }
+  if (!existsSync(checkpointFile)) {
+    return;
+  }
+  const stat = lstatSync(checkpointFile);
+  if (stat.isSymbolicLink()) {
+    throw new Error(
+      `phase checkpoint storage path must not be a symlink: ${rel} -> ${readlinkSync(checkpointFile)}`,
+    );
+  }
+  const checkpointReal = realpathSync(checkpointFile);
+  const relToRealRoot = relative(rootReal, checkpointReal).split('\\').join('/');
+  if (relToRealRoot === '..' || relToRealRoot.startsWith('../')) {
+    throw new Error(`phase checkpoint storage path escapes the installation root: ${rel}`);
+  }
 }
 
 function safePathComponent(value: string, field: 'featureSlug' | 'phaseId'): string {

@@ -23,6 +23,12 @@ export function resolvePaths(root: string, config: InstallationConfig): Resolved
     inbox: resolveKey(root, paths.inbox, join(root, 'DESIGN-INBOX.md'), 'inbox'),
     backlog: resolveKey(root, paths.backlog, join(baseAbs, 'backlog'), 'backlog'),
     auditLog: resolveKey(root, paths.auditLog, join(baseAbs, 'audit-log.md'), 'auditLog'),
+    fleetKnowledge: resolveKey(
+      root,
+      paths.fleetKnowledge,
+      join(baseAbs, 'fleet-knowledge.yaml'),
+      'fleetKnowledge',
+    ),
     // session-skills (011): human docs at root; clone scope defaults to the
     // whole installation subtree (the root dir itself).
     journal: resolveKey(root, paths.journal, join(root, 'DEVELOPMENT-NOTES.md'), 'journal'),

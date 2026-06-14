@@ -84,6 +84,11 @@ function makeRepo(seedAuditLog: string): string {
     ].join('\n'),
     'utf8',
   );
+  writeFileSync(
+    join(repo, '.stack-control', 'fleet-knowledge.yaml'),
+    ['lanes:', '  - name: codex', '    max_prompt_bytes: 24576', ''].join('\n'),
+    'utf8',
+  );
   const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', 'feat');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'audit-log.md'), seedAuditLog, 'utf8');

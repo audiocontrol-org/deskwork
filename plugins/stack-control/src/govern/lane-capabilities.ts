@@ -1,6 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
+import { loadInstallationConfig } from '../config/config-loader.js';
+import { configPathFor } from '../config/installation.js';
+import { resolvePaths } from '../config/resolve-paths.js';
 import { loadAuditBarrageConfig } from '../scope-discovery/audit-barrage/config-loader.js';
 import type {
   EnforcementState,
@@ -12,13 +17,14 @@ import { isLaneEnforced } from '../scope-discovery/audit-barrage/types.js';
 
 export interface LanePayloadEnvelope {
   readonly maxPromptBytes: number;
-  readonly source: 'fleet-knowledge' | 'derived-from-timeout-slope';
+  readonly source: 'fleet-knowledge';
 }
 
 export interface LaneCapabilityProfile {
   readonly name: string;
   readonly model: string;
   readonly binary: string;
+  readonly availability: 'available' | 'unavailable';
   readonly outputMode: OutputMode;
   readonly enforcement: EnforcementState;
   readonly liveness: LivenessState;
@@ -41,22 +47,27 @@ interface FleetKnowledgeLane {
   readonly max_prompt_bytes?: unknown;
 }
 
-const KNOWLEDGE_REL = join('.stack-control', 'fleet-knowledge.yaml');
+const HERE = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_KNOWLEDGE_PATH = join(HERE, '..', '..', 'templates', 'fleet-knowledge.yaml');
 
 export async function loadLaneCapabilities(
   installationRoot: string,
+  probeBinary: (binary: string) => boolean = binaryExistsOnPath,
 ): Promise<readonly LaneCapabilityProfile[]> {
   const config = await loadAuditBarrageConfig(installationRoot);
   const knownEnvelopes = readFleetKnowledge(
     installationRoot,
     config.models.map((model) => model.name),
   );
-  return config.models.map((model) => normalizeLaneCapability(model, knownEnvelopes.get(model.name)));
+  return config.models.map((model) =>
+    normalizeLaneCapability(model, knownEnvelopes.get(model.name), probeBinary(model.binary)),
+  );
 }
 
 function normalizeLaneCapability(
   model: ModelConfig,
   knownEnvelope: number | undefined,
+  available: boolean,
 ): LaneCapabilityProfile {
   const timeoutBasis =
     model.timeoutSeconds !== undefined
@@ -70,57 +81,59 @@ function normalizeLaneCapability(
     name: model.name,
     model: model.model,
     binary: model.binary,
+    availability: available ? 'available' : 'unavailable',
     outputMode: model.outputMode,
     enforcement: isLaneEnforced(model) ? 'enforced' : 'unenforced',
     liveness: model.livenessSignal === 'none' ? 'unmonitored' : 'monitored',
-    envelope:
-      knownEnvelope !== undefined
-        ? { maxPromptBytes: knownEnvelope, source: 'fleet-knowledge' }
-        : {
-            maxPromptBytes: deriveEnvelopeBytes(model),
-            source: 'derived-from-timeout-slope',
-          },
+    envelope: { maxPromptBytes: requireKnownEnvelope(model, knownEnvelope), source: 'fleet-knowledge' },
     timeoutBasis,
   };
 }
 
-function deriveEnvelopeBytes(model: ModelConfig): number {
-  if (model.timeoutSeconds !== undefined) {
-    throw new Error(
-      `lane '${model.name}' needs fleet-knowledge.yaml max_prompt_bytes when timeout_seconds is used; ` +
-        'timeout wall-clock is not a prompt-capacity signal',
-    );
+function requireKnownEnvelope(
+  model: ModelConfig,
+  knownEnvelope: number | undefined,
+): number {
+  if (knownEnvelope !== undefined) {
+    return knownEnvelope;
   }
-  const floor = model.timeoutFloorSeconds ?? 300;
-  const secsPerKb = model.timeoutSecsPerKb ?? 8;
-  return Math.max(1, Math.floor(floor / secsPerKb)) * 1024;
+  throw new Error(
+    `lane '${model.name}' needs fleet-knowledge.yaml max_prompt_bytes; ` +
+      'timeout calibration is not a prompt-capacity signal',
+  );
 }
 
 function readFleetKnowledge(
   installationRoot: string,
   expectedLaneNames: readonly string[],
 ): ReadonlyMap<string, number> {
-  const path = join(installationRoot, KNOWLEDGE_REL);
-  if (!existsSync(path)) return new Map();
-  const parsed = parseYaml(readFileSync(path, 'utf8')) as FleetKnowledgeDoc | null;
+  const overridePath = resolveFleetKnowledgePath(installationRoot);
+  const sourcePath = existsSync(overridePath) ? overridePath : DEFAULT_KNOWLEDGE_PATH;
+  if (!existsSync(sourcePath)) return new Map();
+  const parsed = parseYaml(readFileSync(sourcePath, 'utf8')) as FleetKnowledgeDoc | null;
   if (parsed === null || parsed === undefined) return new Map();
   if (!Array.isArray(parsed.lanes)) {
-    throw new Error(`${path}: lanes must be a list`);
+    throw new Error(`${sourcePath}: lanes must be a list`);
   }
   const pairs: Array<readonly [string, number]> = [];
   const seen = new Set<string>();
   for (const lane of parsed.lanes) {
     if (typeof lane !== 'object' || lane === null) {
-      throw new Error(`${path}: each fleet-knowledge lane must be an object`);
+      throw new Error(`${sourcePath}: each fleet-knowledge lane must be an object`);
     }
     if (typeof lane.name !== 'string' || lane.name.length === 0) {
-      throw new Error(`${path}: each fleet-knowledge lane requires a non-empty name`);
+      throw new Error(`${sourcePath}: each fleet-knowledge lane requires a non-empty name`);
     }
     if (seen.has(lane.name)) {
-      throw new Error(`${path}: duplicate fleet-knowledge lane '${lane.name}'`);
+      throw new Error(`${sourcePath}: duplicate fleet-knowledge lane '${lane.name}'`);
     }
-    if (typeof lane.max_prompt_bytes !== 'number' || !Number.isFinite(lane.max_prompt_bytes) || lane.max_prompt_bytes < 1) {
-      throw new Error(`${path}: lane '${lane.name}' max_prompt_bytes must be a positive number`);
+    if (
+      typeof lane.max_prompt_bytes !== 'number' ||
+      !Number.isFinite(lane.max_prompt_bytes) ||
+      !Number.isInteger(lane.max_prompt_bytes) ||
+      lane.max_prompt_bytes < 1
+    ) {
+      throw new Error(`${sourcePath}: lane '${lane.name}' max_prompt_bytes must be a positive integer`);
     }
     seen.add(lane.name);
     pairs.push([lane.name, lane.max_prompt_bytes]);
@@ -131,10 +144,24 @@ function readFleetKnowledge(
   const missing = Array.from(expected).filter((name) => !actual.has(name)).sort();
   if (unknown.length > 0 || missing.length > 0) {
     throw new Error(
-      `${path}: fleet-knowledge lanes must exactly match configured barrage lanes` +
+      `${sourcePath}: fleet-knowledge lanes must exactly match configured barrage lanes` +
         `${missing.length > 0 ? `; missing: ${missing.join(', ')}` : ''}` +
         `${unknown.length > 0 ? `; unknown: ${unknown.join(', ')}` : ''}`,
     );
   }
   return new Map(pairs);
+}
+
+function resolveFleetKnowledgePath(installationRoot: string): string {
+  const configPath = configPathFor(installationRoot);
+  if (!existsSync(configPath)) {
+    return join(installationRoot, '.stack-control', 'fleet-knowledge.yaml');
+  }
+  const config = loadInstallationConfig(configPath);
+  return resolvePaths(installationRoot, config).fleetKnowledge;
+}
+
+function binaryExistsOnPath(binary: string): boolean {
+  const result = spawnSync('which', [binary], { encoding: 'utf8' });
+  return result.status === 0;
 }

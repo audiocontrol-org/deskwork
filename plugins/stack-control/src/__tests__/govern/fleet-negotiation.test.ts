@@ -7,6 +7,7 @@ const LANES: readonly LaneCapabilityProfile[] = [
     name: 'claude',
     model: 'opus',
     binary: 'claude',
+    availability: 'available',
     outputMode: 'stream-json',
     enforcement: 'enforced',
     liveness: 'monitored',
@@ -17,6 +18,7 @@ const LANES: readonly LaneCapabilityProfile[] = [
     name: 'codex',
     model: 'gpt-5.5',
     binary: 'codex',
+    availability: 'available',
     outputMode: 'text',
     enforcement: 'enforced',
     liveness: 'monitored',
@@ -47,6 +49,7 @@ describe('fleet negotiation records', () => {
           name: 'unsafe',
           model: 'gpt-unsafe',
           binary: 'codex',
+          availability: 'available',
           outputMode: 'text',
           enforcement: 'unenforced',
           liveness: 'unmonitored',
@@ -69,5 +72,38 @@ describe('fleet negotiation records', () => {
   it('fails loud on an invalid requested prompt size', () => {
     expect(() => negotiateFleet(LANES, -1, 1)).toThrow(/requestedPromptBytes must be a positive integer/);
     expect(() => negotiateFleet(LANES, Number.NaN, 1)).toThrow(/requestedPromptBytes must be a positive integer/);
+  });
+
+  it('fails loud when the candidate fleet repeats a lane name', () => {
+    expect(() =>
+      negotiateFleet(
+        [
+          LANES[0]!,
+          {
+            ...LANES[0]!,
+          },
+        ],
+        16000,
+        2,
+      ),
+    ).toThrow(/lane names must be unique/);
+  });
+
+  it('rejects lanes whose binary is unavailable even when the envelope fits', () => {
+    const result = negotiateFleet(
+      [
+        LANES[0]!,
+        {
+          ...LANES[1]!,
+          name: 'missing-codex',
+          availability: 'unavailable',
+        },
+      ],
+      16000,
+      2,
+    );
+    expect(result.disposition).toBe('negotiation-failed');
+    expect(result.acceptedFleet).toEqual(['claude']);
+    expect(result.rejectedLanes).toContain('missing-codex');
   });
 });

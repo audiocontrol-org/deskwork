@@ -18,7 +18,7 @@
 **Purpose**: Add fixtures and protocol records needed by later stories.
 
 - [ ] T001 [P] Add a multi-phase govern fixture with checkpoint, nested-installation, and rename cases under `plugins/stack-control/src/__tests__/fixtures/govern/021-audit-protocol/`
-- [ ] T002 [P] Add lane-capability and negotiation fixtures covering healthy, undersized, unavailable, and degraded fleets under `plugins/stack-control/src/__tests__/fixtures/govern/021-fleet/`
+- [ ] T002 [P] Add lane-capability and negotiation fixtures covering healthy, undersized, unavailable, and degraded fleets under `plugins/stack-control/src/__tests__/fixtures/govern/021-fleet/`, and seed the shipped fallback at `plugins/stack-control/templates/fleet-knowledge.yaml`
 - [ ] T003 [P] Add typed protocol records for phase checkpoints, boundary estimates / measurements, and fleet negotiation in `plugins/stack-control/src/govern/checkpoint-state.ts`, `plugins/stack-control/src/govern/phase-boundary-sizing.ts`, `plugins/stack-control/src/govern/lane-capabilities.ts`, and `plugins/stack-control/src/govern/fleet-negotiation.ts`
 
 ---

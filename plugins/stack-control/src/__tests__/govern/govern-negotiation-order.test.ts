@@ -27,6 +27,11 @@ function makeRepo(): string {
     ].join('\n'),
     'utf8',
   );
+  writeFileSync(
+    join(repo, '.stack-control', 'fleet-knowledge.yaml'),
+    ['lanes:', '  - name: codex', '    max_prompt_bytes: 24576', ''].join('\n'),
+    'utf8',
+  );
   const featureRoot = join(repo, 'docs', '1.0', '001-IN-PROGRESS', 'feat');
   mkdirSync(featureRoot, { recursive: true });
   writeFileSync(join(featureRoot, 'audit-log.md'), '# Audit Log — feat\n', 'utf8');

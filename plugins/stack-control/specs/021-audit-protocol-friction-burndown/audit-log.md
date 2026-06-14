@@ -773,3 +773,398 @@ Surface:    src/govern/phase-boundary-sizing.ts:32-43, src/govern/phase-boundary
 `assertPositiveInteger` accepts any JavaScript integer, including values above `Number.MAX_SAFE_INTEGER`, and `estimateBoundary` multiplies `paths.length * averageBytesPerPath` without checking the result is safe. Large generated path lists or bad caller input can silently lose precision and mark a boundary as fitting or not fitting based on a rounded estimate.
 
 The blast radius is low for normal repository sizes, but this is governance code deciding whether an audit payload fits a fleet envelope. Use `Number.isSafeInteger` for inputs and verify `estimatedPromptBytes` is also safe before returning the estimate.
+
+## 2026-06-14 — audit-barrage lift (20260614T171955355Z-audit-protocol-friction-burndown-phase-1)
+
+### AUDIT-20260614-58 — Checkpoint freshness ignores the checkpoint contract, so upgraded governance can silently trust stale passes
+
+Finding-ID: AUDIT-20260614-58
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/govern/checkpoint-state.ts:11-17`, `src/govern/checkpoint-state.ts:71-87`
+
+`PhaseCheckpointRecord` stores `checkpoint`, `auditLogSection`, and a hardcoded `version`, but `isCheckpointFresh()` only compares `record.scopeFingerprint` against a newly computed fingerprint of governed files. That means an existing checkpoint remains "fresh" whenever the audited files are unchanged, even if the checkpoint semantics changed in code, the audit log section name changed, or the checkpoint protocol itself was strengthened in a new release.
+
+The blast radius is governance bypass on upgrade: an adopter can pull a stricter audit implementation and still have old checkpoint files accepted without rerunning the phase gate, as long as the scoped content did not change. The evidence is the narrow freshness predicate at lines 71-77, contrasted with the additional contract-bearing fields persisted on the record at lines 11-17 that are never consulted for freshness. A reasonable fix is to version the checkpoint contract into freshness evaluation: either include checkpoint identity/version fields in the invalidation key, or treat mismatched `checkpoint` / `auditLogSection` / schema version as stale and require a rerun.
+
+### AUDIT-20260614-59 — Intermediate symlink components can escape the installation root
+
+Finding-ID: AUDIT-20260614-59
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/checkpoint-state.ts:111-144
+
+`resolveScopedPath()` checks lexical containment with `resolve()`/`relative()`, and `digestScopedPath()` rejects only when the final path itself is a symlink (`lstatSync(abs).isSymbolicLink()`). That misses paths where an intermediate directory component is a symlink, such as `governed/link-to-outside/file.md`: the final `lstatSync()` sees the target file, not the symlinked parent, and `readFileSync(abs)` can digest content outside the installation root.
+
+The blast radius is high because this code is explicitly a governance checkpoint primitive for scoped paths. If shipped as-is, a checkpoint can silently fingerprint out-of-root content while still appearing to enforce “must not be a symlink” and “must not escape the installation root.” A reasonable fix is to validate each path component with `lstatSync()` before descending, or compare `realpathSync()` results against the real installation root while still rejecting symlink components according to the stated policy.
+
+## 2026-06-14 — audit-barrage lift (20260614T172207382Z-audit-protocol-friction-burndown-phase-1)
+
+### AUDIT-20260614-60 — Derived lane envelopes understate actual prompt capacity and can reject viable fleets
+
+Finding-ID: AUDIT-20260614-60 (codex-02 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=high
+Decision:   agreement (gate-counted high)
+Surface:    `src/govern/lane-capabilities.ts:87-97`
+
+`deriveEnvelopeBytes()` computes the fallback prompt envelope as `floor(timeoutFloorSeconds / timeoutSecsPerKb) * 1024` bytes. That is not the same contract the runtime actually uses. The existing timeout derivation is `max(floor, ceil(secs_per_kb × payload_kb))` (`src/scope-discovery/audit-barrage/timeout-derivation.ts:1-49`), which means payloads larger than `floor / secsPerKb` are still valid: they simply receive a proportionally larger timeout. Under the new logic, any lane without `fleet-knowledge.yaml` is treated as incapable of prompts above that threshold even though the barrage runtime would run them normally.
+
+The downstream blast radius is feature-visible, not cosmetic. `runProtocol()` and `preflightNegotiatedFleet()` both use these envelopes to decide whether a lane is eligible before running the barrage, so a healthy multi-model fleet can be rejected with `fleet negotiation failed` purely because the fallback envelope is underestimated. The new test only asserts the derived envelope is “greater than 0” (`src/__tests__/govern/lane-capabilities.test.ts:35-42`), so this contract mismatch would ship unnoticed. A reasonable fix is to stop inferring a hard `maxPromptBytes` from the timeout slope at all, or encode a different capability model that matches the runtime’s actual linear-scaling behavior instead of turning the timeout floor into a false upper bound.
+
+### AUDIT-20260614-61 — Phase checkpoint storage trusts symlinked state roots outside the installation
+
+Finding-ID: AUDIT-20260614-61
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/govern/checkpoint-state.ts:39-63`, `src/govern/checkpoint-state.ts:66-80`
+
+The new checkpoint persistence code carefully rejects symlinks in governed payload paths, but it does not apply the same isolation to the checkpoint files themselves. `checkpointDir()`/`checkpointPath()` just `join()` under `.stack-control/govern/phase-checkpoints`, and `writePhaseCheckpoint()` / `readPhaseCheckpoint()` then `mkdirSync`, `writeFileSync`, `renameSync`, and `readFileSync` whatever path resolves there. If `.stack-control/govern` or a feature-specific checkpoint directory is a symlink, this code will read or write checkpoint JSON outside the installation root with no refusal.
+
+That matters because these records are later used to decide whether earlier phases are `current`, `stale`, or `missing`. A symlinked checkpoint directory can therefore make one installation trust another installation’s governance state, or write governance markers into an arbitrary external location, which breaks the installation-isolation guarantees this feature is trying to add. The tests cover symlink rejection for governed source paths (`src/__tests__/govern/checkpoint-state.test.ts:175-201`) but there is no corresponding check for the checkpoint storage path itself. A fix should validate the checkpoint directory chain the same way `resolveScopedPath()` validates governed paths: reject symlinked ancestors and anything that resolves outside `installationRoot` before reading or writing checkpoint files.
+
+### AUDIT-20260614-62 — Fleet knowledge accepts fractional byte limits
+
+Finding-ID: AUDIT-20260614-62
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/govern/lane-capabilities.ts:119`
+
+`readFleetKnowledge` validates `max_prompt_bytes` with `typeof === 'number'`, `Number.isFinite`, and `>= 1`, but it does not require an integer. That means a YAML value like `24576.5` is accepted as a byte ceiling and then used by fleet negotiation as a hard prompt envelope.
+
+The downstream blast radius is medium: this likely will not break normal hand-written config, but it makes the governance primitive accept a nonsensical capacity value and can create boundary decisions around impossible byte counts. A reasonable fix is to require `Number.isInteger(lane.max_prompt_bytes)` and keep the existing positive finite check.
+
+## 2026-06-14 — audit-barrage lift (20260614T172448374Z-audit-protocol-friction-burndown-phase-1)
+
+### AUDIT-20260614-63 — `fleet-knowledge.yaml` became a hard runtime dependency, but the diff does not add any install/migration surface for it
+
+Finding-ID: AUDIT-20260614-63
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/govern/lane-capabilities.ts:44-90` and missing setup/doctor/template updates elsewhere in the diff
+
+`loadLaneCapabilities()` now always resolves `.stack-control/fleet-knowledge.yaml` (`KNOWLEDGE_REL` at lines 44-49) and `normalizeLaneCapability()` refuses to proceed unless every configured lane has a `max_prompt_bytes` entry (`requireKnownEnvelope()` at lines 80-90). The new tests explicitly lock that in: a missing file is a hard failure, not an advisory condition. That means govern has acquired a new mandatory operator-authored file.
+
+The problem is that this diff only adds the runtime reader and test fixtures. It does not add any corresponding seeding, template, setup, or doctor-rule change that would create or validate `.stack-control/fleet-knowledge.yaml` ahead of time. On upgrade or fresh install, an adopter can have a valid existing barrage config and still have `govern` start failing immediately with “needs fleet-knowledge.yaml max_prompt_bytes”. The blast radius is high because this is not a corner case: it is the default state for every installation that pulls this change without already knowing to hand-author a brand-new file. A reasonable fix is to treat `fleet-knowledge.yaml` like the repo’s other governed YAML surfaces: ship a template/seed path, wire it into install/setup, and add a doctor check that fails before the govern path reaches runtime.
+
+### AUDIT-20260614-64 — Phase checkpoint reads and writes do not defend the checkpoint directory tree against symlink escape
+
+Finding-ID: AUDIT-20260614-64
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/govern/checkpoint-state.ts:43-63` and `src/govern/checkpoint-state.ts:68-80`
+
+`checkpointPath()` constructs `<installation>/.stack-control/govern/phase-checkpoints/<slug>/phase-<id>.json` purely by string join (lines 43-51), and both `writePhaseCheckpoint()` and `readPhaseCheckpoint()` trust that path directly (lines 55-63 and 68-80). Unlike `computeScopeFingerprint()`, which explicitly walks the path and rejects symlinks before touching content, the checkpoint persistence path never verifies that `.stack-control/govern`, `phase-checkpoints`, or the feature directory are real directories inside the installation root.
+
+That leaves an installation-isolation hole: if any ancestor in that checkpoint tree is a symlink, writes can be redirected outside the installation root and reads can consume state from outside the repo. In this codebase, installation-boundary correctness is load-bearing, so this is more than hygiene. The blast radius is high because a governed run can silently persist or read checkpoint state in the wrong location, which makes phase gating non-deterministic across repos and can clobber unrelated files. A reasonable fix is to apply the same realpath/symlink rejection strategy used in `resolveScopedPath()` before reading or writing checkpoint files, not just when hashing governed content.
+
+### AUDIT-20260614-65 — Fleet negotiation does not verify lane availability
+
+Finding-ID: AUDIT-20260614-65
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/lane-capabilities.ts:18-24, src/govern/lane-capabilities.ts:69-76, src/govern/fleet-negotiation.ts:24-38
+
+`LaneCapabilityProfile` records `binary`, but neither `loadLaneCapabilities()` nor `negotiateFleet()` checks whether that binary is actually runnable. The accepted-lane predicate only considers prompt envelope, enforcement, and liveness configuration, so a configured lane whose CLI is missing from PATH can still satisfy quorum and be returned in `acceptedFleet`.
+
+The blast radius is high because the feature scope explicitly calls for autonomous fleet negotiation before payload assembly, including unavailable lanes. As written, an adopter with one missing CLI can pass negotiation and only fail during barrage spawn, which is exactly the degraded runtime behavior this control-plane gate is meant to prevent. A reasonable fix is to add an availability signal to `LaneCapabilityProfile`, derive it during capability loading or an injected probe, and exclude unavailable lanes from quorum with a distinct rejection reason.
+
+### AUDIT-20260614-66 — Checkpoint files can be redirected through symlinked governance directories
+
+Finding-ID: AUDIT-20260614-66
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/checkpoint-state.ts:37-63, src/govern/checkpoint-state.ts:159-196
+
+The governed payload paths get careful root and symlink validation in `resolveScopedPath()`, but the checkpoint storage path itself does not. `checkpointPath()` simply joins under `.stack-control/govern/phase-checkpoints`, and `writePhaseCheckpoint()` then creates directories, writes a temp file, and renames it without checking whether `.stack-control`, `.stack-control/govern`, or a feature checkpoint directory is a symlink.
+
+The blast radius is medium: normal installs work, but any symlinked governance directory redirects durable checkpoint reads and writes outside the installation root while still appearing successful. That undermines the mechanical phase gate because the state file can be stored in, or read from, a location the installation resolver did not authorize. A reasonable fix is to validate the checkpoint base and all existing parent components with the same realpath/lstat discipline used for governed paths before reading or writing checkpoint JSON.
+
+## 2026-06-14 — audit-barrage lift (20260614T172912854Z-audit-protocol-friction-burndown-phase-1)
+
+### AUDIT-20260614-67 — Missing governed files are treated as a valid checkpoint fingerprint instead of a hard failure
+
+Finding-ID: AUDIT-20260614-67
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/checkpoint-state.ts:131-143
+
+`computeScopeFingerprint()` currently certifies a phase scope even when one of the governed paths does not exist. In `digestScopedPath()`, the code hashes the path name, appends the sentinel `"\0MISSING\0"`, and returns (`src/govern/checkpoint-state.ts:138-142`) instead of throwing. That means a stale or mistyped `tasks.md` entry can still produce a stable fingerprint and later be considered "current" by checkpoint freshness checks, as long as the path stays missing.
+
+The blast radius is the phase-gating feature itself: a later phase or the composing whole-feature pass can trust a checkpoint that never actually audited the named surface. This is not just hygiene, because unattended consumers will read "current checkpoint" as "this phase's declared scope was governed." A reasonable fix is to fail loud on missing governed paths the same way the code already fails on symlinks and path escapes, so an invalid phase boundary cannot be recorded as converged.
+
+### AUDIT-20260614-68 — The diff introduces mandatory installation state but does not add any setup/doctor/bootstrap path for it
+
+Finding-ID: AUDIT-20260614-68
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/lane-capabilities.ts:46-56,88-146; src/govern/checkpoint-state.ts:37-64; missing changes under `src/setup/`, `templates/`, and doctor/documentation surfaces
+
+This change makes `govern` depend on two new on-disk installation surfaces: `.stack-control/fleet-knowledge.yaml` (`src/govern/lane-capabilities.ts:46-56`) and `.stack-control/govern/phase-checkpoints/...` (`src/govern/checkpoint-state.ts:37-64`). The first is now mandatory in practice, because `requireKnownEnvelope()` throws when a configured lane has no `max_prompt_bytes` entry (`src/govern/lane-capabilities.ts:88-98`), and `readFleetKnowledge()` enforces an exact lane-name match (`src/govern/lane-capabilities.ts:135-146`). But this diff does not add any corresponding scaffold in `src/setup/`, any template alongside `templates/audit-barrage-config.yaml`, or any doctor/readme surface that teaches operators how to create or validate the new file.
+
+That creates an upgrade trap on fresh installs and existing adopters: the code now hard-fails on missing fleet knowledge, but the repository does not appear to provision or validate that requirement anywhere in the install path. The consequence is a real feature break, not just documentation drift, because `govern` stops working until an operator reverse-engineers a file format from code or tests. A reasonable fix is to seed `fleet-knowledge.yaml` through setup/template machinery and add a doctor rule that reports missing/mismatched fleet knowledge before the user hits the govern path.
+
+### AUDIT-20260614-69 — Duplicate lane names can satisfy the required model count
+
+Finding-ID: AUDIT-20260614-69
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/fleet-negotiation.ts:20-45
+
+`negotiateFleet` counts accepted lane entries, not distinct models or distinct lane names. Because `acceptedFleet` is built with `.map((lane) => lane.name)` and the pass condition is `accepted.length >= requireModels`, a caller can pass two `LaneCapabilityProfile` objects with the same `name` and satisfy `requireModels: 2` with only one independent lane represented.
+
+That matters because the feature is explicitly about fleet negotiation across models; downstream governance could believe a multi-model audit barrage is viable when it is actually a duplicated single lane. The reasonable fix is to reject duplicate lane names before negotiation, or deduplicate by lane name before counting and reporting accepted/rejected lanes.
+
+## 2026-06-14 — audit-barrage lift (20260614T173036386Z-audit-protocol-friction-burndown-phase-1)
+
+### AUDIT-20260614-70 — New required `fleet-knowledge.yaml` has no upgrade/bootstrap path, so existing installs hard-fail on first use
+
+Finding-ID: AUDIT-20260614-70 (codex-02 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium, codex-gpt5=high
+Decision:   agreement (gate-counted medium)
+Surface:    `src/govern/lane-capabilities.ts:43-49,89-142` and missing setup/doctor migration surfaces in this diff
+
+`loadLaneCapabilities()` now makes every configured lane depend on `.stack-control/fleet-knowledge.yaml`, because `normalizeLaneCapability()` calls `requireKnownEnvelope()` for every model and that throws whenever a lane has no `max_prompt_bytes` entry (`src/govern/lane-capabilities.ts:43-49,78-87`). At the same time, `readFleetKnowledge()` enforces an exact name-for-name match with the configured barrage lanes (`src/govern/lane-capabilities.ts:123-142`). On a fresh install with no file, or on an upgrade where the lane list changed, the feature stops with a runtime error.
+
+The blast radius is high because a downstream adopter does not get degraded behavior or a guided migration; they get a hard stop the first time this surface is exercised. I would expect this diff to also introduce one of: setup/bootstrap logic that writes the file, a doctor rule that flags the missing/stale file before runtime, or a documented migration path. None of those surfaces are present in the audited range, so the new mandatory artifact is operationally orphaned.
+
+### AUDIT-20260614-71 — Duplicate lane names can falsely satisfy the multi-model quorum
+
+Finding-ID: AUDIT-20260614-71
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    `src/govern/lane-capabilities.ts:51-76,89-142` and `src/govern/fleet-negotiation.ts:18-45`
+
+The quorum logic counts array entries, not distinct lanes. `loadLaneCapabilities()` returns one `LaneCapabilityProfile` per `config.models` entry (`src/govern/lane-capabilities.ts:51-57`), and `negotiateFleet()` decides success with `accepted.length >= requireModels` after a plain `filter().map()` (`src/govern/fleet-negotiation.ts:18-45`). There is no uniqueness check on lane names in the production path. `readFleetKnowledge()` does reject duplicate names inside `fleet-knowledge.yaml`, but it does not reject duplicate configured lane names because it compares the configured names through a `Set` (`src/govern/lane-capabilities.ts:131-142`).
+
+The consequence is that a malformed config with the same lane listed twice can produce `acceptedFleet: ['codex', 'codex']` and still return `disposition: 'accepted'` for `requireModels = 2`. That breaks the stated goal of fleet diversity while reporting success, so downstream consumers can believe they ran a multi-model audit when they actually ran one lane twice. The fix is to enforce unique lane names when loading capabilities, or to compute quorum over distinct accepted lane identities.
+
+### AUDIT-20260614-72 — Phase checkpoint fingerprints ignore executable-bit and mode changes
+
+Finding-ID: AUDIT-20260614-72
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/govern/checkpoint-state.ts:121-150`
+
+`computeScopeFingerprint()` is meant to decide whether a prior phase checkpoint is still fresh, but `digestScopedPath()` only hashes the normalized path name, a directory marker, and file bytes (`src/govern/checkpoint-state.ts:121-150`). It does not include file mode or any other execution-relevant metadata from `lstatSync()`. A governed shell script or CLI wrapper can therefore change from executable to non-executable, or vice versa, without changing the fingerprint.
+
+The blast radius is medium because it creates a false “no material change” result: governance can reuse a prior checkpoint even though the runnable behavior of the governed surface changed. In this repo, executable status is load-bearing for plugin/bin surfaces, so mode changes are not cosmetic. A reasonable fix is to include relevant `stat` metadata, at minimum the file type plus executable bits, in the hashed payload before reading file contents.
+
+### AUDIT-20260614-73 — Checkpoint writes can leave orphan temp files on failure
+
+Finding-ID: AUDIT-20260614-73
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/checkpoint-state.ts:49-51
+
+`writePhaseCheckpoint` writes the checkpoint through a sibling temp file and then renames it, but if `writeFileSync` succeeds and `renameSync` fails, the `.tmp-<pid>-<uuid>` file is left in `.stack-control/govern/phase-checkpoints/...`. The fingerprint reader later walks directories recursively and includes every child in directory digests, so abandoned temp files inside governed storage can become persistent state noise and operator-visible clutter.
+
+The blast radius is medium: this does not corrupt the target checkpoint, but it creates a failure mode that compounds under interrupts, permission errors, or cross-device/storage quirks. A reasonable fix is to wrap the write/rename in `try/catch` and remove the temp path if it exists before rethrowing the original error.
+
+## 2026-06-14 — audit-barrage lift (20260614T173405767Z-audit-protocol-friction-burndown-phase-1)
+
+### AUDIT-20260614-74 — Fresh installs and upgrades now fail at runtime unless a new `fleet-knowledge.yaml` is created out of band
+
+Finding-ID: AUDIT-20260614-74
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/govern/lane-capabilities.ts:43-92` and missing setup/doctor surfaces for `.stack-control/fleet-knowledge.yaml`
+
+`loadLaneCapabilities()` now always routes every configured model through `requireKnownEnvelope()` (`src/govern/lane-capabilities.ts:48-53`, `82-92`). If `.stack-control/fleet-knowledge.yaml` is absent, `readFleetKnowledge()` returns an empty map (`96-101`), and the first model immediately throws `lane '<name>' needs fleet-knowledge.yaml max_prompt_bytes`. That means a fresh install or an upgraded existing installation cannot even reach fleet negotiation; governance aborts before it can classify lanes.
+
+The blast radius is high because this is a hard startup failure on the main path, not a degraded mode. The diff introduces only a test fixture copy of `fleet-knowledge.yaml` under `src/__tests__/fixtures/...`; it does not add any companion setup, migration, doctor, or schema surface that would create or preflight the new required file in real installations. A reasonable fix is to land the runtime requirement together with installer/bootstrap and doctor validation support, or make the absence of fleet knowledge an explicit preflight error from a dedicated validation step rather than a late throw during lane normalization.
+
+### AUDIT-20260614-75 — Empty rendered phases are treated as invalid instead of as a valid zero-byte boundary
+
+Finding-ID: AUDIT-20260614-75
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/govern/phase-boundary-sizing.ts:43-89`
+
+`measureBoundaryFit()` and `assertBoundaryFits()` reject `measuredPromptBytes === 0` because both flow through `assertPositiveInteger()` (`45-49`, `58-64`, `84-88`). That makes a zero-byte payload an exception case rather than producing a measurement with disposition `fits`. For sizing logic, zero is a legitimate boundary outcome whenever a phase renders no governed content after filtering, or when an empty phase is evaluated intentionally.
+
+The blast radius is medium: it does not break every run, but unattended governance will fail on a perfectly representable edge case instead of recording a deterministic measurement. The fix is straightforward: keep `activeFleetEnvelopeBytes` strictly positive, but allow `measuredPromptBytes` to be a non-negative integer so the boundary code can distinguish “empty payload” from “invalid input” cleanly.
+
+### AUDIT-20260614-76 — The new persisted-governance primitives land without executable coverage in the same diff
+
+Finding-ID: AUDIT-20260614-76
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/govern/checkpoint-state.ts:1-288`, `src/govern/lane-capabilities.ts:1-152`, `src/govern/fleet-negotiation.ts:1-66`, `src/govern/phase-boundary-sizing.ts:1-97`
+
+This change adds four new core primitives: persisted checkpoint I/O, filesystem path validation, fleet capability loading from YAML, negotiation logic, and boundary sizing. The only test-side additions in the diff are fixture files (`src/__tests__/fixtures/govern/021-audit-protocol/tasks.md`, `src/__tests__/fixtures/govern/021-fleet/fleet-knowledge.yaml`); there are no accompanying `*.test.ts` changes that exercise the contracts being introduced.
+
+The blast radius is medium because these code paths govern persisted state and install-local configuration, where regressions tend to surface only after shipping: corrupt checkpoint handling, duplicate lane detection, missing knowledge files, symlink rejection, and oversize-boundary behavior are all load-bearing behaviors here. A reasonable fix is to add direct unit coverage for each module’s failure modes and fresh-install path, not just fixtures that imply future tests.
+
+## 2026-06-14 — audit-barrage lift (20260614T173617695Z-audit-protocol-friction-burndown-phase-1)
+
+### AUDIT-20260614-77 — Fleet-knowledge lookup ignores the installation’s configured path semantics
+
+Finding-ID: AUDIT-20260614-77 (codex-01 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=high
+Decision:   agreement (gate-counted high)
+Surface:    src/govern/lane-capabilities.ts:47-110, src/config/resolve-paths.ts:16-31
+
+`loadLaneCapabilities` hardcodes `join('.stack-control', 'fleet-knowledge.yaml')` and then falls back to a plugin-shipped template when that exact file is absent (`src/govern/lane-capabilities.ts:47-49,104-110`). That bypasses the installation path contract that already exists in `resolvePaths`, where `fleetKnowledge` is explicitly configurable via `baseDir` / `paths.fleetKnowledge` (`src/config/resolve-paths.ts:16-31`). An installation that relocates working files will therefore have its real fleet-knowledge file ignored.
+
+The downstream blast radius is high because the govern protocol now makes fleet negotiation and boundary checks depend on this data. On a non-default installation, the code will either read stale built-in capacities from the plugin template or throw a lane-mismatch error against the wrong file, even though the operator configured a valid in-repo path. A reasonable fix is to resolve the fleet-knowledge file through the same installation-path resolver the rest of the product uses, and only read the resolved location rather than a separate hardcoded path.
+
+### AUDIT-20260614-78 — Checkpoint reads still follow a symlinked final JSON file
+
+Finding-ID: AUDIT-20260614-78
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/govern/checkpoint-state.ts:67-80, src/govern/checkpoint-state.ts:201-228
+
+`readPhaseCheckpoint` calls `assertCheckpointStoragePath` and then `readFileSync(path, 'utf8')` (`src/govern/checkpoint-state.ts:67-80`). But `assertCheckpointStoragePath` only walks `components.slice(0, -1)`, so it validates existing parent directories and never inspects the final `phase-<id>.json` entry itself (`src/govern/checkpoint-state.ts:207-228`). If that final file is a symlink, `readFileSync` will follow it.
+
+That leaves a gap in the very surface meant to gate phase advancement. A symlinked checkpoint file can source state from outside the installation root, which means prior-phase freshness can be forged from external content or destabilized by unrelated files elsewhere on disk. The blast radius is high because unattended govern runs may accept or reject phase progression based on data the installation does not own. The fix is straightforward: reject a symlink at the final checkpoint path before reading, the same way governed paths already reject symlinks during fingerprinting.
+
+### AUDIT-20260614-79 — Boundary estimates can silently approve an empty phase
+
+Finding-ID: AUDIT-20260614-79
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/phase-boundary-sizing.ts:28-42
+
+`estimateBoundary()` validates `phaseId`, `averageBytesPerPath`, and `activeFleetEnvelopeBytes`, but it does not validate that `paths` is non-empty. An empty `paths` array produces `estimatedPromptBytes = 0` and `fitsActiveFleet = true` at lines 34-40, which can make a phase with no governed surface look like a valid, fleet-sized boundary.
+
+The blast radius is medium because this does not directly corrupt data, but it weakens the phase-control contract: an omitted or failed scope discovery result can be mistaken for a passing prospective boundary check. A reasonable fix is to reject empty `paths` with an explicit error, or add a separate disposition that distinguishes “no governed paths” from “fits active fleet.”
+
+## 2026-06-14 — audit-barrage lift (20260614T174121098Z-audit-protocol-friction-burndown-phase-1)
+
+### AUDIT-20260614-80 — Fresh installs have no runtime `fleet-knowledge.yaml` to satisfy the new lane-capability contract
+
+Finding-ID: AUDIT-20260614-80 (codex-01 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=blocking
+Decision:   agreement (gate-counted high)
+Surface:    `src/govern/lane-capabilities.ts:45-55,95-97` and missing runtime surface `templates/fleet-knowledge.yaml`
+
+`loadLaneCapabilities()` now requires every configured lane to have a `max_prompt_bytes` entry from either a project override or the default template path (`DEFAULT_KNOWLEDGE_PATH` at lines 45-55). But `readFleetKnowledge()` explicitly returns an empty map when that file is absent (lines 95-97), and `requireKnownEnvelope()` then throws for every lane. In this diff, the only new YAML is a test fixture at `src/__tests__/fixtures/govern/021-fleet/fleet-knowledge.yaml`; there is no runtime `templates/fleet-knowledge.yaml` or install scaffolding for `.stack-control/fleet-knowledge.yaml`.
+
+The blast radius is blocking because a fresh install or upgrade that has not manually created this file cannot negotiate any fleet at all: the first capability load fails before governance can proceed. A reasonable fix is to ship the runtime template and/or seed it during setup, so the new contract exists outside test fixtures.
+
+### AUDIT-20260614-81 — Checkpoint writes can leave torn temp files on failure
+
+Finding-ID: AUDIT-20260614-81
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/src/govern/checkpoint-state.ts:58-63
+
+`writePhaseCheckpoint()` writes to a unique temp path and renames it into place, but it has no cleanup path if `writeFileSync()` succeeds and `renameSync()` fails. Failures here are realistic for governed state writes: interrupted runs, permission changes, storage errors, or cross-device/path issues can leave `.json.tmp-<pid>-<uuid>` files beside real checkpoints.
+
+The blast radius is medium because the primary checkpoint file remains protected by atomic rename, but the governance store accumulates ambiguous checkpoint-looking artifacts that neither the reader nor a doctor/cleanup surface accounts for in this diff. A reasonable fix is to wrap the write/rename sequence and unlink the temp file on failure when it exists, while preserving the original error.
+
+### AUDIT-20260614-82 — Governed path hashing reads non-regular filesystem entries as files
+
+Finding-ID: AUDIT-20260614-82
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/src/govern/checkpoint-state.ts:144-158
+
+`digestScopedPath()` rejects symlinks and recurses directories, but every other filesystem type falls through to `readFileSync(abs)`. That includes FIFOs, sockets, devices, and other special entries that can hang, throw surprising errors, or make checkpoint freshness depend on non-content filesystem state.
+
+The blast radius is medium because `computeScopeFingerprint()` is intended to gate phase freshness over governed paths, and a broad scoped directory can encounter special files created by tools or local processes. A reasonable fix is to accept only regular files and directories after the symlink check, and fail loud with the relative path and detected unsupported type for anything else.
+
+## 2026-06-14 — audit-barrage lift (20260614T174317931Z-audit-protocol-friction-burndown-phase-1)
+
+### AUDIT-20260614-83 — Missing installation `fleet-knowledge` silently falls back to the repo template
+
+Finding-ID: AUDIT-20260614-83 (codex-02 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium, codex-gpt5=high
+Decision:   agreement (gate-counted medium)
+Surface:    src/govern/lane-capabilities.ts:52-58,98-103,149-155
+
+`loadLaneCapabilities()` reads per-installation lane limits, but `readFleetKnowledge()` quietly substitutes `templates/fleet-knowledge.yaml` whenever the resolved installation file is absent (`const sourcePath = existsSync(overridePath) ? overridePath : DEFAULT_KNOWLEDGE_PATH`). That means a fresh install, an upgrade that forgot to seed `.stack-control/fleet-knowledge.yaml`, or a broken path resolution will still produce a seemingly valid capability profile using checked-in defaults rather than operator-owned data.
+
+The blast radius is high because the rest of the governance flow treats these byte ceilings as admission control for unattended audit prompts. If the template overstates a lane’s real prompt capacity, the system will accept a fleet that cannot actually carry the rendered prompt; if it understates capacity, it will reject viable lanes. In both cases the operator gets a wrong governance decision rather than an explicit configuration error. A reasonable fix is to make the resolved installation path mandatory once this feature is enabled, with setup/migration code creating the file and runtime throwing an actionable error when it is missing instead of substituting the repo template.
+
+### AUDIT-20260614-84 — Lane probing converts probe-tool failure into fake lane unavailability
+
+Finding-ID: AUDIT-20260614-84
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/lane-capabilities.ts:52-58,160-163
+
+Binary availability is derived from `spawnSync('which', [binary], ...)` and then reduced to `result.status === 0`. If `which` itself is unavailable, not on `PATH`, or `spawnSync` errors for another environment reason, this code returns `false` and marks the lane `unavailable` instead of surfacing that the probe mechanism failed.
+
+The consequence is a false governance outcome that looks like a real fleet-capability signal. An adopter on a stripped-down environment can end up with every lane rejected and a `negotiation-failed` result even though the configured binaries are present and runnable. That is a medium-severity defect because it blocks the feature in some environments and misattributes the failure to model availability. The fix is to treat probe execution failure as an explicit error path, or use a shell-native probe with error handling that distinguishes “binary not found” from “probe infrastructure failed.”
+
+### AUDIT-20260614-85 — New persisted governance artifacts ship without any matching doctor/schema surface
+
+Finding-ID: AUDIT-20260614-85
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    Missing validation/migration surface for `.stack-control/govern/phase-checkpoints/phase-*.json` and `.stack-control/fleet-knowledge.yaml` introduced by `src/govern/checkpoint-state.ts` and `src/govern/lane-capabilities.ts`
+
+This diff introduces two operator-editable/on-disk contracts: JSON phase checkpoint records (`writePhaseCheckpoint()` in `src/govern/checkpoint-state.ts`) and `fleet-knowledge.yaml` (`src/govern/lane-capabilities.ts`, plus `templates/fleet-knowledge.yaml`). I do not see any corresponding doctor rule, schema, or migration/update surface in the diff for either artifact. The only validation happens at point-of-use during runtime reads.
+
+The blast radius is medium because malformed or stale files now fail late, inside governance execution, instead of being caught by the repo’s normal install/doctor discipline. That is especially risky for upgrades: an older installation can carry no `fleet-knowledge.yaml` or a stale lane set until an audit run touches it. A reasonable fix is to add these artifacts to the existing doctor/schema pipeline and setup/migration flow so the repo can detect missing, stale, or malformed state before governance commands depend on it.
+
+### AUDIT-20260614-86 — Empty governed path sets produce a reusable checkpoint fingerprint
+
+Finding-ID: AUDIT-20260614-86
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/checkpoint-state.ts:102-110, src/govern/checkpoint-state.ts:113-119
+
+`computeScopeFingerprint()` accepts an empty `paths` array, and `canonicalizeScopePaths()` also filters empty strings without checking whether anything remains. The result is the SHA-256 digest of no scoped content, which is stable forever. If a phase scope discovery bug, malformed tasks file, or caller mistake passes `[]`, the checkpoint can be marked fresh without any governed file participating in the staleness decision.
+
+The blast radius is high because this is a governance bypass for the feature’s checkpoint contract: downstream code can persist or compare a checkpoint that never changes with implementation edits. A reasonable fix is to reject empty canonical governed path sets before hashing, with an error that identifies the feature/phase caller context where possible.

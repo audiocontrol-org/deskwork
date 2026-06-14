@@ -15,4 +15,5 @@ export const WORKING_FILE_KEYS: readonly ScaffoldedKey[] = [
   'inbox',
   'backlog',
   'auditLog',
+  'fleetKnowledge',
 ];

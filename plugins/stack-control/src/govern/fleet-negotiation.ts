@@ -21,9 +21,11 @@ export function negotiateFleet(
   if (!Number.isInteger(requireModels) || requireModels < 1) {
     throw new Error(`fleet negotiation requireModels must be a positive integer, got '${requireModels}'`);
   }
+  assertUniqueLaneNames(lanes);
   const accepted = lanes
     .filter(
       (lane) =>
+        lane.availability === 'available' &&
         lane.envelope.maxPromptBytes >= requestedPromptBytes &&
         lane.enforcement === 'enforced' &&
         lane.liveness === 'monitored',
@@ -32,6 +34,7 @@ export function negotiateFleet(
   const rejected = lanes
     .filter(
       (lane) =>
+        lane.availability !== 'available' ||
         lane.envelope.maxPromptBytes < requestedPromptBytes ||
         lane.enforcement !== 'enforced' ||
         lane.liveness !== 'monitored',
@@ -44,4 +47,20 @@ export function negotiateFleet(
     rejectedLanes: rejected,
     disposition: accepted.length >= requireModels ? 'accepted' : 'negotiation-failed',
   };
+}
+
+function assertUniqueLaneNames(lanes: readonly LaneCapabilityProfile[]): void {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const lane of lanes) {
+    if (seen.has(lane.name)) {
+      duplicates.add(lane.name);
+    }
+    seen.add(lane.name);
+  }
+  if (duplicates.size > 0) {
+    throw new Error(
+      `fleet negotiation lane names must be unique; duplicates: ${Array.from(duplicates).sort().join(', ')}`,
+    );
+  }
 }

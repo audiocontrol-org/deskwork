@@ -46,6 +46,15 @@ Durable record of audit findings + their dispositions. Status values: \`open\` â
 
 export const DEFAULT_CONFIG_YAML = 'version: 1\n';
 
+export const FLEET_KNOWLEDGE_SKELETON = `lanes:
+  - name: claude
+    max_prompt_bytes: 65536
+  - name: codex
+    max_prompt_bytes: 24576
+  - name: sonnet
+    max_prompt_bytes: 32768
+`;
+
 /** The 008 deterministic `filesystem_only` backlog config (no interactive init). */
 export function backlogConfigYml(): string {
   return [
@@ -100,6 +109,9 @@ export function scaffoldKey(key: ScaffoldedKey, resolved: ResolvedPaths): Scaffo
       break;
     case 'auditLog':
       writeEnsuringDir(location, AUDIT_LOG_SKELETON);
+      break;
+    case 'fleetKnowledge':
+      writeEnsuringDir(location, FLEET_KNOWLEDGE_SKELETON);
       break;
     case 'backlog':
       mkdirSync(location, { recursive: true });
