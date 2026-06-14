@@ -281,17 +281,31 @@ testable.
 
 ## Phase 4: Referee-request manifest schema validation (v1-scaffold)
 
-- [ ] Referee-request manifest **schema**. **Scaffold-required** fields: surface id, route/state,
+- [x] Referee-request manifest **schema**. **Scaffold-required** fields: surface id, route/state,
       viewport(s) desktop≥1280 + phone≤390, wireframe path+hash, spec path+version+hash, impl
       commit, change-intent brief. **Schema validation only** (no execution, no capture). *(The
       engine-adapter interface itself is declared in Phase 1; Phase 4 is the request **manifest**
       schema.)*
-- [ ] **Schema also DEFINES the later referee-control fields** — baseline+candidate paths,
+      **Done — 2026-06-14.** `@/manifests/referee-request` (`refereeRequestManifestSchema` +
+      `parseRefereeRequestManifest`, distinct from `surfaceStatusManifestSchema`): a zod
+      discriminated union on `mode` carrying every scaffold-required field, with the desktop>=1280 +
+      phone<=390 viewport contract enforced as a post-union refinement and collection-relative path
+      guards (reject `~`/absolute/Windows-drive/UNC). Schema-validation only — no execution, no
+      capture. TDD: RED on the missing module first.
+- [x] **Schema also DEFINES the later referee-control fields** — baseline+candidate paths,
       `stableRegions` DOM-locators, governed dynamic regions, capture-config identity, per-viewport
       identity, auth/principal metadata — **mode-aware: validated-when-present (structure-only) but
       OPTIONAL in scaffold mode.** A scaffold manifest that **omits** them is **valid**; only a
       **referee-preview manifest** (visual-review opt-in) **requires** them. This is how Phase 4 ships
       a schema Phase 5 won't break **without** making referee data a scaffold-completion requirement.
+      **Done — 2026-06-14.** `refereeControlSchema` defines baseline/candidate `{path,sha256}`,
+      `stableRegions` (locator + optional captureStep), governed `dynamicRegions` (locator +
+      required justification), `captureConfig` (identityHash + recipe, non-secret), per-viewport
+      identity, and non-secret `principal` metadata — structure-only. It is `.optional()` on the
+      `scaffold` branch (validated-when-present) and required on the `referee-preview` branch. 13
+      tests cover all four acceptance cases: malformed base rejected; supplied-but-malformed referee
+      field rejected; scaffold omitting referee accepted; referee-preview omitting/under-filling
+      referee rejected. Suite 535 -> 548.
 
 **Acceptance:** a malformed manifest is rejected by schema; a manifest that **supplies** a
 referee-control field in malformed shape is rejected; a **scaffold-mode manifest that omits** the
