@@ -2,6 +2,42 @@
 
 ---
 
+## 2026-06-14: audit-protocol-friction phase-1 govern loop advanced, but session discipline regressed
+
+**Goal:** Drive spec `021-audit-protocol-friction-burndown` through foundational implementation, honor the new per-phase audit standard mechanically, and burn down `phase 1` govern findings until the gate opened.
+
+**Accomplished:**
+- Landed the foundational `021` govern substrate in the working tree: explicit phase-checkpoint persistence, lane-capability loading, fleet negotiation, phase-boundary sizing, anchor cleanup, and the first integration wiring through `govern`.
+- Reconfigured the local barrage override to a Codex-only two-lane fleet and added the tracked companion knowledge surface (`.stack-control/fleet-knowledge.yaml`) so the live govern path could run under the operator’s temporary lane policy.
+- Added and greened the new targeted govern suites around checkpoint state, fleet negotiation, lane capability loading, phase-boundary sizing, and phase-checkpoint enforcement; the latest targeted reruns finished green at 29 tests across 4 files plus 5 tests across 3 govern-focused integration files.
+- Burned down a long sequence of real audit findings from repeated live `govern --phase 1` runs: path traversal in checkpoint state, symlink/path canonicalization gaps, non-atomic checkpoint writes, lane-name drift, duplicate fleet entries, missing object-shape checks, invalid quorum/prompt-size inputs, and dot-segment governed paths.
+- Completed the latest authoritative live run at `20260614T093501359Z-audit-protocol-friction-burndown-phase-1`; both Codex lanes completed, and the remaining top blocker narrowed to the derived-envelope contract in `lane-capabilities.ts` / `phase-boundary-sizing.ts`.
+
+**Didn't Work:**
+- I repeatedly broke the protocol’s own execution standard by slipping from “fix findings and re-govern” into explanation mode, and by waiting too softly on a long-running govern process instead of applying a hard watchdog rule early. The operator had to call this out multiple times.
+- The latest `phase 1` govern pass still did not open. `codex-gpt5` surfaced a HIGH finding that the timeout-derived `maxPromptBytes` ceiling is not a real capacity contract on fresh installs, so the phase remains blocked.
+
+**Course Corrections:**
+- [PROCESS] Adopted an explicit watchdog rule for long-running govern/audit commands: poll artifact growth and lane completion state, treat silence as a diagnosable state rather than “still working,” and stop claiming a run is active once the run dir shows both lanes completed.
+- [PROCESS] Stopped treating “tests pass” as a phase boundary. For this feature, the only acceptable stopping point is a completed govern pass or a concrete blocked finding with the next fix already underway.
+- [COMPLEXITY] Reconciled contradictory fleet-knowledge directions exposed by the barrage itself: the code briefly allowed partial fallback, then was restored to fail-closed exact lane matching because the feature’s own no-silent-fallback rule and fresh-install governance contract demand it.
+- [FABRICATION] Corrected my own earlier overstatement about an in-flight govern run; the authoritative source is the run-dir artifact state, not my impression of whether a background process is “probably still running.”
+
+**Insights:**
+- The feature’s hardest problem right now is contract coherence, not plumbing. The remaining blocker is not “more wiring,” it is whether timeout derivation is allowed to masquerade as a hard payload-capacity ceiling.
+- The audit loop is doing useful work: once the obvious correctness bugs were gone, the barrage shifted to semantic contract defects around fleet knowledge, freshness provenance, and numeric boundary honesty.
+- Mechanical anti-halting discipline is itself a product requirement for this program. A protocol that depends on the operator noticing that the executor quietly stopped is not autonomous enough.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 0
+- Files changed under `plugins/stack-control`: 21
+- Live audit runs touched this session (`after_clarify` + `phase-1`): 14
+- Latest targeted test reruns: 34 passing tests across 7 files
+- Open GitHub issue noted during close-out: #470
+- Next step: fix the remaining `phase 1` blockers from `20260614T093501359Z-audit-protocol-friction-burndown-phase-1` — first the false hard-cap derived-envelope contract, then the residual checkpoint/fleet integer hardening findings — and rerun `govern --phase 1` until the gate opens.
+
+---
+
 ## 2026-06-13: backlog triage + audit-protocol-friction spec 021 defined to runnable
 
 **Goal:** Bring the branch-local backlog back into a trustworthy state, absorb the newest audit-protocol friction intake, and move that cluster through the stack-control front door into a runnable Spec Kit spec.
