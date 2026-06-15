@@ -21,6 +21,16 @@ export interface PhaseCheckpointRecord {
   readonly scopeFingerprint: string;
   readonly passedAt: string;
   readonly governedPaths: readonly string[];
+  /**
+   * The files the phase's audit ACTUALLY covered — `git diff --name-only
+   * <phaseBase> -- <governedPaths>` at write time. Distinct from `governedPaths`
+   * (the tasks.md-declared scope, which may name DIRECTORIES): whole-feature
+   * composition carries these EXACT files so a cross-cutting change under a
+   * declared directory is not silently excluded (TASK-129). Optional for
+   * back-compat: a checkpoint written before TASK-129 omits it and is
+   * conservatively re-audited rather than carried.
+   */
+  readonly auditedFiles?: readonly string[];
 }
 
 interface ParsedCheckpointRecord {
@@ -32,6 +42,7 @@ interface ParsedCheckpointRecord {
   readonly scopeFingerprint?: unknown;
   readonly passedAt?: unknown;
   readonly governedPaths?: unknown;
+  readonly auditedFiles?: unknown;
 }
 
 const CHECKPOINTS_REL = join('.stack-control', 'govern', 'phase-checkpoints');
@@ -299,6 +310,16 @@ function validateCheckpointRecord(
   if (!Array.isArray(parsed.governedPaths) || !parsed.governedPaths.every((v) => typeof v === 'string')) {
     throw new Error(`${path}: phase checkpoint governedPaths must be a string array`);
   }
+  // auditedFiles is optional (back-compat — pre-TASK-129 checkpoints omit it), but
+  // when present it must be a well-formed string array; a malformed value fails loud
+  // rather than being silently dropped.
+  let auditedFiles: readonly string[] | undefined;
+  if (parsed.auditedFiles !== undefined) {
+    if (!Array.isArray(parsed.auditedFiles) || !parsed.auditedFiles.every((v) => typeof v === 'string')) {
+      throw new Error(`${path}: phase checkpoint auditedFiles must be a string array when present`);
+    }
+    auditedFiles = parsed.auditedFiles;
+  }
   return {
     version: 1,
     featureSlug: parsed.featureSlug,
@@ -308,5 +329,6 @@ function validateCheckpointRecord(
     scopeFingerprint: parsed.scopeFingerprint,
     passedAt: parsed.passedAt,
     governedPaths: parsed.governedPaths,
+    ...(auditedFiles !== undefined ? { auditedFiles } : {}),
   };
 }

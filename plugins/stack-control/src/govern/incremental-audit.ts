@@ -148,6 +148,42 @@ export function carriedExclusivelyCurrentFiles(
   return Array.from(carried);
 }
 
+/** One phase's composition input as seen from its durable checkpoint. */
+export interface PhaseCompositionInput {
+  readonly state: 'current' | 'missing' | 'stale';
+  /** The tasks.md-declared scope (may name DIRECTORIES). */
+  readonly declaredFiles: readonly string[];
+  /**
+   * The files the phase's audit ACTUALLY covered — recorded at checkpoint time as
+   * `git diff --name-only <phaseBase> -- <declaredScope>`. Absent on checkpoints
+   * written before TASK-129 (then the phase is conservatively re-audited).
+   */
+  readonly auditedFiles?: readonly string[];
+}
+
+/**
+ * The files to CARRY (exclude from the whole-feature re-audit), composed from
+ * durable checkpoints. TASK-129: a `current` phase contributes its ACTUAL audited
+ * files — NEVER its declared directory scope. So a cross-cutting file living under
+ * a current phase's declared directory but owned by no phase's audit is not in any
+ * `auditedFiles` set, is therefore not carried, and is re-audited. A current phase
+ * with no recorded `auditedFiles` (pre-TASK-129 checkpoint) carries nothing — the
+ * safe direction, self-healing on the next govern run. Non-current phases still
+ * contribute their DECLARED scope as a re-audit claim so a carried file overlapping
+ * a stale/missing phase is dropped (the 021 phase-7 shared-ownership protection).
+ */
+export function carriedFilesForComposition(
+  phases: readonly PhaseCompositionInput[],
+): readonly string[] {
+  return carriedExclusivelyCurrentFiles(
+    phases.map((phase) =>
+      phase.state === 'current'
+        ? { current: true, files: phase.auditedFiles ?? [] }
+        : { current: false, files: phase.declaredFiles },
+    ),
+  );
+}
+
 /** Two repo-relative paths overlap iff equal or one is a directory ancestor of
  * the other (POSIX `/` separators; trailing slashes normalized away). */
 function pathsOverlap(a: string, b: string): boolean {

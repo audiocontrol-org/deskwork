@@ -53,13 +53,14 @@ import {
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
 import {
-  carriedExclusivelyCurrentFiles,
+  carriedFilesForComposition,
   parsePhases,
   resolvePhaseUnit,
 } from '../govern/incremental-audit.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import {
   discoverFeatureRoots,
   resolveFeatureRoot,
@@ -384,7 +385,11 @@ function resolveGovernExcludePaths(installation: Installation): readonly string[
 
 interface PhaseCheckpointStatus {
   readonly phaseId: string;
+  /** The tasks.md-declared scope (may name directories) — used for freshness. */
   readonly files: readonly string[];
+  /** The files the recorded checkpoint actually audited (TASK-129); undefined
+   * when no record exists or a pre-TASK-129 checkpoint omitted them. */
+  readonly auditedFiles: readonly string[] | undefined;
   readonly scopeFingerprint: string;
   readonly state: 'current' | 'missing' | 'stale';
 }
@@ -433,11 +438,18 @@ function resolvePhaseCheckpointStatuses(
     const scopeFingerprint = computeScopeFingerprint(installationRoot, governedPaths);
     const record = readPhaseCheckpoint(installationRoot, slug, phase.phaseId);
     if (record === null) {
-      return { phaseId: phase.phaseId, files: governedPaths, scopeFingerprint, state: 'missing' };
+      return {
+        phaseId: phase.phaseId,
+        files: governedPaths,
+        auditedFiles: undefined,
+        scopeFingerprint,
+        state: 'missing',
+      };
     }
     return {
       phaseId: phase.phaseId,
       files: governedPaths,
+      auditedFiles: record.auditedFiles,
       scopeFingerprint,
       state: isCheckpointFresh(record, {
         version: 1,
@@ -449,6 +461,34 @@ function resolvePhaseCheckpointStatuses(
         : 'stale',
     };
   });
+}
+
+/**
+ * The files a phase's audit ACTUALLY covered: `git diff --name-only <base> --
+ * <declaredScope>`. Recorded in the checkpoint so whole-feature composition carries
+ * these exact files instead of the declared (possibly directory) scope — closing
+ * the TASK-129 cross-cutting blind spot. Fails loud on a git error (the audit it
+ * follows already ran git successfully, so a failure here is a real anomaly, not a
+ * fallback case).
+ */
+function resolveAuditedFiles(
+  repoRoot: string,
+  base: string,
+  declaredScope: readonly string[],
+): readonly string[] {
+  const r = spawnSync('git', ['-C', repoRoot, 'diff', '--name-only', base, '--', ...declaredScope], {
+    encoding: 'utf8',
+  });
+  if (r.status !== 0 || typeof r.stdout !== 'string') {
+    throw new GovernProtocolError(
+      `govern: FATAL — could not resolve audited files via 'git diff --name-only ${base}' ` +
+        `(exit ${r.status ?? 'null'}): ${(r.stderr ?? '').toString().trim()}`,
+    );
+  }
+  return r.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 }
 
 function renderCheckpointRequirements(statuses: readonly PhaseCheckpointStatus[]): string {
@@ -692,14 +732,18 @@ export async function runGovern(args: string[]): Promise<void> {
             diffScope: { base: diffBase, files: [] },
             auditLogSection: 'after_implement',
           };
-          // Carry only files owned EXCLUSIVELY by current phases — a file shared
-          // with a missing/stale phase must be re-audited, not hidden (021 phase-7
-          // AUDIT-BARRAGE-codex-01; phase ownership is not disjoint — govern.ts
-          // belongs to several phases).
-          const carriedFiles = carriedExclusivelyCurrentFiles(
+          // Carry only the files current phases ACTUALLY audited (their recorded
+          // auditedFiles), never their declared DIRECTORY scope — so a cross-cutting
+          // change under a current phase's directory is re-audited, not hidden
+          // (TASK-129). A file shared with a missing/stale phase is still dropped
+          // (021 phase-7 AUDIT-BARRAGE-codex-01; phase ownership is not disjoint —
+          // govern.ts belongs to several phases). A current phase with no recorded
+          // auditedFiles (pre-TASK-129 checkpoint) carries nothing — re-audited.
+          const carriedFiles = carriedFilesForComposition(
             phaseCheckpointStatuses.map((status) => ({
-              files: status.files,
-              current: status.state === 'current',
+              state: status.state,
+              declaredFiles: status.files,
+              auditedFiles: status.auditedFiles,
             })),
           );
           compositionExcludePaths = carriedFiles.map((rel) => join(repoRoot, rel));
@@ -844,6 +888,13 @@ export async function runGovern(args: string[]): Promise<void> {
     if (phaseUnit?.granularity === 'phase' && phaseCheckpointStatuses !== undefined) {
       const phaseStatus = phaseCheckpointStatuses.find((status) => status.phaseId === phaseUnit.phaseId);
       if (phaseStatus !== undefined) {
+        // Record the files this phase's audit ACTUALLY covered (TASK-129) so a later
+        // whole-feature compose carries them exactly, never the declared directory.
+        const auditedFiles = resolveAuditedFiles(
+          repoRoot,
+          phaseUnit.diffScope.base,
+          phaseStatus.files,
+        );
         writePhaseCheckpoint(repoRoot, {
           version: 1,
           featureSlug: slug,
@@ -853,6 +904,7 @@ export async function runGovern(args: string[]): Promise<void> {
           scopeFingerprint: phaseStatus.scopeFingerprint,
           passedAt: new Date().toISOString(),
           governedPaths: phaseStatus.files,
+          auditedFiles,
         });
       }
     }

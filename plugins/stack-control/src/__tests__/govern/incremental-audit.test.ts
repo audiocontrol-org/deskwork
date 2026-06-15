@@ -15,6 +15,7 @@ import {
   resolvePhaseUnit,
   parsePhases,
   carriedExclusivelyCurrentFiles,
+  carriedFilesForComposition,
 } from '../../govern/incremental-audit.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -113,5 +114,50 @@ describe('carriedExclusivelyCurrentFiles (US1 composition, 021 phase-7 HIGH)', (
         { current: false, files: ['src/a'] },
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('carriedFilesForComposition (TASK-129 — carry ACTUAL audited files, not declared dirs)', () => {
+  it('carries a current phase\'s ACTUAL audited files, NOT its declared directory', () => {
+    // US4 declares the directory `src/govern/` but actually audited only
+    // `src/govern/protocol.ts` (its diff). A cross-cutting change to
+    // `src/govern/payload.ts` is owned by no phase. Carrying the DECLARED directory
+    // would exclude payload.ts from the whole-feature audit even though nothing
+    // audited it (TASK-129 blind spot). Composing by the AUDITED file list carries
+    // only protocol.ts; payload.ts stays in the diff and is re-audited.
+    expect(
+      carriedFilesForComposition([
+        {
+          state: 'current',
+          declaredFiles: ['src/govern/'],
+          auditedFiles: ['src/govern/protocol.ts'],
+        },
+      ]),
+    ).toEqual(['src/govern/protocol.ts']);
+  });
+
+  it('carries NOTHING for a current phase with no recorded audited files (conservative re-audit / migration)', () => {
+    // An old checkpoint written before TASK-129 has no auditedFiles. We cannot
+    // prove what it audited, so it is re-audited (never carried) — the safe
+    // direction. On the next govern run the checkpoint is rewritten WITH the field.
+    expect(
+      carriedFilesForComposition([{ state: 'current', declaredFiles: ['src/govern/'] }]),
+    ).toEqual([]);
+  });
+
+  it('still refuses to carry a file shared with a non-current phase (021 phase-7 protection preserved)', () => {
+    // Non-current phases contribute their DECLARED scope as a re-audit claim; a
+    // current phase\'s audited file overlapping any non-current declared scope is
+    // dropped so the non-current phase\'s unaudited work is not hidden.
+    expect(
+      carriedFilesForComposition([
+        {
+          state: 'current',
+          declaredFiles: ['src/'],
+          auditedFiles: ['src/shared.ts', 'src/only-current.ts'],
+        },
+        { state: 'stale', declaredFiles: ['src/shared.ts'] },
+      ]),
+    ).toEqual(['src/only-current.ts']);
   });
 });
