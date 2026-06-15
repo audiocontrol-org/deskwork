@@ -1,0 +1,10 @@
+version: 1
+paths:
+  roadmap: ROADMAP.md
+  inbox: DESIGN-INBOX.md
+  backlog: .stack-control/backlog
+  audit_log: .stack-control/audit-log.md
+  feature_audit_log_pattern: specs/{feature}/audit-log.md
+  journal: DEVELOPMENT-NOTES.md
+  tooling_feedback: tooling-feedback.md
+  clone_scope: .

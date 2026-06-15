@@ -1,0 +1,13 @@
+{
+  "agent": "clone-detector-reader",
+  "featureSlug": "design-control",
+  "baselinePath": ".stack-control/scope-discovery/clones.yaml",
+  "filterApplied": "modules-in-scope",
+  "modulesInScope": [
+    "audit",
+    "docs",
+    "specs",
+    "src"
+  ],
+  "clones": []
+}

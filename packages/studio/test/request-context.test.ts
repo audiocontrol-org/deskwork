@@ -92,8 +92,9 @@ describe('request-context — per-request content-index memoization', () => {
       ],
       distributions: [],
     };
-    mkdirSync(join(root, 'docs'), { recursive: true });
-    writeCalendar(join(root, cfg.sites.wc.calendarPath), cal);
+    // Phase 39c: single project calendar at `.deskwork/calendar.md`.
+    mkdirSync(join(root, '.deskwork'), { recursive: true });
+    writeCalendar(join(root, '.deskwork', 'calendar.md'), cal);
   });
 
   afterEach(() => {

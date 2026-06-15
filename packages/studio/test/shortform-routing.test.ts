@@ -44,8 +44,9 @@ function makeConfig(): DeskworkConfig {
 }
 
 function seedCalendar(root: string, rows: string[]): void {
-  const calPath = join(root, 'docs/cal-a.md');
-  mkdirSync(join(root, 'docs'), { recursive: true });
+  // Phase 39c (sites→lanes retirement): single project calendar.
+  const calPath = join(root, '.deskwork', 'calendar.md');
+  mkdirSync(join(root, '.deskwork'), { recursive: true });
   const calendar = [
     '# Editorial Calendar',
     '',
@@ -77,6 +78,32 @@ function seedCalendar(root: string, rows: string[]): void {
     '',
   ].join('\n');
   writeFileSync(calPath, calendar, 'utf-8');
+
+  // Phase 39c-2b(a): shortform/longform resolution reads the entry's
+  // stored artifactPath. Derive a sidecar per Published row (UUID | Slug
+  // | ...) so the resolvers have it — flat `{slug}.md` template.
+  mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
+  for (const row of rows) {
+    const cells = row.split('|').map((c) => c.trim());
+    const [, uuid, slug] = cells;
+    if (uuid === undefined || slug === undefined) continue;
+    writeFileSync(
+      join(root, '.deskwork', 'entries', `${uuid}.json`),
+      JSON.stringify({
+        uuid,
+        slug,
+        title: slug,
+        keywords: [],
+        source: 'manual',
+        currentStage: 'Published',
+        iterationByStage: {},
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        artifactPath: `src/sites/a/content/blog/${slug}.md`,
+      }),
+      'utf-8',
+    );
+  }
 }
 
 async function postJson(

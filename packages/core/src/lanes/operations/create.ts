@@ -17,18 +17,27 @@ import { dirname } from 'node:path';
 import { appendJournalEvent } from '../../journal/append.ts';
 import { loadPipelineTemplate } from '../../pipelines/loader.ts';
 import {
-  assertSafeContentDir,
+  assertSafeScaffoldDir,
   assertSafeLaneId,
   laneConfigPath,
 } from '../loader.ts';
-import { type LaneConfig } from '../types.ts';
+import { type ArtifactKind, type LaneConfig } from '../types.ts';
 import { commitLaneConfig } from './commit.ts';
 
 export interface CreateLaneOptions {
   readonly id: string;
   readonly name: string;
   readonly pipelineTemplate: string;
-  readonly contentDir: string;
+  /**
+   * Optional add-time scaffold directories, keyed by artifact kind. A
+   * lane carries NO location of its own (Phase 39 sites→lanes
+   * retirement); `scaffoldDefaults` only chooses where `/deskwork:add`
+   * drops a NEW file. Partial by construction — a lane defines defaults
+   * only for the kinds its pipeline scaffolds.
+   */
+  readonly scaffoldDefaults?: Partial<Record<ArtifactKind, string>>;
+  /** Optional website host — present only when the lane publishes a site. */
+  readonly host?: string;
 }
 
 export interface CreateLaneResult {
@@ -51,7 +60,11 @@ export async function createLane(
   opts: CreateLaneOptions,
 ): Promise<CreateLaneResult> {
   assertSafeLaneId(projectRoot, opts.id);
-  assertSafeContentDir(projectRoot, opts.contentDir);
+  if (opts.scaffoldDefaults !== undefined) {
+    for (const dir of Object.values(opts.scaffoldDefaults)) {
+      if (dir !== undefined) assertSafeScaffoldDir(projectRoot, dir);
+    }
+  }
   const target = laneConfigPath(projectRoot, opts.id);
   if (existsSync(target)) {
     throw new Error(
@@ -77,7 +90,10 @@ export async function createLane(
     id: opts.id,
     name: opts.name,
     pipelineTemplate: opts.pipelineTemplate,
-    contentDir: opts.contentDir,
+    ...(opts.scaffoldDefaults !== undefined && {
+      scaffoldDefaults: opts.scaffoldDefaults,
+    }),
+    ...(opts.host !== undefined && { host: opts.host }),
   };
 
   mkdirSync(dirname(target), { recursive: true });
@@ -90,7 +106,10 @@ export async function createLane(
     details: {
       name: opts.name,
       pipelineTemplate: opts.pipelineTemplate,
-      contentDir: opts.contentDir,
+      ...(opts.scaffoldDefaults !== undefined && {
+        scaffoldDefaults: opts.scaffoldDefaults,
+      }),
+      ...(opts.host !== undefined && { host: opts.host }),
     },
   });
 

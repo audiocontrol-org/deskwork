@@ -112,7 +112,6 @@ describe('renderCalendar', () => {
             id: 'default',
             name: 'Default',
             pipelineTemplate: 'editorial',
-            contentDir: 'docs',
           }),
         );
 

@@ -1,0 +1,17 @@
+#!/bin/sh
+# check-design-spec <design-language-spec.md> — validate a design-language spec:
+# markdown schema (closed kinds, css links, example-presence, do/don't) + static
+# link-liveness against author-written CSS (no app boot). Exit codes: 0 green,
+# 1 findings/error, 2 usage. Logic lives in src/design-language/check-spec-file.ts
+# (tested); this shim resolves tsx (first-run-installing runtime deps in adopter
+# mode) and dispatches.
+set -eu
+
+SHIM_NAME=check-design-spec
+PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+. "$PLUGIN_ROOT/bin/_resolve-tsx.sh"
+resolve_tsx
+
+# --tsconfig pins the plugin's own tsconfig (and its @/* alias); without it tsx
+# resolves from the caller's cwd and the documented repo-root invocation crashes.
+exec "$TSX" --tsconfig "$PLUGIN_ROOT/tsconfig.json" "$PLUGIN_ROOT/src/design-language/check-design-spec-cli.ts" "$@"

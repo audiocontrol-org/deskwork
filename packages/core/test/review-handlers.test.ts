@@ -13,7 +13,58 @@ import {
   applyLineDiff,
 } from '../src/review/handlers.ts';
 import { createWorkflow } from '../src/review/pipeline.ts';
+import { writeCalendar } from '../src/calendar.ts';
 import type { DeskworkConfig } from '../src/config.ts';
+
+/**
+ * Phase 39c-2b(a): the review handlers resolve the workflow file via the
+ * entry's stored `artifactPath` (no slug-template search). Bind an entry
+ * — calendar row (slug→uuid) + sidecar (uuid → artifactPath) — so the
+ * resolvers have the authoritative path. Returns the entry uuid for
+ * `createWorkflow({ entryId })`. Mirrors the flat `{slug}.md` template
+ * this suite's config declares.
+ */
+let bindCounter = 0;
+function bindEntry(
+  root: string,
+  cfg: DeskworkConfig,
+  slug: string,
+): { entryId: string; artifactPath: string } {
+  const entryId = `00000000-0000-4000-8000-${String(++bindCounter).padStart(12, '0')}`;
+  const artifactPath = `${cfg.sites.a.contentDir}/${slug}.md`;
+  mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
+  writeCalendar(join(root, '.deskwork', 'calendar.md'), {
+    entries: [
+      {
+        id: entryId,
+        slug,
+        title: slug,
+        description: '',
+        stage: 'Drafting',
+        targetKeywords: [],
+        source: 'manual',
+      },
+    ],
+    distributions: [],
+  });
+  writeFileSync(
+    join(root, '.deskwork', 'entries', `${entryId}.json`),
+    JSON.stringify({
+      uuid: entryId,
+      slug,
+      title: slug,
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      artifactPath,
+    }),
+    'utf-8',
+  );
+  return { entryId, artifactPath };
+}
 
 function config(): DeskworkConfig {
   return {
@@ -228,7 +279,11 @@ describe('review handlers', () => {
       expect(body.workflow.id).toBe(second.id);
     });
 
-    it('returns 400 for an unconfigured site', () => {
+    // Phase 39c c3 (Decision #22): `site` is no longer validated against
+    // config.sites — there are no sites to validate against. An unknown
+    // site for which no entry resolves surfaces as the existing 404, NOT a
+    // site-membership 400.
+    it('returns 404 (not 400) for an unrecognized site with no matching entry', () => {
       const r = handleGetWorkflow(root, cfg, {
         id: null,
         site: 'nope',
@@ -237,7 +292,29 @@ describe('review handlers', () => {
         platform: null,
         channel: null,
       });
-      expect(r.status).toBe(400);
+      expect(r.status).toBe(404);
+    });
+
+    // An existing workflow resolves regardless of the `site` label — the
+    // entry-lookup path governs, the site field is opaque metadata.
+    it('resolves a workflow under an opaque (unconfigured) site label', () => {
+      const w = createWorkflow(root, cfg, {
+        site: 'unregistered-label',
+        slug: 'opaque',
+        contentKind: 'longform',
+        initialMarkdown: '# v1',
+      });
+      const r = handleGetWorkflow(root, cfg, {
+        id: null,
+        site: 'unregistered-label',
+        slug: 'opaque',
+        contentKind: 'longform',
+        platform: null,
+        channel: null,
+      });
+      expect(r.status).toBe(200);
+      const body = r.body as { workflow: { id: string } };
+      expect(body.workflow.id).toBe(w.id);
     });
   });
 
@@ -251,10 +328,12 @@ describe('review handlers', () => {
       );
       mkdirSync(dirname(blogFile), { recursive: true });
       writeFileSync(blogFile, '# v1\n', 'utf-8');
+      const { entryId } = bindEntry(root, cfg, slug);
 
       const w = createWorkflow(root, cfg, {
         site: 'a',
         slug,
+        entryId,
         contentKind: 'longform',
         initialMarkdown: '# v1\n',
       });
@@ -276,7 +355,16 @@ describe('review handlers', () => {
     });
 
     it('returns 500 when the blog file is missing for a longform workflow', () => {
-      const w = seedWorkflow(root, cfg, 'no-file');
+      // Entry is bound (sidecar + artifactPath) but the file itself was
+      // never written — resolution succeeds, existence check fails → 500.
+      const { entryId } = bindEntry(root, cfg, 'no-file');
+      const w = createWorkflow(root, cfg, {
+        site: 'a',
+        slug: 'no-file',
+        entryId,
+        contentKind: 'longform',
+        initialMarkdown: '# v1\n',
+      });
       const r = handleCreateVersion(root, cfg, {
         workflowId: w.id,
         beforeVersion: 1,
@@ -290,9 +378,11 @@ describe('review handlers', () => {
       const blogFile = join(root, 'src/sites/a/content/blog', `${slug}.md`);
       mkdirSync(dirname(blogFile), { recursive: true });
       writeFileSync(blogFile, 'x', 'utf-8');
+      const { entryId } = bindEntry(root, cfg, slug);
       const w = createWorkflow(root, cfg, {
         site: 'a',
         slug,
+        entryId,
         contentKind: 'longform',
         initialMarkdown: 'x',
       });
@@ -311,6 +401,7 @@ describe('review handlers', () => {
       const blogFile = join(root, 'src/sites/a/content/blog', `${slug}.md`);
       mkdirSync(dirname(blogFile), { recursive: true });
       writeFileSync(blogFile, '# Draft body', 'utf-8');
+      bindEntry(root, cfg, slug);
 
       const r = handleStartLongform(root, cfg, { site: 'a', slug });
       expect(r.status).toBe(200);
@@ -320,6 +411,9 @@ describe('review handlers', () => {
     });
 
     it('returns 404 when the blog file does not exist', () => {
+      // Entry is bound (sidecar + artifactPath) but the file is absent —
+      // resolution succeeds, the existence check 404s.
+      bindEntry(root, cfg, 'missing');
       const r = handleStartLongform(root, cfg, { site: 'a', slug: 'missing' });
       expect(r.status).toBe(404);
     });
@@ -330,6 +424,124 @@ describe('review handlers', () => {
         slug: '../escape',
       });
       expect(r.status).toBe(400);
+    });
+
+    // Phase 39c c3 (Decision #22): no `site in config.sites` validation.
+    // An unknown site no longer 400s on membership; the entry-lookup path
+    // governs. With no entry/file bound, resolution still surfaces a 404
+    // (file not found) — NOT a site-membership 400.
+    it('does not 400 on site membership for an unconfigured site', () => {
+      const slug = 'unconfigured-start';
+      const blogFile = join(root, 'somewhere', `${slug}.md`);
+      mkdirSync(dirname(blogFile), { recursive: true });
+      writeFileSync(blogFile, '# body', 'utf-8');
+      // Bind the entry under an unregistered site label; artifactPath is
+      // opaque to the (now-removed) site validation.
+      const entryId = `00000000-0000-4000-8000-${String(++bindCounter).padStart(12, '0')}`;
+      mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
+      writeCalendar(join(root, '.deskwork', 'calendar.md'), {
+        entries: [
+          {
+            id: entryId,
+            slug,
+            title: slug,
+            description: '',
+            stage: 'Drafting',
+            targetKeywords: [],
+            source: 'manual',
+          },
+        ],
+        distributions: [],
+      });
+      writeFileSync(
+        join(root, '.deskwork', 'entries', `${entryId}.json`),
+        JSON.stringify({
+          uuid: entryId,
+          slug,
+          title: slug,
+          keywords: [],
+          source: 'manual',
+          currentStage: 'Drafting',
+          iterationByStage: {},
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          artifactPath: `somewhere/${slug}.md`,
+        }),
+        'utf-8',
+      );
+      const r = handleStartLongform(root, cfg, {
+        site: 'totally-unconfigured',
+        slug,
+        entryId,
+      });
+      expect(r.status).toBe(200);
+    });
+  });
+
+  // Phase 39c c3 (Decision #22): a single entry owns BOTH a longform and a
+  // shortform workflow simultaneously. createWorkflow's dedup MUST keep the
+  // kind/channel discriminator — creating the shortform must NOT return the
+  // pre-existing longform (and vice-versa).
+  describe('matchesKey discriminator survives the entryId rekey', () => {
+    it('keeps longform and shortform workflows distinct for the same entryId', () => {
+      const entryId = '00000000-0000-4000-8000-aaaaaaaaaaaa';
+      const longform = createWorkflow(root, cfg, {
+        site: 'a',
+        slug: 'same-entry',
+        entryId,
+        contentKind: 'longform',
+        initialMarkdown: '# long',
+      });
+      const shortform = createWorkflow(root, cfg, {
+        site: 'a',
+        slug: 'same-entry',
+        entryId,
+        contentKind: 'shortform',
+        platform: 'linkedin',
+        initialMarkdown: 'short',
+      });
+      expect(shortform.id).not.toBe(longform.id);
+
+      // Re-issuing each returns its OWN workflow (idempotent per kind),
+      // never the co-resident sibling.
+      const longformAgain = createWorkflow(root, cfg, {
+        site: 'a',
+        slug: 'same-entry',
+        entryId,
+        contentKind: 'longform',
+        initialMarkdown: '# long',
+      });
+      const shortformAgain = createWorkflow(root, cfg, {
+        site: 'a',
+        slug: 'same-entry',
+        entryId,
+        contentKind: 'shortform',
+        platform: 'linkedin',
+        initialMarkdown: 'short',
+      });
+      expect(longformAgain.id).toBe(longform.id);
+      expect(shortformAgain.id).toBe(shortform.id);
+    });
+
+    it('keeps two shortform workflows distinct by platform for the same entryId', () => {
+      const entryId = '00000000-0000-4000-8000-bbbbbbbbbbbb';
+      const linkedin = createWorkflow(root, cfg, {
+        site: 'a',
+        slug: 'same-entry',
+        entryId,
+        contentKind: 'shortform',
+        platform: 'linkedin',
+        initialMarkdown: 'li',
+      });
+      const reddit = createWorkflow(root, cfg, {
+        site: 'a',
+        slug: 'same-entry',
+        entryId,
+        contentKind: 'shortform',
+        platform: 'reddit',
+        initialMarkdown: 'rd',
+      });
+      expect(reddit.id).not.toBe(linkedin.id);
     });
   });
 });

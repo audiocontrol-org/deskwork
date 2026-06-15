@@ -1,0 +1,9 @@
+{
+  "agent": "ui-route-enumerator",
+  "featureSlug": "design-control",
+  "modulesInScope": [
+    "engine-adapter",
+    "lint"
+  ],
+  "routes": []
+}

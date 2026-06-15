@@ -27,11 +27,8 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { readConfig } from '@deskwork/core/config';
-import {
-  resolveSite,
-  resolveEntryFilePath,
-  resolveShortformFilePath,
-} from '@deskwork/core/paths';
+import { resolveSite } from '@deskwork/core/paths';
+import { composeShortformFileForWorkflow } from '../lib/shortform-file.ts';
 import {
   appendAnnotation,
   appendVersion,
@@ -357,42 +354,27 @@ async function runShortformIterate(
     );
   }
 
+  // Phase 39c-2b(a): the shortform file is COMPOSED from the parent
+  // entry's stored artifactPath dir (spec AUDIT-35) — no slug-template
+  // search. (This function only ever runs for kind === 'shortform'.)
+  const platform = flags.platform;
+  if (platform === undefined || !isPlatform(platform)) {
+    fail('--platform is required when --kind=shortform.');
+  }
   let file: string;
-  if (kind === 'shortform' && flags.platform !== undefined && isPlatform(flags.platform)) {
-    const channel = flags.channel;
-    const resolved = resolveShortformFilePath(
+  try {
+    file = await composeShortformFileForWorkflow(
       projectRoot,
-      config,
-      site,
-      workflow.entryId !== undefined && workflow.entryId !== ''
-        ? { id: workflow.entryId, slug }
-        : { slug },
-      flags.platform,
-      channel,
+      workflow,
+      platform,
+      flags.channel,
     );
-    if (resolved === undefined) {
-      fail(
-        `Cannot resolve shortform file for site=${site} slug=${slug} platform=${flags.platform}. ` +
-          `Run /deskwork:shortform-start to scaffold it first.`,
-      );
-    }
-    file = resolved;
-  } else {
-    file = resolveEntryFilePath(
-      projectRoot,
-      config,
-      site,
-      slug,
-      workflow.entryId,
-    );
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
   }
 
   if (!existsSync(file)) {
-    fail(
-      kind === 'shortform'
-        ? `No shortform file at ${file}. Run /deskwork:shortform-start first.`
-        : `No blog file at ${file}.`,
-    );
+    fail(`No shortform file at ${file}. Run /deskwork:shortform-start first.`);
   }
 
   const diskMarkdown = readFileSync(file, 'utf8');

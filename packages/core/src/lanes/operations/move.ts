@@ -1,7 +1,8 @@
 /**
  * lane move — relocate an entry from one lane to another.
  *
- * Phase 6 Task 6.1 (graphical-entries). The move:
+ * Phase 6 Task 6.1 (graphical-entries); reshaped by Phase 39
+ * (sites→lanes retirement). The move:
  *
  *   1. Resolves the entry's current lane via the sidecar's `lane`
  *      field. Migration-window default: an entry without a `lane`
@@ -9,11 +10,10 @@
  *      the doctor's lane-back-fill default). The move is refused
  *      when the source lane and target lane are the same. Per
  *      AUDIT-20260530-58, when the resolved source lane config does
- *      NOT exist on disk the function refuses with an
- *      entry-named error (no `lane` field → instruct operator to
- *      run `/deskwork:doctor`; explicit `lane` field → name the
- *      missing lane id). No silent fallback to the project's
- *      contentDir — the migration gap is surfaced.
+ *      NOT exist on disk the function refuses with an entry-named
+ *      error (no `lane` field → instruct operator to run
+ *      `/deskwork:doctor`; explicit `lane` field → name the missing
+ *      lane id).
  *
  *   2. Resolves the target lane's pipeline template. The target
  *      stage MUST be in the union of `linearStages ∪
@@ -21,47 +21,37 @@
  *      omits `targetStage`, the move defaults to the target
  *      template's FIRST `linearStages` entry.
  *
- *   3. Relocates the artifact file at
- *      `<sourceContentDir>/<artifactPath>` to
- *      `<targetContentDir>/<artifactPath>` (same relative path under
- *      the lane's contentDir). When the source file does not exist,
- *      the move is refused — the operator must repair the binding
- *      before relocating.
- *
- *   4. Relocates the per-entry scrapbook directory at
- *      `<sourceContentDir>/<slug>/scrapbook/` (when present) to the
- *      target lane's parallel location. A missing scrapbook
- *      directory is normal; the move proceeds.
- *
- *   5. Rewrites the sidecar with `lane = target`, `currentStage =
+ *   3. Rewrites the sidecar with `lane = target`, `currentStage =
  *      targetStage`. Per the PRD's open-question default,
  *      `iterationByStage` is preserved verbatim — no stage-name
  *      remapping. Old keys from the prior lane template become dead
  *      entries that cause no harm (iterate uses `?? 0`).
  *
- *   6. Emits a `lane-move` journal event identifying source / target
- *      lanes, source / target stages, and the artifact paths.
+ *   4. Emits a `lane-move` journal event identifying source / target
+ *      lanes, source / target stages, and the (unchanged) artifact
+ *      path for audit.
  *
- * The function uses `renameSync` for the artifact relocation
- * (atomic on the same filesystem); when `renameSync` fails with
- * `EXDEV` (cross-device) the fallback is a copy + delete loop so the
- * move survives a contentDir that points at a separate mount.
+ * **Phase 39: the move is a METADATA change only.** A lane carries no
+ * `contentDir` — location is a property of the ENTRY
+ * (`entry.artifactPath`, resolved against the project root), never the
+ * lane. So moving an entry between lanes does NOT relocate its artifact
+ * file or its per-entry scrapbook; both stay exactly where they are.
+ * The lane "spans" whatever directories its entries happen to live in,
+ * emergent from the entries. This dissolves the former
+ * source/target-`contentDir` relocation (and its cross-device fallback
+ * + rollback): there is nothing on disk to move.
+ *
+ * The source artifact must still EXIST on disk (when the entry carries
+ * an `artifactPath`) — moving an entry whose artifact is missing is
+ * refused so the operator repairs the binding first.
  */
 
-import {
-  copyFileSync,
-  cpSync,
-  existsSync,
-  mkdirSync,
-  renameSync,
-  rmSync,
-  unlinkSync,
-} from 'node:fs';
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { existsSync } from 'node:fs';
 import { appendJournalEvent } from '../../journal/append.ts';
 import { writeSidecar } from '../../sidecar/write.ts';
 import { readSidecar } from '../../sidecar/read.ts';
 import { loadPipelineTemplate } from '../../pipelines/loader.ts';
+import { resolveStoredArtifactPath } from '../../entry/resolve-artifact.ts';
 import { loadLaneConfig } from '../loader.ts';
 
 const DEFAULT_LANE_ID = 'default';
@@ -84,102 +74,14 @@ export interface MoveEntryResult {
   readonly toLane: string;
   readonly fromStage: string;
   readonly toStage: string;
+  /**
+   * Absolute artifact path. Phase 39: the move does NOT relocate the
+   * artifact, so `from` and `to` are identical — both echo the entry's
+   * (unchanged) resolved `artifactPath`. Present only when the entry
+   * carries an `artifactPath`.
+   */
   readonly fromArtifactPath?: string;
   readonly toArtifactPath?: string;
-}
-
-/**
- * Resolve `<contentDir>` to an absolute path. Lane configs may
- * declare `contentDir` as either absolute (taken verbatim) or
- * relative (resolved against the project root).
- */
-function resolveContentDirAbs(projectRoot: string, contentDir: string): string {
-  return isAbsolute(contentDir) ? contentDir : resolve(projectRoot, contentDir);
-}
-
-/**
- * AUDIT-20260530-64 boundary check. Refuses any resolved filesystem
- * path that escapes its containing lane contentDir. Used at four
- * sites in `moveEntryToLane`: source artifact, target artifact,
- * source scrapbook, target scrapbook. Each site joins a contentDir
- * with an entry-controlled relative segment (`sidecar.artifactPath`
- * or `sidecar.slug`) — without this check, a malformed sidecar with
- * `artifactPath: "../outside.md"` or `slug: "../escape"` makes the
- * move read + write files outside the lane content tree.
- *
- * The check uses `path.relative(contentDir, resolvedPath)` and
- * refuses any relative path that starts with `..` (or is itself
- * `..`) or is absolute. This is the canonical Node pattern for
- * "is X inside Y" — works on both POSIX and Windows because the
- * underlying `path.resolve` and `path.relative` are platform-aware.
- */
-function assertPathInsideContentDir(args: {
-  resolvedPath: string;
-  contentDirAbs: string;
-  entrySlug: string;
-  boundary: 'artifactPath' | 'slug-derived scrapbook';
-  side: 'source' | 'target';
-}): void {
-  const { resolvedPath, contentDirAbs, entrySlug, boundary, side } = args;
-  const rel = relative(contentDirAbs, resolvedPath);
-  const escapes = rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel);
-  if (escapes) {
-    throw new Error(
-      `cannot move entry '${entrySlug}': ${side} ${boundary} resolves to `
-      + `'${resolvedPath}', which escapes the ${side} lane contentDir `
-      + `'${contentDirAbs}'. Refusing the move — repair the sidecar `
-      + `(remove '..' segments / absolute paths from the offending field) `
-      + `before retrying.`,
-    );
-  }
-}
-
-/**
- * Type guard for the subset of Node ErrnoException we care about
- * (just the `code` string). Keeps the cross-device fallback path
- * type-safe without an unchecked `as NodeJS.ErrnoException`.
- */
-function isErrnoCode(err: unknown, expected: string): boolean {
-  if (err === null || typeof err !== 'object') return false;
-  const maybe = (err as { code?: unknown }).code;
-  return typeof maybe === 'string' && maybe === expected;
-}
-
-/**
- * Move a path with renameSync, falling back to a caller-supplied
- * cross-device strategy on EXDEV. The fallback is responsible for
- * both creating the destination and removing the source — the
- * helper does not split copy/delete across calls.
- *
- * The parent directory of `dst` is mkdir'd on every call so callers
- * don't have to thread that detail.
- */
-function tryRenameWithFallback(
-  src: string,
-  dst: string,
-  exdevFallback: (src: string, dst: string) => void,
-): void {
-  mkdirSync(dirname(dst), { recursive: true });
-  try {
-    renameSync(src, dst);
-  } catch (err) {
-    if (!isErrnoCode(err, 'EXDEV')) throw err;
-    exdevFallback(src, dst);
-  }
-}
-
-function moveFile(src: string, dst: string): void {
-  tryRenameWithFallback(src, dst, (s, d) => {
-    copyFileSync(s, d);
-    unlinkSync(s);
-  });
-}
-
-function moveDir(src: string, dst: string): void {
-  tryRenameWithFallback(src, dst, (s, d) => {
-    cpSync(s, d, { recursive: true });
-    rmSync(s, { recursive: true, force: true });
-  });
 }
 
 export async function moveEntryToLane(
@@ -209,13 +111,8 @@ export async function moveEntryToLane(
   //     migration-window state); the error names the entry slug
   //     and directs the operator to `/deskwork:doctor` to back-fill
   //     lane assignments before retrying the move.
-  //
-  // Per the project no-fallback rule, the function does NOT silently
-  // substitute the project's contentDir for the missing lane — that
-  // would hide the migration gap and produce wrong-place file moves.
-  let sourceLane;
   try {
-    sourceLane = loadLaneConfig(sourceLaneId, projectRoot);
+    loadLaneConfig(sourceLaneId, projectRoot);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     if (sidecarHadLane) {
@@ -273,115 +170,18 @@ export async function moveEntryToLane(
     );
   }
 
-  const sourceContentDir = resolveContentDirAbs(
-    projectRoot,
-    sourceLane.contentDir,
-  );
-  const targetContentDir = resolveContentDirAbs(
-    projectRoot,
-    targetLane.contentDir,
-  );
-
-  // Relocate the artifact file. When `artifactPath` is set on the
-  // sidecar, the source file is at `<sourceContentDir>/<artifactPath>`;
-  // we move it to `<targetContentDir>/<artifactPath>` (same relative
-  // shape under the new contentDir).
-  //
-  // Per AUDIT-20260530-64, BOTH the source and the target resolved
-  // paths are checked against their respective contentDirs before any
-  // filesystem operation runs. The schema-level refinement on
-  // `artifactPath` blocks the canonical attack shapes upstream, but
-  // the boundary check stays as defense-in-depth — the field could be
-  // populated by a non-deskwork process, or a future code path could
-  // bypass the schema. The check uses `path.resolve` (via
-  // `assertPathInsideContentDir`) so even a normalised-looking
-  // relative path that traverses out is caught.
-  let fromArtifactAbs: string | undefined;
-  let toArtifactAbs: string | undefined;
-  if (sidecar.artifactPath !== undefined) {
-    fromArtifactAbs = resolve(sourceContentDir, sidecar.artifactPath);
-    toArtifactAbs = resolve(targetContentDir, sidecar.artifactPath);
-    assertPathInsideContentDir({
-      resolvedPath: fromArtifactAbs,
-      contentDirAbs: sourceContentDir,
-      entrySlug: sidecar.slug,
-      boundary: 'artifactPath',
-      side: 'source',
-    });
-    assertPathInsideContentDir({
-      resolvedPath: toArtifactAbs,
-      contentDirAbs: targetContentDir,
-      entrySlug: sidecar.slug,
-      boundary: 'artifactPath',
-      side: 'target',
-    });
-    if (!existsSync(fromArtifactAbs)) {
-      throw new Error(
-        `Cannot move entry ${sidecar.slug}: source artifact does not exist at `
-        + `${fromArtifactAbs}. Repair the binding (e.g. via "deskwork doctor") `
-        + `before moving.`,
-      );
-    }
-    if (existsSync(toArtifactAbs)) {
-      throw new Error(
-        `Cannot move entry ${sidecar.slug}: target artifact already exists at `
-        + `${toArtifactAbs}. The target lane already holds a file at the same `
-        + `relative path; resolve the collision (rename / move / remove) before `
-        + `running lane move.`,
-      );
-    }
-  }
-
-  const sourceScrapbookDir = resolve(sourceContentDir, sidecar.slug, 'scrapbook');
-  const targetScrapbookDir = resolve(targetContentDir, sidecar.slug, 'scrapbook');
-  // Per AUDIT-20260530-64, the per-entry scrapbook path is built from
-  // `sidecar.slug` — also entry-controlled. EntrySchema's `slug` is
-  // an unconstrained `z.string().min(1)` for back-compat, so a slug
-  // like `../escape` parses cleanly. Refuse here for the same reason
-  // as the artifact branch above; check both sides.
-  assertPathInsideContentDir({
-    resolvedPath: sourceScrapbookDir,
-    contentDirAbs: sourceContentDir,
-    entrySlug: sidecar.slug,
-    boundary: 'slug-derived scrapbook',
-    side: 'source',
-  });
-  assertPathInsideContentDir({
-    resolvedPath: targetScrapbookDir,
-    contentDirAbs: targetContentDir,
-    entrySlug: sidecar.slug,
-    boundary: 'slug-derived scrapbook',
-    side: 'target',
-  });
-
-  // Track which filesystem operations succeeded so the catch below
-  // can reverse them on a later failure (e.g. writeSidecar throwing
-  // after the artifact + scrapbook are already in the target lane).
-  let artifactMoved = false;
-  let scrapbookMoved = false;
-
-  if (fromArtifactAbs !== undefined && toArtifactAbs !== undefined) {
-    moveFile(fromArtifactAbs, toArtifactAbs);
-    artifactMoved = true;
-  }
-
-  // Relocate the per-entry scrapbook directory when present. Lives at
-  // `<contentDir>/<slug>/scrapbook/` per the slug-template convention
-  // — see packages/core/src/scrapbook/paths.ts (_scrapbookDirSlug).
-  if (existsSync(sourceScrapbookDir)) {
-    if (existsSync(targetScrapbookDir)) {
-      // Rollback the artifact relocation so the operator's state is
-      // consistent before re-running.
-      if (artifactMoved && fromArtifactAbs !== undefined && toArtifactAbs !== undefined) {
-        moveFile(toArtifactAbs, fromArtifactAbs);
-      }
-      throw new Error(
-        `Cannot move entry ${sidecar.slug}: target scrapbook directory already `
-        + `exists at ${targetScrapbookDir}. Resolve the collision before moving.`,
-      );
-    }
-    moveDir(sourceScrapbookDir, targetScrapbookDir);
-    scrapbookMoved = true;
+  // Resolve the entry's artifact from its STORED `artifactPath` only
+  // (Phase 39 — location is an ENTRY property, resolved against the
+  // project root, never a lane dir). The move does NOT relocate the
+  // file; it stays put. We still require the file to EXIST so the
+  // operator repairs a broken binding before moving lanes.
+  const artifactAbs = resolveStoredArtifactPath(sidecar, projectRoot);
+  if (artifactAbs !== null && !existsSync(artifactAbs)) {
+    throw new Error(
+      `Cannot move entry ${sidecar.slug}: source artifact does not exist at `
+      + `${artifactAbs}. Repair the binding (e.g. via "deskwork doctor") `
+      + `before moving.`,
+    );
   }
 
   const at = new Date().toISOString();
@@ -393,42 +193,7 @@ export async function moveEntryToLane(
     updatedAt: at,
   };
 
-  // Wrap the sidecar write in a rollback. If the sidecar write throws
-  // AFTER the artifact + scrapbook have been moved, the entry is
-  // half-moved: filesystem says "target lane" but sidecar still says
-  // "source lane". Reverse the successful filesystem moves before
-  // re-throwing so the operator's state is consistent.
-  try {
-    await writeSidecar(projectRoot, updated);
-  } catch (err) {
-    try {
-      if (scrapbookMoved) {
-        moveDir(targetScrapbookDir, sourceScrapbookDir);
-      }
-      if (
-        artifactMoved
-        && fromArtifactAbs !== undefined
-        && toArtifactAbs !== undefined
-      ) {
-        moveFile(toArtifactAbs, fromArtifactAbs);
-      }
-    } catch (rollbackErr) {
-      const rollbackDetail = rollbackErr instanceof Error
-        ? rollbackErr.message
-        : String(rollbackErr);
-      const writeDetail = err instanceof Error ? err.message : String(err);
-      throw new Error(
-        `Failed to move entry ${sidecar.slug}: sidecar write failed `
-        + `(${writeDetail}) AND rollback of filesystem moves failed `
-        + `(${rollbackDetail}). Operator intervention required.`,
-      );
-    }
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `Failed to move entry ${sidecar.slug}: sidecar write failed `
-      + `(${detail}); filesystem moves rolled back.`,
-    );
-  }
+  await writeSidecar(projectRoot, updated);
 
   const moveDetails: {
     fromLane: string;
@@ -443,8 +208,10 @@ export async function moveEntryToLane(
     fromStage,
     toStage: targetStage,
   };
-  if (fromArtifactAbs !== undefined) moveDetails.fromArtifactPath = fromArtifactAbs;
-  if (toArtifactAbs !== undefined) moveDetails.toArtifactPath = toArtifactAbs;
+  if (artifactAbs !== null) {
+    moveDetails.fromArtifactPath = artifactAbs;
+    moveDetails.toArtifactPath = artifactAbs;
+  }
 
   await appendJournalEvent(projectRoot, {
     kind: 'lane-move',
@@ -459,8 +226,10 @@ export async function moveEntryToLane(
     toLane: opts.toLane,
     fromStage,
     toStage: targetStage,
-    ...(fromArtifactAbs !== undefined && { fromArtifactPath: fromArtifactAbs }),
-    ...(toArtifactAbs !== undefined && { toArtifactPath: toArtifactAbs }),
+    ...(artifactAbs !== null && {
+      fromArtifactPath: artifactAbs,
+      toArtifactPath: artifactAbs,
+    }),
   };
   return result;
 }

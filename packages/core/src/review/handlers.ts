@@ -4,9 +4,9 @@
  * { status, body } results that routes serialize as JSON.
  *
  * Ported from audiocontrol.org's scripts/lib/editorial-review/handlers.ts.
- * Site validation now checks against config.sites rather than a hardcoded
- * SITES array, and the longform blog file path uses resolveBlogFilePath
- * (which honors the site's blogFilenameTemplate config).
+ * Phase 39c-2b(a): the longform + shortform file paths now resolve from
+ * the entry's stored `artifactPath` (via `review/workflow-paths.ts`), not
+ * the slug-template — see that module.
  */
 
 import { existsSync, writeFileSync } from 'node:fs';
@@ -266,10 +266,9 @@ export function handleGetWorkflow(
   if (!query.entryId && (!query.site || !query.slug)) {
     return err(400, 'either id, entryId, or (site & slug) query params are required');
   }
-  if (query.site && !(query.site in config.sites)) {
-    const known = Object.keys(config.sites).join(', ');
-    return err(400, `unknown site: ${query.site}. Configured: ${known}`);
-  }
+  // Phase 39c c3 (spec Decision #22): `site` is an opaque recorded label,
+  // no longer validated against `config.sites`. An unrecognized site for
+  // which no workflow matches falls through to the existing 404 below.
   const contentKind = (query.contentKind ?? 'longform') as
     | 'longform'
     | 'shortform'
@@ -348,13 +347,17 @@ export function handleCreateVersion(
   // shortform) are disk-backed — Phase 21a removed the shortform special
   // case so the studio's save/iterate/approve handlers see one shape.
   //
-  // Resolve via the content index first (so writingcontrol-shaped layouts
-  // where slug != fs path work), with template fallback for legacy
-  // / pre-doctor cases. For shortform, the path goes through
-  // resolveShortformFilePath (entry-dir + scrapbook/shortform/<…>.md).
-  const targetFile = workflowFilePath(projectRoot, config, workflow);
-  if (targetFile === undefined || !existsSync(targetFile)) {
-    const shown = targetFile ?? '(unresolved)';
+  // Phase 39c-2b(a): workflowFilePath resolves via the entry's stored
+  // artifactPath and throws doctor --fix for an unmigrated entry — surface
+  // that as a save error rather than crashing the route handler.
+  let targetFile: string;
+  try {
+    targetFile = workflowFilePath(projectRoot, config, workflow);
+  } catch (e) {
+    return err(500, e instanceof Error ? e.message : String(e));
+  }
+  if (!existsSync(targetFile)) {
+    const shown = targetFile;
     if (workflow.contentKind === 'shortform') {
       return err(
         500,

@@ -23,6 +23,15 @@ plugins/deskwork-studio/.runtime-cache/
 ## should never be committed.
 plugins/*/package-lock.json
 
+## Exception: design-control is an IN-TREE TypeScript plugin whose package.json
+## ships REAL runtime deps (parse5 / tsx / zod), not an empty thin shell. Its
+## committed lockfile is therefore a SOURCE reproducibility artifact, not an
+## ephemeral runtime graph: the bin shim runs `npm ci` against it so every
+## adopter at a given release tag gets a byte-identical runtime (TASK-37 /
+## AUDIT-20260614-44). Track it. (Other in-tree plugins that grow real deps add
+## their own un-ignore line here.)
+!plugins/design-control/package-lock.json
+
 ## scope-discovery install manifest. Per-worktree transactional state
 ## recording which files `install-scope-discovery-hooks` (and the paired
 ## `install-agent-prompts`) wrote into THIS worktree. Contains absolute

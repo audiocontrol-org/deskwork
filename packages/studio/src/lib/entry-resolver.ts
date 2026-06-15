@@ -8,17 +8,18 @@
  * studio renders `index.md` regardless of `currentStage`. Per-stage
  * scrapbook files are frozen snapshots produced by `approveEntryStage`.
  *
- * Resolution order (T1 + non-index.md fallback):
- *   1. If the sidecar carries an `artifactPath`:
- *      a. Prefer `<dirname(artifactPath)>/index.md` IF it exists on disk
- *         (T1's index.md-canonical case).
- *      b. Otherwise fall back to `artifactPath` itself. Supports
- *         shared-directory layouts (multiple entries per directory,
- *         each addressed by its own filename) — e.g. deskwork's own
- *         feature-doc layout where prd.md / workplan.md / README.md
- *         share a directory.
- *   2. No artifactPath: try `<contentDir>/<slug>/index.md` (pre-#140
- *      entries that the doctor migration hasn't processed yet).
+ * Resolution (Phase 39d — sites→lanes retirement; STORED PATH ONLY):
+ *   The sidecar's `artifactPath` is authoritative. There is NO
+ *   `<contentDir>/<slug>/index.md` fallback — per the spec
+ *   §"Resolution" and the project's "no fallbacks — throw" rule, an
+ *   entry without a stored path THROWS a descriptive error pointing the
+ *   operator at `deskwork doctor --fix` (the migration backfiller owns
+ *   stamping it). Given a stored path, the resolver prefers
+ *   `<dirname(artifactPath)>/index.md` when it exists on disk (T1's
+ *   index.md-canonical case) and otherwise reads `artifactPath` itself
+ *   (shared-directory layouts — e.g. deskwork's own feature-doc layout
+ *   where prd.md / workplan.md / README.md share a directory). That is a
+ *   read-side refinement OF a stored path, not a guess for an absent one.
  *
  * Pre-T1 the resolver routed by stage (Ideas → idea.md, Planned →
  * plan.md, Outlining → outline.md, Drafting/Final/Published →
@@ -26,10 +27,9 @@
  */
 
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { dirname } from 'node:path';
 import { readSidecar } from '@deskwork/core/sidecar';
-import { getContentDir } from '@deskwork/core/config';
+import { resolveArtifactPathOrThrow } from '@deskwork/core/entry/resolve-artifact';
 import type { Entry } from '@deskwork/core/schema/entry';
 
 interface ResolveResult {
@@ -49,22 +49,11 @@ interface ResolveResult {
  * them drift.
  */
 export function resolveIndexPath(projectRoot: string, entry: Entry): string {
-  if (entry.artifactPath) {
-    const absArtifact = join(projectRoot, entry.artifactPath);
-    // Strip the scrapbook segment for legacy `<dir>/scrapbook/<file>.md`
-    // shapes; otherwise dirname(absArtifact) IS the doc dir.
-    const dir =
-      basename(dirname(absArtifact)) === 'scrapbook'
-        ? dirname(dirname(absArtifact))
-        : dirname(absArtifact);
-    const indexPath = join(dir, 'index.md');
-    // T1's index.md-canonical preference: only if it actually exists.
-    // Otherwise fall back to artifactPath (shared-directory layouts).
-    if (existsSync(indexPath)) return indexPath;
-    return absArtifact;
-  }
-  const contentDir = getContentDir(projectRoot);
-  return join(contentDir, entry.slug, 'index.md');
+  // Phase 39c-2b(a): the resolve-stored-path + throw-on-absent + index.md
+  // refinement now lives in the shared core helper so the CLI verbs
+  // (publish / iterate longform) resolve identically — see
+  // `@deskwork/core/entry/resolve-artifact#resolveArtifactPathOrThrow`.
+  return resolveArtifactPathOrThrow(entry, projectRoot);
 }
 
 export async function resolveEntry(projectRoot: string, uuid: string): Promise<ResolveResult> {

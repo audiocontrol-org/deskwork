@@ -92,7 +92,6 @@ function writeLane(
         id,
         name: id === 'default' ? 'Default' : id,
         pipelineTemplate,
-        contentDir: 'docs',
       },
       null,
       2,

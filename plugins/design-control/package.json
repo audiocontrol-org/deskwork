@@ -1,0 +1,26 @@
+{
+  "name": "@deskwork/plugin-design-control",
+  "version": "0.45.2",
+  "private": true,
+  "description": "Workspace package for the design-control Claude Code plugin",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsc --noEmit && vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "parse5": "^7.3.0",
+    "tsx": "^4.21.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

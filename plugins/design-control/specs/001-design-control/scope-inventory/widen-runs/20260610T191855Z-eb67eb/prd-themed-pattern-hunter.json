@@ -1,0 +1,1084 @@
+{
+  "agent": "prd-themed-pattern-hunter",
+  "featureSlug": "design-control",
+  "themes": [
+    {
+      "term": "referee",
+      "occurrences": [
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 16,
+          "snippet": "method: 'referee-screenshot',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 20,
+          "snippet": "payload: { kind: 'referee', screenshot: 'sha256:aaa' },"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 26,
+          "snippet": "method: 'referee-screenshot',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 130,
+          "snippet": "it('flags missing rubricItemIds on a referee-screenshot response', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 132,
+          "snippet": "method: 'referee-screenshot',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 144,
+          "snippet": "it('flags rubricItemIds drift on a referee-screenshot response', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 240,
+          "snippet": "expect([...ENGINE_METHODS]).toContain('referee-screenshot');"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 272,
+          "snippet": "method: 'referee-screenshot',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 47,
+          "snippet": "preflightEngine(probe, { adapterId: 'custom-engine', method: 'referee-screenshot' });"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 62,
+          "snippet": "preflightEngine(probe, { adapterId: 'custom-engine', method: 'referee-screenshot' });"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 59,
+          "snippet": "request: EngineAdapterRequestFor<'referee-screenshot'>,"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 60,
+          "snippet": "): Promise<EngineAdapterResponseFor<'referee-screenshot'>> {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 87,
+          "snippet": "// @ts-expect-error — authorWireframe must reject a referee-screenshot request envelope."
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 88,
+          "snippet": "await adapter.authorWireframe({ method: 'referee-screenshot', manifestId: 'm', payload: {} });"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 52,
+          "snippet": "'referee-screenshot',"
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 114,
+          "snippet": "*  - for `referee-screenshot`: rubricItemIds present, non-empty, and echo the"
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 156,
+          "snippet": "if (request.method === 'referee-screenshot') {"
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 160,
+          "snippet": "'rubricItemIds must be present and non-empty on a referee-screenshot response.',"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 6,
+          "snippet": "*    `translate-design-language`, `referee-screenshot`. These require an engine"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 23,
+          "snippet": "* - `referee-screenshot`      — engine referees a rendered screenshot against a"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 33,
+          "snippet": "'referee-screenshot',"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 102,
+          "snippet": "* Rubric-item ids. Required (and load-bearing) for `referee-screenshot`;"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 135,
+          "snippet": "* `referee-screenshot` responses; may be omitted for other methods."
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 175,
+          "snippet": "request: EngineAdapterRequestFor<'referee-screenshot'>,"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 176,
+          "snippet": "): Promise<EngineAdapterResponseFor<'referee-screenshot'>>;"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 19,
+          "snippet": "* polish leak; pinning an EXPECTED theme per surface is a referee-manifest"
+        }
+      ]
+    },
+    {
+      "term": "engine",
+      "occurrences": [
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 11,
+          "snippet": "} from '@/engine-adapter';"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 12,
+          "snippet": "import { ConfidenceSchema } from '@/engine-adapter/conformance';"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 96,
+          "snippet": "failureMode: 'engine-absent',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 212,
+          "snippet": "failureMode: 'engine-absent',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 232,
+          "snippet": "describe('non-execution conformance surface requires no engine probe (AUDIT-02)', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 233,
+          "snippet": "// This test proves TODAY's engine-free property of the seam: the non-execution"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 236,
+          "snippet": "// NO engine and NO probe constructed. preflightEngine is the only entry point"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 239,
+          "snippet": "// method vocabulary is available without any engine"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 242,
+          "snippet": "// confidence validators run with no engine"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 248,
+          "snippet": "// structural parse runs with no engine"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 252,
+          "snippet": "// semantic echo check runs with no engine"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 255,
+          "snippet": "// combined parse-then-echo runs with no engine"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 7,
+          "snippet": "} from '@/engine-adapter';"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 15,
+          "snippet": "it(`throws when the engine is absent on execution method \"${method}\"`, () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 20,
+          "snippet": "it(`does not throw when the engine is present on execution method \"${method}\"`, () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 40,
+          "snippet": "// names the remedy: install/enable the engine OR use the manual authoring path"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 47,
+          "snippet": "preflightEngine(probe, { adapterId: 'custom-engine', method: 'referee-screenshot' });"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 48,
+          "snippet": "expect(isAvailable).toHaveBeenCalledWith('custom-engine');"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 62,
+          "snippet": "preflightEngine(probe, { adapterId: 'custom-engine', method: 'referee-screenshot' });"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 69,
+          "snippet": "expect(message).toContain('custom-engine');"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 3,
+          "snippet": "import { EngineAdapterRequestSchema, EngineAdapterResponseSchema } from '@/engine-adapter';"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 10,
+          "snippet": "} from '@/engine-adapter';"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 8,
+          "snippet": "} from '@/engine-adapter';"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 9,
+          "snippet": "import { EngineAdapterRequestSchema } from '@/engine-adapter';"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 42,
+          "snippet": "it('includes engine-absent as a defined failure mode', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 43,
+          "snippet": "expect(FAILURE_MODES).toContain('engine-absent');"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 70,
+          "snippet": "method: 'not-an-engine-method',"
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 2,
+          "snippet": "* Conformance schemas + the load-bearing echo-validator for engine-adapter"
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 11,
+          "snippet": "*     check that proves the engine acted on the inputs it was handed."
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 21,
+          "snippet": "} from '@/engine-adapter/types';"
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 37,
+          "snippet": "* Structural schema for an engine-adapter request."
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 79,
+          "snippet": "* Structural schema for an engine-adapter response. The response has no"
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 106,
+          "snippet": "* `request`'s identity fields and carries the required engine metadata. Does NOT"
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 214,
+          "snippet": "* Safe entry point for UNTRUSTED engine output. Runs the structural zod schemas"
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 220,
+          "snippet": "* This makes the safe path the easy path: a caller wiring engine output that"
+        },
+        {
+          "file": "src/engine-adapter/index.ts",
+          "line": 2,
+          "snippet": "* Public surface of the design-control engine-adapter library."
+        },
+        {
+          "file": "src/engine-adapter/index.ts",
+          "line": 4,
+          "snippet": "* Import via `@/engine-adapter`. This barrel declares the engine-adapter"
+        },
+        {
+          "file": "src/engine-adapter/index.ts",
+          "line": 24,
+          "snippet": "} from '@/engine-adapter/types';"
+        },
+        {
+          "file": "src/engine-adapter/index.ts",
+          "line": 32,
+          "snippet": "} from '@/engine-adapter/conformance';"
+        },
+        {
+          "file": "src/engine-adapter/index.ts",
+          "line": 38,
+          "snippet": "} from '@/engine-adapter/preflight';"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 2,
+          "snippet": "* Fail-loud engine presence check, scoped to EXECUTION paths."
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 5,
+          "snippet": "*  - EXECUTION paths (engine-driven): `author-wireframe`,"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 6,
+          "snippet": "*    `translate-design-language`, `referee-screenshot`. These require an engine"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 8,
+          "snippet": "*    them and throws loud when the engine is absent."
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 11,
+          "snippet": "*    engine and works with no engine installed."
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 13,
+          "snippet": "* The invariant — \"manual authoring never requires the engine\" — is enforced by"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 22,
+          "snippet": "} from '@/engine-adapter/types';"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 25,
+          "snippet": "* Probe that reports whether a given engine adapter is available. The concrete"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 37,
+          "snippet": "/** The engine method whose execution path is being gated. */"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 46,
+          "snippet": "* MANUAL authoring never calls this function — that path requires no engine."
+        }
+      ]
+    },
+    {
+      "term": "surface",
+      "occurrences": [
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 232,
+          "snippet": "describe('non-execution conformance surface requires no engine probe (AUDIT-02)', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 234,
+          "snippet": "// surface — ENGINE_METHODS, the confidence validators, the request/response zod"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 157,
+          "snippet": "describe('check-mockup-lofi — allowlist surface', () => {"
+        },
+        {
+          "file": "src/engine-adapter/index.ts",
+          "line": 2,
+          "snippet": "* Public surface of the design-control engine-adapter library."
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 28,
+          "snippet": "* loop all derive from one declaration — collapsing the drift surface to one site."
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 16,
+          "snippet": "* vocabulary, the kit's operator-sanctioned lo-fi visual surface (including the"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 19,
+          "snippet": "* polish leak; pinning an EXPECTED theme per surface is a referee-manifest"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 89,
+          "snippet": "* surface for the allowlist→scanning direction (each pair must be value-scanned"
+        },
+        {
+          "file": "src/lint/index.ts",
+          "line": 2,
+          "snippet": "* Public surface of the design-control lint library."
+        },
+        {
+          "file": "src/wireframe-kit/index.ts",
+          "line": 2,
+          "snippet": "* Public surface of the design-control wireframe-kit library."
+        }
+      ]
+    },
+    {
+      "term": "wireframe",
+      "occurrences": [
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 38,
+          "snippet": "const bad = { method: 'author-wireframe', payload: {} };"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 52,
+          "snippet": "const noPayload = { method: 'author-wireframe', manifestId: 'm' };"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 58,
+          "snippet": "const explicitUndefined = { method: 'author-wireframe', manifestId: 'm', payload: undefined };"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 75,
+          "snippet": "method: 'author-wireframe',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 91,
+          "snippet": "method: 'author-wireframe',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 110,
+          "snippet": "const response = { ...baseSuccessResponse(), method: 'author-wireframe' as const };"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 180,
+          "snippet": "method: 'author-wireframe' as const,"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 187,
+          "snippet": "method: 'author-wireframe',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 202,
+          "snippet": "method: 'author-wireframe',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 207,
+          "snippet": "method: 'author-wireframe',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 288,
+          "snippet": "const rawRequest = { method: 'author-wireframe', payload: {} };"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 30,
+          "snippet": "preflightEngine(probe, { method: 'author-wireframe' });"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 39,
+          "snippet": "expect(message).toContain('author-wireframe');"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 54,
+          "snippet": "preflightEngine(probe, { method: 'author-wireframe' });"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 80,
+          "snippet": "preflightEngine(probe, { method: 'author-wireframe' });"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 35,
+          "snippet": "request: EngineAdapterRequestFor<'author-wireframe'>,"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 36,
+          "snippet": "): Promise<EngineAdapterResponseFor<'author-wireframe'>> {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 78,
+          "snippet": "method: 'author-wireframe',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 82,
+          "snippet": "expect(response.method).toBe('author-wireframe');"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 94,
+          "snippet": "// @ts-expect-error — refereeScreenshot must reject an author-wireframe request envelope."
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 95,
+          "snippet": "await adapter.refereeScreenshot({ method: 'author-wireframe', manifestId: 'm', payload: {} });"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 102,
+          "snippet": "await adapter.authorWireframe({ method: 'author-wireframe', manifestId: 'm' });"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 50,
+          "snippet": "'author-wireframe',"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 5,
+          "snippet": "import { SKETCH_KIT_SAMPLE_PATH } from '@/wireframe-kit/sketch-kit';"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 16,
+          "snippet": "it('passes the shipped example wireframe', () => {"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 22,
+          "snippet": "it('passes a minimal hand-authored wireframe (banner + structural tags + sk-img)', () => {"
+        },
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 24,
+          "snippet": "`<div class=\"sk-banner\"><strong>WIREFRAME</strong> structure only</div>` +"
+        },
+        {
+          "file": "src/__tests__/lint/codepoint.test.ts",
+          "line": 5,
+          "snippet": "import { SKETCH_KIT_SAMPLE_PATH } from '@/wireframe-kit/sketch-kit';"
+        },
+        {
+          "file": "src/__tests__/lint/codepoint.test.ts",
+          "line": 102,
+          "snippet": "it('the shipped example wireframe passes the codepoint allowlist', () => {"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 11,
+          "snippet": "import { SKETCH_KIT_CSS_PATH, SKETCH_KIT_DIR, SKETCH_KIT_FONTS } from '@/wireframe-kit/sketch-kit';"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 18,
+          "snippet": "/** Make a temp wireframe dir with a genuine copy of the shipped sketch-kit.css. */"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 58,
+          "snippet": "it('flags a wireframe with no stylesheet link', () => {"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 214,
+          "snippet": "// verifies any font file PRESENT at the wireframe's baseDir against them."
+        },
+        {
+          "file": "src/__tests__/wireframe-kit/sketch-kit.test.ts",
+          "line": 16,
+          "snippet": "} from '@/wireframe-kit/sketch-kit';"
+        },
+        {
+          "file": "src/__tests__/wireframe-kit/sketch-kit.test.ts",
+          "line": 124,
+          "snippet": "describe('self-labeling WIREFRAME banner + crossed image placeholder', () => {"
+        },
+        {
+          "file": "src/__tests__/wireframe-kit/sketch-kit.test.ts",
+          "line": 136,
+          "snippet": "describe('example wireframe demonstrates the kit honestly', () => {"
+        },
+        {
+          "file": "src/__tests__/wireframe-kit/sketch-kit.test.ts",
+          "line": 152,
+          "snippet": "it('self-labels with the WIREFRAME banner text', () => {"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 5,
+          "snippet": "*  - EXECUTION paths (engine-driven): `author-wireframe`,"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 9,
+          "snippet": "*  - MANUAL authoring path (operator-driven): the operator authors a wireframe"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 5,
+          "snippet": "* execution paths (wireframe authoring, design-language translation, screenshot"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 20,
+          "snippet": "* - `author-wireframe`        — engine authors a wireframe from a manifest."
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 31,
+          "snippet": "'author-wireframe',"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 169,
+          "snippet": "request: EngineAdapterRequestFor<'author-wireframe'>,"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 170,
+          "snippet": "): Promise<EngineAdapterResponseFor<'author-wireframe'>>;"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 23,
+          "snippet": "/** The closed set of structural tags a wireframe may use. */"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 36,
+          "snippet": "// wireframe is a `.sk-img` placeholder; inline `code` stays (collapsing)."
+        },
+        {
+          "file": "src/lint/check-mockup-lofi.ts",
+          "line": 2,
+          "snippet": "* `check-mockup-lofi` — the lo-fi wireframe lint, axis 1 (element/attribute"
+        },
+        {
+          "file": "src/lint/check-mockup-lofi.ts",
+          "line": 36,
+          "snippet": "import { SKETCH_KIT_STYLESHEET_FILENAME } from '@/wireframe-kit/sketch-kit';"
+        },
+        {
+          "file": "src/lint/check-mockup-lofi.ts",
+          "line": 199,
+          "snippet": "* Lint a wireframe HTML string against the element/attribute allowlist."
+        },
+        {
+          "file": "src/lint/codepoint.ts",
+          "line": 59,
+          "snippet": "/** True iff `cp` is permitted in wireframe text content. */"
+        }
+      ]
+    },
+    {
+      "term": "scaffold",
+      "occurrences": []
+    },
+    {
+      "term": "design",
+      "occurrences": [
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 30,
+          "snippet": "modelIdentity: 'claude-frontend-design',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 94,
+          "snippet": "modelIdentity: 'claude-frontend-design',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 135,
+          "snippet": "modelIdentity: 'claude-frontend-design',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 210,
+          "snippet": "modelIdentity: 'claude-frontend-design',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 58,
+          "snippet": "it('the remedy names the ACTUAL missing custom adapter and does not misdirect to frontend-design', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 76,
+          "snippet": "it('the default-adapter case still names frontend-design in the remedy', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 47,
+          "snippet": "request: EngineAdapterRequestFor<'translate-design-language'>,"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.binding.test.ts",
+          "line": 48,
+          "snippet": "): Promise<EngineAdapterResponseFor<'translate-design-language'>> {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 12,
+          "snippet": "it('is the frontend-design cross-plugin dependency', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 13,
+          "snippet": "expect(DEFAULT_CLAUDE_ADAPTER_ID).toBe('frontend-design');"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 51,
+          "snippet": "'translate-design-language',"
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 260,
+          "snippet": "'design-control invariant violated: EngineAdapterRequestSchema parsed a request whose payload key is absent. ' +"
+        },
+        {
+          "file": "src/engine-adapter/index.ts",
+          "line": 2,
+          "snippet": "* Public surface of the design-control engine-adapter library."
+        },
+        {
+          "file": "src/engine-adapter/index.ts",
+          "line": 6,
+          "snippet": "* preflight presence check. Concrete `/frontend-design` adapters are supplied by"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 4,
+          "snippet": "* design-control has two classes of authoring path:"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 6,
+          "snippet": "*    `translate-design-language`, `referee-screenshot`. These require an engine"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 7,
+          "snippet": "*    (default `/frontend-design`) to be present. {@link preflightEngine} gates"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 26,
+          "snippet": "* `/frontend-design`-detection probe is injected by the caller; this library"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 2,
+          "snippet": "* Engine-adapter interface declaration for design-control."
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 4,
+          "snippet": "* The engine-adapter is the contract between the design-control plugin's"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 5,
+          "snippet": "* execution paths (wireframe authoring, design-language translation, screenshot"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 6,
+          "snippet": "* refereeing) and a concrete design engine. The default engine is the Claude"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 7,
+          "snippet": "* `/frontend-design` plugin (see {@link DEFAULT_CLAUDE_ADAPTER_ID}). This module"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 17,
+          "snippet": "* The three engine methods design-control invokes. Each corresponds to one"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 21,
+          "snippet": "* - `translate-design-language` — engine translates a design-language spec into"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 32,
+          "snippet": "'translate-design-language',"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 162,
+          "snippet": "* `/frontend-design`) implements these three async methods. Each method's"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 172,
+          "snippet": "request: EngineAdapterRequestFor<'translate-design-language'>,"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 173,
+          "snippet": "): Promise<EngineAdapterResponseFor<'translate-design-language'>>;"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 180,
+          "snippet": "* The default engine adapter id. design-control's default engine is the Claude"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 181,
+          "snippet": "* `/frontend-design` plugin; this constant documents that cross-plugin"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 185,
+          "snippet": "export const DEFAULT_CLAUDE_ADAPTER_ID = 'frontend-design' as const;"
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 4,
+          "snippet": "* Per the converged design (round-7): the lint is an allowlist, NOT a forbid-"
+        },
+        {
+          "file": "src/lint/check-mockup-lofi.ts",
+          "line": 159,
+          "snippet": "// NAMED sketch-kit.css passes here by design and only the pin catches it."
+        },
+        {
+          "file": "src/lint/index.ts",
+          "line": 2,
+          "snippet": "* Public surface of the design-control lint library."
+        },
+        {
+          "file": "src/wireframe-kit/index.ts",
+          "line": 2,
+          "snippet": "* Public surface of the design-control wireframe-kit library."
+        },
+        {
+          "file": "src/wireframe-kit/sketch-kit.ts",
+          "line": 2,
+          "snippet": "* Sketch-kit — the lo-fi wireframe vocabulary for design-control."
+        },
+        {
+          "file": "src/wireframe-kit/sketch-kit.ts",
+          "line": 16,
+          "snippet": "* `plugins/design-control/specs/001-design-control/mockups/sketch-kit/DECISION.md`."
+        }
+      ]
+    },
+    {
+      "term": "spec",
+      "occurrences": [
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 182,
+          "snippet": "// AUDIT-20260606-19 (claude-02): a spec-valid `?options` suffix is stripped by"
+        },
+        {
+          "file": "src/__tests__/lint/stylesheet-pin.test.ts",
+          "line": 184,
+          "snippet": "it('accepts a correct digest carrying a spec-valid ?options suffix', () => {"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 21,
+          "snippet": "* - `translate-design-language` — engine translates a design-language spec into"
+        },
+        {
+          "file": "src/lint/stylesheet-pin.ts",
+          "line": 38,
+          "snippet": "/** SRI hash algorithms, strongest first (the order the SRI spec selects by). */"
+        },
+        {
+          "file": "src/wireframe-kit/sketch-kit.ts",
+          "line": 13,
+          "snippet": "* converged spec's hard invariant — exactly one identity-pinned sketch-kit"
+        }
+      ]
+    },
+    {
+      "term": "gate",
+      "occurrences": [
+        {
+          "file": "src/__tests__/lint/check-mockup-lofi.test.ts",
+          "line": 88,
+          "snippet": "// AUDIT-20260606-02 (codex-01): mixed rel tokens must not slip the gate."
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 45,
+          "snippet": "* - `lint-rejected`    — the engine output was rejected by a lint/validation gate."
+        },
+        {
+          "file": "src/lint/allowlist.ts",
+          "line": 138,
+          "snippet": "* stylesheet link. Shared by axis-1's link-rel gate and the identity-pin's link"
+        }
+      ]
+    },
+    {
+      "term": "never",
+      "occurrences": [
+        {
+          "file": "src/__tests__/lint/allowlist-url-derivation.test.ts",
+          "line": 61,
+          "snippet": "// `button type` is allowlisted plain-kind: its value never reaches the"
+        },
+        {
+          "file": "src/engine-adapter/conformance.ts",
+          "line": 223,
+          "snippet": "* Unlike {@link validateConformance} (which never throws), this function throws if"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 10,
+          "snippet": "*    by hand. This path NEVER calls {@link preflightEngine}, so it requires no"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 13,
+          "snippet": "* The invariant — \"manual authoring never requires the engine\" — is enforced by"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 46,
+          "snippet": "* MANUAL authoring never calls this function — that path requires no engine."
+        }
+      ]
+    },
+    {
+      "term": "viewport",
+      "occurrences": []
+    },
+    {
+      "term": "declared",
+      "occurrences": [
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 57,
+          "snippet": "it('the request zod enum accepts each declared method', () => {"
+        },
+        {
+          "file": "src/__tests__/wireframe-kit/sketch-kit.test.ts",
+          "line": 108,
+          "snippet": "it('every declared font file + its OFL license is present on disk', () => {"
+        }
+      ]
+    },
+    {
+      "term": "frontend-design",
+      "occurrences": [
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 30,
+          "snippet": "modelIdentity: 'claude-frontend-design',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 94,
+          "snippet": "modelIdentity: 'claude-frontend-design',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 135,
+          "snippet": "modelIdentity: 'claude-frontend-design',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/conformance.test.ts",
+          "line": 210,
+          "snippet": "modelIdentity: 'claude-frontend-design',"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 58,
+          "snippet": "it('the remedy names the ACTUAL missing custom adapter and does not misdirect to frontend-design', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/preflight.test.ts",
+          "line": 76,
+          "snippet": "it('the default-adapter case still names frontend-design in the remedy', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 12,
+          "snippet": "it('is the frontend-design cross-plugin dependency', () => {"
+        },
+        {
+          "file": "src/__tests__/engine-adapter/types.test.ts",
+          "line": 13,
+          "snippet": "expect(DEFAULT_CLAUDE_ADAPTER_ID).toBe('frontend-design');"
+        },
+        {
+          "file": "src/engine-adapter/index.ts",
+          "line": 6,
+          "snippet": "* preflight presence check. Concrete `/frontend-design` adapters are supplied by"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 7,
+          "snippet": "*    (default `/frontend-design`) to be present. {@link preflightEngine} gates"
+        },
+        {
+          "file": "src/engine-adapter/preflight.ts",
+          "line": 26,
+          "snippet": "* `/frontend-design`-detection probe is injected by the caller; this library"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 7,
+          "snippet": "* `/frontend-design` plugin (see {@link DEFAULT_CLAUDE_ADAPTER_ID}). This module"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 162,
+          "snippet": "* `/frontend-design`) implements these three async methods. Each method's"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 181,
+          "snippet": "* `/frontend-design` plugin; this constant documents that cross-plugin"
+        },
+        {
+          "file": "src/engine-adapter/types.ts",
+          "line": 185,
+          "snippet": "export const DEFAULT_CLAUDE_ADAPTER_ID = 'frontend-design' as const;"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+kind: code
+feature_slug: design-control
+generated_by: strawman
+generated_at: 2026-06-10T19:18:06.718Z
+scenarios:
+  - id: default
+    label: Default state
+    description: Strawman scenario; operator curates the real scenario matrix.
+reference_docs:
+  - path: docs/1.0/001-IN-PROGRESS/design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md
+    role: prd
+    summary: Feature PRD — synthesis anchor.
+  - path: .stack-control/scope-discovery/LAYOUT.md
+    role: other
+    summary: On-disk layout contract for scope-discovery artifacts.
+discovery_themes:
+  - engine (50 occurrences)
+  - wireframe (50 occurrences)
+  - design (38 occurrences)
+  - referee (26 occurrences)
+  - frontend-design (15 occurrences)
+  - surface (10 occurrences)
+  - never (5 occurrences)
+  - spec (5 occurrences)
+  - gate (3 occurrences)
+  - declared (2 occurrences)
+modules: []
+codebase_state_metrics:
+  generated_at: 2026-06-10T19:18:06.718Z
+  classification_completeness:
+    catalogued_distinct_shapes: 0
+    pending_distinct_shapes: 0
+    uncatalogued_candidates: 0
+    total_distinct_shapes: 0
+    ratio: 1
+  coverage_per_blessed_pattern: []
+  violation_density_per_cursed_pattern: []
+  surface_uniformity: []
+  catalog_stability:
+    git_available: true
+    lookback_commits: 20
+    commits_with_edits: 0
+    total_catalog_edits: 0
+    edits_per_commit_avg: 0
+    trend: stable
+  discovered_candidate_rate:
+    pending_entries_total: 0
+    unattributed_pending: 0
+    by_scan_run: []
+    trend: null
+  disposition_latency:
+    transitioned_count: 0
+    median_latency_ms: null
+    p90_latency_ms: null
+    slowest_five: []
+notes: Strawman synthesized from 4 discovery agent(s) (ast-grep-matrix,
+  clone-detector-reader, prd-themed-pattern-hunter, ui-route-enumerator).
+  Operator curates devices/scenarios/primitives.

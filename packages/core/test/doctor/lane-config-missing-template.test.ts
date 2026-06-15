@@ -125,7 +125,6 @@ describe('doctor: lane-config-missing-template', () => {
       id: 'dangling',
       name: 'Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
 
     const report = await runAudit(
@@ -156,7 +155,6 @@ describe('doctor: lane-config-missing-template', () => {
       id: 'dangling',
       name: 'Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
 
     const ctx = buildCtx(fixture);
@@ -210,7 +208,6 @@ describe('doctor: lane-config-missing-template', () => {
       id: 'dangling',
       name: 'Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
 
     const ctx = buildCtx(fixture);
@@ -260,7 +257,6 @@ describe('doctor: lane-config-missing-template', () => {
       id: 'dangling',
       name: 'Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
     // Malformed override under .deskwork/pipelines/broken.json —
     // `listAvailablePipelineTemplates` will surface its basename, but
@@ -294,7 +290,6 @@ describe('doctor: lane-config-missing-template', () => {
       id: 'dangling',
       name: 'Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
     const boundUuid = '11111111-1111-4111-8111-111111111111';
     const nowIso = new Date().toISOString();
@@ -350,7 +345,6 @@ describe('doctor: lane-config-missing-template', () => {
       id: 'dangling',
       name: 'Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
     const firstUuid = '22222222-2222-4222-8222-222222222222';
     const secondUuid = '33333333-3333-4333-8333-333333333333';

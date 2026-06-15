@@ -9,6 +9,12 @@
  * fields per site, no hidden defaults. `parseConfig` validates an unknown
  * JSON value and returns a typed DeskworkConfig or throws an Error whose
  * message tells the user which field is wrong.
+ *
+ * `sites` is tolerated as absent or empty (AUDIT-20260603-11): the
+ * sites→lanes migration drops the `sites`/`defaultSite` block, and a
+ * migrated project must still load. An absent/empty `sites` normalizes to
+ * `{}` and `defaultSite` to `''`. A PRESENT but mis-shaped `sites`
+ * (non-object/array, or a site missing required fields) is still rejected.
  */
 
 import { readFileSync } from 'node:fs';
@@ -58,10 +64,14 @@ export interface SiteConfig {
    */
   blogOutlineSection?: boolean;
   /**
-   * Path to the site's `_redirects` file (Netlify-style), relative to
-   * the project root. The slug-rename helper appends 301 redirects here
-   * when an existing post is renamed. Optional — when unset, slug-rename
-   * skips the redirect-append step.
+   * LEGACY MIGRATION INPUT ONLY (Phase 39c / spec Decision #23). Path to
+   * the site's `_redirects` file (Netlify-style), relative to the project
+   * root. This field is RETIRED for runtime use: `redirectsPath` re-homed
+   * onto `LaneConfig.redirectsPath`, and `renameSlug` now reads
+   * `loadLaneConfig(sidecar.lane).redirectsPath` — it no longer reads this
+   * `SiteConfig` field. Retained solely so the sites-to-lanes migration can
+   * read the legacy value and carry it onto the lane; removed wholesale
+   * with `SiteConfig` in the terminal-deletion step.
    */
   redirectsPath?: string;
 }
@@ -139,28 +149,31 @@ export function parseConfig(value: unknown): DeskworkConfig {
     );
   }
 
+  // `sites` is tolerated as ABSENT or EMPTY (AUDIT-20260603-11). The
+  // sites→lanes migration (`dropSitesBlock`) rewrites a project's config
+  // with the `sites`/`defaultSite` block removed; a migrated project must
+  // still load through this loader so every config-reading command
+  // (`install`, `studio`, `ingest`, `doctor`) keeps working between 39b
+  // (migration lands) and 39c (schema fully drops `sites`). An absent or
+  // empty `sites` is normalized to `{}`. A PRESENT `sites` that is the
+  // wrong shape (non-object / array) is still rejected — that is a
+  // malformed config, not a post-migration one.
   const sitesValue = obj.sites;
-  if (
-    sitesValue === undefined ||
-    sitesValue === null ||
-    typeof sitesValue !== 'object' ||
-    Array.isArray(sitesValue)
-  ) {
-    throw new Error(
-      `Invalid deskwork config: "sites" must be an object keyed by site slug.`,
-    );
-  }
-
-  const siteSlugs = Object.keys(sitesValue);
-  if (siteSlugs.length === 0) {
-    throw new Error(
-      `Invalid deskwork config: at least one site must be defined under "sites".`,
-    );
-  }
-
   const sites: Record<string, SiteConfig> = {};
-  for (const slug of siteSlugs) {
-    sites[slug] = parseSiteConfig(slug, (sitesValue as Record<string, unknown>)[slug]);
+  const siteSlugs: string[] = [];
+  if (sitesValue !== undefined && sitesValue !== null) {
+    if (typeof sitesValue !== 'object' || Array.isArray(sitesValue)) {
+      throw new Error(
+        `Invalid deskwork config: "sites" must be an object keyed by site slug.`,
+      );
+    }
+    // `Object.entries` over the narrowed record avoids an indexed-access
+    // cast — `slug`/`raw` are typed `string`/`unknown` and `parseSiteConfig`
+    // validates `raw`.
+    for (const [slug, raw] of Object.entries(sitesValue)) {
+      siteSlugs.push(slug);
+      sites[slug] = parseSiteConfig(slug, raw);
+    }
   }
 
   const defaultSite = resolveDefaultSite(obj.defaultSite, siteSlugs);
@@ -309,6 +322,12 @@ function parseSiteConfig(slug: string, value: unknown): SiteConfig {
 
 function resolveDefaultSite(value: unknown, siteSlugs: string[]): string {
   if (value === undefined || value === null) {
+    // No sites configured (absent/empty `sites` — the post-migration
+    // shape per AUDIT-20260603-11) → no default site to resolve. Return
+    // the empty string; callers that need a site (e.g. `getContentDir`,
+    // `selectSites`) operate over `Object.keys(config.sites)` and simply
+    // see an empty list.
+    if (siteSlugs.length === 0) return '';
     if (siteSlugs.length === 1) return siteSlugs[0];
     throw new Error(
       `Invalid deskwork config: "defaultSite" is required when more than one site is defined. ` +
@@ -320,6 +339,14 @@ function resolveDefaultSite(value: unknown, siteSlugs: string[]): string {
       `Invalid deskwork config: "defaultSite" must be a string, got ${describe(value)}.`,
     );
   }
+  // Phase 39c (sites→lanes retirement): an explicit empty-string
+  // `defaultSite` with no configured sites is the round-trippable
+  // post-migration shape. `parseConfig` normalizes an absent/empty
+  // `sites` to `{}` and `defaultSite` to `''`, and re-writes that to
+  // disk (the install path does exactly this). Re-reading it must NOT
+  // throw — `''` with no sites means "no default site to resolve",
+  // identical to the absent case above (AUDIT-20260603-11 tolerance).
+  if (value === '' && siteSlugs.length === 0) return '';
   if (!siteSlugs.includes(value)) {
     throw new Error(
       `Invalid deskwork config: defaultSite "${value}" is not a configured site. ` +

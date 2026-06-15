@@ -29,10 +29,6 @@
       "default": "./dist/index.js"
     },
     "./package.json": "./package.json",
-    "./body-state": {
-      "types": "./dist/body-state.d.ts",
-      "default": "./dist/body-state.js"
-    },
     "./calendar": {
       "types": "./dist/calendar.d.ts",
       "default": "./dist/calendar.js"
@@ -133,6 +129,14 @@
       "types": "./dist/entry/induct.d.ts",
       "default": "./dist/entry/induct.js"
     },
+    "./entry/resolve-artifact": {
+      "types": "./dist/entry/resolve-artifact.d.ts",
+      "default": "./dist/entry/resolve-artifact.js"
+    },
+    "./entry/shortform-path": {
+      "types": "./dist/entry/shortform-path.d.ts",
+      "default": "./dist/entry/shortform-path.js"
+    },
     "./entry/publish": {
       "types": "./dist/entry/publish.d.ts",
       "default": "./dist/entry/publish.js"
@@ -200,10 +204,6 @@
     "./review/types": {
       "types": "./dist/review/types.d.ts",
       "default": "./dist/review/types.js"
-    },
-    "./scaffold": {
-      "types": "./dist/scaffold.d.ts",
-      "default": "./dist/scaffold.js"
     },
     "./schema/entry": {
       "types": "./dist/schema/entry.d.ts",

@@ -175,7 +175,7 @@ describe('deskwork ingest --apply writes deskwork.id frontmatter (Issue #63)', (
       throw new Error('expected fileId to be defined');
     }
     const calendarRaw = readFileSync(
-      join(project, 'docs/calendar.md'),
+      join(project, '.deskwork/calendar.md'),
       'utf-8',
     );
     expect(calendarRaw).toContain(fileId);
@@ -202,7 +202,7 @@ describe('deskwork ingest --apply writes deskwork.id frontmatter (Issue #63)', (
 
     // Calendar row was still added.
     const calendarRaw = readFileSync(
-      join(project, 'docs/calendar.md'),
+      join(project, '.deskwork/calendar.md'),
       'utf-8',
     );
     expect(calendarRaw).toContain('Skip FM');
@@ -244,7 +244,7 @@ describe('deskwork ingest --apply honors existing deskwork.id (Issue #197)', () 
 
     // Calendar carries the SAME UUID, not a freshly-minted one.
     const calendarRaw = readFileSync(
-      join(project, 'docs/calendar.md'),
+      join(project, '.deskwork/calendar.md'),
       'utf-8',
     );
     expect(calendarRaw).toContain(SETUP_UUID);
@@ -324,7 +324,7 @@ describe('deskwork ingest --apply honors existing deskwork.id (Issue #197)', () 
     }
     expect(mintedId).toBeDefined();
     if (mintedId === undefined) throw new Error('expected mintedId');
-    const calendarPath = join(project, 'docs/calendar.md');
+    const calendarPath = join(project, '.deskwork/calendar.md');
     const calendarBefore = readFileSync(calendarPath, 'utf-8');
     const calendarPatched = calendarBefore.split(mintedId).join(SETUP_UUID);
     writeFileSync(calendarPath, calendarPatched, 'utf-8');

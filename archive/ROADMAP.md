@@ -257,6 +257,97 @@ Failure modes to design against:
 
 This section is **the long-term arc**, not committed work. Phase 16 (audit-coverage hole) is the audit-half of *"fully audited"*; that lands first. The autonomous-but-self-interruptible-on-real-ambiguity half is the next frontier, likely a Phase 17/18 after we have feedback from running the autonomous loop end-to-end on a real burndown.
 
+## Design-control — UX/UI surface-change discipline as a plugin (north star)
+
+*Plugin `design-control` (named for the `*control` family — audiocontrol, editorialcontrol,
+stackcontrol); scope finalized at `/dw-lifecycle:define`. Full narrative +
+architectural commitments: [`DESIGN-DISCIPLINE-THESIS.md`](./DESIGN-DISCIPLINE-THESIS.md).
+Provenance audit: [`docs/superpowers/specs/audiocontrol-uxui-discipline-session-audit.md`](./docs/superpowers/specs/audiocontrol-uxui-discipline-session-audit.md).*
+
+A new deskwork plugin that reduces a **hard-won UX/UI discipline** to portable practice.
+The discipline was earned in a sibling project (audiocontrol) at real cost — a multi-day,
+screenshot-by-screenshot redesign loop — and is currently trapped there: scattered across
+one repo's `tools/`, docs, and a half-shipped feature branch. Per deskwork's own principle
+(*the discipline does not exist for an adopter who installs the plugin and follows the
+README*), it has to ship as installable skills + CLI verbs + tooling, not stay maintainer
+lore.
+
+**The discipline in one line:** model UI changes with **lo-fi wireframes** (UX *spirit*),
+keep visual identity in a **settled design language** (the *letter*), and verify the realized
+thing by having **`/frontend-design` referee a screenshot against both** — never with
+roll-your-own pixel tooling.
+
+`design-control` is a **discipline/orchestration plugin, not a tooling plugin.** `/frontend-design`
+is the single proven engine, threaded through all three concerns; design-control owns only the
+thin glue and rolls **no** visual-verification engine. (Two adversarial audit-barrage rounds
+killed an earlier roll-your-own visual-regression design — the determinism subsystem was a
+research project, not a feature. See the thesis Provenance.)
+
+### North-star shape
+
+1. **Lo-fi wireframe kit + inverted-teeth lint** — portable `sketch-kit.css` + `.sk-*`
+   vocabulary, an authoring skill (with `/frontend-design` working out the UX), and a
+   `check-mockup-lofi` *leakage* lint (CLI verb + skill-body enforcement, **never a git hook**).
+2. **Design-language spec convention** — a markdown schema + a skill that uses `/frontend-design`
+   to translate approved wireframe intent into the project's local design language. (Living
+   gallery from real components → phase 2.)
+3. **Review-referee skill** — screenshot the real surface with an *existing* tool (Playwright;
+   deskwork already uses it) at desktop + phone viewports, then `/frontend-design` referees:
+   spirit of the wireframe + letter of the design-language spec. No baseline, no diff engine.
+   If pixel regression is ever needed → an *existing* tool (Playwright `toHaveScreenshot`,
+   Percy, Argos, Chromatic), never hand-rolled.
+
+Governance: design-control ships its own ACCEPTED/REJECTED exploration archive (lo-fi wireframe
+visual); deskwork's `DESIGN-STANDARDS.md` + `docs/studio-design/` adopting it is a named,
+separate migration.
+
+### Why now, and the first dogfood
+
+The sites→lanes clean break forces a redesign of the studio's content-browser and scrapbook
+surfaces. That redesign is the **first dogfood** of the loop. deskwork already carries the
+"look-don't-deduce / prove-don't-assert" leg (`.claude/rules/ui-verification.md`) and the
+design-decision archive; the gaps to build are the **wireframe kit + lint**, the
+**design-language spec convention**, and the **`/frontend-design` referee orchestration**.
+
+### Design-barrage — diverse UX/UI engines (research thread)
+
+`/frontend-design` is the proven default, but it should not be the *only* engine — single-tool
+lock-in is its own risk, and the audit-barrage already taught us that **genetic diversity in
+model families surfaces failure modes a single one misses.** This thread investigates other
+design tools/models that yield good UX/UI results, to use **instead of or in parallel to**
+`/frontend-design` — a **"design-barrage": the audit-barrage pattern applied to UX/UI
+concerns** rather than code defects.
+
+It maps onto design-control's two `/frontend-design`-driven roles:
+
+- **Generation diversity** — fire several engines at the same wireframe-intent + design-language
+  and compare the candidate designs (the panel/judge shape, but for visual design). The operator
+  picks; runners-up can graft good ideas.
+- **Referee diversity** — have multiple model families look at the *same* screenshot and judge
+  it against the spirit (wireframe) + letter (design-language spec). Cross-model agreement on a
+  visual problem is the high-confidence signal — exactly the audit-barrage's HIGH-confidence
+  rule, transposed to pixels.
+
+Architecturally it composes with what already exists: design-control orchestrates engines, so a
+**configurable design-engine battery** (mirroring `audit-barrage-config.yaml`) lets adopters
+add/swap tools without code changes. Candidates to *investigate* (not yet endorsed — evaluate
+before quoting): the audit-barrage CLI families already on hand (`claude`, `codex`, `gemini`)
+in a referee/generation role, other design-generation skills/MCPs, and dedicated UI-generation
+tools. The investigation's deliverable is an evidence-based shortlist (what each is good/bad at
+for UX vs visual-letter vs referee), not a premature commitment. **Out of scope for v1**
+(v1 uses `/frontend-design` only); this is a phase-2 research thread.
+
+### Status
+
+North star, not yet committed work. Kickoff is feature-request [#424](https://github.com/audiocontrol-org/deskwork/issues/424). The design has been
+**converged** through 11 adversarial audit-barrage rounds (two consecutive zero-HIGH) into
+[`docs/superpowers/specs/2026-06-04-design-control-design.md`](./docs/superpowers/specs/2026-06-04-design-control-design.md)
+— `v1-scaffold` (wireframe kit + allowlist lint + design-language spec + archive + status; zero
+referee dependency) ships first; `v1-referee-preview` (advisory `/frontend-design` referee, gated
+on an adversarial falsification set) follows. Next: `/dw-lifecycle:setup` → PRD iteration.
+Composition-first: orchestrates the proven `/frontend-design` engine and reuses the archive +
+enforcement-in-skills patterns; rolls **no** visual-verification engine of its own.
+
 ## Cross-cutting principles
 
 These shape every roadmap item:

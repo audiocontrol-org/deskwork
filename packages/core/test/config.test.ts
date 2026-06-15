@@ -61,14 +61,20 @@ describe('parseConfig', () => {
     );
   });
 
-  it('rejects missing sites', () => {
-    expect(() => parseConfig({ version: 1 })).toThrow(/sites/i);
+  // AUDIT-20260603-11: the sites→lanes migration drops the `sites` block,
+  // so the loader now TOLERATES an absent/empty `sites` (normalizing it to
+  // `{}`) rather than throwing. A migrated project must still load. The
+  // mis-shaped-sites / bad-site rejections are pinned in
+  // `parse-config-tolerant-sites.test.ts`.
+  it('tolerates missing sites (post-migration shape)', () => {
+    const config = parseConfig({ version: 1 });
+    expect(config.sites).toEqual({});
+    expect(config.defaultSite).toBe('');
   });
 
-  it('rejects empty sites map', () => {
-    expect(() => parseConfig({ version: 1, sites: {} })).toThrow(
-      /at least one site/i,
-    );
+  it('tolerates an empty sites map', () => {
+    const config = parseConfig({ version: 1, sites: {} });
+    expect(config.sites).toEqual({});
   });
 
   it('rejects multi-site config without defaultSite', () => {

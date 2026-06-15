@@ -1,0 +1,5976 @@
+# Audit-barrage — multi-model audit prompt template
+
+You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface the kinds of defects listed under **What to look for** below, in the work product captured under **Under audit**.
+
+You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
+
+## Feature under audit
+
+design-control
+
+## Feature scope (workplan / PRD summary)
+
+Governance pass over the just-implemented work for feature 'design-control', diffed against 0391a0c0. The differentiated back half audits a plan it did not author or execute.
+
+## Commit subjects in the audited range
+
+b36b90b7 docs(design-control): disposition AUDIT-20260611-15..21 — all seven Phase 2 barrage findings fixed
+03ae9291 fix(design-control): capability statements replace temporal deferral phrasing in operator-facing surfaces (AUDIT-20260611-21)
+76a06559 fix(design-control): functional pseudo-class args don't satisfy liveness — exclusion is not styling (AUDIT-20260611-18)
+d4c26551 fix(design-control): single-pass defect surfacing — no fix-and-rerun finding waves (AUDIT-20260611-19, AUDIT-20260611-20)
+76e1cefd fix(design-control): normalize liveness query like the prelude — quoted attribute selectors are linkable (AUDIT-20260611-17)
+7a3c37be fix(design-control): normalize curly-apostrophe field keys — don’t (U+2019) is don't (AUDIT-20260611-16)
+9f5d9a46 fix(design-control): heading-level typo guard — near-miss rule headings are findings, never silent drops (AUDIT-20260611-15)
+bc650cad docs(design-control): check off Phase 2 tasks; roadmap phase-2 → in-flight
+4650ee66 feat(design-control): translate-design-language authoring skill (Phase 2)
+5853f83f feat(design-control): static link-liveness + bin/check-design-spec (Phase 2)
+b2659452 feat(design-control): design-language spec schema + example-presence validation (Phase 2)
+
+
+## Recent audit-log excerpt (prior findings on this feature)
+
+Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
+
+
+Blast radius: low — it requires the spec author to link a selector that happens to appear only in a negation/functional-pseudo context, which is an unusual coincidence rather than a default path, and the failure direction is a missed rot signal (false green on one link), not a false refusal or data loss. The module's internal doc comment honestly describes the mechanism, so a maintainer reading the code isn't misled — only the outward-facing promise is slightly stronger than the check. Fix when worth it: exclude the contents of functional pseudo-class parentheses from the matchable prelude text the same way at-rule preludes are excluded (the paren-tracking is a small extension of the existing state machine), or soften the SKILL.md/tasks.md wording to "appears in a selector of."
+
+### AUDIT-20260611-19 — A duplicate rule heading's entire body is silently ignored — including suppression of the unknown-field typo guard inside it
+
+Finding-ID: AUDIT-20260611-19
+Status:     fixed-d4c26551dd91609c011458bf2972642b0747428c
+Severity:   low
+Surface:    plugins/design-control/src/design-language/schema.ts:155-163 (duplicate-rule-id branch leaves `current` undefined), :176-178 (fields skipped when `current === undefined`)
+
+On a `duplicate-rule-id` hit the parser emits the finding but leaves `current` unset, so every field bullet under the duplicate heading is dropped without inspection — verified empirically that a duplicate section containing both a misspelled `- exmaple:` and a second `- css:` link produces only `["duplicate-rule-id"]`: the typo guard and the extra link are invisible. The likely authoring intent behind a duplicate id is a copy-paste meant to *extend or replace* the first rule; the author sees one finding, renames the id, and only then discovers the next wave of findings the section was carrying. Same wave-revelation shape exists at the compose layer (check-spec-file.ts:36-39): liveness runs only over `parsed.spec.rules`, which excludes structurally invalid rules, so a rule with a missing example *and* a dead css link reports the dead link only after the example is fixed.
+
+Blast radius: low — every path still ends at a non-green verdict (the duplicate finding itself gates exit 1), so nothing wrong ships; the cost is extra fix-rerun round-trips and a momentarily misleading "1 finding" count, not a wrong outcome. Fix: parse the duplicate section into a throwaway `RawRuleSection` (so its field-level findings still surface, attributed to the duplicate heading's line) while continuing to exclude it from `spec.rules`; optionally run liveness over structurally invalid sections' parsed `cssLinks` too, since the two axes are independent.
+
+---
+
+**Summary for triage:** 5 findings, 0 blocking, 1 high. The high finding (claude-01) and the first medium (claude-02) share a root shape — the parser's "non-matching line is inert prose" stance has no near-miss detection above the field-key level, so the artifact's own headline guarantee ("never silently kept or dropped", tasks.md) holds only for one of the three structural levels; both were confirmed by executing the shipped module, not by reading alone. Claude-03 is a verified false-positive class in the liveness gate (quoted attribute selectors are unlinkable). All five reproduce with one-line probes against `parseDesignSpec`/`cssDefinesSelector`, so RED-first regression tests are cheap for each.
+
+### AUDIT-20260611-20 — Schema-invalid rules never reach the link-liveness pass
+
+Finding-ID: AUDIT-20260611-20
+Status:     fixed-d4c26551dd91609c011458bf2972642b0747428c
+Severity:   medium
+Surface:    plugins/design-control/src/design-language/check-spec-file.ts:33-35; plugins/design-control/src/design-language/schema.ts:226-228
+
+`checkDesignSpecFile` parses the markdown, then runs liveness only against `parsed.spec` (`check-spec-file.ts:33-35`). But `parseDesignSpec` filters `spec.rules` down to structurally valid rules only (`schema.ts:226-228`). That means a single rule with both a schema defect and a dead CSS selector reports only the schema defect; its `css:` link is silently excluded from the liveness axis until the operator fixes the schema and reruns.
+
+Blast radius is medium: the checker still fails the spec, so it does not ship a green verdict for that broken rule, but it violates the stated combined gate and creates incremental, rerun-dependent discovery. A reasonable fix is to preserve raw rule sections or parsed CSS links for all rule headings, then run liveness for any syntactically usable `css:` field even when the rule also has schema findings.
+
+### AUDIT-20260611-21 — The audited diff introduces explicit deferral language into the skill and checker contract
+
+Finding-ID: AUDIT-20260611-21
+Status:     fixed-03ae92912178077dbf4fccf8783bfca79fe09432
+Severity:   low
+Surface:    plugins/design-control/skills/translate-design-language/SKILL.md:44-48,97-98; plugins/design-control/src/design-language/check-spec-file.ts:68-71; plugins/design-control/specs/001-design-control/tasks.md:176-191
+
+The diff repeatedly encodes “not validated in v1” / “named-deferred” / “out of v1 scope” language in the operator-facing skill, CLI output, and workplan. The audit prompt’s hard constraint rejects deferral phrases because they become bug-factory commitments in unattended workflows; here they are not just comments, they appear in the user-facing validation output (`check-spec-file.ts:68-71`) and in the skill’s instructions about what the operator may present (`SKILL.md:80-82`).
+
+Blast radius is low because the scope boundary is visible and intentional, and the code does not hide skipped links. The operational risk is documentation discipline: agents may normalize presenting partially unchecked specs as “green” because the deferral is built into the happy path. A reasonable fix is to replace temporal deferral phrasing with a stable capability statement, such as “non-CSS targets are reported as unchecked notes and do not establish link-liveness.”
+
+
+## Under audit
+
+The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
+
+diff --git a/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/INDEX.md b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/INDEX.md
+new file mode 100644
+index 00000000..008a672d
+--- /dev/null
++++ b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/INDEX.md
+@@ -0,0 +1,29 @@
++# Audit-barrage run
++
++- timestamp: 20260611T123117674Z
++- feature: design-control-after_clarify
++- run dir: /Users/orion/work/deskwork-work/design-control/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify
++- prompt: PROMPT.md
++- models attempted: 2
++
++## Per-model results
++### claude
++
++- exit code: 0
++- duration: 249598 ms
++- stdout bytes: 11577
++- stderr bytes: 0
++- stdout path: /Users/orion/work/deskwork-work/design-control/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/claude.md
++- stderr path: /Users/orion/work/deskwork-work/design-control/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/stderr/claude.txt
++- timed out: no
++
++### codex
++
++- exit code: 0
++- duration: 74072 ms
++- stdout bytes: 2493
++- stderr bytes: 104191
++- stdout path: /Users/orion/work/deskwork-work/design-control/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/codex.md
++- stderr path: /Users/orion/work/deskwork-work/design-control/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/stderr/codex.txt
++- timed out: no
++
+diff --git a/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/PROMPT.md b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/PROMPT.md
+new file mode 100644
+index 00000000..95b1b2fc
+--- /dev/null
++++ b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/PROMPT.md
+@@ -0,0 +1,1533 @@
++# Audit-barrage — multi-model audit prompt template
++
++You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface the kinds of defects listed under **What to look for** below, in the work product captured under **Under audit**.
++
++You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
++
++## Feature under audit
++
++design-control
++
++## Feature scope (workplan / PRD summary)
++
++Governance pass over the just-implemented work for feature 'design-control', diffed against 0391a0c0. The differentiated back half audits a plan it did not author or execute.
++
++## Commit subjects in the audited range
++
++bc650cad docs(design-control): check off Phase 2 tasks; roadmap phase-2 → in-flight
++4650ee66 feat(design-control): translate-design-language authoring skill (Phase 2)
++5853f83f feat(design-control): static link-liveness + bin/check-design-spec (Phase 2)
++b2659452 feat(design-control): design-language spec schema + example-presence validation (Phase 2)
++
++
++## Recent audit-log excerpt (prior findings on this feature)
++
++Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
++
++
++Blast radius: medium. Requires the remove-and-re-derive recovery path plus a write failure, but the destroyed artifact is exactly the kind of historical baseline the provenance discipline exists to preserve, and the documented recovery procedure is what walks the operator into it. Fix: include `snapshotTarget` in the append-once refusal (refuse if either final target exists), or promote with no-clobber semantics (`linkSync` + `unlink` instead of `renameSync`).
++
++### AUDIT-20260611-12 — The append-once guarantee is check-then-act — concurrent recorders for the same surface can both succeed
++
++Finding-ID: AUDIT-20260611-12
++Status:     fixed-8916f7d7 (2026-06-10; driving sidecar written with flag wx — O_CREAT|O_EXCL atomic check-and-write; derived sidecar promote linkSync no-clobber; EEXIST on every path maps to the shared append-once refusal; 2 RED-first tests via dangling-symlink TOCTOU stand-in)
++Severity:   low
++Surface:    plugins/design-control/src/provenance/derived.ts:128-141 (assertAppendOnce existsSync), :143-146 (writeProvenance with default 'w' flag), :251-252 (clobbering renameSync)
++
++`assertAppendOnce` uses `existsSync`, then `writeProvenance` writes with the default `'w'` flag and `recordDerivation` promotes via clobbering `renameSync`. Two concurrent recorders for the same surface (the stack-control thesis explicitly targets parallel unattended execution) can both pass the existence check and both "succeed," last-writer-wins — including the derived→driving laundering direction that 0e4027c3 was written to kill. The window is small, but the guarantee is the module's headline promise and the atomic primitive is one flag away.
++
++Blast radius: low — requires two processes recording the same surface near-simultaneously, which already implies an orchestration error, and the result is one record silently lost rather than a default-path failure. Fix: `writeFileSync(path, data, { flag: 'wx' })` for the driving sidecar (making check-and-write atomic, with EEXIST mapped to the append-once refusal), and a link-based no-clobber promote on the derived path (which also resolves claude-04).
++
++### AUDIT-20260611-13 — The govern loop's audited diff embeds its own prior run artifacts — payload compounds each round, and the 900s timeout treats the symptom
++
++Finding-ID: AUDIT-20260611-13
++Status:     filed-upstream https://github.com/audiocontrol-org/deskwork/issues/459 (2026-06-10; stackctl-govern defect — the governed diff must exclude .stack-control/audit-runs/ meta-artifacts; the 900s timeout stays as mitigation until the generator is removed upstream)
++Severity:   medium
++Surface:    plugins/design-control/.stack-control/audit-barrage-config.yaml:30-37 (claude 300→900 rationale); the audited diff's inclusion of audit-runs/\*\*/PROMPT.md
++
++This run's payload contains run 062218157Z's PROMPT.md (~3757 lines), which itself embeds run 055621128Z's full PROMPT.md (~859 lines), which embeds the original feature diff — three levels of recursive self-quotation. Because the governed diff is taken against a fixed base (4a7f30d0) and run artifacts are committed inside the audited tree, every governance round appends its own bookkeeping to the next round's prompt. The config comment documents the consequence — a 181KB prompt and a claude timeout at 301s — and responds by raising the timeout to 900s. That is a symptom patch; the generator is the inclusion of `.stack-control/audit-runs/` (meta-artifacts about the audit) in the diff the audit reads. Per the project's own spec-audit-diminishing-returns rule: remove the generator, don't feed it.
++
++Blast radius: medium and monotonically worsening — each round adds its predecessor's full payload, so timeouts and zero-byte model failures (the exact fleet-degradation mode issue 447 documented) recur at the next size doubling regardless of timeout value, and auditor attention is diluted across thousands of lines of self-quotation. Fix: exclude `.stack-control/audit-runs/` (and governance bookkeeping generally) from the governed diff via pathspec, keeping the diff scoped to work product.
++
++### AUDIT-20260611-14 — Seeded config's header narrates a different feature's history ("project override for graphical-entries")
++
++Finding-ID: AUDIT-20260611-14
++Status:     fixed-in-bookkeeping-commit (2026-06-10; header rewritten to name this installation + the seeding event; inherited graphical-entries rationale explicitly attributed; stale dw-lifecycle template path corrected to the stack-control template)
++Severity:   low
++Surface:    plugins/design-control/.stack-control/audit-barrage-config.yaml:1-27
++
++The file seeded into the design-control nested installation opens with "project override for graphical-entries" and carries that feature's gemini-failure statistics (16 of 17 runs across "the graphical-entries Phase 0 audit cycle") and Phase 12 Task 8 history verbatim. Only the final comment block (claude 300→900, specs/014) belongs to this installation. A future reader tuning this config inherits another feature's rationale as if it were locally measured evidence.
++
++Blast radius: low — no behavioral consequence (the `models:` block is correct), purely misleading provenance in comments, but this plugin's whole subject matter is records that accurately bind to what they describe. Fix: reword the header to name this installation, keep the gemini-disable rationale but attribute it ("per the root override, originally measured on graphical-entries"), and drop the Phase-12 block or cite it as inherited.
++
++---
++
++**Summary for triage:** 7 findings, 0 high/blocking. The strongest cross-cutting signals: (1) the governance tooling itself dropped a run record cited by a commit and rendered untracked files with absolute paths into this very audit's payload (claude-01); (2) two real, verified code defects from the floor-refused run are sitting untriaged (claude-02, independently confirmed as claude-03/-04); (3) the recursive prompt-growth generator behind the timeout bump will defeat the 900s ceiling too (claude-06). Claude-03 and -04 corroborate codex's findings from run 062218157Z — that's cross-model agreement, the protocol's HIGH-confidence signal, despite my medium per-finding blast-radius ratings.
++
++
++## Under audit
++
++The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
++
++diff --git a/plugins/design-control/ROADMAP.md b/plugins/design-control/ROADMAP.md
++index d373af1e..d5f3ac03 100644
++--- a/plugins/design-control/ROADMAP.md
+++++ b/plugins/design-control/ROADMAP.md
++@@ -13,7 +13,7 @@ graph with `stackctl roadmap` — do not hand-edit.
++ - spec: specs/001-design-control
++ 
++ ## impl:feature/phase-2-design-language-spec
++-- status: planned
+++- status: in-flight
++ - spec: specs/001-design-control
++ 
++ ## impl:feature/phase-3-archive-status
++diff --git a/plugins/design-control/bin/check-design-spec b/plugins/design-control/bin/check-design-spec
++new file mode 100755
++index 00000000..40515040
++--- /dev/null
+++++ b/plugins/design-control/bin/check-design-spec
++@@ -0,0 +1,26 @@
+++#!/bin/sh
+++# check-design-spec <design-language-spec.md> — validate a design-language spec:
+++# markdown schema (closed kinds, css links, example-presence, do/don't) + static
+++# link-liveness against author-written CSS (no app boot). Exit codes: 0 green,
+++# 1 findings/error, 2 usage. Logic lives in src/design-language/check-spec-file.ts
+++# (tested); this shim only locates the workspace tsx runner and dispatches.
+++set -eu
+++
+++PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+++
+++dir="$PLUGIN_ROOT"
+++TSX=""
+++while [ "$dir" != "/" ]; do
+++  if [ -x "$dir/node_modules/.bin/tsx" ]; then
+++    TSX="$dir/node_modules/.bin/tsx"
+++    break
+++  fi
+++  dir=$(dirname -- "$dir")
+++done
+++
+++if [ -z "$TSX" ]; then
+++  echo "check-design-spec: tsx runner not found in any node_modules/.bin above $PLUGIN_ROOT — run npm install first" >&2
+++  exit 1
+++fi
+++
+++exec "$TSX" "$PLUGIN_ROOT/src/design-language/check-design-spec-cli.ts" "$@"
++diff --git a/plugins/design-control/skills/translate-design-language/SKILL.md b/plugins/design-control/skills/translate-design-language/SKILL.md
++new file mode 100644
++index 00000000..fbf3294b
++--- /dev/null
+++++ b/plugins/design-control/skills/translate-design-language/SKILL.md
++@@ -0,0 +1,100 @@
+++---
+++name: translate-design-language
+++description: Draft or maintain the project's design-language spec — the hand-authorable markdown artifact that anchors visual identity (palette/type/spacing tokens + signature components, each rule linked to live CSS + ≥1 example). Hand-authoring is the default and needs NO engine; the optional /frontend-design accelerator drafts from approved wireframe intent and is judged by the same check-design-spec gate.
+++---
+++
+++# /design-control:translate-design-language
+++
+++Author or update the **design-language spec** for this project. The spec is the
+++visual-*letter* artifact of the design-control discipline: the durable home for
+++visual identity (the lo-fi wireframe carries UX *spirit* and is structurally
+++incapable of carrying visual detail). Every rule binds to reality — a live CSS
+++file + selector, ≥1 current example — so the spec cannot quietly drift into
+++fiction the way a mockup's incidental polish does.
+++
+++> Per the plugin thesis (`DESIGN-DISCIPLINE-THESIS.md`): policy is enforced by
+++> a process, not a rule. "Each rule links to live CSS" is not a convention the
+++> author is trusted to follow — it is mechanically enforced by the
+++> `check-design-spec` gate (schema + static link-liveness), which every draft
+++> MUST pass before it may be presented.
+++
+++## Spec convention (hand-authorable markdown)
+++
+++One markdown file (conventionally `design-language.md` in the operator's chosen
+++design docs directory). Rules are declared under ATX headings, fields are
+++bullets with a closed key set:
+++
+++```markdown
+++# Design language: <project>
+++
+++## Palette
+++
+++### rule: ink-primary
+++- kind: palette
+++- css: styles/studio.css .btn-primary
+++- example: dashboard compose button uses .btn-primary
+++- do: Use the ink palette for every primary action.
+++- don't: Never introduce raw hex blues outside the palette tokens.
+++```
+++
+++- `kind:` — one of `palette` / `type` / `spacing` / `component` (the closed
+++  vocabulary; `component` is the signature-component class).
+++- `css: <path> <selector>` — ≥1 per rule; the path is relative to the spec
+++  file; the selector must be **defined in that author-written CSS source**
+++  (checked statically — no app boot). Non-CSS targets (CSS-in-JS, utility
+++  frameworks, CSS-Modules) are reported as not-validated-in-v1 notes.
+++- `example:` — ≥1 per rule (a rule with zero examples is rejected). Presence
+++  is structural; whether the example still matches live UI is
+++  `spec-truthfulness`, deliberately out of v1 scope.
+++- `do:` / `don't:` — ≥1 guidance line per rule.
+++
+++## Procedure
+++
+++1. **Locate or create the spec file.** One spec per design language; do not
+++   fork per-surface copies. If the operator has no spec yet, scaffold the
+++   heading + one rule per obvious anchor (masthead, primary action, body type)
+++   directly from the live CSS — with the operator naming the files that count
+++   as design-language source.
+++
+++2. **Author or update rules — manual path (default, requires NO engine).** The
+++   operator (or the agent under operator direction) writes the rules by hand:
+++   pick the selector in live CSS the rule is anchored to, cite ≥1 current
+++   example, state the do/don't. Scaffold completion never depends on engine
+++   presence — this path never calls the engine preflight.
+++
+++3. **Optional engine accelerator.** Only if the operator asks for it: gate on
+++   `preflightEngine` (`@/engine-adapter`, method `translate-design-language`)
+++   — absence fails loud naming the remedy — then request a draft from the
+++   engine (input: the approved wireframe intent + the live CSS files the
+++   operator names). **Engine output gets zero trust:** it lands in the same
+++   file and is judged by the same gate as a hand-authored draft. Engine
+++   conformance (`@/engine-adapter/conformance`) is exercised only when the
+++   engine is present — never stub it to simulate presence.
+++
+++4. **Validation gate — the non-negotiable step.** Run:
+++
+++   ```bash
+++   plugins/design-control/bin/check-design-spec <path/to/design-language.md>
+++   ```
+++
+++   - Exit `0` (spec green, zero findings) → the draft may be presented.
+++     Read any `not validated in v1` notes aloud to the operator — a skipped
+++     link is visible scope, not silent coverage.
+++   - Exit `1` → fix every finding and re-run. A dead selector means either the
+++     rule rots (fix the link) or the CSS moved (update the rule) — NEVER
+++     delete the rule just to silence the finding; that decision is the
+++     operator's.
+++
+++5. **Present and stop.** Show the operator the green spec (path + `0 findings`
+++   output + rule count). The operator owns acceptance; implementation against
+++   the spec and refereeing are separate steps of the loop, not this skill's
+++   job.
+++
+++## What this skill does NOT do
+++
+++- It does not author wireframes (`/design-control:wireframe`), implement, or
+++  referee.
+++- It does not boot the app, capture screenshots, or verify that examples still
+++  match live UI (`spec-truthfulness` is named-deferred).
+++- It does not skip the gate for engine-authored drafts — same gate, same
+++  checker, zero findings.
++diff --git a/plugins/design-control/specs/001-design-control/tasks.md b/plugins/design-control/specs/001-design-control/tasks.md
++index a65fd485..aae9bbd4 100644
++--- a/plugins/design-control/specs/001-design-control/tasks.md
+++++ b/plugins/design-control/specs/001-design-control/tasks.md
++@@ -165,19 +165,40 @@ same lint; a `derived` artifact cannot be accepted without a recorded operator e
++ 
++ ## Phase 2 — Design-language spec convention (v1-scaffold)
++ 
++-- [ ] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
+++- [x] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
++       do/don't), each rule linked to a live CSS file/class + ≥1 current example. The spec is a
++       **hand-authorable markdown artifact** — **scaffold completion does NOT require the engine.**
++-- [ ] **Static** link-liveness check (selector/class must be *defined in author-written source*;
+++      **Done — `b2659452`** (`@/design-language/{types,schema}`: rules under `rule: <id>` ATX
+++      headings; closed RULE_KINDS palette/type/spacing/component; closed field-bullet set
+++      kind/css/example/do/don't with an `unknown-field` typo guard; `css: <path> <selector>`
+++      links; invalid rules become findings, never silently kept or dropped. TDD: RED on the
+++      unresolvable module first; 17 new tests).
+++- [x] **Static** link-liveness check (selector/class must be *defined in author-written source*;
++       **no app boot**). Scoped to author-written CSS selectors/classes; utility-framework / CSS-in-JS
++       / hashed CSS-Modules resolution is **not validated in v1** (named-deferred). Runtime dead-CSS +
++       spec-truthfulness are named-deferred.
++-- [ ] **Example-presence validation:** the schema rejects a rule with **zero example references**
+++      **Done — `5853f83f`** (`@/design-language/link-liveness`: pure file reads, selector must
+++      appear ident-boundary exact in a selector prelude — comments/string-contents stripped,
+++      at-rule preludes excluded but descended into, so `@media` rules count and
+++      `content: ".ghost"` / commented-out rules don't; `.btn-primary` never satisfies `.btn`.
+++      Non-.css targets recorded as `skipped` + printed as notes — the named-deferred boundary is
+++      visible, never a silent drop or a fabricated dead-link. Plus
+++      `@/design-language/check-spec-file` + `bin/check-design-spec` (exit 0/1/2, mirrors
+++      check-wireframe; shim smoke-verified both directions). TDD: RED first; 20 new tests; suite
+++      397 → 417.)
+++- [x] **Example-presence validation:** the schema rejects a rule with **zero example references**
++       (each rule carries ≥1 example). Structural-presence only — verifying the example still matches
++       live UI is `spec-truthfulness` (named-deferred).
++-- [ ] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
+++      **Done — `b2659452`** (`missing-example` finding; an empty `example:` value does NOT
+++      satisfy presence — it surfaces as `empty-field` + `missing-example`, both tested).
+++- [x] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
++       drafts/maintains the spec from approved wireframe intent; its engine conformance is exercised
++       **only when `/frontend-design` is present.**
+++      **Done — `4650ee66`** (`skills/translate-design-language/SKILL.md`, same enforcement shape
+++      as the wireframe skill: manual hand-author path is the default and needs NO engine; the
+++      accelerator gates on `preflightEngine('translate-design-language')`; engine output gets
+++      zero trust — judged by the SAME `bin/check-design-spec` gate; skipped non-CSS links are
+++      read aloud as visible v1 scope).
++ 
++ **Acceptance (two paths):** **(scaffold, required)** an operator can hand-author a spec; static
++ link-liveness flags a **dead selector** with **no app boot** — engine absent; **and the schema
++diff --git a/plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts b/plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts
++new file mode 100644
++index 00000000..d3362e0a
++--- /dev/null
+++++ b/plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts
++@@ -0,0 +1,155 @@
+++/**
+++ * File-level + CLI-core tests for `check-design-spec` (Phase 2).
+++ *
+++ * `checkDesignSpecFile` composes the two axes — markdown schema validation +
+++ * static link-liveness — over a spec FILE, resolving css paths relative to the
+++ * spec's own directory. `runCheckDesignSpec` is the tested CLI core behind
+++ * `bin/check-design-spec` (the shim only dispatches), mirroring the
+++ * check-wireframe exit contract: 0 green / 1 findings-or-error / 2 usage.
+++ *
+++ * Real-fs temp fixtures per .claude/rules/testing.md.
+++ */
+++
+++import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+++import { tmpdir } from 'node:os';
+++import { join } from 'node:path';
+++import { afterEach, describe, expect, it } from 'vitest';
+++import { checkDesignSpecFile, runCheckDesignSpec } from '@/design-language/check-spec-file';
+++
+++const tempDirs: string[] = [];
+++
+++function makeFixtureDir(): string {
+++  const dir = mkdtempSync(join(tmpdir(), 'design-language-cli-'));
+++  tempDirs.push(dir);
+++  return dir;
+++}
+++
+++afterEach(() => {
+++  while (tempDirs.length > 0) {
+++    rmSync(tempDirs.pop() as string, { recursive: true, force: true });
+++  }
+++});
+++
+++interface CapturedIo {
+++  readonly out: string[];
+++  readonly err: string[];
+++  readonly io: { out(line: string): void; err(line: string): void };
+++}
+++
+++function captureIo(): CapturedIo {
+++  const out: string[] = [];
+++  const err: string[] = [];
+++  return { out, err, io: { out: (line) => out.push(line), err: (line) => err.push(line) } };
+++}
+++
+++const GREEN_SPEC = `# Design language: fixture
+++
+++### rule: ink-primary
+++- kind: palette
+++- css: studio.css .btn-primary
+++- example: dashboard compose button
+++- do: Use the ink palette for primary actions.
+++`;
+++
+++function writeGreenFixture(dir: string): string {
+++  writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+++  const specPath = join(dir, 'design-language.md');
+++  writeFileSync(specPath, GREEN_SPEC);
+++  return specPath;
+++}
+++
+++describe('checkDesignSpecFile', () => {
+++  it('passes a hand-authored spec whose links are live', () => {
+++    const specPath = writeGreenFixture(makeFixtureDir());
+++    const result = checkDesignSpecFile(specPath);
+++    expect(result.findings).toEqual([]);
+++    expect(result.ok).toBe(true);
+++    expect(result.spec.rules).toHaveLength(1);
+++  });
+++
+++  it('combines schema findings and liveness findings in one result', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.real { color: ink; }\n');
+++    const specPath = join(dir, 'design-language.md');
+++    writeFileSync(
+++      specPath,
+++      `### rule: no-example
+++- kind: palette
+++- css: studio.css .real
+++- do: x
+++
+++### rule: dead-link
+++- kind: component
+++- css: studio.css .ghost
+++- example: somewhere
+++- do: x
+++`,
+++    );
+++    const result = checkDesignSpecFile(specPath);
+++    const rules = result.findings.map((f) => f.rule);
+++    expect(rules).toContain('missing-example');
+++    expect(rules).toContain('dead-link-selector');
+++    expect(result.ok).toBe(false);
+++  });
+++
+++  it('throws loud on an unreadable spec file (never a clean verdict)', () => {
+++    expect(() => checkDesignSpecFile(join(makeFixtureDir(), 'absent.md'))).toThrow();
+++  });
+++});
+++
+++describe('runCheckDesignSpec — exit contract', () => {
+++  it('exit 0 + green line on a passing spec', () => {
+++    const specPath = writeGreenFixture(makeFixtureDir());
+++    const { out, io } = captureIo();
+++    expect(runCheckDesignSpec([specPath], io)).toBe(0);
+++    expect(out.join('\n')).toContain('0 findings');
+++  });
+++
+++  it('exit 1 + findings on stderr for a dead selector', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.real { color: ink; }\n');
+++    const specPath = join(dir, 'design-language.md');
+++    writeFileSync(
+++      specPath,
+++      `### rule: dead
+++- kind: palette
+++- css: studio.css .ghost
+++- example: somewhere
+++- do: x
+++`,
+++    );
+++    const { err, io } = captureIo();
+++    expect(runCheckDesignSpec([specPath], io)).toBe(1);
+++    expect(err.join('\n')).toContain('dead-link-selector');
+++  });
+++
+++  it('exit 1 + descriptive error on an unreadable file', () => {
+++    const { err, io } = captureIo();
+++    expect(runCheckDesignSpec([join(makeFixtureDir(), 'absent.md')], io)).toBe(1);
+++    expect(err.length).toBeGreaterThan(0);
+++  });
+++
+++  it('exit 2 on usage error', () => {
+++    const { err, io } = captureIo();
+++    expect(runCheckDesignSpec([], io)).toBe(2);
+++    expect(err.join('\n')).toContain('usage');
+++  });
+++
+++  it('reports skipped non-css targets visibly while staying green', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'styles.ts'), 'export const x = 1;\n');
+++    const specPath = join(dir, 'design-language.md');
+++    writeFileSync(
+++      specPath,
+++      `### rule: css-in-js
+++- kind: component
+++- css: styles.ts .btn
+++- example: somewhere
+++- do: x
+++`,
+++    );
+++    const { out, io } = captureIo();
+++    expect(runCheckDesignSpec([specPath], io)).toBe(0);
+++    expect(out.join('\n')).toContain('not validated in v1');
+++  });
+++});
++diff --git a/plugins/design-control/src/__tests__/design-language/link-liveness.test.ts b/plugins/design-control/src/__tests__/design-language/link-liveness.test.ts
++new file mode 100644
++index 00000000..f3bc414f
++--- /dev/null
+++++ b/plugins/design-control/src/__tests__/design-language/link-liveness.test.ts
++@@ -0,0 +1,147 @@
+++/**
+++ * Static link-liveness tests (Phase 2, axis B).
+++ *
+++ * Each rule's `css: <path> <selector>` link must resolve to an author-written
+++ * CSS file in which the selector is DEFINED — checked statically against
+++ * source with NO app boot (the check is pure file reads; the acceptance's
+++ * "flags a dead selector with no app boot — engine absent" lands here).
+++ *
+++ * Scope is author-written CSS only: non-.css targets (CSS-in-JS, hashed
+++ * CSS-Modules, utility frameworks) are NOT validated in v1 (named-deferred) —
+++ * they are recorded as skipped, visibly, never silently dropped and never
+++ * fabricated into a dead-link finding.
+++ *
+++ * Real-fs temp fixtures per .claude/rules/testing.md — never mock the fs.
+++ */
+++
+++import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+++import { tmpdir } from 'node:os';
+++import { join } from 'node:path';
+++import { afterEach, describe, expect, it } from 'vitest';
+++import { checkLinkLiveness } from '@/design-language/link-liveness';
+++import type { ParsedDesignSpec } from '@/design-language/types';
+++
+++const tempDirs: string[] = [];
+++
+++function makeFixtureDir(): string {
+++  const dir = mkdtempSync(join(tmpdir(), 'design-language-liveness-'));
+++  tempDirs.push(dir);
+++  return dir;
+++}
+++
+++afterEach(() => {
+++  while (tempDirs.length > 0) {
+++    rmSync(tempDirs.pop() as string, { recursive: true, force: true });
+++  }
+++});
+++
+++function specWithLink(path: string, selector: string): ParsedDesignSpec {
+++  return {
+++    rules: [
+++      {
+++        id: 'probe',
+++        kind: 'palette',
+++        cssLinks: [{ path, selector }],
+++        examples: ['an example'],
+++        dos: ['guidance'],
+++        donts: [],
+++      },
+++    ],
+++  };
+++}
+++
+++describe('checkLinkLiveness — live selectors pass', () => {
+++  it('passes a class selector defined in the referenced file', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+++    const result = checkLinkLiveness(specWithLink('studio.css', '.btn-primary'), dir);
+++    expect(result.findings).toEqual([]);
+++    expect(result.ok).toBe(true);
+++  });
+++
+++  it('finds a selector defined inside an @media block', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(
+++      join(dir, 'studio.css'),
+++      '@media (min-width: 80rem) {\n  .desktop-rail { width: 16rem; }\n}\n',
+++    );
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.desktop-rail'), dir).ok).toBe(true);
+++  });
+++
+++  it('finds a selector that appears with a pseudo-class in source', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.chip:hover { outline: 1px solid; }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.chip'), dir).ok).toBe(true);
+++  });
+++
+++  it('finds a descendant selector sequence regardless of whitespace', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.masthead   nav a { text-decoration: none; }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.masthead nav a'), dir).ok).toBe(true);
+++  });
+++
+++  it('resolves the css path relative to the spec base dir, including subdirectories', () => {
+++    const dir = makeFixtureDir();
+++    mkdirSync(join(dir, 'styles'));
+++    writeFileSync(join(dir, 'styles', 'chrome.css'), '.masthead-rule { border-top: 2px solid; }\n');
+++    expect(checkLinkLiveness(specWithLink('styles/chrome.css', '.masthead-rule'), dir).ok).toBe(true);
+++  });
+++});
+++
+++describe('checkLinkLiveness — dead links flagged (no app boot)', () => {
+++  it('flags a selector that is not defined anywhere in the file', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+++    const result = checkLinkLiveness(specWithLink('studio.css', '.btn-ghost'), dir);
+++    expect(result.ok).toBe(false);
+++    expect(result.findings.some((f) => f.rule === 'dead-link-selector' && f.ruleId === 'probe')).toBe(
+++      true,
+++    );
+++  });
+++
+++  it('flags a missing css file', () => {
+++    const dir = makeFixtureDir();
+++    const result = checkLinkLiveness(specWithLink('nope.css', '.btn'), dir);
+++    expect(result.findings.some((f) => f.rule === 'dead-link-file')).toBe(true);
+++  });
+++
+++  it('does not let a longer ident satisfy a shorter selector (.btn vs .btn-primary)', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.btn'), dir).ok).toBe(false);
+++  });
+++
+++  it('a selector appearing only in a comment is dead', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '/* .ghost was retired */\n.real { color: ink; }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+++  });
+++
+++  it('a selector appearing only inside a declaration string is dead', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.real::before { content: ".ghost"; }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+++  });
+++
+++  it('a selector appearing only as a property value token is dead', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.real { background: url(.ghost/x.png); }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+++  });
+++});
+++
+++describe('checkLinkLiveness — v1 scope boundary (named-deferred, visible)', () => {
+++  it('records a non-.css target as skipped — no finding, never silent', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'styles.ts'), 'export const btn = css`color: navy;`;\n');
+++    const result = checkLinkLiveness(specWithLink('styles.ts', '.btn'), dir);
+++    expect(result.findings).toEqual([]);
+++    expect(result.ok).toBe(true);
+++    expect(result.skipped).toHaveLength(1);
+++    expect(result.skipped[0]).toMatchObject({
+++      ruleId: 'probe',
+++      reason: 'non-css-target',
+++      link: { path: 'styles.ts', selector: '.btn' },
+++    });
+++  });
+++});
++diff --git a/plugins/design-control/src/__tests__/design-language/schema.test.ts b/plugins/design-control/src/__tests__/design-language/schema.test.ts
++new file mode 100644
++index 00000000..70f527e9
++--- /dev/null
+++++ b/plugins/design-control/src/__tests__/design-language/schema.test.ts
++@@ -0,0 +1,231 @@
+++/**
+++ * Schema tests for the design-language spec convention (Phase 2).
+++ *
+++ * The spec is a HAND-AUTHORABLE markdown artifact — these tests pin the parse +
+++ * structural-validation contract: rules declared under `### rule: <id>` headings
+++ * with bullet fields (`kind:` / `css:` / `example:` / `do:` / `don't:`). The
+++ * example-presence acceptance is here: a rule with ZERO example references is
+++ * rejected (structural presence only — example truthfulness is named-deferred).
+++ *
+++ * Nothing in this module touches the engine or the filesystem: the schema is
+++ * pure text → structure (link-liveness is the separate, fs-backed axis).
+++ */
+++
+++import { describe, expect, it } from 'vitest';
+++import { parseDesignSpec } from '@/design-language/schema';
+++import { RULE_KINDS } from '@/design-language/types';
+++
+++const VALID_SPEC = `# Design language: deskwork studio
+++
+++## Palette
+++
+++### rule: ink-primary
+++- kind: palette
+++- css: styles/studio.css .btn-primary
+++- example: dashboard compose button uses .btn-primary
+++- do: Use the ink palette for every primary action.
+++- don't: Never introduce raw hex blues outside the palette tokens.
+++
+++## Signature components
+++
+++### rule: masthead
+++- kind: component
+++- css: styles/studio.css .masthead
+++- css: styles/chrome.css .masthead-rule
+++- example: every page renders the double-rule masthead
+++- example: entry-review header
+++- do: Every top-level page opens with the masthead.
+++`;
+++
+++function findingsFor(markdown: string) {
+++  return parseDesignSpec(markdown).findings.map((f) => f.rule);
+++}
+++
+++describe('parseDesignSpec — valid hand-authored spec', () => {
+++  it('parses a diverse valid spec with zero findings', () => {
+++    const result = parseDesignSpec(VALID_SPEC);
+++    expect(result.findings).toEqual([]);
+++    expect(result.ok).toBe(true);
+++    expect(result.spec.rules).toHaveLength(2);
+++  });
+++
+++  it('captures rule fields: id, kind, css links, examples, guidance', () => {
+++    const result = parseDesignSpec(VALID_SPEC);
+++    const [ink, masthead] = result.spec.rules;
+++    expect(ink.id).toBe('ink-primary');
+++    expect(ink.kind).toBe('palette');
+++    expect(ink.cssLinks).toEqual([{ path: 'styles/studio.css', selector: '.btn-primary' }]);
+++    expect(ink.examples).toEqual(['dashboard compose button uses .btn-primary']);
+++    expect(ink.dos).toEqual(['Use the ink palette for every primary action.']);
+++    expect(ink.donts).toEqual(['Never introduce raw hex blues outside the palette tokens.']);
+++
+++    expect(masthead.id).toBe('masthead');
+++    expect(masthead.kind).toBe('component');
+++    expect(masthead.cssLinks).toHaveLength(2);
+++    expect(masthead.cssLinks[1]).toEqual({ path: 'styles/chrome.css', selector: '.masthead-rule' });
+++    expect(masthead.examples).toHaveLength(2);
+++    expect(masthead.donts).toEqual([]);
+++  });
+++
+++  it('accepts a descendant (multi-token) selector in a css link', () => {
+++    const result = parseDesignSpec(`### rule: nav-item
+++- kind: component
+++- css: styles/studio.css .masthead nav a
+++- example: top nav
+++- do: Keep nav items inside the masthead.
+++`);
+++    expect(result.findings).toEqual([]);
+++    expect(result.spec.rules[0].cssLinks[0]).toEqual({
+++      path: 'styles/studio.css',
+++      selector: '.masthead nav a',
+++    });
+++  });
+++
+++  it('treats prose lines and non-field bullets as inert prose', () => {
+++    const result = parseDesignSpec(`### rule: spacing-scale
+++- kind: spacing
+++- css: styles/studio.css .stack
+++- example: entry list stacking
+++
+++Background prose explaining the scale.
+++
+++- Note: this bullet is prose, not a field (capitalised key).
+++- do: Use the 4px base scale.
+++`);
+++    expect(result.findings).toEqual([]);
+++    expect(result.spec.rules[0].dos).toEqual(['Use the 4px base scale.']);
+++  });
+++
+++  it('exports the closed kind vocabulary', () => {
+++    expect(RULE_KINDS).toEqual(['palette', 'type', 'spacing', 'component']);
+++  });
+++});
+++
+++describe('parseDesignSpec — example-presence (acceptance: zero examples rejected)', () => {
+++  it('rejects a rule with zero example references', () => {
+++    const result = parseDesignSpec(`### rule: ink-primary
+++- kind: palette
+++- css: styles/studio.css .btn-primary
+++- do: Use the ink palette.
+++`);
+++    expect(result.ok).toBe(false);
+++    expect(result.findings.some((f) => f.rule === 'missing-example' && f.ruleId === 'ink-primary')).toBe(
+++      true,
+++    );
+++  });
+++
+++  it('an empty example value does not satisfy example-presence', () => {
+++    const findings = findingsFor(`### rule: ink-primary
+++- kind: palette
+++- css: styles/studio.css .btn-primary
+++- example:
+++- do: Use the ink palette.
+++`);
+++    expect(findings).toContain('empty-field');
+++    expect(findings).toContain('missing-example');
+++  });
+++});
+++
+++describe('parseDesignSpec — structural rejections', () => {
+++  it('flags a document with no rules at all', () => {
+++    expect(findingsFor('# Design language\n\nProse only.\n')).toContain('no-rules');
+++  });
+++
+++  it('flags a missing kind', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- css: styles/studio.css .btn
+++- example: a button
+++- do: x
+++`),
+++    ).toContain('missing-kind');
+++  });
+++
+++  it('flags a kind outside the closed vocabulary', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- kind: colour
+++- css: styles/studio.css .btn
+++- example: a button
+++- do: x
+++`),
+++    ).toContain('unknown-kind');
+++  });
+++
+++  it('flags a rule with no css link (every rule links to live CSS)', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- kind: palette
+++- example: a button
+++- do: x
+++`),
+++    ).toContain('missing-css-link');
+++  });
+++
+++  it('flags a css link without a selector as malformed', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- kind: palette
+++- css: styles/studio.css
+++- example: a button
+++- do: x
+++`),
+++    ).toContain('malformed-css-link');
+++  });
+++
+++  it('flags a rule with neither do nor don’t guidance', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- kind: palette
+++- css: styles/studio.css .btn
+++- example: a button
+++`),
+++    ).toContain('missing-guidance');
+++  });
+++
+++  it('flags duplicate rule ids', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- kind: palette
+++- css: styles/studio.css .btn
+++- example: a button
+++- do: x
+++
+++### rule: ink
+++- kind: palette
+++- css: styles/studio.css .btn
+++- example: a button
+++- do: x
+++`),
+++    ).toContain('duplicate-rule-id');
+++  });
+++
+++  it('flags a rule heading without an id', () => {
+++    expect(findingsFor('### rule:\n- kind: palette\n')).toContain('malformed-rule-heading');
+++  });
+++
+++  it('flags an unknown lowercase field key (typo guard, allowlist-shaped)', () => {
+++    const findings = findingsFor(`### rule: ink
+++- kind: palette
+++- css: styles/studio.css .btn
+++- exmaple: a button
+++- do: x
+++`);
+++    expect(findings).toContain('unknown-field');
+++    expect(findings).toContain('missing-example');
+++  });
+++
+++  it('excludes invalid rules from spec.rules but keeps valid siblings', () => {
+++    const result = parseDesignSpec(`### rule: broken
+++- kind: palette
+++
+++### rule: fine
+++- kind: type
+++- css: styles/studio.css .serif
+++- example: body copy
+++- do: Use the serif stack for prose.
+++`);
+++    expect(result.ok).toBe(false);
+++    expect(result.spec.rules.map((r) => r.id)).toEqual(['fine']);
+++  });
+++});
++diff --git a/plugins/design-control/src/design-language/check-design-spec-cli.ts b/plugins/design-control/src/design-language/check-design-spec-cli.ts
++new file mode 100644
++index 00000000..ebace3ed
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/check-design-spec-cli.ts
++@@ -0,0 +1,12 @@
+++/**
+++ * Process entry for `bin/check-design-spec`. All behavior lives in
+++ * {@link runCheckDesignSpec} (tested directly); this file only wires argv and
+++ * the process exit code.
+++ */
+++
+++import { runCheckDesignSpec } from '@/design-language/check-spec-file';
+++
+++process.exitCode = runCheckDesignSpec(process.argv.slice(2), {
+++  out: (line) => console.log(line),
+++  err: (line) => console.error(line),
+++});
++diff --git a/plugins/design-control/src/design-language/check-spec-file.ts b/plugins/design-control/src/design-language/check-spec-file.ts
++new file mode 100644
++index 00000000..91797e63
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/check-spec-file.ts
++@@ -0,0 +1,82 @@
+++/**
+++ * File-level entry to the design-language spec check — the enforcement seam
+++ * the `/design-control:translate-design-language` skill (and the
+++ * `bin/check-design-spec` shim) route EVERY spec draft through, hand-authored
+++ * or engine-accelerated alike. Mirrors `@/authoring/lint-file` for wireframes:
+++ * a thin composition of the existing axes, no parallel validation path.
+++ */
+++
+++import { readFileSync } from 'node:fs';
+++import { dirname, resolve } from 'node:path';
+++import { checkLinkLiveness, type SkippedLink } from '@/design-language/link-liveness';
+++import { parseDesignSpec } from '@/design-language/schema';
+++import type { DesignSpecFinding, ParsedDesignSpec } from '@/design-language/types';
+++
+++export interface DesignSpecCheckResult {
+++  /** True iff findings is empty (skipped links stay green but visible). */
+++  readonly ok: boolean;
+++  readonly spec: ParsedDesignSpec;
+++  /** Schema findings followed by link-liveness findings. */
+++  readonly findings: readonly DesignSpecFinding[];
+++  readonly skipped: readonly SkippedLink[];
+++}
+++
+++/**
+++ * Check a design-language spec FILE: read it, validate the markdown schema,
+++ * then check link-liveness with css paths resolved against the spec file's
+++ * own directory. Fails loud on an unreadable file — a missing spec is an
+++ * error, never a clean verdict.
+++ */
+++export function checkDesignSpecFile(filePath: string): DesignSpecCheckResult {
+++  const absolute = resolve(filePath);
+++  const markdown = readFileSync(absolute, 'utf8');
+++  const parsed = parseDesignSpec(markdown);
+++  const liveness = checkLinkLiveness(parsed.spec, dirname(absolute));
+++  const findings = [...parsed.findings, ...liveness.findings];
+++  return { ok: findings.length === 0, spec: parsed.spec, findings, skipped: liveness.skipped };
+++}
+++
+++/** Line-oriented output sink, injected so the CLI core is testable. */
+++export interface CliIo {
+++  out(line: string): void;
+++  err(line: string): void;
+++}
+++
+++const USAGE = 'usage: check-design-spec <design-language-spec.md>';
+++
+++/**
+++ * CLI core behind `bin/check-design-spec`. Exit-code contract (the skill's
+++ * gate, same shape as check-wireframe):
+++ *   0 — spec green (zero findings; skipped links are reported but green)
+++ *   1 — findings present, or the file could not be read (descriptive error;
+++ *       never a fabricated verdict)
+++ *   2 — usage error
+++ */
+++export function runCheckDesignSpec(argv: readonly string[], io: CliIo): number {
+++  if (argv.length !== 1) {
+++    io.err(USAGE);
+++    return 2;
+++  }
+++  const filePath = argv[0];
+++  let result: DesignSpecCheckResult;
+++  try {
+++    result = checkDesignSpecFile(filePath);
+++  } catch (error) {
+++    io.err(error instanceof Error ? error.message : String(error));
+++    return 1;
+++  }
+++  for (const skip of result.skipped) {
+++    io.out(
+++      `note: rule "${skip.ruleId}" link "${skip.link.path} ${skip.link.selector}" is a non-CSS target — not validated in v1 (CSS-in-JS / utility-framework / CSS-Modules liveness is named-deferred).`,
+++    );
+++  }
+++  if (result.ok) {
+++    io.out(`${filePath}: spec green — 0 findings (${result.spec.rules.length} rule(s))`);
+++    return 0;
+++  }
+++  for (const finding of result.findings) {
+++    io.err(`${finding.rule}${finding.ruleId ? ` (rule: ${finding.ruleId})` : ''}: ${finding.message}`);
+++  }
+++  io.err(`${filePath}: ${result.findings.length} finding(s)`);
+++  return 1;
+++}
++diff --git a/plugins/design-control/src/design-language/index.ts b/plugins/design-control/src/design-language/index.ts
++new file mode 100644
++index 00000000..0d0f0520
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/index.ts
++@@ -0,0 +1,29 @@
+++/**
+++ * Public surface of the design-language spec convention (Phase 2):
+++ * markdown schema (axis A, pure) + static link-liveness (axis B, fs-backed)
+++ * + the file-level composition behind `bin/check-design-spec`.
+++ */
+++
+++export {
+++  RULE_KINDS,
+++  type CssLink,
+++  type DesignRuleKind,
+++  type DesignSpecFinding,
+++  type DesignSpecFindingRule,
+++  type DesignSpecParseResult,
+++  type DesignSpecRule,
+++  type ParsedDesignSpec,
+++} from '@/design-language/types';
+++export { parseDesignSpec } from '@/design-language/schema';
+++export {
+++  checkLinkLiveness,
+++  cssDefinesSelector,
+++  type LivenessResult,
+++  type SkippedLink,
+++} from '@/design-language/link-liveness';
+++export {
+++  checkDesignSpecFile,
+++  runCheckDesignSpec,
+++  type CliIo,
+++  type DesignSpecCheckResult,
+++} from '@/design-language/check-spec-file';
++diff --git a/plugins/design-control/src/design-language/link-liveness.ts b/plugins/design-control/src/design-language/link-liveness.ts
++new file mode 100644
++index 00000000..efe9ddcd
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/link-liveness.ts
++@@ -0,0 +1,170 @@
+++/**
+++ * Static link-liveness for design-language spec rules (Phase 2, axis B).
+++ *
+++ * Each rule's `css: <path> <selector>` link must point at an author-written
+++ * CSS file in which the selector is DEFINED. The check is STATIC — pure file
+++ * reads against source, no app boot, no engine (round-6 M1: "authoring
+++ * artifacts only / no capture dependency").
+++ *
+++ * Scope (v1, named-deferred boundary): only `.css` targets are validated.
+++ * Utility-framework, CSS-in-JS, and hashed CSS-Modules resolution are NOT
+++ * validated in v1 — such links are recorded as `skipped` (visible in the
+++ * result and in CLI output), never silently dropped and never fabricated into
+++ * a dead-link verdict. Liveness ≠ truthfulness: a resolving selector does not
+++ * prove the live CSS still matches the rule's described intent
+++ * (`spec-truthfulness`, named-deferred).
+++ *
+++ * "Defined in source" is implemented as: the selector appears, ident-boundary
+++ * exact, inside some selector prelude of the file — preludes are the text
+++ * runs that precede `{` after comments and string literals are stripped and
+++ * at-rule preludes are excluded (their blocks are descended into, so a rule
+++ * inside `@media` counts; `content: ".ghost"` and commented-out rules do not).
+++ */
+++
+++import { readFileSync } from 'node:fs';
+++import { resolve } from 'node:path';
+++import type {
+++  CssLink,
+++  DesignSpecFinding,
+++  ParsedDesignSpec,
+++} from '@/design-language/types';
+++
+++/** A link excluded from v1 validation, recorded visibly. */
+++export interface SkippedLink {
+++  readonly ruleId: string;
+++  readonly link: CssLink;
+++  readonly reason: 'non-css-target';
+++}
+++
+++export interface LivenessResult {
+++  /** True iff findings is empty (skipped links do not fail the check). */
+++  readonly ok: boolean;
+++  readonly findings: readonly DesignSpecFinding[];
+++  readonly skipped: readonly SkippedLink[];
+++}
+++
+++/** Strip CSS comments and the CONTENTS of string literals (delimiters stay). */
+++function stripCommentsAndStrings(css: string): string {
+++  let out = '';
+++  let i = 0;
+++  while (i < css.length) {
+++    const ch = css[i];
+++    if (ch === '/' && css[i + 1] === '*') {
+++      const end = css.indexOf('*/', i + 2);
+++      i = end === -1 ? css.length : end + 2;
+++      continue;
+++    }
+++    if (ch === '"' || ch === "'") {
+++      out += ch;
+++      i += 1;
+++      while (i < css.length && css[i] !== ch) {
+++        i += css[i] === '\\' ? 2 : 1;
+++      }
+++      if (i < css.length) {
+++        out += ch;
+++        i += 1;
+++      }
+++      continue;
+++    }
+++    out += ch;
+++    i += 1;
+++  }
+++  return out;
+++}
+++
+++/**
+++ * Collect selector preludes: text runs preceding `{`, at every nesting depth,
+++ * excluding at-rule preludes (which are descended into, not matched against).
+++ * Prelude buffers reset on `{`, `}`, and `;` so declaration text never leaks
+++ * into selector position.
+++ */
+++function collectSelectorPreludes(css: string): string[] {
+++  const preludes: string[] = [];
+++  let buffer = '';
+++  for (const ch of stripCommentsAndStrings(css)) {
+++    if (ch === '{') {
+++      const prelude = buffer.trim();
+++      if (prelude !== '' && !prelude.startsWith('@')) {
+++        preludes.push(prelude);
+++      }
+++      buffer = '';
+++      continue;
+++    }
+++    if (ch === '}' || ch === ';') {
+++      buffer = '';
+++      continue;
+++    }
+++    buffer += ch;
+++  }
+++  return preludes;
+++}
+++
+++/** True for characters that extend a CSS ident (would change the selector). */
+++function isIdentChar(ch: string | undefined): boolean {
+++  return ch !== undefined && /[A-Za-z0-9_-]/.test(ch);
+++}
+++
+++/**
+++ * True iff `selector` appears ident-boundary exact inside some selector
+++ * prelude of `css`. Whitespace in a multi-token (descendant) selector is
+++ * normalized on both sides before matching.
+++ */
+++export function cssDefinesSelector(css: string, selector: string): boolean {
+++  const query = selector.trim().replace(/\s+/g, ' ');
+++  if (query === '') {
+++    return false;
+++  }
+++  for (const prelude of collectSelectorPreludes(css)) {
+++    const haystack = prelude.replace(/\s+/g, ' ');
+++    let from = 0;
+++    while (true) {
+++      const at = haystack.indexOf(query, from);
+++      if (at === -1) {
+++        break;
+++      }
+++      if (!isIdentChar(haystack[at - 1]) && !isIdentChar(haystack[at + query.length])) {
+++        return true;
+++      }
+++      from = at + 1;
+++    }
+++  }
+++  return false;
+++}
+++
+++/**
+++ * Check every rule's css links against source. Paths resolve relative to
+++ * `baseDir` (the spec file's directory). Missing file → `dead-link-file`;
+++ * selector not defined → `dead-link-selector`; non-.css target → skipped.
+++ */
+++export function checkLinkLiveness(spec: ParsedDesignSpec, baseDir: string): LivenessResult {
+++  const findings: DesignSpecFinding[] = [];
+++  const skipped: SkippedLink[] = [];
+++  for (const rule of spec.rules) {
+++    for (const link of rule.cssLinks) {
+++      if (!link.path.toLowerCase().endsWith('.css')) {
+++        skipped.push({ ruleId: rule.id, link, reason: 'non-css-target' });
+++        continue;
+++      }
+++      const absolute = resolve(baseDir, link.path);
+++      let css: string;
+++      try {
+++        css = readFileSync(absolute, 'utf8');
+++      } catch {
+++        findings.push({
+++          rule: 'dead-link-file',
+++          message: `Rule "${rule.id}" links to "${link.path}" which does not resolve to a readable file (looked at ${absolute}).`,
+++          ruleId: rule.id,
+++        });
+++        continue;
+++      }
+++      if (!cssDefinesSelector(css, link.selector)) {
+++        findings.push({
+++          rule: 'dead-link-selector',
+++          message: `Rule "${rule.id}" links to selector "${link.selector}" which is not defined in "${link.path}".`,
+++          ruleId: rule.id,
+++        });
+++      }
+++    }
+++  }
+++  return { ok: findings.length === 0, findings, skipped };
+++}
++diff --git a/plugins/design-control/src/design-language/schema.ts b/plugins/design-control/src/design-language/schema.ts
++new file mode 100644
++index 00000000..d50fa8c7
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/schema.ts
++@@ -0,0 +1,231 @@
+++/**
+++ * Markdown schema parser/validator for the design-language spec convention
+++ * (Phase 2, axis A — pure text → structure; NO filesystem, NO engine).
+++ *
+++ * Convention (hand-authorable):
+++ *   - a rule is declared by an ATX heading whose text is `rule: <id>`
+++ *     (any heading level); the rule's section runs to the next heading;
+++ *   - fields are single-line bullets `- <key>: <value>` with the CLOSED key set
+++ *     `kind` / `css` / `example` / `do` / `don't`;
+++ *   - `css: <path> <selector>` — first token is the file path, the remainder is
+++ *     the selector (descendant selectors allowed);
+++ *   - other prose (paragraphs, capitalised-key bullets) is inert.
+++ *
+++ * Validation per rule: kind from the closed vocabulary; ≥1 css link; ≥1
+++ * example (structural presence only — example truthfulness is the
+++ * named-deferred `spec-truthfulness`); ≥1 do/don't guidance line. A lowercase
+++ * single-word bullet key outside the closed set is an `unknown-field` finding
+++ * (typo guard) — silently dropping a misspelled `example:` would otherwise
+++ * fabricate a missing-example rejection with no visible cause.
+++ */
+++
+++import {
+++  RULE_KINDS,
+++  type CssLink,
+++  type DesignRuleKind,
+++  type DesignSpecFinding,
+++  type DesignSpecParseResult,
+++  type DesignSpecRule,
+++} from '@/design-language/types';
+++
+++const HEADING_RE = /^#{1,6}\s+(.*)$/;
+++const RULE_HEADING_RE = /^rule:\s*(.*)$/;
+++/** A field bullet: lowercase single-word key (apostrophe allowed: `don't`). */
+++const FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z']*)\s*:\s*(.*)$/;
+++
+++const KNOWN_KEYS = ['kind', 'css', 'example', 'do', "don't"] as const;
+++type FieldKey = (typeof KNOWN_KEYS)[number];
+++
+++function isKnownKey(key: string): key is FieldKey {
+++  return (KNOWN_KEYS as readonly string[]).includes(key);
+++}
+++
+++function isRuleKind(value: string): value is DesignRuleKind {
+++  return (RULE_KINDS as readonly string[]).includes(value);
+++}
+++
+++/** A rule section under one `rule:` heading, before validation. */
+++interface RawRuleSection {
+++  readonly id: string;
+++  readonly headingLine: number;
+++  kind?: string;
+++  readonly cssLinks: CssLink[];
+++  readonly examples: string[];
+++  readonly dos: string[];
+++  readonly donts: string[];
+++}
+++
+++interface FieldSink {
+++  readonly section: RawRuleSection;
+++  readonly findings: DesignSpecFinding[];
+++}
+++
+++function recordField(sink: FieldSink, key: FieldKey, value: string, line: number): void {
+++  const { section, findings } = sink;
+++  if (value === '') {
+++    findings.push({
+++      rule: 'empty-field',
+++      message: `Field "${key}:" has an empty value.`,
+++      ruleId: section.id,
+++      line,
+++    });
+++    return;
+++  }
+++  switch (key) {
+++    case 'kind':
+++      section.kind = value;
+++      return;
+++    case 'css': {
+++      const spaceAt = value.search(/\s/);
+++      if (spaceAt === -1) {
+++        findings.push({
+++          rule: 'malformed-css-link',
+++          message: `css link "${value}" names a file but no selector — expected "css: <path> <selector>".`,
+++          ruleId: section.id,
+++          line,
+++        });
+++        return;
+++      }
+++      section.cssLinks.push({
+++        path: value.slice(0, spaceAt),
+++        selector: value.slice(spaceAt).trim(),
+++      });
+++      return;
+++    }
+++    case 'example':
+++      section.examples.push(value);
+++      return;
+++    case 'do':
+++      section.dos.push(value);
+++      return;
+++    case "don't":
+++      section.donts.push(value);
+++      return;
+++  }
+++}
+++
+++function validateSection(section: RawRuleSection, findings: DesignSpecFinding[]): DesignSpecRule | undefined {
+++  const problems: DesignSpecFinding[] = [];
+++  const at = { ruleId: section.id, line: section.headingLine };
+++  if (section.kind === undefined) {
+++    problems.push({ rule: 'missing-kind', message: `Rule "${section.id}" has no "kind:" field.`, ...at });
+++  } else if (!isRuleKind(section.kind)) {
+++    problems.push({
+++      rule: 'unknown-kind',
+++      message: `Rule "${section.id}" has kind "${section.kind}" — expected one of: ${RULE_KINDS.join(', ')}.`,
+++      ...at,
+++    });
+++  }
+++  if (section.cssLinks.length === 0) {
+++    problems.push({
+++      rule: 'missing-css-link',
+++      message: `Rule "${section.id}" links to no live CSS — every rule needs ≥1 "css: <path> <selector>".`,
+++      ...at,
+++    });
+++  }
+++  if (section.examples.length === 0) {
+++    problems.push({
+++      rule: 'missing-example',
+++      message: `Rule "${section.id}" carries zero example references — every rule needs ≥1 "example:".`,
+++      ...at,
+++    });
+++  }
+++  if (section.dos.length === 0 && section.donts.length === 0) {
+++    problems.push({
+++      rule: 'missing-guidance',
+++      message: `Rule "${section.id}" has neither a "do:" nor a "don't:" guidance line.`,
+++      ...at,
+++    });
+++  }
+++  findings.push(...problems);
+++  if (problems.length > 0 || section.kind === undefined || !isRuleKind(section.kind)) {
+++    return undefined;
+++  }
+++  return {
+++    id: section.id,
+++    kind: section.kind,
+++    cssLinks: section.cssLinks,
+++    examples: section.examples,
+++    dos: section.dos,
+++    donts: section.donts,
+++  };
+++}
+++
+++/**
+++ * Parse + structurally validate a design-language spec. Pure: text in,
+++ * structure + findings out. `spec.rules` carries only the structurally-valid
+++ * rules; every defect is a finding (never a silent drop).
+++ */
+++export function parseDesignSpec(markdown: string): DesignSpecParseResult {
+++  const findings: DesignSpecFinding[] = [];
+++  const sections: RawRuleSection[] = [];
+++  const seenIds = new Set<string>();
+++  let current: RawRuleSection | undefined;
+++
+++  const lines = markdown.split('\n');
+++  for (let i = 0; i < lines.length; i += 1) {
+++    const line = lines[i].trimEnd();
+++    const lineNo = i + 1;
+++    const heading = HEADING_RE.exec(line.trim());
+++    if (heading !== null) {
+++      current = undefined;
+++      const ruleHeading = RULE_HEADING_RE.exec(heading[1].trim());
+++      if (ruleHeading === null) {
+++        continue;
+++      }
+++      const id = ruleHeading[1].trim();
+++      if (id === '') {
+++        findings.push({
+++          rule: 'malformed-rule-heading',
+++          message: `Rule heading at line ${lineNo} has no id — expected "rule: <id>".`,
+++          line: lineNo,
+++        });
+++        continue;
+++      }
+++      if (seenIds.has(id)) {
+++        findings.push({
+++          rule: 'duplicate-rule-id',
+++          message: `Rule id "${id}" is declared more than once.`,
+++          ruleId: id,
+++          line: lineNo,
+++        });
+++        continue;
+++      }
+++      seenIds.add(id);
+++      current = { id, headingLine: lineNo, cssLinks: [], examples: [], dos: [], donts: [] };
+++      sections.push(current);
+++      continue;
+++    }
+++    if (current === undefined) {
+++      continue;
+++    }
+++    const bullet = FIELD_BULLET_RE.exec(line.trim());
+++    if (bullet === null) {
+++      continue;
+++    }
+++    const key = bullet[1];
+++    if (!isKnownKey(key)) {
+++      findings.push({
+++        rule: 'unknown-field',
+++        message: `Unknown field "${key}:" — known fields are: ${KNOWN_KEYS.join(', ')}.`,
+++        ruleId: current.id,
+++        line: lineNo,
+++      });
+++      continue;
+++    }
+++    recordField({ section: current, findings }, key, bullet[2].trim(), lineNo);
+++  }
+++
+++  if (sections.length === 0) {
+++    findings.push({
+++      rule: 'no-rules',
+++      message: 'The spec declares no rules — expected ≥1 "rule: <id>" heading.',
+++    });
+++  }
+++
+++  const rules = sections
+++    .map((section) => validateSection(section, findings))
+++    .filter((rule): rule is DesignSpecRule => rule !== undefined);
+++
+++  return { ok: findings.length === 0, spec: { rules }, findings };
+++}
++diff --git a/plugins/design-control/src/design-language/types.ts b/plugins/design-control/src/design-language/types.ts
++new file mode 100644
++index 00000000..77f3afdc
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/types.ts
++@@ -0,0 +1,89 @@
+++/**
+++ * Shared types for the design-language spec convention (Phase 2).
+++ *
+++ * A design-language spec is a HAND-AUTHORABLE markdown artifact — the visual
+++ * *letter* reference of the design-control discipline (the lo-fi wireframe is
+++ * the UX *spirit*). The schema is allowlist-shaped like the rest of this
+++ * plugin: a closed kind vocabulary, a closed field-key set (typos surface as
+++ * findings, never silently drop), and per-rule structural requirements —
+++ * ≥1 live-CSS link, ≥1 example reference, ≥1 do/don't guidance line.
+++ *
+++ * Extracted so the pure-text schema axis (`schema.ts`) and the fs-backed
+++ * link-liveness axis (`link-liveness.ts`) share one taxonomy without a cycle
+++ * (mirrors `@/lint/types`).
+++ */
+++
+++/**
+++ * Closed vocabulary of rule kinds, single-sourced as a `const ... as const`
+++ * array (mirroring `ENGINE_METHODS` / `FAILURE_MODES`): palette / type /
+++ * spacing tokens + the signature-component vocabulary.
+++ */
+++export const RULE_KINDS = ['palette', 'type', 'spacing', 'component'] as const;
+++
+++export type DesignRuleKind = (typeof RULE_KINDS)[number];
+++
+++/**
+++ * A rule's link to live CSS: a path to an author-written CSS file (relative to
+++ * the spec file) plus the selector the rule is anchored to. The selector may be
+++ * multi-token (descendant combinators); the path is the first whitespace-free
+++ * token of the `css:` field value.
+++ */
+++export interface CssLink {
+++  readonly path: string;
+++  readonly selector: string;
+++}
+++
+++/** One structurally-valid rule parsed out of a design-language spec. */
+++export interface DesignSpecRule {
+++  /** The id from the `### rule: <id>` heading. */
+++  readonly id: string;
+++  /** Kind from the closed {@link RULE_KINDS} vocabulary. */
+++  readonly kind: DesignRuleKind;
+++  /** ≥1 live-CSS link (the link-liveness axis verifies each). */
+++  readonly cssLinks: readonly CssLink[];
+++  /** ≥1 example reference (structural presence only; truthfulness deferred). */
+++  readonly examples: readonly string[];
+++  /** `do:` guidance lines. */
+++  readonly dos: readonly string[];
+++  /** `don't:` guidance lines. */
+++  readonly donts: readonly string[];
+++}
+++
+++/** Finding taxonomy across both axes (schema structure + link-liveness). */
+++export type DesignSpecFindingRule =
+++  // axis A — markdown schema structure
+++  | 'no-rules'
+++  | 'malformed-rule-heading'
+++  | 'duplicate-rule-id'
+++  | 'missing-kind'
+++  | 'unknown-kind'
+++  | 'missing-css-link'
+++  | 'malformed-css-link'
+++  | 'missing-example'
+++  | 'missing-guidance'
+++  | 'unknown-field'
+++  | 'empty-field'
+++  // axis B — static link-liveness against author-written CSS source
+++  | 'dead-link-file'
+++  | 'dead-link-selector';
+++
+++export interface DesignSpecFinding {
+++  readonly rule: DesignSpecFindingRule;
+++  readonly message: string;
+++  /** The spec rule the finding is about, when rule-scoped. */
+++  readonly ruleId?: string;
+++  /** 1-based markdown source line, when known. */
+++  readonly line?: number;
+++}
+++
+++/** The parsed spec: structurally-valid rules only (invalid rules are findings). */
+++export interface ParsedDesignSpec {
+++  readonly rules: readonly DesignSpecRule[];
+++}
+++
+++export interface DesignSpecParseResult {
+++  /** True iff findings is empty. */
+++  readonly ok: boolean;
+++  readonly spec: ParsedDesignSpec;
+++  readonly findings: readonly DesignSpecFinding[];
+++}
++
++
++## What to look for
++
++- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
++- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
++- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
++- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
++- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
++- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
++- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
++
++## Output format
++
++For each finding you surface, emit ONE markdown block in this exact shape:
++
++```
++### <heading: one-line summary of the finding>
++
++Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
++Status:     open
++Severity:   <blocking | high | medium | low | informational>
++Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
++
++<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
++```
++
++Number the findings sequentially (`-01`, `-02`, ...).
++
++**Severity — rate each finding by downstream blast-radius:** the consequence if a downstream consumer acts on the audited surface *as written*. The consumer may be an adopter running the code, or — especially for a spec — an AI agent building **unattended** from it, with no human to catch a wrong reading. Rate by what would actually happen if this shipped as-is, **not by how alarming the finding feels**. State the blast-radius reasoning in the finding body for every finding, at every level.
++
++- `blocking` — acting on it as-written breaks the feature's stated goals in obvious ways; OR (for a spec) the more natural reading an agent reaches first is the wrong one, so it will likely be built wrong by default and nothing in the artifact corrects it.
++- `high` — a correctness/safety defect a consumer will hit; OR a spec contradiction/ambiguity where the readings are roughly equally plausible and the artifact doesn't disambiguate — an agent might build either, including the wrong one.
++- `medium` — a design issue that compounds over time; OR a spec inconsistency a reasonable consumer would resolve correctly anyway (readings barely diverge, or context makes the intended one obvious).
++- `low` — hygiene; cosmetic wording with no behavioral or implementation consequence.
++- `informational` — context worth seeing, not itself a defect.
++
++**Calibrate by consequence, not by alarm.** A genuine contradiction a reader would obviously resolve the right way is at most `medium`. A quietly-plausible wrong reading an agent would actually build is `high`/`blocking` even if it looks minor. A spec's internal consistency is load-bearing — it is the input to an unattended build.
++
++## If you find nothing — say so explicitly
++
++If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
++
++```
++### No findings
++
++Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
++Status:     open
++Severity:   informational
++Surface:    (the entire diff)
++
++I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
++```
++
++**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
++
++## Hard constraints
++
++- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
++- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
++- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
++- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.
+diff --git a/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/claude.md b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/claude.md
+new file mode 100644
+index 00000000..f93d153e
+--- /dev/null
++++ b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/claude.md
+@@ -0,0 +1,60 @@
++I walked the diff (schema parser, link-liveness, file-level composition, CLI shim, SKILL.md, tasks.md bookkeeping) and empirically verified each behavioral hypothesis by executing the actual modules via tsx before reporting. Cleared hypotheses I do NOT report: the engine-adapter's `ENGINE_METHODS` already registers `translate-design-language` (types.ts:30-34), so the skill's preflight gate has a real registry entry; the tasks.md test arithmetic (17 + 20, suite 397→417) reconciles against the `it`-block counts in the diff; the bin shim's tsx-walk and exit contract are consistent with its header. Findings below, strongest first.
++
++### A heading-level typo silently drops an entire rule and the spec still reports green — contradicting the module's "never silently kept or dropped" headline
++
++Finding-ID: AUDIT-BARRAGE-claude-01
++Status:     open
++Severity:   high
++Surface:    plugins/design-control/src/design-language/schema.ts:127-137 (RULE_HEADING_RE match-or-ignore), schema.ts:32 (`RULE_HEADING_RE = /^rule:\s*(.*)$/`)
++
++A rule heading that near-misses the convention is treated as an ordinary section heading, which **resets `current` and silently discards the entire rule plus all of its fields** — with zero findings, and `ok: true` if any other valid rule exists. Empirically verified by executing `parseDesignSpec` against `### Rule: masthead` (capitalized) and `### rule fine-but-no-colon` (missing colon) alongside one valid rule: result was `findings: []`, `rules: ["real"]`, `ok: true`. Two whole rules the author believes exist vanish from the parsed spec, and the gate prints "spec green — 0 findings". Contrast with the field level, where the diff explicitly builds an `unknown-field` typo guard and tasks.md (line "invalid rules become findings, never silently kept or dropped") claims silent drops can't happen — the guard exists one structural level down but not at the level that loses the most content per miss.
++
++Blast radius: this is the gate every draft must pass before presentation, and its consumers act on the green verdict unattended — the SKILL.md procedure (step 4→5) presents a green spec to the operator as complete, and downstream referee/implementation steps treat the parsed rule set as the design language. A capitalized `Rule:` is among the most natural hand-authoring variations (sentence-case headings are the markdown default idiom), so the wrong outcome is reached by default and nothing in the artifact corrects it: the missing rule produces no finding, no skipped-note, no count discrepancy unless the operator hand-counts rules against the output's `N rule(s)`. Fix: add a near-miss detector — a heading whose text matches `rule` case-insensitively or `rule\b` without a colon (e.g. `/^rule\b/i`) but fails the strict form gets a `malformed-rule-heading` (or new `suspicious-rule-heading`) finding, mirroring the `unknown-field` allowlist philosophy stated in the module's own doc comment (schema.ts header: "silently dropping a misspelled `example:` would otherwise fabricate a missing-example rejection with no visible cause" — the identical argument applies to headings, with bigger loss).
++
++### A curly-apostrophe `don’t:` field is silently inert — guidance vanishes with no finding when a `do:` is also present
++
++Finding-ID: AUDIT-BARRAGE-claude-02
++Status:     open
++Severity:   medium
++Surface:    plugins/design-control/src/design-language/schema.ts:34 (`FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z']*)\s*:\s*(.*)$/`)
++
++`FIELD_BULLET_RE`'s key character class admits only the ASCII apostrophe (`[a-z']`). The Unicode right single quotation mark `’` — what macOS smart-quotes, most prose editors, and copy-paste from any rendered document produce — fails the regex entirely, so `- don’t: never raw hex` is classified as inert prose: it doesn't reach the `unknown-field` typo guard (that guard only fires when the bullet *matches* the field shape with an unknown key). Empirically verified: a rule with `- do: keep ink` and `- don’t: never raw hex` (curly) parses with `findings: []` and `donts: []` — the prohibition silently disappears from the spec. Only when the curly `don’t` is the rule's *sole* guidance does a finding appear (`missing-guidance`), and even then the cause is invisible.
++
++Blast radius: the spec is explicitly a hand-authorable prose artifact, so smart-quote substitution is a when-not-if input, and the lost content is specifically the *don't* side — the prohibitions that exist to stop an unattended implementation agent from doing the wrong thing. The check stays green, so nothing prompts a re-read. The same root behavior (non-matching line → inert) is by design for capitalized prose bullets, but `don’t`/`don't` homoglyph confusion is not an authoring choice — it's an editor artifact. Fix: widen the key class to accept `’` and normalize to `don't` before the `isKnownKey` check (one-line: `key.replace(/’/g, "'")`), or add `don’t` to the recognized-then-normalized set; a test pinning the curly form belongs in the corpus.
++
++### Quoted attribute selectors are unlinkable — string-stripping rewrites the source prelude so the liveness check fabricates a dead-link on a live selector
++
++Finding-ID: AUDIT-BARRAGE-claude-03
++Status:     open
++Severity:   medium
++Surface:    plugins/design-control/src/design-language/link-liveness.ts:46-73 (stripCommentsAndStrings strips string CONTENTS), :117-137 (cssDefinesSelector matches against the stripped prelude)
++
++`stripCommentsAndStrings` deliberately empties string literals while keeping delimiters, and `collectSelectorPreludes` runs on that stripped text — so a source rule `input[type="text"] { … }` yields the prelude `input[type=""]`. No spec link can match it: verified empirically that `cssDefinesSelector` returns `false` for both the quoted query `input[type="text"]` and the unquoted `input[type=text]` against that source. Any rule anchored to a quoted attribute selector (`[type="checkbox"]`, `[data-state="open"]`, `[aria-expanded="true"]` — common anchors for exactly the component-kind rules this schema defines) is reported `dead-link-selector` even though the selector is live in the file. The module's own header promises skipped scope is "never fabricated into a dead-link verdict" — this path fabricates one inside the validated scope.
++
++Blast radius: a hard exit-1 wall, but a *visible* one — the operator sees the finding, just gets told a true link is dead. Per SKILL.md step 4 the operator must "fix the link" or "update the rule" and is forbidden to delete the rule; neither remedy exists for this class, so the realistic outcome is re-anchoring to a class selector or a confused push-back, not silent corruption — hence medium rather than high. Fix options: strip strings only when scanning *declaration* text (the prelude/declaration boundary is already tracked via `{`/`}`/`;`), or strip string contents from the *query* with the same function before comparing so both sides normalize identically (`stripCommentsAndStrings(selector)`), which preserves the `content: ".ghost"` protections the tests pin.
++
++### "Defined in source" is satisfied by a selector that only appears inside `:not(...)` or as a non-subject compound — liveness over-approximates definition
++
++Finding-ID: AUDIT-BARRAGE-claude-04
++Status:     open
++Severity:   low
++Surface:    plugins/design-control/src/design-language/link-liveness.ts:117-137 (cssDefinesSelector substring-in-prelude match)
++
++The implemented predicate is "appears ident-boundary exact inside some selector prelude," which is weaker than the documented promise ("the selector must be **defined in that author-written CSS source**", SKILL.md line 47; tasks.md "selector/class must be *defined in author-written source*"). Verified empirically: `cssDefinesSelector('.real:not(.ghost) { … }', '.ghost')` returns `true` — a class that exists *only as an exclusion* in someone else's rule counts as a live anchor. The same holds for any appearance in `:is()`/`:where()`/combinator position. A design rule anchored to such a selector passes the gate while no styling for it exists, which is precisely the rot ("the spec cannot quietly drift into fiction") the liveness axis exists to catch.
++
++Blast radius: low — it requires the spec author to link a selector that happens to appear only in a negation/functional-pseudo context, which is an unusual coincidence rather than a default path, and the failure direction is a missed rot signal (false green on one link), not a false refusal or data loss. The module's internal doc comment honestly describes the mechanism, so a maintainer reading the code isn't misled — only the outward-facing promise is slightly stronger than the check. Fix when worth it: exclude the contents of functional pseudo-class parentheses from the matchable prelude text the same way at-rule preludes are excluded (the paren-tracking is a small extension of the existing state machine), or soften the SKILL.md/tasks.md wording to "appears in a selector of."
++
++### A duplicate rule heading's entire body is silently ignored — including suppression of the unknown-field typo guard inside it
++
++Finding-ID: AUDIT-BARRAGE-claude-05
++Status:     open
++Severity:   low
++Surface:    plugins/design-control/src/design-language/schema.ts:155-163 (duplicate-rule-id branch leaves `current` undefined), :176-178 (fields skipped when `current === undefined`)
++
++On a `duplicate-rule-id` hit the parser emits the finding but leaves `current` unset, so every field bullet under the duplicate heading is dropped without inspection — verified empirically that a duplicate section containing both a misspelled `- exmaple:` and a second `- css:` link produces only `["duplicate-rule-id"]`: the typo guard and the extra link are invisible. The likely authoring intent behind a duplicate id is a copy-paste meant to *extend or replace* the first rule; the author sees one finding, renames the id, and only then discovers the next wave of findings the section was carrying. Same wave-revelation shape exists at the compose layer (check-spec-file.ts:36-39): liveness runs only over `parsed.spec.rules`, which excludes structurally invalid rules, so a rule with a missing example *and* a dead css link reports the dead link only after the example is fixed.
++
++Blast radius: low — every path still ends at a non-green verdict (the duplicate finding itself gates exit 1), so nothing wrong ships; the cost is extra fix-rerun round-trips and a momentarily misleading "1 finding" count, not a wrong outcome. Fix: parse the duplicate section into a throwaway `RawRuleSection` (so its field-level findings still surface, attributed to the duplicate heading's line) while continuing to exclude it from `spec.rules`; optionally run liveness over structurally invalid sections' parsed `cssLinks` too, since the two axes are independent.
++
++---
++
++**Summary for triage:** 5 findings, 0 blocking, 1 high. The high finding (claude-01) and the first medium (claude-02) share a root shape — the parser's "non-matching line is inert prose" stance has no near-miss detection above the field-key level, so the artifact's own headline guarantee ("never silently kept or dropped", tasks.md) holds only for one of the three structural levels; both were confirmed by executing the shipped module, not by reading alone. Claude-03 is a verified false-positive class in the liveness gate (quoted attribute selectors are unlinkable). All five reproduce with one-line probes against `parseDesignSpec`/`cssDefinesSelector`, so RED-first regression tests are cheap for each.
+diff --git a/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/codex.md b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/codex.md
+new file mode 100644
+index 00000000..ff608dfb
+--- /dev/null
++++ b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/codex.md
+@@ -0,0 +1,21 @@
++### Schema-invalid rules never reach the link-liveness pass
++
++Finding-ID: AUDIT-BARRAGE-codex-01
++Status:     open
++Severity:   medium
++Surface:    plugins/design-control/src/design-language/check-spec-file.ts:33-35; plugins/design-control/src/design-language/schema.ts:226-228
++
++`checkDesignSpecFile` parses the markdown, then runs liveness only against `parsed.spec` (`check-spec-file.ts:33-35`). But `parseDesignSpec` filters `spec.rules` down to structurally valid rules only (`schema.ts:226-228`). That means a single rule with both a schema defect and a dead CSS selector reports only the schema defect; its `css:` link is silently excluded from the liveness axis until the operator fixes the schema and reruns.
++
++Blast radius is medium: the checker still fails the spec, so it does not ship a green verdict for that broken rule, but it violates the stated combined gate and creates incremental, rerun-dependent discovery. A reasonable fix is to preserve raw rule sections or parsed CSS links for all rule headings, then run liveness for any syntactically usable `css:` field even when the rule also has schema findings.
++
++### The audited diff introduces explicit deferral language into the skill and checker contract
++
++Finding-ID: AUDIT-BARRAGE-codex-02
++Status:     open
++Severity:   low
++Surface:    plugins/design-control/skills/translate-design-language/SKILL.md:44-48,97-98; plugins/design-control/src/design-language/check-spec-file.ts:68-71; plugins/design-control/specs/001-design-control/tasks.md:176-191
++
++The diff repeatedly encodes “not validated in v1” / “named-deferred” / “out of v1 scope” language in the operator-facing skill, CLI output, and workplan. The audit prompt’s hard constraint rejects deferral phrases because they become bug-factory commitments in unattended workflows; here they are not just comments, they appear in the user-facing validation output (`check-spec-file.ts:68-71`) and in the skill’s instructions about what the operator may present (`SKILL.md:80-82`).
++
++Blast radius is low because the scope boundary is visible and intentional, and the code does not hide skipped links. The operational risk is documentation discipline: agents may normalize presenting partially unchecked specs as “green” because the deferral is built into the happy path. A reasonable fix is to replace temporal deferral phrasing with a stable capability statement, such as “non-CSS targets are reported as unchecked notes and do not establish link-liveness.”
+diff --git a/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/stderr/claude.txt b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/stderr/claude.txt
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/stderr/codex.txt b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/stderr/codex.txt
+new file mode 100644
+index 00000000..5adf9aef
+--- /dev/null
++++ b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/stderr/codex.txt
+@@ -0,0 +1,2308 @@
++Reading prompt from stdin...
++OpenAI Codex v0.136.0
++--------
++workdir: /Users/orion/work/deskwork-work/design-control
++model: gpt-5.5
++provider: openai
++approval: never
++sandbox: workspace-write [workdir, /tmp, $TMPDIR]
++reasoning effort: medium
++reasoning summaries: none
++session id: 019eb6aa-60f2-7d60-a474-7095b2ef7917
++--------
++user
++# Audit-barrage — multi-model audit prompt template
++
++You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface the kinds of defects listed under **What to look for** below, in the work product captured under **Under audit**.
++
++You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
++
++## Feature under audit
++
++design-control
++
++## Feature scope (workplan / PRD summary)
++
++Governance pass over the just-implemented work for feature 'design-control', diffed against 0391a0c0. The differentiated back half audits a plan it did not author or execute.
++
++## Commit subjects in the audited range
++
++bc650cad docs(design-control): check off Phase 2 tasks; roadmap phase-2 → in-flight
++4650ee66 feat(design-control): translate-design-language authoring skill (Phase 2)
++5853f83f feat(design-control): static link-liveness + bin/check-design-spec (Phase 2)
++b2659452 feat(design-control): design-language spec schema + example-presence validation (Phase 2)
++
++
++## Recent audit-log excerpt (prior findings on this feature)
++
++Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
++
++
++Blast radius: medium. Requires the remove-and-re-derive recovery path plus a write failure, but the destroyed artifact is exactly the kind of historical baseline the provenance discipline exists to preserve, and the documented recovery procedure is what walks the operator into it. Fix: include `snapshotTarget` in the append-once refusal (refuse if either final target exists), or promote with no-clobber semantics (`linkSync` + `unlink` instead of `renameSync`).
++
++### AUDIT-20260611-12 — The append-once guarantee is check-then-act — concurrent recorders for the same surface can both succeed
++
++Finding-ID: AUDIT-20260611-12
++Status:     fixed-8916f7d7 (2026-06-10; driving sidecar written with flag wx — O_CREAT|O_EXCL atomic check-and-write; derived sidecar promote linkSync no-clobber; EEXIST on every path maps to the shared append-once refusal; 2 RED-first tests via dangling-symlink TOCTOU stand-in)
++Severity:   low
++Surface:    plugins/design-control/src/provenance/derived.ts:128-141 (assertAppendOnce existsSync), :143-146 (writeProvenance with default 'w' flag), :251-252 (clobbering renameSync)
++
++`assertAppendOnce` uses `existsSync`, then `writeProvenance` writes with the default `'w'` flag and `recordDerivation` promotes via clobbering `renameSync`. Two concurrent recorders for the same surface (the stack-control thesis explicitly targets parallel unattended execution) can both pass the existence check and both "succeed," last-writer-wins — including the derived→driving laundering direction that 0e4027c3 was written to kill. The window is small, but the guarantee is the module's headline promise and the atomic primitive is one flag away.
++
++Blast radius: low — requires two processes recording the same surface near-simultaneously, which already implies an orchestration error, and the result is one record silently lost rather than a default-path failure. Fix: `writeFileSync(path, data, { flag: 'wx' })` for the driving sidecar (making check-and-write atomic, with EEXIST mapped to the append-once refusal), and a link-based no-clobber promote on the derived path (which also resolves claude-04).
++
++### AUDIT-20260611-13 — The govern loop's audited diff embeds its own prior run artifacts — payload compounds each round, and the 900s timeout treats the symptom
++
++Finding-ID: AUDIT-20260611-13
++Status:     filed-upstream https://github.com/audiocontrol-org/deskwork/issues/459 (2026-06-10; stackctl-govern defect — the governed diff must exclude .stack-control/audit-runs/ meta-artifacts; the 900s timeout stays as mitigation until the generator is removed upstream)
++Severity:   medium
++Surface:    plugins/design-control/.stack-control/audit-barrage-config.yaml:30-37 (claude 300→900 rationale); the audited diff's inclusion of audit-runs/\*\*/PROMPT.md
++
++This run's payload contains run 062218157Z's PROMPT.md (~3757 lines), which itself embeds run 055621128Z's full PROMPT.md (~859 lines), which embeds the original feature diff — three levels of recursive self-quotation. Because the governed diff is taken against a fixed base (4a7f30d0) and run artifacts are committed inside the audited tree, every governance round appends its own bookkeeping to the next round's prompt. The config comment documents the consequence — a 181KB prompt and a claude timeout at 301s — and responds by raising the timeout to 900s. That is a symptom patch; the generator is the inclusion of `.stack-control/audit-runs/` (meta-artifacts about the audit) in the diff the audit reads. Per the project's own spec-audit-diminishing-returns rule: remove the generator, don't feed it.
++
++Blast radius: medium and monotonically worsening — each round adds its predecessor's full payload, so timeouts and zero-byte model failures (the exact fleet-degradation mode issue 447 documented) recur at the next size doubling regardless of timeout value, and auditor attention is diluted across thousands of lines of self-quotation. Fix: exclude `.stack-control/audit-runs/` (and governance bookkeeping generally) from the governed diff via pathspec, keeping the diff scoped to work product.
++
++### AUDIT-20260611-14 — Seeded config's header narrates a different feature's history ("project override for graphical-entries")
++
++Finding-ID: AUDIT-20260611-14
++Status:     fixed-in-bookkeeping-commit (2026-06-10; header rewritten to name this installation + the seeding event; inherited graphical-entries rationale explicitly attributed; stale dw-lifecycle template path corrected to the stack-control template)
++Severity:   low
++Surface:    plugins/design-control/.stack-control/audit-barrage-config.yaml:1-27
++
++The file seeded into the design-control nested installation opens with "project override for graphical-entries" and carries that feature's gemini-failure statistics (16 of 17 runs across "the graphical-entries Phase 0 audit cycle") and Phase 12 Task 8 history verbatim. Only the final comment block (claude 300→900, specs/014) belongs to this installation. A future reader tuning this config inherits another feature's rationale as if it were locally measured evidence.
++
++Blast radius: low — no behavioral consequence (the `models:` block is correct), purely misleading provenance in comments, but this plugin's whole subject matter is records that accurately bind to what they describe. Fix: reword the header to name this installation, keep the gemini-disable rationale but attribute it ("per the root override, originally measured on graphical-entries"), and drop the Phase-12 block or cite it as inherited.
++
++---
++
++**Summary for triage:** 7 findings, 0 high/blocking. The strongest cross-cutting signals: (1) the governance tooling itself dropped a run record cited by a commit and rendered untracked files with absolute paths into this very audit's payload (claude-01); (2) two real, verified code defects from the floor-refused run are sitting untriaged (claude-02, independently confirmed as claude-03/-04); (3) the recursive prompt-growth generator behind the timeout bump will defeat the 900s ceiling too (claude-06). Claude-03 and -04 corroborate codex's findings from run 062218157Z — that's cross-model agreement, the protocol's HIGH-confidence signal, despite my medium per-finding blast-radius ratings.
++
++
++## Under audit
++
++The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
++
++diff --git a/plugins/design-control/ROADMAP.md b/plugins/design-control/ROADMAP.md
++index d373af1e..d5f3ac03 100644
++--- a/plugins/design-control/ROADMAP.md
+++++ b/plugins/design-control/ROADMAP.md
++@@ -13,7 +13,7 @@ graph with `stackctl roadmap` — do not hand-edit.
++ - spec: specs/001-design-control
++ 
++ ## impl:feature/phase-2-design-language-spec
++-- status: planned
+++- status: in-flight
++ - spec: specs/001-design-control
++ 
++ ## impl:feature/phase-3-archive-status
++diff --git a/plugins/design-control/bin/check-design-spec b/plugins/design-control/bin/check-design-spec
++new file mode 100755
++index 00000000..40515040
++--- /dev/null
+++++ b/plugins/design-control/bin/check-design-spec
++@@ -0,0 +1,26 @@
+++#!/bin/sh
+++# check-design-spec <design-language-spec.md> — validate a design-language spec:
+++# markdown schema (closed kinds, css links, example-presence, do/don't) + static
+++# link-liveness against author-written CSS (no app boot). Exit codes: 0 green,
+++# 1 findings/error, 2 usage. Logic lives in src/design-language/check-spec-file.ts
+++# (tested); this shim only locates the workspace tsx runner and dispatches.
+++set -eu
+++
+++PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+++
+++dir="$PLUGIN_ROOT"
+++TSX=""
+++while [ "$dir" != "/" ]; do
+++  if [ -x "$dir/node_modules/.bin/tsx" ]; then
+++    TSX="$dir/node_modules/.bin/tsx"
+++    break
+++  fi
+++  dir=$(dirname -- "$dir")
+++done
+++
+++if [ -z "$TSX" ]; then
+++  echo "check-design-spec: tsx runner not found in any node_modules/.bin above $PLUGIN_ROOT — run npm install first" >&2
+++  exit 1
+++fi
+++
+++exec "$TSX" "$PLUGIN_ROOT/src/design-language/check-design-spec-cli.ts" "$@"
++diff --git a/plugins/design-control/skills/translate-design-language/SKILL.md b/plugins/design-control/skills/translate-design-language/SKILL.md
++new file mode 100644
++index 00000000..fbf3294b
++--- /dev/null
+++++ b/plugins/design-control/skills/translate-design-language/SKILL.md
++@@ -0,0 +1,100 @@
+++---
+++name: translate-design-language
+++description: Draft or maintain the project's design-language spec — the hand-authorable markdown artifact that anchors visual identity (palette/type/spacing tokens + signature components, each rule linked to live CSS + ≥1 example). Hand-authoring is the default and needs NO engine; the optional /frontend-design accelerator drafts from approved wireframe intent and is judged by the same check-design-spec gate.
+++---
+++
+++# /design-control:translate-design-language
+++
+++Author or update the **design-language spec** for this project. The spec is the
+++visual-*letter* artifact of the design-control discipline: the durable home for
+++visual identity (the lo-fi wireframe carries UX *spirit* and is structurally
+++incapable of carrying visual detail). Every rule binds to reality — a live CSS
+++file + selector, ≥1 current example — so the spec cannot quietly drift into
+++fiction the way a mockup's incidental polish does.
+++
+++> Per the plugin thesis (`DESIGN-DISCIPLINE-THESIS.md`): policy is enforced by
+++> a process, not a rule. "Each rule links to live CSS" is not a convention the
+++> author is trusted to follow — it is mechanically enforced by the
+++> `check-design-spec` gate (schema + static link-liveness), which every draft
+++> MUST pass before it may be presented.
+++
+++## Spec convention (hand-authorable markdown)
+++
+++One markdown file (conventionally `design-language.md` in the operator's chosen
+++design docs directory). Rules are declared under ATX headings, fields are
+++bullets with a closed key set:
+++
+++```markdown
+++# Design language: <project>
+++
+++## Palette
+++
+++### rule: ink-primary
+++- kind: palette
+++- css: styles/studio.css .btn-primary
+++- example: dashboard compose button uses .btn-primary
+++- do: Use the ink palette for every primary action.
+++- don't: Never introduce raw hex blues outside the palette tokens.
+++```
+++
+++- `kind:` — one of `palette` / `type` / `spacing` / `component` (the closed
+++  vocabulary; `component` is the signature-component class).
+++- `css: <path> <selector>` — ≥1 per rule; the path is relative to the spec
+++  file; the selector must be **defined in that author-written CSS source**
+++  (checked statically — no app boot). Non-CSS targets (CSS-in-JS, utility
+++  frameworks, CSS-Modules) are reported as not-validated-in-v1 notes.
+++- `example:` — ≥1 per rule (a rule with zero examples is rejected). Presence
+++  is structural; whether the example still matches live UI is
+++  `spec-truthfulness`, deliberately out of v1 scope.
+++- `do:` / `don't:` — ≥1 guidance line per rule.
+++
+++## Procedure
+++
+++1. **Locate or create the spec file.** One spec per design language; do not
+++   fork per-surface copies. If the operator has no spec yet, scaffold the
+++   heading + one rule per obvious anchor (masthead, primary action, body type)
+++   directly from the live CSS — with the operator naming the files that count
+++   as design-language source.
+++
+++2. **Author or update rules — manual path (default, requires NO engine).** The
+++   operator (or the agent under operator direction) writes the rules by hand:
+++   pick the selector in live CSS the rule is anchored to, cite ≥1 current
+++   example, state the do/don't. Scaffold completion never depends on engine
+++   presence — this path never calls the engine preflight.
+++
+++3. **Optional engine accelerator.** Only if the operator asks for it: gate on
+++   `preflightEngine` (`@/engine-adapter`, method `translate-design-language`)
+++   — absence fails loud naming the remedy — then request a draft from the
+++   engine (input: the approved wireframe intent + the live CSS files the
+++   operator names). **Engine output gets zero trust:** it lands in the same
+++   file and is judged by the same gate as a hand-authored draft. Engine
+++   conformance (`@/engine-adapter/conformance`) is exercised only when the
+++   engine is present — never stub it to simulate presence.
+++
+++4. **Validation gate — the non-negotiable step.** Run:
+++
+++   ```bash
+++   plugins/design-control/bin/check-design-spec <path/to/design-language.md>
+++   ```
+++
+++   - Exit `0` (spec green, zero findings) → the draft may be presented.
+++     Read any `not validated in v1` notes aloud to the operator — a skipped
+++     link is visible scope, not silent coverage.
+++   - Exit `1` → fix every finding and re-run. A dead selector means either the
+++     rule rots (fix the link) or the CSS moved (update the rule) — NEVER
+++     delete the rule just to silence the finding; that decision is the
+++     operator's.
+++
+++5. **Present and stop.** Show the operator the green spec (path + `0 findings`
+++   output + rule count). The operator owns acceptance; implementation against
+++   the spec and refereeing are separate steps of the loop, not this skill's
+++   job.
+++
+++## What this skill does NOT do
+++
+++- It does not author wireframes (`/design-control:wireframe`), implement, or
+++  referee.
+++- It does not boot the app, capture screenshots, or verify that examples still
+++  match live UI (`spec-truthfulness` is named-deferred).
+++- It does not skip the gate for engine-authored drafts — same gate, same
+++  checker, zero findings.
++diff --git a/plugins/design-control/specs/001-design-control/tasks.md b/plugins/design-control/specs/001-design-control/tasks.md
++index a65fd485..aae9bbd4 100644
++--- a/plugins/design-control/specs/001-design-control/tasks.md
+++++ b/plugins/design-control/specs/001-design-control/tasks.md
++@@ -165,19 +165,40 @@ same lint; a `derived` artifact cannot be accepted without a recorded operator e
++ 
++ ## Phase 2 — Design-language spec convention (v1-scaffold)
++ 
++-- [ ] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
+++- [x] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
++       do/don't), each rule linked to a live CSS file/class + ≥1 current example. The spec is a
++       **hand-authorable markdown artifact** — **scaffold completion does NOT require the engine.**
++-- [ ] **Static** link-liveness check (selector/class must be *defined in author-written source*;
+++      **Done — `b2659452`** (`@/design-language/{types,schema}`: rules under `rule: <id>` ATX
+++      headings; closed RULE_KINDS palette/type/spacing/component; closed field-bullet set
+++      kind/css/example/do/don't with an `unknown-field` typo guard; `css: <path> <selector>`
+++      links; invalid rules become findings, never silently kept or dropped. TDD: RED on the
+++      unresolvable module first; 17 new tests).
+++- [x] **Static** link-liveness check (selector/class must be *defined in author-written source*;
++       **no app boot**). Scoped to author-written CSS selectors/classes; utility-framework / CSS-in-JS
++       / hashed CSS-Modules resolution is **not validated in v1** (named-deferred). Runtime dead-CSS +
++       spec-truthfulness are named-deferred.
++-- [ ] **Example-presence validation:** the schema rejects a rule with **zero example references**
+++      **Done — `5853f83f`** (`@/design-language/link-liveness`: pure file reads, selector must
+++      appear ident-boundary exact in a selector prelude — comments/string-contents stripped,
+++      at-rule preludes excluded but descended into, so `@media` rules count and
+++      `content: ".ghost"` / commented-out rules don't; `.btn-primary` never satisfies `.btn`.
+++      Non-.css targets recorded as `skipped` + printed as notes — the named-deferred boundary is
+++      visible, never a silent drop or a fabricated dead-link. Plus
+++      `@/design-language/check-spec-file` + `bin/check-design-spec` (exit 0/1/2, mirrors
+++      check-wireframe; shim smoke-verified both directions). TDD: RED first; 20 new tests; suite
+++      397 → 417.)
+++- [x] **Example-presence validation:** the schema rejects a rule with **zero example references**
++       (each rule carries ≥1 example). Structural-presence only — verifying the example still matches
++       live UI is `spec-truthfulness` (named-deferred).
++-- [ ] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
+++      **Done — `b2659452`** (`missing-example` finding; an empty `example:` value does NOT
+++      satisfy presence — it surfaces as `empty-field` + `missing-example`, both tested).
+++- [x] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
++       drafts/maintains the spec from approved wireframe intent; its engine conformance is exercised
++       **only when `/frontend-design` is present.**
+++      **Done — `4650ee66`** (`skills/translate-design-language/SKILL.md`, same enforcement shape
+++      as the wireframe skill: manual hand-author path is the default and needs NO engine; the
+++      accelerator gates on `preflightEngine('translate-design-language')`; engine output gets
+++      zero trust — judged by the SAME `bin/check-design-spec` gate; skipped non-CSS links are
+++      read aloud as visible v1 scope).
++ 
++ **Acceptance (two paths):** **(scaffold, required)** an operator can hand-author a spec; static
++ link-liveness flags a **dead selector** with **no app boot** — engine absent; **and the schema
++diff --git a/plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts b/plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts
++new file mode 100644
++index 00000000..d3362e0a
++--- /dev/null
+++++ b/plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts
++@@ -0,0 +1,155 @@
+++/**
+++ * File-level + CLI-core tests for `check-design-spec` (Phase 2).
+++ *
+++ * `checkDesignSpecFile` composes the two axes — markdown schema validation +
+++ * static link-liveness — over a spec FILE, resolving css paths relative to the
+++ * spec's own directory. `runCheckDesignSpec` is the tested CLI core behind
+++ * `bin/check-design-spec` (the shim only dispatches), mirroring the
+++ * check-wireframe exit contract: 0 green / 1 findings-or-error / 2 usage.
+++ *
+++ * Real-fs temp fixtures per .claude/rules/testing.md.
+++ */
+++
+++import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+++import { tmpdir } from 'node:os';
+++import { join } from 'node:path';
+++import { afterEach, describe, expect, it } from 'vitest';
+++import { checkDesignSpecFile, runCheckDesignSpec } from '@/design-language/check-spec-file';
+++
+++const tempDirs: string[] = [];
+++
+++function makeFixtureDir(): string {
+++  const dir = mkdtempSync(join(tmpdir(), 'design-language-cli-'));
+++  tempDirs.push(dir);
+++  return dir;
+++}
+++
+++afterEach(() => {
+++  while (tempDirs.length > 0) {
+++    rmSync(tempDirs.pop() as string, { recursive: true, force: true });
+++  }
+++});
+++
+++interface CapturedIo {
+++  readonly out: string[];
+++  readonly err: string[];
+++  readonly io: { out(line: string): void; err(line: string): void };
+++}
+++
+++function captureIo(): CapturedIo {
+++  const out: string[] = [];
+++  const err: string[] = [];
+++  return { out, err, io: { out: (line) => out.push(line), err: (line) => err.push(line) } };
+++}
+++
+++const GREEN_SPEC = `# Design language: fixture
+++
+++### rule: ink-primary
+++- kind: palette
+++- css: studio.css .btn-primary
+++- example: dashboard compose button
+++- do: Use the ink palette for primary actions.
+++`;
+++
+++function writeGreenFixture(dir: string): string {
+++  writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+++  const specPath = join(dir, 'design-language.md');
+++  writeFileSync(specPath, GREEN_SPEC);
+++  return specPath;
+++}
+++
+++describe('checkDesignSpecFile', () => {
+++  it('passes a hand-authored spec whose links are live', () => {
+++    const specPath = writeGreenFixture(makeFixtureDir());
+++    const result = checkDesignSpecFile(specPath);
+++    expect(result.findings).toEqual([]);
+++    expect(result.ok).toBe(true);
+++    expect(result.spec.rules).toHaveLength(1);
+++  });
+++
+++  it('combines schema findings and liveness findings in one result', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.real { color: ink; }\n');
+++    const specPath = join(dir, 'design-language.md');
+++    writeFileSync(
+++      specPath,
+++      `### rule: no-example
+++- kind: palette
+++- css: studio.css .real
+++- do: x
+++
+++### rule: dead-link
+++- kind: component
+++- css: studio.css .ghost
+++- example: somewhere
+++- do: x
+++`,
+++    );
+++    const result = checkDesignSpecFile(specPath);
+++    const rules = result.findings.map((f) => f.rule);
+++    expect(rules).toContain('missing-example');
+++    expect(rules).toContain('dead-link-selector');
+++    expect(result.ok).toBe(false);
+++  });
+++
+++  it('throws loud on an unreadable spec file (never a clean verdict)', () => {
+++    expect(() => checkDesignSpecFile(join(makeFixtureDir(), 'absent.md'))).toThrow();
+++  });
+++});
+++
+++describe('runCheckDesignSpec — exit contract', () => {
+++  it('exit 0 + green line on a passing spec', () => {
+++    const specPath = writeGreenFixture(makeFixtureDir());
+++    const { out, io } = captureIo();
+++    expect(runCheckDesignSpec([specPath], io)).toBe(0);
+++    expect(out.join('\n')).toContain('0 findings');
+++  });
+++
+++  it('exit 1 + findings on stderr for a dead selector', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.real { color: ink; }\n');
+++    const specPath = join(dir, 'design-language.md');
+++    writeFileSync(
+++      specPath,
+++      `### rule: dead
+++- kind: palette
+++- css: studio.css .ghost
+++- example: somewhere
+++- do: x
+++`,
+++    );
+++    const { err, io } = captureIo();
+++    expect(runCheckDesignSpec([specPath], io)).toBe(1);
+++    expect(err.join('\n')).toContain('dead-link-selector');
+++  });
+++
+++  it('exit 1 + descriptive error on an unreadable file', () => {
+++    const { err, io } = captureIo();
+++    expect(runCheckDesignSpec([join(makeFixtureDir(), 'absent.md')], io)).toBe(1);
+++    expect(err.length).toBeGreaterThan(0);
+++  });
+++
+++  it('exit 2 on usage error', () => {
+++    const { err, io } = captureIo();
+++    expect(runCheckDesignSpec([], io)).toBe(2);
+++    expect(err.join('\n')).toContain('usage');
+++  });
+++
+++  it('reports skipped non-css targets visibly while staying green', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'styles.ts'), 'export const x = 1;\n');
+++    const specPath = join(dir, 'design-language.md');
+++    writeFileSync(
+++      specPath,
+++      `### rule: css-in-js
+++- kind: component
+++- css: styles.ts .btn
+++- example: somewhere
+++- do: x
+++`,
+++    );
+++    const { out, io } = captureIo();
+++    expect(runCheckDesignSpec([specPath], io)).toBe(0);
+++    expect(out.join('\n')).toContain('not validated in v1');
+++  });
+++});
++diff --git a/plugins/design-control/src/__tests__/design-language/link-liveness.test.ts b/plugins/design-control/src/__tests__/design-language/link-liveness.test.ts
++new file mode 100644
++index 00000000..f3bc414f
++--- /dev/null
+++++ b/plugins/design-control/src/__tests__/design-language/link-liveness.test.ts
++@@ -0,0 +1,147 @@
+++/**
+++ * Static link-liveness tests (Phase 2, axis B).
+++ *
+++ * Each rule's `css: <path> <selector>` link must resolve to an author-written
+++ * CSS file in which the selector is DEFINED — checked statically against
+++ * source with NO app boot (the check is pure file reads; the acceptance's
+++ * "flags a dead selector with no app boot — engine absent" lands here).
+++ *
+++ * Scope is author-written CSS only: non-.css targets (CSS-in-JS, hashed
+++ * CSS-Modules, utility frameworks) are NOT validated in v1 (named-deferred) —
+++ * they are recorded as skipped, visibly, never silently dropped and never
+++ * fabricated into a dead-link finding.
+++ *
+++ * Real-fs temp fixtures per .claude/rules/testing.md — never mock the fs.
+++ */
+++
+++import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+++import { tmpdir } from 'node:os';
+++import { join } from 'node:path';
+++import { afterEach, describe, expect, it } from 'vitest';
+++import { checkLinkLiveness } from '@/design-language/link-liveness';
+++import type { ParsedDesignSpec } from '@/design-language/types';
+++
+++const tempDirs: string[] = [];
+++
+++function makeFixtureDir(): string {
+++  const dir = mkdtempSync(join(tmpdir(), 'design-language-liveness-'));
+++  tempDirs.push(dir);
+++  return dir;
+++}
+++
+++afterEach(() => {
+++  while (tempDirs.length > 0) {
+++    rmSync(tempDirs.pop() as string, { recursive: true, force: true });
+++  }
+++});
+++
+++function specWithLink(path: string, selector: string): ParsedDesignSpec {
+++  return {
+++    rules: [
+++      {
+++        id: 'probe',
+++        kind: 'palette',
+++        cssLinks: [{ path, selector }],
+++        examples: ['an example'],
+++        dos: ['guidance'],
+++        donts: [],
+++      },
+++    ],
+++  };
+++}
+++
+++describe('checkLinkLiveness — live selectors pass', () => {
+++  it('passes a class selector defined in the referenced file', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+++    const result = checkLinkLiveness(specWithLink('studio.css', '.btn-primary'), dir);
+++    expect(result.findings).toEqual([]);
+++    expect(result.ok).toBe(true);
+++  });
+++
+++  it('finds a selector defined inside an @media block', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(
+++      join(dir, 'studio.css'),
+++      '@media (min-width: 80rem) {\n  .desktop-rail { width: 16rem; }\n}\n',
+++    );
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.desktop-rail'), dir).ok).toBe(true);
+++  });
+++
+++  it('finds a selector that appears with a pseudo-class in source', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.chip:hover { outline: 1px solid; }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.chip'), dir).ok).toBe(true);
+++  });
+++
+++  it('finds a descendant selector sequence regardless of whitespace', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.masthead   nav a { text-decoration: none; }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.masthead nav a'), dir).ok).toBe(true);
+++  });
+++
+++  it('resolves the css path relative to the spec base dir, including subdirectories', () => {
+++    const dir = makeFixtureDir();
+++    mkdirSync(join(dir, 'styles'));
+++    writeFileSync(join(dir, 'styles', 'chrome.css'), '.masthead-rule { border-top: 2px solid; }\n');
+++    expect(checkLinkLiveness(specWithLink('styles/chrome.css', '.masthead-rule'), dir).ok).toBe(true);
+++  });
+++});
+++
+++describe('checkLinkLiveness — dead links flagged (no app boot)', () => {
+++  it('flags a selector that is not defined anywhere in the file', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+++    const result = checkLinkLiveness(specWithLink('studio.css', '.btn-ghost'), dir);
+++    expect(result.ok).toBe(false);
+++    expect(result.findings.some((f) => f.rule === 'dead-link-selector' && f.ruleId === 'probe')).toBe(
+++      true,
+++    );
+++  });
+++
+++  it('flags a missing css file', () => {
+++    const dir = makeFixtureDir();
+++    const result = checkLinkLiveness(specWithLink('nope.css', '.btn'), dir);
+++    expect(result.findings.some((f) => f.rule === 'dead-link-file')).toBe(true);
+++  });
+++
+++  it('does not let a longer ident satisfy a shorter selector (.btn vs .btn-primary)', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.btn'), dir).ok).toBe(false);
+++  });
+++
+++  it('a selector appearing only in a comment is dead', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '/* .ghost was retired */\n.real { color: ink; }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+++  });
+++
+++  it('a selector appearing only inside a declaration string is dead', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.real::before { content: ".ghost"; }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+++  });
+++
+++  it('a selector appearing only as a property value token is dead', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'studio.css'), '.real { background: url(.ghost/x.png); }\n');
+++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+++  });
+++});
+++
+++describe('checkLinkLiveness — v1 scope boundary (named-deferred, visible)', () => {
+++  it('records a non-.css target as skipped — no finding, never silent', () => {
+++    const dir = makeFixtureDir();
+++    writeFileSync(join(dir, 'styles.ts'), 'export const btn = css`color: navy;`;\n');
+++    const result = checkLinkLiveness(specWithLink('styles.ts', '.btn'), dir);
+++    expect(result.findings).toEqual([]);
+++    expect(result.ok).toBe(true);
+++    expect(result.skipped).toHaveLength(1);
+++    expect(result.skipped[0]).toMatchObject({
+++      ruleId: 'probe',
+++      reason: 'non-css-target',
+++      link: { path: 'styles.ts', selector: '.btn' },
+++    });
+++  });
+++});
++diff --git a/plugins/design-control/src/__tests__/design-language/schema.test.ts b/plugins/design-control/src/__tests__/design-language/schema.test.ts
++new file mode 100644
++index 00000000..70f527e9
++--- /dev/null
+++++ b/plugins/design-control/src/__tests__/design-language/schema.test.ts
++@@ -0,0 +1,231 @@
+++/**
+++ * Schema tests for the design-language spec convention (Phase 2).
+++ *
+++ * The spec is a HAND-AUTHORABLE markdown artifact — these tests pin the parse +
+++ * structural-validation contract: rules declared under `### rule: <id>` headings
+++ * with bullet fields (`kind:` / `css:` / `example:` / `do:` / `don't:`). The
+++ * example-presence acceptance is here: a rule with ZERO example references is
+++ * rejected (structural presence only — example truthfulness is named-deferred).
+++ *
+++ * Nothing in this module touches the engine or the filesystem: the schema is
+++ * pure text → structure (link-liveness is the separate, fs-backed axis).
+++ */
+++
+++import { describe, expect, it } from 'vitest';
+++import { parseDesignSpec } from '@/design-language/schema';
+++import { RULE_KINDS } from '@/design-language/types';
+++
+++const VALID_SPEC = `# Design language: deskwork studio
+++
+++## Palette
+++
+++### rule: ink-primary
+++- kind: palette
+++- css: styles/studio.css .btn-primary
+++- example: dashboard compose button uses .btn-primary
+++- do: Use the ink palette for every primary action.
+++- don't: Never introduce raw hex blues outside the palette tokens.
+++
+++## Signature components
+++
+++### rule: masthead
+++- kind: component
+++- css: styles/studio.css .masthead
+++- css: styles/chrome.css .masthead-rule
+++- example: every page renders the double-rule masthead
+++- example: entry-review header
+++- do: Every top-level page opens with the masthead.
+++`;
+++
+++function findingsFor(markdown: string) {
+++  return parseDesignSpec(markdown).findings.map((f) => f.rule);
+++}
+++
+++describe('parseDesignSpec — valid hand-authored spec', () => {
+++  it('parses a diverse valid spec with zero findings', () => {
+++    const result = parseDesignSpec(VALID_SPEC);
+++    expect(result.findings).toEqual([]);
+++    expect(result.ok).toBe(true);
+++    expect(result.spec.rules).toHaveLength(2);
+++  });
+++
+++  it('captures rule fields: id, kind, css links, examples, guidance', () => {
+++    const result = parseDesignSpec(VALID_SPEC);
+++    const [ink, masthead] = result.spec.rules;
+++    expect(ink.id).toBe('ink-primary');
+++    expect(ink.kind).toBe('palette');
+++    expect(ink.cssLinks).toEqual([{ path: 'styles/studio.css', selector: '.btn-primary' }]);
+++    expect(ink.examples).toEqual(['dashboard compose button uses .btn-primary']);
+++    expect(ink.dos).toEqual(['Use the ink palette for every primary action.']);
+++    expect(ink.donts).toEqual(['Never introduce raw hex blues outside the palette tokens.']);
+++
+++    expect(masthead.id).toBe('masthead');
+++    expect(masthead.kind).toBe('component');
+++    expect(masthead.cssLinks).toHaveLength(2);
+++    expect(masthead.cssLinks[1]).toEqual({ path: 'styles/chrome.css', selector: '.masthead-rule' });
+++    expect(masthead.examples).toHaveLength(2);
+++    expect(masthead.donts).toEqual([]);
+++  });
+++
+++  it('accepts a descendant (multi-token) selector in a css link', () => {
+++    const result = parseDesignSpec(`### rule: nav-item
+++- kind: component
+++- css: styles/studio.css .masthead nav a
+++- example: top nav
+++- do: Keep nav items inside the masthead.
+++`);
+++    expect(result.findings).toEqual([]);
+++    expect(result.spec.rules[0].cssLinks[0]).toEqual({
+++      path: 'styles/studio.css',
+++      selector: '.masthead nav a',
+++    });
+++  });
+++
+++  it('treats prose lines and non-field bullets as inert prose', () => {
+++    const result = parseDesignSpec(`### rule: spacing-scale
+++- kind: spacing
+++- css: styles/studio.css .stack
+++- example: entry list stacking
+++
+++Background prose explaining the scale.
+++
+++- Note: this bullet is prose, not a field (capitalised key).
+++- do: Use the 4px base scale.
+++`);
+++    expect(result.findings).toEqual([]);
+++    expect(result.spec.rules[0].dos).toEqual(['Use the 4px base scale.']);
+++  });
+++
+++  it('exports the closed kind vocabulary', () => {
+++    expect(RULE_KINDS).toEqual(['palette', 'type', 'spacing', 'component']);
+++  });
+++});
+++
+++describe('parseDesignSpec — example-presence (acceptance: zero examples rejected)', () => {
+++  it('rejects a rule with zero example references', () => {
+++    const result = parseDesignSpec(`### rule: ink-primary
+++- kind: palette
+++- css: styles/studio.css .btn-primary
+++- do: Use the ink palette.
+++`);
+++    expect(result.ok).toBe(false);
+++    expect(result.findings.some((f) => f.rule === 'missing-example' && f.ruleId === 'ink-primary')).toBe(
+++      true,
+++    );
+++  });
+++
+++  it('an empty example value does not satisfy example-presence', () => {
+++    const findings = findingsFor(`### rule: ink-primary
+++- kind: palette
+++- css: styles/studio.css .btn-primary
+++- example:
+++- do: Use the ink palette.
+++`);
+++    expect(findings).toContain('empty-field');
+++    expect(findings).toContain('missing-example');
+++  });
+++});
+++
+++describe('parseDesignSpec — structural rejections', () => {
+++  it('flags a document with no rules at all', () => {
+++    expect(findingsFor('# Design language\n\nProse only.\n')).toContain('no-rules');
+++  });
+++
+++  it('flags a missing kind', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- css: styles/studio.css .btn
+++- example: a button
+++- do: x
+++`),
+++    ).toContain('missing-kind');
+++  });
+++
+++  it('flags a kind outside the closed vocabulary', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- kind: colour
+++- css: styles/studio.css .btn
+++- example: a button
+++- do: x
+++`),
+++    ).toContain('unknown-kind');
+++  });
+++
+++  it('flags a rule with no css link (every rule links to live CSS)', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- kind: palette
+++- example: a button
+++- do: x
+++`),
+++    ).toContain('missing-css-link');
+++  });
+++
+++  it('flags a css link without a selector as malformed', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- kind: palette
+++- css: styles/studio.css
+++- example: a button
+++- do: x
+++`),
+++    ).toContain('malformed-css-link');
+++  });
+++
+++  it('flags a rule with neither do nor don’t guidance', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- kind: palette
+++- css: styles/studio.css .btn
+++- example: a button
+++`),
+++    ).toContain('missing-guidance');
+++  });
+++
+++  it('flags duplicate rule ids', () => {
+++    expect(
+++      findingsFor(`### rule: ink
+++- kind: palette
+++- css: styles/studio.css .btn
+++- example: a button
+++- do: x
+++
+++### rule: ink
+++- kind: palette
+++- css: styles/studio.css .btn
+++- example: a button
+++- do: x
+++`),
+++    ).toContain('duplicate-rule-id');
+++  });
+++
+++  it('flags a rule heading without an id', () => {
+++    expect(findingsFor('### rule:\n- kind: palette\n')).toContain('malformed-rule-heading');
+++  });
+++
+++  it('flags an unknown lowercase field key (typo guard, allowlist-shaped)', () => {
+++    const findings = findingsFor(`### rule: ink
+++- kind: palette
+++- css: styles/studio.css .btn
+++- exmaple: a button
+++- do: x
+++`);
+++    expect(findings).toContain('unknown-field');
+++    expect(findings).toContain('missing-example');
+++  });
+++
+++  it('excludes invalid rules from spec.rules but keeps valid siblings', () => {
+++    const result = parseDesignSpec(`### rule: broken
+++- kind: palette
+++
+++### rule: fine
+++- kind: type
+++- css: styles/studio.css .serif
+++- example: body copy
+++- do: Use the serif stack for prose.
+++`);
+++    expect(result.ok).toBe(false);
+++    expect(result.spec.rules.map((r) => r.id)).toEqual(['fine']);
+++  });
+++});
++diff --git a/plugins/design-control/src/design-language/check-design-spec-cli.ts b/plugins/design-control/src/design-language/check-design-spec-cli.ts
++new file mode 100644
++index 00000000..ebace3ed
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/check-design-spec-cli.ts
++@@ -0,0 +1,12 @@
+++/**
+++ * Process entry for `bin/check-design-spec`. All behavior lives in
+++ * {@link runCheckDesignSpec} (tested directly); this file only wires argv and
+++ * the process exit code.
+++ */
+++
+++import { runCheckDesignSpec } from '@/design-language/check-spec-file';
+++
+++process.exitCode = runCheckDesignSpec(process.argv.slice(2), {
+++  out: (line) => console.log(line),
+++  err: (line) => console.error(line),
+++});
++diff --git a/plugins/design-control/src/design-language/check-spec-file.ts b/plugins/design-control/src/design-language/check-spec-file.ts
++new file mode 100644
++index 00000000..91797e63
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/check-spec-file.ts
++@@ -0,0 +1,82 @@
+++/**
+++ * File-level entry to the design-language spec check — the enforcement seam
+++ * the `/design-control:translate-design-language` skill (and the
+++ * `bin/check-design-spec` shim) route EVERY spec draft through, hand-authored
+++ * or engine-accelerated alike. Mirrors `@/authoring/lint-file` for wireframes:
+++ * a thin composition of the existing axes, no parallel validation path.
+++ */
+++
+++import { readFileSync } from 'node:fs';
+++import { dirname, resolve } from 'node:path';
+++import { checkLinkLiveness, type SkippedLink } from '@/design-language/link-liveness';
+++import { parseDesignSpec } from '@/design-language/schema';
+++import type { DesignSpecFinding, ParsedDesignSpec } from '@/design-language/types';
+++
+++export interface DesignSpecCheckResult {
+++  /** True iff findings is empty (skipped links stay green but visible). */
+++  readonly ok: boolean;
+++  readonly spec: ParsedDesignSpec;
+++  /** Schema findings followed by link-liveness findings. */
+++  readonly findings: readonly DesignSpecFinding[];
+++  readonly skipped: readonly SkippedLink[];
+++}
+++
+++/**
+++ * Check a design-language spec FILE: read it, validate the markdown schema,
+++ * then check link-liveness with css paths resolved against the spec file's
+++ * own directory. Fails loud on an unreadable file — a missing spec is an
+++ * error, never a clean verdict.
+++ */
+++export function checkDesignSpecFile(filePath: string): DesignSpecCheckResult {
+++  const absolute = resolve(filePath);
+++  const markdown = readFileSync(absolute, 'utf8');
+++  const parsed = parseDesignSpec(markdown);
+++  const liveness = checkLinkLiveness(parsed.spec, dirname(absolute));
+++  const findings = [...parsed.findings, ...liveness.findings];
+++  return { ok: findings.length === 0, spec: parsed.spec, findings, skipped: liveness.skipped };
+++}
+++
+++/** Line-oriented output sink, injected so the CLI core is testable. */
+++export interface CliIo {
+++  out(line: string): void;
+++  err(line: string): void;
+++}
+++
+++const USAGE = 'usage: check-design-spec <design-language-spec.md>';
+++
+++/**
+++ * CLI core behind `bin/check-design-spec`. Exit-code contract (the skill's
+++ * gate, same shape as check-wireframe):
+++ *   0 — spec green (zero findings; skipped links are reported but green)
+++ *   1 — findings present, or the file could not be read (descriptive error;
+++ *       never a fabricated verdict)
+++ *   2 — usage error
+++ */
+++export function runCheckDesignSpec(argv: readonly string[], io: CliIo): number {
+++  if (argv.length !== 1) {
+++    io.err(USAGE);
+++    return 2;
+++  }
+++  const filePath = argv[0];
+++  let result: DesignSpecCheckResult;
+++  try {
+++    result = checkDesignSpecFile(filePath);
+++  } catch (error) {
+++    io.err(error instanceof Error ? error.message : String(error));
+++    return 1;
+++  }
+++  for (const skip of result.skipped) {
+++    io.out(
+++      `note: rule "${skip.ruleId}" link "${skip.link.path} ${skip.link.selector}" is a non-CSS target — not validated in v1 (CSS-in-JS / utility-framework / CSS-Modules liveness is named-deferred).`,
+++    );
+++  }
+++  if (result.ok) {
+++    io.out(`${filePath}: spec green — 0 findings (${result.spec.rules.length} rule(s))`);
+++    return 0;
+++  }
+++  for (const finding of result.findings) {
+++    io.err(`${finding.rule}${finding.ruleId ? ` (rule: ${finding.ruleId})` : ''}: ${finding.message}`);
+++  }
+++  io.err(`${filePath}: ${result.findings.length} finding(s)`);
+++  return 1;
+++}
++diff --git a/plugins/design-control/src/design-language/index.ts b/plugins/design-control/src/design-language/index.ts
++new file mode 100644
++index 00000000..0d0f0520
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/index.ts
++@@ -0,0 +1,29 @@
+++/**
+++ * Public surface of the design-language spec convention (Phase 2):
+++ * markdown schema (axis A, pure) + static link-liveness (axis B, fs-backed)
+++ * + the file-level composition behind `bin/check-design-spec`.
+++ */
+++
+++export {
+++  RULE_KINDS,
+++  type CssLink,
+++  type DesignRuleKind,
+++  type DesignSpecFinding,
+++  type DesignSpecFindingRule,
+++  type DesignSpecParseResult,
+++  type DesignSpecRule,
+++  type ParsedDesignSpec,
+++} from '@/design-language/types';
+++export { parseDesignSpec } from '@/design-language/schema';
+++export {
+++  checkLinkLiveness,
+++  cssDefinesSelector,
+++  type LivenessResult,
+++  type SkippedLink,
+++} from '@/design-language/link-liveness';
+++export {
+++  checkDesignSpecFile,
+++  runCheckDesignSpec,
+++  type CliIo,
+++  type DesignSpecCheckResult,
+++} from '@/design-language/check-spec-file';
++diff --git a/plugins/design-control/src/design-language/link-liveness.ts b/plugins/design-control/src/design-language/link-liveness.ts
++new file mode 100644
++index 00000000..efe9ddcd
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/link-liveness.ts
++@@ -0,0 +1,170 @@
+++/**
+++ * Static link-liveness for design-language spec rules (Phase 2, axis B).
+++ *
+++ * Each rule's `css: <path> <selector>` link must point at an author-written
+++ * CSS file in which the selector is DEFINED. The check is STATIC — pure file
+++ * reads against source, no app boot, no engine (round-6 M1: "authoring
+++ * artifacts only / no capture dependency").
+++ *
+++ * Scope (v1, named-deferred boundary): only `.css` targets are validated.
+++ * Utility-framework, CSS-in-JS, and hashed CSS-Modules resolution are NOT
+++ * validated in v1 — such links are recorded as `skipped` (visible in the
+++ * result and in CLI output), never silently dropped and never fabricated into
+++ * a dead-link verdict. Liveness ≠ truthfulness: a resolving selector does not
+++ * prove the live CSS still matches the rule's described intent
+++ * (`spec-truthfulness`, named-deferred).
+++ *
+++ * "Defined in source" is implemented as: the selector appears, ident-boundary
+++ * exact, inside some selector prelude of the file — preludes are the text
+++ * runs that precede `{` after comments and string literals are stripped and
+++ * at-rule preludes are excluded (their blocks are descended into, so a rule
+++ * inside `@media` counts; `content: ".ghost"` and commented-out rules do not).
+++ */
+++
+++import { readFileSync } from 'node:fs';
+++import { resolve } from 'node:path';
+++import type {
+++  CssLink,
+++  DesignSpecFinding,
+++  ParsedDesignSpec,
+++} from '@/design-language/types';
+++
+++/** A link excluded from v1 validation, recorded visibly. */
+++export interface SkippedLink {
+++  readonly ruleId: string;
+++  readonly link: CssLink;
+++  readonly reason: 'non-css-target';
+++}
+++
+++export interface LivenessResult {
+++  /** True iff findings is empty (skipped links do not fail the check). */
+++  readonly ok: boolean;
+++  readonly findings: readonly DesignSpecFinding[];
+++  readonly skipped: readonly SkippedLink[];
+++}
+++
+++/** Strip CSS comments and the CONTENTS of string literals (delimiters stay). */
+++function stripCommentsAndStrings(css: string): string {
+++  let out = '';
+++  let i = 0;
+++  while (i < css.length) {
+++    const ch = css[i];
+++    if (ch === '/' && css[i + 1] === '*') {
+++      const end = css.indexOf('*/', i + 2);
+++      i = end === -1 ? css.length : end + 2;
+++      continue;
+++    }
+++    if (ch === '"' || ch === "'") {
+++      out += ch;
+++      i += 1;
+++      while (i < css.length && css[i] !== ch) {
+++        i += css[i] === '\\' ? 2 : 1;
+++      }
+++      if (i < css.length) {
+++        out += ch;
+++        i += 1;
+++      }
+++      continue;
+++    }
+++    out += ch;
+++    i += 1;
+++  }
+++  return out;
+++}
+++
+++/**
+++ * Collect selector preludes: text runs preceding `{`, at every nesting depth,
+++ * excluding at-rule preludes (which are descended into, not matched against).
+++ * Prelude buffers reset on `{`, `}`, and `;` so declaration text never leaks
+++ * into selector position.
+++ */
+++function collectSelectorPreludes(css: string): string[] {
+++  const preludes: string[] = [];
+++  let buffer = '';
+++  for (const ch of stripCommentsAndStrings(css)) {
+++    if (ch === '{') {
+++      const prelude = buffer.trim();
+++      if (prelude !== '' && !prelude.startsWith('@')) {
+++        preludes.push(prelude);
+++      }
+++      buffer = '';
+++      continue;
+++    }
+++    if (ch === '}' || ch === ';') {
+++      buffer = '';
+++      continue;
+++    }
+++    buffer += ch;
+++  }
+++  return preludes;
+++}
+++
+++/** True for characters that extend a CSS ident (would change the selector). */
+++function isIdentChar(ch: string | undefined): boolean {
+++  return ch !== undefined && /[A-Za-z0-9_-]/.test(ch);
+++}
+++
+++/**
+++ * True iff `selector` appears ident-boundary exact inside some selector
+++ * prelude of `css`. Whitespace in a multi-token (descendant) selector is
+++ * normalized on both sides before matching.
+++ */
+++export function cssDefinesSelector(css: string, selector: string): boolean {
+++  const query = selector.trim().replace(/\s+/g, ' ');
+++  if (query === '') {
+++    return false;
+++  }
+++  for (const prelude of collectSelectorPreludes(css)) {
+++    const haystack = prelude.replace(/\s+/g, ' ');
+++    let from = 0;
+++    while (true) {
+++      const at = haystack.indexOf(query, from);
+++      if (at === -1) {
+++        break;
+++      }
+++      if (!isIdentChar(haystack[at - 1]) && !isIdentChar(haystack[at + query.length])) {
+++        return true;
+++      }
+++      from = at + 1;
+++    }
+++  }
+++  return false;
+++}
+++
+++/**
+++ * Check every rule's css links against source. Paths resolve relative to
+++ * `baseDir` (the spec file's directory). Missing file → `dead-link-file`;
+++ * selector not defined → `dead-link-selector`; non-.css target → skipped.
+++ */
+++export function checkLinkLiveness(spec: ParsedDesignSpec, baseDir: string): LivenessResult {
+++  const findings: DesignSpecFinding[] = [];
+++  const skipped: SkippedLink[] = [];
+++  for (const rule of spec.rules) {
+++    for (const link of rule.cssLinks) {
+++      if (!link.path.toLowerCase().endsWith('.css')) {
+++        skipped.push({ ruleId: rule.id, link, reason: 'non-css-target' });
+++        continue;
+++      }
+++      const absolute = resolve(baseDir, link.path);
+++      let css: string;
+++      try {
+++        css = readFileSync(absolute, 'utf8');
+++      } catch {
+++        findings.push({
+++          rule: 'dead-link-file',
+++          message: `Rule "${rule.id}" links to "${link.path}" which does not resolve to a readable file (looked at ${absolute}).`,
+++          ruleId: rule.id,
+++        });
+++        continue;
+++      }
+++      if (!cssDefinesSelector(css, link.selector)) {
+++        findings.push({
+++          rule: 'dead-link-selector',
+++          message: `Rule "${rule.id}" links to selector "${link.selector}" which is not defined in "${link.path}".`,
+++          ruleId: rule.id,
+++        });
+++      }
+++    }
+++  }
+++  return { ok: findings.length === 0, findings, skipped };
+++}
++diff --git a/plugins/design-control/src/design-language/schema.ts b/plugins/design-control/src/design-language/schema.ts
++new file mode 100644
++index 00000000..d50fa8c7
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/schema.ts
++@@ -0,0 +1,231 @@
+++/**
+++ * Markdown schema parser/validator for the design-language spec convention
+++ * (Phase 2, axis A — pure text → structure; NO filesystem, NO engine).
+++ *
+++ * Convention (hand-authorable):
+++ *   - a rule is declared by an ATX heading whose text is `rule: <id>`
+++ *     (any heading level); the rule's section runs to the next heading;
+++ *   - fields are single-line bullets `- <key>: <value>` with the CLOSED key set
+++ *     `kind` / `css` / `example` / `do` / `don't`;
+++ *   - `css: <path> <selector>` — first token is the file path, the remainder is
+++ *     the selector (descendant selectors allowed);
+++ *   - other prose (paragraphs, capitalised-key bullets) is inert.
+++ *
+++ * Validation per rule: kind from the closed vocabulary; ≥1 css link; ≥1
+++ * example (structural presence only — example truthfulness is the
+++ * named-deferred `spec-truthfulness`); ≥1 do/don't guidance line. A lowercase
+++ * single-word bullet key outside the closed set is an `unknown-field` finding
+++ * (typo guard) — silently dropping a misspelled `example:` would otherwise
+++ * fabricate a missing-example rejection with no visible cause.
+++ */
+++
+++import {
+++  RULE_KINDS,
+++  type CssLink,
+++  type DesignRuleKind,
+++  type DesignSpecFinding,
+++  type DesignSpecParseResult,
+++  type DesignSpecRule,
+++} from '@/design-language/types';
+++
+++const HEADING_RE = /^#{1,6}\s+(.*)$/;
+++const RULE_HEADING_RE = /^rule:\s*(.*)$/;
+++/** A field bullet: lowercase single-word key (apostrophe allowed: `don't`). */
+++const FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z']*)\s*:\s*(.*)$/;
+++
+++const KNOWN_KEYS = ['kind', 'css', 'example', 'do', "don't"] as const;
+++type FieldKey = (typeof KNOWN_KEYS)[number];
+++
+++function isKnownKey(key: string): key is FieldKey {
+++  return (KNOWN_KEYS as readonly string[]).includes(key);
+++}
+++
+++function isRuleKind(value: string): value is DesignRuleKind {
+++  return (RULE_KINDS as readonly string[]).includes(value);
+++}
+++
+++/** A rule section under one `rule:` heading, before validation. */
+++interface RawRuleSection {
+++  readonly id: string;
+++  readonly headingLine: number;
+++  kind?: string;
+++  readonly cssLinks: CssLink[];
+++  readonly examples: string[];
+++  readonly dos: string[];
+++  readonly donts: string[];
+++}
+++
+++interface FieldSink {
+++  readonly section: RawRuleSection;
+++  readonly findings: DesignSpecFinding[];
+++}
+++
+++function recordField(sink: FieldSink, key: FieldKey, value: string, line: number): void {
+++  const { section, findings } = sink;
+++  if (value === '') {
+++    findings.push({
+++      rule: 'empty-field',
+++      message: `Field "${key}:" has an empty value.`,
+++      ruleId: section.id,
+++      line,
+++    });
+++    return;
+++  }
+++  switch (key) {
+++    case 'kind':
+++      section.kind = value;
+++      return;
+++    case 'css': {
+++      const spaceAt = value.search(/\s/);
+++      if (spaceAt === -1) {
+++        findings.push({
+++          rule: 'malformed-css-link',
+++          message: `css link "${value}" names a file but no selector — expected "css: <path> <selector>".`,
+++          ruleId: section.id,
+++          line,
+++        });
+++        return;
+++      }
+++      section.cssLinks.push({
+++        path: value.slice(0, spaceAt),
+++        selector: value.slice(spaceAt).trim(),
+++      });
+++      return;
+++    }
+++    case 'example':
+++      section.examples.push(value);
+++      return;
+++    case 'do':
+++      section.dos.push(value);
+++      return;
+++    case "don't":
+++      section.donts.push(value);
+++      return;
+++  }
+++}
+++
+++function validateSection(section: RawRuleSection, findings: DesignSpecFinding[]): DesignSpecRule | undefined {
+++  const problems: DesignSpecFinding[] = [];
+++  const at = { ruleId: section.id, line: section.headingLine };
+++  if (section.kind === undefined) {
+++    problems.push({ rule: 'missing-kind', message: `Rule "${section.id}" has no "kind:" field.`, ...at });
+++  } else if (!isRuleKind(section.kind)) {
+++    problems.push({
+++      rule: 'unknown-kind',
+++      message: `Rule "${section.id}" has kind "${section.kind}" — expected one of: ${RULE_KINDS.join(', ')}.`,
+++      ...at,
+++    });
+++  }
+++  if (section.cssLinks.length === 0) {
+++    problems.push({
+++      rule: 'missing-css-link',
+++      message: `Rule "${section.id}" links to no live CSS — every rule needs ≥1 "css: <path> <selector>".`,
+++      ...at,
+++    });
+++  }
+++  if (section.examples.length === 0) {
+++    problems.push({
+++      rule: 'missing-example',
+++      message: `Rule "${section.id}" carries zero example references — every rule needs ≥1 "example:".`,
+++      ...at,
+++    });
+++  }
+++  if (section.dos.length === 0 && section.donts.length === 0) {
+++    problems.push({
+++      rule: 'missing-guidance',
+++      message: `Rule "${section.id}" has neither a "do:" nor a "don't:" guidance line.`,
+++      ...at,
+++    });
+++  }
+++  findings.push(...problems);
+++  if (problems.length > 0 || section.kind === undefined || !isRuleKind(section.kind)) {
+++    return undefined;
+++  }
+++  return {
+++    id: section.id,
+++    kind: section.kind,
+++    cssLinks: section.cssLinks,
+++    examples: section.examples,
+++    dos: section.dos,
+++    donts: section.donts,
+++  };
+++}
+++
+++/**
+++ * Parse + structurally validate a design-language spec. Pure: text in,
+++ * structure + findings out. `spec.rules` carries only the structurally-valid
+++ * rules; every defect is a finding (never a silent drop).
+++ */
+++export function parseDesignSpec(markdown: string): DesignSpecParseResult {
+++  const findings: DesignSpecFinding[] = [];
+++  const sections: RawRuleSection[] = [];
+++  const seenIds = new Set<string>();
+++  let current: RawRuleSection | undefined;
+++
+++  const lines = markdown.split('\n');
+++  for (let i = 0; i < lines.length; i += 1) {
+++    const line = lines[i].trimEnd();
+++    const lineNo = i + 1;
+++    const heading = HEADING_RE.exec(line.trim());
+++    if (heading !== null) {
+++      current = undefined;
+++      const ruleHeading = RULE_HEADING_RE.exec(heading[1].trim());
+++      if (ruleHeading === null) {
+++        continue;
+++      }
+++      const id = ruleHeading[1].trim();
+++      if (id === '') {
+++        findings.push({
+++          rule: 'malformed-rule-heading',
+++          message: `Rule heading at line ${lineNo} has no id — expected "rule: <id>".`,
+++          line: lineNo,
+++        });
+++        continue;
+++      }
+++      if (seenIds.has(id)) {
+++        findings.push({
+++          rule: 'duplicate-rule-id',
+++          message: `Rule id "${id}" is declared more than once.`,
+++          ruleId: id,
+++          line: lineNo,
+++        });
+++        continue;
+++      }
+++      seenIds.add(id);
+++      current = { id, headingLine: lineNo, cssLinks: [], examples: [], dos: [], donts: [] };
+++      sections.push(current);
+++      continue;
+++    }
+++    if (current === undefined) {
+++      continue;
+++    }
+++    const bullet = FIELD_BULLET_RE.exec(line.trim());
+++    if (bullet === null) {
+++      continue;
+++    }
+++    const key = bullet[1];
+++    if (!isKnownKey(key)) {
+++      findings.push({
+++        rule: 'unknown-field',
+++        message: `Unknown field "${key}:" — known fields are: ${KNOWN_KEYS.join(', ')}.`,
+++        ruleId: current.id,
+++        line: lineNo,
+++      });
+++      continue;
+++    }
+++    recordField({ section: current, findings }, key, bullet[2].trim(), lineNo);
+++  }
+++
+++  if (sections.length === 0) {
+++    findings.push({
+++      rule: 'no-rules',
+++      message: 'The spec declares no rules — expected ≥1 "rule: <id>" heading.',
+++    });
+++  }
+++
+++  const rules = sections
+++    .map((section) => validateSection(section, findings))
+++    .filter((rule): rule is DesignSpecRule => rule !== undefined);
+++
+++  return { ok: findings.length === 0, spec: { rules }, findings };
+++}
++diff --git a/plugins/design-control/src/design-language/types.ts b/plugins/design-control/src/design-language/types.ts
++new file mode 100644
++index 00000000..77f3afdc
++--- /dev/null
+++++ b/plugins/design-control/src/design-language/types.ts
++@@ -0,0 +1,89 @@
+++/**
+++ * Shared types for the design-language spec convention (Phase 2).
+++ *
+++ * A design-language spec is a HAND-AUTHORABLE markdown artifact — the visual
+++ * *letter* reference of the design-control discipline (the lo-fi wireframe is
+++ * the UX *spirit*). The schema is allowlist-shaped like the rest of this
+++ * plugin: a closed kind vocabulary, a closed field-key set (typos surface as
+++ * findings, never silently drop), and per-rule structural requirements —
+++ * ≥1 live-CSS link, ≥1 example reference, ≥1 do/don't guidance line.
+++ *
+++ * Extracted so the pure-text schema axis (`schema.ts`) and the fs-backed
+++ * link-liveness axis (`link-liveness.ts`) share one taxonomy without a cycle
+++ * (mirrors `@/lint/types`).
+++ */
+++
+++/**
+++ * Closed vocabulary of rule kinds, single-sourced as a `const ... as const`
+++ * array (mirroring `ENGINE_METHODS` / `FAILURE_MODES`): palette / type /
+++ * spacing tokens + the signature-component vocabulary.
+++ */
+++export const RULE_KINDS = ['palette', 'type', 'spacing', 'component'] as const;
+++
+++export type DesignRuleKind = (typeof RULE_KINDS)[number];
+++
+++/**
+++ * A rule's link to live CSS: a path to an author-written CSS file (relative to
+++ * the spec file) plus the selector the rule is anchored to. The selector may be
+++ * multi-token (descendant combinators); the path is the first whitespace-free
+++ * token of the `css:` field value.
+++ */
+++export interface CssLink {
+++  readonly path: string;
+++  readonly selector: string;
+++}
+++
+++/** One structurally-valid rule parsed out of a design-language spec. */
+++export interface DesignSpecRule {
+++  /** The id from the `### rule: <id>` heading. */
+++  readonly id: string;
+++  /** Kind from the closed {@link RULE_KINDS} vocabulary. */
+++  readonly kind: DesignRuleKind;
+++  /** ≥1 live-CSS link (the link-liveness axis verifies each). */
+++  readonly cssLinks: readonly CssLink[];
+++  /** ≥1 example reference (structural presence only; truthfulness deferred). */
+++  readonly examples: readonly string[];
+++  /** `do:` guidance lines. */
+++  readonly dos: readonly string[];
+++  /** `don't:` guidance lines. */
+++  readonly donts: readonly string[];
+++}
+++
+++/** Finding taxonomy across both axes (schema structure + link-liveness). */
+++export type DesignSpecFindingRule =
+++  // axis A — markdown schema structure
+++  | 'no-rules'
+++  | 'malformed-rule-heading'
+++  | 'duplicate-rule-id'
+++  | 'missing-kind'
+++  | 'unknown-kind'
+++  | 'missing-css-link'
+++  | 'malformed-css-link'
+++  | 'missing-example'
+++  | 'missing-guidance'
+++  | 'unknown-field'
+++  | 'empty-field'
+++  // axis B — static link-liveness against author-written CSS source
+++  | 'dead-link-file'
+++  | 'dead-link-selector';
+++
+++export interface DesignSpecFinding {
+++  readonly rule: DesignSpecFindingRule;
+++  readonly message: string;
+++  /** The spec rule the finding is about, when rule-scoped. */
+++  readonly ruleId?: string;
+++  /** 1-based markdown source line, when known. */
+++  readonly line?: number;
+++}
+++
+++/** The parsed spec: structurally-valid rules only (invalid rules are findings). */
+++export interface ParsedDesignSpec {
+++  readonly rules: readonly DesignSpecRule[];
+++}
+++
+++export interface DesignSpecParseResult {
+++  /** True iff findings is empty. */
+++  readonly ok: boolean;
+++  readonly spec: ParsedDesignSpec;
+++  readonly findings: readonly DesignSpecFinding[];
+++}
++
++
++## What to look for
++
++- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
++- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
++- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
++- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
++- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
++- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
++- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
++
++## Output format
++
++For each finding you surface, emit ONE markdown block in this exact shape:
++
++```
++### <heading: one-line summary of the finding>
++
++Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
++Status:     open
++Severity:   <blocking | high | medium | low | informational>
++Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
++
++<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
++```
++
++Number the findings sequentially (`-01`, `-02`, ...).
++
++**Severity — rate each finding by downstream blast-radius:** the consequence if a downstream consumer acts on the audited surface *as written*. The consumer may be an adopter running the code, or — especially for a spec — an AI agent building **unattended** from it, with no human to catch a wrong reading. Rate by what would actually happen if this shipped as-is, **not by how alarming the finding feels**. State the blast-radius reasoning in the finding body for every finding, at every level.
++
++- `blocking` — acting on it as-written breaks the feature's stated goals in obvious ways; OR (for a spec) the more natural reading an agent reaches first is the wrong one, so it will likely be built wrong by default and nothing in the artifact corrects it.
++- `high` — a correctness/safety defect a consumer will hit; OR a spec contradiction/ambiguity where the readings are roughly equally plausible and the artifact doesn't disambiguate — an agent might build either, including the wrong one.
++- `medium` — a design issue that compounds over time; OR a spec inconsistency a reasonable consumer would resolve correctly anyway (readings barely diverge, or context makes the intended one obvious).
++- `low` — hygiene; cosmetic wording with no behavioral or implementation consequence.
++- `informational` — context worth seeing, not itself a defect.
++
++**Calibrate by consequence, not by alarm.** A genuine contradiction a reader would obviously resolve the right way is at most `medium`. A quietly-plausible wrong reading an agent would actually build is `high`/`blocking` even if it looks minor. A spec's internal consistency is load-bearing — it is the input to an unattended build.
++
++## If you find nothing — say so explicitly
++
++If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
++
++```
++### No findings
++
++Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
++Status:     open
++Severity:   informational
++Surface:    (the entire diff)
++
++I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
++```
++
++**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
++
++## Hard constraints
++
++- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
++- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
++- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
++- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.
++
++codex
++I’ll use the `feature-review` workflow for this audit, but keep the output in the exact barrage format you requested. I’m going to verify the diff against the working files so any findings have concrete line anchors.
++exec
++/bin/zsh -lc "sed -n '1,220p' .agents/skills/feature-review/SKILL.md && nl -ba plugins/design-control/src/design-language/schema.ts | sed -n '1,260p' && nl -ba plugins/design-control/src/design-language/link-liveness.ts | sed -n '1,220p' && nl -ba plugins/design-control/skills/translate-design-language/SKILL.md | sed -n '1,130p'" in /Users/orion/work/deskwork-work/design-control
++ succeeded in 0ms:
++---
++name: feature-review
++description: "Review recent feature changes for bugs, regressions, and missing tests, then report findings without fixing them."
++---
++
++# Feature Review
++
++1. Determine review scope from uncommitted, staged, and branch-vs-main changes.
++2. Read the changed files and workplan context.
++3. Review for:
++   - bugs
++   - regressions
++   - missing tests
++   - guideline violations
++4. Report findings first, ordered by severity, with file references.
++5. Do not fix issues in this step.
++     1	/**
++     2	 * Markdown schema parser/validator for the design-language spec convention
++     3	 * (Phase 2, axis A — pure text → structure; NO filesystem, NO engine).
++     4	 *
++     5	 * Convention (hand-authorable):
++     6	 *   - a rule is declared by an ATX heading whose text is `rule: <id>`
++     7	 *     (any heading level); the rule's section runs to the next heading;
++     8	 *   - fields are single-line bullets `- <key>: <value>` with the CLOSED key set
++     9	 *     `kind` / `css` / `example` / `do` / `don't`;
++    10	 *   - `css: <path> <selector>` — first token is the file path, the remainder is
++    11	 *     the selector (descendant selectors allowed);
++    12	 *   - other prose (paragraphs, capitalised-key bullets) is inert.
++    13	 *
++    14	 * Validation per rule: kind from the closed vocabulary; ≥1 css link; ≥1
++    15	 * example (structural presence only — example truthfulness is the
++    16	 * named-deferred `spec-truthfulness`); ≥1 do/don't guidance line. A lowercase
++    17	 * single-word bullet key outside the closed set is an `unknown-field` finding
++    18	 * (typo guard) — silently dropping a misspelled `example:` would otherwise
++    19	 * fabricate a missing-example rejection with no visible cause.
++    20	 */
++    21	
++    22	import {
++    23	  RULE_KINDS,
++    24	  type CssLink,
++    25	  type DesignRuleKind,
++    26	  type DesignSpecFinding,
++    27	  type DesignSpecParseResult,
++    28	  type DesignSpecRule,
++    29	} from '@/design-language/types';
++    30	
++    31	const HEADING_RE = /^#{1,6}\s+(.*)$/;
++    32	const RULE_HEADING_RE = /^rule:\s*(.*)$/;
++    33	/** A field bullet: lowercase single-word key (apostrophe allowed: `don't`). */
++    34	const FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z']*)\s*:\s*(.*)$/;
++    35	
++    36	const KNOWN_KEYS = ['kind', 'css', 'example', 'do', "don't"] as const;
++    37	type FieldKey = (typeof KNOWN_KEYS)[number];
++    38	
++    39	function isKnownKey(key: string): key is FieldKey {
++    40	  return (KNOWN_KEYS as readonly string[]).includes(key);
++    41	}
++    42	
++    43	function isRuleKind(value: string): value is DesignRuleKind {
++    44	  return (RULE_KINDS as readonly string[]).includes(value);
++    45	}
++    46	
++    47	/** A rule section under one `rule:` heading, before validation. */
++    48	interface RawRuleSection {
++    49	  readonly id: string;
++    50	  readonly headingLine: number;
++    51	  kind?: string;
++    52	  readonly cssLinks: CssLink[];
++    53	  readonly examples: string[];
++    54	  readonly dos: string[];
++    55	  readonly donts: string[];
++    56	}
++    57	
++    58	interface FieldSink {
++    59	  readonly section: RawRuleSection;
++    60	  readonly findings: DesignSpecFinding[];
++    61	}
++    62	
++    63	function recordField(sink: FieldSink, key: FieldKey, value: string, line: number): void {
++    64	  const { section, findings } = sink;
++    65	  if (value === '') {
++    66	    findings.push({
++    67	      rule: 'empty-field',
++    68	      message: `Field "${key}:" has an empty value.`,
++    69	      ruleId: section.id,
++    70	      line,
++    71	    });
++    72	    return;
++    73	  }
++    74	  switch (key) {
++    75	    case 'kind':
++    76	      section.kind = value;
++    77	      return;
++    78	    case 'css': {
++    79	      const spaceAt = value.search(/\s/);
++    80	      if (spaceAt === -1) {
++    81	        findings.push({
++    82	          rule: 'malformed-css-link',
++    83	          message: `css link "${value}" names a file but no selector — expected "css: <path> <selector>".`,
++    84	          ruleId: section.id,
++    85	          line,
++    86	        });
++    87	        return;
++    88	      }
++    89	      section.cssLinks.push({
++    90	        path: value.slice(0, spaceAt),
++    91	        selector: value.slice(spaceAt).trim(),
++    92	      });
++    93	      return;
++    94	    }
++    95	    case 'example':
++    96	      section.examples.push(value);
++    97	      return;
++    98	    case 'do':
++    99	      section.dos.push(value);
++   100	      return;
++   101	    case "don't":
++   102	      section.donts.push(value);
++   103	      return;
++   104	  }
++   105	}
++   106	
++   107	function validateSection(section: RawRuleSection, findings: DesignSpecFinding[]): DesignSpecRule | undefined {
++   108	  const problems: DesignSpecFinding[] = [];
++   109	  const at = { ruleId: section.id, line: section.headingLine };
++   110	  if (section.kind === undefined) {
++   111	    problems.push({ rule: 'missing-kind', message: `Rule "${section.id}" has no "kind:" field.`, ...at });
++   112	  } else if (!isRuleKind(section.kind)) {
++   113	    problems.push({
++   114	      rule: 'unknown-kind',
++   115	      message: `Rule "${section.id}" has kind "${section.kind}" — expected one of: ${RULE_KINDS.join(', ')}.`,
++   116	      ...at,
++   117	    });
++   118	  }
++   119	  if (section.cssLinks.length === 0) {
++   120	    problems.push({
++   121	      rule: 'missing-css-link',
++   122	      message: `Rule "${section.id}" links to no live CSS — every rule needs ≥1 "css: <path> <selector>".`,
++   123	      ...at,
++   124	    });
++   125	  }
++   126	  if (section.examples.length === 0) {
++   127	    problems.push({
++   128	      rule: 'missing-example',
++   129	      message: `Rule "${section.id}" carries zero example references — every rule needs ≥1 "example:".`,
++   130	      ...at,
++   131	    });
++   132	  }
++   133	  if (section.dos.length === 0 && section.donts.length === 0) {
++   134	    problems.push({
++   135	      rule: 'missing-guidance',
++   136	      message: `Rule "${section.id}" has neither a "do:" nor a "don't:" guidance line.`,
++   137	      ...at,
++   138	    });
++   139	  }
++   140	  findings.push(...problems);
++   141	  if (problems.length > 0 || section.kind === undefined || !isRuleKind(section.kind)) {
++   142	    return undefined;
++   143	  }
++   144	  return {
++   145	    id: section.id,
++   146	    kind: section.kind,
++   147	    cssLinks: section.cssLinks,
++   148	    examples: section.examples,
++   149	    dos: section.dos,
++   150	    donts: section.donts,
++   151	  };
++   152	}
++   153	
++   154	/**
++   155	 * Parse + structurally validate a design-language spec. Pure: text in,
++   156	 * structure + findings out. `spec.rules` carries only the structurally-valid
++   157	 * rules; every defect is a finding (never a silent drop).
++   158	 */
++   159	export function parseDesignSpec(markdown: string): DesignSpecParseResult {
++   160	  const findings: DesignSpecFinding[] = [];
++   161	  const sections: RawRuleSection[] = [];
++   162	  const seenIds = new Set<string>();
++   163	  let current: RawRuleSection | undefined;
++   164	
++   165	  const lines = markdown.split('\n');
++   166	  for (let i = 0; i < lines.length; i += 1) {
++   167	    const line = lines[i].trimEnd();
++   168	    const lineNo = i + 1;
++   169	    const heading = HEADING_RE.exec(line.trim());
++   170	    if (heading !== null) {
++   171	      current = undefined;
++   172	      const ruleHeading = RULE_HEADING_RE.exec(heading[1].trim());
++   173	      if (ruleHeading === null) {
++   174	        continue;
++   175	      }
++   176	      const id = ruleHeading[1].trim();
++   177	      if (id === '') {
++   178	        findings.push({
++   179	          rule: 'malformed-rule-heading',
++   180	          message: `Rule heading at line ${lineNo} has no id — expected "rule: <id>".`,
++   181	          line: lineNo,
++   182	        });
++   183	        continue;
++   184	      }
++   185	      if (seenIds.has(id)) {
++   186	        findings.push({
++   187	          rule: 'duplicate-rule-id',
++   188	          message: `Rule id "${id}" is declared more than once.`,
++   189	          ruleId: id,
++   190	          line: lineNo,
++   191	        });
++   192	        continue;
++   193	      }
++   194	      seenIds.add(id);
++   195	      current = { id, headingLine: lineNo, cssLinks: [], examples: [], dos: [], donts: [] };
++   196	      sections.push(current);
++   197	      continue;
++   198	    }
++   199	    if (current === undefined) {
++   200	      continue;
++   201	    }
++   202	    const bullet = FIELD_BULLET_RE.exec(line.trim());
++   203	    if (bullet === null) {
++   204	      continue;
++   205	    }
++   206	    const key = bullet[1];
++   207	    if (!isKnownKey(key)) {
++   208	      findings.push({
++   209	        rule: 'unknown-field',
++   210	        message: `Unknown field "${key}:" — known fields are: ${KNOWN_KEYS.join(', ')}.`,
++   211	        ruleId: current.id,
++   212	        line: lineNo,
++   213	      });
++   214	      continue;
++   215	    }
++   216	    recordField({ section: current, findings }, key, bullet[2].trim(), lineNo);
++   217	  }
++   218	
++   219	  if (sections.length === 0) {
++   220	    findings.push({
++   221	      rule: 'no-rules',
++   222	      message: 'The spec declares no rules — expected ≥1 "rule: <id>" heading.',
++   223	    });
++   224	  }
++   225	
++   226	  const rules = sections
++   227	    .map((section) => validateSection(section, findings))
++   228	    .filter((rule): rule is DesignSpecRule => rule !== undefined);
++   229	
++   230	  return { ok: findings.length === 0, spec: { rules }, findings };
++   231	}
++     1	/**
++     2	 * Static link-liveness for design-language spec rules (Phase 2, axis B).
++     3	 *
++     4	 * Each rule's `css: <path> <selector>` link must point at an author-written
++     5	 * CSS file in which the selector is DEFINED. The check is STATIC — pure file
++     6	 * reads against source, no app boot, no engine (round-6 M1: "authoring
++     7	 * artifacts only / no capture dependency").
++     8	 *
++     9	 * Scope (v1, named-deferred boundary): only `.css` targets are validated.
++    10	 * Utility-framework, CSS-in-JS, and hashed CSS-Modules resolution are NOT
++    11	 * validated in v1 — such links are recorded as `skipped` (visible in the
++    12	 * result and in CLI output), never silently dropped and never fabricated into
++    13	 * a dead-link verdict. Liveness ≠ truthfulness: a resolving selector does not
++    14	 * prove the live CSS still matches the rule's described intent
++    15	 * (`spec-truthfulness`, named-deferred).
++    16	 *
++    17	 * "Defined in source" is implemented as: the selector appears, ident-boundary
++    18	 * exact, inside some selector prelude of the file — preludes are the text
++    19	 * runs that precede `{` after comments and string literals are stripped and
++    20	 * at-rule preludes are excluded (their blocks are descended into, so a rule
++    21	 * inside `@media` counts; `content: ".ghost"` and commented-out rules do not).
++    22	 */
++    23	
++    24	import { readFileSync } from 'node:fs';
++    25	import { resolve } from 'node:path';
++    26	import type {
++    27	  CssLink,
++    28	  DesignSpecFinding,
++    29	  ParsedDesignSpec,
++    30	} from '@/design-language/types';
++    31	
++    32	/** A link excluded from v1 validation, recorded visibly. */
++    33	export interface SkippedLink {
++    34	  readonly ruleId: string;
++    35	  readonly link: CssLink;
++    36	  readonly reason: 'non-css-target';
++    37	}
++    38	
++    39	export interface LivenessResult {
++    40	  /** True iff findings is empty (skipped links do not fail the check). */
++    41	  readonly ok: boolean;
++    42	  readonly findings: readonly DesignSpecFinding[];
++    43	  readonly skipped: readonly SkippedLink[];
++    44	}
++    45	
++    46	/** Strip CSS comments and the CONTENTS of string literals (delimiters stay). */
++    47	function stripCommentsAndStrings(css: string): string {
++    48	  let out = '';
++    49	  let i = 0;
++    50	  while (i < css.length) {
++    51	    const ch = css[i];
++    52	    if (ch === '/' && css[i + 1] === '*') {
++    53	      const end = css.indexOf('*/', i + 2);
++    54	      i = end === -1 ? css.length : end + 2;
++    55	      continue;
++    56	    }
++    57	    if (ch === '"' || ch === "'") {
++    58	      out += ch;
++    59	      i += 1;
++    60	      while (i < css.length && css[i] !== ch) {
++    61	        i += css[i] === '\\' ? 2 : 1;
++    62	      }
++    63	      if (i < css.length) {
++    64	        out += ch;
++    65	        i += 1;
++    66	      }
++    67	      continue;
++    68	    }
++    69	    out += ch;
++    70	    i += 1;
++    71	  }
++    72	  return out;
++    73	}
++    74	
++    75	/**
++    76	 * Collect selector preludes: text runs preceding `{`, at every nesting depth,
++    77	 * excluding at-rule preludes (which are descended into, not matched against).
++    78	 * Prelude buffers reset on `{`, `}`, and `;` so declaration text never leaks
++    79	 * into selector position.
++    80	 */
++    81	function collectSelectorPreludes(css: string): string[] {
++    82	  const preludes: string[] = [];
++    83	  let buffer = '';
++    84	  for (const ch of stripCommentsAndStrings(css)) {
++    85	    if (ch === '{') {
++    86	      const prelude = buffer.trim();
++    87	      if (prelude !== '' && !prelude.startsWith('@')) {
++    88	        preludes.push(prelude);
++    89	      }
++    90	      buffer = '';
++    91	      continue;
++    92	    }
++    93	    if (ch === '}' || ch === ';') {
++    94	      buffer = '';
++    95	      continue;
++    96	    }
++    97	    buffer += ch;
++    98	  }
++    99	  return preludes;
++   100	}
++   101	
++   102	/** True for characters that extend a CSS ident (would change the selector). */
++   103	function isIdentChar(ch: string | undefined): boolean {
++   104	  return ch !== undefined && /[A-Za-z0-9_-]/.test(ch);
++   105	}
++   106	
++   107	/**
++   108	 * True iff `selector` appears ident-boundary exact inside some selector
++   109	 * prelude of `css`. Whitespace in a multi-token (descendant) selector is
++   110	 * normalized on both sides before matching.
++   111	 */
++   112	export function cssDefinesSelector(css: string, selector: string): boolean {
++   113	  const query = selector.trim().replace(/\s+/g, ' ');
++   114	  if (query === '') {
++   115	    return false;
++   116	  }
++   117	  for (const prelude of collectSelectorPreludes(css)) {
++   118	    const haystack = prelude.replace(/\s+/g, ' ');
++   119	    let from = 0;
++   120	    while (true) {
++   121	      const at = haystack.indexOf(query, from);
++   122	      if (at === -1) {
++   123	        break;
++   124	      }
++   125	      if (!isIdentChar(haystack[at - 1]) && !isIdentChar(haystack[at + query.length])) {
++   126	        return true;
++   127	      }
++   128	      from = at + 1;
++   129	    }
++   130	  }
++   131	  return false;
++   132	}
++   133	
++   134	/**
++   135	 * Check every rule's css links against source. Paths resolve relative to
++   136	 * `baseDir` (the spec file's directory). Missing file → `dead-link-file`;
++   137	 * selector not defined → `dead-link-selector`; non-.css target → skipped.
++   138	 */
++   139	export function checkLinkLiveness(spec: ParsedDesignSpec, baseDir: string): LivenessResult {
++   140	  const findings: DesignSpecFinding[] = [];
++   141	  const skipped: SkippedLink[] = [];
++   142	  for (const rule of spec.rules) {
++   143	    for (const link of rule.cssLinks) {
++   144	      if (!link.path.toLowerCase().endsWith('.css')) {
++   145	        skipped.push({ ruleId: rule.id, link, reason: 'non-css-target' });
++   146	        continue;
++   147	      }
++   148	      const absolute = resolve(baseDir, link.path);
++   149	      let css: string;
++   150	      try {
++   151	        css = readFileSync(absolute, 'utf8');
++   152	      } catch {
++   153	        findings.push({
++   154	          rule: 'dead-link-file',
++   155	          message: `Rule "${rule.id}" links to "${link.path}" which does not resolve to a readable file (looked at ${absolute}).`,
++   156	          ruleId: rule.id,
++   157	        });
++   158	        continue;
++   159	      }
++   160	      if (!cssDefinesSelector(css, link.selector)) {
++   161	        findings.push({
++   162	          rule: 'dead-link-selector',
++   163	          message: `Rule "${rule.id}" links to selector "${link.selector}" which is not defined in "${link.path}".`,
++   164	          ruleId: rule.id,
++   165	        });
++   166	      }
++   167	    }
++   168	  }
++   169	  return { ok: findings.length === 0, findings, skipped };
++   170	}
++     1	---
++     2	name: translate-design-language
++     3	description: Draft or maintain the project's design-language spec — the hand-authorable markdown artifact that anchors visual identity (palette/type/spacing tokens + signature components, each rule linked to live CSS + ≥1 example). Hand-authoring is the default and needs NO engine; the optional /frontend-design accelerator drafts from approved wireframe intent and is judged by the same check-design-spec gate.
++     4	---
++     5	
++     6	# /design-control:translate-design-language
++     7	
++     8	Author or update the **design-language spec** for this project. The spec is the
++     9	visual-*letter* artifact of the design-control discipline: the durable home for
++    10	visual identity (the lo-fi wireframe carries UX *spirit* and is structurally
++    11	incapable of carrying visual detail). Every rule binds to reality — a live CSS
++    12	file + selector, ≥1 current example — so the spec cannot quietly drift into
++    13	fiction the way a mockup's incidental polish does.
++    14	
++    15	> Per the plugin thesis (`DESIGN-DISCIPLINE-THESIS.md`): policy is enforced by
++    16	> a process, not a rule. "Each rule links to live CSS" is not a convention the
++    17	> author is trusted to follow — it is mechanically enforced by the
++    18	> `check-design-spec` gate (schema + static link-liveness), which every draft
++    19	> MUST pass before it may be presented.
++    20	
++    21	## Spec convention (hand-authorable markdown)
++    22	
++    23	One markdown file (conventionally `design-language.md` in the operator's chosen
++    24	design docs directory). Rules are declared under ATX headings, fields are
++    25	bullets with a closed key set:
++    26	
++    27	```markdown
++    28	# Design language: <project>
++    29	
++    30	## Palette
++    31	
++    32	### rule: ink-primary
++    33	- kind: palette
++    34	- css: styles/studio.css .btn-primary
++    35	- example: dashboard compose button uses .btn-primary
++    36	- do: Use the ink palette for every primary action.
++    37	- don't: Never introduce raw hex blues outside the palette tokens.
++    38	```
++    39	
++    40	- `kind:` — one of `palette` / `type` / `spacing` / `component` (the closed
++    41	  vocabulary; `component` is the signature-component class).
++    42	- `css: <path> <selector>` — ≥1 per rule; the path is relative to the spec
++    43	  file; the selector must be **defined in that author-written CSS source**
++    44	  (checked statically — no app boot). Non-CSS targets (CSS-in-JS, utility
++    45	  frameworks, CSS-Modules) are reported as not-validated-in-v1 notes.
++    46	- `example:` — ≥1 per rule (a rule with zero examples is rejected). Presence
++    47	  is structural; whether the example still matches live UI is
++    48	  `spec-truthfulness`, deliberately out of v1 scope.
++    49	- `do:` / `don't:` — ≥1 guidance line per rule.
++    50	
++    51	## Procedure
++    52	
++    53	1. **Locate or create the spec file.** One spec per design language; do not
++    54	   fork per-surface copies. If the operator has no spec yet, scaffold the
++    55	   heading + one rule per obvious anchor (masthead, primary action, body type)
++    56	   directly from the live CSS — with the operator naming the files that count
++    57	   as design-language source.
++    58	
++    59	2. **Author or update rules — manual path (default, requires NO engine).** The
++    60	   operator (or the agent under operator direction) writes the rules by hand:
++    61	   pick the selector in live CSS the rule is anchored to, cite ≥1 current
++    62	   example, state the do/don't. Scaffold completion never depends on engine
++    63	   presence — this path never calls the engine preflight.
++    64	
++    65	3. **Optional engine accelerator.** Only if the operator asks for it: gate on
++    66	   `preflightEngine` (`@/engine-adapter`, method `translate-design-language`)
++    67	   — absence fails loud naming the remedy — then request a draft from the
++    68	   engine (input: the approved wireframe intent + the live CSS files the
++    69	   operator names). **Engine output gets zero trust:** it lands in the same
++    70	   file and is judged by the same gate as a hand-authored draft. Engine
++    71	   conformance (`@/engine-adapter/conformance`) is exercised only when the
++    72	   engine is present — never stub it to simulate presence.
++    73	
++    74	4. **Validation gate — the non-negotiable step.** Run:
++    75	
++    76	   ```bash
++    77	   plugins/design-control/bin/check-design-spec <path/to/design-language.md>
++    78	   ```
++    79	
++    80	   - Exit `0` (spec green, zero findings) → the draft may be presented.
++    81	     Read any `not validated in v1` notes aloud to the operator — a skipped
++    82	     link is visible scope, not silent coverage.
++    83	   - Exit `1` → fix every finding and re-run. A dead selector means either the
++    84	     rule rots (fix the link) or the CSS moved (update the rule) — NEVER
++    85	     delete the rule just to silence the finding; that decision is the
++    86	     operator's.
++    87	
++    88	5. **Present and stop.** Show the operator the green spec (path + `0 findings`
++    89	   output + rule count). The operator owns acceptance; implementation against
++    90	   the spec and refereeing are separate steps of the loop, not this skill's
++    91	   job.
++    92	
++    93	## What this skill does NOT do
++    94	
++    95	- It does not author wireframes (`/design-control:wireframe`), implement, or
++    96	  referee.
++    97	- It does not boot the app, capture screenshots, or verify that examples still
++    98	  match live UI (`spec-truthfulness` is named-deferred).
++    99	- It does not skip the gate for engine-authored drafts — same gate, same
++   100	  checker, zero findings.
++
++codex
++I’ve got the main implementation surfaces in view now. The strongest signal is around promises made by the checker versus which rules actually reach the liveness pass, plus a policy issue in the authored skill text.
++exec
++/bin/zsh -lc "nl -ba plugins/design-control/src/design-language/check-spec-file.ts | sed -n '1,120p'" in /Users/orion/work/deskwork-work/design-control
++ succeeded in 0ms:
++     1	/**
++     2	 * File-level entry to the design-language spec check — the enforcement seam
++     3	 * the `/design-control:translate-design-language` skill (and the
++     4	 * `bin/check-design-spec` shim) route EVERY spec draft through, hand-authored
++     5	 * or engine-accelerated alike. Mirrors `@/authoring/lint-file` for wireframes:
++     6	 * a thin composition of the existing axes, no parallel validation path.
++     7	 */
++     8	
++     9	import { readFileSync } from 'node:fs';
++    10	import { dirname, resolve } from 'node:path';
++    11	import { checkLinkLiveness, type SkippedLink } from '@/design-language/link-liveness';
++    12	import { parseDesignSpec } from '@/design-language/schema';
++    13	import type { DesignSpecFinding, ParsedDesignSpec } from '@/design-language/types';
++    14	
++    15	export interface DesignSpecCheckResult {
++    16	  /** True iff findings is empty (skipped links stay green but visible). */
++    17	  readonly ok: boolean;
++    18	  readonly spec: ParsedDesignSpec;
++    19	  /** Schema findings followed by link-liveness findings. */
++    20	  readonly findings: readonly DesignSpecFinding[];
++    21	  readonly skipped: readonly SkippedLink[];
++    22	}
++    23	
++    24	/**
++    25	 * Check a design-language spec FILE: read it, validate the markdown schema,
++    26	 * then check link-liveness with css paths resolved against the spec file's
++    27	 * own directory. Fails loud on an unreadable file — a missing spec is an
++    28	 * error, never a clean verdict.
++    29	 */
++    30	export function checkDesignSpecFile(filePath: string): DesignSpecCheckResult {
++    31	  const absolute = resolve(filePath);
++    32	  const markdown = readFileSync(absolute, 'utf8');
++    33	  const parsed = parseDesignSpec(markdown);
++    34	  const liveness = checkLinkLiveness(parsed.spec, dirname(absolute));
++    35	  const findings = [...parsed.findings, ...liveness.findings];
++    36	  return { ok: findings.length === 0, spec: parsed.spec, findings, skipped: liveness.skipped };
++    37	}
++    38	
++    39	/** Line-oriented output sink, injected so the CLI core is testable. */
++    40	export interface CliIo {
++    41	  out(line: string): void;
++    42	  err(line: string): void;
++    43	}
++    44	
++    45	const USAGE = 'usage: check-design-spec <design-language-spec.md>';
++    46	
++    47	/**
++    48	 * CLI core behind `bin/check-design-spec`. Exit-code contract (the skill's
++    49	 * gate, same shape as check-wireframe):
++    50	 *   0 — spec green (zero findings; skipped links are reported but green)
++    51	 *   1 — findings present, or the file could not be read (descriptive error;
++    52	 *       never a fabricated verdict)
++    53	 *   2 — usage error
++    54	 */
++    55	export function runCheckDesignSpec(argv: readonly string[], io: CliIo): number {
++    56	  if (argv.length !== 1) {
++    57	    io.err(USAGE);
++    58	    return 2;
++    59	  }
++    60	  const filePath = argv[0];
++    61	  let result: DesignSpecCheckResult;
++    62	  try {
++    63	    result = checkDesignSpecFile(filePath);
++    64	  } catch (error) {
++    65	    io.err(error instanceof Error ? error.message : String(error));
++    66	    return 1;
++    67	  }
++    68	  for (const skip of result.skipped) {
++    69	    io.out(
++    70	      `note: rule "${skip.ruleId}" link "${skip.link.path} ${skip.link.selector}" is a non-CSS target — not validated in v1 (CSS-in-JS / utility-framework / CSS-Modules liveness is named-deferred).`,
++    71	    );
++    72	  }
++    73	  if (result.ok) {
++    74	    io.out(`${filePath}: spec green — 0 findings (${result.spec.rules.length} rule(s))`);
++    75	    return 0;
++    76	  }
++    77	  for (const finding of result.findings) {
++    78	    io.err(`${finding.rule}${finding.ruleId ? ` (rule: ${finding.ruleId})` : ''}: ${finding.message}`);
++    79	  }
++    80	  io.err(`${filePath}: ${result.findings.length} finding(s)`);
++    81	  return 1;
++    82	}
++
++exec
++/bin/zsh -lc "nl -ba plugins/design-control/specs/001-design-control/tasks.md | sed -n '160,215p'" in /Users/orion/work/deskwork-work/design-control
++ succeeded in 0ms:
++   160	manual authoring still works**, and the preflight **precedes the first engine-consuming skill**; the
++   161	lint is allowlist-shaped on both axes with the stylesheet identity-pin invariant asserted; the
++   162	adversarial validator's leakage cases (incl. emoji-as-icon + `𝐌𝐚𝐭𝐡`-bold) all reject; a **diverse
++   163	positive corpus** passes (not a single fixture); the engine-authored wireframe is constrained by the
++   164	same lint; a `derived` artifact cannot be accepted without a recorded operator edit.
++   165	
++   166	## Phase 2 — Design-language spec convention (v1-scaffold)
++   167	
++   168	- [x] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
++   169	      do/don't), each rule linked to a live CSS file/class + ≥1 current example. The spec is a
++   170	      **hand-authorable markdown artifact** — **scaffold completion does NOT require the engine.**
++   171	      **Done — `b2659452`** (`@/design-language/{types,schema}`: rules under `rule: <id>` ATX
++   172	      headings; closed RULE_KINDS palette/type/spacing/component; closed field-bullet set
++   173	      kind/css/example/do/don't with an `unknown-field` typo guard; `css: <path> <selector>`
++   174	      links; invalid rules become findings, never silently kept or dropped. TDD: RED on the
++   175	      unresolvable module first; 17 new tests).
++   176	- [x] **Static** link-liveness check (selector/class must be *defined in author-written source*;
++   177	      **no app boot**). Scoped to author-written CSS selectors/classes; utility-framework / CSS-in-JS
++   178	      / hashed CSS-Modules resolution is **not validated in v1** (named-deferred). Runtime dead-CSS +
++   179	      spec-truthfulness are named-deferred.
++   180	      **Done — `5853f83f`** (`@/design-language/link-liveness`: pure file reads, selector must
++   181	      appear ident-boundary exact in a selector prelude — comments/string-contents stripped,
++   182	      at-rule preludes excluded but descended into, so `@media` rules count and
++   183	      `content: ".ghost"` / commented-out rules don't; `.btn-primary` never satisfies `.btn`.
++   184	      Non-.css targets recorded as `skipped` + printed as notes — the named-deferred boundary is
++   185	      visible, never a silent drop or a fabricated dead-link. Plus
++   186	      `@/design-language/check-spec-file` + `bin/check-design-spec` (exit 0/1/2, mirrors
++   187	      check-wireframe; shim smoke-verified both directions). TDD: RED first; 20 new tests; suite
++   188	      397 → 417.)
++   189	- [x] **Example-presence validation:** the schema rejects a rule with **zero example references**
++   190	      (each rule carries ≥1 example). Structural-presence only — verifying the example still matches
++   191	      live UI is `spec-truthfulness` (named-deferred).
++   192	      **Done — `b2659452`** (`missing-example` finding; an empty `example:` value does NOT
++   193	      satisfy presence — it surfaces as `empty-field` + `missing-example`, both tested).
++   194	- [x] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
++   195	      drafts/maintains the spec from approved wireframe intent; its engine conformance is exercised
++   196	      **only when `/frontend-design` is present.**
++   197	      **Done — `4650ee66`** (`skills/translate-design-language/SKILL.md`, same enforcement shape
++   198	      as the wireframe skill: manual hand-author path is the default and needs NO engine; the
++   199	      accelerator gates on `preflightEngine('translate-design-language')`; engine output gets
++   200	      zero trust — judged by the SAME `bin/check-design-spec` gate; skipped non-CSS links are
++   201	      read aloud as visible v1 scope).
++   202	
++   203	**Acceptance (two paths):** **(scaffold, required)** an operator can hand-author a spec; static
++   204	link-liveness flags a **dead selector** with **no app boot** — engine absent; **and the schema
++   205	rejects a rule with zero example references** (≥1 example per rule, structural-presence only);
++   206	**(accelerator, when present)** the `translate-design-language` skill produces a spec linked to live
++   207	source and passes adapter conformance. Scaffold completion never depends on engine presence.
++   208	
++   209	## Phase 3 — Archive primitive + `design-control status` (v1-scaffold)
++   210	
++   211	- [ ] ACCEPTED/REJECTED exploration archive primitive (briefs + lo-fi wireframe visual; decision
++   212	      states/links: proposal, accepted wireframe, impl commit, rejected rationale, supersedes).
++   213	      Archive writes generated by the skill flow, not "remember to archive."
++   214	- [ ] `design-control status` — per surface, the next required action; refuses "complete" while
++   215	      authoring artifacts are missing. Keys on **manifest structure / artifact presence**, never on
++
++exec
++/bin/zsh -lc "nl -ba plugins/design-control/bin/check-design-spec | sed -n '1,80p'" in /Users/orion/work/deskwork-work/design-control
++ succeeded in 0ms:
++     1	#!/bin/sh
++     2	# check-design-spec <design-language-spec.md> — validate a design-language spec:
++     3	# markdown schema (closed kinds, css links, example-presence, do/don't) + static
++     4	# link-liveness against author-written CSS (no app boot). Exit codes: 0 green,
++     5	# 1 findings/error, 2 usage. Logic lives in src/design-language/check-spec-file.ts
++     6	# (tested); this shim only locates the workspace tsx runner and dispatches.
++     7	set -eu
++     8	
++     9	PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
++    10	
++    11	dir="$PLUGIN_ROOT"
++    12	TSX=""
++    13	while [ "$dir" != "/" ]; do
++    14	  if [ -x "$dir/node_modules/.bin/tsx" ]; then
++    15	    TSX="$dir/node_modules/.bin/tsx"
++    16	    break
++    17	  fi
++    18	  dir=$(dirname -- "$dir")
++    19	done
++    20	
++    21	if [ -z "$TSX" ]; then
++    22	  echo "check-design-spec: tsx runner not found in any node_modules/.bin above $PLUGIN_ROOT — run npm install first" >&2
++    23	  exit 1
++    24	fi
++    25	
++    26	exec "$TSX" "$PLUGIN_ROOT/src/design-language/check-design-spec-cli.ts" "$@"
++
++exec
++/bin/zsh -lc "sed -n '1,220p' plugins/design-control/package.json" in /Users/orion/work/deskwork-work/design-control
++exec
++/bin/zsh -lc "find plugins/design-control -maxdepth 2 -type f \\( -name 'package.json' -o -name 'tsconfig.json' -o -name 'README.md' \\) -print" in /Users/orion/work/deskwork-work/design-control
++ succeeded in 0ms:
++{
++  "name": "@deskwork/plugin-design-control",
++  "version": "0.37.0",
++  "private": true,
++  "description": "Workspace package for the design-control Claude Code plugin",
++  "license": "GPL-3.0-or-later",
++  "type": "module",
++  "scripts": {
++    "typecheck": "tsc --noEmit",
++    "test": "tsc --noEmit && vitest run",
++    "test:watch": "vitest"
++  },
++  "dependencies": {
++    "parse5": "^7.3.0",
++    "tsx": "^4.21.0",
++    "zod": "^3.24.0"
++  },
++  "devDependencies": {
++    "@types/node": "^22.0.0",
++    "typescript": "^5.6.0",
++    "vitest": "^2.1.0"
++  },
++  "engines": {
++    "node": ">=20"
++  }
++}
++
++ succeeded in 0ms:
++plugins/design-control/package.json
++plugins/design-control/tsconfig.json
++
++codex
++### Schema-invalid rules never reach the link-liveness pass
++
++Finding-ID: AUDIT-BARRAGE-codex-01
++Status:     open
++Severity:   medium
++Surface:    plugins/design-control/src/design-language/check-spec-file.ts:33-35; plugins/design-control/src/design-language/schema.ts:226-228
++
++`checkDesignSpecFile` parses the markdown, then runs liveness only against `parsed.spec` (`check-spec-file.ts:33-35`). But `parseDesignSpec` filters `spec.rules` down to structurally valid rules only (`schema.ts:226-228`). That means a single rule with both a schema defect and a dead CSS selector reports only the schema defect; its `css:` link is silently excluded from the liveness axis until the operator fixes the schema and reruns.
++
++Blast radius is medium: the checker still fails the spec, so it does not ship a green verdict for that broken rule, but it violates the stated combined gate and creates incremental, rerun-dependent discovery. A reasonable fix is to preserve raw rule sections or parsed CSS links for all rule headings, then run liveness for any syntactically usable `css:` field even when the rule also has schema findings.
++
++### The audited diff introduces explicit deferral language into the skill and checker contract
++
++Finding-ID: AUDIT-BARRAGE-codex-02
++Status:     open
++Severity:   low
++Surface:    plugins/design-control/skills/translate-design-language/SKILL.md:44-48,97-98; plugins/design-control/src/design-language/check-spec-file.ts:68-71; plugins/design-control/specs/001-design-control/tasks.md:176-191
++
++The diff repeatedly encodes “not validated in v1” / “named-deferred” / “out of v1 scope” language in the operator-facing skill, CLI output, and workplan. The audit prompt’s hard constraint rejects deferral phrases because they become bug-factory commitments in unattended workflows; here they are not just comments, they appear in the user-facing validation output (`check-spec-file.ts:68-71`) and in the skill’s instructions about what the operator may present (`SKILL.md:80-82`).
++
++Blast radius is low because the scope boundary is visible and intentional, and the code does not hide skipped links. The operational risk is documentation discipline: agents may normalize presenting partially unchecked specs as “green” because the deferral is built into the happy path. A reasonable fix is to replace temporal deferral phrasing with a stable capability statement, such as “non-CSS targets are reported as unchecked notes and do not establish link-liveness.”
++tokens used
++68,000
+diff --git a/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/tip.sha b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/tip.sha
+new file mode 100644
+index 00000000..d0523682
+--- /dev/null
++++ b/plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/tip.sha
+@@ -0,0 +1 @@
++bc650cadb1cc7486f5dd3c692a7d4ff1b821073e
+diff --git a/plugins/design-control/ROADMAP.md b/plugins/design-control/ROADMAP.md
+index d373af1e..d5f3ac03 100644
+--- a/plugins/design-control/ROADMAP.md
++++ b/plugins/design-control/ROADMAP.md
+@@ -13,7 +13,7 @@ graph with `stackctl roadmap` — do not hand-edit.
+ - spec: specs/001-design-control
+ 
+ ## impl:feature/phase-2-design-language-spec
+-- status: planned
++- status: in-flight
+ - spec: specs/001-design-control
+ 
+ ## impl:feature/phase-3-archive-status
+diff --git a/plugins/design-control/bin/check-design-spec b/plugins/design-control/bin/check-design-spec
+new file mode 100755
+index 00000000..40515040
+--- /dev/null
++++ b/plugins/design-control/bin/check-design-spec
+@@ -0,0 +1,26 @@
++#!/bin/sh
++# check-design-spec <design-language-spec.md> — validate a design-language spec:
++# markdown schema (closed kinds, css links, example-presence, do/don't) + static
++# link-liveness against author-written CSS (no app boot). Exit codes: 0 green,
++# 1 findings/error, 2 usage. Logic lives in src/design-language/check-spec-file.ts
++# (tested); this shim only locates the workspace tsx runner and dispatches.
++set -eu
++
++PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
++
++dir="$PLUGIN_ROOT"
++TSX=""
++while [ "$dir" != "/" ]; do
++  if [ -x "$dir/node_modules/.bin/tsx" ]; then
++    TSX="$dir/node_modules/.bin/tsx"
++    break
++  fi
++  dir=$(dirname -- "$dir")
++done
++
++if [ -z "$TSX" ]; then
++  echo "check-design-spec: tsx runner not found in any node_modules/.bin above $PLUGIN_ROOT — run npm install first" >&2
++  exit 1
++fi
++
++exec "$TSX" "$PLUGIN_ROOT/src/design-language/check-design-spec-cli.ts" "$@"
+diff --git a/plugins/design-control/skills/translate-design-language/SKILL.md b/plugins/design-control/skills/translate-design-language/SKILL.md
+new file mode 100644
+index 00000000..b9f4258f
+--- /dev/null
++++ b/plugins/design-control/skills/translate-design-language/SKILL.md
+@@ -0,0 +1,102 @@
++---
++name: translate-design-language
++description: Draft or maintain the project's design-language spec — the hand-authorable markdown artifact that anchors visual identity (palette/type/spacing tokens + signature components, each rule linked to live CSS + ≥1 example). Hand-authoring is the default and needs NO engine; the optional /frontend-design accelerator drafts from approved wireframe intent and is judged by the same check-design-spec gate.
++---
++
++# /design-control:translate-design-language
++
++Author or update the **design-language spec** for this project. The spec is the
++visual-*letter* artifact of the design-control discipline: the durable home for
++visual identity (the lo-fi wireframe carries UX *spirit* and is structurally
++incapable of carrying visual detail). Every rule binds to reality — a live CSS
++file + selector, ≥1 current example — so the spec cannot quietly drift into
++fiction the way a mockup's incidental polish does.
++
++> Per the plugin thesis (`DESIGN-DISCIPLINE-THESIS.md`): policy is enforced by
++> a process, not a rule. "Each rule links to live CSS" is not a convention the
++> author is trusted to follow — it is mechanically enforced by the
++> `check-design-spec` gate (schema + static link-liveness), which every draft
++> MUST pass before it may be presented.
++
++## Spec convention (hand-authorable markdown)
++
++One markdown file (conventionally `design-language.md` in the operator's chosen
++design docs directory). Rules are declared under ATX headings, fields are
++bullets with a closed key set:
++
++```markdown
++# Design language: <project>
++
++## Palette
++
++### rule: ink-primary
++- kind: palette
++- css: styles/studio.css .btn-primary
++- example: dashboard compose button uses .btn-primary
++- do: Use the ink palette for every primary action.
++- don't: Never introduce raw hex blues outside the palette tokens.
++```
++
++- `kind:` — one of `palette` / `type` / `spacing` / `component` (the closed
++  vocabulary; `component` is the signature-component class).
++- `css: <path> <selector>` — ≥1 per rule; the path is relative to the spec
++  file; the selector must be **defined in that author-written CSS source**
++  (checked statically — no app boot). Non-CSS targets (CSS-in-JS, utility
++  frameworks, CSS-Modules) are reported as unchecked notes and do not
++  establish link-liveness.
++- `example:` — ≥1 per rule (a rule with zero examples is rejected). Presence
++  is structural; whether the example still matches live UI is
++  `spec-truthfulness`, a separate concern this gate does not check.
++- `do:` / `don't:` — ≥1 guidance line per rule.
++
++## Procedure
++
++1. **Locate or create the spec file.** One spec per design language; do not
++   fork per-surface copies. If the operator has no spec yet, scaffold the
++   heading + one rule per obvious anchor (masthead, primary action, body type)
++   directly from the live CSS — with the operator naming the files that count
++   as design-language source.
++
++2. **Author or update rules — manual path (default, requires NO engine).** The
++   operator (or the agent under operator direction) writes the rules by hand:
++   pick the selector in live CSS the rule is anchored to, cite ≥1 current
++   example, state the do/don't. Scaffold completion never depends on engine
++   presence — this path never calls the engine preflight.
++
++3. **Optional engine accelerator.** Only if the operator asks for it: gate on
++   `preflightEngine` (`@/engine-adapter`, method `translate-design-language`)
++   — absence fails loud naming the remedy — then request a draft from the
++   engine (input: the approved wireframe intent + the live CSS files the
++   operator names). **Engine output gets zero trust:** it lands in the same
++   file and is judged by the same gate as a hand-authored draft. Engine
++   conformance (`@/engine-adapter/conformance`) is exercised only when the
++   engine is present — never stub it to simulate presence.
++
++4. **Validation gate — the non-negotiable step.** Run:
++
++   ```bash
++   plugins/design-control/bin/check-design-spec <path/to/design-language.md>
++   ```
++
++   - Exit `0` (spec green, zero findings) → the draft may be presented.
++     Read any `does not establish link-liveness` notes aloud to the operator —
++     a skipped link is visible scope, not silent coverage.
++   - Exit `1` → fix every finding and re-run. A dead selector means either the
++     rule rots (fix the link) or the CSS moved (update the rule) — NEVER
++     delete the rule just to silence the finding; that decision is the
++     operator's.
++
++5. **Present and stop.** Show the operator the green spec (path + `0 findings`
++   output + rule count). The operator owns acceptance; implementation against
++   the spec and refereeing are separate steps of the loop, not this skill's
++   job.
++
++## What this skill does NOT do
++
++- It does not author wireframes (`/design-control:wireframe`), implement, or
++  referee.
++- It does not boot the app, capture screenshots, or verify that examples still
++  match live UI (that is `spec-truthfulness`, which no step of this skill
++  performs).
++- It does not skip the gate for engine-authored drafts — same gate, same
++  checker, zero findings.
+diff --git a/plugins/design-control/specs/001-design-control/tasks.md b/plugins/design-control/specs/001-design-control/tasks.md
+index a65fd485..aae9bbd4 100644
+--- a/plugins/design-control/specs/001-design-control/tasks.md
++++ b/plugins/design-control/specs/001-design-control/tasks.md
+@@ -165,19 +165,40 @@ same lint; a `derived` artifact cannot be accepted without a recorded operator e
+ 
+ ## Phase 2 — Design-language spec convention (v1-scaffold)
+ 
+-- [ ] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
++- [x] Markdown spec schema (palette/type/spacing tokens + signature-component vocabulary +
+       do/don't), each rule linked to a live CSS file/class + ≥1 current example. The spec is a
+       **hand-authorable markdown artifact** — **scaffold completion does NOT require the engine.**
+-- [ ] **Static** link-liveness check (selector/class must be *defined in author-written source*;
++      **Done — `b2659452`** (`@/design-language/{types,schema}`: rules under `rule: <id>` ATX
++      headings; closed RULE_KINDS palette/type/spacing/component; closed field-bullet set
++      kind/css/example/do/don't with an `unknown-field` typo guard; `css: <path> <selector>`
++      links; invalid rules become findings, never silently kept or dropped. TDD: RED on the
++      unresolvable module first; 17 new tests).
++- [x] **Static** link-liveness check (selector/class must be *defined in author-written source*;
+       **no app boot**). Scoped to author-written CSS selectors/classes; utility-framework / CSS-in-JS
+       / hashed CSS-Modules resolution is **not validated in v1** (named-deferred). Runtime dead-CSS +
+       spec-truthfulness are named-deferred.
+-- [ ] **Example-presence validation:** the schema rejects a rule with **zero example references**
++      **Done — `5853f83f`** (`@/design-language/link-liveness`: pure file reads, selector must
++      appear ident-boundary exact in a selector prelude — comments/string-contents stripped,
++      at-rule preludes excluded but descended into, so `@media` rules count and
++      `content: ".ghost"` / commented-out rules don't; `.btn-primary` never satisfies `.btn`.
++      Non-.css targets recorded as `skipped` + printed as notes — the named-deferred boundary is
++      visible, never a silent drop or a fabricated dead-link. Plus
++      `@/design-language/check-spec-file` + `bin/check-design-spec` (exit 0/1/2, mirrors
++      check-wireframe; shim smoke-verified both directions). TDD: RED first; 20 new tests; suite
++      397 → 417.)
++- [x] **Example-presence validation:** the schema rejects a rule with **zero example references**
+       (each rule carries ≥1 example). Structural-presence only — verifying the example still matches
+       live UI is `spec-truthfulness` (named-deferred).
+-- [ ] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
++      **Done — `b2659452`** (`missing-example` finding; an empty `example:` value does NOT
++      satisfy presence — it surfaces as `empty-field` + `missing-example`, both tested).
++- [x] `translate-design-language` skill (uses `/frontend-design`) — an **optional accelerator** that
+       drafts/maintains the spec from approved wireframe intent; its engine conformance is exercised
+       **only when `/frontend-design` is present.**
++      **Done — `4650ee66`** (`skills/translate-design-language/SKILL.md`, same enforcement shape
++      as the wireframe skill: manual hand-author path is the default and needs NO engine; the
++      accelerator gates on `preflightEngine('translate-design-language')`; engine output gets
++      zero trust — judged by the SAME `bin/check-design-spec` gate; skipped non-CSS links are
++      read aloud as visible v1 scope).
+ 
+ **Acceptance (two paths):** **(scaffold, required)** an operator can hand-author a spec; static
+ link-liveness flags a **dead selector** with **no app boot** — engine absent; **and the schema
+diff --git a/plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts b/plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts
+new file mode 100644
+index 00000000..d25008dc
+--- /dev/null
++++ b/plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts
+@@ -0,0 +1,221 @@
++/**
++ * File-level + CLI-core tests for `check-design-spec` (Phase 2).
++ *
++ * `checkDesignSpecFile` composes the two axes — markdown schema validation +
++ * static link-liveness — over a spec FILE, resolving css paths relative to the
++ * spec's own directory. `runCheckDesignSpec` is the tested CLI core behind
++ * `bin/check-design-spec` (the shim only dispatches), mirroring the
++ * check-wireframe exit contract: 0 green / 1 findings-or-error / 2 usage.
++ *
++ * Real-fs temp fixtures per .claude/rules/testing.md.
++ */
++
++import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { afterEach, describe, expect, it } from 'vitest';
++import { checkDesignSpecFile, runCheckDesignSpec } from '@/design-language/check-spec-file';
++
++const tempDirs: string[] = [];
++
++function makeFixtureDir(): string {
++  const dir = mkdtempSync(join(tmpdir(), 'design-language-cli-'));
++  tempDirs.push(dir);
++  return dir;
++}
++
++afterEach(() => {
++  while (tempDirs.length > 0) {
++    rmSync(tempDirs.pop() as string, { recursive: true, force: true });
++  }
++});
++
++interface CapturedIo {
++  readonly out: string[];
++  readonly err: string[];
++  readonly io: { out(line: string): void; err(line: string): void };
++}
++
++function captureIo(): CapturedIo {
++  const out: string[] = [];
++  const err: string[] = [];
++  return { out, err, io: { out: (line) => out.push(line), err: (line) => err.push(line) } };
++}
++
++const GREEN_SPEC = `# Design language: fixture
++
++### rule: ink-primary
++- kind: palette
++- css: studio.css .btn-primary
++- example: dashboard compose button
++- do: Use the ink palette for primary actions.
++`;
++
++function writeGreenFixture(dir: string): string {
++  writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
++  const specPath = join(dir, 'design-language.md');
++  writeFileSync(specPath, GREEN_SPEC);
++  return specPath;
++}
++
++describe('checkDesignSpecFile', () => {
++  it('passes a hand-authored spec whose links are live', () => {
++    const specPath = writeGreenFixture(makeFixtureDir());
++    const result = checkDesignSpecFile(specPath);
++    expect(result.findings).toEqual([]);
++    expect(result.ok).toBe(true);
++    expect(result.spec.rules).toHaveLength(1);
++  });
++
++  it('combines schema findings and liveness findings in one result', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.real { color: ink; }\n');
++    const specPath = join(dir, 'design-language.md');
++    writeFileSync(
++      specPath,
++      `### rule: no-example
++- kind: palette
++- css: studio.css .real
++- do: x
++
++### rule: dead-link
++- kind: component
++- css: studio.css .ghost
++- example: somewhere
++- do: x
++`,
++    );
++    const result = checkDesignSpecFile(specPath);
++    const rules = result.findings.map((f) => f.rule);
++    expect(rules).toContain('missing-example');
++    expect(rules).toContain('dead-link-selector');
++    expect(result.ok).toBe(false);
++  });
++
++  it('throws loud on an unreadable spec file (never a clean verdict)', () => {
++    expect(() => checkDesignSpecFile(join(makeFixtureDir(), 'absent.md'))).toThrow();
++  });
++
++  it('surfaces a schema defect AND a dead link on the SAME rule in one run (no waves)', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.real { color: ink; }\n');
++    const specPath = join(dir, 'design-language.md');
++    writeFileSync(
++      specPath,
++      `### rule: both-defects
++- kind: palette
++- css: studio.css .ghost
++- do: x
++`,
++    );
++    const result = checkDesignSpecFile(specPath);
++    const rules = result.findings.map((f) => f.rule);
++    expect(rules).toContain('missing-example');
++    expect(rules).toContain('dead-link-selector');
++    expect(result.spec.rules).toEqual([]);
++  });
++
++  it('surfaces a duplicate section’s dead css link in the same run as duplicate-rule-id', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.real { color: ink; }\n');
++    const specPath = join(dir, 'design-language.md');
++    writeFileSync(
++      specPath,
++      `### rule: ink
++- kind: palette
++- css: studio.css .real
++- example: a button
++- do: x
++
++### rule: ink
++- kind: palette
++- css: studio.css .ghost
++- example: a button
++- do: x
++`,
++    );
++    const result = checkDesignSpecFile(specPath);
++    const rules = result.findings.map((f) => f.rule);
++    expect(rules).toContain('duplicate-rule-id');
++    expect(rules).toContain('dead-link-selector');
++    expect(result.spec.rules.map((r) => r.id)).toEqual(['ink']);
++  });
++
++  it('records a non-css auxiliary link as skipped, never silently dropped', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'styles.ts'), 'export const x = 1;\n');
++    const specPath = join(dir, 'design-language.md');
++    writeFileSync(
++      specPath,
++      `### rule: invalid-housing
++- kind: palette
++- css: styles.ts .btn
++- do: x
++`,
++    );
++    const result = checkDesignSpecFile(specPath);
++    expect(result.findings.map((f) => f.rule)).toEqual(['missing-example']);
++    expect(result.skipped).toHaveLength(1);
++    expect(result.skipped[0]).toMatchObject({
++      ruleId: 'invalid-housing',
++      reason: 'non-css-target',
++    });
++  });
++});
++
++describe('runCheckDesignSpec — exit contract', () => {
++  it('exit 0 + green line on a passing spec', () => {
++    const specPath = writeGreenFixture(makeFixtureDir());
++    const { out, io } = captureIo();
++    expect(runCheckDesignSpec([specPath], io)).toBe(0);
++    expect(out.join('\n')).toContain('0 findings');
++  });
++
++  it('exit 1 + findings on stderr for a dead selector', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.real { color: ink; }\n');
++    const specPath = join(dir, 'design-language.md');
++    writeFileSync(
++      specPath,
++      `### rule: dead
++- kind: palette
++- css: studio.css .ghost
++- example: somewhere
++- do: x
++`,
++    );
++    const { err, io } = captureIo();
++    expect(runCheckDesignSpec([specPath], io)).toBe(1);
++    expect(err.join('\n')).toContain('dead-link-selector');
++  });
++
++  it('exit 1 + descriptive error on an unreadable file', () => {
++    const { err, io } = captureIo();
++    expect(runCheckDesignSpec([join(makeFixtureDir(), 'absent.md')], io)).toBe(1);
++    expect(err.length).toBeGreaterThan(0);
++  });
++
++  it('exit 2 on usage error', () => {
++    const { err, io } = captureIo();
++    expect(runCheckDesignSpec([], io)).toBe(2);
++    expect(err.join('\n')).toContain('usage');
++  });
++
++  it('reports skipped non-css targets visibly while staying green', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'styles.ts'), 'export const x = 1;\n');
++    const specPath = join(dir, 'design-language.md');
++    writeFileSync(
++      specPath,
++      `### rule: css-in-js
++- kind: component
++- css: styles.ts .btn
++- example: somewhere
++- do: x
++`,
++    );
++    const { out, io } = captureIo();
++    expect(runCheckDesignSpec([specPath], io)).toBe(0);
++    expect(out.join('\n')).toContain('does not establish link-liveness');
++  });
++});
+diff --git a/plugins/design-control/src/__tests__/design-language/link-liveness.test.ts b/plugins/design-control/src/__tests__/design-language/link-liveness.test.ts
+new file mode 100644
+index 00000000..fa3bf60a
+--- /dev/null
++++ b/plugins/design-control/src/__tests__/design-language/link-liveness.test.ts
+@@ -0,0 +1,193 @@
++/**
++ * Static link-liveness tests (Phase 2, axis B).
++ *
++ * Each rule's `css: <path> <selector>` link must resolve to an author-written
++ * CSS file in which the selector is DEFINED — checked statically against
++ * source with NO app boot (the check is pure file reads; the acceptance's
++ * "flags a dead selector with no app boot — engine absent" lands here).
++ *
++ * Scope is author-written CSS only: non-.css targets (CSS-in-JS, hashed
++ * CSS-Modules, utility frameworks) do not establish link-liveness — they are
++ * recorded as skipped, visibly, never silently dropped and never fabricated
++ * into a dead-link finding.
++ *
++ * Real-fs temp fixtures per .claude/rules/testing.md — never mock the fs.
++ */
++
++import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { afterEach, describe, expect, it } from 'vitest';
++import { checkLinkLiveness } from '@/design-language/link-liveness';
++import type { ParsedDesignSpec } from '@/design-language/types';
++
++const tempDirs: string[] = [];
++
++function makeFixtureDir(): string {
++  const dir = mkdtempSync(join(tmpdir(), 'design-language-liveness-'));
++  tempDirs.push(dir);
++  return dir;
++}
++
++afterEach(() => {
++  while (tempDirs.length > 0) {
++    rmSync(tempDirs.pop() as string, { recursive: true, force: true });
++  }
++});
++
++function specWithLink(path: string, selector: string): ParsedDesignSpec {
++  return {
++    rules: [
++      {
++        id: 'probe',
++        kind: 'palette',
++        cssLinks: [{ path, selector }],
++        examples: ['an example'],
++        dos: ['guidance'],
++        donts: [],
++      },
++    ],
++  };
++}
++
++describe('checkLinkLiveness — live selectors pass', () => {
++  it('passes a class selector defined in the referenced file', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
++    const result = checkLinkLiveness(specWithLink('studio.css', '.btn-primary'), dir);
++    expect(result.findings).toEqual([]);
++    expect(result.ok).toBe(true);
++  });
++
++  it('finds a selector defined inside an @media block', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(
++      join(dir, 'studio.css'),
++      '@media (min-width: 80rem) {\n  .desktop-rail { width: 16rem; }\n}\n',
++    );
++    expect(checkLinkLiveness(specWithLink('studio.css', '.desktop-rail'), dir).ok).toBe(true);
++  });
++
++  it('finds a selector that appears with a pseudo-class in source', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.chip:hover { outline: 1px solid; }\n');
++    expect(checkLinkLiveness(specWithLink('studio.css', '.chip'), dir).ok).toBe(true);
++  });
++
++  it('finds a descendant selector sequence regardless of whitespace', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.masthead   nav a { text-decoration: none; }\n');
++    expect(checkLinkLiveness(specWithLink('studio.css', '.masthead nav a'), dir).ok).toBe(true);
++  });
++
++  it('finds a quoted attribute selector — input[type="text"] is live, not fabricated dead', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), 'input[type="text"] { border: 1px solid; }\n');
++    const result = checkLinkLiveness(specWithLink('studio.css', 'input[type="text"]'), dir);
++    expect(result.findings).toEqual([]);
++    expect(result.ok).toBe(true);
++  });
++
++  it('finds a class + quoted attribute selector — .chip[data-state="open"] is live', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.chip[data-state="open"] { outline: 2px solid; }\n');
++    expect(
++      checkLinkLiveness(specWithLink('studio.css', '.chip[data-state="open"]'), dir).ok,
++    ).toBe(true);
++  });
++
++  it('resolves the css path relative to the spec base dir, including subdirectories', () => {
++    const dir = makeFixtureDir();
++    mkdirSync(join(dir, 'styles'));
++    writeFileSync(join(dir, 'styles', 'chrome.css'), '.masthead-rule { border-top: 2px solid; }\n');
++    expect(checkLinkLiveness(specWithLink('styles/chrome.css', '.masthead-rule'), dir).ok).toBe(true);
++  });
++});
++
++describe('checkLinkLiveness — dead links flagged (no app boot)', () => {
++  it('flags a selector that is not defined anywhere in the file', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
++    const result = checkLinkLiveness(specWithLink('studio.css', '.btn-ghost'), dir);
++    expect(result.ok).toBe(false);
++    expect(result.findings.some((f) => f.rule === 'dead-link-selector' && f.ruleId === 'probe')).toBe(
++      true,
++    );
++  });
++
++  it('flags a missing css file', () => {
++    const dir = makeFixtureDir();
++    const result = checkLinkLiveness(specWithLink('nope.css', '.btn'), dir);
++    expect(result.findings.some((f) => f.rule === 'dead-link-file')).toBe(true);
++  });
++
++  it('does not let a longer ident satisfy a shorter selector (.btn vs .btn-primary)', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
++    expect(checkLinkLiveness(specWithLink('studio.css', '.btn'), dir).ok).toBe(false);
++  });
++
++  it('a selector appearing only in a comment is dead', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '/* .ghost was retired */\n.real { color: ink; }\n');
++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
++  });
++
++  it('a selector appearing only inside a declaration string is dead', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.real::before { content: ".ghost"; }\n');
++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
++  });
++
++  it('a selector appearing only as a property value token is dead', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.real { background: url(.ghost/x.png); }\n');
++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
++  });
++
++  it('a selector appearing only inside :not(...) is dead — exclusion is not styling', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.real:not(.ghost) { color: ink; }\n');
++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
++  });
++
++  it('a selector appearing only inside :is(...) arguments is dead', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.real:is(.ghost, .other) { color: ink; }\n');
++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
++  });
++
++  it('a selector nested inside :not(:is(...)) is dead — parens balance across nesting', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.real:not(:is(.ghost)) { color: ink; }\n');
++    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
++  });
++
++  it('the subject outside the functional pseudo-class still matches (.real in .real:not(.ghost))', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.real:not(.ghost) { color: ink; }\n');
++    expect(checkLinkLiveness(specWithLink('studio.css', '.real'), dir).ok).toBe(true);
++  });
++
++  it('a full-selector query with parens matches its source rule — args stripped on both sides', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'studio.css'), '.real:not(.ghost) { color: ink; }\n');
++    expect(checkLinkLiveness(specWithLink('studio.css', '.real:not(.ghost)'), dir).ok).toBe(true);
++  });
++});
++
++describe('checkLinkLiveness — validated-scope boundary (non-CSS targets, visible)', () => {
++  it('records a non-.css target as skipped — no finding, never silent', () => {
++    const dir = makeFixtureDir();
++    writeFileSync(join(dir, 'styles.ts'), 'export const btn = css`color: navy;`;\n');
++    const result = checkLinkLiveness(specWithLink('styles.ts', '.btn'), dir);
++    expect(result.findings).toEqual([]);
++    expect(result.ok).toBe(true);
++    expect(result.skipped).toHaveLength(1);
++    expect(result.skipped[0]).toMatchObject({
++      ruleId: 'probe',
++      reason: 'non-css-target',
++      link: { path: 'styles.ts', selector: '.btn' },
++    });
++  });
++});
+diff --git a/plugins/design-control/src/__tests__/design-language/schema.test.ts b/plugins/design-control/src/__tests__/design-language/schema.test.ts
+new file mode 100644
+index 00000000..edd64766
+--- /dev/null
++++ b/plugins/design-control/src/__tests__/design-language/schema.test.ts
+@@ -0,0 +1,395 @@
++/**
++ * Schema tests for the design-language spec convention (Phase 2).
++ *
++ * The spec is a HAND-AUTHORABLE markdown artifact — these tests pin the parse +
++ * structural-validation contract: rules declared under `### rule: <id>` headings
++ * with bullet fields (`kind:` / `css:` / `example:` / `do:` / `don't:`). The
++ * example-presence acceptance is here: a rule with ZERO example references is
++ * rejected (structural presence only — example truthfulness is named-deferred).
++ *
++ * Nothing in this module touches the engine or the filesystem: the schema is
++ * pure text → structure (link-liveness is the separate, fs-backed axis).
++ */
++
++import { describe, expect, it } from 'vitest';
++import { parseDesignSpec } from '@/design-language/schema';
++import { RULE_KINDS } from '@/design-language/types';
++
++const VALID_SPEC = `# Design language: deskwork studio
++
++## Palette
++
++### rule: ink-primary
++- kind: palette
++- css: styles/studio.css .btn-primary
++- example: dashboard compose button uses .btn-primary
++- do: Use the ink palette for every primary action.
++- don't: Never introduce raw hex blues outside the palette tokens.
++
++## Signature components
++
++### rule: masthead
++- kind: component
++- css: styles/studio.css .masthead
++- css: styles/chrome.css .masthead-rule
++- example: every page renders the double-rule masthead
++- example: entry-review header
++- do: Every top-level page opens with the masthead.
++`;
++
++function findingsFor(markdown: string) {
++  return parseDesignSpec(markdown).findings.map((f) => f.rule);
++}
++
++describe('parseDesignSpec — valid hand-authored spec', () => {
++  it('parses a diverse valid spec with zero findings', () => {
++    const result = parseDesignSpec(VALID_SPEC);
++    expect(result.findings).toEqual([]);
++    expect(result.ok).toBe(true);
++    expect(result.spec.rules).toHaveLength(2);
++  });
++
++  it('captures rule fields: id, kind, css links, examples, guidance', () => {
++    const result = parseDesignSpec(VALID_SPEC);
++    const [ink, masthead] = result.spec.rules;
++    expect(ink.id).toBe('ink-primary');
++    expect(ink.kind).toBe('palette');
++    expect(ink.cssLinks).toEqual([{ path: 'styles/studio.css', selector: '.btn-primary' }]);
++    expect(ink.examples).toEqual(['dashboard compose button uses .btn-primary']);
++    expect(ink.dos).toEqual(['Use the ink palette for every primary action.']);
++    expect(ink.donts).toEqual(['Never introduce raw hex blues outside the palette tokens.']);
++
++    expect(masthead.id).toBe('masthead');
++    expect(masthead.kind).toBe('component');
++    expect(masthead.cssLinks).toHaveLength(2);
++    expect(masthead.cssLinks[1]).toEqual({ path: 'styles/chrome.css', selector: '.masthead-rule' });
++    expect(masthead.examples).toHaveLength(2);
++    expect(masthead.donts).toEqual([]);
++  });
++
++  it('accepts a descendant (multi-token) selector in a css link', () => {
++    const result = parseDesignSpec(`### rule: nav-item
++- kind: component
++- css: styles/studio.css .masthead nav a
++- example: top nav
++- do: Keep nav items inside the masthead.
++`);
++    expect(result.findings).toEqual([]);
++    expect(result.spec.rules[0].cssLinks[0]).toEqual({
++      path: 'styles/studio.css',
++      selector: '.masthead nav a',
++    });
++  });
++
++  it('treats prose lines and non-field bullets as inert prose', () => {
++    const result = parseDesignSpec(`### rule: spacing-scale
++- kind: spacing
++- css: styles/studio.css .stack
++- example: entry list stacking
++
++Background prose explaining the scale.
++
++- Note: this bullet is prose, not a field (capitalised key).
++- do: Use the 4px base scale.
++`);
++    expect(result.findings).toEqual([]);
++    expect(result.spec.rules[0].dos).toEqual(['Use the 4px base scale.']);
++  });
++
++  it('exports the closed kind vocabulary', () => {
++    expect(RULE_KINDS).toEqual(['palette', 'type', 'spacing', 'component']);
++  });
++});
++
++describe('parseDesignSpec — example-presence (acceptance: zero examples rejected)', () => {
++  it('rejects a rule with zero example references', () => {
++    const result = parseDesignSpec(`### rule: ink-primary
++- kind: palette
++- css: styles/studio.css .btn-primary
++- do: Use the ink palette.
++`);
++    expect(result.ok).toBe(false);
++    expect(result.findings.some((f) => f.rule === 'missing-example' && f.ruleId === 'ink-primary')).toBe(
++      true,
++    );
++  });
++
++  it('an empty example value does not satisfy example-presence', () => {
++    const findings = findingsFor(`### rule: ink-primary
++- kind: palette
++- css: styles/studio.css .btn-primary
++- example:
++- do: Use the ink palette.
++`);
++    expect(findings).toContain('empty-field');
++    expect(findings).toContain('missing-example');
++  });
++});
++
++describe('parseDesignSpec — structural rejections', () => {
++  it('flags a document with no rules at all', () => {
++    expect(findingsFor('# Design language\n\nProse only.\n')).toContain('no-rules');
++  });
++
++  it('flags a missing kind', () => {
++    expect(
++      findingsFor(`### rule: ink
++- css: styles/studio.css .btn
++- example: a button
++- do: x
++`),
++    ).toContain('missing-kind');
++  });
++
++  it('flags a kind outside the closed vocabulary', () => {
++    expect(
++      findingsFor(`### rule: ink
++- kind: colour
++- css: styles/studio.css .btn
++- example: a button
++- do: x
++`),
++    ).toContain('unknown-kind');
++  });
++
++  it('flags a rule with no css link (every rule links to live CSS)', () => {
++    expect(
++      findingsFor(`### rule: ink
++- kind: palette
++- example: a button
++- do: x
++`),
++    ).toContain('missing-css-link');
++  });
++
++  it('flags a css link without a selector as malformed', () => {
++    expect(
++      findingsFor(`### rule: ink
++- kind: palette
++- css: styles/studio.css
++- example: a button
++- do: x
++`),
++    ).toContain('malformed-css-link');
++  });
++
++  it('flags a rule with neither do nor don’t guidance', () => {
++    expect(
++      findingsFor(`### rule: ink
++- kind: palette
++- css: styles/studio.css .btn
++- example: a button
++`),
++    ).toContain('missing-guidance');
++  });
++
++  it('flags duplicate rule ids', () => {
++    expect(
++      findingsFor(`### rule: ink
++- kind: palette
++- css: styles/studio.css .btn
++- example: a button
++- do: x
++
++### rule: ink
++- kind: palette
++- css: styles/studio.css .btn
++- example: a button
++- do: x
++`),
++    ).toContain('duplicate-rule-id');
++  });
++
++  it('flags a rule heading without an id', () => {
++    expect(findingsFor('### rule:\n- kind: palette\n')).toContain('malformed-rule-heading');
++  });
++
++  it('flags an unknown lowercase field key (typo guard, allowlist-shaped)', () => {
++    const findings = findingsFor(`### rule: ink
++- kind: palette
++- css: styles/studio.css .btn
++- exmaple: a button
++- do: x
++`);
++    expect(findings).toContain('unknown-field');
++    expect(findings).toContain('missing-example');
++  });
++
++  it('flags a capitalised "Rule:" heading as a near-miss, not inert structure', () => {
++    const result = parseDesignSpec(`### Rule: masthead
++- kind: component
++- css: styles/studio.css .masthead
++- example: every page renders the masthead
++- do: Every page opens with the masthead.
++`);
++    expect(result.ok).toBe(false);
++    expect(result.findings.some((f) => f.rule === 'malformed-rule-heading')).toBe(true);
++    expect(result.spec.rules).toEqual([]);
++  });
++
++  it('flags a colon-less "rule <id>" heading as a near-miss', () => {
++    expect(findingsFor('### rule missing-colon\n- kind: palette\n')).toContain(
++      'malformed-rule-heading',
++    );
++  });
++
++  it('leaves genuinely unrelated headings inert (word boundary: "Ruler" is not "rule")', () => {
++    const result = parseDesignSpec(`## Ruler settings
++
++## Palette
++
++### rule: ink
++- kind: palette
++- css: styles/studio.css .btn
++- example: a button
++- do: x
++`);
++    expect(result.findings).toEqual([]);
++    expect(result.ok).toBe(true);
++    expect(result.spec.rules.map((r) => r.id)).toEqual(['ink']);
++  });
++
++  it('a near-miss heading alongside a valid rule still flags (no silent green)', () => {
++    const result = parseDesignSpec(`### Rule: masthead
++- kind: component
++- css: styles/studio.css .masthead
++- example: every page renders the masthead
++- do: Every page opens with the masthead.
++
++### rule: fine
++- kind: type
++- css: styles/studio.css .serif
++- example: body copy
++- do: Use the serif stack for prose.
++`);
++    expect(result.ok).toBe(false);
++    expect(result.spec.rules.map((r) => r.id)).toEqual(['fine']);
++    expect(result.findings.map((f) => f.rule)).toContain('malformed-rule-heading');
++  });
++
++  it('captures a curly-apostrophe don’t (U+2019) exactly like ASCII don\'t', () => {
++    const result = parseDesignSpec(`### rule: ink
++- kind: palette
++- css: styles/studio.css .btn
++- example: a button
++- do: Use the ink palette.
++- don’t: Never introduce raw hex blues.
++`);
++    expect(result.findings).toEqual([]);
++    expect(result.ok).toBe(true);
++    expect(result.spec.rules[0].donts).toEqual(['Never introduce raw hex blues.']);
++  });
++
++  it('flags an unknown key containing a curly apostrophe (normalized typo guard)', () => {
++    const findings = findingsFor(`### rule: ink
++- kind: palette
++- css: styles/studio.css .btn
++- example: a button
++- can’t: x
++- do: y
++`);
++    expect(findings).toContain('unknown-field');
++  });
++
++  it('excludes invalid rules from spec.rules but keeps valid siblings', () => {
++    const result = parseDesignSpec(`### rule: broken
++- kind: palette
++
++### rule: fine
++- kind: type
++- css: styles/studio.css .serif
++- example: body copy
++- do: Use the serif stack for prose.
++`);
++    expect(result.ok).toBe(false);
++    expect(result.spec.rules.map((r) => r.id)).toEqual(['fine']);
++  });
++});
++
++describe('parseDesignSpec — single-pass defect surfacing (no finding waves)', () => {
++  const VALID_INK = `### rule: ink
++- kind: palette
++- css: styles/studio.css .btn
++- example: a button
++- do: x
++`;
++
++  it('a valid spec carries zero auxiliary css links', () => {
++    const result = parseDesignSpec(VALID_SPEC);
++    expect(result.auxiliaryCssLinks).toEqual([]);
++  });
++
++  it('routes a structurally-invalid rule’s css links to auxiliaryCssLinks', () => {
++    const result = parseDesignSpec(`### rule: no-example
++- kind: palette
++- css: styles/studio.css .btn
++- do: x
++`);
++    expect(result.findings.map((f) => f.rule)).toContain('missing-example');
++    expect(result.spec.rules).toEqual([]);
++    expect(result.auxiliaryCssLinks).toEqual([
++      { ruleId: 'no-example', link: { path: 'styles/studio.css', selector: '.btn' } },
++    ]);
++  });
++
++  it('a duplicate section’s field bullets are still inspected — typo guard fires', () => {
++    const result = parseDesignSpec(`${VALID_INK}
++### rule: ink
++- kind: palette
++- css: styles/studio.css .btn
++- exmaple: a button
++- do: x
++`);
++    const rules = result.findings.map((f) => f.rule);
++    expect(rules).toContain('duplicate-rule-id');
++    expect(rules).toContain('unknown-field');
++    const typo = result.findings.find((f) => f.rule === 'unknown-field');
++    expect(typo?.ruleId).toBe('ink');
++  });
++
++  it('a duplicate section’s empty fields and malformed css links surface in the same pass', () => {
++    const result = parseDesignSpec(`${VALID_INK}
++### rule: ink
++- kind:
++- css: styles/studio.css
++- example: a button
++- do: x
++`);
++    const rules = result.findings.map((f) => f.rule);
++    expect(rules).toContain('duplicate-rule-id');
++    expect(rules).toContain('empty-field');
++    expect(rules).toContain('malformed-css-link');
++  });
++
++  it('routes a duplicate section’s css links to auxiliaryCssLinks, excluded from spec.rules', () => {
++    const result = parseDesignSpec(`${VALID_INK}
++### rule: ink
++- kind: palette
++- css: styles/studio.css .ghost
++- example: a button
++- do: x
++`);
++    expect(result.spec.rules.map((r) => r.id)).toEqual(['ink']);
++    expect(result.spec.rules[0].cssLinks).toEqual([
++      { path: 'styles/studio.css', selector: '.btn' },
++    ]);
++    expect(result.auxiliaryCssLinks).toEqual([
++      { ruleId: 'ink', link: { path: 'styles/studio.css', selector: '.ghost' } },
++    ]);
++  });
++
++  it('a duplicate section does NOT fire per-rule validation (it is not a rule)', () => {
++    // The duplicate carries only `css:` — missing-kind/example/guidance would
++    // fire if it were validated as a rule. Deliberately they do not: the
++    // canonical rule owns the per-rule contract; the duplicate surfaces only
++    // its field-level defects + duplicate-rule-id.
++    const result = parseDesignSpec(`${VALID_INK}
++### rule: ink
++- css: styles/studio.css .ghost
++`);
++    expect(result.findings.map((f) => f.rule)).toEqual(['duplicate-rule-id']);
++    expect(result.auxiliaryCssLinks).toEqual([
++      { ruleId: 'ink', link: { path: 'styles/studio.css', selector: '.ghost' } },
++    ]);
++  });
++});
+diff --git a/plugins/design-control/src/design-language/check-design-spec-cli.ts b/plugins/design-control/src/design-language/check-design-spec-cli.ts
+new file mode 100644
+index 00000000..ebace3ed
+--- /dev/null
++++ b/plugins/design-control/src/design-language/check-design-spec-cli.ts
+@@ -0,0 +1,12 @@
++/**
++ * Process entry for `bin/check-design-spec`. All behavior lives in
++ * {@link runCheckDesignSpec} (tested directly); this file only wires argv and
++ * the process exit code.
++ */
++
++import { runCheckDesignSpec } from '@/design-language/check-spec-file';
++
++process.exitCode = runCheckDesignSpec(process.argv.slice(2), {
++  out: (line) => console.log(line),
++  err: (line) => console.error(line),
++});
+diff --git a/plugins/design-control/src/design-language/check-spec-file.ts b/plugins/design-control/src/design-language/check-spec-file.ts
+new file mode 100644
+index 00000000..19e071a8
+--- /dev/null
++++ b/plugins/design-control/src/design-language/check-spec-file.ts
+@@ -0,0 +1,96 @@
++/**
++ * File-level entry to the design-language spec check — the enforcement seam
++ * the `/design-control:translate-design-language` skill (and the
++ * `bin/check-design-spec` shim) route EVERY spec draft through, hand-authored
++ * or engine-accelerated alike. Mirrors `@/authoring/lint-file` for wireframes:
++ * a thin composition of the existing axes, no parallel validation path.
++ */
++
++import { readFileSync } from 'node:fs';
++import { dirname, resolve } from 'node:path';
++import {
++  checkCssLinkLiveness,
++  checkLinkLiveness,
++  type SkippedLink,
++} from '@/design-language/link-liveness';
++import { parseDesignSpec } from '@/design-language/schema';
++import type { DesignSpecFinding, ParsedDesignSpec } from '@/design-language/types';
++
++export interface DesignSpecCheckResult {
++  /** True iff findings is empty (skipped links stay green but visible). */
++  readonly ok: boolean;
++  readonly spec: ParsedDesignSpec;
++  /** Schema findings followed by link-liveness findings. */
++  readonly findings: readonly DesignSpecFinding[];
++  readonly skipped: readonly SkippedLink[];
++}
++
++/**
++ * Check a design-language spec FILE: read it, validate the markdown schema,
++ * then check link-liveness with css paths resolved against the spec file's
++ * own directory. Liveness runs over the valid rules AND the parse result's
++ * auxiliary css links (links housed in structurally-invalid / duplicate
++ * sections), so a schema defect and a dead link on the same section surface
++ * in ONE run — never in fix-and-rerun waves. Fails loud on an unreadable
++ * file — a missing spec is an error, never a clean verdict.
++ */
++export function checkDesignSpecFile(filePath: string): DesignSpecCheckResult {
++  const absolute = resolve(filePath);
++  const markdown = readFileSync(absolute, 'utf8');
++  const parsed = parseDesignSpec(markdown);
++  const baseDir = dirname(absolute);
++  const liveness = checkLinkLiveness(parsed.spec, baseDir);
++  const auxiliary = checkCssLinkLiveness(parsed.auxiliaryCssLinks, baseDir);
++  const findings = [...parsed.findings, ...liveness.findings, ...auxiliary.findings];
++  return {
++    ok: findings.length === 0,
++    spec: parsed.spec,
++    findings,
++    skipped: [...liveness.skipped, ...auxiliary.skipped],
++  };
++}
++
++/** Line-oriented output sink, injected so the CLI core is testable. */
++export interface CliIo {
++  out(line: string): void;
++  err(line: string): void;
++}
++
++const USAGE = 'usage: check-design-spec <design-language-spec.md>';
++
++/**
++ * CLI core behind `bin/check-design-spec`. Exit-code contract (the skill's
++ * gate, same shape as check-wireframe):
++ *   0 — spec green (zero findings; skipped links are reported but green)
++ *   1 — findings present, or the file could not be read (descriptive error;
++ *       never a fabricated verdict)
++ *   2 — usage error
++ */
++export function runCheckDesignSpec(argv: readonly string[], io: CliIo): number {
++  if (argv.length !== 1) {
++    io.err(USAGE);
++    return 2;
++  }
++  const filePath = argv[0];
++  let result: DesignSpecCheckResult;
++  try {
++    result = checkDesignSpecFile(filePath);
++  } catch (error) {
++    io.err(error instanceof Error ? error.message : String(error));
++    return 1;
++  }
++  for (const skip of result.skipped) {
++    io.out(
++      `note: rule "${skip.ruleId}" link "${skip.link.path} ${skip.link.selector}" is a non-CSS target — reported unchecked, does not establish link-liveness (this check validates selectors in author-written .css sources only; CSS-in-JS / utility-framework / CSS-Modules targets are outside its validated scope).`,
++    );
++  }
++  if (result.ok) {
++    io.out(`${filePath}: spec green — 0 findings (${result.spec.rules.length} rule(s))`);
++    return 0;
++  }
++  for (const finding of result.findings) {
++    io.err(`${finding.rule}${finding.ruleId ? ` (rule: ${finding.ruleId})` : ''}: ${finding.message}`);
++  }
++  io.err(`${filePath}: ${result.findings.length} finding(s)`);
++  return 1;
++}
+diff --git a/plugins/design-control/src/design-language/index.ts b/plugins/design-control/src/design-language/index.ts
+new file mode 100644
+index 00000000..0fc8e848
+--- /dev/null
++++ b/plugins/design-control/src/design-language/index.ts
+@@ -0,0 +1,31 @@
++/**
++ * Public surface of the design-language spec convention (Phase 2):
++ * markdown schema (axis A, pure) + static link-liveness (axis B, fs-backed)
++ * + the file-level composition behind `bin/check-design-spec`.
++ */
++
++export {
++  RULE_KINDS,
++  type CssLink,
++  type DesignRuleKind,
++  type DesignSpecFinding,
++  type DesignSpecFindingRule,
++  type DesignSpecParseResult,
++  type DesignSpecRule,
++  type ParsedDesignSpec,
++  type RuleScopedCssLink,
++} from '@/design-language/types';
++export { parseDesignSpec } from '@/design-language/schema';
++export {
++  checkCssLinkLiveness,
++  checkLinkLiveness,
++  cssDefinesSelector,
++  type LivenessResult,
++  type SkippedLink,
++} from '@/design-language/link-liveness';
++export {
++  checkDesignSpecFile,
++  runCheckDesignSpec,
++  type CliIo,
++  type DesignSpecCheckResult,
++} from '@/design-language/check-spec-file';
+diff --git a/plugins/design-control/src/design-language/link-liveness.ts b/plugins/design-control/src/design-language/link-liveness.ts
+new file mode 100644
+index 00000000..64a95e99
+--- /dev/null
++++ b/plugins/design-control/src/design-language/link-liveness.ts
+@@ -0,0 +1,248 @@
++/**
++ * Static link-liveness for design-language spec rules (Phase 2, axis B).
++ *
++ * Each rule's `css: <path> <selector>` link must point at an author-written
++ * CSS file in which the selector is DEFINED. The check is STATIC — pure file
++ * reads against source, no app boot, no engine (round-6 M1: "authoring
++ * artifacts only / no capture dependency").
++ *
++ * Scope (the spec's named-deferred boundary): only `.css` targets are
++ * validated. Utility-framework, CSS-in-JS, and hashed CSS-Modules links do
++ * not establish link-liveness — they are recorded as `skipped` (visible in
++ * the result and in CLI output), never silently dropped and never fabricated
++ * into a dead-link verdict. Liveness ≠ truthfulness: a resolving selector
++ * does not prove the live CSS still matches the rule's described intent
++ * (`spec-truthfulness`, named-deferred in the spec, is not checked here).
++ *
++ * "Defined in source" is implemented as: the selector appears, ident-boundary
++ * exact, inside some selector prelude of the file — preludes are the text
++ * runs that precede `{` after comments and string literals are stripped and
++ * at-rule preludes are excluded (their blocks are descended into, so a rule
++ * inside `@media` counts; `content: ".ghost"` and commented-out rules do not).
++ * Functional pseudo-class ARGUMENTS (`:not(.ghost)`, `:is(...)`, `:where(...)`,
++ * `:has(...)`, `:nth-child(...)`) are excluded too — a class that exists only
++ * as an exclusion or only inside a matcher argument has no styling of its own,
++ * so it must not count as a live anchor.
++ */
++
++import { readFileSync } from 'node:fs';
++import { resolve } from 'node:path';
++import type {
++  CssLink,
++  DesignSpecFinding,
++  ParsedDesignSpec,
++  RuleScopedCssLink,
++} from '@/design-language/types';
++
++/** A link outside the validated .css scope, recorded visibly. */
++export interface SkippedLink {
++  readonly ruleId: string;
++  readonly link: CssLink;
++  readonly reason: 'non-css-target';
++}
++
++export interface LivenessResult {
++  /** True iff findings is empty (skipped links do not fail the check). */
++  readonly ok: boolean;
++  readonly findings: readonly DesignSpecFinding[];
++  readonly skipped: readonly SkippedLink[];
++}
++
++/** Strip CSS comments and the CONTENTS of string literals (delimiters stay). */
++function stripCommentsAndStrings(css: string): string {
++  let out = '';
++  let i = 0;
++  while (i < css.length) {
++    const ch = css[i];
++    if (ch === '/' && css[i + 1] === '*') {
++      const end = css.indexOf('*/', i + 2);
++      i = end === -1 ? css.length : end + 2;
++      continue;
++    }
++    if (ch === '"' || ch === "'") {
++      out += ch;
++      i += 1;
++      while (i < css.length && css[i] !== ch) {
++        i += css[i] === '\\' ? 2 : 1;
++      }
++      if (i < css.length) {
++        out += ch;
++        i += 1;
++      }
++      continue;
++    }
++    out += ch;
++    i += 1;
++  }
++  return out;
++}
++
++/**
++ * Collect selector preludes: text runs preceding `{`, at every nesting depth,
++ * excluding at-rule preludes (which are descended into, not matched against).
++ * Prelude buffers reset on `{`, `}`, and `;` so declaration text never leaks
++ * into selector position.
++ */
++function collectSelectorPreludes(css: string): string[] {
++  const preludes: string[] = [];
++  let buffer = '';
++  for (const ch of stripCommentsAndStrings(css)) {
++    if (ch === '{') {
++      const prelude = buffer.trim();
++      if (prelude !== '' && !prelude.startsWith('@')) {
++        preludes.push(prelude);
++      }
++      buffer = '';
++      continue;
++    }
++    if (ch === '}' || ch === ';') {
++      buffer = '';
++      continue;
++    }
++    buffer += ch;
++  }
++  return preludes;
++}
++
++/** True for characters that extend a CSS ident (would change the selector). */
++function isIdentChar(ch: string | undefined): boolean {
++  return ch !== undefined && /[A-Za-z0-9_-]/.test(ch);
++}
++
++/**
++ * Strip the CONTENTS of functional pseudo-class arguments (delimiters stay):
++ * `:not(.ghost)` → `:not()`, for any `:<ident>(` / `::<ident>(`, balancing
++ * nested parens (`:not(:is(.a))` → `:not()`). A selector that appears only as
++ * an exclusion or matcher argument is not styled by the rule, so it must not
++ * satisfy a liveness query.
++ */
++function stripFunctionalPseudoArgs(text: string): string {
++  let out = '';
++  let i = 0;
++  while (i < text.length) {
++    const ch = text[i];
++    if (ch === ':') {
++      let identStart = i + 1;
++      if (text[identStart] === ':') {
++        identStart += 1;
++      }
++      let identEnd = identStart;
++      while (identEnd < text.length && isIdentChar(text[identEnd])) {
++        identEnd += 1;
++      }
++      if (identEnd > identStart && text[identEnd] === '(') {
++        out += text.slice(i, identEnd + 1);
++        let depth = 1;
++        i = identEnd + 1;
++        while (i < text.length && depth > 0) {
++          if (text[i] === '(') {
++            depth += 1;
++          } else if (text[i] === ')') {
++            depth -= 1;
++          }
++          i += 1;
++        }
++        if (depth === 0) {
++          out += ')';
++        }
++        continue;
++      }
++    }
++    out += ch;
++    i += 1;
++  }
++  return out;
++}
++
++/**
++ * True iff `selector` appears ident-boundary exact inside some selector
++ * prelude of `css`. Whitespace in a multi-token (descendant) selector is
++ * normalized on both sides before matching. String-literal CONTENTS are
++ * stripped on both sides identically, so quoted attribute selectors
++ * (`input[type="text"]`) match their source rules; the accepted
++ * over-approximation is that quoted VALUES are not compared —
++ * `[data-state="open"]` matches a source rule for `[data-state="closed"]`.
++ * Functional pseudo-class ARGUMENTS are likewise stripped on both sides
++ * identically, so `.ghost` does not match `.real:not(.ghost)` (an exclusion
++ * is not a definition), while a full-selector query like `.real:not(.ghost)`
++ * still matches its source rule; the symmetric accepted over-approximation is
++ * that argument CONTENTS are not compared — `.real:not(.ghost)` matches a
++ * source rule for `.real:not(.other)`.
++ */
++export function cssDefinesSelector(css: string, selector: string): boolean {
++  const query = stripFunctionalPseudoArgs(stripCommentsAndStrings(selector))
++    .trim()
++    .replace(/\s+/g, ' ');
++  if (query === '') {
++    return false;
++  }
++  for (const prelude of collectSelectorPreludes(css)) {
++    const haystack = stripFunctionalPseudoArgs(prelude).replace(/\s+/g, ' ');
++    let from = 0;
++    while (true) {
++      const at = haystack.indexOf(query, from);
++      if (at === -1) {
++        break;
++      }
++      if (!isIdentChar(haystack[at - 1]) && !isIdentChar(haystack[at + query.length])) {
++        return true;
++      }
++      from = at + 1;
++    }
++  }
++  return false;
++}
++
++/**
++ * Check a flat list of rule-scoped css links against source. This is the
++ * liveness core: it carries no opinion about the HOUSING of a link, so the
++ * file-level check can run it over the valid rules' links AND the parse
++ * result's `auxiliaryCssLinks` (links of structurally-invalid / duplicate
++ * sections) in the same pass. Paths resolve relative to `baseDir` (the spec
++ * file's directory). Missing file → `dead-link-file`; selector not defined →
++ * `dead-link-selector`; non-.css target → skipped.
++ */
++export function checkCssLinkLiveness(
++  links: readonly RuleScopedCssLink[],
++  baseDir: string,
++): LivenessResult {
++  const findings: DesignSpecFinding[] = [];
++  const skipped: SkippedLink[] = [];
++  for (const { ruleId, link } of links) {
++    if (!link.path.toLowerCase().endsWith('.css')) {
++      skipped.push({ ruleId, link, reason: 'non-css-target' });
++      continue;
++    }
++    const absolute = resolve(baseDir, link.path);
++    let css: string;
++    try {
++      css = readFileSync(absolute, 'utf8');
++    } catch {
++      findings.push({
++        rule: 'dead-link-file',
++        message: `Rule "${ruleId}" links to "${link.path}" which does not resolve to a readable file (looked at ${absolute}).`,
++        ruleId,
++      });
++      continue;
++    }
++    if (!cssDefinesSelector(css, link.selector)) {
++      findings.push({
++        rule: 'dead-link-selector',
++        message: `Rule "${ruleId}" links to selector "${link.selector}" which is not defined in "${link.path}".`,
++        ruleId,
++      });
++    }
++  }
++  return { ok: findings.length === 0, findings, skipped };
++}
++
++/**
++ * Check every valid rule's css links against source — the spec-shaped wrapper
++ * over {@link checkCssLinkLiveness} (same per-link contract).
++ */
++export function checkLinkLiveness(spec: ParsedDesignSpec, baseDir: string): LivenessResult {
++  const links = spec.rules.flatMap((rule) =>
++    rule.cssLinks.map((link) => ({ ruleId: rule.id, link })),
++  );
++  return checkCssLinkLiveness(links, baseDir);
++}
+diff --git a/plugins/design-control/src/design-language/schema.ts b/plugins/design-control/src/design-language/schema.ts
+new file mode 100644
+index 00000000..1a79df26
+--- /dev/null
++++ b/plugins/design-control/src/design-language/schema.ts
+@@ -0,0 +1,290 @@
++/**
++ * Markdown schema parser/validator for the design-language spec convention
++ * (Phase 2, axis A — pure text → structure; NO filesystem, NO engine).
++ *
++ * Convention (hand-authorable):
++ *   - a rule is declared by an ATX heading whose text is `rule: <id>`
++ *     (any heading level); the rule's section runs to the next heading;
++ *   - fields are single-line bullets `- <key>: <value>` with the CLOSED key set
++ *     `kind` / `css` / `example` / `do` / `don't` (a curly apostrophe U+2019 in
++ *     the key is normalized to ASCII `'`, so smart-quoted `don’t:` is accepted);
++ *   - `css: <path> <selector>` — first token is the file path, the remainder is
++ *     the selector (descendant selectors allowed);
++ *   - other prose (paragraphs, capitalised-key bullets) is inert.
++ *
++ * Validation per rule: kind from the closed vocabulary; ≥1 css link; ≥1
++ * example (structural presence only — example truthfulness is the
++ * named-deferred `spec-truthfulness`); ≥1 do/don't guidance line. A lowercase
++ * single-word bullet key outside the closed set is an `unknown-field` finding
++ * (typo guard) — silently dropping a misspelled `example:` would otherwise
++ * fabricate a missing-example rejection with no visible cause. The same
++ * philosophy applies at heading level: a heading whose first word is `rule`
++ * but that misses the strict `rule: <id>` form (`Rule: x`, `rule x`) is a
++ * `malformed-rule-heading` finding — never silently demoted to inert
++ * structure, which would drop the whole intended rule with zero findings.
++ */
++
++import {
++  RULE_KINDS,
++  type CssLink,
++  type DesignRuleKind,
++  type DesignSpecFinding,
++  type DesignSpecParseResult,
++  type DesignSpecRule,
++  type RuleScopedCssLink,
++} from '@/design-language/types';
++
++const HEADING_RE = /^#{1,6}\s+(.*)$/;
++const RULE_HEADING_RE = /^rule:\s*(.*)$/;
++/**
++ * Heading-level typo guard: a heading whose first word is `rule` (any case,
++ * colon or not) is an ATTEMPTED rule heading; if it misses the strict
++ * lowercase `rule: <id>` form it is a `malformed-rule-heading` finding, never
++ * inert structure. The `\b` keeps unrelated headings (`Ruler settings`) inert.
++ */
++const RULE_NEAR_MISS_RE = /^rule\b/i;
++/**
++ * A field bullet: lowercase single-word key (apostrophe allowed: `don't`).
++ * U+2019 (’) is also admitted — smart-quote editors substitute it in prose —
++ * and normalized to ASCII `'` before the known-key check, so `don’t:` records
++ * like `don't:` and a misspelled curly key still hits the typo guard.
++ */
++const FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z'’]*)\s*:\s*(.*)$/;
++
++const KNOWN_KEYS = ['kind', 'css', 'example', 'do', "don't"] as const;
++type FieldKey = (typeof KNOWN_KEYS)[number];
++
++function isKnownKey(key: string): key is FieldKey {
++  return (KNOWN_KEYS as readonly string[]).includes(key);
++}
++
++function isRuleKind(value: string): value is DesignRuleKind {
++  return (RULE_KINDS as readonly string[]).includes(value);
++}
++
++/** A rule section under one `rule:` heading, before validation. */
++interface RawRuleSection {
++  readonly id: string;
++  readonly headingLine: number;
++  kind?: string;
++  readonly cssLinks: CssLink[];
++  readonly examples: string[];
++  readonly dos: string[];
++  readonly donts: string[];
++}
++
++interface FieldSink {
++  readonly section: RawRuleSection;
++  readonly findings: DesignSpecFinding[];
++}
++
++function recordField(sink: FieldSink, key: FieldKey, value: string, line: number): void {
++  const { section, findings } = sink;
++  if (value === '') {
++    findings.push({
++      rule: 'empty-field',
++      message: `Field "${key}:" has an empty value.`,
++      ruleId: section.id,
++      line,
++    });
++    return;
++  }
++  switch (key) {
++    case 'kind':
++      section.kind = value;
++      return;
++    case 'css': {
++      const spaceAt = value.search(/\s/);
++      if (spaceAt === -1) {
++        findings.push({
++          rule: 'malformed-css-link',
++          message: `css link "${value}" names a file but no selector — expected "css: <path> <selector>".`,
++          ruleId: section.id,
++          line,
++        });
++        return;
++      }
++      section.cssLinks.push({
++        path: value.slice(0, spaceAt),
++        selector: value.slice(spaceAt).trim(),
++      });
++      return;
++    }
++    case 'example':
++      section.examples.push(value);
++      return;
++    case 'do':
++      section.dos.push(value);
++      return;
++    case "don't":
++      section.donts.push(value);
++      return;
++  }
++}
++
++function validateSection(section: RawRuleSection, findings: DesignSpecFinding[]): DesignSpecRule | undefined {
++  const problems: DesignSpecFinding[] = [];
++  const at = { ruleId: section.id, line: section.headingLine };
++  if (section.kind === undefined) {
++    problems.push({ rule: 'missing-kind', message: `Rule "${section.id}" has no "kind:" field.`, ...at });
++  } else if (!isRuleKind(section.kind)) {
++    problems.push({
++      rule: 'unknown-kind',
++      message: `Rule "${section.id}" has kind "${section.kind}" — expected one of: ${RULE_KINDS.join(', ')}.`,
++      ...at,
++    });
++  }
++  if (section.cssLinks.length === 0) {
++    problems.push({
++      rule: 'missing-css-link',
++      message: `Rule "${section.id}" links to no live CSS — every rule needs ≥1 "css: <path> <selector>".`,
++      ...at,
++    });
++  }
++  if (section.examples.length === 0) {
++    problems.push({
++      rule: 'missing-example',
++      message: `Rule "${section.id}" carries zero example references — every rule needs ≥1 "example:".`,
++      ...at,
++    });
++  }
++  if (section.dos.length === 0 && section.donts.length === 0) {
++    problems.push({
++      rule: 'missing-guidance',
++      message: `Rule "${section.id}" has neither a "do:" nor a "don't:" guidance line.`,
++      ...at,
++    });
++  }
++  findings.push(...problems);
++  if (problems.length > 0 || section.kind === undefined || !isRuleKind(section.kind)) {
++    return undefined;
++  }
++  return {
++    id: section.id,
++    kind: section.kind,
++    cssLinks: section.cssLinks,
++    examples: section.examples,
++    dos: section.dos,
++    donts: section.donts,
++  };
++}
++
++/**
++ * Parse + structurally validate a design-language spec. Pure: text in,
++ * structure + findings out. `spec.rules` carries only the structurally-valid
++ * rules; every defect is a finding (never a silent drop).
++ *
++ * Single-pass surfacing (no finding waves): a section excluded from
++ * `spec.rules` is still INSPECTED, never skipped —
++ *   - a duplicate-id section is parsed into a throwaway section so its
++ *     field-level defects (unknown-field / empty-field / malformed-css-link)
++ *     surface alongside `duplicate-rule-id`. Per-rule validation
++ *     (missing-kind / missing-example / …) deliberately does NOT fire for
++ *     duplicates — the canonical rule owns the per-rule contract; the
++ *     duplicate is not a rule;
++ *   - syntactically-usable css links of invalid + duplicate sections are
++ *     returned as `auxiliaryCssLinks` so the liveness axis can check them in
++ *     the same run.
++ */
++export function parseDesignSpec(markdown: string): DesignSpecParseResult {
++  const findings: DesignSpecFinding[] = [];
++  const sections: RawRuleSection[] = [];
++  const duplicateSections: RawRuleSection[] = [];
++  const seenIds = new Set<string>();
++  let current: RawRuleSection | undefined;
++
++  const lines = markdown.split('\n');
++  for (let i = 0; i < lines.length; i += 1) {
++    const line = lines[i].trimEnd();
++    const lineNo = i + 1;
++    const heading = HEADING_RE.exec(line.trim());
++    if (heading !== null) {
++      current = undefined;
++      const headingText = heading[1].trim();
++      const ruleHeading = RULE_HEADING_RE.exec(headingText);
++      if (ruleHeading === null) {
++        if (RULE_NEAR_MISS_RE.test(headingText)) {
++          const offence = /^rule:/i.test(headingText)
++            ? 'the "rule:" prefix must be lowercase'
++            : 'missing the ":" after "rule"';
++          findings.push({
++            rule: 'malformed-rule-heading',
++            message: `Heading "${headingText}" looks like a rule heading but ${offence} — expected "rule: <id>".`,
++            line: lineNo,
++          });
++        }
++        continue;
++      }
++      const id = ruleHeading[1].trim();
++      if (id === '') {
++        findings.push({
++          rule: 'malformed-rule-heading',
++          message: `Rule heading at line ${lineNo} has no id — expected "rule: <id>".`,
++          line: lineNo,
++        });
++        continue;
++      }
++      if (seenIds.has(id)) {
++        findings.push({
++          rule: 'duplicate-rule-id',
++          message: `Rule id "${id}" is declared more than once.`,
++          ruleId: id,
++          line: lineNo,
++        });
++        // Parse the duplicate into a throwaway section (NOT pushed to
++        // `sections`, no `seenIds` effect) so its field bullets are still
++        // inspected — field-level findings + auxiliary css links surface in
++        // this pass instead of after the author renames the id and reruns.
++        current = { id, headingLine: lineNo, cssLinks: [], examples: [], dos: [], donts: [] };
++        duplicateSections.push(current);
++        continue;
++      }
++      seenIds.add(id);
++      current = { id, headingLine: lineNo, cssLinks: [], examples: [], dos: [], donts: [] };
++      sections.push(current);
++      continue;
++    }
++    if (current === undefined) {
++      continue;
++    }
++    const bullet = FIELD_BULLET_RE.exec(line.trim());
++    if (bullet === null) {
++      continue;
++    }
++    const key = bullet[1].replace(/’/g, "'");
++    if (!isKnownKey(key)) {
++      findings.push({
++        rule: 'unknown-field',
++        message: `Unknown field "${key}:" — known fields are: ${KNOWN_KEYS.join(', ')}.`,
++        ruleId: current.id,
++        line: lineNo,
++      });
++      continue;
++    }
++    recordField({ section: current, findings }, key, bullet[2].trim(), lineNo);
++  }
++
++  if (sections.length === 0) {
++    findings.push({
++      rule: 'no-rules',
++      message: 'The spec declares no rules — expected ≥1 "rule: <id>" heading.',
++    });
++  }
++
++  const rules: DesignSpecRule[] = [];
++  const auxiliaryCssLinks: RuleScopedCssLink[] = [];
++  for (const section of sections) {
++    const rule = validateSection(section, findings);
++    if (rule !== undefined) {
++      rules.push(rule);
++      continue;
++    }
++    // Invalid housing, usable links: the liveness axis still checks them.
++    auxiliaryCssLinks.push(...section.cssLinks.map((link) => ({ ruleId: section.id, link })));
++  }
++  for (const section of duplicateSections) {
++    auxiliaryCssLinks.push(...section.cssLinks.map((link) => ({ ruleId: section.id, link })));
++  }
++
++  return { ok: findings.length === 0, spec: { rules }, findings, auxiliaryCssLinks };
++}
+diff --git a/plugins/design-control/src/design-language/types.ts b/plugins/design-control/src/design-language/types.ts
+new file mode 100644
+index 00000000..4072ff76
+--- /dev/null
++++ b/plugins/design-control/src/design-language/types.ts
+@@ -0,0 +1,103 @@
++/**
++ * Shared types for the design-language spec convention (Phase 2).
++ *
++ * A design-language spec is a HAND-AUTHORABLE markdown artifact — the visual
++ * *letter* reference of the design-control discipline (the lo-fi wireframe is
++ * the UX *spirit*). The schema is allowlist-shaped like the rest of this
++ * plugin: a closed kind vocabulary, a closed field-key set (typos surface as
++ * findings, never silently drop), and per-rule structural requirements —
++ * ≥1 live-CSS link, ≥1 example reference, ≥1 do/don't guidance line.
++ *
++ * Extracted so the pure-text schema axis (`schema.ts`) and the fs-backed
++ * link-liveness axis (`link-liveness.ts`) share one taxonomy without a cycle
++ * (mirrors `@/lint/types`).
++ */
++
++/**
++ * Closed vocabulary of rule kinds, single-sourced as a `const ... as const`
++ * array (mirroring `ENGINE_METHODS` / `FAILURE_MODES`): palette / type /
++ * spacing tokens + the signature-component vocabulary.
++ */
++export const RULE_KINDS = ['palette', 'type', 'spacing', 'component'] as const;
++
++export type DesignRuleKind = (typeof RULE_KINDS)[number];
++
++/**
++ * A rule's link to live CSS: a path to an author-written CSS file (relative to
++ * the spec file) plus the selector the rule is anchored to. The selector may be
++ * multi-token (descendant combinators); the path is the first whitespace-free
++ * token of the `css:` field value.
++ */
++export interface CssLink {
++  readonly path: string;
++  readonly selector: string;
++}
++
++/** One structurally-valid rule parsed out of a design-language spec. */
++export interface DesignSpecRule {
++  /** The id from the `### rule: <id>` heading. */
++  readonly id: string;
++  /** Kind from the closed {@link RULE_KINDS} vocabulary. */
++  readonly kind: DesignRuleKind;
++  /** ≥1 live-CSS link (the link-liveness axis verifies each). */
++  readonly cssLinks: readonly CssLink[];
++  /** ≥1 example reference (structural presence only; truthfulness deferred). */
++  readonly examples: readonly string[];
++  /** `do:` guidance lines. */
++  readonly dos: readonly string[];
++  /** `don't:` guidance lines. */
++  readonly donts: readonly string[];
++}
++
++/** Finding taxonomy across both axes (schema structure + link-liveness). */
++export type DesignSpecFindingRule =
++  // axis A — markdown schema structure
++  | 'no-rules'
++  | 'malformed-rule-heading'
++  | 'duplicate-rule-id'
++  | 'missing-kind'
++  | 'unknown-kind'
++  | 'missing-css-link'
++  | 'malformed-css-link'
++  | 'missing-example'
++  | 'missing-guidance'
++  | 'unknown-field'
++  | 'empty-field'
++  // axis B — static link-liveness against author-written CSS source
++  | 'dead-link-file'
++  | 'dead-link-selector';
++
++export interface DesignSpecFinding {
++  readonly rule: DesignSpecFindingRule;
++  readonly message: string;
++  /** The spec rule the finding is about, when rule-scoped. */
++  readonly ruleId?: string;
++  /** 1-based markdown source line, when known. */
++  readonly line?: number;
++}
++
++/** The parsed spec: structurally-valid rules only (invalid rules are findings). */
++export interface ParsedDesignSpec {
++  readonly rules: readonly DesignSpecRule[];
++}
++
++/** A css link paired with the id of the spec section that declared it. */
++export interface RuleScopedCssLink {
++  readonly ruleId: string;
++  readonly link: CssLink;
++}
++
++export interface DesignSpecParseResult {
++  /** True iff findings is empty. */
++  readonly ok: boolean;
++  readonly spec: ParsedDesignSpec;
++  readonly findings: readonly DesignSpecFinding[];
++  /**
++   * Syntactically-usable css links housed in sections EXCLUDED from
++   * `spec.rules` (structurally-invalid rules + duplicate-id sections). They
++   * still feed the link-liveness axis so a schema defect and a dead link on
++   * the same section surface in ONE checker run, not in waves — downstream
++   * consumers of `spec.rules` never see the invalid housing.
++   */
++  readonly auxiliaryCssLinks: readonly RuleScopedCssLink[];
++}
+
+
+## What to look for
+
+- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
+- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
+- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
+- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
+- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
+- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+
+## Output format
+
+For each finding you surface, emit ONE markdown block in this exact shape:
+
+```
+### <heading: one-line summary of the finding>
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
+Status:     open
+Severity:   <blocking | high | medium | low | informational>
+Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
+
+<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
+```
+
+Number the findings sequentially (`-01`, `-02`, ...).
+
+**Severity — rate each finding by downstream blast-radius:** the consequence if a downstream consumer acts on the audited surface *as written*. The consumer may be an adopter running the code, or — especially for a spec — an AI agent building **unattended** from it, with no human to catch a wrong reading. Rate by what would actually happen if this shipped as-is, **not by how alarming the finding feels**. State the blast-radius reasoning in the finding body for every finding, at every level.
+
+- `blocking` — acting on it as-written breaks the feature's stated goals in obvious ways; OR (for a spec) the more natural reading an agent reaches first is the wrong one, so it will likely be built wrong by default and nothing in the artifact corrects it.
+- `high` — a correctness/safety defect a consumer will hit; OR a spec contradiction/ambiguity where the readings are roughly equally plausible and the artifact doesn't disambiguate — an agent might build either, including the wrong one.
+- `medium` — a design issue that compounds over time; OR a spec inconsistency a reasonable consumer would resolve correctly anyway (readings barely diverge, or context makes the intended one obvious).
+- `low` — hygiene; cosmetic wording with no behavioral or implementation consequence.
+- `informational` — context worth seeing, not itself a defect.
+
+**Calibrate by consequence, not by alarm.** A genuine contradiction a reader would obviously resolve the right way is at most `medium`. A quietly-plausible wrong reading an agent would actually build is `high`/`blocking` even if it looks minor. A spec's internal consistency is load-bearing — it is the input to an unattended build.
+
+## If you find nothing — say so explicitly
+
+If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
+
+```
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+```
+
+**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
+
+## Hard constraints
+
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
+- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
+- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.

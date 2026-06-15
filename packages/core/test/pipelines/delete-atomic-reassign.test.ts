@@ -116,7 +116,6 @@ describe('deletePipeline atomic rollback on partial rebind (AUDIT-20260530-63)',
       id: 'a-lane',
       name: 'Lane A',
       pipelineTemplate: DOOMED_TEMPLATE.id,
-      contentDir: 'docs/a',
     });
 
     // Lane `b` — valid config (passes loadLaneConfig in the
@@ -130,7 +129,6 @@ describe('deletePipeline atomic rollback on partial rebind (AUDIT-20260530-63)',
       id: 'b-lane',
       name: 'Lane B',
       pipelineTemplate: DOOMED_TEMPLATE.id,
-      contentDir: 'docs/b',
     });
     const bLaneTmpBlocker = `${laneConfigPath(projectRoot, 'b-lane')}.${process.pid}.tmp`;
     mkdirSync(bLaneTmpBlocker, { recursive: true });
@@ -140,7 +138,6 @@ describe('deletePipeline atomic rollback on partial rebind (AUDIT-20260530-63)',
       id: 'c-lane',
       name: 'Lane C',
       pipelineTemplate: DOOMED_TEMPLATE.id,
-      contentDir: 'docs/c',
     });
 
     await expect(
@@ -169,13 +166,11 @@ describe('deletePipeline atomic rollback on partial rebind (AUDIT-20260530-63)',
       id: 'a-lane',
       name: 'Lane A',
       pipelineTemplate: DOOMED_TEMPLATE.id,
-      contentDir: 'docs/a',
     });
     writeLane(projectRoot, 'c-lane', {
       id: 'c-lane',
       name: 'Lane C',
       pipelineTemplate: DOOMED_TEMPLATE.id,
-      contentDir: 'docs/c',
     });
 
     const result = await deletePipeline(projectRoot, {

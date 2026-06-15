@@ -54,7 +54,7 @@ function makeLane(): LaneConfig {
     id: 'test-lane',
     name: 'Test Lane',
     pipelineTemplate: 'test-collide',
-    contentDir: 'docs',
+    scaffoldDefaults: { markdown: 'docs' },
   };
 }
 

@@ -34,6 +34,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readConfig } from '@deskwork/core/config';
+import { listLaneConfigs } from '@deskwork/core/lanes';
 import { readWorkflow } from '@deskwork/core/review/pipeline';
 import { createApiRouter, type StudioContext } from './routes/api.ts';
 import { serveScrapbookFile } from './routes/scrapbook-file.ts';
@@ -726,7 +727,11 @@ async function main(): Promise<void> {
   printBanner({
     urls: reachableUrls,
     projectRoot,
-    siteSlugs: Object.keys(config.sites),
+    // Phase 39c (sites→lanes retirement): the boot banner reports the
+    // project's LANES (the unit deskwork operates on), not the retired
+    // `config.sites` keyspace. `config` is unused for the banner now but
+    // is still read above for the studio context.
+    laneIds: listLaneConfigs(projectRoot),
     tailscale,
     port: result.port,
     override: hostOverride,
@@ -737,7 +742,7 @@ async function main(): Promise<void> {
 interface BannerInput {
   readonly urls: readonly string[];
   readonly projectRoot: string;
-  readonly siteSlugs: readonly string[];
+  readonly laneIds: readonly string[];
   readonly tailscale: TailscaleInfo | null;
   readonly port: number;
   readonly override: string | null;
@@ -760,7 +765,7 @@ function printBanner(b: BannerInput): void {
     );
   }
   process.stdout.write(`  project: ${b.projectRoot}\n`);
-  process.stdout.write(`  sites:   ${b.siteSlugs.join(', ')}\n`);
+  process.stdout.write(`  lanes:   ${b.laneIds.join(', ') || '(none yet)'}\n`);
   if (b.autoIncrementedFrom !== null) {
     // Issue #43: surface the auto-increment so the operator isn't
     // confused when the URL doesn't match the documented default.

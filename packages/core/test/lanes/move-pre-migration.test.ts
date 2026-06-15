@@ -145,27 +145,27 @@ describe('moveEntryToLane — pre-migration sidecar (AUDIT-20260530-58)', () => 
     // present, an entry without `lane` is treated as a member of
     // `default`. This negative test confirms the new error path does
     // not regress the happy-path behavior the docblock describes.
-    const contentDir = join(projectRoot, 'docs');
-    mkdirSync(contentDir, { recursive: true });
-    const targetContentDir = join(projectRoot, 'qa-content');
-    mkdirSync(targetContentDir, { recursive: true });
+    //
+    // Phase 39: lanes carry no contentDir; the move is metadata-only.
+    // The artifact (project-root-relative `artifactPath`) stays put.
+    const docsDir = join(projectRoot, 'docs');
+    mkdirSync(docsDir, { recursive: true });
 
     writeLane(projectRoot, 'default', {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeLane(projectRoot, 'qa', {
       id: 'qa',
       name: 'QA',
       pipelineTemplate: 'editorial',
-      contentDir: 'qa-content',
     });
 
-    // Write an artifact file on disk that the move will relocate.
-    const artifactRel = 'pre-migration-entry.md';
-    writeFileSync(join(contentDir, artifactRel), '# entry body\n', 'utf8');
+    // Write an artifact file on disk. The move requires it to EXIST but
+    // does NOT relocate it.
+    const artifactRel = 'docs/pre-migration-entry.md';
+    writeFileSync(join(projectRoot, artifactRel), '# entry body\n', 'utf8');
 
     writeSidecarRaw(
       projectRoot,
@@ -178,5 +178,8 @@ describe('moveEntryToLane — pre-migration sidecar (AUDIT-20260530-58)', () => 
     });
     expect(result.fromLane).toBe('default');
     expect(result.toLane).toBe('qa');
+    // The artifact stays where it was — location is the entry's property.
+    expect(result.fromArtifactPath).toBe(join(projectRoot, artifactRel));
+    expect(result.toArtifactPath).toBe(join(projectRoot, artifactRel));
   });
 });

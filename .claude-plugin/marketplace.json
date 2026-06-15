@@ -52,6 +52,17 @@
       },
       "description": "Provider-agnostic control plane for spec-driven development — define / extend / execute a Spec Kit spec in-session, with cross-model governance firing automatically after native execution. Successor to dw-lifecycle.",
       "version": "0.45.2"
+    },
+    {
+      "name": "design-control",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/audiocontrol-org/deskwork.git",
+        "path": "plugins/design-control",
+        "ref": "v0.45.2"
+      },
+      "description": "Portable UX/UI surface-change discipline — author a lint-enforced lo-fi wireframe, translate it into a hand-authorable design-language spec, then implement and archive the change. The UX/UI-surface specialization of stack-control's stance.",
+      "version": "0.45.2"
     }
   ]
 }

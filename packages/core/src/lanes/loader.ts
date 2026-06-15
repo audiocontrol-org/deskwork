@@ -82,29 +82,35 @@ export function assertSafeLaneId(projectRoot: string, id: string): void {
 }
 
 /**
- * Refuse a `contentDir` whose resolved path escapes the project root.
- * Lane configs constrain `contentDir` to the project tree; an
- * operator passing `--content-dir ../../tmp/foo` (or any other shape
- * that resolves higher in the filesystem) is a path-traversal
- * exposure and is refused at the create / update boundaries. Mirrors
+ * Refuse a `scaffoldDefaults` directory value whose resolved path
+ * escapes the project root. A lane's `scaffoldDefaults` map binds an
+ * `artifactKind` to the directory where `/deskwork:add` drops a NEW
+ * file of that kind; an operator passing
+ * `--scaffold-default markdown=../../tmp/foo` (or any other shape that
+ * resolves higher in the filesystem) is a path-traversal exposure and
+ * is refused at the create / update boundaries. Mirrors
  * `assertSafeLaneId` — same belt-and-suspenders shape.
+ *
+ * Per the sites→lanes retirement (Phase 39) this replaces the former
+ * `assertSafeContentDir` check: a lane no longer carries a
+ * `contentDir`, so the boundary check re-homes onto each scaffold dir.
  *
  * Absolute paths equal to or inside the project root are accepted
  * verbatim; relative paths resolve against the project root.
  */
-export function assertSafeContentDir(
+export function assertSafeScaffoldDir(
   projectRoot: string,
-  contentDir: string,
+  scaffoldDir: string,
 ): void {
   const projectAbs = resolve(projectRoot);
-  const targetAbs = isAbsolute(contentDir)
-    ? resolve(contentDir)
-    : resolve(projectAbs, contentDir);
+  const targetAbs = isAbsolute(scaffoldDir)
+    ? resolve(scaffoldDir)
+    : resolve(projectAbs, scaffoldDir);
   const rel = relative(projectAbs, targetAbs);
   if (rel.startsWith('..') || isAbsolute(rel)) {
     throw new Error(
-      `Invalid contentDir ${JSON.stringify(contentDir)}: resolved path `
-      + `${targetAbs} must resolve inside the project root ${projectAbs}.`,
+      `Invalid scaffoldDefaults dir ${JSON.stringify(scaffoldDir)}: resolved `
+      + `path ${targetAbs} must resolve inside the project root ${projectAbs}.`,
     );
   }
 }
@@ -192,6 +198,36 @@ export function loadLaneConfig(id: string, projectRoot: string): LaneConfig {
   }
 
   return lane;
+}
+
+/**
+ * Load a lane config by id WITHOUT cross-validating its pipeline template
+ * (AUDIT-20260604-19). Same read + safe-id + schema + id-match checks as
+ * `loadLaneConfig`, but it does NOT require the referenced `pipelineTemplate`
+ * to resolve.
+ *
+ * Use this when a caller needs a lane's STORED fields (e.g. the optional
+ * `redirectsPath`) and the pipeline template is orthogonal to that need.
+ * `loadLaneConfig` rejects a lane whose pipeline is mid-edit / renamed /
+ * deleted — correct when you are about to run that pipeline, but wrong when
+ * you only want a published-website field: it would discard a perfectly
+ * valid `redirectsPath` because an unrelated field didn't resolve.
+ *
+ * Throws on: empty id, unsafe id (path-traversal / bad charset), missing
+ * file, invalid JSON, schema violation, or id/filename mismatch. Does NOT
+ * throw on an unresolvable pipeline template.
+ *
+ * @param id - The lane id (matches the JSON filename basename).
+ * @param projectRoot - Absolute path to the project root.
+ */
+export function loadLaneConfigSchemaOnly(id: string, projectRoot: string): LaneConfig {
+  if (id.trim().length === 0) {
+    throw new Error(
+      `loadLaneConfigSchemaOnly requires a non-empty id; received ${JSON.stringify(id)}`,
+    );
+  }
+  assertSafeLaneId(projectRoot, id);
+  return readAndValidate(laneConfigPath(projectRoot, id), id);
 }
 
 /**

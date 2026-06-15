@@ -68,7 +68,7 @@ export function makeProject(): string {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     }),
     'utf-8',
   );
@@ -92,7 +92,11 @@ export function addLane(
   opts: {
     name?: string;
     pipelineTemplate?: string;
-    contentDir?: string;
+    /**
+     * Add-time scaffold dir for the markdown kind. Phase 39: a lane
+     * carries no contentDir — this lands under scaffoldDefaults.markdown.
+     */
+    scaffoldMarkdown?: string;
     archivedAt?: string;
   } = {},
 ): void {
@@ -102,7 +106,7 @@ export function addLane(
       id,
       name: opts.name ?? id,
       pipelineTemplate: opts.pipelineTemplate ?? 'editorial',
-      contentDir: opts.contentDir ?? `docs-${id}`,
+      scaffoldDefaults: { markdown: opts.scaffoldMarkdown ?? `docs-${id}` },
       ...(opts.archivedAt !== undefined && { archivedAt: opts.archivedAt }),
     }),
     'utf-8',

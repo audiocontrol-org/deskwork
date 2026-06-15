@@ -122,7 +122,7 @@ describe('deskwork group create', () => {
 
   it('refuses when the lane is archived', () => {
     addLane(project, 'archived-lane', {
-      contentDir: 'docs-archived',
+      scaffoldMarkdown: 'docs-archived',
       archivedAt: '2026-05-28T10:00:00.000Z',
     });
     const res = group(

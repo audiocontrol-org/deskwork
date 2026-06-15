@@ -52,7 +52,7 @@ function makeLane(id: string, pipelineTemplate: string): LaneConfig {
     id,
     name: id,
     pipelineTemplate,
-    contentDir: 'docs',
+    scaffoldDefaults: { markdown: 'docs' },
   };
 }
 

@@ -1,0 +1,14 @@
+{
+  "agent": "regime-holdout-detector",
+  "featureSlug": "design-control",
+  "findings": [],
+  "meta": {
+    "anti_pattern_count": 0,
+    "adopter_manifest_count": 0,
+    "module_symmetry_holdout_count": 0,
+    "deprecation_count": 0,
+    "total": 0,
+    "actively_enforced_count": 0,
+    "candidate_count": 0
+  }
+}

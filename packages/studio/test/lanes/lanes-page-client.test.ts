@@ -70,10 +70,13 @@ function buildNewForm(container: HTMLElement, templates: readonly string[]): HTM
     select.appendChild(opt);
   }
   form.appendChild(select);
-  // contentDir
-  const contentDir = document.createElement('input');
-  contentDir.dataset.lanesField = 'contentDir';
-  form.appendChild(contentDir);
+  // scaffold default (markdown) + host — Phase 39 replaces contentDir.
+  const scaffoldMarkdown = document.createElement('input');
+  scaffoldMarkdown.dataset.lanesField = 'scaffoldMarkdown';
+  form.appendChild(scaffoldMarkdown);
+  const host = document.createElement('input');
+  host.dataset.lanesField = 'host';
+  form.appendChild(host);
   // preview + copy
   const preview = document.createElement('code');
   preview.dataset.lanesPreview = '';
@@ -91,7 +94,7 @@ function buildNewForm(container: HTMLElement, templates: readonly string[]): HTM
 function buildEditFormRow(
   container: HTMLElement,
   laneId: string,
-  current: { name: string; template: string; contentDir: string },
+  current: { name: string; template: string; scaffoldMarkdown: string },
   templates: readonly string[],
 ): { toggleRow: HTMLElement; editRow: HTMLElement; toggle: HTMLButtonElement; form: HTMLElement } {
   // Toggle row
@@ -144,11 +147,17 @@ function buildEditFormRow(
   }
   form.appendChild(select);
 
-  const contentDirInput = document.createElement('input');
-  contentDirInput.dataset.lanesField = 'contentDir';
-  contentDirInput.dataset.current = current.contentDir;
-  contentDirInput.value = current.contentDir;
-  form.appendChild(contentDirInput);
+  const scaffoldInput = document.createElement('input');
+  scaffoldInput.dataset.lanesField = 'scaffoldMarkdown';
+  scaffoldInput.dataset.current = current.scaffoldMarkdown;
+  scaffoldInput.value = current.scaffoldMarkdown;
+  form.appendChild(scaffoldInput);
+
+  const hostInput = document.createElement('input');
+  hostInput.dataset.lanesField = 'host';
+  hostInput.dataset.current = '';
+  hostInput.value = '';
+  form.appendChild(hostInput);
 
   const preview = document.createElement('code');
   preview.dataset.lanesPreview = '';
@@ -231,7 +240,7 @@ describe('lanes-page client controller', () => {
 
     // Every operator-supplied value is JSON-stringified into the
     // command (quoted symmetrically across id / name / template /
-    // contentDir). Placeholders stay un-quoted angle-brackets.
+    // scaffold default / host). Placeholders stay un-quoted angle-brackets.
     const idInput = container.querySelector<HTMLInputElement>('[data-lanes-field="id"]')!;
     idInput.value = 'mockups';
     idInput.dispatchEvent(inputEvent());
@@ -242,10 +251,12 @@ describe('lanes-page client controller', () => {
     select.dispatchEvent(changeEvent());
     expect(preview.textContent).toContain('--template "visual"');
 
-    const contentDir = container.querySelector<HTMLInputElement>('[data-lanes-field="contentDir"]')!;
-    contentDir.value = 'mockups';
-    contentDir.dispatchEvent(inputEvent());
-    expect(preview.textContent).toContain('--content-dir "mockups"');
+    // Phase 39: the scaffold-default field builds `--scaffold-default
+    // "markdown=<dir>"` (the kind is markdown for the studio form).
+    const scaffold = container.querySelector<HTMLInputElement>('[data-lanes-field="scaffoldMarkdown"]')!;
+    scaffold.value = 'mockups';
+    scaffold.dispatchEvent(inputEvent());
+    expect(preview.textContent).toContain('--scaffold-default "markdown=mockups"');
 
     // Optional name appears only when filled
     expect(preview.textContent).not.toContain('--name');
@@ -273,9 +284,9 @@ describe('lanes-page client controller', () => {
     const select = container.querySelector<HTMLSelectElement>('[data-lanes-field="template"]')!;
     select.value = 'visual';
     select.dispatchEvent(changeEvent());
-    const contentDir = container.querySelector<HTMLInputElement>('[data-lanes-field="contentDir"]')!;
-    contentDir.value = 'mockups';
-    contentDir.dispatchEvent(inputEvent());
+    const scaffold = container.querySelector<HTMLInputElement>('[data-lanes-field="scaffoldMarkdown"]')!;
+    scaffold.value = 'mockups';
+    scaffold.dispatchEvent(inputEvent());
 
     const copy = form.querySelector<HTMLButtonElement>('[data-lanes-copy-button="new"]')!;
     expect(copy.disabled).toBe(false);
@@ -286,7 +297,7 @@ describe('lanes-page client controller', () => {
 
     expect(calls.length).toBe(1);
     expect(calls[0]).toContain(
-      '/deskwork:lane create "mockups" --template "visual" --content-dir "mockups"',
+      '/deskwork:lane create "mockups" --template "visual" --scaffold-default "markdown=mockups"',
     );
   });
 
@@ -295,7 +306,7 @@ describe('lanes-page client controller', () => {
     buildEditFormRow(
       container,
       'editorial-lane',
-      { name: 'Editorial', template: 'editorial', contentDir: 'docs' },
+      { name: 'Editorial', template: 'editorial', scaffoldMarkdown: 'docs' },
       ['editorial', 'visual'],
     );
     initLanesPage();
@@ -307,15 +318,15 @@ describe('lanes-page client controller', () => {
     // for symmetry with the value flags.
     expect(preview.textContent).toBe('/deskwork:lane update "editorial-lane"');
 
-    // Change contentDir only — its flag value is quoted symmetrically
-    // with name (per the slash-command quoting convention).
-    const contentDir = container.querySelector<HTMLInputElement>(
-      '[data-lanes-edit-form][data-lane-id="editorial-lane"] [data-lanes-field="contentDir"]',
+    // Change scaffold default only — its flag value is quoted
+    // symmetrically with name (per the slash-command quoting convention).
+    const scaffold = container.querySelector<HTMLInputElement>(
+      '[data-lanes-edit-form][data-lane-id="editorial-lane"] [data-lanes-field="scaffoldMarkdown"]',
     )!;
-    contentDir.value = 'docs-new';
-    contentDir.dispatchEvent(inputEvent());
+    scaffold.value = 'docs-new';
+    scaffold.dispatchEvent(inputEvent());
     expect(preview.textContent).toBe(
-      '/deskwork:lane update "editorial-lane" --content-dir "docs-new"',
+      '/deskwork:lane update "editorial-lane" --scaffold-default "markdown=docs-new"',
     );
 
     // Also change name
@@ -325,7 +336,7 @@ describe('lanes-page client controller', () => {
     name.value = 'Edit Lane';
     name.dispatchEvent(inputEvent());
     expect(preview.textContent).toContain('--name "Edit Lane"');
-    expect(preview.textContent).toContain('--content-dir "docs-new"');
+    expect(preview.textContent).toContain('--scaffold-default "markdown=docs-new"');
   });
 
   it('Edit toggle reveals + hides the hidden edit row + flips aria-expanded', () => {
@@ -333,7 +344,7 @@ describe('lanes-page client controller', () => {
     const { toggle, editRow } = buildEditFormRow(
       container,
       'editorial-lane',
-      { name: 'Editorial', template: 'editorial', contentDir: 'docs' },
+      { name: 'Editorial', template: 'editorial', scaffoldMarkdown: 'docs' },
       ['editorial'],
     );
     initLanesPage();
@@ -355,7 +366,7 @@ describe('lanes-page client controller', () => {
     const { toggle, editRow, form } = buildEditFormRow(
       container,
       'editorial-lane',
-      { name: 'Editorial', template: 'editorial', contentDir: 'docs' },
+      { name: 'Editorial', template: 'editorial', scaffoldMarkdown: 'docs' },
       ['editorial'],
     );
     initLanesPage();
@@ -374,7 +385,7 @@ describe('lanes-page client controller', () => {
     buildEditFormRow(
       container,
       'editorial-lane',
-      { name: 'Editorial', template: 'editorial', contentDir: 'docs' },
+      { name: 'Editorial', template: 'editorial', scaffoldMarkdown: 'docs' },
       ['editorial', 'visual'],
     );
     initLanesPage();
@@ -391,14 +402,14 @@ describe('lanes-page client controller', () => {
     expect(preview.textContent).toBe('/deskwork:lane update "editorial-lane"');
     expect(preview.textContent).not.toContain('--name');
 
-    // Clear the contentDir — same, no `--content-dir ""`.
-    const contentDir = container.querySelector<HTMLInputElement>(
-      '[data-lanes-edit-form][data-lane-id="editorial-lane"] [data-lanes-field="contentDir"]',
+    // Clear the scaffold default — same, no `--scaffold-default ""`.
+    const scaffold = container.querySelector<HTMLInputElement>(
+      '[data-lanes-edit-form][data-lane-id="editorial-lane"] [data-lanes-field="scaffoldMarkdown"]',
     )!;
-    contentDir.value = '';
-    contentDir.dispatchEvent(inputEvent());
+    scaffold.value = '';
+    scaffold.dispatchEvent(inputEvent());
     expect(preview.textContent).toBe('/deskwork:lane update "editorial-lane"');
-    expect(preview.textContent).not.toContain('--content-dir');
+    expect(preview.textContent).not.toContain('--scaffold-default');
   });
 
   it('Edit toggle: single-open accordion — opening row B closes row A', () => {
@@ -406,13 +417,13 @@ describe('lanes-page client controller', () => {
     const a = buildEditFormRow(
       container,
       'lane-a',
-      { name: 'A', template: 'editorial', contentDir: 'docs-a' },
+      { name: 'A', template: 'editorial', scaffoldMarkdown: 'docs-a' },
       ['editorial'],
     );
     const b = buildEditFormRow(
       container,
       'lane-b',
-      { name: 'B', template: 'editorial', contentDir: 'docs-b' },
+      { name: 'B', template: 'editorial', scaffoldMarkdown: 'docs-b' },
       ['editorial'],
     );
     initLanesPage();
@@ -436,7 +447,7 @@ describe('lanes-page client controller', () => {
     buildEditFormRow(
       container,
       'editorial-lane',
-      { name: 'Editorial', template: 'editorial', contentDir: 'docs' },
+      { name: 'Editorial', template: 'editorial', scaffoldMarkdown: 'docs' },
       ['editorial'],
     );
     const { calls } = installClipboardStub();

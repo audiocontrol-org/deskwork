@@ -1,0 +1,618 @@
+/**
+ * `check-mockup-lofi` — the lo-fi wireframe lint, axis 1 (element/attribute
+ * ALLOWLIST). Built on the WHATWG-compliant parse5 tree so polish channels
+ * cannot leak through parser differentials.
+ *
+ * "Lint green ⇒ genuinely lo-fi" only holds because every rule below is an
+ * allowlist closure, not a denylist patch. Anything not enumerated in
+ * `@/lint/allowlist` is rejected by the catch-all.
+ *
+ * SCOPE BOUNDARY (AUDIT-20260610-18, refined by -27 and -31 — the stable
+ * statement of what content statistics can and cannot see):
+ *
+ * - MECHANICALLY GATED: PUNCTUATION text-FLOW art. Punctuation mass is
+ *   statistically anomalous against copy, so the density gates (per-node,
+ *   block aggregate, consecutive-sibling run) catch it.
+ * - REFEREE'S DOMAIN (outside mechanical closure): text-as-imagery composed
+ *   of LETTER glyphs in ANY layout (flow rows of letter-art — round-7
+ *   gpt-5-03 — or grid mosaics — AUDIT-18), and punctuation art whose image
+ *   arises from GRID PLACEMENT under prose dilution (AUDIT-27). Letter mass
+ *   IS what copy is made of, and grid geometry is invisible to content
+ *   statistics — heuristics here are the whack-a-mole the round-7 allowlist
+ *   pivot abolished. The cross-model referee's gross-class imagery judgment
+ *   (PRD § referee, gross classes 5–7) owns this class.
+ * - UA DEFAULT RENDERING of semantic HTML (AUDIT-26/-30; links per -63):
+ *   browser-native control chrome AND default link/heading styling are the
+ *   definitional UNSTYLED baseline, not author-supplied polish; kit styling
+ *   for controls is kit-completeness work (backlog TASK-18), not a lint gap.
+ * - COMPOSITION OF SANCTIONED ATOMS (AUDIT-48, round-13 — the general form):
+ *   imagery composed by GEOMETRIC PLACEMENT of allowlisted visual atoms (kit
+ *   primitives like .sk-dot, native control states like checked checkboxes,
+ *   text glyphs). The atoms are each legitimate; the arrangements are
+ *   statistically indistinguishable from real idioms (a dot-status matrix, a
+ *   permissions grid); the image exists only to an eye. Constraining
+ *   placement would constrain STRUCTURE itself — which is what a wireframe
+ *   is. The referee looks; the lint does not pretend to.
+ *
+ * Boundary fixtures pin each declared form explicitly (codepoint + lofi suites).
+ *
+ * This task ships axis 1 only. The stylesheet identity-pin (single pinned
+ * `<link>` by canonical path + content hash) is task 4; the text codepoint
+ * allowlist is task 5; the adversarial corpus is tasks 6–7. The pipeline shape
+ * (`walk` + `checkElement`) is the seam those tasks extend.
+ */
+
+import { parse, defaultTreeAdapter as ta } from 'parse5';
+import type { DefaultTreeAdapterMap } from 'parse5';
+import {
+  ALLOWED_TAGS,
+  GLOBAL_ATTRS,
+  TAG_ATTRS,
+  PRESENTATIONAL_ATTRS,
+  URL_ATTRS,
+  RESOURCE_URL_ATTRS,
+  DATA_URI_RE,
+  EXTERNAL_URL_RE,
+  META_NAME_ALLOWLIST,
+  INPUT_TYPE_ALLOWLIST,
+  VIEWPORT_CONTENT_ALLOWLIST,
+  isStylesheetRel,
+  splitHtmlTokens,
+  percentDecode,
+} from '@/lint/allowlist';
+
+export { ALLOWED_TAGS } from '@/lint/allowlist';
+export type { LintRule, LintFinding, LintResult } from '@/lint/types';
+
+import type { LintFinding, LintResult } from '@/lint/types';
+import { checkStylesheetIdentity, type StylesheetPin } from '@/lint/stylesheet-pin';
+import {
+  findDisallowedCodepoints,
+  formatCodepoint,
+  isPunctuationDense,
+  punctuationRatio,
+  PUNCT_DENSITY_RATIO,
+} from '@/lint/codepoint';
+import { SKETCH_KIT_ROOT_CLASS, SKETCH_KIT_STYLESHEET_FILENAME } from '@/wireframe-kit/sketch-kit';
+
+type AnyNode = DefaultTreeAdapterMap['node'];
+type Element = DefaultTreeAdapterMap['element'];
+
+export interface LintOptions {
+  /**
+   * REQUIRED (AUDIT-20260610-11, round-2 cross-model): the stylesheet
+   * identity-pin (axis 1.5) — exactly one stylesheet `<link>`, resolving to the
+   * canonical path, whose content hash matches the pinned sketch-kit.css. The
+   * lo-fi guarantee ("lint green ⇒ genuinely lo-fi") is only true under the
+   * pin; making it optional made the unsafe configuration the default (a
+   * designed local file NAMED sketch-kit.css passed green). Callers that
+   * genuinely want the filesystem-free axes use
+   * {@link lintWireframeStructural}, whose name carries no identity guarantee.
+   */
+  readonly stylesheetPin: StylesheetPin;
+}
+
+const SCRIPT_URI_RE = /^\s*(?:javascript|vbscript):/i;
+// C0 control characters (incl. parse5-decoded \n / \t). They are a scheme-
+// obfuscation channel: `java&#x0a;script:` decodes to an embedded newline that
+// slips a start-anchored scheme regex. Built via RegExp() to keep raw control
+// bytes out of the source.
+const CONTROL_CHAR_RE = new RegExp('[\\u0000-\\u001F]');
+
+function isAllowedAttr(tag: string, attr: string): boolean {
+  if (GLOBAL_ATTRS.has(attr)) return true;
+  if (attr.startsWith('aria-')) return true;
+  return TAG_ATTRS[tag]?.has(attr) ?? false;
+}
+
+/**
+ * Lexical basename of an href: strip query/fragment, then take the segment
+ * after the last separator. Backslashes count as separators because WHATWG URL
+ * parsing normalizes them to `/` in special-scheme contexts — a `\`-path must
+ * not hide (or fake) a kit-named basename.
+ */
+function hrefBasename(href: string): string {
+  // Order matters (AUDIT-20260610-60): the browser splits segments on the RAW
+  // string (raw \ normalizes to / in special-scheme URLs) and only then
+  // decodes — so %5C is a literal filename CHARACTER, not a separator. The
+  // round-15 decode-then-split pipeline inverted this and let an encoded
+  // backslash smuggle a non-kit fetch under a kit-looking basename.
+  const noSuffix = href.split(/[?#]/)[0];
+  const segments = noSuffix.split(/[/\\]/);
+  return percentDecode(segments[segments.length - 1] ?? '');
+}
+
+
+/** Per-document state threaded through the walk (axis-1 needs a link census). */
+interface WalkContext {
+  readonly findings: LintFinding[];
+  stylesheetLinkCount: number;
+  /** body carries the bare `sk` root token (AUDIT-20260610-29). */
+  kitRootPresent: boolean;
+}
+
+/**
+ * Block-level containers whose AGGREGATE descendant text gets the
+ * punctuation-density check (AUDIT-20260610-17, round-3 gpt-5-01/-02): a
+ * per-text-node check is defeated by sharding — adjacent inline shards each
+ * below the length floor, or one glyph per table cell. These are the rendered
+ * row/region granularities the shards visually reassemble at. The per-node
+ * check is kept alongside: an inline island inside a letter-diluted block
+ * (prose + one dense button) only trips at the node level.
+ */
+const DENSITY_BLOCK_TAGS: ReadonlySet<string> = new Set([
+  'body', 'main', 'header', 'footer', 'nav', 'section', 'article', 'aside',
+  'div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote',
+  'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'figure', 'figcaption',
+  'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'caption',
+  'form', // AUDIT-20260610-51: sharded control values ride form rows
+]);
+
+/** Concatenated descendant text of an element (template content included). */
+function aggregateText(el: Element): string {
+  let out = '';
+  const visit = (node: AnyNode): void => {
+    if (ta.isTextNode(node)) out += ta.getTextNodeContent(node);
+    if ('content' in node && node.content) {
+      for (const child of node.content.childNodes) visit(child);
+    }
+    if ('childNodes' in node) {
+      for (const child of node.childNodes) visit(child);
+    }
+  };
+  visit(el);
+  return out;
+}
+
+/**
+ * Like {@link aggregateText} but ALSO includes the author text that controls
+ * RENDER (input value on rendered types, input/textarea placeholder) —
+ * AUDIT-20260610-51: punctuation rows sharded through button values are
+ * visible author text the text-node walk never sees. Used by the density
+ * block/run paths ONLY (the empty-textarea rule keeps plain aggregateText so a
+ * legitimate placeholder is not mistaken for content).
+ */
+function renderedText(el: Element): string {
+  let out = aggregateText(el);
+  const visit = (node: AnyNode): void => {
+    if (ta.isElementNode(node)) {
+      const nodeTag = ta.getTagName(node).toLowerCase();
+      if (nodeTag === 'input' || nodeTag === 'textarea') {
+        const attrs = ta.getAttrList(node);
+        const type = (attrs.find((a) => a.name.toLowerCase() === 'type')?.value ?? '').toLowerCase();
+        const valueRenders = nodeTag === 'input' && !['checkbox', 'radio'].includes(type);
+        for (const { name, value } of attrs) {
+          const attr = name.toLowerCase();
+          if ((attr === 'value' && valueRenders) || attr === 'placeholder') {
+            out += ' ' + value;
+          }
+        }
+      }
+    }
+    if ('childNodes' in node) {
+      for (const child of node.childNodes) visit(child);
+    }
+  };
+  visit(el);
+  return out;
+}
+
+function checkElement(el: Element, ctx: WalkContext): void {
+  const { findings } = ctx;
+  const tag = ta.getTagName(el).toLowerCase();
+
+  // Kit-root census (AUDIT-20260610-29): without the bare `sk` token on body,
+  // the pinned kit is loaded but IN EFFECT nowhere — the page renders through
+  // UA default styling. Checked post-walk in the entry points.
+  // Theme placement (AUDIT-20260610-38): the DECISION contract is ONE theme,
+  // selected on the body root — sk-theme-* below body composes mixed-theme
+  // surfaces (per-section typography/palette/texture switching), a pinned-CSS
+  // polish channel through class PLACEMENT rather than substitution.
+  const classTokens = splitHtmlTokens(
+    ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'class')?.value ?? '',
+  );
+  // Distinct themes, not raw tokens (AUDIT-20260610-46): duplicate identical
+  // tokens compose nothing.
+  const themeTokens = [...new Set(classTokens.filter((t) => t.startsWith('sk-theme-')))];
+  if (tag === 'body') {
+    if (classTokens.includes(SKETCH_KIT_ROOT_CLASS)) ctx.kitRootPresent = true;
+    if (themeTokens.length > 1) {
+      findings.push({
+        rule: 'theme-placement',
+        tag,
+        message: `body carries ${themeTokens.length} sk-theme-* tokens (${themeTokens.join(', ')}) — the kit contract is ONE adopter-selected theme on the body root`,
+      });
+    }
+  } else if (themeTokens.length > 0) {
+    findings.push({
+      rule: 'theme-placement',
+      tag,
+      message: `sk-theme-* on <${tag}> (${themeTokens.join(', ')}) — theme classes belong on the body root only; sub-tree themes compose mixed visual languages (polish via placement)`,
+    });
+  }
+
+  if (!ALLOWED_TAGS.has(tag)) {
+    findings.push({
+      rule: 'disallowed-element',
+      tag,
+      message: `<${tag}> is not in the lo-fi element allowlist`,
+    });
+    return; // the element itself is the violation; don't double-report its attrs
+  }
+
+  for (const { name, value } of ta.getAttrList(el)) {
+    const attr = name.toLowerCase();
+
+    // Named-attribute channels first (these are about the attr NAME).
+    if (attr === 'style') {
+      findings.push({ rule: 'inline-style', tag, attr, message: `inline style= on <${tag}> is a polish channel` });
+      continue;
+    }
+    if (attr.startsWith('on')) {
+      findings.push({ rule: 'event-handler', tag, attr, message: `event-handler ${attr} on <${tag}> is not lo-fi` });
+      continue;
+    }
+    if (PRESENTATIONAL_ATTRS.has(attr)) {
+      findings.push({ rule: 'presentational-attribute', tag, attr, message: `presentational attribute ${attr} on <${tag}> is rejected` });
+      continue;
+    }
+    // Allowlist MEMBERSHIP is decided before any value-shape rule, so a value
+    // that merely looks like a URI on a disallowed attribute is reported as
+    // disallowed-attribute (AUDIT-20260606-01/claude-02), not mislabeled.
+    if (!isAllowedAttr(tag, attr)) {
+      findings.push({ rule: 'disallowed-attribute', tag, attr, message: `attribute ${attr} on <${tag}> is not in the allowlist` });
+      continue;
+    }
+    // Human-visible attribute VALUES pass the codepoint allowlist
+    // (AUDIT-20260610-19; placeholder/value added by -25): `title` renders as
+    // a tooltip, `aria-*` is announced/displayable, `placeholder` renders in
+    // the empty field, and `value` renders as the control's label/content —
+    // the designed-glyph channel axis-2 closes for text nodes must not
+    // survive in attributes the operator can see. class/id stay
+    // value-unconstrained (inert under the pin, round-8).
+    // `value` is a SUBMISSION value (never rendered) on checkbox/radio
+    // (AUDIT-20260610-49) — the visible gates scope to types whose value
+    // renders (field content / button label).
+    // `value` renders ONLY on input controls whose value is the field
+    // content / label (AUDIT-20260610-49; option/li per -65: submission and
+    // numbering metadata respectively — their rendered text is elsewhere).
+    const inputTypeValue =
+      tag === 'input'
+        ? (ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'type')?.value ?? '')
+            .trim()
+            .toLowerCase()
+        : '';
+    const valueIsRendered =
+      attr !== 'value' ||
+      (tag === 'input' && !['checkbox', 'radio'].includes(inputTypeValue));
+    if ((attr === 'title' || attr === 'placeholder' || attr === 'value' || attr.startsWith('aria-')) && valueIsRendered) {
+      for (const { codepoint, char } of findDisallowedCodepoints(value)) {
+        findings.push({
+          rule: 'disallowed-codepoint',
+          tag,
+          attr,
+          message: `disallowed codepoint ${formatCodepoint(codepoint)} (${JSON.stringify(char)}) in ${attr} on <${tag}> — visible attribute values follow the lo-fi codepoint allowlist`,
+        });
+      }
+      // Visible attr values get the density gate too (AUDIT-20260610-21) —
+      // and PER LINE (AUDIT-20260610-36): a multiline placeholder renders
+      // linewise in the textarea viewport and a multiline title renders
+      // linewise in the tooltip, so art rows must not hide behind a diluting
+      // prose tail in the aggregate string.
+      if (isPunctuationDense(value) || value.split('\n').some((line) => isPunctuationDense(line))) {
+        findings.push({
+          rule: 'punctuation-density',
+          tag,
+          attr,
+          message: `${attr} on <${tag}> carries punctuation-dense (imagery-shaped) content — rendered attr surfaces follow the same anti-art gate as text content, per line`,
+        });
+      }
+    }
+    // `input type` is an enumerated structural set (AUDIT-20260610-24):
+    // image loads a resource; color/file/range open visual chrome.
+    if (tag === 'input' && attr === 'type' && !INPUT_TYPE_ALLOWLIST.has(inputTypeValue)) {
+      findings.push({
+        rule: 'disallowed-input-type',
+        tag,
+        attr,
+        message: `input type="${value}" is not in the enumerated structural set (${[...INPUT_TYPE_ALLOWLIST].join(', ')})`,
+      });
+    }
+    // List numbering is digits-only (AUDIT-20260610-54): li value="-1"
+    // renders "-1." markers — generated punctuation columns the text gates
+    // never see.
+    if (((tag === 'li' && attr === 'value') || (tag === 'ol' && attr === 'start')) && !/^\d+$/.test(value.trim())) {
+      findings.push({
+        rule: 'list-numbering',
+        tag,
+        attr,
+        message: `${attr}="${value}" on <${tag}> is not a non-negative integer — list numbering is structural, and non-numeric markers are a generated-text channel`,
+      });
+    }
+    // `meta name` is an enumerated set (AUDIT-20260610-19): theme-color /
+    // color-scheme are visual channels carried by NAME.
+    if (tag === 'meta' && attr === 'name' && !META_NAME_ALLOWLIST.has(value.toLowerCase())) {
+      findings.push({
+        rule: 'disallowed-meta-name',
+        tag,
+        attr,
+        message: `meta name="${value}" is not in the enumerated allowlist (${[...META_NAME_ALLOWLIST].join(', ')}) — theme-color/color-scheme are browser-chrome visual channels`,
+      });
+    }
+    // Viewport content is a rendering channel (AUDIT-20260610-41): forced
+    // scale/zoom presents an app-screenshot look outside the pinned kit. Only
+    // the canonical responsive declaration passes.
+    if (tag === 'meta' && attr === 'content') {
+      const nameValue = ta.getAttrList(el).find((a) => a.name.toLowerCase() === 'name')?.value;
+      if (nameValue?.toLowerCase() === 'viewport') {
+        const normalized = value.toLowerCase().split(',').map((p) => {
+          // Numeric values canonicalize (1.0 ≡ 1; AUDIT-20260610-57).
+          const [k, v] = p.split('=').map((x) => x.trim());
+          if (v !== undefined && v !== '' && Number.isFinite(Number(v))) return `${k}=${Number(v)}`;
+          return p.trim();
+        }).filter(Boolean).sort().join(',');
+        if (!VIEWPORT_CONTENT_ALLOWLIST.has(normalized)) {
+          findings.push({
+            rule: 'disallowed-viewport',
+            tag,
+            attr,
+            message: `viewport content "${value}" is not the canonical responsive declaration (width=device-width, initial-scale=1) — viewport scaling is a rendering channel`,
+          });
+        }
+      }
+    }
+    // A password value renders as masking BULLETS (AUDIT-20260610-42) —
+    // author-controlled glyph substitution; wireframes don't prefill secrets.
+    if (tag === 'input' && attr === 'value') {
+      if (inputTypeValue === 'password' && value !== '') {
+        findings.push({
+          rule: 'password-value',
+          tag,
+          attr,
+          message: `a prefilled password renders as a row of masking bullets (decorative glyph substitution) — use placeholder for the field's copy`,
+        });
+      }
+    }
+    // Value-level URL checks apply ONLY to URL-bearing attrs (URL_ATTRS, the
+    // SSOT — currently just href). Scanning every value for "data:" over-
+    // rejected inert class/meta/title prose and contradicted the round-8 inert-
+    // class invariant (AUDIT-20260606-01). Gating on URL_ATTRS rather than a
+    // hardcoded 'href' keeps coverage in lockstep with the allowlist so a future
+    // URL attr is auto-scanned (AUDIT-20260606-04).
+    if (URL_ATTRS.has(attr)) {
+      if (CONTROL_CHAR_RE.test(value)) {
+        findings.push({ rule: 'disallowed-uri-scheme', tag, attr, message: `control character in ${attr} on <${tag}> (scheme-obfuscation channel) is rejected` });
+        continue;
+      }
+      if (DATA_URI_RE.test(value)) {
+        findings.push({ rule: 'data-uri', tag, attr, message: `data: URI in ${attr} on <${tag}> is rejected` });
+        continue;
+      }
+      if (SCRIPT_URI_RE.test(value)) {
+        findings.push({ rule: 'disallowed-uri-scheme', tag, attr, message: `script-bearing URI scheme in ${attr} on <${tag}> is rejected` });
+        continue;
+      }
+      // external-resource applies only to genuine resource-LOADING attrs (link
+      // href), not <a> navigation links.
+      if (RESOURCE_URL_ATTRS[tag]?.has(attr) && EXTERNAL_URL_RE.test(value)) {
+        findings.push({ rule: 'external-resource', tag, attr, message: `external resource URL in ${attr} on <${tag}> is rejected` });
+      }
+    }
+  }
+
+  // A reversed list with an explicit start must not run below 1
+  // (AUDIT-20260610-62): start="0" reversed renders 0., -1., -2. — generated
+  // NEGATIVE punctuation markers reopening the AUDIT-54 channel.
+  if (tag === 'ol') {
+    const attrs = ta.getAttrList(el);
+    const reversed = attrs.some((a) => a.name.toLowerCase() === 'reversed');
+    const startRaw = attrs.find((a) => a.name.toLowerCase() === 'start')?.value;
+    if (reversed && startRaw !== undefined && /^\d+$/.test(startRaw.trim())) {
+      const start = Number(startRaw.trim());
+      const itemCount = el.childNodes.filter(
+        (n) => ta.isElementNode(n) && ta.getTagName(n).toLowerCase() === 'li',
+      ).length;
+      if (start - itemCount + 1 < 1) {
+        findings.push({
+          rule: 'list-numbering',
+          tag,
+          attr: 'start',
+          message: `reversed list with start="${startRaw}" and ${itemCount} items counts down past 1 (negative "-N." markers are a generated-punctuation channel)`,
+        });
+      }
+    }
+  }
+
+  // textarea must be EMPTY (AUDIT-20260610-33): it preserves whitespace (the
+  // pre channel) AND scrolls, so visible-viewport art can hide behind
+  // scrolled-out diluting prose — statistics cannot see the viewport. The
+  // lo-fi idiom for its copy is the (gated) placeholder.
+  if (tag === 'textarea' && aggregateText(el).trim() !== '') {
+    findings.push({
+      rule: 'textarea-content',
+      tag,
+      message: `textarea must be empty in a wireframe (its rendered surface preserves whitespace and scrolls — the pre/ASCII-art channel); use placeholder for its copy`,
+    });
+  }
+
+  // Block-aggregate punctuation density (AUDIT-20260610-17): the rendered
+  // row/region is what sharded punctuation art reassembles at.
+  if (DENSITY_BLOCK_TAGS.has(tag) && isPunctuationDense(renderedText(el))) {
+    findings.push({
+      rule: 'punctuation-density',
+      tag,
+      message: `aggregate text of <${tag}> is punctuation-dense (imagery-shaped, not copy-shaped) — sharded pixel/ASCII-art channels are rejected; use the .sk-img placeholder for image regions`,
+    });
+  }
+
+  // Sibling-RUN density (AUDIT-20260610-22, round-5; text-node children added
+  // by -44, round-12): stacked rows each below the per-node floor reassemble
+  // vertically while prose dilutes the parent aggregate. Consecutive
+  // density-shaped children — ELEMENT aggregates AND bare TEXT NODES (rows
+  // separated by <br> are text-node siblings) — accumulate as a run; <br> is
+  // transparent (it renders the row separator); the length floor applies to
+  // the run's combined text. A prose child still breaks the run.
+  if (DENSITY_BLOCK_TAGS.has(tag)) {
+    let run = '';
+    const flush = (): void => {
+      if (run !== '' && isPunctuationDense(run)) {
+        findings.push({
+          rule: 'punctuation-density',
+          tag,
+          message: `a run of consecutive punctuation-dense children of <${tag}> is imagery-shaped (stacked pixel/ASCII-art rows) — use the .sk-img placeholder for image regions`,
+        });
+      }
+      run = '';
+    };
+    const classify = (text: string): void => {
+      const trimmed = text.replace(/[\s]/g, '');
+      if (trimmed.length === 0) return; // whitespace-only: neither joins nor breaks
+      if (punctuationRatio(text) >= PUNCT_DENSITY_RATIO) {
+        run += text;
+      } else {
+        flush();
+      }
+    };
+    for (const child of el.childNodes) {
+      if (ta.isTextNode(child)) {
+        classify(ta.getTextNodeContent(child));
+      } else if (ta.isElementNode(child)) {
+        if (ta.getTagName(child).toLowerCase() === 'br') continue; // row separator: transparent
+        classify(renderedText(child));
+      }
+    }
+    flush();
+  }
+
+  // Only the pinned sketch-kit stylesheet link is permitted. The rel token set
+  // must be EXACTLY ['stylesheet'] — a mixed rel like "stylesheet icon" still
+  // pulls a non-CSS resource (AUDIT-20260606-02/codex-01). The exact path+hash
+  // identity-pin is axis 1.5.
+  if (tag === 'link') {
+    const attrs = ta.getAttrList(el);
+    const relValue = attrs.find((a) => a.name.toLowerCase() === 'rel')?.value ?? '';
+    if (!isStylesheetRel(relValue)) {
+      findings.push({ rule: 'disallowed-link-rel', tag, message: `only rel="stylesheet" <link> is permitted; got rel="${relValue}"` });
+    } else {
+      // Axis-1 stylesheet narrowing (AUDIT-20260610-01, gpt-5-02 + fable-02):
+      // the stylesheet link must lexically reference the kit filename, and the
+      // document census (post-walk) enforces a singleton. Filesystem-free —
+      // byte identity remains axis-1.5's job (the pin); a local non-kit file
+      // NAMED sketch-kit.css passes here by design and only the pin catches it.
+      ctx.stylesheetLinkCount += 1;
+      const href = attrs.find((a) => a.name.toLowerCase() === 'href')?.value ?? '';
+      if (hrefBasename(href) !== SKETCH_KIT_STYLESHEET_FILENAME) {
+        findings.push({
+          rule: 'stylesheet-filename-mismatch',
+          tag,
+          attr: 'href',
+          message: `stylesheet href "${href}" does not reference ${SKETCH_KIT_STYLESHEET_FILENAME} — only the sketch-kit stylesheet may be linked`,
+        });
+      }
+    }
+  }
+}
+
+function checkText(node: DefaultTreeAdapterMap['textNode'], findings: LintFinding[]): void {
+  const content = ta.getTextNodeContent(node);
+  for (const { codepoint, char } of findDisallowedCodepoints(content)) {
+    findings.push({
+      rule: 'disallowed-codepoint',
+      message: `disallowed codepoint ${formatCodepoint(codepoint)} (${JSON.stringify(char)}) in text content — outside the lo-fi codepoint allowlist`,
+    });
+  }
+  // AUDIT-20260610-12: imagery-shaped punctuation mass (pixel-art rows) is
+  // rejected per text node — see isPunctuationDense for the channel rationale.
+  if (isPunctuationDense(content)) {
+    findings.push({
+      rule: 'punctuation-density',
+      message: `text content is punctuation-dense (imagery-shaped, not copy-shaped) — pixel/ASCII-art channels are rejected; use the .sk-img placeholder for image regions`,
+    });
+  }
+}
+
+function walk(node: AnyNode, ctx: WalkContext): void {
+  if (ta.isElementNode(node)) {
+    checkElement(node, ctx);
+    // <template> stows its subtree in .content — descend so nothing hides there
+    if ('content' in node && node.content) {
+      for (const child of node.content.childNodes) walk(child, ctx);
+    }
+  } else if (ta.isTextNode(node)) {
+    checkText(node, ctx.findings);
+  }
+  if ('childNodes' in node) {
+    for (const child of node.childNodes) walk(child, ctx);
+  }
+}
+
+/**
+ * STRUCTURAL lint only — axes 1 (element/attribute allowlist) + 2 (text
+ * codepoint allowlist), filesystem-free. The name deliberately carries NO
+ * lo-fi-guarantee claim: without the identity pin, a designed local stylesheet
+ * named like the kit passes these axes (AUDIT-20260610-01/-11). Use
+ * {@link lintWireframe} for the guarantee-bearing check.
+ */
+export function lintWireframeStructural(html: string): LintResult {
+  const ctx: WalkContext = { findings: [], stylesheetLinkCount: 0, kitRootPresent: false };
+  const document = parse(html);
+  walk(document, ctx);
+  const { findings } = ctx;
+  // The standards doctype is required (AUDIT-20260610-55): a legacy or absent
+  // doctype flips the browser into quirks mode — an author-controlled
+  // RENDERING MODE outside the pinned kit.
+  const doctype = document.childNodes.find((n) => n.nodeName === '#documentType');
+  const isStandards =
+    doctype !== undefined &&
+    'name' in doctype &&
+    doctype.name === 'html' &&
+    (!('publicId' in doctype) || doctype.publicId === '') &&
+    (!('systemId' in doctype) || doctype.systemId === '');
+  if (!isStandards) {
+    findings.push({
+      rule: 'doctype-required',
+      message: `the document must carry the standards doctype <!DOCTYPE html> — a legacy or missing doctype switches the browser to quirks rendering mode`,
+    });
+  }
+  // Axis-1 singleton census (AUDIT-20260610-01): more than one stylesheet link
+  // is a smuggling channel regardless of what each names. Zero links is NOT an
+  // axis-1 violation (an unstyled fragment renders browser-default, not
+  // polish); the pin's stylesheet-missing covers presence in pinned mode.
+  if (ctx.stylesheetLinkCount > 1) {
+    findings.push({
+      rule: 'stylesheet-not-singleton',
+      tag: 'link',
+      message: `${ctx.stylesheetLinkCount} stylesheet links found — exactly one (the sketch-kit stylesheet) is permitted`,
+    });
+  }
+  // Kit root required (AUDIT-20260610-29): linked-and-byte-true is not IN
+  // EFFECT; without the `sk` body token the document renders UA-styled.
+  if (!ctx.kitRootPresent) {
+    findings.push({
+      rule: 'kit-root-missing',
+      tag: 'body',
+      message: `body does not carry the "${SKETCH_KIT_ROOT_CLASS}" kit root class — the pinned stylesheet is loaded but in effect nowhere (UA default rendering)`,
+    });
+  }
+  return { ok: findings.length === 0, findings };
+}
+
+/**
+ * Lint a wireframe HTML string with the FULL lo-fi guarantee: structural axes
+ * plus the stylesheet identity-pin (axis 1.5). The pin is required — the
+ * guarantee is false without it, so a pin-less call throws instead of
+ * silently degrading to the filename-only check (AUDIT-20260610-11; no
+ * fallbacks). Returns all findings (does not short-circuit) so the operator
+ * sees every violation in one pass.
+ */
+export function lintWireframe(html: string, options: LintOptions): LintResult {
+  if (!options?.stylesheetPin) {
+    throw new Error(
+      'lintWireframe requires options.stylesheetPin — the lo-fi guarantee is false without the identity pin. ' +
+        'Use lintWireframeStructural(html) for the filesystem-free axes (no guarantee claim).',
+    );
+  }
+  const structural = lintWireframeStructural(html);
+  const findings = [...structural.findings, ...checkStylesheetIdentity(html, options.stylesheetPin)];
+  return { ok: findings.length === 0, findings };
+}

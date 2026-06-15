@@ -10,7 +10,7 @@
  */
 
 import { readCalendar } from '../calendar.ts';
-import { buildContentIndex } from '../content-index.ts';
+import { buildContentIndexFromSidecars } from '../content-index.ts';
 import { resolveCalendarPath } from '../paths.ts';
 import { readWorkflows } from '../review/pipeline.ts';
 import type { DeskworkConfig } from '../config.ts';
@@ -23,6 +23,7 @@ import calendarUuidMissing from './rules/calendar-uuid-missing.ts';
 import legacyTopLevelIdMigration from './rules/legacy-top-level-id-migration.ts';
 import legacyStageArtifactPath from './rules/legacy-stage-artifact-path.ts';
 import laneConfigMissingTemplate from './rules/lane-config-missing-template.ts';
+import sitesToLanesMigration from './rules/sites-to-lanes-migration.ts';
 import entryLaneMissing from './rules/entry-lane-missing.ts';
 import entryAnchorShape from './rules/entry-anchor-shape.ts';
 import entryAddressReasonMissing from './rules/entry-address-reason-missing.ts';
@@ -52,6 +53,7 @@ export const RULES: ReadonlyArray<DoctorRule> = [
   calendarUuidMissing,
   legacyTopLevelIdMigration,
   legacyStageArtifactPath,
+  sitesToLanesMigration,
   laneConfigMissingTemplate,
   entryLaneMissing,
   entryAnchorShape,
@@ -101,44 +103,50 @@ export function parseFixArgument(arg: string): string[] {
 export interface DoctorRunOptions {
   projectRoot: string;
   config: DeskworkConfig;
-  /** Restrict to one site; undefined = run for every site in config. */
+  /**
+   * Phase 39c (sites→lanes retirement): the doctor runs a SINGLE
+   * project-scoped pass. `site` is retained on the options shape (the
+   * `--site` CLI flag still parses) but it no longer scopes the run —
+   * the doctor operates on the project's sidecar set, calendar, and
+   * workflow store as a whole.
+   */
   site?: string;
   /** Restrict the rule set; undefined = all rules. */
   ruleIds?: string[];
 }
 
-/** Build the per-site context once for a run. */
-function buildContext(
+/**
+ * The single project scope label. Phase 39c collapsed the doctor's
+ * per-site loop (location is no longer the identifying axis — the
+ * sidecar set is the source of truth) into one project pass. Findings
+ * carry this as their `site` label so existing consumers that group by
+ * `finding.site` still see a stable key.
+ */
+export const PROJECT_SCOPE = 'project';
+
+/** Build the single project-scoped context for a run. */
+async function buildContext(
   opts: DoctorRunOptions,
-  site: string,
   interaction: DoctorInteraction,
-): DoctorContext {
-  const calendarPath = resolveCalendarPath(opts.projectRoot, opts.config, site);
+): Promise<DoctorContext> {
+  // Phase 39c: the calendar is the single project-level
+  // `.deskwork/calendar.md`; the content index is driven by the sidecar
+  // set (the SSOT), not a configured site `contentDir`. Workflows are no
+  // longer site-filtered — the runner exposes the whole workflow store
+  // and the workflow-stale rule reconciles against the single calendar.
+  const calendarPath = resolveCalendarPath(opts.projectRoot, opts.config);
   const calendar = readCalendar(calendarPath);
-  const index = buildContentIndex(opts.projectRoot, opts.config, site);
-  const allWorkflows = readWorkflows(opts.projectRoot, opts.config);
-  const workflows = allWorkflows.filter((w) => w.site === site);
+  const index = await buildContentIndexFromSidecars(opts.projectRoot);
+  const workflows = readWorkflows(opts.projectRoot, opts.config);
   return {
     projectRoot: opts.projectRoot,
     config: opts.config,
-    site,
+    site: PROJECT_SCOPE,
     calendar,
     index,
     workflows,
     interaction,
   };
-}
-
-function selectSites(opts: DoctorRunOptions): string[] {
-  if (opts.site !== undefined) {
-    if (!(opts.site in opts.config.sites)) {
-      throw new Error(
-        `Unknown site "${opts.site}". Configured sites: ${Object.keys(opts.config.sites).join(', ')}`,
-      );
-    }
-    return [opts.site];
-  }
-  return Object.keys(opts.config.sites);
 }
 
 function selectRules(
@@ -178,6 +186,22 @@ async function buildEffectiveRules(
 }
 
 /**
+ * Shared setup for both doctor entry points: resolve the effective rule
+ * set (built-ins + project overrides, filtered by `ruleIds`) and build the
+ * run context. `runAudit` and `runRepair` differ only in what they DO with
+ * the rules + ctx, not in how they obtain them.
+ */
+async function prepareRun(
+  opts: DoctorRunOptions,
+  interaction: DoctorInteraction,
+): Promise<{ rules: DoctorRule[]; ctx: DoctorContext }> {
+  const available = await buildEffectiveRules(opts.projectRoot);
+  const rules = selectRules(available, opts.ruleIds);
+  const ctx = await buildContext(opts, interaction);
+  return { rules, ctx };
+}
+
+/**
  * Audit: collect findings without mutating the world. Returns a fully-
  * built report with empty `repairs`. Suitable for pre-commit hooks
  * that just want a non-zero exit code on any finding.
@@ -186,18 +210,13 @@ export async function runAudit(
   opts: DoctorRunOptions,
   interaction: DoctorInteraction,
 ): Promise<DoctorReport> {
-  const sites = selectSites(opts);
-  const available = await buildEffectiveRules(opts.projectRoot);
-  const rules = selectRules(available, opts.ruleIds);
+  const { rules, ctx } = await prepareRun(opts, interaction);
   const findings: Finding[] = [];
-  for (const site of sites) {
-    const ctx = buildContext(opts, site, interaction);
-    for (const rule of rules) {
-      const out = await rule.audit(ctx);
-      findings.push(...out);
-    }
+  for (const rule of rules) {
+    const out = await rule.audit(ctx);
+    findings.push(...out);
   }
-  return { findings, repairs: [], sites };
+  return { findings, repairs: [], sites: [PROJECT_SCOPE] };
 }
 
 /**
@@ -213,25 +232,19 @@ export async function runRepair(
   opts: DoctorRunOptions,
   interaction: DoctorInteraction,
 ): Promise<DoctorReport> {
-  const sites = selectSites(opts);
-  const available = await buildEffectiveRules(opts.projectRoot);
-  const rules = selectRules(available, opts.ruleIds);
+  const { rules, ctx } = await prepareRun(opts, interaction);
   const findings: Finding[] = [];
   const repairs: RepairResult[] = [];
-
-  for (const site of sites) {
-    const ctx = buildContext(opts, site, interaction);
-    for (const rule of rules) {
-      const ruleFindings = await rule.audit(ctx);
-      findings.push(...ruleFindings);
-      for (const finding of ruleFindings) {
-        const plan = await rule.plan(ctx, finding);
-        const result = await resolveAndApply(rule, ctx, plan, interaction);
-        repairs.push(result);
-      }
+  for (const rule of rules) {
+    const ruleFindings = await rule.audit(ctx);
+    findings.push(...ruleFindings);
+    for (const finding of ruleFindings) {
+      const plan = await rule.plan(ctx, finding);
+      const result = await resolveAndApply(rule, ctx, plan, interaction);
+      repairs.push(result);
     }
   }
-  return { findings, repairs, sites };
+  return { findings, repairs, sites: [PROJECT_SCOPE] };
 }
 
 /**

@@ -51,9 +51,12 @@ describe('validateAll - file-presence', () => {
   it('flags Drafting sidecar when docs/<slug>/index.md is missing', async () => {
     const uuid = '11111111-1111-1111-1111-111111111111';
     const slug = 'no-artifact';
+    // Phase 39d: resolution reads the stored artifactPath ONLY. Stamp the
+    // path the migration would have backfilled; the file is absent so
+    // file-presence must flag it.
     await writeFile(
       join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
-      entryJson(uuid, slug, 'Drafting'),
+      entryJson(uuid, slug, 'Drafting', `docs/${slug}/index.md`),
     );
     await writeFile(
       join(projectRoot, '.deskwork', 'calendar.md'),
@@ -71,7 +74,7 @@ describe('validateAll - file-presence', () => {
     const slug = 'has-artifact';
     await writeFile(
       join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
-      entryJson(uuid, slug, 'Drafting'),
+      entryJson(uuid, slug, 'Drafting', `docs/${slug}/index.md`),
     );
     await writeFile(
       join(projectRoot, '.deskwork', 'calendar.md'),
@@ -107,7 +110,7 @@ describe('validateAll - file-presence', () => {
     const slug = 'idea-missing';
     await writeFile(
       join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
-      entryJson(uuid, slug, 'Ideas'),
+      entryJson(uuid, slug, 'Ideas', `docs/${slug}/scrapbook/idea.md`),
     );
     await writeFile(
       join(projectRoot, '.deskwork', 'calendar.md'),

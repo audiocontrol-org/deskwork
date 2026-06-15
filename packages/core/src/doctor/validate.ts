@@ -8,6 +8,7 @@ import {
 } from '../schema/entry.ts';
 import { extractEntriesForMigration } from '../calendar/parse.ts';
 import { readJournalEvents } from '../journal/read.ts';
+import { resolveStoredArtifactPath } from '../entry/resolve-artifact.ts';
 
 export interface ValidationFailure {
   category:
@@ -75,15 +76,11 @@ async function readSidecarUuids(projectRoot: string): Promise<Set<string>> {
 
 async function validateCalendarSidecar(projectRoot: string): Promise<ValidationFailure[]> {
   const failures: ValidationFailure[] = [];
-  // NOTE (#232 residual — tracked in #357): this entry-centric
-  // sidecar-consistency check reads the hardcoded `.deskwork/calendar.md`,
-  // NOT the per-site `calendarPath`. regenerate/repair now write the
-  // configured calendar (#232), so for a custom calendarPath this `--check`
-  // reads the wrong file and returns false-clean. Fixing it requires
-  // deciding whether the entry-centric calendar and the per-site
-  // calendarPath are one surface or two (entangled with #234); see #357.
-  // For the default config (calendarPath == .deskwork/calendar.md) the two
-  // coincide and there is no gap.
+  // This entry-centric check reads the single project calendar at
+  // `.deskwork/calendar.md`. Per the sites→lanes retirement spec §"Calendar"
+  // the calendar is a single derived projection (per-site `calendarPath` is
+  // retired); the de-parameterization of regenerate/repair lands in 39c
+  // (#223/#234/#357). This read-side target already matches that endpoint.
   const calendarPath = join(projectRoot, '.deskwork', 'calendar.md');
   let md: string;
   try {
@@ -170,52 +167,19 @@ async function loadSidecars(projectRoot: string): Promise<LoadedSidecar[]> {
 }
 
 /**
- * Stage-conventional artifact path. Returns null when a stage does not have a
- * primary on-disk artifact (e.g. Blocked / Cancelled) OR when the stage is
- * outside the editorial pipeline's eight known values (per Phase 3 / Phase
- * 4 — lane-aware path conventions land in the lane code, not in this
- * editorial-specific heuristic).
+ * Resolve the on-disk artifact path for an entry — STORED PATH ONLY
+ * (Phase 39d, sites→lanes retirement).
  *
- * Note: Published shares the Drafting/Final path (`docs/<slug>/index.md`).
- */
-function artifactPathForStage(projectRoot: string, slug: string, stage: string): string | null {
-  switch (stage) {
-    case 'Ideas':
-      return join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
-    case 'Planned':
-      return join(projectRoot, 'docs', slug, 'scrapbook', 'plan.md');
-    case 'Outlining':
-      return join(projectRoot, 'docs', slug, 'scrapbook', 'outline.md');
-    case 'Drafting':
-    case 'Final':
-    case 'Published':
-      return join(projectRoot, 'docs', slug, 'index.md');
-    case 'Blocked':
-    case 'Cancelled':
-      return null;
-    default:
-      // Lane-specific or unrecognized stage; no editorial-default path
-      // applies. Phase 4 introduces template-driven path resolution.
-      return null;
-  }
-}
-
-/**
- * Resolve the on-disk artifact path for an entry.
- *
- * Precedence:
- *   1. entry.artifactPath (when set — see #140 / migration)
- *   2. slug+stage heuristic (`artifactPathForStage`) for entries without
- *      an explicit path. Off-pipeline stages (Blocked / Cancelled) still
- *      return null.
- *
- * Returns null when no artifact is expected for this stage.
+ * Per the spec §"Resolution": `entry.artifactPath` → the file, full
+ * stop. There is no base-searching and no slug+stage heuristic, so the
+ * #394-class multi-site ambiguity cannot recur. An entry that lacks
+ * `artifactPath` resolves to `null` here (callers treat null as "no
+ * artifact to check"); the `missing-artifact-path` rule surfaces the
+ * gap and the 39b migration backfiller (`sites-migration-backfill.ts`)
+ * owns stamping it — the runtime resolver never guesses.
  */
 function resolveArtifactPath(projectRoot: string, entry: Entry): string | null {
-  if (entry.artifactPath) {
-    return join(projectRoot, entry.artifactPath);
-  }
-  return artifactPathForStage(projectRoot, entry.slug, entry.currentStage);
+  return resolveStoredArtifactPath(entry, projectRoot);
 }
 
 /**
@@ -359,38 +323,36 @@ async function validateIterationHistory(projectRoot: string): Promise<Validation
 }
 
 /**
- * #182 Phase 34 ship-pass — surface entries that lack `artifactPath`
- * but DO have a discoverable file via the slug+stage heuristic.
+ * Surface entries that lack `artifactPath` on a stage that expects an
+ * on-disk artifact.
  *
- * Pre-fix, these entries worked at request time (via the
- * `resolveArtifactPath` heuristic fallback) but the path was
- * re-derived on every read. Stamping `artifactPath` into the sidecar
- * makes the binding explicit + survives slug renames + lets the
- * version-strip / scrapbook / audit layers stop guessing.
+ * Phase 39d (sites→lanes retirement): resolution reads the stored path
+ * ONLY — the runtime no longer derives a path from the slug+stage
+ * heuristic, so this rule no longer SUGGESTS a heuristic location.
+ * It reports the missing field and points the operator at the migration
+ * backfiller, which is the spec-sanctioned LAST use of the heuristic
+ * (`sites-migration-backfill.ts`, 39b). The migration enumerates
+ * candidates across legacy content dirs, halts on ambiguity, and stamps
+ * the unambiguous ones.
  *
  * Returns nothing for entries that:
- *   - Already have artifactPath set (no gap).
- *   - Have a stage with no on-disk artifact (Blocked / Cancelled).
- *   - Have a heuristic path that doesn't exist on disk (file-presence
- *     handles those — backfilling a non-existent path would be
- *     misleading).
- *
- * Repair: write `artifactPath = <heuristic-relative-path>` into the
- * sidecar.
+ *   - Already have a non-empty `artifactPath` (no gap).
+ *   - Are at an off-pipeline stage with no on-disk artifact
+ *     (Blocked / Cancelled) — those legitimately carry no path.
  */
 async function validateMissingArtifactPath(projectRoot: string): Promise<ValidationFailure[]> {
   const failures: ValidationFailure[] = [];
   const sidecars = await loadSidecars(projectRoot);
   for (const { entry, path } of sidecars) {
     if (entry.artifactPath !== undefined && entry.artifactPath !== '') continue;
-    const heuristic = artifactPathForStage(projectRoot, entry.slug, entry.currentStage);
-    if (!heuristic) continue;
-    if (!(await fileExists(heuristic))) continue;
-    // Sidecar lacks artifactPath; the heuristic resolves and the file
-    // exists — this is a backfillable case.
+    // Off-pipeline stages (Blocked / Cancelled) carry no on-disk
+    // artifact, so a missing artifactPath is expected, not a gap.
+    if (isOffPipelineStage(entry.currentStage)) continue;
     failures.push({
       category: 'missing-artifact-path',
-      message: `sidecar lacks artifactPath; heuristic resolves to ${heuristic} (run with --fix=all to stamp)`,
+      message:
+        `sidecar lacks artifactPath (currentStage=${entry.currentStage}); ` +
+        `run \`deskwork doctor --fix\` to backfill it from the sites→lanes migration`,
       entryId: entry.uuid,
       path,
     });

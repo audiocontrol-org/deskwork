@@ -86,7 +86,9 @@ describe('bootstrapDefaultLaneIfMissing', () => {
     expect(result.lane.id).toBe('default');
     expect(result.lane.name).toBe('Default');
     expect(result.lane.pipelineTemplate).toBe('editorial');
-    expect(result.lane.contentDir).toBe('src/content/blog');
+    // Phase 39: a lane carries no contentDir — the legacy site's dir
+    // becomes the lane's add-time scaffoldDefaults.markdown.
+    expect(result.lane.scaffoldDefaults).toEqual({ markdown: 'src/content/blog' });
   });
 
   it('writes a lane file that the loader can read back', async () => {
@@ -99,7 +101,7 @@ describe('bootstrapDefaultLaneIfMissing', () => {
     await bootstrapDefaultLaneIfMissing(projectRoot);
 
     const lane = loadLaneConfig('default', projectRoot);
-    expect(lane.contentDir).toBe('docs');
+    expect(lane.scaffoldDefaults).toEqual({ markdown: 'docs' });
     expect(lane.pipelineTemplate).toBe('editorial');
   });
 
@@ -124,9 +126,11 @@ describe('bootstrapDefaultLaneIfMissing', () => {
     expect(event.migration).toBe('default-lane-from-legacy-site');
     expect(event.source).toBe('sites.legacysite');
     expect(event.target).toBe('lanes.default');
-    const details = event.details as Record<string, string>;
+    const details = event.details as Record<string, unknown>;
     expect(details.legacySiteId).toBe('legacysite');
-    expect(details.contentDir).toBe('content');
+    // Phase 39: new lane-migration events emit scaffoldDefaults, not a
+    // top-level contentDir detail key.
+    expect(details.scaffoldDefaults).toEqual({ markdown: 'content' });
     expect(details.pipelineTemplate).toBe('editorial');
   });
 
@@ -268,7 +272,7 @@ describe('bootstrapDefaultLaneIfMissing', () => {
     // the editorial pipeline template).
     const lane = loadLaneConfig('default', projectRoot);
     expect(lane.id).toBe('default');
-    expect(lane.contentDir).toBe('src/content/posts');
+    expect(lane.scaffoldDefaults).toEqual({ markdown: 'src/content/posts' });
     expect(lane.pipelineTemplate).toBe('editorial');
 
     // A journal event landed.

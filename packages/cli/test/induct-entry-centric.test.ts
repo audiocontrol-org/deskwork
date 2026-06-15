@@ -82,7 +82,7 @@ function writeLane(id: string, pipelineTemplate: string): void {
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, `${id}.json`),
-    JSON.stringify({ id, name: id, pipelineTemplate, contentDir: 'docs' }),
+    JSON.stringify({ id, name: id, pipelineTemplate }),
     'utf-8',
   );
 }

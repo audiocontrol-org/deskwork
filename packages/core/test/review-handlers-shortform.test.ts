@@ -26,7 +26,6 @@ import {
 import type { DraftWorkflowItem } from '../src/review/types.ts';
 import { writeCalendar } from '../src/calendar.ts';
 import { addEntry, planEntry, outlineEntry, draftEntry, publishEntry } from '../src/calendar-mutations.ts';
-import { resolveShortformFilePath } from '../src/paths.ts';
 import { parseFrontmatter } from '../src/frontmatter.ts';
 import type { DeskworkConfig } from '../src/config.ts';
 import type { EditorialCalendar } from '../src/types.ts';
@@ -67,9 +66,34 @@ function seedEntry(
     planEntry(calendar, slugOf(title), ['kw']);
   }
   const entry = calendar.entries[0];
-  mkdirSync(join(root, 'docs'), { recursive: true });
-  writeCalendar(join(root, cfg.sites.a.calendarPath), calendar);
+  // Phase 39c (sites→lanes retirement): the review handlers read the
+  // single project calendar at `.deskwork/calendar.md` (via
+  // `resolveCalendarPath`, now site-independent). Seed it there, not the
+  // legacy per-site `calendarPath`.
+  mkdirSync(join(root, '.deskwork'), { recursive: true });
+  writeCalendar(join(root, '.deskwork', 'calendar.md'), calendar);
   if (entry.id === undefined) throw new Error('entry has no id');
+  // Phase 39c-2b(a): shortform path composition reads the parent entry's
+  // stored `artifactPath` (no slug-template search). Seed a sidecar so
+  // the resolver has the authoritative path to compose the scrapbook
+  // child against.
+  mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
+  writeFileSync(
+    join(root, '.deskwork', 'entries', `${entry.id}.json`),
+    JSON.stringify({
+      uuid: entry.id,
+      slug: entry.slug,
+      title: entry.title,
+      keywords: [],
+      source: 'manual',
+      currentStage: stage,
+      iterationByStage: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      artifactPath: `${cfg.sites.a.contentDir}/${entry.slug}/index.md`,
+    }),
+    'utf-8',
+  );
   return { calendar, slug: entry.slug, entryId: entry.id };
 }
 
@@ -255,39 +279,5 @@ describe('handleCreateVersion (shortform)', () => {
     });
     expect(cv.status).toBe(500);
     expect((cv.body as { error: string }).error).toMatch(/shortform file missing/);
-  });
-});
-
-describe('resolveShortformFilePath integration', () => {
-  let root: string;
-  let cfg: DeskworkConfig;
-
-  beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'deskwork-shortform-r-'));
-    cfg = config();
-  });
-  afterEach(() => rmSync(root, { recursive: true, force: true }));
-
-  it('returns the file path for an indexed entry that exists on disk', () => {
-    const { entryId, slug } = seedEntry(root, cfg, 'Indexed Post');
-    // Need an actual content body for findEntryFile to index.
-    const body = join(root, 'src/content/blog', slug, 'index.md');
-    mkdirSync(dirname(body), { recursive: true });
-    writeFileSync(
-      body,
-      `---\ndeskwork:\n  id: ${entryId}\ntitle: Indexed Post\n---\n\n# Body\n`,
-      'utf-8',
-    );
-
-    const out = resolveShortformFilePath(
-      root,
-      cfg,
-      'a',
-      { id: entryId, slug },
-      'linkedin',
-    );
-    expect(out).toBe(
-      join(root, 'src/content/blog', slug, 'scrapbook/shortform/linkedin.md'),
-    );
   });
 });

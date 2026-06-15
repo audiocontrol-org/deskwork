@@ -94,7 +94,8 @@ function write(rel: string, contents: string): string {
 }
 
 function readCalendarFile(): ReturnType<typeof parseCalendar> {
-  const raw = readFileSync(join(project, 'docs/calendar.md'), 'utf-8');
+  // Phase 39c (sites→lanes retirement): single project calendar.
+  const raw = readFileSync(join(project, '.deskwork/calendar.md'), 'utf-8');
   return parseCalendar(raw);
 }
 
@@ -540,15 +541,18 @@ describe('deskwork ingest — flag overrides', () => {
     ]);
     expect(res.code).toBe(0);
 
-    const secondCal = parseCalendar(
-      readFileSync(join(project, 'docs/calendar-secondary.md'), 'utf-8'),
+    // Phase 39c (sites→lanes retirement): per-site calendars are retired.
+    // `--site` still steers ingest's CONTENT resolution (which site's
+    // contentDir the file is scoped against — that path is migrated in
+    // 39c-2b), but the row lands in the SINGLE project calendar at
+    // `.deskwork/calendar.md`, not a per-site file. The legacy per-site
+    // calendar files are never written.
+    const projectCal = parseCalendar(
+      readFileSync(join(project, '.deskwork/calendar.md'), 'utf-8'),
     );
-    expect(secondCal.entries.map((e) => e.slug)).toEqual(['foo']);
-
-    const mainCal = parseCalendar(
-      readFileSync(join(project, 'docs/calendar-main.md'), 'utf-8'),
-    );
-    expect(mainCal.entries).toHaveLength(0);
+    expect(projectCal.entries.map((e) => e.slug)).toEqual(['foo']);
+    expect(existsSync(join(project, 'docs/calendar-secondary.md'))).toBe(false);
+    expect(existsSync(join(project, 'docs/calendar-main.md'))).toBe(false);
   });
 });
 

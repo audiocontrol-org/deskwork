@@ -17,7 +17,6 @@ function makeLane(overrides: Record<string, unknown> = {}): unknown {
     id: 'default',
     name: 'Default',
     pipelineTemplate: 'editorial',
-    contentDir: 'docs',
     ...overrides,
   };
 }
@@ -71,17 +70,26 @@ describe('LaneConfigSchema', () => {
       );
       expect(result.success).toBe(false);
     });
+  });
 
-    it('rejects a missing contentDir', () => {
-      const result = LaneConfigSchema.safeParse(
-        makeLane({ contentDir: undefined }),
-      );
-      expect(result.success).toBe(false);
+  describe('contentDir removal (Phase 39 sites→lanes retirement)', () => {
+    it('accepts a lane that omits contentDir entirely (no longer a field)', () => {
+      const result = LaneConfigSchema.safeParse(makeLane());
+      expect(result.success).toBe(true);
     });
 
-    it('rejects an empty contentDir', () => {
-      const result = LaneConfigSchema.safeParse(makeLane({ contentDir: '' }));
+    it('REJECTS a lane that still carries contentDir (now an unknown key under .strict())', () => {
+      const result = LaneConfigSchema.safeParse(
+        makeLane({ contentDir: 'docs' }),
+      );
       expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find((i) =>
+          i.message.toLowerCase().includes('unrecognized')
+          || i.path.includes('contentDir'),
+        );
+        expect(issue).toBeDefined();
+      }
     });
   });
 
@@ -91,9 +99,9 @@ describe('LaneConfigSchema', () => {
       expect(result.success).toBe(false);
     });
 
-    it('rejects non-string contentDir', () => {
+    it('rejects non-string scaffoldDefaults value', () => {
       const result = LaneConfigSchema.safeParse(
-        makeLane({ contentDir: ['docs'] }),
+        makeLane({ scaffoldDefaults: { markdown: ['docs'] } }),
       );
       expect(result.success).toBe(false);
     });

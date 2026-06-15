@@ -125,8 +125,12 @@ const EntryAnnotationEvent = z.object({
  *
  * The event is project-scoped (no `entryId`); `source` and `target`
  * identify the migration's logical inputs and outputs, and `details`
- * carries free-form key/value context (e.g. the legacy site id, the
- * resolved contentDir).
+ * carries free-form key/value context. Per the sites→lanes retirement
+ * (Phase 39), NEW migration events emit the legacy site's content dir
+ * under `details.scaffoldDefaults` (the lane's add-time default),
+ * NOT a top-level `contentDir`. Old on-disk events that carry a
+ * `contentDir` detail key still parse — `details` is a free-form
+ * `z.record(z.string(), z.unknown())` (back-compat read).
  */
 const LaneMigrationEvent = z.object({
   kind: z.literal('lane-migration'),
@@ -155,7 +159,7 @@ const LaneMigrationEvent = z.object({
  *
  *   - `lane-create`  — a new lane config was written.
  *   - `lane-update`  — an existing lane's `name`, `pipelineTemplate`,
- *                      or `contentDir` was updated.
+ *                      `scaffoldDefaults`, or `host` was updated.
  *   - `lane-archive` — a lane was soft-archived (its `archivedAt`
  *                      field was set; the JSON stays on disk).
  *   - `lane-restore` — a lane's `archivedAt` field was cleared.
@@ -163,9 +167,12 @@ const LaneMigrationEvent = z.object({
  *                      when any entry still references the lane.
  *   - `lane-move`    — an entry was moved from one lane to another;
  *                      the entry's `lane` and `currentStage` were
- *                      updated and the artifact file (plus
- *                      scrapbook) was relocated under the new lane's
- *                      `contentDir`.
+ *                      updated. Per Phase 39 (sites→lanes retirement)
+ *                      the move is a metadata change only — a lane
+ *                      carries no `contentDir`, so the artifact stays
+ *                      put at its `entry.artifactPath`. The
+ *                      `from/toArtifactPath` detail fields echo the
+ *                      (unchanged) resolved artifact path for audit.
  *
  * `lane-move` additionally carries `entryId` (UUID) because the move
  * is also an entry-state mutation; the dashboard / studio surfaces
@@ -176,11 +183,18 @@ const LaneCreateEvent = z.object({
   kind: z.literal('lane-create'),
   at: z.string().datetime(),
   laneId: z.string().min(1),
-  details: z.object({
-    name: z.string().min(1),
-    pipelineTemplate: z.string().min(1),
-    contentDir: z.string().min(1),
-  }),
+  // Phase 39: NEW events emit `scaffoldDefaults` (+ optional `host`); the
+  // retired `contentDir` stays optional for back-compat reads of old
+  // on-disk events. `.passthrough()` keeps the details bag forward-compat.
+  details: z
+    .object({
+      name: z.string().min(1),
+      pipelineTemplate: z.string().min(1),
+      scaffoldDefaults: z.record(z.string().min(1), z.string().min(1)).optional(),
+      host: z.string().min(1).optional(),
+      contentDir: z.string().min(1).optional(),
+    })
+    .passthrough(),
 });
 
 const LaneUpdateEvent = z.object({

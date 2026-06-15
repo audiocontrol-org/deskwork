@@ -106,7 +106,11 @@ describe('deskwork-install', () => {
     }
   });
 
-  it('handles a multi-site config with explicit defaultSite', () => {
+  it('seeds the single project calendar for a multi-site config (Phase 39c)', () => {
+    // Phase 39c (sites→lanes retirement): per-site `calendarPath` is
+    // retired. A multi-site config (the `sites` block is tolerated for
+    // the CLI-verb family) seeds exactly ONE calendar at
+    // `.deskwork/calendar.md` — never the per-site paths.
     project = newProject();
     tmpConfigs = newTmpConfigDir();
     try {
@@ -129,16 +133,14 @@ describe('deskwork-install', () => {
 
       const res = run([project, cfgFile]);
       expect(res.code).toBe(0);
+      expect(existsSync(join(project, '.deskwork/calendar.md'))).toBe(true);
+      // The retired per-site calendar files are NOT created.
       expect(
-        existsSync(
-          join(project, 'docs/editorial-calendar-audiocontrol.md'),
-        ),
-      ).toBe(true);
+        existsSync(join(project, 'docs/editorial-calendar-audiocontrol.md')),
+      ).toBe(false);
       expect(
-        existsSync(
-          join(project, 'docs/editorial-calendar-editorialcontrol.md'),
-        ),
-      ).toBe(true);
+        existsSync(join(project, 'docs/editorial-calendar-editorialcontrol.md')),
+      ).toBe(false);
     } finally {
       rmSync(project, { recursive: true, force: true });
       rmSync(tmpConfigs, { recursive: true, force: true });
@@ -176,7 +178,12 @@ describe('deskwork-install', () => {
     }
   });
 
-  it('exits non-zero with a schema error when the config is invalid', () => {
+  it('installs a sites-less config (Phase 39c): writes the project calendar + default lane', () => {
+    // Phase 39c (sites→lanes retirement): an empty/absent `sites` block
+    // is the post-migration shape and is tolerated. Install no longer
+    // demands "at least one site" — it writes the single project
+    // calendar at `.deskwork/calendar.md` and a `default` lane so the
+    // project is lane-based from first install.
     project = newProject();
     tmpConfigs = newTmpConfigDir();
     try {
@@ -186,8 +193,14 @@ describe('deskwork-install', () => {
       });
 
       const res = run([project, cfgFile]);
-      expect(res.code).not.toBe(0);
-      expect(res.stderr).toMatch(/at least one site/i);
+      expect(res.code).toBe(0);
+      expect(res.stdout).toMatch(/Created default lane/);
+      expect(
+        existsSync(join(project, '.deskwork/calendar.md')),
+      ).toBe(true);
+      expect(
+        existsSync(join(project, '.deskwork/lanes/default.json')),
+      ).toBe(true);
     } finally {
       rmSync(project, { recursive: true, force: true });
       rmSync(tmpConfigs, { recursive: true, force: true });
@@ -240,9 +253,12 @@ describe('deskwork-install', () => {
       expect(res.code).toBe(0);
       // Heads-up message confirms inferred root before any writes
       expect(res.stdout).toMatch(/Installing into:/);
-      // Real project file landed at the cwd-inferred root
+      // Real project files landed at the cwd-inferred root. Phase 39c:
+      // the single project calendar is seeded at `.deskwork/calendar.md`,
+      // not the retired per-site `calendarPath` (`docs/cal.md`).
       expect(existsSync(join(project, '.deskwork/config.json'))).toBe(true);
-      expect(existsSync(join(project, 'docs/cal.md'))).toBe(true);
+      expect(existsSync(join(project, '.deskwork/calendar.md'))).toBe(true);
+      expect(existsSync(join(project, 'docs/cal.md'))).toBe(false);
     } finally {
       rmSync(project, { recursive: true, force: true });
       rmSync(tmpConfigs, { recursive: true, force: true });

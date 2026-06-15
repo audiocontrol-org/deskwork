@@ -67,7 +67,6 @@ describe('deskwork pipeline delete', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'my-blog',
-      contentDir: 'docs',
     });
     const res = pipeline(project, 'delete', 'my-blog');
     expect(res.code).not.toBe(0);
@@ -80,13 +79,11 @@ describe('deskwork pipeline delete', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'my-blog',
-      contentDir: 'docs',
     });
     writeLaneJson(project, 'second', {
       id: 'second',
       name: 'Second',
       pipelineTemplate: 'my-blog',
-      contentDir: 'src/mockups',
     });
 
     const res = pipeline(
@@ -114,7 +111,6 @@ describe('deskwork pipeline delete', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'my-blog',
-      contentDir: 'docs',
     });
     const res = pipeline(
       project, 'delete', 'my-blog',
@@ -132,7 +128,6 @@ describe('deskwork pipeline delete', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'my-blog',
-      contentDir: 'docs',
     });
     const res = pipeline(
       project, 'delete', 'my-blog',
@@ -171,7 +166,6 @@ describe('deskwork pipeline delete', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'my-blog',
-      contentDir: 'docs',
     });
     const res = pipeline(
       project, 'delete', 'my-blog',
@@ -197,7 +191,6 @@ describe('deskwork pipeline delete', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'my-blog',
-      contentDir: 'docs',
     });
     const res = pipeline(
       project, 'delete', 'my-blog',

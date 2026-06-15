@@ -1,0 +1,15 @@
+#!/bin/sh
+# check-wireframe <wireframe.html> — run the full pinned check-mockup-lofi lint
+# against a wireframe file. Exit codes: 0 lint-green, 1 findings/error, 2 usage.
+# Logic lives in src/authoring/lint-file.ts (tested); this shim resolves tsx
+# (first-run-installing runtime deps in adopter mode) and dispatches.
+set -eu
+
+SHIM_NAME=check-wireframe
+PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+. "$PLUGIN_ROOT/bin/_resolve-tsx.sh"
+resolve_tsx
+
+# --tsconfig pins the plugin's own tsconfig (and its @/* alias); without it tsx
+# resolves from the caller's cwd and the documented repo-root invocation crashes.
+exec "$TSX" --tsconfig "$PLUGIN_ROOT/tsconfig.json" "$PLUGIN_ROOT/src/authoring/check-wireframe-cli.ts" "$@"

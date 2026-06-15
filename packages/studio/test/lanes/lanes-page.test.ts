@@ -65,10 +65,17 @@ function writeLane(
   id: string,
   name: string,
   pipelineTemplate: string,
-  contentDir: string,
+  // Phase 39: a lane carries no contentDir; the dir lands under
+  // scaffoldDefaults.markdown.
+  scaffoldMarkdown: string,
   archivedAt?: string,
 ): void {
-  const json: Record<string, string> = { id, name, pipelineTemplate, contentDir };
+  const json: Record<string, unknown> = {
+    id,
+    name,
+    pipelineTemplate,
+    scaffoldDefaults: { markdown: scaffoldMarkdown },
+  };
   if (archivedAt !== undefined) json.archivedAt = archivedAt;
   writeFileSync(
     join(root, '.deskwork', 'lanes', `${id}.json`),
@@ -150,22 +157,24 @@ describe('lanes-page — `/dev/lanes`', () => {
     expect(r.html).toContain('data-lanes-field="id"');
     expect(r.html).toContain('data-lanes-field="name"');
     expect(r.html).toContain('data-lanes-field="template"');
-    expect(r.html).toContain('data-lanes-field="contentDir"');
+    expect(r.html).toContain('data-lanes-field="scaffoldMarkdown"');
+    expect(r.html).toContain('data-lanes-field="host"');
     expect(r.html).toContain('data-lanes-copy-button="new"');
     expect(r.html).toContain('data-lanes-preview');
     // pipeline-template select carries available preset ids
     expect(r.html).toMatch(/<option value="editorial">/);
   });
 
-  it('renders one active row per active lane with template + contentDir + count', async () => {
+  it('renders one active row per active lane with template + scaffoldDefaults + count', async () => {
     const r = await getHtml(app, '/dev/lanes');
     expect(r.html).toMatch(/data-lane-row[^>]*data-lane-id="editorial-lane"/);
     expect(r.html).toMatch(/data-lane-row[^>]*data-lane-id="visual-lane"/);
-    // contentDir and template values
+    // template values + scaffold-default dirs (rendered in the
+    // scaffold-defaults cell as `<code>` pairs).
     expect(r.html).toMatch(/<code>editorial<\/code>/);
     expect(r.html).toMatch(/<code>visual<\/code>/);
-    expect(r.html).toMatch(/<code>docs<\/code>/);
-    expect(r.html).toMatch(/<code>mockups<\/code>/);
+    expect(r.html).toMatch(/<code class="lanes-scaffold-dir">docs<\/code>/);
+    expect(r.html).toMatch(/<code class="lanes-scaffold-dir">mockups<\/code>/);
   });
 
   it('archived lane is rendered in a separate <details> section, not the active table', async () => {

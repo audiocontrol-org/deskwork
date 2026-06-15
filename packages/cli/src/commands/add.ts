@@ -5,8 +5,15 @@
  *   deskwork-add <project-root> [--site <slug>] [--type blog|youtube|tool]
  *                [--content-url URL] [--source manual|analytics]
  *                [--lane <lane-id>] [--stage <stage>]
- *                [--kind markdown|html-mockup|single-file-html|image]
+ *                [--kind markdown]
+ *                [--layout index|readme|flat]
  *                <title> [description]
+ *
+ * Markdown only (operator decision): `deskwork add` creates markdown
+ * entries. `--kind` still parses the four ArtifactKindSchema values
+ * (graphical-entries shares the type), but a non-markdown value is
+ * rejected loudly pre-write — deskwork only supports markdown content
+ * today, so a non-markdown entry cannot be materialized.
  *
  * Writes the calendar atomically. Emits a JSON result on stdout:
  *   { "slug": "...", "stage": "Ideas", "site": "...", "calendarPath": "..." }
@@ -33,8 +40,16 @@ import { createFreshEntrySidecar } from '@deskwork/core/entry/create';
 import {
   bootstrapDefaultLaneIfMissing,
   loadLaneConfig,
+  composeAddArtifactPath,
+  parseScaffoldLayout,
+  SCAFFOLD_LAYOUTS,
 } from '@deskwork/core/lanes';
-import { ArtifactKindSchema, type ArtifactKind } from '@deskwork/core/lanes';
+import {
+  ArtifactKindSchema,
+  type ArtifactKind,
+  type LaneConfig,
+  type ScaffoldLayout,
+} from '@deskwork/core/lanes';
 import { loadPipelineTemplate } from '@deskwork/core/pipelines';
 
 const DEFAULT_LANE_ID = 'default';
@@ -50,6 +65,7 @@ export async function run(argv: string[]): Promise<void> {
     'lane',
     'stage',
     'kind',
+    'layout',
   ] as const;
   const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 
@@ -60,7 +76,8 @@ export async function run(argv: string[]): Promise<void> {
       'Usage: deskwork-add <project-root> [--site <slug>] [--type blog|youtube|tool] ' +
         '[--content-url URL] [--source manual|analytics] [--slug <path>] ' +
         '[--lane <lane-id>] [--stage <stage>] ' +
-        '[--kind markdown|html-mockup|single-file-html|image] ' +
+        '[--kind markdown] ' +
+        '[--layout index|readme|flat] ' +
         '<title> [description]',
       2,
     );
@@ -107,10 +124,41 @@ export async function run(argv: string[]): Promise<void> {
   // fails, the calendar.md write and sidecar write are both skipped —
   // adopting `fail` here on bad input is the same contract as `--type` /
   // `--source` / `--slug`.
-  const { laneId, currentStage, artifactKind } = await resolveLaneStageKind(
+  const { lane, laneId, currentStage, artifactKind } = await resolveLaneStageKind(
     projectRoot,
     flags,
   );
+
+  // Markdown only (operator decision): deskwork only supports markdown
+  // content today, so a non-markdown kind cannot be materialized and is
+  // rejected. Reject it loudly BEFORE any disk mutation —
+  // same pre-write contract as --type / --source / --stage. (The schema
+  // accepts the value; this is an explicit add-side guard.)
+  if (artifactKind !== 'markdown') {
+    fail(
+      `--kind "${artifactKind}" is not supported: deskwork add only `
+        + `supports markdown entries right now (file creation for `
+        + `non-markdown kinds is not implemented). Use --kind markdown `
+        + `(the default), or omit --kind.`,
+      2,
+    );
+  }
+
+  // Resolve the markdown layout BEFORE any disk mutation. `--layout`,
+  // when supplied, must be one of the legal markdown shapes; when
+  // omitted, the default fires inside composeAddArtifactPath.
+  let layout: ScaffoldLayout | undefined;
+  if (flags['layout'] !== undefined) {
+    const parsedLayout = parseScaffoldLayout(flags['layout']);
+    if (parsedLayout === undefined) {
+      fail(
+        `Invalid --layout "${flags['layout']}". `
+          + `Must be one of: ${SCAFFOLD_LAYOUTS.join(', ')}.`,
+        2,
+      );
+    }
+    layout = parsedLayout;
+  }
 
   const calendar = readCalendar(calendarPath);
 
@@ -123,6 +171,25 @@ export async function run(argv: string[]): Promise<void> {
       ...(flags['content-url'] !== undefined ? { contentUrl: flags['content-url'] } : {}),
       ...(flags.slug !== undefined ? { slug: flags.slug } : {}),
     });
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+
+  // Phase 39c-2b (sub-task b): determine the new entry's authoritative
+  // `artifactPath`. Markdown only — compose it from the lane's
+  // `scaffoldDefaults['markdown']` (directory) + the explicit/default
+  // layout + the slug. Done BEFORE `writeCalendar` so a lane that
+  // declares no markdown default fails loudly with NO disk mutation
+  // (calendar.md + sidecar both skipped) — same pre-write contract as
+  // the flag validations above.
+  let artifactPath: string;
+  try {
+    artifactPath = composeAddArtifactPath(
+      lane,
+      artifactKind,
+      entry.slug,
+      layout,
+    );
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));
   }
@@ -149,6 +216,7 @@ export async function run(argv: string[]): Promise<void> {
     source,
     lane: laneId,
     artifactKind,
+    artifactPath,
   });
 
   emit({
@@ -200,7 +268,12 @@ export async function run(argv: string[]): Promise<void> {
 async function resolveLaneStageKind(
   projectRoot: string,
   flags: Record<string, string>,
-): Promise<{ laneId: string; currentStage: string; artifactKind: ArtifactKind }> {
+): Promise<{
+  lane: LaneConfig;
+  laneId: string;
+  currentStage: string;
+  artifactKind: ArtifactKind;
+}> {
   const explicitLane = flags['lane'];
   const laneId = explicitLane ?? DEFAULT_LANE_ID;
 
@@ -266,5 +339,5 @@ async function resolveLaneStageKind(
     artifactKind = parsed.data;
   }
 
-  return { laneId, currentStage, artifactKind };
+  return { lane, laneId, currentStage, artifactKind };
 }

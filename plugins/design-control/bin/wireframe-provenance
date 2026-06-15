@@ -1,0 +1,16 @@
+#!/bin/sh
+# wireframe-provenance <subcommand> ... — record + verify wireframe provenance
+# (record-driving | record-derived | check-acceptance | verify-driving).
+# Exit codes: 0 success/ok, 1 refusal/error, 2 usage.
+# Logic lives in src/provenance/cli.ts (tested); this shim resolves tsx
+# (first-run-installing runtime deps in adopter mode) and dispatches.
+set -eu
+
+SHIM_NAME=wireframe-provenance
+PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+. "$PLUGIN_ROOT/bin/_resolve-tsx.sh"
+resolve_tsx
+
+# --tsconfig pins the plugin's own tsconfig (and its @/* alias); without it tsx
+# resolves from the caller's cwd and the documented repo-root invocation crashes.
+exec "$TSX" --tsconfig "$PLUGIN_ROOT/tsconfig.json" "$PLUGIN_ROOT/src/provenance/wireframe-provenance-cli.ts" "$@"

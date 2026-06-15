@@ -24,7 +24,6 @@
  *     issueNumber?, filePath?, site, calendarPath }
  */
 
-import { existsSync } from 'node:fs';
 import { readConfig } from '@deskwork/core/config';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
@@ -41,7 +40,6 @@ import {
 import {
   resolveSite,
   resolveCalendarPath,
-  resolveEntryFilePath,
 } from '@deskwork/core/paths';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 import { publishEntry as publishEntrySidecar } from '@deskwork/core/entry/publish';
@@ -172,15 +170,18 @@ async function runLegacyPublish(
     setContentUrl(calendar, slug, flags['content-url']);
   }
 
-  let filePath: string | undefined;
   if (hasRepoContent(contentType)) {
-    filePath = resolveEntryFilePath(projectRoot, config, site, slug, existing.id);
-    if (!existsSync(filePath)) {
-      fail(
-        `Cannot publish blog post "${slug}": no file at ${filePath}. ` +
-          `Write the post before publishing.`,
-      );
-    }
+    // Phase 39c-2b(a): repo-content entries resolve via the stored
+    // `entry.artifactPath` only — there is no slug+stage search. A
+    // legacy (no-sidecar) blog entry has no authoritative path, so it
+    // is an unmigrated entry; refuse and point at the migration rather
+    // than guessing a `<contentDir>/<slug>/index.md` location.
+    fail(
+      `Cannot publish blog post "${slug}": it has no entry sidecar, so its ` +
+        `artifactPath is unknown. Resolution reads the stored path only — there ` +
+        `is no slug+stage fallback. Run \`deskwork doctor --fix\` to migrate this ` +
+        `entry to a sidecar with an artifactPath, then publish.`,
+    );
   } else if (requiresContentUrl(contentType)) {
     const updated = findEntry(calendar, slug)!;
     if (!updated.contentUrl) {
@@ -202,7 +203,6 @@ async function runLegacyPublish(
     contentType,
     contentUrl: published.contentUrl,
     issueNumber: published.issueNumber,
-    filePath,
     site,
     calendarPath,
   });
