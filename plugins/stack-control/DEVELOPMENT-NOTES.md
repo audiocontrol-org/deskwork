@@ -2,6 +2,99 @@
 
 ---
 
+## 2026-06-15: Design session — parseable-lifecycle-workflow (gates, frontend/backend, designing phase)
+
+**Goal:** Orient via `/stack-control:session-start`; pick up the in-flight
+`design:feature/roadmap-protocol` (006); then — as it unfolded — run a design
+conversation defining `multi:feature/parseable-lifecycle-workflow` (the
+workflow-mechanization centerpiece) and capture it durably as a design record.
+
+**Accomplished:**
+- Graduated `design:feature/roadmap-protocol` (006) → **shipped** (56/56 tasks,
+  16/16 checklist, 87/87 roadmap tests green, tree clean). Unblocked
+  `design:gap/roadmap-order-gating`.
+- Re-parented the two roadmap gate-gaps (`roadmap-order-gating`,
+  `roadmap-advance-on-spec-finalize`) under `multi:feature/parseable-lifecycle-workflow`
+  — they're phase-transition gates, not roadmap-protocol query concerns.
+- Captured **TASK-137** (no verb re-parents a roadmap edge → manual ROADMAP.md
+  edit) and promoted it into the roadmap as `impl:gap/roadmap-reparent-verb` under
+  the lifecycle umbrella (record-only promote linkage recorded).
+- Authored the **design-record strawman** at
+  `docs/superpowers/specs/2026-06-15-parseable-lifecycle-workflow-strawman.md`,
+  evolved across the conversation: the work/transition split; derived-not-stored
+  phases; the `designing` phase before `specifying`; the opinionated-frontend /
+  swappable-backend pattern; the opinion-injection mechanism (bend the backend at
+  the seam); and the mechanical-stage-gates foundation.
+
+**Didn't Work:**
+- The strawman is **not yet converged to a spec**. The BACK half of the spine
+  (`implementing → governing → shipped`) cannot have mechanical exit gates until
+  **TASK-19** (governance-graduation-record) lands — without a recorded
+  govern-convergence fact, "are we done governing?" falls back to agent say-so.
+- No dedicated re-parent verb existed, forcing a hand-edit of the governed
+  ROADMAP.md (now tracked as TASK-137 / `impl:gap/roadmap-reparent-verb`).
+
+**Course Corrections:**
+- [PROCESS] Over-rotated to "no new design skill — just invoke brainstorming."
+  Operator corrected: **every stage is an opinionated stack-control frontend over
+  a swappable backend** (`define`→Spec Kit, `execute`→implement, `govern`→model
+  CLIs); `design` is the missing frontend. `/stack-control:design` IS a (frontend)
+  skill; `superpowers:brainstorming` is the default backend.
+- [PROCESS] Drifted toward "driving" (effects automation). Operator re-centered the
+  foundation on **mechanical, queryable stage-gate criteria** — "are we done / how
+  much more / can we move to PQR" — independent of advancing anything.
+
+**Insights:**
+- The whole FRONT of the spine isn't new surface — it's
+  superpowers(brainstorming) → design doc → Spec Kit(specify) → back half, with the
+  workflow as **connective tissue** mechanizing transitions between proven tools.
+- **Bend the backend at the seam** (output contract + gate), not inside its
+  process — generalizes to the execution backends, not just design.
+- **No criterion is ever a debate**: judgment criteria are mechanical because they
+  check a *recorded operator decision* (approval marker), not the judgment itself.
+- TASK-19 is load-bearing for the gate foundation, not a side-detail.
+
+**Next steps (for the next session to pick up):**
+1. **READ FIRST:**
+   `docs/superpowers/specs/2026-06-15-parseable-lifecycle-workflow-strawman.md` —
+   the in-flight `designing`-phase artifact for
+   `multi:feature/parseable-lifecycle-workflow`. The session was a design
+   conversation; this doc IS its record. Eight commits of accumulated design.
+2. **Decide the two open framing questions** in the strawman:
+   - **Q5 (shapes everything):** is the workflow a NEW `workflow` verb family, or
+     phase-awareness layered onto the existing roadmap reasoner?
+   - **Unit:** confirm "roadmap node is the unit, spec dir is its mid-phase
+     artifact" (tentatively settled, not ratified).
+3. **Firm up the BACK half of the spine** (`implementing → governing → shipped`).
+   This is gated on **TASK-19** (governance-graduation-record). Decide: pull
+   TASK-19 into this feature's scope, or sequence it first. Without a recorded
+   govern-convergence fact the `governing` exit gate cannot be mechanical.
+4. **Then converge** the strawman (capture-everything pass + operator review) and
+   hand off to `/stack-control:define` → `/speckit-specify` for
+   `multi:feature/parseable-lifecycle-workflow`.
+5. **Independent / lower-priority follow-ups captured this session:**
+   - `impl:gap/roadmap-reparent-verb` (TASK-137) is **ready and implementable now**,
+     standalone — a `roadmap reparent <id> --part-of|--depends-on` verb.
+   - Open strawman sub-questions: **Q9** (deriving `designing` before the design
+     doc exists → set a `design:` node pointer on entry, like `spec:`);
+     opinion-injection mechanics (how the frontend suppresses backend YAGNI;
+     minimal backend contract; in-session vs shell-out); mid-stream re-design
+     re-entry to `designing` from a later phase.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 9
+  - docs(stack-control): stage gates are mechanical, published, unambiguous — and queryable on their own
+  - docs(stack-control): opinion-injection mechanism — bend the backend at the seam, not its process
+  - docs(stack-control): designing stage = opinionated /stack-control:design frontend over a swappable backend
+  - docs(stack-control): designing phase adopts superpowers:brainstorming (not a new skill)
+  - docs(stack-control): design-record strawman for parseable-lifecycle-workflow
+  - chore(stack-control): promote TASK-137 into the roadmap under the lifecycle umbrella
+  - chore(stack-control): capture TASK-137 — roadmap reparent verb (move part-of/depends-on edge between nodes)
+  - chore(stack-control): re-parent roadmap gate-gaps under the workflow-mechanization engine
+  - chore(stack-control): graduate design:feature/roadmap-protocol (006) to shipped
+- Files changed: 3
+- Backlog touched: TASK-137, TASK-19
+
 ## 2026-06-15: Roadmap reconciliation → v0.47.0 ship → post-release closure → lifecycle-ceremony umbrella
 
 **Goal:** Orient via `/stack-control:session-start`; as it unfolded — reconcile the drifted roadmap, ship the pending stack-control work, verify+close what the release resolved, and institutionalize the post-release/lifecycle ceremony so it stops running on operator stamina.
