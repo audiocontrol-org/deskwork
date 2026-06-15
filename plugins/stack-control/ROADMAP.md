@@ -337,3 +337,9 @@ Public Codex distribution for adopters: the released acquisition + install path 
 - spec: specs/020-config-domain-selection
 Config-domain discovery and sticky selection: resolve and persist the active config domain across installation surfaces.
 
+## multi:feature/release-resolution-cycle
+- status: planned
+- depends-on: design:feature/roadmap-protocol
+- ref: TASK-134
+Mechanize the post-release+install resolution cycle: given an installed release, map the release delta to candidate items (commit refs, audit-log fixed-<sha>, newly-complete spec tasks), verify each against the FORMALLY-INSTALLED artifact (released-binary reconcile, fix present in the installed cache, released tests where deps allow) distinguishing verified-fixed from re-surfacing, propose closure with auto-written Resolution evidence, reconcile + advance roadmap nodes whose specs shipped, and surface loose ends that did not verify. Composes dw-lifecycle re-audit-fixed-findings/close-shipped/complete + stack-control roadmap reconcile/session-end; agent posts evidence, operator decides closure. Promoted from TASK-134.
+
