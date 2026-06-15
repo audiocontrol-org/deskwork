@@ -15,6 +15,13 @@
  *   - plugins/stack-control/.codex-plugin/plugin.json
  *   - .claude-plugin/marketplace.json (top-level metadata.version + each
  *     plugin entry's version)
+ *   - package-lock.json (root workspace lockfile — regenerated via
+ *     `npm install --package-lock-only` so every @deskwork/* workspace's
+ *     self-version + inter-workspace dep pin moves with the bump; the
+ *     MANIFESTS list above can't express the workspace lockfile schema
+ *     by hand, so we let npm derive it from the just-written package.json
+ *     files. Skipping this is the root-lockfile-drift shape that shipped
+ *     v0.46.0 with a stale 0.45.2 lockfile.)
  *
  * Intentionally manual: writes the files, you review the diff, then
  * commit + tag yourself. No "auto-publish on every merge" semantics.
@@ -25,6 +32,7 @@
  *   - node_modules/, dist/, bundle/ — build outputs, no version field.
  */
 
+import { spawnSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -231,6 +239,33 @@ async function bumpFile(manifest: VersionedManifest, version: string): Promise<s
   }
 }
 
+// Regenerate the ROOT workspace package-lock.json from the just-written
+// package.json files. The root lockfile records every @deskwork/* workspace's
+// self-version (under `packages["packages/core"]`, `packages["plugins/*"]`,
+// …) plus the inter-workspace dep pins — a schema the MANIFESTS list can't
+// edit by hand without mirroring npm's internal layout. `--package-lock-only`
+// updates the lockfile WITHOUT touching node_modules; `--ignore-scripts`
+// skips the husky `prepare` hook. A version bump doesn't widen any dependency
+// range, so this only moves the workspace self-versions — third-party pins
+// stay put. Failing loud here beats shipping a stale lockfile (the v0.46.0
+// root-lockfile-drift shape).
+function syncRootLockfile(): string {
+  const result = spawnSync(
+    'npm',
+    ['install', '--package-lock-only', '--ignore-scripts'],
+    { cwd: REPO_ROOT, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  if (result.error) {
+    fail(`root package-lock.json sync failed to spawn npm: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    fail(
+      `root package-lock.json sync exited ${String(result.status)}:\n${result.stderr ?? ''}`,
+    );
+  }
+  return `  ${'root package-lock.json'.padEnd(36)} regenerated via npm install --package-lock-only`;
+}
+
 async function main(): Promise<void> {
   const [, , versionArg] = process.argv;
   if (!versionArg) {
@@ -244,6 +279,8 @@ async function main(): Promise<void> {
   for (const m of MANIFESTS) {
     reports.push(await bumpFile(m, versionArg));
   }
+  // Root workspace lockfile last — it derives from the manifests just written.
+  reports.push(syncRootLockfile());
 
   process.stdout.write(`bumped to ${versionArg}:\n`);
   for (const line of reports) {
