@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "featureSlug": "audit-protocol-friction-burndown",
+  "phaseId": "4",
+  "checkpoint": "phase-4",
+  "auditLogSection": "phase-4",
+  "scopeFingerprint": "a600ad2eb03bbf9470130478f05431b061d957b7bf4dbd716862c41de069f0d4",
+  "passedAt": "2026-06-15T00:39:59.514Z",
+  "governedPaths": [
+    "src/__tests__/govern/phase-boundary-sizing.test.ts",
+    "src/govern/phase-boundary-sizing.ts",
+    "src/__tests__/govern/actual-payload-fit.test.ts",
+    "src/govern/payload-implement.ts",
+    "src/subcommands/govern.ts"
+  ]
+}

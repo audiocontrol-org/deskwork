@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "featureSlug": "audit-protocol-friction-burndown",
+  "phaseId": "5",
+  "checkpoint": "phase-5",
+  "auditLogSection": "phase-5",
+  "scopeFingerprint": "a284787c78d19078de8e17d7ee61c024f6c99f56446d2459d7c06e9d1d0c7167",
+  "passedAt": "2026-06-15T00:43:47.598Z",
+  "governedPaths": [
+    "src/__tests__/govern/fleet-negotiation.test.ts",
+    "src/govern/fleet-negotiation.ts",
+    "src/govern/protocol.ts",
+    "templates/audit-barrage-config.yaml",
+    "src/subcommands/audit-barrage.ts",
+    "src/__tests__/govern/govern-negotiation-order.test.ts"
+  ]
+}

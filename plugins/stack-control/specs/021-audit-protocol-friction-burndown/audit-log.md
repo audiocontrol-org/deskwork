@@ -1359,3 +1359,484 @@ Surface:    `src/subcommands/govern.ts:674-699`; missing paired update in `src/g
 The new whole-feature path constructs a `feature` `AuditUnit` with `diffScope.files: []` and moves the real composed scope into `compositionExcludePaths` (lines 674-699). But the type contract still says the opposite: in `audit-unit-types.ts`, empty `files` means “the whole diff against base” (lines 16-17, 25-26), while a composed feature unit’s `diffScope` is supposed to represent the changed plus cross-cutting paths (lines 35-38). After this patch, the data model no longer describes the payload the command actually audits.
 
 This is a `medium` design/documentation defect because the current command happens not to consume `phaseUnit.diffScope.files` for feature mode, so it does not explode immediately, but any future consumer of `AuditUnit` will read a lie. That is exactly the kind of quiet mismatch unattended tooling builds on. A reasonable fix is to either update the `AuditUnit` contract to represent exclusion-based composition explicitly, or keep the real composed scope in the unit instead of stashing it out-of-band in `compositionExcludePaths`.
+
+## 2026-06-15 — audit-barrage lift (20260615T002627609Z-audit-protocol-friction-burndown-phase-2)
+
+### AUDIT-20260615-01 — Whole-feature composition silently drops files that belong to both carried and non-current phases
+
+Finding-ID: AUDIT-20260615-01
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/govern.ts:691-695
+
+The new whole-feature composition path builds `compositionExcludePaths` as the union of **every** file from phases whose checkpoint state is `current`, then excludes that union from the payload wholesale. There is no check for overlap with phases whose state is `missing` or `stale`. If `tasks.md` names the same file in more than one phase, a file can be excluded just because one earlier phase is current even though a later phase that also owns that file is missing/stale and is supposed to be re-audited.
+
+That contradicts the stated contract in the same hunk: whole-feature govern should “re-audit everything else — changed / missing / stale phases AND cross-cutting code.” As written, a shared file in a missing/stale phase can disappear from the composed payload entirely, so govern can report a successful whole-feature pass without ever auditing code that still belongs to an ungoverned phase. The blast radius is high because this produces a false-clean governance result rather than a loud failure. A reasonable fix is to compute the carry-set as `current` files minus any file also owned by a non-current phase, or to reject overlapping phase ownership explicitly if that layout is not supported.
+
+### AUDIT-20260615-02 — `fleet-floor-shortfall` vs `barrage-outage` is still derived from human stderr text
+
+Finding-ID: AUDIT-20260615-02
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/protocol.ts:407-425
+
+The new machine-readable terminal split is implemented by regexing `barrage.stderr` for a line starting with `audit-barrage: FLOOR SHORTFALL`. That means `govern`’s exported terminal contract is still coupled to the exact English wording emitted by the downstream barrage process, not to a structured result. `audit-barrage` still collapses both conditions to exit code `1`; `govern` is recovering the distinction by parsing prose.
+
+The current wording matches today’s `renderFleetWarnings()` output, so this is not an immediate crash, but it leaves the new contract fragile under internal refactors: a wording change, alternate prefix, or different barrage implementation would silently reclassify floor shortfalls as outages. The blast radius is medium because downstream automation consuming `govern: terminal-outcome=<kind>` would branch on the wrong recovery path even though the run still fails. A reasonable fix is to have `audit-barrage` emit a structured discriminator for the failure class and have `govern` key on that instead of stderr prose.
+
+### AUDIT-20260615-03 — Deferral note embedded in exported contract comment
+
+Finding-ID: AUDIT-20260615-03
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/govern/protocol.ts:39-62
+
+The new exported terminal-outcome contract documents `boundary-too-large` as “not yet reachable” and says reconciling it is tracked in backlog. That is a deferral note inside the public type commentary for `GovernTerminalKind`, not just an internal implementation note. Per the audit constraints and project discipline, this kind of embedded promise is a bug-factory: downstream agents can treat the enum member as supported even though the comment says the current control flow cannot emit it.
+
+Blast radius is low because the code does explicitly preserve the enum member and `runProtocol` still maps `BoundaryTooLargeError` to `boundary-too-large` if that error is reached. The practical fix is to rewrite the comment as current-state behavior without a deferred commitment, or move the unreachable-state rationale into the backlog/progress artifact only.
+
+## 2026-06-15 — audit-barrage lift (20260615T002853577Z-audit-protocol-friction-burndown-phase-3)
+
+### AUDIT-20260615-04 — Whole-feature composition still leaks carried-phase commits into the audit payload
+
+Finding-ID: AUDIT-20260615-04 (codex-01 + codex-02 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   codex=high, codex-gpt5=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/subcommands/govern.ts:671-759; missing corresponding update in src/govern/payload-implement.ts:420-427
+
+The new whole-feature path switches from inclusion-scoping to `compositionExcludePaths`, and the comments at [src/subcommands/govern.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/subcommands/govern.ts:671) say the resulting payload should be “the diff minus carried files.” That is only true for the diff and untracked-fold arms. `buildImplementVars()` now threads the carried files into `excludePaths`, but `assembleImplementPayload()` still builds `commitSubjects` with `git log <base>..HEAD --oneline -- .` and does not apply either `excludePaths` or the phase/feature scope there.
+
+That leaves the prompt internally inconsistent for the audit fleet: the “Under audit” diff excludes carried phases, while the “Commit subjects in the audited range” block can still advertise commits that only touched those excluded carried files. The downstream blast radius is noisy or wrong unattended audit output, because the model is being told that already-carried work is part of the audited range when its hunks are intentionally absent. A reasonable fix is to scope commit-subject collection with the same include/exclude rules used for the committed diff arm, or explicitly drop commit subjects that no longer have any surviving hunks in the composed payload.
+
+## 2026-06-15 — audit-barrage lift (20260615T003250298Z-audit-protocol-friction-burndown-phase-3)
+
+### AUDIT-20260615-05 — Whole-feature composition can hide changed shared files when phases overlap on the same path
+
+Finding-ID: AUDIT-20260615-05 (codex-01 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=high
+Decision:   agreement (gate-counted high)
+Surface:    `src/subcommands/govern.ts:673-699`
+
+The new whole-feature path carries every `current` phase by blindly unioning that phase's file list into `compositionExcludePaths` (`.filter(...state === 'current').flatMap(...status.files)` at lines 691-696). That is only safe if phase file ownership is disjoint, but this codebase does not enforce that invariant: `resolvePhaseCheckpointStatuses()` simply reuses whatever `parsePhases()` extracted from `tasks.md` as each phase's `files` set, with no overlap check (`src/subcommands/govern.ts:415-438`). If one file is named in both a current phase and a missing/stale phase, whole-feature govern now excludes that file entirely, so the stale phase's changes in that shared file disappear from the re-audit.
+
+The blast radius is direct correctness loss in the feature's core promise: a whole-feature govern can report success while silently skipping changed code that still belongs to a non-current phase. This is `high` rather than `medium` because the failure mode is not cosmetic or theoretical; a common "cross-cutting/shared file" phase layout is enough to suppress real audit coverage. A defensible fix is either to reject overlapping per-phase file ownership before composition runs, or to carry only files owned exclusively by current phases instead of excluding every path mentioned by any current phase.
+
+## 2026-06-15 — audit-barrage lift (20260615T003453788Z-audit-protocol-friction-burndown-phase-4)
+
+### AUDIT-20260615-06 — Whole-feature composition silently ignores `--checkpoint` / `GOVERN_CHECKPOINT`
+
+Finding-ID: AUDIT-20260615-06
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/govern.ts:666-699,741-756` and `src/subcommands/govern.ts:119`
+
+When `tasks.md` exists, the new whole-feature branch always synthesizes a `feature` unit with `auditLogSection: 'after_implement'` at [src/subcommands/govern.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/subcommands/govern.ts:666), then passes `phaseUnit.auditLogSection` into `buildImplementVars(...)` at [src/subcommands/govern.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/subcommands/govern.ts:755). That bypasses the normal checkpoint override path entirely. Before this branch, implement mode still flowed through `buildImplementVars`’s `checkpointFlag ?? GOVERN_CHECKPOINT ?? 'after_clarify'` logic; after this change, any whole-feature implement run for a feature with `tasks.md` is hard-wired to `after_implement`, even if the operator explicitly passed `--checkpoint <name>` or set `GOVERN_CHECKPOINT`.
+
+The blast radius is a silent wrong-target write/read: slushing, gating, and audit-log scoping happen under `after_implement` instead of the caller’s requested checkpoint. That can mix unrelated runs together or make an override appear to “not stick” because it was recorded under a different checkpoint than requested. A reasonable fix is to keep `after_implement` as the default composition label, but still let an explicit `flags.checkpoint` / `GOVERN_CHECKPOINT` win before falling back to the synthesized label.
+
+### AUDIT-20260615-07 — Carried phases are excluded from the diff, but their commit subjects still ship in the prompt
+
+Finding-ID: AUDIT-20260615-07
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/govern.ts:691-743` plus `src/govern/payload-implement.ts:264-281,303-314,415-428`
+
+This diff adds `compositionExcludePaths` for every `current` phase and threads them into `excludePaths` at [src/subcommands/govern.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/subcommands/govern.ts:691) and [src/subcommands/govern.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/subcommands/govern.ts:741). `assembleImplementPayload` then correctly applies those excludes to both the committed diff and untracked fold via `excludeTokens` / `underExcludePath` at [src/govern/payload-implement.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/govern/payload-implement.ts:264) and [src/govern/payload-implement.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/govern/payload-implement.ts:303). But the commit-subjects channel is still derived from `git log ... -- .` for the entire installation subtree at [src/govern/payload-implement.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/govern/payload-implement.ts:425), with none of the new carried-phase exclusions applied.
+
+That breaks the “subjects and hunks stay joined” contract stated in the nearby comment. In a composed whole-feature run, the prompt can now mention commits that touched only carried phase files even though every corresponding hunk was intentionally removed from the payload. The downstream effect is noisy or misleading audit context: models can spend tokens on already-carried work or emit “missing surface” findings against commits whose code is absent by design. The fix is to scope commit-subject generation with the same exclusion set as the diff, or derive subjects from the already-filtered diff rather than from a broader `git log` query.
+
+### AUDIT-20260615-08 — `boundary-too-large` remains unobservable in the governed path
+
+Finding-ID: AUDIT-20260615-08
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/__tests__/govern/actual-payload-fit.test.ts:1-8, plus missing governed-path coverage in src/govern/protocol.ts
+
+The new test claims to pin the actual rendered-prompt contract: once the prompt is rendered, an oversized payload should become `boundary-too-large` and “the govern path can map it to a terminal outcome” (lines 3-7). But the test only calls `measureBoundaryFit` / `assertBoundaryFits` directly (lines 31-50). It does not exercise `runProtocol` or `runGovern`, where the terminal outcome is actually emitted.
+
+In the current governed path, `runProtocol` negotiates the fleet using the rendered prompt size before calling `assertBoundaryFits`; an oversized prompt is rejected as `negotiation-failed`, so the later `BoundaryTooLargeError` mapping is not reachable. That means a downstream consumer acting on the US2/US5 terminal-outcome contract will get the wrong machine-readable recovery class for actual payload overflow. The blast radius is high because this is not just missing coverage: operators or automation keying on `boundary-too-large` will never see it for the condition the feature says it represents. A reasonable fix would add an end-to-end oversized-prompt govern test and adjust the ordering/classification so actual envelope overflow emits `govern: terminal-outcome=boundary-too-large`.
+
+## 2026-06-15 — audit-barrage lift (20260615T003804628Z-audit-protocol-friction-burndown-phase-4)
+
+### AUDIT-20260615-09 — Directory-scoped carried phases can hide unrelated later work from the whole-feature audit
+
+Finding-ID: AUDIT-20260615-09 (codex-01 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=high
+Decision:   agreement (gate-counted high)
+Surface:    src/subcommands/govern.ts:675-698
+
+The new true-composition path carries every `current` phase by pushing its `status.files` into `compositionExcludePaths`, then feeds those paths to the payload assembler as hard excludes. That is safe for single-file scopes, but this codebase explicitly preserves directory scopes in phase parsing, so a carried phase can contribute a directory path rather than a file path. Once that happens, the whole-feature pass excludes the entire subtree, not just the specific work that converged.
+
+That matters because the stated contract here is “carry converged-and-unchanged phases, re-audit changed phases and cross-cutting code.” A directory exclude breaks that contract: any later cross-cutting file added under that directory, or any file not named by the carried phase but colocated beneath it, disappears from the final `after_implement` audit. The blast radius is high because the terminal whole-feature pass is the backstop that is supposed to catch cross-phase defects; with directory-scoped tasks it can now silently miss real code. A reasonable fix is to narrow composition to concrete file paths only, or to expand directory scopes to the checkpoint’s concrete file set before exclusion and add a regression test covering “current phase scoped to a directory, later unrelated file added beneath that directory.”
+
+### AUDIT-20260615-10 — The new payload-fit test documents an end-to-end `boundary-too-large` outcome that govern still cannot produce
+
+Finding-ID: AUDIT-20260615-10
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/govern/actual-payload-fit.test.ts:1-7
+
+The new test file says the actual-measurement path means “`assertBoundaryFits` throws so the govern path can map it to a terminal outcome,” but the production protocol still negotiates the fleet on `renderedPromptBytes` before it calls `assertBoundaryFits`. In the current implementation that means an oversized prompt is rejected earlier as `negotiation-failed`, not `boundary-too-large`; `src/govern/protocol.ts` already documents that mismatch explicitly.
+
+This is test-contract drift in a load-bearing area. Future maintainers, or an unattended agent reading the tests as the executable contract, will conclude the end-to-end terminal taxonomy is already wired when it is not. The downstream consequence is wrong fixes and wrong operator expectations rather than immediate runtime breakage, so I’d rate it medium. The fix is either to remove the govern-path claim from this test and keep it strictly unit-scoped, or to add the missing protocol change and an integration test that proves `stackctl govern` can actually emit `terminal-outcome=boundary-too-large`.
+
+### AUDIT-20260615-11 — Commit subjects are broader than the composed diff
+
+Finding-ID: AUDIT-20260615-11
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/payload-implement.ts:425-427
+
+The committed diff is now filtered by `excludePathRels`, including carried phase files and `.stack-control/audit-runs`, but `commitSubjects` still comes from `git log base..HEAD -- .` with no matching excludes. In a composed whole-feature run, the prompt can therefore include commit subjects for work whose hunks were intentionally removed from the payload.
+
+The blast radius is medium: it does not directly omit audited code, but it feeds misleading context into the audit barrage and can cause false “missing surface” findings or token waste against already-carried phases. A reasonable fix is to build the `git log` pathspec from the same include/exclude set as the committed diff, or derive subjects from commits that still have hunks after filtering.
+
+## 2026-06-15 — audit-barrage lift (20260615T004019612Z-audit-protocol-friction-burndown-phase-5)
+
+### AUDIT-20260615-12 — Floor-shortfall still prints outage-specific recovery guidance
+
+Finding-ID: AUDIT-20260615-12
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/protocol.ts:410-425
+
+This hunk splits the machine-readable terminal into `fleet-floor-shortfall` versus `barrage-outage`, and the inline comment explicitly assigns different recoveries to those states at lines 411-414. But the thrown message at lines 421-423 does not branch its guidance: both cases append `Check that the configured model-family CLIs are installed and reachable.` That guidance fits an outage, not a floor shortfall where coverage existed but fewer models emitted than the active floor required.
+
+The blast radius is medium because the run still fails loud and the machine-readable kind is correct, so a consumer keying only on `govern: terminal-outcome=<kind>` can recover properly. The defect is that the operator-facing error text undermines the new distinction this patch just introduced: a human, or any consumer that still displays the message body, is pointed toward the wrong remediation for `fleet-floor-shortfall`. A reasonable fix is to branch the human guidance alongside `terminalKind`, so shortfall errors say to widen the fleet or lower `--require-models`, while outages keep the install/reachability guidance.
+
+### AUDIT-20260615-13 — The new outage-vs-shortfall terminal split has no direct contract test
+
+Finding-ID: AUDIT-20260615-13
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/protocol.ts:408-425 and missing companion coverage in src/__tests__/govern/govern-terminal-outcomes.test.ts:1-221
+
+The diff adds a new behavioral split at `runProtocol()` lines 408-425: a nonzero barrage exit is now classified as either `fleet-floor-shortfall` or `barrage-outage` based on stderr content. But the terminal-outcome test file still exercises only `negotiation-failed`, `graduated`, `blocked`, `usage`, and `--help` (see lines 134-220). There is no end-to-end assertion that govern can actually emit `govern: terminal-outcome=fleet-floor-shortfall`, and none that a generic nonzero barrage exit emits `govern: terminal-outcome=barrage-outage`.
+
+The blast radius is medium because this feature’s stated value is a machine-distinguishable terminal contract for unattended consumers, and the newly introduced kinds are the least stable part of that contract: they depend on downstream barrage stderr shape. Without direct tests, a refactor can silently collapse both paths back into one observable outcome while leaving the rest of the terminal-outcome suite green. A reasonable fix is to add two CLI-level cases with a stub barrage bin: one that exits nonzero and prints an `audit-barrage: FLOOR SHORTFALL ...` line, and one that exits nonzero without that line, then assert the distinct terminal-outcome lines and single-emission behavior for both.
+
+### AUDIT-20260615-14 — Unreachable terminal outcome is documented as part of the machine contract
+
+Finding-ID: AUDIT-20260615-14
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/govern/protocol.ts:53-64`
+
+The diff exports `boundary-too-large` as a `GovernTerminalKind`, but the adjacent comment says it is “not yet reachable” because `negotiateFleet` rejects the prompt before `assertBoundaryFits` can emit that outcome. That means the machine-readable outcome contract advertises a state that current control flow cannot produce.
+
+The blast radius is medium: downstream consumers can build handlers around `boundary-too-large` expecting to distinguish prospective-vs-actual divergence, but real executions will report `negotiation-failed` for that shape. A reasonable fix is to either make the outcome reachable in this change or remove it from the active exported contract until the control flow actually emits it.
+
+### AUDIT-20260615-15 — Diff contains an explicit deferred-work comment in governed code
+
+Finding-ID: AUDIT-20260615-15
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/govern/protocol.ts:57-64`
+
+The added comment says the `boundary-too-large` outcome is “not yet reachable,” that reconciliation is “tracked in backlog TASK-117,” and references an “eventual fix.” The audit prompt’s hard constraints explicitly call out deferred-work phrasing in the diff as a finding because these comments tend to normalize known-broken contracts inside the implementation.
+
+The blast radius is low because this is not a separate runtime defect beyond the unreachable outcome above, but it is an operator-discipline trap in the exact surface that defines the machine-readable governance contract. The comment should state the current invariant without embedding backlog/deferred-work language, or the code should be changed so the documented contract is true now.
+
+## 2026-06-15 — audit-barrage lift (20260615T004230935Z-audit-protocol-friction-burndown-phase-5)
+
+### AUDIT-20260615-16 — `govern` collapses `audit-barrage` process failures into the `barrage-outage` terminal
+
+Finding-ID: AUDIT-20260615-16
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/protocol.ts:408-425; src/subcommands/audit-barrage.ts:391-442
+
+`runProtocol()` now treats every nonzero `audit-barrage` exit as one of exactly two machine-readable outcomes: `fleet-floor-shortfall` when stderr contains a `FLOOR SHORTFALL` line, otherwise `barrage-outage` (`src/govern/protocol.ts:408-425`). But `audit-barrage` has non-coverage failure exits of its own before any barrage result exists: installation resolution can exit `2` (`src/subcommands/audit-barrage.ts:391-400`), config loading can exit `2` (`402-408`), bad model selection can exit `2` (`410-414`), and orchestration exceptions exit `1` (`437-442`). Those are process/configuration failures, not “zero covering families,” yet `govern` will currently relabel all of them as `barrage-outage` unless they happen to print the floor-shortfall prose.
+
+The blast radius is high because US5’s value is a machine-readable recovery surface for unattended consumers. A fresh or misconfigured installation will now emit the wrong terminal kind and the wrong operator guidance (“install/reach the model-family CLIs”) even when the real defect is malformed barrage config or installation discovery. A reasonable fix is to give `audit-barrage` a structured failure discriminator that separates protocol/config/orchestration failures from coverage outcomes, or at minimum branch on its exit-class before mapping everything non-floor to `barrage-outage`.
+
+### AUDIT-20260615-17 — `boundary-too-large` is documented as a terminal outcome but cannot be emitted
+
+Finding-ID: AUDIT-20260615-17
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/govern/protocol.ts:54-60`, `src/govern/protocol.ts:353-380`
+
+The diff adds `boundary-too-large` to the machine-readable terminal outcome contract, but the new comment explicitly says that outcome is “not yet reachable” because `negotiateFleet` rejects the prompt before `assertBoundaryFits` can throw `BoundaryTooLargeError` (`src/govern/protocol.ts:54-60`). The control flow matches that admission: negotiation runs first and maps any rejected fleet to `terminalKind = 'negotiation-failed'` (`src/govern/protocol.ts:353-365`), while the `boundary-too-large` mapping sits behind `assertBoundaryFits` only after an accepted fleet exists (`src/govern/protocol.ts:372-380`).
+
+This breaks the stated US5 goal for downstream consumers: a payload/envelope boundary failure is advertised as a distinct machine outcome, but an adopter will receive `negotiation-failed` for that path and may run the wrong recovery. The blast radius is high because this is the feature’s public machine contract, not an internal diagnostic. A reasonable fix is to make the advertised outcome reachable in this same change by moving the rendered-prompt envelope decision into the boundary-fit path, or remove `boundary-too-large` from the emitted contract until the implementation can actually produce it.
+
+## 2026-06-15 — audit-barrage lift (20260615T004358757Z-audit-protocol-friction-burndown-phase-6)
+
+### AUDIT-20260615-18 — Incremental-audit contract still documents a deleted API and obsolete phase-header grammar
+
+Finding-ID: AUDIT-20260615-18
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    missing update to `specs/015-audit-protocol-convergence/contracts/incremental-audit.md` after `src/govern/incremental-audit.ts:21-28,109-115`
+
+`src/govern/incremental-audit.ts` now broadens phase parsing beyond the old colon-only form (`## Phase <id>[<sep> <title>]` at lines 21-28) and explicitly removes the inclusion-based `resolveComposingFeatureUnit` primitive (lines 109-115). But the published contract still tells readers to pass a `"## Phase N: User Story M"` header id and still documents `resolveComposingFeatureUnit(args): AuditUnit` as an active API in `specs/015-audit-protocol-convergence/contracts/incremental-audit.md:7-30`.
+
+That is more than comment drift. This contract file is the machine-facing authority for the feature, and an unattended consumer reading it today would build against a function that no longer exists and against a narrower header grammar than the implementation now accepts. The blast radius is `medium` because the runtime code in this diff is fine, but the documented interface has become false in a place intended to drive later implementation and review. The fix is to update the contract surface in the same change: remove the deleted helper from the contract and restate the phase-header grammar to match the new separator-tolerant parser.
+
+### AUDIT-20260615-19 — The new terminal-outcome contract ships an explicitly unreachable `boundary-too-large` state
+
+Finding-ID: AUDIT-20260615-19 (codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   codex=high, codex-gpt5=medium
+Decision:   agreement (gate-counted medium)
+Surface:    [src/govern/protocol.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/govern/protocol.ts:43), [src/__tests__/govern/govern-terminal-outcomes.test.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/__tests__/govern/govern-terminal-outcomes.test.ts:148)
+
+The new comment and enum in `protocol.ts` advertise `boundary-too-large` as one of the machine-distinguishable terminal outcomes, but the same comment immediately admits that this kind is “not yet reachable” because negotiation fails first (`protocol.ts:54-61`). The test suite then locks that reality in by explicitly omitting any end-to-end case for the kind and recording it as backlog work (`govern-terminal-outcomes.test.ts:148-156`). This is also an explicit defer note in the shipped diff, which your audit prompt calls out as a bug-factory shape.
+
+The consequence is a false machine contract: downstream automation can reasonably branch on `govern: terminal-outcome=boundary-too-large`, but no real govern run can currently produce it. That is a `medium` blast radius rather than `high` because existing runs still fail loudly; the defect is that the advertised recovery taxonomy is not truthful. A reasonable fix is to either remove `boundary-too-large` from the exported terminal contract until it is genuinely reachable, or change the control flow in the same patch so the kind can actually occur.
+
+### AUDIT-20260615-20 — `fleet-floor-shortfall` detection is coupled to a human stderr sentence, not a structured signal
+
+Finding-ID: AUDIT-20260615-20
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    [src/govern/protocol.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/govern/protocol.ts:408), [src/subcommands/audit-barrage-fleet.ts](/Users/orion/work/deskwork-work/stack-control/plugins/stack-control/src/subcommands/audit-barrage-fleet.ts:163)
+
+The new split between `fleet-floor-shortfall` and `barrage-outage` is implemented by regexing stderr for a specific English line prefix: `^audit-barrage: FLOOR SHORTFALL\b` (`protocol.ts:419`). The producer of that signal is another command that emits a human-readable warning sentence (`audit-barrage-fleet.ts:163`). That means the machine outcome contract now depends on the exact wording and punctuation of prose on stderr rather than on an exit code, flag, or structured artifact.
+
+This is brittle cross-layer coupling. A harmless copy edit in `audit-barrage-fleet.ts`, a localization change, or an extra wrapper around the line silently reclassifies a floor shortfall as a generic outage, which changes the recovery advice and any automation keyed on terminal kind. The blast radius is `medium` because governance still fails loudly, but it can fail with the wrong machine-readable reason. The fix is to pass a structured discriminator across the boundary instead of parsing prose, for example via a dedicated exit-status mapping, a small JSON/status file in the run dir, or a stable machine token emitted separately from the human message.
+
+## 2026-06-15 — audit-barrage lift (20260615T004717535Z-audit-protocol-friction-burndown-phase-6)
+
+### AUDIT-20260615-21 — Scoped rename detection still misses one-ended pathspec moves
+
+Finding-ID: AUDIT-20260615-21
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/payload-implement.ts:274-281
+
+`--find-renames` is added, but the scoped arm still passes task-derived pathspecs directly to `git diff`: `git diff --relative --find-renames <base> -- <includeTokens> <excludeTokens>`. Git can only pair a rename when both sides survive the pathspec. For a phase payload whose task list names only the new path after a tree move, the deleted old path is outside the pathspec, so the diff is still not a paired rename.
+
+The new test only exercises the unscoped feature payload (`assembleImplementPayload({ installationRoot, base })`), so it does not cover the scoped behavior described by the comment at lines 274-278. Blast radius is high because the feature goal is to prevent relocation payload blowups; phase-scoped or file-scoped governance is exactly where this can still ship a large add/delete payload or an add-only payload. A reasonable fix would add coverage for scoped includes and either expand rename candidates to include both endpoints or compute renames before applying the narrower payload filter.
+
+### AUDIT-20260615-22 — Boundary outcome contract documents an unreachable arm
+
+Finding-ID: AUDIT-20260615-22
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/protocol.ts:55-67
+
+The terminal outcome contract exports `boundary-too-large`, but the comment says the current control flow cannot reach it because negotiation rejects the lane first. That means downstream consumers can code against a machine-readable outcome that the implementation does not actually emit for the described condition.
+
+The blast radius is medium: this does not break ordinary govern execution, but it weakens US5’s core promise that degraded states are distinguishable by terminal outcome. A reasonable fix would make the control flow emit `boundary-too-large` for the oversized rendered prompt case, or remove the outcome from the public contract until the implementation can produce it.
+
+### AUDIT-20260615-23 — The diff contains an operator-discipline trap in a contract comment
+
+Finding-ID: AUDIT-20260615-23
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/govern/protocol.ts:55-67
+
+The new contract comment records that `boundary-too-large` is “not yet reachable” and points to backlog TASK-117 while keeping the enum value live. Project guidance calls these out as bug-factories because they normalize a mismatch between the stated contract and executable behavior.
+
+Blast radius is low by itself because the runtime behavior is captured in the previous finding, but the comment makes the mismatch easier to preserve across unattended edits. A reasonable fix is to resolve the behavior/contract mismatch in this change, or change the comment and exported type so they only describe states the code can actually emit.
+
+## 2026-06-15 — audit-barrage lift (20260615T004814176Z-audit-protocol-friction-burndown-phase-7)
+
+### AUDIT-20260615-24 — Whole-feature composition can hide non-current work when phases share a file
+
+Finding-ID: AUDIT-20260615-24
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/govern.ts:673-696
+
+The new whole-feature path computes `compositionExcludePaths` as the union of every file owned by a `current` phase, then excludes that union from the payload (`.filter((status) => status.state === 'current').flatMap((status) => status.files)` at lines 691-695). That is only correct if phase file ownership is disjoint, but this code does not enforce that invariant anywhere in the changed path: `resolvePhaseCheckpointStatuses()` just reuses `parsePhases()` output as-is and records `files` per phase without any overlap check before composition runs.
+
+If one file is named in both a `current` phase and a `missing`/`stale` phase, whole-feature govern now drops that file entirely even though the comment at lines 675-678 says the run should re-audit “changed / missing / stale phases AND cross-cutting code.” The blast radius is high because this produces a false-clean governance result in the feature’s main gate: a whole-feature govern can succeed while silently omitting code that still belongs to a non-current phase. A defensible fix is either to reject overlapping phase ownership before composition, or to carry only files owned exclusively by current phases.
+
+### AUDIT-20260615-25 — Commit-subject context no longer matches the filtered payload in composed runs
+
+Finding-ID: AUDIT-20260615-25
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/govern.ts:741-759 and missing corresponding subject scoping in src/govern/payload-implement.ts:243-280,415-428
+
+This diff starts passing `compositionExcludePaths` into the implement payload as `excludePaths` (lines 741-759), and `assembleImplementPayload()` does use those exclusions to narrow the committed diff (`excludePathRels` into `excludeTokens` at `payload-implement.ts:238-280`). But the commit-subject metadata is still built from `git log ${base}..HEAD --oneline -- .` with no matching exclusions (`payload-implement.ts:425-427`), so the prompt can now mention commits whose hunks were intentionally removed from the payload.
+
+That breaks the nearby contract in `payload-implement.ts` that “subjects and hunks stay joined.” In a composed whole-feature run, commits touching only carried phase files can still appear in `commit_subjects` even though the audited diff no longer contains any of their code. The blast radius is medium: it will not crash govern, but it degrades the audit input the models act on, wasting prompt budget and inviting spurious “missing surface” findings against already-carried work. The fix is to derive subject lines with the same exclusion set as the committed diff, or to compute subjects from the already-filtered diff instead of a broader log query.
+
+### AUDIT-20260615-26 — Boundary-too-large is a declared terminal outcome but currently unreachable
+
+Finding-ID: AUDIT-20260615-26
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/govern/govern-terminal-outcomes.test.ts:146-155, src/subcommands/govern.ts:477-486
+
+The test comment explicitly states that `boundary-too-large` is implemented but “can never observe an oversized prompt over an ACCEPTED fleet” because negotiation rejects the lane first. That means the public machine-readable terminal vocabulary includes a kind that consumers cannot actually receive under the current control flow. The implementation reinforces this: `preflightNegotiatedFleet` throws `GovernProtocolError(..., 'negotiation-failed')` before payload assembly can reach the boundary-fit path.
+
+The blast radius is medium because consumers can still distinguish real exits, but any documentation or agent logic built from the terminal-kind set may treat `boundary-too-large` as a live outcome when the system actually collapses it into `negotiation-failed`. A reasonable correction is to either remove `boundary-too-large` from the observable govern terminal contract, or change the negotiation/boundary split so an accepted fleet can still fail at the payload boundary and the e2e test can lock that behavior.
+
+### AUDIT-20260615-27 — Duplicate terminal outcomes are not tested for success or negotiation exits
+
+Finding-ID: AUDIT-20260615-27
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/govern/govern-terminal-outcomes.test.ts:131-134, src/__tests__/govern/govern-terminal-outcomes.test.ts:160-164
+
+The stated contract is “exactly one” `govern: terminal-outcome=<kind>` line for every execution exit, and the blocked/usage tests assert that with a regex count. The `negotiation-failed` and `graduated` cases only use `toContain`, so a regression that emits the correct line plus an extra terminal outcome would pass those tests.
+
+The blast radius is low because the current implementation appears to emit once on these paths, but the test suite does not fully protect the machine-readable contract it claims to lock. The fix is straightforward: apply the same `out.match(/govern: terminal-outcome=/g)` count assertion to the negotiation and graduated cases.
+
+## 2026-06-15 — audit-barrage lift (20260615T005804308Z-audit-protocol-friction-burndown-phase-2)
+
+### AUDIT-20260615-28 — Whole-feature `after_implement` runs never ratchet stale phases forward into the carried set
+
+Finding-ID: AUDIT-20260615-28
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/govern.ts:675-705,844-858
+
+The new whole-feature composition path explicitly re-audits every non-current phase by carrying only files “owned EXCLUSIVELY by current phases” (`phaseCheckpointStatuses` -> `carriedExclusivelyCurrentFiles` at lines 675-705). But on success, checkpoint persistence still happens only under `if (phaseUnit?.granularity === 'phase')` (lines 844-858). A phase that was `missing` or `stale` and got covered successfully by the `after_implement` payload is therefore left `missing`/`stale` in checkpoint state.
+
+That breaks the feature’s stated ratchet. On the next whole-feature govern, those same unchanged files are still treated as non-current and are re-audited again instead of being carried forward, so payload size and finding churn keep compounding unless the operator separately re-runs each phase in isolation. The blast radius is high because this directly undermines the feature’s stated friction-burndown goal for unattended whole-feature governance: the composition improvement does not persist across runs.
+
+### AUDIT-20260615-29 — `fleet-floor-shortfall` is still inferred from human stderr text instead of a structured barrage outcome
+
+Finding-ID: AUDIT-20260615-29
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/protocol.ts:404-425; src/subcommands/audit-barrage-fleet.ts:150-163
+
+The new terminal-outcome split claims to remove “fragile message-substring matching,” but `runProtocol` still decides between `fleet-floor-shortfall` and `barrage-outage` by regexing the barrage’s stderr for a prose line starting with `audit-barrage: FLOOR SHORTFALL` (lines 404-425). That couples govern’s machine-readable contract to the exact human wording emitted by `renderFleetWarnings` in `audit-barrage-fleet.ts` (lines 150-163).
+
+The govern run still fails loudly either way, so this is not a total feature break, but any wording drift in the barrage summary will silently misclassify the terminal kind and send automation down the wrong recovery path. That is a medium-severity contract problem: the downstream consumer will still see “fatal,” but the new differentiated outcome it is supposed to rely on is not actually sourced from structured data.
+
+### AUDIT-20260615-30 — `boundary-too-large` is a shipped terminal outcome that the control flow cannot emit
+
+Finding-ID: AUDIT-20260615-30
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/protocol.ts:54-60 and src/govern/protocol.ts:353-379
+
+The diff adds `boundary-too-large` as a machine-readable terminal kind, and the comment explicitly says US2 promises it as a distinct prospective-vs-actual divergence outcome. But the same comment states it is not reachable because `negotiateFleet(...)` rejects oversized rendered prompts before `assertBoundaryFits(...)` can throw `BoundaryTooLargeError`. The code confirms that ordering: negotiation runs at lines 353-365, while the boundary assertion only runs afterward at lines 373-379.
+
+Blast radius is high because downstream automation using `govern: terminal-outcome=<kind>` will receive `negotiation-failed` for oversized actual payloads, not the documented `boundary-too-large` recovery path. A reasonable fix is to change the ordering or negotiation contract so fleet selection can distinguish “no viable lane exists” from “selected fleet exists but actual payload exceeds the active envelope,” then cover that path with an end-to-end terminal-outcome test.
+
+### AUDIT-20260615-31 — The diff contains an explicit deferred-behavior comment in load-bearing protocol code
+
+Finding-ID: AUDIT-20260615-31
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/protocol.ts:54-60
+
+Lines 54-60 document a known unresolved mismatch in the terminal-outcome contract: `boundary-too-large` is exported and promised, but the implementation cannot currently produce it, with the reconciliation pointed at backlog task metadata. This is exactly the kind of operator-discipline trap the audit prompt calls out: the code now carries a public contract plus an inline note that the contract is not actually satisfied.
+
+Blast radius is medium independent of the runtime bug above because future maintainers and unattended agents will treat the enum/comment as authoritative while tests intentionally omit the reachable end-to-end case. The fix should be to either make the outcome reachable now or remove/narrow the public promise until the implementation and tests actually support it.
+
+## 2026-06-15 — audit-barrage lift (20260615T010034903Z-audit-protocol-friction-burndown-phase-3)
+
+### AUDIT-20260615-32 — Cross-tree whole-feature composition still re-audits carried files
+
+Finding-ID: AUDIT-20260615-32
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/govern.ts:675-708,750-753` (missing companion update in `src/govern/payload-implement.ts:528-569`)
+
+The new whole-feature path computes `compositionExcludePaths` by joining each carried repo-relative file to `repoRoot` and threading that list through `excludePaths` (`govern.ts:699-705`, `750-753`). That only reaches the installation-root diff and untracked fold. The separate cross-tree feature arm still diffs `featureRelTop` with a single `audit-log.md` exclusion and folds all untracked files under that root (`payload-implement.ts:528-569`), with no hook for the carried-file exclusions.
+
+In the supported transitional layout where `featureRoot` lies outside the installation, any phase-owned file under that cross-tree root will still enter the `after_implement` payload even after its phase checkpoint is current. The stated contract in this diff is “the whole diff minus carried files”; in that layout it becomes “the installation diff minus carried files, plus the full cross-tree feature root”. The blast radius is repeated re-auditing and repeated findings on already-converged feature-root artifacts, which is exactly the noise/composition problem this change is trying to burn down. A reasonable fix is to thread the carried exclusions into `assembleCrossTreeFeatureArm` as well, filtering both its committed diff pathspecs and its untracked fold.
+
+### AUDIT-20260615-33 — Commit-subject metadata no longer matches the composed payload scope
+
+Finding-ID: AUDIT-20260615-33
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/govern.ts:675-708,750-760` with `src/subcommands/govern.ts:332-342` (missing companion update in `src/govern/payload-implement.ts:425-427`)
+
+This diff changes whole-feature implement governance from an inclusion-style unit to an exclusion-style payload: carried phases are removed from `payload.diff` via `compositionExcludePaths` (`govern.ts:678-708`, `750-760`). But the model input still includes `commit_subjects: payload.commitSubjects` (`govern.ts:332-342`), and `payload.commitSubjects` is still built from `git log ${base}..HEAD --oneline -- .` plus the cross-tree arm subjects (`payload-implement.ts:425-427`). That log is installation-wide; it is not filtered by the same carried-file exclusions.
+
+The result is a mixed payload where the diff intentionally omits carried phases but the metadata still advertises commits that touched only those omitted files. For an audit prompt that asks models to reason over “commit subjects in the audited range”, this is a real behavior mismatch, not just stale commentary: the barrage can now be baited into “missing surface” or “where is commit X?” findings by metadata for code it was explicitly supposed not to re-audit. The blast radius is audit noise rather than a runtime crash, so I would rate it `medium`, but it undercuts the core intent of the composition change. The fix is to scope commit-subject collection with the same include/exclude contract as the diff arm, or drop subjects that have no surviving hunks in the composed payload.
+
+## 2026-06-15 — audit-barrage lift (20260615T010614190Z-audit-protocol-friction-burndown-after_implement)
+
+### AUDIT-20260615-34 — Whole-feature composition can silently hide unowned cross-cutting changes when a carried phase names a directory
+
+Finding-ID: AUDIT-20260615-34
+Status:     open
+Severity:   high
+Per-lane:   codex-gpt5=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/govern/incremental-audit.ts:123-156`, `src/subcommands/govern.ts:680-753`, `src/govern/payload-implement.ts:257-280`
+
+The new composition logic carries any path owned only by current phases, then turns those carried paths into `:(exclude)` pathspecs for the whole-feature diff. That is safe for exact file paths, but it is not safe for directory-scoped phase entries. If a current phase lists `src/` in `tasks.md`, `carriedExclusivelyCurrentFiles()` will return `src` unless a non-current phase also names an overlapping path (`incremental-audit.ts:135-146`). `runGovern()` then converts that to an exclusion path (`govern.ts:699-705`), and the payload assembler applies it directly to `git diff` (`payload-implement.ts:264-280`).
+
+That exclusion hides every changed file under `src/`, including cross-cutting files owned by no phase at all. The code comments in `govern.ts:681-684` explicitly promise that whole-feature govern re-audits “cross-cutting code owned by no phase,” but the implementation only checks overlap against non-current phase ownership, not against unowned changed paths. The blast radius is a false-clean whole-feature govern: an operator can get a composed pass while real unowned edits under a carried directory never reach the barrage. A reasonable fix is to stop carrying directory tokens as raw excludes, or to expand carries against the actual changed-file set and exclude only concrete files proven to be owned exclusively by current phases.
+
+### AUDIT-20260615-35 — The diff hardcodes `boundary-too-large` as unreachable, but the spec and quickstart still require it as a real terminal outcome
+
+Finding-ID: AUDIT-20260615-35 (codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   codex=high, codex-gpt5=high
+Decision:   agreement (gate-counted high)
+Surface:    `src/govern/protocol.ts:45-60`, `specs/021-audit-protocol-friction-burndown/tasks.md:100-101`; missing corresponding updates to `specs/021-audit-protocol-friction-burndown/spec.md:69-75,117,148,167` and `specs/021-audit-protocol-friction-burndown/quickstart.md:6`
+
+This diff now documents, in code, that `boundary-too-large` is not actually reachable: `protocol.ts:52-59` says negotiation rejects undersized lanes first, so the later `assertBoundaryFits()` branch never wins. `tasks.md:100-101` reinforces that by explicitly saying the e2e terminal test was omitted because the condition is “structurally unreachable.” But the feature spec still says an oversized rendered payload “must reject the boundary” (`spec.md:69-75`), the independent test still demands a separate “phase-too-large rejection” (`spec.md:117`), the requirements still mark `boundary-too-large` as a distinct mandatory terminal (`spec.md:148,167`), and the quickstart still tells the operator to validate that behavior (`quickstart.md:6`).
+
+That is a live contract contradiction, not just commentary drift. A downstream agent building or extending this feature from the spec will naturally preserve or reintroduce a distinct reachable `boundary-too-large` path, while the implementation and task record now normalize the opposite reading. The blast radius is high because this spec is the unattended build input for later work. The fix needs one source of truth: either restore a reachable `boundary-too-large` path in code, or update the spec/quickstart to say negotiation currently subsumes that condition.
