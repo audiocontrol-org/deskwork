@@ -2,6 +2,46 @@
 
 ---
 
+## 2026-06-15: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 19
+  - chore(stack-control): record 021 after_implement audit state (phase checkpoints 1-6, audit-log, backlog residuals)
+  - fix(stack-control): composition shared-ownership uses PREFIX overlap not exact match (021 after_implement HIGH)
+  - fix(stack-control): composition carries only EXCLUSIVELY-current files (021 phase-7 HIGH)
+  - docs(stack-control): retire anti-defer 'deferred design decision' comment on boundary-too-large
+  - fix(stack-control): exit-2 on unexpected govern errors + retire vestigial composition primitive (021 audit)
+  - feat(stack-control): US1 whole-feature govern uses TRUE COMPOSITION (021 audit)
+  - fix(stack-control): narrow terminal-outcome contract + harden floor split (021 audit)
+  - fix(stack-control): emit terminal-outcome at EVERY govern exit (021 audit HIGH)
+  - docs(stack-control): record 021 T032 test-umbrella result
+  - chore(stack-control): 021 task checkoffs + backlog reconciliation
+  - test(stack-control): 021 T010 phase-composition + T013 actual-payload-fit
+  - feat(stack-control): US5 — machine-readable terminal outcomes + audit-runs noise trim
+  - feat(stack-control): US4 — richer phase-header grammar + rename-aware payload scoping
+  - test(stack-control): make nested-fixture git repos hermetic (no gpg dependency)
+  - chore(stack-control): close 4 same-session-fixed 021 backlog dupes
+  - chore(stack-control): record 021 phase-1 govern gate-open + slush routing
+  - fix(stack-control): route 021 lane-capability failures through governed FATAL
+  - fix(stack-control): burn down 021 phase-1 govern HIGH/MEDIUM findings
+  - feat(stack-control): land 021 govern phase-control substrate
+- Files changed: 97
+- Backlog touched: TASK-111, TASK-114, TASK-115, TASK-116, TASK-117, TASK-120, TASK-121, TASK-129, TASK-47, TASK-57, TASK-71, TASK-81
+
 ## 2026-06-14: audit-protocol-friction phase-1 govern loop advanced, but session discipline regressed
 
 **Goal:** Drive spec `021-audit-protocol-friction-burndown` through foundational implementation, honor the new per-phase audit standard mechanically, and burn down `phase 1` govern findings until the gate opened.
