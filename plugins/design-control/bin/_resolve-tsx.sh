@@ -19,7 +19,7 @@
 #       upward node_modules lookup → probe passes → NO install, dispatch directly.
 #     - Adopter sparse-clone (incl. a stray-ancestor node_modules/.bin/tsx that
 #       does NOT carry parse5/zod): the plugin's own deps do NOT resolve →
-#       probe fails → local `npm install --omit=dev --workspaces=false`.
+#       probe fails → local `npm ci --omit=dev --workspaces=false`.
 #   Bounded contract of this check: it resolves each declared dep's ENTRY by name
 #   from $PLUGIN_ROOT — stronger than a bare on-disk path probe, but NOT a
 #   transitive-closure integrity proof and NOT version-aware. A corrupted/partial
@@ -62,16 +62,23 @@ _dc_all_deps_resolve() {
 }
 
 # First-run install into the plugin's own node_modules/.
+#   `npm ci` (NOT `npm install`): the plugin ships a committed package-lock.json,
+#   so `npm ci` installs the EXACT locked dependency tree — two adopters at the
+#   same plugin tag get byte-identical runtime, and the "release tag is the source
+#   of truth" contract holds (the float that `npm install` against `^` ranges
+#   would introduce is the defect this closes). `npm ci` also wipes any partial
+#   node_modules/ before installing, so it repairs a damaged/interrupted prior
+#   install rather than dispatching into it.
 #   --workspaces=false: when sparse-cloned from a workspaces-declaring monorepo,
 #   npm would otherwise hoist node_modules/ to the workspace root, leaving
 #   $PLUGIN_ROOT/node_modules/ empty. Force install into the plugin's own tree.
 _dc_run_install() {
-  echo "${SHIM_NAME:-design-control}: installing plugin dependencies (first run)..." >&2
-  ( cd "$PLUGIN_ROOT" && npm install --omit=dev --workspaces=false \
+  echo "${SHIM_NAME:-design-control}: installing plugin dependencies (npm ci, first run)..." >&2
+  ( cd "$PLUGIN_ROOT" && npm ci --omit=dev --workspaces=false \
       --no-audit --no-fund --loglevel=error ) >&2
 }
 
-# resolve_tsx — sets TSX to a usable tsx path, bootstrapping (npm install) when
+# resolve_tsx — sets TSX to a usable tsx path, bootstrapping (npm ci) when
 # the declared runtime deps do not resolve from $PLUGIN_ROOT. The resolution
 # probe is the single source of truth and runs UNCONDITIONALLY — there is no
 # "ancestor tsx == workspace, skip the probe" short-circuit (that wrongly let a
@@ -93,11 +100,11 @@ resolve_tsx() {
   _dc_run_install
   TSX=$(_dc_find_tsx || true)
   if [ -z "$TSX" ]; then
-    echo "${SHIM_NAME:-design-control}: npm install completed but tsx is still not resolvable from $PLUGIN_ROOT. Aborting." >&2
+    echo "${SHIM_NAME:-design-control}: npm ci completed but tsx is still not resolvable from $PLUGIN_ROOT. Aborting." >&2
     exit 1
   fi
   if ! _dc_all_deps_resolve; then
-    echo "${SHIM_NAME:-design-control}: npm install completed but a declared runtime dep ($RUNTIME_DEPS) still does not resolve from $PLUGIN_ROOT. Aborting." >&2
+    echo "${SHIM_NAME:-design-control}: npm ci completed but a declared runtime dep ($RUNTIME_DEPS) still does not resolve from $PLUGIN_ROOT. Aborting." >&2
     exit 1
   fi
   return 0

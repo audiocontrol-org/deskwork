@@ -119,7 +119,9 @@ function stubNpmDir(pluginRoot: string): string {
   const script = [
     '#!/bin/sh',
     'set -eu',
-    `: > "${marker}"`,
+    // Record the npm subcommand ($1) into the marker so a test can assert the
+    // shim uses `npm ci` (reproducible, locked) and not `npm install` (floats).
+    `printf '%s' "$1" > "${marker}"`,
     `mkdir -p "${nm}/.bin"`,
     `ln -sf "${realTsxBin}" "${nm}/.bin/tsx"`,
     `for dep in parse5 tsx zod; do`,
@@ -195,6 +197,9 @@ describe('bin shims — adopter (sparse-clone) bootstrap', () => {
       existsSync(marker),
       `stub npm install was never invoked; stderr: ${result.stderr}`,
     ).toBe(true);
+    // Reproducible install: the bootstrap must use `npm ci` (locked) — a
+    // regression to `npm install` (which floats `^` ranges) fails here.
+    expect(readFileSync(marker, 'utf8')).toBe('ci');
     expect(result.stderr).not.toContain('run npm install first');
     expect(result.status, `stderr: ${result.stderr}`).toBe(0);
     expect(result.stdout).toContain('DISPATCHED-OK');

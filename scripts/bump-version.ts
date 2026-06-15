@@ -50,6 +50,7 @@ interface VersionedManifest {
     | 'package-json'
     | 'lockstep-package-json'
     | 'plugin-json'
+    | 'package-lock-json'
     | 'marketplace-json'
     | 'extension-yml';
 }
@@ -64,6 +65,7 @@ const MANIFESTS: readonly VersionedManifest[] = [
   { path: 'plugins/dw-lifecycle/package.json', label: 'dw-lifecycle plugin shell', kind: 'package-json' },
   { path: 'plugins/stack-control/package.json', label: 'stack-control plugin shell', kind: 'package-json' },
   { path: 'plugins/design-control/package.json', label: 'design-control plugin shell', kind: 'package-json' },
+  { path: 'plugins/design-control/package-lock.json', label: 'design-control plugin lock', kind: 'package-lock-json' },
   { path: 'plugins/deskwork/.claude-plugin/plugin.json', label: 'deskwork plugin.json', kind: 'plugin-json' },
   { path: 'plugins/deskwork-studio/.claude-plugin/plugin.json', label: 'deskwork-studio plugin.json', kind: 'plugin-json' },
   { path: 'plugins/dw-lifecycle/.claude-plugin/plugin.json', label: 'dw-lifecycle plugin.json', kind: 'plugin-json' },
@@ -130,6 +132,24 @@ async function bumpFile(manifest: VersionedManifest, version: string): Promise<s
     case 'plugin-json': {
       const before = data.version;
       data.version = version;
+      await writeJson(abs, data);
+      return `  ${manifest.label.padEnd(36)} ${String(before)} -> ${version}`;
+    }
+    case 'package-lock-json': {
+      // A committed plugin-local package-lock.json (shipped so adopter
+      // sparse-clone installs are reproducible via `npm ci`). lockfileVersion 3
+      // records the root package's own version in TWO places — top-level
+      // `version` and `packages[""].version` — both must move with the bump so
+      // the lockfile's self-version never drifts from package.json /
+      // plugin.json (the AUDIT-20260614-34 lockfile-drift shape). Dependency
+      // pins inside the lock are NOT touched — they pin third-party versions,
+      // which the bump must leave alone.
+      const before = data.version;
+      data.version = version;
+      const rootPkg = (data.packages as Record<string, { version?: string }> | undefined)?.[''];
+      if (rootPkg && typeof rootPkg === 'object') {
+        rootPkg.version = version;
+      }
       await writeJson(abs, data);
       return `  ${manifest.label.padEnd(36)} ${String(before)} -> ${version}`;
     }
