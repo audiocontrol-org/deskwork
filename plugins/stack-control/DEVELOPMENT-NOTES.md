@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-06-15: Roadmap reconciliation → v0.47.0 ship → post-release closure → lifecycle-ceremony umbrella
+
+**Goal:** Orient via `/stack-control:session-start`; as it unfolded — reconcile the drifted roadmap, ship the pending stack-control work, verify+close what the release resolved, and institutionalize the post-release/lifecycle ceremony so it stops running on operator stamina.
+
+**Accomplished:**
+- **Roadmap reconciliation (zeroed all detectable drift).** Advanced 7 tasks-complete features to `shipped` across two passes (document-primitives, spec-governance, installation-isolation; then insight-capture, migrate-scope-discovery, session-skills, project-doc-setup). Unorphaned all 15 spec dirs — added `spec:` to 5 existing nodes; created 10 new nodes (audit saga 013/014/014/021 grouped `part-of` audit-protocol-convergence). Marked `migrate-audit-barrage` shipped on operator confirmation → shipped `audit-protocol-convergence` + unblocked the `retire-dw-lifecycle` endgame. reconcile: 0 drift / 0 orphans / 0 unresolved.
+- **Merged `origin/main`** (clean, disjoint files) and shipped **PR #476** (133 files, +7609/−184) → cut as **v0.47.0**.
+- **Fixed a real CI blocker mid-merge (TASK-132).** The 021 fleet-negotiation gate probes real model CLIs (claude/codex/sonnet) absent in CI, so ~20 govern e2e tests short-circuited to `negotiation-failed` — passing locally only because the dev box has the CLIs. Added the test-only `GOVERN_FLEET_AVAILABLE` seam in `loadLaneCapabilitiesGoverned` (mirrors `GOVERN_BARRAGE_BIN`); set it in 8 e2e files. Verified red→green by reproducing CLI-less with a `which`-shim hiding the three binaries — full suite 1543/1543. (`68415fee`)
+- **Post-release verification against the formally-installed v0.47.0.** Confirmed the released cache carries the seam + reconcile=0-orphans; closed **TASK-131** + **TASK-132** with `## Resolution` blocks citing the fixing commit + post-release evidence; split the residual reconcile-has-no-unorphan tooling gap to **TASK-133**.
+- **Structured the "mechanize the lifecycle ceremony" theme into a first-class effort.** New umbrella `multi:feature/lifecycle-industrialization` with three children `part-of` it: `release-resolution-cycle` (TASK-134), `backlog-promotion-mechanization` (TASK-135), `parseable-lifecycle-workflow` (TASK-136). Sharpened TASK-136 from "document the workflow" to a **parseable, deterministic workflow engine** (governed grammar-parsed doc + an engine that drives items through gated phases; WORKFLOW.md becomes one rendering, not the source of truth).
+
+**Didn't Work:**
+- First CI run on #476 was red (the hermeticity defect). The green local suite masked it — ambient-dependency landmine (my box has the model CLIs; CI doesn't).
+- `stackctl session-end` auto-derived "286 commits / 662 files" because the `7de27776..HEAD` boundary swept in the entire `origin/main` merge (v0.46/0.47 + design-control). Corrected to the honest first-parent count (13). Boundary-spans-merge inflation is a session-end gap worth noting.
+
+**Course Corrections:**
+- [PROCESS] "merge when green" surfaced a real defect, not a slow build. Did NOT merge red — fixed the hermeticity and verified in the ACTUAL CLI-less condition (a which-shim, not my laptop) before merging.
+- [PROCESS] Operator owns scope/closure: surfaced the reconcile drift, the Cohort-B node taxonomy, and the close decisions as proposals (AskUserQuestion / explicit asks) rather than unilaterally advancing/closing. Held `audit-protocol-convergence` until its dependency shipped; held the 4-vs-5 status advances for an explicit nod.
+- [PROCESS] Operator sharpened TASK-136 from a documentation item to a parseable/deterministic engine — recorded the SHARPENED framing in the item body, not a quiet reinterpretation.
+
+**Insights:**
+- The roadmap silently understated shipped work: 7 complete features sat at planned/in-flight and 15 implemented spec dirs had no node or no `spec:` field. reconcile only REPORTS this — it can't repair it (orphans needed hand-edits). That gap is the seed of the lifecycle-industrialization umbrella: the closing/reconciling half of the lifecycle has no momentum of its own and runs on stamina.
+- The real post-release gate is verifying against the FORMALLY-INSTALLED artifact, not the worktree (the released cache was `--omit=dev`, so verification was code-identity + the CLI-less functional run, not re-running its tests). The whole verify→close→reconcile→promote ceremony we ran by hand today is exactly what TASK-134 + the umbrella exist to mechanize.
+- A passing local suite that depends on ambient model CLIs is a CI landmine — TASK-132 (and the broader TASK-116 class) only surface CLI-less, so "green locally" is not evidence.
+
+**Quantitative (this session — re-derived first-parent, NOT the merge-inflated auto-count):**
+- Commits: 13 on `feature/stack-control` (11 work + 1 `origin/main` merge + 1 session-end record). The verb's auto-derived "286 commits / 662 files" counts the merged-in `origin/main` history (v0.46→v0.47 + design-control), not this session's work.
+- Released: PR #476 → v0.47.0.
+- Backlog: closed TASK-131 + TASK-132 (verified in v0.47.0); captured TASK-130, 133, 134, 135, 136; promoted TASK-134/135/136 into the roadmap under the new umbrella.
+- Corrections: ~0 hard corrections (operator gave direction + one "close out" ambiguity clarification; no claimed-untrue or reverted work).
+
+---
+
 ## 2026-06-15: 021 whole-feature-gate blockers — boundary-too-large + cross-cutting composition (TASK-117, TASK-129)
 
 **Goal:** Resumed via `/stack-control:execute` on `021-audit-protocol-friction-burndown`. Found execute was a no-op (all 32 tasks complete, clean tree) — the real "unfinished work" the operator expected was the two spec-required structural HIGHs the prior session's journal named as blocking the whole-feature govern gate: TASK-117 (`boundary-too-large` unreachable) and TASK-129 (directory-scoped composition hides cross-cutting changes). Fix both.
