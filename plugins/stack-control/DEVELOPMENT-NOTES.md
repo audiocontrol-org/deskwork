@@ -2,6 +2,31 @@
 
 ---
 
+## 2026-06-15: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 4
+  - chore(stack-control): close TASK-129 (compose by actual audited files) with resolution note
+  - fix(stack-control): whole-feature compose carries ACTUAL audited files, not declared dirs (TASK-129)
+  - chore(stack-control): close TASK-117 (boundary-too-large reachable) with resolution note
+  - fix(stack-control): make boundary-too-large reachable — split lane-health from payload-size (TASK-117)
+- Files changed: 10
+- Backlog touched: TASK-117, TASK-129
+
 ## 2026-06-15: 021 audit-protocol-friction — full implementation + deep after_implement audit
 
 **Goal:** Burn down the entire `021-audit-protocol-friction-burndown` task list (all 32 tasks) and audit it via the `/stack-control:execute` protocol — drive native `/speckit-implement`, then let the deskwork-governance cross-model barrage fire on `after_implement`.
