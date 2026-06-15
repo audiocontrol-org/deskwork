@@ -41,7 +41,7 @@ One-move out-of-sequence insight capture as a first-class control-plane capabili
 Move scope-discovery primitives + skills in-house with per-codebase clone detection; vendor the full clone-detector.
 
 ## design:feature/roadmap-protocol
-- status: in-flight
+- status: shipped
 - depends-on: design:feature/document-primitives
 - spec: specs/006-roadmap-protocol
 Keep the roadmap live, crisp, and up-to-date: a DAG of heading-keyed work items with first-class typed edges. This feature (the manual self-seed).
