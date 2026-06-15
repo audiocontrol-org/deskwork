@@ -2,21 +2,33 @@
 
 ---
 
-## 2026-06-15: <!-- session title -->
+## 2026-06-15: 021 whole-feature-gate blockers — boundary-too-large + cross-cutting composition (TASK-117, TASK-129)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Resumed via `/stack-control:execute` on `021-audit-protocol-friction-burndown`. Found execute was a no-op (all 32 tasks complete, clean tree) — the real "unfinished work" the operator expected was the two spec-required structural HIGHs the prior session's journal named as blocking the whole-feature govern gate: TASK-117 (`boundary-too-large` unreachable) and TASK-129 (directory-scoped composition hides cross-cutting changes). Fix both.
 
 **Accomplished:**
-- <!-- compose -->
+- **TASK-117 — `boundary-too-large` made reachable.** Root cause: `negotiateFleet` envelope-gated lanes, so an oversized rendered payload always exited `negotiation-failed` and `assertBoundaryFits` was structurally dead. Fix: split the two axes — `negotiateFleet` selects on lane-health only (availability / read-only enforcement / liveness / floor); `assertBoundaryFits` owns the payload-vs-envelope check. The two terminals (US2/FR-006 vs US3/FR-008) are now both reachable and machine-distinguishable (SC-005). Dropped `requestedPromptBytes` from the negotiation signature + result + the preflight `1` sentinel. RED→GREEN e2e replaces the bug-documenting NOTE in `govern-terminal-outcomes.test.ts`. (`b709c845`)
+- **TASK-129 — whole-feature compose carries ACTUAL audited files, not declared dirs.** Root cause: the checkpoint recorded only the tasks.md-DECLARED scope (`governedPaths`, possibly a directory); at compose time there was no stored signal to tell "audited under this dir" from "cross-cutting under this dir", so no pure-compose-time fix existed. Operator's framing drove the design (git is the record of what changed): each phase checkpoint now records `auditedFiles = git diff --name-only <phaseBase> -- <declaredScope>`, and the new `carriedFilesForComposition` carries those EXACT files. A cross-cutting file under a current phase's declared directory isn't in any `auditedFiles` set → not carried → re-audited. 021 phase-7 shared-ownership protection preserved; pre-TASK-129 checkpoints (no `auditedFiles`) carry nothing (self-healing). (`08c0e4b8`)
+- Both backlog items closed with resolution notes (`8c2156fa`, `f4b19ccb`). Full umbrella green: 233 files / 1544 tests. Zero new tsc errors (the lone `govern.ts` nullability error is pre-existing on clean HEAD).
 
 **Didn't Work:**
-- <!-- compose -->
+- Did NOT run a live whole-feature govern to observe the gate actually open — that fires the expensive cross-model barrage and writes audit-log + backlog, so it's the operator's trigger. The two correctness blockers are fixed + unit/integration-tested, but "the gate opens in a live run" is unverified-by-observation.
+- The first `AskUserQuestion` (what `/stack-control:execute` should do) was denied — the operator wanted to chat through the situation first, not pick from options.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] `/stack-control:execute` on a complete spec is a no-op; surfaced it instead of mechanically churning a no-op implement + empty-diff govern (the TASK-54 degraded path). The honest read of "expected unfinished work" was the parked after_implement findings, not spec tasks.
+- [PROCESS] Corrected my own earlier over-claim: I speculated git-as-source-of-truth would also collapse the checkpoint path-fingerprint findings (symlink/separator/overlap). After reading `checkpoint-state.ts`: NO — the freshness fingerprint is deliberately content-based (catches uncommitted working-tree edits a git ref would miss). It's a separate mechanism; git-as-SoT fixes the compose EXCLUDE, not the freshness fingerprint.
 
 **Insights:**
-- <!-- compose -->
+- The audit-log `Status:` field is **unreliable** — it showed 94 "open" (4 BLOCKING, 59 HIGH) but spot-checking the BLOCKINGs, ≥3 of 4 were already addressed by post-audit commits and never re-marked (e.g. the wiring BLOCKINGs -03/-11 — primitives ARE wired into protocol.ts/govern.ts now; the composition BLOCKING -16 references the retired `resolveComposingFeatureUnit`). "All tasks checked" hid this. Worth a reconciliation pass (backlog TASK-19 territory: governance graduation has no on-disk record).
+- TASK-117 and TASK-129 are two sides of the same root: the protocol conflated DECLARED scope with ACTUAL audited surface. 117 = negotiation conflated lane-health with payload-size; 129 = composition conflated declared-directory with audited-files. Both fixed by separating the conflated axes.
+- The whole-feature payload was ALREADY git-truthful (`git diff <base> :(exclude)…` + untracked fold); TASK-129 was purely in how the EXCLUDE set was computed (human-declared dirs vs git's actual changed files).
+
+**Next session — recommended next steps (operator's call on all three; left at a decision point):**
+1. **Cascade-friction fix (freshness-by-`auditedFiles`) — needs operator OK; it changes the system's "teeth".** Investigated the journal's checkpoint-cascade item: it's MOSTLY inherent-and-correct (a genuinely-shared audited file like `govern.ts` SHOULD re-stale every phase that audited it — that's the teeth, not a bug). The ONE avoidable sliver: a phase that declares a DIRECTORY but audited only a few files under it is re-staled by edits to unaudited files under that dir. Fix = key checkpoint freshness on `auditedFiles` (now recorded) instead of the declared scope. Safe (cross-cutting files still caught by the TASK-129 compose) but it REDEFINES what stales a checkpoint and breaks the existing checkpoint-freshness test contract — so it wants explicit sign-off (analogous to amending a settled invariant), not a silent change.
+2. **Live whole-feature govern** on 021 to confirm the gate now opens end-to-end. Expensive (real cross-model barrage), writes audit-log + backlog, generates new findings — operator's trigger. Note: existing on-disk checkpoints (phase-1..6) now lack `auditedFiles`, so they'll carry nothing and re-audit (self-healing; first run rewrites them with the field).
+3. **Audit-log reconciliation** (TASK-19): the 94 "open" 021 findings need a pass to mark the genuinely-fixed-but-unmarked ones and isolate the true residue. The headline count is misleading until then.
+4. **TASK-60 proper** (myopic convergence, gh-453): a process-redesign (self-red-team-a-fix-before-refire), not a code fix — needs a design conversation.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 4
