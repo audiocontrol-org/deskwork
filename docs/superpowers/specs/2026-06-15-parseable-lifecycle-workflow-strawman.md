@@ -30,6 +30,13 @@
   phase. This formalizes a convention the repo already runs informally (the
   `docs/superpowers/specs/*-design.md` family) but currently leaves to operator
   memory.
+- **Every stage is an opinionated stack-control FRONTEND over a swappable
+  BACKEND.** `define`→Spec Kit, `execute`→`/speckit-implement`, `govern`→model
+  CLIs — and now `design`→a design backend (default `superpowers:brainstorming`,
+  possibly third-party). The frontend owns the *opinion + contract* (the
+  "stack-control way"); the backend owns the *mechanism* and is selected by
+  **capability, never vendor identity** (succession rule, execution-backend
+  port). This is a first-class principle, not specific to the design stage.
 
 ---
 
@@ -61,7 +68,7 @@ informally — the workflow engine just makes it explicit and total.
 |---|---|---|---|
 | 0 | `captured` | a found bug/gap exists in the backlog | `/stack-control:backlog capture` |
 | 1 | `planned` | promoted to a roadmap node, awaiting design | `roadmap add` / `backlog promote` |
-| 2 | `designing` | **free-form exploration → a design record** (problem domain, solution space, decisions, rejected alternatives) | `superpowers:brainstorming` → `docs/superpowers/specs/<date>-<slug>-design.md` |
+| 2 | `designing` | **free-form exploration → a design record** (problem domain, solution space, decisions, rejected alternatives) | `/stack-control:design` (frontend) → backend (default `superpowers:brainstorming`) → `docs/superpowers/specs/<date>-<slug>-design.md` |
 | 3 | `specifying` | author + converge the spec (from the design record) | `/stack-control:define` + speckit chain + `govern --mode spec` |
 | 4 | `implementing` | execute the spec (write the code) | `/stack-control:execute` (speckit-implement) |
 | 5 | `governing` | cross-model audit-barrage convergence on the impl | `govern` (after_implement) |
@@ -91,8 +98,8 @@ doc-grammar: workflow
 - next: designing
 
 ## phase: designing
-- derive: design record present ∧ no spec dir
-- work: superpowers:brainstorming     # produces docs/superpowers/specs/<date>-<slug>-design.md
+- derive: node design: field present ∧ no spec dir
+- work: /stack-control:design     # opinionated frontend; drives a design backend (default superpowers:brainstorming) → *-design.md
 - next: specifying
 
 ## phase: specifying
@@ -136,22 +143,47 @@ final decision is incomplete; it must show what was considered and why the
 alternatives lost, so the spec, the implementation, and any future
 re-litigation inherit the reasoning instead of re-deriving it.
 
-**The work surface is `superpowers:brainstorming` — not a new skill.** We don't
-invent the exploration method or the template; brainstorming already:
+**The work surface is `/stack-control:design` — an opinionated FRONTEND over a
+swappable BACKEND** (default `superpowers:brainstorming`, possibly third-party).
+Same pattern as `define`→Spec Kit. The frontend owns the *opinion*; the backend
+owns the *mechanism*.
+
+**What the backend supplies (default = brainstorming):**
 
 - writes + commits `docs/superpowers/specs/<date>-<topic>-design.md` (its step 6);
-- **"always propose 2-3 approaches with trade-offs"** — the capture-rejected-
-  alternatives requirement, built into the method;
-- runs a **user-review gate** ("review the written spec… wait for the response")
-  — the operator-decides-faithfulness gate;
-- runs a **spec self-review** (placeholder / consistency / scope / ambiguity scan);
-- enforces a **HARD-GATE** against implementing before design approval.
+- proposes 2-3 approaches with trade-offs (the explore-alternatives method);
+- a **user-review gate** ("review the written spec… wait for the response");
+- a **self-review** (placeholder / consistency / scope / ambiguity scan);
+- a **HARD-GATE** against implementing before design approval.
 
-So the strawman's capture-faithfulness machinery (open Q#6) is mostly already
-*in* brainstorming. The workflow adds only the **mechanical layer around it**:
-the `design-to-spec` exit-gate verifies the record's required sections are
-present (structural, not judgment), and the transition fires the bookkeeping
-effects (link to node, journal, route to spec).
+**The backend contract** (so a backend is selectable by *capability*, not vendor):
+conduct a structured exploration → emit a design record at the convention path
+with the required sections → support an approval gate → be drivable in-session.
+
+**What the frontend's opinion ADDS / OVERRIDES (the "stack-control way"):**
+
+- **Override the backend's YAGNI with capture-everything.** Brainstorming's Key
+  Principles say *"YAGNI ruthlessly — remove unnecessary features from all
+  designs"* — which **directly violates** `agent-discipline.md` § Capture mode vs
+  scope mode (*"capture everything… THEN scope it; never insert scope-cuts the
+  operator didn't ask for"*). The frontend MUST suppress the backend's
+  scope-cutting; the design record captures the full domain, scoping is the
+  operator's later explicit pass.
+- **Terminal handoff = Spec Kit, not `writing-plans`.** The frontend intercepts
+  the backend's hardcoded terminal state and routes to the workflow's
+  `design-to-spec` transition (→ `/stack-control:define` → `/speckit-specify`).
+  The backend stays workflow-agnostic.
+- **Anchor to a roadmap item + set the `design:` pointer** on entry (the unit is
+  the node; the pointer makes phase-derivation work mid-exploration — Q9).
+- **Required-section contract** the `design-to-spec` exit-gate can mechanically
+  verify (problem domain, solution space incl. rejected alternatives, decisions,
+  open questions, provenance).
+
+So capture-faithfulness (open Q#6) is *mostly* in the backend, but the **frontend
+is load-bearing** — without it the backend's generic opinions (YAGNI, plan-handoff)
+break stack-control rules. The workflow then adds the mechanical layer: the
+exit-gate verifies required sections (structural, not judgment), and the
+transition fires the bookkeeping effects (link to node, journal, route to spec).
 
 **This already exists as a convention.** The `docs/superpowers/specs/*-design.md`
 family IS this artifact — `2026-06-08-roadmap-protocol-design.md` was the named
@@ -252,11 +284,14 @@ stackctl workflow advance design:feature/roadmap-protocol --apply
    (the `/frontend-design` rule, `feature-extend` re-design). v1 models the
    linear `planned → designing → specifying` case; re-entry to `designing` from
    a later phase is a real case to handle — captured here, not yet designed.
-8. **[RESOLVED] No new design skill.** The `designing` work surface is
-   `superpowers:brainstorming`, not a net-new `/stack-control:design`. The only
-   adaptation: redirect brainstorming's hardcoded `writing-plans` terminal state
-   to Spec Kit — and that routing lives in the `design-to-spec` *transition*, so
-   brainstorming stays workflow-agnostic.
+8. **`/stack-control:design` IS a new frontend skill — over a swappable backend.**
+   Not a from-scratch design tool, and not bare brainstorming either: an
+   opinionated frontend (the "stack-control way") that drives a backend (default
+   `superpowers:brainstorming`). Open sub-questions: (a) how does the frontend
+   *suppress the backend's YAGNI* in practice — a prepended instruction, a
+   wrapper prompt, a forked backend invocation? (b) what's the minimal backend
+   contract for capability-based selection? (c) does the frontend drive the
+   backend in-session (sub-agent / skill invocation) or shell out?
 9. **Deriving `designing` before the doc exists.** Brainstorming writes the
    `*-design.md` only at its END (step 6). So between entering `designing` and
    that write, there is no design record to derive on — the item would mis-derive
