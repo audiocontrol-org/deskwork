@@ -18,11 +18,17 @@
 import { readFileSync } from 'node:fs';
 import type { AuditUnit } from './audit-unit-types.js';
 
-/** `## Phase <id>: …` header grammar (verified present in every tasks.md). */
-const PHASE_HEADER_RE = /^##\s+Phase\s+([^:\n]+?)\s*:/;
+/**
+ * `## Phase <id>[<sep> <title>]` header grammar (US4 / TASK-71). The id is the
+ * digit-led token after `Phase`; the optional title may follow a colon, dash,
+ * en-dash, or em-dash separator — or nothing at all. A colon appearing inside the
+ * TITLE never splits the id (the id stops at the first non-`[0-9A-Za-z.]` char),
+ * and a digit-led id keeps a prose `## Phase notes` line from being selectable.
+ */
+const PHASE_HEADER_RE = /^##\s+Phase\s+([0-9][0-9A-Za-z.]*)\b.*$/;
 const TOP_HEADER_RE = /^##\s+/;
-/** A repo-relative path token (mirrors extract-barrage-findings' surface tokens). */
-const PATH_TOKEN_RE = /[A-Za-z0-9_./-]*\/[A-Za-z0-9_./-]+\.[a-z]{1,5}/g;
+/** Backticked path-like tokens from tasks prose; directories carry a slash. */
+const BACKTICK_TOKEN_RE = /`([^`\n]+)`/g;
 
 interface ParsedPhase {
   readonly phaseId: string;
@@ -47,9 +53,19 @@ export function parsePhases(tasksText: string): ParsedPhase[] {
         ? phases[idx + 1]!.start
         : nextTopHeaderOrEnd(lines, p.start + 1);
     const body = lines.slice(p.start + 1, end).join('\n');
-    const files = Array.from(new Set(body.match(PATH_TOKEN_RE) ?? []));
+    const files = Array.from(new Set(extractScopedPaths(body)));
     return { phaseId: p.phaseId, files };
   });
+}
+
+function extractScopedPaths(body: string): readonly string[] {
+  const matches: string[] = [];
+  for (const match of body.matchAll(BACKTICK_TOKEN_RE)) {
+    const token = match[1]?.trim();
+    if (token === undefined || !token.includes('/')) continue;
+    matches.push(token.replace(/\/+$/, ''));
+  }
+  return matches;
 }
 
 function nextTopHeaderOrEnd(lines: readonly string[], from: number): number {
@@ -61,7 +77,7 @@ function nextTopHeaderOrEnd(lines: readonly string[], from: number): number {
 
 export interface ResolvePhaseUnitArgs {
   readonly tasksPath: string;
-  /** A `## Phase N: …` header id (the trimmed token between `Phase` and `:`). */
+  /** A `## Phase N …` header id (the digit-led token after `Phase`, any separator). */
   readonly phaseId: string;
   /** The ref the phase's work started from. */
   readonly diffBase: string;
@@ -90,45 +106,88 @@ export function resolvePhaseUnit(args: ResolvePhaseUnitArgs): AuditUnit {
   };
 }
 
-/** One phase's convergence/change status, supplied by the composing caller. */
-export interface PhaseStatus {
-  readonly phaseId: string;
-  /** Did this phase's unit-audit already reach `converged`? */
-  readonly converged: boolean;
-  /** Has the phase's code changed since that convergence? */
-  readonly changed: boolean;
-}
+// NOTE: the whole-feature `after_implement` unit is composed EXCLUSION-side by the
+// govern command itself (specs/021 US1 true-composition): it carries converged +
+// unchanged phases by adding their files to the payload `excludePaths`, so the
+// audited scope is "the diff minus carried files" (re-audited phases + cross-cutting
+// code). The earlier inclusion-based `resolveComposingFeatureUnit` primitive was
+// removed (021 phase-2 audit AUDIT-BARRAGE-codex-01) — it returned an inclusion file
+// list the command discarded, and inclusion silently dropped cross-cutting code.
 
-export interface ResolveComposingFeatureUnitArgs {
-  readonly tasksPath: string;
-  readonly diffBase: string;
-  /** Per-phase convergence/change status (FR-008 composition inputs). */
-  readonly phases: readonly PhaseStatus[];
+/** One phase's composition input: its files and whether its checkpoint is current. */
+export interface PhaseCompositionStatus {
+  readonly files: readonly string[];
+  readonly current: boolean;
 }
 
 /**
- * Resolve the whole-feature `after_implement` unit by COMPOSITION (FR-008): its
- * `diffScope` EXCLUDES any phase whose code is unchanged since that phase's
- * unit-audit converged (carried), and INCLUDES changed phases (and any phase
- * with no recorded convergence — cross-cutting / never-audited code). The
- * composing pass is the final safety net, not a from-scratch re-audit.
+ * The files to CARRY (exclude from the whole-feature re-audit): those owned
+ * EXCLUSIVELY by current phases. A file named by BOTH a current phase and a
+ * missing/stale phase must NOT be carried — carrying it would hide the
+ * non-current phase's still-unaudited work on that shared file, producing a
+ * false-clean whole-feature gate (021 phase-7 audit AUDIT-BARRAGE-codex-01).
+ * Phase file ownership is NOT disjoint in practice (e.g. `govern.ts` belongs to
+ * several phases), so the exclusivity check is load-bearing, not defensive.
  */
-export function resolveComposingFeatureUnit(
-  args: ResolveComposingFeatureUnitArgs,
-): AuditUnit {
-  const parsed = parsePhases(readFileSync(args.tasksPath, 'utf8'));
-  const statusOf = new Map(args.phases.map((s) => [s.phaseId, s]));
-  const files: string[] = [];
-  for (const phase of parsed) {
-    const status = statusOf.get(phase.phaseId);
-    // Carry a phase ONLY when it converged AND is unchanged since; otherwise its
-    // code is changed or never-converged (cross-cutting) → re-audit it.
-    const carried = status !== undefined && status.converged && !status.changed;
-    if (!carried) files.push(...phase.files);
+export function carriedExclusivelyCurrentFiles(
+  phases: readonly PhaseCompositionStatus[],
+): readonly string[] {
+  const nonCurrent = phases.filter((p) => !p.current).flatMap((p) => p.files);
+  const carried = new Set<string>();
+  for (const phase of phases) {
+    if (!phase.current) continue;
+    for (const file of phase.files) {
+      // Shared ownership is PREFIX overlap in either direction, not just an exact
+      // string match (021 after_implement audit AUDIT-BARRAGE-codex-01): a current
+      // phase owning a directory `src/` must NOT carry it when a stale phase owns
+      // `src/foo.ts` under it (the carried `:(exclude)src/` pathspec would hide the
+      // stale file), and vice-versa.
+      if (!nonCurrent.some((other) => pathsOverlap(file, other))) carried.add(file);
+    }
   }
-  return {
-    granularity: 'feature',
-    diffScope: { base: args.diffBase, files: Array.from(new Set(files)) },
-    auditLogSection: 'after_implement',
-  };
+  return Array.from(carried);
+}
+
+/** One phase's composition input as seen from its durable checkpoint. */
+export interface PhaseCompositionInput {
+  readonly state: 'current' | 'missing' | 'stale';
+  /** The tasks.md-declared scope (may name DIRECTORIES). */
+  readonly declaredFiles: readonly string[];
+  /**
+   * The files the phase's audit ACTUALLY covered — recorded at checkpoint time as
+   * `git diff --name-only <phaseBase> -- <declaredScope>`. Absent on checkpoints
+   * written before TASK-129 (then the phase is conservatively re-audited).
+   */
+  readonly auditedFiles?: readonly string[];
+}
+
+/**
+ * The files to CARRY (exclude from the whole-feature re-audit), composed from
+ * durable checkpoints. TASK-129: a `current` phase contributes its ACTUAL audited
+ * files — NEVER its declared directory scope. So a cross-cutting file living under
+ * a current phase's declared directory but owned by no phase's audit is not in any
+ * `auditedFiles` set, is therefore not carried, and is re-audited. A current phase
+ * with no recorded `auditedFiles` (pre-TASK-129 checkpoint) carries nothing — the
+ * safe direction, self-healing on the next govern run. Non-current phases still
+ * contribute their DECLARED scope as a re-audit claim so a carried file overlapping
+ * a stale/missing phase is dropped (the 021 phase-7 shared-ownership protection).
+ */
+export function carriedFilesForComposition(
+  phases: readonly PhaseCompositionInput[],
+): readonly string[] {
+  return carriedExclusivelyCurrentFiles(
+    phases.map((phase) =>
+      phase.state === 'current'
+        ? { current: true, files: phase.auditedFiles ?? [] }
+        : { current: false, files: phase.declaredFiles },
+    ),
+  );
+}
+
+/** Two repo-relative paths overlap iff equal or one is a directory ancestor of
+ * the other (POSIX `/` separators; trailing slashes normalized away). */
+function pathsOverlap(a: string, b: string): boolean {
+  const x = a.replace(/\/+$/, '');
+  const y = b.replace(/\/+$/, '');
+  return x === y || x.startsWith(`${y}/`) || y.startsWith(`${x}/`);
 }

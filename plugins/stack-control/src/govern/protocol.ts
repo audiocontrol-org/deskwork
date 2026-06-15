@@ -34,14 +34,97 @@ import {
   parseIndexLaneStates,
 } from '../scope-discovery/audit-barrage/run-artifacts.js';
 import { completedNonConvergedAnnotation } from '../scope-discovery/audit-barrage/types.js';
+import { loadLaneCapabilities, type LaneCapabilityProfile } from './lane-capabilities.js';
+import { negotiateFleet } from './fleet-negotiation.js';
+import { assertBoundaryFits, BoundaryTooLargeError } from './phase-boundary-sizing.js';
 
 /** Thrown for any fail-loud protocol condition; carries a process exit code. */
+/**
+ * Machine-distinguishable terminal outcomes (specs/021 US5 / T028). Every govern
+ * EXECUTION exit — an invocation that resolves flags and attempts governance —
+ * emits exactly one `govern: terminal-outcome=<kind>` line so a consumer can tell
+ * the degraded states apart without fragile message-substring matching: a fleet
+ * that could not be negotiated, a phase whose payload exceeds the active
+ * envelope, a barrage that produced no covering family (outage), and a barrage
+ * that produced coverage but missed the cross-model floor are different failures
+ * with different recoveries. The `--help` / usage-info early return is NOT a
+ * governed run and deliberately emits no terminal-outcome (it does no work and
+ * has no outcome to report); that boundary is locked by a test.
+ *
+ * `boundary-too-large` (US2/FR-006) and `negotiation-failed` (US3/FR-008) live on
+ * two distinct axes and are both reachable (TASK-117 root-fix): `negotiateFleet`
+ * selects lanes on lane-health alone (availability / read-only enforcement /
+ * liveness / required-models floor), and `assertBoundaryFits` separately checks
+ * the rendered payload against the active fleet envelope. So a viable fleet whose
+ * envelope is overflowed by the actual rendered payload surfaces as
+ * `boundary-too-large`, while a fleet that cannot meet the health floor surfaces
+ * as `negotiation-failed` — the two terminals stay machine-distinguishable
+ * (SC-005).
+ */
+export type GovernTerminalKind =
+  | 'graduated'
+  | 'blocked'
+  | 'boundary-too-large'
+  | 'negotiation-failed'
+  | 'fleet-floor-shortfall'
+  | 'barrage-outage'
+  | 'payload-error'
+  | 'usage'
+  | 'fatal';
+
 export class GovernProtocolError extends Error {
   readonly exitCode: number;
-  constructor(message: string, exitCode = 2) {
+  readonly terminalKind: GovernTerminalKind;
+  constructor(message: string, exitCode = 2, terminalKind: GovernTerminalKind = 'fatal') {
     super(message);
     this.name = 'GovernProtocolError';
     this.exitCode = exitCode;
+    this.terminalKind = terminalKind;
+  }
+}
+
+/**
+ * Load lane capabilities, routing fleet-knowledge read + binary-probe failures
+ * onto the governed FATAL channel. `loadLaneCapabilities()` raises plain `Error`s
+ * (missing fleet-knowledge.yaml, probe-infrastructure failure); govern's outer
+ * catch only converts `GovernProtocolError` / `GovernPayloadError`, so an
+ * unwrapped throw escapes as an uncaught exception instead of the actionable
+ * `govern: FATAL —` surface (AUDIT-BARRAGE-codex-01). Both lane-loading call
+ * sites (implement-mode preflight + the spec/loop path) go through here.
+ */
+/**
+ * Test-only availability seam (mirrors the `GOVERN_BARRAGE_BIN` barrage stub).
+ * `GOVERN_FLEET_AVAILABLE` lets a hermetic test mark lane binaries available
+ * WITHOUT the real `which <binary>` PATH probe — so a CLI-less environment (CI)
+ * can exercise govern's downstream behavior instead of short-circuiting to
+ * `negotiation-failed`. `*` (or `all`) → every binary available; otherwise a
+ * comma-separated list of binary names to treat as available. Unset (the
+ * production default) → the real PATH probe via `binaryExistsOnPath`.
+ */
+function fleetAvailabilityProbeFromEnv(): ((binary: string) => boolean) | undefined {
+  const raw = process.env.GOVERN_FLEET_AVAILABLE;
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const spec = raw.trim();
+  if (spec === '*' || spec === 'all') return () => true;
+  const allowed = new Set(
+    spec
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+  );
+  return (binary: string) => allowed.has(binary);
+}
+
+export async function loadLaneCapabilitiesGoverned(
+  installationRoot: string,
+): Promise<readonly LaneCapabilityProfile[]> {
+  try {
+    return await loadLaneCapabilities(installationRoot, fleetAvailabilityProbeFromEnv());
+  } catch (err) {
+    if (err instanceof GovernProtocolError) throw err;
+    throw new GovernProtocolError(
+      `govern: FATAL — ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 }
 
@@ -186,10 +269,12 @@ export interface RunProtocolArgs {
   readonly stackctl: string;
   /** The barrage entrypoint (GOVERN_BARRAGE_BIN seam) — render/barrage/lift. */
   readonly barrageBin: string;
-  readonly repoRoot: string;
+  /** Authoritative installation anchor for this govern run. */
+  readonly installationRoot: string;
   readonly slug: string;
   readonly checkpoint: string;
   readonly vars: BarrageVars;
+  readonly laneCapabilities?: readonly LaneCapabilityProfile[] | undefined;
   readonly models?: string | undefined;
   /**
    * Minimum emitting models passed to the barrage as
@@ -224,7 +309,7 @@ export interface ProtocolResult {
  * the contract as a named type keeps "who drives the loop" (the driver) separate
  * from "what one pass does" (this function) without changing the pass itself.
  */
-export type ProtocolStep = () => ProtocolResult;
+export type ProtocolStep = () => Promise<ProtocolResult>;
 
 function spawnText(
   bin: string,
@@ -249,7 +334,7 @@ function spawnText(
  * in implement mode from `subcommands/govern.ts` (see govern/clone-step.ts),
  * before this gate chain — it is advisory and does not affect the gate verdict.
  */
-export function runProtocol(args: RunProtocolArgs): ProtocolResult {
+export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult> {
   const work = mkdtempSync(join(tmpdir(), 'govern.'));
   try {
     const varsPath = join(work, 'vars.json');
@@ -277,30 +362,62 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       '--output',
       promptPath,
       '--repo-root',
-      args.repoRoot,
+      args.installationRoot,
     ]);
     if (render.status !== 0) {
       throw new GovernProtocolError(
         `govern: FATAL — audit-barrage-render failed (exit ${render.status}): ${render.stderr.trim()}`,
       );
     }
+    const renderedPromptBytes = readFileSync(promptPath).byteLength;
+    const laneCapabilities = selectRequestedLaneCapabilities(
+      args.laneCapabilities ?? (await loadLaneCapabilitiesGoverned(args.installationRoot)),
+      args.models,
+    );
+    const negotiatedFleet = negotiateFleet(laneCapabilities, args.requireModels ?? 1);
+    if (negotiatedFleet.disposition !== 'accepted') {
+      throw new GovernProtocolError(
+        `govern: FATAL — fleet negotiation failed: ` +
+          `accepted ${negotiatedFleet.acceptedFleet.length}/${args.requireModels ?? 1} viable lane(s) ` +
+          `(availability / read-only enforcement / liveness). ` +
+          `Rejected lanes: ${negotiatedFleet.rejectedLanes.join(', ') || 'none'}.`,
+        2,
+        'negotiation-failed',
+      );
+    }
+    const activeEnvelope = Math.min(
+      ...laneCapabilities
+        .filter((lane) => negotiatedFleet.acceptedFleet.includes(lane.name))
+        .map((lane) => lane.envelope.maxPromptBytes),
+    );
+    try {
+      assertBoundaryFits(args.checkpoint, renderedPromptBytes, activeEnvelope);
+    } catch (err) {
+      if (err instanceof BoundaryTooLargeError) {
+        throw new GovernProtocolError(
+          `govern: FATAL — boundary-too-large: ${err.message}`,
+          2,
+          'boundary-too-large',
+        );
+      }
+      throw err;
+    }
 
     // --- barrage (barrage bin); tag the run-dir label with the checkpoint so
     // the gate can scope per-checkpoint (AUDIT-20260607-05). The lift + slush +
     // gate keep the bare slug for audit-log resolution. ---
-    const barrageArgs = [
+    const barrageArgs: string[] = [
       'audit-barrage',
       '--feature',
       `${args.slug}-${args.checkpoint}`,
       '--prompt-file',
       promptPath,
       '--at',
-      args.repoRoot,
+      args.installationRoot,
       '--output-run-dir',
+      '--models',
+      negotiatedFleet.acceptedFleet.join(','),
     ];
-    if (args.models !== undefined && args.models.length > 0) {
-      barrageArgs.push('--models', args.models);
-    }
     if (args.requireModels !== undefined) {
       barrageArgs.push('--require-models', String(args.requireModels));
     }
@@ -311,10 +428,22 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
     // stderr names which (OUTAGE summary vs FLOOR SHORTFALL line).
     if (barrage.status !== 0) {
       const barrageNote = barrage.stderr.trim();
+      // T028 (US5): split the bundled terminal into two machine-distinguishable
+      // kinds. A FLOOR SHORTFALL means the barrage produced coverage but fewer
+      // emitting families than the cross-model floor demands (recovery: widen the
+      // fleet / lower --require-models); an OUTAGE means zero covering families
+      // (recovery: the model CLIs are missing/unreachable). Match the barrage's
+      // OWN diagnostic LINE — `audit-barrage: FLOOR SHORTFALL — …` — anchored to a
+      // line start, not a blob substring, so incidental stderr text (echoed
+      // prompts, prior findings, command traces) can't misclassify an outage
+      // (AUDIT-BARRAGE-codex-02).
+      const isFloorShortfall = /^audit-barrage: FLOOR SHORTFALL\b/m.test(barrageNote);
       throw new GovernProtocolError(
-        `govern: FATAL — audit-barrage OUTAGE or fleet-floor shortfall (exit ${barrage.status}). ` +
+        `govern: FATAL — ${isFloorShortfall ? 'fleet-floor shortfall' : 'audit-barrage OUTAGE'} (exit ${barrage.status}). ` +
           'The work is NOT recorded as governed (FR-005). Check that the configured model-family CLIs are installed and reachable.' +
           (barrageNote.length > 0 ? `\n${barrageNote}` : ''),
+        2,
+        isFloorShortfall ? 'fleet-floor-shortfall' : 'barrage-outage',
       );
     }
     const runDir = barrage.stdout.trim();
@@ -331,7 +460,7 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       '--run-dir',
       runDir,
       '--at',
-      args.repoRoot,
+      args.installationRoot,
       '--apply',
     ]);
     if (lift.status !== 0) {
@@ -356,7 +485,7 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
         '--feature',
         args.slug,
         '--at',
-        args.repoRoot,
+        args.installationRoot,
         '--checkpoint',
         args.checkpoint,
         '--scope',
@@ -378,7 +507,7 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
       '--feature',
       args.slug,
       '--repo-root',
-      args.repoRoot,
+      args.installationRoot,
       '--checkpoint',
       args.checkpoint,
     ];
@@ -400,4 +529,28 @@ export function runProtocol(args: RunProtocolArgs): ProtocolResult {
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
+}
+
+export function selectRequestedLaneCapabilities(
+  lanes: readonly LaneCapabilityProfile[],
+  requestedModels: string | undefined,
+): readonly LaneCapabilityProfile[] {
+  if (requestedModels === undefined || requestedModels.trim().length === 0) {
+    return lanes;
+  }
+  const requested = requestedModels
+    .split(',')
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0);
+  if (requested.length === 0) {
+    throw new GovernProtocolError('govern: FATAL — GOVERN_MODELS/--models resolved to zero lane names.');
+  }
+  const selected = lanes.filter((lane) => requested.includes(lane.name));
+  const missing = requested.filter((name) => !selected.some((lane) => lane.name === name));
+  if (missing.length > 0) {
+    throw new GovernProtocolError(
+      `govern: FATAL — requested lane(s) not configured: ${missing.join(', ')}`,
+    );
+  }
+  return selected;
 }

@@ -3,13 +3,22 @@
 # Overrides the plugin default at:
 #   plugins/stack-control/templates/audit-barrage-config.yaml
 #
-# Migrated to config grammar v2 (specs/014-audit-barrage-reliability):
-# explicit model pins (FR-001), mechanical read-only enforcement fragments
-# (FR-003/FR-004; hostile-probe verified via
-# plugins/stack-control/scripts/probe-readonly-spawn.sh), measured liveness
-# signals (FR-008/FR-009), and payload-derived timeouts (FR-002 — the fix for
-# the 2026-06-10 design-control incident: 17 consecutive claude runs SIGTERMed
-# at a guessed 600 s cap while the prompt had outgrown it).
+# This installation pins an explicit two-lane Codex-only fleet:
+#   - codex / gpt-5.5
+#   - codex-gpt5 / gpt-5.4
+#
+# Rationale:
+# - governance here currently avoids the local Claude lanes entirely because the
+#   Codex pair is the operator-selected durable policy for this installation.
+# - a durable local override is the right surface for that policy; the shipped
+#   template stays unchanged.
+# - the second Codex/OpenAI lane is the current substitute for the disabled
+#   Claude lanes so the barrage still has two independently-pinned lanes.
+# - IMPORTANT: this is still a same-family fleet, so 2-of-2 agreement here is
+#   weaker evidence than a cross-family barrage. Treat it as an operational
+#   temporary policy, not the ideal steady-state signal.
+# - the explicit timeout overrides are retained from the design-control
+#   configuration that has already been usable in practice.
 #
 # Disabled gemini effective 2026-06-01 — gemini-cli was failing 94.1% of runs
 # (16 of 17 across the graphical-entries Phase 0 audit cycle) on two cascading
@@ -22,28 +31,7 @@
 # the lane passes the hostile write-probe (it then runs loudly marked
 # write-unenforced), and pin the model explicitly.
 #
-# Thoroughness: the claude lane below currently runs the template default
-# (`model: opus` / `timeout_secs_per_kb: 13`). A more-thorough profile is
-# AVAILABLE but NOT applied here: the operator may edit the lane to
-# `model: fable` with `timeout_secs_per_kb: 17` (2026-06-10 calibration) to
-# trade latency for maximum thoroughness.
-#
-# Fleet (2026-06-12): three lanes — claude(opus), codex(gpt-5.5), and sonnet
-# (claude-sonnet-4-6, promoted per specs/015 US5). NOTE that opus + sonnet are the
-# same vendor (see the sonnet lane comment below): a same-family quorum is weaker
-# evidence than a cross-vendor (opus+codex) one.
-
 models:
-  - name: claude
-    binary: claude
-    model: opus
-    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
-    readonly_enforcement: "--permission-mode plan"
-    output_mode: stream-json
-    liveness_signal: stdout
-    liveness_window_seconds: 60
-    timeout_floor_seconds: 300
-    timeout_secs_per_kb: 13
   - name: codex
     binary: codex
     model: gpt-5.5
@@ -52,27 +40,14 @@ models:
     output_mode: text
     liveness_signal: stderr
     liveness_window_seconds: 60
-    timeout_floor_seconds: 300
-    timeout_secs_per_kb: 7
-  # sonnet — promoted to the default fleet 2026-06-12 (specs/015 US5 / FR-011;
-  # live calibration in specs/015-audit-protocol-convergence/quickstart-results.md).
-  # Added to deskwork's own dogfood override to match the shipped template promotion.
-  # IMPORTANT (AUDIT-BARRAGE-claude-02): opus + sonnet are SAME-VENDOR (Anthropic,
-  # shared architecture lineage + training + RLHF), so their failure modes are
-  # CORRELATED. An opus+sonnet concurrence is therefore a REACHABILITY fallback when
-  # codex is down — NOT the genuine cross-vendor genetic-diversity signal the barrage
-  # is built on (`.claude/rules/agent-discipline.md`: "genetic diversity in failure
-  # modes"). Treat a same-family 2-of-2 agreement as WEAKER evidence than an
-  # opus+codex one; restore a non-Anthropic lane (codex) for real cross-model
-  # agreement. (Open follow-up: tag quorum by vendor-family so the fleet surface
-  # distinguishes same-family from cross-vendor concurrence.)
-  - name: sonnet
-    binary: claude
-    model: claude-sonnet-4-6
-    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
-    readonly_enforcement: "--permission-mode plan"
-    output_mode: stream-json
-    liveness_signal: stdout
+    timeout_seconds: 600
+
+  - name: codex-gpt5
+    binary: codex
+    model: gpt-5.4
+    args_template: "exec -m {{model}} --sandbox read-only {{prompt-stdin}}"
+    readonly_enforcement: "--sandbox read-only"
+    output_mode: text
+    liveness_signal: stderr
     liveness_window_seconds: 60
-    timeout_floor_seconds: 300
-    timeout_secs_per_kb: 13
+    timeout_seconds: 600

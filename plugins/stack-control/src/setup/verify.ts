@@ -41,6 +41,8 @@ export function verifyKey(
         return verifyBacklog(resolved.backlog);
       case 'auditLog':
         return verifyAuditLog(resolved.auditLog);
+      case 'fleetKnowledge':
+        return verifyFleetKnowledge(resolved.fleetKnowledge);
     }
   } catch (err) {
     return { ok: false, detail: errorMessage(err) };
@@ -68,6 +70,17 @@ function verifyAuditLog(path: string): VerifyOutcome {
     .find((l) => l !== '') ?? '';
   if (!firstNonEmpty.startsWith('# Audit Log')) {
     return { ok: false, detail: `audit log missing the '# Audit Log' header: ${path}` };
+  }
+  return { ok: true };
+}
+
+function verifyFleetKnowledge(path: string): VerifyOutcome {
+  if (!existsSync(path)) {
+    return { ok: false, detail: `fleet knowledge missing: ${path}` };
+  }
+  const text = readFileSync(path, 'utf8');
+  if (!text.includes('lanes:')) {
+    return { ok: false, detail: `fleet knowledge missing 'lanes:' root: ${path}` };
   }
   return { ok: true };
 }

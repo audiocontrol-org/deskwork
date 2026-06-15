@@ -21,6 +21,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveTsx, CLI } from './_run-helpers.js';
+import { seedDefaultFleetKnowledge } from './_isolation-harness.js';
 import { tmpBacklog } from '../../tests/backlog/helpers.js';
 import { parseFlags as parseBarrageFlags } from '../subcommands/audit-barrage.js';
 
@@ -77,6 +78,7 @@ function makeRepo(slug: string): string {
   // the enclosing installation from --at.
   mkdirSync(join(repo, '.stack-control'), { recursive: true });
   writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
+  seedDefaultFleetKnowledge(repo);
   const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'audit-log.md'), `# Audit Log — ${slug}\n`, 'utf8');
@@ -86,7 +88,10 @@ function makeRepo(slug: string): string {
 function runGovern(args: string[], env: Record<string, string>) {
   return spawnSync(resolveTsx(), [CLI, 'govern', ...args], {
     encoding: 'utf8',
-    env: { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog(), ...env },
+    // Hermetic fleet: mark lanes available so a CLI-less env (CI) reaches the
+    // stubbed barrage (and records the --require-models argv) instead of
+    // short-circuiting on the lane-availability probe. See TASK-132.
+    env: { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog(), GOVERN_FLEET_AVAILABLE: '*', ...env },
   });
 }
 

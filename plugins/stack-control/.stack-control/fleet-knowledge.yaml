@@ -1,0 +1,5 @@
+lanes:
+  - name: codex
+    max_prompt_bytes: 98304
+  - name: codex-gpt5
+    max_prompt_bytes: 98304

@@ -47,6 +47,33 @@ export interface NestedFixture {
 /** Minimal valid installation config — the marker the resolver walks to. */
 export const MINIMAL_INSTALLATION_CONFIG = 'version: 1\n';
 
+/**
+ * Default-lane fleet knowledge, as `stackctl setup` seeds it. The govern
+ * fleet-negotiation preflight requires this file (no bundled-template fallback —
+ * AUDIT-BARRAGE-codex-01), so any fixture that drives govern past negotiation must
+ * carry it. Lanes match the default barrage config (claude/codex/sonnet).
+ */
+export const DEFAULT_FLEET_KNOWLEDGE_YAML = [
+  'lanes:',
+  '  - name: claude',
+  '    max_prompt_bytes: 65536',
+  '  - name: codex',
+  '    max_prompt_bytes: 24576',
+  '  - name: sonnet',
+  '    max_prompt_bytes: 32768',
+  '',
+].join('\n');
+
+/** Seed `<installationRoot>/.stack-control/fleet-knowledge.yaml` with the default lanes. */
+export function seedDefaultFleetKnowledge(installationRoot: string): void {
+  mkdirSync(join(installationRoot, '.stack-control'), { recursive: true });
+  writeFileSync(
+    join(installationRoot, '.stack-control', 'fleet-knowledge.yaml'),
+    DEFAULT_FLEET_KNOWLEDGE_YAML,
+    'utf8',
+  );
+}
+
 export function gitIn(cwd: string, args: readonly string[]): void {
   const r = spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' });
   if (r.status !== 0) {
@@ -81,10 +108,16 @@ export function makeNestedFixture(opts?: {
     MINIMAL_INSTALLATION_CONFIG,
     'utf8',
   );
+  seedDefaultFleetKnowledge(installationRoot);
 
   gitIn(outerRoot, ['init', '-q']);
   gitIn(outerRoot, ['config', 'user.email', 'probe@example.invalid']);
   gitIn(outerRoot, ['config', 'user.name', 'isolation-probe']);
+  // Hermetic fixtures: throwaway tmpdir repos must NOT sign — a global
+  // `commit.gpgsign=true` (operator setup) would otherwise make these fixtures
+  // depend on an unlocked gpg key and fail in any keyless CI environment.
+  gitIn(outerRoot, ['config', 'commit.gpgsign', 'false']);
+  gitIn(outerRoot, ['config', 'tag.gpgsign', 'false']);
   writeFileSync(join(outerRoot, 'README.md'), 'outer fixture repo\n', 'utf8');
   gitIn(outerRoot, ['add', '.']);
   gitIn(outerRoot, ['commit', '-q', '-m', 'seed']);
@@ -120,6 +153,11 @@ export function makeMarkerlessFixture(): NestedFixture {
   gitIn(outerRoot, ['init', '-q']);
   gitIn(outerRoot, ['config', 'user.email', 'probe@example.invalid']);
   gitIn(outerRoot, ['config', 'user.name', 'isolation-probe']);
+  // Hermetic fixtures: throwaway tmpdir repos must NOT sign — a global
+  // `commit.gpgsign=true` (operator setup) would otherwise make these fixtures
+  // depend on an unlocked gpg key and fail in any keyless CI environment.
+  gitIn(outerRoot, ['config', 'commit.gpgsign', 'false']);
+  gitIn(outerRoot, ['config', 'tag.gpgsign', 'false']);
   writeFileSync(join(outerRoot, 'README.md'), 'marker-less fixture repo\n', 'utf8');
   gitIn(outerRoot, ['add', '.']);
   gitIn(outerRoot, ['commit', '-q', '-m', 'seed']);

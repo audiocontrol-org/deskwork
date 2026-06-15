@@ -269,10 +269,15 @@ export function assembleImplementPayload(
           ...excludePathRels.map((rel) => `:(exclude)${rel}`),
         ]
       : [];
+  // `--find-renames` forces rename detection regardless of the operator's
+  // `diff.renames` git config (specs/021 T026 / TASK-47): a tree-move pairs as a
+  // rename (small payload) instead of a full delete + full add (the same content
+  // shipped twice, bloating the payload past model context). The pairing only
+  // binds renames whose BOTH endpoints fall inside the scoped/`--relative` arm.
   const diffArgs =
     includeTokens.length > 0 || excludeTokens.length > 0
-      ? ['diff', '--relative', base, '--', ...includeTokens, ...excludeTokens]
-      : ['diff', '--relative', base];
+      ? ['diff', '--relative', '--find-renames', base, '--', ...includeTokens, ...excludeTokens]
+      : ['diff', '--relative', '--find-renames', base];
   let diff = git(installationRoot, diffArgs);
   const committedDiffEmpty = diff.trim().length === 0;
 
@@ -527,6 +532,7 @@ function assembleCrossTreeFeatureArm(args: {
       '-C',
       toplevel,
       'diff',
+      '--find-renames',
       base,
       '--',
       featureRelTop,

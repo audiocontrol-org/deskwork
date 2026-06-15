@@ -11,6 +11,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, rmSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveTsx, CLI } from './_run-helpers.js';
+import { seedDefaultFleetKnowledge } from './_isolation-harness.js';
 import { tmpBacklog } from '../../tests/backlog/helpers.js';
 
 // A fake barrage bin that satisfies the render/barrage/lift verbs the protocol
@@ -74,6 +75,7 @@ function makeRepo(slug: string): string {
   // via the marker walk-up from the threaded --at start dir.
   mkdirSync(join(repo, '.stack-control'), { recursive: true });
   writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
+  seedDefaultFleetKnowledge(repo);
   const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
   mkdirSync(dir, { recursive: true });
   // Seed an audit-log so lift/slush/gate can resolve it.
@@ -86,7 +88,10 @@ function runGovern(args: string[], env: Record<string, string>) {
     encoding: 'utf8',
     // Isolate the backlog destination of govern's slush step (008 rewire) to a
     // fresh tmp dir so no govern test ever writes the committed dogfood pile.
-    env: { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog(), ...env },
+    // Hermetic fleet: mark lanes available so a CLI-less env (CI) reaches the
+    // stubbed barrage instead of short-circuiting on the lane-availability probe
+    // (negotiation-failed). See TASK-132.
+    env: { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog(), GOVERN_FLEET_AVAILABLE: '*', ...env },
   });
 }
 

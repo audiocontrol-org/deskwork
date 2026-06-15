@@ -12,7 +12,9 @@
  * Env parity (preserved for the shims; flags win over env when both are set):
  *   GOVERN_FEATURE_SLUG, GOVERN_DIFF_BASE, GOVERN_SPEC_PATH, GOVERN_PLAN_PATH,
  *   GOVERN_CHECKPOINT, GOVERN_CEILING, GOVERN_OVERRIDE, GOVERN_MODELS,
- *   GOVERN_BARRAGE_BIN (test stub), GOVERN_NO_SLUSH, GOVERN_PAYLOAD_BUDGET.
+ *   GOVERN_BARRAGE_BIN (test stub), GOVERN_NO_SLUSH, GOVERN_PAYLOAD_BUDGET,
+ *   GOVERN_FLEET_AVAILABLE (test stub: bypass the real `which` lane-availability
+ *   probe so a CLI-less environment can exercise downstream govern behavior).
  *   GOVERN_REPO_ROOT is RETIRED (specs/installation-isolation R2): setting it
  *   is a loud FATAL naming the --at replacement — never a silent no-op.
  *
@@ -27,15 +29,17 @@
  */
 
 import { existsSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   GovernProtocolError,
   assertBarrageBinPresent,
   currentBranch,
+  loadLaneCapabilitiesGoverned,
   resolveSlug,
   runProtocol,
   type BarrageVars,
+  type GovernTerminalKind,
 } from '../govern/protocol.js';
 import {
   assembleImplementPayload,
@@ -50,10 +54,15 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
-import { resolvePhaseUnit } from '../govern/incremental-audit.js';
+import {
+  carriedFilesForComposition,
+  parsePhases,
+  resolvePhaseUnit,
+} from '../govern/incremental-audit.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import {
   discoverFeatureRoots,
   resolveFeatureRoot,
@@ -62,6 +71,15 @@ import { resolveInstallation } from '../config/installation.js';
 import type { Installation } from '../config/types.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
+import {
+  computeScopeFingerprint,
+  isCheckpointFresh,
+  readPhaseCheckpoint,
+  writePhaseCheckpoint,
+} from '../govern/checkpoint-state.js';
+import { type LaneCapabilityProfile } from '../govern/lane-capabilities.js';
+import { negotiateFleet } from '../govern/fleet-negotiation.js';
+import { selectRequestedLaneCapabilities } from '../govern/protocol.js';
 
 /**
  * specs/015 US2 (FR-004): the per-invocation convergence ceiling govern hands the
@@ -305,9 +323,8 @@ export function buildImplementVars(
     ...(budgetEnv !== undefined && budgetEnv.length > 0
       ? { budgetBytes: Number.parseInt(budgetEnv, 10) }
       : {}),
-    // specs/015 (FR-006/D7): bound the untracked fold to the audit unit's path
-    // scope so unrelated parked-feature scaffolds are excluded. Empty/undefined
-    // for a whole-feature unit (folds all untracked — pre-015 behavior).
+    // specs/015 (FR-006/D7): bound the fold to the audit unit's explicit path
+    // scope when one exists; otherwise keep the whole-feature pre-015 behavior.
     ...(pathScope !== undefined && pathScope.length > 0 ? { pathScope } : {}),
   });
   if (payload.empty) {
@@ -354,10 +371,174 @@ export function buildImplementVars(
  */
 function resolveGovernExcludePaths(installation: Installation): readonly string[] {
   const seam = process.env.STACKCTL_BACKLOG_DIR;
-  if (seam !== undefined && seam !== '') {
-    return [join(seam, 'backlog')];
+  const excludes = [
+    seam !== undefined && seam !== ''
+      ? join(seam, 'backlog')
+      : join(dirname(installation.resolved.backlog), 'backlog'),
+    join(installation.root, '.stack-control', 'govern', 'phase-checkpoints'),
+    // T029 / TASK-57: the barrage's own run artifacts are control-plane noise.
+    // Folding them re-feeds prior rounds' prompts + findings to the fleet, so the
+    // payload compounds recursively each round. Exclude as defense-in-depth —
+    // independent of whether the installation gitignores the dir.
+    join(installation.root, '.stack-control', 'audit-runs'),
+  ];
+  return excludes;
+}
+
+interface PhaseCheckpointStatus {
+  readonly phaseId: string;
+  /** The tasks.md-declared scope (may name directories) — used for freshness. */
+  readonly files: readonly string[];
+  /** The files the recorded checkpoint actually audited (TASK-129); undefined
+   * when no record exists or a pre-TASK-129 checkpoint omitted them. */
+  readonly auditedFiles: readonly string[] | undefined;
+  readonly scopeFingerprint: string;
+  readonly state: 'current' | 'missing' | 'stale';
+}
+
+function normalizeGovernedPaths(
+  installationRoot: string,
+  paths: readonly string[],
+): readonly string[] {
+  const top = deriveDistinctGitToplevel(installationRoot);
+  const installationRel =
+    top !== null ? relative(top, installationRoot).split('\\').join('/') : null;
+  return Array.from(
+    new Set(
+      paths.map((path) => {
+        const normalized = path.split('\\').join('/');
+        if (existsSync(join(installationRoot, normalized))) {
+          return normalized;
+        }
+        if (
+          installationRel !== null &&
+          installationRel.length > 0 &&
+          (normalized === installationRel || normalized.startsWith(`${installationRel}/`))
+        ) {
+          return normalized.slice(installationRel.length + 1);
+        }
+        return normalized;
+      }),
+    ),
+  );
+}
+
+function resolvePhaseCheckpointStatuses(
+  installationRoot: string,
+  slug: string,
+  tasksPath: string,
+): readonly PhaseCheckpointStatus[] {
+  return parsePhases(readFileSync(tasksPath, 'utf8')).map((phase) => {
+    const governedPaths = normalizeGovernedPaths(installationRoot, phase.files);
+    if (governedPaths.length === 0) {
+      throw new Error(
+        `phase '${phase.phaseId}' in ${tasksPath} has no governed file list; ` +
+          'a phase checkpoint cannot be scoped to an empty path set ' +
+          '(add the phase\'s authoritative files to tasks.md)',
+      );
+    }
+    const scopeFingerprint = computeScopeFingerprint(installationRoot, governedPaths);
+    const record = readPhaseCheckpoint(installationRoot, slug, phase.phaseId);
+    if (record === null) {
+      return {
+        phaseId: phase.phaseId,
+        files: governedPaths,
+        auditedFiles: undefined,
+        scopeFingerprint,
+        state: 'missing',
+      };
+    }
+    return {
+      phaseId: phase.phaseId,
+      files: governedPaths,
+      auditedFiles: record.auditedFiles,
+      scopeFingerprint,
+      state: isCheckpointFresh(record, {
+        version: 1,
+        checkpoint: `phase-${phase.phaseId}`,
+        auditLogSection: `phase-${phase.phaseId}`,
+        scopeFingerprint,
+      })
+        ? 'current'
+        : 'stale',
+    };
+  });
+}
+
+/**
+ * The files a phase's audit ACTUALLY covered: `git diff --name-only <base> --
+ * <declaredScope>`. Recorded in the checkpoint so whole-feature composition carries
+ * these exact files instead of the declared (possibly directory) scope — closing
+ * the TASK-129 cross-cutting blind spot. Fails loud on a git error (the audit it
+ * follows already ran git successfully, so a failure here is a real anomaly, not a
+ * fallback case).
+ */
+function resolveAuditedFiles(
+  repoRoot: string,
+  base: string,
+  declaredScope: readonly string[],
+): readonly string[] {
+  const r = spawnSync('git', ['-C', repoRoot, 'diff', '--name-only', base, '--', ...declaredScope], {
+    encoding: 'utf8',
+  });
+  if (r.status !== 0 || typeof r.stdout !== 'string') {
+    throw new GovernProtocolError(
+      `govern: FATAL — could not resolve audited files via 'git diff --name-only ${base}' ` +
+        `(exit ${r.status ?? 'null'}): ${(r.stderr ?? '').toString().trim()}`,
+    );
   }
-  return [join(dirname(installation.resolved.backlog), 'backlog')];
+  return r.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+function renderCheckpointRequirements(statuses: readonly PhaseCheckpointStatus[]): string {
+  return statuses.map((status) => `${status.state} phase-${status.phaseId}`).join(', ');
+}
+
+function assertPriorPhaseCheckpointsCurrent(
+  statuses: readonly PhaseCheckpointStatus[],
+  phaseId: string,
+): void {
+  const phaseIndex = statuses.findIndex((status) => status.phaseId === phaseId);
+  if (phaseIndex < 0) return;
+  const unmet = statuses.slice(0, phaseIndex).filter((status) => status.state !== 'current');
+  if (unmet.length > 0) {
+    throw new GovernProtocolError(
+      `govern: FATAL — phase '${phaseId}' cannot advance until earlier required checkpoints are current: ${renderCheckpointRequirements(unmet)}.`,
+    );
+  }
+}
+
+function preflightNegotiatedFleet(
+  laneCapabilities: readonly LaneCapabilityProfile[],
+  requestedModels: string | undefined,
+  requireModels: number,
+): readonly LaneCapabilityProfile[] {
+  const selected = selectRequestedLaneCapabilities(laneCapabilities, requestedModels);
+  const negotiation = negotiateFleet(selected, requireModels);
+  if (negotiation.disposition !== 'accepted') {
+    throw new GovernProtocolError(
+      `govern: FATAL — fleet negotiation failed before payload assembly; ` +
+        `accepted ${negotiation.acceptedFleet.length}/${requireModels} viable lane(s). ` +
+        `Rejected lanes: ${negotiation.rejectedLanes.join(', ') || 'none'}.`,
+      2,
+      'negotiation-failed',
+    );
+  }
+  return selected;
+}
+
+async function resolveGovernFeatureRoot(
+  repoRoot: string,
+  slug: string,
+): Promise<Awaited<ReturnType<typeof resolveFeatureRoot>>> {
+  try {
+    return await resolveFeatureRoot({ repoRoot, slug });
+  } catch (err) {
+    throw new GovernProtocolError(`govern: FATAL — ${errorMessage(err)}`);
+  }
 }
 
 export function buildSpecVars(
@@ -394,19 +575,37 @@ export function buildSpecVars(
   return { vars, checkpoint: payload.checkpoint, skippedOutOfScope: [] };
 }
 
+/**
+ * Emit the single machine-readable terminal line (T028 / US5 — AUDIT-BARRAGE-codex-01,
+ * 021 phase-2 cross-model finding). Every govern EXECUTION exit routes through
+ * here so a consumer keying on `govern: terminal-outcome=<kind>` sees exactly one
+ * line — the pre-try usage/preflight `process.exit(2)` paths, the gated
+ * success/blocked exits, and the unexpected-exception fallthrough. The `--help`
+ * early return below is the ONE deliberate non-emitter (it does no governance
+ * work, so it has no outcome to report).
+ */
+function emitTerminalOutcome(kind: GovernTerminalKind): void {
+  process.stderr.write(`govern: terminal-outcome=${kind}\n`);
+}
+
 export async function runGovern(args: string[]): Promise<void> {
   const parsed = parseFlags(args);
   if (parsed.ok && parsed.flags.help) {
+    // Usage-info early return — NOT a governed run, so no terminal-outcome by
+    // design (the "every exit" contract is scoped to execution exits; locked by
+    // the `--help emits no terminal-outcome` test).
     process.stdout.write(`${USAGE}\n`);
     return;
   }
   if (!parsed.ok) {
     process.stderr.write(`govern: ${parsed.error}\n${USAGE}\n`);
+    emitTerminalOutcome('usage');
     process.exit(2);
   }
   const flags = parsed.flags;
   if (flags.mode === undefined) {
     process.stderr.write(`govern: --mode <implement|spec> is required\n${USAGE}\n`);
+    emitTerminalOutcome('usage');
     process.exit(2);
   }
 
@@ -421,6 +620,7 @@ export async function runGovern(args: string[]): Promise<void> {
       process.stderr.write(
         `govern: --require-models requires a positive integer, got '${flags.requireModels}'\n${USAGE}\n`,
       );
+      emitTerminalOutcome('usage');
       process.exit(2);
     }
     requireModels = n;
@@ -435,6 +635,7 @@ export async function runGovern(args: string[]): Promise<void> {
       'govern: FATAL — GOVERN_REPO_ROOT is retired (specs/installation-isolation R2); ' +
         'use --at <dir> to name the installation enclosing <dir> explicitly.\n',
     );
+    emitTerminalOutcome('fatal');
     process.exit(2);
   }
 
@@ -447,6 +648,7 @@ export async function runGovern(args: string[]): Promise<void> {
     installation = resolveInstallation(flags.at ?? process.cwd());
   } catch (err) {
     process.stderr.write(`govern: FATAL — ${errorMessage(err)}\n`);
+    emitTerminalOutcome('fatal');
     process.exit(2);
   }
 
@@ -466,9 +668,25 @@ export async function runGovern(args: string[]): Promise<void> {
     // smaller payload. Resolve the phase unit from the feature's tasks.md, scope
     // the untracked fold + committed diff to the phase's files, and run the loop
     // under the per-phase checkpoint (`phase-<id>`). `--phase` is implement only.
+    const requestedModels = pick(undefined, process.env.GOVERN_MODELS);
+    const laneCapabilities =
+      flags.mode === 'implement'
+        ? preflightNegotiatedFleet(
+            await loadLaneCapabilitiesGoverned(repoRoot),
+            requestedModels,
+            requireModels,
+          )
+        : undefined;
+
     let phaseUnit: AuditUnit | undefined;
+    let payloadPathScope: readonly string[] | undefined;
+    let phaseCheckpointStatuses: readonly PhaseCheckpointStatus[] | undefined;
+    // US1 true-composition (operator decision 2026-06-14): whole-feature govern
+    // EXCLUDES the files of converged-and-unchanged phases from the payload (it
+    // carries them) — absolute paths threaded into the assembler's excludePaths.
+    let compositionExcludePaths: readonly string[] = [];
     if (flags.mode === 'implement' && flags.phase !== undefined) {
-      const { root } = await resolveFeatureRoot({ repoRoot, slug });
+      const { root } = await resolveGovernFeatureRoot(repoRoot, slug);
       if (root === undefined) {
         throw new GovernProtocolError(
           `govern: FATAL — --phase given but feature '${slug}' root not found (cannot resolve tasks.md).`,
@@ -482,7 +700,60 @@ export async function runGovern(args: string[]): Promise<void> {
       }
       const diffBase =
         flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
+      phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, slug, tasksPath);
+      assertPriorPhaseCheckpointsCurrent(phaseCheckpointStatuses, flags.phase);
       phaseUnit = resolvePhaseUnit({ tasksPath, phaseId: flags.phase, diffBase });
+      payloadPathScope = normalizeGovernedPaths(repoRoot, phaseUnit.diffScope.files);
+      if (payloadPathScope.length === 0) {
+        throw new GovernProtocolError(
+          `govern: FATAL — phase '${flags.phase}' resolved to an empty path scope; refine tasks.md boundaries before governing this phase.`,
+        );
+      }
+    } else if (flags.mode === 'implement') {
+      const { root } = await resolveGovernFeatureRoot(repoRoot, slug);
+      if (root !== undefined) {
+        const tasksPath = join(root, 'tasks.md');
+        if (existsSync(tasksPath)) {
+          const diffBase =
+            flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
+          phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, slug, tasksPath);
+          // TRUE COMPOSITION (operator decision 2026-06-14, US1 — TASK-120/121):
+          // whole-feature govern does NOT gate on missing/stale checkpoints. It
+          // CARRIES converged-and-unchanged phases (excludes their files) and
+          // re-audits everything else — changed / missing / stale phases AND
+          // cross-cutting code owned by no phase. EXCLUSION (not inclusion) is what
+          // makes the cross-cutting remainder visible, so all-carried audits ONLY
+          // the cross-cutting diff (the whole diff minus every phase's files),
+          // never the whole feature.
+          // The after_implement unit is the whole-feature payload (exclusion-based
+          // scope, below) under the `after_implement` checkpoint label. Construct
+          // it explicitly — the scope it audits is "the diff minus carried files",
+          // expressed via compositionExcludePaths, not an inclusion file list.
+          phaseUnit = {
+            granularity: 'feature',
+            diffScope: { base: diffBase, files: [] },
+            auditLogSection: 'after_implement',
+          };
+          // Carry only the files current phases ACTUALLY audited (their recorded
+          // auditedFiles), never their declared DIRECTORY scope — so a cross-cutting
+          // change under a current phase's directory is re-audited, not hidden
+          // (TASK-129). A file shared with a missing/stale phase is still dropped
+          // (021 phase-7 AUDIT-BARRAGE-codex-01; phase ownership is not disjoint —
+          // govern.ts belongs to several phases). A current phase with no recorded
+          // auditedFiles (pre-TASK-129 checkpoint) carries nothing — re-audited.
+          const carriedFiles = carriedFilesForComposition(
+            phaseCheckpointStatuses.map((status) => ({
+              state: status.state,
+              declaredFiles: status.files,
+              auditedFiles: status.auditedFiles,
+            })),
+          );
+          compositionExcludePaths = carriedFiles.map((rel) => join(repoRoot, rel));
+          // Whole-feature payload (undefined scope) MINUS the carried phase files
+          // (compositionExcludePaths, merged into excludePaths below).
+          payloadPathScope = undefined;
+        }
+      }
     }
 
     // specs/014 US5: resolve the audit-log excerpt (spec mode), the feature root
@@ -507,6 +778,7 @@ export async function runGovern(args: string[]): Promise<void> {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(`govern: FATAL — ${msg}\n`);
+      emitTerminalOutcome('fatal');
       process.exit(2);
     }
     // AUDIT-20260611-04: implement mode REFUSES to run without a resolved feature
@@ -516,13 +788,14 @@ export async function runGovern(args: string[]): Promise<void> {
       process.stderr.write(
         `govern: FATAL — feature '${slug}' not found under ${join(repoRoot, 'specs')}/<NNN>-${slug} (speckit) or ${join(repoRoot, 'docs')}/*/001-IN-PROGRESS/${slug} (legacy-docs).\n`,
       );
+      emitTerminalOutcome('fatal');
       process.exit(2);
     }
     // AUDIT-20260611-08: thread the governance backlog store so its bookkeeping
     // commits/files are excluded from both payload arms.
     const excludePaths =
       flags.mode === 'implement' && featureRoot !== undefined
-        ? resolveGovernExcludePaths(installation)
+        ? [...resolveGovernExcludePaths(installation), ...compositionExcludePaths]
         : undefined;
     // specs/015 + 014 merge: buildImplementVars threads BOTH the per-phase
     // pathScope (015 US4 — phaseUnit's files, and its `phase-<id>` checkpoint when
@@ -535,7 +808,7 @@ export async function runGovern(args: string[]): Promise<void> {
             slug,
             flags.diffBase,
             phaseUnit !== undefined ? phaseUnit.auditLogSection : flags.checkpoint,
-            phaseUnit?.diffScope.files,
+            payloadPathScope,
             featureRoot,
             excludeRoots,
             excludePaths,
@@ -563,11 +836,12 @@ export async function runGovern(args: string[]): Promise<void> {
     const protocolArgs = {
       stackctl,
       barrageBin,
-      repoRoot,
+      installationRoot: repoRoot,
       slug,
       checkpoint: built.checkpoint,
       vars: built.vars,
-      models: pick(undefined, process.env.GOVERN_MODELS),
+      laneCapabilities,
+      models: requestedModels,
       requireModels,
       ceiling: pick(flags.ceiling, process.env.GOVERN_CEILING),
       override: pick(flags.override, process.env.GOVERN_OVERRIDE),
@@ -589,7 +863,7 @@ export async function runGovern(args: string[]): Promise<void> {
     const ceiling = resolveCeiling(pick(flags.ceiling, process.env.GOVERN_CEILING));
     const outcome: ConvergenceOutcome = await runConvergenceLoop({
       ceiling,
-      runPass: async () => ({ gateOpen: runProtocol(protocolArgs).gateOpen }),
+      runPass: async () => ({ gateOpen: (await runProtocol(protocolArgs)).gateOpen }),
       dispatchFix: async () => {
         process.stderr.write(
           'govern: convergence gate BLOCKED — fix the surfaced findings; the loop ' +
@@ -610,20 +884,57 @@ export async function runGovern(args: string[]): Promise<void> {
           : 'govern: implementation NOT done — convergence gate BLOCKED') +
           ` after ${outcome.rounds} round(s) (ceiling ${outcome.ceiling}); fix findings & re-govern, or record --override.\n`,
       );
+      emitTerminalOutcome('blocked');
       process.exit(1);
+    }
+    if (phaseUnit?.granularity === 'phase' && phaseCheckpointStatuses !== undefined) {
+      const phaseStatus = phaseCheckpointStatuses.find((status) => status.phaseId === phaseUnit.phaseId);
+      if (phaseStatus !== undefined) {
+        // Record the files this phase's audit ACTUALLY covered (TASK-129) so a later
+        // whole-feature compose carries them exactly, never the declared directory.
+        const auditedFiles = resolveAuditedFiles(
+          repoRoot,
+          phaseUnit.diffScope.base,
+          phaseStatus.files,
+        );
+        writePhaseCheckpoint(repoRoot, {
+          version: 1,
+          featureSlug: slug,
+          phaseId: phaseUnit.phaseId,
+          checkpoint: built.checkpoint,
+          auditLogSection: phaseUnit.auditLogSection,
+          scopeFingerprint: phaseStatus.scopeFingerprint,
+          passedAt: new Date().toISOString(),
+          governedPaths: phaseStatus.files,
+          auditedFiles,
+        });
+      }
     }
     process.stderr.write(
       flags.mode === 'spec'
         ? 'govern: spec may graduate (convergence gate satisfied or overridden).\n'
         : 'govern: implementation governed (convergence gate satisfied or overridden).\n',
     );
+    emitTerminalOutcome('graduated');
     process.exit(0);
   } catch (err) {
     if (err instanceof GovernProtocolError || err instanceof GovernPayloadError) {
       process.stderr.write(`${err.message}\n`);
+      // T028 (US5): one machine-readable terminal tag per exit. A payload-spec
+      // failure is its own kind; a protocol error carries the specific kind it
+      // was thrown with (negotiation-failed / boundary-too-large / etc.).
+      const kind = err instanceof GovernProtocolError ? err.terminalKind : 'payload-error';
+      emitTerminalOutcome(kind);
       const code = err instanceof GovernProtocolError ? err.exitCode : 2;
       process.exit(code);
     }
-    throw err;
+    // AUDIT-BARRAGE-codex-01 (021 phase-2 HIGH): an UNEXPECTED exception (fs
+    // failure, checkpoint-write failure, uncaught child error) is a govern FATAL.
+    // Emit the `fatal` terminal AND exit 2 — rethrowing let the generic CLI
+    // wrapper exit 1, contradicting the tag (machine-readable `fatal` vs a
+    // non-fatal exit code). Print the message so the failure is still diagnosable.
+    process.stderr.write(`govern: FATAL — ${errorMessage(err)}\n`);
+    emitTerminalOutcome('fatal');
+    process.exit(2);
   }
 }

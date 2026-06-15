@@ -2,27 +2,166 @@
 
 ---
 
-## 2026-06-13: <!-- session title -->
+## 2026-06-15: 021 whole-feature-gate blockers — boundary-too-large + cross-cutting composition (TASK-117, TASK-129)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Resumed via `/stack-control:execute` on `021-audit-protocol-friction-burndown`. Found execute was a no-op (all 32 tasks complete, clean tree) — the real "unfinished work" the operator expected was the two spec-required structural HIGHs the prior session's journal named as blocking the whole-feature govern gate: TASK-117 (`boundary-too-large` unreachable) and TASK-129 (directory-scoped composition hides cross-cutting changes). Fix both.
 
 **Accomplished:**
-- <!-- compose -->
+- **TASK-117 — `boundary-too-large` made reachable.** Root cause: `negotiateFleet` envelope-gated lanes, so an oversized rendered payload always exited `negotiation-failed` and `assertBoundaryFits` was structurally dead. Fix: split the two axes — `negotiateFleet` selects on lane-health only (availability / read-only enforcement / liveness / floor); `assertBoundaryFits` owns the payload-vs-envelope check. The two terminals (US2/FR-006 vs US3/FR-008) are now both reachable and machine-distinguishable (SC-005). Dropped `requestedPromptBytes` from the negotiation signature + result + the preflight `1` sentinel. RED→GREEN e2e replaces the bug-documenting NOTE in `govern-terminal-outcomes.test.ts`. (`b709c845`)
+- **TASK-129 — whole-feature compose carries ACTUAL audited files, not declared dirs.** Root cause: the checkpoint recorded only the tasks.md-DECLARED scope (`governedPaths`, possibly a directory); at compose time there was no stored signal to tell "audited under this dir" from "cross-cutting under this dir", so no pure-compose-time fix existed. Operator's framing drove the design (git is the record of what changed): each phase checkpoint now records `auditedFiles = git diff --name-only <phaseBase> -- <declaredScope>`, and the new `carriedFilesForComposition` carries those EXACT files. A cross-cutting file under a current phase's declared directory isn't in any `auditedFiles` set → not carried → re-audited. 021 phase-7 shared-ownership protection preserved; pre-TASK-129 checkpoints (no `auditedFiles`) carry nothing (self-healing). (`08c0e4b8`)
+- Both backlog items closed with resolution notes (`8c2156fa`, `f4b19ccb`). Full umbrella green: 233 files / 1544 tests. Zero new tsc errors (the lone `govern.ts` nullability error is pre-existing on clean HEAD).
 
 **Didn't Work:**
-- <!-- compose -->
+- Did NOT run a live whole-feature govern to observe the gate actually open — that fires the expensive cross-model barrage and writes audit-log + backlog, so it's the operator's trigger. The two correctness blockers are fixed + unit/integration-tested, but "the gate opens in a live run" is unverified-by-observation.
+- The first `AskUserQuestion` (what `/stack-control:execute` should do) was denied — the operator wanted to chat through the situation first, not pick from options.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] `/stack-control:execute` on a complete spec is a no-op; surfaced it instead of mechanically churning a no-op implement + empty-diff govern (the TASK-54 degraded path). The honest read of "expected unfinished work" was the parked after_implement findings, not spec tasks.
+- [PROCESS] Corrected my own earlier over-claim: I speculated git-as-source-of-truth would also collapse the checkpoint path-fingerprint findings (symlink/separator/overlap). After reading `checkpoint-state.ts`: NO — the freshness fingerprint is deliberately content-based (catches uncommitted working-tree edits a git ref would miss). It's a separate mechanism; git-as-SoT fixes the compose EXCLUDE, not the freshness fingerprint.
 
 **Insights:**
-- <!-- compose -->
+- The audit-log `Status:` field is **unreliable** — it showed 94 "open" (4 BLOCKING, 59 HIGH) but spot-checking the BLOCKINGs, ≥3 of 4 were already addressed by post-audit commits and never re-marked (e.g. the wiring BLOCKINGs -03/-11 — primitives ARE wired into protocol.ts/govern.ts now; the composition BLOCKING -16 references the retired `resolveComposingFeatureUnit`). "All tasks checked" hid this. Worth a reconciliation pass (backlog TASK-19 territory: governance graduation has no on-disk record).
+- TASK-117 and TASK-129 are two sides of the same root: the protocol conflated DECLARED scope with ACTUAL audited surface. 117 = negotiation conflated lane-health with payload-size; 129 = composition conflated declared-directory with audited-files. Both fixed by separating the conflated axes.
+- The whole-feature payload was ALREADY git-truthful (`git diff <base> :(exclude)…` + untracked fold); TASK-129 was purely in how the EXCLUDE set was computed (human-declared dirs vs git's actual changed files).
+
+**Next session — recommended next steps (operator's call on all three; left at a decision point):**
+1. **Cascade-friction fix (freshness-by-`auditedFiles`) — needs operator OK; it changes the system's "teeth".** Investigated the journal's checkpoint-cascade item: it's MOSTLY inherent-and-correct (a genuinely-shared audited file like `govern.ts` SHOULD re-stale every phase that audited it — that's the teeth, not a bug). The ONE avoidable sliver: a phase that declares a DIRECTORY but audited only a few files under it is re-staled by edits to unaudited files under that dir. Fix = key checkpoint freshness on `auditedFiles` (now recorded) instead of the declared scope. Safe (cross-cutting files still caught by the TASK-129 compose) but it REDEFINES what stales a checkpoint and breaks the existing checkpoint-freshness test contract — so it wants explicit sign-off (analogous to amending a settled invariant), not a silent change.
+2. **Live whole-feature govern** on 021 to confirm the gate now opens end-to-end. Expensive (real cross-model barrage), writes audit-log + backlog, generates new findings — operator's trigger. Note: existing on-disk checkpoints (phase-1..6) now lack `auditedFiles`, so they'll carry nothing and re-audit (self-healing; first run rewrites them with the field).
+3. **Audit-log reconciliation** (TASK-19): the 94 "open" 021 findings need a pass to mark the genuinely-fixed-but-unmarked ones and isolate the true residue. The headline count is misleading until then.
+4. **TASK-60 proper** (myopic convergence, gh-453): a process-redesign (self-red-team-a-fix-before-refire), not a code fix — needs a design conversation.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 4
+  - chore(stack-control): close TASK-129 (compose by actual audited files) with resolution note
+  - fix(stack-control): whole-feature compose carries ACTUAL audited files, not declared dirs (TASK-129)
+  - chore(stack-control): close TASK-117 (boundary-too-large reachable) with resolution note
+  - fix(stack-control): make boundary-too-large reachable — split lane-health from payload-size (TASK-117)
+- Files changed: 10
+- Backlog touched: TASK-117, TASK-129
+
+## 2026-06-15: 021 audit-protocol-friction — full implementation + deep after_implement audit
+
+**Goal:** Burn down the entire `021-audit-protocol-friction-burndown` task list (all 32 tasks) and audit it via the `/stack-control:execute` protocol — drive native `/speckit-implement`, then let the deskwork-governance cross-model barrage fire on `after_implement`.
+
+**Accomplished:**
+- Completed the phase-1 govern burndown to gate-open (the prior session's blocker): fleet-knowledge no-runtime-fallback, `classifyBinaryProbe`, lane-capability FATAL channel, empty-paths fingerprint.
+- Implemented all 32 tasks: US4 (richer phase-header grammar, rename-aware `--find-renames` scoping), US5 (machine-readable `terminal-outcome=<kind>`, audit-runs payload trim), US1 true-composition, T010/T013, polish. Full umbrella green (234 files / 1538 tests when fixtures can sign).
+- The cross-model `after_implement` audit caught and I fixed **~11 real bugs in my own work**: terminal-outcome contract holes (untagged exits, `--help`, exit-2-on-unexpected-error), the US1 strict-gate-vs-compose design fork (→ exclusion-based true composition), a vestigial primitive, shared-file + nested-path composition exclusion (false-clean gates), fragile floor-substring matching.
+- Phases 1–6 gate-open; the whole-feature composing pass now runs to completion (payload-size/floor-shortfall wall resolved by carrying all phases).
+- Reconciled backlog: closed TASK-57/71/81/111/114/115 (verified-fixed); 12 residuals tracked (TASK-116, 117, 120–129) with precise repro/fix notes.
+
+**Didn't Work:**
+- The whole-feature gate did NOT open: it's blocked on **spec-required structural HIGHs** — TASK-117 (`boundary-too-large` unreachable; US2/quickstart require it) and TASK-129 (carrying a directory-scoped phase hides unowned cross-cutting changes). These can't keep being overridden against the spec.
+- The per-phase cascade is structurally unstable: `govern.ts`/`incremental-audit.ts` belong to 4–6 phases each, so every fix re-stales those phases' checkpoints, making whole-feature gate-open a moving target.
+
+**Course Corrections:**
+- [PROCESS] Operator chose **US1 true-composition** over the strict checkpoint gate (the audit surfaced the spec self-contradiction); implemented exclusion-based composition.
+- [PROCESS] Operator chose **override-and-graduate** for the diminishing-returns plateau (implementation-altitude MEDIUMs); applied across phases 2–6.
+- [FABRICATION] Verified a codex HIGH (composition carries stale ownership) as a **false positive** — the staleness fingerprint already includes paths — and documented the reasoning in the override rather than blindly implementing.
+- [DOCUMENTATION] Retired an anti-defer "deferred design decision" code comment the audit correctly flagged as a trap; replaced with a tracked backlog reference.
+
+**Insights:**
+- The cross-model audit-barrage earns its keep: it found genuine correctness bugs (shared-file/nested-path exclusion, exit-code/tag contradiction) the green test suite did not — because `govern.ts` genuinely spans many phases, the composition bugs were real for this very feature.
+- Exclusion-based whole-feature composition is in fundamental tension with directory-granular phase ownership (TASK-129) — needs a design decision (expand dir-scopes to files, or compute cross-cutting explicitly).
+- `boundary-too-large` is a spec-vs-impl design fork that recurs as a generator across phases; the structural root-fix (move the rendered-prompt envelope check from `negotiateFleet` into `assertBoundaryFits`) is the right next step, not repeated overrides.
+- The per-phase audit's checkpoint-cascade needs a friction fix so a single shared-file change doesn't invalidate most of the feature's checkpoints (TASK-60 adjacent).
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 19
+  - chore(stack-control): record 021 after_implement audit state (phase checkpoints 1-6, audit-log, backlog residuals)
+  - fix(stack-control): composition shared-ownership uses PREFIX overlap not exact match (021 after_implement HIGH)
+  - fix(stack-control): composition carries only EXCLUSIVELY-current files (021 phase-7 HIGH)
+  - docs(stack-control): retire anti-defer 'deferred design decision' comment on boundary-too-large
+  - fix(stack-control): exit-2 on unexpected govern errors + retire vestigial composition primitive (021 audit)
+  - feat(stack-control): US1 whole-feature govern uses TRUE COMPOSITION (021 audit)
+  - fix(stack-control): narrow terminal-outcome contract + harden floor split (021 audit)
+  - fix(stack-control): emit terminal-outcome at EVERY govern exit (021 audit HIGH)
+  - docs(stack-control): record 021 T032 test-umbrella result
+  - chore(stack-control): 021 task checkoffs + backlog reconciliation
+  - test(stack-control): 021 T010 phase-composition + T013 actual-payload-fit
+  - feat(stack-control): US5 — machine-readable terminal outcomes + audit-runs noise trim
+  - feat(stack-control): US4 — richer phase-header grammar + rename-aware payload scoping
+  - test(stack-control): make nested-fixture git repos hermetic (no gpg dependency)
+  - chore(stack-control): close 4 same-session-fixed 021 backlog dupes
+  - chore(stack-control): record 021 phase-1 govern gate-open + slush routing
+  - fix(stack-control): route 021 lane-capability failures through governed FATAL
+  - fix(stack-control): burn down 021 phase-1 govern HIGH/MEDIUM findings
+  - feat(stack-control): land 021 govern phase-control substrate
+- Files changed: 97
+- Backlog touched: TASK-111, TASK-114, TASK-115, TASK-116, TASK-117, TASK-120, TASK-121, TASK-129, TASK-47, TASK-57, TASK-71, TASK-81
+
+## 2026-06-14: audit-protocol-friction phase-1 govern loop advanced, but session discipline regressed
+
+**Goal:** Drive spec `021-audit-protocol-friction-burndown` through foundational implementation, honor the new per-phase audit standard mechanically, and burn down `phase 1` govern findings until the gate opened.
+
+**Accomplished:**
+- Landed the foundational `021` govern substrate in the working tree: explicit phase-checkpoint persistence, lane-capability loading, fleet negotiation, phase-boundary sizing, anchor cleanup, and the first integration wiring through `govern`.
+- Reconfigured the local barrage override to a Codex-only two-lane fleet and added the tracked companion knowledge surface (`.stack-control/fleet-knowledge.yaml`) so the live govern path could run under the operator’s temporary lane policy.
+- Added and greened the new targeted govern suites around checkpoint state, fleet negotiation, lane capability loading, phase-boundary sizing, and phase-checkpoint enforcement; the latest targeted reruns finished green at 29 tests across 4 files plus 5 tests across 3 govern-focused integration files.
+- Burned down a long sequence of real audit findings from repeated live `govern --phase 1` runs: path traversal in checkpoint state, symlink/path canonicalization gaps, non-atomic checkpoint writes, lane-name drift, duplicate fleet entries, missing object-shape checks, invalid quorum/prompt-size inputs, and dot-segment governed paths.
+- Completed the latest authoritative live run at `20260614T093501359Z-audit-protocol-friction-burndown-phase-1`; both Codex lanes completed, and the remaining top blocker narrowed to the derived-envelope contract in `lane-capabilities.ts` / `phase-boundary-sizing.ts`.
+
+**Didn't Work:**
+- I repeatedly broke the protocol’s own execution standard by slipping from “fix findings and re-govern” into explanation mode, and by waiting too softly on a long-running govern process instead of applying a hard watchdog rule early. The operator had to call this out multiple times.
+- The latest `phase 1` govern pass still did not open. `codex-gpt5` surfaced a HIGH finding that the timeout-derived `maxPromptBytes` ceiling is not a real capacity contract on fresh installs, so the phase remains blocked.
+
+**Course Corrections:**
+- [PROCESS] Adopted an explicit watchdog rule for long-running govern/audit commands: poll artifact growth and lane completion state, treat silence as a diagnosable state rather than “still working,” and stop claiming a run is active once the run dir shows both lanes completed.
+- [PROCESS] Stopped treating “tests pass” as a phase boundary. For this feature, the only acceptable stopping point is a completed govern pass or a concrete blocked finding with the next fix already underway.
+- [COMPLEXITY] Reconciled contradictory fleet-knowledge directions exposed by the barrage itself: the code briefly allowed partial fallback, then was restored to fail-closed exact lane matching because the feature’s own no-silent-fallback rule and fresh-install governance contract demand it.
+- [FABRICATION] Corrected my own earlier overstatement about an in-flight govern run; the authoritative source is the run-dir artifact state, not my impression of whether a background process is “probably still running.”
+
+**Insights:**
+- The feature’s hardest problem right now is contract coherence, not plumbing. The remaining blocker is not “more wiring,” it is whether timeout derivation is allowed to masquerade as a hard payload-capacity ceiling.
+- The audit loop is doing useful work: once the obvious correctness bugs were gone, the barrage shifted to semantic contract defects around fleet knowledge, freshness provenance, and numeric boundary honesty.
+- Mechanical anti-halting discipline is itself a product requirement for this program. A protocol that depends on the operator noticing that the executor quietly stopped is not autonomous enough.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 0
-  - (no commits this session)
-- Files changed: 0
-- Backlog touched: (none)
+- Files changed under `plugins/stack-control`: 21
+- Live audit runs touched this session (`after_clarify` + `phase-1`): 14
+- Latest targeted test reruns: 34 passing tests across 7 files
+- Open GitHub issue noted during close-out: #470
+- Next step: fix the remaining `phase 1` blockers from `20260614T093501359Z-audit-protocol-friction-burndown-phase-1` — first the false hard-cap derived-envelope contract, then the residual checkpoint/fleet integer hardening findings — and rerun `govern --phase 1` until the gate opens.
+
+---
+
+## 2026-06-13: backlog triage + audit-protocol-friction spec 021 defined to runnable
+
+**Goal:** Bring the branch-local backlog back into a trustworthy state, absorb the newest audit-protocol friction intake, and move that cluster through the stack-control front door into a runnable Spec Kit spec.
+
+**Accomplished:**
+- Imported and then safely closed the newly-filed stack-control GitHub issues into the local backlog, adding TASK-70/71 first and later TASK-73/74/75/76 as the newer audit-protocol-friction umbrella and its decomposed edges.
+- Added TASK-72 to retire roadmap and insight capture in favor of backlog as the single system of record, then characterized the backlog as a mostly-open hardening queue with duplicate-ID hygiene debt at TASK-26/TASK-27.
+- Verified backlog status freshness instead of trusting stale `To Do` labels: TASK-18, TASK-27, TASK-29, and TASK-37 were proven by targeted Vitest coverage and marked `Done` with implementation notes updated in place.
+- Promoted the audit-protocol cluster from backlog into the new front-door target `specs/021-audit-protocol-friction-burndown`, then authored `021` through the native stack-control seam to a runnable state (`spec=yes plan=yes tasks=yes`) with spec, plan, research, data model, contracts, checklist, quickstart, and tasks.
+- Repointed the active Spec Kit marker (`.specify/feature.json` + `CLAUDE.md`) from 020 to 021 so the branch now resumes on the audit-protocol-friction work rather than the earlier config-domain slice.
+
+**Didn't Work:**
+- The installed Spec Kit surface in this repo still does not expose a clean Codex-native `/speckit-*` execution path for defining a new spec; the project is initialized for `claude`, and the mandatory git feature-branch hook still conflicts with the one-long-lived-branch program layout. `021` had to be created by following the skill contract manually: direct feature-dir creation, pointer updates, authored artifacts, and `stackctl spec-check` confirmation after each stage.
+
+**Course Corrections:**
+- [PROCESS] Instead of treating the audit-protocol queue as a loose pile of bugs, promoted it into one explicit front-door feature body (`021`) so payload scope, per-phase teeth, fleet negotiation, and boundary sizing can be implemented as one protocol change rather than as disconnected patchwork.
+- [DOCUMENTATION] Treated the backlog as the canonical intake surface and captured the operator's “three edges” refinement directly into TASK-75/TASK-76 before defining the spec, so the feature body started from the sharpened model rather than from a fuzzy umbrella issue.
+- [PROCESS] Performed a status-audit pass before further promotion work; stale backlog items that were already implemented were closed first so the remaining queue better represents actual unfinished audit-protocol debt.
+
+**Insights:**
+- The most important audit-protocol work is now clearly a trust-boundary problem, not a throughput problem: mechanical per-phase teeth, real payload fit, and pre-remediation fleet negotiation are the seams that decide whether the protocol is genuinely operator-light.
+- The backlog-to-spec seam works well when the backlog is healthy, but duplicate IDs and stale status undermine that seam immediately; backlog hygiene is not clerical overhead here, it directly affects whether promoted work is safe to reason about.
+- Defining `021` made the current architecture gap explicit: stack-control can prove runnable spec state with `spec-check`, but the authoring path still has portability friction as long as Spec Kit's branch-hook / integration assumptions remain `claude`-centric.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 7
+  - chore(stack-control): define audit protocol friction spec
+  - chore(stack-control): refine audit boundary and fleet tasks
+  - chore(stack-control): intake per-phase audit protocol friction
+  - chore(stack-control): close verified audit protocol backlog items
+  - chore(stack-control): promote audit protocol backlog cluster
+  - chore(stack-control): capture backlog-system-of-record item
+  - chore(stack-control): import open github issues into backlog
+- Files changed: 29
+- Backlog touched: TASK-18, TASK-27, TASK-29, TASK-37, TASK-41, TASK-47, TASK-54, TASK-57, TASK-58, TASK-60, TASK-70, TASK-71, TASK-72, TASK-73, TASK-74, TASK-75, TASK-76
+- Next step: start `021` execution at Phase 1 / Phase 2 (`T001`-`T006`) through the stack-control front door.
 
 ## 2026-06-12: installation-isolation executed + governed to OPEN; v0.44.0 merged in and reconciled
 

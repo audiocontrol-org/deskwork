@@ -17,7 +17,13 @@
  */
 /** The keys `setup` SCAFFOLDS — the installation-level managed set written at
  * setup time (config-first order). A strict subset of WorkingFileKey. */
-export type ScaffoldedKey = 'config' | 'roadmap' | 'inbox' | 'backlog' | 'auditLog';
+export type ScaffoldedKey =
+  | 'config'
+  | 'roadmap'
+  | 'inbox'
+  | 'backlog'
+  | 'auditLog'
+  | 'fleetKnowledge';
 
 /**
  * Every RESOLVABLE working-file key. session-skills (011) extends the resolvable
@@ -34,6 +40,7 @@ export interface InstallationPaths {
   readonly inbox?: string;
   readonly backlog?: string;
   readonly auditLog?: string;
+  readonly fleetKnowledge?: string;
   /** Per-feature audit-log pattern; MUST contain the literal `{feature}` placeholder. */
   readonly featureAuditLogPattern?: string;
   // session-skills (011) keys.

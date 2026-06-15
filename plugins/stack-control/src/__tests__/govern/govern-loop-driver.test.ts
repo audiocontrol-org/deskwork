@@ -14,6 +14,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, rmSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveTsx, CLI } from '../_run-helpers.js';
+import { seedDefaultFleetKnowledge } from '../_isolation-harness.js';
 import { tmpBacklog } from '../../../tests/backlog/helpers.js';
 
 /** Stub barrage whose lift appends a finding of `STUB_SEVERITY` every round. */
@@ -68,6 +69,10 @@ function makeRepo(slug: string): string {
   // the enclosing installation from --at.
   mkdirSync(join(repo, '.stack-control'), { recursive: true });
   writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
+  // The fleet-negotiation preflight loads lane capacities before dispatch and now
+  // fails loud on a missing fleet-knowledge file (no bundled-template fallback) — seed
+  // it as `stackctl setup` would.
+  seedDefaultFleetKnowledge(repo);
   const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'audit-log.md'), `# Audit Log — ${slug}\n`, 'utf8');
@@ -77,7 +82,10 @@ function makeRepo(slug: string): string {
 function runGovern(args: string[], env: Record<string, string>) {
   return spawnSync(resolveTsx(), [CLI, 'govern', ...args], {
     encoding: 'utf8',
-    env: { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog(), ...env },
+    // Hermetic fleet: mark lanes available so a CLI-less env (CI) reaches the
+    // convergence-loop driver instead of short-circuiting on the lane-
+    // availability probe (negotiation-failed). See TASK-132.
+    env: { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog(), GOVERN_FLEET_AVAILABLE: '*', ...env },
   });
 }
 

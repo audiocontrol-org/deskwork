@@ -3,9 +3,10 @@ id: TASK-27
 title: >-
   spec-governance gate: cluster-max severity inflation can make
   two-consecutive-0-HIGH structurally unreachable
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-11 13:16'
+updated_date: '2026-06-13 19:03'
 labels:
   - agent-found
   - 'type:gap'
@@ -29,6 +30,7 @@ residual single-lane inflations (`adjudicate-findings.ts`): a cluster one lane
 rated HIGH and another rated MEDIUM now gate-counts MEDIUM, so the dampener's
 two-consecutive-raw-0-HIGH branch becomes reachable (proven by
 `__tests__/govern/convergence-sc001.test.ts`, SC-001). A genuine >=2-lane HIGH
-still blocks (SC-003). Status left To Do pending verification in a formally
-installed release (per the issue-closure discipline — the operator closes).
+still blocks (SC-003).
+
+Verified 2026-06-13 in the current stack-control worktree: `npx vitest run src/__tests__/scope-discovery/promote-findings/dampener-raw-counting.test.ts src/__tests__/govern/convergence-loop.test.ts src/__tests__/govern/convergence-sc001.test.ts` passed (13 tests). Marked Done on that basis.
 <!-- SECTION:NOTES:END -->

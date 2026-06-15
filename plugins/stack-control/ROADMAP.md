@@ -23,19 +23,21 @@ rationale live in
 this document is the live feature queue.
 
 ## design:feature/document-primitives
-- status: in-flight
+- status: shipped
 - depends-on: multi:feature/front-door
 - spec: specs/005-document-primitives
 Generalized archive / unarchive / curate over self-describing governed documents — the engine this roadmap protocol is built on.
 
 ## design:feature/insight-capture
-- status: in-flight
+- status: shipped
 - depends-on: multi:feature/front-door
+- spec: specs/007-insight-capture
 One-move out-of-sequence insight capture as a first-class control-plane capability; capture ≠ scope. Retires the interim design-inbox convention.
 
 ## design:feature/migrate-scope-discovery
-- status: planned
+- status: shipped
 - depends-on: multi:feature/front-door
+- spec: specs/010-migrate-scope-discovery
 Move scope-discovery primitives + skills in-house with per-codebase clone detection; vendor the full clone-detector.
 
 ## design:feature/roadmap-protocol
@@ -50,7 +52,7 @@ Keep the roadmap live, crisp, and up-to-date: a DAG of heading-keyed work items 
 Author specs at promise altitude — the prevention half of spec quality, sibling to spec-governance's detection.
 
 ## design:feature/spec-governance
-- status: in-flight
+- status: shipped
 - depends-on: multi:feature/front-door
 - spec: specs/004-spec-governance
 Govern the spec, not just the implementation: cross-model audit-barrage over a spec at definition time. The mode-aware lens shipped.
@@ -84,13 +86,14 @@ Fuller control-plane frontend: spec→implementation negotiation, scope/barrage 
 The self-hosting bootstrap: plugin + stackctl + native Spec Kit execution. The thin control plane everything after is built through.
 
 ## multi:feature/migrate-audit-barrage
-- status: planned
+- status: shipped
 - depends-on: multi:feature/front-door
 Migrate audit-barrage + the audit protocol (convergence criterion + finding state machine) in-house; the one-way execution→governance seam survives.
 
 ## multi:feature/audit-protocol-convergence
-- status: in-flight
+- status: shipped
 - depends-on: multi:feature/migrate-audit-barrage
+- spec: specs/015-audit-protocol-convergence
 Make the cross-model audit-barrage convergence loop mechanically terminate and shrink the unit of work it audits (specs/015-audit-protocol-convergence). Five threads: cross-lane severity AGREEMENT + adjudication replace max-of-cluster so the dampener's two-consecutive-0-HIGH branch is reachable (US1); a code loop driver owns the iterate/stop decision + ceiling, not skill prose (US2); the implement payload drops its own audit-log excerpt + parked scaffolds (US3); a per-phase `--phase` audit unit shrinks the payload, governed by the same loop (US4); sonnet re-calibrated to an operator-selectable read-only override profile on the smaller units (US5); the #432 raw-counting guarded against regression (US6). Resolves backlog TASK-27 + TASK-18 (both facets) + the DESIGN-INBOX adjudication capture; sibling #431 payload self-reference addressed by US3.
 
 ## multi:feature/migrate-session-skills
@@ -238,13 +241,15 @@ Automated hand-off of a promoted inbox entry into deskwork's Ideas stage (exclud
 stackctl inbox/roadmap default --doc to the plugin-bundled DESIGN-INBOX.md/ROADMAP.md (correct for in-repo dogfood, wrong for an adopter running without --doc). Add project-relative governed-doc discovery (cwd/config resolution) for the whole verb family so adopters get their own inbox/roadmap by default. Surfaced by the 007 after_implement barrage (AUDIT-BARRAGE-codex-01, HIGH).
 
 ## multi:feature/session-skills
-- status: planned
+- status: shipped
 - depends-on: multi:feature/front-door
+- spec: specs/011-session-skills
 Native, Spec-Kit-aware session-start / session-end lifecycle skills for stack-control: bootstrap a fresh agent into the active spec + governed roadmap + open work at session boot, and capture the journal + tooling-friction + clone-snapshot at session close. Built native (NOT ported from dw-lifecycle, whose session skills are hardcoded to deskwork conventions).
 
 ## multi:feature/project-doc-setup
-- status: planned
+- status: shipped
 - depends-on: multi:feature/front-door
+- spec: specs/009-project-doc-setup
 Post-install project setup: scaffold the governed documents + config the plugin verbs require (ROADMAP.md, DESIGN-INBOX.md, the backlog store, stack-control config) into a freshly-installed adopter project, so stackctl inbox/roadmap/backlog work without hand-authoring the docs. The create-side complement to design:gap/project-relative-doc-discovery (which resolves an adopter own docs at read time).
 
 ## multi:gap/audit-barrage-model-pinning
@@ -267,7 +272,7 @@ A timed-out barrage model leaves a zero-byte stdout artifact; the kill is visibl
 Put a real port between the stack-control backlog frontend (capture / list / import-github / import-slush / promote) and the concrete store: a BacklogStore interface with the current backlog.md CLI as one adapter behind it, so the backend is swappable and its conventions stop leaking. Motivation: backlog.md imposes its own filename convention (spaces and the 'id - title' separator, double .md.md when a title ends in .md), its own archiving model, and its own directory layout on the governed store; the operator has explicit opinions on naming, archiving, and directory layout that the abstraction must make expressible instead of inheriting upstream defaults. Origin: 2026-06-11 session — shell work over the tasks dir broke on the space-laden filenames during the TASK-13/14/25 closure pass.
 
 ## impl:feature/installation-isolation
-- status: planned
+- status: shipped
 - spec: specs/installation-isolation
 - ref: TASK-45
 Installations are isolated: all stack-control state anchors at the nearest-enclosing installation; --repo-root retired on state-writing verbs; legacy half-installation detection; Spec Kit root relocates into the installation. Operator directive 2026-06-10; promoted from TASK-45 (anchor unification).
@@ -276,4 +281,59 @@ Installations are isolated: all stack-control state anchors at the nearest-enclo
 - status: planned
 - spec: specs/descriptive-naming
 Slugs, not fake ordinals: new specs slug-only, backlog interaction slug-first over the adopted tool, agents speak friendly names to the operator, recorded history grandfathered with zero ledger rewrites. Operator directive 2026-06-10.
+
+## multi:feature/audit-protocol-hardening
+- status: shipped
+- part-of: multi:feature/audit-protocol-convergence
+- spec: specs/013-audit-protocol-hardening
+Layout-aware feature + audit-log resolution: audit-protocol path resolution robust to the installation layout. Iterative hardening of the audit protocol.
+
+## multi:feature/audit-barrage-reliability
+- status: shipped
+- part-of: multi:feature/audit-protocol-convergence
+- spec: specs/014-audit-barrage-reliability
+Audit-barrage reliability hardening: timed-out/zero-byte barrage runs are observable and recoverable rather than silently downgraded.
+
+## multi:feature/audit-protocol-reliability
+- status: shipped
+- part-of: multi:feature/audit-protocol-convergence
+- spec: specs/014-audit-protocol-reliability
+Audit-protocol reliability: silent-failure hardening across the protocol's resolution + reporting paths. (Numbering collision with audit-barrage-reliability; distinct feature.)
+
+## multi:feature/audit-protocol-friction-burndown
+- status: shipped
+- part-of: multi:feature/audit-protocol-convergence
+- spec: specs/021-audit-protocol-friction-burndown
+Audit-protocol friction burndown: per-phase govern boundaries, fleet negotiation, checkpoint composition; whole-feature gate reachable. Closes the convergence-era friction backlog.
+
+## design:feature/backlog-surface
+- status: shipped
+- spec: specs/008-backlog-surface
+Backlog slush-pile surface: capture/list/import/promote over the configured backlog store, deliberately separate from the curated roadmap.
+
+## design:feature/backlog-promotion-seam
+- status: shipped
+- spec: specs/012-backlog-promotion-seam
+Backlog to feature-rigor promotion seam: a record-only graduation linkage from a backlog item into the spec-driven tier.
+
+## impl:feature/anchor-unification
+- status: planned
+- spec: specs/016-anchor-unification
+- ref: TASK-56
+Anchor unification: residual anchoring defects after installation-isolation converged; all stack-control state anchors at the nearest-enclosing installation. Follow-on completing the constitution's installation-anchor contract. (Not started: 0/38.)
+
+## multi:feature/portability
+- status: shipped
+- spec: specs/017-portability
+Portable stack-control workflow across Claude Code and Codex: the CLI-first core runs vendor-neutral; skills are thin adapters.
+
+## multi:feature/codex-adopter-distribution
+- status: shipped
+- spec: specs/019-codex-adopter-distribution
+Public Codex distribution for adopters: the released acquisition + install path for non-Claude-Code consumers.
+
+## impl:feature/config-domain-selection
+- status: shipped
+- spec: specs/020-config-domain-selection
+Config-domain discovery and sticky selection: resolve and persist the active config domain across installation surfaces.
 

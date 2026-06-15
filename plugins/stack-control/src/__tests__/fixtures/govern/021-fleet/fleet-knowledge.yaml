@@ -1,0 +1,7 @@
+lanes:
+  - name: claude
+    max_prompt_bytes: 65536
+  - name: codex
+    max_prompt_bytes: 24576
+  - name: sonnet
+    max_prompt_bytes: 32768

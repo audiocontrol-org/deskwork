@@ -22,6 +22,7 @@ plugins/stack-control/bin/stackctl setup [--at <dir>] [--apply]
 | `inbox` | `<root>/DESIGN-INBOX.md` | governed design inbox, zero captures |
 | `backlog` | `<root>/.stack-control/backlog` | `filesystem_only` backlog store |
 | `audit_log` (program) | `<root>/.stack-control/audit-log.md` | audit-log header, zero findings |
+| `fleet_knowledge` | `<root>/.stack-control/fleet-knowledge.yaml` | default audit-barrage lane capacities (per-lane `max_prompt_bytes`) |
 
 Per-feature audit logs (`specs/<feature>/audit-log.md`) and operation-products (governance runs, scope-discovery registries) are **not** scaffolded here — the feature lifecycle / the producing verb create them.
 

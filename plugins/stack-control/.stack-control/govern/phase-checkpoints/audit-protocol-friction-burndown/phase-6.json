@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "featureSlug": "audit-protocol-friction-burndown",
+  "phaseId": "6",
+  "checkpoint": "phase-6",
+  "auditLogSection": "phase-6",
+  "scopeFingerprint": "4498ad20ab7de1cef3aadd9977c003302bfd2b618caf1a0deba7c025ba9e77c2",
+  "passedAt": "2026-06-15T00:48:04.430Z",
+  "governedPaths": [
+    "src/__tests__/govern/govern-phase-header-grammar.test.ts",
+    "src/govern/incremental-audit.ts",
+    "src/__tests__/govern/govern-anchor-unification-021.test.ts",
+    "src/govern/protocol.ts",
+    "src/__tests__/govern/govern-rename-scope.test.ts",
+    "src/govern/payload-implement.ts"
+  ]
+}

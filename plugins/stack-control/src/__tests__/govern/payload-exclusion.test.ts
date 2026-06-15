@@ -121,6 +121,7 @@ describe('untracked fold is bounded to the unit path scope (SC-005, parked scaff
     expect(r.diff).toContain('export const B = 2;');
     expect(r.skippedOutOfScope).toEqual([]);
   });
+
 });
 
 describe('committed diff is scoped to the unit path scope (AUDIT-20260612-01)', () => {

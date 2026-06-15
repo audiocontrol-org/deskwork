@@ -29,6 +29,7 @@ const PATHS_KEY_MAP: ReadonlyMap<string, keyof InstallationPaths> = new Map([
   ['inbox', 'inbox'],
   ['backlog', 'backlog'],
   ['audit_log', 'auditLog'],
+  ['fleet_knowledge', 'fleetKnowledge'],
   ['feature_audit_log_pattern', 'featureAuditLogPattern'],
   // session-skills (011) keys.
   ['journal', 'journal'],
