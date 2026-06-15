@@ -14,10 +14,19 @@
 
 ## Settled going in
 
-- **Teeth (v1):** gates are **reported, not enforced** (no hard refusal). But
-  transition **effects are automatic** — when you advance a stage, the tooling
-  (not agent discretion) applies *all* the required doc + status updates. In
-  Jira terms: post-functions automated; conditions/validators reported.
+- **Gate criteria are MECHANICAL, published, unambiguous, debate-free** — this is
+  the heart (see the dedicated section). Every entrance/exit criterion is a
+  computable true/false predicate over artifacts that already exist; the criteria
+  live in the governed `WORKFLOW.md` (published, single source); the engine
+  answers "are we done / how much more / can we move to X" deterministically. The
+  query engine has **standalone value independent of advancing anything.**
+- **Teeth (v1):** gates are **evaluated + reported, not enforced as refusals** (no
+  hard gating). "Report-only" means we tell you the criteria's true/false status;
+  we don't *block*. The criteria themselves are not soft — only the refusal is
+  deferred. Separately, transition **effects are automatic** — when you DO advance,
+  the tooling (not agent discretion) applies all the required doc + status updates.
+  In Jira terms: conditions/validators are mechanical + reported; post-functions
+  automated. But driving is a layer ON TOP of the queryable criteria, not the point.
 - **Unit:** a **roadmap node** (`<phase>:<kind>/<slug>`). "What's next for XYZ"
   reads XYZ as a node. The spec dir is an *artifact produced during XYZ's
   middle phases*, not the unit.
@@ -59,6 +68,65 @@ state field, no second source of truth, no drift:
 
 This is the same computation `session-start` and `roadmap reconcile` already do
 informally — the workflow engine just makes it explicit and total.
+
+---
+
+## Stage gates: mechanical, published, unambiguous — and queryable on their own
+
+**This is the heart of the feature, and it stands independent of "driving."** You
+ask the criteria; you do not have to advance anything. Operator requirement,
+verbatim intent: *entrance and exit criteria for any stage must be mechanical,
+well-publicized, unambiguous, and not subject to debate.*
+
+Every stage publishes two criteria sets in the governed `WORKFLOW.md`: its
+**entrance criteria** (what must hold to enter) and **exit criteria** (what must
+hold to be done). The three hard properties:
+
+- **Mechanical** — every criterion is a computable predicate over artifacts that
+  already exist: *file exists*, *section present*, *count ≥ N*, *tasks 100%*,
+  *tree clean*, *recorded approval present*. No criterion is a judgment call.
+- **Published** — they live in `WORKFLOW.md` (single source), never in skill prose
+  or anyone's head. "What does it take to exit `designing`?" is answered by
+  reading the doc — identically by every agent, every session.
+- **Unambiguous / debate-free** — a criterion evaluates to exactly true/false on
+  the artifacts. There is nothing to argue about.
+
+### Judgment criteria are still mechanical — they check a RECORDED decision
+
+"Is the design actually complete and good?" is a judgment — but the *criterion*
+the engine checks is **"operator approval recorded: yes/no"**, which is mechanical
+and debate-free. The judgment happens in the operator's head; the gate checks the
+recorded marker. Same shape as the whole system: operator decides, tooling records
++ checks the record ("agent posts evidence, operator decides" → the decision, once
+made, is a mechanical fact). **No criterion is a debate; some criteria are a
+recorded operator decision.** That dissolves the mechanical-vs-judgment tension.
+
+### The query surface — your three questions, mechanically answered
+
+| operator asks | engine | answer |
+|---|---|---|
+| "are we done with this stage?" | `workflow status {item}` | current stage's exit criteria — all met? (bool) |
+| "how much more before the next stage?" | `workflow status {item}` | the UNMET exit criteria, enumerated (M of N met) |
+| "can we move to {stage} yet?" | `workflow can-enter {item} {stage}` | {stage}'s entrance criteria — met? + what's missing |
+
+All read-only, deterministic, write nothing. **This query engine is the
+foundation**; the effects/advance manifest is a separate layer built on top. You
+query the gates without ever advancing.
+
+### Example mechanical criteria (strawman)
+
+| stage | exit criteria — every one a true/false predicate |
+|---|---|
+| `designing` | design record exists · required sections present · solution-space ≥ 2 alternatives · operator-approval recorded |
+| `specifying` | spec dir exists · speckit chain complete (`analyze` clean) · spec-govern converged (recorded) |
+| `implementing` | `tasks.md` 100% · suite green (recorded run) · tree clean |
+| `governing` | impl-govern convergence **recorded ∧ converged**  ← needs TASK-19 governance-record |
+| `shipped` | released (version tag present) · post-release verification recorded |
+
+The `governing` row is why TASK-19 (governance-graduation-record) is a real
+prerequisite: without a *recorded* convergence fact, that exit criterion cannot be
+mechanical — it would fall back to "the agent says it's governed," which is exactly
+the debate this feature exists to kill.
 
 ---
 
@@ -236,12 +304,14 @@ instruction you hope its process honors. In-context precedence is best-effort
    exit-gate verifies: required sections present, `design:` pointer set, terminal
    routed to Spec Kit (the workflow *owns* what fires next, so `writing-plans`
    structurally cannot fire). These hold regardless of whether the soft layer held.
-3. **Operator gate — for judgment opinions.** "Is the capture complete? did the
-   backend silently cut scope?" can't be fully checked mechanically (you'd have to
-   already know the full domain). The backstop is the **operator-review gate**
-   (brainstorming already has one) — the agent posts the record, the operator
-   decides it's faithful. The project's "agent posts evidence, operator decides"
-   pattern is precisely the enforcement for un-mechanizable opinions.
+3. **Operator gate — for judgment opinions, recorded as a mechanical fact.** "Is
+   the capture complete? did the backend silently cut scope?" can't be checked by
+   inspecting the artifact alone. The backstop is the **operator-review gate**
+   (brainstorming already has one) — agent posts the record, operator decides it's
+   faithful. Crucially, that decision is **recorded** (an approval marker), and the
+   `designing` exit criterion checks the *marker* — so even this lands as a
+   mechanical, debate-free gate (see Stage gates § judgment criteria). The judgment
+   is the operator's; the criterion is the recorded fact.
 
 ### Single-source opinion: inject AND check from one block
 
