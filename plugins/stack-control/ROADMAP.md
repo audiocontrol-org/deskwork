@@ -59,7 +59,7 @@ Govern the spec, not just the implementation: cross-model audit-barrage over a s
 
 ## design:gap/roadmap-order-gating
 - status: planned
-- part-of: design:feature/roadmap-protocol
+- part-of: multi:feature/parseable-lifecycle-workflow
 - depends-on: design:feature/roadmap-protocol
 The deferred hard out-of-order GATING (006 FR-018): refuse work on an item whose dependencies are not yet shipped. Captured here so the deferral is a tracked roadmap item, never silently dropped.
 
@@ -227,7 +227,8 @@ Retire /dw-lifecycle:review and /dw-lifecycle:audit in favor of audit-barrage as
 
 ## design:gap/roadmap-advance-on-spec-finalize
 - status: planned
-- part-of: design:feature/roadmap-protocol
+- part-of: multi:feature/parseable-lifecycle-workflow
+- depends-on: design:feature/roadmap-protocol
 Advancing a roadmap item's status when its spec is finalized must be NON-DISCRETIONARY (thesis: make it mechanical, never rely on the agent remembering roadmap advance). Add a Spec Kit hook on spec finalization (e.g. after_tasks / after_analyze) that advances the roadmap item whose spec: field points at the just-finalized spec dir to in-flight, resolved via .specify/feature.json. Surfaced as TF-24.
 
 ## design:gap/insight-capture-ideas-stage-handoff
