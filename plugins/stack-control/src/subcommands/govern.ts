@@ -52,7 +52,11 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
-import { parsePhases, resolvePhaseUnit } from '../govern/incremental-audit.js';
+import {
+  carriedExclusivelyCurrentFiles,
+  parsePhases,
+  resolvePhaseUnit,
+} from '../govern/incremental-audit.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
@@ -688,12 +692,17 @@ export async function runGovern(args: string[]): Promise<void> {
             diffScope: { base: diffBase, files: [] },
             auditLogSection: 'after_implement',
           };
-          const carriedFiles = phaseCheckpointStatuses
-            .filter((status) => status.state === 'current')
-            .flatMap((status) => status.files);
-          compositionExcludePaths = Array.from(new Set(carriedFiles)).map((rel) =>
-            join(repoRoot, rel),
+          // Carry only files owned EXCLUSIVELY by current phases — a file shared
+          // with a missing/stale phase must be re-audited, not hidden (021 phase-7
+          // AUDIT-BARRAGE-codex-01; phase ownership is not disjoint — govern.ts
+          // belongs to several phases).
+          const carriedFiles = carriedExclusivelyCurrentFiles(
+            phaseCheckpointStatuses.map((status) => ({
+              files: status.files,
+              current: status.state === 'current',
+            })),
           );
+          compositionExcludePaths = carriedFiles.map((rel) => join(repoRoot, rel));
           // Whole-feature payload (undefined scope) MINUS the carried phase files
           // (compositionExcludePaths, merged into excludePaths below).
           payloadPathScope = undefined;

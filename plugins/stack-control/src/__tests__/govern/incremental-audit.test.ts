@@ -11,7 +11,11 @@
 import { describe, it, expect } from 'vitest';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolvePhaseUnit, parsePhases } from '../../govern/incremental-audit.js';
+import {
+  resolvePhaseUnit,
+  parsePhases,
+  carriedExclusivelyCurrentFiles,
+} from '../../govern/incremental-audit.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TASKS = join(HERE, '..', 'fixtures', 'convergence', 'multi-phase-feature', 'tasks.md');
@@ -62,5 +66,34 @@ describe('phase units record under the per-feature store (FR-008)', () => {
   it('a phase unit uses a per-phase section label', () => {
     const phaseUnit = resolvePhaseUnit({ tasksPath: TASKS, phaseId: '2', diffBase: 'HEAD' });
     expect(phaseUnit.auditLogSection).toBe('phase-2');
+  });
+});
+
+describe('carriedExclusivelyCurrentFiles (US1 composition, 021 phase-7 HIGH)', () => {
+  it('carries a file owned only by current phases', () => {
+    expect(
+      carriedExclusivelyCurrentFiles([
+        { current: true, files: ['a.ts', 'b.ts'] },
+        { current: false, files: ['c.ts'] },
+      ]),
+    ).toEqual(['a.ts', 'b.ts']);
+  });
+
+  it('does NOT carry a file shared by a current AND a non-current phase (no false-clean)', () => {
+    // `shared.ts` belongs to a current phase AND a stale/missing phase — it must be
+    // re-audited (excluded from the carry set), or the non-current phase's work on
+    // it is silently hidden.
+    expect(
+      carriedExclusivelyCurrentFiles([
+        { current: true, files: ['shared.ts', 'only-current.ts'] },
+        { current: false, files: ['shared.ts', 'only-stale.ts'] },
+      ]),
+    ).toEqual(['only-current.ts']);
+  });
+
+  it('carries nothing when every phase is non-current', () => {
+    expect(
+      carriedExclusivelyCurrentFiles([{ current: false, files: ['a.ts'] }]),
+    ).toEqual([]);
   });
 });

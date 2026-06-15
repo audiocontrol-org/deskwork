@@ -113,3 +113,34 @@ export function resolvePhaseUnit(args: ResolvePhaseUnitArgs): AuditUnit {
 // code). The earlier inclusion-based `resolveComposingFeatureUnit` primitive was
 // removed (021 phase-2 audit AUDIT-BARRAGE-codex-01) — it returned an inclusion file
 // list the command discarded, and inclusion silently dropped cross-cutting code.
+
+/** One phase's composition input: its files and whether its checkpoint is current. */
+export interface PhaseCompositionStatus {
+  readonly files: readonly string[];
+  readonly current: boolean;
+}
+
+/**
+ * The files to CARRY (exclude from the whole-feature re-audit): those owned
+ * EXCLUSIVELY by current phases. A file named by BOTH a current phase and a
+ * missing/stale phase must NOT be carried — carrying it would hide the
+ * non-current phase's still-unaudited work on that shared file, producing a
+ * false-clean whole-feature gate (021 phase-7 audit AUDIT-BARRAGE-codex-01).
+ * Phase file ownership is NOT disjoint in practice (e.g. `govern.ts` belongs to
+ * several phases), so the exclusivity check is load-bearing, not defensive.
+ */
+export function carriedExclusivelyCurrentFiles(
+  phases: readonly PhaseCompositionStatus[],
+): readonly string[] {
+  const ownedByNonCurrent = new Set(
+    phases.filter((p) => !p.current).flatMap((p) => p.files),
+  );
+  const carried = new Set<string>();
+  for (const phase of phases) {
+    if (!phase.current) continue;
+    for (const file of phase.files) {
+      if (!ownedByNonCurrent.has(file)) carried.add(file);
+    }
+  }
+  return Array.from(carried);
+}
