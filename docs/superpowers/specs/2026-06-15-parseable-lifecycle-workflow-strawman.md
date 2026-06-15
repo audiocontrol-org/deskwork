@@ -61,7 +61,7 @@ informally — the workflow engine just makes it explicit and total.
 |---|---|---|---|
 | 0 | `captured` | a found bug/gap exists in the backlog | `/stack-control:backlog capture` |
 | 1 | `planned` | promoted to a roadmap node, awaiting design | `roadmap add` / `backlog promote` |
-| 2 | `designing` | **free-form exploration → a design record** (problem domain, solution space, decisions) | a design conversation + `/stack-control:design` (NEW skill) |
+| 2 | `designing` | **free-form exploration → a design record** (problem domain, solution space, decisions, rejected alternatives) | `superpowers:brainstorming` → `docs/superpowers/specs/<date>-<slug>-design.md` |
 | 3 | `specifying` | author + converge the spec (from the design record) | `/stack-control:define` + speckit chain + `govern --mode spec` |
 | 4 | `implementing` | execute the spec (write the code) | `/stack-control:execute` (speckit-implement) |
 | 5 | `governing` | cross-model audit-barrage convergence on the impl | `govern` (after_implement) |
@@ -92,7 +92,7 @@ doc-grammar: workflow
 
 ## phase: designing
 - derive: design record present ∧ no spec dir
-- work: /stack-control:design        # free-form exploration → design record
+- work: superpowers:brainstorming     # produces docs/superpowers/specs/<date>-<slug>-design.md
 - next: specifying
 
 ## phase: specifying
@@ -103,17 +103,16 @@ doc-grammar: workflow
 
 ## transition: planned → designing
 - codename: open-design
-- exit-gate: (none — entering exploration; the record is scaffolded here)
+- exit-gate: (none — entering exploration; superpowers:brainstorming writes the record itself)
 - effect: roadmap advance {item} --to in-flight
-- effect: workflow scaffold-design {item} {design-doc}   # NEW verb — writes the templated record skeleton
-- effect: workflow link-design {item} {design-doc}       # NEW verb (gap)
-- effect: journal append "opened design exploration for {item}"
-- effect: commit "chore(stack-control): open design {design-doc} for {item}"
+- effect: journal append "entered designing for {item}"
+- effect: commit "chore(stack-control): {item} → designing"
 
 ## transition: designing → specifying
 - codename: design-to-spec
-- exit-gate: design record's required sections are all filled (problem domain, solution space, ≥1 decision, open questions)
-- effect: workflow link-spec {item} {spec-dir}    # spec's source-of-truth = the design record
+- exit-gate: design record exists ∧ required sections filled (problem domain, solution space incl. rejected alternatives, ≥1 decision, open questions) ∧ brainstorming's user-review approved
+- effect: workflow link-design {item} {design-doc}   # NEW verb — set node design: field (doc now exists)
+- effect: workflow link-spec {item} {spec-dir}       # spec's source-of-truth = the design record
 - effect: journal append "design finalized {design-doc}; opened spec {spec-dir} for {item}"
 - effect: commit "chore(stack-control): design→spec for {item}"
 
@@ -137,24 +136,30 @@ final decision is incomplete; it must show what was considered and why the
 alternatives lost, so the spec, the implementation, and any future
 re-litigation inherit the reasoning instead of re-deriving it.
 
-The `open-design` transition **scaffolds** the record so it exists from the
-start (hard to skip), and the `design-to-spec` exit-gate checks it's filled
-(reported in v1). Required sections (strawman template):
+**The work surface is `superpowers:brainstorming` — not a new skill.** We don't
+invent the exploration method or the template; brainstorming already:
 
-```
-# <feature> — design record
-- problem domain        : the pain, who has it, why now
-- solution space        : approaches CONSIDERED, incl. ones rejected + why
-- decisions             : what we chose, the reasoning
-- open questions        : explicitly deferred to the spec
-- provenance            : source conversation (date), participants
-```
+- writes + commits `docs/superpowers/specs/<date>-<topic>-design.md` (its step 6);
+- **"always propose 2-3 approaches with trade-offs"** — the capture-rejected-
+  alternatives requirement, built into the method;
+- runs a **user-review gate** ("review the written spec… wait for the response")
+  — the operator-decides-faithfulness gate;
+- runs a **spec self-review** (placeholder / consistency / scope / ambiguity scan);
+- enforces a **HARD-GATE** against implementing before design approval.
+
+So the strawman's capture-faithfulness machinery (open Q#6) is mostly already
+*in* brainstorming. The workflow adds only the **mechanical layer around it**:
+the `design-to-spec` exit-gate verifies the record's required sections are
+present (structural, not judgment), and the transition fires the bookkeeping
+effects (link to node, journal, route to spec).
 
 **This already exists as a convention.** The `docs/superpowers/specs/*-design.md`
-family is exactly this artifact — `2026-06-08-roadmap-protocol-design.md` was
-the named source of truth for spec 006. The workflow doesn't invent the
-artifact; it makes producing it a **named, required phase** instead of an
-operator-remembered habit.
+family IS this artifact — `2026-06-08-roadmap-protocol-design.md` was the named
+source of truth for spec 006 (its frontmatter: `status: design-approved
+(brainstorming output; feeds /speckit-specify)`). The workflow doesn't invent
+the artifact or the skill; it makes producing it a **named, required phase** and
+**redirects brainstorming's terminal handoff** from its hardcoded `writing-plans`
+to Spec Kit (`/speckit-specify` via `/stack-control:define`).
 
 **This document is itself a `designing`-phase artifact** — the free-form
 conversation defining `parseable-lifecycle-workflow`, captured as it happens.
@@ -238,18 +243,24 @@ stackctl workflow advance design:feature/roadmap-protocol --apply
 5. **Reuse vs new.** `workflow next` overlaps `session-start` and `roadmap next`
    heavily. Is the workflow engine a new verb family, or an extension of the
    roadmap reasoner with phase-awareness layered on?
-6. **Capturing a free-form conversation faithfully.** The design record is
-   written by an *agent* from a *conversation* — that's phase WORK, not a
-   mechanical effect. How do we keep it honest/complete (the agent's failure
-   modes are forgetting + hallucination)? Options: a required-section checklist
-   the exit-gate verifies (structural, mechanical); an explicit "capture the
-   rejected alternatives" prompt in the `/stack-control:design` skill body; an
-   operator review gate before `design-to-spec`. Probably all three.
+6. **[MOSTLY RESOLVED] Capturing faithfully = `superpowers:brainstorming`.**
+   Brainstorming already supplies the 2-3-alternatives requirement, the
+   user-review gate, the spec self-review, and the HARD-GATE. The workflow adds
+   only the mechanical required-section exit-gate on top. Not a net-new capture
+   mechanism.
 7. **Mid-stream re-design.** Design also happens AFTER specifying/implementing
    (the `/frontend-design` rule, `feature-extend` re-design). v1 models the
    linear `planned → designing → specifying` case; re-entry to `designing` from
    a later phase is a real case to handle — captured here, not yet designed.
-8. **`/stack-control:design` is a NEW skill.** The spine names it as the
-   `designing`-phase work surface. It doesn't exist yet — it's the conversational
-   exploration skill that produces the design record. New surface this feature
-   implies.
+8. **[RESOLVED] No new design skill.** The `designing` work surface is
+   `superpowers:brainstorming`, not a net-new `/stack-control:design`. The only
+   adaptation: redirect brainstorming's hardcoded `writing-plans` terminal state
+   to Spec Kit — and that routing lives in the `design-to-spec` *transition*, so
+   brainstorming stays workflow-agnostic.
+9. **Deriving `designing` before the doc exists.** Brainstorming writes the
+   `*-design.md` only at its END (step 6). So between entering `designing` and
+   that write, there is no design record to derive on — the item would mis-derive
+   as `planned`. Options: set the node `design:` field on `open-design` (pointer
+   before the file exists, derive on the field) vs. accept a transient
+   "designing, pre-record" sub-state. Needs a decision; the `spec:`-field
+   precedent argues for a `design:` pointer.
