@@ -201,6 +201,72 @@ converged to the full template above — that conversion is the remaining
 
 ---
 
+## Opinion injection — how a frontend bends a backend it doesn't control
+
+This is the reusable crux for *every* stack-control frontend-over-third-party-
+backend (design now; the execution backends later). Get the shape right once.
+
+### The constraint that forces the shape
+
+The design conversation is **interactive** — the operator is in the loop,
+answering clarifying questions one at a time. That means the backend **cannot be
+isolated in a sub-agent** (sub-agents are non-interactive task executors). The
+backend runs in the **main session**, so its SKILL.md instructions (including its
+*conflicting* opinions, e.g. "YAGNI ruthlessly") are unavoidably in the same
+context as the frontend's. **You do not control the backend's process.**
+
+### The principle: bend the backend at the SEAM, not inside its process
+
+Since you can't control a third-party tool's internals, the durable lever is
+**the contract its OUTPUT must satisfy + the gate that enforces it** — not an
+instruction you hope its process honors. In-context precedence is best-effort
+*guidance*; the gate is *teeth*. Stated as a rule for all frontends:
+
+> **Prefer opinions you can gate. An opinion with no mechanical or operator
+> backstop is a weak opinion.** (Thesis: fix agents with environment, not yelling.)
+
+### Three layers, each opinion backed by whichever can check it
+
+1. **Soft — in-context precedence, restated at point-of-use.** The frontend
+   states the opinion up front AND re-injects the override at the *specific
+   backend step where the conflict bites* (e.g. at brainstorming's scope-check
+   self-review: "do NOT cut scope here; capture it as an open question"). A
+   preamble-only override is the version the model forgets mid-conversation.
+2. **Mechanical gate — for structurally checkable opinions.** The `design-to-spec`
+   exit-gate verifies: required sections present, `design:` pointer set, terminal
+   routed to Spec Kit (the workflow *owns* what fires next, so `writing-plans`
+   structurally cannot fire). These hold regardless of whether the soft layer held.
+3. **Operator gate — for judgment opinions.** "Is the capture complete? did the
+   backend silently cut scope?" can't be fully checked mechanically (you'd have to
+   already know the full domain). The backstop is the **operator-review gate**
+   (brainstorming already has one) — the agent posts the record, the operator
+   decides it's faithful. The project's "agent posts evidence, operator decides"
+   pattern is precisely the enforcement for un-mechanizable opinions.
+
+### Single-source opinion: inject AND check from one block
+
+The frontend declares its opinion ONCE as a named, versioned **house-rules block**;
+two consumers read it — the frontend *injects* it into the backend conversation,
+and the exit-gate *checks* against it. (Same one-source-many-consumers shape as
+the governed docs: parsed AND rendered from one file.) Strawman house-rules:
+
+| # | rule | backed by |
+|---|---|---|
+| R1 | capture everything; no unrequested scope-cuts (overrides backend YAGNI) | operator gate |
+| R2 | record has sections {problem, solution-space incl. rejected, decisions, open-Qs, provenance} | mechanical gate |
+| R3 | terminal handoff → Spec Kit, never `writing-plans` | structural (workflow owns next) |
+| R4 | anchored to a roadmap item; `design:` pointer set | mechanical gate |
+
+### Worked against the YAGNI conflict
+
+- **Soft:** frontend re-states "capture, don't cut" at the backend's scope-check step.
+- **Mechanical:** exit-gate confirms the solution-space section exists with ≥2 alternatives.
+- **Operator:** the review gate surfaces the record; operator catches anything dropped.
+
+No single layer is trusted; the opinion that MUST hold is the one with a backstop.
+
+---
+
 ## How the three operator asks map
 
 - **"what's next for XYZ?"** → `stackctl workflow next {item}` — derives the
