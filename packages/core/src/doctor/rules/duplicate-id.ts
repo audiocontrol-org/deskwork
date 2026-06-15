@@ -14,7 +14,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { parseFrontmatter, removeFrontmatterPaths } from '../../frontmatter.ts';
-import { resolveContentDir } from '../../paths.ts';
 import type {
   DoctorContext,
   DoctorRule,
@@ -54,16 +53,20 @@ interface DuplicateGroup {
 
 /**
  * Group `index.byPath` (relPath → uuid) by uuid, return only groups
- * with more than one file. Caller resolves relative paths against
- * the site's contentDir to get absolute paths for repair.
+ * with more than one file.
+ *
+ * Phase 39c (sites→lanes retirement): the doctor's content index is now
+ * built by `buildContentIndexFromSidecars`, whose `byPath` keys are
+ * PROJECT-ROOT-relative (matching `entry.artifactPath`'s base), not
+ * contentDir-relative. So we reconstruct absolute paths by joining
+ * against `projectRoot` — there is no per-site `contentDir` axis.
  */
 export function findDuplicateGroups(
   ctx: DoctorContext,
 ): DuplicateGroup[] {
-  const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, ctx.site);
   const byUuid = new Map<string, string[]>();
   for (const [relPath, uuid] of ctx.index.byPath) {
-    const abs = join(contentDir, relPath);
+    const abs = join(ctx.projectRoot, relPath);
     const list = byUuid.get(uuid);
     if (list) list.push(abs);
     else byUuid.set(uuid, [abs]);

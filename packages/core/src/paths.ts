@@ -25,11 +25,10 @@
  * access to a calendar entry should prefer `findEntryFile`.
  */
 
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import type { DeskworkConfig, SiteConfig } from './config.ts';
 import type { ContentIndex } from './content-index.ts';
 import { buildContentIndex } from './content-index.ts';
-import type { Platform } from './types.ts';
 
 /**
  * Resolve a user-supplied site argument to a configured site slug.
@@ -60,25 +59,25 @@ function siteConfig(config: DeskworkConfig, site: string | null | undefined): Si
   return config.sites[slug];
 }
 
-/** Absolute path to the site's editorial calendar file. */
+/**
+ * Absolute path to the project's editorial calendar file.
+ *
+ * Phase 39c (sites→lanes retirement) — the calendar is a single,
+ * project-level derived projection from sidecars (spec §"Calendar"). The
+ * legacy per-site `calendarPath` is retired; there is one calendar at
+ * `.deskwork/calendar.md`. The `config`/`site` parameters are retained so
+ * call sites (and the CLI-verb resolution path, scoped to 39c-2b) need
+ * not change in lockstep — the de-parameterization is internal. Both are
+ * intentionally ignored. Closes #234 (divergence), #357 (read-side
+ * validator), #223 (regen flip-flop) per spec §"Inherited calendar-surface
+ * cluster".
+ */
 export function resolveCalendarPath(
   projectRoot: string,
-  config: DeskworkConfig,
-  site?: string | null,
+  _config: DeskworkConfig,
+  _site?: string | null,
 ): string {
-  return join(projectRoot, siteConfig(config, site).calendarPath);
-}
-
-/** Absolute path to the site's channels file, or undefined when the site declares none. */
-export function resolveChannelsPath(
-  projectRoot: string,
-  config: DeskworkConfig,
-  site?: string | null,
-): string | undefined {
-  const entry = siteConfig(config, site);
-  return entry.channelsPath === undefined
-    ? undefined
-    : join(projectRoot, entry.channelsPath);
+  return join(projectRoot, '.deskwork', 'calendar.md');
 }
 
 /** Absolute path to the site's blog content directory. */
@@ -90,39 +89,11 @@ export function resolveContentDir(
   return join(projectRoot, siteConfig(config, site).contentDir);
 }
 
-/**
- * Bare public hostname for the site (no protocol). Returns `undefined` for
- * collections that aren't published as a website (no `host` configured).
- * Callers needing a non-undefined value for display should fall back to the
- * site slug; callers needing a real URL should throw if undefined.
- */
-export function resolveSiteHost(
-  config: DeskworkConfig,
-  site?: string | null,
-): string | undefined {
-  return siteConfig(config, site).host;
-}
-
-/**
- * Canonical public base URL for the site, with trailing slash. Throws when
- * the collection has no `host` configured (i.e. is not published as a
- * website) — callers that need a URL must guarantee the collection is a
- * website-rendered one before calling.
- */
-export function resolveSiteBaseUrl(
-  config: DeskworkConfig,
-  site?: string | null,
-): string {
-  const host = resolveSiteHost(config, site);
-  if (host === undefined) {
-    const slug = site ?? config.defaultSite;
-    throw new Error(
-      `Cannot resolve a base URL for collection "${slug}": no "host" is configured. ` +
-        `Add a "host" field to .deskwork/config.json if this collection is published as a website.`,
-    );
-  }
-  return `https://${host}/`;
-}
+// Phase 39c (sites→lanes retirement): `resolveSiteHost` and
+// `resolveSiteBaseUrl` are removed. They had ZERO production call sites
+// (the only `host` reads were two studio files reading `lane.host`
+// directly). Per spec §18 they were effectively dead. Host now lives on
+// the lane (`lane.host`); studio reads it from lane configs.
 
 const DEFAULT_BLOG_FILENAME_TEMPLATE = '{slug}/index.md';
 
@@ -229,129 +200,4 @@ export function findEntryFile(
     );
   }
   return undefined;
-}
-
-/**
- * Resolve the markdown file backing a calendar entry, preferring the
- * UUID frontmatter binding (refactor-proof) and falling back to the
- * site's slug-template only when no binding exists.
- *
- * Equivalent to the studio's `resolveLongformFilePath` but exposed as a
- * top-level helper from `paths.ts` so CLI commands can use it without
- * pulling in `review/` infrastructure. Always returns an absolute path
- * (the slug-template fallback is unconditional); callers should
- * `existsSync` if they need an existence guarantee.
- *
- * Precedence:
- *   1. Content index — when `entryId` is supplied (and non-empty), look
- *      up the file whose frontmatter `deskwork.id:` matches. Refactor-
- *      proof: the binding follows the file regardless of slug rename or
- *      directory relocation.
- *   2. Slug-template fallback — when the index has no record (entry's
- *      file isn't bound to frontmatter yet, e.g. pre-doctor / pre-ingest
- *      state) or no `entryId` was supplied, fall back to
- *      `resolveBlogFilePath(slug)`.
- *
- * @param projectRoot Absolute path to the deskwork project root.
- * @param config Loaded deskwork config.
- * @param site Site slug (or null/undefined for the default site).
- * @param slug Calendar entry slug — used both as the legacy fallback
- *             template input and as a hint for the slug-template fallback.
- * @param entryId Calendar entry's stable UUID. When omitted or empty,
- *                resolution falls straight through to the slug template.
- * @param index Pre-built content index. When omitted, this function
- *              builds one. Pass the per-request memoized index when
- *              calling from the studio; let the CLI build per call.
- */
-export function resolveEntryFilePath(
-  projectRoot: string,
-  config: DeskworkConfig,
-  site: string | null | undefined,
-  slug: string,
-  entryId?: string,
-  index?: ContentIndex,
-): string {
-  if (entryId !== undefined && entryId !== '') {
-    const idx = index ?? buildContentIndex(projectRoot, config, resolveSite(config, site));
-    const hit = idx.byId.get(entryId);
-    if (hit !== undefined) return hit;
-  }
-  return resolveBlogFilePath(projectRoot, config, site, slug);
-}
-
-// ---------------------------------------------------------------------------
-// Phase 21a — shortform file resolution
-// ---------------------------------------------------------------------------
-
-/**
- * Channel must be a kebab-case token. Same shape as a slug segment so the
- * filename remains URL-safe and matches the rest of deskwork's vocabulary.
- */
-const CHANNEL_RE = /^[a-z0-9][a-z0-9-]*$/;
-
-/**
- * Resolve the markdown file path for a shortform draft.
- *
- *   <contentDir>/<entry-dir>/scrapbook/shortform/<platform>[-<channel>].md
- *
- * Platform is the lowercase Platform value. Channel (if present) is appended
- * as `-<channel>`. Channel must validate against the kebab-case regex —
- * deskwork stores channels as kebab-case strings throughout.
- *
- * The entry directory is resolved through `findEntryFile` (id-driven,
- * refactor-proof) with slug-template fallback for legacy entries created
- * pre-doctor. The slug-template fallback is intentional migration logic so
- * pre-bind entries keep working.
- *
- * Forward-compatibility: every reference to the shortform file location
- * goes through this function. Phase 20 (sandbox migration) redirects this
- * single function; everything downstream (handlers, CLI, studio) works
- * unchanged.
- *
- * @param projectRoot Absolute path to the deskwork project root.
- * @param config Loaded deskwork config.
- * @param site Site slug (or null/undefined for the default site).
- * @param entry Calendar entry — `id` preferred, `slug` used both as the
- *              legacy fallback and to identify the entry directory.
- * @param platform Which distribution platform.
- * @param channel Optional sub-channel (e.g. `synthdiy` for r/synthdiy).
- *                Must be kebab-case.
- * @param index Optional pre-built content index (per-request memoization).
- * @returns absolute file path, or undefined when neither the index nor the
- *          slug-template fallback resolves the entry's directory.
- */
-export function resolveShortformFilePath(
-  projectRoot: string,
-  config: DeskworkConfig,
-  site: string,
-  entry: { id?: string; slug: string },
-  platform: Platform,
-  channel?: string,
-  index?: ContentIndex,
-): string | undefined {
-  if (channel !== undefined && channel !== '') {
-    if (!CHANNEL_RE.test(channel)) {
-      throw new Error(
-        `Invalid shortform channel "${channel}": must match ${CHANNEL_RE} ` +
-          `(kebab-case, same shape as a slug segment).`,
-      );
-    }
-  }
-
-  const entryFile = findEntryFile(
-    projectRoot,
-    config,
-    site,
-    entry.id ?? '',
-    index,
-    { slug: entry.slug },
-  );
-  if (entryFile === undefined) return undefined;
-
-  const entryDir = dirname(entryFile);
-  const filename =
-    channel !== undefined && channel !== ''
-      ? `${platform}-${channel}.md`
-      : `${platform}.md`;
-  return join(entryDir, 'scrapbook', 'shortform', filename);
 }

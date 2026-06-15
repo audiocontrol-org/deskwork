@@ -12,7 +12,52 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import { createWorkflow } from '@deskwork/core/review/pipeline';
+import { writeCalendar } from '@deskwork/core/calendar';
 import { createApp } from '../src/server.ts';
+
+/**
+ * Phase 39c-2b(a): the review handlers resolve the workflow file via the
+ * entry's stored `artifactPath`. Bind an entry — calendar row (slug→uuid)
+ * + sidecar (uuid → artifactPath) — so the resolvers have it. Flat
+ * `{slug}.md` template. Returns the entry uuid.
+ */
+let bindCounter = 0;
+function bind(root: string, slug: string): string {
+  const entryId = `00000000-0000-4000-8000-${String(++bindCounter).padStart(12, '0')}`;
+  const artifactPath = `src/sites/a/content/blog/${slug}.md`;
+  mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
+  writeCalendar(join(root, '.deskwork', 'calendar.md'), {
+    entries: [
+      {
+        id: entryId,
+        slug,
+        title: slug,
+        description: '',
+        stage: 'Drafting',
+        targetKeywords: [],
+        source: 'manual',
+      },
+    ],
+    distributions: [],
+  });
+  writeFileSync(
+    join(root, '.deskwork', 'entries', `${entryId}.json`),
+    JSON.stringify({
+      uuid: entryId,
+      slug,
+      title: slug,
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      artifactPath,
+    }),
+    'utf-8',
+  );
+  return entryId;
+}
 
 function makeConfig(): DeskworkConfig {
   return {
@@ -182,9 +227,11 @@ describe('studio API', () => {
       const blogFile = join(root, 'src/sites/a/content/blog', `${slug}.md`);
       mkdirSync(dirname(blogFile), { recursive: true });
       writeFileSync(blogFile, '# v1\n', 'utf-8');
+      const entryId = bind(root, slug);
       const w = createWorkflow(root, cfg, {
         site: 'a',
         slug,
+        entryId,
         contentKind: 'longform',
         initialMarkdown: '# v1\n',
       });
@@ -204,6 +251,7 @@ describe('studio API', () => {
       const blogFile = join(root, 'src/sites/a/content/blog', `${slug}.md`);
       mkdirSync(dirname(blogFile), { recursive: true });
       writeFileSync(blogFile, '# Body', 'utf-8');
+      bind(root, slug);
       const r = await postJson(app, '/api/dev/editorial-review/start-longform', {
         site: 'a',
         slug,
@@ -215,6 +263,9 @@ describe('studio API', () => {
     });
 
     it('returns 404 when the blog file does not exist', async () => {
+      // Entry is bound (sidecar + artifactPath) but the file is absent —
+      // resolution succeeds, the existence check 404s.
+      bind(root, 'missing');
       const r = await postJson(app, '/api/dev/editorial-review/start-longform', {
         site: 'a',
         slug: 'missing',

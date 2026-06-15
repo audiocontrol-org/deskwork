@@ -104,7 +104,6 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
         id: 'default',
         name: 'Default',
         pipelineTemplate: 'editorial',
-        contentDir: 'docs',
       }),
     );
     await writeFile(
@@ -113,7 +112,6 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
         id: 'mockups',
         name: 'Mockups',
         pipelineTemplate: 'visual',
-        contentDir: 'mockups',
       }),
     );
 
@@ -149,7 +147,6 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
         id: 'default',
         name: 'Default',
         pipelineTemplate: 'editorial',
-        contentDir: 'docs',
       }),
     );
     // Entry has no `lane` field (legacy, migration window).
@@ -177,7 +174,6 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
         id: 'default',
         name: 'Default',
         pipelineTemplate: 'editorial',
-        contentDir: 'docs',
       }),
     );
     await writeSidecar(projectRoot, entry('post-a', 'Drafting', { lane: 'default' }));
@@ -202,7 +198,6 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
         id: 'default',
         name: 'Default',
         pipelineTemplate: 'editorial',
-        contentDir: 'docs',
       }),
     );
     // Entry with no lane → routes to the "(unassigned)" lane section.
@@ -233,7 +228,6 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
           id: 'mockups',
           name: 'Mockups',
           pipelineTemplate: 'visual',
-          contentDir: 'mockups',
         }),
       );
       // Entry bound to the valid lane but carrying a stage the
@@ -273,7 +267,6 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
           id: 'default',
           name: 'Default',
           pipelineTemplate: 'editorial',
-          contentDir: 'docs',
         }),
       );
       // Entry references a lane id whose config does NOT exist on disk
@@ -306,7 +299,6 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
           id: 'default',
           name: 'Default',
           pipelineTemplate: 'editorial',
-          contentDir: 'docs',
         }),
       );
       await writeFile(
@@ -315,7 +307,6 @@ describe('regenerateCalendar — multi-lane / #247 regression', () => {
           id: 'mockups',
           name: 'Mockups',
           pipelineTemplate: 'visual',
-          contentDir: 'mockups',
         }),
       );
 

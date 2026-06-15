@@ -14,6 +14,18 @@ Do not unilaterally defer work or let a side observation die as "out of scope."
 - If something adjacent is worth flagging, either fix it now or file an issue immediately.
 - "Noted" is not a disposition.
 
+## Give one workflow step at a time
+
+When the operator asks for the "next step" in a workflow, answer with the single
+immediate next action only.
+
+- Do not bundle the subsequent step into the same answer unless the operator
+  explicitly asks for the full sequence.
+- If a later step is worth mentioning, label it explicitly as later and do not
+  execute it from a generic "do it."
+- If multiple actions are presented, mark one as the default and treat follow-up
+  commands like "do it" as referring to that default only.
+
 ## Packaging is UX
 
 When evaluating a real install, treat the install state as ground truth.

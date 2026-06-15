@@ -61,13 +61,11 @@ describe('listLanes — graceful degradation on malformed configs (AUDIT-2026053
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeLane(projectRoot, 'mockups', {
       id: 'mockups',
       name: 'Mockups',
       pipelineTemplate: 'editorial',
-      contentDir: 'src/mockups',
     });
     writeRawLane(projectRoot, 'broken', '{ not json');
 
@@ -84,7 +82,6 @@ describe('listLanes — graceful degradation on malformed configs (AUDIT-2026053
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
 
     const result = listLanes(projectRoot);

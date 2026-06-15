@@ -1,0 +1,259 @@
+/* =========================================================================
+   sketch-kit.css — the lo-fi WIREFRAME vocabulary for design-control.
+
+   ONE stylesheet, identity-pinnable. Carries the structural `.sk-*` base plus
+   THREE adopter-selectable lo-fi visual languages, each scoped under a root
+   theme class. Select a theme with, e.g., <body class="sk sk-theme-blueprint">.
+   No theme class => the neutral default (grayscale) values apply.
+
+   Self-contained by construction: the only external references are the bundled
+   local OFL fonts under ./fonts/ — no remote URLs, no inline-encoded resources,
+   no stylesheet imports. The fonts are aesthetic only, NOT a determinism claim.
+   ========================================================================= */
+
+/* ---- bundled OFL fonts (local only) ----------------------------------- */
+@font-face {
+  font-family: "Patrick Hand";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/patrick-hand-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Space Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/space-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Space Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/space-mono-700.woff2") format("woff2");
+}
+
+/* ---- neutral defaults (== grayscale theme) ---------------------------- */
+.sk {
+  --sk-font: "Helvetica Neue", Arial, sans-serif;
+  --sk-ink: #2a2a2a;
+  --sk-ink-soft: #7b7b7b;
+  --sk-paper: #ffffff;
+  --sk-fill: #d9d9d9;
+  --sk-fill-2: #ececec;
+  --sk-line: #9a9a9a;
+  --sk-accent: #d9d9d9;
+  --sk-accent-ink: #2a2a2a;
+  --sk-radius: 2px;
+  --sk-border: 1px dashed var(--sk-line);
+  --sk-shadow: none;
+  --sk-ground: var(--sk-paper);
+  --sk-ground-img: none;
+  --sk-ground-size: auto;
+  --sk-line-fill: var(--sk-fill);
+
+  margin: 0;
+  font-family: var(--sk-font);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--sk-ink);
+  background-color: var(--sk-ground);
+  background-image: var(--sk-ground-img);
+  background-size: var(--sk-ground-size);
+  -webkit-font-smoothing: antialiased;
+}
+.sk *,
+.sk *::before,
+.sk *::after { box-sizing: border-box; }
+
+/* ---- theme: MARKER (hand-drawn) --------------------------------------- */
+.sk-theme-marker {
+  --sk-font: "Patrick Hand", "Bradley Hand", "Comic Sans MS", cursive;
+  --sk-ink: #2b2b2b;
+  --sk-ink-soft: #6f6f6f;
+  --sk-paper: #f7f4ec;
+  --sk-fill: #efe9da;
+  --sk-fill-2: #efe9da;
+  --sk-line: #3a3a3a;
+  --sk-accent: #b54a2f;
+  --sk-accent-ink: #ffffff;
+  --sk-radius: 14px 6px 13px 7px;          /* hand-drawn wobble */
+  --sk-border: 2px solid var(--sk-line);
+  --sk-shadow: 2px 3px 0 #00000018;
+  --sk-ground: var(--sk-paper);
+  --sk-ground-img: repeating-linear-gradient(transparent 0 31px, #0000000a 31px 32px);
+  --sk-ground-size: auto;
+  --sk-line-fill: repeating-linear-gradient(90deg, #0000 0 2px, var(--sk-ink-soft) 2px 3px);
+  font-size: 17px;
+}
+
+/* ---- theme: BLUEPRINT (engineering grid) ------------------------------ */
+.sk-theme-blueprint {
+  --sk-font: "Space Mono", "Courier New", monospace;
+  --sk-ink: #dff2fb;
+  --sk-ink-soft: #8fc4dc;
+  --sk-paper: #0d2536;
+  --sk-fill: #123448;
+  --sk-fill-2: #0d2536;
+  --sk-line: #5fb6d6;
+  --sk-accent: #ffd24a;
+  --sk-accent-ink: #0e2a3b;
+  --sk-radius: 0;
+  --sk-border: 1px solid var(--sk-line);
+  --sk-shadow: none;
+  --sk-ground: #0e2a3b;
+  --sk-ground-img:
+    linear-gradient(#ffffff14 1px, transparent 1px),
+    linear-gradient(90deg, #ffffff14 1px, transparent 1px);
+  --sk-ground-size: 24px 24px;
+  --sk-line-fill: repeating-linear-gradient(90deg, var(--sk-ink-soft) 0 6px, transparent 6px 10px);
+  letter-spacing: 0.01em;
+}
+
+/* ---- theme: GRAYSCALE (flat blocks) — explicit re-statement ----------- */
+.sk-theme-grayscale {
+  --sk-font: "Helvetica Neue", Arial, sans-serif;
+  --sk-ink: #2a2a2a;
+  --sk-ink-soft: #7b7b7b;
+  --sk-paper: #ffffff;
+  --sk-fill: #d9d9d9;
+  --sk-fill-2: #ececec;
+  --sk-line: #9a9a9a;
+  --sk-accent: #d9d9d9;
+  --sk-accent-ink: #2a2a2a;
+  --sk-radius: 2px;
+  --sk-border: 1px dashed var(--sk-line);
+  --sk-shadow: none;
+  --sk-ground: #ffffff;
+  --sk-ground-img: none;
+  --sk-line-fill: var(--sk-fill);
+}
+
+/* ---- shared bordered idiom -------------------------------------------- */
+.sk-card,
+.sk-img,
+.sk-btn,
+.sk-box,
+.sk-search,
+.sk-logo,
+.sk-avatar,
+.sk-nav {
+  border: var(--sk-border);
+  border-radius: var(--sk-radius);
+  box-shadow: var(--sk-shadow);
+  background: var(--sk-paper);
+}
+
+/* ---- self-labeling WIREFRAME banner ----------------------------------- */
+.sk-banner {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 1rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: var(--sk-ink);
+  color: var(--sk-paper);
+  border-bottom: var(--sk-border);
+}
+.sk-banner strong {
+  padding: 0.08rem 0.55rem;
+  letter-spacing: 0.2em;
+  background: var(--sk-accent);
+  color: var(--sk-accent-ink);
+}
+.sk-theme-marker .sk-banner { background: #fff4d6; color: #7a5a16; }
+.sk-theme-marker .sk-banner strong { border-radius: 3px 9px 4px 8px; transform: rotate(-1.2deg); }
+
+/* ---- shell + header --------------------------------------------------- */
+.sk-shell { max-width: 1080px; margin: 0 auto; padding: 1.4rem 1.2rem 3rem; }
+.sk-header { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.1rem; }
+.sk-logo {
+  width: 50px; height: 50px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  font-size: 0.7rem; color: var(--sk-ink-soft); background: var(--sk-fill);
+}
+.sk-h1 { flex: 1; margin: 0; font-size: 1.6rem; }
+.sk-search {
+  flex: 0 0 220px; padding: 0.5rem 0.75rem;
+  color: var(--sk-ink-soft); background: var(--sk-fill-2);
+  border-style: dashed; font-size: 0.88rem;
+}
+.sk-avatar {
+  width: 42px; height: 42px; flex: 0 0 auto; border-radius: 50%;
+  display: grid; place-items: center; font-size: 0.7rem;
+  color: var(--sk-ink-soft); background: var(--sk-fill);
+}
+
+/* ---- nav -------------------------------------------------------------- */
+.sk-nav { display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0.4rem; margin-bottom: 1.3rem; }
+.sk-nav-item { padding: 0.4rem 0.9rem; border-radius: var(--sk-radius); color: var(--sk-ink-soft); }
+.sk-nav-item.sk-current { background: var(--sk-fill); color: var(--sk-ink); }
+.sk-theme-blueprint .sk-nav-item.sk-current { background: var(--sk-line); color: var(--sk-paper); }
+
+/* ---- rows / stats ----------------------------------------------------- */
+.sk-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+.sk-stats { margin-bottom: 1.2rem; }
+.sk-stat { flex: 1 1 160px; padding: 1rem; }
+.sk-num { font-size: 2.2rem; line-height: 1; color: var(--sk-ink-soft); }
+.sk-theme-blueprint .sk-num { color: var(--sk-accent); }
+.sk-label { font-size: 0.9rem; color: var(--sk-ink-soft); }
+
+/* ---- main / cards ----------------------------------------------------- */
+.sk-main { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1rem; }
+.sk-card { padding: 1rem 1.1rem; }
+.sk-title {
+  margin: 0.1rem 0 0.8rem; padding-bottom: 0.35rem; font-size: 1.05rem;
+  border-bottom: var(--sk-border);
+}
+
+/* ---- placeholder text lines (never real copy) ------------------------- */
+.sk-line { height: 0.8rem; margin: 0.55rem 0; border-radius: var(--sk-radius); background: var(--sk-line-fill); opacity: 0.85; }
+.sk-theme-marker .sk-line { opacity: 0.5; }
+.sk-theme-blueprint .sk-line { opacity: 0.6; }
+.sk-line-s { width: 55%; }
+.sk-line-m { width: 78%; }
+.sk-line-l { width: 95%; }
+
+.sk-listrow { display: flex; align-items: center; gap: 0.7rem; padding: 0.5rem 0; border-bottom: var(--sk-border); }
+.sk-listrow .sk-line { flex: 1; margin: 0; }
+.sk-dot { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 50%; background: var(--sk-fill); }
+
+/* ---- the fixed crossed-box image placeholder -------------------------- */
+/* The two gradients each draw a thin band at the midpoint of a corner-to-corner
+   axis, which renders the OPPOSITE diagonal — together a full X that reaches the
+   corners at ANY aspect ratio. */
+.sk-img {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--sk-ink-soft);
+  font-size: 0.85rem;
+  background-color: var(--sk-fill-2);
+  background-image:
+    linear-gradient(to bottom right, transparent calc(50% - 0.8px), var(--sk-line) calc(50% - 0.8px) calc(50% + 0.8px), transparent calc(50% + 0.8px)),
+    linear-gradient(to bottom left, transparent calc(50% - 0.8px), var(--sk-line) calc(50% - 0.8px) calc(50% + 0.8px), transparent calc(50% + 0.8px));
+}
+.sk-img-label { position: relative; padding: 0.12rem 0.55rem; background: var(--sk-fill-2); }
+
+/* ---- buttons ---------------------------------------------------------- */
+.sk-actions { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-top: 1.2rem; }
+.sk-btn { padding: 0.55rem 1.15rem; font-family: inherit; font-size: 0.92rem; color: var(--sk-ink); background: var(--sk-paper); cursor: default; }
+.sk-btn-primary { background: var(--sk-accent); color: var(--sk-accent-ink); border-style: solid; border-color: var(--sk-line); }
+
+/* ---- footer ----------------------------------------------------------- */
+.sk-foot { margin-top: 2rem; text-align: center; font-size: 0.85rem; color: var(--sk-ink-soft); }
+
+/* ---- responsive ------------------------------------------------------- */
+@media (max-width: 720px) {
+  .sk-main { grid-template-columns: 1fr; }
+}

@@ -21,8 +21,8 @@ import { readConfig } from '@deskwork/core/config';
 import {
   resolveSite,
   resolveCalendarPath,
-  resolveShortformFilePath,
 } from '@deskwork/core/paths';
+import { composeShortformFileForWorkflow } from '../lib/shortform-file.ts';
 import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
 import { parseFrontmatter } from '@deskwork/core/frontmatter';
 import { handleGetWorkflow } from '@deskwork/core/review/handlers';
@@ -183,25 +183,30 @@ async function runShortformApprove(
   const approveAnn = latestApprove(annotations);
   const approvedVersion = approveAnn?.version ?? workflow.currentVersion;
 
-  if (!flags.platform) fail('--platform is required for shortform workflows');
-  if (!isPlatform(flags.platform)) fail(`Invalid --platform "${flags.platform}".`);
+  const platform = flags.platform;
+  if (platform === undefined) fail('--platform is required for shortform workflows');
+  if (!isPlatform(platform)) fail(`Invalid --platform "${platform}".`);
 
   // Phase 21a: shortform is now disk-backed. Read the on-disk file as
   // the SSOT — the journal version is just the latest snapshot, but
   // every save writes to disk first. Strip the frontmatter so the
   // calendar's `## Shortform Copy` section captures the body only.
-  const filePath = resolveShortformFilePath(
-    projectRoot,
-    config,
-    site,
-    { slug },
-    flags.platform,
-    flags.channel,
-  );
-  if (filePath === undefined || !existsSync(filePath)) {
-    const shown = filePath ?? '(unresolved)';
+  // Phase 39c-2b(a): the file path is COMPOSED from the parent entry's
+  // stored artifactPath dir (spec AUDIT-35) — no slug-template search.
+  let filePath: string;
+  try {
+    filePath = await composeShortformFileForWorkflow(
+      projectRoot,
+      workflow,
+      platform,
+      flags.channel,
+    );
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+  if (!existsSync(filePath)) {
     fail(
-      `Shortform file missing at ${shown}. ` +
+      `Shortform file missing at ${filePath}. ` +
         `The file is the SSOT — re-run /deskwork:shortform-start if needed.`,
     );
   }

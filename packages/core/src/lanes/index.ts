@@ -26,6 +26,20 @@ export {
 
 export { detectArtifactKind } from './detection.ts';
 
+// Phase 39c-2b (sub-task b) — add-time artifactPath composition. The
+// directory comes from the lane's `scaffoldDefaults['markdown']`; the
+// on-disk shape comes from the layout; the slug fills the rest. Markdown
+// only — a non-markdown kind throws. Fails loudly when the lane declares
+// no markdown default.
+export {
+  composeAddArtifactPath,
+  layoutToContentRelativePath,
+  parseScaffoldLayout,
+  DEFAULT_SCAFFOLD_LAYOUT,
+  SCAFFOLD_LAYOUTS,
+  type ScaffoldLayout,
+} from './scaffold-path.ts';
+
 export {
   bootstrapDefaultLaneIfMissing,
   type BootstrapResult,

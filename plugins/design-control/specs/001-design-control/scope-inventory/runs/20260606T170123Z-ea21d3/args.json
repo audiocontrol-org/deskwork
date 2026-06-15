@@ -1,0 +1,13 @@
+{
+  "featureSlug": "design-control",
+  "prdPath": "/Users/orion/work/deskwork-work/design-control/docs/1.0/001-IN-PROGRESS/design-control/prd.md",
+  "outPath": "/Users/orion/work/deskwork-work/design-control/docs/1.0/001-IN-PROGRESS/design-control/scope-manifest.yaml",
+  "repoRoot": "/Users/orion/work/deskwork-work/design-control",
+  "moduleRoot": "plugins/design-control/src",
+  "evidenceTrail": true,
+  "quiet": false,
+  "moduleSymmetryOut": null,
+  "noAuditRead": false,
+  "noAuditFire": false,
+  "noRequireModules": false
+}

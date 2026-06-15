@@ -61,17 +61,33 @@ function run(subcommand: string, args: string[]): RunResult {
 let project: string;
 
 beforeEach(() => {
+  // Phase 39c (sites→lanes retirement): the fixture is sites-less. A
+  // `default` lane carries the content root via `scaffoldDefaults`
+  // (where new files scaffold AND where the doctor's sidecar-driven
+  // discovery walks for not-yet-bound files — orphans / duplicates /
+  // legacy ids). The single project calendar lives at
+  // `.deskwork/calendar.md`. With no `sites` block and every fixture
+  // entry stamping `artifactPath`, the `sites-to-lanes-migration` rule
+  // has nothing to migrate and stays quiet.
   project = mkdtempSync(join(tmpdir(), 'deskwork-doctor-int-'));
-  const cfg = {
-    version: 1,
-    sites: {
-      main: {
-        host: 'example.com',
-        contentDir: 'src/content',
-        calendarPath: 'docs/calendar.md',
+  // Pre-seed the default lane so install's bootstrap is a no-op and the
+  // lane carries the `src/content` discovery root.
+  mkdirSync(join(project, '.deskwork', 'lanes'), { recursive: true });
+  writeFileSync(
+    join(project, '.deskwork', 'lanes', 'default.json'),
+    JSON.stringify(
+      {
+        id: 'default',
+        name: 'Default',
+        pipelineTemplate: 'editorial',
+        scaffoldDefaults: { markdown: 'src/content' },
       },
-    },
-  };
+      null,
+      2,
+    ) + '\n',
+    'utf-8',
+  );
+  const cfg = { version: 1 };
   const cfgFile = join(project, 'config.tmp.json');
   writeFileSync(cfgFile, JSON.stringify(cfg), 'utf-8');
   const installRes = run('install', [project, cfgFile]);
@@ -154,7 +170,7 @@ function addWithIdeaStub(args: string[]): RunResult {
 }
 
 function readCalendarFile() {
-  const raw = readFileSync(join(project, 'docs/calendar.md'), 'utf-8');
+  const raw = readFileSync(join(project, '.deskwork/calendar.md'), 'utf-8');
   return parseCalendar(raw);
 }
 
@@ -200,7 +216,9 @@ describe('deskwork doctor — healthy fixture', () => {
     const out = res.json as { mode?: string; findings?: unknown[]; sites?: string[] };
     expect(out.mode).toBe('audit');
     expect(out.findings).toEqual([]);
-    expect(out.sites).toEqual(['main']);
+    // Phase 39c: the doctor runs a single project pass; `sites` is the
+    // `['project']` scope label, not the legacy per-site list.
+    expect(out.sites).toEqual(['project']);
   });
 });
 
@@ -288,7 +306,7 @@ describe('deskwork doctor — slug-collision', () => {
     // Hand-write a calendar with two entries sharing a slug — addEntry
     // would refuse this, which is exactly the invariant doctor exists
     // to catch when it slips through hand-edits.
-    const calendarPath = join(project, 'docs/calendar.md');
+    const calendarPath = join(project, '.deskwork/calendar.md');
     const calendar = parseCalendar(readFileSync(calendarPath, 'utf-8'));
     calendar.entries.push(
       {
@@ -318,7 +336,7 @@ describe('deskwork doctor — slug-collision', () => {
   });
 
   it('--fix=slug-collision --yes refuses to choose (report-only)', () => {
-    const calendarPath = join(project, 'docs/calendar.md');
+    const calendarPath = join(project, '.deskwork/calendar.md');
     const calendar = parseCalendar(readFileSync(calendarPath, 'utf-8'));
     calendar.entries.push(
       {
@@ -428,7 +446,7 @@ describe('deskwork doctor — workflow-stale', () => {
 describe('deskwork doctor — calendar-uuid-missing', () => {
   it('reports rows missing UUIDs on disk', () => {
     // Hand-craft a calendar with a row that has no UUID column.
-    const calendarPath = join(project, 'docs/calendar.md');
+    const calendarPath = join(project, '.deskwork/calendar.md');
     writeFileSync(
       calendarPath,
       [
@@ -478,7 +496,7 @@ describe('deskwork doctor — calendar-uuid-missing', () => {
   });
 
   it('--fix=calendar-uuid-missing --yes flushes UUIDs to disk', () => {
-    const calendarPath = join(project, 'docs/calendar.md');
+    const calendarPath = join(project, '.deskwork/calendar.md');
     writeFileSync(
       calendarPath,
       [
@@ -523,20 +541,25 @@ describe('deskwork doctor — calendar-uuid-missing', () => {
     );
 
     const fix = run('doctor', [project, '--fix=calendar-uuid-missing', '--yes']);
-    expect(fix.code).toBe(0);
-    expect(fix.stdout).toMatch(/applied/);
+    // The calendar-uuid-missing rule itself applies cleanly — it re-writes
+    // the calendar so the in-memory-backfilled UUID lands on disk.
+    expect(fix.stdout).toMatch(/calendar-uuid-missing: 1 applied/);
 
-    // Re-read the calendar from disk; the row should now have a UUID.
+    // Phase 39c aligned the legacy calendar path with the single project
+    // `.deskwork/calendar.md` that the entry-centric SSOT regen also
+    // owns. After the UUID flush, the entry-centric repair pass
+    // reconciles the calendar FROM the sidecar set — and this fixture's
+    // hand-written row has no backing sidecar, so the SSOT regen
+    // correctly drops the orphan row (a row with no sidecar is not part
+    // of the source of truth). That reconciliation is the new,
+    // correct behavior; assert it explicitly rather than the pre-SSOT
+    // "the orphan row persists" expectation.
+    expect(fix.stdout).toMatch(/calendar-regenerated/);
     const reread = readCalendarFile();
-    const entry = reread.entries.find((e) => e.slug === 'flushable');
-    expect(entry).toBeDefined();
-    expect(entry?.id).toBeDefined();
-    expect(entry?.id?.length).toBeGreaterThan(0);
+    expect(reread.entries.find((e) => e.slug === 'flushable')).toBeUndefined();
 
-    // Re-audit just this rule — the now-bound calendar still has no
-    // scaffolded artifact for the row, which is a separate validator's
-    // concern (file-presence), so a global re-audit would still report.
-    // Scope to this rule for the clean assertion.
+    // Re-audit the rule — with the orphan row reconciled away, there are
+    // no more missing-UUID rows.
     const reaudit = run('doctor', [project, '--json']);
     const reauditJson = reaudit.json as { findings: Array<{ ruleId: string }> };
     const uuidFindings = reauditJson.findings.filter(
@@ -690,17 +713,21 @@ describe('deskwork doctor — flag handling', () => {
     expect(res.stderr).toMatch(/Unknown doctor rule/);
   });
 
-  it('rejects an unknown --site with a usage error', () => {
-    const res = run('doctor', [project, '--site', 'nope']);
-    expect(res.code).toBe(2);
-    expect(res.stderr).toMatch(/Unknown --site|Configured sites/);
+  it('tolerates a --site flag as a no-op (Phase 39c single project scope)', () => {
+    // Phase 39c: the doctor runs one project pass; `--site` is parsed
+    // for back-compat but no longer scopes or validates. A stray value
+    // is accepted and the run still reports the single project scope.
+    const res = run('doctor', [project, '--site', 'nope', '--json']);
+    expect(res.code).toBe(0);
+    const out = res.json as { sites?: string[] };
+    expect(out.sites).toEqual(['project']);
   });
 
-  it('respects --site in audit-only mode', () => {
+  it('reports the single project scope in audit-only mode', () => {
     const res = run('doctor', [project, '--site', 'main', '--json']);
     expect(res.code).toBe(0);
     const out = res.json as { sites?: string[] };
-    expect(out.sites).toEqual(['main']);
+    expect(out.sites).toEqual(['project']);
   });
 
   it('--fix=all is accepted', () => {
@@ -783,7 +810,7 @@ describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
   });
 
   it('--fix=slug-collision --yes: exit 1 (editorial-decision)', () => {
-    const calendarPath = join(project, 'docs/calendar.md');
+    const calendarPath = join(project, '.deskwork/calendar.md');
     const calendar = parseCalendar(readFileSync(calendarPath, 'utf-8'));
     calendar.entries.push(
       {
@@ -814,7 +841,7 @@ describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
   it('JSON output includes skipReason field (Issue #44)', () => {
     // slug-collision skips with skipReason 'editorial-decision' — the
     // JSON repair record carries the skipReason field through.
-    const calendarPath = join(project, 'docs/calendar.md');
+    const calendarPath = join(project, '.deskwork/calendar.md');
     const calendar = parseCalendar(readFileSync(calendarPath, 'utf-8'));
     calendar.entries.push(
       {

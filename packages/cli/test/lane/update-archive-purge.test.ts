@@ -31,7 +31,7 @@ describe('deskwork lane update', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
   });
 
@@ -41,10 +41,22 @@ describe('deskwork lane update', () => {
     expect(readLaneJson(project, 'default')['name']).toBe('Primary');
   });
 
-  it('mutates --content-dir in place', () => {
-    const res = lane(project, 'update', 'default', '--content-dir', 'content');
+  it('mutates --scaffold-default in place', () => {
+    const res = lane(
+      project,
+      'update', 'default',
+      '--scaffold-default', 'markdown=content',
+    );
     expect(res.code).toBe(0);
-    expect(readLaneJson(project, 'default')['contentDir']).toBe('content');
+    expect(readLaneJson(project, 'default')['scaffoldDefaults']).toEqual({
+      markdown: 'content',
+    });
+  });
+
+  it('mutates --host in place', () => {
+    const res = lane(project, 'update', 'default', '--host', 'example.com');
+    expect(res.code).toBe(0);
+    expect(readLaneJson(project, 'default')['host']).toBe('example.com');
   });
 
   it('cross-validates --template before committing', () => {
@@ -65,23 +77,25 @@ describe('deskwork lane update', () => {
       project,
       'update', 'default',
       '--name', 'Primary',
-      '--content-dir', 'content',
+      '--scaffold-default', 'markdown=content',
     );
     expect(res.code).toBe(0);
     const parsed = JSON.parse(res.stdout) as { changedFields: string[] };
-    expect(parsed.changedFields.sort()).toEqual(['contentDir', 'name']);
+    expect(parsed.changedFields.sort()).toEqual(['name', 'scaffoldDefaults']);
   });
 
-  it('refuses --content-dir that resolves outside the project root', () => {
+  it('refuses a --scaffold-default dir that resolves outside the project root', () => {
     const res = lane(
       project,
       'update', 'default',
-      '--content-dir', '../../tmp/foo',
+      '--scaffold-default', 'markdown=../../tmp/foo',
     );
     expect(res.code).not.toBe(0);
-    expect(res.stderr).toMatch(/Invalid contentDir/);
+    expect(res.stderr).toMatch(/Invalid scaffoldDefaults dir/);
     // Lane config unchanged
-    expect(readLaneJson(project, 'default')['contentDir']).toBe('docs');
+    expect(readLaneJson(project, 'default')['scaffoldDefaults']).toEqual({
+      markdown: 'docs',
+    });
   });
 });
 
@@ -91,7 +105,7 @@ describe('deskwork lane archive / restore', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
   });
 
@@ -130,7 +144,7 @@ describe('deskwork lane purge', () => {
       id: 'mockups',
       name: 'Mockups',
       pipelineTemplate: 'editorial',
-      contentDir: 'src/mockups',
+      scaffoldDefaults: { markdown: 'src/mockups' },
     });
   });
 

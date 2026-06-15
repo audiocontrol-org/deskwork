@@ -28,7 +28,7 @@
 
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
-import { resolveContentDir } from '../../paths.ts';
+import { collectSidecarArtifactDirs } from '../../content-index.ts';
 import {
   parseFrontmatter,
   removeFrontmatterPaths,
@@ -163,22 +163,21 @@ const rule: DoctorRule = {
   label: 'Frontmatter id at top level should be under `deskwork:` namespace',
 
   async audit(ctx: DoctorContext): Promise<Finding[]> {
-    const contentDir = resolveContentDir(
-      ctx.projectRoot,
-      ctx.config,
-      ctx.site,
-    );
+    // Phase 39c (sites→lanes retirement): discovery is sidecar-driven —
+    // walk each entry's resolved artifact directory rather than a
+    // configured site `contentDir`. The sidecar is the SSOT; legacy
+    // top-level-id files live alongside the entries that reference them.
+    const roots = await collectSidecarArtifactDirs(ctx.projectRoot);
     const calendarIds = new Set<string>();
     for (const e of ctx.calendar.entries) {
       if (e.id) calendarIds.add(e.id);
     }
 
-    let files: string[];
-    try {
-      files = collectMarkdownFiles(contentDir);
-    } catch {
-      return [];
+    const seen = new Set<string>();
+    for (const root of roots) {
+      for (const abs of collectMarkdownFiles(root)) seen.add(abs);
     }
+    const files = [...seen].sort();
 
     const findings: Finding[] = [];
     for (const abs of files) {

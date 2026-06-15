@@ -197,11 +197,27 @@ describe('deskwork ingest --apply writes entry-centric sidecar (Issue #183)', ()
     const ingestRes = run('ingest', [project, '--apply', 'src/content/posts/']);
     expect(ingestRes.code).toBe(0);
 
-    const doctorRes = run('doctor', [project, '--check']);
-    // Doctor exit code is 0 when no findings; we accept 0 here.
-    expect(doctorRes.code).toBe(0);
+    const doctorRes = run('doctor', [project, '--check', '--json']);
+    // The assertion is specifically that ingest leaves NO calendar-sidecar
+    // drift — the calendar row and the entry sidecar agree.
     expect(doctorRes.stdout).not.toContain('calendar-sidecar');
     expect(doctorRes.stderr).not.toContain('calendar-sidecar');
+
+    // Phase 39c (sites→lanes retirement): this fixture installs with a
+    // `sites` block (the ingest CLI-verb path still resolves through it
+    // until 39c-2b migrates that path). With `sites` present, the
+    // sites-to-lanes-migration rule legitimately fires a detection
+    // warning. That warning is the ONLY finding — assert it is, so this
+    // test stays a precise calendar-sidecar-drift regression and not a
+    // catch-all exit-code check.
+    const out = JSON.parse(doctorRes.stdout) as {
+      findings?: Array<{ ruleId: string }>;
+    };
+    const ruleIds = new Set((out.findings ?? []).map((f) => f.ruleId));
+    expect(ruleIds.has('calendar-sidecar')).toBe(false);
+    for (const id of ruleIds) {
+      expect(id).toBe('sites-to-lanes-migration');
+    }
   });
 
   it('--no-write-frontmatter still writes the sidecar (calendar.md must reference a real sidecar)', () => {
@@ -214,9 +230,10 @@ describe('deskwork ingest --apply writes entry-centric sidecar (Issue #183)', ()
     expect(res.code).toBe(0);
 
     // The source file is unmodified — so we can't read the UUID from
-    // its frontmatter. Instead read it from the calendar row.
+    // its frontmatter. Instead read it from the calendar row. Phase 39c:
+    // the calendar is the single project file at `.deskwork/calendar.md`.
     const calendarRaw = readFileSync(
-      join(project, 'docs', 'calendar.md'),
+      join(project, '.deskwork', 'calendar.md'),
       'utf-8',
     );
     const uuidMatch = calendarRaw.match(

@@ -1,0 +1,2871 @@
+Reading prompt from stdin...
+OpenAI Codex v0.136.0
+--------
+workdir: /Users/orion/work/deskwork-work/design-control
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019eb708-834a-7b22-a1d3-c05d1f6a46fb
+--------
+user
+# Audit-barrage — multi-model audit prompt template
+
+You are an **independent audit reviewer** firing as part of a multi-model audit barrage. Your siblings (other CLIs running this same prompt in parallel) emit their own findings independently; the operator triages all of your outputs side-by-side after every model has settled. Your job is to surface the kinds of defects listed under **What to look for** below, in the work product captured under **Under audit**.
+
+You are NOT collaborating with the other models. You write what you see. The cross-model genetic diversity comes from each of you reporting independently.
+
+## Feature under audit
+
+design-control
+
+## Feature scope (workplan / PRD summary)
+
+Governance pass over the just-implemented work for feature 'design-control', diffed against 0391a0c0. The differentiated back half audits a plan it did not author or execute.
+
+## Commit subjects in the audited range
+
+8fad5abe docs(design-control): disposition AUDIT-20260611-30..34 — round-3 barrage findings fixed
+fd1f6bfa fix(design-control): combinator-spacing normalization + drive-relative path rejection (round-3 barrage, final pair)
+cb9542f4 fix(design-control): code blocks are inert to the spec parser; line-attempt guard calibrated to id shape (round-3 barrage, parser pair)
+725389bc fix(design-control): pin the plugin tsconfig in every bin shim — the documented repo-root invocation works (round-3 barrage, HIGH)
+ca2046f2 docs(design-control): disposition AUDIT-20260611-22..29 — round-2 barrage findings fixed; backlog TASK-19
+258d6476 fix(design-control): stable capability statements in source comments + agent-authored workplan annotations; AUDIT-21 scope recorded (round-2 barrage, codex-03 + claude-05)
+165e69b7 fix(design-control): machine-rooted css paths are malformed — specs stay portable with their collection (round-2 barrage, codex-02)
+ee05786d fix(design-control): canonical value comparison replaces strip-to-empty in liveness matching (round-2 barrage, selector pair)
+b4284b33 fix(design-control): generalize + calibrate the rule-attempt guard; single-pass for all excluded sections (round-2 barrage, heading-guard trio)
+b36b90b7 docs(design-control): disposition AUDIT-20260611-15..21 — all seven Phase 2 barrage findings fixed
+03ae9291 fix(design-control): capability statements replace temporal deferral phrasing in operator-facing surfaces (AUDIT-20260611-21)
+76a06559 fix(design-control): functional pseudo-class args don't satisfy liveness — exclusion is not styling (AUDIT-20260611-18)
+d4c26551 fix(design-control): single-pass defect surfacing — no fix-and-rerun finding waves (AUDIT-20260611-19, AUDIT-20260611-20)
+76e1cefd fix(design-control): normalize liveness query like the prelude — quoted attribute selectors are linkable (AUDIT-20260611-17)
+7a3c37be fix(design-control): normalize curly-apostrophe field keys — don’t (U+2019) is don't (AUDIT-20260611-16)
+9f5d9a46 fix(design-control): heading-level typo guard — near-miss rule headings are findings, never silent drops (AUDIT-20260611-15)
+bc650cad docs(design-control): check off Phase 2 tasks; roadmap phase-2 → in-flight
+4650ee66 feat(design-control): translate-design-language authoring skill (Phase 2)
+5853f83f feat(design-control): static link-liveness + bin/check-design-spec (Phase 2)
+b2659452 feat(design-control): design-language spec schema + example-presence validation (Phase 2)
+
+
+## Recent audit-log excerpt (prior findings on this feature)
+
+Use this to avoid re-reporting findings that have already been triaged. If a finding was previously dispositioned (`closed`, `won't-fix`, `accepted-trade-off`), don't re-litigate the disposition; only surface a new instance if the underlying shape regressed.
+
+
+Blast radius: medium — the phantom-rule direction is a silent wrong outcome on a green verdict (downstream consumers of `spec.rules` receive a documentation artifact as design language, and the operator-shown rule count is inflated), but it requires the author to embed example blocks in the spec, which is plausible-not-default; the false-finding direction is loud. Fix: track fence state in the line loop (toggle on ```` ``` ````/`~~~` lines, skip lines while inside; optionally skip 4-space-indented lines following a blank line), which collapses both directions at once.
+
+### AUDIT-20260611-32 — The line-level declaration guard fires on ordinary lowercase prose — any sentence starting "rule: …" is now structurally forbidden
+
+Finding-ID: AUDIT-20260611-32
+Status:     fixed-cb9542f49e4343d64b9282503af34e51898e41e7
+Severity:   low
+Surface:    plugins/design-control/src/design-language/rule-attempt.ts:40 (`LINE_ATTEMPT_RE = /^rule\s*:\s*\S/` — no id-shape constraint), :78-88; plugins/design-control/src/design-language/schema.ts:289-296
+
+The heading-level near-miss trigger was carefully calibrated (colon required, or exact-lowercase `rule` + exactly one id-shaped token, per the `rule-attempt.ts` header), but the line-level trigger accepts *any* text after the colon. Verified empirically: a spec whose prose includes the line `rule: never introduce raw hex blues outside the tokens.` exits 1 with `malformed-rule-heading: Line "rule: never introduce raw hex blues outside the tokens." looks like a rule declaration but is not a heading — declare it as an ATX heading: "### rule: never introduce raw hex blues outside the tokens."` — advising the author to convert a prose sentence into a rule heading with a nine-word id. In a document whose whole subject is design *rules*, line-initial lowercase "rule: …" prose is a realistic authoring shape, and the existing test corpus only pins the mid-line case as inert.
+
+Blast radius: low — a loud false refusal with a clear (if absurd) message, costing a reword round-trip, never a silent wrong outcome. Fix: apply the same id-shape constraint the heading guard uses (`/^rule\s*:\s*[\w-]+\s*$/` — a single id-shaped token and nothing after), so multi-word prose after the colon stays inert while `rule: beta` setext/paragraph declarations still flag; pin both directions in the corpus.
+
+### AUDIT-20260611-33 — Combinator spacing still fabricates dead-links — `.a > .b` cannot match a source written `.a>.b` (and vice versa)
+
+Finding-ID: AUDIT-20260611-33 (claude-04 + codex-01; cross-model)
+Status:     fixed-fd1f6bfa5040b4fb0fcb2b55bfdaaee0deeacbc2
+Severity:   low
+Surface:    plugins/design-control/src/design-language/selector-canon.ts:185-192 (normalizeSelectorWhitespace handles parens + commas only); plugins/design-control/src/design-language/link-liveness.ts:172-194 (cssDefinesSelector)
+
+`normalizeSelectorWhitespace` collapses runs, paren-adjacent spaces, and comma spacing — but not spacing around the child/adjacent/sibling combinators `>`, `+`, `~`. Verified empirically through the CLI in both directions: query `.a > .b` against source `.a>.b` → `dead-link-selector`, and query `.c+.d` against source `.c + .d` → `dead-link-selector`, both on selectors that are live in the file. This is the same shape as the AUDIT-17/AUDIT-round2 quote-style fixes (delimiter-insensitive equality the author reasonably expects), one token class over: Prettier and most formatters write spaced combinators, so a formatting commit on the CSS flips previously-green spaced-vs-tight links to dead, and the test corpus's "regardless of whitespace" coverage pins descendant selectors only.
+
+Blast radius: low — a loud exit-1 false refusal with an actionable message, and the common authoring path (copying the selector verbatim from the CSS) avoids it until a reformat lands; no silent wrong outcome. Fix: extend `normalizeSelectorWhitespace` with `.replace(/\s*([>+~])\s*/g, '$1')` — safe against the `~=` attribute operator (post-canonicalization it carries no surrounding spaces) and it additionally unifies `:nth-child(2n + 1)`/`(2n+1)`, shrinking a documented approximation — pinned by a RED test per combinator.
+
+---
+
+**Summary for triage:** 4 findings, 0 blocking, 1 high. The high (claude-01) is an environment-coupling defect in the gate's own entry point — the exact command SKILL.md documents crashes from the repo root because the shim locates the workspace tsx but never pins the plugin's tsconfig; the "smoke-verified" claim in tasks.md was true only for a plugin-local cwd. Claude-02 and claude-03 share a root: the parser and the just-landed declaration guards operate on raw lines with no markdown-context (fence/indent) or prose-shape awareness, producing one silent-green direction (phantom rule from a fenced example, the worst direction in the module) and two loud false-refusal directions. Claude-04 is the combinator residual of the AUDIT-17/round-2 delimiter-normalization series. All four were confirmed by executing the shipped `bin/check-design-spec` against temp fixtures (since removed), not by reading alone, so RED-first regression tests are cheap for each.
+
+### AUDIT-20260611-34 — Drive-relative Windows CSS paths slip past the portability guard
+
+Finding-ID: AUDIT-20260611-34
+Status:     fixed-fd1f6bfa5040b4fb0fcb2b55bfdaaee0deeacbc2
+Severity:   low
+Surface:    plugins/design-control/src/design-language/schema.ts:69-73; plugins/design-control/src/design-language/schema.ts:122-150; plugins/design-control/src/design-language/types.ts:25-32
+
+The type contract says machine-rooted drive-letter paths never enter `CssLink`, but `NON_PORTABLE_CSS_PATH_RE` only rejects drive-letter paths when the colon is followed by `/` or `\`. A path like `C:styles.css` is not caught, so `recordField` accepts it into `cssLinks`. On Windows that spelling is drive-relative and machine-contextual; on POSIX it can even resolve as a literal filename under the spec directory, producing a green result for a spec link that does not travel cleanly across platforms.
+
+Blast radius is low because this is an uncommon spelling and the main absolute-path cases are covered. It is still a portability leak in the same boundary the schema claims to enforce. A reasonable correction is to reject any leading single-letter drive prefix (`^[A-Za-z]:`) and add a regression case for `css: C:styles.css .btn`.
+
+
+## Under audit
+
+The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn't).
+
+
+
+## What to look for
+
+- **Correctness bugs** — logic errors, off-by-one, null/undefined paths, race conditions, missing error handling, swallowed exceptions.
+- **Design issues** — coupling between layers that should be independent, leaking abstractions, primitives that should compose but don't, configuration that should be data ending up as code.
+- **Missed edge cases** — what happens with empty input? Maximum input? Concurrent calls? Partial failure? Network unavailability? Operator interrupt mid-operation? What is the behavior on a fresh install vs. an upgrade?
+- **Code-quality concerns** — files growing past a reasonable cap, names that don't reveal intent, dead code, duplicated logic, magic numbers without explanation, tests that don't test the contract they claim to test.
+- **Cross-cutting impact** — does this diff touch a surface that other surfaces depend on? Are those other surfaces updated? Are migrations needed? Are doctor rules / schemas / validators updated to match the new shape?
+- **Documentation drift** — does the README / SKILL.md / PRD describe the behavior the code actually implements? If the spec changed, did the implementation? If the implementation changed, did the spec?
+- **Operator-discipline traps** — placeholder comments, swallowed errors, hardcoded paths/values that should be configurable, fallbacks that hide failure modes, mock data outside test code. These are bug-factories per project guidelines.
+
+## Output format
+
+For each finding you surface, emit ONE markdown block in this exact shape:
+
+```
+### <heading: one-line summary of the finding>
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-<NN>
+Status:     open
+Severity:   <blocking | high | medium | low | informational>
+Surface:    <repo-relative-path:line-range> OR <description of the surface if not anchored to a single file>
+
+<one-to-three paragraphs of body: what the finding is, why it matters, what evidence you relied on, what a reasonable fix would look like. Be specific. Cite line numbers from the diff. If the finding is structural / cross-file, name every file affected.>
+```
+
+Number the findings sequentially (`-01`, `-02`, ...).
+
+**Severity — rate each finding by downstream blast-radius:** the consequence if a downstream consumer acts on the audited surface *as written*. The consumer may be an adopter running the code, or — especially for a spec — an AI agent building **unattended** from it, with no human to catch a wrong reading. Rate by what would actually happen if this shipped as-is, **not by how alarming the finding feels**. State the blast-radius reasoning in the finding body for every finding, at every level.
+
+- `blocking` — acting on it as-written breaks the feature's stated goals in obvious ways; OR (for a spec) the more natural reading an agent reaches first is the wrong one, so it will likely be built wrong by default and nothing in the artifact corrects it.
+- `high` — a correctness/safety defect a consumer will hit; OR a spec contradiction/ambiguity where the readings are roughly equally plausible and the artifact doesn't disambiguate — an agent might build either, including the wrong one.
+- `medium` — a design issue that compounds over time; OR a spec inconsistency a reasonable consumer would resolve correctly anyway (readings barely diverge, or context makes the intended one obvious).
+- `low` — hygiene; cosmetic wording with no behavioral or implementation consequence.
+- `informational` — context worth seeing, not itself a defect.
+
+**Calibrate by consequence, not by alarm.** A genuine contradiction a reader would obviously resolve the right way is at most `medium`. A quietly-plausible wrong reading an agent would actually build is `high`/`blocking` even if it looks minor. A spec's internal consistency is load-bearing — it is the input to an unattended build.
+
+## If you find nothing — say so explicitly
+
+If you walk the diff carefully and find no findings worth surfacing, emit ONE block in this shape instead:
+
+```
+### No findings
+
+Finding-ID: AUDIT-BARRAGE-<your-model-name>-CLEAN
+Status:     open
+Severity:   informational
+Surface:    (the entire diff)
+
+I walked the diff for the feature named above and found no findings worth surfacing. My specific reasoning: <three-to-five sentences explaining what you checked, why those checks came back clean, and what you would have flagged if it had been present.>
+```
+
+**Do not pad with weak findings.** A confident "I checked X, Y, Z and they are clean for these reasons" is more useful to the operator than three vague low-severity notes. The cross-model diversity gives the operator independent signal; an empty clean report from your CLI is itself a signal when paired with findings from your siblings.
+
+## Hard constraints
+
+- **No deferral phrases.** Don't write phrases like "fix later", "address in a follow-up", or other commitments to deferred work. The dispatch-wrapper rejects these as bug-factories. If you spot a deferral phrase IN the diff, surface it as a finding.
+- **Anchor findings to evidence.** A finding that says "this might be a problem" without naming the specific file + line is not actionable. Name the surface, quote the relevant code, explain what's wrong.
+- **One issue per finding block.** Don't bundle multiple concerns into one entry; the operator triages each block as a discrete signal.
+- **Provenance is your model name.** Replace `<your-model-name>` in the Finding-ID with the CLI you are (`claude`, `codex`, `gemini`, etc.). This is how the operator joins findings across models.
+
+codex
+I’ll audit the feature range against `0391a0c0` and avoid re-reporting the listed dispositions. I’m going to read the diff and the touched implementation/tests/docs surfaces before deciding whether there are actionable findings.
+exec
+/bin/zsh -lc 'git diff --name-only 0391a0c0..HEAD' in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/INDEX.md
+plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/PROMPT.md
+plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/claude.md
+plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/codex.md
+plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/stderr/claude.txt
+plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/stderr/codex.txt
+plugins/design-control/.stack-control/audit-runs/20260611T123117674Z-design-control-after_clarify/tip.sha
+plugins/design-control/.stack-control/audit-runs/20260611T131139811Z-design-control-after_clarify/INDEX.md
+plugins/design-control/.stack-control/audit-runs/20260611T131139811Z-design-control-after_clarify/PROMPT.md
+plugins/design-control/.stack-control/audit-runs/20260611T131139811Z-design-control-after_clarify/claude.md
+plugins/design-control/.stack-control/audit-runs/20260611T131139811Z-design-control-after_clarify/codex.md
+plugins/design-control/.stack-control/audit-runs/20260611T131139811Z-design-control-after_clarify/stderr/claude.txt
+plugins/design-control/.stack-control/audit-runs/20260611T131139811Z-design-control-after_clarify/stderr/codex.txt
+plugins/design-control/.stack-control/audit-runs/20260611T131139811Z-design-control-after_clarify/tip.sha
+plugins/design-control/.stack-control/audit-runs/20260611T134728627Z-design-control-after_clarify/INDEX.md
+plugins/design-control/.stack-control/audit-runs/20260611T134728627Z-design-control-after_clarify/PROMPT.md
+plugins/design-control/.stack-control/audit-runs/20260611T134728627Z-design-control-after_clarify/claude.md
+plugins/design-control/.stack-control/audit-runs/20260611T134728627Z-design-control-after_clarify/codex.md
+plugins/design-control/.stack-control/audit-runs/20260611T134728627Z-design-control-after_clarify/stderr/claude.txt
+plugins/design-control/.stack-control/audit-runs/20260611T134728627Z-design-control-after_clarify/stderr/codex.txt
+plugins/design-control/.stack-control/audit-runs/20260611T134728627Z-design-control-after_clarify/tip.sha
+plugins/design-control/.stack-control/backlog/tasks/task-19 - Temporal-in-v1-phrasing-in-lint-allowlist-comments-Latin-only-rationale.md
+plugins/design-control/ROADMAP.md
+plugins/design-control/bin/check-design-spec
+plugins/design-control/bin/check-wireframe
+plugins/design-control/bin/wireframe-provenance
+plugins/design-control/skills/translate-design-language/SKILL.md
+plugins/design-control/specs/001-design-control/audit-log.md
+plugins/design-control/specs/001-design-control/tasks.md
+plugins/design-control/src/__tests__/authoring/check-wireframe-shim.test.ts
+plugins/design-control/src/__tests__/design-language/check-design-spec-shim.test.ts
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts
+plugins/design-control/src/__tests__/design-language/schema.test.ts
+plugins/design-control/src/__tests__/provenance/wireframe-provenance-shim.test.ts
+plugins/design-control/src/design-language/check-design-spec-cli.ts
+plugins/design-control/src/design-language/check-spec-file.ts
+plugins/design-control/src/design-language/index.ts
+plugins/design-control/src/design-language/link-liveness.ts
+plugins/design-control/src/design-language/rule-attempt.ts
+plugins/design-control/src/design-language/schema.ts
+plugins/design-control/src/design-language/selector-canon.ts
+plugins/design-control/src/design-language/types.ts
+
+exec
+/bin/zsh -lc 'git diff --stat 0391a0c0..HEAD' in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+ .../INDEX.md                                       |    29 +
+ .../PROMPT.md                                      |  1533 ++
+ .../claude.md                                      |    60 +
+ .../codex.md                                       |    21 +
+ .../stderr/claude.txt                              |     0
+ .../stderr/codex.txt                               |  2308 ++
+ .../tip.sha                                        |     1 +
+ .../INDEX.md                                       |    29 +
+ .../PROMPT.md                                      |  5976 ++++++
+ .../claude.md                                      |    62 +
+ .../codex.md                                       |    32 +
+ .../stderr/claude.txt                              |     0
+ .../stderr/codex.txt                               |  6986 +++++++
+ .../tip.sha                                        |     1 +
+ .../INDEX.md                                       |    29 +
+ .../PROMPT.md                                      | 19762 +++++++++++++++++
+ .../claude.md                                      |    49 +
+ .../codex.md                                       |    21 +
+ .../stderr/claude.txt                              |     0
+ .../stderr/codex.txt                               | 20940 +++++++++++++++++++
+ .../tip.sha                                        |     1 +
+ ...lint-allowlist-comments-Latin-only-rationale.md |    19 +
+ plugins/design-control/ROADMAP.md                  |     2 +-
+ plugins/design-control/bin/check-design-spec       |    28 +
+ plugins/design-control/bin/check-wireframe         |     4 +-
+ plugins/design-control/bin/wireframe-provenance    |     4 +-
+ .../skills/translate-design-language/SKILL.md      |   111 +
+ .../specs/001-design-control/audit-log.md          |   244 +
+ .../specs/001-design-control/tasks.md              |    29 +-
+ .../authoring/check-wireframe-shim.test.ts         |    48 +
+ .../design-language/check-design-spec-shim.test.ts |    83 +
+ .../design-language/check-spec-file.test.ts        |   221 +
+ .../design-language/link-liveness.test.ts          |   371 +
+ .../src/__tests__/design-language/schema.test.ts   |   723 +
+ .../provenance/wireframe-provenance-shim.test.ts   |    28 +
+ .../src/design-language/check-design-spec-cli.ts   |    12 +
+ .../src/design-language/check-spec-file.ts         |    96 +
+ .../design-control/src/design-language/index.ts    |    31 +
+ .../src/design-language/link-liveness.ts           |   232 +
+ .../src/design-language/rule-attempt.ts            |    98 +
+ .../design-control/src/design-language/schema.ts   |   410 +
+ .../src/design-language/selector-canon.ts          |   201 +
+ .../design-control/src/design-language/types.ts    |   107 +
+ 43 files changed, 60935 insertions(+), 7 deletions(-)
+
+exec
+/bin/zsh -lc 'git status --short' in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+ D docs/1.0/001-IN-PROGRESS/command-shortcuts/README.md
+ D docs/1.0/001-IN-PROGRESS/command-shortcuts/prd.md
+ D docs/1.0/001-IN-PROGRESS/command-shortcuts/workplan.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-issue-158-ux-audit.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-phase-34-ship-pass-implementation-audit.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-phase-34a-implementation-audit.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-phase-34b-implementation-audit.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-phase-34e-implementation-audit.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-04-open-issue-tranche-proposal.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/38-0-blast-radius-review.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/39-sites-to-lanes-blueprint.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/README.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/audit-log.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/implementation-summary.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/mockups/birds-eye-content-view.html
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/mockups/design-audit-v0.5.0.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/mockups/editorial-nav-and-index.html
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/mockups/studio-unified.html
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/phase-34-prd-review.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/phase-34a-task-breakdown.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/01-dev-editorial-studio-1512.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/02-dev-index-1512.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/03-dev-content-1512.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/04-dev-shortform-1512.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/05-dev-help-manual-1512.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/06-dev-scrapbook-baseline-1512.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/07-dashboard-after-ingest-c93b8b3e.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/08-entry-review-c93b8b3e-direct.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/09-dashboard-with-press-queue-1512.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/10-dashboard-press-queue-scrolled.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/11-dashboard-press-queue-mobile-800.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/12-review-surface-tables-after-gfm.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/13-review-surface-table-rendered.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/14-tables-styled-marginalia-visible.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/15-tables-marginalia-stowed.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/16-tables-marginalia-visible-final.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/17-tables-final.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/18-tables-final-table-view.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/19-tables-final-stowed.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/20-thesis-on-review-surface.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/21-images-render-on-review-surface-v4.png
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/plan.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-plugin/workplan.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-triage/README.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-triage/prd.md
+ D docs/1.0/001-IN-PROGRESS/deskwork-triage/workplan.md
+ D docs/1.0/001-IN-PROGRESS/document-primitives/audit-log.md
+ D docs/1.0/001-IN-PROGRESS/dw-lifecycle/2026-05-03-implementation-audit.md
+ D docs/1.0/001-IN-PROGRESS/dw-lifecycle/2026-05-03-post-remediation-audit.md
+ D docs/1.0/001-IN-PROGRESS/dw-lifecycle/2026-05-03-prd-conformance-audit.md
+ D docs/1.0/001-IN-PROGRESS/dw-lifecycle/README.md
+ D docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md
+ D docs/1.0/001-IN-PROGRESS/dw-lifecycle/workplan.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/README.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/audit-log.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/dogfood-handoff.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/prd.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260525T110802Z-1cdd0f/adopter-manifest-checker.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260525T110802Z-1cdd0f/args.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260525T110802Z-1cdd0f/clone-detector-reader.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260525T110802Z-1cdd0f/editor-symmetry.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260525T110802Z-1cdd0f/pattern-matrix.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260525T110802Z-1cdd0f/prd-themed-pattern-hunter.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260525T110802Z-1cdd0f/regime-holdout-detector.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260525T110802Z-1cdd0f/synthesis.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260525T110802Z-1cdd0f/ui-route-enumerator.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260528T061038Z-b5fc2d/adopter-manifest-checker.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260528T061038Z-b5fc2d/args.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260528T061038Z-b5fc2d/clone-detector-reader.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260528T061038Z-b5fc2d/editor-symmetry.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260528T061038Z-b5fc2d/pattern-matrix.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260528T061038Z-b5fc2d/prd-themed-pattern-hunter.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260528T061038Z-b5fc2d/regime-holdout-detector.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260528T061038Z-b5fc2d/synthesis.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260528T061038Z-b5fc2d/ui-route-enumerator.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T061143Z-89b7a1/args.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T061143Z-89b7a1/augmented-prd.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T061143Z-89b7a1/clone-detector-reader.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T061143Z-89b7a1/complaint.txt
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T061143Z-89b7a1/delta.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T061143Z-89b7a1/new-manifest.yaml
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T061143Z-89b7a1/pattern-matrix.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T061143Z-89b7a1/prd-themed-pattern-hunter.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T061143Z-89b7a1/synthesis.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T061143Z-89b7a1/ui-route-enumerator.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T082055Z-220e45/args.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T082055Z-220e45/augmented-prd.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T082055Z-220e45/clone-detector-reader.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T082055Z-220e45/complaint.txt
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T082055Z-220e45/delta.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T082055Z-220e45/new-manifest.yaml
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T082055Z-220e45/pattern-matrix.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T082055Z-220e45/prd-themed-pattern-hunter.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T082055Z-220e45/synthesis.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T082055Z-220e45/ui-route-enumerator.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T090129Z-4f2251/args.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T090129Z-4f2251/augmented-prd.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T090129Z-4f2251/clone-detector-reader.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T090129Z-4f2251/complaint.txt
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T090129Z-4f2251/delta.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T090129Z-4f2251/new-manifest.yaml
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T090129Z-4f2251/pattern-matrix.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T090129Z-4f2251/prd-themed-pattern-hunter.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T090129Z-4f2251/synthesis.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T090129Z-4f2251/ui-route-enumerator.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T094458Z-a64941/args.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T094458Z-a64941/augmented-prd.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T094458Z-a64941/clone-detector-reader.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T094458Z-a64941/complaint.txt
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T094458Z-a64941/delta.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T094458Z-a64941/new-manifest.yaml
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T094458Z-a64941/pattern-matrix.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T094458Z-a64941/prd-themed-pattern-hunter.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T094458Z-a64941/synthesis.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T094458Z-a64941/ui-route-enumerator.json
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/scope-manifest.yaml
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/tooling-feedback.md
+ D docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md
+ D docs/1.0/001-IN-PROGRESS/hygiene/README.md
+ D docs/1.0/001-IN-PROGRESS/hygiene/audit-log.md
+ D docs/1.0/001-IN-PROGRESS/hygiene/issue-closure-audit-2026-05-29.md
+ D docs/1.0/001-IN-PROGRESS/hygiene/prd.md
+ D docs/1.0/001-IN-PROGRESS/hygiene/tooling-feedback.md
+ D docs/1.0/001-IN-PROGRESS/hygiene/workplan-archive.md
+ D docs/1.0/001-IN-PROGRESS/hygiene/workplan.md
+ D docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/README.md
+ D docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/audit-log.md
+ D docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/design.md
+ D docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/feature-definition.md
+ D docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/govern-consolidation-design.md
+ D docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/prd.md
+ D docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md
+ D docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-thesis.md
+ D docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/tooling-feedback.md
+ D docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/workplan.md
+ D docs/1.0/001-IN-PROGRESS/scope-discovery/README.md
+ D docs/1.0/001-IN-PROGRESS/scope-discovery/audit-barrage-cli-notes.md
+ D docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md
+ D docs/1.0/001-IN-PROGRESS/scope-discovery/paper-test-graphical-entries.md
+ D docs/1.0/001-IN-PROGRESS/scope-discovery/phase-11-acceptance.md
+ D docs/1.0/001-IN-PROGRESS/scope-discovery/phase-25-inventory.md
+ D docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md
+ D docs/1.0/001-IN-PROGRESS/scope-discovery/scope-inventory-graphical-entries.yaml
+ D docs/1.0/001-IN-PROGRESS/scope-discovery/workplan-archive.md
+ D docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md
+?? plugins/design-control/.stack-control/audit-runs/20260611T141406686Z-design-control-after_clarify/
+
+codex
+The worktree has many unrelated deleted docs and a new audit-run directory already present; I’ll leave those alone. The audited feature diff itself is concentrated in the `plugins/design-control` validator, shims, skill docs, and tests.
+exec
+/bin/zsh -lc 'git diff 0391a0c0..HEAD -- plugins/design-control/src/design-language/link-liveness.ts' in /Users/orion/work/deskwork-work/design-control
+exec
+/bin/zsh -lc 'git diff 0391a0c0..HEAD -- plugins/design-control/src/design-language/schema.ts' in /Users/orion/work/deskwork-work/design-control
+exec
+/bin/zsh -lc 'git diff 0391a0c0..HEAD -- plugins/design-control/src/design-language/selector-canon.ts' in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+diff --git a/plugins/design-control/src/design-language/link-liveness.ts b/plugins/design-control/src/design-language/link-liveness.ts
+new file mode 100644
+index 00000000..580df3ca
+--- /dev/null
++++ b/plugins/design-control/src/design-language/link-liveness.ts
+@@ -0,0 +1,232 @@
++/**
++ * Static link-liveness for design-language spec rules (Phase 2, axis B).
++ *
++ * Each rule's `css: <path> <selector>` link must point at an author-written
++ * CSS file in which the selector is DEFINED. The check is STATIC — pure file
++ * reads against source, no app boot, no engine (round-6 M1: "authoring
++ * artifacts only / no capture dependency").
++ *
++ * Scope: this check validates selectors in author-written `.css` sources
++ * only. Utility-framework, CSS-in-JS, and hashed CSS-Modules links do
++ * not establish link-liveness — they are recorded as `skipped` (visible in
++ * the result and in CLI output), never silently dropped and never fabricated
++ * into a dead-link verdict. Liveness ≠ truthfulness: a resolving selector
++ * does not establish that the live CSS still matches the rule's described
++ * intent — `spec-truthfulness` is a separate axis this check does not
++ * perform (scope decision recorded in specs/001-design-control/spec.md).
++ *
++ * "Defined in source" is implemented as: the selector appears, ident-boundary
++ * exact, inside some selector prelude of the file — preludes are the text
++ * runs that precede `{` after comments are stripped and at-rule preludes are
++ * excluded (their blocks are descended into, so a rule inside `@media` counts;
++ * `content: ".ghost"` and commented-out rules do not). Both sides are
++ * canonicalized before comparison (AUDIT-round2-codex-01 / -claude-04):
++ * attribute values rewrite to one double-quoted spelling with the value text
++ * PRESERVED, so `input[type=text]` matches `input[type="text"]` while
++ * `[data-state="open"]` never matches `[data-state="closed"]`; functional
++ * pseudo-class arguments (`:not(.ghost)`, `:is(...)`, `:where(...)`,
++ * `:has(...)`, `:nth-child(...)`) are compared when the QUERY names them and
++ * excluded from the scan when it does not — a class that exists only as an
++ * exclusion, matcher argument, or attribute value has no styling of its own,
++ * so it must not count as a live anchor for a query that never named it.
++ * Remaining accepted approximations are stated in `selector-canon.ts`
++ * (verbatim escapes; collapsed-not-erased argument whitespace).
++ */
++
++import { readFileSync } from 'node:fs';
++import { resolve } from 'node:path';
++import { isNonPortableCssPath } from '@/design-language/schema';
++import {
++  blankAttributeValues,
++  canonicalizeAttributeSelectors,
++  copyStringLiteral,
++  isIdentChar,
++  normalizeSelectorWhitespace,
++  stripComments,
++  stripFunctionalPseudoArgs,
++} from '@/design-language/selector-canon';
++import type {
++  CssLink,
++  DesignSpecFinding,
++  ParsedDesignSpec,
++  RuleScopedCssLink,
++} from '@/design-language/types';
++
++/** A link outside the validated .css scope, recorded visibly. */
++export interface SkippedLink {
++  readonly ruleId: string;
++  readonly link: CssLink;
++  readonly reason: 'non-css-target';
++}
++
++export interface LivenessResult {
++  /** True iff findings is empty (skipped links do not fail the check). */
++  readonly ok: boolean;
++  readonly findings: readonly DesignSpecFinding[];
++  readonly skipped: readonly SkippedLink[];
++}
++
++/**
++ * Collect selector preludes: text runs preceding `{`, at every nesting depth,
++ * excluding at-rule preludes (which are descended into, not matched against).
++ * Comments are stripped; string-literal CONTENTS are copied verbatim (their
++ * structural characters are content, never braces/semicolons) so attribute
++ * values survive into preludes for canonical comparison. Prelude buffers
++ * reset on `{`, `}`, and `;` so declaration text (`content: ".ghost"`) never
++ * leaks into selector position.
++ */
++function collectSelectorPreludes(css: string): string[] {
++  const preludes: string[] = [];
++  let buffer = '';
++  let i = 0;
++  while (i < css.length) {
++    const ch = css[i];
++    if (ch === '/' && css[i + 1] === '*') {
++      const end = css.indexOf('*/', i + 2);
++      i = end === -1 ? css.length : end + 2;
++      continue;
++    }
++    if (ch === '"' || ch === "'") {
++      const literal = copyStringLiteral(css, i);
++      buffer += literal.copied;
++      i = literal.end;
++      continue;
++    }
++    if (ch === '{') {
++      const prelude = buffer.trim();
++      if (prelude !== '' && !prelude.startsWith('@')) {
++        preludes.push(prelude);
++      }
++      buffer = '';
++    } else if (ch === '}' || ch === ';') {
++      buffer = '';
++    } else {
++      buffer += ch;
++    }
++    i += 1;
++  }
++  return preludes;
++}
++
++/**
++ * True iff `selector` appears ident-boundary exact inside some selector
++ * prelude of `css`, with both sides canonicalized identically: attribute
++ * values rewrite to one double-quoted spelling with their text PRESERVED
++ * (quote style never diverges; `[data-state="open"]` never matches
++ * `[data-state="closed"]`), and whitespace normalizes (descendant
++ * combinators, argument spacing).
++ *
++ * Two-mode scan, derived from the query (a value or argument the query never
++ * named is not a definition — exclusion is not styling, AUDIT-20260611-18):
++ * - Query WITHOUT functional pseudo args: haystack args are stripped, so
++ *   `.ghost` does not match `.real:not(.ghost)`. A query WITH them compares
++ *   argument text — `.real:not(.ghost)` matches only a `:not(.ghost)` source,
++ *   never `:not(.other)`.
++ * - Query WITHOUT an attribute selector: haystack attribute values are
++ *   blanked, so `.ghost` does not match `[data-icon=".ghost"]` and `ghost`
++ *   does not match `[class~=ghost]`. A query WITH one compares values.
++ */
++export function cssDefinesSelector(css: string, selector: string): boolean {
++  const canonicalQuery = canonicalizeAttributeSelectors(stripComments(selector));
++  const compareArgs = canonicalQuery.includes('(');
++  const compareAttrValues = canonicalQuery.includes('[');
++  // Stripping/blanking the query itself would be a no-op in the modes where
++  // they apply (no parens / no brackets to act on), so normalize directly.
++  const query = normalizeSelectorWhitespace(canonicalQuery);
++  if (query === '') {
++    return false;
++  }
++  for (const prelude of collectSelectorPreludes(css)) {
++    let haystack = canonicalizeAttributeSelectors(prelude);
++    if (!compareArgs) {
++      haystack = stripFunctionalPseudoArgs(haystack);
++    }
++    if (!compareAttrValues) {
++      haystack = blankAttributeValues(haystack);
++    }
++    haystack = normalizeSelectorWhitespace(haystack);
++    let from = 0;
++    while (true) {
++      const at = haystack.indexOf(query, from);
++      if (at === -1) {
++        break;
++      }
++      if (!isIdentChar(haystack[at - 1]) && !isIdentChar(haystack[at + query.length])) {
++        return true;
++      }
++      from = at + 1;
++    }
++  }
++  return false;
++}
++
++/**
++ * Check a flat list of rule-scoped css links against source. This is the
++ * liveness core: it carries no opinion about the HOUSING of a link, so the
++ * file-level check can run it over the valid rules' links AND the parse
++ * result's `auxiliaryCssLinks` (links of structurally-invalid / duplicate
++ * sections) in the same pass. Paths resolve relative to `baseDir` (the spec
++ * file's directory). Missing file → `dead-link-file`; selector not defined →
++ * `dead-link-selector`; non-.css target → skipped.
++ *
++ * Machine-rooted paths THROW (AUDIT-round2-codex-02): `resolve(baseDir, path)`
++ * ignores baseDir for an absolute path, so the check would read the author's
++ * machine-local file and fabricate a verdict that does not travel.
++ * {@link parseDesignSpec} rejects such paths as `malformed-css-link` before
++ * they reach this seam, so a machine-rooted link arriving here is a caller
++ * contract violation (this function is exported and callable with hand-built
++ * links) — fail loud rather than return a nonportable green/red.
++ */
++export function checkCssLinkLiveness(
++  links: readonly RuleScopedCssLink[],
++  baseDir: string,
++): LivenessResult {
++  const findings: DesignSpecFinding[] = [];
++  const skipped: SkippedLink[] = [];
++  for (const { ruleId, link } of links) {
++    if (isNonPortableCssPath(link.path)) {
++      throw new Error(
++        `Rule "${ruleId}" css link path ${JSON.stringify(link.path)} is machine-rooted — ` +
++          `css link paths are relative to the spec file, and resolve() would ignore baseDir for ` +
++          `an absolute path, checking a machine-local file the spec cannot portably name. ` +
++          `parseDesignSpec rejects these as malformed-css-link; fix the call site to pass ` +
++          `spec-relative paths ("../" traversal within the repository is allowed).`,
++      );
++    }
++    if (!link.path.toLowerCase().endsWith('.css')) {
++      skipped.push({ ruleId, link, reason: 'non-css-target' });
++      continue;
++    }
++    const absolute = resolve(baseDir, link.path);
++    let css: string;
++    try {
++      css = readFileSync(absolute, 'utf8');
++    } catch {
++      findings.push({
++        rule: 'dead-link-file',
++        message: `Rule "${ruleId}" links to "${link.path}" which does not resolve to a readable file (looked at ${absolute}).`,
++        ruleId,
++      });
++      continue;
++    }
++    if (!cssDefinesSelector(css, link.selector)) {
++      findings.push({
++        rule: 'dead-link-selector',
++        message: `Rule "${ruleId}" links to selector "${link.selector}" which is not defined in "${link.path}".`,
++        ruleId,
++      });
++    }
++  }
++  return { ok: findings.length === 0, findings, skipped };
++}
++
++/**
++ * Check every valid rule's css links against source — the spec-shaped wrapper
++ * over {@link checkCssLinkLiveness} (same per-link contract).
++ */
++export function checkLinkLiveness(spec: ParsedDesignSpec, baseDir: string): LivenessResult {
++  const links = spec.rules.flatMap((rule) =>
++    rule.cssLinks.map((link) => ({ ruleId: rule.id, link })),
++  );
++  return checkCssLinkLiveness(links, baseDir);
++}
+
+ succeeded in 0ms:
+diff --git a/plugins/design-control/src/design-language/schema.ts b/plugins/design-control/src/design-language/schema.ts
+new file mode 100644
+index 00000000..6b5b03dd
+--- /dev/null
++++ b/plugins/design-control/src/design-language/schema.ts
+@@ -0,0 +1,410 @@
++/**
++ * Markdown schema parser/validator for the design-language spec convention
++ * (Phase 2, axis A — pure text → structure; NO filesystem, NO engine).
++ *
++ * Convention (hand-authorable):
++ *   - a rule is declared by an ATX heading whose text is `rule: <id>`
++ *     (any heading level); the rule's section runs to the next heading;
++ *   - fields are single-line bullets `- <key>: <value>` with the CLOSED key set
++ *     `kind` / `css` / `example` / `do` / `don't` (a curly apostrophe U+2019 in
++ *     the key is normalized to ASCII `'`, so smart-quoted `don’t:` is accepted);
++ *   - `css: <path> <selector>` — first token is the file path (relative to the
++ *     spec file; machine-rooted paths are rejected, `../` traversal is allowed
++ *     — see {@link isNonPortableCssPath}), the remainder is the selector
++ *     (descendant selectors allowed);
++ *   - other prose (paragraphs, capitalised-key bullets) is inert;
++ *   - code blocks are inert (AUDIT round-3 claude-02): a fenced block
++ *     (``` or ~~~, ≥3 markers, info string allowed; the closer is a line of
++ *     ONLY the same marker repeated at least the opener's length — pragmatic
++ *     CommonMark, indented/nested-in-list fences not modeled) suspends ALL
++ *     parsing, so a documentation example containing `### rule: phantom`
++ *     never becomes a live rule. Likewise a ≥4-space-indented (or
++ *     tab-indented) NON-bullet line is indented code and skipped; indented
++ *     FIELD BULLETS still record, so nested-list authoring keeps working.
++ *
++ * Validation per rule: kind from the closed vocabulary; ≥1 css link; ≥1
++ * example (structural presence only — this validator does not establish
++ * example truthfulness; that is the separate `spec-truthfulness` axis,
++ * scope decision recorded in specs/001-design-control/spec.md); ≥1
++ * do/don't guidance line. A lowercase
++ * single-word bullet key outside the closed set is an `unknown-field` finding
++ * (typo guard) — silently dropping a misspelled `example:` would otherwise
++ * fabricate a missing-example rejection with no visible cause. The same
++ * philosophy applies to rule DECLARATIONS: an attempted `rule: <id>` that
++ * misses the strict form — wrong case (`Rule: x`), spaced colon (`rule : x`),
++ * missing colon (`rule x`), setext heading, or bare paragraph line — is a
++ * `malformed-rule-heading` finding — never silently demoted to inert
++ * structure, which would drop the whole intended rule with zero findings
++ * (or merge its bullets into the preceding rule). The attempt classifiers
++ * live in `@/design-language/rule-attempt`.
++ */
++
++import { classifyHeadingAttempt, classifyLineAttempt } from '@/design-language/rule-attempt';
++import {
++  RULE_KINDS,
++  type CssLink,
++  type DesignRuleKind,
++  type DesignSpecFinding,
++  type DesignSpecParseResult,
++  type DesignSpecRule,
++  type RuleScopedCssLink,
++} from '@/design-language/types';
++
++const HEADING_RE = /^#{1,6}\s+(.*)$/;
++const RULE_HEADING_RE = /^rule:\s*(.*)$/;
++/**
++ * A field bullet: lowercase single-word key (apostrophe allowed: `don't`).
++ * U+2019 (’) is also admitted — smart-quote editors substitute it in prose —
++ * and normalized to ASCII `'` before the known-key check, so `don’t:` records
++ * like `don't:` and a misspelled curly key still hits the typo guard.
++ */
++const FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z'’]*)\s*:\s*(.*)$/;
++
++/**
++ * `css:` paths are RELATIVE TO THE SPEC FILE — the portability contract
++ * (AUDIT-round2-codex-02). A machine-rooted path (POSIX `/...`, Windows
++ * `C:\...` / `C:/...` or drive-RELATIVE `C:styles.css` (resolves against the
++ * drive's current directory on Windows, as a literal filename on POSIX — a
++ * css path has no legitimate single-letter-colon prefix), UNC `\\...` or
++ * root-relative `\...`, `~`-expanded home) goes green on its author's
++ * machine — `resolve(baseDir, path)` IGNORES baseDir for an absolute path —
++ * while the spec it lives in is collection content that travels; everywhere
++ * else the link misleads or breaks. Such a path is rejected at the SCHEMA
++ * level as `malformed-css-link` (a structurally-rejected token, like the
++ * missing-selector case — it never enters cssLinks/auxiliaryCssLinks).
++ * Parent traversal (`../`) is DELIBERATELY accepted: a spec legitimately
++ * references author CSS elsewhere in the repository tree — the portability
++ * boundary is the repository/collection, not the spec's own directory.
++ */
++const NON_PORTABLE_CSS_PATH_RE = /^(?:[/\\]|~|[a-zA-Z]:)/;
++
++/** True iff `path` is machine-rooted (see {@link NON_PORTABLE_CSS_PATH_RE}). */
++export function isNonPortableCssPath(path: string): boolean {
++  return NON_PORTABLE_CSS_PATH_RE.test(path);
++}
++
++/** Opening/closing run of a code fence: ≥3 backticks or ≥3 tildes. */
++const FENCE_RUN_RE = /^(`{3,}|~{3,})/;
++/** ≥4-space (or tab) indentation: CommonMark indented code. */
++const INDENTED_CODE_RE = /^(?: {4}|\t)/;
++/** Any bullet shape — indented bullets are list nesting, not indented code. */
++const BULLET_SHAPE_RE = /^[-*]\s/;
++
++/** An open fenced code block: marker char + opener run length. */
++interface OpenFence {
++  readonly char: string;
++  readonly length: number;
++}
++
++/**
++ * Classify `trimmed` as a fence opener. Pragmatic CommonMark: any run of ≥3
++ * backticks/tildes opens a fence; trailing text is the info string (the
++ * CommonMark no-backticks-in-backtick-info-string rule is not modeled).
++ */
++function openingFence(trimmed: string): OpenFence | undefined {
++  const run = FENCE_RUN_RE.exec(trimmed);
++  if (run === null) {
++    return undefined;
++  }
++  return { char: run[1][0], length: run[1].length };
++}
++
++/**
++ * True iff `trimmed` closes `fence`: a line of ONLY the same marker char,
++ * repeated at least the opener's length (CommonMark: closers carry no info
++ * string and must be at least as long as the opener).
++ */
++function closesFence(fence: OpenFence, trimmed: string): boolean {
++  const run = FENCE_RUN_RE.exec(trimmed);
++  return run !== null && run[1] === trimmed && run[1][0] === fence.char && run[1].length >= fence.length;
++}
++
++const KNOWN_KEYS = ['kind', 'css', 'example', 'do', "don't"] as const;
++type FieldKey = (typeof KNOWN_KEYS)[number];
++
++function isKnownKey(key: string): key is FieldKey {
++  return (KNOWN_KEYS as readonly string[]).includes(key);
++}
++
++function isRuleKind(value: string): value is DesignRuleKind {
++  return (RULE_KINDS as readonly string[]).includes(value);
++}
++
++/** A rule section under one `rule:` heading, before validation. */
++interface RawRuleSection {
++  readonly id: string;
++  readonly headingLine: number;
++  kind?: string;
++  readonly cssLinks: CssLink[];
++  readonly examples: string[];
++  readonly dos: string[];
++  readonly donts: string[];
++}
++
++function newSection(id: string, headingLine: number): RawRuleSection {
++  return { id, headingLine, cssLinks: [], examples: [], dos: [], donts: [] };
++}
++
++interface FieldSink {
++  readonly section: RawRuleSection;
++  readonly findings: DesignSpecFinding[];
++}
++
++function recordField(sink: FieldSink, key: FieldKey, value: string, line: number): void {
++  const { section, findings } = sink;
++  if (value === '') {
++    findings.push({
++      rule: 'empty-field',
++      message: `Field "${key}:" has an empty value.`,
++      ruleId: section.id,
++      line,
++    });
++    return;
++  }
++  switch (key) {
++    case 'kind':
++      section.kind = value;
++      return;
++    case 'css': {
++      const spaceAt = value.search(/\s/);
++      if (spaceAt === -1) {
++        findings.push({
++          rule: 'malformed-css-link',
++          message: `css link "${value}" names a file but no selector — expected "css: <path> <selector>".`,
++          ruleId: section.id,
++          line,
++        });
++        return;
++      }
++      const path = value.slice(0, spaceAt);
++      if (isNonPortableCssPath(path)) {
++        findings.push({
++          rule: 'malformed-css-link',
++          message:
++            `css link path "${path}" is machine-rooted — paths are relative to the spec file, ` +
++            `so the spec stays portable with its collection; an absolute, drive-prefixed, or ` +
++            `~-prefixed path resolves only on its author's machine. Use a spec-relative path ` +
++            `("../" traversal within the repository is allowed).`,
++          ruleId: section.id,
++          line,
++        });
++        return;
++      }
++      section.cssLinks.push({
++        path,
++        selector: value.slice(spaceAt).trim(),
++      });
++      return;
++    }
++    case 'example':
++      section.examples.push(value);
++      return;
++    case 'do':
++      section.dos.push(value);
++      return;
++    case "don't":
++      section.donts.push(value);
++      return;
++  }
++}
++
++function validateSection(section: RawRuleSection, findings: DesignSpecFinding[]): DesignSpecRule | undefined {
++  const problems: DesignSpecFinding[] = [];
++  const at = { ruleId: section.id, line: section.headingLine };
++  if (section.kind === undefined) {
++    problems.push({ rule: 'missing-kind', message: `Rule "${section.id}" has no "kind:" field.`, ...at });
++  } else if (!isRuleKind(section.kind)) {
++    problems.push({
++      rule: 'unknown-kind',
++      message: `Rule "${section.id}" has kind "${section.kind}" — expected one of: ${RULE_KINDS.join(', ')}.`,
++      ...at,
++    });
++  }
++  if (section.cssLinks.length === 0) {
++    problems.push({
++      rule: 'missing-css-link',
++      message: `Rule "${section.id}" links to no live CSS — every rule needs ≥1 "css: <path> <selector>".`,
++      ...at,
++    });
++  }
++  if (section.examples.length === 0) {
++    problems.push({
++      rule: 'missing-example',
++      message: `Rule "${section.id}" carries zero example references — every rule needs ≥1 "example:".`,
++      ...at,
++    });
++  }
++  if (section.dos.length === 0 && section.donts.length === 0) {
++    problems.push({
++      rule: 'missing-guidance',
++      message: `Rule "${section.id}" has neither a "do:" nor a "don't:" guidance line.`,
++      ...at,
++    });
++  }
++  findings.push(...problems);
++  if (problems.length > 0 || section.kind === undefined || !isRuleKind(section.kind)) {
++    return undefined;
++  }
++  return {
++    id: section.id,
++    kind: section.kind,
++    cssLinks: section.cssLinks,
++    examples: section.examples,
++    dos: section.dos,
++    donts: section.donts,
++  };
++}
++
++/**
++ * Parse + structurally validate a design-language spec. Pure: text in,
++ * structure + findings out. `spec.rules` carries only the structurally-valid
++ * rules; every defect is a finding (never a silent drop).
++ *
++ * Single-pass surfacing (no finding waves): a section excluded from
++ * `spec.rules` is still INSPECTED, never skipped —
++ *   - every excluded-section kind (duplicate-id, malformed-rule-heading
++ *     near-miss, setext/paragraph declaration attempt) is parsed into a
++ *     throwaway section so its field-level defects (unknown-field /
++ *     empty-field / malformed-css-link) surface alongside the section-level
++ *     finding. Per-rule validation (missing-kind / missing-example / …)
++ *     deliberately does NOT fire for these — they are not rules;
++ *   - syntactically-usable css links of invalid, duplicate, and attempt
++ *     sections are returned as `auxiliaryCssLinks` so the liveness axis can
++ *     check them in the same run.
++ */
++export function parseDesignSpec(markdown: string): DesignSpecParseResult {
++  const findings: DesignSpecFinding[] = [];
++  const sections: RawRuleSection[] = [];
++  // Throwaway sections (duplicates + declaration attempts): inspected for
++  // field-level defects + auxiliary css links, excluded from `spec.rules`.
++  const throwawaySections: RawRuleSection[] = [];
++  const seenIds = new Set<string>();
++  let current: RawRuleSection | undefined;
++  let fence: OpenFence | undefined;
++
++  const lines = markdown.split('\n');
++  for (let i = 0; i < lines.length; i += 1) {
++    const line = lines[i].trimEnd();
++    const lineNo = i + 1;
++    const trimmed = line.trim();
++    // Code blocks are inert (see module doc): inside a fence, every line —
++    // headings, bullets, attempt shapes, setext lookahead — is skipped.
++    if (fence !== undefined) {
++      if (closesFence(fence, trimmed)) {
++        fence = undefined;
++      }
++      continue;
++    }
++    // A ≥4-space-indented non-bullet line is indented code, also inert
++    // (field bullets are column-0 by convention; indented BULLETS still
++    // parse so nested-list authoring keeps working). Checked before the
++    // fence opener so an indented ``` is code content, not a fence.
++    if (INDENTED_CODE_RE.test(line) && !BULLET_SHAPE_RE.test(trimmed)) {
++      continue;
++    }
++    const opened = openingFence(trimmed);
++    if (opened !== undefined) {
++      fence = opened;
++      continue;
++    }
++    const heading = HEADING_RE.exec(trimmed);
++    if (heading !== null) {
++      current = undefined;
++      const headingText = heading[1].trim();
++      const ruleHeading = RULE_HEADING_RE.exec(headingText);
++      if (ruleHeading === null) {
++        const attempt = classifyHeadingAttempt(headingText);
++        if (attempt !== undefined) {
++          findings.push({ rule: 'malformed-rule-heading', message: attempt.message, line: lineNo });
++          // Inspect the attempt's body too (mirrors the duplicate branch).
++          current = newSection(attempt.attemptedId, lineNo);
++          throwawaySections.push(current);
++        }
++        continue;
++      }
++      const id = ruleHeading[1].trim();
++      if (id === '') {
++        findings.push({
++          rule: 'malformed-rule-heading',
++          message: `Rule heading at line ${lineNo} has no id — expected "rule: <id>".`,
++          line: lineNo,
++        });
++        // Best-effort attribution: the heading text is all the id there is.
++        current = newSection(headingText, lineNo);
++        throwawaySections.push(current);
++        continue;
++      }
++      if (seenIds.has(id)) {
++        findings.push({
++          rule: 'duplicate-rule-id',
++          message: `Rule id "${id}" is declared more than once.`,
++          ruleId: id,
++          line: lineNo,
++        });
++        // Parse the duplicate into a throwaway section (NOT pushed to
++        // `sections`, no `seenIds` effect) so its field bullets are still
++        // inspected — field-level findings + auxiliary css links surface in
++        // this pass instead of after the author renames the id and reruns.
++        current = newSection(id, lineNo);
++        throwawaySections.push(current);
++        continue;
++      }
++      seenIds.add(id);
++      current = newSection(id, lineNo);
++      sections.push(current);
++      continue;
++    }
++    const lineAttempt = classifyLineAttempt(trimmed, lines[i + 1]);
++    if (lineAttempt !== undefined) {
++      // A declaration in the wrong syntax (setext heading / bare paragraph):
++      // flag it AND start a throwaway section so its bullets are inspected
++      // instead of silently merging into the preceding rule's section.
++      findings.push({ rule: 'malformed-rule-heading', message: lineAttempt.message, line: lineNo });
++      current = newSection(lineAttempt.attemptedId, lineNo);
++      throwawaySections.push(current);
++      continue;
++    }
++    if (current === undefined) {
++      continue;
++    }
++    const bullet = FIELD_BULLET_RE.exec(trimmed);
++    if (bullet === null) {
++      continue;
++    }
++    const key = bullet[1].replace(/’/g, "'");
++    if (!isKnownKey(key)) {
++      findings.push({
++        rule: 'unknown-field',
++        message: `Unknown field "${key}:" — known fields are: ${KNOWN_KEYS.join(', ')}.`,
++        ruleId: current.id,
++        line: lineNo,
++      });
++      continue;
++    }
++    recordField({ section: current, findings }, key, bullet[2].trim(), lineNo);
++  }
++
++  if (sections.length === 0) {
++    findings.push({
++      rule: 'no-rules',
++      message: 'The spec declares no rules — expected ≥1 "rule: <id>" heading.',
++    });
++  }
++
++  const rules: DesignSpecRule[] = [];
++  const auxiliaryCssLinks: RuleScopedCssLink[] = [];
++  for (const section of sections) {
++    const rule = validateSection(section, findings);
++    if (rule !== undefined) {
++      rules.push(rule);
++      continue;
++    }
++    // Invalid housing, usable links: the liveness axis still checks them.
++    auxiliaryCssLinks.push(...section.cssLinks.map((link) => ({ ruleId: section.id, link })));
++  }
++  for (const section of throwawaySections) {
++    auxiliaryCssLinks.push(...section.cssLinks.map((link) => ({ ruleId: section.id, link })));
++  }
++
++  return { ok: findings.length === 0, spec: { rules }, findings, auxiliaryCssLinks };
++}
+
+ succeeded in 0ms:
+diff --git a/plugins/design-control/src/design-language/selector-canon.ts b/plugins/design-control/src/design-language/selector-canon.ts
+new file mode 100644
+index 00000000..fef9d3e4
+--- /dev/null
++++ b/plugins/design-control/src/design-language/selector-canon.ts
+@@ -0,0 +1,201 @@
++/**
++ * Selector-text canonicalization primitives for link-liveness
++ * (AUDIT-round2-codex-01, AUDIT-round2-claude-04).
++ *
++ * The liveness matcher compares a query selector against source selector
++ * preludes as TEXT. These helpers make that comparison honest in both
++ * directions: attribute values are rewritten to ONE canonical spelling
++ * (double-quoted) so quote style never produces a false dead AND distinct
++ * values never conflate into a false green; functional pseudo-class arguments
++ * are preserved for comparison (or stripped/blanked by the matcher when the
++ * query does not name them — an exclusion argument or attribute value is not
++ * a selector definition); whitespace is normalized identically on both sides.
++ *
++ * Remaining accepted approximations (stated, not silent):
++ * - Escape sequences inside quoted values are kept verbatim, not decoded —
++ *   `[a='it\'s']` and `[a="it's"]` spell the same value but do not unify.
++ * - Whitespace inside functional-pseudo arguments is collapsed to single
++ *   spaces (and trimmed at parens/commas/combinator-shaped characters), not
++ *   erased — the combinator pass strips spacing around `+`, so
++ *   `:nth-child(2n+1)` and `:nth-child(2n + 1)` DO unify, while the
++ *   `-`-spelled forms (`:nth-child(2n-1)` vs `(2n - 1)`) do not.
++ * - Attribute names are matched as plain idents; namespaced attribute
++ *   selectors (`[svg|href]`) are left un-canonicalized (compared verbatim).
++ */
++
++/** True for characters that extend a CSS ident (would change the selector). */
++export function isIdentChar(ch: string | undefined): boolean {
++  return ch !== undefined && /[A-Za-z0-9_-]/.test(ch);
++}
++
++/**
++ * Copy a string literal verbatim starting at `text[start]` (an opening quote),
++ * walking `\` escapes. Returns the copied literal (closing quote included when
++ * present) and the index just past it.
++ */
++export function copyStringLiteral(text: string, start: number): { copied: string; end: number } {
++  const quote = text[start];
++  let copied = quote;
++  let i = start + 1;
++  while (i < text.length && text[i] !== quote) {
++    copied += text[i];
++    if (text[i] === '\\' && i + 1 < text.length) {
++      copied += text[i + 1];
++      i += 2;
++    } else {
++      i += 1;
++    }
++  }
++  if (i < text.length) {
++    copied += quote;
++    i += 1;
++  }
++  return { copied, end: i };
++}
++
++/** Strip CSS comments; string-literal contents are copied verbatim. */
++export function stripComments(text: string): string {
++  let out = '';
++  let i = 0;
++  while (i < text.length) {
++    const ch = text[i];
++    if (ch === '/' && text[i + 1] === '*') {
++      const end = text.indexOf('*/', i + 2);
++      i = end === -1 ? text.length : end + 2;
++      continue;
++    }
++    if (ch === '"' || ch === "'") {
++      const literal = copyStringLiteral(text, i);
++      out += literal.copied;
++      i = literal.end;
++      continue;
++    }
++    out += ch;
++    i += 1;
++  }
++  return out;
++}
++
++/**
++ * One attribute selector: name, optional operator + value (double-quoted,
++ * single-quoted, or unquoted) + optional case-sensitivity flag.
++ */
++const ATTRIBUTE_SELECTOR =
++  /\[\s*([A-Za-z0-9_-]+)\s*(?:([~|^$*]?=)\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^\s\]'"]+))(?:\s+([iIsS]))?\s*)?\]/g;
++
++/**
++ * Rewrite every attribute selector to one canonical spelling:
++ * `[attr=val]` / `[attr='val']` / `[attr="val"]` → `[attr="val"]` (value text
++ * preserved; flag lowercased; internal whitespace dropped). Different values
++ * therefore never conflate, and quote styles never diverge.
++ */
++export function canonicalizeAttributeSelectors(text: string): string {
++  let out = '';
++  let last = 0;
++  ATTRIBUTE_SELECTOR.lastIndex = 0;
++  let match = ATTRIBUTE_SELECTOR.exec(text);
++  while (match !== null) {
++    out += text.slice(last, match.index);
++    const name: string = match[1];
++    const operator: string | undefined = match[2];
++    if (operator === undefined) {
++      out += `[${name}]`;
++    } else {
++      const value: string = match[3] ?? match[4] ?? match[5] ?? '';
++      const flag: string | undefined = match[6];
++      out += `[${name}${operator}"${value}"${flag === undefined ? '' : ` ${flag.toLowerCase()}`}]`;
++    }
++    last = match.index + match[0].length;
++    match = ATTRIBUTE_SELECTOR.exec(text);
++  }
++  return out + text.slice(last);
++}
++
++/**
++ * Blank the VALUES of canonicalized attribute selectors (`[a="x"]` → `[a=""]`).
++ * Used on the haystack when the query names no attribute selector, so a bare
++ * query never matches text that exists only as an attribute value — an
++ * attribute value is not a selector definition. Run AFTER
++ * {@link canonicalizeAttributeSelectors} (it only sees double-quoted values).
++ */
++export function blankAttributeValues(text: string): string {
++  return text.replace(/(\[[A-Za-z0-9_-]+[~|^$*]?=)"(?:[^"\\]|\\.)*"/g, '$1""');
++}
++
++/**
++ * Strip the CONTENTS of functional pseudo-class arguments (delimiters stay):
++ * `:not(.ghost)` → `:not()`, for any `:<ident>(` / `::<ident>(`, balancing
++ * nested parens (`:not(:is(.a))` → `:not()`) and skipping string literals so
++ * parens inside quoted values do not unbalance the walk. A selector that
++ * appears only as an exclusion or matcher argument is not styled by the rule,
++ * so it must not satisfy a liveness query that never named the argument.
++ */
++export function stripFunctionalPseudoArgs(text: string): string {
++  let out = '';
++  let i = 0;
++  while (i < text.length) {
++    const ch = text[i];
++    if (ch === '"' || ch === "'") {
++      const literal = copyStringLiteral(text, i);
++      out += literal.copied;
++      i = literal.end;
++      continue;
++    }
++    if (ch === ':') {
++      let identStart = i + 1;
++      if (text[identStart] === ':') {
++        identStart += 1;
++      }
++      let identEnd = identStart;
++      while (identEnd < text.length && isIdentChar(text[identEnd])) {
++        identEnd += 1;
++      }
++      if (identEnd > identStart && text[identEnd] === '(') {
++        out += text.slice(i, identEnd + 1);
++        let depth = 1;
++        i = identEnd + 1;
++        while (i < text.length && depth > 0) {
++          if (text[i] === '"' || text[i] === "'") {
++            i = copyStringLiteral(text, i).end;
++            continue;
++          }
++          if (text[i] === '(') {
++            depth += 1;
++          } else if (text[i] === ')') {
++            depth -= 1;
++          }
++          i += 1;
++        }
++        if (depth === 0) {
++          out += ')';
++        }
++        continue;
++      }
++    }
++    out += ch;
++    i += 1;
++  }
++  return out;
++}
++
++/**
++ * Normalize selector whitespace for textual comparison: runs collapse to one
++ * space; spaces inside paren delimiters, around commas, and around the
++ * non-descendant combinators (`>` `+` `~` `||`) drop; ends trim. Prettier
++ * writes spaced combinators, so `.a>.b` and `.a > .b` must compare equal — a
++ * CSS reformat must never flip a green link dead. The `~` of the `~=`
++ * attribute operator is safe here: {@link canonicalizeAttributeSelectors}
++ * runs first and emits `[a~="x"]` with no surrounding spaces, so the
++ * combinator pass is an identity on it. Applied identically to query and
++ * haystack, so descendant-combinator, combinator, and argument-list spacing
++ * differences never produce a false dead.
++ */
++export function normalizeSelectorWhitespace(text: string): string {
++  return text
++    .replace(/\s+/g, ' ')
++    .replace(/\(\s+/g, '(')
++    .replace(/\s+\)/g, ')')
++    .replace(/\s*,\s*/g, ',')
++    .replace(/\s*(\|\||[>+~])\s*/g, '$1')
++    .trim();
++}
+
+codex
+I’ve read the main parser and liveness code. The parser has explicit markdown-context handling for fences/indented code and the liveness path now has portability guards at both parse and direct-call boundaries, so I’m looking for fresh edge cases rather than the prior audit shapes.
+exec
+/bin/zsh -lc 'git diff 0391a0c0..HEAD -- plugins/design-control/src/design-language/rule-attempt.ts' in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+diff --git a/plugins/design-control/src/design-language/rule-attempt.ts b/plugins/design-control/src/design-language/rule-attempt.ts
+new file mode 100644
+index 00000000..d3952c74
+--- /dev/null
++++ b/plugins/design-control/src/design-language/rule-attempt.ts
+@@ -0,0 +1,98 @@
++/**
++ * Rule-declaration ATTEMPT detection for the design-language schema
++ * (extracted from `schema.ts` to keep that module under the file-size cap).
++ *
++ * The convention's only valid declaration is an ATX heading `rule: <id>`.
++ * Everything here classifies the NEAR MISSES — text that an author plainly
++ * meant as a declaration but that misses the strict form — so the parser can
++ * surface a `malformed-rule-heading` finding instead of silently demoting the
++ * intended rule to inert prose (and, worse, merging its bullets into the
++ * preceding rule's section).
++ *
++ * Trigger calibration (deliberately narrow): a heading counts as an attempt
++ * only when it carries a colon after the `rule` word (`Rule: x`, `rule : x`)
++ * OR is exact-lowercase `rule` followed by exactly one id-shaped token
++ * (`rule missing-colon`). Multi-word prose headings (`Rule of thumb`,
++ * `Rule kinds`) stay inert — reserving every heading that merely STARTS with
++ * "rule" would structurally forbid ordinary prose headings.
++ *
++ * Non-heading lines count only when they are line-initial exact-lowercase
++ * `rule: <id>` with a SINGLE id-shaped token and nothing after — the
++ * unambiguous declaration shape in the wrong syntax (setext heading or bare
++ * paragraph). The id-shape constraint mirrors the heading-level calibration
++ * (AUDIT round-3 claude-03): lowercase prose sentences like
++ * `rule: never introduce raw hex blues outside the tokens.` stay inert —
++ * a multi-word value is guidance prose, not a declaration. Capitalised prose
++ * like "Rule: always X." and mid-line mentions of "rule:" also stay inert.
++ */
++
++/** A classified declaration attempt: finding message + attribution id. */
++export interface RuleAttempt {
++  /** Complete `malformed-rule-heading` finding message. */
++  readonly message: string;
++  /** Best-effort id from the attempted declaration, for finding attribution. */
++  readonly attemptedId: string;
++}
++
++/** Colon after the rule word, any case / spacing: `Rule: x`, `rule : x`. */
++const COLON_ATTEMPT_RE = /^rule\s*:/i;
++/** Space between `rule` and the colon: `rule :x`, `Rule : x`. */
++const SPACED_COLON_RE = /^rule\s+:/i;
++/** Exact-lowercase `rule` + exactly one id-shaped token: `rule missing-colon`. */
++const BARE_ID_ATTEMPT_RE = /^rule\s+[\w-]+$/;
++/**
++ * Line-initial exact-lowercase declaration shape on a non-heading line:
++ * exactly one id-shaped token after the colon (`rule: beta`). Multi-word
++ * lowercase prose (`rule: never use raw hex.`) is NOT an attempt.
++ */
++const LINE_ATTEMPT_RE = /^rule\s*:\s*[\w-]+\s*$/;
++/** A setext underline: a line of only `=` or only `-` characters. */
++const SETEXT_UNDERLINE_RE = /^(?:=+|-+)$/;
++
++/** Best-effort id from the attempted heading text (`Rule: x` → `x`). */
++function deriveAttemptedId(text: string): string {
++  const id = /^rule\s*:?\s*(.*)$/i.exec(text)?.[1].trim() ?? '';
++  return id === '' ? text : id;
++}
++
++/**
++ * Classify an ATX heading's text (already known NOT to match the strict
++ * `rule: <id>` form) as a declaration attempt, naming the ACTUAL mismatch.
++ */
++export function classifyHeadingAttempt(headingText: string): RuleAttempt | undefined {
++  const colonAttempt = COLON_ATTEMPT_RE.test(headingText);
++  if (!colonAttempt && !BARE_ID_ATTEMPT_RE.test(headingText)) {
++    return undefined;
++  }
++  let offence: string;
++  if (SPACED_COLON_RE.test(headingText)) {
++    offence = 'has a space between "rule" and the ":"';
++  } else if (colonAttempt) {
++    offence = 'the "rule:" prefix must be lowercase';
++  } else {
++    offence = 'missing the ":" after "rule"';
++  }
++  return {
++    message: `Heading "${headingText}" looks like a rule heading but ${offence} — expected "rule: <id>".`,
++    attemptedId: deriveAttemptedId(headingText),
++  };
++}
++
++/**
++ * Classify a non-heading line as a declaration attempt: a line-initial
++ * `rule: <id>` (single id-shaped token, nothing after) rendered as a setext
++ * heading (underlined by `---`/`===`) or as a bare paragraph. Both direct the
++ * author to the documented ATX syntax. Lowercase prose with a multi-word
++ * value stays inert (AUDIT round-3 claude-03).
++ */
++export function classifyLineAttempt(lineText: string, nextLine: string | undefined): RuleAttempt | undefined {
++  if (!LINE_ATTEMPT_RE.test(lineText)) {
++    return undefined;
++  }
++  const attemptedId = deriveAttemptedId(lineText);
++  const isSetext = nextLine !== undefined && SETEXT_UNDERLINE_RE.test(nextLine.trim());
++  const message = isSetext
++    ? `Setext heading "${lineText}" attempts a rule declaration — rule headings use ATX syntax: "### rule: ${attemptedId}".`
++    : `Line "${lineText}" looks like a rule declaration but is not a heading — declare it as an ATX heading: "### rule: ${attemptedId}".`;
++  return { message, attemptedId };
++}
+
+exec
+/bin/zsh -lc 'git diff 0391a0c0..HEAD -- plugins/design-control/bin/check-design-spec plugins/design-control/bin/check-wireframe plugins/design-control/bin/wireframe-provenance' in /Users/orion/work/deskwork-work/design-control
+exec
+/bin/zsh -lc 'git diff 0391a0c0..HEAD -- plugins/design-control/src/design-language/check-spec-file.ts plugins/design-control/src/design-language/check-design-spec-cli.ts plugins/design-control/src/design-language/types.ts plugins/design-control/src/design-language/index.ts' in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+diff --git a/plugins/design-control/bin/check-design-spec b/plugins/design-control/bin/check-design-spec
+new file mode 100755
+index 00000000..def0e493
+--- /dev/null
++++ b/plugins/design-control/bin/check-design-spec
+@@ -0,0 +1,28 @@
++#!/bin/sh
++# check-design-spec <design-language-spec.md> — validate a design-language spec:
++# markdown schema (closed kinds, css links, example-presence, do/don't) + static
++# link-liveness against author-written CSS (no app boot). Exit codes: 0 green,
++# 1 findings/error, 2 usage. Logic lives in src/design-language/check-spec-file.ts
++# (tested); this shim only locates the workspace tsx runner and dispatches.
++set -eu
++
++PLUGIN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
++
++dir="$PLUGIN_ROOT"
++TSX=""
++while [ "$dir" != "/" ]; do
++  if [ -x "$dir/node_modules/.bin/tsx" ]; then
++    TSX="$dir/node_modules/.bin/tsx"
++    break
++  fi
++  dir=$(dirname -- "$dir")
++done
++
++if [ -z "$TSX" ]; then
++  echo "check-design-spec: tsx runner not found in any node_modules/.bin above $PLUGIN_ROOT — run npm install first" >&2
++  exit 1
++fi
++
++# --tsconfig pins the plugin's own tsconfig (and its @/* alias); without it tsx
++# resolves from the caller's cwd and the documented repo-root invocation crashes.
++exec "$TSX" --tsconfig "$PLUGIN_ROOT/tsconfig.json" "$PLUGIN_ROOT/src/design-language/check-design-spec-cli.ts" "$@"
+diff --git a/plugins/design-control/bin/check-wireframe b/plugins/design-control/bin/check-wireframe
+index b5919fb3..9fc25bed 100755
+--- a/plugins/design-control/bin/check-wireframe
++++ b/plugins/design-control/bin/check-wireframe
+@@ -22,4 +22,6 @@ if [ -z "$TSX" ]; then
+   exit 1
+ fi
+ 
+-exec "$TSX" "$PLUGIN_ROOT/src/authoring/check-wireframe-cli.ts" "$@"
++# --tsconfig pins the plugin's own tsconfig (and its @/* alias); without it tsx
++# resolves from the caller's cwd and the documented repo-root invocation crashes.
++exec "$TSX" --tsconfig "$PLUGIN_ROOT/tsconfig.json" "$PLUGIN_ROOT/src/authoring/check-wireframe-cli.ts" "$@"
+diff --git a/plugins/design-control/bin/wireframe-provenance b/plugins/design-control/bin/wireframe-provenance
+index eff94773..392b9e35 100755
+--- a/plugins/design-control/bin/wireframe-provenance
++++ b/plugins/design-control/bin/wireframe-provenance
+@@ -23,4 +23,6 @@ if [ -z "$TSX" ]; then
+   exit 1
+ fi
+ 
+-exec "$TSX" "$PLUGIN_ROOT/src/provenance/wireframe-provenance-cli.ts" "$@"
++# --tsconfig pins the plugin's own tsconfig (and its @/* alias); without it tsx
++# resolves from the caller's cwd and the documented repo-root invocation crashes.
++exec "$TSX" --tsconfig "$PLUGIN_ROOT/tsconfig.json" "$PLUGIN_ROOT/src/provenance/wireframe-provenance-cli.ts" "$@"
+
+ succeeded in 0ms:
+diff --git a/plugins/design-control/src/design-language/check-design-spec-cli.ts b/plugins/design-control/src/design-language/check-design-spec-cli.ts
+new file mode 100644
+index 00000000..ebace3ed
+--- /dev/null
++++ b/plugins/design-control/src/design-language/check-design-spec-cli.ts
+@@ -0,0 +1,12 @@
++/**
++ * Process entry for `bin/check-design-spec`. All behavior lives in
++ * {@link runCheckDesignSpec} (tested directly); this file only wires argv and
++ * the process exit code.
++ */
++
++import { runCheckDesignSpec } from '@/design-language/check-spec-file';
++
++process.exitCode = runCheckDesignSpec(process.argv.slice(2), {
++  out: (line) => console.log(line),
++  err: (line) => console.error(line),
++});
+diff --git a/plugins/design-control/src/design-language/check-spec-file.ts b/plugins/design-control/src/design-language/check-spec-file.ts
+new file mode 100644
+index 00000000..19e071a8
+--- /dev/null
++++ b/plugins/design-control/src/design-language/check-spec-file.ts
+@@ -0,0 +1,96 @@
++/**
++ * File-level entry to the design-language spec check — the enforcement seam
++ * the `/design-control:translate-design-language` skill (and the
++ * `bin/check-design-spec` shim) route EVERY spec draft through, hand-authored
++ * or engine-accelerated alike. Mirrors `@/authoring/lint-file` for wireframes:
++ * a thin composition of the existing axes, no parallel validation path.
++ */
++
++import { readFileSync } from 'node:fs';
++import { dirname, resolve } from 'node:path';
++import {
++  checkCssLinkLiveness,
++  checkLinkLiveness,
++  type SkippedLink,
++} from '@/design-language/link-liveness';
++import { parseDesignSpec } from '@/design-language/schema';
++import type { DesignSpecFinding, ParsedDesignSpec } from '@/design-language/types';
++
++export interface DesignSpecCheckResult {
++  /** True iff findings is empty (skipped links stay green but visible). */
++  readonly ok: boolean;
++  readonly spec: ParsedDesignSpec;
++  /** Schema findings followed by link-liveness findings. */
++  readonly findings: readonly DesignSpecFinding[];
++  readonly skipped: readonly SkippedLink[];
++}
++
++/**
++ * Check a design-language spec FILE: read it, validate the markdown schema,
++ * then check link-liveness with css paths resolved against the spec file's
++ * own directory. Liveness runs over the valid rules AND the parse result's
++ * auxiliary css links (links housed in structurally-invalid / duplicate
++ * sections), so a schema defect and a dead link on the same section surface
++ * in ONE run — never in fix-and-rerun waves. Fails loud on an unreadable
++ * file — a missing spec is an error, never a clean verdict.
++ */
++export function checkDesignSpecFile(filePath: string): DesignSpecCheckResult {
++  const absolute = resolve(filePath);
++  const markdown = readFileSync(absolute, 'utf8');
++  const parsed = parseDesignSpec(markdown);
++  const baseDir = dirname(absolute);
++  const liveness = checkLinkLiveness(parsed.spec, baseDir);
++  const auxiliary = checkCssLinkLiveness(parsed.auxiliaryCssLinks, baseDir);
++  const findings = [...parsed.findings, ...liveness.findings, ...auxiliary.findings];
++  return {
++    ok: findings.length === 0,
++    spec: parsed.spec,
++    findings,
++    skipped: [...liveness.skipped, ...auxiliary.skipped],
++  };
++}
++
++/** Line-oriented output sink, injected so the CLI core is testable. */
++export interface CliIo {
++  out(line: string): void;
++  err(line: string): void;
++}
++
++const USAGE = 'usage: check-design-spec <design-language-spec.md>';
++
++/**
++ * CLI core behind `bin/check-design-spec`. Exit-code contract (the skill's
++ * gate, same shape as check-wireframe):
++ *   0 — spec green (zero findings; skipped links are reported but green)
++ *   1 — findings present, or the file could not be read (descriptive error;
++ *       never a fabricated verdict)
++ *   2 — usage error
++ */
++export function runCheckDesignSpec(argv: readonly string[], io: CliIo): number {
++  if (argv.length !== 1) {
++    io.err(USAGE);
++    return 2;
++  }
++  const filePath = argv[0];
++  let result: DesignSpecCheckResult;
++  try {
++    result = checkDesignSpecFile(filePath);
++  } catch (error) {
++    io.err(error instanceof Error ? error.message : String(error));
++    return 1;
++  }
++  for (const skip of result.skipped) {
++    io.out(
++      `note: rule "${skip.ruleId}" link "${skip.link.path} ${skip.link.selector}" is a non-CSS target — reported unchecked, does not establish link-liveness (this check validates selectors in author-written .css sources only; CSS-in-JS / utility-framework / CSS-Modules targets are outside its validated scope).`,
++    );
++  }
++  if (result.ok) {
++    io.out(`${filePath}: spec green — 0 findings (${result.spec.rules.length} rule(s))`);
++    return 0;
++  }
++  for (const finding of result.findings) {
++    io.err(`${finding.rule}${finding.ruleId ? ` (rule: ${finding.ruleId})` : ''}: ${finding.message}`);
++  }
++  io.err(`${filePath}: ${result.findings.length} finding(s)`);
++  return 1;
++}
+diff --git a/plugins/design-control/src/design-language/index.ts b/plugins/design-control/src/design-language/index.ts
+new file mode 100644
+index 00000000..2939c4ca
+--- /dev/null
++++ b/plugins/design-control/src/design-language/index.ts
+@@ -0,0 +1,31 @@
++/**
++ * Public surface of the design-language spec convention (Phase 2):
++ * markdown schema (axis A, pure) + static link-liveness (axis B, fs-backed)
++ * + the file-level composition behind `bin/check-design-spec`.
++ */
++
++export {
++  RULE_KINDS,
++  type CssLink,
++  type DesignRuleKind,
++  type DesignSpecFinding,
++  type DesignSpecFindingRule,
++  type DesignSpecParseResult,
++  type DesignSpecRule,
++  type ParsedDesignSpec,
++  type RuleScopedCssLink,
++} from '@/design-language/types';
++export { isNonPortableCssPath, parseDesignSpec } from '@/design-language/schema';
++export {
++  checkCssLinkLiveness,
++  checkLinkLiveness,
++  cssDefinesSelector,
++  type LivenessResult,
++  type SkippedLink,
++} from '@/design-language/link-liveness';
++export {
++  checkDesignSpecFile,
++  runCheckDesignSpec,
++  type CliIo,
++  type DesignSpecCheckResult,
++} from '@/design-language/check-spec-file';
+diff --git a/plugins/design-control/src/design-language/types.ts b/plugins/design-control/src/design-language/types.ts
+new file mode 100644
+index 00000000..bc89c2f8
+--- /dev/null
++++ b/plugins/design-control/src/design-language/types.ts
+@@ -0,0 +1,107 @@
++/**
++ * Shared types for the design-language spec convention (Phase 2).
++ *
++ * A design-language spec is a HAND-AUTHORABLE markdown artifact — the visual
++ * *letter* reference of the design-control discipline (the lo-fi wireframe is
++ * the UX *spirit*). The schema is allowlist-shaped like the rest of this
++ * plugin: a closed kind vocabulary, a closed field-key set (typos surface as
++ * findings, never silently drop), and per-rule structural requirements —
++ * ≥1 live-CSS link, ≥1 example reference, ≥1 do/don't guidance line.
++ *
++ * Extracted so the pure-text schema axis (`schema.ts`) and the fs-backed
++ * link-liveness axis (`link-liveness.ts`) share one taxonomy without a cycle
++ * (mirrors `@/lint/types`).
++ */
++
++/**
++ * Closed vocabulary of rule kinds, single-sourced as a `const ... as const`
++ * array (mirroring `ENGINE_METHODS` / `FAILURE_MODES`): palette / type /
++ * spacing tokens + the signature-component vocabulary.
++ */
++export const RULE_KINDS = ['palette', 'type', 'spacing', 'component'] as const;
++
++export type DesignRuleKind = (typeof RULE_KINDS)[number];
++
++/**
++ * A rule's link to live CSS: a path to an author-written CSS file (relative to
++ * the spec file) plus the selector the rule is anchored to. The selector may be
++ * multi-token (descendant combinators); the path is the first whitespace-free
++ * token of the `css:` field value. Machine-rooted paths (absolute, drive-letter,
++ * UNC, `~`-prefixed) never appear here — the schema rejects them as
++ * `malformed-css-link` (portability: the spec travels with its collection);
++ * `../` traversal within the repository is allowed.
++ */
++export interface CssLink {
++  readonly path: string;
++  readonly selector: string;
++}
++
++/** One structurally-valid rule parsed out of a design-language spec. */
++export interface DesignSpecRule {
++  /** The id from the `### rule: <id>` heading. */
++  readonly id: string;
++  /** Kind from the closed {@link RULE_KINDS} vocabulary. */
++  readonly kind: DesignRuleKind;
++  /** ≥1 live-CSS link (the link-liveness axis verifies each). */
++  readonly cssLinks: readonly CssLink[];
++  /** ≥1 example reference (structural presence only; does not establish example truthfulness). */
++  readonly examples: readonly string[];
++  /** `do:` guidance lines. */
++  readonly dos: readonly string[];
++  /** `don't:` guidance lines. */
++  readonly donts: readonly string[];
++}
++
++/** Finding taxonomy across both axes (schema structure + link-liveness). */
++export type DesignSpecFindingRule =
++  // axis A — markdown schema structure
++  | 'no-rules'
++  | 'malformed-rule-heading'
++  | 'duplicate-rule-id'
++  | 'missing-kind'
++  | 'unknown-kind'
++  | 'missing-css-link'
++  | 'malformed-css-link'
++  | 'missing-example'
++  | 'missing-guidance'
++  | 'unknown-field'
++  | 'empty-field'
++  // axis B — static link-liveness against author-written CSS source
++  | 'dead-link-file'
++  | 'dead-link-selector';
++
++export interface DesignSpecFinding {
++  readonly rule: DesignSpecFindingRule;
++  readonly message: string;
++  /** The spec rule the finding is about, when rule-scoped. */
++  readonly ruleId?: string;
++  /** 1-based markdown source line, when known. */
++  readonly line?: number;
++}
++
++/** The parsed spec: structurally-valid rules only (invalid rules are findings). */
++export interface ParsedDesignSpec {
++  readonly rules: readonly DesignSpecRule[];
++}
++
++/** A css link paired with the id of the spec section that declared it. */
++export interface RuleScopedCssLink {
++  readonly ruleId: string;
++  readonly link: CssLink;
++}
++
++export interface DesignSpecParseResult {
++  /** True iff findings is empty. */
++  readonly ok: boolean;
++  readonly spec: ParsedDesignSpec;
++  readonly findings: readonly DesignSpecFinding[];
++  /**
++   * Syntactically-usable css links housed in sections EXCLUDED from
++   * `spec.rules` (structurally-invalid rules, duplicate-id sections, and
++   * malformed-rule-heading declaration attempts). They still feed the
++   * link-liveness axis so a schema defect and a dead link on the same section
++   * surface in ONE checker run, not in waves — downstream consumers of
++   * `spec.rules` never see the invalid housing.
++   */
++  readonly auxiliaryCssLinks: readonly RuleScopedCssLink[];
++}
+
+codex
+The CLI composition is thin and mostly delegates correctly: parse findings, valid-rule liveness, and auxiliary liveness are combined in one pass. I’m now checking selector matching semantics because that is where this feature makes the most approximate, consumer-visible claims.
+exec
+/bin/zsh -lc "rg -n \"foo\\.btn|primary|compound|ident-boundary|cssDefinesSelector|\\.btn\" plugins/design-control/src/__tests__/design-language plugins/design-control/src/design-language" in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+plugins/design-control/src/__tests__/design-language/check-design-spec-shim.test.ts:47:    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+plugins/design-control/src/__tests__/design-language/check-design-spec-shim.test.ts:51:      `### rule: ink-primary
+plugins/design-control/src/__tests__/design-language/check-design-spec-shim.test.ts:53:- css: studio.css .btn-primary
+plugins/design-control/src/__tests__/design-language/check-design-spec-shim.test.ts:55:- do: Use the ink palette for primary actions.
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:56:    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:57:    const result = checkLinkLiveness(specWithLink('studio.css', '.btn-primary'), dir);
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:113:    writeFileSync(join(dir, 'shared.css'), '.btn-primary { color: navy; }\n');
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:114:    const result = checkLinkLiveness(specWithLink('../shared.css', '.btn-primary'), join(dir, 'specs'));
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:127:    writeFileSync(join(dir, 'studio.css'), '.btn { color: navy; }\n');
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:130:        [{ ruleId: 'probe', link: { path: join(dir, 'studio.css'), selector: '.btn' } }],
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:140:        [{ ruleId: 'probe', link: { path: '~/styles/studio.css', selector: '.btn' } }],
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:150:        [{ ruleId: 'probe', link: { path: 'C:styles.css', selector: '.btn' } }],
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:160:    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:161:    const result = checkLinkLiveness(specWithLink('studio.css', '.btn-ghost'), dir);
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:170:    const result = checkLinkLiveness(specWithLink('nope.css', '.btn'), dir);
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:174:  it('does not let a longer ident satisfy a shorter selector (.btn vs .btn-primary)', () => {
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:176:    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:177:    expect(checkLinkLiveness(specWithLink('studio.css', '.btn'), dir).ok).toBe(false);
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:361:    const result = checkLinkLiveness(specWithLink('styles.ts', '.btn'), dir);
+plugins/design-control/src/__tests__/design-language/link-liveness.test.ts:368:      link: { path: 'styles.ts', selector: '.btn' },
+plugins/design-control/src/__tests__/design-language/schema.test.ts:23:### rule: ink-primary
+plugins/design-control/src/__tests__/design-language/schema.test.ts:25:- css: styles/studio.css .btn-primary
+plugins/design-control/src/__tests__/design-language/schema.test.ts:26:- example: dashboard compose button uses .btn-primary
+plugins/design-control/src/__tests__/design-language/schema.test.ts:27:- do: Use the ink palette for every primary action.
+plugins/design-control/src/__tests__/design-language/schema.test.ts:56:    expect(ink.id).toBe('ink-primary');
+plugins/design-control/src/__tests__/design-language/schema.test.ts:58:    expect(ink.cssLinks).toEqual([{ path: 'styles/studio.css', selector: '.btn-primary' }]);
+plugins/design-control/src/__tests__/design-language/schema.test.ts:59:    expect(ink.examples).toEqual(['dashboard compose button uses .btn-primary']);
+plugins/design-control/src/__tests__/design-language/schema.test.ts:60:    expect(ink.dos).toEqual(['Use the ink palette for every primary action.']);
+plugins/design-control/src/__tests__/design-language/schema.test.ts:107:    const result = parseDesignSpec(`### rule: ink-primary
+plugins/design-control/src/__tests__/design-language/schema.test.ts:109:- css: styles/studio.css .btn-primary
+plugins/design-control/src/__tests__/design-language/schema.test.ts:113:    expect(result.findings.some((f) => f.rule === 'missing-example' && f.ruleId === 'ink-primary')).toBe(
+plugins/design-control/src/__tests__/design-language/schema.test.ts:119:    const findings = findingsFor(`### rule: ink-primary
+plugins/design-control/src/__tests__/design-language/schema.test.ts:121:- css: styles/studio.css .btn-primary
+plugins/design-control/src/__tests__/design-language/schema.test.ts:138:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:149:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:181:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:191:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:197:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:211:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:244:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:274:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:287:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:313:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:326:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:332:      { ruleId: 'no-example', link: { path: 'styles/studio.css', selector: '.btn' } },
+plugins/design-control/src/__tests__/design-language/schema.test.ts:340:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:375:      { path: 'styles/studio.css', selector: '.btn' },
+plugins/design-control/src/__tests__/design-language/schema.test.ts:417:- css: /Users/alice/project/styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:431:- css: C:\\styles\\studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:441:- css: C:/styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:454:- css: C:styles.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:464:- css: c:styles.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:474:- css: \\\\server\\share\\studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:484:- css: ~/project/styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:494:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:510:- css: ../shared/styles.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:517:      { path: '../shared/styles.css', selector: '.btn' },
+plugins/design-control/src/__tests__/design-language/schema.test.ts:525:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:597:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:622:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:649:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:666:      { path: 'styles/studio.css', selector: '.btn' },
+plugins/design-control/src/__tests__/design-language/schema.test.ts:691:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/schema.test.ts:695:The guiding rule: keep ink primary everywhere.
+plugins/design-control/src/__tests__/design-language/schema.test.ts:708:- css: styles/studio.css .btn
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:47:### rule: ink-primary
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:49:- css: studio.css .btn-primary
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:51:- do: Use the ink palette for primary actions.
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:55:  writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:152:- css: styles.ts .btn
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:212:- css: styles.ts .btn
+plugins/design-control/src/design-language/index.ts:22:  cssDefinesSelector,
+plugins/design-control/src/design-language/link-liveness.ts:18: * "Defined in source" is implemented as: the selector appears, ident-boundary
+plugins/design-control/src/design-language/link-liveness.ts:112: * True iff `selector` appears ident-boundary exact inside some selector
+plugins/design-control/src/design-language/link-liveness.ts:129:export function cssDefinesSelector(css: string, selector: string): boolean {
+plugins/design-control/src/design-language/link-liveness.ts:212:    if (!cssDefinesSelector(css, link.selector)) {
+
+exec
+/bin/zsh -lc "sed -n '1,260p' plugins/design-control/src/__tests__/design-language/link-liveness.test.ts" in /Users/orion/work/deskwork-work/design-control
+exec
+/bin/zsh -lc "sed -n '260,520p' plugins/design-control/src/__tests__/design-language/link-liveness.test.ts" in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+      checkLinkLiveness(specWithLink('studio.css', '.chip[data-state="open"]'), dir).ok,
+    ).toBe(true);
+  });
+
+  it('a selector appearing only as a quoted attribute VALUE is dead — values are not definitions', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real[data-icon=".ghost"] { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+  });
+
+  it('a selector appearing only as an UNQUOTED attribute value is dead too', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real[class~=ghost] { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', 'ghost'), dir).ok).toBe(false);
+  });
+});
+
+describe('checkLinkLiveness — functional pseudo-class arguments compared (AUDIT-round2-codex-01)', () => {
+  it('a .real:not(.ghost) query is dead against a source defining only .real:not(.other)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not(.other) { color: ink; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', '.real:not(.ghost)'), dir);
+    expect(result.ok).toBe(false);
+    expect(result.findings.some((f) => f.rule === 'dead-link-selector')).toBe(true);
+  });
+
+  it('argument whitespace is normalized — .real:not(.ghost) matches a :not( .ghost ) source', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not( .ghost ) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.real:not(.ghost)'), dir).ok).toBe(true);
+  });
+
+  it('argument-list comma spacing is normalized — :is(.a,.b) matches :is(.a, .b)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:is(.a, .b) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.real:is(.a,.b)'), dir).ok).toBe(true);
+  });
+});
+
+describe('checkLinkLiveness — combinator spacing normalized (AUDIT-20260611 combinator finding)', () => {
+  it('a spaced child query matches an unspaced source — .a > .b vs .a>.b', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.a>.b { color: ink; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', '.a > .b'), dir);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('an unspaced adjacent-sibling query matches a spaced source — .c+.d vs .c + .d', () => {
+    // Prettier writes spaced combinators, so a CSS reformat must not flip a
+    // green link dead.
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.c + .d { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.c+.d'), dir).ok).toBe(true);
+  });
+
+  it('a spaced general-sibling query matches an unspaced source — .x ~ .y vs .x~.y', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.x~.y { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.x ~ .y'), dir).ok).toBe(true);
+  });
+
+  it('an unspaced column-combinator query matches a spaced source — .col||.cell vs .col || .cell', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.col || .cell { width: 4rem; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.col||.cell'), dir).ok).toBe(true);
+  });
+
+  it('combinator unification never fabricates a green — .a>.b is dead against a descendant .a .b source', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.a .b { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.a>.b'), dir).ok).toBe(false);
+  });
+
+  it('descendant combinators keep their single-space normalization alongside the combinator pass', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.list   >   .item   .label { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.list > .item .label'), dir).ok).toBe(true);
+  });
+
+  it('the ~= attribute operator is untouched — [a~="x"] matches a spaced [a ~= "x"] source', () => {
+    // Attribute canonicalization owns operator spacing (the ~ there is part of
+    // ~=); the combinator pass must not corrupt it.
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real[a ~= "x"] { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.real[a~="x"]'), dir).ok).toBe(true);
+  });
+
+  it('nth-child + spelling unifies as a consequence — :nth-child(2n+1) matches :nth-child(2n + 1)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.row:nth-child(2n + 1) { background: paper; }\n');
+    expect(
+      checkLinkLiveness(specWithLink('studio.css', '.row:nth-child(2n+1)'), dir).ok,
+    ).toBe(true);
+  });
+});
+
+describe('checkLinkLiveness — validated-scope boundary (non-CSS targets, visible)', () => {
+  it('records a non-.css target as skipped — no finding, never silent', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'styles.ts'), 'export const btn = css`color: navy;`;\n');
+    const result = checkLinkLiveness(specWithLink('styles.ts', '.btn'), dir);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({
+      ruleId: 'probe',
+      reason: 'non-css-target',
+      link: { path: 'styles.ts', selector: '.btn' },
+    });
+  });
+});
+
+ succeeded in 0ms:
+/**
+ * Static link-liveness tests (Phase 2, axis B).
+ *
+ * Each rule's `css: <path> <selector>` link must resolve to an author-written
+ * CSS file in which the selector is DEFINED — checked statically against
+ * source with NO app boot (the check is pure file reads; the acceptance's
+ * "flags a dead selector with no app boot — engine absent" lands here).
+ *
+ * Scope is author-written CSS only: non-.css targets (CSS-in-JS, hashed
+ * CSS-Modules, utility frameworks) do not establish link-liveness — they are
+ * recorded as skipped, visibly, never silently dropped and never fabricated
+ * into a dead-link finding.
+ *
+ * Real-fs temp fixtures per .claude/rules/testing.md — never mock the fs.
+ */
+
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { checkCssLinkLiveness, checkLinkLiveness } from '@/design-language/link-liveness';
+import type { ParsedDesignSpec } from '@/design-language/types';
+
+const tempDirs: string[] = [];
+
+function makeFixtureDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'design-language-liveness-'));
+  tempDirs.push(dir);
+  return dir;
+}
+
+afterEach(() => {
+  while (tempDirs.length > 0) {
+    rmSync(tempDirs.pop() as string, { recursive: true, force: true });
+  }
+});
+
+function specWithLink(path: string, selector: string): ParsedDesignSpec {
+  return {
+    rules: [
+      {
+        id: 'probe',
+        kind: 'palette',
+        cssLinks: [{ path, selector }],
+        examples: ['an example'],
+        dos: ['guidance'],
+        donts: [],
+      },
+    ],
+  };
+}
+
+describe('checkLinkLiveness — live selectors pass', () => {
+  it('passes a class selector defined in the referenced file', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', '.btn-primary'), dir);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('finds a selector defined inside an @media block', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(
+      join(dir, 'studio.css'),
+      '@media (min-width: 80rem) {\n  .desktop-rail { width: 16rem; }\n}\n',
+    );
+    expect(checkLinkLiveness(specWithLink('studio.css', '.desktop-rail'), dir).ok).toBe(true);
+  });
+
+  it('finds a selector that appears with a pseudo-class in source', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.chip:hover { outline: 1px solid; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.chip'), dir).ok).toBe(true);
+  });
+
+  it('finds a descendant selector sequence regardless of whitespace', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.masthead   nav a { text-decoration: none; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.masthead nav a'), dir).ok).toBe(true);
+  });
+
+  it('finds a quoted attribute selector — input[type="text"] is live, not fabricated dead', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), 'input[type="text"] { border: 1px solid; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', 'input[type="text"]'), dir);
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('finds a class + quoted attribute selector — .chip[data-state="open"] is live', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.chip[data-state="open"] { outline: 2px solid; }\n');
+    expect(
+      checkLinkLiveness(specWithLink('studio.css', '.chip[data-state="open"]'), dir).ok,
+    ).toBe(true);
+  });
+
+  it('resolves the css path relative to the spec base dir, including subdirectories', () => {
+    const dir = makeFixtureDir();
+    mkdirSync(join(dir, 'styles'));
+    writeFileSync(join(dir, 'styles', 'chrome.css'), '.masthead-rule { border-top: 2px solid; }\n');
+    expect(checkLinkLiveness(specWithLink('styles/chrome.css', '.masthead-rule'), dir).ok).toBe(true);
+  });
+
+  it('resolves parent traversal — a subdir spec referencing ../ css is live', () => {
+    // Deliberate (AUDIT-round2-codex-02): `../` stays accepted — a spec
+    // legitimately references author CSS elsewhere in the repository tree;
+    // the portability boundary is the repository/collection, not the spec's
+    // own directory.
+    const dir = makeFixtureDir();
+    mkdirSync(join(dir, 'specs'));
+    writeFileSync(join(dir, 'shared.css'), '.btn-primary { color: navy; }\n');
+    const result = checkLinkLiveness(specWithLink('../shared.css', '.btn-primary'), join(dir, 'specs'));
+    expect(result.findings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe('checkCssLinkLiveness — public-seam portability defense (AUDIT-round2-codex-02)', () => {
+  it('throws on a machine-rooted link path instead of fabricating a machine-local verdict', () => {
+    // The path EXISTS on this machine — exactly the trap: resolve() would
+    // ignore baseDir and the check would go green here while the spec is
+    // nonportable. The schema never emits such a link; a hand-built one at
+    // this public seam is a caller contract violation → fail loud.
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.btn { color: navy; }\n');
+    expect(() =>
+      checkCssLinkLiveness(
+        [{ ruleId: 'probe', link: { path: join(dir, 'studio.css'), selector: '.btn' } }],
+        dir,
+      ),
+    ).toThrow(/relative to the spec file/);
+  });
+
+  it('throws on a ~-prefixed link path too (home expansion is machine-local)', () => {
+    const dir = makeFixtureDir();
+    expect(() =>
+      checkCssLinkLiveness(
+        [{ ruleId: 'probe', link: { path: '~/styles/studio.css', selector: '.btn' } }],
+        dir,
+      ),
+    ).toThrow(/relative to the spec file/);
+  });
+
+  it('throws on a drive-RELATIVE Windows link path (C:styles.css — machine-contextual on Windows)', () => {
+    const dir = makeFixtureDir();
+    expect(() =>
+      checkCssLinkLiveness(
+        [{ ruleId: 'probe', link: { path: 'C:styles.css', selector: '.btn' } }],
+        dir,
+      ),
+    ).toThrow(/relative to the spec file/);
+  });
+});
+
+describe('checkLinkLiveness — dead links flagged (no app boot)', () => {
+  it('flags a selector that is not defined anywhere in the file', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', '.btn-ghost'), dir);
+    expect(result.ok).toBe(false);
+    expect(result.findings.some((f) => f.rule === 'dead-link-selector' && f.ruleId === 'probe')).toBe(
+      true,
+    );
+  });
+
+  it('flags a missing css file', () => {
+    const dir = makeFixtureDir();
+    const result = checkLinkLiveness(specWithLink('nope.css', '.btn'), dir);
+    expect(result.findings.some((f) => f.rule === 'dead-link-file')).toBe(true);
+  });
+
+  it('does not let a longer ident satisfy a shorter selector (.btn vs .btn-primary)', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.btn-primary { color: navy; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.btn'), dir).ok).toBe(false);
+  });
+
+  it('a selector appearing only in a comment is dead', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '/* .ghost was retired */\n.real { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+  });
+
+  it('a selector appearing only inside a declaration string is dead', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real::before { content: ".ghost"; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+  });
+
+  it('a selector appearing only as a property value token is dead', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real { background: url(.ghost/x.png); }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+  });
+
+  it('a selector appearing only inside :not(...) is dead — exclusion is not styling', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not(.ghost) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+  });
+
+  it('a selector appearing only inside :is(...) arguments is dead', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:is(.ghost, .other) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+  });
+
+  it('a selector nested inside :not(:is(...)) is dead — parens balance across nesting', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not(:is(.ghost)) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.ghost'), dir).ok).toBe(false);
+  });
+
+  it('the subject outside the functional pseudo-class still matches (.real in .real:not(.ghost))', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not(.ghost) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.real'), dir).ok).toBe(true);
+  });
+
+  it('a full-selector query with parens matches its source rule — argument text compared', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.real:not(.ghost) { color: ink; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', '.real:not(.ghost)'), dir).ok).toBe(true);
+  });
+});
+
+describe('checkLinkLiveness — attribute values compared canonically (AUDIT-round2-codex-01 / -claude-04)', () => {
+  it('a [data-state="open"] query is dead against a source defining only [data-state="closed"]', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), '.chip[data-state="closed"] { outline: none; }\n');
+    const result = checkLinkLiveness(specWithLink('studio.css', '.chip[data-state="open"]'), dir);
+    expect(result.ok).toBe(false);
+    expect(result.findings.some((f) => f.rule === 'dead-link-selector')).toBe(true);
+  });
+
+  it('an unquoted query matches a double-quoted source — input[type=text] vs input[type="text"]', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), 'input[type="text"] { border: 1px solid; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', 'input[type=text]'), dir).ok).toBe(true);
+  });
+
+  it('a double-quoted query matches an unquoted source — input[type="text"] vs input[type=text]', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), 'input[type=text] { border: 1px solid; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', 'input[type="text"]'), dir).ok).toBe(true);
+  });
+
+  it('a single-quoted query matches a double-quoted source', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), 'input[type="text"] { border: 1px solid; }\n');
+    expect(checkLinkLiveness(specWithLink('studio.css', "input[type='text']"), dir).ok).toBe(true);
+  });
+
+  it('a double-quoted query matches a single-quoted source', () => {
+    const dir = makeFixtureDir();
+    writeFileSync(join(dir, 'studio.css'), ".chip[data-state='open'] { outline: 2px solid; }\n");
+    expect(
+      checkLinkLiveness(specWithLink('studio.css', '.chip[data-state="open"]'), dir).ok,
+
+codex
+One candidate issue is emerging in Markdown heading handling rather than in previously dispositioned parser guards: the rule parser treats raw ATX heading text as the semantic heading, so CommonMark closing hashes may become part of the rule id. I’m verifying that against the shipped CLI/tests before I write it up.
+exec
+/bin/zsh -lc "nl -ba plugins/design-control/src/design-language/schema.ts | sed -n '45,75p;285,325p'" in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+    45	  type CssLink,
+    46	  type DesignRuleKind,
+    47	  type DesignSpecFinding,
+    48	  type DesignSpecParseResult,
+    49	  type DesignSpecRule,
+    50	  type RuleScopedCssLink,
+    51	} from '@/design-language/types';
+    52	
+    53	const HEADING_RE = /^#{1,6}\s+(.*)$/;
+    54	const RULE_HEADING_RE = /^rule:\s*(.*)$/;
+    55	/**
+    56	 * A field bullet: lowercase single-word key (apostrophe allowed: `don't`).
+    57	 * U+2019 (’) is also admitted — smart-quote editors substitute it in prose —
+    58	 * and normalized to ASCII `'` before the known-key check, so `don’t:` records
+    59	 * like `don't:` and a misspelled curly key still hits the typo guard.
+    60	 */
+    61	const FIELD_BULLET_RE = /^[-*]\s+([a-z][a-z'’]*)\s*:\s*(.*)$/;
+    62	
+    63	/**
+    64	 * `css:` paths are RELATIVE TO THE SPEC FILE — the portability contract
+    65	 * (AUDIT-round2-codex-02). A machine-rooted path (POSIX `/...`, Windows
+    66	 * `C:\...` / `C:/...` or drive-RELATIVE `C:styles.css` (resolves against the
+    67	 * drive's current directory on Windows, as a literal filename on POSIX — a
+    68	 * css path has no legitimate single-letter-colon prefix), UNC `\\...` or
+    69	 * root-relative `\...`, `~`-expanded home) goes green on its author's
+    70	 * machine — `resolve(baseDir, path)` IGNORES baseDir for an absolute path —
+    71	 * while the spec it lives in is collection content that travels; everywhere
+    72	 * else the link misleads or breaks. Such a path is rejected at the SCHEMA
+    73	 * level as `malformed-css-link` (a structurally-rejected token, like the
+    74	 * missing-selector case — it never enters cssLinks/auxiliaryCssLinks).
+    75	 * Parent traversal (`../`) is DELIBERATELY accepted: a spec legitimately
+   285	  const lines = markdown.split('\n');
+   286	  for (let i = 0; i < lines.length; i += 1) {
+   287	    const line = lines[i].trimEnd();
+   288	    const lineNo = i + 1;
+   289	    const trimmed = line.trim();
+   290	    // Code blocks are inert (see module doc): inside a fence, every line —
+   291	    // headings, bullets, attempt shapes, setext lookahead — is skipped.
+   292	    if (fence !== undefined) {
+   293	      if (closesFence(fence, trimmed)) {
+   294	        fence = undefined;
+   295	      }
+   296	      continue;
+   297	    }
+   298	    // A ≥4-space-indented non-bullet line is indented code, also inert
+   299	    // (field bullets are column-0 by convention; indented BULLETS still
+   300	    // parse so nested-list authoring keeps working). Checked before the
+   301	    // fence opener so an indented ``` is code content, not a fence.
+   302	    if (INDENTED_CODE_RE.test(line) && !BULLET_SHAPE_RE.test(trimmed)) {
+   303	      continue;
+   304	    }
+   305	    const opened = openingFence(trimmed);
+   306	    if (opened !== undefined) {
+   307	      fence = opened;
+   308	      continue;
+   309	    }
+   310	    const heading = HEADING_RE.exec(trimmed);
+   311	    if (heading !== null) {
+   312	      current = undefined;
+   313	      const headingText = heading[1].trim();
+   314	      const ruleHeading = RULE_HEADING_RE.exec(headingText);
+   315	      if (ruleHeading === null) {
+   316	        const attempt = classifyHeadingAttempt(headingText);
+   317	        if (attempt !== undefined) {
+   318	          findings.push({ rule: 'malformed-rule-heading', message: attempt.message, line: lineNo });
+   319	          // Inspect the attempt's body too (mirrors the duplicate branch).
+   320	          current = newSection(attempt.attemptedId, lineNo);
+   321	          throwawaySections.push(current);
+   322	        }
+   323	        continue;
+   324	      }
+   325	      const id = ruleHeading[1].trim();
+
+exec
+/bin/zsh -lc 'rg -n "closing|ATX|### rule|heading" plugins/design-control/src/__tests__/design-language/schema.test.ts plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts plugins/design-control/skills/translate-design-language/SKILL.md' in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+plugins/design-control/skills/translate-design-language/SKILL.md:24:design docs directory). Rules are declared under ATX headings, fields are
+plugins/design-control/skills/translate-design-language/SKILL.md:32:### rule: ink-primary
+plugins/design-control/skills/translate-design-language/SKILL.md:54:Headings (or line-initial paragraphs / setext headings) that look like rule
+plugins/design-control/skills/translate-design-language/SKILL.md:55:declarations but miss the strict ATX `rule: <id>` form (`Rule: x`, `rule : x`,
+plugins/design-control/skills/translate-design-language/SKILL.md:56:`rule x`) are flagged as `malformed-rule-heading`; prose headings starting
+plugins/design-control/skills/translate-design-language/SKILL.md:65:   heading + one rule per obvious anchor (masthead, primary action, body type)
+plugins/design-control/src/__tests__/design-language/schema.test.ts:5: * structural-validation contract: rules declared under `### rule: <id>` headings
+plugins/design-control/src/__tests__/design-language/schema.test.ts:23:### rule: ink-primary
+plugins/design-control/src/__tests__/design-language/schema.test.ts:32:### rule: masthead
+plugins/design-control/src/__tests__/design-language/schema.test.ts:72:    const result = parseDesignSpec(`### rule: nav-item
+plugins/design-control/src/__tests__/design-language/schema.test.ts:86:    const result = parseDesignSpec(`### rule: spacing-scale
+plugins/design-control/src/__tests__/design-language/schema.test.ts:107:    const result = parseDesignSpec(`### rule: ink-primary
+plugins/design-control/src/__tests__/design-language/schema.test.ts:119:    const findings = findingsFor(`### rule: ink-primary
+plugins/design-control/src/__tests__/design-language/schema.test.ts:137:      findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:147:      findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:158:      findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:168:      findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:179:      findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:189:      findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:195:### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:204:  it('flags a rule heading without an id', () => {
+plugins/design-control/src/__tests__/design-language/schema.test.ts:205:    expect(findingsFor('### rule:\n- kind: palette\n')).toContain('malformed-rule-heading');
+plugins/design-control/src/__tests__/design-language/schema.test.ts:209:    const findings = findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:219:  it('flags a capitalised "Rule:" heading as a near-miss, not inert structure', () => {
+plugins/design-control/src/__tests__/design-language/schema.test.ts:227:    expect(result.findings.some((f) => f.rule === 'malformed-rule-heading')).toBe(true);
+plugins/design-control/src/__tests__/design-language/schema.test.ts:231:  it('flags a colon-less "rule <id>" heading as a near-miss', () => {
+plugins/design-control/src/__tests__/design-language/schema.test.ts:232:    expect(findingsFor('### rule missing-colon\n- kind: palette\n')).toContain(
+plugins/design-control/src/__tests__/design-language/schema.test.ts:233:      'malformed-rule-heading',
+plugins/design-control/src/__tests__/design-language/schema.test.ts:237:  it('leaves genuinely unrelated headings inert (word boundary: "Ruler" is not "rule")', () => {
+plugins/design-control/src/__tests__/design-language/schema.test.ts:242:### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:253:  it('a near-miss heading alongside a valid rule still flags (no silent green)', () => {
+plugins/design-control/src/__tests__/design-language/schema.test.ts:260:### rule: fine
+plugins/design-control/src/__tests__/design-language/schema.test.ts:268:    expect(result.findings.map((f) => f.rule)).toContain('malformed-rule-heading');
+plugins/design-control/src/__tests__/design-language/schema.test.ts:272:    const result = parseDesignSpec(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:285:    const findings = findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:296:    const result = parseDesignSpec(`### rule: broken
+plugins/design-control/src/__tests__/design-language/schema.test.ts:299:### rule: fine
+plugins/design-control/src/__tests__/design-language/schema.test.ts:311:  const VALID_INK = `### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:324:    const result = parseDesignSpec(`### rule: no-example
+plugins/design-control/src/__tests__/design-language/schema.test.ts:338:### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:353:### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:367:### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:388:### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:403:    expect(rules).toContain('malformed-rule-heading');
+plugins/design-control/src/__tests__/design-language/schema.test.ts:415:    const result = parseDesignSpec(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:429:    const findings = findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:439:    const findings = findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:452:    const findings = findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:462:    const findings = findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:472:    const findings = findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:482:    const findings = findingsFor(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:492:    const result = parseDesignSpec(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:498:### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:508:    const result = parseDesignSpec(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:523:  const VALID_INK = `### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:535:### rule: phantom
+plugins/design-control/src/__tests__/design-language/schema.test.ts:549:  it('a near-miss "Rule: x" heading inside a fence raises no malformed-rule-heading', () => {
+plugins/design-control/src/__tests__/design-language/schema.test.ts:563:### rule: phantom
+plugins/design-control/src/__tests__/design-language/schema.test.ts:574:### rule: phantom
+plugins/design-control/src/__tests__/design-language/schema.test.ts:587:    ### rule: phantom
+plugins/design-control/src/__tests__/design-language/schema.test.ts:595:    const result = parseDesignSpec(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:609:### rule: phantom
+plugins/design-control/src/__tests__/design-language/schema.test.ts:612:    const finding = result.findings.find((f) => f.rule === 'malformed-rule-heading');
+plugins/design-control/src/__tests__/design-language/schema.test.ts:620:  const VALID_INK = `### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:639:    const finding = result.findings.find((f) => f.rule === 'malformed-rule-heading');
+plugins/design-control/src/__tests__/design-language/schema.test.ts:645:describe('parseDesignSpec — rule-declaration attempts outside the ATX form', () => {
+plugins/design-control/src/__tests__/design-language/schema.test.ts:646:  it('flags a setext "rule: beta" heading and does not merge its fields into the prior rule', () => {
+plugins/design-control/src/__tests__/design-language/schema.test.ts:647:    const result = parseDesignSpec(`### rule: alpha
+plugins/design-control/src/__tests__/design-language/schema.test.ts:661:    const finding = result.findings.find((f) => f.rule === 'malformed-rule-heading');
+plugins/design-control/src/__tests__/design-language/schema.test.ts:680:    const finding = result.findings.find((f) => f.rule === 'malformed-rule-heading');
+plugins/design-control/src/__tests__/design-language/schema.test.ts:682:    expect(finding?.message).toMatch(/heading/i);
+plugins/design-control/src/__tests__/design-language/schema.test.ts:689:    const result = parseDesignSpec(`### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:701:  it('leaves prose headings starting with "Rule" inert ("Rule of thumb", "Rule kinds")', () => {
+plugins/design-control/src/__tests__/design-language/schema.test.ts:706:### rule: ink
+plugins/design-control/src/__tests__/design-language/schema.test.ts:717:  it('names the spaced-colon mismatch for "### rule :x" (not "missing the colon")', () => {
+plugins/design-control/src/__tests__/design-language/schema.test.ts:718:    const result = parseDesignSpec('### rule :x\n');
+plugins/design-control/src/__tests__/design-language/schema.test.ts:719:    const finding = result.findings.find((f) => f.rule === 'malformed-rule-heading');
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:47:### rule: ink-primary
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:76:      `### rule: no-example
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:81:### rule: dead-link
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:105:      `### rule: both-defects
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:124:      `### rule: ink
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:130:### rule: ink
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:150:      `### rule: invalid-housing
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:180:      `### rule: dead
+plugins/design-control/src/__tests__/design-language/check-spec-file.test.ts:210:      `### rule: css-in-js
+
+exec
+/bin/zsh -lc 'npm --workspace @deskwork/design-control exec vitest -- run src/__tests__/design-language/schema.test.ts src/__tests__/design-language/link-liveness.test.ts' in /Users/orion/work/deskwork-work/design-control
+ exited 1 in 218ms:
+npm error No workspaces found:
+npm error   --workspace=@deskwork/design-control
+npm error Log files were not written due to an error writing to the directory: /Users/orion/.npm/_logs
+npm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal
+
+codex
+The workspace command from the repo root does not see `@deskwork/design-control` as an npm workspace, so I’ll use the plugin-local package command for any targeted verification. The missing test coverage for closing ATX markers is confirmed by search.
+exec
+/bin/zsh -lc "sed -n '1,220p' plugins/design-control/package.json" in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+{
+  "name": "@deskwork/plugin-design-control",
+  "version": "0.37.0",
+  "private": true,
+  "description": "Workspace package for the design-control Claude Code plugin",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsc --noEmit && vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "parse5": "^7.3.0",
+    "tsx": "^4.21.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+
+exec
+/bin/zsh -lc "node -e \"const { readFileSync } = require('fs'); const p='plugins/design-control/package.json'; console.log(readFileSync(p,'utf8'))\"" in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+{
+  "name": "@deskwork/plugin-design-control",
+  "version": "0.37.0",
+  "private": true,
+  "description": "Workspace package for the design-control Claude Code plugin",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsc --noEmit && vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "parse5": "^7.3.0",
+    "tsx": "^4.21.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+
+
+exec
+/bin/zsh -lc 'git diff 0391a0c0..HEAD -- plugins/design-control/skills/translate-design-language/SKILL.md' in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+diff --git a/plugins/design-control/skills/translate-design-language/SKILL.md b/plugins/design-control/skills/translate-design-language/SKILL.md
+new file mode 100644
+index 00000000..77f1812f
+--- /dev/null
++++ b/plugins/design-control/skills/translate-design-language/SKILL.md
+@@ -0,0 +1,111 @@
++---
++name: translate-design-language
++description: Draft or maintain the project's design-language spec — the hand-authorable markdown artifact that anchors visual identity (palette/type/spacing tokens + signature components, each rule linked to live CSS + ≥1 example). Hand-authoring is the default and needs NO engine; the optional /frontend-design accelerator drafts from approved wireframe intent and is judged by the same check-design-spec gate.
++---
++
++# /design-control:translate-design-language
++
++Author or update the **design-language spec** for this project. The spec is the
++visual-*letter* artifact of the design-control discipline: the durable home for
++visual identity (the lo-fi wireframe carries UX *spirit* and is structurally
++incapable of carrying visual detail). Every rule binds to reality — a live CSS
++file + selector, ≥1 current example — so the spec cannot quietly drift into
++fiction the way a mockup's incidental polish does.
++
++> Per the plugin thesis (`DESIGN-DISCIPLINE-THESIS.md`): policy is enforced by
++> a process, not a rule. "Each rule links to live CSS" is not a convention the
++> author is trusted to follow — it is mechanically enforced by the
++> `check-design-spec` gate (schema + static link-liveness), which every draft
++> MUST pass before it may be presented.
++
++## Spec convention (hand-authorable markdown)
++
++One markdown file (conventionally `design-language.md` in the operator's chosen
++design docs directory). Rules are declared under ATX headings, fields are
++bullets with a closed key set:
++
++```markdown
++# Design language: <project>
++
++## Palette
++
++### rule: ink-primary
++- kind: palette
++- css: styles/studio.css .btn-primary
++- example: dashboard compose button uses .btn-primary
++- do: Use the ink palette for every primary action.
++- don't: Never introduce raw hex blues outside the palette tokens.
++```
++
++- `kind:` — one of `palette` / `type` / `spacing` / `component` (the closed
++  vocabulary; `component` is the signature-component class).
++- `css: <path> <selector>` — ≥1 per rule; the path is relative to the spec
++  file (absolute or `~`-rooted paths are rejected as malformed — they only
++  resolve on the author's machine; `../` traversal within the repository is
++  fine); the selector must be **defined in that author-written CSS source**
++  (checked statically — no app boot). Non-CSS targets (CSS-in-JS, utility
++  frameworks, CSS-Modules) are reported as unchecked notes and do not
++  establish link-liveness.
++- `example:` — ≥1 per rule (a rule with zero examples is rejected). Presence
++  is structural; whether the example still matches live UI is
++  `spec-truthfulness`, a separate concern this gate does not check.
++- `do:` / `don't:` — ≥1 guidance line per rule.
++
++Headings (or line-initial paragraphs / setext headings) that look like rule
++declarations but miss the strict ATX `rule: <id>` form (`Rule: x`, `rule : x`,
++`rule x`) are flagged as `malformed-rule-heading`; prose headings starting
++with "Rule" (e.g. `## Rule of thumb`) are fine. Fenced and indented code
++blocks are inert — an authoring example like the one above never parses as a
++live rule.
++
++## Procedure
++
++1. **Locate or create the spec file.** One spec per design language; do not
++   fork per-surface copies. If the operator has no spec yet, scaffold the
++   heading + one rule per obvious anchor (masthead, primary action, body type)
++   directly from the live CSS — with the operator naming the files that count
++   as design-language source.
++
++2. **Author or update rules — manual path (default, requires NO engine).** The
++   operator (or the agent under operator direction) writes the rules by hand:
++   pick the selector in live CSS the rule is anchored to, cite ≥1 current
++   example, state the do/don't. Scaffold completion never depends on engine
++   presence — this path never calls the engine preflight.
++
++3. **Optional engine accelerator.** Only if the operator asks for it: gate on
++   `preflightEngine` (`@/engine-adapter`, method `translate-design-language`)
++   — absence fails loud naming the remedy — then request a draft from the
++   engine (input: the approved wireframe intent + the live CSS files the
++   operator names). **Engine output gets zero trust:** it lands in the same
++   file and is judged by the same gate as a hand-authored draft. Engine
++   conformance (`@/engine-adapter/conformance`) is exercised only when the
++   engine is present — never stub it to simulate presence.
++
++4. **Validation gate — the non-negotiable step.** Run:
++
++   ```bash
++   plugins/design-control/bin/check-design-spec <path/to/design-language.md>
++   ```
++
++   - Exit `0` (spec green, zero findings) → the draft may be presented.
++     Read any `does not establish link-liveness` notes aloud to the operator —
++     a skipped link is visible scope, not silent coverage.
++   - Exit `1` → fix every finding and re-run. A dead selector means either the
++     rule rots (fix the link) or the CSS moved (update the rule) — NEVER
++     delete the rule just to silence the finding; that decision is the
++     operator's.
++
++5. **Present and stop.** Show the operator the green spec (path + `0 findings`
++   output + rule count). The operator owns acceptance; implementation against
++   the spec and refereeing are separate steps of the loop, not this skill's
++   job.
++
++## What this skill does NOT do
++
++- It does not author wireframes (`/design-control:wireframe`), implement, or
++  referee.
++- It does not boot the app, capture screenshots, or verify that examples still
++  match live UI (that is `spec-truthfulness`, which no step of this skill
++  performs).
++- It does not skip the gate for engine-authored drafts — same gate, same
++  checker, zero findings.
+
+codex
+I found one concrete, non-duplicate defect with a silent-green direction. I’m doing a quick empirical check through the plugin-local runner so the finding can cite behavior, not just code shape.
+exec
+/bin/zsh -lc "./node_modules/.bin/tsx --tsconfig tsconfig.json -e \"import { parseDesignSpec } from './src/design-language/schema.ts'; const r=parseDesignSpec('### rule: ink-primary ###\\n- kind: palette\\n- css: styles/studio.css .btn\\n- example: ex\\n- do: use it\\n'); console.log(JSON.stringify({ok:r.ok, rules:r.spec.rules, findings:r.findings}, null, 2));\"" in /Users/orion/work/deskwork-work/design-control/plugins/design-control
+ exited 127 in 0ms:
+zsh:1: no such file or directory: ./node_modules/.bin/tsx
+
+exec
+/bin/zsh -lc "find .. -path '*/node_modules/.bin/tsx' -type f -o -type l | head -20" in /Users/orion/work/deskwork-work/design-control/plugins/design-control
+ succeeded in 0ms:
+../stack-control/node_modules/.bin/vitest
+../stack-control/node_modules/.bin/esbuild
+../stack-control/node_modules/vitest/node_modules/.bin/vite
+../design-control/node_modules/.bin/vitest
+../design-control/node_modules/.bin/esbuild
+../design-control/node_modules/vitest/node_modules/.bin/vite
+../dw-lifecycle/node_modules/.bin/vitest
+../dw-lifecycle/node_modules/.bin/esbuild
+../dw-lifecycle/node_modules/vitest/node_modules/.bin/vite
+
+exec
+/bin/zsh -lc "nl -ba plugins/design-control/src/design-language/schema.ts | sed -n '310,345p'" in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+   310	    const heading = HEADING_RE.exec(trimmed);
+   311	    if (heading !== null) {
+   312	      current = undefined;
+   313	      const headingText = heading[1].trim();
+   314	      const ruleHeading = RULE_HEADING_RE.exec(headingText);
+   315	      if (ruleHeading === null) {
+   316	        const attempt = classifyHeadingAttempt(headingText);
+   317	        if (attempt !== undefined) {
+   318	          findings.push({ rule: 'malformed-rule-heading', message: attempt.message, line: lineNo });
+   319	          // Inspect the attempt's body too (mirrors the duplicate branch).
+   320	          current = newSection(attempt.attemptedId, lineNo);
+   321	          throwawaySections.push(current);
+   322	        }
+   323	        continue;
+   324	      }
+   325	      const id = ruleHeading[1].trim();
+   326	      if (id === '') {
+   327	        findings.push({
+   328	          rule: 'malformed-rule-heading',
+   329	          message: `Rule heading at line ${lineNo} has no id — expected "rule: <id>".`,
+   330	          line: lineNo,
+   331	        });
+   332	        // Best-effort attribution: the heading text is all the id there is.
+   333	        current = newSection(headingText, lineNo);
+   334	        throwawaySections.push(current);
+   335	        continue;
+   336	      }
+   337	      if (seenIds.has(id)) {
+   338	        findings.push({
+   339	          rule: 'duplicate-rule-id',
+   340	          message: `Rule id "${id}" is declared more than once.`,
+   341	          ruleId: id,
+   342	          line: lineNo,
+   343	        });
+   344	        // Parse the duplicate into a throwaway section (NOT pushed to
+   345	        // `sections`, no `seenIds` effect) so its field bullets are still
+
+exec
+/bin/zsh -lc "rg -n \"fix later|follow-up|later|future|eventually|not yet|TODO|production-ready|Q[1-4]|next phase|defer|deferred|temporal\" plugins/design-control --glob '"'!*.stack-control/**'"'" in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+plugins/design-control/package.json:6:  "license": "GPL-3.0-or-later",
+plugins/design-control/skills/wireframe/SKILL.md:77:   by name + sha256, so a later replacement of the wireframe is tamper-evident:
+plugins/design-control/ROADMAP.md:32:- deferred-until: GATED evidence-spike: built last, after the v1-scaffold ships (Phases 1-4); advisory until its adversarial falsification set passes
+plugins/design-control/ROADMAP.md:42:- deferred-until: post-v1 operator decision (captured out-of-v1 scope: styleguide gallery, design-barrage, WebKit/iOS, waypoint auto-fire, lint profiles, a11y review, broader pixel regression, studio-design migration)
+plugins/design-control/DEVELOPMENT-NOTES.md:213:- Two of the loop's own dispositions were REVERSED on later evidence (AUDIT-14
+plugins/design-control/src/provenance/derived.ts:21: * `derived` record can never be silently flipped to `driving` by a later
+plugins/design-control/src/provenance/derived.ts:185: * writing fails loud. Without this, a later `recordDrivingWireframe` call
+plugins/design-control/src/provenance/derived.ts:238: * so a later wholesale replacement of the wireframe is tamper-evident
+plugins/design-control/CLAUDE.md:57:    operator** — the agent never picks a backlog item to work on unilaterally. Capture ≠
+plugins/design-control/src/lint/allowlist.ts:141: * value-shape checks on — NOT a hardcoded `'href'` literal — so a future
+plugins/design-control/src/__tests__/lint/check-mockup-lofi.test.ts:169:  // value-shape checks on URL_ATTRS. If a future task adds a resource attr to
+plugins/design-control/specs/001-design-control/audit-log.md:11:- If work is deferred, change `Status:` to `acknowledged-<ref>` with the issue, workplan section, or operator-approved plan.
+plugins/design-control/specs/001-design-control/audit-log.md:15:- `open` — reported; not yet resolved
+plugins/design-control/specs/001-design-control/audit-log.md:16:- `acknowledged-<ref>` — accepted but deferred
+plugins/design-control/specs/001-design-control/audit-log.md:49:- 1e deferral language removed from types.ts/preflight.ts/index.ts comments; grep over engine-adapter/*.ts for deferral words returns zero hits.
+plugins/design-control/specs/001-design-control/audit-log.md:258:Disposition override: slush-merged under -01; cross-model agreement (two independent models flagged it) = high-confidence. claude framed it as the axis-1 boundary for tasks 6–7; codex as a MEDIUM the rule under-delivers on. Closed now (cheap) rather than deferred, per scope-don't-defer.
+plugins/design-control/specs/001-design-control/audit-log.md:280:The round-1 fix narrowed value-shape scanning by wrapping the whole block (control-char, data:, script:, external-resource) in `if (attr === 'href')`. That made `RESOURCE_URL_ATTRS` (a per-tag `Record`) effectively dead — its branch can only fire when `attr === 'href'` — and rested the data:/scheme narrowing on the implicit, unenforced assumption that href is the only URL-bearing allowed attr. If a future task added a non-href URL attr (`img src`, `source srcset`, `a ping`), its value would pass completely unscanned, silently weakening the "lint green ⇒ lo-fi" guarantee with no signal.
+plugins/design-control/specs/001-design-control/audit-log.md:315:Disposition (present-tense invariant, not a defer — reworded per AUDIT-20260606-09/codex-02): the `URL_ATTRS` doc comment now states a COMPLETE invariant: every URL-bearing attribute in the allowlist is a member of `URL_ATTRS`, so its values are scanned. That invariant holds today and is non-vacuous — the allowlist's only URL attr is `href`, which is present in `URL_ATTRS`. The RESOURCE direction is test-enforced (`RESOURCE_URL_ATTRS ⊆ URL_ATTRS`); the non-resource direction (`a ping`, `form action`, `q cite`) is vacuously satisfied because no such attr is in the allowlist. Machine-checking the non-resource direction (deriving `URL_ATTRS` from URL-tagged allowlist entries) is tracked as filed enhancement **#428** — not promised in a code comment. There is no outstanding code change while the invariant holds. (Reworded under AUDIT-20260606-14, then -17, to replace the future-patch promise and then the residual scheduling language with a bare #428 reference.)
+plugins/design-control/specs/001-design-control/audit-log.md:319:This matters because AUDIT-04's own stated motivation names `a ping` as a non-href URL attr to worry about — and `ping` is a navigation-beacon attribute, *not* resource-loading, so a future dev would add it to `TAG_ATTRS['a']` (allowlist) without touching `RESOURCE_URL_ATTRS`. Its value would then pass completely unscanned for `data:`/`javascript:`/control-char schemes, and **no test would fail**. Same for `form action`, `blockquote/q cite`, `area href`. The fix's audit-log claim ("adding a resource attr without scheme coverage now fails a test instead of shipping a latent gap") is true but narrower than AUDIT-04's framing implies — the general "URL attr" coupling it set out to close is only closed for the resource-loading subset.
+plugins/design-control/specs/001-design-control/audit-log.md:374:### AUDIT-20260606-09 — diff contained explicit deferred-work wording in the audit log and source comment
+plugins/design-control/specs/001-design-control/audit-log.md:381:Disposition override: slush-pile; a real (LOW) operator-discipline catch — my AUDIT-07 disposition + `URL_ATTRS` comment used deferral phrasing ("parked," "warranted the moment," "becomes actionable"), which `.claude/rules/agent-discipline.md` § "Just for now is bullshit" treats as bug-factory language. Fixed in this commit — both reworded to a present-tense, complete invariant ("every URL-bearing allowlist attr is in `URL_ATTRS`"; the non-resource direction is vacuously satisfied today) with the enforcement clause stated as part of the invariant, no deferral framing.
+plugins/design-control/specs/001-design-control/audit-log.md:383:The hard constraints for this audit say to surface deferral phrases in the diff. The new audit-log disposition said the structural half "is parked with a CONCRETE TRIGGER," and the `URL_ATTRS` comment said the robust fix "is warranted the moment the allowlist grows such an attr." Those were documented deferrals, even though carefully scoped — now reworded to a present-tense invariant + enforcement clause.
+plugins/design-control/specs/001-design-control/audit-log.md:404:### AUDIT-20260606-14 — Reworded URL_ATTRS "invariant" still encodes a triggered future structural fix with no tracking artifact
+plugins/design-control/specs/001-design-control/audit-log.md:411:Disposition override: slush-pile; a real cross-model LOW — the AUDIT-09 reword still left a future-structural-change promise in the comment ("the patch that first adds… replaces this hand-maintained coupling"), the IOU-in-a-comment shape the "Just for now is bullshit" rule names. Properly terminated in this commit: filed the structural-derivation work as #428, dropped the IOU sentence, and the comment now states the present invariant + a bare `tracked in #428` reference (a pointer, not a promise). The AUDIT-07 disposition below is likewise updated to reference #428.
+plugins/design-control/specs/001-design-control/audit-log.md:413:The AUDIT-20260606-09 rework replaced the earlier "parked with a CONCRETE TRIGGER" language, but the substance of the deferral survives the rewrite. allowlist.ts lines 77-81: *"The patch that first adds a non-resource URL attr to the allowlist adds it here in the same change AND **replaces this hand-maintained coupling with URL-tagged allowlist entries** that derive this set."* That clause describes the robust structural fix AUDIT-07 actually asked for (derive `URL_ATTRS` from URL-tagged allowlist entries so `allowlist → scanning` is machine-checkable) as conditional future work, gated on a trigger, recorded only in a code comment — no GitHub issue, no workplan task. The same shape is in the audit-log disposition.
+plugins/design-control/specs/001-design-control/audit-log.md:415:Per the project's own `.claude/rules/agent-discipline.md` § "Just for now is bullshit", a deferral must terminate in one of: addressed now, filed as an issue with link, scoped into the workplan, or an explicit operator decision with acceptance criteria — and "a code comment promising future work" is explicitly named as the failure mode, not a valid disposition. The hard constraints for this audit also direct surfacing deferral phrasing found in the diff. The rewording is genuinely better (the *present* state is described as a complete-while-vacuous invariant, which is accurate), so the latent coupling itself is correctly characterized — but the structural fix is still IOU'd in a comment rather than tracked. I flag it acknowledging it was already triaged once under AUDIT-09; the recommendation is narrow: either file the structural-derivation work as an issue and reference the number in the comment, or drop the "the patch that first adds… replaces this hand-maintained coupling" sentence entirely (the vacuous-today invariant stands on its own without promising the future refactor).
+plugins/design-control/specs/001-design-control/audit-log.md:441:The two new tests cover exactly one stronger-algo shape (`sha384-other <pin>` → rejected) and one same-algo shape (`sha256-decoyAAAA <pin>` → accepted). The `hasStrongerAlgo` regex matches `sha512-` too (line 151), but nothing exercises it — a regression that dropped `512` from the alternation would pass the suite while silently letting a sha512-overriding integrity through the membership branch. Likewise there is no test for the stronger-algo-*only* case (`integrity="sha384-foo"` with no sha256 token at all), which routes through the `hasStrongerAlgo` branch and produces the "overrides the pinned" message rather than the "does not assert the pinned" message — the two message branches at 156-158 are a behavior contract and only one is asserted. Add: (a) a sha512-token rejection case, and (b) a stronger-algo-only case asserting `stylesheet-sri-mismatch`. This is hygiene, not a live bug — the implementation is correct for these inputs today; the gap is that the test suite wouldn't catch a future narrowing of the regex or a swap of the two message branches.
+plugins/design-control/specs/001-design-control/audit-log.md:443:I checked the security-critical direction (no false-negative / no path that greenlights an unenforced pin), the `#428` reference (issue exists and is OPEN — disposition grounded), the regex for backtracking/anchoring issues (clean), the empty/garbage-integrity edge cases (all flagged correctly), and the audit-log rewordings for residual deferral phrasing (the AUDIT-07 reword and the allowlist comment now terminate in the `#428` pointer, no IOU). Those are clean; the two findings above are the only ones worth surfacing.
+plugins/design-control/specs/001-design-control/audit-log.md:445:### AUDIT-20260606-17 — URL_ATTRS comment still contains conditional future-work wording
+plugins/design-control/specs/001-design-control/audit-log.md:454:The diff removes the untracked promise shape, but the replacement still says the machine-checking work is “tracked in #428 — to be done when the allowlist first gains a non-resource URL attr.” That is still conditional future-work wording in a code comment, and the audit prompt’s hard constraint explicitly says to surface deferral phrasing found in the diff.
+plugins/design-control/specs/001-design-control/audit-log.md:527:Disposition: WON'T-DO (accepted observation, no change planned — reworded per AUDIT-20260606-26 to drop deferral phrasing). Position-less findings are the established, consistent pattern across this entire lint; cross-node duplicate `disallowed-codepoint` messages match that pattern and are neither a regression nor a correctness bug. No code change. Original auditor note follows.
+plugins/design-control/specs/001-design-control/audit-log.md:560:This is **not a correctness bug** — the behavior is now consistent between NFC and NFD input (NFD `Ǎ` and precomposed `Ǎ` both fail because U+01CD is genuinely off-allowlist), which is the correct invariant. I'm flagging it only because the docstring reads as an unconditional "NFD accented Latin now passes" claim, and a future reader could mistake a legitimately-off-allowlist NFD failure for a regression of this fix. A one-clause qualifier ("…for accents whose precomposed form is in the allowlisted ranges") would make the boundary explicit and prevent that misread.
+plugins/design-control/specs/001-design-control/audit-log.md:562:### AUDIT-20260606-26 — AUDIT-20260606-23 disposition uses soft-deferral phrasing ("not done now" / "optional future enhancement") without an issue link
+plugins/design-control/specs/001-design-control/audit-log.md:569:Disposition override: slush-pile; a real cross-model LOW — my AUDIT-23 disposition reintroduced the deferral phrasing ("not done now", "optional future enhancement") that the project's "Just for now is bullshit" rule forbids and that I'd been closing elsewhere this session. Fixed in this commit — the AUDIT-23 disposition is reworded to a definitive WON'T-DO ("no change planned"; position-less findings are the established pattern), no scheduling or speculative-work language.
+plugins/design-control/specs/001-design-control/audit-log.md:571:The new AUDIT-23 disposition records an informational observation and twice frames the remediation as deferred-but-coming: "Global per-document message dedup or positional context is an optional future enhancement at the `checkText`/walk boundary; **not done now**" (line 521) and "that is a small enhancement at the `checkText`/walk boundary" (line 526). Per the project's own discipline (`.claude/rules/agent-discipline.md` § "Just for now is bullshit") and the prior triage note at the top of this audit-log that explicitly flagged conditional future-work wording ("to be done when…"), "not done now" reads as the same soft-IOU smell — it implies the work *will* happen without any tracking surface to ensure it does.
+plugins/design-control/specs/001-design-control/audit-log.md:573:The audit prompt's hard constraint also directs surfacing deferral phrasing found in the diff. An informational "no code change" disposition is legitimate, but the wording should commit one way or the other: either file an issue and reference it (`tracked in #NNN`), or state it as an accepted observation that is *not* planned ("position-less findings are the established pattern for this lint; no change planned"). Rewriting to drop "not done now" / "future enhancement" and adopting won't-do/issue-linked framing keeps the record from reintroducing the exact operator-discipline smell the surrounding entries have been closing.
+plugins/design-control/specs/001-design-control/audit-log.md:1408:- Two of the loop's own earlier dispositions were REVERSED on later evidence
+plugins/design-control/specs/001-design-control/audit-log.md:1421:  restored fleet is the natural post-447 follow-up.
+plugins/design-control/specs/001-design-control/audit-log.md:1431:### AUDIT-20260611-01 — Provenance mode can be silently rewritten — a later `recordDrivingWireframe` call overwrites a `derived` record and launders the exact claim the module exists to prevent
+plugins/design-control/specs/001-design-control/audit-log.md:1438:`writeProvenance` unconditionally `writeFileSync`s `<surfaceId>.provenance.json`. Nothing in `recordDrivingWireframe` or `recordDerivation` checks whether a sidecar already exists, so a surface recorded as `derived` (with its snapshot + hash baseline) can be flipped to `driving` with a single later call — after which `wireframeDroveImplementation` returns `true` and `checkDerivedAcceptance` passes unconditionally (lines 144-146 short-circuit on non-derived mode). The module's own header (lines 15-17) states the design goal: *"provenance distinguishes the two modes precisely so the claim cannot be laundered through acceptance."* The overwrite path is a one-call laundering vector that bypasses acceptance entirely. The derivation-time snapshot is also silently orphaned (the `.derived-snapshot.html` stays on disk but nothing references it), erasing the audit trail.
+plugins/design-control/specs/001-design-control/audit-log.md:1473:Blast radius: a downstream consumer (the future referee, or any "did a wireframe drive this change?" check) gets a `true` that is unfalsifiable against the on-disk artifact. Nothing breaks today, but every claim recorded under this schema is permanently unverifiable, and a later schema fix can't retro-bind old records — the cost compounds with adoption, hence medium. Fix: record the wireframe's filename and sha256 at `recordDrivingWireframe` time (the wireframe file already exists at that point per SKILL.md step ordering — lint at step 5 precedes provenance at step 6), and have `wireframeDroveImplementation` (or a sibling verifier) check the hash the way `checkDerivedAcceptance` checks the snapshot.
+plugins/design-control/specs/001-design-control/audit-log.md:1484:Blast radius: no behavioral consequence — the value lands in `createdAt` correctly — but this is an exported public API (`@/provenance`), so the misleading name propagates to every future caller and to the eventual `bin/` verb's flag naming. Hence low. Fix: rename to `createdAt?` (or `at?`) in both record functions for symmetry, while the call-site count is still two test files.
+plugins/design-control/specs/001-design-control/audit-log.md:1506:The blast radius is medium: normal consumers will usually succeed, but the failure mode creates ambiguous provenance state in the operator’s artifact directory. A later unattended agent or operator may see the snapshot and assume derivation was recorded, while `loadProvenance` fails loud because the sidecar is absent. A reasonable fix is to write both artifacts via temporary files and atomic renames, with cleanup on failure, or to write the sidecar first with a temporary snapshot reference and only promote both names once both writes have succeeded.
+plugins/design-control/specs/001-design-control/audit-log.md:1519:Blast radius: medium. The governance discipline's value rests on run records being durable and discoverable; an uncommitted record cited by a commit message is a provenance gap in the provenance tooling itself, and the absolute-path diff rendering will mislead every future cross-model auditor fed this payload. Fix: commit the run directory (matching 9c0d556c's pattern), and make the diff-builder either exclude untracked files or render them with correct repo-relative prefixes.
+plugins/design-control/specs/001-design-control/audit-log.md:1528:The run produced AUDIT-BARRAGE-codex-01 (`wireframeFile` can escape the provenance directory) and AUDIT-BARRAGE-codex-02 (`recordDerivation` can clobber an existing snapshot before the sidecar commit fails). A grep of `audit-log.md` finds no disposition for either. The run failed the ≥2-emitting-models floor, which legitimately refuses the *round* — but the findings exist, were captured to disk, and I have independently verified both defects are present in `src/provenance/derived.ts` as written (see claude-03 and claude-04 below, which are my independent confirmations). Per the project's scope-don't-defer rule, a captured finding with no disposition is precisely the parked-defect failure mode the audit-log exists to prevent; the floor refusal is being silently treated as if it also voided the findings.
+plugins/design-control/specs/001-design-control/audit-log.md:1539:Commit 896be642 added `assertPortableSurfaceId` at every surfaceId path-building entry, with a zod-side defense on load. But `recordDrivingWireframe` then does `join(input.dir, input.wireframeFile)` (line 172) with `wireframeFile` constrained only to `z.string().min(1)` (line 75), and `verifyDrivingWireframe` re-joins the stored value at line 344. A `wireframeFile` of `../outside.html`, a nested `sub/file.html`, or a planted sidecar carrying a traversal path binds driving provenance to — and later "verifies" — an artifact outside the operator-chosen wireframes directory. SKILL.md (step 6) promises the filename is "relative to `<wireframes-dir>`" but nothing enforces it. This is the exact shape AUDIT-20260611-02 fixed for surfaceId, applied asymmetrically.
+plugins/design-control/specs/001-design-control/audit-log.md:1583:The file seeded into the design-control nested installation opens with "project override for graphical-entries" and carries that feature's gemini-failure statistics (16 of 17 runs across "the graphical-entries Phase 0 audit cycle") and Phase 12 Task 8 history verbatim. Only the final comment block (claude 300→900, specs/014) belongs to this installation. A future reader tuning this config inherits another feature's rationale as if it were locally measured evidence.
+plugins/design-control/specs/001-design-control/audit-log.md:1663:### AUDIT-20260611-21 — The audited diff introduces explicit deferral language into the skill and checker contract
+plugins/design-control/specs/001-design-control/audit-log.md:1670:text in tasks.md and spec.md deliberately RETAINS the operator-approved "named-deferred"
+plugins/design-control/specs/001-design-control/audit-log.md:1676:The diff repeatedly encodes “not validated in v1” / “named-deferred” / “out of v1 scope” language in the operator-facing skill, CLI output, and workplan. The audit prompt’s hard constraint rejects deferral phrases because they become bug-factory commitments in unattended workflows; here they are not just comments, they appear in the user-facing validation output (`check-spec-file.ts:68-71`) and in the skill’s instructions about what the operator may present (`SKILL.md:80-82`).
+plugins/design-control/specs/001-design-control/audit-log.md:1678:Blast radius is low because the scope boundary is visible and intentional, and the code does not hide skipped links. The operational risk is documentation discipline: agents may normalize presenting partially unchecked specs as “green” because the deferral is built into the happy path. A reasonable fix is to replace temporal deferral phrasing with a stable capability statement, such as “non-CSS targets are reported as unchecked notes and do not establish link-liveness.”
+plugins/design-control/specs/001-design-control/audit-log.md:1689:The AUDIT-15 fix added a heading-level typo guard, but the guard lives entirely inside the ATX-heading branch — a markdown **setext** heading (`rule: beta` underlined with `---` or `===`) renders as a real heading to the author yet never matches `HEADING_RE`. Verified empirically: a spec with valid `### rule: alpha` followed by setext `rule: beta\n----------` and beta's field bullets returns `ok: true, findings: []` with ONE rule — alpha — now carrying **beta's css link and example merged into it** (`css: [.alpha, .beta]`, `examples: 2`). This is worse than a plain silent drop: the intended rule disappears with zero findings AND the surviving rule's parsed content is corrupted, so a dead `.beta` selector would later be misattributed to alpha, and a live one yields a fully green verdict (`spec green — 0 findings (1 rule(s))`) for a spec the author believes declares two rules. This is exactly the silent-green direction the module's headline guarantee ("never silently kept or dropped") and the just-landed near-miss guard exist to kill — one heading syntax over.
+plugins/design-control/specs/001-design-control/audit-log.md:1724:Blast radius: low — a visible exit-1 false refusal, and the realistic authoring path (copying the selector verbatim from the CSS file) sidesteps it; it bites when the author types the selector from memory or the CSS is later reformatted by a tool that changes quote style (Prettier normalizes to double quotes — a formatting commit would flip previously-green links to dead). Fix: normalize attribute-value delimiters on both sides (e.g. rewrite `['"]?` content-stripped values to a canonical empty `""`, treating `[attr=]`, `[attr=""]`, `[attr='']` identically), pinned by a RED test per quote-style pair.
+plugins/design-control/specs/001-design-control/audit-log.md:1726:### AUDIT-20260611-26 — AUDIT-21 is dispositioned "fixed" but one of its cited surfaces — tasks.md — still carries the temporal deferral phrasing
+plugins/design-control/specs/001-design-control/audit-log.md:1731:Surface:    plugins/design-control/specs/001-design-control/tasks.md:176-191 ("is **not validated in v1** (named-deferred)", "Runtime dead-CSS + spec-truthfulness are named-deferred", "visible v1 scope"); audit-log disposition for AUDIT-20260611-21
+plugins/design-control/specs/001-design-control/audit-log.md:1733:Commit 03ae9291 replaced temporal deferral phrasing with capability statements in SKILL.md and the CLI output (verified in the final-state diff: "reported as unchecked notes and do not establish link-liveness", "outside its validated scope" — clean), and the audit log records AUDIT-21 as `fixed-03ae9291`. But the original codex finding explicitly anchored three surfaces, including `tasks.md:176-191`, and the workplan's task text retains "not validated in v1 (named-deferred)" and "named-deferred" verbatim in the final state. The workplan is the artifact the next implementing agent reads to understand the gate's contract, so the bug-factory mechanism the finding named — agents normalizing "deferred" as the contract — survives on one of the three cited surfaces while the disposition claims all seven findings fixed.
+plugins/design-control/specs/001-design-control/audit-log.md:1735:Blast radius: low — the two surfaces an operator actually touches at run time (skill body, CLI output) are fixed, and a workplan is partially version-bound history where naming v1 is defensible; the defect is disposition accuracy (a `fixed` status whose cited surface is unchanged), which matters in this project precisely because the audit log is the instrument future rounds use to decide what not to re-report. Fix: either reword the tasks.md scope sentences to the same capability framing, or amend the AUDIT-21 disposition to record the deliberate exclusion of tasks.md so the narrowed scope is auditable.
+plugins/design-control/specs/001-design-control/audit-log.md:1770:The operator-facing skill and CLI text were rewritten to capability statements, but the workplan and design-language source comments still retain the temporal scope phrasing called out by the audit prompt’s hard constraint. The visible task record at `tasks.md:176-191` still carries that language several times, and source comments repeat the same framing in the schema, liveness, and shared type docs.
+plugins/design-control/specs/001-design-control/audit-log.md:1772:Blast radius is low because the runtime behavior is visible and the CLI now uses stable capability language. The issue is documentation discipline: future agents reading the workplan or comments can reintroduce the same phrasing into operator-facing surfaces. A reasonable correction is to use capability wording consistently, matching the skill and CLI text.
+plugins/design-control/specs/001-design-control/audit-log.md:1794:`parseDesignSpec` walks raw lines with no awareness of fenced (``` ```` ```) or indented code blocks, so markdown that *renders as an inert code example* is parsed as live spec structure. Verified empirically through the CLI: a spec with one real rule plus a fenced ```markdown example containing `### rule: phantom` (the SKILL.md-style authoring example, css link pointing at a live selector) reports **`spec green — 0 findings (2 rule(s))`** — the documentation example becomes a real parsed rule, silently. The same blindness drives the loud direction: an *indented* code line `rule: sample` inside an authoring example produces a false `malformed-rule-heading` (verified, exit 1). Note the trap is self-modeling: SKILL.md's own convention section teaches the format via exactly such a fenced example; an author who pastes that preamble into their spec for future maintainers gets either a phantom rule (if the example's selector happens to be live, as SKILL.md's `.btn-primary` would be in this very project) or spurious dead-link findings on documentation text.
+plugins/design-control/src/lint/check-mockup-lofi.ts:378:    // hardcoded 'href' keeps coverage in lockstep with the allowlist so a future
+plugins/design-control/specs/001-design-control/spec.md:96:  gate. This replaces "single Claude shim now, cross-model later."
+plugins/design-control/specs/001-design-control/spec.md:276:Named-deferred (see Out of Scope): **runtime dead-CSS detection** and **spec-truthfulness**
+plugins/design-control/specs/001-design-control/spec.md:316:The schema **also defines the fields later referee controls need** (baseline + candidate paths,
+plugins/design-control/specs/001-design-control/spec.md:344:  regions (that is `spec-truthfulness`, named-deferred).
+plugins/design-control/specs/001-design-control/spec.md:419:      *matches* live UI is `spec-truthfulness`, named-deferred). The spec is **hand-authorable** —
+plugins/design-control/specs/001-design-control/spec.md:476:## Out of Scope (v1 — captured, named-deferred; not hidden)
+plugins/design-control/specs/001-design-control/spec.md:479:  deferral.** Pixel regression, if ever needed, uses an **existing** tool (Playwright
+plugins/design-control/specs/001-design-control/spec.md:489:  deferred.
+plugins/design-control/specs/001-design-control/spec.md:493:  (validated on the deskwork studio). Resolving link-liveness for those stacks is deferred.
+plugins/design-control/specs/001-design-control/spec.md:497:  only; a semantic-stability sampling check is named-deferred — NOT a Phase 5 obligation** (no
+plugins/design-control/specs/001-design-control/spec.md:498:  dangling "resolve later" commitment).
+plugins/design-control/specs/001-design-control/tasks.md:130:      cross-model re-validation is the natural follow-up once 447 lands.
+plugins/design-control/specs/001-design-control/tasks.md:178:      / hashed CSS-Modules resolution is **not validated in v1** (named-deferred). Runtime dead-CSS +
+plugins/design-control/specs/001-design-control/tasks.md:179:      spec-truthfulness are named-deferred.
+plugins/design-control/specs/001-design-control/tasks.md:191:      live UI is `spec-truthfulness` (named-deferred).
+plugins/design-control/specs/001-design-control/tasks.md:242:- [ ] **Schema also DEFINES the later referee-control fields** — baseline+candidate paths,
+plugins/design-control/specs/001-design-control/scope-inventory/runs/20260606T170123Z-ea21d3/synthesis.md:12:Operator action: review the 17 discovered candidate cluster(s) + 0 novel-shape candidate finding(s) BEFORE treating this run as "all clear." A non-zero candidate count is the signal the catalog is not yet exhaustive.
+plugins/design-control/specs/001-design-control/tooling-feedback.md:57:**Repro:** The barrage produced 9 structured findings (claude-01..06, codex-01..03). `audit-barrage-lift --feature design-control --run-dir <run-dir> --apply` collapsed them to 4 audit-log entries. AUDIT-20260605-01's `Finding-ID` line reads `(claude-01 + claude-03 + claude-04 + codex-01 + codex-03; cross-model)` — i.e. it merged FIVE distinct findings (EngineMethod single-sourcing, preflight remedy hardcoding the default adapter, the `[0,1]` confidence check duplicated three times, method/envelope type-binding, and deferral language in source comments) into one entry whose **body describes only the EngineMethod single-sourcing issue.** A fixer reading only AUDIT-01's body would fix one of five real defects and mark the entry `fixed`, silently dropping the other four.
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191707Z-9fe621/augmented-prd.md:96:  gate. This replaces "single Claude shim now, cross-model later."
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191707Z-9fe621/augmented-prd.md:276:Named-deferred (see Out of Scope): **runtime dead-CSS detection** and **spec-truthfulness**
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191707Z-9fe621/augmented-prd.md:316:The schema **also defines the fields later referee controls need** (baseline + candidate paths,
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191707Z-9fe621/augmented-prd.md:344:  regions (that is `spec-truthfulness`, named-deferred).
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191707Z-9fe621/augmented-prd.md:419:      *matches* live UI is `spec-truthfulness`, named-deferred). The spec is **hand-authorable** —
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191707Z-9fe621/augmented-prd.md:476:## Out of Scope (v1 — captured, named-deferred; not hidden)
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191707Z-9fe621/augmented-prd.md:479:  deferral.** Pixel regression, if ever needed, uses an **existing** tool (Playwright
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191707Z-9fe621/augmented-prd.md:489:  deferred.
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191707Z-9fe621/augmented-prd.md:493:  (validated on the deskwork studio). Resolving link-liveness for those stacks is deferred.
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191707Z-9fe621/augmented-prd.md:497:  only; a semantic-stability sampling check is named-deferred — NOT a Phase 5 obligation** (no
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191707Z-9fe621/augmented-prd.md:498:  dangling "resolve later" commitment).
+plugins/design-control/specs/001-design-control/mockups/sketch-kit/DECISION.md:35:## Consequences captured (not deferred)
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191855Z-eb67eb/augmented-prd.md:96:  gate. This replaces "single Claude shim now, cross-model later."
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191855Z-eb67eb/augmented-prd.md:276:Named-deferred (see Out of Scope): **runtime dead-CSS detection** and **spec-truthfulness**
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191855Z-eb67eb/augmented-prd.md:316:The schema **also defines the fields later referee controls need** (baseline + candidate paths,
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191855Z-eb67eb/augmented-prd.md:344:  regions (that is `spec-truthfulness`, named-deferred).
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191855Z-eb67eb/augmented-prd.md:419:      *matches* live UI is `spec-truthfulness`, named-deferred). The spec is **hand-authorable** —
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191855Z-eb67eb/augmented-prd.md:476:## Out of Scope (v1 — captured, named-deferred; not hidden)
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191855Z-eb67eb/augmented-prd.md:479:  deferral.** Pixel regression, if ever needed, uses an **existing** tool (Playwright
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191855Z-eb67eb/augmented-prd.md:489:  deferred.
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191855Z-eb67eb/augmented-prd.md:493:  (validated on the deskwork studio). Resolving link-liveness for those stacks is deferred.
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191855Z-eb67eb/augmented-prd.md:497:  only; a semantic-stability sampling check is named-deferred — NOT a Phase 5 obligation** (no
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191855Z-eb67eb/augmented-prd.md:498:  dangling "resolve later" commitment).
+plugins/design-control/specs/001-design-control/scope-inventory/runs/20260606T170123Z-ea21d3/editor-symmetry.md:3:Rows are adoption conventions declared in `.dw-lifecycle/scope-discovery/adopter-manifests.yaml`; columns are parallel top-level modules under `plugins/design-control/src/`. Cells show adoption status: `✓ N/N` = all files in the module matching the manifest glob import the canonical path; `⚠ A/E (H holdout(s))` = partial adoption with `H` files holding out; `✗` = the module was targeted by the glob but has zero matched files or zero adopters; `⏳ A/E (T tracked)` = adopter set has only tracked-holdouts (deferred-but-known migrations, each with a `tracked_holdouts:` entry naming the follow-up issue; gate-passing, NOT masked as ✓); `—` = the manifest does not target this module (n/a).
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md:96:  gate. This replaces "single Claude shim now, cross-model later."
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md:276:Named-deferred (see Out of Scope): **runtime dead-CSS detection** and **spec-truthfulness**
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md:316:The schema **also defines the fields later referee controls need** (baseline + candidate paths,
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md:344:  regions (that is `spec-truthfulness`, named-deferred).
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md:419:      *matches* live UI is `spec-truthfulness`, named-deferred). The spec is **hand-authorable** —
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md:476:## Out of Scope (v1 — captured, named-deferred; not hidden)
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md:479:  deferral.** Pixel regression, if ever needed, uses an **existing** tool (Playwright
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md:489:  deferred.
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md:493:  (validated on the deskwork studio). Resolving link-liveness for those stacks is deferred.
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md:497:  only; a semantic-stability sampling check is named-deferred — NOT a Phase 5 obligation** (no
+plugins/design-control/specs/001-design-control/scope-inventory/widen-runs/20260610T191806Z-b0dbba/augmented-prd.md:498:  dangling "resolve later" commitment).
+
+exec
+/bin/zsh -lc "nl -ba plugins/design-control/src/__tests__/design-language/schema.test.ts | sed -n '1,120p'" in /Users/orion/work/deskwork-work/design-control
+ succeeded in 0ms:
+     1	/**
+     2	 * Schema tests for the design-language spec convention (Phase 2).
+     3	 *
+     4	 * The spec is a HAND-AUTHORABLE markdown artifact — these tests pin the parse +
+     5	 * structural-validation contract: rules declared under `### rule: <id>` headings
+     6	 * with bullet fields (`kind:` / `css:` / `example:` / `do:` / `don't:`). The
+     7	 * example-presence acceptance is here: a rule with ZERO example references is
+     8	 * rejected (structural presence only — the schema axis does not establish
+     9	 * example truthfulness).
+    10	 *
+    11	 * Nothing in this module touches the engine or the filesystem: the schema is
+    12	 * pure text → structure (link-liveness is the separate, fs-backed axis).
+    13	 */
+    14	
+    15	import { describe, expect, it } from 'vitest';
+    16	import { parseDesignSpec } from '@/design-language/schema';
+    17	import { RULE_KINDS } from '@/design-language/types';
+    18	
+    19	const VALID_SPEC = `# Design language: deskwork studio
+    20	
+    21	## Palette
+    22	
+    23	### rule: ink-primary
+    24	- kind: palette
+    25	- css: styles/studio.css .btn-primary
+    26	- example: dashboard compose button uses .btn-primary
+    27	- do: Use the ink palette for every primary action.
+    28	- don't: Never introduce raw hex blues outside the palette tokens.
+    29	
+    30	## Signature components
+    31	
+    32	### rule: masthead
+    33	- kind: component
+    34	- css: styles/studio.css .masthead
+    35	- css: styles/chrome.css .masthead-rule
+    36	- example: every page renders the double-rule masthead
+    37	- example: entry-review header
+    38	- do: Every top-level page opens with the masthead.
+    39	`;
+    40	
+    41	function findingsFor(markdown: string) {
+    42	  return parseDesignSpec(markdown).findings.map((f) => f.rule);
+    43	}
+    44	
+    45	describe('parseDesignSpec — valid hand-authored spec', () => {
+    46	  it('parses a diverse valid spec with zero findings', () => {
+    47	    const result = parseDesignSpec(VALID_SPEC);
+    48	    expect(result.findings).toEqual([]);
+    49	    expect(result.ok).toBe(true);
+    50	    expect(result.spec.rules).toHaveLength(2);
+    51	  });
+    52	
+    53	  it('captures rule fields: id, kind, css links, examples, guidance', () => {
+    54	    const result = parseDesignSpec(VALID_SPEC);
+    55	    const [ink, masthead] = result.spec.rules;
+    56	    expect(ink.id).toBe('ink-primary');
+    57	    expect(ink.kind).toBe('palette');
+    58	    expect(ink.cssLinks).toEqual([{ path: 'styles/studio.css', selector: '.btn-primary' }]);
+    59	    expect(ink.examples).toEqual(['dashboard compose button uses .btn-primary']);
+    60	    expect(ink.dos).toEqual(['Use the ink palette for every primary action.']);
+    61	    expect(ink.donts).toEqual(['Never introduce raw hex blues outside the palette tokens.']);
+    62	
+    63	    expect(masthead.id).toBe('masthead');
+    64	    expect(masthead.kind).toBe('component');
+    65	    expect(masthead.cssLinks).toHaveLength(2);
+    66	    expect(masthead.cssLinks[1]).toEqual({ path: 'styles/chrome.css', selector: '.masthead-rule' });
+    67	    expect(masthead.examples).toHaveLength(2);
+    68	    expect(masthead.donts).toEqual([]);
+    69	  });
+    70	
+    71	  it('accepts a descendant (multi-token) selector in a css link', () => {
+    72	    const result = parseDesignSpec(`### rule: nav-item
+    73	- kind: component
+    74	- css: styles/studio.css .masthead nav a
+    75	- example: top nav
+    76	- do: Keep nav items inside the masthead.
+    77	`);
+    78	    expect(result.findings).toEqual([]);
+    79	    expect(result.spec.rules[0].cssLinks[0]).toEqual({
+    80	      path: 'styles/studio.css',
+    81	      selector: '.masthead nav a',
+    82	    });
+    83	  });
+    84	
+    85	  it('treats prose lines and non-field bullets as inert prose', () => {
+    86	    const result = parseDesignSpec(`### rule: spacing-scale
+    87	- kind: spacing
+    88	- css: styles/studio.css .stack
+    89	- example: entry list stacking
+    90	
+    91	Background prose explaining the scale.
+    92	
+    93	- Note: this bullet is prose, not a field (capitalised key).
+    94	- do: Use the 4px base scale.
+    95	`);
+    96	    expect(result.findings).toEqual([]);
+    97	    expect(result.spec.rules[0].dos).toEqual(['Use the 4px base scale.']);
+    98	  });
+    99	
+   100	  it('exports the closed kind vocabulary', () => {
+   101	    expect(RULE_KINDS).toEqual(['palette', 'type', 'spacing', 'component']);
+   102	  });
+   103	});
+   104	
+   105	describe('parseDesignSpec — example-presence (acceptance: zero examples rejected)', () => {
+   106	  it('rejects a rule with zero example references', () => {
+   107	    const result = parseDesignSpec(`### rule: ink-primary
+   108	- kind: palette
+   109	- css: styles/studio.css .btn-primary
+   110	- do: Use the ink palette.
+   111	`);
+   112	    expect(result.ok).toBe(false);
+   113	    expect(result.findings.some((f) => f.rule === 'missing-example' && f.ruleId === 'ink-primary')).toBe(
+   114	      true,
+   115	    );
+   116	  });
+   117	
+   118	  it('an empty example value does not satisfy example-presence', () => {
+   119	    const findings = findingsFor(`### rule: ink-primary
+   120	- kind: palette
+
+codex
+### Closing ATX hashes become part of the rule id
+
+Finding-ID: AUDIT-BARRAGE-codex-01
+Status:     open
+Severity:   medium
+Surface:    plugins/design-control/src/design-language/schema.ts:53-54, plugins/design-control/src/design-language/schema.ts:310-325
+
+`HEADING_RE` captures the raw text after the opening hashes, and `parseDesignSpec` immediately feeds `heading[1].trim()` into `RULE_HEADING_RE`. That means a valid Markdown ATX heading with a closing sequence, such as `### rule: ink-primary ###`, parses as rule id `ink-primary ###` instead of `ink-primary`. The tests only cover headings without closing hashes, so this common Markdown spelling is not pinned.
+
+Blast radius is medium: the spec can go green while downstream consumers of `spec.rules` receive the wrong stable rule id, and the duplicate-id guard can be bypassed by mixing `### rule: ink` with `### rule: ink ###`. A reasonable correction is to normalize ATX heading text before rule parsing by stripping a valid closing hash sequence per Markdown rules, then add regression coverage for both id extraction and duplicate detection.
+tokens used
+65,169

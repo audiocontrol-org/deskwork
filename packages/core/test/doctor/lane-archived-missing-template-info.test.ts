@@ -97,7 +97,6 @@ describe('doctor: lane-config-missing-template (archived-lane severity)', () => 
       id: 'active-dangling',
       name: 'Active Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
 
     const report = await runAudit(
@@ -119,7 +118,6 @@ describe('doctor: lane-config-missing-template (archived-lane severity)', () => 
       id: 'archived-dangling',
       name: 'Archived Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
       archivedAt: '2026-05-30T00:00:00.000Z',
     });
 
@@ -146,13 +144,11 @@ describe('doctor: lane-config-missing-template (archived-lane severity)', () => 
       id: 'active-dangling',
       name: 'Active Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
     writeLaneJson(fixture.root, 'archived-dangling', {
       id: 'archived-dangling',
       name: 'Archived Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
       archivedAt: '2026-05-30T00:00:00.000Z',
     });
 
@@ -177,7 +173,6 @@ describe('doctor: lane-config-missing-template (archived-lane severity)', () => 
       id: 'archived-dangling',
       name: 'Archived Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
       archivedAt: '2026-05-30T00:00:00.000Z',
     });
 

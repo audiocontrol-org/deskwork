@@ -155,7 +155,6 @@ describe('regenerateCalendar — error-tolerant on lane/template misconfig (AUDI
         // throws on resolution; the `loadLaneConfig` cross-validation
         // bubbles the throw up.
         pipelineTemplate: 'does-not-exist',
-        contentDir: 'docs',
       }),
     );
     await writeSidecar(projectRoot, entry('post-a', 'Ideas'));
@@ -184,7 +183,6 @@ describe('regenerateCalendar — error-tolerant on lane/template misconfig (AUDI
         id: 'default',
         name: 'Default',
         pipelineTemplate: 'editorial',
-        contentDir: 'docs',
       }),
     );
     await writeFile(

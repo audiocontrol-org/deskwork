@@ -21,7 +21,7 @@
  *   - Positive: live value `"docs"` + `data-current=" docs "`
  *     (whitespace-only delta) yields NO `--content-dir` flag.
  *   - Negative: live value `"new-docs"` + `data-current=" docs "`
- *     (real value change) DOES emit `--content-dir "new-docs"`.
+ *     (real value change) DOES emit `--scaffold-default "markdown=new-docs"`.
  *   - Mixed: name field unchanged-with-whitespace + contentDir
  *     genuinely changed → only the genuinely-changed flag is emitted.
  */
@@ -51,7 +51,7 @@ interface FieldSeed {
 function buildEditFormRow(
   container: HTMLElement,
   laneId: string,
-  fields: { readonly name: FieldSeed; readonly template: FieldSeed; readonly contentDir: FieldSeed },
+  fields: { readonly name: FieldSeed; readonly template: FieldSeed; readonly scaffoldMarkdown: FieldSeed },
   templates: readonly string[],
 ): { editRow: HTMLElement; form: HTMLElement; preview: HTMLElement } {
   const toggleRow = document.createElement('tr');
@@ -107,11 +107,11 @@ function buildEditFormRow(
   }
   form.appendChild(select);
 
-  const contentDirInput = document.createElement('input');
-  contentDirInput.dataset.lanesField = 'contentDir';
-  contentDirInput.dataset.current = fields.contentDir.dataCurrent;
-  contentDirInput.value = fields.contentDir.liveValue;
-  form.appendChild(contentDirInput);
+  const scaffoldInput = document.createElement('input');
+  scaffoldInput.dataset.lanesField = 'scaffoldMarkdown';
+  scaffoldInput.dataset.current = fields.scaffoldMarkdown.dataCurrent;
+  scaffoldInput.value = fields.scaffoldMarkdown.liveValue;
+  form.appendChild(scaffoldInput);
 
   const preview = document.createElement('code');
   preview.dataset.lanesPreview = '';
@@ -137,7 +137,7 @@ describe('lanes edit-form diff-emit: trim-symmetry contract (AUDIT-20260530-69)'
     document.body.innerHTML = '';
   });
 
-  it('whitespace-only delta on contentDir does NOT emit --content-dir (both sides trimmed)', () => {
+  it('whitespace-only delta on scaffold default does NOT emit --scaffold-default (both sides trimmed)', () => {
     const container = buildContainer();
     const { preview } = buildEditFormRow(
       container,
@@ -148,7 +148,7 @@ describe('lanes edit-form diff-emit: trim-symmetry contract (AUDIT-20260530-69)'
         // The bug repros precisely when `data-current` carries
         // surrounding whitespace the live value (already trimmed by
         // the browser on render, or trimmed by readFieldValue) lacks.
-        contentDir: { liveValue: 'docs', dataCurrent: ' docs ' },
+        scaffoldMarkdown: { liveValue: 'docs', dataCurrent: ' docs ' },
       },
       ['editorial', 'visual'],
     );
@@ -159,7 +159,7 @@ describe('lanes edit-form diff-emit: trim-symmetry contract (AUDIT-20260530-69)'
     // `--content-dir "docs"` to leak into the bare update command.
     // Post-fix: both sides trim to "docs"; no flag emitted.
     expect(preview.textContent).toBe('/deskwork:lane update "editorial-lane"');
-    expect(preview.textContent).not.toContain('--content-dir');
+    expect(preview.textContent).not.toContain('--scaffold-default');
   });
 
   it('whitespace-only delta on name does NOT emit --name', () => {
@@ -170,7 +170,7 @@ describe('lanes edit-form diff-emit: trim-symmetry contract (AUDIT-20260530-69)'
       {
         name: { liveValue: 'Editorial', dataCurrent: '  Editorial  ' },
         template: { liveValue: 'editorial', dataCurrent: 'editorial' },
-        contentDir: { liveValue: 'docs', dataCurrent: 'docs' },
+        scaffoldMarkdown: { liveValue: 'docs', dataCurrent: 'docs' },
       },
       ['editorial'],
     );
@@ -190,14 +190,14 @@ describe('lanes edit-form diff-emit: trim-symmetry contract (AUDIT-20260530-69)'
         template: { liveValue: 'editorial', dataCurrent: 'editorial' },
         // Real change: operator typed `"new-docs"`. The stored value's
         // surrounding whitespace must NOT swallow the diff.
-        contentDir: { liveValue: 'new-docs', dataCurrent: ' docs ' },
+        scaffoldMarkdown: { liveValue: 'new-docs', dataCurrent: ' docs ' },
       },
       ['editorial'],
     );
     initLanesPage();
 
     expect(preview.textContent).toBe(
-      '/deskwork:lane update "editorial-lane" --content-dir "new-docs"',
+      '/deskwork:lane update "editorial-lane" --scaffold-default "markdown=new-docs"',
     );
   });
 
@@ -211,14 +211,14 @@ describe('lanes edit-form diff-emit: trim-symmetry contract (AUDIT-20260530-69)'
         name: { liveValue: 'Editorial', dataCurrent: ' Editorial ' },
         template: { liveValue: 'editorial', dataCurrent: 'editorial' },
         // Real change — should emit.
-        contentDir: { liveValue: 'docs-v2', dataCurrent: 'docs' },
+        scaffoldMarkdown: { liveValue: 'docs-v2', dataCurrent: 'docs' },
       },
       ['editorial'],
     );
     initLanesPage();
 
     expect(preview.textContent).toBe(
-      '/deskwork:lane update "editorial-lane" --content-dir "docs-v2"',
+      '/deskwork:lane update "editorial-lane" --scaffold-default "markdown=docs-v2"',
     );
     expect(preview.textContent).not.toContain('--name');
   });

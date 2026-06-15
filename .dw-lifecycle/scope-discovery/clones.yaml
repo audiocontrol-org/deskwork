@@ -1,9 +1,9 @@
-generated_at: 2026-06-04T03:41:24.668Z
+generated_at: 2026-06-04T21:40:03.912Z
 clones:
   - id: 014b49040fe1
     lines: 13
     members:
-      - packages/cli/src/commands/add.ts:78:90
+      - packages/cli/src/commands/add.ts:95:107
       - packages/cli/src/commands/ingest.ts:104:115
     disposition: pending
     reason: null
@@ -18,7 +18,7 @@ clones:
     lines: 12
     members:
       - packages/cli/src/commands/approve.ts:121:132
-      - packages/cli/src/commands/publish.ts:111:122
+      - packages/cli/src/commands/publish.ts:109:120
     disposition: pending
     reason: null
   - id: 62a9f3c52a49
@@ -31,7 +31,7 @@ clones:
   - id: fed80612d9af
     lines: 11
     members:
-      - packages/cli/src/commands/approve.ts:259:269
+      - packages/cli/src/commands/approve.ts:264:274
       - packages/studio/src/pages/shortform-review.ts:62:72
     disposition: pending
     reason: null
@@ -40,7 +40,7 @@ clones:
     members:
       - packages/cli/src/commands/approve.ts:46:60
       - packages/cli/src/commands/induct.ts:54:68
-      - packages/cli/src/commands/publish.ts:51:65
+      - packages/cli/src/commands/publish.ts:49:63
     disposition: ignore-with-justification
     reason: Pre-existing CLI command boilerplate (parseArgs + projectRoot + readConfig + resolveSite) re-keyed when AUDIT-20260530-20 fix shifted induct.ts line ranges; identical shape was previously dispositioned across approve/publish/block. Not a NEW clone; extracting a shared helper is a cross-CLI refactor out of scope for the audit-finding fix.
   - id: 24450692261b
@@ -54,7 +54,7 @@ clones:
     lines: 15
     members:
       - packages/cli/src/commands/block.ts:21:35
-      - packages/cli/src/commands/induct.ts:54:65
+      - packages/cli/src/commands/induct.ts:54:63
     disposition: ignore-with-justification
     reason: Pre-existing CLI command boilerplate (parseArgs + projectRoot + readConfig + resolveSite) re-keyed when AUDIT-20260530-20 fix shifted induct.ts line ranges; identical shape was previously dispositioned across approve/publish/block. Not a NEW clone; extracting a shared helper is a cross-CLI refactor out of scope for the audit-finding fix.
   - id: 341413173fdd
@@ -96,7 +96,7 @@ clones:
     lines: 14
     members:
       - packages/cli/src/commands/cancel.ts:81:94
-      - packages/cli/src/commands/publish.ts:110:185
+      - packages/cli/src/commands/publish.ts:108:185
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: 4b85626d608b
@@ -113,62 +113,55 @@ clones:
       - packages/cli/src/commands/shortform-start.ts:81:97
     disposition: pending
     reason: null
-  - id: 7fd4d02355a8
-    lines: 30
+  - id: e01c7e70c06a
+    lines: 25
     members:
-      - packages/cli/src/commands/group.ts:110:139
-      - packages/cli/src/commands/pipeline.ts:93:106
-    disposition: keep-with-reason
-    reason: Sibling verb-dispatch convention across group/lane/pipeline CRUD modules; shared shape is deliberate, not duplication.
-  - id: 40b2115a7171
-    lines: 14
+      - packages/cli/src/commands/group.ts:110:134
+      - packages/cli/src/commands/pipeline.ts:93:183
+    disposition: pending
+    reason: null
+  - id: f7aa5e917e37
+    lines: 12
     members:
-      - packages/cli/src/commands/group.ts:249:262
-      - packages/cli/src/commands/lane.ts:225:238
-    disposition: keep-with-reason
-    reason: Sibling per-verb update-handler shape across group/lane CRUD modules; parallel emit/fail handling is deliberate, not duplication.
+      - packages/cli/src/commands/group.ts:249:260
+      - packages/cli/src/commands/lane.ts:305:316
+    disposition: pending
+    reason: null
   - id: 89f8a99f8ce2
     lines: 13
     members:
       - packages/cli/src/commands/induct.ts:172:184
-      - packages/cli/src/commands/publish.ts:110:122
+      - packages/cli/src/commands/publish.ts:108:120
     disposition: pending
     reason: null
   - id: 039be133bac2
     lines: 13
     members:
-      - packages/cli/src/commands/iterate.ts:77:89
-      - packages/cli/src/commands/publish.ts:53:65
+      - packages/cli/src/commands/iterate.ts:74:86
+      - packages/cli/src/commands/publish.ts:51:63
     disposition: pending
     reason: null
-  - id: 835569e8b606
-    lines: 12
-    members:
-      - packages/cli/src/commands/lane.ts:153:164
-      - packages/cli/src/commands/pipeline.ts:163:174
-    disposition: keep-with-reason
-    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline list handlers each emit a malformed channel with the same { id, error } projection shape — the projection is the verb-family contract, not a refactorable helper. Extracting would couple two unrelated CLI surfaces and obscure the AUDIT-20260530-57 fix. Mirrors prior dispositions on the lane/pipeline KNOWN_FLAGS/VERB_USAGE/genericUsage clones."
-  - id: 35dd3acfbdb6
-    lines: 11
-    members:
-      - packages/cli/src/commands/lane.ts:195:205
-      - packages/cli/src/commands/pipeline.ts:200:210
-    disposition: keep-with-reason
-    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane CLI handler symmetry (usage banners, error catch shape, JSON emit shape). The verb families share a dispatch contract by design; collapsing would mean a generic 'CRUD dispatcher' that obscures per-verb argument validation."
-  - id: 51bf553937e3
-    lines: 11
-    members:
-      - packages/cli/src/commands/lane.ts:230:240
-      - packages/cli/src/commands/pipeline.ts:310:319
-    disposition: keep-with-reason
-    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane CLI handler symmetry (usage banners, error catch shape, JSON emit shape). The verb families share a dispatch contract by design; collapsing would mean a generic 'CRUD dispatcher' that obscures per-verb argument validation."
   - id: 99d2afe73b96
     lines: 28
     members:
-      - packages/cli/src/commands/lane.ts:68:95
+      - packages/cli/src/commands/lane.ts:150:177
       - packages/cli/src/commands/pipeline.ts:84:111
     disposition: keep-with-reason
     reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane CLI handler symmetry (usage banners, error catch shape, JSON emit shape). The verb families share a dispatch contract by design; collapsing would mean a generic 'CRUD dispatcher' that obscures per-verb argument validation."
+  - id: 835569e8b606
+    lines: 12
+    members:
+      - packages/cli/src/commands/lane.ts:238:249
+      - packages/cli/src/commands/pipeline.ts:163:174
+    disposition: keep-with-reason
+    reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline list handlers each emit a malformed channel with the same { id, error } projection shape — the projection is the verb-family contract, not a refactorable helper. Extracting would couple two unrelated CLI surfaces and obscure the AUDIT-20260530-57 fix. Mirrors prior dispositions on the lane/pipeline KNOWN_FLAGS/VERB_USAGE/genericUsage clones."
+  - id: 256204f1dcf6
+    lines: 7
+    members:
+      - packages/cli/src/commands/lane.ts:280:286
+      - packages/cli/src/commands/lane.ts:312:318
+    disposition: pending
+    reason: null
   - id: f8fd4881f0dc
     lines: 12
     members:
@@ -179,7 +172,7 @@ clones:
   - id: e5936d3c2a28
     lines: 11
     members:
-      - packages/cli/test/group/helpers.ts:115:125
+      - packages/cli/test/group/helpers.ts:119:129
       - packages/cli/test/lane/helpers.ts:63:73
       - packages/cli/test/pipeline/helpers.ts:64:74
       - packages/cli/test/pipeline/helpers.ts:77:87
@@ -242,41 +235,41 @@ clones:
       - packages/core/src/calendar.ts:92:101
     disposition: pending
     reason: null
+  - id: 0f2b9efdb23c
+    lines: 7
+    members:
+      - packages/core/src/calendar/regenerate.ts:1:7
+      - packages/core/src/doctor/repair.ts:1:7
+    disposition: pending
+    reason: null
   - id: f0c41a1155b2
     lines: 7
     members:
       - packages/core/src/calendar/render.ts:265:271
-      - packages/core/src/lanes/loader.ts:130:136
+      - packages/core/src/lanes/loader.ts:136:142
       - packages/core/src/pipelines/loader.ts:235:241
     disposition: keep-with-reason
     reason: Renderer editorial-preset-from-bundle loader mirrors the lanes/loader + pipelines/loader Zod-validate idiom by design (third member of the parallel-readers symmetry; extracting a shared helper would couple calendar evolution to pipeline+lane evolution); extends keep-with-reason on prior clone b223f2def90d.
   - id: db7dfc711fad
     lines: 28
     members:
-      - packages/core/src/content-index.ts:120:147
+      - packages/core/src/content-index.ts:122:149
       - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:67:94
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
-  - id: d90106a0fd59
-    lines: 23
-    members:
-      - packages/core/src/doctor/repair.ts:25:47
-      - packages/core/src/doctor/validate.ts:181:213
-    disposition: keep-with-reason
-    reason: pre-existing duplication of artifactPathForStage between doctor/repair.ts and doctor/validate.ts; the file-internal comments document the intentional copy to avoid a cross-import cycle; Phase 4 will replace both with template-driven path resolution
   - id: ab480e7452f8
     lines: 14
     members:
       - packages/core/src/doctor/rules/calendar-uuid-missing.ts:155:168
-      - packages/core/src/doctor/rules/duplicate-id.ts:115:128
+      - packages/core/src/doctor/rules/duplicate-id.ts:118:131
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:160:173
-      - packages/core/src/doctor/rules/workflow-stale.ts:103:116
+      - packages/core/src/doctor/rules/workflow-stale.ts:107:120
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: 2d803bd758f4
     lines: 16
     members:
-      - packages/core/src/doctor/rules/duplicate-id.ts:34:49
+      - packages/core/src/doctor/rules/duplicate-id.ts:33:48
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:96:111
     disposition: pending
     reason: null
@@ -312,8 +305,8 @@ clones:
     lines: 15
     members:
       - packages/core/src/doctor/rules/legacy-stage-artifact-path.ts:208:222
-      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:218:232
-      - packages/core/src/doctor/rules/workflow-stale.ts:103:116
+      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:217:231
+      - packages/core/src/doctor/rules/workflow-stale.ts:107:120
     disposition: keep-with-reason
     reason: Parallel-domain symmetry across deskwork subcommand/rule families surfaced after merging origin/main into feature/graphical-entries — shared parseArgs / verb-dispatch / per-handler error-mapping shape is the established convention; mirrors existing branch dispositions for the same pattern
   - id: bf1260ae927f
@@ -323,18 +316,11 @@ clones:
       - packages/core/src/entry/snapshot.ts:63:80
     disposition: pending
     reason: null
-  - id: 189be54baaa8
-    lines: 9
-    members:
-      - packages/core/src/doctor/runner.ts:185:193
-      - packages/core/src/doctor/runner.ts:212:220
-    disposition: pending
-    reason: null
   - id: 41b3f9fce647
     lines: 8
     members:
-      - packages/core/src/doctor/validate.ts:156:163
-      - packages/core/src/doctor/validate.ts:43:50
+      - packages/core/src/doctor/validate.ts:153:160
+      - packages/core/src/doctor/validate.ts:44:51
     disposition: pending
     reason: null
   - id: 5c72154b2f6d
@@ -389,7 +375,7 @@ clones:
   - id: c20b4e4f0469
     lines: 9
     members:
-      - packages/core/src/lanes/loader.ts:120:128
+      - packages/core/src/lanes/loader.ts:126:134
       - packages/core/src/pipelines/loader.ts:225:233
     disposition: keep-with-reason
     reason: "lanes/loader mirrors pipelines/loader by workplan design: JSON-read+Zod-validate+id-match-filename idiom across two parallel module-shaped readers; extracting a shared helper would couple lane evolution to pipeline evolution"
@@ -414,53 +400,46 @@ clones:
       - packages/core/src/pipelines/operations/update.ts:324:333
     disposition: keep-with-reason
     reason: "Phase 6 Task 6.2: in-file similarity between applySetLocked and applySetOffPipeline — both validate each comma-separated stage against linearStages with mirror invariants. Collapsing into a shared helper would obscure the asymmetry (set-locked enforces subset, set-off-pipeline enforces disjoint) that matters at the error-message level."
-  - id: 68e3966349bd
-    lines: 11
+  - id: dba29300cb11
+    lines: 6
     members:
-      - packages/core/src/review/start-handlers.ts:145:155
-      - packages/core/src/review/start-handlers.ts:54:65
-    disposition: pending
-    reason: null
+      - packages/core/src/review/start-handlers.ts:155:160
+      - packages/core/src/review/start-handlers.ts:60:66
+    disposition: keep-with-reason
+    reason: Intentionally-parallel sibling start handlers (longform + shortform). The shared 6-line site+slug input guard is minimal sibling duplication; extracting it requires a type-narrowing workaround and shifts jscpd onto the handlers remaining structural parallelism (entry-lookup + workflow-setup) with no net reduction. c3 surfaced it by aligning the two comment/guard blocks.
   - id: 1884e3dfff81
     lines: 7
     members:
-      - packages/core/src/review/start-handlers.ts:162:168
-      - packages/core/src/review/start-handlers.ts:65:71
+      - packages/core/src/review/start-handlers.ts:167:173
+      - packages/core/src/review/start-handlers.ts:66:72
     disposition: pending
     reason: null
   - id: 0b03898d0cc8
     lines: 8
     members:
-      - packages/core/src/review/start-handlers.ts:232:239
-      - packages/core/src/review/start-handlers.ts:83:90
+      - packages/core/src/review/start-handlers.ts:223:230
+      - packages/core/src/review/start-handlers.ts:89:96
     disposition: pending
     reason: null
   - id: 0e85f4a2e968
     lines: 10
     members:
-      - packages/core/src/review/start-handlers.ts:241:250
-      - packages/core/src/review/start-handlers.ts:90:99
-    disposition: pending
-    reason: null
-  - id: b59c3f6b4e1b
-    lines: 13
-    members:
-      - packages/core/src/review/workflow-paths.ts:138:150
-      - packages/core/src/review/workflow-paths.ts:97:109
+      - packages/core/src/review/start-handlers.ts:232:241
+      - packages/core/src/review/start-handlers.ts:96:105
     disposition: pending
     reason: null
   - id: e3dffdccdd78
     lines: 9
     members:
-      - packages/core/src/schema/journal-events.ts:189:197
-      - packages/core/src/schema/journal-events.ts:411:419
+      - packages/core/src/schema/journal-events.ts:203:211
+      - packages/core/src/schema/journal-events.ts:425:433
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: d93b64cd1eae
     lines: 7
     members:
-      - packages/core/src/schema/journal-events.ts:420:426
-      - packages/core/src/schema/journal-events.ts:432:438
+      - packages/core/src/schema/journal-events.ts:434:440
+      - packages/core/src/schema/journal-events.ts:446:452
     disposition: keep-with-reason
     reason: "Parallel-domain symmetry across deskwork verb families: lane/pipeline/group CRUD dispatchers share KNOWN_FLAGS/VERB_USAGE/genericUsage boilerplate; cancel/induct/block/publish/approve share stage-transition + parseArgs boilerplate. Extracting these into a shared helper would lose per-verb-family argument validation specificity (each verb's flag set differs in non-trivial ways), and the verb-family boundary is the operator-facing unit. Mirrors the prior session lane-config-missing-template disposition."
   - id: 13e80bf116fb
@@ -502,9 +481,16 @@ clones:
     lines: 11
     members:
       - packages/core/src/sidecar/read-all.ts:43:53
-      - packages/core/src/sidecar/read.ts:17:27
+      - packages/core/src/sidecar/read.ts:8:18
     disposition: pending
     reason: null
+  - id: f2aa9e0ff153
+    lines: 10
+    members:
+      - packages/core/src/sidecar/read.ts:25:34
+      - packages/core/src/sidecar/read.ts:47:56
+    disposition: keep-with-reason
+    reason: readSidecar/readSidecarSync async-sync siblings; JSON+schema parse already factored into parseSidecar; residual readFile-vs-readFileSync + ENOENT mapping cannot share a call across the async/sync boundary (39c-2b a)
   - id: 9dddadfc374d
     lines: 12
     members:
@@ -602,8 +588,8 @@ clones:
   - id: d6093f110268
     lines: 10
     members:
-      - packages/studio/src/server.ts:471:480
-      - packages/studio/src/server.ts:480:489
+      - packages/studio/src/server.ts:472:481
+      - packages/studio/src/server.ts:481:490
     disposition: pending
     reason: null
   - id: 22fbdfa51c64
@@ -665,22 +651,8 @@ clones:
   - id: 6c6c2b4096e5
     lines: 18
     members:
-      - packages/studio/test/__helpers/dashboard-swimlane-fixture.ts:30:47
-      - packages/studio/test/dashboard-swimlane-integration-fixture.ts:44:61
-    disposition: keep-with-reason
-    reason: "AUDIT-20260528-14 split: __helpers/dashboard-swimlane-fixture.ts ships the 1-entry-per-lane fixture for the per-feature render-tests split from dashboard-swimlane.test.ts. dashboard-swimlane-integration-fixture.ts ships the parallel 2-entries-per-lane fixture (with locked stages) for the Task 5.6 dual node-env/jsdom-env integration tests. Trivial shape (makeConfig/makeEntry/writeLane) is intrinsic to on-disk sidecar fixtures."
-  - id: b07f9968c8cd
-    lines: 19
-    members:
-      - packages/studio/test/__helpers/dashboard-swimlane-fixture.ts:60:74
-      - packages/studio/test/dashboard-swimlane-integration-fixture.ts:74:92
-    disposition: keep-with-reason
-    reason: "AUDIT-20260528-14 split: __helpers/dashboard-swimlane-fixture.ts ships the 1-entry-per-lane fixture for the per-feature render-tests split from dashboard-swimlane.test.ts. dashboard-swimlane-integration-fixture.ts ships the parallel 2-entries-per-lane fixture (with locked stages) for the Task 5.6 dual node-env/jsdom-env integration tests. Trivial shape (makeConfig/makeEntry/writeLane) is intrinsic to on-disk sidecar fixtures."
-  - id: f5105894d009
-    lines: 7
-    members:
-      - packages/studio/test/__helpers/dashboard-swimlane-fixture.ts:94:102
-      - packages/studio/test/dashboard-swimlane-integration-fixture.ts:94:100
+      - packages/studio/test/__helpers/dashboard-swimlane-fixture.ts:31:48
+      - packages/studio/test/dashboard-swimlane-integration-fixture.ts:45:62
     disposition: keep-with-reason
     reason: "AUDIT-20260528-14 split: __helpers/dashboard-swimlane-fixture.ts ships the 1-entry-per-lane fixture for the per-feature render-tests split from dashboard-swimlane.test.ts. dashboard-swimlane-integration-fixture.ts ships the parallel 2-entries-per-lane fixture (with locked stages) for the Task 5.6 dual node-env/jsdom-env integration tests. Trivial shape (makeConfig/makeEntry/writeLane) is intrinsic to on-disk sidecar fixtures."
   - id: 49e020702bf0

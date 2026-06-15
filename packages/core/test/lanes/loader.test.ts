@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   loadLaneConfig,
+  loadLaneConfigSchemaOnly,
   listLaneConfigs,
   laneConfigPath,
   lanesDir,
@@ -43,13 +44,13 @@ describe('loadLaneConfig', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
     const lane = loadLaneConfig('default', projectRoot);
     expect(lane.id).toBe('default');
     expect(lane.name).toBe('Default');
     expect(lane.pipelineTemplate).toBe('editorial');
-    expect(lane.contentDir).toBe('docs');
+    expect(lane.scaffoldDefaults).toEqual({ markdown: 'docs' });
   });
 
   it('passes through unknown extra fields (e.g. $rationale)', () => {
@@ -58,7 +59,7 @@ describe('loadLaneConfig', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
+      scaffoldDefaults: { markdown: 'docs' },
     });
     const lane = loadLaneConfig('default', projectRoot);
     expect(lane.id).toBe('default');
@@ -91,7 +92,6 @@ describe('loadLaneConfig', () => {
       id: 'default',
       name: 'Default',
       // pipelineTemplate missing — required
-      contentDir: 'docs',
     });
     expect(() => loadLaneConfig('default', projectRoot))
       .toThrow(/failed Zod validation/);
@@ -102,7 +102,6 @@ describe('loadLaneConfig', () => {
       id: 'mockups',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     expect(() => loadLaneConfig('default', projectRoot))
       .toThrow(/declares id "mockups" but was loaded as "default"/);
@@ -113,7 +112,6 @@ describe('loadLaneConfig', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'does-not-exist',
-      contentDir: 'docs',
     });
     expect(() => loadLaneConfig('default', projectRoot))
       .toThrow(/references pipelineTemplate "does-not-exist"/);
@@ -168,10 +166,43 @@ describe('loadLaneConfig', () => {
       id: 'mockups',
       name: 'Mockups',
       pipelineTemplate: 'visual',
-      contentDir: 'src/mockups',
     });
     const lane = loadLaneConfig('mockups', projectRoot);
     expect(lane.pipelineTemplate).toBe('visual');
+  });
+});
+
+describe('loadLaneConfigSchemaOnly (AUDIT-20260604-19)', () => {
+  let projectRoot: string;
+  beforeEach(() => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'deskwork-lanes-schemaonly-'));
+  });
+  afterEach(() => {
+    rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('reads a lane WITHOUT cross-validating the pipeline template — an unresolvable pipeline does NOT throw', () => {
+    writeLane(projectRoot, 'pub', {
+      id: 'pub',
+      name: 'pub',
+      pipelineTemplate: 'no-such-template',
+      redirectsPath: 'public/_redirects',
+    });
+    // loadLaneConfig throws on the unresolvable pipeline…
+    expect(() => loadLaneConfig('pub', projectRoot)).toThrow(/pipelineTemplate|resolve/i);
+    // …but the schema-only reader returns the stored fields, pipeline ignored.
+    const lane = loadLaneConfigSchemaOnly('pub', projectRoot);
+    expect(lane.redirectsPath).toBe('public/_redirects');
+    expect(lane.pipelineTemplate).toBe('no-such-template');
+  });
+
+  it('still throws on a missing file, invalid JSON, schema violation, and unsafe id', () => {
+    expect(() => loadLaneConfigSchemaOnly('absent', projectRoot)).toThrow(/not found/i);
+    mkdirSync(lanesDir(projectRoot), { recursive: true });
+    writeFileSync(join(lanesDir(projectRoot), 'bad.json'), '{ not json', 'utf8');
+    expect(() => loadLaneConfigSchemaOnly('bad', projectRoot)).toThrow(/JSON/i);
+    expect(() => loadLaneConfigSchemaOnly('', projectRoot)).toThrow(/non-empty/i);
+    expect(() => loadLaneConfigSchemaOnly('../escape', projectRoot)).toThrow();
   });
 });
 
@@ -200,13 +231,11 @@ describe('listLaneConfigs', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeLane(projectRoot, 'mockups', {
       id: 'mockups',
       name: 'Mockups',
       pipelineTemplate: 'visual',
-      contentDir: 'src/mockups',
     });
     expect(listLaneConfigs(projectRoot)).toEqual(['default', 'mockups']);
   });
@@ -216,13 +245,11 @@ describe('listLaneConfigs', () => {
       id: 'zebra',
       name: 'Zebra',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeLane(projectRoot, 'alpha', {
       id: 'alpha',
       name: 'Alpha',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     const ids = listLaneConfigs(projectRoot);
     expect(ids).toEqual([...ids].sort());
@@ -238,7 +265,6 @@ describe('listLaneConfigs', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     const ids = listLaneConfigs(projectRoot);
     expect(ids).toEqual(['default']);
@@ -249,13 +275,11 @@ describe('listLaneConfigs', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeLane(projectRoot, 'stale', {
       id: 'stale',
       name: 'Stale',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
       archivedAt: '2026-05-28T10:00:00.000Z',
     });
     expect(listLaneConfigs(projectRoot)).toEqual(['default']);
@@ -266,13 +290,11 @@ describe('listLaneConfigs', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeLane(projectRoot, 'stale', {
       id: 'stale',
       name: 'Stale',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
       archivedAt: '2026-05-28T10:00:00.000Z',
     });
     expect(listLaneConfigs(projectRoot, { includeArchived: true })).toEqual([
@@ -292,7 +314,6 @@ describe('listLaneConfigs', () => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     expect(listLaneConfigs(projectRoot)).toEqual(['broken', 'default']);
   });

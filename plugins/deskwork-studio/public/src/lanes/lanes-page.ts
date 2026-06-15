@@ -35,10 +35,15 @@
  * Slash-command quoting convention: every operator-supplied value
  * routed through `quoteValue()` (JSON.stringify). This handles
  * embedded quotes, backslashes, and whitespace symmetrically across
- * every flag — name, template, contentDir, id. Cleared fields in
- * the Edit form are NOT emitted as `--flag ""`; to clear a field's
- * value, manually edit the slash-command after pasting (the Edit
- * form is a copy-builder, not a destructive editor).
+ * every flag — name, template, scaffold default, host, id. Cleared
+ * fields in the Edit form are NOT emitted as `--flag ""`; to clear a
+ * field's value, manually edit the slash-command after pasting (the
+ * Edit form is a copy-builder, not a destructive editor).
+ *
+ * Per Phase 39 (sites→lanes retirement) a lane carries no `contentDir`;
+ * the former content-dir field builds `--scaffold-default markdown=<dir>`
+ * (the editorial pipeline's artifact kind) and a separate optional
+ * `--host` flag.
  *
  * THESIS Consequence 2: the controller never mutates state on the
  * server. There are no fetch / POST paths; every operator action
@@ -76,7 +81,8 @@ interface NewFormValues {
   readonly id: string;
   readonly name: string;
   readonly template: string;
-  readonly contentDir: string;
+  readonly scaffoldMarkdown: string;
+  readonly host: string;
 }
 
 interface EditFormValues {
@@ -84,8 +90,10 @@ interface EditFormValues {
   readonly nameCurrent: string;
   readonly template: string;
   readonly templateCurrent: string;
-  readonly contentDir: string;
-  readonly contentDirCurrent: string;
+  readonly scaffoldMarkdown: string;
+  readonly scaffoldMarkdownCurrent: string;
+  readonly host: string;
+  readonly hostCurrent: string;
 }
 
 /**
@@ -141,42 +149,43 @@ function readFieldCurrent(form: HTMLElement, name: string): string {
  * Preview-vs-validity split (per AUDIT-20260530-73, Task 0.48):
  *
  *   - `command` is ALWAYS populated, using placeholder angle-brackets
- *     for empty required fields (`<id>`, `<template>`, `<path>`). The
- *     placeholder shape is preview-only — it gives the operator
- *     typing-feedback about the eventual command shape without
- *     premature value-binding.
+ *     for empty required fields (`<id>`, `<template>`). The placeholder
+ *     shape is preview-only — it gives the operator typing-feedback
+ *     about the eventual command shape without premature value-binding.
  *   - `error` is non-null when one or more required fields (`id`,
- *     `template`, `contentDir`) are empty. When set, the Copy button
- *     is disabled and the inline notice surfaces the message. This
- *     prevents the pre-fix bug where the Copy handler clipboarded
- *     the placeholder-bearing preview verbatim — pasting `<id>` into
- *     a shell is shell-injection-grade dangerous.
+ *     `template`) are empty. When set, the Copy button is disabled and
+ *     the inline notice surfaces the message. This prevents the pre-fix
+ *     bug where the Copy handler clipboarded the placeholder-bearing
+ *     preview verbatim — pasting `<id>` into a shell is
+ *     shell-injection-grade dangerous.
  *
- * The `name` field is intentionally optional (only emitted as
- * `--name <value>` when filled); its absence does NOT mark the build
- * invalid.
+ * Per Phase 39 (sites→lanes retirement) a lane carries no `contentDir`.
+ * The scaffold-default (markdown) and host fields are OPTIONAL — emitted
+ * as `--scaffold-default markdown=<dir>` / `--host <h>` only when filled.
+ * Their absence does NOT mark the build invalid. The `name` field is
+ * likewise optional.
  */
 function buildCreateCommand(values: NewFormValues): CopyBuildResult {
   const id = values.id.length > 0 ? quoteValue(values.id) : '<id>';
   const template =
     values.template.length > 0 ? quoteValue(values.template) : '<template>';
-  const contentDir =
-    values.contentDir.length > 0 ? quoteValue(values.contentDir) : '<path>';
+  const scaffoldFragment =
+    values.scaffoldMarkdown.length > 0
+      ? ` --scaffold-default ${quoteValue(`markdown=${values.scaffoldMarkdown}`)}`
+      : '';
+  const hostFragment =
+    values.host.length > 0 ? ` --host ${quoteValue(values.host)}` : '';
   const nameFragment =
     values.name.length > 0 ? ` --name ${quoteValue(values.name)}` : '';
-  const command = `/deskwork:lane create ${id} --template ${template} --content-dir ${contentDir}${nameFragment}`;
+  const command = `/deskwork:lane create ${id} --template ${template}${scaffoldFragment}${hostFragment}${nameFragment}`;
 
   const missing: string[] = [];
   if (values.id.length === 0) missing.push('id');
   if (values.template.length === 0) missing.push('template');
-  if (values.contentDir.length === 0) missing.push('content-dir');
 
   if (missing.length === 0) {
     return { command, error: null };
   }
-  // Name fields in the operator's vocabulary (e.g. `content-dir` for
-  // the `contentDir` JS field), so the notice text matches the
-  // `--content-dir` flag the operator sees in the preview.
   const fieldsLabel = missing.length === 1 ? 'field' : 'fields';
   return {
     command,
@@ -194,7 +203,7 @@ function buildCreateCommand(values: NewFormValues): CopyBuildResult {
  * manually edits the resulting slash-command after pasting.
  *
  * Operator-supplied values flow through `quoteValue()` to keep
- * quoting symmetric across name / template / contentDir.
+ * quoting symmetric across name / template / scaffold default / host.
  */
 function buildUpdateCommand(
   laneId: string,
@@ -208,10 +217,15 @@ function buildUpdateCommand(
     flags.push(`--template ${quoteValue(values.template)}`);
   }
   if (
-    values.contentDir !== values.contentDirCurrent &&
-    values.contentDir.length > 0
+    values.scaffoldMarkdown !== values.scaffoldMarkdownCurrent &&
+    values.scaffoldMarkdown.length > 0
   ) {
-    flags.push(`--content-dir ${quoteValue(values.contentDir)}`);
+    flags.push(
+      `--scaffold-default ${quoteValue(`markdown=${values.scaffoldMarkdown}`)}`,
+    );
+  }
+  if (values.host !== values.hostCurrent && values.host.length > 0) {
+    flags.push(`--host ${quoteValue(values.host)}`);
   }
   const flagFragment = flags.length === 0 ? '' : ` ${flags.join(' ')}`;
   return `/deskwork:lane update ${quoteValue(laneId)}${flagFragment}`;
@@ -222,7 +236,8 @@ function rebuildNewFormPreview(form: HTMLElement): CopyBuildResult {
     id: readFieldValue(form, 'id'),
     name: readFieldValue(form, 'name'),
     template: readFieldValue(form, 'template'),
-    contentDir: readFieldValue(form, 'contentDir'),
+    scaffoldMarkdown: readFieldValue(form, 'scaffoldMarkdown'),
+    host: readFieldValue(form, 'host'),
   };
   const result = buildCreateCommand(values);
   const preview = form.querySelector<HTMLElement>('[data-lanes-preview]');
@@ -236,8 +251,10 @@ function rebuildEditFormPreview(form: HTMLElement, laneId: string): string {
     nameCurrent: readFieldCurrent(form, 'name'),
     template: readFieldValue(form, 'template'),
     templateCurrent: readFieldCurrent(form, 'template'),
-    contentDir: readFieldValue(form, 'contentDir'),
-    contentDirCurrent: readFieldCurrent(form, 'contentDir'),
+    scaffoldMarkdown: readFieldValue(form, 'scaffoldMarkdown'),
+    scaffoldMarkdownCurrent: readFieldCurrent(form, 'scaffoldMarkdown'),
+    host: readFieldValue(form, 'host'),
+    hostCurrent: readFieldCurrent(form, 'host'),
   };
   const command = buildUpdateCommand(laneId, values);
   const preview = form.querySelector<HTMLElement>('[data-lanes-preview]');

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch-kit · Direction A — Marker Sketch</title>
+<style>
+/* =========================================================================
+   DIRECTION A — "MARKER SKETCH"  (hand-drawn / Balsamiq lineage)
+   Mockup preview only. The shipped sketch-kit.css is a SINGLE external
+   stylesheet; this <style> block exists only so the operator can preview.
+   Real kit bundles an OFL hand-drawn webfont (e.g. Patrick Hand / Caveat);
+   preview falls back to a system marker stack.
+   ========================================================================= */
+:root{
+  --sk-ink:#2b2b2b;
+  --sk-ink-soft:#6f6f6f;
+  --sk-paper:#f7f4ec;
+  --sk-paper-2:#efe9da;
+  --sk-line:#3a3a3a;
+  --sk-accent:#b54a2f;          /* a single marker-red accent, used sparingly */
+  --sk-font:"Patrick Hand","Bradley Hand","Comic Sans MS","Chalkboard SE",cursive;
+}
+*{box-sizing:border-box;}
+body.sk{
+  margin:0;font-family:var(--sk-font);color:var(--sk-ink);
+  background:var(--sk-paper);
+  /* faint ruled-paper texture via repeating gradient — atmosphere, still lo-fi */
+  background-image:repeating-linear-gradient(transparent 0 31px,#0000000a 31px 32px);
+  line-height:1.5;-webkit-font-smoothing:antialiased;
+  font-size:17px;
+}
+
+/* --- self-labeling WIREFRAME banner ----------------------------------- */
+.sk-banner{
+  position:sticky;top:0;z-index:5;
+  display:flex;gap:.6rem;align-items:center;justify-content:center;
+  background:#fff4d6;color:#7a5a16;
+  border-bottom:2px dashed var(--sk-line);
+  padding:.45rem 1rem;font-size:.95rem;letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.sk-banner strong{
+  background:var(--sk-accent);color:#fff;
+  padding:.05rem .55rem;border-radius:3px 9px 4px 8px;/* wobble */
+  transform:rotate(-1.2deg);
+}
+
+/* --- shared sketch border idiom: irregular radius + offset shadow ------ */
+.sk-card,.sk-img,.sk-btn,.sk-box,.sk-search,.sk-logo,.sk-avatar,.sk-nav{
+  border:2px solid var(--sk-line);
+  border-radius:14px 6px 13px 7px;            /* the hand-drawn wobble */
+  box-shadow:2px 3px 0 #00000018;
+  background:var(--sk-paper);
+}
+
+.sk-shell{max-width:1080px;margin:0 auto;padding:1.4rem 1.2rem 3rem;}
+
+/* --- header ----------------------------------------------------------- */
+.sk-header{display:flex;align-items:center;gap:.9rem;margin-bottom:1.1rem;}
+.sk-logo{
+  width:54px;height:54px;display:grid;place-items:center;
+  font-size:.8rem;color:var(--sk-ink-soft);flex:0 0 auto;
+  border-radius:50% 48% 52% 50%;
+}
+.sk-h1{font-size:1.9rem;margin:0;flex:1;}
+.sk-search{
+  flex:0 0 220px;padding:.5rem .8rem;color:var(--sk-ink-soft);
+  border-style:dashed;
+}
+.sk-avatar{width:46px;height:46px;border-radius:50%;flex:0 0 auto;
+  display:grid;place-items:center;font-size:.75rem;color:var(--sk-ink-soft);}
+
+/* --- nav -------------------------------------------------------------- */
+.sk-nav{display:flex;flex-wrap:wrap;gap:.4rem;padding:.5rem;margin-bottom:1.3rem;
+  border-radius:12px 10px 12px 9px;}
+.sk-nav-item{padding:.35rem .9rem;border:2px solid transparent;border-radius:9px 7px 10px 6px;}
+.sk-nav-item.is-here{border-color:var(--sk-line);background:var(--sk-paper-2);}
+
+/* --- layout ----------------------------------------------------------- */
+.sk-row{display:flex;gap:1rem;flex-wrap:wrap;}
+.sk-stats{margin-bottom:1.2rem;}
+.sk-stat{flex:1 1 160px;padding:1rem;}
+.sk-stat .sk-num{font-size:2.4rem;line-height:1;}
+.sk-stat .sk-label{color:var(--sk-ink-soft);font-size:.95rem;}
+
+.sk-main{display:grid;grid-template-columns:1.4fr 1fr;gap:1rem;}
+@media(max-width:720px){.sk-main{grid-template-columns:1fr;}}
+.sk-card{padding:1rem 1.1rem;}
+.sk-title{font-size:1.25rem;margin:.1rem 0 .8rem;
+  border-bottom:2px solid var(--sk-line);padding-bottom:.3rem;}
+
+/* text placeholder lines — clearly NOT real copy */
+.sk-line{height:.8rem;background:repeating-linear-gradient(90deg,#0000 0 2px,var(--sk-ink-soft) 2px 3px);
+  opacity:.5;border-radius:4px;margin:.55rem 0;}
+.sk-line.s{width:55%;}.sk-line.m{width:78%;}.sk-line.l{width:95%;}
+
+.sk-listrow{display:flex;align-items:center;gap:.7rem;padding:.5rem 0;
+  border-bottom:1px dashed #00000030;}
+.sk-dot{width:30px;height:30px;border:2px solid var(--sk-line);border-radius:50% 47% 53% 50%;flex:0 0 auto;}
+.sk-listrow .sk-line{margin:0;flex:1;}
+
+/* --- the fixed image placeholder: a crossed box ----------------------- */
+.sk-img{
+  position:relative;width:100%;aspect-ratio:4/3;display:grid;place-items:center;
+  color:var(--sk-ink-soft);font-size:.9rem;overflow:hidden;background:var(--sk-paper-2);
+}
+.sk-img::before,.sk-img::after{
+  content:"";position:absolute;inset:0;border-top:2px solid var(--sk-line);
+  transform-origin:center;
+}
+.sk-img::before{transform:rotate(11deg) scaleX(1.6);}
+.sk-img::after{transform:rotate(-11deg) scaleX(1.6);}
+.sk-img span{position:relative;background:var(--sk-paper-2);padding:.1rem .5rem;border-radius:6px;}
+
+/* --- buttons ---------------------------------------------------------- */
+.sk-actions{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:1.2rem;}
+.sk-btn{padding:.55rem 1.2rem;font-family:inherit;font-size:1rem;cursor:default;}
+.sk-btn.is-primary{background:var(--sk-accent);color:#fff;border-color:var(--sk-line);}
+
+.sk-foot{margin-top:2rem;text-align:center;color:var(--sk-ink-soft);font-size:.9rem;}
+</style>
+</head>
+<body class="sk">
+
+<div class="sk-banner">
+  <strong>Wireframe</strong> <span>structure &amp; flow only — not a visual design</span>
+</div>
+
+<div class="sk-shell">
+
+  <header class="sk-header">
+    <div class="sk-logo">LOGO</div>
+    <h1 class="sk-h1">Content Dashboard</h1>
+    <div class="sk-search">search…</div>
+    <div class="sk-avatar">you</div>
+  </header>
+
+  <nav class="sk-nav">
+    <div class="sk-nav-item is-here">Dashboard</div>
+    <div class="sk-nav-item">Calendar</div>
+    <div class="sk-nav-item">Review</div>
+    <div class="sk-nav-item">Archive</div>
+    <div class="sk-nav-item">Settings</div>
+  </nav>
+
+  <div class="sk-row sk-stats">
+    <div class="sk-card sk-stat"><div class="sk-num">12</div><div class="sk-label">In review</div></div>
+    <div class="sk-card sk-stat"><div class="sk-num">4</div><div class="sk-label">Drafting</div></div>
+    <div class="sk-card sk-stat"><div class="sk-num">38</div><div class="sk-label">Published</div></div>
+  </div>
+
+  <div class="sk-main">
+    <section class="sk-card">
+      <h2 class="sk-title">Recent entries</h2>
+      <div class="sk-listrow"><div class="sk-dot"></div><div class="sk-line l"></div></div>
+      <div class="sk-listrow"><div class="sk-dot"></div><div class="sk-line m"></div></div>
+      <div class="sk-listrow"><div class="sk-dot"></div><div class="sk-line l"></div></div>
+      <div class="sk-listrow"><div class="sk-dot"></div><div class="sk-line s"></div></div>
+      <div class="sk-actions">
+        <div class="sk-btn is-primary">+ New entry</div>
+        <div class="sk-btn">Approve</div>
+        <div class="sk-btn">Cancel</div>
+      </div>
+    </section>
+
+    <section class="sk-card">
+      <h2 class="sk-title">Preview</h2>
+      <div class="sk-img"><span>image</span></div>
+      <div class="sk-line m"></div>
+      <div class="sk-line s"></div>
+    </section>
+  </div>
+
+  <div class="sk-foot">— wireframe · sketch-kit direction A · marker sketch —</div>
+</div>
+
+</body>
+</html>

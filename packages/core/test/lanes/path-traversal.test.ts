@@ -86,7 +86,6 @@ describe('AUDIT-20260530-07 — loadLaneConfig path-traversal hardening', () => 
       id: 'gotcha',
       name: 'Gotcha',
       pipelineTemplate: 'editorial',
-      contentDir: 'gotcha',
     }), 'utf8');
     expect(existsSync(traversalTarget)).toBe(true);
 
@@ -119,7 +118,6 @@ describe('AUDIT-20260530-07 — loadLaneConfig path-traversal hardening', () => 
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     const lane = loadLaneConfig('default', projectRoot);
     expect(lane.id).toBe('default');
@@ -179,13 +177,11 @@ describe('AUDIT-20260530-07 — listLaneConfigs filters non-canonical basenames'
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     });
     writeLane(projectRoot, 'mockups', {
       id: 'mockups',
       name: 'Mockups',
       pipelineTemplate: 'visual',
-      contentDir: 'mockups',
     });
     // Non-canonical strays.
     const dir = lanesDir(projectRoot);

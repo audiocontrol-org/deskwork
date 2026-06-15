@@ -1,6 +1,6 @@
 {
   "name": "stack-control",
-  "version": "0.45.2",
+  "version": "0.46.0",
   "description": "Provider-agnostic control plane for spec-driven development across Claude Code and Codex.",
   "author": {
     "name": "audiocontrol.org",

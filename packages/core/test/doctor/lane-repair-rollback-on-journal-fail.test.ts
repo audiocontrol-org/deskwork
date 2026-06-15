@@ -122,7 +122,6 @@ describe('doctor: lane-config-missing-template repair rolls back on journal-appe
       id: 'dangling',
       name: 'Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
     const laneFile = join(fixture.root, '.deskwork', 'lanes', 'dangling.json');
     const originalBody = readFileSync(laneFile, 'utf8');
@@ -174,7 +173,6 @@ describe('doctor: lane-config-missing-template repair rolls back on journal-appe
       id: 'dangling',
       name: 'Dangling Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
     const laneFile = join(fixture.root, '.deskwork', 'lanes', 'dangling.json');
     const originalBody = readFileSync(laneFile, 'utf8');

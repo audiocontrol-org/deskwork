@@ -1,21 +1,13 @@
 /**
  * Project-scope gate for doctor rules.
  *
- * The doctor runner invokes `audit()` once per configured site. Rules
- * whose target lives at the PROJECT scope (under `<projectRoot>/.deskwork/`
- * regardless of site count — lane configs, sidecars, the journal) need
- * to emit findings once, not N times. The convention this module
- * captures: project-scoped rules early-return when the current site is
- * not the FIRST site in `ctx.config.sites` (Object.keys insertion order).
- * Single-site projects (the overwhelming majority) trip the guard on
- * their only site; multi-site projects trip it on the first site listed
- * in the config and skip the remainder.
- *
- * The alternative — a dedicated project-scope abstraction in the runner
- * — would let project-scoped rules opt out of the per-site loop
- * entirely. Until that abstraction lands, this helper is the agreed
- * shape; extracted here so multiple rules consuming the pattern share a
- * single named definition rather than duplicating the body.
+ * Phase 39c (sites→lanes retirement): the doctor runner no longer loops
+ * per configured site — it runs a SINGLE project-scoped pass (see
+ * `runner.ts` `PROJECT_SCOPE`). Project-scoped rules (lane configs,
+ * sidecars, the journal) therefore already run exactly once. This gate
+ * is now a constant `true`; it is retained (rather than ripped out of
+ * every rule body) so the rules that consume it keep their shape and
+ * the single-pass guarantee is documented in one place.
  *
  * Sibling-relative imports per the project convention.
  */
@@ -23,14 +15,11 @@
 import type { DoctorContext } from './types.ts';
 
 /**
- * Returns `true` when the current site is the "first" site per the
- * config's `Object.keys` insertion order — the conventional signal
- * that a project-scoped rule should run during the current per-site
- * iteration. Empty `sites` collection returns `true` (degenerate
- * single-pass case so the rule still runs).
+ * Phase 39c: the runner makes a single project pass, so a project-scoped
+ * rule always runs exactly once. The legacy "first site in
+ * `Object.keys(config.sites)`" check is retired with the per-site loop;
+ * this now unconditionally admits the single pass.
  */
-export function isFirstSite(ctx: DoctorContext): boolean {
-  const siteIds = Object.keys(ctx.config.sites);
-  if (siteIds.length === 0) return true;
-  return siteIds[0] === ctx.site;
+export function isFirstSite(_ctx: DoctorContext): boolean {
+  return true;
 }

@@ -1,0 +1,11 @@
+{
+  "agent": "ui-route-enumerator",
+  "featureSlug": "design-control",
+  "modulesInScope": [
+    "audit",
+    "docs",
+    "specs",
+    "src"
+  ],
+  "routes": []
+}

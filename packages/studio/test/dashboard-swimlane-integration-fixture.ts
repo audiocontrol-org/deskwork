@@ -28,12 +28,13 @@
  * full integration contract Task 5.6 specifies.
  */
 
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import { writeSidecar } from '@deskwork/core/sidecar';
 import type { Entry } from '@deskwork/core/schema/entry';
+import { writeLaneConfig } from './__helpers/write-lane-config.ts';
 
 /** Stable UUIDs — 2 entries per lane × 3 lanes = 6 entries total. */
 export const UUID_DEFAULT_DRAFTING = '11111111-1111-4111-8111-111111111111';
@@ -71,19 +72,10 @@ export function makeEntry(overrides: Partial<Entry>): Entry {
   };
 }
 
-function writeLane(
-  root: string,
-  id: string,
-  name: string,
-  pipelineTemplate: string,
-  contentDir: string,
-): void {
-  writeFileSync(
-    join(root, '.deskwork', 'lanes', `${id}.json`),
-    JSON.stringify({ id, name, pipelineTemplate, contentDir }, null, 2),
-    'utf8',
-  );
-}
+// Phase 39: the lane-config writer is shared with the unit fixture via
+// `__helpers/write-lane-config.ts` (one copy, not two). `writeLane` is a
+// local alias kept so the call sites below stay terse.
+const writeLane = writeLaneConfig;
 
 /**
  * Build the canonical Task 5.6 multi-lane fixture in a fresh tmp

@@ -116,7 +116,6 @@ describe('doctor: lane-config-missing-template — delete corrupt-sidecar guard 
       id: 'qa',
       name: 'QA Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
     // ONE unparseable sidecar. No parseable sidecars at all — under
     // the buggy guard, `readAllSidecars` would throw, and the existing
@@ -160,7 +159,6 @@ describe('doctor: lane-config-missing-template — delete corrupt-sidecar guard 
       id: 'qa',
       name: 'QA Lane',
       pipelineTemplate: 'nonsense',
-      contentDir: 'docs',
     });
     writeCorruptSidecar(fixture.root, 'broken-one');
     writeCorruptSidecar(fixture.root, 'broken-two');

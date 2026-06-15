@@ -86,7 +86,6 @@ async function seedProjectScaffold(projectRoot: string): Promise<void> {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     }),
     'utf-8',
   );

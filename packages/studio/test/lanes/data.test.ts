@@ -43,10 +43,17 @@ function writeLane(
   id: string,
   name: string,
   pipelineTemplate: string,
-  contentDir: string,
+  // Phase 39: a lane carries no contentDir; the dir lands under
+  // scaffoldDefaults.markdown.
+  scaffoldMarkdown: string,
   archivedAt?: string,
 ): void {
-  const json: Record<string, string> = { id, name, pipelineTemplate, contentDir };
+  const json: Record<string, unknown> = {
+    id,
+    name,
+    pipelineTemplate,
+    scaffoldDefaults: { markdown: scaffoldMarkdown },
+  };
   if (archivedAt !== undefined) json.archivedAt = archivedAt;
   writeFileSync(
     join(root, '.deskwork', 'lanes', `${id}.json`),
@@ -207,6 +214,8 @@ describe('loadLanesPageData', () => {
     expect(row.id).toBe('editorial-lane');
     expect(row.name).toBe('Editorial');
     expect(row.pipelineTemplate).toBe('editorial');
-    expect(row.contentDir).toBe('docs');
+    // Phase 39: a lane row exposes scaffoldDefaults (+ host), not contentDir.
+    expect(row.scaffoldDefaults).toEqual({ markdown: 'docs' });
+    expect(row.host).toBeNull();
   });
 });

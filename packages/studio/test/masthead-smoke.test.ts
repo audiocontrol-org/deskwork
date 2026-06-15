@@ -53,6 +53,9 @@ function makeEntry(overrides: Partial<Entry>): Entry {
     source: 'manual',
     currentStage: 'Drafting',
     iterationByStage: { Drafting: 3 },
+    // Phase 39c (sites→lanes retirement): stored-path-only resolution;
+    // the fixture seeds docs/sample-draft/index.md.
+    artifactPath: 'docs/sample-draft/index.md',
     createdAt: '2026-04-30T10:00:00.000Z',
     updatedAt: '2026-04-30T10:00:00.000Z',
     ...overrides,

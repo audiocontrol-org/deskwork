@@ -64,8 +64,10 @@ function buildFixture(root: string, cfg: DeskworkConfig, spec: FixtureSpec) {
     entries: spec.entries,
     distributions: [],
   };
-  const calendarPath = join(root, cfg.sites.wc.calendarPath);
-  mkdirSync(join(root, 'docs'), { recursive: true });
+  // Phase 39c (sites→lanes retirement): the content page reads the
+  // single project calendar at `.deskwork/calendar.md`.
+  const calendarPath = join(root, '.deskwork', 'calendar.md');
+  mkdirSync(join(root, '.deskwork'), { recursive: true });
   writeCalendar(calendarPath, cal);
   // On-disk files.
   for (const [rel, content] of Object.entries(spec.files)) {

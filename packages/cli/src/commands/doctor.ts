@@ -114,12 +114,11 @@ export async function run(argv: string[]): Promise<void> {
   const migrateResult = await maybeMigrate(projectRoot, repairMode, check);
   if (migrateResult.handled) process.exit(migrateResult.exitCode);
 
-  if (flags.site !== undefined && !(flags.site in config.sites)) {
-    fail(
-      `Unknown --site "${flags.site}". Configured sites: ${Object.keys(config.sites).join(', ')}`,
-      2,
-    );
-  }
+  // Phase 39c (sites→lanes retirement): the doctor runs a single
+  // project-scoped pass. The `--site` flag is still PARSED (back-compat
+  // for adopters who pass it) but it no longer scopes the run and is not
+  // validated against `config.sites` (which may legitimately be empty in
+  // a post-migration project). The flag is a tolerated no-op.
 
   let ruleIds: string[] | undefined;
   if (flags.fix !== undefined) {

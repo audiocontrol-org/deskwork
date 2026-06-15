@@ -40,9 +40,8 @@ export interface SplitOutline {
  * prepended to `body`; anything after is appended. Rejoin via
  * `joinOutline`.
  *
- * This mirrors the line-wise logic in `scripts/lib/editorial/
- * body-state.ts` (kept separate so the browser-side bundle
- * doesn't have to drag in the server's fs/path imports).
+ * Kept as a standalone line-wise helper so the browser-side bundle
+ * doesn't have to drag in the server's fs/path imports.
  */
 export function splitOutline(md: string): SplitOutline {
   const lines = md.split('\n');

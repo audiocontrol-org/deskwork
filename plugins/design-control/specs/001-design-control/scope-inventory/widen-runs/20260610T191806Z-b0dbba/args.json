@@ -1,0 +1,11 @@
+{
+  "featureSlug": "design-control",
+  "complaint": "Lint adversarial barrage 2026-06-10 surfaced four leakage classes the original scope missed: (1) foreign local stylesheets ride bare axis-1 because identity-pinning is opt-in (AUDIT-20260610-01); (2) transitive resources named by the pinned CSS — @font-face woff2 files — were outside the pin's identity closure (AUDIT-20260610-03); (3) preserved-whitespace text imagery (ASCII-art logos in pre) is invisible to both the element and codepoint axes (AUDIT-20260610-04); (4) attribute VALUES beyond URL-kind attrs are an unscanned channel (meta theme-color/color-scheme, title/aria glyphs — AUDIT-20260610-05, parked TASK-12)",
+  "manifestPath": "/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/scope-manifest.yaml",
+  "prdPath": "/Users/orion/work/deskwork-work/design-control/plugins/design-control/specs/001-design-control/spec.md",
+  "repoRoot": "/Users/orion/work/deskwork-work/design-control/plugins/design-control",
+  "moduleRoot": ".",
+  "apply": false,
+  "evidenceTrail": true,
+  "quiet": false
+}

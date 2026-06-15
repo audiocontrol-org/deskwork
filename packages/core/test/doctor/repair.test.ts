@@ -41,11 +41,20 @@ describe('repairAll - calendar regeneration', () => {
   });
 
   /**
-   * #182 Phase 34 ship-pass — backfill artifactPath when the sidecar
-   * lacks the field but the slug+stage heuristic resolves to a real
-   * file.
+   * Phase 39d (sites→lanes retirement): the runtime artifactPath
+   * backfiller is REMOVED from `repair.ts`. `repairAll` no longer
+   * derives a path from the slug+stage heuristic — it reads stored paths
+   * only and regenerates the calendar. Backfilling missing artifactPath
+   * is owned by the 39b migration (`sites-migration-backfill.ts`), which
+   * enumerates candidates across legacy content dirs and halts on
+   * ambiguity. Those backfill semantics are tested in
+   * `sites-to-lanes-migration.test.ts` + `migration-slug-collision.test.ts`.
+   *
+   * This regression locks in that `repairAll` does NOT touch
+   * `artifactPath`, even when a path-less sidecar has a file sitting at
+   * the old heuristic location.
    */
-  it('backfills artifactPath on sidecars that lack the field but where the heuristic resolves', async () => {
+  it('does NOT backfill artifactPath (heuristic backfill moved to the 39b migration)', async () => {
     const entry: Entry = {
       uuid: '660e8400-e29b-41d4-a716-446655440001',
       slug: 'plan-doc',
@@ -59,63 +68,17 @@ describe('repairAll - calendar regeneration', () => {
       // artifactPath INTENTIONALLY OMITTED — older entry shape.
     };
     await writeSidecar(projectRoot, entry);
-    // Seed the file at the heuristic location for Drafting stage:
-    // docs/<slug>/index.md.
-    const heuristicPath = join(projectRoot, 'docs', 'plan-doc', 'index.md');
+    // Seed a file at the OLD heuristic location. repairAll must NOT
+    // stamp artifactPath from it — that backfill is the migration's job.
     await mkdir(join(projectRoot, 'docs', 'plan-doc'), { recursive: true });
-    await writeFile(heuristicPath, '# Plan Doc\n\nbody\n');
+    await writeFile(join(projectRoot, 'docs', 'plan-doc', 'index.md'), '# Plan Doc\n\nbody\n');
 
     const result = await repairAll(projectRoot, { destructive: false });
-    expect(result.applied.some((a) => a.startsWith('artifact-path-backfilled'))).toBe(true);
-
-    const updated = await readSidecar(projectRoot, entry.uuid);
-    expect(updated.artifactPath).toBe('docs/plan-doc/index.md');
-  });
-
-  it('does NOT backfill when the heuristic file is missing', async () => {
-    const entry: Entry = {
-      uuid: '770e8400-e29b-41d4-a716-446655440002',
-      slug: 'no-file',
-      title: 'No File',
-      keywords: [],
-      source: 'manual',
-      currentStage: 'Drafting',
-      iterationByStage: {},
-      createdAt: '2026-04-30T10:00:00.000Z',
-      updatedAt: '2026-04-30T10:00:00.000Z',
-    };
-    await writeSidecar(projectRoot, entry);
-    // No file seeded at docs/no-file/index.md.
-
-    const result = await repairAll(projectRoot, { destructive: false });
-    // calendar still regenerates, but no backfill applied.
+    // Calendar still regenerates; no artifact-path-backfill happens.
     expect(result.applied).toContain('calendar-regenerated');
     expect(result.applied.some((a) => a.startsWith('artifact-path-backfilled'))).toBe(false);
 
-    // Sidecar artifactPath stays unset — no field added when the
-    // heuristic doesn't resolve to an existing file.
     const updated = await readSidecar(projectRoot, entry.uuid);
     expect(updated.artifactPath).toBeUndefined();
-  });
-
-  it('is idempotent — re-running on already-backfilled sidecars is a no-op', async () => {
-    const entry: Entry = {
-      uuid: '880e8400-e29b-41d4-a716-446655440003',
-      slug: 'already-stamped',
-      title: 'Already Stamped',
-      keywords: [],
-      source: 'manual',
-      currentStage: 'Drafting',
-      iterationByStage: { Drafting: 1 },
-      artifactPath: 'docs/already-stamped/index.md',
-      createdAt: '2026-04-30T10:00:00.000Z',
-      updatedAt: '2026-04-30T10:00:00.000Z',
-    };
-    await writeSidecar(projectRoot, entry);
-    await mkdir(join(projectRoot, 'docs', 'already-stamped'), { recursive: true });
-    await writeFile(join(projectRoot, 'docs', 'already-stamped', 'index.md'), '# x\n');
-
-    const result = await repairAll(projectRoot, { destructive: false });
-    expect(result.applied.some((a) => a.startsWith('artifact-path-backfilled'))).toBe(false);
   });
 });

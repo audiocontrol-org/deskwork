@@ -1,11 +1,13 @@
 /**
  * deskwork CLI `lane move` — cross-lane entry relocation.
  *
- * Phase 6 Task 6.1 (graphical-entries). Move is the most complex
- * verb: it touches both lane configs (target lane resolution) AND
- * entries (sidecar mutation + artifact relocation + scrapbook
- * relocation). Tests cover the happy paths, the stage-defaulting
- * rule, and the refusal shapes.
+ * Phase 6 Task 6.1 (graphical-entries); reshaped by Phase 39
+ * (sites→lanes retirement). A lane carries no `contentDir` — location
+ * is a property of the ENTRY (`entry.artifactPath`). So `lane move` is a
+ * METADATA change only: it updates the sidecar's `lane` + `currentStage`
+ * and does NOT relocate the artifact file or its scrapbook (both stay
+ * put). These tests assert the metadata mutation + stage-defaulting +
+ * the refusal shapes, AND that the artifact does NOT move.
  */
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
@@ -28,17 +30,19 @@ let project: string;
 beforeEach(() => {
   project = makeProject();
   writeVisualPipeline(project);
+  // Phase 39: lanes carry no contentDir. Their only location-adjacent
+  // metadata is the optional add-time scaffoldDefaults.
   writeLaneJson(project, 'default', {
     id: 'default',
     name: 'Default',
     pipelineTemplate: 'editorial',
-    contentDir: 'docs',
+    scaffoldDefaults: { markdown: 'docs' },
   });
   writeLaneJson(project, 'mockups', {
     id: 'mockups',
     name: 'Mockups',
     pipelineTemplate: 'visual',
-    contentDir: 'src/mockups',
+    scaffoldDefaults: { markdown: 'src/mockups' },
   });
 });
 afterEach(() => { destroyProject(project); });
@@ -46,6 +50,7 @@ afterEach(() => { destroyProject(project); });
 interface SeedOptions {
   readonly uuid: string;
   readonly slug: string;
+  /** Entry-owned artifact path, relative to the PROJECT root (Phase 39). */
   readonly artifactPath: string;
   readonly artifactBody?: string;
   readonly scrapbookContents?: Record<string, string>;
@@ -61,12 +66,14 @@ function seedEntryWithArtifact(opts: SeedOptions): void {
       iterationByStage: opts.iterationByStage,
     }),
   });
-  const artifactAbs = join(project, 'docs', opts.artifactPath);
+  // The artifact lives at <projectRoot>/<artifactPath> — resolution is
+  // entry-owned and project-root-relative, not lane-relative.
+  const artifactAbs = join(project, opts.artifactPath);
   mkdirSync(dirname(artifactAbs), { recursive: true });
   writeFileSync(artifactAbs, opts.artifactBody ?? '# body\n', 'utf-8');
 
   if (opts.scrapbookContents !== undefined) {
-    const scrapbookDir = join(project, 'docs', opts.slug, 'scrapbook');
+    const scrapbookDir = join(dirname(artifactAbs), 'scrapbook');
     mkdirSync(scrapbookDir, { recursive: true });
     for (const [name, content] of Object.entries(opts.scrapbookContents)) {
       writeFileSync(join(scrapbookDir, name), content, 'utf-8');
@@ -75,12 +82,12 @@ function seedEntryWithArtifact(opts: SeedOptions): void {
 }
 
 describe('deskwork lane move', () => {
-  it('relocates the artifact file to the target lane contentDir', () => {
+  it('updates the sidecar lane + stage WITHOUT relocating the artifact', () => {
     const uuid = '550e8400-e29b-41d4-a716-446655440010';
     seedEntryWithArtifact({
       uuid,
       slug: 'a-mockup',
-      artifactPath: 'a-mockup.md',
+      artifactPath: 'docs/a-mockup.md',
       artifactBody: '# my mockup\n',
     });
 
@@ -88,43 +95,34 @@ describe('deskwork lane move', () => {
     expect(res.stderr).toBe('');
     expect(res.code).toBe(0);
 
-    expect(existsSync(join(project, 'docs', 'a-mockup.md'))).toBe(false);
+    // The artifact STAYS at its entry-owned path — the lane has no
+    // contentDir to relocate into (Phase 39).
     expect(
-      readFileSync(join(project, 'src', 'mockups', 'a-mockup.md'), 'utf-8'),
+      readFileSync(join(project, 'docs', 'a-mockup.md'), 'utf-8'),
     ).toBe('# my mockup\n');
 
     const sidecar = readSidecarJson(project, uuid);
     expect(sidecar['lane']).toBe('mockups');
     expect(sidecar['currentStage']).toBe('Sketch');
+    // artifactPath is unchanged — location is the entry's property.
+    expect(sidecar['artifactPath']).toBe('docs/a-mockup.md');
   });
 
-  it('relocates the per-entry scrapbook directory when present', () => {
+  it('leaves the per-entry scrapbook directory in place', () => {
     const uuid = '550e8400-e29b-41d4-a716-446655440011';
     seedEntryWithArtifact({
       uuid,
       slug: 'with-scrapbook',
-      artifactPath: 'with-scrapbook.md',
+      artifactPath: 'docs/with-scrapbook.md',
       scrapbookContents: { 'note.md': 'a note\n' },
     });
 
     const res = lane(project, 'move', 'with-scrapbook', '--to', 'mockups');
     expect(res.code).toBe(0);
 
+    // Scrapbook stays put next to the (unmoved) artifact.
     expect(
-      existsSync(join(project, 'docs', 'with-scrapbook', 'scrapbook')),
-    ).toBe(false);
-    expect(
-      readFileSync(
-        join(
-          project,
-          'src',
-          'mockups',
-          'with-scrapbook',
-          'scrapbook',
-          'note.md',
-        ),
-        'utf-8',
-      ),
+      readFileSync(join(project, 'docs', 'scrapbook', 'note.md'), 'utf-8'),
     ).toBe('a note\n');
   });
 
@@ -133,7 +131,7 @@ describe('deskwork lane move', () => {
     seedEntryWithArtifact({
       uuid,
       slug: 'iter-preserve',
-      artifactPath: 'iter-preserve.md',
+      artifactPath: 'docs/iter-preserve.md',
       iterationByStage: { Drafting: 3, Outlining: 1 },
     });
     const res = lane(project, 'move', 'iter-preserve', '--to', 'mockups');
@@ -150,7 +148,7 @@ describe('deskwork lane move', () => {
     seedEntryWithArtifact({
       uuid,
       slug: 'default-stage',
-      artifactPath: 'default-stage.md',
+      artifactPath: 'docs/default-stage.md',
     });
     const res = lane(project, 'move', 'default-stage', '--to', 'mockups');
     expect(res.code).toBe(0);
@@ -162,7 +160,7 @@ describe('deskwork lane move', () => {
     seedEntryWithArtifact({
       uuid,
       slug: 'explicit-stage',
-      artifactPath: 'explicit-stage.md',
+      artifactPath: 'docs/explicit-stage.md',
     });
     const res = lane(
       project,
@@ -179,7 +177,7 @@ describe('deskwork lane move', () => {
     seedEntryWithArtifact({
       uuid,
       slug: 'bad-stage',
-      artifactPath: 'bad-stage.md',
+      artifactPath: 'docs/bad-stage.md',
     });
     const res = lane(
       project,
@@ -198,7 +196,7 @@ describe('deskwork lane move', () => {
     seedEntryWithArtifact({
       uuid,
       slug: 'same-lane',
-      artifactPath: 'same-lane.md',
+      artifactPath: 'docs/same-lane.md',
     });
     const res = lane(project, 'move', 'same-lane', '--to', 'default');
     expect(res.code).not.toBe(0);
@@ -210,7 +208,7 @@ describe('deskwork lane move', () => {
     writeSidecar(project, uuid, 'missing-art', {
       lane: 'default',
       currentStage: 'Drafting',
-      artifactPath: 'missing-art.md',
+      artifactPath: 'docs/missing-art.md',
     });
     const res = lane(project, 'move', 'missing-art', '--to', 'mockups');
     expect(res.code).not.toBe(0);
@@ -222,7 +220,7 @@ describe('deskwork lane move', () => {
     seedEntryWithArtifact({
       uuid,
       slug: 'no-target',
-      artifactPath: 'no-target.md',
+      artifactPath: 'docs/no-target.md',
     });
     const res = lane(project, 'move', 'no-target');
     expect(res.code).toBe(2);
@@ -234,7 +232,7 @@ describe('deskwork lane move', () => {
     seedEntryWithArtifact({
       uuid,
       slug: 'to-archived',
-      artifactPath: 'to-archived.md',
+      artifactPath: 'docs/to-archived.md',
     });
     lane(project, 'archive', 'mockups');
     const res = lane(project, 'move', 'to-archived', '--to', 'mockups');
@@ -244,22 +242,15 @@ describe('deskwork lane move', () => {
 });
 
 /**
- * Sidecar-write failure rollback (AUDIT-20260530-59).
+ * Sidecar-write failure (AUDIT-20260530-59).
  *
- * Drives `moveEntryToLane` in-process and uses `vi.mock` to make
- * `writeSidecar` throw on the rollback path. This is deterministic
- * regardless of the test runner's uid (root or unprivileged), unlike
- * the prior chmod-based pattern that pre-flighted a write and silently
- * bailed via `return` when the lock didn't take effect — vitest then
- * recorded a green PASS for an unverified contract.
- *
- * The mock targets the same source file that move.ts imports
- * (`packages/core/src/sidecar/write.ts`) so vitest's module-graph dedup
- * routes both consumers (the test and the move impl) through the
- * mocked module. We import `moveEntryToLane` from source for the same
- * reason: a dist-build import would resolve `writeSidecar` from the
- * compiled `dist/sidecar/write.js`, a different module from the
- * mocked source path.
+ * Phase 39: the move no longer relocates files, so there is no
+ * filesystem rollback to verify — the move's only mutation is the
+ * sidecar write. This test confirms a `writeSidecar` failure surfaces
+ * as a thrown error AND that the artifact/scrapbook (which were never
+ * moved) remain in place. The mock targets the same source file move.ts
+ * imports so vitest's module-graph dedup routes both consumers through
+ * the mocked module.
  */
 vi.mock('../../../core/src/sidecar/write.ts', async () => {
   const actual = await vi.importActual<
@@ -271,8 +262,8 @@ vi.mock('../../../core/src/sidecar/write.ts', async () => {
   };
 });
 
-describe('deskwork lane move — sidecar-write failure rollback', () => {
-  it('rolls back artifact + scrapbook when writeSidecar fails', async () => {
+describe('deskwork lane move — sidecar-write failure', () => {
+  it('surfaces a thrown error and leaves the (unmoved) artifact + scrapbook in place', async () => {
     const { writeSidecar: mockedWriteSidecar } = await import(
       '../../../core/src/sidecar/write.ts'
     );
@@ -287,7 +278,7 @@ describe('deskwork lane move — sidecar-write failure rollback', () => {
     seedEntryWithArtifact({
       uuid,
       slug: 'rollback-me',
-      artifactPath: 'rollback-me.md',
+      artifactPath: 'docs/rollback-me.md',
       artifactBody: '# pre-move\n',
       scrapbookContents: { 'note.md': 'pre-move scrapbook\n' },
     });
@@ -302,30 +293,18 @@ describe('deskwork lane move — sidecar-write failure rollback', () => {
 
     await expect(
       moveEntryToLane(project, { uuid, toLane: 'mockups' }),
-    ).rejects.toThrow(/sidecar write failed/);
+    ).rejects.toThrow(/mocked sidecar write failure/);
 
     expect(writeMock).toHaveBeenCalledTimes(1);
 
-    // Artifact restored at source path; target empty.
+    // Artifact + scrapbook were never relocated (Phase 39) — they stay
+    // at their entry-owned path regardless of the write failure.
     expect(
       readFileSync(join(project, 'docs', 'rollback-me.md'), 'utf-8'),
     ).toBe('# pre-move\n');
-    expect(existsSync(join(project, 'src', 'mockups', 'rollback-me.md'))).toBe(
-      false,
-    );
-
-    // Scrapbook restored at source path; target empty.
     expect(
-      readFileSync(
-        join(project, 'docs', 'rollback-me', 'scrapbook', 'note.md'),
-        'utf-8',
-      ),
+      readFileSync(join(project, 'docs', 'scrapbook', 'note.md'), 'utf-8'),
     ).toBe('pre-move scrapbook\n');
-    expect(
-      existsSync(
-        join(project, 'src', 'mockups', 'rollback-me', 'scrapbook', 'note.md'),
-      ),
-    ).toBe(false);
 
     // Sidecar untouched: write was mocked to throw before disk contact.
     expect(readFileSync(sidecarPathAbs, 'utf-8')).toBe(sidecarBefore);

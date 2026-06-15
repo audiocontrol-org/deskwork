@@ -66,7 +66,10 @@ describe('JournalEventSchema', () => {
     expect(JournalEventSchema.safeParse(event).success).toBe(true);
   });
 
-  it('parses a lane-create event (Phase 6 Task 6.1)', () => {
+  it('parses a legacy lane-create event carrying contentDir (Phase 39 back-compat read)', () => {
+    // Old on-disk `lane-create` events emitted a top-level `contentDir`
+    // detail key. Phase 39 retires the lane field but KEEPS the event
+    // detail optional so historical journals still parse cleanly.
     const event: JournalEvent = {
       kind: 'lane-create',
       at: '2026-05-28T10:00:00.000Z',
@@ -75,6 +78,23 @@ describe('JournalEventSchema', () => {
         name: 'Mockups',
         pipelineTemplate: 'visual',
         contentDir: 'src/mockups',
+      },
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('parses a NEW lane-create event emitting scaffoldDefaults + host (Phase 39)', () => {
+    // New `lane-create` events emit the lane's add-time scaffoldDefaults
+    // (and optional host) instead of the retired contentDir.
+    const event: JournalEvent = {
+      kind: 'lane-create',
+      at: '2026-05-28T10:00:00.000Z',
+      laneId: 'mockups',
+      details: {
+        name: 'Mockups',
+        pipelineTemplate: 'visual',
+        scaffoldDefaults: { markdown: 'src/mockups' },
+        host: 'example.com',
       },
     };
     expect(JournalEventSchema.safeParse(event).success).toBe(true);

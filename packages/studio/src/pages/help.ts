@@ -30,6 +30,7 @@ import {
   SKILLS_SORTED,
   type Skill,
 } from '../lib/editorial-skills-catalogue.ts';
+import { listLaneConfigs, loadLaneConfig } from '@deskwork/core/lanes';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
@@ -44,10 +45,29 @@ function formatIssueDate(now: Date): string {
   return `${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
 }
 
+/**
+ * Phase 39c (sites→lanes retirement): the imprint's host list reads
+ * `lane.host` from the project's lane configs (a lane publishes to a
+ * host when it renders a website), NOT the retired `config.sites[*].host`.
+ * Lanes without a host (internal-doc collections) contribute nothing.
+ * Malformed lane files are skipped — a cosmetic imprint must not crash
+ * the help page.
+ */
+function collectLaneHosts(ctx: StudioContext): string[] {
+  const hosts: string[] = [];
+  for (const laneId of listLaneConfigs(ctx.projectRoot)) {
+    try {
+      const lane = loadLaneConfig(laneId, ctx.projectRoot);
+      if (lane.host !== undefined && lane.host.length > 0) hosts.push(lane.host);
+    } catch {
+      // skip unreadable lane — surfaced by doctor, not here
+    }
+  }
+  return hosts;
+}
+
 function renderCover(ctx: StudioContext, now: Date): RawHtml {
-  const sitesInline = Object.values(ctx.config.sites)
-    .map((s) => s.host)
-    .join(' · ');
+  const sitesInline = collectLaneHosts(ctx).join(' · ');
   return unsafe(html`
     <header class="er-pagehead er-pagehead--centered eh-cover">
       <p class="er-pagehead__kicker eh-cover-kicker">

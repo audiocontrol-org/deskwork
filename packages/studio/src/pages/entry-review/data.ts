@@ -33,7 +33,7 @@ import {
 } from '@deskwork/core/iterate/history';
 import { listEntryAnnotations } from '@deskwork/core/entry/annotations';
 import { readSidecar, sidecarPath } from '@deskwork/core/sidecar';
-import { isPopulatedGroupEntry } from '@deskwork/core/groups';
+import { isGroupEntry, isPopulatedGroupEntry } from '@deskwork/core/groups';
 import {
   listLaneConfigs,
   loadLaneConfig,
@@ -163,6 +163,17 @@ export interface LoadOptions {
  * the first match (entry UUIDs are globally unique). Falls back to
  * `config.defaultSite` with a null `calendarEntry` when no calendar
  * carries the entry.
+ *
+ * Phase 39c (sites→lanes retirement) NOTE: the calendar is now a single
+ * project file (`resolveCalendarPath` is site-independent), so iterating
+ * `config.sites` reads the SAME calendar per key — harmless redundancy
+ * while `sites` is retained for the CLI-verb path. The returned `site`
+ * is still threaded into the CLI-verb content-index + verb-command
+ * surfaces (`getIndex(site)`, `lookupCalendarEntryStrict`), so it must
+ * remain a real configured site slug until 39c-2b migrates that path.
+ * Collapsing the returned label to a synthetic `project` scope here
+ * breaks the content-index keying — deferred to 39c-2b with the rest of
+ * the CLI-verb resolution migration.
  *
  * Failures (calendar absent, parse error) fall through to the default
  * — the press-check surface should render even when calendar resolution
@@ -294,11 +305,17 @@ async function loadGroupMembersBundle(
       if (!usedLaneIds.has(laneId)) continue;
       try {
         const config = loadLaneConfig(laneId, projectRoot);
+        // Phase 39 (sites→lanes retirement): a lane carries no
+        // contentDir. Project the runtime-contract fields; scaffoldDefaults
+        // / host are optional and copied only when present.
         const strict: LaneConfig = {
           id: config.id,
           name: config.name,
           pipelineTemplate: config.pipelineTemplate,
-          contentDir: config.contentDir,
+          ...(config.scaffoldDefaults !== undefined && {
+            scaffoldDefaults: config.scaffoldDefaults,
+          }),
+          ...(config.host !== undefined && { host: config.host }),
         };
         // Load template FIRST; only register the lane once the
         // template-side load succeeds. If the template load throws,
@@ -330,12 +347,40 @@ async function loadGroupMembersBundle(
   };
 }
 
+/**
+ * Resolve an entry's sidecar + artifact body, with a declared-group
+ * fallback (Phase 39c). For a non-group entry, defers entirely to
+ * `resolveEntry` (stored-path-only; throws when artifactPath is absent).
+ * For a DECLARED GROUP entry (`members` array present) that has no
+ * artifactPath, the group has no artifact of its own — read the sidecar
+ * and return an empty body so the Members section renders. A group that
+ * DOES carry an artifactPath still resolves through `resolveEntry`.
+ */
+async function resolveEntryOrGroup(
+  projectRoot: string,
+  entryId: string,
+): Promise<{ entry: Entry; artifactBody: string; artifactPath: string }> {
+  const sidecar = await readSidecar(projectRoot, entryId);
+  if (isGroupEntry(sidecar) && sidecar.artifactPath === undefined) {
+    return { entry: sidecar, artifactBody: '', artifactPath: '' };
+  }
+  return resolveEntry(projectRoot, entryId);
+}
+
 export async function loadEntryReviewData(
   ctx: StudioContext,
   entryId: string,
   opts: LoadOptions = {},
 ): Promise<EntryReviewData> {
-  const resolved = await resolveEntry(ctx.projectRoot, entryId);
+  // Phase 39c (sites→lanes retirement): entry resolution reads the stored
+  // artifactPath only (no slug+stage fallback) and THROWS when it is
+  // absent. A DECLARED GROUP (`members` array present) legitimately has
+  // no artifact of its own — its body is its members. For such an entry
+  // without an artifactPath, read the sidecar directly and render with
+  // empty markdown so the Members section / empty-state CTA shows instead
+  // of a 404. Non-group entries still require an artifact (resolveEntry
+  // throws → the route renders the not-found shell).
+  const resolved = await resolveEntryOrGroup(ctx.projectRoot, entryId);
   const iterations = await listEntryIterations(ctx.projectRoot, entryId);
   const annotations = await listEntryAnnotations(ctx.projectRoot, entryId);
   const { site, calendarEntry } = findEntrySite(ctx, entryId);

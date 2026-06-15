@@ -135,19 +135,25 @@ function buildEmptyStageMap(
 
 /**
  * Project a loaded `LaneConfig` down to the runtime-contract fields
- * (id / name / pipelineTemplate / contentDir / archivedAt). Drops the
- * documentation-only `$rationale` field that the schema permits on
- * disk. Per AUDIT-20260530-08 the `Pick<>` alias is gone, so the
- * return type is `LaneConfig` itself; the function survives as a
- * runtime-side projection.
+ * (id / name / pipelineTemplate / scaffoldDefaults / host / archivedAt).
+ * Drops the documentation-only `$rationale` field that the schema
+ * permits on disk. Per AUDIT-20260530-08 the `Pick<>` alias is gone, so
+ * the return type is `LaneConfig` itself; the function survives as a
+ * runtime-side projection. Per Phase 39 (sites→lanes retirement) a lane
+ * carries no `contentDir`.
  */
 function strictifyLane(lane: LaneConfig): LaneConfig {
   const projected: LaneConfig = {
     id: lane.id,
     name: lane.name,
     pipelineTemplate: lane.pipelineTemplate,
-    contentDir: lane.contentDir,
   };
+  if (lane.scaffoldDefaults !== undefined) {
+    projected.scaffoldDefaults = lane.scaffoldDefaults;
+  }
+  if (lane.host !== undefined) {
+    projected.host = lane.host;
+  }
   if (lane.archivedAt !== undefined) {
     projected.archivedAt = lane.archivedAt;
   }
@@ -169,7 +175,10 @@ function strictifyLane(lane: LaneConfig): LaneConfig {
  * persisted." Per project rule, this isn't a silent fallback — the
  * dashboard's data layer always emits at least one lane, and the
  * lane's identity is documented (`id="default"`, template
- * `editorial`, `contentDir` from `config.sites[defaultSite]`).
+ * `editorial`, `scaffoldDefaults.markdown` from
+ * `config.sites[defaultSite].contentDir`). Per Phase 39 (sites→lanes
+ * retirement) the lane carries no `contentDir`; the legacy site dir
+ * becomes the lane's add-time `scaffoldDefaults.markdown`.
  *
  * Throws on lane- or template-resolution failures (loud — a project
  * with broken lane configs should not silently render an empty bay).
@@ -214,7 +223,7 @@ async function resolveAllLanes(
         id: DEFAULT_LANE_ID,
         name: 'Default',
         pipelineTemplate: 'editorial',
-        contentDir: site.contentDir,
+        scaffoldDefaults: { markdown: site.contentDir },
       };
       byLane.set(DEFAULT_LANE_ID, {
         lane,

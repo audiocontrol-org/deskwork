@@ -263,7 +263,7 @@ describe('custom-pipeline + lane integration (Phase 6 Task 6.6)', () => {
       project,
       'create', 'blog-lane',
       '--template', 'custom-blog',
-      '--content-dir', 'content/blog',
+      '--scaffold-default', 'markdown=content/blog',
       '--name', 'Blog',
     );
     expect(laneRes.stderr).toBe('');
@@ -276,7 +276,7 @@ describe('custom-pipeline + lane integration (Phase 6 Task 6.6)', () => {
     expect(laneOnDisk['id']).toBe('blog-lane');
     expect(laneOnDisk['name']).toBe('Blog');
     expect(laneOnDisk['pipelineTemplate']).toBe('custom-blog');
-    expect(laneOnDisk['contentDir']).toBe('content/blog');
+    expect(laneOnDisk['scaffoldDefaults']).toEqual({ markdown: 'content/blog' });
 
     // 4. Create two entries via `deskwork add` bound to the lane at a
     //    non-locked, non-terminal stage of the custom pipeline. Driving

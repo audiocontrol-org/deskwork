@@ -3,8 +3,9 @@
  *
  * Phase 6 Task 6.1 (graphical-entries). Wraps `listLaneConfigs` and
  * loads each lane's metadata so the CLI handler can render id + name
- * + pipelineTemplate + contentDir + archived state without making N+1
- * calls to `loadLaneConfig` in the CLI layer.
+ * + pipelineTemplate + scaffoldDefaults + archived state without
+ * making N+1 calls to `loadLaneConfig` in the CLI layer. Per Phase 39
+ * (sites→lanes retirement) a lane carries no `contentDir`.
  *
  * The `includeArchived` flag flows through to the loader. The result
  * preserves the loader's alphabetical-by-id ordering; the CLI handler

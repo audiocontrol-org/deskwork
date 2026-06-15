@@ -63,9 +63,41 @@ const ENTRY_ID = 'abababab-abab-4abc-8abc-abababababab';
 
 function seedCalendar(root: string, cfg: DeskworkConfig, e: CalendarEntry) {
   const cal: EditorialCalendar = { entries: [e], distributions: [] };
-  const calendarPath = join(root, cfg.sites.a.calendarPath);
-  mkdirSync(join(root, 'docs'), { recursive: true });
+  // Phase 39c (sites→lanes retirement): the handlers read the single
+  // project calendar at `.deskwork/calendar.md`.
+  const calendarPath = join(root, '.deskwork', 'calendar.md');
+  mkdirSync(join(root, '.deskwork'), { recursive: true });
   writeCalendar(calendarPath, cal);
+  // Phase 39c-2b(a): resolution reads the entry's stored artifactPath —
+  // seed a sidecar so the resolver has it. Flat `{slug}.md` template.
+  if (e.id !== undefined) {
+    seedSidecar(root, e.id, e.slug, `${cfg.sites.a.contentDir}/${e.slug}.md`);
+  }
+}
+
+function seedSidecar(
+  root: string,
+  uuid: string,
+  slug: string,
+  artifactPath: string,
+): void {
+  mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
+  writeFileSync(
+    join(root, '.deskwork', 'entries', `${uuid}.json`),
+    JSON.stringify({
+      uuid,
+      slug,
+      title: slug,
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      artifactPath,
+    }),
+    'utf-8',
+  );
 }
 
 function seedBlog(root: string, slug: string, body = '# Body\n') {
@@ -124,17 +156,16 @@ describe('review handlers — entryId propagation (Phase 19d)', () => {
     expect(body.workflow.entryId).toBe(customId);
   });
 
-  it('omits entryId when the slug has no calendar entry', () => {
-    // A draft can exist on disk without a calendar record (rare,
-    // but valid for ad-hoc workflows). The handler should NOT make
-    // up an id; the workflow stays slug-keyed and doctor reports it.
+  it('refuses a slug with no calendar entry / sidecar (artifactPath-only, no slug-template fallback)', () => {
+    // Phase 39c-2b(a): resolution reads the entry's stored artifactPath
+    // only — the legacy "ad-hoc draft on disk without a calendar record,
+    // resolved via the slug-template" path is retired. The handler still
+    // does NOT make up an id; it refuses and points at doctor --fix.
     seedBlog(root, 'orphan');
 
     const r = handleStartLongform(root, cfg, { site: 'a', slug: 'orphan' });
-    expect(r.status).toBe(200);
-    const body = r.body as { workflow: { entryId?: string; slug: string } };
-    expect(body.workflow.slug).toBe('orphan');
-    expect(body.workflow.entryId).toBeUndefined();
+    expect(r.status).toBe(400);
+    expect((r.body as { error: string }).error).toMatch(/doctor --fix/);
   });
 
   it('handleGetWorkflow finds a workflow by entryId join', () => {
@@ -248,9 +279,22 @@ function wcConfig(): DeskworkConfig {
 
 function seedWcCalendar(root: string, cfg: DeskworkConfig, e: CalendarEntry) {
   const cal: EditorialCalendar = { entries: [e], distributions: [] };
-  const calendarPath = join(root, cfg.sites.wc.calendarPath);
-  mkdirSync(join(root, 'docs'), { recursive: true });
+  // Phase 39c (sites→lanes retirement): single project calendar.
+  const calendarPath = join(root, '.deskwork', 'calendar.md');
+  mkdirSync(join(root, '.deskwork'), { recursive: true });
   writeCalendar(calendarPath, cal);
+  // Phase 39c-2b(a): the writingcontrol shape (slug != fs path) is now
+  // expressed by the stored artifactPath pointing at the real on-disk
+  // location — exactly what `seedWcBlog` writes. This is the artifactPath
+  // successor to the retired content-index lookup.
+  if (e.id !== undefined) {
+    seedSidecar(
+      root,
+      e.id,
+      e.slug,
+      `${cfg.sites.wc.contentDir}/projects/${e.slug}/index.md`,
+    );
+  }
 }
 
 /**

@@ -9,13 +9,23 @@
  */
 
 import type { DeskworkConfig } from '../config.ts';
-import type { AnnotationCategory, DraftWorkflowState } from './types.ts';
+import type { AnnotationCategory, DraftWorkflowState, DraftWorkflowItem } from './types.ts';
 import { readHistory, readWorkflows } from './pipeline.ts';
+import { readSidecarSync } from '../sidecar/read.ts';
+import { lookupEntry } from './workflow-paths.ts';
+
+/** Stable bucket key for workflows whose entry/lane cannot be resolved. */
+const UNKNOWN_LANE = '(unknown)';
 
 export interface ReportOptions {
   /** Include only workflows that have reached a terminal state. Default true. */
   terminalOnly?: boolean;
-  /** Optional site filter. */
+  /**
+   * Optional opaque `site`-label filter (Phase 39c c3 — `site` is no
+   * longer validated; it is tolerated recorded metadata on legacy
+   * workflows). Retained as a deprecated-but-tolerated input; the
+   * terminal-deletion unit removes it.
+   */
   site?: string;
 }
 
@@ -39,7 +49,13 @@ export interface ReportBreakdown {
 
 export interface ReviewReport {
   all: ReportBreakdown;
-  bySite: Record<string, ReportBreakdown>;
+  /**
+   * Phase 39c c3 (Decision #22): the breakdown is keyed by the entry's
+   * LANE, not the retired `site` axis. The lane is derived from each
+   * workflow's entry sidecar (`entry.lane`). Workflows whose entry/lane
+   * cannot be resolved (legacy/orphan) bucket under `(unknown)`.
+   */
+  byLane: Record<string, ReportBreakdown>;
   topCategories: Array<{ category: AnnotationCategory; count: number }>;
 }
 
@@ -101,6 +117,33 @@ function categoryValue(counts: CategoryCounts, cat: AnnotationCategory): number 
 }
 
 /**
+ * Resolve the LANE a workflow belongs to (Phase 39c c3, Decision #22).
+ * Prefers the entry's stable id (`w.entryId`); falls back to a slug
+ * lookup against the calendar when entryId is absent (legacy workflows).
+ * Reads the entry sidecar (`entry.lane`) via the shared `readSidecarSync`
+ * helper. Returns the `(unknown)` bucket key when the entry, sidecar, or
+ * lane can't be resolved — a report must not crash on one orphan workflow.
+ */
+function resolveWorkflowLane(
+  projectRoot: string,
+  config: DeskworkConfig,
+  w: DraftWorkflowItem,
+): string {
+  let entryId =
+    w.entryId !== undefined && w.entryId !== '' ? w.entryId : undefined;
+  if (entryId === undefined) {
+    entryId = lookupEntry(projectRoot, config, w.site, { slug: w.slug })?.id;
+  }
+  if (entryId === undefined || entryId === '') return UNKNOWN_LANE;
+  try {
+    const lane = readSidecarSync(projectRoot, entryId).lane;
+    return lane !== undefined && lane !== '' ? lane : UNKNOWN_LANE;
+  } catch {
+    return UNKNOWN_LANE;
+  }
+}
+
+/**
  * Build a voice-drift report from the pipeline + history. Counts only
  * workflows that reached a terminal state by default — in-flight
  * workflows don't represent settled signal yet.
@@ -122,40 +165,45 @@ export function buildReport(
 
   const workflowIds = new Set(scoped.map((w) => w.id));
   const all = emptyBreakdown();
-  const bySite: Record<string, ReportBreakdown> = {};
+  const byLane: Record<string, ReportBreakdown> = {};
+
+  // Resolve each scoped workflow's lane once; reused for the count pass
+  // and the annotation pass.
+  const workflowLaneById = new Map<string, string>(
+    scoped.map((w) => [w.id, resolveWorkflowLane(projectRoot, config, w)]),
+  );
 
   for (const w of scoped) {
     if (w.state === 'applied') all.approvedCount++;
     if (w.state === 'cancelled') all.cancelledCount++;
-    const b = bySite[w.site] ?? emptyBreakdown();
+    const lane = workflowLaneById.get(w.id) ?? UNKNOWN_LANE;
+    const b = byLane[lane] ?? emptyBreakdown();
     if (w.state === 'applied') b.approvedCount++;
     if (w.state === 'cancelled') b.cancelledCount++;
-    bySite[w.site] = b;
+    byLane[lane] = b;
   }
-
-  const workflowSiteById = new Map(scoped.map((w) => [w.id, w.site]));
 
   for (const entry of readHistory(projectRoot, config)) {
     if (entry.kind !== 'annotation') continue;
     const ann = entry.annotation;
     if (!workflowIds.has(ann.workflowId)) continue;
-    const s = workflowSiteById.get(ann.workflowId);
+    const lane = workflowLaneById.get(ann.workflowId);
 
     if (ann.type === 'comment') {
       all.totalComments++;
       bump(all.commentsByCategory, ann.category);
-      if (s) {
-        const b = bySite[s] ?? emptyBreakdown();
+      if (lane) {
+        const b = byLane[lane] ?? emptyBreakdown();
         b.totalComments++;
         bump(b.commentsByCategory, ann.category);
-        bySite[s] = b;
+        byLane[lane] = b;
       }
     } else if (ann.type === 'reject') {
       all.rejectCount++;
-      if (s) {
-        const b = bySite[s] ?? emptyBreakdown();
+      if (lane) {
+        const b = byLane[lane] ?? emptyBreakdown();
         b.rejectCount++;
-        bySite[s] = b;
+        byLane[lane] = b;
       }
     }
   }
@@ -165,7 +213,7 @@ export function buildReport(
     count: categoryValue(all.commentsByCategory, cat),
   })).sort((a, b) => b.count - a.count);
 
-  return { all, bySite, topCategories };
+  return { all, byLane, topCategories };
 }
 
 /** Render a report as plain text for the review-report skill. */
@@ -183,15 +231,15 @@ export function renderReport(report: ReviewReport): string {
     lines.push(`  ${category.padEnd(18)} ${count}`);
   }
 
-  const siteKeys = Object.keys(report.bySite).sort();
-  if (siteKeys.length > 1) {
+  const laneKeys = Object.keys(report.byLane).sort();
+  if (laneKeys.length > 1) {
     lines.push('');
-    lines.push('Per-site breakdown:');
-    for (const s of siteKeys) {
-      const b = report.bySite[s];
+    lines.push('Per-lane breakdown:');
+    for (const lane of laneKeys) {
+      const b = report.byLane[lane];
       lines.push('');
       lines.push(
-        `  ${s}: ${b.approvedCount} approved, ${b.cancelledCount} cancelled, ${b.totalComments} comments, ${b.rejectCount} rejects`,
+        `  ${lane}: ${b.approvedCount} approved, ${b.cancelledCount} cancelled, ${b.totalComments} comments, ${b.rejectCount} rejects`,
       );
       for (const cat of CATEGORY_KEYS) {
         const n = categoryValue(b.commentsByCategory, cat);

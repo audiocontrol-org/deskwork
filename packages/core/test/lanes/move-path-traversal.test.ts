@@ -2,32 +2,18 @@
  * Path-traversal hardening test for `moveEntryToLane`
  * (AUDIT-20260530-64, cross-model: AUDIT-BARRAGE-codex-P6-1).
  *
- * Surface: `packages/core/src/lanes/operations/move.ts:210-231` (the
- * `join(sourceContentDir, sidecar.artifactPath)` and
- * `join(targetContentDir, sidecar.artifactPath)` call sites), plus the
- * sibling per-entry scrapbook path built from `sidecar.slug`.
- *
- * Pre-fix:
- *   - The move builds `<contentDir>/<sidecar.artifactPath>` without
- *     verifying the resolved path stays inside `<contentDir>`. A
- *     malformed sidecar with `artifactPath: "../outside.md"` makes
- *     the move read + write files outside the lane content tree.
- *   - `EntrySchema.artifactPath` is unconstrained — a raw
- *     `z.string().optional()` — so the malformed value parses cleanly
- *     and flows straight into the path build.
- *
- * Post-fix:
- *   - The schema rejects `artifactPath` strings that are absolute or
- *     contain `..` segments — defense-in-depth at the read boundary.
- *   - `moveEntryToLane` re-checks the resolved source AND target
- *     paths for BOTH the artifact and the per-entry scrapbook
- *     directory, and refuses any path that escapes its contentDir
- *     with an error naming the entry slug + the offending path +
- *     which boundary was violated.
+ * Phase 39 (sites→lanes retirement): a lane carries no `contentDir`, so
+ * the move no longer relocates files — it's a metadata change only. The
+ * former per-lane boundary checks dissolve; the protection that remains
+ * is the SCHEMA-level `EntrySchema.artifactPath` refinement, which
+ * rejects absolute paths and `..` segments at the `readSidecar`
+ * boundary. The move surfaces those schema errors before any filesystem
+ * dereference. The slug-derived-scrapbook boundary attack no longer
+ * applies to move (the scrapbook is not touched).
  *
  * The negative regression test confirms a canonical artifactPath
- * (`pre-migration-entry.md` under the lane's contentDir) still
- * relocates cleanly.
+ * (`pre-migration-entry.md`) survives the move with its location
+ * unchanged.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -81,35 +67,23 @@ function makeEntry(overrides: Partial<Entry> & { artifactPath?: string } = {}): 
   return { ...base, ...overrides };
 }
 
-function seedLanes(projectRoot: string): {
-  sourceContentDir: string;
-  targetContentDir: string;
-} {
-  // Use NESTED contentDirs so a `../` traversal from each lane
-  // resolves to a DIFFERENT location — the realistic attack shape.
-  // With sibling contentDirs at the project root (`docs/` and
-  // `qa-content/`), `<sourceContentDir>/../outside.md` and
-  // `<targetContentDir>/../outside.md` collide at the same file and
-  // the move's "target artifact already exists" check accidentally
-  // shields the boundary. Nesting one level keeps the traversal
-  // attack-shaped.
-  const sourceContentDir = join(projectRoot, 'src-lane', 'docs');
-  mkdirSync(sourceContentDir, { recursive: true });
-  const targetContentDir = join(projectRoot, 'tgt-lane', 'qa-content');
-  mkdirSync(targetContentDir, { recursive: true });
+function seedLanes(projectRoot: string): { docsDir: string } {
+  // Phase 39: lanes carry no contentDir. Both lanes are pure logical
+  // groupings; the entry's artifact lives wherever its (project-root-
+  // relative) `artifactPath` points.
+  const docsDir = join(projectRoot, 'docs');
+  mkdirSync(docsDir, { recursive: true });
   writeLane(projectRoot, 'default', {
     id: 'default',
     name: 'Default',
     pipelineTemplate: 'editorial',
-    contentDir: 'src-lane/docs',
   });
   writeLane(projectRoot, 'qa', {
     id: 'qa',
     name: 'QA',
     pipelineTemplate: 'editorial',
-    contentDir: 'tgt-lane/qa-content',
   });
-  return { sourceContentDir, targetContentDir };
+  return { docsDir };
 }
 
 describe('moveEntryToLane — path-traversal hardening (AUDIT-20260530-64)', () => {
@@ -123,31 +97,18 @@ describe('moveEntryToLane — path-traversal hardening (AUDIT-20260530-64)', () 
     rmSync(projectRoot, { recursive: true, force: true });
   });
 
-  it('refuses a sidecar whose artifactPath escapes the lane contentDir via "../"', async () => {
-    const { sourceContentDir } = seedLanes(projectRoot);
+  it('refuses a sidecar whose artifactPath escapes the project root via "../"', async () => {
+    seedLanes(projectRoot);
 
-    // Seed the would-be-source so a hypothetical move that bypassed
-    // the schema rejection would still have a file to operate on.
-    // The schema-layer rejection is what blocks this attack post-fix,
-    // but the seed makes the test honest — it documents that even if
-    // schema validation were skipped, the move-layer boundary check
-    // would still refuse.
-    writeFileSync(
-      join(sourceContentDir, '..', 'outside.md'),
-      '# outside the source lane\n',
-      'utf8',
-    );
-
+    // The schema-layer rejection (EntrySchema.artifactPath refinement)
+    // is the gate: `readSidecar` rejects the malformed value before any
+    // filesystem dereference. Phase 39 has no per-lane boundary check —
+    // the schema refinement is the single, authoritative protection.
     writeSidecarRaw(
       projectRoot,
       makeEntry({ artifactPath: '../outside.md' }),
     );
 
-    // Post-fix the schema layer (EntrySchema.artifactPath refinement)
-    // is the first gate, so the move surfaces the schema error
-    // (`sidecar schema invalid …`) rather than the move-layer
-    // boundary error. The schema error message names the offending
-    // field, which is the right operator-facing signal.
     await expect(
       moveEntryToLane(projectRoot, { uuid: SAMPLE_UUID, toLane: 'qa' }),
     ).rejects.toThrow(/artifactPath/);
@@ -159,10 +120,8 @@ describe('moveEntryToLane — path-traversal hardening (AUDIT-20260530-64)', () 
   it('refuses a sidecar whose artifactPath is absolute', async () => {
     seedLanes(projectRoot);
 
-    // Absolute paths that don't begin with the lane contentDir are
-    // outside the lane by definition. Use `/etc/passwd` (a path the
-    // test definitely doesn't write to) — schema rejection fires
-    // before any filesystem dereference.
+    // Absolute paths are rejected by the schema refinement before any
+    // filesystem dereference.
     writeSidecarRaw(
       projectRoot,
       makeEntry({ artifactPath: '/etc/passwd' }),
@@ -171,63 +130,13 @@ describe('moveEntryToLane — path-traversal hardening (AUDIT-20260530-64)', () 
     await expect(
       moveEntryToLane(projectRoot, { uuid: SAMPLE_UUID, toLane: 'qa' }),
     ).rejects.toThrow(/artifactPath/);
-    await expect(
-      moveEntryToLane(projectRoot, { uuid: SAMPLE_UUID, toLane: 'qa' }),
-    ).rejects.toThrow(/relative to the lane contentDir/);
   });
 
-  it('refuses a sidecar whose slug escapes the lane contentDir via "../" (scrapbook boundary)', async () => {
-    const { sourceContentDir } = seedLanes(projectRoot);
+  it('regression: canonical artifactPath survives the move with its location unchanged', async () => {
+    const { docsDir } = seedLanes(projectRoot);
 
-    // The slug field carries `../escape` — when joined with
-    // <contentDir>/<slug>/scrapbook it resolves above the lane.
-    // Seed a scrapbook directory at the would-be-traversal target so
-    // existsSync(sourceScrapbookDir) returns true and the move would
-    // proceed if the boundary check were absent.
-    const traversalScrapbook = join(sourceContentDir, '..', 'escape', 'scrapbook');
-    mkdirSync(traversalScrapbook, { recursive: true });
-    writeFileSync(
-      join(traversalScrapbook, 'note.md'),
-      '# scrapbook note\n',
-      'utf8',
-    );
-
-    // Provide a real artifactPath inside the contentDir so the
-    // artifact branch isn't what trips the failure — we want the
-    // scrapbook boundary check to fire.
-    const artifactRel = 'safe-artifact.md';
-    writeFileSync(join(sourceContentDir, artifactRel), '# safe body\n', 'utf8');
-
-    writeSidecarRaw(projectRoot, {
-      // Slug is the carrier; everything else is canonical. We bypass
-      // makeEntry()'s spread because EntrySchema's slug field accepts
-      // arbitrary non-empty strings (the entry-naming charset binding
-      // is out of scope for this AUDIT — the boundary check must
-      // catch the traversal at the move layer regardless of what the
-      // schema admits).
-      uuid: SAMPLE_UUID,
-      slug: '../escape',
-      title: 'Slug traversal',
-      keywords: [],
-      source: 'manual',
-      currentStage: 'Ideas',
-      iterationByStage: {},
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      lane: 'default',
-      artifactPath: artifactRel,
-    });
-
-    await expect(
-      moveEntryToLane(projectRoot, { uuid: SAMPLE_UUID, toLane: 'qa' }),
-    ).rejects.toThrow(/escape/i);
-  });
-
-  it('regression: canonical artifactPath under the lane contentDir still relocates', async () => {
-    const { sourceContentDir, targetContentDir } = seedLanes(projectRoot);
-
-    const artifactRel = 'pre-migration-entry.md';
-    writeFileSync(join(sourceContentDir, artifactRel), '# entry body\n', 'utf8');
+    const artifactRel = 'docs/pre-migration-entry.md';
+    writeFileSync(join(docsDir, 'pre-migration-entry.md'), '# entry body\n', 'utf8');
 
     writeSidecarRaw(
       projectRoot,
@@ -240,8 +149,9 @@ describe('moveEntryToLane — path-traversal hardening (AUDIT-20260530-64)', () 
     });
     expect(result.fromLane).toBe('default');
     expect(result.toLane).toBe('qa');
-    expect(result.fromArtifactPath).toBe(join(sourceContentDir, artifactRel));
-    expect(result.toArtifactPath).toBe(join(targetContentDir, artifactRel));
+    // Phase 39: the move does NOT relocate — from/to are identical.
+    expect(result.fromArtifactPath).toBe(join(projectRoot, artifactRel));
+    expect(result.toArtifactPath).toBe(join(projectRoot, artifactRel));
   });
 });
 

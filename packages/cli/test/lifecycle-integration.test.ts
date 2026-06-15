@@ -85,7 +85,10 @@ function bootstrapProject(
 }
 
 function readProjectCalendar(project: string) {
-  const raw = readFileSync(join(project, 'docs/calendar.md'), 'utf-8');
+  // Phase 39c (sites→lanes retirement): the calendar is the single
+  // project file at `.deskwork/calendar.md`; per-site `calendarPath` is
+  // retired. The verbs write here regardless of any legacy config value.
+  const raw = readFileSync(join(project, '.deskwork/calendar.md'), 'utf-8');
   return parseCalendar(raw);
 }
 

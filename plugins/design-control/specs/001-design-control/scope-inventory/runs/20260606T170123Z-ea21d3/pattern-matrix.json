@@ -1,0 +1,121 @@
+{
+  "agent": "ast-grep-matrix",
+  "featureSlug": "design-control",
+  "patterns": [
+    {
+      "id": "as-type-cast",
+      "description": "`as <TypeName>` cast (banned per CLAUDE.md \"never bypass typing\")",
+      "regex": "\\bas\\s+(?!const\\b|unknown\\b)[A-Z][A-Za-z0-9_]*",
+      "hits": [],
+      "provenance": "registered-pattern"
+    },
+    {
+      "id": "any-annotation",
+      "description": "`: any` type annotation (banned per CLAUDE.md)",
+      "regex": ":\\s*any\\b(?![A-Za-z0-9_])",
+      "hits": [],
+      "provenance": "registered-pattern"
+    },
+    {
+      "id": "ts-ignore-pragma",
+      "description": "`@ts-ignore` or `@ts-expect-error` (banned per CLAUDE.md)",
+      "regex": "@ts-(?:ignore|expect-error)\\b",
+      "hits": [],
+      "provenance": "registered-pattern"
+    },
+    {
+      "id": "magic-number",
+      "description": "Inline numeric literal >= 10 not bound to a const/named identifier (heuristic — synthesis layer + operator curate)",
+      "regex": "(?<![A-Za-z0-9_.=])\\d{2,}\\b",
+      "hits": [
+        {
+          "file": "plugins/design-control/src/lint/allowlist.ts",
+          "line": 69,
+          "snippet": "* (AUDIT-20260606-04)."
+        },
+        {
+          "file": "plugins/design-control/src/lint/allowlist.ts",
+          "line": 80,
+          "snippet": "* allowlist entries) is tracked in #428."
+        },
+        {
+          "file": "plugins/design-control/src/lint/allowlist.ts",
+          "line": 98,
+          "snippet": "* collector so the two cannot disagree (AUDIT-20260606-08)."
+        },
+        {
+          "file": "plugins/design-control/src/lint/check-mockup-lofi.ts",
+          "line": 93,
+          "snippet": "// disallowed-attribute (AUDIT-20260606-01/claude-02), not mislabeled."
+        },
+        {
+          "file": "plugins/design-control/src/lint/check-mockup-lofi.ts",
+          "line": 101,
+          "snippet": "// class invariant (AUDIT-20260606-01). Gating on URL_ATTRS rather than a"
+        },
+        {
+          "file": "plugins/design-control/src/lint/check-mockup-lofi.ts",
+          "line": 103,
+          "snippet": "// URL attr is auto-scanned (AUDIT-20260606-04)."
+        },
+        {
+          "file": "plugins/design-control/src/lint/check-mockup-lofi.ts",
+          "line": 127,
+          "snippet": "// pulls a non-CSS resource (AUDIT-20260606-02/codex-01). The exact path+hash"
+        },
+        {
+          "file": "plugins/design-control/src/lint/codepoint.ts",
+          "line": 3,
+          "snippet": "* (PRD round-9/10). Symmetric with the element/attribute allowlist: a denylist"
+        },
+        {
+          "file": "plugins/design-control/src/lint/codepoint.ts",
+          "line": 12,
+          "snippet": "* ideographic spacers as an alignment channel, round-10), and an enumerated set"
+        },
+        {
+          "file": "plugins/design-control/src/lint/codepoint.ts",
+          "line": 19,
+          "snippet": "/** Enumerated whitespace: space, newline, tab only (round-10). */"
+        },
+        {
+          "file": "plugins/design-control/src/lint/codepoint.ts",
+          "line": 54,
+          "snippet": "// (U+00F7) math symbols, plus Latin Extended-A (U+0100–U+017F)."
+        },
+        {
+          "file": "plugins/design-control/src/lint/codepoint.ts",
+          "line": 79,
+          "snippet": "* text — composes to its precomposed form (AUDIT-20260606-22). This rescues NFD"
+        },
+        {
+          "file": "plugins/design-control/src/lint/codepoint.ts",
+          "line": 102,
+          "snippet": "return 'U+' + cp.toString(16).toUpperCase().padStart(4, '0');"
+        },
+        {
+          "file": "plugins/design-control/src/lint/stylesheet-pin.ts",
+          "line": 99,
+          "snippet": "// disagree on what counts as a stylesheet link (AUDIT-20260606-08): a mixed"
+        },
+        {
+          "file": "plugins/design-control/src/lint/stylesheet-pin.ts",
+          "line": 137,
+          "snippet": "// `../`-escaping href pull arbitrary files off disk (AUDIT-20260606-10)."
+        },
+        {
+          "file": "plugins/design-control/src/lint/stylesheet-pin.ts",
+          "line": 172,
+          "snippet": "// and an unrecognized-algorithm-only integrity (AUDIT-20260606-15; the prior"
+        },
+        {
+          "file": "plugins/design-control/src/lint/stylesheet-pin.ts",
+          "line": 178,
+          "snippet": "// lowercased (AUDIT-20260606-18 case, -19 options)."
+        }
+      ],
+      "provenance": "registered-pattern"
+    }
+  ],
+  "discoveredCandidates": []
+}

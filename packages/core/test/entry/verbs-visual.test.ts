@@ -46,7 +46,6 @@ describe('verbs — visual preset', () => {
         id: 'mockups',
         name: 'Mockups',
         pipelineTemplate: 'visual',
-        contentDir: 'mockups',
       }),
     );
     await writeFile(

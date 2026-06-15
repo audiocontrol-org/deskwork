@@ -1,0 +1,1 @@
+../../../.specify/extensions/deskwork-governance/.specify-dev/agent-commands/claude/speckit-deskwork-governance-govern/SKILL.md

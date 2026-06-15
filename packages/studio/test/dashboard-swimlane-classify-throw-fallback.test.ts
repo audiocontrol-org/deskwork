@@ -59,7 +59,7 @@ function makeLane(): LaneConfig {
     id: 'test-lane',
     name: 'Test Lane',
     pipelineTemplate: 'test-classify-throw',
-    contentDir: 'docs',
+    scaffoldDefaults: { markdown: 'docs' },
   };
 }
 

@@ -9,13 +9,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   findEntryFile,
-  resolveShortformFilePath,
   resolveSite,
   resolveCalendarPath,
-  resolveChannelsPath,
   resolveContentDir,
-  resolveSiteHost,
-  resolveSiteBaseUrl,
 } from '../src/paths.ts';
 import type { ContentIndex } from '../src/content-index.ts';
 import type { DeskworkConfig } from '../src/config.ts';
@@ -72,37 +68,27 @@ describe('resolveSite', () => {
   });
 });
 
-describe('resolveCalendarPath', () => {
-  it('joins project root with the site calendar path', () => {
+describe('resolveCalendarPath (Phase 39c — single project calendar)', () => {
+  // Per the sites→lanes retirement spec §"Calendar", the calendar is a
+  // single project-level file at `.deskwork/calendar.md`. The `site`
+  // parameter is retained on the signature (so CLI-verb call sites need
+  // not change in lockstep) but ignored.
+  it('returns the single project calendar regardless of site argument', () => {
     expect(
       resolveCalendarPath('/tmp/project', multiSite, 'audiocontrol'),
-    ).toBe('/tmp/project/docs/editorial-calendar-audiocontrol.md');
+    ).toBe('/tmp/project/.deskwork/calendar.md');
   });
 
-  it('defaults to the defaultSite when site is not passed', () => {
+  it('returns the same path when site is omitted', () => {
     expect(resolveCalendarPath('/tmp/project', singleSite)).toBe(
       '/tmp/project/.deskwork/calendar.md',
     );
   });
 
-  it('throws for an unknown site', () => {
-    expect(() =>
-      resolveCalendarPath('/tmp/project', multiSite, 'nope'),
-    ).toThrow(/nope/);
-  });
-});
-
-describe('resolveChannelsPath', () => {
-  it('returns the resolved channels path when the site declares one', () => {
-    expect(
-      resolveChannelsPath('/tmp/project', multiSite, 'audiocontrol'),
-    ).toBe('/tmp/project/docs/editorial-channels-audiocontrol.json');
-  });
-
-  it('returns undefined when the site has no channelsPath', () => {
-    expect(
-      resolveChannelsPath('/tmp/project', multiSite, 'editorialcontrol'),
-    ).toBeUndefined();
+  it('ignores a site that is not in config (no longer throws)', () => {
+    expect(resolveCalendarPath('/tmp/project', multiSite, 'nope')).toBe(
+      '/tmp/project/.deskwork/calendar.md',
+    );
   });
 });
 
@@ -114,26 +100,9 @@ describe('resolveContentDir', () => {
   });
 });
 
-describe('resolveSiteHost', () => {
-  it('returns the configured host for a site', () => {
-    expect(resolveSiteHost(multiSite, 'audiocontrol')).toBe('audiocontrol.org');
-    expect(resolveSiteHost(multiSite, 'editorialcontrol')).toBe(
-      'editorialcontrol.org',
-    );
-  });
-
-  it('defaults to the defaultSite', () => {
-    expect(resolveSiteHost(singleSite)).toBe('example.com');
-  });
-});
-
-describe('resolveSiteBaseUrl', () => {
-  it('builds a canonical https URL with trailing slash', () => {
-    expect(resolveSiteBaseUrl(multiSite, 'audiocontrol')).toBe(
-      'https://audiocontrol.org/',
-    );
-  });
-});
+// Phase 39c (sites→lanes retirement): `resolveSiteHost` /
+// `resolveSiteBaseUrl` were removed (zero production call sites). Host now
+// lives on the lane (`lane.host`). Their tests are retired with them.
 
 describe('findEntryFile (Phase 19c)', () => {
   // findEntryFile precedence:
@@ -200,127 +169,5 @@ describe('findEntryFile (Phase 19c)', () => {
       `---\ndeskwork:\n  id: ${id}\ntitle: The Outbound\n---\n\n# The Outbound\n`,
     );
     expect(findEntryFile(root, cfg, 'wc', id)).toBe(abs);
-  });
-});
-
-describe('resolveShortformFilePath (Phase 21a)', () => {
-  let root: string;
-  const cfg: DeskworkConfig = {
-    version: 1,
-    sites: {
-      wc: {
-        host: 'wc.example',
-        contentDir: 'src/content/blog',
-        calendarPath: 'docs/cal.md',
-      },
-    },
-    defaultSite: 'wc',
-  };
-
-  beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'deskwork-shortform-path-'));
-  });
-  afterEach(() => rmSync(root, { recursive: true, force: true }));
-
-  it('returns <entry-dir>/scrapbook/shortform/<platform>.md when no channel', () => {
-    const id = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
-    const entryFile = join(root, 'src/content/blog/my-post/index.md');
-    mkdirSync(join(entryFile, '..'), { recursive: true });
-    writeFileSync(
-      entryFile,
-      `---\ndeskwork:\n  id: ${id}\ntitle: My Post\n---\n\n# My Post\n`,
-    );
-
-    const out = resolveShortformFilePath(
-      root,
-      cfg,
-      'wc',
-      { id, slug: 'my-post' },
-      'linkedin',
-    );
-    expect(out).toBe(
-      join(root, 'src/content/blog/my-post/scrapbook/shortform/linkedin.md'),
-    );
-  });
-
-  it('appends -<channel> when channel is passed', () => {
-    const id = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
-    const entryFile = join(root, 'src/content/blog/my-post/index.md');
-    mkdirSync(join(entryFile, '..'), { recursive: true });
-    writeFileSync(
-      entryFile,
-      `---\ndeskwork:\n  id: ${id}\ntitle: My Post\n---\n\n# Body\n`,
-    );
-
-    const out = resolveShortformFilePath(
-      root,
-      cfg,
-      'wc',
-      { id, slug: 'my-post' },
-      'reddit',
-      'rprogramming',
-    );
-    expect(out).toBe(
-      join(
-        root,
-        'src/content/blog/my-post/scrapbook/shortform/reddit-rprogramming.md',
-      ),
-    );
-  });
-
-  it('uses slug-template fallback when no id binding (legacy / pre-doctor)', () => {
-    // No file laid down; the slug-template fallback path under findEntryFile
-    // assumes the entry's body would land at <slug>/index.md. resolveShortformFilePath
-    // returns the derived shortform path even though the body doesn't yet exist.
-    const out = resolveShortformFilePath(
-      root,
-      cfg,
-      'wc',
-      { slug: 'planned-but-no-scaffold' },
-      'youtube',
-    );
-    expect(out).toBe(
-      join(
-        root,
-        'src/content/blog/planned-but-no-scaffold/scrapbook/shortform/youtube.md',
-      ),
-    );
-  });
-
-  it('throws on a channel with invalid characters', () => {
-    expect(() =>
-      resolveShortformFilePath(
-        root,
-        cfg,
-        'wc',
-        { slug: 'my-post' },
-        'reddit',
-        'rProgramming',
-      ),
-    ).toThrow(/Invalid shortform channel/);
-    expect(() =>
-      resolveShortformFilePath(
-        root,
-        cfg,
-        'wc',
-        { slug: 'my-post' },
-        'reddit',
-        'r/programming',
-      ),
-    ).toThrow(/Invalid shortform channel/);
-  });
-
-  it('treats empty channel as undefined and resolves to bare platform.md', () => {
-    const out = resolveShortformFilePath(
-      root,
-      cfg,
-      'wc',
-      { slug: 'p' },
-      'instagram',
-      '',
-    );
-    expect(out).toBe(
-      join(root, 'src/content/blog/p/scrapbook/shortform/instagram.md'),
-    );
   });
 });

@@ -16,7 +16,8 @@
  * fixture project trees live on disk via `mkdtempSync`.
  */
 
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
+import { writeLaneConfig } from './write-lane-config.ts';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DeskworkConfig } from '@deskwork/core/config';
@@ -57,19 +58,13 @@ export function makeEntry(overrides: Partial<Entry>): Entry {
   };
 }
 
-export function writeLane(
-  root: string,
-  id: string,
-  name: string,
-  pipelineTemplate: string,
-  contentDir: string,
-): void {
-  writeFileSync(
-    join(root, '.deskwork', 'lanes', `${id}.json`),
-    JSON.stringify({ id, name, pipelineTemplate, contentDir }, null, 2),
-    'utf8',
-  );
-}
+// Phase 39: the lane-config writer lives in one place
+// (`./write-lane-config.ts`). Re-exported as `writeLane` so existing
+// importers of this fixture keep resolving; also bound locally (the
+// `export { … } from` form does NOT create a local binding) so the
+// fixture builders below can call it. A lane carries no contentDir; the
+// dir argument lands under scaffoldDefaults.markdown.
+export { writeLaneConfig as writeLane };
 
 export async function getHtml(
   app: ReturnType<typeof createApp>,
@@ -95,9 +90,9 @@ export async function setupDashboardFixture(): Promise<{
   mkdirSync(join(root, '.deskwork', 'entries'), { recursive: true });
   mkdirSync(join(root, '.deskwork', 'lanes'), { recursive: true });
 
-  writeLane(root, 'default', 'Editorial', 'editorial', 'docs');
-  writeLane(root, 'mockups', 'Mockups', 'visual', 'mockups');
-  writeLane(root, 'qa', 'QA', 'qa-plan', 'qa');
+  writeLaneConfig(root, 'default', 'Editorial', 'editorial', 'docs');
+  writeLaneConfig(root, 'mockups', 'Mockups', 'visual', 'mockups');
+  writeLaneConfig(root, 'qa', 'QA', 'qa-plan', 'qa');
 
   const app = createApp({ projectRoot: root, config: makeConfig() });
 

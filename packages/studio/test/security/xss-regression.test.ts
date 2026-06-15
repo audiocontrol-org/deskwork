@@ -3,14 +3,15 @@
  * land in rendered HTML — Task 0.45 (closes AUDIT-20260530-70 / cross-
  * model: AUDIT-BARRAGE-claude-P6-2).
  *
- * The lane page renders `name` and `contentDir` into both text and
- * double-quoted attribute contexts:
+ * The lane page renders `name` and `scaffoldDefaults` into both text
+ * and double-quoted attribute contexts (Phase 39: `contentDir` retired;
+ * the lane's scaffold dirs are the location-adjacent free text now):
  *
  *   `<td class="lanes-cell lanes-cell--name">${row.name}</td>`        (text)
  *   `data-current="${row.name}"`                                      (attr)
  *   `value="${row.name}"`                                             (attr)
- *   `data-current="${row.contentDir}"`                                (attr)
- *   `<code>${row.contentDir}</code>`                                  (text)
+ *   `data-current="${row.scaffoldDefaults['markdown']}"`              (attr)
+ *   `<code class="lanes-scaffold-dir">${dir}</code>`                  (text)
  *
  * The pipelines page renders `name` and `description` into text
  * context inside the View panel:
@@ -63,7 +64,7 @@ function writeLane(
 ): void {
   writeFileSync(
     join(root, '.deskwork', 'lanes', `${id}.json`),
-    JSON.stringify({ id, name, pipelineTemplate, contentDir }, null, 2),
+    JSON.stringify({ id, name, pipelineTemplate, scaffoldDefaults: { markdown: contentDir } }, null, 2),
     'utf8',
   );
 }
@@ -210,7 +211,7 @@ describe('xss-regression — lane `name` field escaping (Task 0.45 / AUDIT-20260
   });
 });
 
-describe('xss-regression — lane `contentDir` field escaping (Task 0.45 / AUDIT-20260530-70)', () => {
+describe('xss-regression — lane `scaffoldDefaults` field escaping (Task 0.45 / AUDIT-20260530-70)', () => {
   let root: string;
   let app: ReturnType<typeof createApp>;
 
@@ -225,11 +226,12 @@ describe('xss-regression — lane `contentDir` field escaping (Task 0.45 / AUDIT
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('escapes a quote-break + script payload in the contentDir text cell + edit attributes', async () => {
+  it('escapes a quote-break + script payload in the scaffoldDefaults text cell + edit attributes', async () => {
     // Sentence-shaped payload to exercise both `"` and `<` in the same
-    // string. The lane contentDir lands in `<code>${row.contentDir}</code>`
-    // (text), `value="${row.contentDir}"` (attr), and
-    // `data-current="${row.contentDir}"` (attr).
+    // string. Phase 39: the writeLane helper writes the payload into the
+    // lane's `scaffoldDefaults.markdown`, which lands in the table's
+    // scaffold-defaults `<code>` cell (text) and the edit-form's
+    // scaffoldMarkdown `value="..."` / `data-current="..."` attributes.
     const payload = '"; <script>alert(1)</script>';
     writeLane(root, 'cdir-attack', 'Some Lane', 'editorial', payload);
     app = createApp({ projectRoot: root, config: makeConfig() });

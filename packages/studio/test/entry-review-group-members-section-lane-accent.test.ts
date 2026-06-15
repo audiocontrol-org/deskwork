@@ -120,7 +120,7 @@ function makeRenderInput(): RenderMembersSectionInput {
     id: 'essays',
     name: 'Essays',
     pipelineTemplate: 'editorial',
-    contentDir: 'docs/essays',
+    scaffoldDefaults: { markdown: 'docs/essays' },
   };
   const template = makeEditorialTemplate();
   const orderedMembers: MemberItem[] = [{ kind: 'resolved', entry: member }];

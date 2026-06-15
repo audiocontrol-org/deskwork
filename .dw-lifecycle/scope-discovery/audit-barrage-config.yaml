@@ -19,19 +19,24 @@
 # https://github.com/audiocontrol-org/deskwork/issues (the LLM-CLI-failure
 # tooling-feedback context).
 
-# Phase 12 Task 8 (#397, 2026-06-04): migrated to {{prompt-stdin}} for
-# both active models. The argv path failed with spawn E2BIG on bootstrap
-# HEAD~N ranges; stdin delivery bypasses the OS per-arg limit. Phase 19's
-# verb path supports {{prompt-stdin}} since v0.32.1 (the cached v0.36.0
-# binary respects this override even though its own plugin default still
-# ships {{prompt}} until v0.37.0).
+# 2026-06-04 (#418): migrated args_template from `{{prompt}}` (argv) to
+# `{{prompt-stdin}}` so the audit prompt is delivered via child stdin instead
+# of argv — bypasses the OS ARG_MAX limit that fails large-diff barrages with
+# `spawn E2BIG` (the #386/#397 fix; this config was a pre-#397 override that
+# still used argv). Matches the plugin default template. (Same migration
+# recorded on main as Phase 12 Task 8, #397: Phase 19's verb path supports
+# {{prompt-stdin}} since v0.32.1.)
+#
+# 2026-06-10 merge note: timeout_seconds 600 kept from the feature branch —
+# the TF-003 fix (300s was too short for heavy adversarial / multi-file
+# prompts; see specs/001-design-control/tooling-feedback.md TF-003).
 
 models:
   - name: claude
     binary: claude
     args_template: "-p {{prompt-stdin}}"
-    timeout_seconds: 300
+    timeout_seconds: 600
   - name: codex
     binary: codex
     args_template: "exec {{prompt-stdin}}"
-    timeout_seconds: 300
+    timeout_seconds: 600

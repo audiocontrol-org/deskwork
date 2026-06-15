@@ -83,7 +83,11 @@ function uuidFromAddOutput(stdout: string): string {
   // `deskwork add` emits a JSON blob with slug/title/etc. but not the
   // UUID directly — read it from calendar.md by slug.
   const parsed = JSON.parse(stdout) as { slug: string };
-  const calendarRaw = readFileSync(join(project, 'docs', 'calendar.md'), 'utf-8');
+  // Phase 39c (sites→lanes retirement): single project calendar.
+  const calendarRaw = readFileSync(
+    join(project, '.deskwork', 'calendar.md'),
+    'utf-8',
+  );
   const m = calendarRaw.match(
     new RegExp(`\\| ([0-9a-f-]{36}) \\| ${parsed.slug.replace(/[\/.]/g, '\\$&')} \\|`),
   );
@@ -106,7 +110,13 @@ describe('deskwork add writes entry-centric sidecar (Issue #184)', () => {
     expect(sidecar.source).toBe('manual');
     expect(sidecar.keywords).toEqual([]);
     expect(sidecar.iterationByStage).toEqual({});
-    expect('artifactPath' in sidecar).toBe(false);
+    // Phase 39c-2b (sub-task b): `add` now composes + stamps the
+    // entry's authoritative `artifactPath` from the default lane's
+    // `scaffoldDefaults.markdown` (bootstrapped from the legacy
+    // `sites.main.contentDir = 'src/content'`) + the default `index`
+    // layout + the slug. Previously this field was absent — the
+    // regression-lock is now flipped to assert presence + value.
+    expect(sidecar.artifactPath).toBe('src/content/my-new-idea/index.md');
     expect('datePublished' in sidecar).toBe(false);
     expect(typeof sidecar.createdAt).toBe('string');
     expect(typeof sidecar.updatedAt).toBe('string');

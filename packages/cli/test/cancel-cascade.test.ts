@@ -61,7 +61,6 @@ beforeEach(() => {
       id: 'default',
       name: 'Default',
       pipelineTemplate: 'editorial',
-      contentDir: 'docs',
     }),
     'utf-8',
   );
