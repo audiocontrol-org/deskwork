@@ -51,14 +51,14 @@ import { assertBoundaryFits, BoundaryTooLargeError } from './phase-boundary-sizi
  * governed run and deliberately emits no terminal-outcome (it does no work and
  * has no outcome to report); that boundary is locked by a test.
  *
- * KNOWN GAP (TASK-117, US2 design fork — operator-owned): `boundary-too-large` is
- * exported as a distinct outcome, but the current control flow cannot emit it —
- * `negotiateFleet` already rejects a lane whose envelope is smaller than the
- * rendered prompt (→ `negotiation-failed`), so `assertBoundaryFits` never observes
- * an oversized prompt over an accepted fleet. The kind is retained because US2
- * wants prospective-vs-actual divergence distinguishable; making it reachable
- * (de-couple the boundary check from the negotiation envelope gate) is a deferred
- * design decision, not an oversight.
+ * `boundary-too-large` is exported because US2 promises a distinct
+ * prospective-vs-actual-divergence outcome. In the current control flow it is not
+ * yet reachable — `negotiateFleet` rejects a lane whose envelope is smaller than
+ * the rendered prompt first (→ `negotiation-failed`). Reconciling the two (move
+ * the rendered-prompt envelope check out of negotiation into `assertBoundaryFits`)
+ * is tracked in backlog TASK-117 with a recorded `GOVERN_OVERRIDE` on the 021
+ * phase-2 checkpoint; the kind stays in the enum so the eventual fix needs no
+ * contract change.
  */
 export type GovernTerminalKind =
   | 'graduated'

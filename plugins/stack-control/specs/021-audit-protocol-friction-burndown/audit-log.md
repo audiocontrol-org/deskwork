@@ -1331,3 +1331,31 @@ The new whole-feature path claims composition is now exclusion-based: current ph
 That makes `resolveComposingFeatureUnit` a misleading no-op for whole-feature payload scoping: its documented contract says it computes the composing unit’s included files, but this caller now uses only `auditLogSection`. The downstream blast radius is medium because current behavior can still be correct through `excludePaths`, but the duplicated and contradictory composition primitive will compound: future code or tests can reasonably trust `phaseUnit.diffScope.files` as the actual audited scope and get the wrong answer for cross-cutting remainder audits.
 
 A reasonable fix is to either stop calling the scope-computing helper here and construct the feature audit unit explicitly for the `after_implement` label, or update/extract the primitive so its returned `diffScope` represents the exclusion-based whole-feature composition actually used by this caller.
+
+## 2026-06-14 — audit-barrage lift (20260614T204811638Z-audit-protocol-friction-burndown-phase-2)
+
+### AUDIT-20260614-98 — Dead public terminal kind: `boundary-too-large` is exported but unreachable
+
+Finding-ID: AUDIT-20260614-98 (codex-01 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium, codex-gpt5=medium
+Decision:   agreement (gate-counted medium)
+Surface:    `src/govern/protocol.ts:43-72`, `src/govern/protocol.ts:353-380`
+
+The patch publishes `boundary-too-large` as a machine-readable `GovernTerminalKind`, but the same hunk documents that the current control flow can never emit it: `negotiateFleet(...)` rejects undersized lanes first (`negotiation-failed` at lines 353-365), so the later `assertBoundaryFits(...)` branch at lines 372-380 is dead. That means the new terminal-outcome contract now advertises a distinct recovery path that no caller can actually observe.
+
+The blast radius is contract drift rather than an immediate crash, so I rate it `medium`: any automation built against `govern: terminal-outcome=<kind>` will reasonably treat `boundary-too-large` as real, but in practice every oversize-prompt case collapses into `negotiation-failed`. The comment at lines 54-61 makes this worse by explicitly baking a deferred gap into the shipped surface instead of reconciling the enum with the reachable behavior. A reasonable fix is to either remove `boundary-too-large` from the public outcome set until it is reachable, or change the negotiation/boundary split so the distinct terminal can actually occur.
+
+### AUDIT-20260614-99 — Whole-feature composition now bypasses the `AuditUnit` scope contract
+
+Finding-ID: AUDIT-20260614-99
+Status:     open
+Severity:   medium
+Per-lane:   codex-gpt5=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/govern.ts:674-699`; missing paired update in `src/govern/audit-unit-types.ts:13-18`, `src/govern/audit-unit-types.ts:23-38`
+
+The new whole-feature path constructs a `feature` `AuditUnit` with `diffScope.files: []` and moves the real composed scope into `compositionExcludePaths` (lines 674-699). But the type contract still says the opposite: in `audit-unit-types.ts`, empty `files` means “the whole diff against base” (lines 16-17, 25-26), while a composed feature unit’s `diffScope` is supposed to represent the changed plus cross-cutting paths (lines 35-38). After this patch, the data model no longer describes the payload the command actually audits.
+
+This is a `medium` design/documentation defect because the current command happens not to consume `phaseUnit.diffScope.files` for feature mode, so it does not explode immediately, but any future consumer of `AuditUnit` will read a lie. That is exactly the kind of quiet mismatch unattended tooling builds on. A reasonable fix is to either update the `AuditUnit` contract to represent exclusion-based composition explicitly, or keep the real composed scope in the unit instead of stashing it out-of-band in `compositionExcludePaths`.
