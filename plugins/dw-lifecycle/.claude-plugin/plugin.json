@@ -1,6 +1,6 @@
 {
   "name": "dw-lifecycle",
-  "version": "0.46.0",
+  "version": "0.47.0",
   "description": "[RETIRED — superseded by stack-control] Project lifecycle orchestration plugin — define → setup → issues → implement → review → ship → complete.",
   "license": "GPL-3.0-or-later"
 }
