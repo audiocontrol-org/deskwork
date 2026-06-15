@@ -339,7 +339,26 @@ Config-domain discovery and sticky selection: resolve and persist the active con
 
 ## multi:feature/release-resolution-cycle
 - status: planned
+- part-of: multi:feature/lifecycle-industrialization
 - depends-on: design:feature/roadmap-protocol
 - ref: TASK-134
 Mechanize the post-release+install resolution cycle: given an installed release, map the release delta to candidate items (commit refs, audit-log fixed-<sha>, newly-complete spec tasks), verify each against the FORMALLY-INSTALLED artifact (released-binary reconcile, fix present in the installed cache, released tests where deps allow) distinguishing verified-fixed from re-surfacing, propose closure with auto-written Resolution evidence, reconcile + advance roadmap nodes whose specs shipped, and surface loose ends that did not verify. Composes dw-lifecycle re-audit-fixed-findings/close-shipped/complete + stack-control roadmap reconcile/session-end; agent posts evidence, operator decides closure. Promoted from TASK-134.
+
+## multi:feature/lifecycle-industrialization
+- status: planned
+Umbrella: industrialize the stack-control project lifecycle so the governing ceremony runs mechanically, not on operator stamina or sheer force of will. Groups the mechanization pieces that tie up loose ends deterministically: a parseable lifecycle workflow engine (parseable-lifecycle-workflow / TASK-136), post-release+install resolution (release-resolution-cycle / TASK-134), backlog->roadmap promotion (backlog-promotion-mechanization / TASK-135), and orphan->node reconciliation (unorphan assist / TASK-133, still in backlog). Realizes the thesis ('industrialize execution') at the macro/process layer. Children are part-of this node.
+
+## multi:feature/backlog-promotion-mechanization
+- status: planned
+- depends-on: design:feature/roadmap-protocol
+- part-of: multi:feature/lifecycle-industrialization
+- ref: TASK-135
+One-move backlog->roadmap promotion: given a backlog item, PROPOSE the roadmap node derived from it (phase/kind from labels, slug from title, status planned, candidate edges, ref=TASK-id, description from body), dry-run the node + linkage, and on --apply CREATE the node AND record the promote linkage atomically — removing the two hand steps (roadmap add + backlog promote) run for TASK-134. Preserves the record-only-promote intent (bidirectional navigability). Promoted from TASK-135.
+
+## multi:feature/parseable-lifecycle-workflow
+- status: planned
+- depends-on: design:feature/roadmap-protocol, design:feature/document-primitives
+- part-of: multi:feature/lifecycle-industrialization
+- ref: TASK-136
+The centerpiece: a PARSEABLE, DETERMINISTIC lifecycle workflow that drives items through phases — not just a WORKFLOW.md doc. Apply the roadmap-protocol pattern to the process itself: a governed grammar-parsed workflow document (phases, per-phase entry/exit gates, the verb/skill executing each phase) plus an engine that, given an item, knows its current phase, the gate conditions to advance, and deterministically drives it to the next phase or reports why it's blocked. The human-readable WORKFLOW.md is one rendering of the parseable source of truth. Reuses document-primitives (governed parseable-doc engine) + roadmap-protocol grammar/DAG reasoning. Promoted from TASK-136.
 
