@@ -3,7 +3,7 @@ schema_version: "1.0"
 extension:
   id: spec-governance
   name: "stack-control Spec Governance"
-  version: "0.45.2"
+  version: "0.46.0"
   description: "Fires the cross-model audit-barrage over a SPEC at definition time + gates graduation on convergence"
   author: stack-control
 
