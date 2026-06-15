@@ -2,21 +2,32 @@
 
 ---
 
-## 2026-06-15: <!-- session title -->
+## 2026-06-15: 021 audit-protocol-friction — full implementation + deep after_implement audit
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Burn down the entire `021-audit-protocol-friction-burndown` task list (all 32 tasks) and audit it via the `/stack-control:execute` protocol — drive native `/speckit-implement`, then let the deskwork-governance cross-model barrage fire on `after_implement`.
 
 **Accomplished:**
-- <!-- compose -->
+- Completed the phase-1 govern burndown to gate-open (the prior session's blocker): fleet-knowledge no-runtime-fallback, `classifyBinaryProbe`, lane-capability FATAL channel, empty-paths fingerprint.
+- Implemented all 32 tasks: US4 (richer phase-header grammar, rename-aware `--find-renames` scoping), US5 (machine-readable `terminal-outcome=<kind>`, audit-runs payload trim), US1 true-composition, T010/T013, polish. Full umbrella green (234 files / 1538 tests when fixtures can sign).
+- The cross-model `after_implement` audit caught and I fixed **~11 real bugs in my own work**: terminal-outcome contract holes (untagged exits, `--help`, exit-2-on-unexpected-error), the US1 strict-gate-vs-compose design fork (→ exclusion-based true composition), a vestigial primitive, shared-file + nested-path composition exclusion (false-clean gates), fragile floor-substring matching.
+- Phases 1–6 gate-open; the whole-feature composing pass now runs to completion (payload-size/floor-shortfall wall resolved by carrying all phases).
+- Reconciled backlog: closed TASK-57/71/81/111/114/115 (verified-fixed); 12 residuals tracked (TASK-116, 117, 120–129) with precise repro/fix notes.
 
 **Didn't Work:**
-- <!-- compose -->
+- The whole-feature gate did NOT open: it's blocked on **spec-required structural HIGHs** — TASK-117 (`boundary-too-large` unreachable; US2/quickstart require it) and TASK-129 (carrying a directory-scoped phase hides unowned cross-cutting changes). These can't keep being overridden against the spec.
+- The per-phase cascade is structurally unstable: `govern.ts`/`incremental-audit.ts` belong to 4–6 phases each, so every fix re-stales those phases' checkpoints, making whole-feature gate-open a moving target.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Operator chose **US1 true-composition** over the strict checkpoint gate (the audit surfaced the spec self-contradiction); implemented exclusion-based composition.
+- [PROCESS] Operator chose **override-and-graduate** for the diminishing-returns plateau (implementation-altitude MEDIUMs); applied across phases 2–6.
+- [FABRICATION] Verified a codex HIGH (composition carries stale ownership) as a **false positive** — the staleness fingerprint already includes paths — and documented the reasoning in the override rather than blindly implementing.
+- [DOCUMENTATION] Retired an anti-defer "deferred design decision" code comment the audit correctly flagged as a trap; replaced with a tracked backlog reference.
 
 **Insights:**
-- <!-- compose -->
+- The cross-model audit-barrage earns its keep: it found genuine correctness bugs (shared-file/nested-path exclusion, exit-code/tag contradiction) the green test suite did not — because `govern.ts` genuinely spans many phases, the composition bugs were real for this very feature.
+- Exclusion-based whole-feature composition is in fundamental tension with directory-granular phase ownership (TASK-129) — needs a design decision (expand dir-scopes to files, or compute cross-cutting explicitly).
+- `boundary-too-large` is a spec-vs-impl design fork that recurs as a generator across phases; the structural root-fix (move the rendered-prompt envelope check from `negotiateFleet` into `assertBoundaryFits`) is the right next step, not repeated overrides.
+- The per-phase audit's checkpoint-cascade needs a friction fix so a single shared-file change doesn't invalidate most of the feature's checkpoints (TASK-60 adjacent).
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 19
