@@ -43,7 +43,7 @@ the **`stack-control`** plugin (CLI `stackctl`), built as the **successor to `dw
 in-monorepo plugin sharing the repository's single lockstep version with every other plugin;
 absorb-then-retire; `dw-lifecycle` stays undisturbed until parity). It derives from deskwork's existing conventions (`.claude/CLAUDE.md`, `.claude/rules/`,
 including `.claude/rules/stack-control-succession.md`), the program roadmap
-(`docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md`), and the operator
+(`plugins/stack-control/ROADMAP.md`), and the operator
 directives set during the integration-first dogfood of GitHub Spec Kit. Where this constitution and
 deskwork's repo-level rules overlap, they are intended to agree; deskwork's rules remain authoritative
 for the wider repo. (The earlier `design.md` is superseded-as-spine — it now describes the deferred
@@ -66,7 +66,7 @@ When two readings of a principle compete, prefer the one that adds a mechanical 
 that adds advice.
 
 Full grounding — the thesis, the hard-won principles, and the motivating blog post — lives in
-`docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-thesis.md`. Read it before applying
+`plugins/stack-control/THESIS.md`. Read it before applying
 these principles.
 
 ## Core Principles

@@ -18,9 +18,8 @@ satisfied only when the target is `shipped`), `part-of` (non-blocking grouping),
 clears it). Reason over the graph with `/stack-control:roadmap` (`next` /
 `blocked` / `blocks` / `order` / `graph` / `reconcile`) and keep it crisp with
 `add` / `advance` / `decompose` / `reclassify` / `defer`. Program vision +
-rationale live in
-`docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md`;
-this document is the live feature queue.
+rationale live in [`THESIS.md`](./THESIS.md); this document is the live feature
+queue.
 
 ## design:feature/document-primitives
 - status: in-flight
