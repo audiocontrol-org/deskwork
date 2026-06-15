@@ -339,6 +339,10 @@ describe('US3/US4 — govern end-to-end: --at anchor, no cwd leak, backlog-store
           env: {
             ...process.env,
             GOVERN_BARRAGE_BIN: stub,
+            // Hermetic fleet: mark lanes available so a CLI-less env (CI) reaches
+            // the stubbed barrage instead of short-circuiting on the lane-
+            // availability probe (negotiation-failed). See TASK-132.
+            GOVERN_FLEET_AVAILABLE: '*',
             STUB_RUN_DIR: join(fx, 'run-anchor'),
             STUB_VARS_COPY: varsCopy,
             STUB_ARGS_FILE: argsFile,

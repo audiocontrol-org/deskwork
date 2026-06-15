@@ -99,6 +99,10 @@ describe('US4 — govern one-anchor unification under nesting (T023/T024)', () =
           env: {
             ...process.env,
             GOVERN_BARRAGE_BIN: stub,
+            // Hermetic fleet: mark lanes available so a CLI-less env (CI) reaches
+            // the full govern run under test instead of short-circuiting on the
+            // lane-availability probe (negotiation-failed). See TASK-132.
+            GOVERN_FLEET_AVAILABLE: '*',
             STUB_RUN_DIR: join(fx, 'run'),
             // Backlog slush destination isolated to a fresh tmp dir so the test
             // never writes the committed dogfood pile (and so a leak would show

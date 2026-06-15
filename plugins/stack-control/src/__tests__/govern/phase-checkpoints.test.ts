@@ -131,6 +131,10 @@ function runGovern(repo: string, stub: string, args: readonly string[]) {
       ...process.env,
       STACKCTL_BACKLOG_DIR: tmpBacklog(),
       GOVERN_BARRAGE_BIN: stub,
+      // Hermetic fleet: mark lanes available so a CLI-less env (CI) reaches the
+      // phase-checkpoint enforcement instead of short-circuiting on the lane-
+      // availability probe (negotiation-failed). See TASK-132.
+      GOVERN_FLEET_AVAILABLE: '*',
       STUB_RUN_DIR: join(repo, '.tmp-run'),
     },
   });

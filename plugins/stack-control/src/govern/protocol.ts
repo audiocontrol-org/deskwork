@@ -92,11 +92,34 @@ export class GovernProtocolError extends Error {
  * `govern: FATAL —` surface (AUDIT-BARRAGE-codex-01). Both lane-loading call
  * sites (implement-mode preflight + the spec/loop path) go through here.
  */
+/**
+ * Test-only availability seam (mirrors the `GOVERN_BARRAGE_BIN` barrage stub).
+ * `GOVERN_FLEET_AVAILABLE` lets a hermetic test mark lane binaries available
+ * WITHOUT the real `which <binary>` PATH probe — so a CLI-less environment (CI)
+ * can exercise govern's downstream behavior instead of short-circuiting to
+ * `negotiation-failed`. `*` (or `all`) → every binary available; otherwise a
+ * comma-separated list of binary names to treat as available. Unset (the
+ * production default) → the real PATH probe via `binaryExistsOnPath`.
+ */
+function fleetAvailabilityProbeFromEnv(): ((binary: string) => boolean) | undefined {
+  const raw = process.env.GOVERN_FLEET_AVAILABLE;
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const spec = raw.trim();
+  if (spec === '*' || spec === 'all') return () => true;
+  const allowed = new Set(
+    spec
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
+  );
+  return (binary: string) => allowed.has(binary);
+}
+
 export async function loadLaneCapabilitiesGoverned(
   installationRoot: string,
 ): Promise<readonly LaneCapabilityProfile[]> {
   try {
-    return await loadLaneCapabilities(installationRoot);
+    return await loadLaneCapabilities(installationRoot, fleetAvailabilityProbeFromEnv());
   } catch (err) {
     if (err instanceof GovernProtocolError) throw err;
     throw new GovernProtocolError(

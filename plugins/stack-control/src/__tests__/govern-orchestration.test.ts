@@ -88,7 +88,10 @@ function runGovern(args: string[], env: Record<string, string>) {
     encoding: 'utf8',
     // Isolate the backlog destination of govern's slush step (008 rewire) to a
     // fresh tmp dir so no govern test ever writes the committed dogfood pile.
-    env: { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog(), ...env },
+    // Hermetic fleet: mark lanes available so a CLI-less env (CI) reaches the
+    // stubbed barrage instead of short-circuiting on the lane-availability probe
+    // (negotiation-failed). See TASK-132.
+    env: { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog(), GOVERN_FLEET_AVAILABLE: '*', ...env },
   });
 }
 

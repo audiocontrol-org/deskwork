@@ -12,7 +12,9 @@
  * Env parity (preserved for the shims; flags win over env when both are set):
  *   GOVERN_FEATURE_SLUG, GOVERN_DIFF_BASE, GOVERN_SPEC_PATH, GOVERN_PLAN_PATH,
  *   GOVERN_CHECKPOINT, GOVERN_CEILING, GOVERN_OVERRIDE, GOVERN_MODELS,
- *   GOVERN_BARRAGE_BIN (test stub), GOVERN_NO_SLUSH, GOVERN_PAYLOAD_BUDGET.
+ *   GOVERN_BARRAGE_BIN (test stub), GOVERN_NO_SLUSH, GOVERN_PAYLOAD_BUDGET,
+ *   GOVERN_FLEET_AVAILABLE (test stub: bypass the real `which` lane-availability
+ *   probe so a CLI-less environment can exercise downstream govern behavior).
  *   GOVERN_REPO_ROOT is RETIRED (specs/installation-isolation R2): setting it
  *   is a loud FATAL naming the --at replacement — never a silent no-op.
  *

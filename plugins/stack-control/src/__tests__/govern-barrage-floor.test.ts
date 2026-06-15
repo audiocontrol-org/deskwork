@@ -88,7 +88,10 @@ function makeRepo(slug: string): string {
 function runGovern(args: string[], env: Record<string, string>) {
   return spawnSync(resolveTsx(), [CLI, 'govern', ...args], {
     encoding: 'utf8',
-    env: { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog(), ...env },
+    // Hermetic fleet: mark lanes available so a CLI-less env (CI) reaches the
+    // stubbed barrage (and records the --require-models argv) instead of
+    // short-circuiting on the lane-availability probe. See TASK-132.
+    env: { ...process.env, STACKCTL_BACKLOG_DIR: tmpBacklog(), GOVERN_FLEET_AVAILABLE: '*', ...env },
   });
 }
 
