@@ -132,15 +132,26 @@ export interface PhaseCompositionStatus {
 export function carriedExclusivelyCurrentFiles(
   phases: readonly PhaseCompositionStatus[],
 ): readonly string[] {
-  const ownedByNonCurrent = new Set(
-    phases.filter((p) => !p.current).flatMap((p) => p.files),
-  );
+  const nonCurrent = phases.filter((p) => !p.current).flatMap((p) => p.files);
   const carried = new Set<string>();
   for (const phase of phases) {
     if (!phase.current) continue;
     for (const file of phase.files) {
-      if (!ownedByNonCurrent.has(file)) carried.add(file);
+      // Shared ownership is PREFIX overlap in either direction, not just an exact
+      // string match (021 after_implement audit AUDIT-BARRAGE-codex-01): a current
+      // phase owning a directory `src/` must NOT carry it when a stale phase owns
+      // `src/foo.ts` under it (the carried `:(exclude)src/` pathspec would hide the
+      // stale file), and vice-versa.
+      if (!nonCurrent.some((other) => pathsOverlap(file, other))) carried.add(file);
     }
   }
   return Array.from(carried);
+}
+
+/** Two repo-relative paths overlap iff equal or one is a directory ancestor of
+ * the other (POSIX `/` separators; trailing slashes normalized away). */
+function pathsOverlap(a: string, b: string): boolean {
+  const x = a.replace(/\/+$/, '');
+  const y = b.replace(/\/+$/, '');
+  return x === y || x.startsWith(`${y}/`) || y.startsWith(`${x}/`);
 }

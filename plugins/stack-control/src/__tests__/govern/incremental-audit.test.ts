@@ -96,4 +96,22 @@ describe('carriedExclusivelyCurrentFiles (US1 composition, 021 phase-7 HIGH)', (
       carriedExclusivelyCurrentFiles([{ current: false, files: ['a.ts'] }]),
     ).toEqual([]);
   });
+
+  it('treats directory/file PREFIX overlap as shared ownership (021 after_implement HIGH)', () => {
+    // A current phase owns the directory `src/`; a stale phase owns `src/foo.ts`
+    // under it → `src/` must NOT be carried (it would exclude the stale file).
+    expect(
+      carriedExclusivelyCurrentFiles([
+        { current: true, files: ['src/', 'docs/keep.md'] },
+        { current: false, files: ['src/foo.ts'] },
+      ]),
+    ).toEqual(['docs/keep.md']);
+    // Reverse direction: current owns the file, stale owns the ancestor dir.
+    expect(
+      carriedExclusivelyCurrentFiles([
+        { current: true, files: ['src/a/b.ts'] },
+        { current: false, files: ['src/a'] },
+      ]),
+    ).toEqual([]);
+  });
 });
