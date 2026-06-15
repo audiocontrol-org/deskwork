@@ -29,16 +29,21 @@ const LANES: readonly LaneCapabilityProfile[] = [
 
 describe('fleet negotiation records', () => {
   it('accepts a viable fleet before payload assembly', () => {
-    const result = negotiateFleet(LANES, 16000, 2);
+    const result = negotiateFleet(LANES, 2);
     expect(result.disposition).toBe('accepted');
     expect(result.acceptedFleet).toEqual(['claude', 'codex']);
   });
 
-  it('fails explicitly when too few lanes can carry the payload', () => {
-    const result = negotiateFleet(LANES, 40000, 2);
-    expect(result.disposition).toBe('negotiation-failed');
-    expect(result.acceptedFleet).toEqual(['claude']);
-    expect(result.rejectedLanes).toEqual(['codex']);
+  // TASK-117: negotiation is the LANE-HEALTH axis; it no longer rejects a lane on
+  // payload size. A small-envelope lane is still accepted here — an oversized
+  // payload is the BOUNDARY axis, caught later by `assertBoundaryFits` as the
+  // distinct `boundary-too-large` terminal (see govern-terminal-outcomes.test.ts).
+  it('accepts a healthy lane regardless of its envelope size (size is the boundary axis)', () => {
+    const result = negotiateFleet(LANES, 2);
+    // codex has the smaller envelope (24576); it is NOT rejected for size.
+    expect(result.disposition).toBe('accepted');
+    expect(result.acceptedFleet).toEqual(['claude', 'codex']);
+    expect(result.rejectedLanes).toEqual([]);
   });
 
   it('rejects lanes that are not enforced and monitored even when their envelopes fit', () => {
@@ -57,7 +62,6 @@ describe('fleet negotiation records', () => {
           timeoutBasis: { mode: 'override', timeoutSeconds: 600 },
         },
       ],
-      16000,
       3,
     );
     expect(result.disposition).toBe('negotiation-failed');
@@ -66,12 +70,7 @@ describe('fleet negotiation records', () => {
   });
 
   it('fails loud on a non-positive quorum requirement', () => {
-    expect(() => negotiateFleet([], 1024, 0)).toThrow(/positive integer/);
-  });
-
-  it('fails loud on an invalid requested prompt size', () => {
-    expect(() => negotiateFleet(LANES, -1, 1)).toThrow(/requestedPromptBytes must be a positive integer/);
-    expect(() => negotiateFleet(LANES, Number.NaN, 1)).toThrow(/requestedPromptBytes must be a positive integer/);
+    expect(() => negotiateFleet([], 0)).toThrow(/positive integer/);
   });
 
   it('fails loud when the candidate fleet repeats a lane name', () => {
@@ -83,7 +82,6 @@ describe('fleet negotiation records', () => {
             ...LANES[0]!,
           },
         ],
-        16000,
         2,
       ),
     ).toThrow(/lane names must be unique/);
@@ -99,7 +97,6 @@ describe('fleet negotiation records', () => {
           availability: 'unavailable',
         },
       ],
-      16000,
       2,
     );
     expect(result.disposition).toBe('negotiation-failed');

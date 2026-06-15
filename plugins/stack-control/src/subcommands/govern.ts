@@ -475,7 +475,7 @@ function preflightNegotiatedFleet(
   requireModels: number,
 ): readonly LaneCapabilityProfile[] {
   const selected = selectRequestedLaneCapabilities(laneCapabilities, requestedModels);
-  const negotiation = negotiateFleet(selected, 1, requireModels);
+  const negotiation = negotiateFleet(selected, requireModels);
   if (negotiation.disposition !== 'accepted') {
     throw new GovernProtocolError(
       `govern: FATAL — fleet negotiation failed before payload assembly; ` +

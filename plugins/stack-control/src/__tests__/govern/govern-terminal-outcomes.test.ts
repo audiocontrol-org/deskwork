@@ -145,15 +145,33 @@ describe('US5 — machine-readable govern terminal outcomes (T027/T028)', () => 
     }
   });
 
-  // NOTE: a dedicated `boundary-too-large` e2e case is intentionally omitted —
-  // `negotiateFleet` already rejects any lane whose envelope is smaller than the
-  // rendered prompt (disposition `negotiation-failed`), so `assertBoundaryFits`
-  // can never observe an oversized prompt over an ACCEPTED fleet. The terminal
-  // KIND is implemented (protocol.ts maps BoundaryTooLargeError → terminalKind
-  // 'boundary-too-large') and the boundary math is unit-covered in
-  // phase-boundary-sizing.test.ts, but the terminal is currently preempted by
-  // negotiation. Captured as a backlog finding (TASK — boundary-too-large
-  // unreachable: redundant with the negotiation envelope gate).
+  // TASK-117 (021 after_implement HIGH): boundary-too-large is now REACHABLE.
+  // The structural root-fix moved the rendered-prompt-vs-envelope check out of
+  // `negotiateFleet` (which now selects lanes on health/availability/floor only)
+  // and into `assertBoundaryFits`. So a HEALTHY lane (enforced + monitored) whose
+  // envelope is smaller than the actual rendered payload is ACCEPTED by
+  // negotiation, then rejected by the boundary gate — the distinct terminal US2/
+  // FR-006 promise. negotiation-failed stays reserved for lane-health/floor
+  // failures (lane-health axis), boundary-too-large for payload-size (SC-005).
+  it('boundary-too-large: a healthy lane whose envelope is smaller than the rendered payload', () => {
+    // The render stub writes "stub prompt\n" (12 bytes); a 5-byte envelope on an
+    // otherwise-viable (enforced + monitored) lane is overflowed by the real
+    // payload, so negotiation accepts the lane and the boundary gate rejects it.
+    const repo = makeRepo({ enforced: true, maxPromptBytes: 5 });
+    const fx = mkdtempSync(join(tmpdir(), 'gov-terminal-fx-'));
+    try {
+      const r = runGovern(repo, fx, ['--require-models', '1'], 'low');
+      expect(r.status, `stderr:\n${r.stderr}`).toBe(2);
+      const out = `${r.stdout}${r.stderr}`;
+      expect(out).toContain('govern: terminal-outcome=boundary-too-large');
+      // exactly one terminal-outcome line, and it is NOT the negotiation terminal.
+      expect(out.match(/govern: terminal-outcome=/g) ?? []).toHaveLength(1);
+      expect(out).not.toContain('govern: terminal-outcome=negotiation-failed');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
 
   it('graduated: an enforced lane + a clean (low) barrage opens the gate', () => {
     const repo = makeRepo({ enforced: true, maxPromptBytes: 65536 });

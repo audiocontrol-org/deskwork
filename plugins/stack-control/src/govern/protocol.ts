@@ -51,14 +51,15 @@ import { assertBoundaryFits, BoundaryTooLargeError } from './phase-boundary-sizi
  * governed run and deliberately emits no terminal-outcome (it does no work and
  * has no outcome to report); that boundary is locked by a test.
  *
- * `boundary-too-large` is exported because US2 promises a distinct
- * prospective-vs-actual-divergence outcome. In the current control flow it is not
- * yet reachable — `negotiateFleet` rejects a lane whose envelope is smaller than
- * the rendered prompt first (→ `negotiation-failed`). Reconciling the two (move
- * the rendered-prompt envelope check out of negotiation into `assertBoundaryFits`)
- * is tracked in backlog TASK-117 with a recorded `GOVERN_OVERRIDE` on the 021
- * phase-2 checkpoint; the kind stays in the enum so the eventual fix needs no
- * contract change.
+ * `boundary-too-large` (US2/FR-006) and `negotiation-failed` (US3/FR-008) live on
+ * two distinct axes and are both reachable (TASK-117 root-fix): `negotiateFleet`
+ * selects lanes on lane-health alone (availability / read-only enforcement /
+ * liveness / required-models floor), and `assertBoundaryFits` separately checks
+ * the rendered payload against the active fleet envelope. So a viable fleet whose
+ * envelope is overflowed by the actual rendered payload surfaces as
+ * `boundary-too-large`, while a fleet that cannot meet the health floor surfaces
+ * as `negotiation-failed` — the two terminals stay machine-distinguishable
+ * (SC-005).
  */
 export type GovernTerminalKind =
   | 'graduated'
@@ -350,15 +351,12 @@ export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult
       args.laneCapabilities ?? (await loadLaneCapabilitiesGoverned(args.installationRoot)),
       args.models,
     );
-    const negotiatedFleet = negotiateFleet(
-      laneCapabilities,
-      renderedPromptBytes,
-      args.requireModels ?? 1,
-    );
+    const negotiatedFleet = negotiateFleet(laneCapabilities, args.requireModels ?? 1);
     if (negotiatedFleet.disposition !== 'accepted') {
       throw new GovernProtocolError(
-        `govern: FATAL — fleet negotiation failed for ${renderedPromptBytes} prompt bytes; ` +
-          `accepted ${negotiatedFleet.acceptedFleet.length}/${args.requireModels ?? 1} lane(s). ` +
+        `govern: FATAL — fleet negotiation failed: ` +
+          `accepted ${negotiatedFleet.acceptedFleet.length}/${args.requireModels ?? 1} viable lane(s) ` +
+          `(availability / read-only enforcement / liveness). ` +
           `Rejected lanes: ${negotiatedFleet.rejectedLanes.join(', ') || 'none'}.`,
         2,
         'negotiation-failed',
