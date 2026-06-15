@@ -2614,7 +2614,7 @@ The blast radius is low because the current runtime behavior is fail-loud for ma
 ### AUDIT-20260614-44 — Tagged plugin releases are not reproducible because first-run install floats dependency versions
 
 Finding-ID: AUDIT-20260614-44
-Status: migrated-to-backlog TASK-37
+Status: fixed-2bca7dc2 (was migrated-to-backlog TASK-37; TASK-37 closed Done)
 Severity:   medium
 Per-lane:   codex-gpt5=medium
 Decision:   single-model (gate-counted medium)
