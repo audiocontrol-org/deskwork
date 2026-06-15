@@ -23,7 +23,7 @@ rationale live in
 this document is the live feature queue.
 
 ## design:feature/document-primitives
-- status: in-flight
+- status: shipped
 - depends-on: multi:feature/front-door
 - spec: specs/005-document-primitives
 Generalized archive / unarchive / curate over self-describing governed documents — the engine this roadmap protocol is built on.
@@ -50,7 +50,7 @@ Keep the roadmap live, crisp, and up-to-date: a DAG of heading-keyed work items 
 Author specs at promise altitude — the prevention half of spec quality, sibling to spec-governance's detection.
 
 ## design:feature/spec-governance
-- status: in-flight
+- status: shipped
 - depends-on: multi:feature/front-door
 - spec: specs/004-spec-governance
 Govern the spec, not just the implementation: cross-model audit-barrage over a spec at definition time. The mode-aware lens shipped.
@@ -267,7 +267,7 @@ A timed-out barrage model leaves a zero-byte stdout artifact; the kill is visibl
 Put a real port between the stack-control backlog frontend (capture / list / import-github / import-slush / promote) and the concrete store: a BacklogStore interface with the current backlog.md CLI as one adapter behind it, so the backend is swappable and its conventions stop leaking. Motivation: backlog.md imposes its own filename convention (spaces and the 'id - title' separator, double .md.md when a title ends in .md), its own archiving model, and its own directory layout on the governed store; the operator has explicit opinions on naming, archiving, and directory layout that the abstraction must make expressible instead of inheriting upstream defaults. Origin: 2026-06-11 session — shell work over the tasks dir broke on the space-laden filenames during the TASK-13/14/25 closure pass.
 
 ## impl:feature/installation-isolation
-- status: planned
+- status: shipped
 - spec: specs/installation-isolation
 - ref: TASK-45
 Installations are isolated: all stack-control state anchors at the nearest-enclosing installation; --repo-root retired on state-writing verbs; legacy half-installation detection; Spec Kit root relocates into the installation. Operator directive 2026-06-10; promoted from TASK-45 (anchor unification).
