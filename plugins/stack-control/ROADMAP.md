@@ -31,11 +31,13 @@ Generalized archive / unarchive / curate over self-describing governed documents
 ## design:feature/insight-capture
 - status: in-flight
 - depends-on: multi:feature/front-door
+- spec: specs/007-insight-capture
 One-move out-of-sequence insight capture as a first-class control-plane capability; capture ≠ scope. Retires the interim design-inbox convention.
 
 ## design:feature/migrate-scope-discovery
 - status: planned
 - depends-on: multi:feature/front-door
+- spec: specs/010-migrate-scope-discovery
 Move scope-discovery primitives + skills in-house with per-codebase clone detection; vendor the full clone-detector.
 
 ## design:feature/roadmap-protocol
@@ -91,6 +93,7 @@ Migrate audit-barrage + the audit protocol (convergence criterion + finding stat
 ## multi:feature/audit-protocol-convergence
 - status: in-flight
 - depends-on: multi:feature/migrate-audit-barrage
+- spec: specs/015-audit-protocol-convergence
 Make the cross-model audit-barrage convergence loop mechanically terminate and shrink the unit of work it audits (specs/015-audit-protocol-convergence). Five threads: cross-lane severity AGREEMENT + adjudication replace max-of-cluster so the dampener's two-consecutive-0-HIGH branch is reachable (US1); a code loop driver owns the iterate/stop decision + ceiling, not skill prose (US2); the implement payload drops its own audit-log excerpt + parked scaffolds (US3); a per-phase `--phase` audit unit shrinks the payload, governed by the same loop (US4); sonnet re-calibrated to an operator-selectable read-only override profile on the smaller units (US5); the #432 raw-counting guarded against regression (US6). Resolves backlog TASK-27 + TASK-18 (both facets) + the DESIGN-INBOX adjudication capture; sibling #431 payload self-reference addressed by US3.
 
 ## multi:feature/migrate-session-skills
@@ -240,11 +243,13 @@ stackctl inbox/roadmap default --doc to the plugin-bundled DESIGN-INBOX.md/ROADM
 ## multi:feature/session-skills
 - status: planned
 - depends-on: multi:feature/front-door
+- spec: specs/011-session-skills
 Native, Spec-Kit-aware session-start / session-end lifecycle skills for stack-control: bootstrap a fresh agent into the active spec + governed roadmap + open work at session boot, and capture the journal + tooling-friction + clone-snapshot at session close. Built native (NOT ported from dw-lifecycle, whose session skills are hardcoded to deskwork conventions).
 
 ## multi:feature/project-doc-setup
 - status: planned
 - depends-on: multi:feature/front-door
+- spec: specs/009-project-doc-setup
 Post-install project setup: scaffold the governed documents + config the plugin verbs require (ROADMAP.md, DESIGN-INBOX.md, the backlog store, stack-control config) into a freshly-installed adopter project, so stackctl inbox/roadmap/backlog work without hand-authoring the docs. The create-side complement to design:gap/project-relative-doc-discovery (which resolves an adopter own docs at read time).
 
 ## multi:gap/audit-barrage-model-pinning
