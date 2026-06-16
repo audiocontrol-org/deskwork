@@ -2,21 +2,39 @@
 
 ---
 
-## 2026-06-16: <!-- session title -->
+## 2026-06-16: 024 release-readiness review → T040 fix → PR #481 opened + merged to main
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** (continuation of the same working day, after the first session-end) Decide whether
+024 is complete enough to release, fix what that bar requires, then open + merge the PR.
 
 **Accomplished:**
-- <!-- compose -->
+- **Release-readiness call**: assessed 024 as releasable with one recommended pre-release fix
+  (T040 — the headline primitive's own contract), T039/T041 as mitigated post-merge follow-ups.
+- **T040 done** (the compass verdict now evaluates the forward-transition exit gate): `release`/
+  `ship` can no longer be `on-course` from `governing` without the convergence gate met; new
+  `Verdict.unmetGate`; orientation + verdict + advance now single-sourced on the same transition
+  gate (claude-05). Generalized beyond release — the compass now enforces EVERY forward gate
+  (e.g. `define` requires a complete, approved design record: design-before-spec). 1702 green.
+- **PR [#481](https://github.com/audiocontrol-org/deskwork/pull/481) opened and merged to
+  `main`** (merge commit; long-lived `feature/stack-control` branch kept).
 
 **Didn't Work:**
-- <!-- compose -->
+- Nothing material this segment. (The spec-barrage misfire — running the parked `govern --mode
+  spec` in response to a check-question — happened just before this segment and was reverted
+  cleanly; see Course Corrections.)
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Ran the **parked spec-mode audit barrage** because the operator *asked* "did you run
+  it?" — a check, not a request. Killed the run (no artifacts), and added the durable rule
+  *"a question is not an instruction to act"* (`.claude/rules/agent-discipline.md`).
 
 **Insights:**
-- <!-- compose -->
+- T040's fix was stronger than scoped: making the verdict gate-aware closed codex-01 (release-
+  gate) AND claude-05 (orientation/enforcement single-source) AND turned the compass into a
+  per-transition gate enforcer — a net win for un-skippability from one change.
+- "Release-ready" ≠ "done": 024 ships functionally-complete + governed, but the node stays at
+  `specifying` (T039/T041 open) and it isn't *verified* until installed from a formal release and
+  walked (project closure rule). The PR body states this explicitly — no "production-ready".
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 1
