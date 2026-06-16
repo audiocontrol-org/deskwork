@@ -113,6 +113,14 @@ governed `templates/WORKFLOW.md` carries the new gate criterion so adopters inhe
 
 ## Phase notes
 
+> **Phase-vs-transition timing (U1, resolved 2026-06-16, see spec FR-006a)**: per-phase
+> govern fires *during* `implementing` (each task-phase boundary). By the time
+> `implementing → governing` fires, all per-phase checkpoints exist; the `governing` phase
+> therefore performs **no new whole-feature govern run** — it composes the
+> `record-converged impl` signal from the checkpoint union and verifies all checkpoints
+> are current (the graduate gate). The graduate gate criterion is
+> `all-phase-checkpoints-current`, NOT `record-converged impl` (C1).
+
 - **Phase 0 (research.md)**: resolve how the 021 checkpoint/fingerprint, 022 gate-eval
   criterion kinds, and the existing whole-feature `record-converged` reader compose into
   a single graduate signal; how `execute` currently sequences phases (and where the

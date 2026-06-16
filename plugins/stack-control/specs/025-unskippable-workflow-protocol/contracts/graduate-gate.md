@@ -10,9 +10,12 @@ The computable gate criterion published in `templates/WORKFLOW.md` and evaluated
   - `graduate` (`governing → shipped`) — required for every `tasks.md` phase.
   - `start-governing` (`implementing → governing`) — required for the phases completed so
     far (FR-002).
-- **Source of truth**: 021 per-phase checkpoints; the whole-feature `record-converged
-  impl` signal is **composed** from their union (FR-001a) — no separate whole-feature
-  govern run.
+- **Source of truth**: 021 per-phase checkpoints. The gate criterion is
+  `all-phase-checkpoints-current` (this kind) — NOT `record-converged impl`. The
+  whole-feature `record-converged impl` signal is the **derived artifact** the criterion's
+  success also writes (composed from the checkpoint union, FR-001a), consumed by
+  reconcile/reporting — never a second, separately-run criterion and never a separate
+  whole-feature govern run (C1, resolved 2026-06-16).
 
 ## Evaluation algorithm (deterministic)
 

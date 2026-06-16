@@ -18,16 +18,23 @@ what 021 already writes.
 ## Entity: Composed graduate signal (new derivation — US1 compose, FR-001a)
 
 - **Derived from**: the union of all current per-phase checkpoints for the feature.
-- **Represents**: the whole-feature `record-converged impl` signal the `governing →
-  shipped` gate reads — NOT a separately-run whole-feature govern.
+- **Represents**: the whole-feature `record-converged impl` signal, **composed** (not
+  produced by a separate whole-feature govern run). Consumed by reconcile + reporting and
+  any reader of `record-converged impl`.
 - **Rule**: the signal is "converged" iff every `tasks.md` phase has a current checkpoint.
   No whole-feature payload is ever assembled or sent to the fleet.
-- **Relationship**: replaces the *production* of `record-converged impl` (composed, not
-  run) while preserving the existing 022 criterion that *reads* it.
+- **Relationship to the gate (C1, resolved 2026-06-16)**: the `governing → shipped`
+  **gate criterion is `all-phase-checkpoints-current`** (the criterion below) — that is
+  what the gate evaluates. The composed `record-converged impl` signal is the **derived
+  artifact** the criterion's success also writes (for reconcile/reporting), NOT a second,
+  separately-run criterion: one evaluation (all checkpoints current) yields both the gate
+  verdict and the composed record. The legacy standalone whole-feature `record-converged
+  impl` *production* path (a separate govern run) is retired.
 
 ## Entity: Graduate gate criterion (new criterion kind — US1, FR-001/005)
 
-- **Name**: `all-phase-checkpoints-current` (working name; finalized in contracts).
+- **Name**: `all-phase-checkpoints-current` (the finalized criterion-kind name; see
+  contracts/graduate-gate.md).
 - **Where**: published in `templates/WORKFLOW.md` on the `graduate` transition
   (`governing → shipped`) and on `start-governing` (`implementing → governing`, FR-002),
   so adopters inherit it via `claude plugin install`.

@@ -122,9 +122,9 @@ reopens the gate.
 
 `/stack-control:execute` runs `govern --phase <id>` as each `tasks.md` phase
 completes — a skill-body post-condition, not an agent choice — and refuses to start
-phase N+1 until phase N has a current checkpoint. Per-phase payloads stay inside the
-fleet envelope by construction, so `boundary-too-large` becomes a non-event on the
-sanctioned path.
+phase N+1 until phase N has a current checkpoint. Per-phase scoping keeps payloads inside
+the fleet envelope for right-sized phases, so `boundary-too-large` becomes a non-event on
+the sanctioned path (an oversized single phase fails loud — FR-008).
 
 **Why this priority**: This is what makes US1's gate satisfiable *without agent
 discretion*. The gate (US1) is the lock; this is the mechanism that turns the key at
@@ -261,9 +261,10 @@ explicit operator-initiated, recorded override.
   govern. There MUST be no whole-feature govern pass (that is the `boundary-too-large`
   path this feature exists to remove); the per-phase checkpoints are the single source
   of truth and the graduate gate reads the composed result.
-- **FR-002**: The `implementing → governing` gate MUST likewise require the per-phase
-  checkpoints to be present and current for the phases completed so far, consistent
-  with the per-phase cadence (decision 1).
+- **FR-002**: The `implementing → governing` gate MUST likewise require a current
+  per-phase checkpoint for **all `tasks.md` phases** (which are complete at this
+  transition, since it fires at tasks-complete), consistent with the per-phase cadence.
+  See FR-006a for how the checkpoints come to exist before this transition.
 - **FR-003**: A checkpoint MUST be treated as *current* only when its 021 scope
   fingerprint matches the phase's current content; a phase edited after its checkpoint
   MUST reopen the gate (staleness detection).
@@ -278,15 +279,24 @@ explicit operator-initiated, recorded override.
 
 - **FR-006**: `/stack-control:execute` MUST run `govern --phase <id>` as each `tasks.md`
   phase completes, as a skill-body post-condition — not as an agent choice.
+- **FR-006a** (phase-vs-transition timing, resolved 2026-06-16): The per-phase govern in
+  FR-006 occurs **during the `implementing` phase** (at each task-phase boundary), so the
+  per-phase checkpoints already exist when `implementing → governing` fires. Consequently
+  the `governing` phase performs **no new whole-feature govern run** — its role is to
+  **compose** the `record-converged impl` signal from the per-phase checkpoint union
+  (FR-001a) and verify all checkpoints are current (the graduate gate, FR-001). This
+  reconciles the WORKFLOW.md `governing` phase with the per-phase cadence: govern *work*
+  happens per-phase during implementing; `governing` is compose-and-verify.
 - **FR-007**: `execute` MUST refuse to start phase N+1 until phase N has a current
   checkpoint (per-phase ordering; 021 already enforces this at govern time — the gap
   closed here is `execute` *firing* the per-phase govern so the checkpoint is written
   without agent discretion).
-- **FR-008**: Per-phase payloads MUST stay within the fleet envelope by construction;
-  `boundary-too-large` MUST become a non-event on the sanctioned per-phase path. When a
-  single phase still exceeds the envelope, `execute` MUST fail loud with
-  `boundary-too-large` pointing at right-sizing guidance — it MUST NOT auto-split a
-  phase. (Companion dependency: TASK-75.)
+- **FR-008**: Scoping govern per phase (rather than whole-feature) keeps payloads within
+  the fleet envelope **provided phases are right-sized**, so `boundary-too-large` does not
+  occur on the sanctioned per-phase path for a right-sized phase. When a single phase
+  still exceeds the envelope, `execute` MUST fail loud with `boundary-too-large` pointing
+  at right-sizing guidance — it MUST NOT auto-split a phase and MUST NOT silently scope it
+  down. (Companion dependency: TASK-75.)
 
 **Mechanical commit-and-push (US3)**
 
