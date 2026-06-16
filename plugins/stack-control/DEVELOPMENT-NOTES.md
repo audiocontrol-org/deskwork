@@ -2,6 +2,31 @@
 
 ---
 
+## 2026-06-16: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 4
+  - chore(stack-control): close out 024 lifecycle-compass — shipped
+  - Merge remote-tracking branch 'origin/main' into feature/stack-control
+  - chore: release v0.49.0
+  - Merge pull request #481 from audiocontrol-org/feature/stack-control
+- Files changed: 24
+- Backlog touched: TASK-139, TASK-142, TASK-143, TASK-83
+
 ## 2026-06-16: 024 release-readiness review → T040 fix → PR #481 opened + merged to main
 
 **Goal:** (continuation of the same working day, after the first session-end) Decide whether
