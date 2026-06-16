@@ -357,7 +357,8 @@ Umbrella: industrialize the stack-control project lifecycle so the governing cer
 One-move backlog->roadmap promotion: given a backlog item, PROPOSE the roadmap node derived from it (phase/kind from labels, slug from title, status planned, candidate edges, ref=TASK-id, description from body), dry-run the node + linkage, and on --apply CREATE the node AND record the promote linkage atomically — removing the two hand steps (roadmap add + backlog promote) run for TASK-134. Preserves the record-only-promote intent (bidirectional navigability). Promoted from TASK-135.
 
 ## multi:feature/parseable-lifecycle-workflow
-- status: planned
+- status: shipped
+- spec: specs/022-parseable-lifecycle-workflow
 - depends-on: design:feature/roadmap-protocol, design:feature/document-primitives
 - part-of: multi:feature/lifecycle-industrialization
 - ref: TASK-136
