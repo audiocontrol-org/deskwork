@@ -2,6 +2,47 @@
 
 ---
 
+## 2026-06-16: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 20
+  - docs(rules): a question is not an instruction to act
+  - fix(stack-control): 024 round-4 barrage findings — stale comment, session-end doc; scope codex-03
+  - fix(stack-control): extractScopedPaths excludes bare leading-slash slash-commands (round-4 FATAL)
+  - fix(stack-control): 024 round-3 barrage findings — eager-marker, fake-test, identity coupling
+  - fix(stack-control): 024 claude-01 (HIGH) — FR-008 model (b): define CREATES the node (capture-fusion)
+  - docs(stack-control): 024 round-2 — ship-phantom hygiene (claude-04) + fold claude-03 into T039
+  - fix(stack-control): 024 round-2 barrage findings — session-end contract, govern precondition, marker fail-loud
+  - fix(stack-control): 024 barrage findings — doc reconcile (claude-03, codex-03) + scope claude-02/05
+  - fix(stack-control): 024 codex-01 — govern resolves the feature by item, not incidental branch
+  - fix(stack-control): 024 barrage findings — convergence-key fail-loud + path-span precision
+  - chore(stack-control): frontier-only cross-family barrage fleet for whole-feature govern
+  - fix(stack-control): 024 phase-1 governance findings — intent protocol surface
+  - design(stack-control): capture unskippable-workflow-protocol + stopgap offroading rules
+  - docs(stack-control): 024 phase 9 — compass surface + honest-boundary docs; line-cap (US, FR-014)
+  - feat(stack-control): 024 phases 7-8 — capture fusion + back-half gate refusal (US3/US5)
+  - feat(stack-control): 024 phase 6 — every lifecycle skill refuses off-rail (US2, FR-006/007)
+  - feat(stack-control): 024 phase 5 — the lifecycle compass primitive (US1, FR-001..005)
+  - feat(stack-control): 024 phases 1-3 — canonical identity + govern runnable (FR-011/012/013)
+  - tasks(stack-control): /speckit-tasks 024 lifecycle-compass — 38 tasks, FR-015 sequencing (govern-runnability + identity lead), TDD throughout
+  - plan(stack-control): /speckit-plan 024 lifecycle-compass — research, data-model, contracts, quickstart
+- Files changed: 41
+- Backlog touched: TASK-139, TASK-83
+
 ## 2026-06-16: Execute 022 → ship 022/023 → discover & design the un-skippable workflow (compass)
 
 **Goal:** Execute the runnable spec 022 (`parseable-lifecycle-workflow`) via

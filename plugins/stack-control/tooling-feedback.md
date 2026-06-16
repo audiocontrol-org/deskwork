@@ -62,3 +62,7 @@
 - govern --mode implement FATALs 'feature not found' on the session-pinned branch (derives slug from feature/<branch>=stack-control, looks for specs/<NNN>-stack-control); after_implement hook passes no --feature. Captured in spec 024 FR-011.
 - Authoring a spec via speckit-specify does not set the roadmap node's spec: pointer -> the spec dir is briefly an orphan (manual-capture gap, hit twice this session: 023 and 024). Captured in spec 024 FR-008 (capture fused to authoring).
 - roadmap reconcile still proposes in-flight->shipped from tasks-completion, disagreeing with the workflow's derived 'governing' phase (no convergence record). reconcile should defer to the workflow phase. Captured in spec 024.
+
+## session-end 2026-06-16
+- Per-phase governance should fire at each phase boundary, not as one whole-feature pass at the end (boundary-too-large). Mechanization scoped in multi:feature/unskippable-workflow-protocol.
+- govern.ts is ~1000 lines (well over the 300-500 cap); barrage findings keep landing there. Needs decomposition.
