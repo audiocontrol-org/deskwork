@@ -76,6 +76,7 @@ import {
 } from '../scope-discovery/util/feature-root.js';
 import { resolveInstallation } from '../config/installation.js';
 import type { Installation } from '../config/types.js';
+import { checkLifecyclePrecondition } from '../lifecycle-precondition.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
 import {
@@ -676,6 +677,21 @@ export async function runGovern(args: string[]): Promise<void> {
     // hook/operator path), resolve the feature from the item's spec pointer and use
     // it as the explicit slug — never guess from the incidental branch/marker.
     const itemSlug = flags.item !== undefined ? resolveFeatureFromItem(installation, flags.item) : undefined;
+    // 024 codex-01 (HIGH): when an explicit item is named (the authoritative path), gate
+    // govern through the compass — govern is a lifecycle surface and MUST NOT run on an item
+    // whose phase is not ready for governing (a `--item` entry bypasses execute's precondition,
+    // so the gate has to live here too). Refuse loud on a non-zero verdict, before any payload
+    // assembly or barrage.
+    if (flags.item !== undefined) {
+      const pre = checkLifecyclePrecondition({ item: flags.item, intent: 'govern', cwd: installation.root });
+      if (!pre.proceed) {
+        process.stderr.write(
+          `govern: REFUSED — compass verdict '${pre.verdict.outcome}' for '${flags.item}': ${pre.verdict.reason}\n`,
+        );
+        emitTerminalOutcome('fatal');
+        process.exit(2);
+      }
+    }
     const explicitSlug = itemSlug ?? pick(flags.feature, process.env.GOVERN_FEATURE_SLUG);
     const branchForSlug = currentBranch(repoRoot);
     const markerSlug = readActiveFeatureSlug(repoRoot);

@@ -25,8 +25,14 @@ The helper is the single place the refusal message shape lives; skills do not ha
 
 ## The skill-body contract (each lifecycle SKILL.md)
 
-Every lifecycle skill — at minimum `define`, `execute`, the `after_implement` govern hook,
-`ship`, `release`, `session-end` (FR-006) — opens with a precondition step:
+Every **authoring/advancing** lifecycle skill — `define`, `design`, `execute`, the
+`after_implement` govern surface, `release` (FR-006) — opens with a HARD-REFUSAL precondition
+step. **`session-end` is EXCLUDED from the hard-refusal set** (AUDIT-BARRAGE codex-02 +
+claude-02, cross-family): it is capture-only and **never refuses to close** — its compass
+consultation is an *optional, advisory* orientation that is not even recorded by the verb (see
+skills/session-end/SKILL.md + README). A finishing skill that refuses would break the
+capture-over-scope / empty-revisions-beat-missed-changes invariant. The hard-refusal contract
+below applies only to the authoring/advancing skills:
 
 ```
 1. Resolve the item this invocation operates on (its --item / the active item).
@@ -52,9 +58,11 @@ Every lifecycle skill — at minimum `define`, `execute`, the `after_implement` 
 - **Binds**: an agent following its skills cannot skip a step — the skill it runs orients for
   it and refuses if off-rail. This is the threat model (agent drift).
 - **Does not bind**: a human (or agent) using raw `git`/`gh` to author/advance directly. No
-  verb embeds the compass there. The backstop is that the *finishing* skills
-  (`ship`/`release`/`session-end`) refuse without the full recorded evidence chain (spec Edge
-  Cases). This boundary MUST be documented, not overclaimed (FR-014).
+  verb embeds the compass there. The backstop is that the advancing finishing skill
+  (`release`) refuses without the full recorded evidence chain, and the back-half govern gate
+  (the per-phase convergence record) cannot graduate without it (spec Edge Cases).
+  `session-end` is NOT a backstop here — it is capture-only and advisory (above). This boundary
+  MUST be documented, not overclaimed (FR-014).
 
 ## Tests (lifecycle-precondition.test.ts)
 

@@ -99,9 +99,14 @@ The compass consultation that gates a skill's execution (FR-006). Spec Key Entit
 | `intent` | `string` | the skill's own name, passed as `--intent` |
 | `verdict` | `Verdict` | the compass result; non-zero `exitCode` ⇒ hard refusal |
 
-**Behavior**: a non-zero verdict ⇒ the skill performs **none** of its work and refuses loud,
-naming the violated invariant + the skipped step (FR-006, SC-002). An `on-course`/`behind`
-verdict ⇒ the skill proceeds (the gate is transparent on the happy path).
+**Behavior**: for an **authoring/advancing** skill (`define`, `design`, `execute`, the govern
+surface, `release`) a non-zero verdict ⇒ the skill performs **none** of its work and refuses
+loud, naming the violated invariant + the skipped step (FR-006, SC-002). An `on-course`/`behind`
+verdict ⇒ the skill proceeds (the gate is transparent on the happy path). **`session-end` is
+excluded** (AUDIT-BARRAGE codex-02/claude-02): it is capture-only and never refuses; its compass
+consultation is advisory and not recorded by the verb. Under FR-008 model (b), **`define`
+additionally treats a no-node feature as a CREATE (capture-fusion), not a refusal** — see the
+Orphan / capture-fusion entry below.
 
 ## Reused 022 entities (no schema change)
 

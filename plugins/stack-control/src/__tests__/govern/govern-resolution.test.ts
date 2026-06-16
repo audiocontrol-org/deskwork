@@ -5,8 +5,9 @@
 // RED first (T006/T007).
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { runCli } from '../_run-helpers.js';
 import { extractScopedPaths } from '../../govern/incremental-audit.js';
-import { resolveConvergenceItem, resolveFeatureFromItem, resolveFeatureSlug } from '../../govern/feature-resolution.js';
+import { readActiveFeatureSlug, resolveConvergenceItem, resolveFeatureFromItem, resolveFeatureSlug } from '../../govern/feature-resolution.js';
 import { resolveInstallation } from '../../config/installation.js';
 import { makeWorkflowFixture, type WorkflowFixture } from '../fixtures/workflow/workflow-fixtures.js';
 
@@ -137,5 +138,39 @@ describe('024 codex-01 — govern resolves by item/marker, not an incidental bra
     const inst = resolveInstallation(f.root);
     expect(() => resolveFeatureFromItem(inst, 'multi:feature/missing')).toThrow(/item/i);
     expect(() => resolveFeatureFromItem(inst, 'multi:feature/nospec')).toThrow(/spec/i);
+  });
+});
+
+describe('024 codex-01 — govern --item runs the compass precondition (no bypass)', () => {
+  it('refuses an item not ready for governing, before any barrage', () => {
+    // item at `specifying` (spec set, not analyze-clean) → govern (governing) is `ahead`
+    const f = convFixture([
+      { identifier: 'multi:feature/x', status: 'in-flight', design: 'd', spec: 'specs/024-x', analyzeClean: false },
+    ]);
+    const r = runCli(['govern', '--mode', 'implement', '--item', 'multi:feature/x'], { cwd: f.root });
+    expect(r.status).not.toBe(0);
+    expect(`${r.stdout}${r.stderr}`).toMatch(/REFUSED|compass|ahead/i);
+  });
+});
+
+describe('024 codex-03 — a malformed active-feature marker fails loud (not silently absent)', () => {
+  it('returns null when .specify/feature.json is genuinely absent', () => {
+    const f = convFixture([]);
+    expect(readActiveFeatureSlug(f.root)).toBeNull();
+  });
+  it('returns the basename when the marker is valid', () => {
+    const f = convFixture([]);
+    f.write('.specify/feature.json', JSON.stringify({ feature_directory: 'specs/024-x' }));
+    expect(readActiveFeatureSlug(f.root)).toBe('024-x');
+  });
+  it('THROWS when the marker exists but is unparseable', () => {
+    const f = convFixture([]);
+    f.write('.specify/feature.json', '{ not json');
+    expect(() => readActiveFeatureSlug(f.root)).toThrow(/feature\.json|marker/i);
+  });
+  it('THROWS when the marker exists but has no feature_directory', () => {
+    const f = convFixture([]);
+    f.write('.specify/feature.json', JSON.stringify({ wrong: 'key' }));
+    expect(() => readActiveFeatureSlug(f.root)).toThrow(/feature_directory|marker/i);
   });
 });

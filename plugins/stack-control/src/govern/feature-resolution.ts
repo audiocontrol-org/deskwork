@@ -42,17 +42,28 @@ export function branchDerivedSlug(branch: string | undefined): string | null {
  */
 export function readActiveFeatureSlug(repoRoot: string): string | null {
   const pointer = join(repoRoot, '.specify', 'feature.json');
+  // Genuinely absent = a clean "no active Spec Kit feature" → null. But a PRESENT marker that
+  // is unparseable / missing `feature_directory` is NOT a clean absence (AUDIT-BARRAGE codex-03):
+  // the authoritative active-feature pointer cannot be trusted, and collapsing it to null lets an
+  // incidental branch slug win → govern runs against the wrong feature. Fail loud (Principle V).
   if (!existsSync(pointer)) return null;
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(readFileSync(pointer, 'utf8'));
-    if (typeof parsed === 'object' && parsed !== null) {
-      const dir = (parsed as Record<string, unknown>)['feature_directory'];
-      if (typeof dir === 'string' && dir.length > 0) return basename(dir);
-    }
-  } catch {
-    return null;
+    parsed = JSON.parse(readFileSync(pointer, 'utf8'));
+  } catch (err) {
+    throw new GovernProtocolError(
+      `govern: FATAL — .specify/feature.json is present but unparseable (${err instanceof Error ? err.message : String(err)}); ` +
+        `the active-feature marker cannot be trusted. Fix or remove it.`,
+    );
   }
-  return null;
+  if (typeof parsed === 'object' && parsed !== null) {
+    const dir = (parsed as Record<string, unknown>)['feature_directory'];
+    if (typeof dir === 'string' && dir.length > 0) return basename(dir);
+  }
+  throw new GovernProtocolError(
+    `govern: FATAL — .specify/feature.json is present but has no valid 'feature_directory'; ` +
+      `the active-feature marker cannot be trusted. Fix or remove it.`,
+  );
 }
 
 /**
