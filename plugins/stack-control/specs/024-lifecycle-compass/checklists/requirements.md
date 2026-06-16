@@ -13,8 +13,8 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — 3 remain (FR-004, FR-010, FR-015); resolved by `/speckit-clarify`
-- [x] Requirements are testable and unambiguous (excepting the 3 marked forks)
+- [x] No [NEEDS CLARIFICATION] markers remain — all 3 resolved (operator-confirmed 2026-06-16)
+- [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic
 - [x] All acceptance scenarios are defined
@@ -31,7 +31,6 @@
 
 ## Notes
 
-- 3 `[NEEDS CLARIFICATION]` markers remain by design — they are genuine operator forks
-  (intent vocabulary, FR-010 retirement scope, prerequisite sequencing) that the
-  dedicated `/speckit-clarify` step resolves next in the chain. The spec is otherwise
-  complete and validated.
+- All 3 forks (intent vocabulary, FR-010 retirement scope, prerequisite sequencing)
+  resolved by operator confirmation 2026-06-16 and encoded into the Clarifications
+  section + FR-004/FR-010/FR-015. Spec is complete and ready for `/speckit-plan`.

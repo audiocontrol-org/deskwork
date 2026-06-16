@@ -62,8 +62,21 @@ open questions.
 
 ### Session 2026-06-16
 
-(Reserved — to be populated by `/speckit-clarify`. The open forks are surfaced as
-`[NEEDS CLARIFICATION]` markers in Requirements below and in Assumptions.)
+- Q: Is the compass intent vocabulary a fixed enumeration, or free-form NL mapped
+  heuristically? → A: **Fixed enumeration of lifecycle skill/verb names; an unknown
+  intent refuses (fail-loud).** A heuristic NL→phase mapping would reintroduce the
+  agent-judgment the feature exists to remove; the verdict must be mechanical.
+- Q: Is the FR-010 report-only retirement global or phased? → A: **Phased — enforce
+  the entry gate (orphan/capture) and the back-half `governing → shipped` gate first;
+  mid-pipeline gates stay advisory in the *engine's* `advance` path.** Order is still
+  enforced mid-pipeline by the compass embedded in the skills (US2/FR-006); FR-010 is
+  only about the engine's own advance path, and a global flip risks blocking legit
+  in-flight work before the govern fixes are proven.
+- Q: Do the govern-runnability + canonical-identity fixes ship as separate
+  prerequisite features, or fold into this spec? → A: **One spec — but the
+  govern-runnability fixes (FR-011/FR-012) and the canonical identity (FR-013) are the
+  FIRST task phases**, so the compass enforcement builds on an already-runnable govern
+  ("can't enforce a step that can't run").
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -251,11 +264,10 @@ own item.
   node / a terminal side-state).
 - **FR-003**: The verdict MUST be exposed as a process exit code (zero = proceed,
   non-zero = refuse) so a skill body can gate on it without parsing prose.
-- **FR-004**: An intended action that the compass does not recognize MUST fail loud
-  (treated as a refusal), never silently classified as `on-course`. [NEEDS
-  CLARIFICATION: is the intent vocabulary a fixed enumeration of lifecycle
-  skill/verb names, with anything else refused — or is a free-form natural-language
-  intent accepted and mapped heuristically (advisory only)?]
+- **FR-004**: The intent vocabulary MUST be a fixed enumeration of lifecycle
+  skill/verb names, each mapped to the phase it belongs to. An intended action not in
+  the enumeration MUST fail loud (treated as a refusal), never silently classified as
+  `on-course` and never mapped heuristically. *(Clarified 2026-06-16.)*
 - **FR-005**: The compass MUST be read-only (writing nothing; identical output on
   re-run with no on-disk change).
 
@@ -280,11 +292,12 @@ own item.
 
 **Gates are refusals**
 
-- **FR-010**: The workflow's enforced gates MUST be refusals, not reports — retiring
-  the 022 v1 report-only posture where enforcement applies. [NEEDS CLARIFICATION:
-  is the report-only retirement global (all gates refuse) or phased (enforce the
-  entry gate + the back-half `governing → shipped` gate first; keep mid-pipeline
-  gates advisory during migration)?]
+- **FR-010**: The report-only retirement MUST be phased: the **entry gate**
+  (orphan/capture, US3) and the back-half **`governing → shipped`** gate are enforced
+  as refusals first; mid-pipeline gates remain advisory in the engine's own `advance`
+  path during migration. Mid-pipeline ORDER is still enforced by the compass embedded
+  in the skills (FR-006) — FR-010 governs only the engine's advance path.
+  *(Clarified 2026-06-16.)*
 
 **Govern runnable (prerequisite)**
 
@@ -310,11 +323,11 @@ own item.
 
 **Scope / sequencing**
 
-- **FR-015**: [NEEDS CLARIFICATION: do the govern-runnability fixes (FR-011/FR-012)
-  and the canonical-identity change (FR-013) ship as prerequisite features *ahead* of
-  the compass + embedding, or are they folded into this single spec's implementation?
-  They block enforceability of the back-half gate, so they must land no later than the
-  enforcement that depends on them.]
+- **FR-015**: The govern-runnability fixes (FR-011/FR-012) and the canonical-identity
+  change (FR-013) MUST be the FIRST implementation phases of this spec — the compass +
+  skill embedding (FR-001/FR-006) build on an already-runnable, identity-consistent
+  govern. They are not separate features, but they sequence first because the
+  back-half gate's enforceability depends on them. *(Clarified 2026-06-16.)*
 
 ### Key Entities
 
@@ -353,12 +366,9 @@ own item.
 
 - **Capture everything; scope later.** Per the project's capture-don't-cut rule, this
   spec records the full surface (compass + embedding + capture-fusion + govern
-  runnability + canonical identity + report-only retirement). Which slices ship first
-  is a later, explicit operator-driven scoping pass — surfaced as FR-015's
-  clarification, not silently cut here.
-- **Intent vocabulary default** (pending FR-004 clarification): the intent is a fixed
-  enumeration of lifecycle skill/verb names; an unknown intent refuses (fail-loud).
-- **Capture-fusion mechanics default** (pending): the spec-authoring front door
+  runnability + canonical identity + report-only retirement). The sequencing within it
+  is settled by FR-015 (govern-runnability + identity lead).
+- **Capture-fusion mechanics** (default applied): the spec-authoring front door
   (`define` / `speckit-specify` path) creates the node; the node id derives from the
   canonical feature identity (FR-013) so it round-trips with the spec dir.
 - **Legacy migration** (default applied, not a blocking clarification): the
