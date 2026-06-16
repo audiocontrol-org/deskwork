@@ -45,6 +45,7 @@ import {
   branchDerivedSlug,
   readActiveFeatureSlug,
   resolveConvergenceItem,
+  resolveFeatureFromItem,
   resolveFeatureSlug,
 } from '../govern/feature-resolution.js';
 import {
@@ -112,6 +113,8 @@ const USAGE = [
   '',
   '  --mode <implement|spec>   Required.',
   '  --feature <slug>          Feature slug (else derived from feature/<slug>).',
+  '  --item <id>               Roadmap item id — resolve the feature AUTHORITATIVELY',
+  '                            from its spec: pointer (preferred over branch/marker).',
   '  --at <dir>                Resolve the installation enclosing <dir> (default: cwd).',
   '  --ceiling <N>             Convergence iteration ceiling (default 1). NOTE: govern',
   '                            applies NO in-process fix between rounds, so N>1 re-runs',
@@ -139,6 +142,7 @@ type Mode = 'implement' | 'spec';
 interface GovernFlags {
   mode?: Mode;
   feature?: string;
+  item?: string;
   at?: string;
   ceiling?: string;
   override?: string;
@@ -156,6 +160,7 @@ interface GovernFlags {
 const VALUED = new Set([
   '--mode',
   '--feature',
+  '--item',
   '--at',
   '--ceiling',
   '--override',
@@ -189,6 +194,7 @@ function parseFlags(argv: readonly string[]): { ok: true; flags: GovernFlags } |
         }
         flags.mode = value;
       } else if (tok === '--feature') flags.feature = value;
+      else if (tok === '--item') flags.item = value;
       else if (tok === '--at') flags.at = value;
       else if (tok === '--ceiling') flags.ceiling = value;
       else if (tok === '--override') flags.override = value;
@@ -665,7 +671,12 @@ export async function runGovern(args: string[]): Promise<void> {
     // marker — so govern runs on the session-pinned branch (where the branch slug
     // is NOT a feature slug). Pre-compute which candidate slugs have an existing
     // feature root (resolveFeatureRoot is async), then resolve synchronously.
-    const explicitSlug = pick(flags.feature, process.env.GOVERN_FEATURE_SLUG);
+    //
+    // 024 codex-01 (HIGH): when an explicit `--item` is supplied (the authoritative
+    // hook/operator path), resolve the feature from the item's spec pointer and use
+    // it as the explicit slug — never guess from the incidental branch/marker.
+    const itemSlug = flags.item !== undefined ? resolveFeatureFromItem(installation, flags.item) : undefined;
+    const explicitSlug = itemSlug ?? pick(flags.feature, process.env.GOVERN_FEATURE_SLUG);
     const branchForSlug = currentBranch(repoRoot);
     const markerSlug = readActiveFeatureSlug(repoRoot);
     const candidateSlugs = [branchDerivedSlug(branchForSlug), markerSlug].filter(

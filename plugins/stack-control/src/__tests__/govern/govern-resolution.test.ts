@@ -6,7 +6,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { extractScopedPaths } from '../../govern/incremental-audit.js';
-import { resolveConvergenceItem, resolveFeatureSlug } from '../../govern/feature-resolution.js';
+import { resolveConvergenceItem, resolveFeatureFromItem, resolveFeatureSlug } from '../../govern/feature-resolution.js';
 import { resolveInstallation } from '../../config/installation.js';
 import { makeWorkflowFixture, type WorkflowFixture } from '../fixtures/workflow/workflow-fixtures.js';
 
@@ -115,5 +115,27 @@ describe('024 FR-013 — resolveConvergenceItem keys by canonical node id or fai
     const f = convFixture([]);
     const inst = resolveInstallation(f.root);
     expect(resolveConvergenceItem(inst, undefined, 'fallback-slug')).toBe('fallback-slug');
+  });
+});
+
+describe('024 codex-01 — govern resolves by item/marker, not an incidental branch', () => {
+  it('prefers the marker over the branch slug when BOTH feature roots exist', () => {
+    // an incidental branch slug must not win over the deliberate active-feature marker
+    expect(
+      resolveFeatureSlug({ branch: 'feature/013-foo', markerSlug: '024-compass', featureRootExists: () => true }),
+    ).toBe('024-compass');
+  });
+
+  it('resolveFeatureFromItem resolves the feature slug authoritatively from the item spec pointer', () => {
+    const f = convFixture([{ identifier: 'multi:feature/x', status: 'in-flight', spec: 'specs/024-compass' }]);
+    const inst = resolveInstallation(f.root);
+    expect(resolveFeatureFromItem(inst, 'multi:feature/x')).toBe('024-compass');
+  });
+
+  it('resolveFeatureFromItem fails loud for an unknown item or an item with no spec pointer', () => {
+    const f = convFixture([{ identifier: 'multi:feature/nospec', status: 'planned' }]);
+    const inst = resolveInstallation(f.root);
+    expect(() => resolveFeatureFromItem(inst, 'multi:feature/missing')).toThrow(/item/i);
+    expect(() => resolveFeatureFromItem(inst, 'multi:feature/nospec')).toThrow(/spec/i);
   });
 });

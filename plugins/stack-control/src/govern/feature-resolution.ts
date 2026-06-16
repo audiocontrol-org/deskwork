@@ -12,7 +12,7 @@ import { basename, join, relative } from 'node:path';
 import type { Installation } from '../config/types.js';
 import { loadRoadmap } from '../roadmap/roadmap-model.js';
 import { grammarOptsForRoot } from '../subcommands/document-verb-shared.js';
-import { resolveIdentityFromSpecDir } from '../workflow/identity.js';
+import { resolveIdentity, resolveIdentityFromSpecDir } from '../workflow/identity.js';
 import { GovernProtocolError } from './protocol.js';
 
 export interface ResolveFeatureSlugArgs {
@@ -81,16 +81,45 @@ export function resolveFeatureSlug(args: ResolveFeatureSlugArgs): string {
     );
   }
 
-  if (fromBranch !== null && exists(fromBranch)) return fromBranch;
+  // Prefer the deliberate active-feature MARKER over an incidental branch slug
+  // (AUDIT-BARRAGE codex-01): a branch slug that happens to resolve to any feature
+  // root must not win over the marker that names the feature actually in flight.
   if (args.markerSlug != null && args.markerSlug.length > 0 && exists(args.markerSlug)) {
     return args.markerSlug;
   }
+  if (fromBranch !== null && exists(fromBranch)) return fromBranch;
 
   throw new GovernProtocolError(
     `govern: FATAL — no feature resolved (branch '${args.branch ?? ''}' slug ` +
       `'${fromBranch ?? '(none)'}', SPECKIT marker '${args.markerSlug ?? '(none)'}'). ` +
       'Set --feature/GOVERN_FEATURE_SLUG, or ensure the active spec dir exists.',
   );
+}
+
+/**
+ * 024 codex-01 (HIGH): resolve the feature to govern AUTHORITATIVELY from an explicit
+ * roadmap item — the `--item` / hook-context path — rather than guessing from the
+ * branch slug or the active-feature marker (which can be incidental or stale). The
+ * item's `spec:` pointer is the canonical feature→spec binding (FR-013); its basename
+ * is the feature slug `resolveFeatureRoot` resolves. Fails loud on an unknown item or
+ * an item with no spec pointer (Principle V) — never silently falls through to the
+ * branch/marker guess when the operator named an item.
+ */
+export function resolveFeatureFromItem(installation: Installation, itemId: string): string {
+  const model = loadRoadmap(installation.resolved.roadmap, grammarOptsForRoot(installation.root));
+  const item = model.byId.get(itemId);
+  if (item === undefined) {
+    throw new GovernProtocolError(
+      `govern: FATAL — no roadmap item '${itemId}' (--item); known: ${[...model.byId.keys()].join(', ') || '(none)'}`,
+    );
+  }
+  const id = resolveIdentity(installation.root, item);
+  if (id.specPointer === null) {
+    throw new GovernProtocolError(
+      `govern: FATAL — roadmap item '${itemId}' has no spec: pointer; cannot resolve a feature to govern (link a spec first).`,
+    );
+  }
+  return basename(id.specPointer);
 }
 
 /**
