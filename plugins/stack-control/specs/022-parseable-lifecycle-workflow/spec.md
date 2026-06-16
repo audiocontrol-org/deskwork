@@ -31,6 +31,14 @@ These were operator decisions that gated converging the design record; they are 
 3. **TASK-19 scope**: the governance-graduation record is delivered BY this feature, together with every gate that reads it (the full back-half `governing → shipped` mechanical exit). No report-only interim for the back half.
 4. **Installation-anchor invariant**: every artifact the workflow authors lands inside the configuration domain (the installation tree rooted at the dir owning `.stack-control/config.yaml`), never the adopter's repo root. This is the constitution's installation-anchor invariant (installation-isolation FR-010) applied to every new artifact this feature introduces.
 
+## Clarifications
+
+### Session 2026-06-16
+
+- Q: Where does the governed `WORKFLOW.md` live — bundled default vs per-installation authored? → A: **Plugin-bundled default, per-install overridable.** The canonical stack-control lifecycle (phase vocabulary + gate criteria) ships with the plugin; an installation may override it via the customize seam (the same override-resolution as built-in templates / doctor rules — installation copy wins, else the bundled default). The lifecycle stays universal but tailorable.
+- Q: Should `spec-govern` convergence (the `specifying → implementing` signal) be recorded the same way as TASK-19's impl-govern record? → A: **Symmetric — one govern-convergence record mechanism, two modes.** Both `govern --mode spec` and impl govern write a durable on-disk convergence record (keyed by mode); the phase-derivation function reads both symmetrically, so `specifying → implementing` is mechanical too, not agent say-so.
+- Q: Where is the recorded operator-approval marker (for judgment gates) stored? → A: **A field on the roadmap node** (e.g. `design-approved:`), co-located with the `design:` / `spec:` pointers — one governed surface, consistent with node-is-the-unit.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Mechanical, queryable stage gates (Priority: P1) 🎯 MVP
@@ -189,13 +197,14 @@ Design also happens AFTER specifying / implementing (the `/frontend-design` rule
 **Governed WORKFLOW.md**
 
 - **FR-005**: The phase vocabulary, derive predicates, gate criteria, and transition effect manifests MUST live in a single governed, grammar-parsed `WORKFLOW.md`; the engine MUST read them from the document and MUST NOT hardcode them.
+- **FR-005a**: `WORKFLOW.md` MUST be a **plugin-bundled default** (the canonical stack-control lifecycle) that an installation MAY override via the customize seam; the engine MUST resolve it through the existing override-resolution order (installation copy wins, else the bundled default) — the same pattern as built-in templates and doctor rules. *(Clarified 2026-06-16.)*
 - **FR-006**: `WORKFLOW.md` MUST support two unit kinds — **phase** (publishing derive predicate, work, entrance criteria, exit criteria, next) and **transition** (publishing codename, exit-gate, ordered effects).
 - **FR-007**: A malformed `WORKFLOW.md` MUST fail loud naming the grammar violation; the engine MUST NOT fall back to built-in defaults.
 
 **Stage gates**
 
 - **FR-008**: Every entrance and exit criterion MUST be a computable true/false predicate over artifacts that already exist (e.g. file exists, section present, count ≥ N, tasks 100%, tree clean, recorded approval marker present).
-- **FR-009**: A criterion that encodes a judgment MUST be expressed as a check of a recorded operator decision (an approval marker), never as a subjective evaluation performed at evaluation time.
+- **FR-009**: A criterion that encodes a judgment MUST be expressed as a check of a recorded operator decision (an approval marker), never as a subjective evaluation performed at evaluation time. The approval marker MUST be stored as **a field on the roadmap node** (e.g. `design-approved:`), co-located with the `design:` / `spec:` pointers — one governed surface. *(Clarified 2026-06-16.)*
 - **FR-010**: In v1, gates MUST be evaluated and REPORTED but MUST NOT be enforced as refusals (no hard gating). The criteria themselves are not softened — only the refusal is deferred.
 
 **Query surface (read-only)**
@@ -226,8 +235,8 @@ Design also happens AFTER specifying / implementing (the `/frontend-design` rule
 
 **Governance-graduation record (TASK-19)**
 
-- **FR-028**: The system MUST produce a durable on-disk govern-convergence record when governance converges, written inside the installation domain.
-- **FR-029**: The `governing → shipped` exit criterion MUST be decided by that record (impl-govern convergence recorded ∧ converged); it MUST NOT infer shipped from tasks-completion or any agent assertion.
+- **FR-028**: The system MUST produce a durable on-disk govern-convergence record when governance converges, written inside the installation domain. The record MUST be a **single symmetric mechanism keyed by mode** that covers BOTH `govern --mode spec` (spec-govern convergence) and impl govern (impl-govern convergence). *(Clarified 2026-06-16: spec-govern and impl-govern convergence are recorded the same way.)*
+- **FR-029**: The phase-derivation function and the exit gates MUST read the convergence records symmetrically: the `specifying → implementing` signal is decided by the **spec-govern** convergence record, and the `governing → shipped` exit criterion by the **impl-govern** convergence record (recorded ∧ converged). Neither MUST infer convergence from chain-completion, tasks-completion, or any agent assertion.
 
 **Installation-anchor invariant**
 
@@ -247,8 +256,8 @@ Design also happens AFTER specifying / implementing (the `/frontend-design` rule
 - **Effect**: a call to a governed verb from the fixed v1 vocabulary; the ordered set is an effect manifest.
 - **House-rules block**: the frontend's named, single-source opinion — injected into the backend AND checked by the exit gate.
 - **Design record**: the `designing`-phase artifact (problem domain, solution space incl. rejected alternatives, decisions, open questions, provenance), written at the installation-anchored convention path.
-- **Govern-convergence record**: the durable on-disk record that governance converged (the `governing → shipped` gate input; TASK-19).
-- **Approval marker**: a recorded operator decision that makes a judgment criterion mechanical.
+- **Govern-convergence record**: a durable on-disk record that governance converged — a single mode-keyed mechanism covering both spec-govern (the `specifying → implementing` signal) and impl-govern (the `governing → shipped` gate input; TASK-19).
+- **Approval marker**: a recorded operator decision that makes a judgment criterion mechanical, stored as a field on the roadmap node (e.g. `design-approved:`), co-located with the `design:` / `spec:` pointers.
 
 ## Success Criteria *(mandatory)*
 
