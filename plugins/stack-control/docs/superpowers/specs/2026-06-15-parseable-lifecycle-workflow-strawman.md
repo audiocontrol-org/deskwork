@@ -74,21 +74,38 @@ All are now settled — downstream design and the spec inherit them:
   report-only interim for the back half. Consequence: the `governing` exit criterion
   (`impl-govern convergence recorded ∧ converged`) is in scope here, not deferred;
   the spec must design the graduation record's shape and write path.
-- **Design-record placement (operator correction):** design records live **INSIDE
-  the stack-control configuration domain** (the installation root that owns
-  `.stack-control/config.yaml`), NOT at the repo root. The repo-root
-  `docs/superpowers/specs/` is deskwork's *shared* archive; writing a
-  stack-control-specific design doc there leaks across the installation boundary and
-  violates the isolation invariant (constitution Additional Constraints,
-  installation-anchor). The `designing`-phase convention path is therefore
-  **domain-relative**: `<install-domain>/docs/superpowers/specs/<date>-<slug>-design.md`
-  (for this monorepo's dogfood, `plugins/stack-control/docs/superpowers/specs/`). This
-  is the design-doc instance of the already-tracked
-  `design:gap/project-relative-doc-discovery` — the `/stack-control:design` frontend
-  MUST resolve the record path against the installation (the same anchor every
-  state-writing verb uses), never a hardcoded repo-root path. This strawman was first
-  written to the repo root and moved into the domain on 2026-06-16 as the corrective;
-  the spec must make the domain-relative path the only path the frontend can write.
+- **All authored artifacts anchor inside the installation domain (operator
+  principle — the load-bearing one for this whole feature).** In ANY repo
+  stack-control operates on — most importantly an **adopter's** repo, not just this
+  monorepo's dogfood — **every artifact the workflow authors lands inside the
+  configuration domain**: the installation tree rooted at the directory that owns
+  `.stack-control/config.yaml`. The tool **never** writes to the adopter's repo root
+  and never treats the repo root as a home for anything. *The configuration domain is
+  the entire universe the tool may write to.* This is **already the constitution's
+  installation-anchor invariant** (Additional Constraints / installation-isolation
+  FR-010: "every verb that creates or mutates stack-control-owned state MUST anchor
+  that state inside the nearest-enclosing installation; writing outside the
+  installation tree by default is prohibited"). Roadmap, backlog, journal,
+  audit-runs, and Spec Kit `specs/` already obey it; the `designing`-phase **design
+  record was the one new artifact that violated it** by proposing a repo-root path.
+  - **Consequence for the design record:** the `/stack-control:design` frontend
+    resolves the record path **relative to the installation root**, e.g.
+    `<install-root>/docs/superpowers/specs/<date>-<slug>-design.md` where
+    `<install-root>` is the nearest-enclosing installation (the dir containing
+    `.stack-control/`). Hardcoding a repo-root path is prohibited. This is the
+    design-doc instance of the already-tracked
+    `design:gap/project-relative-doc-discovery`.
+  - **Consequence for the whole workflow:** the same rule binds every NEW artifact
+    this feature introduces — the governed `WORKFLOW.md`, the
+    governance-graduation record (TASK-19), any checkpoint/effect bookkeeping. None
+    may default to the adopter's repo root; all anchor in the installation. The
+    spec's acceptance criteria must assert this (an adopter-repo fixture proving no
+    artifact escapes the installation tree), mirroring the existing
+    `installation-isolation-probe` enforcement.
+  - **Dogfood note:** this monorepo's installation root is `plugins/stack-control/`,
+    so the corrective move of this strawman into
+    `plugins/stack-control/docs/superpowers/specs/` on 2026-06-16 is the dogfood
+    instance of the general principle — not a monorepo-specific layout choice.
 
 ---
 
@@ -179,7 +196,7 @@ the debate this feature exists to kill.
 |---|---|---|---|
 | 0 | `captured` | a found bug/gap exists in the backlog | `/stack-control:backlog capture` |
 | 1 | `planned` | promoted to a roadmap node, awaiting design | `roadmap add` / `backlog promote` |
-| 2 | `designing` | **free-form exploration → a design record** (problem domain, solution space, decisions, rejected alternatives) | `/stack-control:design` (frontend) → backend (default `superpowers:brainstorming`) → `<install-domain>/docs/superpowers/specs/<date>-<slug>-design.md` (domain-relative; see Ratified 2026-06-16) |
+| 2 | `designing` | **free-form exploration → a design record** (problem domain, solution space, decisions, rejected alternatives) | `/stack-control:design` (frontend) → backend (default `superpowers:brainstorming`) → `<install-root>/docs/superpowers/specs/<date>-<slug>-design.md` (installation-anchored; see Ratified 2026-06-16) |
 | 3 | `specifying` | author + converge the spec (from the design record) | `/stack-control:define` + speckit chain + `govern --mode spec` |
 | 4 | `implementing` | execute the spec (write the code) | `/stack-control:execute` (speckit-implement) |
 | 5 | `governing` | cross-model audit-barrage convergence on the impl | `govern` (after_implement) |
@@ -262,7 +279,7 @@ owns the *mechanism*.
 **What the backend supplies (default = brainstorming):**
 
 - writes + commits the design record at the convention path (its step 6) — the
-  frontend supplies the domain-relative `<install-domain>/docs/superpowers/specs/`
+  frontend supplies the installation-anchored `<install-root>/docs/superpowers/specs/`
   base (Ratified 2026-06-16); the backend must not hardcode a repo-root path;
 - proposes 2-3 approaches with trade-offs (the explore-alternatives method);
 - a **user-review gate** ("review the written spec… wait for the response");
