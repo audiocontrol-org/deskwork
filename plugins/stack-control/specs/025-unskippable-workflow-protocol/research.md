@@ -103,3 +103,59 @@ discretion. Each decision below is grounded in an in-tree primitive.
 
 **Output**: all NEEDS CLARIFICATION resolved (there were none after clarify); design
 ready for data-model + contracts.
+
+## Implementation anchors (T001 — inventory of the primitives this feature wires)
+
+Recorded during implementation (2026-06-16). Exact extension points the feature
+attaches to; no behavior change in this task.
+
+### Per-phase checkpoint primitives (021) — `src/govern/checkpoint-state.ts`
+
+- `checkpointPath(installationRoot, featureSlug, phaseId)` → `.stack-control/govern/phase-checkpoints/<feature>/phase-<id>.json`.
+- `readPhaseCheckpoint(root, slug, phaseId): PhaseCheckpointRecord | null` — fail-loud on corrupt/torn JSON.
+- `writePhaseCheckpoint(root, record)` — atomic temp+rename; symlink-escape guarded.
+- `listCheckpointPhaseIds(root, slug)` — recorded checkpoint phase ids.
+- `isCheckpointFresh(record, {version, checkpoint, auditLogSection, scopeFingerprint})` — the currency predicate.
+- `isCheckpointStale(root, slug, phaseId)` — `.stale` re-design sidecar.
+- `computeScopeFingerprint(root, paths)` — SHA-256 over the governed file set + content; **throws on an empty scope** (no meaningless fingerprint).
+- `PhaseCheckpointRecord` carries `checkpoint`, `auditLogSection` (both `phase-<id>`), `scopeFingerprint`, `governedPaths`, optional `auditedFiles`.
+
+### Per-phase status + governed-path resolution — `src/subcommands/govern.ts` (TO EXTRACT)
+
+- `interface PhaseCheckpointStatus { phaseId; files; auditedFiles; scopeFingerprint; state: 'current'|'missing'|'stale' }` (govern.ts:401).
+- `normalizeGovernedPaths(installationRoot, paths)` (govern.ts:412) — installation-relative normalization.
+- `resolvePhaseCheckpointStatuses(installationRoot, slug, tasksPath)` (govern.ts:439) — parses phases, **fails loud naming the phase on an empty governed file list (FR-004)**, computes fingerprint, reads checkpoint, derives `current|missing|stale`. **This is the exact per-phase currency logic the US1 gate needs.**
+  - **Anchor decision**: extract `PhaseCheckpointStatus` + `normalizeGovernedPaths` + `resolvePhaseCheckpointStatuses` into a shared `src/govern/phase-checkpoint-status.ts`; `govern.ts` re-imports them (pure move, no behavior change); the new US1 compose-convergence reader imports the same resolver (no clone — project anti-clone discipline). Verified no test couples to these internal names or the empty-list message string.
+
+### tasks.md phase enumeration — `src/govern/incremental-audit.ts`
+
+- `parsePhases(tasksText): {phaseId, files}[]` — `## Phase <id>` header grammar (`PHASE_HEADER_RE`), backtick-span file extraction (`extractScopedPaths`). Returns `files: []` for a phase with no path spans (does NOT fail loud, does NOT guard zero-phases).
+- **Anchor decision (T004)**: new `src/workflow/phase-enumeration.ts` wraps `parsePhases` and adds the two FR-004 fail-loud guards the gate requires: zero derivable phases → FATAL; a phase with an empty file list → FATAL naming the phase. Pure over tasks text.
+
+### Gate-eval criterion machinery (022) — `src/workflow/gate-eval.ts` + `workflow-types.ts`
+
+- `CRITERION_KINDS` (workflow-types.ts:44) — add `all-phase-checkpoints-current`.
+- `Criterion {kind, target, param?}`; `evaluateCriterion(c, ctx)` switch (gate-eval.ts:105) — add the case; `GateContext` carries `installationRoot`, `item`, `specDirPath` (enough to resolve tasks.md + checkpoints). Fail-loud = throw `WorkflowError` (matches the existing malformed-criterion pattern).
+
+### Composed convergence record (022/TASK-19) — `src/govern/convergence-record.ts`
+
+- `isModeConverged(root, 'impl', item)` is today's `record-converged impl` gate signal; `recordGovernConvergence(...)` writes it.
+- **Anchor decision (T009)**: `src/govern/compose-convergence.ts` derives the `impl` converged signal from the per-phase checkpoint union (all phases current) — no separate whole-feature govern run (FR-001a). The gate criterion (`all-phase-checkpoints-current`) is the gate's read; composing/writing the derived record is a reconcile/reporting concern (the gate itself stays a pure read per graduate-gate.md).
+
+### Governed WORKFLOW.md (US1, FR-005) — `templates/WORKFLOW.md`
+
+- `transition:graduate` exit-gate `record-converged impl` → `all-phase-checkpoints-current impl`.
+- `transition:start-governing` exit-gate `tasks-complete spec` → add `all-phase-checkpoints-current impl` (FR-002). Grammar parsed by `src/workflow/workflow-grammar.ts`.
+
+### Execute cadence surface (US2/US3) — `src/subcommands/execute-check.ts` + `skills/execute/SKILL.md`
+
+- `execute-check.ts` is today a read-only runnability gate (tasks.md present). The per-phase cadence post-condition (govern→commit→push, refuse N+1 until N current, oversized→`boundary-too-large` fail-loud) attaches here as injectable-runner functions (DI for hermetic tests); the skill body drives them as non-discretionary post-conditions.
+- `git govern-time per-phase ordering` already enforced by `assertPriorPhaseCheckpointsCurrent` (govern.ts:767) — the cadence reuses it; the gap is *who fires* govern, which `execute` closes.
+
+### Speckit wrapper (US4) — NEW `src/speckit-wrapper/` + `.claude/skills/speckit-*/SKILL.md`
+
+- No module today. Add `src/speckit-wrapper/refusal.ts` (skill-identity → front-door redirect map) + injected precondition blocks atop each vendored `speckit-{specify,plan,tasks,implement}/SKILL.md`.
+
+### No-shortcuts audit (US5) — NEW `src/subcommands/no-shortcuts-audit.ts`
+
+- No audit today. Phrase scan over `skills/*/SKILL.md`; enumerate prohibited skip/defer/shortcut phrasings.
