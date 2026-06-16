@@ -165,6 +165,21 @@ After every commit on a feature branch, push to `origin/<branch>`. Don't batch p
 - After session-end's documentation commit: push.
 - The only time NOT to push is when the branch has unresolved local conflicts or pre-commit/pre-push hooks failing — in which case fix the underlying state, don't bypass the hook (per the existing `Never bypass pre-commit/pre-push hooks` rule).
 - Force-push is still operator-authorized only — `push early and often` is about normal fast-forward pushes, not the destructive variety.
+- **No reminder required.** Committing and pushing at each boundary is automatic agent behavior, not something the operator should have to ask for each session. If you notice you've done multiple boundaries' work without committing+pushing, that itself is the bug. (This rule is the *stopgap*; the mechanical fix — auto-commit/push wired into the execute loop — is captured in `multi:feature/unskippable-workflow-protocol`, design record `docs/superpowers/specs/2026-06-16-unskippable-workflow-protocol-design.md`.)
+
+## No offroading the stack-control workflow protocol
+
+The stack-control workflow protocol is applied **consistently, every time**. The agent does not improvise around it, shortcut it, or reach behind it. These are recurring offroading patterns the operator has had to police by hand — recorded here so they bind durably, and being mechanized under `multi:feature/unskippable-workflow-protocol` (design record `docs/superpowers/specs/2026-06-16-unskippable-workflow-protocol-design.md`). Until the mechanism lands, this rule is the discipline.
+
+1. **Never offer the operator a shortcut.** Do not present "defer / skip / shortcut this step?" as an option. The operator *never* wants to skip a protocol step — *"I always want a consistent application of the workflow protocol."* An agent-offered protocol bypass IS the offroad, even when framed as a helpful choice. The only operator-facing branches are genuine **scope** decisions the operator initiates (what's in/out of a feature), never **protocol** bypasses the agent proposes. When a step is heavy (e.g. per-phase governance), the answer is to *do it*, not to offer to defer it.
+
+2. **Never bypass `/stack-control:execute` to run the backend `/speckit-implement` (or other vendored backend skills) directly.** The sanctioned implement path is the stack-control skill, which drives the backend in order, fires the `after_implement` governance, and holds the gates. Reaching *behind* stack-control to the vendored tool evades all of that. The same applies to every stack-control front-door skill over its backend: drive the stack-control skill, never the tool it wraps. (Mirrors the public-channel rule above: no privileged path the protocol doesn't sanction.)
+
+3. **Governance runs per phase, at each phase boundary — not batched at the end.** Run `stackctl govern --mode implement --phase <id>` as each `tasks.md` phase completes; do not defer governance to one whole-feature pass (it exceeds the model fleet envelope → `boundary-too-large`, and it hides findings until the end). See the memory `feedback_govern_per_phase_not_batched`.
+
+4. **Apply the spec-kit chain in full order, every step.** `specify → clarify → plan → checklist → tasks → analyze → implement`, with governance per phase. Do not drop a step because it "seems redundant" (Constitution Principle VIII). A step that feels unnecessary is still run.
+
+**Why this rule exists:** the 2026-06-16 lifecycle-compass session demonstrated all of these live — the agent batched governance, offered a "defer governance" shortcut, and (per the operator across sessions) recurringly bypasses `execute` and forgets to commit/push. Each is *operator vigilance that should be mechanical*. The thesis: you don't fix this with a bigger rules document (that's the yelling that already failed) — you fix it with environmental design that makes the offroad impossible. This rule is the stopgap until that mechanism (`multi:feature/unskippable-workflow-protocol`) ships; the mechanism is the real fix.
 
 ## Closure is a structural step, not aspirational
 
