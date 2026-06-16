@@ -35,13 +35,13 @@ export interface PreconditionArgs {
  * silent proceed.
  */
 export function checkLifecyclePrecondition(args: PreconditionArgs): PreconditionResult {
-  const { doc, hasNode, currentPhase } = resolveCompass(args.cwd ?? process.cwd(), args.item);
+  const { doc, hasNode, currentPhase, nextGateUnmet } = resolveCompass(args.cwd ?? process.cwd(), args.item);
   const intent = resolveIntent(doc, args.intent);
   if (intent === null) {
     throw new WorkflowError(
       `lifecycle precondition: unknown intent '${args.intent}' (known: ${knownIntents(doc).join(', ')})`,
     );
   }
-  const verdict = computeVerdict({ doc, currentPhase, intent, hasNode });
+  const verdict = computeVerdict({ doc, currentPhase, intent, hasNode, nextGateUnmet });
   return { proceed: verdict.exitCode === 0, verdict };
 }

@@ -173,12 +173,18 @@ function emitCompassOrientation(
   } else {
     process.stdout.write(`  legitimate next action: ${t.codename} (${t.from} → ${t.to})\n`);
   }
-  if (gate !== null) reportGate('exit gate', evaluateGate(p.exit, gate));
+  // T040/claude-05: single-source the orientation gate report onto the FORWARD TRANSITION's
+  // exit gate — the same gate the verdict (nextGateUnmet) and the advance enforcement use — so
+  // orientation, verdict, and enforcement cannot disagree about what blocks the next move. Falls
+  // back to the phase's own exit criteria at a terminal phase (no forward transition).
+  if (gate !== null) {
+    reportGate('exit gate', evaluateGate(t !== undefined ? t.exitGate : p.exit, gate));
+  }
 }
 
 /** `workflow compass <item> [--intent <action>] [--json]` (024 US1) — orient + diff; the verdict is the exit code. */
 function emitCompass(itemId: string, intentName: string | undefined, json: boolean): void {
-  const { doc, hasNode, currentPhase, gate } = resolveCompass(process.cwd(), itemId);
+  const { doc, hasNode, currentPhase, gate, nextGateUnmet } = resolveCompass(process.cwd(), itemId);
 
   if (intentName === undefined) {
     emitCompassOrientation(doc, itemId, currentPhase, hasNode, gate);
@@ -189,7 +195,7 @@ function emitCompass(itemId: string, intentName: string | undefined, json: boole
   if (resolved === null) {
     failUsage(`unknown intent '${intentName}' (known: ${knownIntents(doc).join(', ')})`);
   }
-  const verdict = computeVerdict({ doc, currentPhase, intent: resolved, hasNode });
+  const verdict = computeVerdict({ doc, currentPhase, intent: resolved, hasNode, nextGateUnmet });
   if (json) {
     process.stdout.write(`${JSON.stringify(verdict, null, 2)}\n`);
   } else {

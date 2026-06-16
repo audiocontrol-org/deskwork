@@ -5,8 +5,9 @@
 // (FR-003) so an agent following its skills cannot skip a step. Read-only: this
 // module computes; it never writes (FR-005).
 
-import type { DerivedPhase, PhaseId, Verdict, WorkflowDoc } from './workflow-types.js';
+import type { Criterion, DerivedPhase, PhaseId, Verdict, WorkflowDoc } from './workflow-types.js';
 import { VERDICT_EXIT } from './workflow-types.js';
+import { describeCriterion } from './gate-eval.js';
 import type { IntentResolution } from './intent-vocabulary.js';
 
 /** The ordinal of a phase id in the doc's ordered pipeline (−1 when absent). */
@@ -27,8 +28,9 @@ function mk(
   legitimateNext: PhaseId | null,
   skippedStep: PhaseId | null,
   reason: string,
+  unmetGate: readonly string[] = [],
 ): Verdict {
-  return { outcome, currentPhase, intentPhase, legitimateNext, skippedStep, reason, exitCode: VERDICT_EXIT[outcome] };
+  return { outcome, currentPhase, intentPhase, legitimateNext, skippedStep, unmetGate, reason, exitCode: VERDICT_EXIT[outcome] };
 }
 
 export interface ComputeVerdictArgs {
@@ -39,6 +41,14 @@ export interface ComputeVerdictArgs {
   readonly intent: IntentResolution;
   /** Whether a roadmap node exists for the item (false ⇒ orphan ⇒ off-rail). */
   readonly hasNode: boolean;
+  /**
+   * The UNMET exit-gate criteria of the legitimate-next transition out of the current phase
+   * (T040/codex-01). When the intent targets that next phase (a graduation like `release`/`ship`
+   * → `shipped`) but this is non-empty, the verdict is `ahead` (refuse) instead of `on-course` —
+   * the compass cannot say "go" while the transition's gate (e.g. `record-converged impl`) is
+   * unmet. Empty (default) when the gate is met or the caller doesn't supply it.
+   */
+  readonly nextGateUnmet?: readonly Criterion[];
 }
 
 /**
@@ -51,6 +61,7 @@ export interface ComputeVerdictArgs {
  */
 export function computeVerdict(args: ComputeVerdictArgs): Verdict {
   const { doc, currentPhase, intent, hasNode } = args;
+  const nextGateUnmet = args.nextGateUnmet ?? [];
 
   // off-rail: orphan (no node) or a terminal side-state — refuse linear advancement.
   if (!hasNode) {
@@ -77,6 +88,16 @@ export function computeVerdict(args: ComputeVerdictArgs): Verdict {
   const nextOrd = nextId === null ? -1 : ordinal(doc, nextId);
 
   if (nextId !== null && intentOrd === nextOrd) {
+    // T040/codex-01: the next phase is ordinally legitimate, but if the transition's exit gate
+    // is UNMET the move is not actually available — refuse (`ahead`) naming the unmet gate, so
+    // the compass cannot green-light a graduation (`release`/`ship`) without its gate satisfied.
+    if (nextGateUnmet.length > 0) {
+      const names = nextGateUnmet.map(describeCriterion);
+      return mk('ahead', currentPhase, intentId, nextId, null,
+        `'${intentId}' targets the legitimate next phase '${nextId}', but its exit gate is unmet ` +
+          `(${names.join('; ')}) — complete the current phase's work first`,
+        names);
+    }
     return mk('on-course', currentPhase, intentId, nextId, null,
       `'${intentId}' is the legitimate next move from '${currentId}'`);
   }

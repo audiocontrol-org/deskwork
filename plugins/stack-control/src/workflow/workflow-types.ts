@@ -253,8 +253,15 @@ export interface Verdict {
   readonly intentPhase: PhaseId | null;
   /** The single legitimate next phase (null at a terminal phase / side-state). */
   readonly legitimateNext: PhaseId | null;
-  /** The first jumped phase — non-null IFF `outcome === 'ahead'` (FR-002, SC-001). */
+  /** The first jumped phase — non-null when `ahead` due to a skipped phase (FR-002, SC-001). */
   readonly skippedStep: PhaseId | null;
+  /**
+   * The unmet exit-gate criteria of the legitimate-next transition (T040/codex-01).
+   * Non-empty makes a graduation intent (`release`/`ship`) `ahead` instead of `on-course`
+   * when its `governing → shipped` gate is unmet — so the compass cannot green-light a
+   * release without the recorded convergence. Empty on a met gate / non-graduation intents.
+   */
+  readonly unmetGate: readonly string[];
   /** Actionable message naming the violated invariant (for the skill refusal). */
   readonly reason: string;
   /** Process exit code mirroring `VERDICT_EXIT[outcome]` (FR-003). */

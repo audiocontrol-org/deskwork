@@ -40,14 +40,40 @@ describe('024 FR-008 (model b) — the front door creates the node; a node-less 
     expect(r.verdict.reason).toMatch(/node/i);
   });
 
-  it('on an EXISTING node, define gates normally and proceeds when design is done', () => {
-    // node present, design pointer set + approved → designing → define is on-course
-    const f = fixture([
-      { identifier: ITEM, status: 'in-flight', design: 'd', designApproved: true },
+  it('on an EXISTING node, define proceeds when the design-to-spec gate is genuinely met', () => {
+    // T040: define (specifying work) now evaluates the design-to-spec exit gate via the
+    // compass verdict — so it proceeds only when the design record is COMPLETE (all required
+    // sections + ≥2 solution-space alternatives) AND approved. A pointer + flag alone is not
+    // "design done" (that fixture would correctly REFUSE — design-before-spec enforcement).
+    const f = fixture([]);
+    f.write(
+      'docs/x-design.md',
+      [
+        '# Design: x',
+        '## problem-domain', 'p',
+        '## solution-space', '- Alternative A', '- Alternative B',
+        '## decisions', 'd',
+        '## open-questions', 'q',
+        '## provenance', 'v',
+        '',
+      ].join('\n'),
+    );
+    f.setRoadmap([
+      { identifier: ITEM, status: 'in-flight', design: 'docs/x-design.md', designApproved: true },
     ]);
     const r = checkLifecyclePrecondition({ item: ITEM, intent: 'define', cwd: f.root });
     expect(r.proceed).toBe(true);
     expect(r.verdict.outcome).toBe('on-course');
+  });
+
+  it('on an EXISTING node, define REFUSES when the design-to-spec gate is unmet (design-before-spec)', () => {
+    // pointer + approval flag but NO real design record → the design-to-spec gate is unmet →
+    // define is `ahead` (refuse): you must finish design before authoring the spec.
+    const f = fixture([{ identifier: ITEM, status: 'in-flight', design: 'docs/missing.md', designApproved: true }]);
+    const r = checkLifecyclePrecondition({ item: ITEM, intent: 'define', cwd: f.root });
+    expect(r.proceed).toBe(false);
+    expect(r.verdict.outcome).toBe('ahead');
+    expect(r.verdict.unmetGate.length).toBeGreaterThan(0);
   });
 });
 

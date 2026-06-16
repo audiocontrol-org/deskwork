@@ -62,6 +62,35 @@ describe('024 FR-002 — compass verdict matrix', () => {
     expect(verdict(doc(), phase('governing'), 'ship').outcome).toBe('on-course');
   });
 
+  it('T040/codex-01: release/ship from governing REFUSES when the graduation exit gate is unmet', () => {
+    const d = doc();
+    const unmet = [{ kind: 'record-converged', target: 'impl' } as const];
+    const v = computeVerdict({
+      doc: d,
+      currentPhase: phase('governing'),
+      intent: resolveIntent(d, 'release')!,
+      hasNode: true,
+      nextGateUnmet: unmet,
+    });
+    expect(v.outcome).toBe('ahead'); // NOT on-course — the compass cannot green-light release
+    expect(v.exitCode).not.toBe(0);
+    expect(v.unmetGate.length).toBeGreaterThan(0);
+    expect(v.reason).toMatch(/record-converged impl|exit gate/i);
+  });
+
+  it('T040: release from governing is on-course when the graduation gate is met (empty unmet)', () => {
+    const d = doc();
+    const v = computeVerdict({
+      doc: d,
+      currentPhase: phase('governing'),
+      intent: resolveIntent(d, 'release')!,
+      hasNode: true,
+      nextGateUnmet: [],
+    });
+    expect(v.outcome).toBe('on-course');
+    expect(v.unmetGate).toEqual([]);
+  });
+
   it('behind: intent at or before the current phase (re-entry/redundant, allowed)', () => {
     const d = doc();
     const v = verdict(d, phase('implementing'), 'design'); // designing < implementing

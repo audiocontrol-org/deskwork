@@ -39,6 +39,21 @@ function snapshot(root: string): Map<string, string> {
 const ITEM = 'multi:feature/x';
 const planned = () => fixture([{ identifier: ITEM, status: 'planned' }]);
 
+describe('024 T040 — compass refuses release when the graduation gate is unmet (end-to-end)', () => {
+  it('compass --intent release on a governing item with NO convergence record exits non-zero, naming the gate', () => {
+    // design + spec + analyze-clean + tasks complete, NO impl convergence record → governing,
+    // and the graduate exit gate (record-converged impl) is unmet.
+    const f = fixture([
+      { identifier: ITEM, status: 'in-flight', design: 'd', spec: 'specs/x', analyzeClean: true },
+    ]);
+    f.writeSpecTasks('specs/x', true);
+    const r = runCli(['workflow', 'compass', ITEM, '--intent', 'release'], { cwd: f.root });
+    expect(r.status).not.toBe(0); // the compass does NOT green-light release without convergence
+    expect(r.stdout).toContain('verdict: ahead');
+    expect(r.stdout + r.stderr).toMatch(/record-converged impl|exit gate/i);
+  });
+});
+
 describe('024 US1 — workflow compass orientation (no --intent)', () => {
   it('reports the current phase + legitimate next action; exits 0', () => {
     const f = planned();
