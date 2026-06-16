@@ -37,8 +37,9 @@
   record** capturing problem domain, solution space (incl. rejected
   alternatives), and initial decisions. The record informs every downstream
   phase. This formalizes a convention the repo already runs informally (the
-  `docs/superpowers/specs/*-design.md` family) but currently leaves to operator
-  memory.
+  `*-design.md` family, historically at the repo-root `docs/superpowers/specs/` —
+  now corrected to live in the installation domain; see Ratified 2026-06-16) but
+  currently leaves to operator memory.
 - **Every stage is an opinionated stack-control FRONTEND over a swappable
   BACKEND.** `define`→Spec Kit, `execute`→`/speckit-implement`, `govern`→model
   CLIs — and now `design`→a design backend (default `superpowers:brainstorming`,
@@ -46,6 +47,48 @@
   "stack-control way"); the backend owns the *mechanism* and is selected by
   **capability, never vendor identity** (succession rule, execution-backend
   port). This is a first-class principle, not specific to the design stage.
+
+---
+
+## Ratified 2026-06-16 (operator decisions this session)
+
+These framing decisions were the gate on converging this strawman to a spec.
+All are now settled — downstream design and the spec inherit them:
+
+- **Engine shape (resolves open-decision #5 / Q5):** the workflow is a **NEW
+  `workflow` verb family that CONSUMES the roadmap node-reader** — not phase-awareness
+  bolted onto the `roadmap` reasoner. Phase-derivation reuses the existing node model;
+  the net-new surface (the governed `WORKFLOW.md` grammar, the transition units, the
+  effect manifest, `workflow status|can-enter|next|advance`) lives in its own family.
+  `roadmap` stays focused on the DAG; `workflow` owns phases/transitions/effects.
+  Rationale: `roadmap` has never fired effects; folding effect-execution into it
+  couples two concerns. Composition over a fork.
+- **Unit (ratified):** the unit IS the **roadmap node** (`<phase>:<kind>/<slug>`);
+  the spec dir is a mid-phase artifact the node produces during
+  specifying/implementing. Consistent with what `session-start` and
+  `roadmap reconcile` already key on.
+- **TASK-19 scope (resolves open-decision #3):** **TASK-19
+  (governance-graduation-record) is PULLED INTO this feature's scope.** This feature
+  delivers BOTH the on-disk govern-convergence record AND every mechanical gate that
+  reads it — including the full back-half `governing → shipped` exit gate. No
+  report-only interim for the back half. Consequence: the `governing` exit criterion
+  (`impl-govern convergence recorded ∧ converged`) is in scope here, not deferred;
+  the spec must design the graduation record's shape and write path.
+- **Design-record placement (operator correction):** design records live **INSIDE
+  the stack-control configuration domain** (the installation root that owns
+  `.stack-control/config.yaml`), NOT at the repo root. The repo-root
+  `docs/superpowers/specs/` is deskwork's *shared* archive; writing a
+  stack-control-specific design doc there leaks across the installation boundary and
+  violates the isolation invariant (constitution Additional Constraints,
+  installation-anchor). The `designing`-phase convention path is therefore
+  **domain-relative**: `<install-domain>/docs/superpowers/specs/<date>-<slug>-design.md`
+  (for this monorepo's dogfood, `plugins/stack-control/docs/superpowers/specs/`). This
+  is the design-doc instance of the already-tracked
+  `design:gap/project-relative-doc-discovery` — the `/stack-control:design` frontend
+  MUST resolve the record path against the installation (the same anchor every
+  state-writing verb uses), never a hardcoded repo-root path. This strawman was first
+  written to the repo root and moved into the domain on 2026-06-16 as the corrective;
+  the spec must make the domain-relative path the only path the frontend can write.
 
 ---
 
@@ -136,7 +179,7 @@ the debate this feature exists to kill.
 |---|---|---|---|
 | 0 | `captured` | a found bug/gap exists in the backlog | `/stack-control:backlog capture` |
 | 1 | `planned` | promoted to a roadmap node, awaiting design | `roadmap add` / `backlog promote` |
-| 2 | `designing` | **free-form exploration → a design record** (problem domain, solution space, decisions, rejected alternatives) | `/stack-control:design` (frontend) → backend (default `superpowers:brainstorming`) → `docs/superpowers/specs/<date>-<slug>-design.md` |
+| 2 | `designing` | **free-form exploration → a design record** (problem domain, solution space, decisions, rejected alternatives) | `/stack-control:design` (frontend) → backend (default `superpowers:brainstorming`) → `<install-domain>/docs/superpowers/specs/<date>-<slug>-design.md` (domain-relative; see Ratified 2026-06-16) |
 | 3 | `specifying` | author + converge the spec (from the design record) | `/stack-control:define` + speckit chain + `govern --mode spec` |
 | 4 | `implementing` | execute the spec (write the code) | `/stack-control:execute` (speckit-implement) |
 | 5 | `governing` | cross-model audit-barrage convergence on the impl | `govern` (after_implement) |
@@ -218,7 +261,9 @@ owns the *mechanism*.
 
 **What the backend supplies (default = brainstorming):**
 
-- writes + commits `docs/superpowers/specs/<date>-<topic>-design.md` (its step 6);
+- writes + commits the design record at the convention path (its step 6) — the
+  frontend supplies the domain-relative `<install-domain>/docs/superpowers/specs/`
+  base (Ratified 2026-06-16); the backend must not hardcode a repo-root path;
 - proposes 2-3 approaches with trade-offs (the explore-alternatives method);
 - a **user-review gate** ("review the written spec… wait for the response");
 - a **self-review** (placeholder / consistency / scope / ambiguity scan);
@@ -253,13 +298,15 @@ break stack-control rules. The workflow then adds the mechanical layer: the
 exit-gate verifies required sections (structural, not judgment), and the
 transition fires the bookkeeping effects (link to node, journal, route to spec).
 
-**This already exists as a convention.** The `docs/superpowers/specs/*-design.md`
-family IS this artifact — `2026-06-08-roadmap-protocol-design.md` was the named
-source of truth for spec 006 (its frontmatter: `status: design-approved
-(brainstorming output; feeds /speckit-specify)`). The workflow doesn't invent
-the artifact or the skill; it makes producing it a **named, required phase** and
-**redirects brainstorming's terminal handoff** from its hardcoded `writing-plans`
-to Spec Kit (`/speckit-specify` via `/stack-control:define`).
+**This already exists as a convention.** The `*-design.md` family IS this artifact
+— `2026-06-08-roadmap-protocol-design.md` was the named source of truth for spec 006
+(its frontmatter: `status: design-approved (brainstorming output; feeds
+/speckit-specify)`). The workflow doesn't invent the artifact or the skill; it makes
+producing it a **named, required phase**, **relocates it into the installation
+domain** (Ratified 2026-06-16 — the historical instances at repo-root
+`docs/superpowers/specs/` predate the correction), and **redirects brainstorming's
+terminal handoff** from its hardcoded `writing-plans` to Spec Kit (`/speckit-specify`
+via `/stack-control:define`).
 
 **This document is itself a `designing`-phase artifact** — the free-form
 conversation defining `parseable-lifecycle-workflow`, captured as it happens.
@@ -399,10 +446,13 @@ stackctl workflow advance design:feature/roadmap-protocol --apply
    Strawman picks (a) for v1.
 2. **Effect vocabulary.** Is the 5-verb palette above the right v1 set? What's
    missing (e.g. `workflow link-spec`, a `release`-firing effect)?
-3. **Phase-derivation inputs.** The derive predicates depend on a "spec-govern
-   converged" and "impl-govern converged" signal. Today governance graduation
-   has **no on-disk record** (backlog TASK-19) — the workflow needs that record
-   to derive `governing` vs `shipped` reliably. This is a real dependency.
+3. **[RESOLVED 2026-06-16] Phase-derivation inputs.** The derive predicates depend
+   on a "spec-govern converged" and "impl-govern converged" signal. Today governance
+   graduation has **no on-disk record** (backlog TASK-19) — the workflow needs that
+   record to derive `governing` vs `shipped` reliably. **Decision: TASK-19 is pulled
+   INTO this feature's scope** (see Ratified 2026-06-16) — this feature designs and
+   ships the graduation record + the gates that read it. No longer an external
+   dependency; it is in-scope work.
 4. **Where transitions fire side-effecting skills.** Some effects (`release`,
    `govern`) are heavy and interactive. Does `workflow advance` *invoke* them,
    or only the lightweight bookkeeping, leaving heavy work to the explicit
