@@ -114,7 +114,7 @@ complete without inventing an item-specific path the bundled default cannot know
 - kind: transition
 - from: designing
 - to: specifying
-- exit-gate: section-present design problem-domain; section-present design solution-space; count-gte solution-space-alternatives 2; approval-marker design-approved
+- exit-gate: section-present design problem-domain; section-present design solution-space; section-present design decisions; section-present design open-questions; section-present design provenance; count-gte solution-space-alternatives 2; approval-marker design-approved
 - effects: workflow-link-spec spec-dir={spec-dir}; journal-append message={message}; commit message={message}
 
 ## transition:start-implementing

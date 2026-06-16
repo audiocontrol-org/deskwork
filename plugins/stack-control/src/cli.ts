@@ -22,6 +22,7 @@ import { runArchiveCli } from './subcommands/archive.js';
 import { runUnarchiveCli } from './subcommands/unarchive.js';
 import { runCurateCli } from './subcommands/curate.js';
 import { runRoadmapCli } from './subcommands/roadmap.js';
+import { runWorkflowCli } from './subcommands/workflow.js';
 import { runInboxCli } from './subcommands/inbox.js';
 import { runBacklogCli } from './subcommands/backlog.js';
 import { runSetupCli } from './subcommands/setup.js';
@@ -75,6 +76,8 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   curate: runCurateCli,
   // Roadmap protocol semantic layer (design/roadmap-protocol).
   roadmap: runRoadmapCli,
+  // Parseable lifecycle workflow engine (022 parseable-lifecycle-workflow).
+  workflow: runWorkflowCli,
   // Low-friction insight capture (design/insight-capture).
   inbox: runInboxCli,
   // Backlog slush-pile surface — external-backend adapter verb (008).

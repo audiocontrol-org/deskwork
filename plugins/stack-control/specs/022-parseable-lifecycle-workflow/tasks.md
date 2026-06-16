@@ -17,9 +17,9 @@
 
 **Purpose**: fixtures and module scaffolding the later phases need.
 
-- [ ] T001 [P] Add workflow fixtures (a sample governed `WORKFLOW.md`, roadmap nodes at each artifact state across the derivation table, and a nested adopter-repo installation) under `plugins/stack-control/src/__tests__/fixtures/workflow/`
-- [ ] T002 [P] Scaffold the new `src/workflow/` module directory with typed stubs for `workflow-grammar.ts`, `phase-derivation.ts`, `gate-eval.ts`, `transition-engine.ts`, `effects.ts`, `house-rules.ts` in `plugins/stack-control/src/workflow/`
-- [ ] T003 [P] Add the typed protocol records (Phase, Transition, Criterion, Effect, GovernConvergenceRecord, HouseRulesBlock, DesignRecord, WorkflowDoc) from data-model.md in `plugins/stack-control/src/workflow/workflow-types.ts`
+- [X] T001 [P] Add workflow fixtures (a sample governed `WORKFLOW.md`, roadmap nodes at each artifact state across the derivation table, and a nested adopter-repo installation) under `plugins/stack-control/src/__tests__/fixtures/workflow/`
+- [X] T002 [P] Scaffold the new `src/workflow/` module directory with typed stubs for `workflow-grammar.ts`, `phase-derivation.ts`, `gate-eval.ts`, `transition-engine.ts`, `effects.ts`, `house-rules.ts` in `plugins/stack-control/src/workflow/`
+- [X] T003 [P] Add the typed protocol records (Phase, Transition, Criterion, Effect, GovernConvergenceRecord, HouseRulesBlock, DesignRecord, WorkflowDoc) from data-model.md in `plugins/stack-control/src/workflow/workflow-types.ts`
 
 ---
 
@@ -27,10 +27,10 @@
 
 **Purpose**: shared seams every story reads. MUST complete before the user stories.
 
-- [ ] T004 Author the plugin-bundled default `plugins/stack-control/templates/WORKFLOW.md` — the canonical 7-phase lifecycle (captured→…→shipped) + side-states, with phase + transition units, derive predicates, gate criteria, and effect manifests, conforming to the grammar contract. (Analyze O1: either wire the `doc set-status-field` effect into a concrete transition here — e.g. a feature-README status-table update on `graduate` — or add an inline note that it is an available-but-unused v1 verb; do not leave its v1 use ambiguous.) (Workflow-policy 2026-06-16: the `specifying → implementing` exit gate is `speckit-analyze`-clean by DEFAULT; do NOT make a spec-govern convergence record a default-required criterion — spec audit-barrage is parked. The `governing → shipped` gate DOES require the impl-govern convergence record.)
-- [ ] T005 Implement WORKFLOW.md grammar binding via the `document-model` engine in `plugins/stack-control/src/workflow/workflow-grammar.ts` (parse phase + transition units; fail loud on malformed)
-- [ ] T006 Implement bundled-default + per-install override resolution for `WORKFLOW.md` (installation copy wins, else bundled) in `plugins/stack-control/src/workflow/workflow-grammar.ts`, reusing the existing override resolver
-- [ ] T007 Add the new roadmap node fields `design:`, `design-approved:`, and `analyze-clean:` (alongside existing `spec:`) to the node reader in `plugins/stack-control/src/roadmap/roadmap-model.ts`. (`analyze-clean:` is the `node-marker` the default `specifying → implementing` gate reads — analyze U1; spec audit-barrage parked.)
+- [X] T004 Author the plugin-bundled default `plugins/stack-control/templates/WORKFLOW.md` — the canonical 7-phase lifecycle (captured→…→shipped) + side-states, with phase + transition units, derive predicates, gate criteria, and effect manifests, conforming to the grammar contract. (Analyze O1: either wire the `doc set-status-field` effect into a concrete transition here — e.g. a feature-README status-table update on `graduate` — or add an inline note that it is an available-but-unused v1 verb; do not leave its v1 use ambiguous.) (Workflow-policy 2026-06-16: the `specifying → implementing` exit gate is `speckit-analyze`-clean by DEFAULT; do NOT make a spec-govern convergence record a default-required criterion — spec audit-barrage is parked. The `governing → shipped` gate DOES require the impl-govern convergence record.)
+- [X] T005 Implement WORKFLOW.md grammar binding via the `document-model` engine in `plugins/stack-control/src/workflow/workflow-grammar.ts` (parse phase + transition units; fail loud on malformed)
+- [X] T006 Implement bundled-default + per-install override resolution for `WORKFLOW.md` (installation copy wins, else bundled) in `plugins/stack-control/src/workflow/workflow-grammar.ts`, reusing the existing override resolver
+- [X] T007 Add the new roadmap node fields `design:`, `design-approved:`, and `analyze-clean:` (alongside existing `spec:`) to the node reader in `plugins/stack-control/src/roadmap/roadmap-model.ts`. (`analyze-clean:` is the `node-marker` the default `specifying → implementing` gate reads — analyze U1; spec audit-barrage parked.)
 
 **Checkpoint**: the engine can load a governed `WORKFLOW.md`, resolve overrides, and read all node fields.
 
@@ -42,9 +42,9 @@
 
 **Independent Test**: drive a fixture item through each artifact state; the derived phase matches the table; no phase field is ever written.
 
-- [ ] T008 [P] [US2] RED: derivation totality + determinism tests (every artifact state → exactly one phase; identical inputs → identical phase; `designing` keyed on the `design:` pointer not file existence) in `plugins/stack-control/src/__tests__/workflow/phase-derivation.test.ts`
-- [ ] T009 [US2] Implement the pure phase-derivation function in `plugins/stack-control/src/workflow/phase-derivation.ts` (reads node status, `design:`/`spec:` pointers, govern-convergence records, `tasks.md` completion, release tag; writes nothing)
-- [ ] T010 [US2] Implement terminal side-state derivation (`blocked`/`cancelled`/`retired`) in `plugins/stack-control/src/workflow/phase-derivation.ts`
+- [X] T008 [P] [US2] RED: derivation totality + determinism tests (every artifact state → exactly one phase; identical inputs → identical phase; `designing` keyed on the `design:` pointer not file existence) in `plugins/stack-control/src/__tests__/workflow/phase-derivation.test.ts`
+- [X] T009 [US2] Implement the pure phase-derivation function in `plugins/stack-control/src/workflow/phase-derivation.ts` (reads node status, `design:`/`spec:` pointers, govern-convergence records, `tasks.md` completion, release tag; writes nothing)
+- [X] T010 [US2] Implement terminal side-state derivation (`blocked`/`cancelled`/`retired`) in `plugins/stack-control/src/workflow/phase-derivation.ts`
 
 ---
 
@@ -54,11 +54,11 @@
 
 **Independent Test**: `workflow status`/`can-enter` report met/unmet criteria deterministically; re-run yields identical output and zero writes.
 
-- [ ] T011 [P] [US1] RED: gate-evaluation tests (each criterion kind → definite true/false; unmet enumeration M of N; judgment criterion reads the `design-approved:` node marker) in `plugins/stack-control/src/__tests__/workflow/gate-eval.test.ts`
-- [ ] T012 [US1] Implement criterion predicates + unmet enumeration in `plugins/stack-control/src/workflow/gate-eval.ts`
-- [ ] T013 [P] [US1] RED: query-verb tests (`status`/`can-enter`/`next` output + read-only determinism; AND — analyze U1 — assert an unmet gate is REPORTED, not enforced as a refusal: v1 gates never block) in `plugins/stack-control/src/__tests__/workflow/query-verbs.test.ts`
-- [ ] T014 [US1] Implement `workflow status` and `workflow can-enter` (read-only) in `plugins/stack-control/src/subcommands/workflow.ts`
-- [ ] T015 [US1] Implement `workflow next` (derive phase, name next transition + WORK skill, preview effects) in `plugins/stack-control/src/subcommands/workflow.ts`
+- [X] T011 [P] [US1] RED: gate-evaluation tests (each criterion kind → definite true/false; unmet enumeration M of N; judgment criterion reads the `design-approved:` node marker) in `plugins/stack-control/src/__tests__/workflow/gate-eval.test.ts`
+- [X] T012 [US1] Implement criterion predicates + unmet enumeration in `plugins/stack-control/src/workflow/gate-eval.ts`
+- [X] T013 [P] [US1] RED: query-verb tests (`status`/`can-enter`/`next` output + read-only determinism; AND — analyze U1 — assert an unmet gate is REPORTED, not enforced as a refusal: v1 gates never block) in `plugins/stack-control/src/__tests__/workflow/query-verbs.test.ts`
+- [X] T014 [US1] Implement `workflow status` and `workflow can-enter` (read-only) in `plugins/stack-control/src/subcommands/workflow.ts`
+- [X] T015 [US1] Implement `workflow next` (derive phase, name next transition + WORK skill, preview effects) in `plugins/stack-control/src/subcommands/workflow.ts`
 
 **Checkpoint**: MVP — the gates are queryable end-to-end without advancing anything.
 
