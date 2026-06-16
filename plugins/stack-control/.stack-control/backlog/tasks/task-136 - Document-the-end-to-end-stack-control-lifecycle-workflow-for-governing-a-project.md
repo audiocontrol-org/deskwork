@@ -3,10 +3,10 @@ id: TASK-136
 title: >-
   Parseable, deterministic stack-control lifecycle workflow that drives items
   through phases (not just documentation)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-15 20:50'
-updated_date: '2026-06-15 20:55'
+updated_date: '2026-06-16 04:49'
 labels:
   - agent-found
   - 'type:gap'

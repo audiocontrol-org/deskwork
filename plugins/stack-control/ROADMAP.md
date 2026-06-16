@@ -362,6 +362,7 @@ One-move backlog->roadmap promotion: given a backlog item, PROPOSE the roadmap n
 - depends-on: design:feature/roadmap-protocol, design:feature/document-primitives
 - part-of: multi:feature/lifecycle-industrialization
 - ref: TASK-136
+- closes: TASK-19
 The centerpiece: a PARSEABLE, DETERMINISTIC lifecycle workflow that drives items through phases — not just a WORKFLOW.md doc. Apply the roadmap-protocol pattern to the process itself: a governed grammar-parsed workflow document (phases, per-phase entry/exit gates, the verb/skill executing each phase) plus an engine that, given an item, knows its current phase, the gate conditions to advance, and deterministically drives it to the next phase or reports why it's blocked. The human-readable WORKFLOW.md is one rendering of the parseable source of truth. Reuses document-primitives (governed parseable-doc engine) + roadmap-protocol grammar/DAG reasoning. Promoted from TASK-136.
 
 ## impl:gap/roadmap-reparent-verb
@@ -370,4 +371,18 @@ The centerpiece: a PARSEABLE, DETERMINISTIC lifecycle workflow that drives items
 - part-of: multi:feature/lifecycle-industrialization
 - ref: TASK-137
 Add a roadmap reparent verb to move an existing part-of / depends-on edge between nodes (no mutation verb does this today; re-parenting requires hand-editing the governed ROADMAP.md). Shape: roadmap reparent <id> --part-of <target> | --depends-on <target> [--remove <target>], dry-run then --apply, graph-revalidating (refuse cycle/dangling/self), zero-write-on-failure. Promoted from TASK-137.
+
+## impl:feature/terminal-closure
+- status: in-flight
+- part-of: multi:feature/lifecycle-industrialization
+- spec: specs/023-terminal-closure
+Mechanical terminal closure: roadmap close-related closes a terminal item's recorded closes:/ref: backlog ids in one deterministic move.
+
+## multi:feature/lifecycle-compass
+- status: in-flight
+- spec: specs/024-lifecycle-compass
+- design: docs/superpowers/specs/2026-06-16-lifecycle-compass-design.md
+- design-approved: 2026-06-16
+- part-of: multi:feature/lifecycle-industrialization
+Make the lifecycle un-skippable: a workflow 'compass' primitive that orients an agent against a roadmap item and diffs intended action vs allowed phase, embedded as the precondition of every lifecycle skill (real refusals, not reports). Includes the supporting fixes (capture fused to authoring; govern feature-resolution from the spec pointer not the branch slug; TASK-83) so the gates are enforceable.
 

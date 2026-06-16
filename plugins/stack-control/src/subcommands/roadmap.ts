@@ -24,6 +24,8 @@ import {
 } from '../roadmap/mutations.js';
 import { globParent, reconcile } from '../roadmap/reconcile.js';
 import { loadRoadmap, type RoadmapModel } from '../roadmap/roadmap-model.js';
+import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
+import { backlogRoot } from '../backlog/root.js';
 import { blockedReport, mermaid, readyList } from '../roadmap/views.js';
 import {
   failUsage,
@@ -68,6 +70,7 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   decompose: { valueFlags: ['into'], apply: true, clear: false, positionals: 1 },
   reclassify: { valueFlags: ['to'], apply: true, clear: false, positionals: 1 },
   defer: { valueFlags: ['until'], apply: true, clear: true, positionals: 1 },
+  'close-related': { valueFlags: [], apply: true, clear: false, positionals: 1 },
 };
 
 /** The union of every subaction's value-flag names, so the scanner can reject a
@@ -219,6 +222,59 @@ function emitReconcile(flags: Flags, opts: LoadOptions): void {
   for (const u of report.unresolved) process.stdout.write(`    - ${u}\n`);
 }
 
+/**
+ * `roadmap close-related <item>` (023) — mechanical terminal closure. Closes EXACTLY
+ * the backlog ids recorded on the node (`closes:` ∪ `ref:`) when the item is in a
+ * grammar-terminal status. Never title-matches or infers; dry-run by default;
+ * fail-loud per id; idempotent (an already-`Done` item is reported, not re-closed).
+ */
+function emitCloseRelated(model: RoadmapModel, flags: Flags): void {
+  const id = requireId(flags, 'close-related');
+  const item = model.byId.get(id);
+  if (item === undefined) failUsage('roadmap', `close-related: no item '${id}'`);
+  const terminal = model.doc.grammar.terminalStatuses;
+  if (!terminal.includes(item.status)) {
+    failUsage(
+      'roadmap',
+      `close-related: '${id}' is '${item.status}', not a terminal status (${terminal.join('/')}) — ` +
+        `loose ends are tied only once an item reaches a terminal state`,
+    );
+  }
+  // The resolved set is a RECORDED fact: closes: ∪ ref:. Never inferred (023 FR-003).
+  const targets = [...new Set([...item.closes, ...(item.ref !== null ? [item.ref] : [])])];
+  if (targets.length === 0) {
+    process.stdout.write(`roadmap close-related ${id}: no recorded resolved items (closes:/ref:); nothing to close\n`);
+    return;
+  }
+
+  const backend = createBacklogBackend({ cwd: backlogRoot() });
+  const statusById = new Map(backend.list().map((it) => [it.id, it.status]));
+  // Fail loud on any unknown id BEFORE applying anything (FR-006 — never a fabricated close).
+  const unknown = targets.filter((t) => !statusById.has(t));
+  if (unknown.length > 0) {
+    throw new BacklogError(`close-related: unknown backlog id(s) ${unknown.join(', ')} (recorded on '${id}' but absent from the backlog)`);
+  }
+
+  if (!flags.apply) {
+    process.stdout.write(`roadmap close-related ${id}: dry-run — would close (use --apply):\n`);
+    for (const t of targets) {
+      const already = statusById.get(t) === BACKLOG_DONE_STATUS;
+      process.stdout.write(`  - ${t}${already ? ' (already closed)' : ''}\n`);
+    }
+    return;
+  }
+
+  process.stdout.write(`roadmap close-related ${id}: closing resolved items\n`);
+  for (const t of targets) {
+    if (statusById.get(t) === BACKLOG_DONE_STATUS) {
+      process.stdout.write(`  - ${t}: already closed (no-op)\n`);
+      continue;
+    }
+    backend.close(t); // non-zero → BacklogError, never a fabricated success
+    process.stdout.write(`  - ${t}: closed -> ${BACKLOG_DONE_STATUS}\n`);
+  }
+}
+
 export async function runRoadmapCli(args: string[]): Promise<void> {
   const subaction = args[0];
   if (subaction === undefined || subaction.startsWith('--')) {
@@ -229,7 +285,7 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
   if (SUBACTION_SPECS[subaction] === undefined) {
     failUsage(
       'roadmap',
-      `unknown subaction '${subaction}' (known: next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, reconcile)`,
+      `unknown subaction '${subaction}' (known: next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, reconcile, close-related)`,
     );
   }
   const scanned = scanFlags(args.slice(1));
@@ -277,6 +333,9 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
       case 'reconcile':
         emitReconcile(flags, opts);
         return;
+      case 'close-related':
+        emitCloseRelated(loadRoadmap(flags.doc, opts), flags);
+        return;
     }
     // Exhaustiveness backstop (AUDIT-20260610-09): the pre-dispatch guard only
     // rejects subactions ABSENT from SUBACTION_SPECS. A subaction REGISTERED in
@@ -293,6 +352,10 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
     if (err instanceof DocumentModelError) {
       process.stderr.write(`roadmap: ${err.message}\n`);
       process.exit(2);
+    }
+    if (err instanceof BacklogError) {
+      process.stderr.write(`roadmap: ${err.message}\n`);
+      process.exit(1);
     }
     throw err; // unexpected → dispatcher exits 1
   }
