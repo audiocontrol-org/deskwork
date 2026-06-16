@@ -108,9 +108,9 @@
 
 **Independent Test**: a converged IMPL govern run writes the record inside the installation; the `governing→shipped` gate passes only when recorded ∧ converged; no agent assertion substitutes. The spec-mode record is exercised as an opt-in path, not a default-required gate.
 
-- [ ] T027 [P] [US6] RED: govern-convergence-record tests (impl mode required for `governing→shipped`, passes only recorded ∧ converged, tasks-100%-but-no-record → gate unmet; spec mode written/read as an OPT-IN path; `specifying→implementing` default gate is analyze-clean, NOT spec-govern-required) in `plugins/stack-control/src/__tests__/workflow/govern-record.test.ts`
-- [ ] T028 [US6] Implement the symmetric mode-keyed govern-convergence record mechanism (write on convergence; installation-anchored; reuse the 021 checkpoint fingerprint shape) in `plugins/stack-control/src/govern/convergence-record.ts` — retain spec mode in the mechanism even though its gate is parked
-- [ ] T029 [US6] Wire the record into the impl govern emit site (required gate) and the opt-in `govern --mode spec` path in `plugins/stack-control/src/subcommands/govern.ts`, and into phase-derivation in `plugins/stack-control/src/workflow/phase-derivation.ts` (default `specifying→implementing` = the `analyze-clean:` node-marker, NOT the spec-govern record; spec-govern record is the opt-in alternative gate — analyze U1)
+- [X] T027 [P] [US6] RED: govern-convergence-record tests (impl mode required for `governing→shipped`, passes only recorded ∧ converged, tasks-100%-but-no-record → gate unmet; spec mode written/read as an OPT-IN path; `specifying→implementing` default gate is analyze-clean, NOT spec-govern-required) in `plugins/stack-control/src/__tests__/workflow/govern-record.test.ts`
+- [X] T028 [US6] Implement the symmetric mode-keyed govern-convergence record mechanism (write on convergence; installation-anchored; reuse the 021 checkpoint fingerprint shape) in `plugins/stack-control/src/govern/convergence-record.ts` — retain spec mode in the mechanism even though its gate is parked
+- [X] T029 [US6] Wire the record into the impl govern emit site (required gate) and the opt-in `govern --mode spec` path in `plugins/stack-control/src/subcommands/govern.ts`, and into phase-derivation in `plugins/stack-control/src/workflow/phase-derivation.ts` (default `specifying→implementing` = the `analyze-clean:` node-marker, NOT the spec-govern record; spec-govern record is the opt-in alternative gate — analyze U1)
 
 ---
 

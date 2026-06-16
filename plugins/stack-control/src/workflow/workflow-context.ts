@@ -5,7 +5,7 @@
 // each resolved through the installation anchor (FR-030). Kept separate from the
 // CLI dispatch so the query/advance verbs stay thin.
 
-import { isAbsolute, join } from 'node:path';
+import { basename, isAbsolute, join } from 'node:path';
 import { isModeConverged } from '../govern/convergence-record.js';
 import type { WorkItem } from '../roadmap/roadmap-model.js';
 import { evaluateCriterion, type GateContext } from './gate-eval.js';
@@ -34,8 +34,12 @@ export function buildItemContext(
 ): ItemContext {
   const designRecordPath = anchored(installationRoot, item.design);
   const specDirPath = anchored(installationRoot, item.spec);
-  const implRecordConverged = isModeConverged(installationRoot, 'impl', item.identifier);
-  const specRecordConverged = isModeConverged(installationRoot, 'spec', item.identifier);
+  // The govern-convergence record is keyed by the spec-dir basename — the stable
+  // identity govern (its spec dir) and the workflow (the node's `spec:` pointer)
+  // both compute. With no spec pointer there is no convergence record to read.
+  const convergenceKey = item.spec !== null ? basename(item.spec) : item.identifier;
+  const implRecordConverged = isModeConverged(installationRoot, 'impl', convergenceKey);
+  const specRecordConverged = isModeConverged(installationRoot, 'spec', convergenceKey);
 
   const gate: GateContext = {
     installationRoot,

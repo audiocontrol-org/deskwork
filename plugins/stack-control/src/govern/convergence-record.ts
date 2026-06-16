@@ -12,10 +12,11 @@
 // gate is opt-in (spec audit-barrage parked, TASK-138). This module is the
 // mechanism — symmetric for both modes — independent of which gate is enforced.
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import type { GovernConvergenceRecord } from '../workflow/workflow-types.js';
+import { computeScopeFingerprint } from './checkpoint-state.js';
 
 export type GovernMode = GovernConvergenceRecord['mode'];
 
@@ -143,4 +144,47 @@ export function isModeConverged(
 ): boolean {
   const record = readGovernConvergenceRecord(installationRoot, mode, item);
   return record !== null && record.converged;
+}
+
+/**
+ * Compute the scope fingerprint for a convergence record, reusing the 021
+ * checkpoint fingerprint shape over the governed paths. When no governed path
+ * resolves inside the installation (e.g. the spec dir is absent), fall back to a
+ * stable digest of the item id so the record always carries a non-empty
+ * fingerprint (a later in-scope change re-fingerprints when paths DO resolve).
+ */
+function convergenceFingerprint(
+  installationRoot: string,
+  item: string,
+  scopePaths: readonly string[],
+): string {
+  const usable = scopePaths
+    .map((p) => (isAbsolute(p) ? relative(installationRoot, p) : p))
+    .filter((rel) => rel.length > 0 && !rel.startsWith('..') && existsSync(resolve(installationRoot, rel)));
+  if (usable.length > 0) {
+    return computeScopeFingerprint(installationRoot, usable);
+  }
+  return createHash('sha256').update(`\0item\0${item}`).digest('hex');
+}
+
+/**
+ * Record that governance converged for an item (the govern emit-site seam, T029).
+ * Writes a `converged: true` record keyed by mode, fingerprinting the governed
+ * scope. `recordedAt` is supplied by the caller (the CLI stamps the time).
+ */
+export function recordGovernConvergence(
+  installationRoot: string,
+  mode: GovernMode,
+  item: string,
+  scopePaths: readonly string[],
+  recordedAt: string,
+): string {
+  return writeGovernConvergenceRecord(installationRoot, {
+    version: 1,
+    mode,
+    item,
+    scopeFingerprint: convergenceFingerprint(installationRoot, item, scopePaths),
+    converged: true,
+    recordedAt,
+  });
 }
