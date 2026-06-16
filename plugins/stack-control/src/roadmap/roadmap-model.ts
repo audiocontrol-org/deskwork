@@ -29,6 +29,8 @@ export interface WorkItem {
   readonly designApproved: boolean;
   /** Recorded `speckit-analyze`-clean marker (022 FR-029) — the default `specifying → implementing` signal. */
   readonly analyzeClean: boolean;
+  /** Backlog ids this item resolves; closed mechanically on terminal closure (023 FR-001). */
+  readonly closes: readonly string[];
   /** The item's shape prose (body, sans the heading and the field bullets). */
   readonly scope: string;
 }
@@ -126,6 +128,12 @@ function toWorkItem(unit: Unit): WorkItem {
   const design = firstOrNull(edgeTargets(unit, 'design'));
   const designApproved = firstOrNull(edgeTargets(unit, 'design-approved'));
   const analyzeClean = firstOrNull(edgeTargets(unit, 'analyze-clean'));
+  // `closes` is a prose edge (single raw value) carrying a comma-list of backlog ids.
+  const closesRaw = firstOrNull(edgeTargets(unit, 'closes'));
+  const closes =
+    closesRaw === null
+      ? []
+      : closesRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
   return {
     identifier: unit.identifier,
     phase,
@@ -139,6 +147,7 @@ function toWorkItem(unit: Unit): WorkItem {
     design: design === null ? null : unquote(design),
     designApproved: markerTrue(designApproved),
     analyzeClean: markerTrue(analyzeClean),
+    closes,
     scope: scopeOf(unit),
   };
 }

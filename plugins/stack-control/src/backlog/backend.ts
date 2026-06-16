@@ -62,7 +62,14 @@ export interface BacklogBackend {
   /** Additively edit an existing item (add a label / append notes). Shells the
    * real binary; a non-zero exit (e.g. unknown id) throws BacklogError (D6). */
   edit(id: string, spec: EditSpec): void;
+  /** Close an item by setting its status to the terminal `Done` (023 FR-007).
+   * Shells the real binary; a non-zero exit (e.g. unknown id) throws BacklogError —
+   * never a silent no-op, never a fabricated success. */
+  close(id: string): void;
 }
+
+/** The terminal backlog status an item is moved to on closure. */
+export const BACKLOG_DONE_STATUS = 'Done';
 
 export interface BacklogBackendOptions {
   /** Working dir whose `backlog/` tree the binary operates on. */
@@ -262,6 +269,13 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
       if (spec.appendNotes !== undefined) args.push('--append-notes', spec.appendNotes);
       args.push('--plain');
       run(args); // non-zero (e.g. unknown id) → BacklogError, never a silent no-op
+    },
+
+    close(id: string): void {
+      // Set status to the terminal `Done` via the real binary. A non-zero exit
+      // (unknown id, backend error) throws BacklogError — the caller never reports
+      // a close it did not perform (023 FR-006/FR-007).
+      run(['task', 'edit', id, '-s', BACKLOG_DONE_STATUS, '--plain']);
     },
   };
 }
