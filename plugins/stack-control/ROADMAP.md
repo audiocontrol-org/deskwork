@@ -390,8 +390,10 @@ Make the lifecycle un-skippable: a workflow 'compass' primitive that orients an 
 
 ## multi:feature/unskippable-workflow-protocol
 - status: in-flight
+- spec: specs/025-unskippable-workflow-protocol
 - design: docs/superpowers/specs/2026-06-16-unskippable-workflow-protocol-design.md
 - design-approved: 2026-06-16
+- analyze-clean: 2026-06-16
 - part-of: multi:feature/lifecycle-industrialization
 Make the stack-control workflow protocol mechanically un-skippable for adopting agents (the 024 compass principle extended past the macro-lifecycle): per-phase governance gated at each tasks.md phase boundary (close the boundary-too-large batching hole); no agent-offered shortcuts (consistent protocol always); no bypassing stack-control:execute to reach the backend speckit-implement directly; commit-and-push automatic at phase boundaries (not operator-reminded). Enforcement lives in the governed WORKFLOW.md gates + skill bodies + CLI verbs (travels with install), never git hooks.
 
