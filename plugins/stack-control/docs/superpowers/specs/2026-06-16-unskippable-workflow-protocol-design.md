@@ -2,7 +2,8 @@
 
 **Roadmap item**: `multi:feature/unskippable-workflow-protocol` (part-of `multi:feature/lifecycle-industrialization`)
 **Date**: 2026-06-16
-**Status**: in design (awaiting operator approval)
+**Status**: approved (operator, 2026-06-16)
+**Scope**: ONE feature, ONE spec (operator decision 2026-06-16) — all four holes + the speckit wrapper land together as one cohesive mechanism.
 
 ## problem-domain
 
@@ -89,10 +90,18 @@ inside `implementing` — governance cadence, no-shortcuts, the execute boundary
    shortcut a protocol step. The only operator-facing branches are genuine *scope* decisions the
    operator initiates — never an agent-offered protocol bypass. (A `--no-…` escape, if ever
    needed, is an explicit operator override recorded as such, not a menu item.)
-5. **No bypassing `execute`.** The sanctioned implement path is `/stack-control:execute`; running
-   the backend `/speckit-implement` directly is a protocol violation. The per-phase checkpoint
-   gate (decision 1) means even a raw-speckit path **cannot graduate** without the checkpoints —
-   narrowing the FR-014 hole at the graduation gate rather than only documenting it.
+5. **No bypassing `execute` — block outright (operator decision 2026-06-16).** The sanctioned
+   implement path is `/stack-control:execute`; running the backend `/speckit-implement` directly is
+   a protocol violation that is **refused at the point of invocation**, not merely made useless at
+   graduation. A **speckit wrapper** (a stack-control-owned shim over the vendored backend implement
+   skill) intercepts a direct `/speckit-implement` invocation, refuses loud, and redirects to
+   `/stack-control:execute`. The per-phase checkpoint graduation gate (decision 1) is retained as
+   **defense-in-depth**: even if the wrapper is somehow evaded, a raw-speckit path still **cannot
+   graduate** without the per-phase checkpoints. (Mechanism note: the wrapper mirrors the 024 compass
+   precondition pattern — a refusal in the skill body / CLI verb that travels with `claude plugin
+   install`, per `enforcement-lives-in-skills.md`; never a git hook. The wrapper's exact interception
+   shape — shadowing skill vs. precondition block injected into the vendored skill — is a spec/plan
+   detail, captured not cut.)
 6. **Commit-and-push is mechanical.** The execute loop commits and pushes at each phase boundary;
    "push early and often" becomes a mechanism, not a reminder. Push failure fails loud (record
    safe locally), never silent.
@@ -103,19 +112,47 @@ inside `implementing` — governance cadence, no-shortcuts, the execute boundary
 
 ## open-questions
 
-(Captured, not cut — scoping is a later operator-driven pass per the capture-don't-cut rule.)
+(Captured, not cut — scoping is a later operator-driven pass per the capture-don't-cut rule. The
+operator resolved the load-bearing forks at design approval 2026-06-16; resolutions are recorded
+below alongside the items still carried into the spec for `/speckit-clarify` to pin.)
 
-- **Scope split:** one feature or several specs (per-phase-gate; no-shortcuts; no-execute-bypass;
-  auto-commit-push)? The per-phase gate is the lead; the others may be siblings.
+### Resolved at design approval (2026-06-16)
+
+- **Scope split — RESOLVED: one feature, one spec.** All four holes (per-phase-gate;
+  no-shortcuts; no-execute-bypass; auto-commit-push) plus the speckit wrapper land together as a
+  single cohesive mechanism. They share the compass-enforcement pattern, so splitting them would
+  fragment one mechanism across specs. (See `**Scope**` header + decision additions.)
+- **Raw-speckit blocking — RESOLVED: block outright.** A speckit wrapper refuses a direct
+  `/speckit-implement` and redirects to `/stack-control:execute`; the graduation gate stays as
+  defense-in-depth. (Folded into decision 5.)
+- **Auto-push failure modes — RESOLVED: commit-local-first, push fail-loud.** Decision 6 governs:
+  the commit always lands locally (work safe), then push; a push failure (offline / auth /
+  hook-failure) fails loud and is surfaced — never silent, never `--no-verify` (existing rule).
+- **Orchestrator vs implementation session split — RESOLVED: cadence lives in the implementation
+  session.** Auto-commit/push fires inside the `execute` loop, which runs in the implementation
+  session (feature worktree) per the two-session rule; the orchestrator session never runs
+  `execute`, so the cadence does not cross the boundary.
+
+### Carried into the spec (mechanism detail for `/speckit-clarify` + `/speckit-plan`)
+
 - **Phase enumeration:** how the gate derives "the phases" when the `tasks.md` phase→file mapping
-  is incomplete (relates to TASK-70).
-- **Single oversized phase:** right-sizing guidance (TASK-75) when one phase still exceeds the
-  envelope.
-- **Raw-speckit blocking:** block a direct `/speckit-implement` invocation outright (needs a
-  speckit wrapper), or only block graduation via the gate (decision 5)?
-- **Auto-push failure modes:** offline / hook-failure handling — fail-loud vs warn-and-continue.
-- **Orchestrator vs implementation session split:** how the auto-commit/push cadence interacts
-  with the two-session boundary.
+  is incomplete. Design position: the gate derives the phase set from `tasks.md` phase headers and
+  **fails loud** when a phase's authoritative file list is missing/incomplete, rather than scoping
+  a partial or empty payload. **Hard dependency on TASK-70** (per-phase govern scoping is unsound
+  without authoritative file lists) — a precondition for the per-phase gate's soundness.
+- **Single oversized phase:** when one phase still exceeds the fleet envelope after per-phase
+  splitting, the mechanism **fails loud** with `boundary-too-large` pointing at **TASK-75**
+  right-sizing guidance. The mechanism does NOT auto-split a phase; right-sizing stays
+  operator/guidance work (TASK-75). Carried as a known limitation + companion dependency.
+- **Speckit wrapper interception shape:** shadowing skill vs. a precondition block injected into
+  the vendored backend implement skill (decision 5 mechanism note) — a `/speckit-plan` detail.
+
+### Surfaced dependencies (to record as roadmap edges)
+
+- **TASK-70** (phase-scoping soundness) and **TASK-75** (phase right-sizing) become
+  **preconditions/companions** of this feature: the per-phase gate's soundness rests on TASK-70's
+  authoritative file lists, and the boundary-too-large fail-loud path defers right-sizing to
+  TASK-75. Record as `depends-on` edges on the roadmap node.
 
 ## provenance
 
