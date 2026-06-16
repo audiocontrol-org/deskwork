@@ -2,6 +2,75 @@
 
 ---
 
+## 2026-06-16: Converge parseable-lifecycle-workflow design → author spec 022 to runnable; park spec audit-barrage
+
+**Goal:** Pick up the 2026-06-15 design handoff — converge the
+`parseable-lifecycle-workflow` strawman to a spec and author it through
+`/stack-control:define` to runnable.
+
+**Accomplished:**
+- Oriented via `/stack-control:session-start`; ran `/speckit-analyze` on the
+  shipped 021 (re-surfaced the boundary-too-large gap, already parked as TASK-117).
+- Ratified the 3 framing decisions that gated convergence: a **new `workflow` verb
+  family consuming the roadmap node-reader**; the **roadmap node** as the unit;
+  **TASK-19** (governance-graduation-record) pulled into the feature's scope.
+- Drove all 6 remaining open design decisions to resolution and **converged the
+  strawman** (atomicity = commit-last/git-rollback; fixed 7-verb effect vocabulary;
+  designing-frontend over swappable backend in-session; derive `designing` on the
+  `design:` pointer; mid-stream re-design captured-but-thin).
+- **Authored spec 022 (`parseable-lifecycle-workflow`)** through the full Spec Kit
+  chain in-session: specify → clarify (3 high-impact resolutions) → plan
+  (research / data-model / 4 contracts / quickstart) → tasks (36 RED-first across
+  11 phases) → analyze (**clean — 0 CRITICAL/HIGH**) + remediation.
+  `spec=yes plan=yes tasks=yes`, `execute-check: runnable`.
+- **Parked spec audit-barrage from the default workflow** (operator decision; impl
+  audit-barrage unchanged) using the **"park the gate, keep the mechanism"** shape —
+  reflected in 022 (FR-028/029, research D8, tasks) + the
+  `spec-audit-diminishing-returns` rule; captured **TASK-138** for re-enable.
+
+**Didn't Work:**
+- `stackctl session-end` auto-derived **"Commits: 0 / Files: 0 / backlog: 0"** —
+  boundary resolution failed on the long-lived `feature/stack-control` branch
+  (known **TASK-39 / TASK-59**). Re-derived by hand from `git log 465d590c..HEAD`
+  (the prior session's tip): 10 commits / 18 files.
+- `stackctl spec-check --spec` is not cwd/repo-root tolerant — from the repo root it
+  needs the plugin-prefixed path or it FATALs "not found" (captured as friction).
+- The `before_specify` `speckit.git.feature` hook (mandatory) would create a
+  per-spec branch contrary to the one-long-lived-branch program convention; ran
+  `create-new-feature.sh --dry-run` to get the number only (captured as friction).
+
+**Course Corrections:**
+- [PROCESS] Design-doc placement: operator corrected that stack-control design docs
+  belong **inside the configuration domain**, then sharpened that the principle is
+  about **adopter repos** — every authored artifact anchors in the installation
+  domain (the constitution's installation-anchor invariant). I'd initially
+  investigated this monorepo's layout (wrong universe) before the sharpening landed.
+- [PROCESS] Scope: operator parked spec audit-barrage from the default workflow
+  ("until the kinks are worked out"; keep impl). Reshaped 022's just-clarified
+  symmetric govern gate into **park-the-gate-keep-the-mechanism** (confirmed via a
+  pick) rather than stripping or leaving it contradictory.
+- [PROCESS] Operator reminder "commit and push early and often" — applied the
+  analyze remediation and committed/pushed immediately rather than batching.
+
+**Insights:**
+- "Park the gate, keep the mechanism" is the right shape for a temporary
+  protocol-maturity park — the symmetric convergence-record mechanism stays, so
+  re-enabling the spec gate later is a flag flip, not a re-design.
+- The full `define` chain ran cleanly in-session on one long-lived branch; the
+  program's no-per-spec-branch convention requires handling the mandatory
+  `git.feature` hook via `--dry-run` (a recurring friction worth a real fix).
+
+**Quantitative (re-derived from git; auto-derivation failed — see Didn't Work):**
+- Commits: **10** (9 work + 1 session-end record) on `feature/stack-control`
+  (`465d590c..HEAD`). The verb's auto-derived "0" is the TASK-39/-59 long-lived-branch
+  boundary failure, not a no-op session.
+- Files changed: **18**.
+- Backlog touched: captured **TASK-138** (re-enable spec audit-barrage); referenced
+  **TASK-19 / TASK-136 / TASK-137** (022 scope + linkage) and **TASK-117** (021
+  analyze). Verb auto-derived "backlog progressed: 0" — same boundary failure.
+- Corrections: ~3 (placement→adopter-domain; park spec barrage; commit-push
+  reminder). No reverted or claimed-untrue work.
+
 ## 2026-06-15: Design session — parseable-lifecycle-workflow (gates, frontend/backend, designing phase)
 
 **Goal:** Orient via `/stack-control:session-start`; pick up the in-flight
