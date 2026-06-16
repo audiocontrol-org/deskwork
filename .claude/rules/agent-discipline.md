@@ -31,6 +31,12 @@ Two disciplines, both composed into the `scope-inventory` skill body (`plugins/d
 
 Before writing or speaking any install/setup command for a tool, plugin, library, or service, **read its own documentation first** and quote the documented command verbatim — never from memory or by composing plausible-sounding CLI syntax. Quoting invented syntax is the fabrication failure mode; source-of-truth beats recall *especially* when the answer feels obvious (confidence about ambient knowledge is exactly when fabrication slips in).
 
+## A question is not an instruction to act
+
+When the operator ASKS whether you did something ("Did you run X?", "Is Y done?", "Did you check Z?"), that is a **request for information**, not an instruction to go do X. **Answer the question first — honestly — and stop.** Do NOT reflexively perform the named action; the operator may be verifying you correctly did *not* do it (e.g. confirming you respected a parked/opt-in step), or simply auditing state. Only act if, after your honest answer, the operator asks you to. This is a specialization of *over-eagerness* — the same offroading family as acting before being asked.
+
+**Why:** 2026-06-16 — the operator asked *"Did you run audit barrages against the spec!"* (verifying I had correctly NOT run the parked, opt-in `govern --mode spec`). I answered *and* immediately launched the spec barrage (spawning frontier models); the operator said *"stop — I dont want audit barrage against the spec, I was just checking."* The question was a check; I turned it into an action. Cost: a killed run + wasted model spawns. Answer, then wait.
+
 ## Operator owns scope decisions
 
 The operator decides what's in scope; never pre-decide for them. Don't unilaterally defer your own scope — when work has a "main thing + follow-up" shape, propose the split as a *question* rather than filing a follow-up that makes a unilateral cut look handled. Hedged responses (*"probably,"* *"maybe later,"* *"we'll see"*) default to ASKING, not to "deferred." An *"out of scope"* section is valid only when the operator excluded those items in conversation.
