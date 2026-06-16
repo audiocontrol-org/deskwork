@@ -2,21 +2,42 @@
 
 ---
 
-## 2026-06-16: <!-- session title -->
+## 2026-06-16: Release v0.49.0 (024 shipped) → verify in the installed build → close out 024
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Confirm the release that carries 024, verify the compass in the formally-installed
+plugin (the closure rule), and close out 024.
 
 **Accomplished:**
-- <!-- compose -->
+- **v0.49.0 released** (after the #481 merge) — contains 024 (compass source + the `workflow
+  compass` verb). Branch synced with `main` (the merge + release bumps).
+- **Verified 024 in the installed 0.49.0 build** (adopter ground truth, run from the cached
+  plugin binary): `compass` orientation → exit 0; intent diff `behind` → 0; off-rail (no node)
+  → **exit 4**; unknown intent → **exit 2**. The gating contract — the whole point of the
+  compass — works end-to-end in the released build. (Bonus dogfood: this session-end skill is
+  running from 0.49.0 and its body shows the codex-03/claude-03 doc edits — confirming 024's
+  SKILL.md changes shipped.)
+- **Closed out 024**: ROADMAP node `multi:feature/lifecycle-compass` → `shipped` (+ recorded
+  `analyze-clean`, `closes:`); `close-related` closed **TASK-83** (FR-012) + **TASK-139**
+  (FR-013) → Done; residual hardening promoted to the backlog as **TASK-142** (was T039) +
+  **TASK-143** (was T041) so it survives closure.
 
 **Didn't Work:**
-- <!-- compose -->
+- Nothing material this segment.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] When told "the latest plugin version is installed," I started reasoning about
+  whether 024 was in it from memory (assuming 0.48.1) — then **checked the installed build
+  empirically** (found 0.49.0 with the compass). Verify the installed state as ground truth;
+  don't infer it (the dogfood-as-user discipline). No operator correction needed — caught it
+  in the same turn.
 
 **Insights:**
-- <!-- compose -->
+- The closure rule paid off: verifying the compass in the *installed release* (not the source
+  tree) is the honest "shipped" signal — and it confirmed the released build's gating exit
+  codes, not just the local suite.
+- stack-control's feature close-out is mechanical: terminal `shipped` status + `close-related`
+  (the 023 verb) closes the resolved backlog items; residuals go to the backlog so a shipped
+  feature carries no silently-open tasks.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 4
