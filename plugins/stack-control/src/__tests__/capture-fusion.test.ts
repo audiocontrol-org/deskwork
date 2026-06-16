@@ -26,8 +26,13 @@ afterEach(() => {
 
 const ITEM = 'multi:feature/x';
 
-describe('024 FR-008 — no spec dir through the front door without a node', () => {
-  it('authoring (define) is refused for an item with no roadmap node (off-rail)', () => {
+describe('024 FR-008 (model b) — the front door creates the node; a node-less item is off-rail (backstop)', () => {
+  it('a no-node item yields an off-rail compass verdict — the mechanical BACKSTOP', () => {
+    // Model (b), operator decision 2026-06-16: `/stack-control:define` CREATES the roadmap node
+    // when absent (capture-fusion, in the skill body) — it does NOT refuse-and-redirect. So the
+    // supported path never produces an orphan. This off-rail verdict is the mechanical BACKSTOP
+    // (FR-009) for a node-less spec dir that slips in another way (e.g. hand-authored), and the
+    // compass behavior other skills rely on — NOT define's own front-door behavior.
     const f = fixture([{ identifier: 'multi:feature/other', status: 'in-flight' }]); // roadmap present; queried item absent
     const r = checkLifecyclePrecondition({ item: 'multi:feature/orphan', intent: 'define', cwd: f.root });
     expect(r.proceed).toBe(false);
@@ -35,7 +40,7 @@ describe('024 FR-008 — no spec dir through the front door without a node', () 
     expect(r.verdict.reason).toMatch(/node/i);
   });
 
-  it('authoring proceeds only once the node exists and design is done (no orphan)', () => {
+  it('on an EXISTING node, define gates normally and proceeds when design is done', () => {
     // node present, design pointer set + approved → designing → define is on-course
     const f = fixture([
       { identifier: ITEM, status: 'in-flight', design: 'd', designApproved: true },

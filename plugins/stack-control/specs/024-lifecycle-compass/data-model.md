@@ -121,8 +121,11 @@ Orphan / capture-fusion entry below.
 
 The compass itself is read-only and stateless. The enforcement it adds:
 
-- **Entry gate** (`captured`/no-node → authoring): orphan is a hard error; capture-fusion
-  makes the node→spec creation atomic (US3). Enforced as a refusal now.
+- **Entry gate** (`captured`/no-node → authoring): capture-fusion — the `define` front door
+  **CREATES the node→spec atomically** when no node exists (FR-008 model b, US3); it does NOT
+  refuse-and-redirect. The mechanical teeth are the **backstop**: any spec dir that still ends
+  up without a node is a hard error (`off-rail`) reported by the compass and every spec-resolving
+  verb (FR-009), so orphans are impossible through the front door AND caught otherwise.
 - **`governing → shipped`**: the transition refuses on an unmet exit gate rather than only
   reporting it (US5). Enforced as a refusal now (depends on govern being runnable — FR-011/12).
 - **Mid-pipeline transitions**: remain advisory in the engine's `advance` path during
