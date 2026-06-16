@@ -62,6 +62,23 @@ exist for an adopter who installs the plugin and follows the README.
 protocol" record decisions 4–6 as discipline until this mechanization lands; this
 feature is the mechanism that *replaces* the rules (the "yelling").
 
+## Clarifications
+
+### Session 2026-06-16
+
+- Q: How should the new per-phase-checkpoint requirement relate to the existing
+  whole-feature `record-converged impl` graduate gate? → A: **Compose** — the
+  whole-feature converged-impl signal is *derived from* the union of current
+  per-phase checkpoints (one source of truth, per-phase). There is no separate
+  whole-feature govern run; the graduate gate reads the composed signal. This kills
+  the boundary-too-large path while keeping a single graduate signal (aligns with
+  021's compose-from-checkpoints contract).
+- Q: Which backend skills should the speckit wrapper intercept? → A: **All backend
+  speckit skills** (specify / plan / tasks / implement). Every stack-control front
+  door is the only sanctioned path to its backend: specify/plan/tasks route through
+  `/stack-control:define` or `/stack-control:extend`; implement routes through
+  `/stack-control:execute`.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Per-phase governance is a gated boundary (Priority: P1) 🎯 MVP
@@ -158,28 +175,33 @@ surfaced loud while the local commit remains intact.
 
 ---
 
-### User Story 4 - No bypassing `execute` (speckit wrapper blocks outright) (Priority: P2)
+### User Story 4 - No bypassing the front doors (speckit wrapper blocks outright) (Priority: P2)
 
-A direct `/speckit-implement` invocation is **refused at the point of invocation** and
-redirected to `/stack-control:execute`. The per-phase graduation gate (US1) is
-retained as defense-in-depth: even if the wrapper is somehow evaded, a raw-speckit
-path cannot graduate without per-phase checkpoints.
+A direct invocation of any wrapped backend speckit skill (`/speckit-specify`,
+`/speckit-plan`, `/speckit-tasks`, `/speckit-implement`) is **refused at the point of
+invocation** and redirected to its sanctioned stack-control front door
+(define/extend for authoring; execute for implement). The per-phase graduation gate
+(US1) is retained as defense-in-depth: even if the wrapper is somehow evaded, a
+raw-speckit path cannot graduate without per-phase checkpoints.
 
 **Why this priority**: Closes the bypass hole at the point of bypass, not only at
 graduation. P2 because US1 already denies a bypassed path the ability to *ship*; this
-adds a stronger, earlier refusal.
+adds a stronger, earlier refusal across the whole backend chain.
 
-**Independent Test**: Invoke the backend implement skill directly; confirm it refuses
-and names `/stack-control:execute` as the sanctioned path. Separately confirm a
-hypothetically-evaded raw path still cannot graduate (US1 gate).
+**Independent Test**: Invoke each wrapped backend skill directly; confirm each refuses
+and names its front door. Separately confirm a hypothetically-evaded raw implement
+path still cannot graduate (US1 gate).
 
 **Acceptance Scenarios**:
 
 1. **Given** an agent invokes `/speckit-implement` directly, **When** the wrapper
    intercepts, **Then** it refuses loud and redirects to `/stack-control:execute`.
-2. **Given** the wrapper is somehow evaded and a feature is implemented raw, **When**
+2. **Given** an agent invokes `/speckit-specify` / `/speckit-plan` / `/speckit-tasks`
+   directly, **When** the wrapper intercepts, **Then** it refuses loud and redirects to
+   `/stack-control:define` or `/stack-control:extend`.
+3. **Given** the wrapper is somehow evaded and a feature is implemented raw, **When**
    graduation is attempted, **Then** it is refused (no per-phase checkpoints — US1).
-3. **Given** the refusal logic, **When** an adopter installs the plugin, **Then** the
+4. **Given** the refusal logic, **When** an adopter installs the plugin, **Then** the
    refusal travels with the install (skill body / CLI verb), with no git hook required.
 
 ---
@@ -231,8 +253,14 @@ explicit operator-initiated, recorded override.
 **Per-phase governance gate (US1)**
 
 - **FR-001**: The `governing → shipped` gate MUST require a *current* per-phase govern
-  checkpoint for **every** `tasks.md` phase; a single whole-feature record MUST NOT
-  satisfy it.
+  checkpoint for **every** `tasks.md` phase; a single standalone whole-feature record
+  MUST NOT satisfy it.
+- **FR-001a** (compose, per Clarifications 2026-06-16): The whole-feature
+  `record-converged impl` graduate signal MUST be **derived from** the union of the
+  current per-phase checkpoints — a composed signal, not a separately-run whole-feature
+  govern. There MUST be no whole-feature govern pass (that is the `boundary-too-large`
+  path this feature exists to remove); the per-phase checkpoints are the single source
+  of truth and the graduate gate reads the composed result.
 - **FR-002**: The `implementing → governing` gate MUST likewise require the per-phase
   checkpoints to be present and current for the phases completed so far, consistent
   with the per-phase cadence (decision 1).
@@ -271,9 +299,11 @@ explicit operator-initiated, recorded override.
 
 **No bypassing `execute` (US4)**
 
-- **FR-012**: A direct `/speckit-implement` (backend implement skill) invocation MUST be
-  refused at the point of invocation and redirected to `/stack-control:execute` (the
-  speckit wrapper).
+- **FR-012**: A direct invocation of **any** backend speckit skill the stack-control front
+  doors wrap — `/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, `/speckit-implement`
+  (per Clarifications 2026-06-16) — MUST be refused at the point of invocation and
+  redirected to its sanctioned front door: specify/plan/tasks → `/stack-control:define`
+  or `/stack-control:extend`; implement → `/stack-control:execute`. (The speckit wrapper.)
 - **FR-013**: The wrapper's refusal MUST live in a skill body / CLI verb that travels
   with `claude plugin install` — never a git hook.
 - **FR-014**: The per-phase graduation gate (FR-001) MUST be retained as
@@ -305,9 +335,13 @@ explicit operator-initiated, recorded override.
   phase. The unit the US1 gate counts and the US2 cadence writes.
 - **Per-phase graduate gate criterion** — the computable `WORKFLOW.md` gate (022
   gate-eval) requiring all per-phase checkpoints current before `governing → shipped`.
-- **Speckit wrapper** — the stack-control-owned shim over the vendored backend implement
-  skill that intercepts a direct invocation and redirects to `execute`. (Interception
-  shape — shadowing skill vs. injected precondition block — is a plan-level detail.)
+  The whole-feature `record-converged impl` signal is **composed** from the union of
+  these checkpoints (FR-001a), not produced by a separate whole-feature govern run.
+- **Speckit wrapper** — the stack-control-owned shim over the vendored backend speckit
+  skills (specify / plan / tasks / implement) that intercepts a direct invocation and
+  redirects to the sanctioned front door (define/extend for authoring; execute for
+  implement). (Interception shape — shadowing skill vs. injected precondition block — is
+  a plan-level detail.)
 
 ## Success Criteria *(mandatory)*
 
@@ -320,8 +354,9 @@ explicit operator-initiated, recorded override.
   (staleness detection), naming the stale phase.
 - **SC-003**: Driving `execute` over a multi-phase feature produces a govern checkpoint
   AND a commit+push at each phase boundary, with zero operator reminders required.
-- **SC-004**: A direct backend-implement invocation is refused and redirected to
-  `/stack-control:execute` 100% of the time.
+- **SC-004**: A direct invocation of any wrapped backend speckit skill (specify / plan /
+  tasks / implement) is refused and redirected to its sanctioned front door 100% of the
+  time.
 - **SC-005**: An audit of stack-control skill bodies finds zero skip/defer/shortcut
   affordances.
 - **SC-006**: `boundary-too-large` does not occur on the sanctioned per-phase path for
