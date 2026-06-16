@@ -9,6 +9,16 @@ Use the stack-control release surface as the portable contract for deskwork
 releases. The workflow remains one monorepo release with one version line; host
 surfaces are adapters, not separate release streams.
 
+## Compass precondition (024 — the un-skippable lifecycle)
+
+**Before doing ANY of this skill's work**, consult the compass for the roadmap item being released, declaring this skill as the intent:
+
+```bash
+plugins/stack-control/bin/stackctl workflow compass <item> --intent release
+```
+
+A **non-zero exit is a hard refusal**: print the compass's reason and **STOP — perform none of this skill's work**. `release` maps to the back-half `shipped` target, so an item that has not reached `governing` returns `ahead` (naming the skipped step) — you cannot release un-governed work. Proceed only on exit 0. Per `.claude/rules/enforcement-lives-in-skills.md` the gate lives in this skill body + the `stackctl workflow compass` verb, never a git hook.
+
 ## Shared-core contract
 
 Start with the shared-core check:

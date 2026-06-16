@@ -212,3 +212,65 @@ export class WorkflowError extends Error {
     this.name = 'WorkflowError';
   }
 }
+
+// ── Lifecycle compass (024) ──────────────────────────────────────────────────
+
+/**
+ * The classification of an intended action against an item's live phase (024
+ * data-model § Verdict, FR-002). `on-course` = the legitimate next move; `ahead`
+ * = the action belongs to a later phase (a step is skipped); `behind` = an earlier
+ * phase (re-entry / redundant — allowed); `off-rail` = no node or a terminal
+ * side-state (refuse).
+ */
+export const VERDICT_OUTCOMES = ['on-course', 'ahead', 'behind', 'off-rail'] as const;
+export type VerdictOutcome = (typeof VERDICT_OUTCOMES)[number];
+
+/**
+ * Verdict → process exit code (024 FR-003): a skill body gates on the code without
+ * parsing prose. `on-course`/`behind` proceed (0); `ahead`/`off-rail` refuse with
+ * DISTINCT non-zero codes so the embedding skill names the precise violated
+ * invariant. Usage/parse/unknown-intent errors use a separate code (2) at the CLI.
+ */
+export const VERDICT_EXIT = {
+  'on-course': 0,
+  behind: 0,
+  ahead: 3,
+  'off-rail': 4,
+} as const satisfies Record<VerdictOutcome, number>;
+
+/** A compass verdict (024 data-model § Verdict). Plain data; computed purely. */
+export interface Verdict {
+  readonly outcome: VerdictOutcome;
+  /** The item's derived phase (reused from 022 derivation). */
+  readonly currentPhase: DerivedPhase;
+  /**
+   * The phase the intent maps to. Null in three valid cases: orientation mode (no
+   * intent), off-rail with no resolvable node, AND a phase-NEUTRAL intent (e.g.
+   * `session-end`) — which yields a successful `on-course` verdict with a null
+   * `intentPhase` (AUDIT-BARRAGE-codex-02). Null is therefore NOT an error sentinel;
+   * read `outcome` for the verdict, never `intentPhase === null`.
+   */
+  readonly intentPhase: PhaseId | null;
+  /** The single legitimate next phase (null at a terminal phase / side-state). */
+  readonly legitimateNext: PhaseId | null;
+  /** The first jumped phase — non-null when `ahead` due to a skipped phase (FR-002, SC-001). */
+  readonly skippedStep: PhaseId | null;
+  /**
+   * The unmet exit-gate criteria of the legitimate-next transition (T040/codex-01).
+   * Non-empty makes a graduation intent (`release`/`ship`) `ahead` instead of `on-course`
+   * when its `governing → shipped` gate is unmet — so the compass cannot green-light a
+   * release without the recorded convergence. Empty on a met gate / non-graduation intents.
+   */
+  readonly unmetGate: readonly string[];
+  /** Actionable message naming the violated invariant (for the skill refusal). */
+  readonly reason: string;
+  /** Process exit code mirroring `VERDICT_EXIT[outcome]` (FR-003). */
+  readonly exitCode: number;
+}
+
+// 024 data-model § Intent: the realized intent contract is the DISCRIMINATED
+// `IntentResolution` in `intent-vocabulary.ts` (`kind: 'phase' | 'neutral'`, with
+// `phase: null` for a phase-neutral intent such as `session-end`). A phase-only
+// `Intent { name; phase }` type is intentionally NOT published here — it would
+// contradict the accepted phase-neutral inputs (AUDIT-BARRAGE-codex-01). Consumers
+// import `IntentResolution`, not a phase-only shape.

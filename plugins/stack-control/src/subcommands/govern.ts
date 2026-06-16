@@ -37,11 +37,17 @@ import {
   assertBarrageBinPresent,
   currentBranch,
   loadLaneCapabilitiesGoverned,
-  resolveSlug,
   runProtocol,
   type BarrageVars,
   type GovernTerminalKind,
 } from '../govern/protocol.js';
+import {
+  branchDerivedSlug,
+  readActiveFeatureSlug,
+  resolveConvergenceItem,
+  resolveFeatureFromItem,
+  resolveFeatureSlug,
+} from '../govern/feature-resolution.js';
 import {
   assembleImplementPayload,
   CODE_AUDIT_LENS,
@@ -70,6 +76,7 @@ import {
 } from '../scope-discovery/util/feature-root.js';
 import { resolveInstallation } from '../config/installation.js';
 import type { Installation } from '../config/types.js';
+import { checkLifecyclePrecondition } from '../lifecycle-precondition.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
 import {
@@ -107,6 +114,8 @@ const USAGE = [
   '',
   '  --mode <implement|spec>   Required.',
   '  --feature <slug>          Feature slug (else derived from feature/<slug>).',
+  '  --item <id>               Roadmap item id — resolve the feature AUTHORITATIVELY',
+  '                            from its spec: pointer (preferred over branch/marker).',
   '  --at <dir>                Resolve the installation enclosing <dir> (default: cwd).',
   '  --ceiling <N>             Convergence iteration ceiling (default 1). NOTE: govern',
   '                            applies NO in-process fix between rounds, so N>1 re-runs',
@@ -134,6 +143,7 @@ type Mode = 'implement' | 'spec';
 interface GovernFlags {
   mode?: Mode;
   feature?: string;
+  item?: string;
   at?: string;
   ceiling?: string;
   override?: string;
@@ -151,6 +161,7 @@ interface GovernFlags {
 const VALUED = new Set([
   '--mode',
   '--feature',
+  '--item',
   '--at',
   '--ceiling',
   '--override',
@@ -184,6 +195,7 @@ function parseFlags(argv: readonly string[]): { ok: true; flags: GovernFlags } |
         }
         flags.mode = value;
       } else if (tok === '--feature') flags.feature = value;
+      else if (tok === '--item') flags.item = value;
       else if (tok === '--at') flags.at = value;
       else if (tok === '--ceiling') flags.ceiling = value;
       else if (tok === '--override') flags.override = value;
@@ -655,9 +667,59 @@ export async function runGovern(args: string[]): Promise<void> {
 
   try {
     const repoRoot = installation.root;
-    const slug = resolveSlug({
-      explicit: pick(flags.feature, process.env.GOVERN_FEATURE_SLUG),
-      branch: currentBranch(repoRoot),
+    // 024 FR-011: resolve the feature from an existing feature root — explicit,
+    // then the branch slug (when it resolves), then the Spec Kit active-feature
+    // marker — so govern runs on the session-pinned branch (where the branch slug
+    // is NOT a feature slug). Pre-compute which candidate slugs have an existing
+    // feature root (resolveFeatureRoot is async), then resolve synchronously.
+    //
+    // 024 codex-01 (HIGH): when an explicit `--item` is supplied (the authoritative
+    // hook/operator path), resolve the feature from the item's spec pointer and use
+    // it as the explicit slug — never guess from the incidental branch/marker.
+    const itemSlug = flags.item !== undefined ? resolveFeatureFromItem(installation, flags.item) : undefined;
+    // 024 codex-01 (HIGH): when an explicit item is named (the authoritative path), gate
+    // govern through the compass — govern is a lifecycle surface and MUST NOT run on an item
+    // whose phase is not ready for governing (a `--item` entry bypasses execute's precondition,
+    // so the gate has to live here too). Refuse loud on a non-zero verdict, before any payload
+    // assembly or barrage.
+    if (flags.item !== undefined) {
+      const pre = checkLifecyclePrecondition({ item: flags.item, intent: 'govern', cwd: installation.root });
+      if (!pre.proceed) {
+        process.stderr.write(
+          `govern: REFUSED — compass verdict '${pre.verdict.outcome}' for '${flags.item}': ${pre.verdict.reason}\n`,
+        );
+        emitTerminalOutcome('fatal');
+        // Propagate the compass exit code (ahead=3 / off-rail=4), not a flat usage 2 — preserve
+        // the ahead/off-rail distinction the compass contract establishes (AUDIT-BARRAGE claude-03).
+        process.exit(pre.verdict.exitCode || 1);
+      }
+    }
+    const explicitSlug = itemSlug ?? pick(flags.feature, process.env.GOVERN_FEATURE_SLUG);
+    const branchForSlug = currentBranch(repoRoot);
+    // Only consult the active-feature marker when it is actually a resolution candidate —
+    // i.e. when no explicit slug (--item/--feature/GOVERN_FEATURE_SLUG) already resolved the
+    // feature (AUDIT-BARRAGE codex-02/claude-01). readActiveFeatureSlug fails loud on a
+    // malformed marker (codex-03); reading it eagerly would FATAL the explicit-override path —
+    // the very escape hatch for a broken marker. resolveFeatureSlug short-circuits on explicit,
+    // so the marker is unused in that case anyway.
+    const markerSlug = explicitSlug !== undefined ? null : readActiveFeatureSlug(repoRoot);
+    const candidateSlugs = [branchDerivedSlug(branchForSlug), markerSlug].filter(
+      (s): s is string => s !== null && s.length > 0,
+    );
+    const existingSlugs = new Set<string>();
+    for (const candidate of candidateSlugs) {
+      try {
+        const { root } = await resolveFeatureRoot({ repoRoot, slug: candidate });
+        if (root !== undefined) existingSlugs.add(candidate);
+      } catch {
+        // not found — not a candidate
+      }
+    }
+    const slug = resolveFeatureSlug({
+      explicit: explicitSlug,
+      branch: branchForSlug,
+      markerSlug,
+      featureRootExists: (s) => existingSlugs.has(s),
     });
 
     const barrageBin = resolveBarrageBin();
@@ -914,12 +976,20 @@ export async function runGovern(args: string[]): Promise<void> {
     // 022 US6 / T029 (FR-028/FR-029): on convergence, write the durable, mode-keyed
     // govern-convergence record inside the installation so the workflow's
     // `governing → shipped` gate (impl) — and the opt-in `specifying → implementing`
-    // gate (spec) — is mechanical, not agent say-so. Keyed by the spec-dir basename,
-    // the stable identity the workflow's `spec:` pointer also resolves. A write
-    // failure leaves the gate CLOSED (fail-safe) with a loud warning — never a
-    // silent graduation.
+    // gate (spec) — is mechanical, not agent say-so. 024 FR-013 / TASK-139: keyed by
+    // the CANONICAL node id (`resolveConvergenceItem`), matching the workflow read-side.
+    // There is NO spec-dir fallback: when no node resolves (orphan/legacy),
+    // `resolveConvergenceItem` FAILS LOUD (AUDIT-BARRAGE claude-01 — the comment matches
+    // the code). A write failure leaves the gate CLOSED (fail-safe): the workflow
+    // `governing → shipped` gate reads the record, so an absent record means the feature
+    // simply cannot advance — graduation is impossible regardless of this exit code.
+    // KNOWN CAVEAT (AUDIT-BARRAGE codex-03, scoped T041): a node-less govern still prints
+    // "governed" + exits 0 here, which is a misleading exit code for a WORKFLOW-driven
+    // orphan (the gate stays closed, so no actual un-governed graduation). The correct
+    // fix distinguishes a workflow-driven orphan (refuse non-zero) from a legitimate
+    // STANDALONE govern with no workflow node (the test fixtures) — tracked as T041.
     try {
-      const convergenceItem = featureRoot !== undefined ? basename(featureRoot) : slug;
+      const convergenceItem = resolveConvergenceItem(installation, featureRoot, slug);
       const scopePaths = featureRoot !== undefined ? [featureRoot] : [];
       recordGovernConvergence(
         repoRoot,
@@ -931,7 +1001,8 @@ export async function runGovern(args: string[]): Promise<void> {
     } catch (err) {
       process.stderr.write(
         `govern: WARNING — could not write the govern-convergence record (${errorMessage(err)}); ` +
-          `the governing -> shipped gate stays closed until it is recorded.\n`,
+          `the governing -> shipped gate stays CLOSED until it is recorded (the feature cannot ` +
+          `graduate in the workflow regardless of this exit code; see T041).\n`,
       );
     }
     process.stderr.write(

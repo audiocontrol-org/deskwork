@@ -22,6 +22,10 @@ import { describeCriterion, evaluateGate, type GateContext } from '../workflow/g
 import { derivePhase } from '../workflow/phase-derivation.js';
 import { loadWorkflowDoc } from '../workflow/workflow-grammar.js';
 import { buildItemContext } from '../workflow/workflow-context.js';
+import { computeVerdict, legitimateNextPhase } from '../workflow/compass.js';
+import { resolveCompass } from '../workflow/compass-resolve.js';
+import { knownIntents, resolveIntent } from '../workflow/intent-vocabulary.js';
+import type { DerivedPhase } from '../workflow/workflow-types.js';
 import type { EffectContext } from '../workflow/effects.js';
 import { applyTransition, previewTransition } from '../workflow/transition-engine.js';
 import { reenterDesign } from '../workflow/redesign.js';
@@ -138,6 +142,75 @@ function emitNext(itemId: string): void {
   t.effects.forEach((e, i) => process.stdout.write(`    ${i + 1}. ${e.verb}\n`));
 }
 
+/** Orientation mode (no --intent, FR-001): the phase + the single legitimate next action + gate state. Exit 0. */
+function emitCompassOrientation(
+  doc: WorkflowDoc,
+  itemId: string,
+  currentPhase: DerivedPhase,
+  hasNode: boolean,
+  gate: GateContext | null,
+): void {
+  process.stdout.write(`workflow compass ${itemId}\n`);
+  if (!hasNode) {
+    process.stdout.write(
+      `  off-rail: no roadmap node for '${itemId}' — capture it first (the front door creates the node)\n`,
+    );
+    return;
+  }
+  if (currentPhase.kind === 'side-state') {
+    process.stdout.write(`  current phase: ${currentPhase.id} (terminal side-state)\n`);
+    process.stdout.write(`  no legitimate forward move; induct back to resume\n`);
+    return;
+  }
+  const p = phaseById(doc, currentPhase.id);
+  if (p === undefined) throw new WorkflowError(`derived phase '${currentPhase.id}' is not declared in WORKFLOW.md`);
+  process.stdout.write(`  current phase: ${currentPhase.id}\n`);
+  process.stdout.write(`  work: ${p.work}\n`);
+  const nextId = legitimateNextPhase(doc, currentPhase.id);
+  const t = forwardTransition(doc, p);
+  if (nextId === null || t === undefined) {
+    process.stdout.write(`  legitimate next action: (none — terminal phase '${currentPhase.id}')\n`);
+  } else {
+    process.stdout.write(`  legitimate next action: ${t.codename} (${t.from} → ${t.to})\n`);
+  }
+  // T040/claude-05: single-source the orientation gate report onto the FORWARD TRANSITION's
+  // exit gate — the same gate the verdict (nextGateUnmet) and the advance enforcement use — so
+  // orientation, verdict, and enforcement cannot disagree about what blocks the next move. Falls
+  // back to the phase's own exit criteria at a terminal phase (no forward transition).
+  if (gate !== null) {
+    reportGate('exit gate', evaluateGate(t !== undefined ? t.exitGate : p.exit, gate));
+  }
+}
+
+/** `workflow compass <item> [--intent <action>] [--json]` (024 US1) — orient + diff; the verdict is the exit code. */
+function emitCompass(itemId: string, intentName: string | undefined, json: boolean): void {
+  const { doc, hasNode, currentPhase, gate, nextGateUnmet } = resolveCompass(process.cwd(), itemId);
+
+  if (intentName === undefined) {
+    emitCompassOrientation(doc, itemId, currentPhase, hasNode, gate);
+    return;
+  }
+
+  const resolved = resolveIntent(doc, intentName);
+  if (resolved === null) {
+    failUsage(`unknown intent '${intentName}' (known: ${knownIntents(doc).join(', ')})`);
+  }
+  const verdict = computeVerdict({ doc, currentPhase, intent: resolved, hasNode, nextGateUnmet });
+  if (json) {
+    process.stdout.write(`${JSON.stringify(verdict, null, 2)}\n`);
+  } else {
+    process.stdout.write(`workflow compass ${itemId}\n`);
+    process.stdout.write(`  current phase: ${currentPhase.id}${currentPhase.kind === 'side-state' ? ' (terminal side-state)' : ''}\n`);
+    process.stdout.write(
+      `  intent: ${intentName}${resolved.phase !== null ? ` (phase ${resolved.phase})` : ' (finishing)'}\n`,
+    );
+    process.stdout.write(`  verdict: ${verdict.outcome}\n`);
+    if (verdict.skippedStep !== null) process.stdout.write(`  skipped step: ${verdict.skippedStep}\n`);
+    process.stdout.write(`  → ${verdict.reason}\n`);
+  }
+  if (verdict.exitCode !== 0) process.exit(verdict.exitCode);
+}
+
 /** Build the effect context for a forward transition out of the current phase. */
 function effectContextFor(r: Resolved, transition: Transition, extra: Record<string, string>): EffectContext {
   const message = `workflow(${transition.codename}): ${r.item.identifier} ${transition.from} -> ${transition.to}`;
@@ -153,7 +226,7 @@ function effectContextFor(r: Resolved, transition: Transition, extra: Record<str
 
 function emitAdvance(itemId: string, apply: boolean, values: Record<string, string>): void {
   const r = resolve(itemId);
-  const { inputs } = buildItemContext(r.root, r.item);
+  const { inputs, gate } = buildItemContext(r.root, r.item);
   const phase = derivePhase(r.doc, inputs);
   if (phase.kind === 'side-state') {
     failUsage(`'${itemId}' is in terminal side-state '${phase.id}'; induct it back before advancing`);
@@ -163,6 +236,22 @@ function emitAdvance(itemId: string, apply: boolean, values: Record<string, stri
   const t = forwardTransition(r.doc, p);
   if (t === undefined) {
     failUsage(`'${itemId}' is in terminal phase '${p.id}'; no forward transition to advance`);
+  }
+  // 024 US5 / FR-010 (phased): the back-half `governing → shipped` (terminal)
+  // transition is ENFORCED as a refusal — an unmet exit gate blocks the advance
+  // rather than only being reported (022 v1 report-only is retired HERE). Mid-
+  // pipeline transitions stay ADVISORY in this advance path during migration;
+  // mid-pipeline ORDER is still enforced by the compass embedded in the skills.
+  const terminalPhaseId = r.doc.phases[r.doc.phases.length - 1]!.id;
+  if (t.to === terminalPhaseId && t.exitGate.length > 0) {
+    const result = evaluateGate(t.exitGate, gate);
+    if (!result.allMet) {
+      process.stderr.write(
+        `workflow advance ${itemId}: REFUSED — '${t.codename}' (${t.from} -> ${t.to}) exit gate unmet:\n`,
+      );
+      for (const c of result.unmet) process.stderr.write(`    [ ] ${describeCriterion(c)}\n`);
+      process.exit(1);
+    }
   }
   const ctx = effectContextFor(r, t, values);
   if (!apply) {
@@ -238,7 +327,7 @@ function emitRedesign(itemId: string, designDoc: string, apply: boolean): void {
 export async function runWorkflowCli(args: string[]): Promise<void> {
   const subaction = args[0];
   if (subaction === undefined || subaction.startsWith('--')) {
-    failUsage('a subaction is required (usage: workflow <status|can-enter|next|advance|link-design|link-spec> ...)');
+    failUsage('a subaction is required (usage: workflow <status|can-enter|next|compass|advance|link-design|link-spec> ...)');
   }
   const rest = args.slice(1);
   const apply = rest.includes('--apply');
@@ -262,6 +351,17 @@ export async function runWorkflowCli(args: string[]): Promise<void> {
         const item = positionals[0];
         if (item === undefined) failUsage('next requires an <item> positional');
         emitNext(item);
+        return;
+      }
+      case 'compass': {
+        const item = positionals[0];
+        if (item === undefined) failUsage('compass requires an <item> positional');
+        const intentIdx = rest.indexOf('--intent');
+        const intentName = intentIdx >= 0 ? rest[intentIdx + 1] : undefined;
+        if (intentIdx >= 0 && (intentName === undefined || intentName.startsWith('--'))) {
+          failUsage('--intent requires a value (an action name)');
+        }
+        emitCompass(item, intentName, rest.includes('--json'));
         return;
       }
       case 'advance': {
@@ -293,7 +393,7 @@ export async function runWorkflowCli(args: string[]): Promise<void> {
       }
       default:
         failUsage(
-          `unknown subaction '${subaction}' (known: status, can-enter, next, advance, link-design, link-spec, redesign)`,
+          `unknown subaction '${subaction}' (known: status, can-enter, next, compass, advance, link-design, link-spec, redesign)`,
         );
     }
   } catch (err) {

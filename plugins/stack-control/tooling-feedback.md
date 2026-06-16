@@ -57,3 +57,12 @@
 ## session-end 2026-06-16
 - stackctl spec-check --spec <path> fails with FATAL 'not found' when run from the repo root with an installation-relative path (specs/NNN-slug); requires the plugins/stack-control-prefixed path. The --spec resolver is not cwd/repo-root tolerant. Repro: from repo root, stackctl spec-check --spec specs/022-... -> FATAL; --spec plugins/stack-control/specs/022-... -> ok. Workaround: always pass the plugin-prefixed path.
 - The before_specify speckit.git.feature hook (mandatory, optional:false) does git checkout -b NNN-slug, creating a per-spec branch that contradicts this program's session-pinned one-long-lived-branch convention (specs 015-022 all live on feature/stack-control). Workaround: run create-new-feature.sh in --dry-run to compute FEATURE_NUM only, stay on feature/stack-control. The mandatory hook vs program convention conflict is unresolved (related TF-09); a faithful run of /speckit-specify would create a stray branch.
+
+## session-end 2026-06-16
+- govern --mode implement FATALs 'feature not found' on the session-pinned branch (derives slug from feature/<branch>=stack-control, looks for specs/<NNN>-stack-control); after_implement hook passes no --feature. Captured in spec 024 FR-011.
+- Authoring a spec via speckit-specify does not set the roadmap node's spec: pointer -> the spec dir is briefly an orphan (manual-capture gap, hit twice this session: 023 and 024). Captured in spec 024 FR-008 (capture fused to authoring).
+- roadmap reconcile still proposes in-flight->shipped from tasks-completion, disagreeing with the workflow's derived 'governing' phase (no convergence record). reconcile should defer to the workflow phase. Captured in spec 024.
+
+## session-end 2026-06-16
+- Per-phase governance should fire at each phase boundary, not as one whole-feature pass at the end (boundary-too-large). Mechanization scoped in multi:feature/unskippable-workflow-protocol.
+- govern.ts is ~1000 lines (well over the 300-500 cap); barrage findings keep landing there. Needs decomposition.

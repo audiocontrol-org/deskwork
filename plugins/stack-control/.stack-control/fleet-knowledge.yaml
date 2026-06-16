@@ -1,5 +1,12 @@
+# Per-lane payload envelopes (max rendered PROMPT.md bytes a lane will accept).
+# Operator-directed 2026-06-16 for whole-feature ("full-implementation") barrages:
+# FRONTIER-ONLY fleet, sized to 256 KiB — above the observed 024 whole-feature
+# payload (~186 KB) with margin, and within each frontier lane's large context window.
+# Must EXACTLY match the configured barrage lanes in audit-barrage-config.yaml.
+# (Older/smaller models are NOT listed: they choke on a payload this size — proven
+# 2026-06-16, gpt-5.4 + sonnet-4-6 produced 0 output — so they are not in the fleet.)
 lanes:
   - name: codex
-    max_prompt_bytes: 98304
-  - name: codex-gpt5
-    max_prompt_bytes: 98304
+    max_prompt_bytes: 262144
+  - name: claude
+    max_prompt_bytes: 262144

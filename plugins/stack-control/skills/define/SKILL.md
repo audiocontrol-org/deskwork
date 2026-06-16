@@ -18,6 +18,38 @@ Author a **new** Spec Kit spec through the stack-control front door (Feature 1, 
 > is navigable both ways. See [`/stack-control:backlog`](../backlog/SKILL.md)
 > § *Promote into the feature rigor* for the canonical description of the seam.
 
+## Compass precondition + capture-fusion (024 — FR-008 model b)
+
+`define` is the **authoring front door that FUSES capture** (FR-008, model b — operator decision
+2026-06-16): authoring a spec for a feature with **no roadmap node CREATES the node in the same
+move** — never a refuse-and-go-capture-first detour. So the opening branch is *create-or-gate*,
+not *refuse*:
+
+1. **Resolve the feature/item.** Determine the roadmap node id for the feature you are about to
+   author (the `--item` if given, else the active feature).
+2. **No node yet → CREATE it (capture-fusion).** Author the spec dir via `/speckit-specify`
+   first (it numbers `specs/NNN-<slug>/`), then create the referencing node in the same
+   operation:
+
+   ```bash
+   plugins/stack-control/bin/stackctl roadmap add <id> --spec specs/NNN-<slug> --apply
+   ```
+
+   A spec dir is never left without a node (no orphan). Do **not** refuse.
+3. **Node already exists → compass-gate.** Consult the compass and refuse loud on a non-zero
+   verdict (an `ahead`/`off-rail` action — e.g. the item is in a terminal side-state), performing
+   none of this skill's work:
+
+   ```bash
+   plugins/stack-control/bin/stackctl workflow compass <id> --intent define
+   ```
+
+**Backstop (FR-009, mechanical):** any spec dir that still ends up with no roadmap node (e.g.
+hand-authored outside this path) is a hard error — the compass reports it `off-rail` and every
+spec-resolving verb refuses. So orphans are impossible through the front door (define creates the
+node) AND caught if they appear another way. Per `.claude/rules/enforcement-lives-in-skills.md`
+the discipline lives in this skill body + the `stackctl` verbs, never a git hook.
+
 ## Scope — authoring only
 
 `define` is **spec-authoring only**. It does NOT create a worktree, a docs tree, or any other physical infrastructure — that is a separate concern (mirrors dw-lifecycle's `define` ≠ `setup`, and Constitution Principle IV: providers own authoring intent; physical substrate is a distinct responsibility). If infra is needed, that is the operator's separate call.
