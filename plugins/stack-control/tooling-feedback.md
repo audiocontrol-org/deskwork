@@ -66,3 +66,6 @@
 ## session-end 2026-06-16
 - Per-phase governance should fire at each phase boundary, not as one whole-feature pass at the end (boundary-too-large). Mechanization scoped in multi:feature/unskippable-workflow-protocol.
 - govern.ts is ~1000 lines (well over the 300-500 cap); barrage findings keep landing there. Needs decomposition.
+
+## session-end 2026-06-16
+- speckit before_specify hook (speckit.git.feature) is mandatory (optional:false) but creates a per-spec branch, which conflicts with this program's one-long-lived-branch convention (TF-09). Every /stack-control:define must skip a 'mandatory' hook. Suggested: a stack-control define-mode that suppresses/no-ops the branch-creation hook on one-branch installations, so the agent isn't forced to deviate from a mandatory hook each spec.
