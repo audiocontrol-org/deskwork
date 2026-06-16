@@ -84,6 +84,16 @@ export function derivePhase(doc: WorkflowDoc, inputs: DerivationInputs): Derived
   const side = sideStateOf(inputs);
   if (side !== null) return side;
 
+  // A terminal roadmap status `shipped` is an operator-recorded fact that the item
+  // shipped (operator decision 2026-06-16) — derive the doc's terminal phase (its
+  // last phase) directly, rather than re-deriving from a convergence record that a
+  // pre-workflow process never wrote. This mirrors the recorded-fact discipline of
+  // `cancelled`/`retired` (handled by sideStateOf) and `analyze-clean:`/
+  // `design-approved:` markers: the operator records, derivation reads.
+  if (inputs.status?.toLowerCase() === 'shipped') {
+    return { kind: 'phase', id: doc.phases[doc.phases.length - 1]!.id };
+  }
+
   for (let i = doc.phases.length - 1; i >= 0; i--) {
     const phase = doc.phases[i]!;
     if (deriveHolds(phase.derive, inputs)) return { kind: 'phase', id: phase.id };
