@@ -2,27 +2,69 @@
 
 ---
 
-## 2026-06-16: <!-- session title -->
+## 2026-06-16: Analyze spec 022 → remediate findings to clean
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up the prior session's runnable spec 022
+(`parseable-lifecycle-workflow`) and run `/speckit-analyze` — the inferred next
+chain step — then act on whatever it surfaced.
 
 **Accomplished:**
-- <!-- compose -->
+- Oriented via `/stack-control:session-start`; next-step was `/speckit-analyze`
+  on the active spec 022. Ran it across spec / plan / tasks / data-model /
+  research / 4 contracts / constitution.
+- Analyze result: **0 CRITICAL, 0 constitution violations**; 1 HIGH, 2 MEDIUM,
+  3 LOW. Remediated all six (one commit, doc-only, no code):
+  - **I1 (HIGH):** the two `contracts/*.md` still described the *un-parked*
+    spec-govern behavior — `specifying → implementing` decided by the spec-govern
+    record — contradicting the ratified 2026-06-16 park (FR-029). Synced both to
+    analyze-clean-by-default / spec-govern-opt-in / impl-govern-required.
+  - **U1 (MEDIUM):** `speckit-analyze` writes no artifact, so the *default*
+    `specifying → implementing` gate had no on-disk signal or matching criterion
+    kind. Resolved (operator-picked Option A): a recorded `analyze-clean:` node
+    marker + a new `node-marker` criterion kind, mirroring the `design-approved:`
+    precedent — no new artifact store. Wired into data-model, FR-029, Assumptions,
+    T007, T029.
+  - **A1 (MEDIUM):** FR-016 now states the transition exit-gate is reported, not
+    enforced, in v1 (consistent with FR-010).
+  - **C1/P1/T1 (LOW):** T019 asserts heavy verbs rejected as effects; T035
+    reworded to post-evidence (operator closes TASK-19, not self-close); derivation
+    contract distinguishes phase `planned` vs node-status `planned`.
+- Verified no stale `spec-govern decides specifying→implementing` references
+  remain; `analyze-clean` now consistent across all 5 artifacts. Committed
+  (`d5031e1c`) + pushed. **Spec 022 is analyze-clean and ready for
+  `/speckit-implement`** (in a separate worktree/session per the two-session
+  boundary).
 
 **Didn't Work:**
-- <!-- compose -->
+- `stackctl session-end` again auto-derived **"Commits: 0 / Files: 0 / backlog: 0"**
+  — the known long-lived-branch boundary-resolution bug (**TASK-39 / TASK-59**).
+  Re-derived by hand from the prior session-end tip `c20b3b4d..HEAD`: 2 commits
+  (1 substantive remediation + this session-end record), 5 files in the
+  substantive commit.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Twice answered "your recommendation" with an options menu before
+  committing to a single decisive recommendation + applying it. The operator wanted
+  the call made, not a survey — collapse to one recommendation and act.
 
 **Insights:**
-- <!-- compose -->
+- The HIGH finding was a stale-contract drift created *within the prior session*:
+  the park decision updated spec/research/tasks but not the two `contracts/*.md`.
+  Contracts are exactly what a fresh TDD session treats as authoritative — analyze
+  earning its keep by catching the one artifact pair that didn't get the memo.
+- U1 is the deeper lesson: "derive from `speckit-analyze`-clean" *sounds*
+  mechanical but analyze persists nothing, so the default gate had no signal to
+  read. The fix (record the fact as a node marker) is the same shape the spec
+  already ratified for `design-approved:` — judgment/chain-completion becomes
+  mechanical by recording the fact, never by re-judging at evaluation time.
 
-**Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 0
-  - (no commits this session)
-- Files changed: 0
-- Backlog touched: (none)
+**Quantitative (re-derived by hand — auto-derivation hit TASK-39/-59 boundary bug):**
+- Commits: 2 (`c20b3b4d..HEAD`)
+  - `d5031e1c` docs(stack-control): remediate spec 022 analyze findings (I1/U1/A1 + lows)
+  - `ec4c1110` docs(session): session-end record
+- Files changed: 5 (substantive commit — all under specs/022-…)
+- Backlog touched: none mutated; TASK-138 (re-enable spec audit-barrage) and TASK-19
+  (governance-graduation-record) referenced in artifacts, no status transition.
 
 ## 2026-06-16: Converge parseable-lifecycle-workflow design → author spec 022 to runnable; park spec audit-barrage
 
