@@ -55,9 +55,16 @@ function touchedPathsOf(transition: Transition, ctx: EffectContext): string[] {
 function commitMessage(transition: Transition, ctx: EffectContext): string {
   const commit = transition.effects.find((e) => e.verb === 'commit');
   const raw = commit?.args.message ?? `workflow(${transition.codename}): ${ctx.item}`;
-  return raw.replace(/\{([a-z0-9-]+)\}/gi, (_m, key: string) =>
-    key === 'item' ? ctx.item : ctx.bindings[key] ?? `{${key}}`,
-  );
+  // Fail loud on an unbound placeholder (governance MEDIUM) — consistent with
+  // resolveArg; never commit a literal `{key}` message.
+  return raw.replace(/\{([a-z0-9-]+)\}/gi, (_m, key: string) => {
+    if (key === 'item') return ctx.item;
+    const v = ctx.bindings[key];
+    if (v === undefined) {
+      throw new WorkflowError(`commit message references unbound template value '{${key}}'`);
+    }
+    return v;
+  });
 }
 
 /** Dry-run preview — the exact ordered effects; writes nothing (FR-015). */

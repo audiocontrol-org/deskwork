@@ -6,9 +6,9 @@
 // module is the apply side.
 
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
 import type { LoadOptions } from '../document-model/document.js';
 import { advance, setField } from '../roadmap/mutations.js';
+import { anchorWithin } from './anchor.js';
 import { WorkflowError, type Effect } from './workflow-types.js';
 
 /** Everything an effect needs to fire, resolved by the transition engine. */
@@ -43,7 +43,8 @@ function requireArg(effect: Effect, key: string): string {
 }
 
 function anchored(installationRoot: string, p: string): string {
-  return isAbsolute(p) ? p : join(installationRoot, p);
+  // F1 (governance HIGH): fail loud if the authored path escapes the installation.
+  return anchorWithin(installationRoot, p);
 }
 
 /**

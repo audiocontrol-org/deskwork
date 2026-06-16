@@ -109,6 +109,11 @@ export function evaluateCriterion(c: Criterion, ctx: GateContext): boolean {
       if (c.target === 'spec') return ctx.specDirPath !== null && existsSync(ctx.specDirPath);
       throw new WorkflowError(`criterion 'file-exists' has unknown target '${c.target}' (expected design|spec)`);
     case 'section-present':
+      // F-M (governance MEDIUM): validate the target rather than silently reading the
+      // design record for any target — a malformed `section-present spec ...` fails loud.
+      if (c.target !== 'design') {
+        throw new WorkflowError(`criterion 'section-present' has unknown target '${c.target}' (expected design)`);
+      }
       if (c.param === undefined) throw new WorkflowError(`criterion 'section-present ${c.target}' requires a section name`);
       return sectionPresent(ctx.designRecordPath, String(c.param));
     case 'count-gte': {
@@ -119,8 +124,14 @@ export function evaluateCriterion(c: Criterion, ctx: GateContext): boolean {
       return countSolutionSpaceAlternatives(ctx.designRecordPath) >= threshold;
     }
     case 'tasks-complete':
+      if (c.target !== 'spec') {
+        throw new WorkflowError(`criterion 'tasks-complete' has unknown target '${c.target}' (expected spec)`);
+      }
       return tasksComplete(ctx.specDirPath);
     case 'tree-clean':
+      if (c.target !== 'advance') {
+        throw new WorkflowError(`criterion 'tree-clean' has unknown target '${c.target}' (expected advance)`);
+      }
       return ctx.advanceTreeClean;
     case 'pointer-set':
       if (c.target === 'design') return ctx.designPointer !== null;

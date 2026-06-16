@@ -11,7 +11,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
-import { basename } from 'node:path';
+import { basename, join } from 'node:path';
 import { InstallationError } from '../config/errors.js';
 import { resolveInstallation } from '../config/installation.js';
 import { DocumentModelError } from '../document-model/types.js';
@@ -214,10 +214,21 @@ function emitRedesign(itemId: string, designDoc: string, apply: boolean): void {
     at: new Date().toISOString(),
   });
   appendFileSync(r.journalPath, `workflow(redesign): ${itemId} re-entered designing (revision ${result.revision})\n`, 'utf8');
-  spawnSync('git', ['-C', r.root, 'add', '-A'], { encoding: 'utf8' });
-  spawnSync('git', ['-C', r.root, 'commit', '-m', `workflow(redesign): ${itemId} re-entered designing`], {
-    encoding: 'utf8',
-  });
+  // F2 (governance HIGH, cross-model): stage ONLY the redesign-touched paths (never
+  // `git add -A`, which sweeps unrelated working-tree changes) and fail loud on a
+  // commit error (a non-zero git exit must NOT be reported as success).
+  const checkpointsDir = featureSlug !== null
+    ? join(r.root, '.stack-control', 'govern', 'phase-checkpoints', featureSlug)
+    : null;
+  const touched = [r.roadmapPath, join(r.root, designDoc), r.journalPath, ...(checkpointsDir ? [checkpointsDir] : [])];
+  const add = spawnSync('git', ['-C', r.root, 'add', '--', ...touched], { encoding: 'utf8' });
+  if (add.status !== 0) failUsage(`redesign: git add failed — ${add.stderr ?? ''}`);
+  const commit = spawnSync(
+    'git',
+    ['-C', r.root, 'commit', '-m', `workflow(redesign): ${itemId} re-entered designing`, '--', ...touched],
+    { encoding: 'utf8' },
+  );
+  if (commit.status !== 0) failUsage(`redesign: git commit failed — ${commit.stderr ?? ''}`);
   process.stdout.write(`workflow redesign ${itemId}: re-entered designing\n`);
   process.stdout.write(`  design record revision: ${result.revision}\n`);
   process.stdout.write(`  staled checkpoints: ${result.staledCheckpoints.join(', ') || '(none)'}\n`);

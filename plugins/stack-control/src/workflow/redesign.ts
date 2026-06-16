@@ -9,9 +9,9 @@
 // pinned here and exercised test-first.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
 import type { LoadOptions } from '../document-model/document.js';
 import { setField } from '../roadmap/mutations.js';
+import { anchorWithin } from './anchor.js';
 import {
   isCheckpointStale,
   listCheckpointPhaseIds,
@@ -60,7 +60,8 @@ export interface ReenterArgs {
 }
 
 function anchored(installationRoot: string, p: string): string {
-  return isAbsolute(p) ? p : join(installationRoot, p);
+  // F1 (governance HIGH): the design-record pointer must stay inside the installation.
+  return anchorWithin(installationRoot, p);
 }
 
 /**

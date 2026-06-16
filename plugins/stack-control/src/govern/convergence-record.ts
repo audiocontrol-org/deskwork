@@ -91,7 +91,7 @@ export function readGovernConvergenceRecord(
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`${path}: govern-convergence record is corrupt or torn; ${message}`);
   }
-  return validate(parsed, path, mode, item);
+  return validate(parsed, path, mode, item, installationRoot);
 }
 
 function validate(
@@ -99,6 +99,7 @@ function validate(
   path: string,
   expectedMode: GovernMode,
   expectedItem: string,
+  installationRoot: string,
 ): GovernConvergenceRecord {
   if (parsed.version !== 1) throw new Error(`${path}: govern-convergence record version must be 1`);
   if (parsed.mode !== 'spec' && parsed.mode !== 'impl') {
@@ -124,6 +125,15 @@ function validate(
   }
   if (typeof parsed.anchorRoot !== 'string' || parsed.anchorRoot.length === 0) {
     throw new Error(`${path}: govern-convergence record anchorRoot must be a non-empty string`);
+  }
+  // F3 (governance MEDIUM, cross-model): the stamped anchorRoot is authoritative —
+  // a copied/stale record from ANOTHER installation must not be accepted (it would
+  // open the shipped gate against the wrong tree). Compare to the reading root.
+  if (resolve(parsed.anchorRoot) !== resolve(installationRoot)) {
+    throw new Error(
+      `${path}: govern-convergence record anchorRoot '${parsed.anchorRoot}' does not match the ` +
+        `installation root '${installationRoot}' (a record from another installation is not authoritative)`,
+    );
   }
   return {
     version: 1,

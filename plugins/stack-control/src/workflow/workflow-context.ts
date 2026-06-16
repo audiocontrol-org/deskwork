@@ -5,9 +5,10 @@
 // each resolved through the installation anchor (FR-030). Kept separate from the
 // CLI dispatch so the query/advance verbs stay thin.
 
-import { basename, isAbsolute, join } from 'node:path';
+import { basename } from 'node:path';
 import { isModeConverged } from '../govern/convergence-record.js';
 import type { WorkItem } from '../roadmap/roadmap-model.js';
+import { anchorWithin } from './anchor.js';
 import { evaluateCriterion, type GateContext } from './gate-eval.js';
 import type { DerivationInputs } from './phase-derivation.js';
 
@@ -16,10 +17,10 @@ export interface ItemContext {
   readonly gate: GateContext;
 }
 
-/** Resolve an install-anchored pointer to an absolute path (null when unset). */
+/** Resolve an install-anchored pointer to an absolute path (null when unset); fail loud on escape. */
 function anchored(installationRoot: string, pointer: string | null): string | null {
   if (pointer === null) return null;
-  return isAbsolute(pointer) ? pointer : join(installationRoot, pointer);
+  return anchorWithin(installationRoot, pointer);
 }
 
 /**
