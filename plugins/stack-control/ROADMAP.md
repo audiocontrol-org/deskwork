@@ -380,6 +380,7 @@ Mechanical terminal closure: roadmap close-related closes a terminal item's reco
 
 ## multi:feature/lifecycle-compass
 - status: in-flight
+- spec: specs/024-lifecycle-compass
 - design: docs/superpowers/specs/2026-06-16-lifecycle-compass-design.md
 - design-approved: 2026-06-16
 - part-of: multi:feature/lifecycle-industrialization
