@@ -37,11 +37,18 @@ import {
   assertBarrageBinPresent,
   currentBranch,
   loadLaneCapabilitiesGoverned,
-  resolveSlug,
   runProtocol,
   type BarrageVars,
   type GovernTerminalKind,
 } from '../govern/protocol.js';
+import {
+  branchDerivedSlug,
+  readActiveFeatureSlug,
+  resolveFeatureSlug,
+} from '../govern/feature-resolution.js';
+import { loadRoadmap } from '../roadmap/roadmap-model.js';
+import { grammarOptsForRoot } from './document-verb-shared.js';
+import { resolveIdentityFromSpecDir } from '../workflow/identity.js';
 import {
   assembleImplementPayload,
   CODE_AUDIT_LENS,
@@ -216,6 +223,29 @@ function resolveBarrageBin(): string {
 function tail(text: string, n: number): string {
   const lines = text.split('\n');
   return lines.slice(Math.max(0, lines.length - n)).join('\n');
+}
+
+/**
+ * 024 FR-013 / TASK-139: the canonical convergence-record key for a governed
+ * feature — the roadmap NODE ID resolved from the governed spec dir, so it matches
+ * the workflow read-side. Falls back to the installation-relative spec dir (still
+ * collision-free) when no node resolves, never the bare spec-dir basename.
+ */
+function resolveConvergenceItem(
+  installation: Installation,
+  featureRoot: string | undefined,
+  slug: string,
+): string {
+  if (featureRoot === undefined) return slug;
+  const repoRoot = installation.root;
+  try {
+    const model = loadRoadmap(installation.resolved.roadmap, grammarOptsForRoot(repoRoot));
+    const id = resolveIdentityFromSpecDir(model, featureRoot);
+    if (id !== null) return id.nodeId;
+  } catch {
+    // roadmap unreadable — fall back to the relative spec dir below.
+  }
+  return relative(repoRoot, featureRoot);
 }
 
 /**
@@ -655,9 +685,31 @@ export async function runGovern(args: string[]): Promise<void> {
 
   try {
     const repoRoot = installation.root;
-    const slug = resolveSlug({
-      explicit: pick(flags.feature, process.env.GOVERN_FEATURE_SLUG),
-      branch: currentBranch(repoRoot),
+    // 024 FR-011: resolve the feature from an existing feature root — explicit,
+    // then the branch slug (when it resolves), then the Spec Kit active-feature
+    // marker — so govern runs on the session-pinned branch (where the branch slug
+    // is NOT a feature slug). Pre-compute which candidate slugs have an existing
+    // feature root (resolveFeatureRoot is async), then resolve synchronously.
+    const explicitSlug = pick(flags.feature, process.env.GOVERN_FEATURE_SLUG);
+    const branchForSlug = currentBranch(repoRoot);
+    const markerSlug = readActiveFeatureSlug(repoRoot);
+    const candidateSlugs = [branchDerivedSlug(branchForSlug), markerSlug].filter(
+      (s): s is string => s !== null && s.length > 0,
+    );
+    const existingSlugs = new Set<string>();
+    for (const candidate of candidateSlugs) {
+      try {
+        const { root } = await resolveFeatureRoot({ repoRoot, slug: candidate });
+        if (root !== undefined) existingSlugs.add(candidate);
+      } catch {
+        // not found — not a candidate
+      }
+    }
+    const slug = resolveFeatureSlug({
+      explicit: explicitSlug,
+      branch: branchForSlug,
+      markerSlug,
+      featureRootExists: (s) => existingSlugs.has(s),
     });
 
     const barrageBin = resolveBarrageBin();
@@ -914,12 +966,15 @@ export async function runGovern(args: string[]): Promise<void> {
     // 022 US6 / T029 (FR-028/FR-029): on convergence, write the durable, mode-keyed
     // govern-convergence record inside the installation so the workflow's
     // `governing → shipped` gate (impl) — and the opt-in `specifying → implementing`
-    // gate (spec) — is mechanical, not agent say-so. Keyed by the spec-dir basename,
-    // the stable identity the workflow's `spec:` pointer also resolves. A write
-    // failure leaves the gate CLOSED (fail-safe) with a loud warning — never a
+    // gate (spec) — is mechanical, not agent say-so. 024 FR-013 / TASK-139: keyed by
+    // the CANONICAL node id (resolved from the governed spec dir), not the spec-dir
+    // basename, which collides across two features sharing a basename — the workflow
+    // read-side keys by the same node id. When no node resolves (orphan/legacy), fall
+    // back to the installation-relative spec dir (still collision-free), never the
+    // bare basename. A write failure leaves the gate CLOSED (fail-safe), never a
     // silent graduation.
     try {
-      const convergenceItem = featureRoot !== undefined ? basename(featureRoot) : slug;
+      const convergenceItem = resolveConvergenceItem(installation, featureRoot, slug);
       const scopePaths = featureRoot !== undefined ? [featureRoot] : [];
       recordGovernConvergence(
         repoRoot,

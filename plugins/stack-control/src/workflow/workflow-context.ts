@@ -5,10 +5,10 @@
 // each resolved through the installation anchor (FR-030). Kept separate from the
 // CLI dispatch so the query/advance verbs stay thin.
 
-import { basename } from 'node:path';
 import { isModeConverged } from '../govern/convergence-record.js';
 import type { WorkItem } from '../roadmap/roadmap-model.js';
 import { anchorWithin } from './anchor.js';
+import { convergenceKeyFor } from './identity.js';
 import { evaluateCriterion, type GateContext } from './gate-eval.js';
 import type { DerivationInputs } from './phase-derivation.js';
 
@@ -35,10 +35,11 @@ export function buildItemContext(
 ): ItemContext {
   const designRecordPath = anchored(installationRoot, item.design);
   const specDirPath = anchored(installationRoot, item.spec);
-  // The govern-convergence record is keyed by the spec-dir basename — the stable
-  // identity govern (its spec dir) and the workflow (the node's `spec:` pointer)
-  // both compute. With no spec pointer there is no convergence record to read.
-  const convergenceKey = item.spec !== null ? basename(item.spec) : item.identifier;
+  // The govern-convergence record is keyed by the CANONICAL node id (024 FR-013 /
+  // TASK-139) — never the spec-dir basename, which collides across two features
+  // whose spec dirs share a basename. govern's write side resolves the same node
+  // id via `resolveIdentityFromSpecDir`, so read and write agree.
+  const convergenceKey = convergenceKeyFor(item);
   const implRecordConverged = isModeConverged(installationRoot, 'impl', convergenceKey);
   const specRecordConverged = isModeConverged(installationRoot, 'spec', convergenceKey);
 

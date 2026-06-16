@@ -30,7 +30,7 @@ NOT follow raw spec priority; it follows FR-015. Story labels still map to spec.
 
 **Purpose**: the plain-data shapes every later phase consumes.
 
-- [ ] T001 Extend `src/workflow/workflow-types.ts` with `Verdict` (outcome/currentPhase/intentPhase/legitimateNext/skippedStep/reason/exitCode), the `VerdictOutcome` union (`on-course|ahead|behind|off-rail`), the `Intent` shape, and the verdict→exit-code constants (per data-model.md). No behavior — types only.
+- [X] T001 Extend `src/workflow/workflow-types.ts` with `Verdict` (outcome/currentPhase/intentPhase/legitimateNext/skippedStep/reason/exitCode), the `VerdictOutcome` union (`on-course|ahead|behind|off-rail`), the `Intent` shape, and the verdict→exit-code constants (per data-model.md). No behavior — types only.
 
 ---
 
@@ -42,10 +42,10 @@ correct compass derivation (US1), so it precedes both.
 
 **⚠️ CRITICAL**: no US4/US1 work begins until the convergence re-key lands.
 
-- [ ] T002 [P] RED: `src/__tests__/workflow/canonical-identity.test.ts` — `resolveIdentity` returns the node id as `nodeId` and the node's `spec:` as `specPointer`; two fixture items whose spec dirs share a basename resolve to distinct `nodeId`s (per contracts/canonical-identity.md). Seen to fail.
-- [ ] T003 Create `src/workflow/identity.ts` — `resolveIdentity(installationRoot, item) → { nodeId, specPointer, specDir }`, install-anchored (FR-013). GREEN T002.
-- [ ] T004 RED: convergence-key test in `src/__tests__/workflow/canonical-identity.test.ts` — the govern-convergence record is keyed by `nodeId`, not `basename(item.spec)` (TASK-139). Seen to fail.
-- [ ] T005 Re-key the convergence record by canonical identity: replace `basename(item.spec)` with `resolveIdentity(...).nodeId` in `src/workflow/workflow-context.ts` (`convergenceKey`) and the read/write paths in `src/govern/convergence-record.ts`. GREEN T004. (Keep records ≤ cap; no schema change beyond the key.)
+- [X] T002 [P] RED: `src/__tests__/workflow/canonical-identity.test.ts` — `resolveIdentity` returns the node id as `nodeId` and the node's `spec:` as `specPointer`; two fixture items whose spec dirs share a basename resolve to distinct `nodeId`s (per contracts/canonical-identity.md). Seen to fail.
+- [X] T003 Create `src/workflow/identity.ts` — `resolveIdentity(installationRoot, item) → { nodeId, specPointer, specDir }`, install-anchored (FR-013). GREEN T002.
+- [X] T004 RED: convergence-key test in `src/__tests__/workflow/canonical-identity.test.ts` — the govern-convergence record is keyed by `nodeId`, not `basename(item.spec)` (TASK-139). Seen to fail.
+- [X] T005 Re-key the convergence record by canonical identity: replace `basename(item.spec)` with `resolveIdentity(...).nodeId` in `src/workflow/workflow-context.ts` (`convergenceKey`) and the read/write paths in `src/govern/convergence-record.ts`. GREEN T004. (Keep records ≤ cap; no schema change beyond the key.)
 
 **Checkpoint**: one canonical identity; convergence no longer collides on basename.
 
@@ -60,11 +60,11 @@ no longer crashes on a `/stack-control:*` backtick span — so the back-half gat
 resolves the feature (no branch-slug FATAL) and assembles a payload over a spec containing a
 `/stack-control:define` backtick span (no "escapes the installation root" FATAL).
 
-- [ ] T006 [P] [US4] RED: `src/__tests__/govern/govern-resolution.test.ts` — item-driven govern on a `feature/<non-spec-slug>` branch with a `spec:` pointer resolves the feature (no "feature not found" FATAL) (FR-011). Seen to fail.
-- [ ] T007 [P] [US4] RED: in the same test file — `extractScopedPaths` over a body containing a `` `/stack-control:define` `` span returns NO path for that token AND still returns a genuine `` `src/govern/protocol.ts` `` span (FR-012 / TASK-83). Seen to fail.
-- [ ] T008 [US4] FR-012 fix in `src/govern/incremental-audit.ts` `extractScopedPaths`: skip skill-reference tokens (a `/<plugin>:<verb>` `:`-bearing token / a token that is not a plausible installation-relative path) before the governed-path validator; keep real path spans. GREEN T007. (Must NOT grow `incremental-audit.ts` past the 300–500-line cap.)
-- [ ] T009 [US4] FR-011 item-driven resolution: in `src/subcommands/govern.ts` (+ the `resolveSlug` seam in `src/govern/protocol.ts`) prefer `resolveIdentity(item).specPointer` / the CLAUDE.md SPECKIT marker over the branch slug when an item is supplied. GREEN T006.
-- [ ] T010 [US4] Fail-loud guard: when no item `spec:` pointer, no SPECKIT marker, and no `--feature` resolves a feature, `govern` FATALs naming what to supply (Principle V — no silent slug fallback). Test in `govern-resolution.test.ts`.
+- [X] T006 [P] [US4] RED: `src/__tests__/govern/govern-resolution.test.ts` — item-driven govern on a `feature/<non-spec-slug>` branch with a `spec:` pointer resolves the feature (no "feature not found" FATAL) (FR-011). Seen to fail.
+- [X] T007 [P] [US4] RED: in the same test file — `extractScopedPaths` over a body containing a `` `/stack-control:define` `` span returns NO path for that token AND still returns a genuine `` `src/govern/protocol.ts` `` span (FR-012 / TASK-83). Seen to fail.
+- [X] T008 [US4] FR-012 fix in `src/govern/incremental-audit.ts` `extractScopedPaths`: skip skill-reference tokens (a `/<plugin>:<verb>` `:`-bearing token / a token that is not a plausible installation-relative path) before the governed-path validator; keep real path spans. GREEN T007. (Must NOT grow `incremental-audit.ts` past the 300–500-line cap.)
+- [X] T009 [US4] FR-011 item-driven resolution: in `src/subcommands/govern.ts` (+ the `resolveSlug` seam in `src/govern/protocol.ts`) prefer `resolveIdentity(item).specPointer` / the CLAUDE.md SPECKIT marker over the branch slug when an item is supplied. GREEN T006.
+- [X] T010 [US4] Fail-loud guard: when no item `spec:` pointer, no SPECKIT marker, and no `--feature` resolves a feature, `govern` FATALs naming what to supply (Principle V — no silent slug fallback). Test in `govern-resolution.test.ts`.
 
 **Checkpoint**: govern runs on the session-pinned branch; the back-half gate can be enforced.
 

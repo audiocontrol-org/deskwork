@@ -19,7 +19,11 @@ import { makeWorkflowFixture, type WorkflowFixture } from '../fixtures/workflow/
 let fixtures: WorkflowFixture[] = [];
 const ITEM = 'multi:feature/x';
 const SPEC = 'specs/022-x';
-const KEY = '022-x'; // basename of the spec dir — the convergence-record key
+// 024 FR-013 / TASK-139: the convergence record is keyed by the CANONICAL node id,
+// not the spec-dir basename. Records read through buildItemContext use ITEM; the
+// direct-mechanism tests below pass an arbitrary string key (KEY) to the raw
+// read/write API, which is key-agnostic.
+const KEY = '022-x';
 
 function fixture(overrides: Partial<Parameters<typeof makeWorkflowFixture>[0][number]> = {}): WorkflowFixture {
   const f = makeWorkflowFixture([
@@ -51,7 +55,7 @@ describe('US6 — the impl record gates governing → shipped (required, mechani
     f.writeRecord({
       version: 1,
       mode: 'impl',
-      item: KEY,
+      item: ITEM,
       scopeFingerprint: 'abc',
       converged: true,
       recordedAt: '2026-06-16T00:00:00Z',
@@ -64,7 +68,7 @@ describe('US6 — the impl record gates governing → shipped (required, mechani
     f.writeRecord({
       version: 1,
       mode: 'impl',
-      item: KEY,
+      item: ITEM,
       scopeFingerprint: 'abc',
       converged: false,
       recordedAt: '2026-06-16T00:00:00Z',
@@ -84,7 +88,7 @@ describe('US6 — the spec record is OPT-IN, not the default specifying → impl
     writeGovernConvergenceRecord(f.root, {
       version: 1,
       mode: 'spec',
-      item: KEY,
+      item: ITEM,
       scopeFingerprint: 'abc',
       converged: true,
       recordedAt: '2026-06-16T00:00:00Z',

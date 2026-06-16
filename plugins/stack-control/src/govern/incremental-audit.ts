@@ -58,11 +58,20 @@ export function parsePhases(tasksText: string): ParsedPhase[] {
   });
 }
 
-function extractScopedPaths(body: string): readonly string[] {
+/**
+ * Extract the governed filesystem paths named in backtick spans of a tasks.md
+ * phase body. A span is a path only when it contains `/` AND no `:` — a `:`-bearing
+ * token is a skill/verb reference (`/stack-control:define`), a URL, or a Windows
+ * drive, none of which are installation-relative governed paths. 024 FR-012 /
+ * TASK-83: feeding such a span to the governed-path validator crashed payload
+ * assembly with "escapes the installation root"; classifying it out at the source
+ * is the fix (the validator is correct — its input was wrong).
+ */
+export function extractScopedPaths(body: string): readonly string[] {
   const matches: string[] = [];
   for (const match of body.matchAll(BACKTICK_TOKEN_RE)) {
     const token = match[1]?.trim();
-    if (token === undefined || !token.includes('/')) continue;
+    if (token === undefined || !token.includes('/') || token.includes(':')) continue;
     matches.push(token.replace(/\/+$/, ''));
   }
   return matches;
