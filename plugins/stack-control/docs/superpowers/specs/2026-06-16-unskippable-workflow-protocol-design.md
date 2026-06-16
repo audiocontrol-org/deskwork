@@ -79,6 +79,12 @@ inside `implementing` — governance cadence, no-shortcuts, the execute boundary
    path.
 3. **`execute` refuses to start phase N+1 until phase N has a current checkpoint.** Per-phase
    ordering interleaves governance instead of letting it pile up at the end.
+   *(Finding 2026-06-16: 021's `govern --phase` ALREADY enforces this at govern time — `govern
+   --phase 2` FATALs "cannot advance until earlier required checkpoints are current: missing
+   phase-1". So per-phase ordering is partially built. The remaining gap is decisions 1 + 2: the
+   graduate gate must REQUIRE all per-phase checkpoints, and `execute` must FIRE `govern --phase`
+   per boundary so the checkpoints get written without agent discretion. The ordering teeth
+   exist; the cadence + the graduate-gate teeth do not.)*
 4. **No agent-offered shortcuts.** stack-control skills never present an option to skip/defer/
    shortcut a protocol step. The only operator-facing branches are genuine *scope* decisions the
    operator initiates — never an agent-offered protocol bypass. (A `--no-…` escape, if ever

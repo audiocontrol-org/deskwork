@@ -3,33 +3,28 @@
 # Overrides the plugin default at:
 #   plugins/stack-control/templates/audit-barrage-config.yaml
 #
-# This installation pins an explicit two-lane Codex-only fleet:
-#   - codex / gpt-5.5
-#   - codex-gpt5 / gpt-5.4
+# FRONTIER-ONLY cross-family fleet (operator decision 2026-06-16) for whole-feature
+# ("full-implementation") barrages. Only frontier, large-context models are pinned —
+# older/smaller models choke on a large whole-feature payload (proven 2026-06-16: a
+# 4-lane run including gpt-5.4 and claude-sonnet-4-6 produced 0 output from BOTH older
+# lanes on a ~186 KB payload, while gpt-5.5 and opus completed). Do NOT add a
+# non-frontier lane to a large-scope fleet; it silently no-ops and degrades the run.
 #
-# Rationale:
-# - governance here currently avoids the local Claude lanes entirely because the
-#   Codex pair is the operator-selected durable policy for this installation.
-# - a durable local override is the right surface for that policy; the shipped
-#   template stays unchanged.
-# - the second Codex/OpenAI lane is the current substitute for the disabled
-#   Claude lanes so the barrage still has two independently-pinned lanes.
-# - IMPORTANT: this is still a same-family fleet, so 2-of-2 agreement here is
-#   weaker evidence than a cross-family barrage. Treat it as an operational
-#   temporary policy, not the ideal steady-state signal.
-# - the explicit timeout overrides are retained from the design-control
-#   configuration that has already been usable in practice.
+#   codex  / gpt-5.5  (OpenAI/codex family — frontier)
+#   claude / opus     (Anthropic/claude family — frontier, large context)
 #
-# Disabled gemini effective 2026-06-01 — gemini-cli was failing 94.1% of runs
-# (16 of 17 across the graphical-entries Phase 0 audit cycle) on two cascading
-# error modes: (1) ClassifierStrategy JSON-routing failures in
-# @google/gemini-cli-core/.../baseLlmClient.js#generateJson (retry exhaustion
-# on empty/unparsable JSON); (2) "exhausted your capacity on this model" API
-# quota errors after the routing failure. Re-enable when the gemini-cli
-# upstream fixes the JSON-mode routing reliability OR our gemini account has
-# sustained quota. When re-enabling: keep readonly_enforcement at `none` until
-# the lane passes the hostile write-probe (it then runs loudly marked
-# write-unenforced), and pin the model explicitly.
+# Two frontier lanes, one per family = cross-family genetic diversity; 2-of-2
+# AGREEMENT ACROSS families is the strong HIGH-confidence signal a same-family fleet
+# cannot give. Byte envelopes (fleet-knowledge.yaml) are sized above the whole-feature
+# payload for these large-context lanes — operator-directed, not a floated default.
+#
+# Timeout derivation (per lane): effective timeout = max(floor, ceil(secs_per_kb x
+# payload_KB)). claude uses stream-json + stdout liveness (text mode emits no stdout
+# pulse until completion); codex uses stderr liveness.
+#
+# Re-adding a second lane per family (e.g. for redundancy) is fine ONLY with another
+# FRONTIER, large-context model — never an older model that cannot hold the payload.
+# gemini stays DISABLED (94.1% run-failure rate, 2026-06-01 cycle).
 #
 models:
   - name: codex
@@ -40,14 +35,16 @@ models:
     output_mode: text
     liveness_signal: stderr
     liveness_window_seconds: 60
-    timeout_seconds: 600
+    timeout_floor_seconds: 300
+    timeout_secs_per_kb: 7
 
-  - name: codex-gpt5
-    binary: codex
-    model: gpt-5.4
-    args_template: "exec -m {{model}} --sandbox read-only {{prompt-stdin}}"
-    readonly_enforcement: "--sandbox read-only"
-    output_mode: text
-    liveness_signal: stderr
+  - name: claude
+    binary: claude
+    model: opus
+    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
+    readonly_enforcement: "--permission-mode plan"
+    output_mode: stream-json
+    liveness_signal: stdout
     liveness_window_seconds: 60
-    timeout_seconds: 600
+    timeout_floor_seconds: 300
+    timeout_secs_per_kb: 13
