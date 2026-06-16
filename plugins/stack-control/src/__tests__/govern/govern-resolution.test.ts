@@ -174,3 +174,13 @@ describe('024 codex-03 — a malformed active-feature marker fails loud (not sil
     expect(() => readActiveFeatureSlug(f.root)).toThrow(/feature_directory|marker/i);
   });
 });
+
+describe('024 codex-02/claude-01 — an explicit slug bypasses a malformed active-feature marker', () => {
+  it('govern --feature does not FATAL on a corrupt .specify/feature.json (the marker is not a resolution source here)', () => {
+    const f = convFixture([{ identifier: 'multi:feature/x', status: 'in-flight' }]);
+    f.write('.specify/feature.json', '{ not json'); // corrupt marker
+    const r = runCli(['govern', '--mode', 'implement', '--feature', '024-x'], { cwd: f.root });
+    // The explicit --feature must short-circuit; the corrupt marker must NOT crash the run.
+    expect(`${r.stdout}${r.stderr}`).not.toMatch(/feature\.json/i);
+  });
+});

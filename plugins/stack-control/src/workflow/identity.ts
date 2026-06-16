@@ -53,30 +53,21 @@ function relSpec(installationRoot: string, specDirPointer: string): string {
  * caller falls back to the spec-dir pointer (collision-free) and notes it.
  */
 export function resolveIdentityFromSpecDir(
+  installationRoot: string,
   model: RoadmapModel,
   specDirPointer: string,
 ): FeatureIdentity | null {
-  // Compare on the installation-relative spec dir. The roadmap's `spec:` pointers
-  // are installation-relative; the caller's dir may be absolute — normalise both.
-  // The installation root is the directory the roadmap doc lives beside; the
-  // pointers in the doc are relative to it, so we relativise against the doc's dir.
-  const installRoot = roadmapInstallRoot(model);
-  const want = relSpec(installRoot, specDirPointer);
+  // Compare on the installation-relative spec dir. The roadmap's `spec:` pointers are
+  // installation-relative; the caller's dir may be absolute — normalise both against the
+  // REAL installation root the caller threads in (AUDIT-BARRAGE claude-05). (Previously this
+  // re-derived the root by string-slicing `dirname(ROADMAP.md)`, which both hardcoded `/` and
+  // assumed ROADMAP.md sits at the install root — a latent coupling a config change would break.)
+  const want = relSpec(installationRoot, specDirPointer);
   for (const item of model.items) {
     if (item.spec === null) continue;
-    if (relSpec(installRoot, item.spec) === want) {
-      return resolveIdentity(installRoot, item);
+    if (relSpec(installationRoot, item.spec) === want) {
+      return resolveIdentity(installationRoot, item);
     }
   }
   return null;
-}
-
-/**
- * The installation root a roadmap model was loaded from. The document model carries
- * the source path on the doc; the installation root is its containing directory's
- * parent of `ROADMAP.md` — i.e. the directory holding the roadmap file.
- */
-function roadmapInstallRoot(model: RoadmapModel): string {
-  const docPath = model.doc.path;
-  return docPath.slice(0, docPath.lastIndexOf('/'));
 }

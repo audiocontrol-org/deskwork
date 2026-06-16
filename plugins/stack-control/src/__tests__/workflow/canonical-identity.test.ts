@@ -12,6 +12,8 @@ import {
   resolveIdentity,
   resolveIdentityFromSpecDir,
 } from '../../workflow/identity.js';
+import { resolveConvergenceItem } from '../../govern/feature-resolution.js';
+import { resolveInstallation } from '../../config/installation.js';
 import { makeWorkflowFixture, type WorkflowFixture } from '../fixtures/workflow/workflow-fixtures.js';
 
 let fixtures: WorkflowFixture[] = [];
@@ -25,11 +27,18 @@ afterEach(() => {
   fixtures = [];
 });
 
-/** Two distinct items whose spec dirs share a basename (`compass`) — the TASK-139 shape. */
+/**
+ * Two distinct items whose spec dirs have GENUINELY IDENTICAL basenames (`compass`) — the real
+ * TASK-139 collision shape (AUDIT-BARRAGE claude-02). `basename('specs/lane-a/compass')` ===
+ * `basename('specs/lane-b/compass')` === `compass`, so the OLD `basename(item.spec)` keying
+ * would write/read BOTH under `compass` (a true collision); the canonical node-id keying must
+ * keep them distinct. (The prior fixture used `010-compass`/`020-compass`, whose basenames
+ * DIFFER — it never reproduced a collision and passed trivially.)
+ */
 function collisionRoadmap(f: WorkflowFixture): void {
   f.setRoadmap([
-    { identifier: 'multi:feature/a', status: 'in-flight', spec: 'specs/010-compass' },
-    { identifier: 'multi:feature/b', status: 'in-flight', spec: 'specs/020-compass' },
+    { identifier: 'multi:feature/a', status: 'in-flight', spec: 'specs/lane-a/compass' },
+    { identifier: 'multi:feature/b', status: 'in-flight', spec: 'specs/lane-b/compass' },
   ]);
 }
 
@@ -57,18 +66,33 @@ describe('024 FR-013 — canonical identity resolver', () => {
     expect(convergenceKeyFor(a)).not.toBe(convergenceKeyFor(b));
   });
 
+  it('resolveConvergenceItem keys two IDENTICAL-basename features by distinct node ids (real collision)', () => {
+    // The teeth of FR-013: under the OLD basename keying both dirs key to `compass` (collision);
+    // node-id keying keeps them distinct. A basename-keying regression would make both `compass`
+    // and this test would fail — which the prior distinct-basename fixture could never catch.
+    const f = fixture();
+    collisionRoadmap(f);
+    const inst = resolveInstallation(f.root);
+    const keyA = resolveConvergenceItem(inst, `${inst.root}/specs/lane-a/compass`, 'compass');
+    const keyB = resolveConvergenceItem(inst, `${inst.root}/specs/lane-b/compass`, 'compass');
+    expect(keyA).toBe('multi:feature/a');
+    expect(keyB).toBe('multi:feature/b');
+    expect(keyA).not.toBe(keyB); // a basename-keying regression collapses both to 'compass'
+    expect(keyA).not.toBe('compass'); // explicitly NOT the colliding basename
+  });
+
   it('resolveIdentityFromSpecDir maps a governed feature dir to its node id', () => {
     const f = fixture();
     collisionRoadmap(f);
     const model = loadRoadmap(f.roadmapPath, f.opts);
-    expect(resolveIdentityFromSpecDir(model, 'specs/010-compass')?.nodeId).toBe('multi:feature/a');
-    expect(resolveIdentityFromSpecDir(model, 'specs/020-compass')?.nodeId).toBe('multi:feature/b');
+    expect(resolveIdentityFromSpecDir(f.root, model, 'specs/lane-a/compass')?.nodeId).toBe('multi:feature/a');
+    expect(resolveIdentityFromSpecDir(f.root, model, 'specs/lane-b/compass')?.nodeId).toBe('multi:feature/b');
     // An absolute path inside the installation resolves the same node.
-    expect(resolveIdentityFromSpecDir(model, `${f.root}/specs/020-compass`)?.nodeId).toBe(
+    expect(resolveIdentityFromSpecDir(f.root, model, `${f.root}/specs/lane-b/compass`)?.nodeId).toBe(
       'multi:feature/b',
     );
     // An unknown spec dir resolves to null (an orphan / legacy feature).
-    expect(resolveIdentityFromSpecDir(model, 'specs/999-nope')).toBeNull();
+    expect(resolveIdentityFromSpecDir(f.root, model, 'specs/999-nope')).toBeNull();
   });
 });
 

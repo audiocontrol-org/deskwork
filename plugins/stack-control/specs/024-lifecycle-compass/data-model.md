@@ -83,9 +83,18 @@ A spec dir with no roadmap node — a hard error, not a passive reconcile note (
 |---|---|---|
 | `specDir` | `string` | the spec dir found with no referencing node |
 
-**Behavior**: the compass returns `off-rail` naming the missing node; every spec-resolving
-verb raises a hard error (FR-009). Through the supported authoring path, an orphan is
-*unreachable* — capture-fusion creates the node in the same operation (FR-008, SC-003).
+**Behavior** (honest scope — AUDIT-BARRAGE claude-04): the orphan backstop is enforced at the
+points that actually resolve an item by node id, NOT a proactive scan of `specs/` for node-less
+dirs:
+- the **compass** returns `off-rail` for a queried item id that has no node;
+- `govern --item` refuses at the compass precondition; the no-`--item` `after_implement` path
+  catches an orphan when `resolveConvergenceItem` throws at convergence-write (post-barrage —
+  late, but fail-safe: the gate stays closed).
+
+There is currently **no verb that scans `specs/` and proactively flags a node-less dir** (e.g.
+a hand-created `specs/099-orphan`) before it is queried — moving the orphan check ahead of the
+barrage on the hook path is scoped follow-up. Through the supported authoring path an orphan is
+*unreachable* — capture-fusion (FR-008 model b) creates the node in the same operation (SC-003).
 
 ## Entity: Lifecycle Skill Precondition (the embedded gate)
 
@@ -123,9 +132,11 @@ The compass itself is read-only and stateless. The enforcement it adds:
 
 - **Entry gate** (`captured`/no-node → authoring): capture-fusion — the `define` front door
   **CREATES the node→spec atomically** when no node exists (FR-008 model b, US3); it does NOT
-  refuse-and-redirect. The mechanical teeth are the **backstop**: any spec dir that still ends
-  up without a node is a hard error (`off-rail`) reported by the compass and every spec-resolving
-  verb (FR-009), so orphans are impossible through the front door AND caught otherwise.
+  refuse-and-redirect. The mechanical teeth are the **backstop**: a node-less item id is
+  `off-rail` from the compass, and the govern convergence-write throws on a node-less governed
+  dir (gate stays closed) — see the Orphan Spec Dir entry for the exact enforcement points
+  (FR-009). Orphans are unreachable through the front door (define creates the node) and
+  fail-safe-caught at the node-id resolution points otherwise.
 - **`governing → shipped`**: the transition refuses on an unmet exit gate rather than only
   reporting it (US5). Enforced as a refusal now (depends on govern being runnable — FR-011/12).
 - **Mid-pipeline transitions**: remain advisory in the engine's `advance` path during

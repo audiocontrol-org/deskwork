@@ -689,12 +689,20 @@ export async function runGovern(args: string[]): Promise<void> {
           `govern: REFUSED — compass verdict '${pre.verdict.outcome}' for '${flags.item}': ${pre.verdict.reason}\n`,
         );
         emitTerminalOutcome('fatal');
-        process.exit(2);
+        // Propagate the compass exit code (ahead=3 / off-rail=4), not a flat usage 2 — preserve
+        // the ahead/off-rail distinction the compass contract establishes (AUDIT-BARRAGE claude-03).
+        process.exit(pre.verdict.exitCode || 1);
       }
     }
     const explicitSlug = itemSlug ?? pick(flags.feature, process.env.GOVERN_FEATURE_SLUG);
     const branchForSlug = currentBranch(repoRoot);
-    const markerSlug = readActiveFeatureSlug(repoRoot);
+    // Only consult the active-feature marker when it is actually a resolution candidate —
+    // i.e. when no explicit slug (--item/--feature/GOVERN_FEATURE_SLUG) already resolved the
+    // feature (AUDIT-BARRAGE codex-02/claude-01). readActiveFeatureSlug fails loud on a
+    // malformed marker (codex-03); reading it eagerly would FATAL the explicit-override path —
+    // the very escape hatch for a broken marker. resolveFeatureSlug short-circuits on explicit,
+    // so the marker is unused in that case anyway.
+    const markerSlug = explicitSlug !== undefined ? null : readActiveFeatureSlug(repoRoot);
     const candidateSlugs = [branchDerivedSlug(branchForSlug), markerSlug].filter(
       (s): s is string => s !== null && s.length > 0,
     );

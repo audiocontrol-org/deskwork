@@ -155,7 +155,7 @@ export function resolveConvergenceItem(
   if (featureRoot === undefined) return slug;
   // Let a roadmap load error propagate — fail loud, no silent fallback key.
   const model = loadRoadmap(installation.resolved.roadmap, grammarOptsForRoot(installation.root));
-  const id = resolveIdentityFromSpecDir(model, featureRoot);
+  const id = resolveIdentityFromSpecDir(installation.root, model, featureRoot);
   if (id !== null) return id.nodeId;
   throw new GovernProtocolError(
     `govern-convergence: no roadmap node references the governed feature dir ` +
