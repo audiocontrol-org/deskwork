@@ -222,3 +222,21 @@ an agent can self-orient and catch its own skips even before the skills embed it
 - Commit after each task or logical RED→GREEN pair; push (Principle VII / project rule).
 - Closure (SC-006) is verified post-release in a formally-installed plugin — the agent posts
   evidence; the operator decides closure.
+
+---
+
+## Phase 10: Post-implementation barrage findings (cross-family frontier, 2026-06-16)
+
+The whole-feature cross-family barrage (codex/gpt-5.5 + claude/opus) surfaced findings on the
+024 implementation. The HIGH (cross-family) + the cheap precise MEDIUMs were fixed in-session
+(see commits); the two MEDIUMs below are scoped here as TDD-first fix-tasks (per the
+scope-don't-defer discipline). Both are real but lower-priority and the default bundled
+WORKFLOW.md works today — they harden the adopter-customized case.
+
+- [ ] T039 [US5] RED→GREEN: `emitAdvance` resolves the enforced back-half gate by the SEMANTIC `governing → shipped` transition (the graduate codename / a terminal-in-linear-pipeline flag), NOT by `r.doc.phases[length-1]` array position (AUDIT-BARRAGE claude-02). Test: an adopter WORKFLOW.md whose terminal phase is not the array tail, or with a side-state in `phases`, still enforces the correct transition. File: `src/subcommands/workflow.ts` (the US5 refusal block) + a fixture in `advance-gate-enforcement.test.ts`.
+- [ ] T040 [US1/US5] RED→GREEN: source the compass ORIENTATION exit-gate report and the ADVANCE enforcement from ONE gate definition, OR assert the invariant that a phase's `exit` and its forward transition's `exitGate` are identical (AUDIT-BARRAGE claude-05). Today they match in the bundled WORKFLOW.md (`governing.exit` == graduate `exitGate` == `record-converged impl`) but the code reads two different fields (`p.exit` vs `t.exitGate`) that could diverge under adopter customization, leaking the "orientation tells you what enforcement holds" contract. File: `src/subcommands/workflow.ts` (orientation + advance) + a divergence test.
+
+> Also scoped to `multi:feature/unskippable-workflow-protocol` (not this spec): wiring the
+> `after_implement` hook / `execute` to pass `--item` to govern (codex-01 remainder — the
+> authoritative item path now EXISTS via `--item`; the hook does not yet supply it), and a
+> recorded session-end compass warning (codex-03 remainder).

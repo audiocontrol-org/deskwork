@@ -21,15 +21,25 @@ working file — journal, tooling-feedback, clone scope — resolves through tha
 installation's configured paths. Outside any installation the verb **fails loud**
 directing you to `stackctl setup` (no bundled-copy fallback).
 
-## Compass orientation (024 — advisory, capture-only)
+## Compass orientation (024 — advisory, MANUAL; not recorded by the verb)
 
-session-end is **capture-only** and never refuses to close. It still consults the compass for **orientation** — surfacing any **off-rail** item (e.g. a spec dir authored with no roadmap node) as a **warning** in the session record so the next session inherits it — but it does **not** block the close:
+session-end is **capture-only** and never refuses to close. As an **optional, manual
+orientation** step the agent MAY run the compass against the active item to surface an
+**off-rail** condition (e.g. a spec dir authored with no roadmap node) before closing:
 
 ```bash
 plugins/stack-control/bin/stackctl workflow compass <item> --intent session-end
 ```
 
-`session-end` is a phase-neutral finishing intent: the verdict is `on-course` on any real node and `off-rail` only when no node exists. Record an off-rail item as a warning; **do not refuse**. (The hard-refusal compass embedding lives in the authoring/advancing skills — `define` / `design` / `execute` / `release` — per FR-006; session-end's capture-only posture, an explicit operator decision, is preserved.)
+`session-end` is a phase-neutral finishing intent: the verdict is `on-course` on any real node
+and `off-rail` only when no node exists. **Honest scope (AUDIT-BARRAGE codex-03):** `stackctl
+session-end` does **not** itself call the compass or persist a compass warning — the only
+warning it renders is for uncommitted non-doc changes. This compass check is therefore an
+operator/agent-facing orientation aid, not a recorded backstop; if an off-rail item must be
+preserved for the next session, capture it explicitly (e.g. `stackctl backlog`). Wiring a
+recorded compass warning into the verb is scoped to `multi:feature/unskippable-workflow-protocol`.
+(The hard-refusal compass embedding lives in the authoring/advancing skills — `define` /
+`design` / `execute` / `release` — per FR-006; session-end's capture-only posture is preserved.)
 
 ## What it does
 

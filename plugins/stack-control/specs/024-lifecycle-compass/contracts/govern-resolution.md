@@ -20,14 +20,20 @@ branch. These are the FIRST implementation phases (FR-015). Two distinct fixes.
 `after_implement` hook and `/stack-control:execute` both know the item):
 
 1. Resolve the feature from the item's recorded `spec:` pointer (the roadmap node), via the
-   canonical-identity resolver (contracts/canonical-identity.md).
-2. Fall back to the CLAUDE.md SPECKIT marker (`specs/<NNN>-<slug>/plan.md`) when no item is
-   supplied but a marker is present.
+   canonical-identity resolver (contracts/canonical-identity.md) — the `--item` authoritative
+   path.
+2. Fall back to the **active-feature marker = Spec Kit's own `.specify/feature.json`
+   (`feature_directory` → basename)** when no item is supplied but a marker is present. *(As
+   built: the marker source is `.specify/feature.json`, the tool's own pointer — NOT a separate
+   `CLAUDE.md` marker. Reading Spec Kit's pointer rather than inventing a parallel "active
+   feature" notion keeps faith with Principle VIII; AUDIT-BARRAGE claude-03 reconciled
+   doc→impl 2026-06-16.)* The marker is preferred over an incidental branch slug.
 3. The existing `--feature` / branch-`resolveSlug` path remains for explicit/legacy callers.
 
 The branch slug is NEVER the sole resolution source on a session-pinned branch. No silent
-fallback: when neither an item `spec:` pointer, a SPECKIT marker, nor `--feature` resolves a
-feature, govern FATALs with an actionable message naming what to supply (Principle V).
+fallback: when neither an item `spec:` pointer, the `.specify/feature.json` marker, nor
+`--feature` resolves a feature, govern FATALs with an actionable message naming what to supply
+(Principle V).
 
 ### Acceptance (SC-004, US4.1)
 

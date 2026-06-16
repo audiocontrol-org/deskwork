@@ -83,8 +83,10 @@ N copies of the precondition drifting (Alternative B rejected in the design reco
 
 **Decision**: Add an item-driven resolution path to govern. When invoked for a roadmap item
 (the `after_implement` hook and `execute` both know the item), govern resolves the feature from
-the item's recorded `spec:` pointer (the roadmap node) — falling back to the CLAUDE.md SPECKIT
-marker — instead of `resolveSlug({branch})`. The existing `resolveSlug` branch-derivation stays
+the item's recorded `spec:` pointer (the roadmap node) — falling back to the active-feature
+marker, which as built is Spec Kit's own `.specify/feature.json` (`feature_directory` basename),
+NOT a separate `CLAUDE.md` marker (Principle VIII — read the tool's pointer; AUDIT-BARRAGE
+claude-03) — instead of `resolveSlug({branch})`. The existing `resolveSlug` branch-derivation stays
 as the explicit-`--feature` / legacy path; the new path is preferred when an item/spec pointer
 is available, so the session-pinned `feature/stack-control` branch no longer FATALs
 "feature 'stack-control' not found".
