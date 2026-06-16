@@ -1,10 +1,12 @@
 # Parseable Lifecycle Workflow — STRAWMAN for discussion
 
-**Status:** strawman — for operator reaction, not yet a spec. Feeds
+**Status:** strawman — **converged 2026-06-16** (all framing + open decisions
+resolved or fully captured); **pending operator review** (the `designing` exit gate)
+→ then handoff to `/stack-control:define` → `/speckit-specify`. Feeds
 `multi:feature/parseable-lifecycle-workflow` (roadmap), part-of
 `multi:feature/lifecycle-industrialization`.
 
-**Date:** 2026-06-15
+**Date:** 2026-06-15 (authored) · 2026-06-16 (framing ratified + converged)
 
 > This document is a *design strawman* to react to. It is NOT the canonical
 > `WORKFLOW.md` and is NOT governed/parsed yet. The grammar shown below is a
@@ -455,7 +457,90 @@ stackctl workflow advance design:feature/roadmap-protocol --apply
 
 ---
 
+## Converged 2026-06-16 (open-decisions resolution — driven, for operator review)
+
+Resolutions to the open design decisions below, derived from this strawman's own
+principles + existing precedents. These are the agent's converging calls; the
+operator-review gate (the `designing` exit) ratifies or redirects them. After this
+pass, every open decision (#1–#9) is resolved or fully captured.
+
+**#9 Deriving `designing` before the record exists → RESOLVED: `design:` pointer on entry.**
+The `open-design` transition sets the node's `design:` pointer field immediately —
+before the backend writes the file. Phase-derivation keys on the POINTER, not file
+existence (the exact `spec:`-field precedent). The file is filled during the phase;
+the `design-to-spec` EXIT GATE checks the file's content (required sections). Derive
+on the pointer, gate on the content — derivation stays total and monotonic, with no
+transient mis-derive back to `planned`.
+
+**#4 Heavy-skill firing → CONFIRMED: advance fires bookkeeping only.**
+`workflow advance` applies ONLY the lightweight bookkeeping effects (palette in #2).
+The heavy, interactive phase WORK — the design backend, the speckit chain, `execute`,
+`govern`, `release` — is NEVER an advance effect; it is the explicit skill the agent
+runs, named by `workflow next`. Folding heavy interactive work into the atomic effect
+manifest would break both atomicity (#1) and the report-only/advance separation.
+
+**#8 `/stack-control:design` frontend mechanics → RESOLVED by the Opinion-injection section.**
+- **(c) in-session — NOT shell-out, NOT sub-agent.** The design conversation is
+  interactive (operator answers one question at a time); sub-agents are
+  non-interactive task executors, so the backend MUST run in the main session. The
+  frontend is a SKILL.md that invokes the backend skill in-session.
+- **(a) YAGNI suppression = the three-layer opinion injection.** The frontend
+  declares the house-rules block ONCE, re-injects "capture, don't cut" at the
+  backend's scope-check step, and the `design-to-spec` exit-gate mechanically verifies
+  solution-space ≥2 alternatives + required sections. No single layer is trusted; the
+  gate is the teeth.
+- **(b) minimal backend contract (capability-selected, never vendor):** conduct a
+  structured exploration → emit a design record at the installation-anchored
+  convention path with the required sections → support an approval gate → be drivable
+  in-session.
+
+**#1 Atomicity → RESOLVED: commit-last is the transaction boundary; git is the rollback.**
+Refines the strawman's option (a). `workflow advance --apply` (1) requires the
+advance-touched paths to be CLEAN (fail loud if dirty — never clobber uncommitted
+operator work); (2) validates every effect can fire; (3) applies all NON-commit
+bookkeeping mutations to the working tree; (4) fires `commit` LAST as the atomic
+boundary. On any failure before the commit, `git restore` the advance-touched paths →
+working tree returns to pre-advance. No bespoke transaction engine — the single
+trailing commit IS the commit point and git provides the rollback for free. (A real
+staged transaction is deferred unless a non-git effect ever needs it.)
+
+**#2 Effect vocabulary → RESOLVED: a 7-verb v1 palette; a missing effect ⇒ add a verb.**
+Derived by enumerating every linear-spine transition's bookkeeping needs:
+```
+roadmap advance {item} --to {status}
+roadmap reconcile
+journal append {message}
+doc set-status-field {path} {field} {value}
+workflow link-design {item} {design-doc}     # NEW — set node design: pointer (fires on open-design)
+workflow link-spec {item} {spec-dir}         # NEW — set node spec: pointer (fires on design-to-spec)
+commit {templated-message}                   # ALWAYS last — the atomic boundary (#1)
+```
+Every effect is a call to a governed verb from this fixed vocabulary, never prose.
+When a transition needs an effect that isn't a verb, the answer is ADD THE VERB
+(field-proven: TASK-137 `roadmap reparent`). The two `workflow link-*` verbs are
+exactly such surfaced additions. Every authored path anchors in the installation
+(Ratified 2026-06-16).
+
+**#7 Mid-stream re-design → CAPTURED (per capture mode); design sketch THIN, flagged.**
+Re-entry to `designing` from a later phase (the `/frontend-design` rule, the
+`feature-extend` re-design case) is REAL and is captured here, not cut. Sketch: a
+`* → designing` re-entry transition (induct-style, like the `blocked`/`cancelled`
+side-moves) that (a) re-opens / appends a revision to the design record; (b) marks
+the affected downstream phase checkpoints STALE (reusing 021's checkpoint-staleness
+machinery — a re-design changes in-scope intent, so dependent
+specifying/implementing checkpoints must re-derive); (c) preserves the existing spec
+dir as a new revision rather than discarding it. This is the THINNEST open decision —
+its interaction with checkpoint-staleness and spec-revisioning likely needs its own
+focused pass during `/speckit-plan`. Captured fully here; the build-now-vs-follow-on
+SCOPE call is the operator's separate later pass, never a design-time cut.
+
+---
+
 ## Open design decisions (for the spec)
+
+> **Status (2026-06-16):** all resolved — #3 and #5 in *Ratified 2026-06-16*; #6 was
+> already mostly-resolved; #1, #2, #4, #7, #8, #9 in *Converged 2026-06-16* above.
+> Kept below as the original question record.
 
 1. **Atomicity.** All-or-nothing is required (a half-applied transition is worse
    than none). v1 options: (a) "validate every effect can fire, then fire in
