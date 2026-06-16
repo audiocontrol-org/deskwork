@@ -75,6 +75,11 @@ export function extractScopedPaths(body: string): readonly string[] {
   for (const match of body.matchAll(BACKTICK_TOKEN_RE)) {
     const raw = match[1]?.trim();
     if (raw === undefined || !raw.includes('/')) continue;
+    // A LEADING-slash token is a slash-command (`/release`, `/code-review`) or an absolute
+    // path — never an installation-relative governed scope path. Excluding it prevents the
+    // "escapes the installation root" FATAL the validator (correctly) raises on absolutes
+    // (round-4 finding; same FR-012/TASK-83 class as the `:`-bearing case below).
+    if (raw.startsWith('/')) continue;
     // Strip a trailing `:<line>[:<col>]` suffix from a file:line span.
     const token = raw.replace(/:(\d+)(:\d+)?$/, '');
     // A remaining `:` marks a namespace/skill reference or URL — never a path.

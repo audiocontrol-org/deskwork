@@ -41,6 +41,14 @@ describe('024 FR-012 — backtick skill-reference span is not a governed path (T
   it('still excludes a /<plugin>:<verb> skill ref even with no line number', () => {
     expect(extractScopedPaths('`/stack-control:define` and `src/x.ts:3`')).toEqual(['src/x.ts']);
   });
+
+  it('excludes a BARE leading-slash slash-command / absolute ref (no colon) — round-4 FATAL fix', () => {
+    // `/release`, `/code-review` etc. have `/` and no `:`, so the prior filter kept them →
+    // absolute → "escapes the installation root" FATAL. A leading-`/` token is never an
+    // installation-relative governed path.
+    expect(extractScopedPaths('`/release` is operator-gated; `/code-review` too')).toEqual([]);
+    expect(extractScopedPaths('run `/release`, then edit `src/x.ts`')).toEqual(['src/x.ts']);
+  });
 });
 
 describe('024 FR-011 — feature slug resolves from the marker, not only the branch', () => {
