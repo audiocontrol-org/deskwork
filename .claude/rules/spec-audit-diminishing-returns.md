@@ -1,5 +1,7 @@
 # Spec-audit diminishing returns — detect the plateau, don't chase the generator
 
+> **STATUS (operator decision 2026-06-16): spec audit-barrage is PARKED from the default workflow.** `stackctl govern --mode spec` is **not a default/required step** until the spec-audit protocol's kinks are worked out — it is **opt-in only**. Implementation audit-barrage (the `after_implement` deskwork-governance hook) is **unchanged and stays required**. The guidance below still applies whenever spec governance IS run deliberately, but do not treat running it as a default expectation in the lifecycle. Re-enabling it as a default-required gate is tracked as **TASK-138**; the `022 parseable-lifecycle-workflow` design reflects the park (spec-govern gate opt-in; `specifying→implementing` defaults to `speckit-analyze`-clean; the symmetric convergence-record mechanism is retained for cheap re-enable).
+
 When running the cross-model audit-barrage against a **spec** (`stackctl govern --mode spec` — the spec-governance convergence loop), the hard part is **knowing when to stop**. Code-audit convergence is crisp (0 findings = clean). Spec-audit has **no such floor**: a spec is prose, inherently incomplete, so an aggressive cross-model barrage can always find another under-specified edge. Detecting diminishing returns is genuinely fuzzy — and getting it wrong means burning barrage cycles feeding a finding *generator* instead of converging.
 
 ## The rule

@@ -53,3 +53,7 @@
 ## session-end 2026-06-15
 - Per-phase govern cascade instability: govern.ts/incremental-audit.ts are in many phases' scopes, so every fix re-stales 4-6 phase checkpoints, making whole-feature gate-open a moving target (TASK-60 adjacent).
 - boundary-too-large is a recurring cross-phase audit generator (HIGH at the US2/whole-feature level, spec/quickstart require it); overriding it repeatedly fights the spec — needs the structural negotiation/boundary reorder (TASK-117).
+
+## session-end 2026-06-16
+- stackctl spec-check --spec <path> fails with FATAL 'not found' when run from the repo root with an installation-relative path (specs/NNN-slug); requires the plugins/stack-control-prefixed path. The --spec resolver is not cwd/repo-root tolerant. Repro: from repo root, stackctl spec-check --spec specs/022-... -> FATAL; --spec plugins/stack-control/specs/022-... -> ok. Workaround: always pass the plugin-prefixed path.
+- The before_specify speckit.git.feature hook (mandatory, optional:false) does git checkout -b NNN-slug, creating a per-spec branch that contradicts this program's session-pinned one-long-lived-branch convention (specs 015-022 all live on feature/stack-control). Workaround: run create-new-feature.sh in --dry-run to compute FEATURE_NUM only, stay on feature/stack-control. The mandatory hook vs program convention conflict is unresolved (related TF-09); a faithful run of /speckit-specify would create a stray branch.

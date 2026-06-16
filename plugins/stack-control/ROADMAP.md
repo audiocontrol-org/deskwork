@@ -41,7 +41,7 @@ One-move out-of-sequence insight capture as a first-class control-plane capabili
 Move scope-discovery primitives + skills in-house with per-codebase clone detection; vendor the full clone-detector.
 
 ## design:feature/roadmap-protocol
-- status: in-flight
+- status: shipped
 - depends-on: design:feature/document-primitives
 - spec: specs/006-roadmap-protocol
 Keep the roadmap live, crisp, and up-to-date: a DAG of heading-keyed work items with first-class typed edges. This feature (the manual self-seed).
@@ -59,7 +59,7 @@ Govern the spec, not just the implementation: cross-model audit-barrage over a s
 
 ## design:gap/roadmap-order-gating
 - status: planned
-- part-of: design:feature/roadmap-protocol
+- part-of: multi:feature/parseable-lifecycle-workflow
 - depends-on: design:feature/roadmap-protocol
 The deferred hard out-of-order GATING (006 FR-018): refuse work on an item whose dependencies are not yet shipped. Captured here so the deferral is a tracked roadmap item, never silently dropped.
 
@@ -227,7 +227,8 @@ Retire /dw-lifecycle:review and /dw-lifecycle:audit in favor of audit-barrage as
 
 ## design:gap/roadmap-advance-on-spec-finalize
 - status: planned
-- part-of: design:feature/roadmap-protocol
+- part-of: multi:feature/parseable-lifecycle-workflow
+- depends-on: design:feature/roadmap-protocol
 Advancing a roadmap item's status when its spec is finalized must be NON-DISCRETIONARY (thesis: make it mechanical, never rely on the agent remembering roadmap advance). Add a Spec Kit hook on spec finalization (e.g. after_tasks / after_analyze) that advances the roadmap item whose spec: field points at the just-finalized spec dir to in-flight, resolved via .specify/feature.json. Surfaced as TF-24.
 
 ## design:gap/insight-capture-ideas-stage-handoff
@@ -336,4 +337,36 @@ Public Codex distribution for adopters: the released acquisition + install path 
 - status: shipped
 - spec: specs/020-config-domain-selection
 Config-domain discovery and sticky selection: resolve and persist the active config domain across installation surfaces.
+
+## multi:feature/release-resolution-cycle
+- status: planned
+- part-of: multi:feature/lifecycle-industrialization
+- depends-on: design:feature/roadmap-protocol
+- ref: TASK-134
+Mechanize the post-release+install resolution cycle: given an installed release, map the release delta to candidate items (commit refs, audit-log fixed-<sha>, newly-complete spec tasks), verify each against the FORMALLY-INSTALLED artifact (released-binary reconcile, fix present in the installed cache, released tests where deps allow) distinguishing verified-fixed from re-surfacing, propose closure with auto-written Resolution evidence, reconcile + advance roadmap nodes whose specs shipped, and surface loose ends that did not verify. Composes dw-lifecycle re-audit-fixed-findings/close-shipped/complete + stack-control roadmap reconcile/session-end; agent posts evidence, operator decides closure. Promoted from TASK-134.
+
+## multi:feature/lifecycle-industrialization
+- status: planned
+Umbrella: industrialize the stack-control project lifecycle so the governing ceremony runs mechanically, not on operator stamina or sheer force of will. Groups the mechanization pieces that tie up loose ends deterministically: a parseable lifecycle workflow engine (parseable-lifecycle-workflow / TASK-136), post-release+install resolution (release-resolution-cycle / TASK-134), backlog->roadmap promotion (backlog-promotion-mechanization / TASK-135), and orphan->node reconciliation (unorphan assist / TASK-133, still in backlog). Realizes the thesis ('industrialize execution') at the macro/process layer. Children are part-of this node.
+
+## multi:feature/backlog-promotion-mechanization
+- status: planned
+- depends-on: design:feature/roadmap-protocol
+- part-of: multi:feature/lifecycle-industrialization
+- ref: TASK-135
+One-move backlog->roadmap promotion: given a backlog item, PROPOSE the roadmap node derived from it (phase/kind from labels, slug from title, status planned, candidate edges, ref=TASK-id, description from body), dry-run the node + linkage, and on --apply CREATE the node AND record the promote linkage atomically — removing the two hand steps (roadmap add + backlog promote) run for TASK-134. Preserves the record-only-promote intent (bidirectional navigability). Promoted from TASK-135.
+
+## multi:feature/parseable-lifecycle-workflow
+- status: planned
+- depends-on: design:feature/roadmap-protocol, design:feature/document-primitives
+- part-of: multi:feature/lifecycle-industrialization
+- ref: TASK-136
+The centerpiece: a PARSEABLE, DETERMINISTIC lifecycle workflow that drives items through phases — not just a WORKFLOW.md doc. Apply the roadmap-protocol pattern to the process itself: a governed grammar-parsed workflow document (phases, per-phase entry/exit gates, the verb/skill executing each phase) plus an engine that, given an item, knows its current phase, the gate conditions to advance, and deterministically drives it to the next phase or reports why it's blocked. The human-readable WORKFLOW.md is one rendering of the parseable source of truth. Reuses document-primitives (governed parseable-doc engine) + roadmap-protocol grammar/DAG reasoning. Promoted from TASK-136.
+
+## impl:gap/roadmap-reparent-verb
+- status: planned
+- depends-on: design:feature/roadmap-protocol
+- part-of: multi:feature/lifecycle-industrialization
+- ref: TASK-137
+Add a roadmap reparent verb to move an existing part-of / depends-on edge between nodes (no mutation verb does this today; re-parenting requires hand-editing the governed ROADMAP.md). Shape: roadmap reparent <id> --part-of <target> | --depends-on <target> [--remove <target>], dry-run then --apply, graph-revalidating (refuse cycle/dangling/self), zero-write-on-failure. Promoted from TASK-137.
 

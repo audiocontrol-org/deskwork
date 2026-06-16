@@ -134,6 +134,36 @@ export function add(
   return commitCandidate(docPath, candidate, opts, apply);
 }
 
+/**
+ * Set (or update) a single body field on an item — the substrate for the
+ * workflow `link-design` / `link-spec` governed verbs (022 FR-019). When the
+ * field line already exists it is rewritten; otherwise it is inserted directly
+ * after the status line (or the heading when there is none). Re-validates the
+ * whole graph; an invalidating value is zero-write (R7).
+ */
+export function setField(
+  docPath: string,
+  identifier: string,
+  field: string,
+  value: string,
+  opts: LoadOptions,
+  apply: boolean,
+): MutationResult {
+  const { doc } = loadDocument(docPath, opts);
+  const unit = requireUnit(doc, identifier);
+  const lines = [...doc.sourceLines];
+  const fieldRe = new RegExp(`^\\s*[-*]\\s+${field}\\s*:`, 'i');
+  const idx = lineInUnit(lines, unit, fieldRe);
+  if (idx >= 0) {
+    lines[idx] = `- ${field}: ${value}`;
+  } else {
+    const statusIdx = lineInUnit(lines, unit, STATUS_LINE);
+    const insertAfter = statusIdx >= 0 ? statusIdx : unit.span.startLine - 1;
+    lines.splice(insertAfter + 1, 0, `- ${field}: ${value}`);
+  }
+  return commitCandidate(docPath, lines.join('\n'), opts, apply);
+}
+
 /** Change an item's status along the lifecycle (re-validates whole graph; R7). */
 export function advance(
   docPath: string,

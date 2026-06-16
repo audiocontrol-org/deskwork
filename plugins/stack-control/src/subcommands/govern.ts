@@ -29,7 +29,8 @@
  */
 
 import { existsSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { recordGovernConvergence } from '../govern/convergence-record.js';
 import { fileURLToPath } from 'node:url';
 import {
   GovernProtocolError,
@@ -909,6 +910,29 @@ export async function runGovern(args: string[]): Promise<void> {
           auditedFiles,
         });
       }
+    }
+    // 022 US6 / T029 (FR-028/FR-029): on convergence, write the durable, mode-keyed
+    // govern-convergence record inside the installation so the workflow's
+    // `governing → shipped` gate (impl) — and the opt-in `specifying → implementing`
+    // gate (spec) — is mechanical, not agent say-so. Keyed by the spec-dir basename,
+    // the stable identity the workflow's `spec:` pointer also resolves. A write
+    // failure leaves the gate CLOSED (fail-safe) with a loud warning — never a
+    // silent graduation.
+    try {
+      const convergenceItem = featureRoot !== undefined ? basename(featureRoot) : slug;
+      const scopePaths = featureRoot !== undefined ? [featureRoot] : [];
+      recordGovernConvergence(
+        repoRoot,
+        flags.mode === 'spec' ? 'spec' : 'impl',
+        convergenceItem,
+        scopePaths,
+        new Date().toISOString(),
+      );
+    } catch (err) {
+      process.stderr.write(
+        `govern: WARNING — could not write the govern-convergence record (${errorMessage(err)}); ` +
+          `the governing -> shipped gate stays closed until it is recorded.\n`,
+      );
     }
     process.stderr.write(
       flags.mode === 'spec'

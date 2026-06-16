@@ -23,8 +23,23 @@ export interface WorkItem {
   readonly deferredUntil: string | null;
   readonly spec: string | null;
   readonly ref: string | null;
+  /** The design-record pointer (022 FR-003); derivation keys `designing` on this. */
+  readonly design: string | null;
+  /** Recorded operator-approval marker (022 FR-009) — the `design-to-spec` judgment gate. */
+  readonly designApproved: boolean;
+  /** Recorded `speckit-analyze`-clean marker (022 FR-029) — the default `specifying → implementing` signal. */
+  readonly analyzeClean: boolean;
   /** The item's shape prose (body, sans the heading and the field bullets). */
   readonly scope: string;
+}
+
+/**
+ * A marker field (`design-approved:` / `analyze-clean:`) is TRUE when present and
+ * not an explicit negation. The spec chain / operator records the fact; the gate
+ * checks it (022 D5/analyze-U1) — presence is the recorded fact.
+ */
+function markerTrue(value: string | null): boolean {
+  return value !== null && !/^(false|no|0)$/i.test(value.trim());
 }
 
 export interface RoadmapModel {
@@ -108,6 +123,9 @@ function toWorkItem(unit: Unit): WorkItem {
   const deferred = firstOrNull(edgeTargets(unit, 'deferred-until'));
   const spec = firstOrNull(edgeTargets(unit, 'spec'));
   const ref = firstOrNull(edgeTargets(unit, 'ref'));
+  const design = firstOrNull(edgeTargets(unit, 'design'));
+  const designApproved = firstOrNull(edgeTargets(unit, 'design-approved'));
+  const analyzeClean = firstOrNull(edgeTargets(unit, 'analyze-clean'));
   return {
     identifier: unit.identifier,
     phase,
@@ -118,6 +136,9 @@ function toWorkItem(unit: Unit): WorkItem {
     deferredUntil: deferred === null ? null : unquote(deferred),
     spec: spec === null ? null : unquote(spec),
     ref: ref === null ? null : unquote(ref),
+    design: design === null ? null : unquote(design),
+    designApproved: markerTrue(designApproved),
+    analyzeClean: markerTrue(analyzeClean),
     scope: scopeOf(unit),
   };
 }

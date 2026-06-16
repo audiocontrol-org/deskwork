@@ -2,6 +2,265 @@
 
 ---
 
+## 2026-06-16: Analyze spec 022 → remediate findings to clean
+
+**Goal:** Pick up the prior session's runnable spec 022
+(`parseable-lifecycle-workflow`) and run `/speckit-analyze` — the inferred next
+chain step — then act on whatever it surfaced.
+
+**Accomplished:**
+- Oriented via `/stack-control:session-start`; next-step was `/speckit-analyze`
+  on the active spec 022. Ran it across spec / plan / tasks / data-model /
+  research / 4 contracts / constitution.
+- Analyze result: **0 CRITICAL, 0 constitution violations**; 1 HIGH, 2 MEDIUM,
+  3 LOW. Remediated all six (one commit, doc-only, no code):
+  - **I1 (HIGH):** the two `contracts/*.md` still described the *un-parked*
+    spec-govern behavior — `specifying → implementing` decided by the spec-govern
+    record — contradicting the ratified 2026-06-16 park (FR-029). Synced both to
+    analyze-clean-by-default / spec-govern-opt-in / impl-govern-required.
+  - **U1 (MEDIUM):** `speckit-analyze` writes no artifact, so the *default*
+    `specifying → implementing` gate had no on-disk signal or matching criterion
+    kind. Resolved (operator-picked Option A): a recorded `analyze-clean:` node
+    marker + a new `node-marker` criterion kind, mirroring the `design-approved:`
+    precedent — no new artifact store. Wired into data-model, FR-029, Assumptions,
+    T007, T029.
+  - **A1 (MEDIUM):** FR-016 now states the transition exit-gate is reported, not
+    enforced, in v1 (consistent with FR-010).
+  - **C1/P1/T1 (LOW):** T019 asserts heavy verbs rejected as effects; T035
+    reworded to post-evidence (operator closes TASK-19, not self-close); derivation
+    contract distinguishes phase `planned` vs node-status `planned`.
+- Verified no stale `spec-govern decides specifying→implementing` references
+  remain; `analyze-clean` now consistent across all 5 artifacts. Committed
+  (`d5031e1c`) + pushed. **Spec 022 is analyze-clean and ready for
+  `/speckit-implement`** (in a separate worktree/session per the two-session
+  boundary).
+
+**Didn't Work:**
+- `stackctl session-end` again auto-derived **"Commits: 0 / Files: 0 / backlog: 0"**
+  — the known long-lived-branch boundary-resolution bug (**TASK-39 / TASK-59**).
+  Re-derived by hand from the prior session-end tip `c20b3b4d..HEAD`: 2 commits
+  (1 substantive remediation + this session-end record), 5 files in the
+  substantive commit.
+
+**Course Corrections:**
+- [PROCESS] Twice answered "your recommendation" with an options menu before
+  committing to a single decisive recommendation + applying it. The operator wanted
+  the call made, not a survey — collapse to one recommendation and act.
+
+**Insights:**
+- The HIGH finding was a stale-contract drift created *within the prior session*:
+  the park decision updated spec/research/tasks but not the two `contracts/*.md`.
+  Contracts are exactly what a fresh TDD session treats as authoritative — analyze
+  earning its keep by catching the one artifact pair that didn't get the memo.
+- U1 is the deeper lesson: "derive from `speckit-analyze`-clean" *sounds*
+  mechanical but analyze persists nothing, so the default gate had no signal to
+  read. The fix (record the fact as a node marker) is the same shape the spec
+  already ratified for `design-approved:` — judgment/chain-completion becomes
+  mechanical by recording the fact, never by re-judging at evaluation time.
+
+**Quantitative (re-derived by hand — auto-derivation hit TASK-39/-59 boundary bug):**
+- Commits: 2 (`c20b3b4d..HEAD`)
+  - `d5031e1c` docs(stack-control): remediate spec 022 analyze findings (I1/U1/A1 + lows)
+  - `ec4c1110` docs(session): session-end record
+- Files changed: 5 (substantive commit — all under specs/022-…)
+- Backlog touched: none mutated; TASK-138 (re-enable spec audit-barrage) and TASK-19
+  (governance-graduation-record) referenced in artifacts, no status transition.
+
+## 2026-06-16: Converge parseable-lifecycle-workflow design → author spec 022 to runnable; park spec audit-barrage
+
+**Goal:** Pick up the 2026-06-15 design handoff — converge the
+`parseable-lifecycle-workflow` strawman to a spec and author it through
+`/stack-control:define` to runnable.
+
+**Accomplished:**
+- Oriented via `/stack-control:session-start`; ran `/speckit-analyze` on the
+  shipped 021 (re-surfaced the boundary-too-large gap, already parked as TASK-117).
+- Ratified the 3 framing decisions that gated convergence: a **new `workflow` verb
+  family consuming the roadmap node-reader**; the **roadmap node** as the unit;
+  **TASK-19** (governance-graduation-record) pulled into the feature's scope.
+- Drove all 6 remaining open design decisions to resolution and **converged the
+  strawman** (atomicity = commit-last/git-rollback; fixed 7-verb effect vocabulary;
+  designing-frontend over swappable backend in-session; derive `designing` on the
+  `design:` pointer; mid-stream re-design captured-but-thin).
+- **Authored spec 022 (`parseable-lifecycle-workflow`)** through the full Spec Kit
+  chain in-session: specify → clarify (3 high-impact resolutions) → plan
+  (research / data-model / 4 contracts / quickstart) → tasks (36 RED-first across
+  11 phases) → analyze (**clean — 0 CRITICAL/HIGH**) + remediation.
+  `spec=yes plan=yes tasks=yes`, `execute-check: runnable`.
+- **Parked spec audit-barrage from the default workflow** (operator decision; impl
+  audit-barrage unchanged) using the **"park the gate, keep the mechanism"** shape —
+  reflected in 022 (FR-028/029, research D8, tasks) + the
+  `spec-audit-diminishing-returns` rule; captured **TASK-138** for re-enable.
+
+**Didn't Work:**
+- `stackctl session-end` auto-derived **"Commits: 0 / Files: 0 / backlog: 0"** —
+  boundary resolution failed on the long-lived `feature/stack-control` branch
+  (known **TASK-39 / TASK-59**). Re-derived by hand from `git log 465d590c..HEAD`
+  (the prior session's tip): 10 commits / 18 files.
+- `stackctl spec-check --spec` is not cwd/repo-root tolerant — from the repo root it
+  needs the plugin-prefixed path or it FATALs "not found" (captured as friction).
+- The `before_specify` `speckit.git.feature` hook (mandatory) would create a
+  per-spec branch contrary to the one-long-lived-branch program convention; ran
+  `create-new-feature.sh --dry-run` to get the number only (captured as friction).
+
+**Course Corrections:**
+- [PROCESS] Design-doc placement: operator corrected that stack-control design docs
+  belong **inside the configuration domain**, then sharpened that the principle is
+  about **adopter repos** — every authored artifact anchors in the installation
+  domain (the constitution's installation-anchor invariant). I'd initially
+  investigated this monorepo's layout (wrong universe) before the sharpening landed.
+- [PROCESS] Scope: operator parked spec audit-barrage from the default workflow
+  ("until the kinks are worked out"; keep impl). Reshaped 022's just-clarified
+  symmetric govern gate into **park-the-gate-keep-the-mechanism** (confirmed via a
+  pick) rather than stripping or leaving it contradictory.
+- [PROCESS] Operator reminder "commit and push early and often" — applied the
+  analyze remediation and committed/pushed immediately rather than batching.
+
+**Insights:**
+- "Park the gate, keep the mechanism" is the right shape for a temporary
+  protocol-maturity park — the symmetric convergence-record mechanism stays, so
+  re-enabling the spec gate later is a flag flip, not a re-design.
+- The full `define` chain ran cleanly in-session on one long-lived branch; the
+  program's no-per-spec-branch convention requires handling the mandatory
+  `git.feature` hook via `--dry-run` (a recurring friction worth a real fix).
+
+**Quantitative (re-derived from git; auto-derivation failed — see Didn't Work):**
+- Commits: **10** (9 work + 1 session-end record) on `feature/stack-control`
+  (`465d590c..HEAD`). The verb's auto-derived "0" is the TASK-39/-59 long-lived-branch
+  boundary failure, not a no-op session.
+- Files changed: **18**.
+- Backlog touched: captured **TASK-138** (re-enable spec audit-barrage); referenced
+  **TASK-19 / TASK-136 / TASK-137** (022 scope + linkage) and **TASK-117** (021
+  analyze). Verb auto-derived "backlog progressed: 0" — same boundary failure.
+- Corrections: ~3 (placement→adopter-domain; park spec barrage; commit-push
+  reminder). No reverted or claimed-untrue work.
+
+## 2026-06-15: Design session — parseable-lifecycle-workflow (gates, frontend/backend, designing phase)
+
+**Goal:** Orient via `/stack-control:session-start`; pick up the in-flight
+`design:feature/roadmap-protocol` (006); then — as it unfolded — run a design
+conversation defining `multi:feature/parseable-lifecycle-workflow` (the
+workflow-mechanization centerpiece) and capture it durably as a design record.
+
+**Accomplished:**
+- Graduated `design:feature/roadmap-protocol` (006) → **shipped** (56/56 tasks,
+  16/16 checklist, 87/87 roadmap tests green, tree clean). Unblocked
+  `design:gap/roadmap-order-gating`.
+- Re-parented the two roadmap gate-gaps (`roadmap-order-gating`,
+  `roadmap-advance-on-spec-finalize`) under `multi:feature/parseable-lifecycle-workflow`
+  — they're phase-transition gates, not roadmap-protocol query concerns.
+- Captured **TASK-137** (no verb re-parents a roadmap edge → manual ROADMAP.md
+  edit) and promoted it into the roadmap as `impl:gap/roadmap-reparent-verb` under
+  the lifecycle umbrella (record-only promote linkage recorded).
+- Authored the **design-record strawman** at
+  `docs/superpowers/specs/2026-06-15-parseable-lifecycle-workflow-strawman.md`,
+  evolved across the conversation: the work/transition split; derived-not-stored
+  phases; the `designing` phase before `specifying`; the opinionated-frontend /
+  swappable-backend pattern; the opinion-injection mechanism (bend the backend at
+  the seam); and the mechanical-stage-gates foundation.
+
+**Didn't Work:**
+- The strawman is **not yet converged to a spec**. The BACK half of the spine
+  (`implementing → governing → shipped`) cannot have mechanical exit gates until
+  **TASK-19** (governance-graduation-record) lands — without a recorded
+  govern-convergence fact, "are we done governing?" falls back to agent say-so.
+- No dedicated re-parent verb existed, forcing a hand-edit of the governed
+  ROADMAP.md (now tracked as TASK-137 / `impl:gap/roadmap-reparent-verb`).
+
+**Course Corrections:**
+- [PROCESS] Over-rotated to "no new design skill — just invoke brainstorming."
+  Operator corrected: **every stage is an opinionated stack-control frontend over
+  a swappable backend** (`define`→Spec Kit, `execute`→implement, `govern`→model
+  CLIs); `design` is the missing frontend. `/stack-control:design` IS a (frontend)
+  skill; `superpowers:brainstorming` is the default backend.
+- [PROCESS] Drifted toward "driving" (effects automation). Operator re-centered the
+  foundation on **mechanical, queryable stage-gate criteria** — "are we done / how
+  much more / can we move to PQR" — independent of advancing anything.
+
+**Insights:**
+- The whole FRONT of the spine isn't new surface — it's
+  superpowers(brainstorming) → design doc → Spec Kit(specify) → back half, with the
+  workflow as **connective tissue** mechanizing transitions between proven tools.
+- **Bend the backend at the seam** (output contract + gate), not inside its
+  process — generalizes to the execution backends, not just design.
+- **No criterion is ever a debate**: judgment criteria are mechanical because they
+  check a *recorded operator decision* (approval marker), not the judgment itself.
+- TASK-19 is load-bearing for the gate foundation, not a side-detail.
+
+**Next steps (for the next session to pick up):**
+1. **READ FIRST:**
+   `docs/superpowers/specs/2026-06-15-parseable-lifecycle-workflow-strawman.md` —
+   the in-flight `designing`-phase artifact for
+   `multi:feature/parseable-lifecycle-workflow`. The session was a design
+   conversation; this doc IS its record. Eight commits of accumulated design.
+2. **Decide the two open framing questions** in the strawman:
+   - **Q5 (shapes everything):** is the workflow a NEW `workflow` verb family, or
+     phase-awareness layered onto the existing roadmap reasoner?
+   - **Unit:** confirm "roadmap node is the unit, spec dir is its mid-phase
+     artifact" (tentatively settled, not ratified).
+3. **Firm up the BACK half of the spine** (`implementing → governing → shipped`).
+   This is gated on **TASK-19** (governance-graduation-record). Decide: pull
+   TASK-19 into this feature's scope, or sequence it first. Without a recorded
+   govern-convergence fact the `governing` exit gate cannot be mechanical.
+4. **Then converge** the strawman (capture-everything pass + operator review) and
+   hand off to `/stack-control:define` → `/speckit-specify` for
+   `multi:feature/parseable-lifecycle-workflow`.
+5. **Independent / lower-priority follow-ups captured this session:**
+   - `impl:gap/roadmap-reparent-verb` (TASK-137) is **ready and implementable now**,
+     standalone — a `roadmap reparent <id> --part-of|--depends-on` verb.
+   - Open strawman sub-questions: **Q9** (deriving `designing` before the design
+     doc exists → set a `design:` node pointer on entry, like `spec:`);
+     opinion-injection mechanics (how the frontend suppresses backend YAGNI;
+     minimal backend contract; in-session vs shell-out); mid-stream re-design
+     re-entry to `designing` from a later phase.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 9
+  - docs(stack-control): stage gates are mechanical, published, unambiguous — and queryable on their own
+  - docs(stack-control): opinion-injection mechanism — bend the backend at the seam, not its process
+  - docs(stack-control): designing stage = opinionated /stack-control:design frontend over a swappable backend
+  - docs(stack-control): designing phase adopts superpowers:brainstorming (not a new skill)
+  - docs(stack-control): design-record strawman for parseable-lifecycle-workflow
+  - chore(stack-control): promote TASK-137 into the roadmap under the lifecycle umbrella
+  - chore(stack-control): capture TASK-137 — roadmap reparent verb (move part-of/depends-on edge between nodes)
+  - chore(stack-control): re-parent roadmap gate-gaps under the workflow-mechanization engine
+  - chore(stack-control): graduate design:feature/roadmap-protocol (006) to shipped
+- Files changed: 3
+- Backlog touched: TASK-137, TASK-19
+
+## 2026-06-15: Roadmap reconciliation → v0.47.0 ship → post-release closure → lifecycle-ceremony umbrella
+
+**Goal:** Orient via `/stack-control:session-start`; as it unfolded — reconcile the drifted roadmap, ship the pending stack-control work, verify+close what the release resolved, and institutionalize the post-release/lifecycle ceremony so it stops running on operator stamina.
+
+**Accomplished:**
+- **Roadmap reconciliation (zeroed all detectable drift).** Advanced 7 tasks-complete features to `shipped` across two passes (document-primitives, spec-governance, installation-isolation; then insight-capture, migrate-scope-discovery, session-skills, project-doc-setup). Unorphaned all 15 spec dirs — added `spec:` to 5 existing nodes; created 10 new nodes (audit saga 013/014/014/021 grouped `part-of` audit-protocol-convergence). Marked `migrate-audit-barrage` shipped on operator confirmation → shipped `audit-protocol-convergence` + unblocked the `retire-dw-lifecycle` endgame. reconcile: 0 drift / 0 orphans / 0 unresolved.
+- **Merged `origin/main`** (clean, disjoint files) and shipped **PR #476** (133 files, +7609/−184) → cut as **v0.47.0**.
+- **Fixed a real CI blocker mid-merge (TASK-132).** The 021 fleet-negotiation gate probes real model CLIs (claude/codex/sonnet) absent in CI, so ~20 govern e2e tests short-circuited to `negotiation-failed` — passing locally only because the dev box has the CLIs. Added the test-only `GOVERN_FLEET_AVAILABLE` seam in `loadLaneCapabilitiesGoverned` (mirrors `GOVERN_BARRAGE_BIN`); set it in 8 e2e files. Verified red→green by reproducing CLI-less with a `which`-shim hiding the three binaries — full suite 1543/1543. (`68415fee`)
+- **Post-release verification against the formally-installed v0.47.0.** Confirmed the released cache carries the seam + reconcile=0-orphans; closed **TASK-131** + **TASK-132** with `## Resolution` blocks citing the fixing commit + post-release evidence; split the residual reconcile-has-no-unorphan tooling gap to **TASK-133**.
+- **Structured the "mechanize the lifecycle ceremony" theme into a first-class effort.** New umbrella `multi:feature/lifecycle-industrialization` with three children `part-of` it: `release-resolution-cycle` (TASK-134), `backlog-promotion-mechanization` (TASK-135), `parseable-lifecycle-workflow` (TASK-136). Sharpened TASK-136 from "document the workflow" to a **parseable, deterministic workflow engine** (governed grammar-parsed doc + an engine that drives items through gated phases; WORKFLOW.md becomes one rendering, not the source of truth).
+
+**Didn't Work:**
+- First CI run on #476 was red (the hermeticity defect). The green local suite masked it — ambient-dependency landmine (my box has the model CLIs; CI doesn't).
+- `stackctl session-end` auto-derived "286 commits / 662 files" because the `7de27776..HEAD` boundary swept in the entire `origin/main` merge (v0.46/0.47 + design-control). Corrected to the honest first-parent count (13). Boundary-spans-merge inflation is a session-end gap worth noting.
+
+**Course Corrections:**
+- [PROCESS] "merge when green" surfaced a real defect, not a slow build. Did NOT merge red — fixed the hermeticity and verified in the ACTUAL CLI-less condition (a which-shim, not my laptop) before merging.
+- [PROCESS] Operator owns scope/closure: surfaced the reconcile drift, the Cohort-B node taxonomy, and the close decisions as proposals (AskUserQuestion / explicit asks) rather than unilaterally advancing/closing. Held `audit-protocol-convergence` until its dependency shipped; held the 4-vs-5 status advances for an explicit nod.
+- [PROCESS] Operator sharpened TASK-136 from a documentation item to a parseable/deterministic engine — recorded the SHARPENED framing in the item body, not a quiet reinterpretation.
+
+**Insights:**
+- The roadmap silently understated shipped work: 7 complete features sat at planned/in-flight and 15 implemented spec dirs had no node or no `spec:` field. reconcile only REPORTS this — it can't repair it (orphans needed hand-edits). That gap is the seed of the lifecycle-industrialization umbrella: the closing/reconciling half of the lifecycle has no momentum of its own and runs on stamina.
+- The real post-release gate is verifying against the FORMALLY-INSTALLED artifact, not the worktree (the released cache was `--omit=dev`, so verification was code-identity + the CLI-less functional run, not re-running its tests). The whole verify→close→reconcile→promote ceremony we ran by hand today is exactly what TASK-134 + the umbrella exist to mechanize.
+- A passing local suite that depends on ambient model CLIs is a CI landmine — TASK-132 (and the broader TASK-116 class) only surface CLI-less, so "green locally" is not evidence.
+
+**Quantitative (this session — re-derived first-parent, NOT the merge-inflated auto-count):**
+- Commits: 13 on `feature/stack-control` (11 work + 1 `origin/main` merge + 1 session-end record). The verb's auto-derived "286 commits / 662 files" counts the merged-in `origin/main` history (v0.46→v0.47 + design-control), not this session's work.
+- Released: PR #476 → v0.47.0.
+- Backlog: closed TASK-131 + TASK-132 (verified in v0.47.0); captured TASK-130, 133, 134, 135, 136; promoted TASK-134/135/136 into the roadmap under the new umbrella.
+- Corrections: ~0 hard corrections (operator gave direction + one "close out" ambiguity clarification; no claimed-untrue or reverted work).
+
+---
+
 ## 2026-06-15: 021 whole-feature-gate blockers — boundary-too-large + cross-cutting composition (TASK-117, TASK-129)
 
 **Goal:** Resumed via `/stack-control:execute` on `021-audit-protocol-friction-burndown`. Found execute was a no-op (all 32 tasks complete, clean tree) — the real "unfinished work" the operator expected was the two spec-required structural HIGHs the prior session's journal named as blocking the whole-feature govern gate: TASK-117 (`boundary-too-large` unreachable) and TASK-129 (directory-scoped composition hides cross-cutting changes). Fix both.
