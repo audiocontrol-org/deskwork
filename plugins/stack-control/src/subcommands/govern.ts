@@ -977,12 +977,17 @@ export async function runGovern(args: string[]): Promise<void> {
     // govern-convergence record inside the installation so the workflow's
     // `governing → shipped` gate (impl) — and the opt-in `specifying → implementing`
     // gate (spec) — is mechanical, not agent say-so. 024 FR-013 / TASK-139: keyed by
-    // the CANONICAL node id (resolved from the governed spec dir), not the spec-dir
-    // basename, which collides across two features sharing a basename — the workflow
-    // read-side keys by the same node id. When no node resolves (orphan/legacy), fall
-    // back to the installation-relative spec dir (still collision-free), never the
-    // bare basename. A write failure leaves the gate CLOSED (fail-safe), never a
-    // silent graduation.
+    // the CANONICAL node id (`resolveConvergenceItem`), matching the workflow read-side.
+    // There is NO spec-dir fallback: when no node resolves (orphan/legacy),
+    // `resolveConvergenceItem` FAILS LOUD (AUDIT-BARRAGE claude-01 — the comment matches
+    // the code). A write failure leaves the gate CLOSED (fail-safe): the workflow
+    // `governing → shipped` gate reads the record, so an absent record means the feature
+    // simply cannot advance — graduation is impossible regardless of this exit code.
+    // KNOWN CAVEAT (AUDIT-BARRAGE codex-03, scoped T041): a node-less govern still prints
+    // "governed" + exits 0 here, which is a misleading exit code for a WORKFLOW-driven
+    // orphan (the gate stays closed, so no actual un-governed graduation). The correct
+    // fix distinguishes a workflow-driven orphan (refuse non-zero) from a legitimate
+    // STANDALONE govern with no workflow node (the test fixtures) — tracked as T041.
     try {
       const convergenceItem = resolveConvergenceItem(installation, featureRoot, slug);
       const scopePaths = featureRoot !== undefined ? [featureRoot] : [];
@@ -996,7 +1001,8 @@ export async function runGovern(args: string[]): Promise<void> {
     } catch (err) {
       process.stderr.write(
         `govern: WARNING — could not write the govern-convergence record (${errorMessage(err)}); ` +
-          `the governing -> shipped gate stays closed until it is recorded.\n`,
+          `the governing -> shipped gate stays CLOSED until it is recorded (the feature cannot ` +
+          `graduate in the workflow regardless of this exit code; see T041).\n`,
       );
     }
     process.stderr.write(

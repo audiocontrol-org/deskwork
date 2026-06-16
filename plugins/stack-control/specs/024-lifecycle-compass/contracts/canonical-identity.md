@@ -59,3 +59,14 @@ silent fabrication). A record that cannot be resolved under either key is report
   convergence records are independent. Fails before the re-key.
 - `resolveIdentity` returns the node id as `nodeId` and the node's `spec:` as `specPointer`.
 - compass + govern + close-related agree on `nodeId` for the same item.
+
+## Known limitation (AUDIT-BARRAGE claude-04, LOW)
+
+The convergence-record KEY is canonical (node id via `resolveConvergenceItem`), so the FR-013
+basename-collision class is closed for the record. But govern's feature-root LOOKUP path
+(`resolveFeatureFromItem` → `basename(specPointer)` → `resolveFeatureRoot`) still keys on the
+spec-dir basename. For the standard `specs/NNN-<slug>` layout basenames are unique (the numeric
+prefix), so this is safe in practice; it only re-opens the seam in the exotic same-basename
+layout the collision test invents (`specs/lane-a/compass`, `specs/lane-b/compass`). A cleaner
+future change threads the resolved `specDir` (or node id) through to feature-root resolution so
+the same canonical identity governs both the record key and the file lookup. Tracked as low.

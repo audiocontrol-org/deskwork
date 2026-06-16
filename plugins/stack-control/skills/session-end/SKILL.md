@@ -31,8 +31,10 @@ orientation** step the agent MAY run the compass against the active item to surf
 plugins/stack-control/bin/stackctl workflow compass <item> --intent session-end
 ```
 
-`session-end` is a phase-neutral finishing intent: the verdict is `on-course` on any real node
-and `off-rail` only when no node exists. **Honest scope (AUDIT-BARRAGE codex-03):** `stackctl
+`session-end` is a phase-neutral finishing intent: the verdict is `on-course` on any **pipeline**
+node, and `off-rail` when no node exists **OR the node is in a terminal side-state**
+(`blocked`/`cancelled`/`retired`) — the off-rail side-state check precedes the neutral branch
+(AUDIT-BARRAGE claude-03). **Honest scope (AUDIT-BARRAGE codex-03):** `stackctl
 session-end` does **not** itself call the compass or persist a compass warning — the only
 warning it renders is for uncommitted non-doc changes. This compass check is therefore an
 operator/agent-facing orientation aid, not a recorded backstop; if an off-rail item must be
