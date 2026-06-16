@@ -63,9 +63,11 @@ so the FR-012 fix must not grow it further.
 
 **Scale/Scope**: One new CLI verb, one pure verdict module, one intent enumeration, one
 shared skill-precondition helper, one identity resolver, two govern-runnability fixes, one
-capture-fusion change, and the report-only retirement on two enforced gates. Six lifecycle
-skill bodies gain a compass-precondition opening (`define`, `execute`, the `after_implement`
-govern hook, `ship`, `release`, `session-end`).
+capture-fusion change, and the report-only retirement on two enforced gates. The lifecycle
+skill bodies gain a compass-precondition opening: hard-refusal in the authoring/advancing
+skills (`define`, `design`, `execute`, the `after_implement` govern surface, `release`), and an
+advisory consultation in `session-end` (capture-only). `ship` is an intent alias of `release`
+(no standalone skill).
 
 ## Constitution Check
 
@@ -148,11 +150,11 @@ src/
 └── lifecycle-precondition.ts # NEW — shared compass-precondition helper for skills
 
 skills/
-├── define/SKILL.md           # FR-006 — open with compass precondition + FR-008 capture-fusion
-├── execute/SKILL.md          # FR-006
-├── ship/SKILL.md             # FR-006 (+ session-end, release if present as skills)
-├── release/SKILL.md          # FR-006
-└── session-end/SKILL.md      # FR-006
+├── define/SKILL.md           # FR-006 hard-refusal + FR-008 capture-fusion (creates the node)
+├── design/SKILL.md           # FR-006 hard-refusal
+├── execute/SKILL.md          # FR-006 hard-refusal
+├── release/SKILL.md          # FR-006 hard-refusal — `ship` is an intent ALIAS of release (no standalone skill)
+└── session-end/SKILL.md      # advisory only (capture-only; NOT a hard-refusal skill)
 
 src/__tests__/
 ├── workflow/
