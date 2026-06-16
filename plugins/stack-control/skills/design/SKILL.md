@@ -20,6 +20,16 @@ does the exploration; this skill owns the *opinion injection*, the *pointer*, th
 > capability contract below, NEVER by branching on which tool it is. Any backend
 > that satisfies the contract drives without a code change.
 
+## Compass precondition (024 — the un-skippable lifecycle)
+
+**Before doing ANY of this skill's work**, consult the compass for the roadmap item this invocation operates on, declaring this skill as the intent:
+
+```bash
+plugins/stack-control/bin/stackctl workflow compass <item> --intent design
+```
+
+A **non-zero exit is a hard refusal**: print the compass's reason (it names the violated invariant and, for an `ahead` verdict, the skipped step) and **STOP — perform none of this skill's work**. Proceed only on exit 0 (`on-course` / `behind`). If no item resolves (a spec dir with no roadmap node is `off-rail`), refuse loud and direct the operator to capture it first. The lifecycle rules live in one place (the compass + the governed `WORKFLOW.md`), not re-encoded here; per `.claude/rules/enforcement-lives-in-skills.md` the gate lives in this skill body + the `stackctl workflow compass` verb, never a git hook.
+
 ## Preconditions
 
 - An interactive coding-agent session (the design conversation is interactive — it

@@ -18,6 +18,16 @@ Author a **new** Spec Kit spec through the stack-control front door (Feature 1, 
 > is navigable both ways. See [`/stack-control:backlog`](../backlog/SKILL.md)
 > § *Promote into the feature rigor* for the canonical description of the seam.
 
+## Compass precondition (024 — the un-skippable lifecycle)
+
+**Before doing ANY of this skill's work**, consult the compass for the roadmap item this invocation operates on, declaring this skill as the intent:
+
+```bash
+plugins/stack-control/bin/stackctl workflow compass <item> --intent define
+```
+
+A **non-zero exit is a hard refusal**: print the compass's reason (it names the violated invariant and, for an `ahead` verdict, the skipped step) and **STOP — perform none of this skill's work**. Proceed only on exit 0 (`on-course` / `behind`). If no item resolves (a spec dir with no roadmap node is `off-rail`), refuse loud and direct the operator to capture/design it first. The lifecycle rules live in one place (the compass + the governed `WORKFLOW.md`), not re-encoded here; per `.claude/rules/enforcement-lives-in-skills.md` the gate lives in this skill body + the `stackctl workflow compass` verb, never a git hook.
+
 ## Scope — authoring only
 
 `define` is **spec-authoring only**. It does NOT create a worktree, a docs tree, or any other physical infrastructure — that is a separate concern (mirrors dw-lifecycle's `define` ≠ `setup`, and Constitution Principle IV: providers own authoring intent; physical substrate is a distinct responsibility). If infra is needed, that is the operator's separate call.

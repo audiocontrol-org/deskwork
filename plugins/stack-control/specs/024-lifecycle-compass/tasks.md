@@ -116,14 +116,14 @@ verdict — an agent following its skills cannot skip a step.
 **Independent Test**: driving a lifecycle skill on an `ahead`/`off-rail` item refuses loud
 (names the missing prior step) and performs none of its work; an `on-course` item proceeds.
 
-- [ ] T022 [P] [US2] RED: `src/__tests__/lifecycle-precondition.test.ts` — `checkLifecyclePrecondition({item,intent})`: ahead/off-rail → `proceed:false` with the reason + skipped step; on-course/behind → `proceed:true`; no resolvable item → fail loud (contracts/skill-precondition.md). Seen to fail.
-- [ ] T023 [US2] Create `src/lifecycle-precondition.ts` — resolve item → compute compass verdict → `{ proceed, verdict }` with the single canonical refusal-message shape. GREEN T022.
-- [ ] T024 [US2] Embed the compass-precondition opening step in `skills/define/SKILL.md` (run `workflow compass <item> --intent define`; non-zero ⇒ hard refusal, perform no work).
-- [ ] T025 [P] [US2] Embed the precondition in `skills/design/SKILL.md` (`--intent design`).
-- [ ] T026 [P] [US2] Embed the precondition in `skills/execute/SKILL.md` (`--intent execute`).
-- [ ] T027 [P] [US2] Embed the precondition in `skills/release/SKILL.md` (`--intent release`).
-- [ ] T028 [P] [US2] Embed the precondition in `skills/session-end/SKILL.md` (`--intent session-end`).
-- [ ] T029 [US2] Embed the precondition at the `after_implement` govern surface — the `govern` opening in `src/subcommands/govern.ts` (and/or the `execute` skill's govern step) consults the compass with `--intent govern` before assembling the payload.
+- [X] T022 [P] [US2] RED: `src/__tests__/lifecycle-precondition.test.ts` — `checkLifecyclePrecondition({item,intent})`: ahead/off-rail → `proceed:false` with the reason + skipped step; on-course/behind → `proceed:true`; no resolvable item → fail loud (contracts/skill-precondition.md). Seen to fail.
+- [X] T023 [US2] Create `src/lifecycle-precondition.ts` — resolve item → compute compass verdict → `{ proceed, verdict }` with the single canonical refusal-message shape. GREEN T022.
+- [X] T024 [US2] Embed the compass-precondition opening step in `skills/define/SKILL.md` (run `workflow compass <item> --intent define`; non-zero ⇒ hard refusal, perform no work).
+- [X] T025 [P] [US2] Embed the precondition in `skills/design/SKILL.md` (`--intent design`).
+- [X] T026 [P] [US2] Embed the precondition in `skills/execute/SKILL.md` (`--intent execute`).
+- [X] T027 [P] [US2] Embed the precondition in `skills/release/SKILL.md` (`--intent release`).
+- [X] T028 [P] [US2] Embed the precondition in `skills/session-end/SKILL.md` (`--intent session-end`).
+- [X] T029 [US2] Embed the precondition at the `after_implement` govern surface — the `govern` opening in `src/subcommands/govern.ts` (and/or the `execute` skill's govern step) consults the compass with `--intent govern` before assembling the payload.
 
 **Checkpoint**: the compass is the enforcement surface; off-rail actions are refused at every lifecycle skill.
 

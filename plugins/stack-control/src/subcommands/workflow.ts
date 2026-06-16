@@ -23,6 +23,7 @@ import { derivePhase } from '../workflow/phase-derivation.js';
 import { loadWorkflowDoc } from '../workflow/workflow-grammar.js';
 import { buildItemContext } from '../workflow/workflow-context.js';
 import { computeVerdict, legitimateNextPhase } from '../workflow/compass.js';
+import { resolveCompass } from '../workflow/compass-resolve.js';
 import { knownIntents, resolveIntent } from '../workflow/intent-vocabulary.js';
 import type { DerivedPhase } from '../workflow/workflow-types.js';
 import type { EffectContext } from '../workflow/effects.js';
@@ -141,22 +142,6 @@ function emitNext(itemId: string): void {
   t.effects.forEach((e, i) => process.stdout.write(`    ${i + 1}. ${e.verb}\n`));
 }
 
-/** Resolve the installation + doc + roadmap item for the compass; a MISSING item is null (orphan → off-rail), never a usage error. */
-function resolveForCompass(itemId: string): { root: string; doc: WorkflowDoc; item: WorkItem | null } {
-  const inst = resolveInstallation(process.cwd());
-  const doc = loadWorkflowDoc(inst.root);
-  const opts = grammarOptsForRoot(inst.root);
-  const model = loadRoadmap(inst.resolved.roadmap, opts);
-  return { root: inst.root, doc, item: model.byId.get(itemId) ?? null };
-}
-
-/** Derive the item's current phase; a no-node item is at the pre-node entry phase. */
-function currentPhaseFor(root: string, doc: WorkflowDoc, item: WorkItem | null): DerivedPhase {
-  if (item === null) return { kind: 'phase', id: doc.phases[0]!.id };
-  const { inputs } = buildItemContext(root, item);
-  return derivePhase(doc, inputs);
-}
-
 /** Orientation mode (no --intent, FR-001): the phase + the single legitimate next action + gate state. Exit 0. */
 function emitCompassOrientation(
   doc: WorkflowDoc,
@@ -193,12 +178,9 @@ function emitCompassOrientation(
 
 /** `workflow compass <item> [--intent <action>] [--json]` (024 US1) — orient + diff; the verdict is the exit code. */
 function emitCompass(itemId: string, intentName: string | undefined, json: boolean): void {
-  const { root, doc, item } = resolveForCompass(itemId);
-  const hasNode = item !== null;
-  const currentPhase = currentPhaseFor(root, doc, item);
+  const { doc, hasNode, currentPhase, gate } = resolveCompass(process.cwd(), itemId);
 
   if (intentName === undefined) {
-    const gate = item !== null ? buildItemContext(root, item).gate : null;
     emitCompassOrientation(doc, itemId, currentPhase, hasNode, gate);
     return;
   }

@@ -21,6 +21,16 @@ working file — journal, tooling-feedback, clone scope — resolves through tha
 installation's configured paths. Outside any installation the verb **fails loud**
 directing you to `stackctl setup` (no bundled-copy fallback).
 
+## Compass orientation (024 — advisory, capture-only)
+
+session-end is **capture-only** and never refuses to close. It still consults the compass for **orientation** — surfacing any **off-rail** item (e.g. a spec dir authored with no roadmap node) as a **warning** in the session record so the next session inherits it — but it does **not** block the close:
+
+```bash
+plugins/stack-control/bin/stackctl workflow compass <item> --intent session-end
+```
+
+`session-end` is a phase-neutral finishing intent: the verdict is `on-course` on any real node and `off-rail` only when no node exists. Record an off-rail item as a warning; **do not refuse**. (The hard-refusal compass embedding lives in the authoring/advancing skills — `define` / `design` / `execute` / `release` — per FR-006; session-end's capture-only posture, an explicit operator decision, is preserved.)
+
 ## What it does
 
 ```bash
