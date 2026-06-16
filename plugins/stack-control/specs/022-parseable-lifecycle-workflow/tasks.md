@@ -27,7 +27,7 @@
 
 **Purpose**: shared seams every story reads. MUST complete before the user stories.
 
-- [ ] T004 Author the plugin-bundled default `plugins/stack-control/templates/WORKFLOW.md` — the canonical 7-phase lifecycle (captured→…→shipped) + side-states, with phase + transition units, derive predicates, gate criteria, and effect manifests, conforming to the grammar contract. (Analyze O1: either wire the `doc set-status-field` effect into a concrete transition here — e.g. a feature-README status-table update on `graduate` — or add an inline note that it is an available-but-unused v1 verb; do not leave its v1 use ambiguous.)
+- [ ] T004 Author the plugin-bundled default `plugins/stack-control/templates/WORKFLOW.md` — the canonical 7-phase lifecycle (captured→…→shipped) + side-states, with phase + transition units, derive predicates, gate criteria, and effect manifests, conforming to the grammar contract. (Analyze O1: either wire the `doc set-status-field` effect into a concrete transition here — e.g. a feature-README status-table update on `graduate` — or add an inline note that it is an available-but-unused v1 verb; do not leave its v1 use ambiguous.) (Workflow-policy 2026-06-16: the `specifying → implementing` exit gate is `speckit-analyze`-clean by DEFAULT; do NOT make a spec-govern convergence record a default-required criterion — spec audit-barrage is parked. The `governing → shipped` gate DOES require the impl-govern convergence record.)
 - [ ] T005 Implement WORKFLOW.md grammar binding via the `document-model` engine in `plugins/stack-control/src/workflow/workflow-grammar.ts` (parse phase + transition units; fail loud on malformed)
 - [ ] T006 Implement bundled-default + per-install override resolution for `WORKFLOW.md` (installation copy wins, else bundled) in `plugins/stack-control/src/workflow/workflow-grammar.ts`, reusing the existing override resolver
 - [ ] T007 Add the new roadmap node fields `design:` and `design-approved:` (alongside existing `spec:`) to the node reader in `plugins/stack-control/src/roadmap/roadmap-model.ts`
@@ -104,13 +104,13 @@
 
 ## Phase 8: User Story 6 - Governance graduation is recorded on disk (Priority: P2)
 
-**Goal**: a mode-keyed govern-convergence record makes `specifying→implementing` and `governing→shipped` mechanical (absorbs TASK-19).
+**Goal**: a mode-keyed govern-convergence record makes `governing→shipped` mechanical (absorbs TASK-19). The record MECHANISM is symmetric (spec + impl), but per the 2026-06-16 workflow-policy decision the spec-govern GATE is parked/opt-in — `governing→shipped` (impl) is the required default gate; `specifying→implementing` is `speckit-analyze`-clean by default.
 
-**Independent Test**: a converged govern run writes the record inside the installation; the gate passes only when recorded ∧ converged; no agent assertion substitutes.
+**Independent Test**: a converged IMPL govern run writes the record inside the installation; the `governing→shipped` gate passes only when recorded ∧ converged; no agent assertion substitutes. The spec-mode record is exercised as an opt-in path, not a default-required gate.
 
-- [ ] T027 [P] [US6] RED: govern-convergence-record tests (spec + impl modes written + read; gate passes only recorded ∧ converged; tasks-100%-but-no-record → gate unmet) in `plugins/stack-control/src/__tests__/workflow/govern-record.test.ts`
-- [ ] T028 [US6] Implement the mode-keyed govern-convergence record (write on convergence; installation-anchored; reuse the 021 checkpoint fingerprint shape) in `plugins/stack-control/src/govern/convergence-record.ts`
-- [ ] T029 [US6] Wire the record into `govern --mode spec` and impl govern emit sites in `plugins/stack-control/src/subcommands/govern.ts`, and into phase-derivation in `plugins/stack-control/src/workflow/phase-derivation.ts`
+- [ ] T027 [P] [US6] RED: govern-convergence-record tests (impl mode required for `governing→shipped`, passes only recorded ∧ converged, tasks-100%-but-no-record → gate unmet; spec mode written/read as an OPT-IN path; `specifying→implementing` default gate is analyze-clean, NOT spec-govern-required) in `plugins/stack-control/src/__tests__/workflow/govern-record.test.ts`
+- [ ] T028 [US6] Implement the symmetric mode-keyed govern-convergence record mechanism (write on convergence; installation-anchored; reuse the 021 checkpoint fingerprint shape) in `plugins/stack-control/src/govern/convergence-record.ts` — retain spec mode in the mechanism even though its gate is parked
+- [ ] T029 [US6] Wire the record into the impl govern emit site (required gate) and the opt-in `govern --mode spec` path in `plugins/stack-control/src/subcommands/govern.ts`, and into phase-derivation in `plugins/stack-control/src/workflow/phase-derivation.ts` (default `specifying→implementing` = analyze-clean; spec-govern gate opt-in)
 
 ---
 

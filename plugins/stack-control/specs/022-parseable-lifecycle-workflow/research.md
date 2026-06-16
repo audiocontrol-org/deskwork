@@ -44,11 +44,12 @@ No `NEEDS CLARIFICATION` markers remained after `/speckit-clarify`. This records
 - **Rationale**: a fixed vocabulary leaves nothing to interpret, so nothing to relitigate; the add-a-verb rule is field-proven (TASK-137 `roadmap reparent`).
 - **Alternatives**: prose effects — rejected (re-introduces interpretation/debate).
 
-## D8. Symmetric, mode-keyed govern-convergence record (TASK-19)
+## D8. Mode-keyed govern-convergence record (TASK-19) — symmetric mechanism, spec gate parked
 
-- **Decision**: one record mechanism keyed by mode records both `govern --mode spec` and impl govern convergence, written inside the installation; derivation reads both (`specifying → implementing` from spec-govern; `governing → shipped` from impl-govern). Extends `src/govern/`.
-- **Rationale**: makes both back-half-style signals mechanical, not agent say-so; one mechanism, two modes. *(Clarification 2026-06-16; absorbs TASK-19.)*
-- **Alternatives**: infer spec-govern from analyze-clean (asymmetric, weaker signal) — rejected.
+- **Decision**: one record *mechanism* keyed by mode can record both `govern --mode spec` and impl govern convergence, written inside the installation; the mechanism is retained for both modes. Extends `src/govern/`.
+- **Gate enforcement (workflow-policy decision 2026-06-16):** spec audit-barrage is **parked from the default workflow** ("until the spec-audit protocol's kinks are worked out"). So `governing → shipped` is decided by the impl-govern record (required, mechanical), while `specifying → implementing` derives from `speckit-analyze`-clean **by default**; the spec-govern record/gate is **opt-in**, not default-required. The symmetric mechanism is kept so re-enabling the spec gate is a flag flip, not a re-design.
+- **Rationale**: keeps the impl back-half mechanical (absorbs TASK-19) while not forcing an immature spec-audit protocol into the default path; the retained mechanism keeps the door open.
+- **Alternatives**: make spec-govern a default-required gate now (rejected — the spec-audit protocol has unresolved kinks); strip spec-govern from the design entirely (rejected — the park is temporary, re-design cost is avoided by keeping the mechanism).
 
 ## D9. The design frontend bends the backend at the seam, in-session
 

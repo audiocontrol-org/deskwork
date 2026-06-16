@@ -39,6 +39,15 @@ These were operator decisions that gated converging the design record; they are 
 - Q: Should `spec-govern` convergence (the `specifying → implementing` signal) be recorded the same way as TASK-19's impl-govern record? → A: **Symmetric — one govern-convergence record mechanism, two modes.** Both `govern --mode spec` and impl govern write a durable on-disk convergence record (keyed by mode); the phase-derivation function reads both symmetrically, so `specifying → implementing` is mechanical too, not agent say-so.
 - Q: Where is the recorded operator-approval marker (for judgment gates) stored? → A: **A field on the roadmap node** (e.g. `design-approved:`), co-located with the `design:` / `spec:` pointers — one governed surface, consistent with node-is-the-unit.
 
+#### Workflow-policy decision 2026-06-16 — spec audit-barrage parked from the default workflow
+
+- **Decision (operator):** spec-document audit-barrage (`govern --mode spec`) is **removed from the default workflow until the spec-audit protocol's kinks are worked out**; **implementation audit-barrage stays** (the `after_implement` deskwork-governance hook is unchanged). This refines the symmetric-record clarification above.
+- **Consequence for the design (park the gate, keep the mechanism):**
+  - The symmetric, mode-keyed govern-convergence-record **mechanism is retained** (so re-enabling spec governance later is a flag flip, not a re-design).
+  - The `specifying → implementing` exit gate is **NOT** a default-required spec-govern gate. By default it derives from **`speckit-analyze`-clean** (the spec-chain completion signal). The spec-govern convergence record + gate is **opt-in** (available when the operator chooses to run `govern --mode spec`), never default-required, while parked.
+  - The `governing → shipped` impl-govern gate **remains required and mechanical** — implementation audit-barrage is unchanged.
+- **Temporary:** this is a park, not a deletion. Re-enabling spec audit-barrage as a default-required gate is tracked as a backlog follow-up (see Assumptions).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Mechanical, queryable stage gates (Priority: P1) 🎯 MVP
@@ -235,8 +244,8 @@ Design also happens AFTER specifying / implementing (the `/frontend-design` rule
 
 **Governance-graduation record (TASK-19)**
 
-- **FR-028**: The system MUST produce a durable on-disk govern-convergence record when governance converges, written inside the installation domain. The record MUST be a **single symmetric mechanism keyed by mode** that covers BOTH `govern --mode spec` (spec-govern convergence) and impl govern (impl-govern convergence). *(Clarified 2026-06-16: spec-govern and impl-govern convergence are recorded the same way.)*
-- **FR-029**: The phase-derivation function and the exit gates MUST read the convergence records symmetrically: the `specifying → implementing` signal is decided by the **spec-govern** convergence record, and the `governing → shipped` exit criterion by the **impl-govern** convergence record (recorded ∧ converged). Neither MUST infer convergence from chain-completion, tasks-completion, or any agent assertion.
+- **FR-028**: The system MUST provide a durable on-disk govern-convergence record **mechanism** — a single symmetric mechanism keyed by mode able to record BOTH `govern --mode spec` (spec-govern convergence) and impl govern (impl-govern convergence), written inside the installation domain. The **mechanism** is retained for both modes; whether a given mode's gate is *enforced by default* is governed by FR-029. *(Clarified 2026-06-16; mechanism symmetric, gate enforcement per the workflow-policy decision.)*
+- **FR-029**: The `governing → shipped` exit criterion MUST be decided by the **impl-govern** convergence record (recorded ∧ converged) — required and mechanical; it MUST NOT infer convergence from tasks-completion or any agent assertion. The `specifying → implementing` signal MUST, **by default**, derive from `speckit-analyze`-clean (spec-chain completion); the **spec-govern** convergence record is an **opt-in** stricter gate (used only when the operator runs `govern --mode spec`), never default-required while spec audit-barrage is parked (workflow-policy decision 2026-06-16). The spec-govern gate MUST be re-enableable as default without re-design (FR-028 mechanism retained).
 
 **Installation-anchor invariant**
 
@@ -280,5 +289,6 @@ Design also happens AFTER specifying / implementing (the `/frontend-design` rule
 - The document-primitives grammar engine (`ROADMAP.md`, `DESIGN-INBOX.md`) is reused for `WORKFLOW.md` (third use), not built anew.
 - `superpowers:brainstorming` is the default design backend and already supplies the 2–3-alternatives method, the user-review gate, the self-review, and the hard-gate; the frontend adds the mechanical required-section exit gate and the stack-control opinion overrides on top.
 - v1 gate teeth are report-only (no refusals); enforcement-as-refusal is a later, explicit operator decision, not assumed here.
+- **Spec audit-barrage is parked from the default workflow** (workflow-policy decision 2026-06-16): `specifying → implementing` derives from `speckit-analyze`-clean by default; the spec-govern gate is opt-in. Re-enabling spec audit-barrage as a default-required gate, once the spec-audit protocol's kinks are worked out, is tracked as **TASK-138**. Implementation audit-barrage is unchanged.
 - **Open question carried to planning (FR-032 / US8)**: the precise interaction of `* → designing` re-entry with checkpoint-staleness invalidation scope and spec-dir revisioning is the least-designed area and is expected to be expanded during `/speckit-plan`; it is captured here as a requirement with known open depth, not cut.
 - **Open question carried to planning**: whether the side-state induct transitions (`blocked`/`cancelled`/`retired`) are authored as first-class `WORKFLOW.md` transitions in v1 or inherited from the existing roadmap status moves — captured, to be settled in planning, not silently scoped out.
