@@ -137,9 +137,9 @@ hard error reported by the compass and every spec-resolving verb.
 **Independent Test**: authoring through the front door yields a spec dir AND a node at a
 consistent phase; a hand-created orphan spec dir is a hard error everywhere it is resolved.
 
-- [ ] T030 [P] [US3] RED: `src/__tests__/capture-fusion.test.ts` — authoring through the supported path creates a referencing roadmap node in the same operation (FR-008); a spec dir with no node is a hard error for every spec-resolving verb (FR-009) and `off-rail` from the compass (SC-003). Seen to fail.
-- [ ] T031 [US3] Fuse node creation into the authoring front door — the `define` / `speckit-specify` path creates the roadmap node (derived from the canonical identity) atomically with the spec dir; no spec dir producible without a node. GREEN the FR-008 half of T030. (Realized in `skills/define/SKILL.md` body + any supporting verb; no orphan-producing path remains.)
-- [ ] T032 [US3] Orphan = hard error: spec-resolving verbs raise a hard error (not a passive reconcile note) on a spec dir with no node, and the compass returns `off-rail`. GREEN the FR-009 half of T030.
+- [X] T030 [P] [US3] RED: `src/__tests__/capture-fusion.test.ts` — authoring through the supported path creates a referencing roadmap node in the same operation (FR-008); a spec dir with no node is a hard error for every spec-resolving verb (FR-009) and `off-rail` from the compass (SC-003). Seen to fail.
+- [X] T031 [US3] Fuse node creation into the authoring front door — the `define` / `speckit-specify` path creates the roadmap node (derived from the canonical identity) atomically with the spec dir; no spec dir producible without a node. GREEN the FR-008 half of T030. (Realized in `skills/define/SKILL.md` body + any supporting verb; no orphan-producing path remains.)
+- [X] T032 [US3] Orphan = hard error: spec-resolving verbs raise a hard error (not a passive reconcile note) on a spec dir with no node, and the compass returns `off-rail`. GREEN the FR-009 half of T030.
 
 **Checkpoint**: the 023-class orphan is unreachable through the supported path.
 
@@ -154,8 +154,8 @@ advance path during migration.
 **Independent Test**: an enforced transition with an unmet exit gate refuses loud (not merely
 prints the unmet criteria); a met gate proceeds.
 
-- [ ] T033 [P] [US5] RED: `src/__tests__/workflow/compass-cli.test.ts` (or a focused advance test) — a `governing → shipped` advance with an unmet exit gate refuses loud (non-zero), naming the unmet criteria; the entry gate refuses an orphan; a met gate proceeds (US5.1/US5.2). Seen to fail.
-- [ ] T034 [US5] Enforce the two gates as refusals in `src/subcommands/workflow.ts` `emitAdvance` (and/or `src/workflow/transition-engine.ts`): the `governing → shipped` transition and the entry gate refuse on unmet criteria; mid-pipeline transitions remain advisory (retire the blanket FR-010 report-only comment ONLY for the enforced gates). GREEN T033.
+- [X] T033 [P] [US5] RED: `src/__tests__/workflow/compass-cli.test.ts` (or a focused advance test) — a `governing → shipped` advance with an unmet exit gate refuses loud (non-zero), naming the unmet criteria; the entry gate refuses an orphan; a met gate proceeds (US5.1/US5.2). Seen to fail.
+- [X] T034 [US5] Enforce the two gates as refusals in `src/subcommands/workflow.ts` `emitAdvance` (and/or `src/workflow/transition-engine.ts`): the `governing → shipped` transition and the entry gate refuse on unmet criteria; mid-pipeline transitions remain advisory (retire the blanket FR-010 report-only comment ONLY for the enforced gates). GREEN T033.
 
 **Checkpoint**: the back half has teeth; report-only is retired where enforcement applies.
 

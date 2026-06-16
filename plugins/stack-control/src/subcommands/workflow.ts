@@ -220,7 +220,7 @@ function effectContextFor(r: Resolved, transition: Transition, extra: Record<str
 
 function emitAdvance(itemId: string, apply: boolean, values: Record<string, string>): void {
   const r = resolve(itemId);
-  const { inputs } = buildItemContext(r.root, r.item);
+  const { inputs, gate } = buildItemContext(r.root, r.item);
   const phase = derivePhase(r.doc, inputs);
   if (phase.kind === 'side-state') {
     failUsage(`'${itemId}' is in terminal side-state '${phase.id}'; induct it back before advancing`);
@@ -230,6 +230,22 @@ function emitAdvance(itemId: string, apply: boolean, values: Record<string, stri
   const t = forwardTransition(r.doc, p);
   if (t === undefined) {
     failUsage(`'${itemId}' is in terminal phase '${p.id}'; no forward transition to advance`);
+  }
+  // 024 US5 / FR-010 (phased): the back-half `governing → shipped` (terminal)
+  // transition is ENFORCED as a refusal — an unmet exit gate blocks the advance
+  // rather than only being reported (022 v1 report-only is retired HERE). Mid-
+  // pipeline transitions stay ADVISORY in this advance path during migration;
+  // mid-pipeline ORDER is still enforced by the compass embedded in the skills.
+  const terminalPhaseId = r.doc.phases[r.doc.phases.length - 1]!.id;
+  if (t.to === terminalPhaseId && t.exitGate.length > 0) {
+    const result = evaluateGate(t.exitGate, gate);
+    if (!result.allMet) {
+      process.stderr.write(
+        `workflow advance ${itemId}: REFUSED — '${t.codename}' (${t.from} -> ${t.to}) exit gate unmet:\n`,
+      );
+      for (const c of result.unmet) process.stderr.write(`    [ ] ${describeCriterion(c)}\n`);
+      process.exit(1);
+    }
   }
   const ctx = effectContextFor(r, t, values);
   if (!apply) {
