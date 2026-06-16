@@ -133,8 +133,8 @@
 
 > **Note (design depth):** this is the thinnest area (spec FR-032 / research D10). T032 begins with a focused design/RED pass nailing the staleness-invalidation scope and spec-dir revisioning semantics before T033 implements.
 
-- [ ] T032 [P] [US8] RED: re-entry tests (new design-record revision opened not overwritten; affected downstream checkpoints marked stale; spec dir preserved as a revision) in `plugins/stack-control/src/__tests__/workflow/redesign-reentry.test.ts`
-- [ ] T033 [US8] Implement the `* → designing` re-entry transition (revision the record; invalidate affected checkpoints via `src/govern/checkpoint-state.ts`; preserve the spec dir) in `plugins/stack-control/src/workflow/transition-engine.ts`
+- [X] T032 [P] [US8] RED: re-entry tests (new design-record revision opened not overwritten; affected downstream checkpoints marked stale; spec dir preserved as a revision) in `plugins/stack-control/src/__tests__/workflow/redesign-reentry.test.ts`
+- [X] T033 [US8] Implement the `* → designing` re-entry transition (revision the record; invalidate affected checkpoints via `src/govern/checkpoint-state.ts`; preserve the spec dir) in `plugins/stack-control/src/workflow/transition-engine.ts`
 
 ---
 

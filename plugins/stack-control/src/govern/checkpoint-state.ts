@@ -62,6 +62,45 @@ export function checkpointPath(
   );
 }
 
+/**
+ * Mark a phase checkpoint STALE (022 US8 / FR-032) — a `* → designing` re-entry
+ * invalidates downstream audit work that re-design changed. Writes an additive
+ * `.stale` sidecar next to the checkpoint (the record itself is preserved as
+ * history); the next govern re-audits the phase. Returns the marker path.
+ */
+export function markCheckpointStale(
+  installationRoot: string,
+  featureSlug: string,
+  phaseId: string,
+  reason: string,
+  at: string,
+): string {
+  const marker = `${checkpointPath(installationRoot, featureSlug, phaseId)}.stale`;
+  assertCheckpointStoragePath(installationRoot, marker);
+  mkdirSync(dirname(marker), { recursive: true });
+  writeFileSync(marker, `${JSON.stringify({ reason, staledAt: at }, null, 2)}\n`, 'utf8');
+  return marker;
+}
+
+/** True when a phase checkpoint has been marked stale by a re-design re-entry. */
+export function isCheckpointStale(
+  installationRoot: string,
+  featureSlug: string,
+  phaseId: string,
+): boolean {
+  return existsSync(`${checkpointPath(installationRoot, featureSlug, phaseId)}.stale`);
+}
+
+/** The phase ids of every checkpoint recorded for a feature ([] when none). */
+export function listCheckpointPhaseIds(installationRoot: string, featureSlug: string): string[] {
+  const dir = checkpointDir(installationRoot, featureSlug);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .map((name) => /^phase-(.+)\.json$/.exec(name))
+    .filter((m): m is RegExpExecArray => m !== null)
+    .map((m) => m[1]!);
+}
+
 export function writePhaseCheckpoint(
   installationRoot: string,
   record: PhaseCheckpointRecord,

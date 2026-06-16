@@ -9,6 +9,9 @@
 // FR-010); 2 usage/parse/validation (unknown subaction, missing arg, ungovernable
 // doc, unknown item).
 
+import { spawnSync } from 'node:child_process';
+import { appendFileSync } from 'node:fs';
+import { basename } from 'node:path';
 import { InstallationError } from '../config/errors.js';
 import { resolveInstallation } from '../config/installation.js';
 import { DocumentModelError } from '../document-model/types.js';
@@ -21,6 +24,8 @@ import { loadWorkflowDoc } from '../workflow/workflow-grammar.js';
 import { buildItemContext } from '../workflow/workflow-context.js';
 import type { EffectContext } from '../workflow/effects.js';
 import { applyTransition, previewTransition } from '../workflow/transition-engine.js';
+import { reenterDesign } from '../workflow/redesign.js';
+import { listCheckpointPhaseIds } from '../govern/checkpoint-state.js';
 import { WorkflowError, type Phase, type Transition, type WorkflowDoc } from '../workflow/workflow-types.js';
 import type { LoadOptions } from '../document-model/document.js';
 
@@ -188,6 +193,37 @@ function emitLink(itemId: string, field: 'design' | 'spec', value: string, apply
   );
 }
 
+function emitRedesign(itemId: string, designDoc: string, apply: boolean): void {
+  const r = resolve(itemId);
+  const featureSlug = r.item.spec !== null ? basename(r.item.spec) : null;
+  if (!apply) {
+    const checkpoints = featureSlug !== null ? listCheckpointPhaseIds(r.root, featureSlug) : [];
+    process.stdout.write(`workflow redesign ${itemId} (dry-run — writes nothing; use --apply)\n`);
+    process.stdout.write(`  * -> designing re-entry: open a new design-record revision (append-only)\n`);
+    process.stdout.write(`  stale ${checkpoints.length} downstream checkpoint(s); preserve the spec dir\n`);
+    return;
+  }
+  const result = reenterDesign({
+    installationRoot: r.root,
+    roadmapPath: r.roadmapPath,
+    item: itemId,
+    designDoc,
+    featureSlug,
+    hasSpec: r.item.spec !== null,
+    opts: r.opts,
+    at: new Date().toISOString(),
+  });
+  appendFileSync(r.journalPath, `workflow(redesign): ${itemId} re-entered designing (revision ${result.revision})\n`, 'utf8');
+  spawnSync('git', ['-C', r.root, 'add', '-A'], { encoding: 'utf8' });
+  spawnSync('git', ['-C', r.root, 'commit', '-m', `workflow(redesign): ${itemId} re-entered designing`], {
+    encoding: 'utf8',
+  });
+  process.stdout.write(`workflow redesign ${itemId}: re-entered designing\n`);
+  process.stdout.write(`  design record revision: ${result.revision}\n`);
+  process.stdout.write(`  staled checkpoints: ${result.staledCheckpoints.join(', ') || '(none)'}\n`);
+  process.stdout.write(`  spec dir preserved: ${result.specPreserved}\n`);
+}
+
 export async function runWorkflowCli(args: string[]): Promise<void> {
   const subaction = args[0];
   if (subaction === undefined || subaction.startsWith('--')) {
@@ -237,8 +273,17 @@ export async function runWorkflowCli(args: string[]): Promise<void> {
         emitLink(item, 'spec', dir, apply);
         return;
       }
+      case 'redesign': {
+        const item = positionals[0];
+        const doc = positionals[1];
+        if (item === undefined || doc === undefined) failUsage('redesign requires <item> <design-doc> positionals');
+        emitRedesign(item, doc, apply);
+        return;
+      }
       default:
-        failUsage(`unknown subaction '${subaction}' (known: status, can-enter, next, advance, link-design, link-spec)`);
+        failUsage(
+          `unknown subaction '${subaction}' (known: status, can-enter, next, advance, link-design, link-spec, redesign)`,
+        );
     }
   } catch (err) {
     if (err instanceof InstallationError) {
