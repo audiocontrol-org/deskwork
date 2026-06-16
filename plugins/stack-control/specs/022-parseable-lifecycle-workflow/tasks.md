@@ -140,9 +140,9 @@
 
 ## Phase 11: Polish & Cross-Cutting
 
-- [ ] T034 [P] Document the workflow surface (verbs + the governed `WORKFLOW.md` grammar) and update `quickstart.md` with validation evidence in `specs/022-parseable-lifecycle-workflow/quickstart.md`. (Analyze U2: include a self-hosting validation bullet — SC-008 — demonstrating the workflow verbs can drive the next feature's item through its phases.)
-- [ ] T035 [P] Reconcile linked backlog items: record disposition + post evidence for TASK-19 (governance-graduation-record delivered — closure is the operator's call after release verification, per the constitution's closure gate; do not self-close), note TASK-136 (this feature) and TASK-137 (`roadmap reparent` precedent); record dispositions
-- [ ] T036 Run the targeted Vitest suites plus the plugin test umbrella; record results and any pre-existing unrelated failures
+- [X] T034 [P] Document the workflow surface (verbs + the governed `WORKFLOW.md` grammar) and update `quickstart.md` with validation evidence in `specs/022-parseable-lifecycle-workflow/quickstart.md`. (Analyze U2: include a self-hosting validation bullet — SC-008 — demonstrating the workflow verbs can drive the next feature's item through its phases.)
+- [X] T035 [P] Reconcile linked backlog items: record disposition + post evidence for TASK-19 (governance-graduation-record delivered — closure is the operator's call after release verification, per the constitution's closure gate; do not self-close), note TASK-136 (this feature) and TASK-137 (`roadmap reparent` precedent); record dispositions
+- [X] T036 Run the targeted Vitest suites plus the plugin test umbrella; record results and any pre-existing unrelated failures
 
 ## Dependencies & Execution Order
 

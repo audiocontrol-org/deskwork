@@ -54,3 +54,38 @@ Run the full workflow surface in an installation nested below an adopter repo ro
 - `src/__tests__/workflow/design-gate.test.ts` — Scenario 4 exit-gate failures.
 - `src/__tests__/workflow/govern-record.test.ts` — Scenario 5 mode-keyed record reads.
 - `src/__tests__/workflow/installation-isolation-022.test.ts` — Scenario 6 (mirrors the existing isolation probe).
+- `src/__tests__/workflow/query-verbs.test.ts` — `status`/`can-enter`/`next` read-only determinism (US1).
+- `src/__tests__/workflow/workflow-md-source-of-truth.test.ts` — override-wins + fail-loud (US3).
+- `src/__tests__/workflow/effects.test.ts` — the fixed 7-verb vocabulary dispatch (US4).
+- `src/__tests__/workflow/advance-cli.test.ts` — the advance / link-design / link-spec CLI (US4).
+- `src/__tests__/workflow/redesign-reentry.test.ts` — the `* → designing` re-entry (US8).
+
+## The workflow surface (verbs + governed grammar)
+
+Read-only: `workflow status <item>`, `workflow can-enter <item> <stage>`,
+`workflow next <item>`. Mutating: `workflow advance <item> [--apply]`,
+`workflow link-design <item> <design-doc> [--apply]`,
+`workflow link-spec <item> <spec-dir> [--apply]`,
+`workflow redesign <item> <design-doc> [--apply]`. The phase vocabulary, derive
+predicates, gate criteria, and effect manifests are published in the governed,
+grammar-parsed `templates/WORKFLOW.md` (bundled default, per-install overridable at
+`<install-root>/.stack-control/WORKFLOW.md`); see `grammars/workflow.peg` for the
+heading-keyed grammar and `src/workflow/workflow-grammar.ts` for the binding. The
+`/stack-control:design` skill is the designing-phase frontend over a swappable
+backend.
+
+## Validation evidence
+
+- **Targeted workflow suite**: `npx vitest run src/__tests__/workflow` — all green
+  (derivation, gates, query verbs, source-of-truth, effects, atomic advance,
+  design gate, govern record, isolation probe, re-entry).
+- **Full plugin umbrella**: `npx vitest run` — 244 files / 1617 tests green
+  (the workflow feature is additive; the roadmap-grammar node-field extension is
+  backward-compatible with every prior suite).
+- **Self-hosting (SC-008)**: the verb set above is the complete surface needed to
+  author and drive an item through its phases without manual re-assembly — derive
+  the phase (`status`/`next`), open design (`link-design` + `/stack-control:design`),
+  author the spec (`link-spec` + `/stack-control:define`), advance the gated
+  bookkeeping (`advance --apply`), and re-enter design mid-stream (`redesign`).
+  The same surface drives the *next* feature's roadmap item, consistent with the
+  `define`/`extend`/`execute` front-door precedent.
