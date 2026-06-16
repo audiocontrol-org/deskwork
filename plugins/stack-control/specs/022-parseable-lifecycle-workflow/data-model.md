@@ -21,10 +21,11 @@ All artifacts are anchored inside the nearest-enclosing installation (the tree r
 
 ## Criterion
 
-- `kind`: `file-exists` | `section-present` | `count-gte` | `tasks-complete` | `tree-clean` | `pointer-set` | `record-converged` | `approval-marker`
+- `kind`: `file-exists` | `section-present` | `count-gte` | `tasks-complete` | `tree-clean` | `pointer-set` | `record-converged` | `approval-marker` | `node-marker`
 - `target`: string — the artifact / field / count the predicate reads
 - `param`: string | number — threshold or section name (when applicable)
 - Evaluates to a definite `boolean`; a `approval-marker` criterion reads a node field (D5), never a subjective judgment.
+- A `node-marker` criterion reads a recorded boolean fact on the roadmap node (e.g. `analyze-clean:`) — the same "operator/chain records the fact, the gate checks it" shape as `approval-marker`. The default `specifying → implementing` gate is a `node-marker` over `analyze-clean:` (D8 — spec audit-barrage parked; `record-converged` over the spec-govern record is the opt-in alternative).
 
 ## Effect (fixed v1 vocabulary)
 
@@ -37,6 +38,7 @@ All artifacts are anchored inside the nearest-enclosing installation (the tree r
 - `design:`: string (pointer) — the design-record path; set on `open-design` (derivation keys on this, D3)
 - `spec:`: string (pointer) — existing; the spec dir, set on `design-to-spec`
 - `design-approved:`: marker — the recorded operator approval that makes the design judgment gate mechanical (D5)
+- `analyze-clean:`: marker — the recorded `speckit-analyze`-clean fact set by the spec chain; the default `specifying → implementing` gate is a `node-marker` over this (D8; spec audit-barrage parked, spec-govern record is the opt-in alternative)
 
 ## GovernConvergenceRecord (mode-keyed; TASK-19, D8)
 

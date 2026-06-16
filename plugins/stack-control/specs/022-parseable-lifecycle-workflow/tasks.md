@@ -30,7 +30,7 @@
 - [ ] T004 Author the plugin-bundled default `plugins/stack-control/templates/WORKFLOW.md` — the canonical 7-phase lifecycle (captured→…→shipped) + side-states, with phase + transition units, derive predicates, gate criteria, and effect manifests, conforming to the grammar contract. (Analyze O1: either wire the `doc set-status-field` effect into a concrete transition here — e.g. a feature-README status-table update on `graduate` — or add an inline note that it is an available-but-unused v1 verb; do not leave its v1 use ambiguous.) (Workflow-policy 2026-06-16: the `specifying → implementing` exit gate is `speckit-analyze`-clean by DEFAULT; do NOT make a spec-govern convergence record a default-required criterion — spec audit-barrage is parked. The `governing → shipped` gate DOES require the impl-govern convergence record.)
 - [ ] T005 Implement WORKFLOW.md grammar binding via the `document-model` engine in `plugins/stack-control/src/workflow/workflow-grammar.ts` (parse phase + transition units; fail loud on malformed)
 - [ ] T006 Implement bundled-default + per-install override resolution for `WORKFLOW.md` (installation copy wins, else bundled) in `plugins/stack-control/src/workflow/workflow-grammar.ts`, reusing the existing override resolver
-- [ ] T007 Add the new roadmap node fields `design:` and `design-approved:` (alongside existing `spec:`) to the node reader in `plugins/stack-control/src/roadmap/roadmap-model.ts`
+- [ ] T007 Add the new roadmap node fields `design:`, `design-approved:`, and `analyze-clean:` (alongside existing `spec:`) to the node reader in `plugins/stack-control/src/roadmap/roadmap-model.ts`. (`analyze-clean:` is the `node-marker` the default `specifying → implementing` gate reads — analyze U1; spec audit-barrage parked.)
 
 **Checkpoint**: the engine can load a governed `WORKFLOW.md`, resolve overrides, and read all node fields.
 
@@ -82,7 +82,7 @@
 **Independent Test**: success → all effects in one trailing commit; injected fault → touched paths restored, nothing committed; dirty tree → refuse loud.
 
 - [ ] T018 [P] [US4] RED: atomicity fault-injection tests (fault at each effect position → restore touched paths, nothing committed; dirty advance-touched tree → refuse loud; success → single trailing commit) in `plugins/stack-control/src/__tests__/workflow/advance-atomic.test.ts`
-- [ ] T019 [P] [US4] RED: effect-vocabulary tests (each of the 7 verbs dispatches; `commit` always last; a non-vocabulary effect is rejected) in `plugins/stack-control/src/__tests__/workflow/effects.test.ts`
+- [ ] T019 [P] [US4] RED: effect-vocabulary tests (each of the 7 verbs dispatches; `commit` always last; a non-vocabulary effect is rejected; AND — FR-017 — a heavy/interactive verb (design backend, the Spec Kit chain, `execute`, `govern`, `release`) MUST be rejected as an effect: advance fires lightweight bookkeeping only) in `plugins/stack-control/src/__tests__/workflow/effects.test.ts`
 - [ ] T020 [US4] Implement the fixed effect-vocabulary dispatch (`roadmap-advance`, `roadmap-reconcile`, `journal-append`, `doc-set-status-field`, `workflow-link-design`, `workflow-link-spec`, `commit`) in `plugins/stack-control/src/workflow/effects.ts`
 - [ ] T021 [US4] Implement the transition engine: clean-tree precondition, validate-all, apply non-commit mutations, commit-last, restore-on-failure in `plugins/stack-control/src/workflow/transition-engine.ts`
 - [ ] T022 [US4] Implement `workflow advance` (dry-run preview + `--apply`) and the new `workflow link-design` / `workflow link-spec` verbs in `plugins/stack-control/src/subcommands/workflow.ts`
@@ -110,7 +110,7 @@
 
 - [ ] T027 [P] [US6] RED: govern-convergence-record tests (impl mode required for `governing→shipped`, passes only recorded ∧ converged, tasks-100%-but-no-record → gate unmet; spec mode written/read as an OPT-IN path; `specifying→implementing` default gate is analyze-clean, NOT spec-govern-required) in `plugins/stack-control/src/__tests__/workflow/govern-record.test.ts`
 - [ ] T028 [US6] Implement the symmetric mode-keyed govern-convergence record mechanism (write on convergence; installation-anchored; reuse the 021 checkpoint fingerprint shape) in `plugins/stack-control/src/govern/convergence-record.ts` — retain spec mode in the mechanism even though its gate is parked
-- [ ] T029 [US6] Wire the record into the impl govern emit site (required gate) and the opt-in `govern --mode spec` path in `plugins/stack-control/src/subcommands/govern.ts`, and into phase-derivation in `plugins/stack-control/src/workflow/phase-derivation.ts` (default `specifying→implementing` = analyze-clean; spec-govern gate opt-in)
+- [ ] T029 [US6] Wire the record into the impl govern emit site (required gate) and the opt-in `govern --mode spec` path in `plugins/stack-control/src/subcommands/govern.ts`, and into phase-derivation in `plugins/stack-control/src/workflow/phase-derivation.ts` (default `specifying→implementing` = the `analyze-clean:` node-marker, NOT the spec-govern record; spec-govern record is the opt-in alternative gate — analyze U1)
 
 ---
 
@@ -141,7 +141,7 @@
 ## Phase 11: Polish & Cross-Cutting
 
 - [ ] T034 [P] Document the workflow surface (verbs + the governed `WORKFLOW.md` grammar) and update `quickstart.md` with validation evidence in `specs/022-parseable-lifecycle-workflow/quickstart.md`. (Analyze U2: include a self-hosting validation bullet — SC-008 — demonstrating the workflow verbs can drive the next feature's item through its phases.)
-- [ ] T035 [P] Reconcile linked backlog items: close TASK-19 (governance-graduation-record delivered), note TASK-136 (this feature) and TASK-137 (`roadmap reparent` precedent); record dispositions
+- [ ] T035 [P] Reconcile linked backlog items: record disposition + post evidence for TASK-19 (governance-graduation-record delivered — closure is the operator's call after release verification, per the constitution's closure gate; do not self-close), note TASK-136 (this feature) and TASK-137 (`roadmap reparent` precedent); record dispositions
 - [ ] T036 Run the targeted Vitest suites plus the plugin test umbrella; record results and any pre-existing unrelated failures
 
 ## Dependencies & Execution Order
