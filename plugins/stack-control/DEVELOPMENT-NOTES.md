@@ -2,6 +2,34 @@
 
 ---
 
+## 2026-06-16: session-end re-invocation (no new work since prior close)
+
+**Goal:** Operator re-invoked `/stack-control:session-end` immediately after the prior
+close.
+
+**Accomplished:**
+- Honest sparse close: **0 new commits and 0 backlog items progressed** since the prior
+  session-end (`db9402b0`). The real session is recorded in the entry below it. Run as
+  asked (capture-only / empty-revisions discipline) rather than pre-skipped.
+
+**Didn't Work:**
+- N/A — no work this segment.
+
+**Course Corrections:**
+- [PROCESS] Bounded the boundary at the prior close (`--since db9402b0`) so the verb
+  derived the true delta (0) instead of re-deriving the whole session into a duplicate
+  entry.
+
+**Insights:**
+- A re-invoked session-end on an unchanged tree is correctly a no-op-but-recorded; the
+  bounded `--since` is what keeps it honest rather than duplicative.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 0
+  - (no commits this session)
+- Files changed: 0
+- Backlog touched: (none)
+
 ## 2026-06-16: Pick up unskippable-workflow-protocol → design+approve → author spec 025 to runnable
 
 **Goal:** Pick up `multi:feature/unskippable-workflow-protocol` (operator suspected it might
