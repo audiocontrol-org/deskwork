@@ -3,10 +3,10 @@ id: TASK-19
 title: >-
   Governance graduation has no on-disk record; roadmap reconcile falls back to
   tasks-completion as the shipped signal
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-11 00:55'
+updated_date: '2026-06-16 04:49'
 labels:
   - agent-found
   - 'type:gap'

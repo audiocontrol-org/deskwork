@@ -362,6 +362,7 @@ One-move backlog->roadmap promotion: given a backlog item, PROPOSE the roadmap n
 - depends-on: design:feature/roadmap-protocol, design:feature/document-primitives
 - part-of: multi:feature/lifecycle-industrialization
 - ref: TASK-136
+- closes: TASK-19
 The centerpiece: a PARSEABLE, DETERMINISTIC lifecycle workflow that drives items through phases — not just a WORKFLOW.md doc. Apply the roadmap-protocol pattern to the process itself: a governed grammar-parsed workflow document (phases, per-phase entry/exit gates, the verb/skill executing each phase) plus an engine that, given an item, knows its current phase, the gate conditions to advance, and deterministically drives it to the next phase or reports why it's blocked. The human-readable WORKFLOW.md is one rendering of the parseable source of truth. Reuses document-primitives (governed parseable-doc engine) + roadmap-protocol grammar/DAG reasoning. Promoted from TASK-136.
 
 ## impl:gap/roadmap-reparent-verb
