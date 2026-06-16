@@ -155,4 +155,16 @@ describe('US2 terminal side-states (T010)', () => {
       derivePhase(doc, base({ blocked: true, specPointer: 's', analyzeClean: true })),
     ).toEqual({ kind: 'side-state', id: 'blocked' });
   });
+
+  it('a node whose roadmap status is shipped derives the terminal shipped phase (operator-recorded fact, no convergence record needed)', () => {
+    const doc = loadWorkflowDoc(fixture().root);
+    // A historical feature: status shipped, spec set, tasks complete, but NO impl
+    // convergence record (it shipped under the old process). It must NOT mis-derive
+    // to 'governing' — the recorded shipped status is terminal (operator decision).
+    const r = derivePhase(
+      doc,
+      base({ status: 'shipped', specPointer: 's', analyzeClean: true, tasksComplete: true, implRecordConverged: false }),
+    );
+    expect(r).toEqual({ kind: 'phase', id: 'shipped' });
+  });
 });
