@@ -2,6 +2,55 @@
 
 ---
 
+## 2026-06-16: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 28
+  - chore(stack-control): link spec 024 to its node (close the lifecycle-compass orphan; designing -> specifying)
+  - docs(stack-control): clarify spec 024 — resolve 3 forks (intent vocab / FR-010 phased / FR-015 prereq-first)
+  - docs(stack-control): author spec 024 lifecycle-compass (define / speckit-specify)
+  - chore(stack-control): record design-approved on lifecycle-compass (operator approved 2026-06-16)
+  - design(stack-control): lifecycle-compass — make the workflow un-skippable
+  - Merge remote-tracking branch 'origin/main' into feature/stack-control
+  - chore(stack-control): close TASK-136 + TASK-19 via roadmap close-related (023 first use)
+  - feat(stack-control): mechanical terminal closure of resolved backlog items (023)
+  - chore: release v0.48.1
+  - Merge pull request #478 from audiocontrol-org/feature/stack-control
+  - Merge remote-tracking branch 'origin/main' into feature/stack-control
+  - chore(stack-control): disposition the parseable-lifecycle-workflow roadmap node (022)
+  - fix(stack-control): derive terminal phase from roadmap status:shipped (022)
+  - chore: release v0.48.0
+  - Merge pull request #477 from audiocontrol-org/feature/stack-control
+  - fix(stack-control): remediate cross-model governance findings (022 after_implement)
+  - docs(stack-control): workflow surface docs + backlog reconciliation (022 Phase 11, T034-T036)
+  - feat(stack-control): mid-stream re-design re-entry (022 Phase 10, T032-T033)
+  - test(stack-control): installation-isolation probe over the workflow surface (022 Phase 9, T030-T031)
+  - feat(stack-control): govern-convergence record gates the back half (022 Phase 8, T027-T029)
+  - feat(stack-control): designing phase + frontend over backend (022 Phase 7, T023-T026)
+  - feat(stack-control): atomic advance + fixed effect vocabulary (022 Phase 6, T018-T022)
+  - feat(stack-control): phase derivation + queryable MVP (022 Phase 3-4, T008-T015)
+  - feat(stack-control): workflow engine foundation (022 Phase 1-2, T001-T007)
+  - chore: release v0.47.0
+  - fix(release): bump-version regenerates root package-lock.json
+  - chore: sync root package-lock.json to v0.46.0
+  - Merge pull request #476 from audiocontrol-org/feature/stack-control
+- Files changed: 74
+- Backlog touched: TASK-136, TASK-137, TASK-139, TASK-19, TASK-83
+
 ## 2026-06-16: Analyze spec 022 → remediate findings to clean
 
 **Goal:** Pick up the prior session's runnable spec 022
