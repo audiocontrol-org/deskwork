@@ -70,8 +70,8 @@
 
 **Independent Test**: mutating a criterion in `WORKFLOW.md` changes the query answer; a malformed doc fails loud naming the violation.
 
-- [ ] T016 [P] [US3] RED: source-of-truth tests (a criterion edited in `WORKFLOW.md` changes engine behavior; malformed doc → fail loud, no default fallback) in `plugins/stack-control/src/__tests__/workflow/workflow-md-source-of-truth.test.ts`
-- [ ] T017 [US3] Harden grammar parsing fail-loud + the override-resolution edges surfaced by T016 in `plugins/stack-control/src/workflow/workflow-grammar.ts`
+- [X] T016 [P] [US3] RED: source-of-truth tests (a criterion edited in `WORKFLOW.md` changes engine behavior; malformed doc → fail loud, no default fallback) in `plugins/stack-control/src/__tests__/workflow/workflow-md-source-of-truth.test.ts`
+- [X] T017 [US3] Harden grammar parsing fail-loud + the override-resolution edges surfaced by T016 in `plugins/stack-control/src/workflow/workflow-grammar.ts`
 
 ---
 
@@ -81,11 +81,11 @@
 
 **Independent Test**: success → all effects in one trailing commit; injected fault → touched paths restored, nothing committed; dirty tree → refuse loud.
 
-- [ ] T018 [P] [US4] RED: atomicity fault-injection tests (fault at each effect position → restore touched paths, nothing committed; dirty advance-touched tree → refuse loud; success → single trailing commit) in `plugins/stack-control/src/__tests__/workflow/advance-atomic.test.ts`
-- [ ] T019 [P] [US4] RED: effect-vocabulary tests (each of the 7 verbs dispatches; `commit` always last; a non-vocabulary effect is rejected; AND — FR-017 — a heavy/interactive verb (design backend, the Spec Kit chain, `execute`, `govern`, `release`) MUST be rejected as an effect: advance fires lightweight bookkeeping only) in `plugins/stack-control/src/__tests__/workflow/effects.test.ts`
-- [ ] T020 [US4] Implement the fixed effect-vocabulary dispatch (`roadmap-advance`, `roadmap-reconcile`, `journal-append`, `doc-set-status-field`, `workflow-link-design`, `workflow-link-spec`, `commit`) in `plugins/stack-control/src/workflow/effects.ts`
-- [ ] T021 [US4] Implement the transition engine: clean-tree precondition, validate-all, apply non-commit mutations, commit-last, restore-on-failure in `plugins/stack-control/src/workflow/transition-engine.ts`
-- [ ] T022 [US4] Implement `workflow advance` (dry-run preview + `--apply`) and the new `workflow link-design` / `workflow link-spec` verbs in `plugins/stack-control/src/subcommands/workflow.ts`
+- [X] T018 [P] [US4] RED: atomicity fault-injection tests (fault at each effect position → restore touched paths, nothing committed; dirty advance-touched tree → refuse loud; success → single trailing commit) in `plugins/stack-control/src/__tests__/workflow/advance-atomic.test.ts`
+- [X] T019 [P] [US4] RED: effect-vocabulary tests (each of the 7 verbs dispatches; `commit` always last; a non-vocabulary effect is rejected; AND — FR-017 — a heavy/interactive verb (design backend, the Spec Kit chain, `execute`, `govern`, `release`) MUST be rejected as an effect: advance fires lightweight bookkeeping only) in `plugins/stack-control/src/__tests__/workflow/effects.test.ts`
+- [X] T020 [US4] Implement the fixed effect-vocabulary dispatch (`roadmap-advance`, `roadmap-reconcile`, `journal-append`, `doc-set-status-field`, `workflow-link-design`, `workflow-link-spec`, `commit`) in `plugins/stack-control/src/workflow/effects.ts`
+- [X] T021 [US4] Implement the transition engine: clean-tree precondition, validate-all, apply non-commit mutations, commit-last, restore-on-failure in `plugins/stack-control/src/workflow/transition-engine.ts`
+- [X] T022 [US4] Implement `workflow advance` (dry-run preview + `--apply`) and the new `workflow link-design` / `workflow link-spec` verbs in `plugins/stack-control/src/subcommands/workflow.ts`
 
 ---
 

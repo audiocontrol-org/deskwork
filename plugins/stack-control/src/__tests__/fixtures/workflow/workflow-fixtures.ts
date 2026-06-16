@@ -5,6 +5,7 @@
 // and the gate evaluator read. The nested-adopter variant (US7) reuses the
 // shared isolation harness.
 
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -39,7 +40,16 @@ export interface WorkflowFixture {
   writeRecord(rec: Omit<GovernConvergenceRecord, 'anchorRoot'>): string;
   /** Write an arbitrary file under the installation; returns the abs path. */
   write(rel: string, content: string): string;
+  /** Run a git command in the installation root; throws on non-zero. */
+  git(args: readonly string[]): string;
+  /** Stage everything and commit (the installation must be git-initialised). */
+  commitAll(message: string): void;
   cleanup(): void;
+}
+
+export interface FixtureOptions {
+  /** Initialise a git repo at the installation root (hermetic — no signing). */
+  readonly git?: boolean;
 }
 
 function nodeMarkdown(node: FixtureNode): string {
@@ -59,7 +69,10 @@ export function roadmapMarkdown(nodes: readonly FixtureNode[]): string {
 }
 
 /** A flat installation fixture (a tmp dir owning `.stack-control/config.yaml`). */
-export function makeWorkflowFixture(nodes: readonly FixtureNode[] = []): WorkflowFixture {
+export function makeWorkflowFixture(
+  nodes: readonly FixtureNode[] = [],
+  options: FixtureOptions = {},
+): WorkflowFixture {
   const root = mkdtempSync(join(tmpdir(), 'wf-fixture-'));
   mkdirSync(join(root, '.stack-control'), { recursive: true });
   writeFileSync(join(root, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
@@ -76,10 +89,29 @@ export function makeWorkflowFixture(nodes: readonly FixtureNode[] = []): Workflo
     return abs;
   };
 
+  const git = (args: readonly string[]): string => {
+    const r = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr ?? ''}`);
+    return r.stdout ?? '';
+  };
+
+  if (options.git === true) {
+    git(['init', '-q']);
+    git(['config', 'user.email', 'wf@example.invalid']);
+    git(['config', 'user.name', 'wf-fixture']);
+    git(['config', 'commit.gpgsign', 'false']);
+    git(['config', 'tag.gpgsign', 'false']);
+  }
+
   const fixture: WorkflowFixture = {
     root,
     roadmapPath,
     opts,
+    git,
+    commitAll: (message) => {
+      git(['add', '-A']);
+      git(['commit', '-q', '-m', message]);
+    },
     setRoadmap: (next) => writeFileSync(roadmapPath, roadmapMarkdown(next), 'utf8'),
     writeSpecTasks: (specDirRel, complete) => {
       const box = complete ? 'X' : ' ';
