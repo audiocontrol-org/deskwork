@@ -243,7 +243,13 @@ export interface Verdict {
   readonly outcome: VerdictOutcome;
   /** The item's derived phase (reused from 022 derivation). */
   readonly currentPhase: DerivedPhase;
-  /** The phase the intent maps to; null in orientation mode / off-rail with no intent. */
+  /**
+   * The phase the intent maps to. Null in three valid cases: orientation mode (no
+   * intent), off-rail with no resolvable node, AND a phase-NEUTRAL intent (e.g.
+   * `session-end`) — which yields a successful `on-course` verdict with a null
+   * `intentPhase` (AUDIT-BARRAGE-codex-02). Null is therefore NOT an error sentinel;
+   * read `outcome` for the verdict, never `intentPhase === null`.
+   */
   readonly intentPhase: PhaseId | null;
   /** The single legitimate next phase (null at a terminal phase / side-state). */
   readonly legitimateNext: PhaseId | null;
@@ -255,8 +261,9 @@ export interface Verdict {
   readonly exitCode: number;
 }
 
-/** The action an agent declares (024 data-model § Intent) — a `--intent` value mapped to a phase. */
-export interface Intent {
-  readonly name: string;
-  readonly phase: PhaseId;
-}
+// 024 data-model § Intent: the realized intent contract is the DISCRIMINATED
+// `IntentResolution` in `intent-vocabulary.ts` (`kind: 'phase' | 'neutral'`, with
+// `phase: null` for a phase-neutral intent such as `session-end`). A phase-only
+// `Intent { name; phase }` type is intentionally NOT published here — it would
+// contradict the accepted phase-neutral inputs (AUDIT-BARRAGE-codex-01). Consumers
+// import `IntentResolution`, not a phase-only shape.
