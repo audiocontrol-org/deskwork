@@ -27,7 +27,7 @@
 
 **Purpose**: shared seams every story reads. MUST complete before the user stories.
 
-- [ ] T004 Author the plugin-bundled default `plugins/stack-control/templates/WORKFLOW.md` — the canonical 7-phase lifecycle (captured→…→shipped) + side-states, with phase + transition units, derive predicates, gate criteria, and effect manifests, conforming to the grammar contract
+- [ ] T004 Author the plugin-bundled default `plugins/stack-control/templates/WORKFLOW.md` — the canonical 7-phase lifecycle (captured→…→shipped) + side-states, with phase + transition units, derive predicates, gate criteria, and effect manifests, conforming to the grammar contract. (Analyze O1: either wire the `doc set-status-field` effect into a concrete transition here — e.g. a feature-README status-table update on `graduate` — or add an inline note that it is an available-but-unused v1 verb; do not leave its v1 use ambiguous.)
 - [ ] T005 Implement WORKFLOW.md grammar binding via the `document-model` engine in `plugins/stack-control/src/workflow/workflow-grammar.ts` (parse phase + transition units; fail loud on malformed)
 - [ ] T006 Implement bundled-default + per-install override resolution for `WORKFLOW.md` (installation copy wins, else bundled) in `plugins/stack-control/src/workflow/workflow-grammar.ts`, reusing the existing override resolver
 - [ ] T007 Add the new roadmap node fields `design:` and `design-approved:` (alongside existing `spec:`) to the node reader in `plugins/stack-control/src/roadmap/roadmap-model.ts`
@@ -56,7 +56,7 @@
 
 - [ ] T011 [P] [US1] RED: gate-evaluation tests (each criterion kind → definite true/false; unmet enumeration M of N; judgment criterion reads the `design-approved:` node marker) in `plugins/stack-control/src/__tests__/workflow/gate-eval.test.ts`
 - [ ] T012 [US1] Implement criterion predicates + unmet enumeration in `plugins/stack-control/src/workflow/gate-eval.ts`
-- [ ] T013 [P] [US1] RED: query-verb tests (`status`/`can-enter`/`next` output + read-only determinism) in `plugins/stack-control/src/__tests__/workflow/query-verbs.test.ts`
+- [ ] T013 [P] [US1] RED: query-verb tests (`status`/`can-enter`/`next` output + read-only determinism; AND — analyze U1 — assert an unmet gate is REPORTED, not enforced as a refusal: v1 gates never block) in `plugins/stack-control/src/__tests__/workflow/query-verbs.test.ts`
 - [ ] T014 [US1] Implement `workflow status` and `workflow can-enter` (read-only) in `plugins/stack-control/src/subcommands/workflow.ts`
 - [ ] T015 [US1] Implement `workflow next` (derive phase, name next transition + WORK skill, preview effects) in `plugins/stack-control/src/subcommands/workflow.ts`
 
@@ -140,7 +140,7 @@
 
 ## Phase 11: Polish & Cross-Cutting
 
-- [ ] T034 [P] Document the workflow surface (verbs + the governed `WORKFLOW.md` grammar) and update `quickstart.md` with validation evidence in `specs/022-parseable-lifecycle-workflow/quickstart.md`
+- [ ] T034 [P] Document the workflow surface (verbs + the governed `WORKFLOW.md` grammar) and update `quickstart.md` with validation evidence in `specs/022-parseable-lifecycle-workflow/quickstart.md`. (Analyze U2: include a self-hosting validation bullet — SC-008 — demonstrating the workflow verbs can drive the next feature's item through its phases.)
 - [ ] T035 [P] Reconcile linked backlog items: close TASK-19 (governance-graduation-record delivered), note TASK-136 (this feature) and TASK-137 (`roadmap reparent` precedent); record dispositions
 - [ ] T036 Run the targeted Vitest suites plus the plugin test umbrella; record results and any pre-existing unrelated failures
 

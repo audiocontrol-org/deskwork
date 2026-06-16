@@ -274,6 +274,7 @@ Design also happens AFTER specifying / implementing (the `/frontend-design` rule
 
 ## Assumptions
 
+- **Terminology**: "stage" and "phase" are used interchangeably throughout this spec for the same lifecycle unit (a `phase` unit in `WORKFLOW.md`). The query verb `workflow can-enter {item} {stage}` and the derived "current phase" refer to the same concept; there is no distinction between a stage and a phase.
 - The roadmap node remains the unit; the `roadmap` node-reader is consumed by the `workflow` family rather than reimplemented (ratified decision 1/2).
 - Existing `tasks.md` phases and the 021 checkpoint / staleness machinery remain the implementation substrate for phase-scope and freshness; this feature layers phase-awareness and the governed gates on top rather than replacing them.
 - The document-primitives grammar engine (`ROADMAP.md`, `DESIGN-INBOX.md`) is reused for `WORKFLOW.md` (third use), not built anew.
