@@ -120,8 +120,8 @@
 
 **Independent Test**: in a nested adopter-repo fixture, a probe asserts every authored artifact path resolves inside the installation tree; no-installation → refuse loud.
 
-- [ ] T030 [P] [US7] RED: installation-isolation probe over the full workflow surface (WORKFLOW.md override, design record, govern-convergence record, effect bookkeeping) in `plugins/stack-control/src/__tests__/workflow/installation-isolation-022.test.ts`, mirroring `installation-isolation-probe.test.ts`
-- [ ] T031 [US7] Make every workflow authored-path resolve through the installation anchor (and refuse loud with no enclosing installation) across `plugins/stack-control/src/workflow/` and `plugins/stack-control/src/subcommands/workflow.ts`
+- [X] T030 [P] [US7] RED: installation-isolation probe over the full workflow surface (WORKFLOW.md override, design record, govern-convergence record, effect bookkeeping) in `plugins/stack-control/src/__tests__/workflow/installation-isolation-022.test.ts`, mirroring `installation-isolation-probe.test.ts`
+- [X] T031 [US7] Make every workflow authored-path resolve through the installation anchor (and refuse loud with no enclosing installation) across `plugins/stack-control/src/workflow/` and `plugins/stack-control/src/subcommands/workflow.ts`
 
 ---
 
