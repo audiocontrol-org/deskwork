@@ -2,21 +2,63 @@
 
 ---
 
-## 2026-06-16: <!-- session title -->
+## 2026-06-16: Execute 022 → ship 022/023 → discover & design the un-skippable workflow (compass)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Execute the runnable spec 022 (`parseable-lifecycle-workflow`) via
+`/stack-control:execute`, then drive whatever the dogfood surfaced.
 
 **Accomplished:**
-- <!-- compose -->
+- **Shipped 022** end-to-end via `/stack-control:execute` → `/speckit-implement`:
+  all 36 tasks TDD (RED→GREEN) — the workflow engine (phase derivation, queryable
+  gates, governed `WORKFLOW.md`, atomic advance, designing-phase frontend,
+  govern-convergence record, isolation probe, re-design re-entry). Umbrella 1632
+  tests green. PR #477 merged; released v0.48.0.
+- **Governance under TASK-83:** the `after_implement` hook fired but the payload
+  assembler FATAL'd on TASK-83 → ran cross-model `audit-barrage` directly;
+  remediated the cross-model-agreed findings TDD-first (install-anchoring,
+  redesign git atomicity, `anchorRoot` validation); scoped 3 mediums to backlog
+  (TASK-139/140/141).
+- **Terminal-status derivation fix** (roadmap `status: shipped` → terminal phase) +
+  022 roadmap disposition; PR #478 merged; released **v0.48.1**; verified live
+  through the installed plugin.
+- **Shipped 023** `terminal-closure` (the `roadmap close-related` verb) through
+  define→execute; used it *in anger* to close TASK-136 + TASK-19; PR #479 merged.
+- **Designed + spec'd `lifecycle-compass` (024)** to make the workflow un-skippable:
+  approved design record, authored + clarified spec (3 forks resolved), captured on
+  the roadmap. Stopped at the clarified spec (`specifying`) for a fresh-context
+  pickup next session.
 
 **Didn't Work:**
-- <!-- compose -->
+- Governance can't run normally on this repo: `govern --mode implement` FATALs
+  "feature not found" on the session-pinned branch (branch slug ≠ spec slug), and
+  TASK-83 crashes the assembler on `/stack-control:*` backtick spans. So 022/023
+  shipped without governance mechanically running.
+- Built spec 023 **entirely off-rail** (no roadmap node) — the workflow was blind;
+  the orphan was caught only by a manual `reconcile`. **The workflow is useless
+  because it is skippable** (FR-010 report-only). This was the crippling failure.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Shipped 023 with no roadmap node; capture must be the *mandatory*,
+  *mechanical* first step — not something the agent remembers.
+- [PROCESS] Mis-framed the crippling failure twice (the govern dead-end; "add gates
+  at the verbs") before landing on the operator's principle: **compliance must be
+  mechanical — not reliant on operator vigilance OR agent discipline.**
+- [PROCESS] Authored spec 024 via `speckit-specify` without setting the node's
+  `spec:` pointer → another orphan (the manual-capture gap, live). Fixed via
+  `link-spec`; folded into 024 FR-008.
 
 **Insights:**
-- <!-- compose -->
+- The 022 workflow *enforces nothing* (FR-010 report-only) → it is a passive
+  observer, not a driver: it cannot pull work onto the rail (orphans) nor push it
+  off the end (govern unreachable).
+- The fix is the operator's **compass** primitive: orient + diff
+  intended-action-vs-phase → verdict + exit code, **embedded as the precondition of
+  every lifecycle skill** so an agent following its skills cannot skip a step. One
+  enforcement brain, every surface consults it.
+- A gate cannot enforce a step that cannot run — govern's feature-resolution +
+  TASK-83 are the *first* phases of 024.
+- Capture must be fused to authoring (spec → node atomically); `reconcile` should
+  defer to the workflow's derived phase, not tasks-completion.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 28
@@ -49,7 +91,13 @@
   - chore: sync root package-lock.json to v0.46.0
   - Merge pull request #476 from audiocontrol-org/feature/stack-control
 - Files changed: 74
-- Backlog touched: TASK-136, TASK-137, TASK-139, TASK-19, TASK-83
+- Backlog touched: TASK-136 (Done), TASK-19 (Done), TASK-83 / TASK-137 / TASK-139 (To Do — referenced)
+- Boundary note: the `88f9935f..HEAD` range includes 3 merge commits (main→branch
+  syncs after PRs #477/#478/#479) and 3 release commits (v0.47.0/v0.48.0/v0.48.1)
+  cross-merged from main — the substantive work is the 022 + 023 features and the
+  024 compass design/spec; the count is not 28 net-new feature commits.
+- PRs merged this session: #477 (022), #478 (terminal fix + disposition), #479
+  (023 close mechanism + the 024 compass design/spec).
 
 ## 2026-06-16: Analyze spec 022 → remediate findings to clean
 
