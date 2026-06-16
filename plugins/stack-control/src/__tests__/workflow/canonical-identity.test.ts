@@ -72,6 +72,41 @@ describe('024 FR-013 — canonical identity resolver', () => {
   });
 });
 
+describe('024 US6 — compass / govern / close-related agree on one identity', () => {
+  it('the canonical nodeId IS the roadmap node id close-related and the compass key by', () => {
+    const f = fixture();
+    collisionRoadmap(f);
+    const model = loadRoadmap(f.roadmapPath, f.opts);
+    for (const item of model.items) {
+      // close-related resolves `model.byId.get(<id>)`; the compass resolves the
+      // item the same way; both must equal the canonical nodeId (US6.2).
+      expect(resolveIdentity(f.root, item).nodeId).toBe(item.identifier);
+      expect(model.byId.get(resolveIdentity(f.root, item).nodeId)).toBe(item);
+    }
+  });
+});
+
+describe('024 FR-013 — legacy migration (read-side fail-safe)', () => {
+  it('a record under the OLD basename key is not read as the node converged (gate stays closed)', () => {
+    const f = fixture();
+    f.setRoadmap([{ identifier: 'multi:feature/a', status: 'in-flight', spec: 'specs/010-compass' }]);
+    const model = loadRoadmap(f.roadmapPath, f.opts);
+    const a = model.byId.get('multi:feature/a')!;
+    // A stale record keyed by the legacy spec-dir basename ('010-compass').
+    f.writeRecord({
+      version: 1,
+      mode: 'impl',
+      item: '010-compass',
+      scopeFingerprint: 'legacy',
+      converged: true,
+      recordedAt: '2026-06-16T00:00:00.000Z',
+    });
+    // The node reads NOT converged (no fabrication from the stale key); the next
+    // govern run re-establishes it under the canonical node id (fail-safe).
+    expect(buildItemContext(f.root, a).inputs.implRecordConverged).toBe(false);
+  });
+});
+
 describe('024 FR-013 — convergence record keyed by canonical identity', () => {
   it('governing item A does not mark a basename-sharing item B converged (SC-005)', () => {
     const f = fixture();

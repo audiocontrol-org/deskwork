@@ -78,10 +78,10 @@ feature through the one canonical identity (US6 acceptance over the Phase-2 reso
 **Independent Test**: two specs sharing a spec-dir basename never collide on any identity-keyed
 artifact; compass, govern, and `close-related` agree on the same `nodeId`.
 
-- [ ] T011 [P] [US6] RED: `src/__tests__/workflow/canonical-identity.test.ts` — governing item A does not mark item B converged when their spec dirs share a basename (SC-005). Seen to fail (passes once Phase-2 re-key + this path land).
-- [ ] T012 [P] [US6] RED: `close-related` resolves its target through `resolveIdentity` and agrees with compass + govern on `nodeId` (US6.2). Seen to fail.
-- [ ] T013 [US6] Route `close-related` (023) through `resolveIdentity` in `src/subcommands/roadmap.ts`. GREEN T012.
-- [ ] T014 [US6] Legacy migration (read-side, per spec Assumptions): a convergence record written under the old basename key is re-derived under the canonical key on next govern; a record resolvable under neither key is reported, never fabricated. Test the read-side fallback in `canonical-identity.test.ts`.
+- [X] T011 [P] [US6] RED: `src/__tests__/workflow/canonical-identity.test.ts` — governing item A does not mark item B converged when their spec dirs share a basename (SC-005). Seen to fail (passes once Phase-2 re-key + this path land).
+- [X] T012 [P] [US6] RED: `close-related` resolves its target through `resolveIdentity` and agrees with compass + govern on `nodeId` (US6.2). Seen to fail.
+- [X] T013 [US6] Route `close-related` (023) through `resolveIdentity` in `src/subcommands/roadmap.ts`. GREEN T012.
+- [X] T014 [US6] Legacy migration (read-side, per spec Assumptions): a convergence record written under the old basename key is re-derived under the canonical key on next govern; a record resolvable under neither key is reported, never fabricated. Test the read-side fallback in `canonical-identity.test.ts`.
 
 **Checkpoint**: one identity across all four subsystems; basename collision class eliminated.
 
@@ -96,13 +96,13 @@ verdict + gating exit code over the existing 022 derivation.
 single legitimate next action + gate state; `--intent` returns on-course/ahead/behind/off-rail
 with the matching exit code, deterministically and writing nothing.
 
-- [ ] T015 [P] [US1] RED: `src/__tests__/workflow/intent-vocabulary.test.ts` — vocabulary is total over `DEFAULT_PHASES` work skills; a known intent maps to its `work:` phase; an unknown intent throws (exit 2); names the known set (FR-004, contracts/intent-vocabulary.md). Seen to fail.
-- [ ] T016 [US1] Create `src/workflow/intent-vocabulary.ts` — build the fixed `Map<intent, phaseId>` by inverting `phase.work` from the governed doc + the fixed transition aliases; load-time error if a phase work-skill is unmappable. GREEN T015.
-- [ ] T017 [P] [US1] RED: `src/__tests__/workflow/compass.test.ts` — the verdict matrix (item-state × intent): on-course / ahead (names first skipped step) / behind / off-rail (no node / side-state); `skippedStep !== null ⇔ ahead` (SC-001). Seen to fail.
-- [ ] T018 [US1] Create `src/workflow/compass.ts` — pure `computeVerdict(doc, currentPhase, intentPhase, hasNode, sideState) → Verdict` over `derivePhase` + the doc's ordered phase ordinals (R1). GREEN T017.
-- [ ] T019 [P] [US1] RED: `src/__tests__/workflow/compass-cli.test.ts` — exit codes (on-course/behind → 0; ahead → non-zero; off-rail → non-zero; unknown intent → 2); read-only/determinism (identical output + clean tree on re-run); `--json` shape (contracts/compass-cli.md). Seen to fail.
-- [ ] T020 [US1] Add the `compass` subaction to `src/subcommands/workflow.ts` — orientation mode (no `--intent`) + intent-diff mode; reuse the existing `resolve`/`failUsage`/exit conventions; emit `--json`. GREEN T019.
-- [ ] T021 [US1] Off-rail orphan detection: an item with no roadmap node (orphan spec dir) → `off-rail` naming the missing node, wired through `resolveIdentity` / the derivation context (acceptance US1.3).
+- [X] T015 [P] [US1] RED: `src/__tests__/workflow/intent-vocabulary.test.ts` — vocabulary is total over `DEFAULT_PHASES` work skills; a known intent maps to its `work:` phase; an unknown intent throws (exit 2); names the known set (FR-004, contracts/intent-vocabulary.md). Seen to fail.
+- [X] T016 [US1] Create `src/workflow/intent-vocabulary.ts` — build the fixed `Map<intent, phaseId>` by inverting `phase.work` from the governed doc + the fixed transition aliases; load-time error if a phase work-skill is unmappable. GREEN T015.
+- [X] T017 [P] [US1] RED: `src/__tests__/workflow/compass.test.ts` — the verdict matrix (item-state × intent): on-course / ahead (names first skipped step) / behind / off-rail (no node / side-state); `skippedStep !== null ⇔ ahead` (SC-001). Seen to fail.
+- [X] T018 [US1] Create `src/workflow/compass.ts` — pure `computeVerdict(doc, currentPhase, intentPhase, hasNode, sideState) → Verdict` over `derivePhase` + the doc's ordered phase ordinals (R1). GREEN T017.
+- [X] T019 [P] [US1] RED: `src/__tests__/workflow/compass-cli.test.ts` — exit codes (on-course/behind → 0; ahead → non-zero; off-rail → non-zero; unknown intent → 2); read-only/determinism (identical output + clean tree on re-run); `--json` shape (contracts/compass-cli.md). Seen to fail.
+- [X] T020 [US1] Add the `compass` subaction to `src/subcommands/workflow.ts` — orientation mode (no `--intent`) + intent-diff mode; reuse the existing `resolve`/`failUsage`/exit conventions; emit `--json`. GREEN T019.
+- [X] T021 [US1] Off-rail orphan detection: an item with no roadmap node (orphan spec dir) → `off-rail` naming the missing node, wired through `resolveIdentity` / the derivation context (acceptance US1.3).
 
 **Checkpoint**: the compass is a usable orientation + diff primitive (MVP), independent of any skill embedding.
 

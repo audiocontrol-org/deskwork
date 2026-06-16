@@ -22,6 +22,9 @@ import { describeCriterion, evaluateGate, type GateContext } from '../workflow/g
 import { derivePhase } from '../workflow/phase-derivation.js';
 import { loadWorkflowDoc } from '../workflow/workflow-grammar.js';
 import { buildItemContext } from '../workflow/workflow-context.js';
+import { computeVerdict, legitimateNextPhase } from '../workflow/compass.js';
+import { knownIntents, resolveIntent } from '../workflow/intent-vocabulary.js';
+import type { DerivedPhase } from '../workflow/workflow-types.js';
 import type { EffectContext } from '../workflow/effects.js';
 import { applyTransition, previewTransition } from '../workflow/transition-engine.js';
 import { reenterDesign } from '../workflow/redesign.js';
@@ -138,6 +141,88 @@ function emitNext(itemId: string): void {
   t.effects.forEach((e, i) => process.stdout.write(`    ${i + 1}. ${e.verb}\n`));
 }
 
+/** Resolve the installation + doc + roadmap item for the compass; a MISSING item is null (orphan → off-rail), never a usage error. */
+function resolveForCompass(itemId: string): { root: string; doc: WorkflowDoc; item: WorkItem | null } {
+  const inst = resolveInstallation(process.cwd());
+  const doc = loadWorkflowDoc(inst.root);
+  const opts = grammarOptsForRoot(inst.root);
+  const model = loadRoadmap(inst.resolved.roadmap, opts);
+  return { root: inst.root, doc, item: model.byId.get(itemId) ?? null };
+}
+
+/** Derive the item's current phase; a no-node item is at the pre-node entry phase. */
+function currentPhaseFor(root: string, doc: WorkflowDoc, item: WorkItem | null): DerivedPhase {
+  if (item === null) return { kind: 'phase', id: doc.phases[0]!.id };
+  const { inputs } = buildItemContext(root, item);
+  return derivePhase(doc, inputs);
+}
+
+/** Orientation mode (no --intent, FR-001): the phase + the single legitimate next action + gate state. Exit 0. */
+function emitCompassOrientation(
+  doc: WorkflowDoc,
+  itemId: string,
+  currentPhase: DerivedPhase,
+  hasNode: boolean,
+  gate: GateContext | null,
+): void {
+  process.stdout.write(`workflow compass ${itemId}\n`);
+  if (!hasNode) {
+    process.stdout.write(
+      `  off-rail: no roadmap node for '${itemId}' — capture it first (the front door creates the node)\n`,
+    );
+    return;
+  }
+  if (currentPhase.kind === 'side-state') {
+    process.stdout.write(`  current phase: ${currentPhase.id} (terminal side-state)\n`);
+    process.stdout.write(`  no legitimate forward move; induct back to resume\n`);
+    return;
+  }
+  const p = phaseById(doc, currentPhase.id);
+  if (p === undefined) throw new WorkflowError(`derived phase '${currentPhase.id}' is not declared in WORKFLOW.md`);
+  process.stdout.write(`  current phase: ${currentPhase.id}\n`);
+  process.stdout.write(`  work: ${p.work}\n`);
+  const nextId = legitimateNextPhase(doc, currentPhase.id);
+  const t = forwardTransition(doc, p);
+  if (nextId === null || t === undefined) {
+    process.stdout.write(`  legitimate next action: (none — terminal phase '${currentPhase.id}')\n`);
+  } else {
+    process.stdout.write(`  legitimate next action: ${t.codename} (${t.from} → ${t.to})\n`);
+  }
+  if (gate !== null) reportGate('exit gate', evaluateGate(p.exit, gate));
+}
+
+/** `workflow compass <item> [--intent <action>] [--json]` (024 US1) — orient + diff; the verdict is the exit code. */
+function emitCompass(itemId: string, intentName: string | undefined, json: boolean): void {
+  const { root, doc, item } = resolveForCompass(itemId);
+  const hasNode = item !== null;
+  const currentPhase = currentPhaseFor(root, doc, item);
+
+  if (intentName === undefined) {
+    const gate = item !== null ? buildItemContext(root, item).gate : null;
+    emitCompassOrientation(doc, itemId, currentPhase, hasNode, gate);
+    return;
+  }
+
+  const resolved = resolveIntent(doc, intentName);
+  if (resolved === null) {
+    failUsage(`unknown intent '${intentName}' (known: ${knownIntents(doc).join(', ')})`);
+  }
+  const verdict = computeVerdict({ doc, currentPhase, intent: resolved, hasNode });
+  if (json) {
+    process.stdout.write(`${JSON.stringify(verdict, null, 2)}\n`);
+  } else {
+    process.stdout.write(`workflow compass ${itemId}\n`);
+    process.stdout.write(`  current phase: ${currentPhase.id}${currentPhase.kind === 'side-state' ? ' (terminal side-state)' : ''}\n`);
+    process.stdout.write(
+      `  intent: ${intentName}${resolved.phase !== null ? ` (phase ${resolved.phase})` : ' (finishing)'}\n`,
+    );
+    process.stdout.write(`  verdict: ${verdict.outcome}\n`);
+    if (verdict.skippedStep !== null) process.stdout.write(`  skipped step: ${verdict.skippedStep}\n`);
+    process.stdout.write(`  → ${verdict.reason}\n`);
+  }
+  if (verdict.exitCode !== 0) process.exit(verdict.exitCode);
+}
+
 /** Build the effect context for a forward transition out of the current phase. */
 function effectContextFor(r: Resolved, transition: Transition, extra: Record<string, string>): EffectContext {
   const message = `workflow(${transition.codename}): ${r.item.identifier} ${transition.from} -> ${transition.to}`;
@@ -238,7 +323,7 @@ function emitRedesign(itemId: string, designDoc: string, apply: boolean): void {
 export async function runWorkflowCli(args: string[]): Promise<void> {
   const subaction = args[0];
   if (subaction === undefined || subaction.startsWith('--')) {
-    failUsage('a subaction is required (usage: workflow <status|can-enter|next|advance|link-design|link-spec> ...)');
+    failUsage('a subaction is required (usage: workflow <status|can-enter|next|compass|advance|link-design|link-spec> ...)');
   }
   const rest = args.slice(1);
   const apply = rest.includes('--apply');
@@ -262,6 +347,17 @@ export async function runWorkflowCli(args: string[]): Promise<void> {
         const item = positionals[0];
         if (item === undefined) failUsage('next requires an <item> positional');
         emitNext(item);
+        return;
+      }
+      case 'compass': {
+        const item = positionals[0];
+        if (item === undefined) failUsage('compass requires an <item> positional');
+        const intentIdx = rest.indexOf('--intent');
+        const intentName = intentIdx >= 0 ? rest[intentIdx + 1] : undefined;
+        if (intentIdx >= 0 && (intentName === undefined || intentName.startsWith('--'))) {
+          failUsage('--intent requires a value (an action name)');
+        }
+        emitCompass(item, intentName, rest.includes('--json'));
         return;
       }
       case 'advance': {
@@ -293,7 +389,7 @@ export async function runWorkflowCli(args: string[]): Promise<void> {
       }
       default:
         failUsage(
-          `unknown subaction '${subaction}' (known: status, can-enter, next, advance, link-design, link-spec, redesign)`,
+          `unknown subaction '${subaction}' (known: status, can-enter, next, compass, advance, link-design, link-spec, redesign)`,
         );
     }
   } catch (err) {
