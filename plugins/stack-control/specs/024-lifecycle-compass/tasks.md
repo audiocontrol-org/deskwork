@@ -163,10 +163,10 @@ prints the unmet criteria); a met gate proceeds.
 
 ## Phase 9: Polish & Cross-Cutting
 
-- [ ] T035 [P] FR-014 honest-boundary documentation: record in `README.md` / the relevant SKILL.md that enforcement binds the agent (which follows its skills), not a human with raw `git`/`gh`. Do not overclaim.
-- [ ] T036 [P] Line-cap audit (Principle VI): confirm the FR-012 fix did not push `src/govern/incremental-audit.ts` or `src/govern/payload-implement.ts` past 300–500 lines (TASK-48 already flags payload-implement); refactor the touched module if it crossed.
-- [ ] T037 Run the full `npm test` (Vitest) suite green + walk `quickstart.md` scenarios 1–5 (scenario 6 is post-release per the closure rule).
-- [ ] T038 [P] Update the workflow surface docs (the `workflow` verb help / any README workflow section) to document the new `compass` subaction + its exit codes.
+- [X] T035 [P] FR-014 honest-boundary documentation: record in `README.md` / the relevant SKILL.md that enforcement binds the agent (which follows its skills), not a human with raw `git`/`gh`. Do not overclaim.
+- [X] T036 [P] Line-cap audit (Principle VI): confirm the FR-012 fix did not push `src/govern/incremental-audit.ts` or `src/govern/payload-implement.ts` past 300–500 lines (TASK-48 already flags payload-implement); refactor the touched module if it crossed.
+- [X] T037 Run the full `npm test` (Vitest) suite green + walk `quickstart.md` scenarios 1–5 (scenario 6 is post-release per the closure rule).
+- [X] T038 [P] Update the workflow surface docs (the `workflow` verb help / any README workflow section) to document the new `compass` subaction + its exit codes.
 
 ---
 

@@ -8,7 +8,11 @@
 // govern.ts / protocol.ts do not grow further past the line cap (finding C1).
 
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, join, relative } from 'node:path';
+import type { Installation } from '../config/types.js';
+import { loadRoadmap } from '../roadmap/roadmap-model.js';
+import { grammarOptsForRoot } from '../subcommands/document-verb-shared.js';
+import { resolveIdentityFromSpecDir } from '../workflow/identity.js';
 import { GovernProtocolError } from './protocol.js';
 
 export interface ResolveFeatureSlugArgs {
@@ -87,4 +91,27 @@ export function resolveFeatureSlug(args: ResolveFeatureSlugArgs): string {
       `'${fromBranch ?? '(none)'}', SPECKIT marker '${args.markerSlug ?? '(none)'}'). ` +
       'Set --feature/GOVERN_FEATURE_SLUG, or ensure the active spec dir exists.',
   );
+}
+
+/**
+ * 024 FR-013 / TASK-139: the canonical convergence-record key for a governed
+ * feature — the roadmap NODE ID resolved from the governed spec dir, so it matches
+ * the workflow read-side. Falls back to the installation-relative spec dir (still
+ * collision-free) when no node resolves, never the bare spec-dir basename.
+ */
+export function resolveConvergenceItem(
+  installation: Installation,
+  featureRoot: string | undefined,
+  slug: string,
+): string {
+  if (featureRoot === undefined) return slug;
+  const repoRoot = installation.root;
+  try {
+    const model = loadRoadmap(installation.resolved.roadmap, grammarOptsForRoot(repoRoot));
+    const id = resolveIdentityFromSpecDir(model, featureRoot);
+    if (id !== null) return id.nodeId;
+  } catch {
+    // roadmap unreadable — fall back to the relative spec dir below.
+  }
+  return relative(repoRoot, featureRoot);
 }

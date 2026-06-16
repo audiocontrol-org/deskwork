@@ -44,11 +44,9 @@ import {
 import {
   branchDerivedSlug,
   readActiveFeatureSlug,
+  resolveConvergenceItem,
   resolveFeatureSlug,
 } from '../govern/feature-resolution.js';
-import { loadRoadmap } from '../roadmap/roadmap-model.js';
-import { grammarOptsForRoot } from './document-verb-shared.js';
-import { resolveIdentityFromSpecDir } from '../workflow/identity.js';
 import {
   assembleImplementPayload,
   CODE_AUDIT_LENS,
@@ -223,29 +221,6 @@ function resolveBarrageBin(): string {
 function tail(text: string, n: number): string {
   const lines = text.split('\n');
   return lines.slice(Math.max(0, lines.length - n)).join('\n');
-}
-
-/**
- * 024 FR-013 / TASK-139: the canonical convergence-record key for a governed
- * feature — the roadmap NODE ID resolved from the governed spec dir, so it matches
- * the workflow read-side. Falls back to the installation-relative spec dir (still
- * collision-free) when no node resolves, never the bare spec-dir basename.
- */
-function resolveConvergenceItem(
-  installation: Installation,
-  featureRoot: string | undefined,
-  slug: string,
-): string {
-  if (featureRoot === undefined) return slug;
-  const repoRoot = installation.root;
-  try {
-    const model = loadRoadmap(installation.resolved.roadmap, grammarOptsForRoot(repoRoot));
-    const id = resolveIdentityFromSpecDir(model, featureRoot);
-    if (id !== null) return id.nodeId;
-  } catch {
-    // roadmap unreadable — fall back to the relative spec dir below.
-  }
-  return relative(repoRoot, featureRoot);
 }
 
 /**

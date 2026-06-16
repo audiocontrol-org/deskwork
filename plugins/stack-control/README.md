@@ -167,6 +167,18 @@ Two native verbs bookend a working session, both resolving every working file th
 
 Both run to completion in a plain shell with **no Claude Code surface** — the CLI is the vendor-neutral core; the skills add no behavior the CLI lacks.
 
+## Lifecycle compass — the un-skippable workflow
+
+The 022 workflow engine *derives* an item's phase and *reports* gate state; the **compass** (024) turns it into a driver. `workflow compass` is the single orientation-and-enforcement primitive every lifecycle skill consults, so an agent following its skills cannot skip a step.
+
+| Verb | What it does |
+|---|---|
+| `stackctl workflow compass <item> [--intent <action>] [--json]` | **Read-only**, deterministic. Without `--intent`: orient — the current phase, the single legitimate next action, the exit-gate state. With `--intent <action>`: diff the intended action against the live phase → `on-course` / `ahead` (names the first skipped step) / `behind` (re-entry, allowed) / `off-rail` (no roadmap node or a terminal side-state). The verdict is the **exit code** (0 proceed; distinct non-zero for `ahead` vs `off-rail`; `2` usage/unknown-intent) so a skill body gates without parsing prose. |
+
+The intent vocabulary is a **fixed enumeration** single-sourced from the governed `WORKFLOW.md` (each phase's `work:` skill, plus the `govern`/`ship`/`release`/`specify` aliases); an unknown intent fails loud. Every authoring/advancing lifecycle skill — `define`, `design`, `execute`, `release` — **opens** with the compass and **hard-refuses** on a non-zero verdict (performing none of its work, naming the violated invariant); `session-end` consults it advisorily (capture-only). The back-half `governing → shipped` transition is enforced as a **refusal** on an unmet exit gate; capture is fused to authoring so an **orphan spec dir (a spec with no roadmap node) is `off-rail`**, not a passive reconcile note.
+
+**Honest boundary (what this does and does not bind).** The mechanism makes an *agent that follows its skills* unable to skip a step — that is the threat model (agent drift). It does **not** prevent a human (or agent) acting through raw `git`/`gh` or running `/speckit-implement` directly outside the skills; no verb embeds the compass there. The backstop for that path is that the finishing skills (`release`, and `session-end` advisorily) surface the missing recorded evidence chain. This boundary is by design and is not overclaimed.
+
 ## Backlog slush pile — intake: three sources, one pile
 
 `stackctl backlog` is a structured, agent-easy **slush pile** for found-mid-work bugs/gaps, kept deliberately **separate from the curated `ROADMAP.md`** so the roadmap stays a small hand-curated DAG while the backlog absorbs the flood. Unlike `inbox`/`roadmap` (in-tree governed documents), `backlog` is the plugin's first **external-backend adapter** verb over the configured backlog store. The stable workflow contract stays in stack-control terms (capture, list, import, promote); backend storage shape and backend-native triage surfaces are implementation details behind that seam. The agent-facing skill is [`/stack-control:backlog`](./skills/backlog/SKILL.md).
