@@ -4,9 +4,11 @@
 // resolves the feature from the SPECKIT marker / spec pointer, not the branch slug.
 // RED first (T006/T007).
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { extractScopedPaths } from '../../govern/incremental-audit.js';
-import { resolveFeatureSlug } from '../../govern/feature-resolution.js';
+import { resolveConvergenceItem, resolveFeatureSlug } from '../../govern/feature-resolution.js';
+import { resolveInstallation } from '../../config/installation.js';
+import { makeWorkflowFixture, type WorkflowFixture } from '../fixtures/workflow/workflow-fixtures.js';
 
 describe('024 FR-012 — backtick skill-reference span is not a governed path (TASK-83)', () => {
   it('skips a /stack-control:<verb> skill reference span', () => {
@@ -26,6 +28,17 @@ describe('024 FR-012 — backtick skill-reference span is not a governed path (T
     expect(extractScopedPaths('edit `src/workflow/compass.ts` now')).toEqual([
       'src/workflow/compass.ts',
     ]);
+  });
+
+  it('keeps a file:line span, stripping the trailing line[:col] suffix (claude-01)', () => {
+    // The blunt includes(':') guard silently dropped these; a real governed path with a
+    // line number must survive (it appears verbatim in this feature's own contract docs).
+    expect(extractScopedPaths('see `src/govern/protocol.ts:141`')).toEqual(['src/govern/protocol.ts']);
+    expect(extractScopedPaths('at `src/workflow/compass.ts:88:7`')).toEqual(['src/workflow/compass.ts']);
+  });
+
+  it('still excludes a /<plugin>:<verb> skill ref even with no line number', () => {
+    expect(extractScopedPaths('`/stack-control:define` and `src/x.ts:3`')).toEqual(['src/x.ts']);
   });
 });
 
@@ -65,5 +78,42 @@ describe('024 FR-011 — feature slug resolves from the marker, not only the bra
         featureRootExists: () => false,
       }),
     ).toThrow(/feature/i);
+  });
+});
+
+let convFixtures: WorkflowFixture[] = [];
+afterEach(() => {
+  for (const f of convFixtures) f.cleanup();
+  convFixtures = [];
+});
+function convFixture(nodes: Parameters<typeof makeWorkflowFixture>[0]): WorkflowFixture {
+  const f = makeWorkflowFixture(nodes);
+  convFixtures.push(f);
+  return f;
+}
+
+describe('024 FR-013 — resolveConvergenceItem keys by canonical node id or fails loud (codex-02/claude-04)', () => {
+  it('returns the canonical node id when a roadmap node references the governed spec dir', () => {
+    const f = convFixture([{ identifier: 'multi:feature/x', status: 'in-flight', spec: 'specs/010-x' }]);
+    const inst = resolveInstallation(f.root);
+    expect(resolveConvergenceItem(inst, `${inst.root}/specs/010-x`, 'x')).toBe('multi:feature/x');
+  });
+
+  it('FAILS LOUD when the roadmap cannot be read — never invents a divergent fallback key', () => {
+    const f = convFixture([]); // no ROADMAP.md written
+    const inst = resolveInstallation(f.root);
+    expect(() => resolveConvergenceItem(inst, `${inst.root}/specs/010-x`, 'x')).toThrow();
+  });
+
+  it('FAILS LOUD when the roadmap is readable but no node references the governed dir (orphan)', () => {
+    const f = convFixture([{ identifier: 'multi:feature/other', status: 'in-flight', spec: 'specs/999-other' }]);
+    const inst = resolveInstallation(f.root);
+    expect(() => resolveConvergenceItem(inst, `${inst.root}/specs/010-x`, 'x')).toThrow(/node/i);
+  });
+
+  it('returns the slug when no feature dir is governed (spec mode)', () => {
+    const f = convFixture([]);
+    const inst = resolveInstallation(f.root);
+    expect(resolveConvergenceItem(inst, undefined, 'fallback-slug')).toBe('fallback-slug');
   });
 });

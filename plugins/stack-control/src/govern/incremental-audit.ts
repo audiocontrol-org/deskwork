@@ -60,18 +60,25 @@ export function parsePhases(tasksText: string): ParsedPhase[] {
 
 /**
  * Extract the governed filesystem paths named in backtick spans of a tasks.md
- * phase body. A span is a path only when it contains `/` AND no `:` — a `:`-bearing
- * token is a skill/verb reference (`/stack-control:define`), a URL, or a Windows
- * drive, none of which are installation-relative governed paths. 024 FR-012 /
- * TASK-83: feeding such a span to the governed-path validator crashed payload
- * assembly with "escapes the installation root"; classifying it out at the source
- * is the fix (the validator is correct — its input was wrong).
+ * phase body. A span is a path only when it contains `/`. 024 FR-012 / TASK-83: a
+ * `/<plugin>:<verb>` skill-reference span (e.g. `/stack-control:define`) is NOT an
+ * installation-relative path and crashed the governed-path validator — classify it
+ * out here. But a precise filter is required (AUDIT-BARRAGE claude-01): a legitimate
+ * `file:line[:col]` span (`src/govern/protocol.ts:141`) IS a real governed path — so
+ * strip a trailing line/col suffix FIRST, then exclude any token still bearing a `:`
+ * (a `<plugin>:<verb>` namespace, a URL scheme). A blunt `includes(':')` would
+ * silently DROP real file:line paths — trading the loud crash for a silent
+ * under-scope, which is worse.
  */
 export function extractScopedPaths(body: string): readonly string[] {
   const matches: string[] = [];
   for (const match of body.matchAll(BACKTICK_TOKEN_RE)) {
-    const token = match[1]?.trim();
-    if (token === undefined || !token.includes('/') || token.includes(':')) continue;
+    const raw = match[1]?.trim();
+    if (raw === undefined || !raw.includes('/')) continue;
+    // Strip a trailing `:<line>[:<col>]` suffix from a file:line span.
+    const token = raw.replace(/:(\d+)(:\d+)?$/, '');
+    // A remaining `:` marks a namespace/skill reference or URL — never a path.
+    if (token.includes(':')) continue;
     matches.push(token.replace(/\/+$/, ''));
   }
   return matches;

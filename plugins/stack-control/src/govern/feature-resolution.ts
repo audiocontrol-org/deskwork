@@ -96,8 +96,16 @@ export function resolveFeatureSlug(args: ResolveFeatureSlugArgs): string {
 /**
  * 024 FR-013 / TASK-139: the canonical convergence-record key for a governed
  * feature — the roadmap NODE ID resolved from the governed spec dir, so it matches
- * the workflow read-side. Falls back to the installation-relative spec dir (still
- * collision-free) when no node resolves, never the bare spec-dir basename.
+ * the workflow read-side (`convergenceKeyFor(item) === item.identifier`).
+ *
+ * FAIL LOUD, never key by a divergent fallback shape (AUDIT-BARRAGE codex-02 HIGH +
+ * claude-04, cross-family agreement): the read side keys UNCONDITIONALLY by the node
+ * id, so writing under any other key (the relative spec dir, etc.) silently diverges
+ * — govern would report success while the `governing → shipped` gate, reading the
+ * node-id key, stays closed. An unreadable roadmap is NOT a safe condition for
+ * inventing a second key (Principle V); a readable roadmap with no matching node is
+ * an orphan/legacy feature that must be surfaced, not papered over. Both raise; the
+ * govern caller leaves the gate CLOSED (fail-safe) on the throw.
  */
 export function resolveConvergenceItem(
   installation: Installation,
@@ -105,13 +113,14 @@ export function resolveConvergenceItem(
   slug: string,
 ): string {
   if (featureRoot === undefined) return slug;
-  const repoRoot = installation.root;
-  try {
-    const model = loadRoadmap(installation.resolved.roadmap, grammarOptsForRoot(repoRoot));
-    const id = resolveIdentityFromSpecDir(model, featureRoot);
-    if (id !== null) return id.nodeId;
-  } catch {
-    // roadmap unreadable — fall back to the relative spec dir below.
-  }
-  return relative(repoRoot, featureRoot);
+  // Let a roadmap load error propagate — fail loud, no silent fallback key.
+  const model = loadRoadmap(installation.resolved.roadmap, grammarOptsForRoot(installation.root));
+  const id = resolveIdentityFromSpecDir(model, featureRoot);
+  if (id !== null) return id.nodeId;
+  throw new GovernProtocolError(
+    `govern-convergence: no roadmap node references the governed feature dir ` +
+      `'${relative(installation.root, featureRoot)}' — cannot key the convergence record by ` +
+      `canonical identity (orphan/legacy feature; capture it on the roadmap first). The read ` +
+      `side keys by node id, so a fallback key would silently leave the gate closed.`,
+  );
 }
