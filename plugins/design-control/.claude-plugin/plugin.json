@@ -1,6 +1,6 @@
 {
   "name": "design-control",
-  "version": "0.46.0",
+  "version": "0.48.0",
   "description": "Portable UX/UI surface-change discipline — author a lo-fi wireframe (lint-enforced), translate it into a hand-authorable design-language spec, then implement and archive the change. The UX/UI-surface specialization of stack-control's stance; cross-model design referee is an advisory, gated track.",
   "license": "GPL-3.0-or-later"
 }
