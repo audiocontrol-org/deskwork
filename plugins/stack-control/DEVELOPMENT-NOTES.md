@@ -2,21 +2,78 @@
 
 ---
 
-## 2026-06-16: <!-- session title -->
+## 2026-06-16: Implement + govern spec 024 (lifecycle-compass) — full Spec Kit chain, 4-round cross-family barrage, capture unskippable-workflow-protocol
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up 024 (`lifecycle-compass`) at `specifying` and drive it through the
+Spec Kit chain to a governed close: `/speckit-plan → tasks → analyze → implement`,
+then the `after_implement` audit barrage to convergence.
 
 **Accomplished:**
-- <!-- compose -->
+- **Shipped 024 lifecycle-compass** — the un-skippable workflow. Full Spec Kit chain:
+  plan (research/data-model/5 contracts/quickstart) → 38-task tasks.md (FR-015
+  sequencing) → analyze (no CRITICAL) → implement (all 38 tasks, TDD). Suite
+  1632 → **1698 green**. Everything committed + pushed on `feature/stack-control`.
+  - The **compass** primitive (`workflow compass <item> [--intent]`): pure verdict
+    (on-course/ahead/behind/off-rail) + gating exit codes over the 022 derivation;
+    fixed intent vocabulary single-sourced from `WORKFLOW.md`.
+  - **Embedded** as a hard-refusal precondition in `define`/`design`/`execute`/
+    `release` (advisory in `session-end`); **capture-fusion** (FR-008 model b —
+    operator decision: `define` *creates* the node, better UX); back-half
+    `governing → shipped` gate enforced as a refusal.
+  - **Govern made runnable** on the session-pinned branch (FR-011 item/marker
+    resolution; FR-012 + the leading-slash variant — backtick skill/command spans
+    are not governed paths) and **canonical node-id identity** (FR-013 / TASK-139),
+    proven E2E: the convergence record wrote as `impl__multi-feature-lifecycle-compass.json`.
+- **4-round cross-family frontier audit barrage** (codex/gpt-5.5 + claude/opus) — the
+  payoff of a real cross-family fleet. Every cross-family HIGH was real and fixed +
+  verified: convergence-key fail-loud, session-end contract carve-out, eager-marker
+  bypass, govern item-resolution, the path-span class. It also caught **regressions in
+  my own fixes** (eager-marker, exit-code) and a **fake FR-013 collision test** (distinct
+  basenames — never tested a collision; rewritten to a real one). Graduated by a
+  substantive `GOVERN_OVERRIDE`; residual = 3 scoped, mitigated fix-tasks (T039/T040/T041).
+- **Captured `multi:feature/unskippable-workflow-protocol`** (roadmap node at `designing`
+  + design record) — mechanize the offroading patterns (per-phase govern gate, no agent
+  shortcuts, no bypassing `execute` for backend speckit, auto-commit/push) — plus stopgap
+  agent-discipline rules so the discipline binds before the mechanism lands.
 
 **Didn't Work:**
-- <!-- compose -->
+- **Whole-feature govern hit `boundary-too-large`** (167 KB payload > the codex-only
+  98 KB envelope) — because I **batched** governance into one end-of-feature pass
+  instead of per-phase. The corrected approach is per-phase / a frontier-only
+  large-envelope fleet.
+- **Older models choked**: a 4-lane fleet including gpt-5.4 + sonnet-4-6 produced 0
+  output from both on the large payload — frontier-only is required for whole-feature scope.
+- Several of my own fix commits introduced regressions the next barrage round caught
+  (eager-marker crash on explicit override; exit-2 flattening; the leading-slash FATAL
+  from my own T040 prose) — fix-churn, the pattern the barrage exists to surface.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Batched governance instead of per-phase → `boundary-too-large`. Operator:
+  *"why didn't you run governance after each phase?"* Captured as a memory + the
+  unskippable-workflow-protocol design.
+- [PROCESS] Offered the operator a "defer governance" **shortcut**. Operator never wants
+  shortcuts — consistent protocol always. Recorded as an agent-discipline rule.
+- [PROCESS] Put **older (non-frontier) models** in the "frontier" fleet (they choked).
+  Frontier-only for large-scope barrages — documented in the fleet config + rule.
+- [PROCESS] Ran the **parked spec-mode barrage** in response to a check-question
+  (*"Did you run audit barrages against the spec!"* — the operator was just verifying I
+  had *not*). Added the rule: *a question is not an instruction to act.*
+- [PROCESS] Jumped into `/speckit-plan` before reading last session's dev log (operator
+  flagged; re-read, confirmed 024 pickup was correct).
 
 **Insights:**
-- <!-- compose -->
+- The cross-family frontier barrage is genuinely high-value: it caught real defects, my
+  own fix-regressions, and a fake test that gave false confidence on the marquee FR-013.
+  Cross-family agreement is the HIGH-confidence signal a same-family fleet can't give.
+- Spec-mode audit is parked/opt-in (`spec-audit-diminishing-returns.md`); the impl
+  barrage over the whole diff already scrutinizes the spec artifacts (many findings were
+  spec/doc issues), so the spec content was reviewed without the dedicated protocol.
+- 021's `govern --phase` already enforces per-phase ordering (phase N needs phase N-1's
+  checkpoint) — the unskippable gap is narrower than first framed (graduate-gate +
+  execute-cadence teeth).
+- Convergence plateaus by round 3-4 into fix-churn + scoped re-surfaces; the override-
+  vs-grind call is operator-owned, and "the real gate still holds" is the right lens for
+  mitigated residuals (T040 release-gate, T041 exit-code).
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 20
