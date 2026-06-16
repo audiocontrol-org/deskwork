@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-06-16: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 1
+  - feat(stack-control): T040 — the compass verdict evaluates the forward-transition exit gate
+- Files changed: 9
+- Backlog touched: (none)
+
 ## 2026-06-16: Implement + govern spec 024 (lifecycle-compass) — full Spec Kit chain, 4-round cross-family barrage, capture unskippable-workflow-protocol
 
 **Goal:** Pick up 024 (`lifecycle-compass`) at `specifying` and drive it through the
