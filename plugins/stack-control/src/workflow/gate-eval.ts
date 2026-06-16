@@ -10,6 +10,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WorkflowError, type Criterion } from './workflow-types.js';
+import { designGateCriteria } from './house-rules.js';
 
 /**
  * The resolved, install-anchored facts the evaluator reads. Built by the query /
@@ -158,4 +159,14 @@ export function evaluateGate(criteria: readonly Criterion[], ctx: GateContext): 
 export function describeCriterion(c: Criterion): string {
   const param = c.param === undefined ? '' : ` ${c.param}`;
   return `${c.kind} ${c.target}${param}`;
+}
+
+/**
+ * The `design-to-spec` exit gate (022 US5 / T025, FR-027): every required design-
+ * record section present, ≥2 solution-space alternatives, and the recorded
+ * `design-approved:` marker. The criteria are DERIVED from the single-source
+ * house-rules block (one opinion injected into the backend AND checked here).
+ */
+export function evaluateDesignGate(ctx: GateContext): GateResult {
+  return evaluateGate(designGateCriteria(), ctx);
 }

@@ -95,10 +95,10 @@
 
 **Independent Test**: entry sets the `design:` pointer; the record is written installation-anchored with required sections; the exit gate fails loud on a missing section / <2 alternatives / absent approval marker.
 
-- [ ] T023 [P] [US5] RED: design-to-spec exit-gate tests (missing required section, <2 solution-space alternatives, absent `design-approved:` marker each fail the gate) in `plugins/stack-control/src/__tests__/workflow/design-gate.test.ts`
-- [ ] T024 [US5] Implement the single-source house-rules block (injected into the backend AND read by the exit gate) in `plugins/stack-control/src/workflow/house-rules.ts`
-- [ ] T025 [US5] Implement the `design-to-spec` exit gate (required sections, ≥2 alternatives, approval marker) in `plugins/stack-control/src/workflow/gate-eval.ts`
-- [ ] T026 [US5] Author `plugins/stack-control/skills/design/SKILL.md` — the frontend that drives the backend (default `superpowers:brainstorming`) in-session, sets the `design:` pointer on entry, re-injects capture-over-YAGNI at the backend scope-check step, routes the terminal handoff to `/stack-control:define`, and writes the record at `<install-root>/docs/superpowers/specs/`
+- [X] T023 [P] [US5] RED: design-to-spec exit-gate tests (missing required section, <2 solution-space alternatives, absent `design-approved:` marker each fail the gate) in `plugins/stack-control/src/__tests__/workflow/design-gate.test.ts`
+- [X] T024 [US5] Implement the single-source house-rules block (injected into the backend AND read by the exit gate) in `plugins/stack-control/src/workflow/house-rules.ts`
+- [X] T025 [US5] Implement the `design-to-spec` exit gate (required sections, ≥2 alternatives, approval marker) in `plugins/stack-control/src/workflow/gate-eval.ts`
+- [X] T026 [US5] Author `plugins/stack-control/skills/design/SKILL.md` — the frontend that drives the backend (default `superpowers:brainstorming`) in-session, sets the `design:` pointer on entry, re-injects capture-over-YAGNI at the backend scope-check step, routes the terminal handoff to `/stack-control:define`, and writes the record at `<install-root>/docs/superpowers/specs/`
 
 ---
 
