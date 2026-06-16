@@ -16,6 +16,9 @@ edgeFields:
   - { name: deferred-until, references: prose,    acyclic: false, blocking: true  }
   - { name: spec,           references: external, acyclic: false, blocking: false }
   - { name: ref,            references: external, acyclic: false, blocking: false }
+  - { name: design,          references: external, acyclic: false, blocking: false }
+  - { name: design-approved, references: prose,    acyclic: false, blocking: false }
+  - { name: analyze-clean,   references: prose,    acyclic: false, blocking: false }
 reconciliationHook:
   kind: glob
   source: "specs/*/spec.md"

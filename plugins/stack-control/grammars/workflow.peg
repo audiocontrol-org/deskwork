@@ -1,0 +1,76 @@
+---
+id: workflow
+unit:
+  kind: heading
+  level: 2
+statusVocabulary: [active]
+terminalStatuses: []
+orderKey:
+  field: kind
+  relation: [phase, transition]
+identifier:
+  kind: slug
+edgeFields: []
+---
+{{
+  // WORKFLOW.md is HEADING-KEYED (022 T005, contracts/workflow-md-grammar.md):
+  // each `## <identifier>` head at the reserved level 2 starts a Unit; the
+  // heading text IS the identifier. Two unit kinds are distinguished by the
+  // identifier prefix — `phase:<slug>` and `transition:<slug>`. The phase derive
+  // predicate, work, entrance/exit criteria, next, and the transition exit-gate +
+  // effect manifest live as `- field:` body bullets parsed by the SECOND-level
+  // binding (src/workflow/workflow-grammar.ts); this PEG only enforces the unit
+  // boundaries + identifier shape and reads the `- status:` bullet, exactly like
+  // roadmap.peg. `orderValue` is the prefix segment (before `:`), ordered by the
+  // declared relation [phase, transition], NOT lexicographically.
+  //
+  // A `## heading` that is not a conforming `phase:<slug>` / `transition:<slug>`
+  // identifier is a PARSE FAILURE (error()), so no Unit is produced and the
+  // engine fails loud per FR-007. The slug may not contain whitespace, `/`, or `:`.
+  const IDENT = /^(phase|transition):[a-z][a-z0-9-]*$/;
+  function statusOf(bodyLines) {
+    for (const b of bodyLines) {
+      const m = /^status:\s*([A-Za-z][A-Za-z-]*)/i.exec(b.text);
+      if (m) return m[1].toLowerCase();
+    }
+    return null;
+  }
+}}
+
+document = preamble units:unit* postamble { return units; }
+
+preamble = (!unitHead anyLine)*
+
+unit = h:unitHead b:bodyLine* {
+  if (!IDENT.test(h.text)) {
+    error(`workflow identifier '${h.text}' is not a 'phase:<slug>' or 'transition:<slug>' identifier (e.g. 'phase:designing', 'transition:open-design')`);
+  }
+  const status = statusOf(b);
+  const kind = h.text.split(':')[0];
+  return {
+    identifier: h.text,
+    status,
+    orderValue: kind,
+    startLine: h.line,
+    endLine: b.length ? b[b.length - 1].line : h.line,
+  };
+}
+
+unitHead = "H2" TAB t:lineText nl { return { text: t, line: location().start.line }; }
+
+bodyLine = !unitHead !shallowHead k:kind TAB t:lineText nl {
+  return { kind: k, text: t, line: location().start.line };
+}
+
+postamble = (!unitHead anyLine)*
+
+// A shallower-or-peer heading (H1) terminates the Unit; an interleaved shallow
+// heading before a later Unit head leaves leftover input → parse failure. H3+ are
+// legitimate body sub-notes.
+shallowHead = "H1" TAB
+
+anyLine = kind TAB lineText nl
+kind = $[A-Za-z0-9]+
+lineText = $[^\n]*
+TAB = "\t"
+nl = "\n" / !.
