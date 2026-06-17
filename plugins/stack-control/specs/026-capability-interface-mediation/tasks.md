@@ -80,14 +80,15 @@ description: "Task list for capability-interface mediation"
 - [ ] T029 [P] Extend `src/__tests__/installation-isolation-probe.test.ts` to cover the new state-writing verbs (`front-door enter/exit`) and `mediate-check --at` (anchor invariant).
 - [ ] T030 [P] Amend `.claude/rules/enforcement-lives-in-skills.md` + `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` with the spec Decision 5 ruling (a plugin-shipped PreToolUse hook is a permitted enforcement surface; rationale + the bookkeeping-spiral distinction).
 - [ ] T031 [P] Update plugin docs (capability mediation overview; `stackctl capability`/`mediate-check`/`front-door` verbs) and confirm no new file exceeds the 300–500-line cap (Principle VI; refactor if needed).
-- [ ] T032 Run the full `npx vitest` suite + the quickstart CLI scenarios (A–E, G); confirm green before `/stack-control:execute` governance.
+- [ ] T032 [P] Add a test asserting the mediation layer never writes to adopter backend artifacts (FR-018): `mediate-check` is pure-read, and `front-door`/`marker` writes target only `<installation>/.stack-control/state/**`, never a backend skill/CLI file path. In `src/__tests__/capability/no-backend-writes.test.ts`.
+- [ ] T033 Run the full `npx vitest` suite + the quickstart CLI scenarios (A–E, G); confirm green before `/stack-control:execute` governance.
 
 ## Dependencies & ordering
 
 - **Setup (T001)** → **Foundational (T002–T006)** → user stories.
 - **US1 (T007–T018)** depends on Foundational; it is the MVP and the only story that must precede US3/US4 backstop+parity work (which reference the verb + gate). US2 (discovery) depends only on the registry (T004) and can start in parallel with US1's verb work.
 - **T002 (spike)** gates T015 (the `Skill` matcher) only — the CLI/Bash path (T003–T014) does not depend on it.
-- **Polish (T029–T032)** last.
+- **Polish (T029–T033)** last.
 
 ## Parallel execution examples
 
@@ -101,4 +102,4 @@ description: "Task list for capability-interface mediation"
 - Then **US2** (discovery/API-spec), **US3** (backstop), **US4** (cross-vendor) in priority order.
 - Each task is RED-first per Constitution I; commit + push at each task boundary (Principle VII).
 
-**Total**: 32 tasks — Setup 1 · Foundational 5 (incl. 1 spike) · US1 12 · US2 3 · US3 4 · US4 3 · Polish 4.
+**Total**: 33 tasks — Setup 1 · Foundational 5 (incl. 1 spike) · US1 12 · US2 3 · US3 4 · US4 3 · Polish 5.

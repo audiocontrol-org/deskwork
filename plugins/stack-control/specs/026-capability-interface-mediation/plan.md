@@ -22,7 +22,7 @@ stack-control becomes the agent-facing API whose capability interfaces *complete
 
 **Project Type**: single project (CLI + plugin), extending the existing `plugins/stack-control` tree.
 
-**Performance Goals**: the hook fires on EVERY `Bash`/`Skill` tool call — the adapter MUST cheap-pre-filter (no `stackctl` spawn when the identity is obviously in no registry set) so non-backend calls add ~no latency; a matched call's `mediate-check` should return in well under a human-perceptible delay.
+**Performance Goals**: the hook fires on EVERY `Bash`/`Skill` tool call. Measurable budget: a NON-matching call MUST short-circuit in the adapter WITHOUT spawning `stackctl` (pure in-process pre-filter — target < 5 ms added overhead); only a registry-matching identity spawns `mediate-check`, whose decision is a small registry lookup + one marker-file read (target < 50 ms). These bound the per-tool-call tax the interceptor adds.
 
 **Constraints**: cross-vendor (decision logic in `stackctl`, branch on capability/identity never vendor — Principle III); must not edit the adopter's backend files (Principle IV); enforcement travels with `claude plugin install` (no git hook — ADR ruling, spec Decision 5); installation-anchor invariant for all marker writes; `STACKCTL_FRONT_DOOR` migrates env→file.
 

@@ -90,11 +90,11 @@ The interception behaves identically whether the agent runs under Claude Code or
 
 **Why this priority**: Cross-vendor is a hard constraint, but the Codex interceptor mechanism needs research (open question 2), so it is sequenced after the Claude path proves the model. The portable core (one `stackctl` verb) is built from the start; the second adapter follows.
 
-**Independent Test**: Run the same raw reach-around under each vendor's adapter → both refuse via the same `stackctl` verb with the same exit-code contract.
+**Independent Test**: Run the same raw **Bash-surfaced** reach-around (e.g. `backlog …`) under each vendor's adapter → both refuse via the same `stackctl` verb with the same exit-code contract. (Skill-surfaced reach-arounds are observable only under Claude; on Codex they are covered by the backstop, not interception.)
 
 **Acceptance Scenarios**:
 
-1. **Given** the `stackctl` decision verb, **When** invoked from the Claude Code adapter and from the Codex adapter on the same raw call, **Then** both produce the same refuse/permit verdict and exit code.
+1. **Given** the `stackctl` decision verb, **When** invoked from the Claude Code adapter and from the Codex adapter on the same raw **Bash-surfaced** call both adapters observe, **Then** both produce the same refuse/permit verdict and exit code.
 2. **Given** the decision logic, **When** inspected, **Then** it branches on capability/identity only — never on vendor identity (Principle III) — and contains no hardcoded `.claude/skills` path (GitHub #480).
 
 ---
@@ -168,7 +168,7 @@ The interception behaves identically whether the agent runs under Claude Code or
 - **SC-002**: 100% of the same backend operations, when issued through the sanctioned stack-control front-door skill, complete (zero false-positive refusals of sanctioned calls).
 - **SC-003**: Zero false-positive refusals of unrelated commands that merely contain a fronted backend's name as an incidental token (precise identity matching holds across a representative collision set).
 - **SC-004**: Adding a new fronted backend to the registry produces correct refusal of its raw invocations with no edit to the interceptor logic (registry-entry-only extensibility verified).
-- **SC-005**: The refusal verdict and exit code are identical across the Claude and Codex adapters for the same raw call (cross-vendor parity).
+- **SC-005**: For surfaces both vendors can observe (Bash-invoked CLIs), the refusal verdict and exit code are identical across the Claude and Codex adapters for the same raw call (cross-vendor parity). Skill-surface parity is NOT claimed for Codex — its PreToolUse is Bash-only (research D8); Codex covers skill-surfaced capabilities via the Approach C backstop, not via interception.
 - **SC-006**: Backend work that bypassed the front door cannot graduate, and the reconciler reports it — verified on at least one capability beyond `speckit-implement`.
 - **SC-007**: stack-control dogfoods the mediation on itself — a maintainer's raw reach-around in this repo is refused by the same installed surfaces an adopter would have.
 
