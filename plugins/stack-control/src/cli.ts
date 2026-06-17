@@ -11,6 +11,7 @@
 import { setInstallationNoticeVerb } from './config/installation.js';
 import { runVersion } from './subcommands/version.js';
 import { runExecuteCheck } from './subcommands/execute-check.js';
+import { runSpeckitGuard } from './subcommands/speckit-guard.js';
 import { runSpecCheck } from './subcommands/spec-check.js';
 import { runSpecGovernanceGate } from './subcommands/spec-governance-gate.js';
 import { runSlushFindings } from './subcommands/slush-findings.js';
@@ -59,6 +60,8 @@ type Subcommand = (args: string[]) => Promise<void>;
 const SUBCOMMANDS: Record<string, Subcommand> = {
   version: runVersion,
   'execute-check': runExecuteCheck,
+  // Speckit wrapper refusal/redirect (025 US4) — portable, cross-vendor.
+  'speckit-guard': runSpeckitGuard,
   'spec-check': runSpecCheck,
   'spec-governance-gate': runSpecGovernanceGate,
   'slush-findings': runSlushFindings,

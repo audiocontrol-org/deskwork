@@ -47,16 +47,25 @@ success criterion. Run from the installation root
    - **Expected**: FATAL `boundary-too-large` pointing at right-sizing guidance (TASK-75);
      no auto-split, no silent downgrade.
 
-## Scenario D — Speckit wrapper blocks the whole backend chain (SC-004)
+## Scenario D — Speckit wrapper refusal/redirect + defense-in-depth (SC-004)
 
-1. Invoke `/speckit-implement` directly (not via execute).
-   - **Expected**: refused loud, redirects to `/stack-control:execute`.
-2. Invoke `/speckit-specify` / `/speckit-plan` / `/speckit-tasks` directly.
-   - **Expected**: refused loud, redirects to `/stack-control:define` (or `:extend`).
-3. Invoke implement via `/stack-control:execute` (the front door).
-   - **Expected**: NOT refused (no false positive).
-4. Implement raw (evading the wrapper), then attempt to graduate.
-   - **Expected**: refused — no per-phase checkpoints (defense-in-depth, FR-014).
+> **Corrected mechanism (operator decision 2026-06-16):** 025 ships the refusal as a
+> portable `stackctl speckit-guard` verb + the cross-vendor `commands/speckit-guard.md`
+> adapter — NOT an injection into the adopter's `.claude/skills/speckit-*` (those are the
+> adopter's own Spec Kit, not plugin-controlled; and `.claude/skills/` is Claude-only). The
+> **US1 per-phase graduate gate is the real teeth.** A cross-vendor point-of-invocation
+> interception of a *raw* backend call is the filed follow-on
+> `design:gap/speckit-bypass-point-of-invocation-refusal`.
+
+1. `stackctl speckit-guard speckit-implement` (no front-door marker).
+   - **Expected**: exit 1, refused, names `/stack-control:execute`.
+2. `stackctl speckit-guard speckit-specify` / `speckit-plan` / `speckit-tasks`.
+   - **Expected**: exit 1, refused, names `/stack-control:define` (or `:extend`).
+3. `STACKCTL_FRONT_DOOR=1 stackctl speckit-guard speckit-implement` (reached via front door).
+   - **Expected**: exit 0, NOT refused (no false positive).
+4. Implement raw (evading the wrapper — no per-phase govern), then attempt to graduate.
+   - **Expected**: refused — no per-phase checkpoints (defense-in-depth, FR-014; the
+     load-bearing guarantee for 025).
 
 ## Scenario E — No agent-offered shortcuts (SC-005)
 
