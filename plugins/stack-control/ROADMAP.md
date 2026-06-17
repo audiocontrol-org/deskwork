@@ -400,8 +400,10 @@ Make the stack-control workflow protocol mechanically un-skippable for adopting 
 
 ## design:feature/capability-interface-mediation
 - status: in-flight
+- spec: specs/026-capability-interface-mediation
 - design: docs/superpowers/specs/2026-06-17-capability-interface-mediation-design.md
 - design-approved: 2026-06-17
+- analyze-clean: 2026-06-17
 - part-of: multi:feature/lifecycle-industrialization
 The stack-control agent-facing capability API: capability interfaces (backlog-like, spec-definition, spec-execution operations) that COMPLETELY MEDIATE between an adopting agent and the swappable backends that implement them, with point-of-invocation interception as the enforcement that makes mediation complete (the agent cannot reach past the API to the backend). Generalizes 025 US4 speckit-guard (operator decision 2026-06-17): refuse ALL fronted-backend calls (front door is the only sanctioned path); mechanism = a cross-vendor PreToolUse interceptor calling the stackctl guard (primary) + the make-bypass-harmless gate (backstop). Cross-vendor (logic in stackctl, never vendor identity); the backend skills/CLIs are the adopter's own (no hardcoded .claude/skills). Umbrella node: design:feature/backlog-backend-port + impl:feature/execution-engine re-relate as concrete capability adapters (part-of edges pending the TASK-137 reparent verb). Ruling in the design record: a plugin-shipped Claude Code hook is a permitted enforcement surface (travels with claude plugin install, unlike a git hook). See docs/superpowers/specs/2026-06-17-capability-interface-mediation-design.md + specs/025 US4.
 
