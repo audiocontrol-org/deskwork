@@ -14,8 +14,12 @@ Run a Spec Kit spec through **native** `/speckit-implement` — driven by the in
 **Before doing ANY of this skill's work**, consult the compass for the roadmap item this invocation operates on, declaring this skill as the intent:
 
 ```bash
-plugins/stack-control/bin/stackctl workflow compass <item> --intent execute
+stackctl workflow compass <item> --intent execute
 ```
+
+> Invoke the CLI as bare `stackctl` (it is on `PATH` in a plugin install). Do NOT
+> use the source-repo `plugins/stack-control/bin/stackctl` form — it 404s in an
+> adopter's host install (GitHub #480).
 
 A **non-zero exit is a hard refusal**: print the compass's reason (it names the violated invariant and, for an `ahead` verdict, the skipped step) and **STOP — perform none of this skill's work**. Proceed only on exit 0 (`on-course` / `behind`). If no item resolves (a spec dir with no roadmap node is `off-rail`), refuse loud and direct the operator to capture/design/specify it first. The lifecycle rules live in one place (the compass + the governed `WORKFLOW.md`), not re-encoded here; per `.claude/rules/enforcement-lives-in-skills.md` the gate lives in this skill body + the `stackctl workflow compass` verb, never a git hook.
 
@@ -34,31 +38,50 @@ A **non-zero exit is a hard refusal**: print the compass's reason (it names the 
 2. **Gate on runnability — fail loud, no partial run.** Run:
 
    ```bash
-   plugins/stack-control/bin/stackctl execute-check --spec <spec-dir>
+   stackctl execute-check --spec <spec-dir>
    ```
 
    - Exit `0` (`runnable`) → continue to step 3.
    - Exit non-zero → **STOP.** Surface the `stackctl` stderr **verbatim** (it names the missing artifact, e.g. `tasks.md missing; spec not runnable (run /speckit-tasks first)`). Do not start native execution, do not fabricate a run, do not paper over the gap (FR-008, Principle V). The recovery is to author the spec to runnable via `/stack-control:extend` (or `/speckit-tasks`), then re-run execute.
 
-3. **Drive native `/speckit-implement` via the in-session agent.** Invoke the native Spec Kit implement step over the resolved spec — in this session, with this agent. **Do NOT shell out to a headless/batch CLI** to invoke the agent (FR-006; the durability motivation behind Principle IX). Native execution does the work; stack-control does not walk the tasks itself (governance is the differentiator, execution is commodity).
+3. **Drive native `/speckit-implement` PHASE BY PHASE, governing at each boundary (025 US2 — non-discretionary).** Walk the `tasks.md` phases **in order**. For each phase:
 
-4. **Let governance fire automatically — do not invoke it manually.** Native `/speckit-implement`'s `after_implement` hook fires `speckit.deskwork-governance.govern` (`optional: false`) automatically: it gathers the implemented diff, runs deskwork's cross-model `audit-barrage`, and lifts findings into the feature `audit-log.md`. **This skill does not call governance itself** (SC-002: zero manual barrage invocations). If the hook is non-optional and does not fire, that is a failure to surface — not something to work around.
+   1. **Refuse to start a phase until every prior phase is governed.** A phase may begin only when all earlier `tasks.md` phases have a *current* per-phase checkpoint (FR-007). `stackctl` enforces this at govern time; do not start phase N+1's work while phase N is missing/stale.
+   2. **Drive that phase's tasks** via native `/speckit-implement`, in this session, with this agent. **Do NOT shell out to a headless/batch CLI** to invoke the agent (FR-006; the durability motivation behind Principle IX). Native execution does the work; stack-control does not walk the tasks itself.
+   3. **At the phase boundary, run per-phase governance** — a skill-body post-condition, **not** an agent choice (FR-006):
 
-5. **Confirm and report.** Confirm governance fired and report:
+      ```bash
+      stackctl govern --mode implement --phase <id>
+      ```
+
+      This scopes the cross-model `audit-barrage` to the phase's files (a right-sized payload) and writes the phase checkpoint. Governance runs **per phase, here — never batched into one whole-feature pass at the end** (a whole-feature barrage exceeds the model-fleet envelope → `boundary-too-large`; FR-006a, and the `.claude/rules/agent-discipline.md` "No offroading" rule this feature mechanizes).
+      - If a **single phase** still exceeds the fleet envelope, `stackctl` fails loud with **`boundary-too-large`** pointing at right-sizing guidance (TASK-75). **Do NOT auto-split the phase and do NOT silently scope it down** (FR-008). The recovery is to re-shape the phase's `tasks.md` boundary, then re-run — never to bypass govern.
+   4. *(US3, per-phase commit + push at this boundary — see the "Commit and push" subsection below.)*
+
+   There is **no skip/defer/shortcut branch** anywhere in this loop (US5). A heavy step is *done*, not offered for deferral.
+
+4. **Governance is the per-phase pass — the `governing` phase composes, it does not re-barrage (FR-006a).** Because every phase was governed in step 3 during `implementing`, the per-phase checkpoints already exist when the feature reaches `governing`. The whole-feature `record-converged impl` signal the graduate gate reads is **composed** from the union of those per-phase checkpoints (it carries converged-and-unchanged phases and re-audits only cross-cutting remainder) — there is **no new whole-feature barrage**. This skill never runs `audit-barrage` directly (SC-002); `stackctl govern --phase` owns it.
+
+5. **Confirm and report.** Report:
    - the spec dir that was executed,
-   - the governance run-dir (printed by `govern.sh`, under `.dw-lifecycle/scope-discovery/audit-runs/`),
+   - the per-phase govern run-dirs (under `.stack-control/audit-runs/`) and the phase checkpoints written (`.stack-control/govern/phase-checkpoints/<feature>/`),
    - where findings landed (`audit-log.md`),
-   - how many model lanes produced output.
+   - how many model lanes produced output per phase.
 
-   If governance failed (e.g. `dw-lifecycle` absent from PATH), surface the descriptive error — governance is **not** optional, and a missing dependency fails loud (the cross-plugin seam, guarded by `scripts/smoke-governance-missing-dep.sh`).
+   If a per-phase govern failed (e.g. the model fleet floor was not met), surface the descriptive error — governance is **not** optional, and a missing capability fails loud. Do not lower `--require-models` or `--override` to "keep moving" (that is the prohibited offroad).
+
+## Commit and push (025 US3 — mechanical, at each phase boundary)
+
+*(Documented fully in Phase 5 / T018.)* After each phase's govern in step 3.3, the boundary commits the phase's work (landing locally first so completed work is never lost) and then pushes to the branch's remote. A push failure fails loud and is surfaced; the local commit always survives; `--no-verify` is never used.
 
 ## Postcondition
 
-Native execution ran over the spec; governance fired automatically on `after_implement`; findings are recorded. On any blocked path, you surfaced a descriptive error naming the missing piece (mechanism / runnable spec / governance capability) — never a faked or partial run (SC-006).
+Native execution ran over the spec **phase by phase**, with `stackctl govern --phase` governing each boundary (never one batched whole-feature run); per-phase checkpoints exist for every phase; the graduate gate's signal is composed from them. On any blocked path, you surfaced a descriptive error naming the missing piece (runnable spec / oversized boundary → TASK-75 / governance capability) — never a faked or partial run (SC-006).
 
 ## What this skill does NOT do
 
 - It does not author or repair the spec (use `/stack-control:define` / `/stack-control:extend`).
 - It does not reimplement `/speckit-implement`.
-- It does not manually run `audit-barrage` — the `after_implement` hook owns that.
+- It does not run a single batched whole-feature `audit-barrage` — governance is per-phase (`stackctl govern --phase`); the `governing` phase composes from the checkpoints (FR-006a).
+- It does not offer to skip/defer/shortcut any step (US5), and it does not lower the fleet floor or `--override` to bypass a failed govern.
 - It does not branch on which tool authored the spec (Principle III — capability, not provider identity).
