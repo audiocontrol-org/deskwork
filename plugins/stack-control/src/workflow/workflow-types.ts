@@ -51,6 +51,10 @@ export const CRITERION_KINDS = [
   'record-converged',
   'approval-marker',
   'node-marker',
+  // 025 US1: every tasks.md phase has a CURRENT per-phase govern checkpoint. The
+  // composed `record-converged impl` signal is derived from this (FR-001a) — this
+  // criterion, NOT `record-converged impl`, is what the graduate gate evaluates (C1).
+  'all-phase-checkpoints-current',
 ] as const;
 export type CriterionKind = (typeof CRITERION_KINDS)[number];
 

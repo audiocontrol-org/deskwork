@@ -6,15 +6,31 @@
 // auditLogSection = `phase-<id>`, scope fingerprint over the phase's governed
 // paths). Reuses the 022 workflow fixture for the installation + roadmap + git.
 
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { computeScopeFingerprint, writePhaseCheckpoint } from '../../../govern/checkpoint-state.js';
+import {
+  computeScopeFingerprint,
+  phaseCheckpointSection,
+  writePhaseCheckpoint,
+} from '../../../govern/checkpoint-state.js';
 import { parsePhases } from '../../../govern/incremental-audit.js';
 import { makeWorkflowFixture, type FixtureNode, type WorkflowFixture } from './workflow-fixtures.js';
 
 /** One phase of a fixture feature: its id and the files its tasks name. */
 export interface FixturePhase {
+  /**
+   * The phase id, as it appears after `## Phase ` in the rendered tasks.md. MUST be
+   * digit-led (`PHASE_HEADER_RE` in incremental-audit.ts selects only `[0-9][0-9A-Za-z.]*`)
+   * — a non-digit-led id renders a header the parser silently ignores, so the phase would
+   * vanish from enumeration (AUDIT-BARRAGE claude-01).
+   */
   readonly id: string;
-  /** Installation-relative paths (must contain `/`, no `:`), each a real file. */
+  /**
+   * Each file's installation-relative path MUST contain a `/` and no `:` — the
+   * `extractScopedPaths` grammar drops any other token, which would silently under-scope
+   * the checkpoint fingerprint. `governedPathsFor` asserts written-vs-parsed equality so a
+   * dropped path fails loud at construction rather than as a false-green staleness test.
+   */
   readonly files: readonly { readonly path: string; readonly content: string }[];
 }
 
@@ -41,6 +57,8 @@ export function makeUnskippableFixture(opts: {
   readonly phases: readonly FixturePhase[];
   readonly node?: FixtureNode;
   readonly git?: boolean;
+  /** Render the tasks.md checkboxes as checked (so the item derives at `governing`). */
+  readonly tasksComplete?: boolean;
 }): UnskippableFixture {
   const base = makeWorkflowFixture(opts.node !== undefined ? [opts.node] : [], {
     git: opts.git ?? false,
@@ -52,8 +70,15 @@ export function makeUnskippableFixture(opts: {
   for (const phase of opts.phases) {
     for (const file of phase.files) base.write(file.path, file.content);
   }
-  const tasksText = renderTasks(opts.phases);
+  const tasksText = renderTasks(opts.phases, opts.tasksComplete ?? false);
   const tasksPath = base.write(join(specDirRel, 'tasks.md'), tasksText);
+
+  const writtenPathsFor = (phaseId: string): readonly string[] => {
+    const phase = opts.phases.find((p) => p.id === phaseId);
+    if (phase === undefined) throw new Error(`makeUnskippableFixture: no phase '${phaseId}'`);
+    return phase.files.map((f) => f.path);
+  };
+  const allWrittenPaths = new Set(opts.phases.flatMap((p) => p.files.map((f) => f.path)));
 
   const governedPathsFor = (phaseId: string): readonly string[] => {
     const parsed = parsePhases(tasksText).find((p) => p.phaseId === phaseId);
@@ -62,6 +87,17 @@ export function makeUnskippableFixture(opts: {
     }
     if (parsed.files.length === 0) {
       throw new Error(`makeUnskippableFixture: phase '${phaseId}' has no governed files`);
+    }
+    // claude-01: assert the parser saw EXACTLY the files we wrote. If extractScopedPaths
+    // silently dropped a path (no `/`, leading `/`, or a `:`), the fingerprint would cover
+    // a subset and a staleness test on the dropped file would falsely pass — fail loud here.
+    const written = [...writtenPathsFor(phaseId)].sort();
+    const seen = [...parsed.files].sort();
+    if (written.length !== seen.length || written.some((p, i) => p !== seen[i])) {
+      throw new Error(
+        `makeUnskippableFixture: phase '${phaseId}' path-grammar drop — wrote [${written.join(', ')}] ` +
+          `but tasks.md parsed [${seen.join(', ')}]; every fixture file path must contain '/' and no ':'`,
+      );
     }
     return parsed.files;
   };
@@ -79,25 +115,45 @@ export function makeUnskippableFixture(opts: {
         version: 1,
         featureSlug: opts.slug,
         phaseId,
-        checkpoint: `phase-${phaseId}`,
-        auditLogSection: `phase-${phaseId}`,
+        // claude-02: derive the section key from the shared helper so the fixture cannot
+        // drift from govern's live write path (which keys freshness on the same value).
+        checkpoint: phaseCheckpointSection(phaseId),
+        auditLogSection: phaseCheckpointSection(phaseId),
         scopeFingerprint,
         passedAt,
         governedPaths,
       });
     },
-    editPhaseFile: (path, content) => base.write(path, content),
+    editPhaseFile: (path, content) => {
+      // claude-04: a no-op edit (identical content) leaves the SHA-256 fingerprint unchanged,
+      // so the "goes stale" promise would silently not hold; and editing a non-phase path
+      // checkpoints nothing. Make both misuses loud.
+      if (!allWrittenPaths.has(path)) {
+        throw new Error(
+          `makeUnskippableFixture.editPhaseFile: '${path}' is not a known phase file ` +
+            `(known: ${[...allWrittenPaths].join(', ')})`,
+        );
+      }
+      if (readFileSync(join(base.root, path), 'utf8') === content) {
+        throw new Error(
+          `makeUnskippableFixture.editPhaseFile: content for '${path}' is identical — ` +
+            'an identical write does not change the fingerprint, so the checkpoint would NOT go stale',
+        );
+      }
+      base.write(path, content);
+    },
     cleanup: base.cleanup,
   };
 }
 
 /** Render a tasks.md with one `## Phase <id>` section per phase, files in backticks. */
-function renderTasks(phases: readonly FixturePhase[]): string {
+function renderTasks(phases: readonly FixturePhase[], complete: boolean): string {
+  const box = complete ? 'X' : ' ';
   const lines = ['# Tasks', ''];
   for (const phase of phases) {
     lines.push(`## Phase ${phase.id}: fixture phase ${phase.id}`, '');
     for (const file of phase.files) {
-      lines.push(`- [ ] T-${phase.id} touch \`${file.path}\``);
+      lines.push(`- [${box}] T-${phase.id} touch \`${file.path}\``);
     }
     lines.push('');
   }

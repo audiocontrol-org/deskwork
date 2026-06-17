@@ -29,7 +29,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { recordGovernConvergence } from '../govern/convergence-record.js';
 import { fileURLToPath } from 'node:url';
 import {
@@ -63,9 +63,13 @@ import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
 import {
   carriedFilesForComposition,
-  parsePhases,
   resolvePhaseUnit,
 } from '../govern/incremental-audit.js';
+import {
+  normalizeGovernedPaths,
+  resolvePhaseCheckpointStatuses,
+  type PhaseCheckpointStatus,
+} from '../govern/phase-checkpoint-status.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
@@ -79,12 +83,7 @@ import type { Installation } from '../config/types.js';
 import { checkLifecyclePrecondition } from '../lifecycle-precondition.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
-import {
-  computeScopeFingerprint,
-  isCheckpointFresh,
-  readPhaseCheckpoint,
-  writePhaseCheckpoint,
-} from '../govern/checkpoint-state.js';
+import { writePhaseCheckpoint } from '../govern/checkpoint-state.js';
 import { type LaneCapabilityProfile } from '../govern/lane-capabilities.js';
 import { negotiateFleet } from '../govern/fleet-negotiation.js';
 import { selectRequestedLaneCapabilities } from '../govern/protocol.js';
@@ -398,85 +397,9 @@ function resolveGovernExcludePaths(installation: Installation): readonly string[
   return excludes;
 }
 
-interface PhaseCheckpointStatus {
-  readonly phaseId: string;
-  /** The tasks.md-declared scope (may name directories) — used for freshness. */
-  readonly files: readonly string[];
-  /** The files the recorded checkpoint actually audited (TASK-129); undefined
-   * when no record exists or a pre-TASK-129 checkpoint omitted them. */
-  readonly auditedFiles: readonly string[] | undefined;
-  readonly scopeFingerprint: string;
-  readonly state: 'current' | 'missing' | 'stale';
-}
-
-function normalizeGovernedPaths(
-  installationRoot: string,
-  paths: readonly string[],
-): readonly string[] {
-  const top = deriveDistinctGitToplevel(installationRoot);
-  const installationRel =
-    top !== null ? relative(top, installationRoot).split('\\').join('/') : null;
-  return Array.from(
-    new Set(
-      paths.map((path) => {
-        const normalized = path.split('\\').join('/');
-        if (existsSync(join(installationRoot, normalized))) {
-          return normalized;
-        }
-        if (
-          installationRel !== null &&
-          installationRel.length > 0 &&
-          (normalized === installationRel || normalized.startsWith(`${installationRel}/`))
-        ) {
-          return normalized.slice(installationRel.length + 1);
-        }
-        return normalized;
-      }),
-    ),
-  );
-}
-
-function resolvePhaseCheckpointStatuses(
-  installationRoot: string,
-  slug: string,
-  tasksPath: string,
-): readonly PhaseCheckpointStatus[] {
-  return parsePhases(readFileSync(tasksPath, 'utf8')).map((phase) => {
-    const governedPaths = normalizeGovernedPaths(installationRoot, phase.files);
-    if (governedPaths.length === 0) {
-      throw new Error(
-        `phase '${phase.phaseId}' in ${tasksPath} has no governed file list; ` +
-          'a phase checkpoint cannot be scoped to an empty path set ' +
-          '(add the phase\'s authoritative files to tasks.md)',
-      );
-    }
-    const scopeFingerprint = computeScopeFingerprint(installationRoot, governedPaths);
-    const record = readPhaseCheckpoint(installationRoot, slug, phase.phaseId);
-    if (record === null) {
-      return {
-        phaseId: phase.phaseId,
-        files: governedPaths,
-        auditedFiles: undefined,
-        scopeFingerprint,
-        state: 'missing',
-      };
-    }
-    return {
-      phaseId: phase.phaseId,
-      files: governedPaths,
-      auditedFiles: record.auditedFiles,
-      scopeFingerprint,
-      state: isCheckpointFresh(record, {
-        version: 1,
-        checkpoint: `phase-${phase.phaseId}`,
-        auditLogSection: `phase-${phase.phaseId}`,
-        scopeFingerprint,
-      })
-        ? 'current'
-        : 'stale',
-    };
-  });
-}
+// PhaseCheckpointStatus, normalizeGovernedPaths, and resolvePhaseCheckpointStatuses
+// were extracted to ../govern/phase-checkpoint-status.js (025 US1) so the per-phase
+// graduate gate reuses the SAME currency logic this command writes (no clone).
 
 /**
  * The files a phase's audit ACTUALLY covered: `git diff --name-only <base> --

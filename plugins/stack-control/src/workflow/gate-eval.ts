@@ -8,9 +8,10 @@
 // item-specific paths. `evaluateGate` enumerates the unmet criteria (M of N).
 
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { WorkflowError, type Criterion } from './workflow-types.js';
 import { designGateCriteria } from './house-rules.js';
+import { composeConvergedImpl } from '../govern/compose-convergence.js';
 
 /**
  * The resolved, install-anchored facts the evaluator reads. Built by the query /
@@ -141,6 +142,28 @@ export function evaluateCriterion(c: Criterion, ctx: GateContext): boolean {
       if (c.target === 'impl') return ctx.implRecordConverged;
       if (c.target === 'spec') return ctx.specRecordConverged;
       throw new WorkflowError(`criterion 'record-converged' has unknown target '${c.target}' (expected impl|spec)`);
+    case 'all-phase-checkpoints-current': {
+      // 025 US1 (FR-001/001a/002/003): met IFF every tasks.md phase has a current
+      // per-phase checkpoint. The composed `record-converged impl` signal is DERIVED
+      // from this union — a standalone whole-feature record never satisfies it. Reads
+      // only the per-phase checkpoints (no whole-feature payload); fails loud (FR-004)
+      // on a spec with no resolvable dir or a malformed phase set. Pure read (Principle IV).
+      if (c.target !== 'impl') {
+        throw new WorkflowError(`criterion 'all-phase-checkpoints-current' has unknown target '${c.target}' (expected impl)`);
+      }
+      // No spec dir / no tasks.md → no per-phase governance has been done → the gate is
+      // UNMET (not a fail-loud): a feature without a runnable tasks.md simply cannot have
+      // current per-phase checkpoints. Returning false (vs throwing) keeps the read-only
+      // compass robust; the dangerous masquerade case (a phase with no file list) still
+      // fails loud inside composeConvergedImpl (FR-004).
+      if (ctx.specDirPath === null) return false;
+      const tasksPath = join(ctx.specDirPath, 'tasks.md');
+      if (!existsSync(tasksPath)) return false;
+      // featureSlug = basename(specDirPath): the marker-resolved slug govern keys
+      // per-phase checkpoints under (resolveFeatureSlug prefers the SPECKIT marker,
+      // whose basename is the spec dir name).
+      return composeConvergedImpl(ctx.installationRoot, basename(ctx.specDirPath), tasksPath);
+    }
     case 'approval-marker':
       if (c.target === 'design-approved') return ctx.designApproved;
       throw new WorkflowError(`criterion 'approval-marker' has unknown target '${c.target}' (expected design-approved)`);
