@@ -69,3 +69,7 @@
 
 ## session-end 2026-06-16
 - speckit before_specify hook (speckit.git.feature) is mandatory (optional:false) but creates a per-spec branch, which conflicts with this program's one-long-lived-branch convention (TF-09). Every /stack-control:define must skip a 'mandatory' hook. Suggested: a stack-control define-mode that suppresses/no-ops the branch-creation hook on one-branch installations, so the agent isn't forced to deviate from a mandatory hook each spec.
+
+## session-end 2026-06-17
+- Per-phase govern run RETROACTIVELY over a finished feature manufactures scoping-artifact false-positives: governing phase N (scoped to phase-N files, whole-history diff base) cannot see fixes that live in other phases' files, so it reports them 'absent/unverified' (025 phase-1 re-govern claude-01 flagged the govern.ts featureCheckpointKey fix as missing though it was committed + tested). Per-phase also MULTIPLIES the auditor oscillation (8 phases x N rounds). The cadence is designed to run DURING implementation, not as a retroactive sweep. Captured as TASK-154 / multi:feature/audit-barrage-convergence.
+- session-end + govern boundary resolution is unreliable on the long-lived feature/stack-control branch: after a merge to main, merge-base resolves to ~HEAD so auto-derived 'Commits' would be 0; had to pass --since <prior-session-end-sha> explicitly. (TASK-39/TASK-59 territory.)

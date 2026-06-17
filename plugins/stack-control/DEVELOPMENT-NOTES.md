@@ -2,6 +2,92 @@
 
 ---
 
+## 2026-06-17: Execute 025 unskippable-workflow-protocol → ship to main (PR #483)
+
+**Goal:** Run the analyze-clean 025 spec through `/stack-control:execute` → native
+`/speckit-implement`, per-phase, governing at each boundary, then ship.
+
+**Accomplished:**
+- **All 5 user stories implemented + shipped to `main` (PR #483, merge `111d2fb8`).** 30 tasks,
+  full suite green (**264 test files / 1731 tests**), `spec-check` exit 0.
+  - US1: `all-phase-checkpoints-current` graduate gate (composed signal from the checkpoint
+    union; currency logic extracted from `govern.ts` with no clone; single-sourced
+    `featureCheckpointKey`). US2: `execute` per-phase govern cadence + oversized→TASK-75.
+    US3: mechanical commit-local-first→push, never `--no-verify`. US4: portable
+    `stackctl speckit-guard` + cross-vendor adapter + US1-gate teeth. US5: `no-shortcuts-audit`.
+- **Governance dogfooded — caught 2 cross-model HIGH bugs the 1731-test suite missed**
+  (checkpoint-key drift; false fail-loud docstring), both fixed TDD-first.
+- Composed the important follow-ons into governed roadmap nodes (`multi:feature/audit-barrage-convergence`
+  + 6 children/residuals); opened + auto-merged PR #483.
+
+**Didn't Work:**
+- **The retroactive per-phase govern sweep did not converge.** Run after the feature was
+  finished (whole-history diff base scoped to one phase's files), it manufactured
+  scoping-artifact false-positives (the barrage couldn't see fixes living in other phases'
+  files → flagged a committed+tested fix as "absent") and amplified the auditor oscillation.
+  Stopped it; recorded a `GOVERN_OVERRIDE` at the plateau (operator decision).
+- First govern run hit a fleet-floor shortfall — codex `killed-no-liveness` (60s stderr
+  window too tight for its silent reasoning on a real payload).
+
+**Course Corrections:**
+- [PROCESS] **US4 mechanism was invalid.** The spec said inject precondition blocks into the
+  adopter's `.claude/skills/speckit-*` — but those are the adopter's own Spec Kit (not
+  plugin-controlled) and `.claude/skills` is Claude-only (the plugin is cross-vendor). Operator
+  redirected to a portable `stackctl` verb + cross-vendor adapters + US1-gate teeth; amended the
+  spec; filed the point-of-invocation interception as a follow-on.
+- [PROCESS] **Build for the adopter environment, not the source repo** (GitHub #480): skill
+  bodies must invoke bare `stackctl` (on PATH in a host install), not `plugins/stack-control/bin/stackctl`.
+- [PROCESS] **Don't hardcode Claude-only deps** — the plugin is cross-vendor (Claude + Codex);
+  behavior lives in `stackctl`, hosts are thin adapters (specs/017 Decision 1).
+- [PROCESS] **codex fleet liveness** — operator chose to widen the window as a stopgap and
+  capture the better fix (emit reasoning summaries) as TASK-145, not paper over the floor.
+- [PROCESS] **Per-phase-vs-full-audit reconsideration** — operator surfaced that per-phase
+  (meant to shrink payloads for small models) didn't pay off and magnified the ringing;
+  captured TASK-154 + composed the `audit-barrage-convergence` roadmap feature.
+- [COMPLEXITY] **Override-and-graduate at the govern plateau** (operator) rather than grinding
+  8 retroactive barrages with finding-fix iterations.
+
+**Insights:**
+- **The barbell thesis validated live**: cross-model stochastic governance caught two real HIGH
+  bugs that 1731 deterministic tests did not (a key-drift latent only for adopter `--feature`
+  usage; a lying docstring). Detection over instruction.
+- **Per-phase govern is an anti-pattern when applied retroactively**: intended to shrink the
+  audit payload, it instead *multiplied* the audit surface (8 phases × N rounds), introduced
+  scoping blind spots, and amplified oscillation. The cadence belongs *during* implementation,
+  not as an end-of-feature sweep — which is exactly what TASK-154 / the convergence feature now
+  targets.
+- **025 gates itself**: the feature's own graduation now requires per-phase checkpoints it
+  didn't produce cleanly — the dogfood-eats-itself moment that surfaced the upgrade-migration
+  gap (TASK-153).
+
+**Governance / findings (per AUDIT-03 convention):**
+- Implement-mode govern caught 2 cross-model HIGH → both FIXED (commit `bd5366bc`). Plateau
+  residuals dispositioned: 1 false-positive (per-phase scoping, no-action), 1 won't-fix
+  (filed-follow-on reference is a disposition, not a deferral), 2 design forks SCOPED to roadmap
+  (`impl:gap/start-governing-enforcement`, `impl:gap/per-phase-gate-upgrade-migration`).
+  Recorded `GOVERN_OVERRIDE` (audit-log) at the plateau per operator. **0 open findings carried
+  silently** — every residual is scoped or dispositioned.
+- New backlog this session: TASK-145, 151, 152, 153, 154 (+ 13 GitHub issues imported).
+  Promoted to roadmap: TASK-60, 145, 146, 149, 152, 153, 154.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 13
+  - roadmap(stack-control): compose 025-session backlog items into governed roadmap nodes
+  - backlog(stack-control): TASK-154 — audit-granularity switch (per-phase opt-in vs full-audit-at-end)
+  - govern(stack-control): 025 GOVERN_OVERRIDE at the convergence plateau (operator decision 2026-06-17)
+  - fix(stack-control): 025 remediate Phase-1 govern cross-model findings (codex-01/claude-02 HIGH, claude-01 HIGH, claude-03/codex-02/claude-04)
+  - chore(stack-control): 025 Phase 8 polish — enforcement-home audit, honest boundary, file-size guard (T027-T030)
+  - feat(stack-control): 025 US5 — no agent-offered shortcuts audit (T024-T026)
+  - feat(stack-control): 025 US4 — portable speckit wrapper refusal + US1-gate defense-in-depth (T019-T023)
+  - feat(stack-control): 025 US3 — mechanical commit-and-push at each phase boundary (T016-T018)
+  - feat(stack-control): 025 US2 — execute fires per-phase govern at each boundary (T012-T015)
+  - feat(stack-control): 025 US1 per-phase graduate gate (T006-T011, MVP)
+  - spec(stack-control): 025 correct US4 to adopter-safe + cross-vendor; fleet + backlog remediation
+  - feat(stack-control): 025 Phase 2 — fail-loud phase enumeration (T003-T005)
+  - feat(stack-control): 025 Phase 1 setup — primitive inventory + multi-phase fixtures
+- Files changed: 48
+- Backlog touched: TASK-145, TASK-146, TASK-149, TASK-151, TASK-152, TASK-153, TASK-154, TASK-48, TASK-60, TASK-70, TASK-75
+
 ## 2026-06-16: session-end re-invocation (no new work since prior close)
 
 **Goal:** Operator re-invoked `/stack-control:session-end` immediately after the prior
