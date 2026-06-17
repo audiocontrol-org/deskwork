@@ -2,6 +2,30 @@
 
 ---
 
+## 2026-06-17: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 3
+  - roadmap(stack-control): reclassify capability-interface-mediation + record design approval
+  - design(stack-control): capability-interface mediation design record
+  - roadmap(stack-control): graduate 025 unskippable-workflow-protocol to shipped
+- Files changed: 2
+- Backlog touched: TASK-137, TASK-144
+
 ## 2026-06-17: Execute 025 unskippable-workflow-protocol → ship to main (PR #483)
 
 **Goal:** Run the analyze-clean 025 spec through `/stack-control:execute` → native
