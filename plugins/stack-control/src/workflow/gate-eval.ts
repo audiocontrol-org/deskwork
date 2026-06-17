@@ -8,10 +8,11 @@
 // item-specific paths. `evaluateGate` enumerates the unmet criteria (M of N).
 
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { WorkflowError, type Criterion } from './workflow-types.js';
 import { designGateCriteria } from './house-rules.js';
 import { composeConvergedImpl } from '../govern/compose-convergence.js';
+import { featureCheckpointKey } from '../govern/phase-checkpoint-status.js';
 
 /**
  * The resolved, install-anchored facts the evaluator reads. Built by the query /
@@ -159,10 +160,11 @@ export function evaluateCriterion(c: Criterion, ctx: GateContext): boolean {
       if (ctx.specDirPath === null) return false;
       const tasksPath = join(ctx.specDirPath, 'tasks.md');
       if (!existsSync(tasksPath)) return false;
-      // featureSlug = basename(specDirPath): the marker-resolved slug govern keys
-      // per-phase checkpoints under (resolveFeatureSlug prefers the SPECKIT marker,
-      // whose basename is the spec dir name).
-      return composeConvergedImpl(ctx.installationRoot, basename(ctx.specDirPath), tasksPath);
+      // The checkpoint namespace key is single-sourced via featureCheckpointKey (AUDIT
+      // codex-01/claude-02): the spec-dir basename, the SAME canonical key govern writes
+      // under — so write-key and read-key cannot drift (a branch/explicit slug never
+      // re-routes the gate to a different checkpoint dir).
+      return composeConvergedImpl(ctx.installationRoot, featureCheckpointKey(ctx.specDirPath), tasksPath);
     }
     case 'approval-marker':
       if (c.target === 'design-approved') return ctx.designApproved;

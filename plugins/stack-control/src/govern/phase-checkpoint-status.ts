@@ -9,15 +9,29 @@
 // `phaseCheckpointSection` helper so a format change can never drift writer vs reader.
 
 import { existsSync, readFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { basename, join, relative } from 'node:path';
 import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
-import { parsePhases } from './incremental-audit.js';
+import { enumeratePhases } from '../workflow/phase-enumeration.js';
 import {
   computeScopeFingerprint,
   isCheckpointFresh,
   phaseCheckpointSection,
   readPhaseCheckpoint,
 } from './checkpoint-state.js';
+
+/**
+ * The CANONICAL per-phase checkpoint namespace key for a feature (025 AUDIT codex-01 /
+ * claude-02, HIGH): the basename of the feature's spec/root directory. BOTH the writer
+ * (`govern`, keyed off the resolved feature ROOT) and the reader (the US1 graduate gate,
+ * keyed off the spec dir) MUST derive the key through THIS one function — so a govern run
+ * and the gate can never address different `.stack-control/govern/phase-checkpoints/<key>/`
+ * directories (which would make a fully-governed feature un-graduatable and loop). The key
+ * is spec-anchored and branch-independent — NOT `resolveFeatureSlug` (which may return a
+ * branch/explicit slug that differs from the spec dir name).
+ */
+export function featureCheckpointKey(featureDir: string): string {
+  return basename(featureDir.replace(/[/\\]+$/, ''));
+}
 
 export interface PhaseCheckpointStatus {
   readonly phaseId: string;
@@ -62,15 +76,11 @@ export function resolvePhaseCheckpointStatuses(
   slug: string,
   tasksPath: string,
 ): readonly PhaseCheckpointStatus[] {
-  return parsePhases(readFileSync(tasksPath, 'utf8')).map((phase) => {
+  // Single enumeration substrate (AUDIT claude-01/claude-03): enumeratePhases polices the
+  // FR-004 empty-file-list FATAL for ALL callers (no clone); allowZeroPhases keeps a
+  // non-phased tasks.md a soft [] here so the gate reports a named unmet, not a crash.
+  return enumeratePhases(readFileSync(tasksPath, 'utf8'), { allowZeroPhases: true }).map((phase) => {
     const governedPaths = normalizeGovernedPaths(installationRoot, phase.files);
-    if (governedPaths.length === 0) {
-      throw new Error(
-        `phase '${phase.phaseId}' in ${tasksPath} has no governed file list; ` +
-          'a phase checkpoint cannot be scoped to an empty path set ' +
-          "(add the phase's authoritative files to tasks.md)",
-      );
-    }
     const scopeFingerprint = computeScopeFingerprint(installationRoot, governedPaths);
     const section = phaseCheckpointSection(phase.phaseId);
     const record = readPhaseCheckpoint(installationRoot, slug, phase.phaseId);

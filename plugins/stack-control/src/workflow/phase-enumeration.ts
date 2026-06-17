@@ -6,10 +6,13 @@
 //   - zero derivable phases → FATAL (a feature is NOT trivially gate-met);
 //   - a phase with no authoritative file list → FATAL naming the phase.
 //
-// This is the shared substrate the US1 graduate gate (all-phase-checkpoints-current)
-// and the US2 execute cadence both read — both need the SAME phase set + file lists,
-// and both must refuse an empty phase rather than let it masquerade as governed
-// (the AUDIT-class "empty phase approved" failure).
+// This is the single shared enumeration substrate. The US2 execute cadence calls it with
+// the default (zero phases → FATAL, since an agent actively governing must not proceed on
+// a non-phased tasks.md). The US1 graduate gate reaches it through
+// `resolvePhaseCheckpointStatuses` with `allowZeroPhases: true` — zero phases is a NAMED
+// unmet verdict there, not a crash, because the read-only compass evaluates that gate
+// (AUDIT codex-01/claude-01). The empty-file-list FATAL (a phase that masquerades as
+// governed) is policed HERE for BOTH callers — one guard, no clone (AUDIT claude-03).
 //
 // Hard dependency: TASK-70 (per-phase govern scoping is unsound without authoritative
 // file lists). When tasks.md does not name a phase's files, this fails loud rather
@@ -24,15 +27,28 @@ export interface EnumeratedPhase {
   readonly files: readonly string[];
 }
 
+export interface EnumeratePhasesOptions {
+  /**
+   * When true, zero derivable phases returns `[]` instead of throwing — for the read-only
+   * gate path, which reports zero phases as a named unmet verdict (the compass must not
+   * crash). Default false: the execute/govern path fails loud on a non-phased tasks.md.
+   */
+  readonly allowZeroPhases?: boolean;
+}
+
 /**
- * Enumerate the phases of a tasks.md, each with its authoritative file list.
- * Throws `WorkflowError` (FATAL) on zero phases or a phase with no file list —
- * the gate / cadence callers surface the message; they never proceed on a
- * partial/empty payload (FR-004).
+ * Enumerate the phases of a tasks.md, each with its authoritative file list. Throws
+ * `WorkflowError` (FATAL) when a phase EXISTS but has no file list (the masquerade danger,
+ * FR-004) — always, for every caller. Zero phases throws by default, or returns `[]` when
+ * `allowZeroPhases` is set (the gate path). Callers never proceed on a partial payload.
  */
-export function enumeratePhases(tasksText: string): EnumeratedPhase[] {
+export function enumeratePhases(
+  tasksText: string,
+  options: EnumeratePhasesOptions = {},
+): EnumeratedPhase[] {
   const parsed = parsePhases(tasksText);
   if (parsed.length === 0) {
+    if (options.allowZeroPhases === true) return [];
     throw new WorkflowError(
       'tasks.md has no derivable phase headers (`## Phase <id> …`); ' +
         'the per-phase gate cannot treat a feature with no phases as trivially met',

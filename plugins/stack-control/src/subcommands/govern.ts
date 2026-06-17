@@ -66,6 +66,7 @@ import {
   resolvePhaseUnit,
 } from '../govern/incremental-audit.js';
 import {
+  featureCheckpointKey,
   normalizeGovernedPaths,
   resolvePhaseCheckpointStatuses,
   type PhaseCheckpointStatus,
@@ -667,6 +668,10 @@ export async function runGovern(args: string[]): Promise<void> {
     let phaseUnit: AuditUnit | undefined;
     let payloadPathScope: readonly string[] | undefined;
     let phaseCheckpointStatuses: readonly PhaseCheckpointStatus[] | undefined;
+    // The canonical checkpoint namespace key (AUDIT codex-01/claude-02): derived from the
+    // resolved feature ROOT via featureCheckpointKey — the SAME spec-anchored key the US1
+    // gate reads under, NOT the (possibly branch/explicit) `slug`. Set where `root` resolves.
+    let phaseCheckpointKey: string | undefined;
     // US1 true-composition (operator decision 2026-06-14): whole-feature govern
     // EXCLUDES the files of converged-and-unchanged phases from the payload (it
     // carries them) — absolute paths threaded into the assembler's excludePaths.
@@ -686,7 +691,8 @@ export async function runGovern(args: string[]): Promise<void> {
       }
       const diffBase =
         flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
-      phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, slug, tasksPath);
+      phaseCheckpointKey = featureCheckpointKey(root);
+      phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, phaseCheckpointKey, tasksPath);
       assertPriorPhaseCheckpointsCurrent(phaseCheckpointStatuses, flags.phase);
       phaseUnit = resolvePhaseUnit({ tasksPath, phaseId: flags.phase, diffBase });
       payloadPathScope = normalizeGovernedPaths(repoRoot, phaseUnit.diffScope.files);
@@ -702,7 +708,8 @@ export async function runGovern(args: string[]): Promise<void> {
         if (existsSync(tasksPath)) {
           const diffBase =
             flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
-          phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, slug, tasksPath);
+          phaseCheckpointKey = featureCheckpointKey(root);
+          phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, phaseCheckpointKey, tasksPath);
           // TRUE COMPOSITION (operator decision 2026-06-14, US1 — TASK-120/121):
           // whole-feature govern does NOT gate on missing/stale checkpoints. It
           // CARRIES converged-and-unchanged phases (excludes their files) and
@@ -885,7 +892,8 @@ export async function runGovern(args: string[]): Promise<void> {
         );
         writePhaseCheckpoint(repoRoot, {
           version: 1,
-          featureSlug: slug,
+          // Canonical key (AUDIT codex-01/claude-02) — what the US1 gate reads under.
+          featureSlug: phaseCheckpointKey ?? featureCheckpointKey(slug),
           phaseId: phaseUnit.phaseId,
           checkpoint: built.checkpoint,
           auditLogSection: phaseUnit.auditLogSection,

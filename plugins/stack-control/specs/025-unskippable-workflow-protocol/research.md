@@ -130,7 +130,7 @@ attaches to; no behavior change in this task.
 ### tasks.md phase enumeration — `src/govern/incremental-audit.ts`
 
 - `parsePhases(tasksText): {phaseId, files}[]` — `## Phase <id>` header grammar (`PHASE_HEADER_RE`), backtick-span file extraction (`extractScopedPaths`). Returns `files: []` for a phase with no path spans (does NOT fail loud, does NOT guard zero-phases).
-- **Anchor decision (T004)**: new `src/workflow/phase-enumeration.ts` wraps `parsePhases` and adds the two FR-004 fail-loud guards the gate requires: zero derivable phases → FATAL; a phase with an empty file list → FATAL naming the phase. Pure over tasks text.
+- **Anchor decision (T004; refined per AUDIT codex-02/claude-01)**: `src/workflow/phase-enumeration.ts` wraps `parsePhases` as the SINGLE enumeration substrate. The FR-004 **empty-file-list FATAL** (a phase that exists but names no files — the masquerade) is policed here for ALL callers (one guard, no clone). **Zero-phases** behaviour is caller-selected: the execute/govern path (US2) gets the default **FATAL** (an agent actively governing must not proceed on a non-phased tasks.md); the read-only US1 gate reaches it via `resolvePhaseCheckpointStatuses({allowZeroPhases:true})` and reports zero phases as a **named unmet verdict, not a crash** (the compass evaluates that gate). Pure over tasks text.
 
 ### Gate-eval criterion machinery (022) — `src/workflow/gate-eval.ts` + `workflow-types.ts`
 

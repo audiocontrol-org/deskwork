@@ -3,31 +3,37 @@
 // The whole-feature `record-converged impl` signal is DERIVED from the union of the
 // per-phase checkpoints (FR-001a) — there is NO separate whole-feature govern run
 // (that is the boundary-too-large path this feature removes). This module is a pure
-// READ over the per-phase checkpoints: it enumerates the tasks.md phases (failing
-// loud per FR-004 on zero phases / a phase with no authoritative file list), resolves
-// each phase's checkpoint currency via the shared `resolvePhaseCheckpointStatuses`
-// (the SAME logic govern uses to write them — no clone), and reports the gate verdict.
-// It assembles no payload and never spawns a barrage.
+// READ over the per-phase checkpoints, via the shared `resolvePhaseCheckpointStatuses`
+// (the SAME currency logic govern writes under — no clone, and keyed by the SAME
+// featureCheckpointKey). Fail-loud behaviour (FR-004): the ONLY fatal path is a phase
+// that EXISTS but declares no authoritative file list (a zero-scope checkpoint would
+// masquerade as governed). A tasks.md with ZERO `## Phase` headers is reported as a
+// (named) UNMET verdict — NOT fatal — because the read-only compass evaluates this gate
+// and must not crash on a non-phased/legacy feature (AUDIT codex-02/claude-01). This is
+// deliberately distinct from `enumeratePhases` (the execute/govern primitive), which DOES
+// throw on zero phases when an agent is actively governing. It assembles no payload and
+// never spawns a barrage.
 
 import { resolvePhaseCheckpointStatuses } from './phase-checkpoint-status.js';
 
 /** One unmet phase in the per-phase gate, with WHY it is unmet (names the phase). */
 export interface UnmetPhase {
   readonly phaseId: string;
-  readonly reason: 'missing' | 'stale';
+  readonly reason: 'missing' | 'stale' | 'no-phases';
 }
 
 export interface PhaseCheckpointGateResult {
-  /** Met iff every tasks.md phase has a current checkpoint. */
+  /** Met iff there is ≥1 phase and every tasks.md phase has a current checkpoint. */
   readonly met: boolean;
   /** The phases without a current checkpoint, each naming the reason (SC-001/SC-002). */
   readonly unmet: readonly UnmetPhase[];
 }
 
 /**
- * Evaluate the per-phase checkpoint gate for a feature. Fails loud (FR-004) on a
- * malformed phase set (zero derivable phases, or a phase with no authoritative file
- * list) via `enumeratePhases`; otherwise reports met/unmet with the offending phases.
+ * Evaluate the per-phase checkpoint gate for a feature. Throws (FR-004) ONLY when a phase
+ * EXISTS but has no authoritative file list (the masquerade danger) — via
+ * `resolvePhaseCheckpointStatuses`. Zero derivable phases is a NAMED unmet verdict (not a
+ * throw). Otherwise reports met/unmet, naming each offending phase. Pure read.
  */
 export function evaluatePhaseCheckpoints(
   installationRoot: string,
@@ -39,10 +45,11 @@ export function evaluatePhaseCheckpoints(
   // would masquerade as governed (US1 acceptance #4). That throw propagates to the caller.
   const statuses = resolvePhaseCheckpointStatuses(installationRoot, slug, tasksPath);
   // Zero derivable phases is NOT trivially met: a tasks.md with no `## Phase` headers can
-  // never satisfy a per-phase gate, so it is UNMET (not a crash — the gate is also read
-  // by the read-only compass). The dangerous masquerade above is the only fail-loud path.
+  // never satisfy a per-phase gate, so it is UNMET — named (claude-04), not silent — and
+  // not a crash (the gate is also read by the read-only compass). The masquerade above is
+  // the only fail-loud path.
   if (statuses.length === 0) {
-    return { met: false, unmet: [] };
+    return { met: false, unmet: [{ phaseId: '(no tasks.md phases)', reason: 'no-phases' }] };
   }
   const unmet: UnmetPhase[] = [];
   for (const status of statuses) {
