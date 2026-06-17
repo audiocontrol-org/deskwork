@@ -24,6 +24,14 @@ The governing model is **not** "guard that wraps backends." It is: **stack-contr
 - **Complete-mediation invariant**: for every capability, the agent's only sanctioned path to a backend is through the interface.
 - **Point-of-invocation interception** is the enforcement that makes mediation complete — the teeth that stop an agent reaching past the API to the implementation.
 
+## Clarifications
+
+### Session 2026-06-17
+
+- Q: How should the front-door marker propagate so the interceptor observes it across the front-door-skill → backend-skill boundary on both Claude and Codex? → A: **Marker file on disk** — vendor-portable, survives the cross-process invocation boundary; lifecycle must handle stale markers and nesting (FR-014).
+- Q: Which capabilities are under the complete-mediation invariant at v1? → A: **The three clear ones** — backlog, spec-definition, spec-execution; scope-discovery / audit-barrage / roadmap are operator tools outside the invariant for v1, addable later as registry entries (FR-017).
+- Q: How should the interceptor identify a fronted CLI invocation in Bash precisely? → A: **Normalized argv[0] identity resolution** (basename + PATH/alias resolution) matched against the registry's backend identity set; name occurrences in paths/args/comments do not trigger refusal (FR-005).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Reach-around is refused at the point of invocation; sanctioned front-door calls pass (Priority: P1)
@@ -110,7 +118,7 @@ The interception behaves identically whether the agent runs under Claude Code or
 - **FR-002**: The refusal scope MUST be **all** fronted-backend calls — reads included — not a mutating-only or allowlist-precision subset. The front door is the only sanctioned path.
 - **FR-003**: A refusal MUST emit a message that names the capability interface the agent should use instead (read from the registry).
 - **FR-004**: A backend call carrying the front-door marker (`STACKCTL_FRONT_DOOR`), set by a capability-interface skill legitimately driving the backend, MUST be permitted.
-- **FR-005**: Identity matching for Bash-invoked CLIs MUST be **precise** (identity-based), not loose substring matching, to avoid refusing unrelated commands that merely contain a backend's name. [NEEDS CLARIFICATION: the exact identity-matching grammar for distinguishing a fronted CLI invocation from an unrelated token — argv[0] resolution, path normalization, alias/wrapper handling.]
+- **FR-005**: Identity matching for Bash-invoked CLIs MUST be **precise** (identity-based), not loose substring matching, to avoid refusing unrelated commands that merely contain a backend's name. The interceptor MUST resolve the command's `argv[0]` to a normalized executable identity (basename + PATH/alias resolution) and match that against the registry's backend identity set; occurrences of a backend's name in paths, arguments, or comments MUST NOT trigger refusal.
 - **FR-006**: The interception decision logic MUST live in `stackctl` (the vendor-neutral core) and branch on capability/identity, never on vendor identity; it MUST NOT hardcode a Claude-only `.claude/skills` path.
 - **FR-007**: The interceptor's exit-code contract MUST be: 1 = refused, 0 = permitted, 2 = usage error (inherited from the 025 guard verb).
 - **FR-008**: The interceptor MUST be delivered as plugin-shipped surfaces that travel with `claude plugin install` — a Claude Code `PreToolUse` hook declared in the plugin manifest/`hooks/`, and a Codex equivalent — NOT a hand-rolled `.husky`/`.git/hooks` script.
@@ -125,7 +133,8 @@ The interception behaves identically whether the agent runs under Claude Code or
 **Front-door marker:**
 
 - **FR-013**: Capability-interface skills MUST set the front-door marker when they legitimately drive a backend, and the marker MUST be absent on a raw reach-around.
-- **FR-014**: The marker propagation mechanism MUST be pinned such that a `PreToolUse`-style interceptor reliably observes the marker across the front-door-skill → backend-skill invocation boundary. [NEEDS CLARIFICATION: process environment variable vs. a marker file the hook reads — which mechanism reliably propagates across the invocation boundary on BOTH Claude and Codex? This is the core feasibility risk and must be resolved before the interceptor is built.]
+- **FR-014**: The front-door marker MUST propagate via a **marker file on disk**: a capability-interface skill writes a sentinel file under the installation before driving the backend and removes it after; the interceptor reads that file to decide permit/refuse. This mechanism is vendor-portable (a hook reading a file behaves identically on Claude and Codex) and survives the cross-process front-door-skill → backend-skill invocation boundary.
+- **FR-014a**: The marker file's lifecycle MUST be robust: a stale marker left by a crashed/aborted front-door skill MUST NOT silently sanction a later raw call (e.g. staleness bounded by pid/timestamp or cleared on next front-door entry), and concurrent or nested front-door invocations MUST NOT have one's teardown clear another's live marker.
 
 **Harmless-bypass backstop (Approach C — layered):**
 
@@ -134,7 +143,7 @@ The interception behaves identically whether the agent runs under Claude Code or
 
 **Capability inventory:**
 
-- **FR-017**: The v1 registry MUST cover the backlog, spec-definition, and spec-execution capabilities. [NEEDS CLARIFICATION: are scope-discovery, audit-barrage, and roadmap also agent-mediated capabilities under the complete-mediation invariant, or operator tools outside it? Registry completeness is an operator capture pass that bounds v1 scope.]
+- **FR-017**: The v1 registry MUST cover exactly three capabilities — backlog, spec-definition, and spec-execution. scope-discovery, audit-barrage, and roadmap are treated as operator tools OUTSIDE the complete-mediation invariant for v1; they MAY be added later as registry entries without interceptor code change (FR-011), but the v1 interceptor MUST NOT refuse their raw invocations.
 
 **Adopter-boundary constraints:**
 
@@ -165,14 +174,14 @@ The interception behaves identically whether the agent runs under Claude Code or
 
 ## Open Questions *(capture — resolve in clarify/plan; NOT scope cuts)*
 
-Per the project's capture-over-scope rule, all six design-record open questions are recorded here as genuine unknowns. The three most scope/feasibility-critical are also tagged inline as `[NEEDS CLARIFICATION]` in the requirements above for `/speckit-clarify` to resolve.
+Per the project's capture-over-scope rule, all six design-record open questions are recorded here. Three were resolved in the `/speckit-clarify` session (2026-06-17) — see Clarifications; three remain for the plan/research phase.
 
-1. **Marker propagation** *(inline FR-014 — core feasibility risk)*: does a `PreToolUse` hook reliably observe `STACKCTL_FRONT_DOOR` across the front-door-skill → backend-skill invocation boundary, on both Claude and Codex? Process env vs. marker file.
-2. **Codex interceptor mechanism**: the concrete equivalent of Claude Code `PreToolUse` for Codex needs research; the portable expression (one `stackctl` verb, two thin adapters) depends on what Codex exposes.
-3. **Capability inventory at v1** *(inline FR-017)*: are scope-discovery, audit-barrage, and roadmap agent-mediated capabilities under the invariant, or operator tools outside it?
-4. **Approach A fallback**: keep shadow-adapters for any surface the interceptor cannot observe — and is there such a surface?
-5. **Provider / plan-source port**: deferred per the succession rule. Does the umbrella capability-API framing change that deferral, or does the provider port simply become another capability adapter when un-deferred?
-6. **False-positive boundary** *(inline FR-005)*: precise identity matching for Bash-invoked CLIs — the matching grammar needs definition.
+1. **Marker propagation** — **RESOLVED** (Clarifications / FR-014): marker file on disk, vendor-portable, lifecycle-hardened (FR-014a).
+2. **Codex interceptor mechanism** — **OPEN (plan/research)**: the concrete equivalent of Claude Code `PreToolUse` for Codex needs research; the portable expression (one `stackctl` verb, two thin adapters) depends on what Codex exposes. Sequenced after the Claude path proves the model (US4).
+3. **Capability inventory at v1** — **RESOLVED** (Clarifications / FR-017): exactly backlog, spec-definition, spec-execution; scope-discovery / audit-barrage / roadmap are operator tools outside the v1 invariant, addable later as registry entries.
+4. **Approach A fallback** — **OPEN (plan/research)**: keep shadow-adapters for any surface the interceptor cannot observe — and is there such a surface? Resolvable only once the marker-file interceptor is built and observed surfaces are enumerated.
+5. **Provider / plan-source port** — **OPEN (defer)**: deferred per the succession rule. Does the umbrella capability-API framing change that deferral, or does the provider port simply become another capability adapter when un-deferred?
+6. **False-positive boundary** — **RESOLVED** (Clarifications / FR-005): normalized `argv[0]` identity resolution matched against the registry's backend identity set.
 
 ## Decisions *(settled in the design record — recorded, not open)*
 

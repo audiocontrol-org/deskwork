@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,6 +31,6 @@
 
 ## Notes
 
-- **Three `[NEEDS CLARIFICATION]` markers are deliberately retained** (FR-005 identity-matching grammar; FR-014 marker propagation mechanism; FR-017 v1 capability inventory). These are the three most scope/feasibility-critical of the design record's six captured open questions. They are intentionally left for `/speckit-clarify` — the dedicated next step in the chain — rather than forced to a guess at specify time. The operator framed all six as "resolve in spec/clarify."
-- The remaining three open questions (Codex interceptor mechanism; Approach A fallback; provider/plan-source port) are captured in the spec's Open Questions section without inline markers — they are research / later-phase resolutions, not specify-time scope forks.
+- **All three `[NEEDS CLARIFICATION]` markers were resolved in the `/speckit-clarify` session (2026-06-17)** — see the spec's Clarifications section: FR-014 marker propagation → marker file on disk (+ FR-014a lifecycle); FR-017 v1 inventory → backlog / spec-definition / spec-execution only; FR-005 identity matching → normalized `argv[0]` identity resolution.
+- The remaining three open questions (Codex interceptor mechanism; Approach A fallback; provider/plan-source port) stay OPEN by design — research/plan-phase resolutions, not specify-time scope forks. They are recorded in the spec's Open Questions section.
 - This is a **capture-mode** spec: everything known or knowably-implied from the approved design record is recorded. Scoping is a separate, explicit, operator-driven pass.
