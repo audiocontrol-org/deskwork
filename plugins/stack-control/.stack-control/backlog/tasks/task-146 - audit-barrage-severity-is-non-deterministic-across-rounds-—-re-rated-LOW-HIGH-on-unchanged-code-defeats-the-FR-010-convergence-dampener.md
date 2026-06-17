@@ -6,9 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-16 23:37'
+updated_date: '2026-06-17 17:31'
 labels:
   - 'type:imported-issue'
   - bug
+  - promoted
 dependencies: []
 references:
   - gh-482
@@ -57,3 +59,9 @@ So a finding the fleet itself called **LOW in round 2** was called **HIGH in rou
 - Project consuming the published plugin (not the stack-control source tree); macOS; fleet = `claude` (opus) + `codex` (gpt-5.5), `sonnet` lane removed per operator config.
 - This run also required several setup workarounds to get `govern` to start (`GOVERN_STACKCTL`, seeding `fleet-knowledge.yaml`, lane-set alignment, a per-phase governed-file-list, and raising the lane prompt-byte envelopes for a 125 KB whole-feature compose) — those are separable and can be split into their own reports if useful.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** roadmap:multi:gap/audit-barrage-severity-determinism
+<!-- SECTION:NOTES:END -->

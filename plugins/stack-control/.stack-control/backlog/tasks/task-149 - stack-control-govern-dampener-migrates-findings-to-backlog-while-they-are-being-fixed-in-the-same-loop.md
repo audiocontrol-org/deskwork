@@ -6,8 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-16 23:37'
+updated_date: '2026-06-17 17:31'
 labels:
   - 'type:imported-issue'
+  - promoted
 dependencies: []
 references:
   - gh-471
@@ -48,3 +50,9 @@ Net effect: the backlog accumulated 6 tasks for work that was done minutes later
 
 Found while dogfooding `design-control` Phase-4 governance (8-round convergence, 2026-06-14).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** roadmap:multi:gap/govern-dampener-in-loop
+<!-- SECTION:NOTES:END -->

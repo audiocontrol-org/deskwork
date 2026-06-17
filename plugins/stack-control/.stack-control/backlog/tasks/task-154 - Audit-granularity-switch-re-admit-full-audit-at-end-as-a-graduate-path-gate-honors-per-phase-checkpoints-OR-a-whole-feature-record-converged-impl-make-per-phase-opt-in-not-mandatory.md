@@ -7,9 +7,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-17 02:32'
+updated_date: '2026-06-17 17:31'
 labels:
   - agent-found
   - 'type:gap'
+  - promoted
 dependencies: []
 ordinal: 154000
 ---
@@ -25,3 +27,9 @@ WHY (operator observations, confirmed live in the 025 dogfood):
 
 PROPOSED SHAPE (for /stack-control:design): a per-installation/per-feature audit-granularity choice where the graduate gate is met by EITHER all-phase-checkpoints-current OR a whole-feature record-converged impl (the 'augment'/either-of option). Default to full-audit-at-end (one convergence loop); per-phase becomes OPT-IN for small-model fleets that genuinely need payload-sizing. Touches: templates/WORKFLOW.md gate semantics (graduate + start-governing), the govern default mode, the 025 spec clarify record (must amend the rejected-augment decision), and the convergence-record reader. Related: TASK-60 (myopic convergence), .claude/rules/spec-audit-diminishing-returns.md. Operator chose: capture-to-backlog (decide scheduling later); the thorough path is /stack-control:design.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** roadmap:design:gap/audit-granularity-switch
+<!-- SECTION:NOTES:END -->
