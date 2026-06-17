@@ -168,3 +168,34 @@ export function governPhaseBoundary(
     );
   }
 }
+
+// ── Per-phase commit + push (025 US3) ────────────────────────────────────────────
+
+/** Runs a `git` invocation; MUST throw on a non-zero exit. Injected for hermetic tests. */
+export type GitRunner = (args: readonly string[]) => void;
+
+/**
+ * The mechanical commit-then-push boundary post-condition (FR-009/010/011). "Push early
+ * and often" becomes a mechanism, not a reminder:
+ *   - the commit lands LOCALLY FIRST, so completed work is never lost (FR-009);
+ *   - the push follows (FR-010);
+ *   - a push failure FAILS LOUD and is surfaced, the local commit stays intact, the path
+ *     never silently continues, and `--no-verify` is NEVER used — a pre-commit/pre-push
+ *     hook failure is fixed, not bypassed (FR-011/SC-007).
+ */
+export function commitAndPushBoundary(run: GitRunner, repoRoot: string, message: string): void {
+  // Commit locally first (work-safe). NEVER `--no-verify` — hook failures are fixed.
+  run(['-C', repoRoot, 'add', '-A']);
+  run(['-C', repoRoot, 'commit', '-m', message]);
+  // Push; on failure surface loud with the local commit intact (it pushes on retry).
+  try {
+    run(['-C', repoRoot, 'push']);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `execute: FATAL — git push failed at the phase boundary; the local commit is INTACT ` +
+        `and will push on retry. Fix the push (offline/auth/pre-push hook) — NEVER use ` +
+        `--no-verify, fix the hook instead — then re-run. Underlying: ${detail}`,
+    );
+  }
+}

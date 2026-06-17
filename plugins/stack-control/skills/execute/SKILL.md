@@ -56,7 +56,7 @@ A **non-zero exit is a hard refusal**: print the compass's reason (it names the 
 
       This scopes the cross-model `audit-barrage` to the phase's files (a right-sized payload) and writes the phase checkpoint. Governance runs **per phase, here — never batched into one whole-feature pass at the end** (a whole-feature barrage exceeds the model-fleet envelope → `boundary-too-large`; FR-006a, and the `.claude/rules/agent-discipline.md` "No offroading" rule this feature mechanizes).
       - If a **single phase** still exceeds the fleet envelope, `stackctl` fails loud with **`boundary-too-large`** pointing at right-sizing guidance (TASK-75). **Do NOT auto-split the phase and do NOT silently scope it down** (FR-008). The recovery is to re-shape the phase's `tasks.md` boundary, then re-run — never to bypass govern.
-   4. *(US3, per-phase commit + push at this boundary — see the "Commit and push" subsection below.)*
+   4. **Commit, then push — at this boundary, mechanically (025 US3).** After the phase's govern, **commit the phase's work** (it lands locally first, so completed work is never lost — FR-009), then **push** to the branch's remote (FR-010). This is automatic boundary behavior, not something the operator has to ask for. If the **push fails** (offline / auth / pre-push hook), surface the failure loud — the local commit is intact and pushes on retry; **never** continue silently and **never** use `--no-verify` (fix the hook, don't bypass it; FR-011/SC-007).
 
    There is **no skip/defer/shortcut branch** anywhere in this loop (US5). A heavy step is *done*, not offered for deferral.
 
@@ -72,7 +72,20 @@ A **non-zero exit is a hard refusal**: print the compass's reason (it names the 
 
 ## Commit and push (025 US3 — mechanical, at each phase boundary)
 
-*(Documented fully in Phase 5 / T018.)* After each phase's govern in step 3.3, the boundary commits the phase's work (landing locally first so completed work is never lost) and then pushes to the branch's remote. A push failure fails loud and is surfaced; the local commit always survives; `--no-verify` is never used.
+After each phase's govern (step 3.3), the boundary runs — in order, non-discretionary:
+
+1. **Commit, local-first.** `git add -A` then `git commit` the phase's work. The commit
+   lands locally before the push so completed work is never lost (FR-009). One logical
+   change per commit (Principle VII).
+2. **Push.** `git push` the branch to its remote (FR-010).
+3. **On push failure, fail loud.** Offline / auth / a pre-push hook refusal → surface the
+   error, leave the local commit intact (it pushes on retry), do **not** continue silently,
+   and **never** use `--no-verify` — a hook failure is *fixed*, not bypassed (FR-011/SC-007).
+
+This is the mechanism that replaces the recurring "remember to commit and push" reminder
+(Principle VII as a mechanism, not advice). It runs in the **implementation session**
+(feature worktree); the orchestrator session never runs `execute`, so the cadence does not
+cross that boundary.
 
 ## Postcondition
 
