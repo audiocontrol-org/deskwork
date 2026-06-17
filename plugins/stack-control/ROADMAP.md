@@ -267,6 +267,7 @@ Barrage spawns inherit ambient permissions — read-only is held by model dispos
 - status: planned
 - part-of: multi:feature/migrate-audit-barrage
 A timed-out barrage model leaves a zero-byte stdout artifact; the kill is visible only in the run INDEX.md (exit 143, timed out: yes). Nothing at the synthesis/lift layer distinguishes 'produced nothing because SIGTERMed' from 'clean, no findings' — the fleet silently degrades (design-control ran 17 one-model rounds). Surface per-model timeout/failure state at synthesis.
+
 ## design:feature/backlog-backend-port
 - status: planned
 - depends-on: multi:feature/front-door
@@ -397,11 +398,12 @@ Make the lifecycle un-skippable: a workflow 'compass' primitive that orients an 
 - part-of: multi:feature/lifecycle-industrialization
 Make the stack-control workflow protocol mechanically un-skippable for adopting agents (the 024 compass principle extended past the macro-lifecycle): per-phase governance gated at each tasks.md phase boundary (close the boundary-too-large batching hole); no agent-offered shortcuts (consistent protocol always); no bypassing stack-control:execute to reach the backend speckit-implement directly; commit-and-push automatic at phase boundaries (not operator-reminded). Enforcement lives in the governed WORKFLOW.md gates + skill bodies + CLI verbs (travels with install), never git hooks.
 
-## design:gap/speckit-bypass-point-of-invocation-refusal
-- status: planned
+## design:feature/capability-interface-mediation
+- status: in-flight
 - design: docs/superpowers/specs/2026-06-17-capability-interface-mediation-design.md
+- design-approved: 2026-06-17
 - part-of: multi:feature/lifecycle-industrialization
-Defense-in-depth follow-on to 025 US4 (operator decision 2026-06-16): cross-vendor point-of-invocation refusal of raw backend speckit invocations (shadowing adapters surfaced by both Claude+Codex), succeeding 025's US1-gate-only enforcement. Backend speckit skills are the adopter's own Spec Kit (not plugin-controlled); must not hardcode .claude/skills (claude-only). See specs/025 US4 + operator decision.
+The stack-control agent-facing capability API: capability interfaces (backlog-like, spec-definition, spec-execution operations) that COMPLETELY MEDIATE between an adopting agent and the swappable backends that implement them, with point-of-invocation interception as the enforcement that makes mediation complete (the agent cannot reach past the API to the backend). Generalizes 025 US4 speckit-guard (operator decision 2026-06-17): refuse ALL fronted-backend calls (front door is the only sanctioned path); mechanism = a cross-vendor PreToolUse interceptor calling the stackctl guard (primary) + the make-bypass-harmless gate (backstop). Cross-vendor (logic in stackctl, never vendor identity); the backend skills/CLIs are the adopter's own (no hardcoded .claude/skills). Umbrella node: design:feature/backlog-backend-port + impl:feature/execution-engine re-relate as concrete capability adapters (part-of edges pending the TASK-137 reparent verb). Ruling in the design record: a plugin-shipped Claude Code hook is a permitted enforcement surface (travels with claude plugin install, unlike a git hook). See docs/superpowers/specs/2026-06-17-capability-interface-mediation-design.md + specs/025 US4.
 
 ## multi:feature/audit-barrage-convergence
 - status: planned
