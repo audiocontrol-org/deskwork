@@ -79,3 +79,14 @@ success criterion. Run from the installation root
 The mechanism binds an agent following the skills. A human running the raw vendored
 `speckit` scripts or raw `git` can still bypass; this is not claimed otherwise. The
 per-phase graduate gate narrows the worst hole (no graduation without checkpoints).
+
+## Enforcement-home audit (FR-018, T027)
+
+All enforcement this feature adds lives in `templates/WORKFLOW.md` (the
+`all-phase-checkpoints-current` gate criterion) + skill bodies (`skills/execute/SKILL.md`)
++ CLI verbs (`stackctl govern --phase`, the per-phase cadence functions in
+`execute-check.ts`, `stackctl speckit-guard`, `stackctl no-shortcuts-audit`) + the
+cross-vendor `commands/*.md` adapters — all of which travel with `claude plugin install`
+and surface under Codex. **Nothing is wired into `.husky/` or `.git/hooks/`** (verified:
+`grep` of the new primitives over both hook surfaces returns empty). An adopter gets the
+discipline by installing the plugin and following the README, never by wiring a git hook.

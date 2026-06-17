@@ -91,6 +91,16 @@ cross that boundary.
 
 Native execution ran over the spec **phase by phase**, with `stackctl govern --phase` governing each boundary (never one batched whole-feature run); per-phase checkpoints exist for every phase; the graduate gate's signal is composed from them. On any blocked path, you surfaced a descriptive error naming the missing piece (runnable spec / oversized boundary → TASK-75 / governance capability) — never a faked or partial run (SC-006).
 
+## Honest boundary (FR-017)
+
+This mechanism binds an agent **following the skills**. It does NOT claim to prevent a
+deliberate human bypass via raw `git` / `gh` / the vendored `speckit` scripts — a person
+running those directly is outside the skill surface. What IS guaranteed: the **US1 per-phase
+graduate gate** narrows the worst hole — a feature implemented raw (without per-phase govern
+checkpoints) **cannot graduate to `shipped`**, on any host (the defense-in-depth, FR-014).
+The cross-vendor point-of-invocation interception of a raw backend call is a filed follow-on
+(`design:gap/speckit-bypass-point-of-invocation-refusal`), not claimed here.
+
 ## What this skill does NOT do
 
 - It does not author or repair the spec (use `/stack-control:define` / `/stack-control:extend`).
