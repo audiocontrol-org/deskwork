@@ -34,7 +34,12 @@ models:
     readonly_enforcement: "--sandbox read-only"
     output_mode: text
     liveness_signal: stderr
-    liveness_window_seconds: 60
+    # 60s was too tight: codex (gpt-5.5) reasons silently on a real ~17KB audit
+    # payload for >60s before its first stderr pulse, tripping killed-no-liveness
+    # well before the 300s timeout (observed 2026-06-16, 025 phase-1 govern). Widen
+    # to the timeout floor so the watchdog only fires on a genuine hang, not on
+    # codex's silent-reasoning latency.
+    liveness_window_seconds: 300
     timeout_floor_seconds: 300
     timeout_secs_per_kb: 7
 

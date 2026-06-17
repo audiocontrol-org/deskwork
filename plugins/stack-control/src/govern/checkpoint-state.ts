@@ -51,6 +51,17 @@ function checkpointDir(installationRoot: string, featureSlug: string): string {
   return join(installationRoot, CHECKPOINTS_REL, safePathComponent(featureSlug, 'featureSlug'));
 }
 
+/**
+ * The single source of truth for a phase's checkpoint/audit-log section key
+ * (`phase-<id>`). Both the checkpoint `checkpoint`/`auditLogSection` fields and
+ * the freshness comparison derive from this — so a format change can never drift
+ * the writer (govern), the readers (the per-phase status resolver + US1 gate),
+ * and the test fixtures out of sync (AUDIT-BARRAGE claude-02, 025 phase-1).
+ */
+export function phaseCheckpointSection(phaseId: string): string {
+  return `phase-${phaseId}`;
+}
+
 export function checkpointPath(
   installationRoot: string,
   featureSlug: string,

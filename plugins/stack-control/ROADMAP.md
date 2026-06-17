@@ -379,16 +379,67 @@ Add a roadmap reparent verb to move an existing part-of / depends-on edge betwee
 Mechanical terminal closure: roadmap close-related closes a terminal item's recorded closes:/ref: backlog ids in one deterministic move.
 
 ## multi:feature/lifecycle-compass
-- status: in-flight
+- status: shipped
 - spec: specs/024-lifecycle-compass
 - design: docs/superpowers/specs/2026-06-16-lifecycle-compass-design.md
 - design-approved: 2026-06-16
+- analyze-clean: 2026-06-16
 - part-of: multi:feature/lifecycle-industrialization
+- closes: TASK-83, TASK-139
 Make the lifecycle un-skippable: a workflow 'compass' primitive that orients an agent against a roadmap item and diffs intended action vs allowed phase, embedded as the precondition of every lifecycle skill (real refusals, not reports). Includes the supporting fixes (capture fused to authoring; govern feature-resolution from the spec pointer not the branch slug; TASK-83) so the gates are enforceable.
 
 ## multi:feature/unskippable-workflow-protocol
-- status: planned
+- status: in-flight
+- spec: specs/025-unskippable-workflow-protocol
 - design: docs/superpowers/specs/2026-06-16-unskippable-workflow-protocol-design.md
+- design-approved: 2026-06-16
+- analyze-clean: 2026-06-16
 - part-of: multi:feature/lifecycle-industrialization
 Make the stack-control workflow protocol mechanically un-skippable for adopting agents (the 024 compass principle extended past the macro-lifecycle): per-phase governance gated at each tasks.md phase boundary (close the boundary-too-large batching hole); no agent-offered shortcuts (consistent protocol always); no bypassing stack-control:execute to reach the backend speckit-implement directly; commit-and-push automatic at phase boundaries (not operator-reminded). Enforcement lives in the governed WORKFLOW.md gates + skill bodies + CLI verbs (travels with install), never git hooks.
+
+## design:gap/speckit-bypass-point-of-invocation-refusal
+- status: planned
+- part-of: multi:feature/lifecycle-industrialization
+Defense-in-depth follow-on to 025 US4 (operator decision 2026-06-16): cross-vendor point-of-invocation refusal of raw backend speckit invocations (shadowing adapters surfaced by both Claude+Codex), succeeding 025's US1-gate-only enforcement. Backend speckit skills are the adopter's own Spec Kit (not plugin-controlled); must not hardcode .claude/skills (claude-only). See specs/025 US4 + operator decision.
+
+## multi:feature/audit-barrage-convergence
+- status: planned
+- part-of: multi:feature/lifecycle-industrialization
+- ref: TASK-60
+Make cross-model audit-barrage governance converge cleanly instead of ringing. Problem (TASK-60): myopic convergence — many rounds where few were needed, fix-induced surface growth, serial single-fleet discovery. Confirmed live in the 025 dogfood: auditors get ever nit-pickier each round. Children address the levers (granularity, severity determinism, dampener-in-loop).
+
+## design:gap/audit-granularity-switch
+- status: planned
+- part-of: multi:feature/audit-barrage-convergence
+- ref: TASK-154
+Re-admit full-audit-at-end as a graduate path (gate honors per-phase checkpoints OR a whole-feature record-converged impl); per-phase opt-in for small-model payload-sizing, not mandatory. Reverses the 025 'compose, reject augment' clarify. Per-phase multiplied audit surface + oscillation rather than reducing it. Detail: TASK-154.
+
+## multi:gap/audit-barrage-severity-determinism
+- status: planned
+- part-of: multi:feature/audit-barrage-convergence
+- ref: TASK-146
+Severity must be stable across rounds on unchanged code; re-rating LOW->HIGH defeats the FR-010 convergence dampener and drives the ringing. Detail: TASK-146 (gh-482).
+
+## multi:gap/govern-dampener-in-loop
+- status: planned
+- part-of: multi:feature/audit-barrage-convergence
+- ref: TASK-149
+govern dampener migrates findings to the backlog while they are being fixed in the same loop. Detail: TASK-149 (gh-471).
+
+## multi:gap/audit-barrage-codex-liveness
+- status: planned
+- ref: TASK-145
+codex lane trips killed-no-liveness on real payloads; emit reasoning summaries (or --json events) for genuine stderr liveness pulses so the window can stay tight, instead of widening it blindly. Update installation + template config. Detail: TASK-145.
+
+## impl:gap/start-governing-enforcement
+- status: planned
+- part-of: multi:feature/unskippable-workflow-protocol
+- ref: TASK-152
+025 FR-002: start-governing (implementing->governing) gate authored in WORKFLOW.md but advisory in the 024 advance engine (only the terminal transition is enforced). Bounded by US2 cadence + graduate-gate teeth. Fork: enforce vs honest-boundary. Detail: TASK-152.
+
+## impl:gap/per-phase-gate-upgrade-migration
+- status: planned
+- part-of: multi:feature/unskippable-workflow-protocol
+- ref: TASK-153
+025 upgrade: pre-025 / in-flight features with no per-phase checkpoints become un-graduatable when all-phase-checkpoints-current lands; no backfill/grandfather/migration. Detail: TASK-153.
 
