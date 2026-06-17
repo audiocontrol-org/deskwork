@@ -2,21 +2,59 @@
 
 ---
 
-## 2026-06-17: <!-- session title -->
+## 2026-06-17: Close 025 + design capability-interface mediation (the agent-facing API)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Verify the installed v0.50.0 release and run the 025 closing ceremony; then
+pick up the next roadmap item — the backend-bypass protection follow-on — and design it.
 
 **Accomplished:**
-- <!-- compose -->
+- **025 closing ceremony.** Verified the *formally-installed* v0.50.0 (booted the cached
+  binary, exercised the 025 deliverables: `speckit-guard` refuses `/speckit-implement` and
+  redirects; `no-shortcuts-audit` / `execute-check` / `spec-governance-gate` present).
+  `roadmap advance multi:feature/unskippable-workflow-protocol --to shipped`; `close-related`
+  found no recorded resolved items. Left `impl:feature/terminal-closure` (023) at in-flight
+  intentionally — unpaid govern debt (TASK-144).
+- **Designed the backend-bypass follow-on through `/stack-control:design` → brainstorming.**
+  Found the existing node `design:gap/speckit-bypass-point-of-invocation-refusal`; the operator
+  reframed it from "guard that wraps backends" to **the stack-control agent-facing capability
+  API** — capability interfaces that *completely mediate* between an adopting agent and swappable
+  backends, with point-of-invocation interception as the enforcement that makes mediation complete.
+- **Locked four decisions:** refuse ALL fronted-backend calls; mechanism = cross-vendor
+  `PreToolUse` interceptor calling the `stackctl` guard (primary) + make-bypass-harmless gate
+  (backstop); umbrella capability-API node; plugin-shipped Claude Code hook is a permitted
+  enforcement surface (travels with install, unlike a git hook).
+- **Wrote the installation-anchored design record** (7 sections, 4 alternatives), reclassified
+  the node → `design:feature/capability-interface-mediation`, advanced to in-flight, recorded
+  the `design-approved` marker. **design-to-spec gate 7/7.** Checkpointed at the boundary before
+  `/stack-control:define` (operator's call).
+- Spun up a Tailscale-reachable markdown review server so the operator could read the design
+  record on their phone before approving.
 
 **Didn't Work:**
-- <!-- compose -->
+- **Wrote the design record to the wrong directory first.** Put it under repo-root
+  `docs/superpowers/specs/` (where legacy ADRs live); the gate reads the pointer
+  *installation-anchored* (`plugins/stack-control/docs/...`) and showed 0/7 until I moved it.
+  Self-caught via the gate, not operator-caught. Captured as tooling friction.
+- **Reparent has no verb.** Attaching `part-of` edges from `backlog-backend-port` +
+  `execution-engine` to the new umbrella node is unsupported (`add` refuses an existing node);
+  deferred to TASK-137. Relationship captured in the design record + node body so nothing is lost.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] **Reframe, not correction:** the operator's "think of this as a stack-control API for
+  adopting agents, not backend-wrapping" was scope-shaping captured into the design — the steer
+  that turned a small `gap` into the umbrella `feature`. The agent's own misstep this session was
+  the wrong record path (gate-caught), not an operator correction.
 
 **Insights:**
-- <!-- compose -->
+- The capability-API / complete-mediation reframe **unifies the existing port nodes**
+  (`backlog-backend-port`, `execution-engine` are the *backend* side of a port) by adding the
+  missing *agent-facing* side: the interface is the only surface the agent may touch.
+- Point-of-invocation interception reads as a bolt-on guard until you see it as the *teeth* of a
+  mediation boundary — which is why "all fronted-backend calls" (not mutating-only) is the
+  coherent rule: an API you can reach around isn't an API.
+- The enforcement-lives-in-skills ADR's real test is "surfaces an adopter gets after
+  `claude plugin install`" — which *admits* plugin-shipped Claude Code hooks (they travel with
+  install) and only excludes git hooks (they don't). That distinction unblocked mechanism B.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 3
