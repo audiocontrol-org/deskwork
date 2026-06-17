@@ -102,18 +102,26 @@ phase-enumeration gate (and TASK-70) has the inputs it needs.
 
 **Independent test**: invoke each wrapped skill directly → refused with redirect; front-door invocation → not refused (quickstart Scenario D).
 
+> **CORRECTED 2026-06-16 (operator decision)**: the original `.claude/skills/speckit-*`
+> precondition-block injection is invalid (adopter's own Spec Kit, not plugin-controlled;
+> `.claude/skills/` is Claude-only). US4 ships a portable `stackctl` refusal verb + the
+> cross-vendor command/skill adapters; the US1 gate is the real teeth. Cross-vendor
+> point-of-invocation interception is the filed follow-on
+> `design:gap/speckit-bypass-point-of-invocation-refusal`. See spec.md Clarifications +
+> contracts/speckit-wrapper.md.
+
 ### Tests (RED first)
 
-- [ ] T019 [P] [US4] Contract test for `speckit-wrapper.md`: each of specify/plan/tasks/implement refused + correct redirect; front-door invocation NOT refused (no false positive) — in `src/__tests__/speckit-wrapper/wrapper-refusal.test.ts` (SC-004, FR-012).
+- [ ] T019 [P] [US4] Contract test for `speckit-wrapper.md`: the refusal map redirects each of specify/plan/tasks/implement to its correct front door; a front-door-marked invocation is NOT refused (no false positive) — in `src/__tests__/speckit-wrapper/wrapper-refusal.test.ts` (SC-004, FR-012).
 
 ### Implementation
 
-- [ ] T020 [US4] Implement the wrapper refusal/redirect logic (skill-identity based, never vendor identity) in `src/speckit-wrapper/refusal.ts`; expose the front-door marker check.
-- [ ] T021 [US4] Inject the precondition block (chosen mechanism per `research.md`) at the top of each vendored `.claude/skills/speckit-{specify,plan,tasks,implement}/SKILL.md`, redirecting to define/extend (authoring) or execute (implement); travels with install, no git hook (FR-013/018).
-- [ ] T022 [US4] Document the vendoring step (re-apply precondition blocks when `speckit` is re-vendored) in `specs/025-unskippable-workflow-protocol/quickstart.md` (Scenario D note) and the vendoring doc; the US5 audit (T024) catches a missing block.
+- [ ] T020 [US4] Implement the portable refusal/redirect map (skill-identity → front-door, never vendor identity; pure function, no host/fs dependency) in `src/speckit-wrapper/refusal.ts`; expose the front-door-marker check. Wire a `stackctl` verb that surfaces it.
+- [ ] T021 [US4] Expose the refusal/redirect through the plugin's cross-vendor command/skill adapters (`commands/*.md` + a `skills/*/SKILL.md` note) so it travels with `claude plugin install` AND surfaces under Codex. Use bare `stackctl` (PATH), never `plugins/stack-control/bin/stackctl` (GitHub #480). NO injection into the adopter's `.claude/skills/` (FR-013/018).
+- [ ] T022 [US4] Document (quickstart Scenario D + the wrapper docs) that 025 ships the portable refusal + US1-gate teeth, and that cross-vendor point-of-invocation interception is the filed follow-on `design:gap/speckit-bypass-point-of-invocation-refusal` (honest-boundary note, FR-017).
 - [ ] T023 [US4] Cross-link the defense-in-depth test: an evaded raw implement cannot graduate (reuses the Phase-3 graduate-gate test) — add the assertion reference in `src/__tests__/speckit-wrapper/wrapper-refusal.test.ts` (FR-014).
 
-**Checkpoint**: the whole backend chain is gated at the point of invocation + at graduation.
+**Checkpoint**: the backend chain is refused/redirected at the stack-control surface (cross-vendor) + cannot graduate raw (US1 gate).
 
 ---
 

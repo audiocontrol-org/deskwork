@@ -55,16 +55,24 @@ what 021 already writes.
 - **Oversized-phase rule**: if a single phase's payload exceeds the fleet envelope, fail
   loud with `boundary-too-large` pointing at TASK-75 right-sizing — never auto-split.
 
-## Entity: Speckit wrapper refusal (new — US4)
+## Entity: Speckit wrapper refusal (new — US4; CORRECTED 2026-06-16)
 
 - **Subject**: a direct invocation of a wrapped backend skill (`/speckit-specify`,
   `/speckit-plan`, `/speckit-tasks`, `/speckit-implement`).
-- **Behavior**: refuse loud; name the sanctioned front door (specify/plan/tasks →
+- **Behavior**: a portable `stackctl` refusal verb maps the backend skill identity to its
+  sanctioned front door and emits a loud redirect (specify/plan/tasks →
   `/stack-control:define`|`/stack-control:extend`; implement → `/stack-control:execute`).
-- **Home**: an injected precondition block in each vendored `speckit-*/SKILL.md` (chosen)
-  / a shadowing skill (fallback) — finalized in contracts. Travels with install; never a
-  git hook. Branches on skill identity, never vendor identity.
-- **Defense-in-depth**: even an evaded wrapper cannot graduate (the per-phase gate, US1).
+  Branches on skill identity, never vendor identity (Principle III). Pure function over the
+  skill name → no host/fs dependency.
+- **Home**: `stackctl` (`src/speckit-wrapper/refusal.ts` — the redirect map) + the plugin's
+  cross-vendor `commands/*.md` (and `skills/*/SKILL.md`) adapters that call it. Travels with
+  `claude plugin install` and surfaces identically under Codex. **NOT** an injected block in
+  the adopter's `.claude/skills/speckit-*` (corrected — those are the adopter's own Spec Kit,
+  not plugin-controlled; `.claude/skills/` is Claude-only).
+- **Defense-in-depth (the teeth)**: the per-phase graduate gate (US1, pure `stackctl`) — a raw
+  backend-speckit path cannot graduate without per-phase checkpoints, on any host (FR-014).
+- **Follow-on (filed)**: cross-vendor point-of-invocation interception of a *raw* backend
+  call (`design:gap/speckit-bypass-point-of-invocation-refusal`) — out of 025 scope.
 
 ## Entity: Shortcut-affordance audit (new — US5)
 

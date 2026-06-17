@@ -397,3 +397,8 @@ Make the lifecycle un-skippable: a workflow 'compass' primitive that orients an 
 - part-of: multi:feature/lifecycle-industrialization
 Make the stack-control workflow protocol mechanically un-skippable for adopting agents (the 024 compass principle extended past the macro-lifecycle): per-phase governance gated at each tasks.md phase boundary (close the boundary-too-large batching hole); no agent-offered shortcuts (consistent protocol always); no bypassing stack-control:execute to reach the backend speckit-implement directly; commit-and-push automatic at phase boundaries (not operator-reminded). Enforcement lives in the governed WORKFLOW.md gates + skill bodies + CLI verbs (travels with install), never git hooks.
 
+## design:gap/speckit-bypass-point-of-invocation-refusal
+- status: planned
+- part-of: multi:feature/lifecycle-industrialization
+Defense-in-depth follow-on to 025 US4 (operator decision 2026-06-16): cross-vendor point-of-invocation refusal of raw backend speckit invocations (shadowing adapters surfaced by both Claude+Codex), succeeding 025's US1-gate-only enforcement. Backend speckit skills are the adopter's own Spec Kit (not plugin-controlled); must not hardcode .claude/skills (claude-only). See specs/025 US4 + operator decision.
+

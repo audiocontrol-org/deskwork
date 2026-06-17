@@ -78,6 +78,20 @@ feature is the mechanism that *replaces* the rules (the "yelling").
   door is the only sanctioned path to its backend: specify/plan/tasks route through
   `/stack-control:define` or `/stack-control:extend`; implement routes through
   `/stack-control:execute`.
+- Q (resolved 2026-06-16, during implementation): The original US4 mechanism —
+  "inject a precondition block into each vendored `.claude/skills/speckit-*/SKILL.md`"
+  — was found **invalid**: the backend speckit skills are the **adopter's own Spec Kit
+  install** (NOT shipped/controlled by this plugin — GitHub #480), and `.claude/skills/`
+  is **Claude-only** while the plugin is cross-vendor (Claude + Codex; specs/017-portability
+  Decision 1: `stackctl` is authoritative, hosts are thin adapters). → A (operator
+  decision): **Start with US4 as a portable `stackctl` refusal verb + the cross-vendor
+  `commands/*.md` adapters, with the US1 per-phase graduate gate (pure `stackctl`) as the
+  real defense-in-depth teeth** (a raw backend-speckit path cannot graduate without
+  per-phase checkpoints, on any host). A deeper cross-vendor **point-of-invocation**
+  interception (shadowing adapters that refuse a raw backend invocation before any work
+  runs) is a **filed follow-on** roadmap item
+  (`design:gap/speckit-bypass-point-of-invocation-refusal`), not 025's scope. No injection
+  into the adopter's `.claude/skills/`; no Claude-only path.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -175,18 +189,27 @@ surfaced loud while the local commit remains intact.
 
 ---
 
-### User Story 4 - No bypassing the front doors (speckit wrapper blocks outright) (Priority: P2)
+### User Story 4 - No bypassing the front doors (speckit wrapper) (Priority: P2)
 
-A direct invocation of any wrapped backend speckit skill (`/speckit-specify`,
-`/speckit-plan`, `/speckit-tasks`, `/speckit-implement`) is **refused at the point of
-invocation** and redirected to its sanctioned stack-control front door
-(define/extend for authoring; execute for implement). The per-phase graduation gate
-(US1) is retained as defense-in-depth: even if the wrapper is somehow evaded, a
-raw-speckit path cannot graduate without per-phase checkpoints.
+stack-control provides a portable `stackctl` refusal/redirect for any wrapped backend
+speckit skill (`/speckit-specify`, `/speckit-plan`, `/speckit-tasks`,
+`/speckit-implement`) — mapping each to its sanctioned front door (define/extend for
+authoring; execute for implement) — exposed through the plugin's own cross-vendor
+command/skill adapters that travel with the install (Claude + Codex). The per-phase
+graduation gate (US1, pure `stackctl`) is the real defense-in-depth: a raw backend-speckit
+path cannot graduate without per-phase checkpoints, on any host.
 
-**Why this priority**: Closes the bypass hole at the point of bypass, not only at
-graduation. P2 because US1 already denies a bypassed path the ability to *ship*; this
-adds a stronger, earlier refusal across the whole backend chain.
+**Corrected mechanism (operator decision 2026-06-16)**: 025 does NOT inject a precondition
+block into the adopter's `.claude/skills/speckit-*` (those are the adopter's own Spec Kit,
+not plugin-controlled, and `.claude/skills/` is Claude-only — both violate the
+adopter-environment + cross-vendor principles). A cross-vendor **point-of-invocation**
+interception of a *raw* backend call (refuse before any work runs, on every host) is the
+filed follow-on `design:gap/speckit-bypass-point-of-invocation-refusal`. 025's US4 ships the
+portable verb + adapters + the US1 gate as the teeth.
+
+**Why this priority**: P2 because US1 already denies a bypassed path the ability to *ship*;
+US4 adds the front-door refusal/redirect across the whole backend chain at the surfaces the
+plugin actually controls.
 
 **Independent Test**: Invoke each wrapped backend skill directly; confirm each refuses
 and names its front door. Separately confirm a hypothetically-evaded raw implement
@@ -309,13 +332,23 @@ explicit operator-initiated, recorded override.
 
 **No bypassing `execute` (US4)**
 
-- **FR-012**: A direct invocation of **any** backend speckit skill the stack-control front
-  doors wrap — `/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, `/speckit-implement`
-  (per Clarifications 2026-06-16) — MUST be refused at the point of invocation and
-  redirected to its sanctioned front door: specify/plan/tasks → `/stack-control:define`
-  or `/stack-control:extend`; implement → `/stack-control:execute`. (The speckit wrapper.)
-- **FR-013**: The wrapper's refusal MUST live in a skill body / CLI verb that travels
-  with `claude plugin install` — never a git hook.
+- **FR-012**: stack-control MUST provide a refusal/redirect for a direct invocation of
+  **any** backend speckit skill the front doors wrap — `/speckit-specify`, `/speckit-plan`,
+  `/speckit-tasks`, `/speckit-implement` (per Clarifications 2026-06-16) — mapping each to
+  its sanctioned front door: specify/plan/tasks → `/stack-control:define` or
+  `/stack-control:extend`; implement → `/stack-control:execute`. The refusal/redirect logic
+  MUST live in a portable `stackctl` verb (the authoritative cross-vendor surface) that the
+  plugin's own cross-vendor command/skill adapters call. (Corrected 2026-06-16: the original
+  "inject into the adopter's `.claude/skills/speckit-*`" mechanism is invalid — those skills
+  are the adopter's Spec Kit, not plugin-controlled, and `.claude/skills/` is Claude-only.)
+  A cross-vendor **point-of-invocation** interception of a *raw* backend call (before any
+  work runs) is the filed follow-on `design:gap/speckit-bypass-point-of-invocation-refusal`,
+  not 025's scope.
+- **FR-013**: The refusal MUST live in `stackctl` + the plugin's cross-vendor command/skill
+  adapters that travel with `claude plugin install` (and surface identically under Codex) —
+  never a git hook, never a Claude-only `.claude/skills/` patch of files the plugin does not
+  ship. Every CLI invocation in a shipped prompt surface uses bare `stackctl` (on PATH),
+  never the source-repo `plugins/stack-control/bin/stackctl` form (GitHub #480).
 - **FR-014**: The per-phase graduation gate (FR-001) MUST be retained as
   defense-in-depth, so even an evaded wrapper cannot graduate a feature without
   per-phase checkpoints.
@@ -347,11 +380,14 @@ explicit operator-initiated, recorded override.
   gate-eval) requiring all per-phase checkpoints current before `governing → shipped`.
   The whole-feature `record-converged impl` signal is **composed** from the union of
   these checkpoints (FR-001a), not produced by a separate whole-feature govern run.
-- **Speckit wrapper** — the stack-control-owned shim over the vendored backend speckit
-  skills (specify / plan / tasks / implement) that intercepts a direct invocation and
-  redirects to the sanctioned front door (define/extend for authoring; execute for
-  implement). (Interception shape — shadowing skill vs. injected precondition block — is
-  a plan-level detail.)
+- **Speckit wrapper** — a portable `stackctl` refusal/redirect verb (skill-identity →
+  front-door map, never vendor identity) that the plugin's cross-vendor command/skill
+  adapters call to redirect a direct backend-speckit invocation to its sanctioned front
+  door (define/extend for authoring; execute for implement). It does NOT patch the
+  adopter's own backend speckit skills (those aren't plugin-controlled) and does NOT use a
+  Claude-only `.claude/skills/` path. The deeper cross-vendor point-of-invocation
+  interception of a *raw* backend call is a filed follow-on, not 025's scope; the US1
+  per-phase graduate gate is 025's real defense-in-depth (FR-014).
 
 ## Success Criteria *(mandatory)*
 

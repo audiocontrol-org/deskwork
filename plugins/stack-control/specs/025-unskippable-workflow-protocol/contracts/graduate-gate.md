@@ -20,15 +20,25 @@ The computable gate criterion published in `templates/WORKFLOW.md` and evaluated
 ## Evaluation algorithm (deterministic)
 
 1. Enumerate phases from `tasks.md` phase headers for the feature.
-2. If zero phases are derivable → **FATAL** (not trivially met).
+2. If zero phases are derivable → **unmet** (NOT trivially met, and NOT a crash). A
+   `tasks.md` with no `## Phase` headers can never satisfy a per-phase gate, so the gate is
+   unmet — important because the read-only compass evaluates this gate and must not crash on
+   a non-phased/legacy feature. (Refined 2026-06-16: the earlier "zero phases → FATAL"
+   reserved FATAL for the dangerous masquerade in step 3, which is the case that actually
+   needs fail-loud.)
 3. For each phase, resolve its authoritative file list.
-   - If a phase has no/incomplete file list → **FATAL**, naming the phase (FR-004; depends
-     on TASK-70). Never scope a partial/empty payload.
+   - If a phase EXISTS but has no/incomplete file list → **FATAL**, naming the phase (FR-004;
+     depends on TASK-70). This is the only fail-loud path: a zero-scope checkpoint would
+     masquerade as governed. Never scope a partial/empty payload.
 4. For each phase, assert a checkpoint exists AND is current (021 fingerprint matches
    present content).
    - Missing checkpoint → unmet, name the phase.
    - Stale checkpoint (fingerprint mismatch) → unmet, name the phase (FR-003).
-5. Met **iff** all phases have current checkpoints.
+5. Met **iff** there is ≥1 phase and all phases have current checkpoints.
+
+(Note: `enumeratePhases` — the primitive the `execute`/`govern` paths use when actively
+governing — DOES fail loud on zero phases; the *gate* read here degrades zero-phases to
+unmet so the compass stays robust. Both treat a phase-with-no-file-list as FATAL.)
 
 ## Inputs / outputs
 

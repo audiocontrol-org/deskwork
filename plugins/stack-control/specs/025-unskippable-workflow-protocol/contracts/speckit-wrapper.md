@@ -13,20 +13,31 @@ Covers FR-012, FR-013, FR-014, FR-015, FR-016, FR-017, FR-018.
 
 ## Refusal behavior
 
-- A direct invocation of any wrapped skill MUST refuse loud at the point of invocation and
-  name its sanctioned front door (FR-012).
-- The refusal lives in a skill body / CLI verb that travels with `claude plugin install`
-  — never a git hook (FR-013, FR-018).
+- stack-control MUST map a direct invocation of any wrapped skill to its sanctioned front
+  door and emit a loud redirect (FR-012).
+- The refusal/redirect lives in a portable `stackctl` verb + the plugin's cross-vendor
+  command/skill adapters that travel with `claude plugin install` and surface identically
+  under Codex — never a git hook, never a Claude-only `.claude/skills/` patch (FR-013, FR-018).
 - Branches on skill identity, never vendor identity (Principle III).
 
-## Interception mechanism
+## Interception mechanism (CORRECTED 2026-06-16 — operator decision)
 
-- **Chosen**: an injected **precondition block** at the top of each vendored
-  `.claude/skills/speckit-*/SKILL.md`, mirroring the 024 compass-precondition shape — the
-  block refuses unless a front-door marker indicates the skill was reached via its
-  stack-control front door. Re-applied at `speckit` vendor time (documented vendoring
-  step); a missing block is caught by the US5 audit.
-- **Fallback**: a shadowing skill of the same name that intercepts and redirects.
+The original "inject a precondition block into each vendored `.claude/skills/speckit-*/SKILL.md`"
+mechanism is **invalid**: the backend speckit skills are the **adopter's own Spec Kit**
+install (not shipped/controlled by this plugin — GitHub #480), and `.claude/skills/` is a
+**Claude-only** path (the plugin is cross-vendor — specs/017-portability Decision 1: `stackctl`
+authoritative, hosts thin adapters).
+
+- **Chosen (025 scope)**: the refusal/redirect is a **portable `stackctl` verb** (a pure
+  skill-identity → front-door map in `src/speckit-wrapper/refusal.ts`) exposed through the
+  plugin's own cross-vendor `commands/*.md` (and `skills/*/SKILL.md`) adapters. The plugin
+  patches nothing it does not ship. The **US1 per-phase graduate gate is the real teeth**
+  (defense-in-depth): a raw backend-speckit path cannot graduate without per-phase checkpoints,
+  on any host.
+- **Follow-on (filed, NOT 025 scope)**: a cross-vendor **point-of-invocation** interception of
+  a *raw* backend call (shadowing adapters that refuse before any work runs, on every host) is
+  the roadmap item `design:gap/speckit-bypass-point-of-invocation-refusal`, to be re-specced via
+  `/stack-control:design`.
 
 ## Defense-in-depth (FR-014) + honest boundary (FR-017)
 

@@ -122,9 +122,9 @@ attaches to; no behavior change in this task.
 
 ### Per-phase status + governed-path resolution — `src/subcommands/govern.ts` (TO EXTRACT)
 
-- `interface PhaseCheckpointStatus { phaseId; files; auditedFiles; scopeFingerprint; state: 'current'|'missing'|'stale' }` (govern.ts:401).
-- `normalizeGovernedPaths(installationRoot, paths)` (govern.ts:412) — installation-relative normalization.
-- `resolvePhaseCheckpointStatuses(installationRoot, slug, tasksPath)` (govern.ts:439) — parses phases, **fails loud naming the phase on an empty governed file list (FR-004)**, computes fingerprint, reads checkpoint, derives `current|missing|stale`. **This is the exact per-phase currency logic the US1 gate needs.**
+- `interface PhaseCheckpointStatus { phaseId; files; auditedFiles; scopeFingerprint; state: 'current'|'missing'|'stale' }` (symbol in `govern.ts`).
+- `normalizeGovernedPaths(installationRoot, paths)` — installation-relative normalization.
+- `resolvePhaseCheckpointStatuses(installationRoot, slug, tasksPath)` — parses phases, **fails loud naming the phase on an empty governed file list (FR-004)**, computes fingerprint, reads checkpoint, derives `current|missing|stale`. **This is the exact per-phase currency logic the US1 gate needs.** (Line numbers intentionally omitted — they rot on the first extraction; key off the symbol names, claude-03/04.)
   - **Anchor decision**: extract `PhaseCheckpointStatus` + `normalizeGovernedPaths` + `resolvePhaseCheckpointStatuses` into a shared `src/govern/phase-checkpoint-status.ts`; `govern.ts` re-imports them (pure move, no behavior change); the new US1 compose-convergence reader imports the same resolver (no clone — project anti-clone discipline). Verified no test couples to these internal names or the empty-list message string.
 
 ### tasks.md phase enumeration — `src/govern/incremental-audit.ts`
@@ -134,8 +134,8 @@ attaches to; no behavior change in this task.
 
 ### Gate-eval criterion machinery (022) — `src/workflow/gate-eval.ts` + `workflow-types.ts`
 
-- `CRITERION_KINDS` (workflow-types.ts:44) — add `all-phase-checkpoints-current`.
-- `Criterion {kind, target, param?}`; `evaluateCriterion(c, ctx)` switch (gate-eval.ts:105) — add the case; `GateContext` carries `installationRoot`, `item`, `specDirPath` (enough to resolve tasks.md + checkpoints). Fail-loud = throw `WorkflowError` (matches the existing malformed-criterion pattern).
+- `CRITERION_KINDS` (in `workflow-types.ts`) — add `all-phase-checkpoints-current`.
+- `Criterion {kind, target, param?}`; `evaluateCriterion(c, ctx)` switch (in `gate-eval.ts`) — add the case; `GateContext` carries `installationRoot`, `item`, `specDirPath` (enough to resolve tasks.md + checkpoints — featureSlug = `basename(specDirPath)`, matching govern's marker-resolved slug). Fail-loud = throw `WorkflowError` (matches the existing malformed-criterion pattern).
 
 ### Composed convergence record (022/TASK-19) — `src/govern/convergence-record.ts`
 
@@ -150,12 +150,21 @@ attaches to; no behavior change in this task.
 ### Execute cadence surface (US2/US3) — `src/subcommands/execute-check.ts` + `skills/execute/SKILL.md`
 
 - `execute-check.ts` is today a read-only runnability gate (tasks.md present). The per-phase cadence post-condition (govern→commit→push, refuse N+1 until N current, oversized→`boundary-too-large` fail-loud) attaches here as injectable-runner functions (DI for hermetic tests); the skill body drives them as non-discretionary post-conditions.
-- `git govern-time per-phase ordering` already enforced by `assertPriorPhaseCheckpointsCurrent` (govern.ts:767) — the cadence reuses it; the gap is *who fires* govern, which `execute` closes.
+- govern-time per-phase ordering already enforced by `assertPriorPhaseCheckpointsCurrent` (symbol in `govern.ts`) — the cadence reuses it; the gap is *who fires* govern, which `execute` closes.
 
-### Speckit wrapper (US4) — NEW `src/speckit-wrapper/` + `.claude/skills/speckit-*/SKILL.md`
+### Speckit wrapper (US4) — NEW `src/speckit-wrapper/refusal.ts` + cross-vendor command adapters (CORRECTED, operator decision 2026-06-16)
 
-- No module today. Add `src/speckit-wrapper/refusal.ts` (skill-identity → front-door redirect map) + injected precondition blocks atop each vendored `speckit-{specify,plan,tasks,implement}/SKILL.md`.
+- **Adopter + cross-vendor reality (verified during implementation; GitHub #480 + specs/017-portability Decision 1):**
+  - The backend speckit skills (`speckit-specify/plan/tasks/implement`) are **NOT shipped by this plugin** — they are the adopter's own Spec Kit install. The repo-root `.claude/skills/speckit-*` in THIS tree is dev/dogfood only, not part of the plugin payload.
+  - `.claude/skills/` is **Claude-only**; Codex is a first-class host that surfaces the same commands through the thin `commands/*.md` adapter layer, with behavior living in `stackctl` (specs/017 Decision 1: stackctl authoritative, hosts thin adapters).
+  - Therefore the original spec assumption (inject a precondition block into each vendored `.claude/skills/speckit-*/SKILL.md`) is **invalid on two counts** — it patches files the plugin does not control, and it is a Claude-only path.
+- **Corrected mechanism (operator decision 2026-06-16 — start with this; option 3 below is a filed follow-on):**
+  - Refusal logic lives in `stackctl` (a portable CLI verb / front-door-marker check) — the authoritative surface that ships with the plugin and runs identically under Claude and Codex. `src/speckit-wrapper/refusal.ts` holds the skill-identity → front-door redirect map (never vendor identity, Principle III).
+  - The cross-vendor `commands/*.md` adapters (surfaced by both hosts) are the interception touch points that call the verb. No injection into the adopter's `.claude/skills/`.
+  - **The US1 per-phase graduate gate (pure `stackctl`) is the real teeth (FR-014 defense-in-depth):** a raw backend-speckit path cannot graduate without per-phase checkpoints, regardless of host. The honest boundary (FR-017) already concedes a deliberate raw bypass is not prevented at the point of invocation across all hosts.
+  - **Follow-on (filed):** roadmap item `design:gap/speckit-bypass-point-of-invocation-refusal` re-specs cross-vendor point-of-invocation shadowing adapters as the deeper defense-in-depth, via `/stack-control:design`.
+- **Path convention (GitHub #480):** every skill-body / command-adapter invocation of the CLI uses **bare `stackctl`** (on PATH in a host install), never the source-repo `plugins/stack-control/bin/stackctl` form (which 404s in an adopter install; pre-existing bug across 14 skill bodies).
 
 ### No-shortcuts audit (US5) — NEW `src/subcommands/no-shortcuts-audit.ts`
 
-- No audit today. Phrase scan over `skills/*/SKILL.md`; enumerate prohibited skip/defer/shortcut phrasings.
+- No audit today. Phrase scan over the **stack-control-owned** prompt surfaces that ship with the plugin: `skills/*/SKILL.md` AND the cross-vendor `commands/*.md` adapters (codex-02: the audit's input set must include every shipped prompt surface, not skills/ alone). It does NOT scan the adopter's backend speckit skills (not plugin-controlled; corrected US4). Enumerate prohibited skip/defer/shortcut phrasings.
