@@ -389,7 +389,7 @@ Mechanical terminal closure: roadmap close-related closes a terminal item's reco
 Make the lifecycle un-skippable: a workflow 'compass' primitive that orients an agent against a roadmap item and diffs intended action vs allowed phase, embedded as the precondition of every lifecycle skill (real refusals, not reports). Includes the supporting fixes (capture fused to authoring; govern feature-resolution from the spec pointer not the branch slug; TASK-83) so the gates are enforceable.
 
 ## multi:feature/unskippable-workflow-protocol
-- status: in-flight
+- status: shipped
 - spec: specs/025-unskippable-workflow-protocol
 - design: docs/superpowers/specs/2026-06-16-unskippable-workflow-protocol-design.md
 - design-approved: 2026-06-16
