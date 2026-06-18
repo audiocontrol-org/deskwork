@@ -2,6 +2,30 @@
 
 ---
 
+## 2026-06-18: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 3
+  - chore(stack-control): close skill-surface mediation + graduate 026 (live-verified 0.51.1)
+  - chore(stack-control): bookkeep skill-surface spike resolution (roadmap + TASK-241)
+  - fix(stack-control): 026 skill-surface mediation reads tool_input.skill, not skill_name
+- Files changed: 8
+- Backlog touched: TASK-241
+
 ## 2026-06-18: Execute 026 capability-interface-mediation (7 phases) → PR #484 merged → live T018 validation
 
 **Goal:** Pick up the in-flight, runnable 026 spec; drive native implementation
