@@ -2,27 +2,38 @@
 
 ---
 
-## 2026-06-18: <!-- session title -->
+## 2026-06-18: Offing friction → roadmap edge-mutation+cluster: design, prior-art, a foundational ADR, and a runnable spec
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Review the `offing` project's roadmap-clustering friction (from its Claude Code session), capture a remediation — and, as the operator pulled scope upward, design the feature, research prior art, settle a foundational store-architecture question, and author a runnable spec.
 
 **Accomplished:**
-- <!-- compose -->
+- Captured the offing dogfood friction as backlog **TASK-242** + a roadmap remediation node; **folded the reparent gap (TASK-137)** into it; added the self-documenting requirement.
+- Fixed roadmap `reconcile` drift (`terminal-closure` in-flight → shipped).
+- Drove the **design front door**: brainstormed the feature (5 forks), operator-approved (designing gate **7/7**), design record on disk.
+- **Prior-art research** (deep-research workflow, 101 agents): mapped Backlog.md / Beads / Org-mode+Org Edna / markdown-plan / Airflow / clap·Typer·Cobra·oclif. Found that **Backlog.md (an existing dependency) already ships ~80% of 027's operations** (self-doc CLI, edit-existing deps, grouping, sequence).
+- **Foundational decision + ADR** (`2026-06-18-governed-markdown-foundation-adr.md`): keep the governed-markdown foundation; adopt a parser **library** for CLI ergonomics; harden the `roadmap-model ← document-model` seam; recorded revisit-if triggers. Added durable rule `.claude/rules/governed-markdown-foundation.md`.
+- **Re-scoped 027** accordingly (~half the build), then drove the full Spec Kit chain `specify → clarify → plan → checklist → tasks → analyze` to **runnable** (`spec=yes plan=yes tasks=yes`; execute-check runnable; analyze **0 CRITICAL / 0 HIGH**). Node advanced through `design-approved` + `analyze-clean` to the **implementing** phase. Implementation deferred to a separate session (orchestrator/implementer boundary).
 
 **Didn't Work:**
-- <!-- compose -->
+- The deep-research **verification phase was rate-limited** → the harness reported "all 25 claims refuted / inconclusive," a false headline (the adversarial verifiers never ran; votes were `0-0`). Recovered by directly WebFetch-verifying the two decisive leads (Beads, markdown-plan).
+- `session-end` auto-derived **"Commits: 0"** — the known long-lived-branch boundary bug (**TASK-39**); re-derived by hand below (AUDIT-04 convention).
+- Accidentally committed a throwaway review-server script (`.review-server.mjs`) via `git add -A` in commit `3800ed0a`; removed in the session-end commit.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] The operator pulled scope **upward twice** (027 → the store → document-primitives wholesale), forcing a foundational reconsideration **before** building — which caught reinvention of Backlog.md's machinery before any code was written. The leverage was in *not building*.
+- [PROCESS] "A question is not an instruction": the backlog.md-overlap and prior-art questions were *answered/researched*, not acted on blindly; the spec chain was paused, not pushed through.
+- [PROCESS] Throwaway-path hygiene: `git add -A` swept a bare `.review-server.*` throwaway into a commit; prefer in-tree gitignored or `mktemp` paths for throwaways.
 
 **Insights:**
-- <!-- compose -->
+- The highest-leverage move was **stopping to research prior art** instead of building: it converted a full bespoke build (shared parser + edge-verb suite) into a half-size *adopt-a-lib* feature **plus** a durable foundational decision (the ADR + rule) that prevents the same re-litigation next time.
+- The roadmap's **own friction bit us repeatedly while operating it**: setting `design-approved`, `analyze-clean`, and the scope re-scope all required hand-edits (no verb for node markers / scope / rename) — live confirmation of exactly the gap 027 fixes. Dogfooding surfaced the tool's holes faster than reasoning about them.
+- The deep-research "all refuted" failure mode is a trap: a rate-limited verifier defaults to *refuted*, which reads as "claims are false" rather than "verification didn't run." Check the vote shape (`0-0` = no verifier ran), not just the headline.
 
-**Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 0
-  - (no commits this session)
-- Files changed: 0
-- Backlog touched: (none)
+**Quantitative:**
+- Commits: **14** since session-start `90082afb` (re-derived by hand — `session-end` boundary auto-derivation returned 0 on this long-lived branch, TASK-39). Includes the session-end record + the review-server-removal.
+- Files changed: ~21 files, +1026 / −13 (`git diff --stat 90082afb..HEAD`).
+- Backlog touched: **TASK-242** (created — offing friction), **TASK-137** (folded/re-pointed to the edge-mutation node).
+- Audit findings: none — orchestration/authoring session; per-phase governance (audit-barrage) runs in the implementation session, not here.
 
 ## 2026-06-18: Skill-surface-mediation spike overturns the "inert hook" diagnosis — one-field fix, 026 graduated
 
