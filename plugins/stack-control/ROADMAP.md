@@ -367,7 +367,7 @@ One-move backlog->roadmap promotion: given a backlog item, PROPOSE the roadmap n
 The centerpiece: a PARSEABLE, DETERMINISTIC lifecycle workflow that drives items through phases — not just a WORKFLOW.md doc. Apply the roadmap-protocol pattern to the process itself: a governed grammar-parsed workflow document (phases, per-phase entry/exit gates, the verb/skill executing each phase) plus an engine that, given an item, knows its current phase, the gate conditions to advance, and deterministically drives it to the next phase or reports why it's blocked. The human-readable WORKFLOW.md is one rendering of the parseable source of truth. Reuses document-primitives (governed parseable-doc engine) + roadmap-protocol grammar/DAG reasoning. Promoted from TASK-136.
 
 ## impl:feature/terminal-closure
-- status: in-flight
+- status: shipped
 - part-of: multi:feature/lifecycle-industrialization
 - spec: specs/023-terminal-closure
 Mechanical terminal closure: roadmap close-related closes a terminal item's recorded closes:/ref: backlog ids in one deterministic move.
