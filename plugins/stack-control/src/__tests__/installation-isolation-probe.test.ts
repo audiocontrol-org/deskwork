@@ -23,8 +23,10 @@
 // install-scope-discovery) plus `--at` anchored rows that additionally
 // pin WHERE the state lands inside the installation (SC-001).
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
+import { activeCapabilities, enterFrontDoor, exitFrontDoor } from '../capability/marker.js';
+import { mediateCheck } from '../subcommands/mediate-check.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
@@ -336,4 +338,36 @@ describe('installation-isolation probe (US1/FR-008) — outer tree byte-identica
     },
     120_000,
   );
+});
+
+// 026 T029 — the capability-mediation state writers anchor to the INSTALLATION, never
+// the outer root (the same isolation invariant the table above polices for other verbs).
+describe('026 capability mediation — front-door + mediate-check anchor to the installation (T029)', () => {
+  let fx: NestedFixture | undefined;
+  afterEach(() => fx?.cleanup());
+
+  it('front-door enter writes the marker INSIDE the nested installation; nothing leaks to the outer root', () => {
+    fx = makeNestedFixture();
+    const before = snapshotOutsideInstallation(fx);
+    const token = enterFrontDoor(fx.installationRoot, 'sess', 'backlog');
+    expect(existsSync(join(fx.installationRoot, '.stack-control', 'state', 'front-door', 'sess.json'))).toBe(true);
+    expect(diffSnapshots(before, snapshotOutsideInstallation(fx))).toEqual([]);
+    exitFrontDoor(fx.installationRoot, 'sess', token);
+    expect(diffSnapshots(before, snapshotOutsideInstallation(fx))).toEqual([]);
+  });
+
+  it('mediate-check --at reads the NESTED installation marker (permits) and writes nothing outside it', () => {
+    fx = makeNestedFixture();
+    // A marker for `sess`/backlog lives in the INNER installation only. If --at correctly
+    // anchors there, mediate-check reads it and PERMITS; a no-op/wrong --at would find no
+    // marker and refuse — so PERMIT is what actually proves the anchor (not a default refuse).
+    enterFrontDoor(fx.installationRoot, 'sess', 'backlog');
+    const before = snapshotOutsideInstallation(fx);
+    const result = mediateCheck(
+      ['--surface', 'bash', '--identity', 'backlog list', '--session', 'sess', '--at', fx.installationRoot],
+      { resolveActive: (at, session) => activeCapabilities(at, session) },
+    );
+    expect(result.code).toBe(0); // permit — proves --at resolved the nested install + read its marker
+    expect(diffSnapshots(before, snapshotOutsideInstallation(fx))).toEqual([]);
+  });
 });

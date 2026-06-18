@@ -27,24 +27,40 @@ afterEach(() => {
   fixtures = [];
 });
 
-describe('speckit wrapper refusal map (contracts/speckit-wrapper.md, FR-012)', () => {
-  it('recognizes exactly the four wrapped backend skills (skill identity, not vendor)', () => {
-    expect([...WRAPPED_SKILLS]).toEqual([
-      'speckit-specify',
-      'speckit-plan',
-      'speckit-tasks',
-      'speckit-implement',
-    ]);
-    expect(isWrappedSkill('speckit-implement')).toBe(true);
-    expect(isWrappedSkill('stack-control:execute')).toBe(false);
-    expect(isWrappedSkill('speckit-analyze')).toBe(false); // not wrapped
+describe('speckit wrapper refusal map (026 T017 — now registry-derived, single source)', () => {
+  it('exposes exactly the v1 contract skill set (a registry change that drops/adds one fails here)', () => {
+    // Assert against the EXPECTED literal contract — NOT a re-derivation of the same
+    // flatMap (claude-05: that would be tautological and could never fail). This pins the
+    // 025-superseding v1 set so a registry edit that changes it is caught against intent.
+    expect([...WRAPPED_SKILLS].sort()).toEqual(
+      [
+        'speckit-analyze',
+        'speckit-checklist',
+        'speckit-clarify',
+        'speckit-implement',
+        'speckit-plan',
+        'speckit-specify',
+        'speckit-tasks',
+      ].sort(),
+    );
   });
 
-  it('redirects implement → execute, and specify/plan/tasks → define/extend', () => {
+  it('recognizes the registry-fronted speckit skills (skill identity, not vendor)', () => {
+    expect(isWrappedSkill('speckit-implement')).toBe(true);
+    expect(isWrappedSkill('speckit-analyze')).toBe(true); // now fronted (spec-definition) — was incomplete in 025
+    expect(isWrappedSkill('stack-control:execute')).toBe(false);
+    expect(isWrappedSkill('backlog')).toBe(false); // a CLI identity, not a skill
+  });
+
+  it('redirects implement → execute, and every authoring skill → define/extend', () => {
     expect(frontDoorsFor('speckit-implement')).toEqual(['stack-control:execute']);
-    for (const authoring of ['speckit-specify', 'speckit-plan', 'speckit-tasks'] as const) {
+    for (const authoring of ['speckit-specify', 'speckit-clarify', 'speckit-plan', 'speckit-checklist', 'speckit-tasks', 'speckit-analyze'] as const) {
       expect(frontDoorsFor(authoring)).toEqual(['stack-control:define', 'stack-control:extend']);
     }
+  });
+
+  it('frontDoorsFor throws on a non-wrapped skill (callers gate with isWrappedSkill)', () => {
+    expect(() => frontDoorsFor('not-a-speckit-skill')).toThrow();
   });
 
   it('a DIRECT invocation is refused and names its front door (FR-012)', () => {

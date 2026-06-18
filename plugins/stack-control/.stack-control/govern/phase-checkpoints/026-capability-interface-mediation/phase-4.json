@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "featureSlug": "026-capability-interface-mediation",
+  "phaseId": "4",
+  "checkpoint": "phase-4",
+  "auditLogSection": "phase-4",
+  "scopeFingerprint": "babb140c6105d1babefbe86af2794c2237285cc43f2cfa57769c1ae607c4b487",
+  "passedAt": "2026-06-18T05:07:54.699Z",
+  "governedPaths": [
+    "src/__tests__/subcommands/capability.test.ts",
+    "src/subcommands/capability.ts"
+  ],
+  "auditedFiles": []
+}

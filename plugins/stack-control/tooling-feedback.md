@@ -69,3 +69,13 @@
 
 ## session-end 2026-06-16
 - speckit before_specify hook (speckit.git.feature) is mandatory (optional:false) but creates a per-spec branch, which conflicts with this program's one-long-lived-branch convention (TF-09). Every /stack-control:define must skip a 'mandatory' hook. Suggested: a stack-control define-mode that suppresses/no-ops the branch-creation hook on one-branch installations, so the agent isn't forced to deviate from a mandatory hook each spec.
+
+## session-end 2026-06-17
+- Per-phase govern run RETROACTIVELY over a finished feature manufactures scoping-artifact false-positives: governing phase N (scoped to phase-N files, whole-history diff base) cannot see fixes that live in other phases' files, so it reports them 'absent/unverified' (025 phase-1 re-govern claude-01 flagged the govern.ts featureCheckpointKey fix as missing though it was committed + tested). Per-phase also MULTIPLIES the auditor oscillation (8 phases x N rounds). The cadence is designed to run DURING implementation, not as a retroactive sweep. Captured as TASK-154 / multi:feature/audit-barrage-convergence.
+- session-end + govern boundary resolution is unreliable on the long-lived feature/stack-control branch: after a merge to main, merge-base resolves to ~HEAD so auto-derived 'Commits' would be 0; had to pass --since <prior-session-end-sha> explicitly. (TASK-39/TASK-59 territory.)
+
+## session-end 2026-06-17
+- design-record path is ambiguous between repo-root docs/superpowers/specs/ (legacy ADRs live there) and the installation-anchored plugins/stack-control/docs/superpowers/specs/ that the design-to-spec gate actually resolves (relative to install root). Repro: /stack-control:design step 1 says write to 'docs/superpowers/specs/<date>-<slug>-design.md'; I wrote to repo root and the gate read 0/7 (file-not-found) until moved under plugins/stack-control/. Workaround: write under the installation root. Suggested-fix: the design skill should state the install-anchored path explicitly, or link-design should warn when the resolved record path does not exist.
+
+## session-end 2026-06-18
+- define compass-gate path (roadmap node already exists) does not auto-record the spec: correspondence on the node, so the freshly-authored spec dir is left orphaned until manually linked (reconcile flags it; no unorphan verb — related to TASK-133). define's capture-fusion only creates the node+spec link on the node-MISSING branch.

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "featureSlug": "026-capability-interface-mediation",
+  "phaseId": "6",
+  "checkpoint": "phase-6",
+  "auditLogSection": "phase-6",
+  "scopeFingerprint": "8461a789729c1148c35889398677ef7a463faf45b6433ecc6e6daae113e0a466",
+  "passedAt": "2026-06-18T05:56:26.231Z",
+  "governedPaths": [
+    "src/__tests__/capability/purity.test.ts",
+    ".claude/skills"
+  ],
+  "auditedFiles": []
+}

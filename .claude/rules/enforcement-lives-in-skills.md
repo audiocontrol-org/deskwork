@@ -49,6 +49,16 @@ Before writing or modifying any enforcement primitive in this plugin:
 
 It doesn't. Relocating a check from a hook to a skill body is not more expensive than writing the hook — the verb already exists; the skill body invokes it. The cost is in the *thinking before the code* — same shape as the `.claude/rules/affordance-placement.md` rule (component-attached affordances aren't more expensive than toolbar buttons; the cost is in the design decision, not the code).
 
+## 026 amendment — a PLUGIN-SHIPPED PreToolUse hook IS a permitted enforcement surface (Decision 5)
+
+The capability-interface-mediation feature (specs/026) ships a Claude Code **PreToolUse hook** (`plugins/stack-control/hooks/hooks.json` → `bin/intercept`) that refuses a raw fronted-backend call at the point of invocation. This is NOT a contradiction of this rule — it is the rule's own principle applied correctly:
+
+- **The test is "does it travel with `claude plugin install`?"**, not "is it technically a hook?" A **git hook** (`.husky/`, `.git/hooks/`) does NOT travel with the plugin install — the adopter must discover and wire it (the exact "doesn't exist for an adopter who follows the README" failure this rule names). A **plugin-shipped Claude Code hook** (`hooks/hooks.json` at the plugin root, auto-discovered on install) DOES travel with the install — the adopter gets it from `claude plugin install`, no separate wiring.
+- So: **git hooks remain forbidden; a plugin-shipped PreToolUse / `hooks.json` hook is permitted** when (a) it ships inside the plugin and is auto-loaded on install, and (b) it contains NO decision logic — it is a thin adapter that calls a `stackctl` verb (the decision lives in the vendor-neutral CLI core, the same skill-bodies-+-verbs discipline). The 026 interceptor satisfies both: `bin/intercept` only marshals the payload to `stackctl mediate-check`/`intercept`; the decision is the `capability/` core.
+- **Defense-in-depth, not the sole guarantee.** Per FR-014/FR-017 the interceptor is best-effort (a deliberate raw bypass outside the skill surface is out of scope); the load-bearing guarantee remains the US3 per-phase graduate gate (bypassed work cannot graduate), which lives in the CLI verbs + gate — exactly where this rule says enforcement belongs.
+
+In short: the firing surface for 026 mediation is a plugin-shipped hook + the `mediate-check` CLI verb — both travel with the install — never a git hook.
+
 ## Why this rule exists
 
 This rule was written 2026-06-03 after v0.35.0's release required three `--no-verify` pushes for bookkeeping commits the audit-finding gates refused. That session — driving Phase 22/23 of scope-discovery on a feature branch — produced [#401](https://github.com/audiocontrol-org/deskwork/issues/401), [#402](https://github.com/audiocontrol-org/deskwork/issues/402), [#403](https://github.com/audiocontrol-org/deskwork/issues/403) and the synthesis: the audit-finding gates we ship aren't installable for adopters, so we've been measuring a UX we don't actually ship.

@@ -105,3 +105,19 @@ plugins/stack-control/bin/stackctl backlog promote <item-id> [<item-id>...] \
 - `0` — success / no-op (including a dry-run that wrote nothing, and a promote recorded against a not-yet-created target).
 - `1` — `promote` runtime fail-loud: a named item does not exist, or the backlog store / a task file is malformed (these are caught in preflight → zero writes); or a backend write failed mid-batch (the message names the items already recorded so you can retry the remainder).
 - `2` — usage error (unknown subaction/flag, missing required value, empty title, invalid type, a malformed `--to` ref, multiple ids on a non-`tasks:` target, a re-promotion of an already-promoted item) OR a fail-loud failure on the capture/import paths: a missing `backlog`/`gh` binary or a non-zero backend exit, with remediation. Never a silent skip or empty success.
+
+## Front-door marker (026 — capability mediation)
+
+This skill is the sanctioned interface for the **backlog** capability. It drives
+`stackctl backlog` (the wrapper verb), NOT the raw `backlog` CLI — so the PreToolUse
+interceptor (which refuses a raw agent-level `backlog ...` Bash call and redirects here)
+does not fire on this skill's own calls. If a future change has this skill invoke the
+raw `backlog` CLI directly as an agent Bash call, bracket it with the front-door marker:
+
+```bash
+TOKEN=$(stackctl front-door enter --capability backlog --session "$CLAUDE_CODE_SESSION_ID")
+# ... raw backlog CLI call ...
+stackctl front-door exit --token "$TOKEN" --session "$CLAUDE_CODE_SESSION_ID"
+```
+
+The marker is session-keyed and nesting-safe (FR-014a); `exit` is crash-safe.

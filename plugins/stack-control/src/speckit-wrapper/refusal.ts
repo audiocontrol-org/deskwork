@@ -1,60 +1,56 @@
-// Speckit wrapper refusal/redirect map (025 US4 — corrected mechanism, operator
-// decision 2026-06-16).
+// Speckit wrapper refusal/redirect map (025 US4) — 026 T017: now DERIVED from the
+// capability registry (the single source), not a second hardcoded skill list.
 //
-// A PORTABLE, pure map from a wrapped backend speckit skill identity to its sanctioned
-// stack-control front door. It branches on SKILL IDENTITY, never vendor identity
-// (Principle III), and lives in `stackctl` — the authoritative cross-vendor surface
-// (specs/017 Decision 1) — exposed through the plugin's own cross-vendor command/skill
-// adapters. It does NOT patch the adopter's own backend speckit skills (those are the
-// adopter's Spec Kit, not plugin-controlled) and uses no Claude-only `.claude/skills`
-// path (GitHub #480). The US1 per-phase graduate gate is the real defense-in-depth: an
-// evaded raw backend path cannot graduate without per-phase checkpoints (FR-014). A
-// cross-vendor point-of-invocation interception of a *raw* call is the filed follow-on
-// `design:gap/speckit-bypass-point-of-invocation-refusal`, not 025's scope.
+// DEPRECATED in favor of the 026 capability interceptor (`bin/intercept` +
+// `stackctl mediate-check`), which refuses a raw backend at the point of invocation and
+// reads the session-keyed marker FILE (research D1). `speckit-guard` remains as a frozen
+// 025 CLI verb (per the documented-subcommand contract — never removed, only superseded)
+// and delegates its skill→front-door mapping here, where it derives from
+// CAPABILITY_REGISTRY. The env-var marker below is the legacy 025 path; the marker-FILE
+// switch (T017) is realized by the 026 interceptor, not by changing this verb's signature.
 
-/** The backend speckit skills every stack-control front door wraps (FR-012). */
-export const WRAPPED_SKILLS = [
-  'speckit-specify',
-  'speckit-plan',
-  'speckit-tasks',
-  'speckit-implement',
-] as const;
-export type WrappedSkill = (typeof WRAPPED_SKILLS)[number];
+import { CAPABILITY_REGISTRY } from '../capability/registry.js';
+
+/** The backend speckit skills the registry fronts (spec-definition + spec-execution),
+ *  DERIVED from the single source — adding a skill backend to the registry extends this
+ *  with no edit here (FR-011 non-drift). */
+export const WRAPPED_SKILLS: readonly string[] = CAPABILITY_REGISTRY.capabilities.flatMap(
+  (c) => c.backendIdentities.skills,
+);
 
 /**
- * The env marker a stack-control front door sets when it legitimately drives a backend
- * skill, so the wrapper does not refuse a sanctioned invocation. The CLI verb reads it;
- * the pure `evaluateRefusal` takes the resolved boolean (no ambient state in the core).
+ * The env marker a 025 front door set when it legitimately drove a backend skill.
+ * DEPRECATED: the 026 mechanism is the session-keyed marker FILE (see `capability/marker.ts`),
+ * read by the interceptor. Kept only for the frozen 025 `speckit-guard` contract.
  */
 export const FRONT_DOOR_MARKER_ENV = 'STACKCTL_FRONT_DOOR';
 
-const AUTHORING_FRONT_DOORS = ['stack-control:define', 'stack-control:extend'] as const;
-const IMPLEMENT_FRONT_DOOR = ['stack-control:execute'] as const;
-
-/** True when `name` is one of the wrapped backend skills (skill identity, never vendor). */
-export function isWrappedSkill(name: string): name is WrappedSkill {
-  return (WRAPPED_SKILLS as readonly string[]).includes(name);
+/** True when `name` is a wrapped backend skill (registry-derived; skill identity, never vendor). */
+export function isWrappedSkill(name: string): boolean {
+  return WRAPPED_SKILLS.includes(name);
 }
 
-/** The sanctioned front door(s) for a wrapped skill: authoring → define/extend; implement → execute. */
-export function frontDoorsFor(skill: WrappedSkill): readonly string[] {
-  return skill === 'speckit-implement' ? IMPLEMENT_FRONT_DOOR : AUTHORING_FRONT_DOORS;
+/** The sanctioned front door(s) for a wrapped skill — the interface of the registry
+ *  capability that owns it. Throws if `skill` is not wrapped (callers gate with isWrappedSkill). */
+export function frontDoorsFor(skill: string): readonly string[] {
+  const cap = CAPABILITY_REGISTRY.capabilities.find((c) => c.backendIdentities.skills.includes(skill));
+  if (cap === undefined) throw new Error(`'${skill}' is not a wrapped backend skill`);
+  return cap.interface;
 }
 
 export interface RefusalVerdict {
   readonly refused: boolean;
-  readonly skill: WrappedSkill;
+  readonly skill: string;
   readonly frontDoors: readonly string[];
   readonly message: string;
 }
 
 /**
- * Evaluate whether a direct invocation of `skill` is refused. A direct invocation
- * (`viaFrontDoor === false`) is refused and the message names the sanctioned front
- * door (FR-012); a front-door-marked invocation (`viaFrontDoor === true`) is permitted
- * (no false positive). Pure — no ambient state.
+ * Evaluate whether a direct invocation of `skill` is refused. Direct (`viaFrontDoor ===
+ * false`) → refused, message names the sanctioned front door (FR-012); front-door-marked
+ * → permitted (no false positive). Pure — the caller resolves `viaFrontDoor`.
  */
-export function evaluateRefusal(skill: WrappedSkill, viaFrontDoor: boolean): RefusalVerdict {
+export function evaluateRefusal(skill: string, viaFrontDoor: boolean): RefusalVerdict {
   const frontDoors = frontDoorsFor(skill);
   if (viaFrontDoor) {
     return {

@@ -2,6 +2,209 @@
 
 ---
 
+## 2026-06-18: Author the 026 capability-interface-mediation spec (full Spec Kit chain)
+
+**Goal:** Mark 025 shipped on the roadmap, then pick up the in-flight effort from the
+last journal entry (`design:feature/capability-interface-mediation`) and advance it.
+
+**Accomplished:**
+- **025 was already shipped.** Confirmed `multi:feature/unskippable-workflow-protocol`
+  is `status: shipped` (last session's ceremony already did it). The session-start
+  "active spec → next /speckit-analyze" line is the TASK-130 bug, not real work — nothing
+  to change. Left the unrelated terminal-closure (023) drift alone.
+- **Authored specs/026 end-to-end through the `/stack-control:define` front door.** Drove
+  the full faithful Spec Kit chain in order — **specify → clarify → plan → checklist →
+  tasks → analyze** — for the capability-interface-mediation feature, from the design-approved
+  record. Compass `on-course` at entry. Spec is **runnable** (`execute-check` green).
+- **Clarify** resolved the 3 inline open questions (operator decisions): marker = file on
+  disk; v1 capability set = backlog / spec-definition / spec-execution; identity matching =
+  normalized `argv[0]`.
+- **Plan** dispatched two parallel research agents (Explore for the real code shapes;
+  claude-code-guide for the PreToolUse contract). Two findings reshaped the design — env-var
+  propagation is unreliable (confirms the marker-file decision), and **PreToolUse fires on the
+  `Skill` tool**, so the `/speckit-*` skill surfaces ARE observable (closes Approach-A / Open
+  Q4; no shadow-skills needed). Wrote research.md (D1–D8), data-model, 3 contracts, quickstart.
+- **Tasks**: 33 tasks, TDD-first (Constitution I overrides the "tests optional" default),
+  organized by user story (US1 = the refuse/permit MVP).
+- **Analyze**: 0 critical / 0 high. Applied the operator-chosen F1+A1+C1 remediations
+  (parity scoped to Bash for Codex; latency budget quantified; FR-018 coverage task).
+- **Linked the roadmap node to specs/026** (`spec:` correspondence + `analyze-clean`),
+  resolving the reconcile orphan-spec-dir finding. Node stays in-flight (not shipped).
+
+**Didn't Work:**
+- **session-end auto-derived `Commits: 0`** on this long-lived branch (boundary resolution
+  failed silently — TASK-39 / TASK-59). Re-derived the real numbers from `git log` and
+  corrected the Quantitative block below, per the AUDIT-04 reconciliation convention.
+- **`define` compass-gate path left the spec dir orphaned.** Authoring a spec for an
+  *existing* roadmap node does not auto-record the `spec:` correspondence (capture-fusion only
+  links on the node-MISSING branch), so reconcile flagged specs/026 as orphan until a manual
+  ROADMAP edit. No unorphan verb (TASK-133). Captured as tooling friction.
+
+**Course Corrections:**
+- [PROCESS] Operator chose "fix F1+A1+C1, then stop" at the analyze gate — applied the three
+  precision fixes and stopped short of implementation, honoring the two-session
+  (orchestrator vs implementer) boundary rather than driving `/stack-control:execute` here.
+
+**Insights:**
+- The biggest plan-phase risk (can a PreToolUse hook see a raw `/speckit-*` skill?) resolved
+  to a *spike*, not an operator decision — PreToolUse fires on the `Skill` tool, the only
+  unknown is the undocumented `tool_input` field name. Grounding the design in the real
+  `refusal.ts` / `house-rules.ts` instances (Principle II) made the registry shape fall out
+  cleanly rather than being imagined.
+
+**Quantitative (re-derived from `git log b4f97717..HEAD`; auto-derivation reported 0 — boundary bug TASK-39/59):**
+- Commits: 8 (c8e249d2 spec · 5361052b clarify · 5000d4a1 plan · 8711b194 checklist · 45e56e54 tasks · 32f75e73 analyze-remediation · 89b8abbe roadmap-link · 375b5882 session-record)
+- Files changed: 16 (+968 / −4)
+- Backlog touched: none (no TASK refs in commits; 026 authored from the roadmap node, not a backlog promotion)
+
+## 2026-06-17: Close 025 + design capability-interface mediation (the agent-facing API)
+
+**Goal:** Verify the installed v0.50.0 release and run the 025 closing ceremony; then
+pick up the next roadmap item — the backend-bypass protection follow-on — and design it.
+
+**Accomplished:**
+- **025 closing ceremony.** Verified the *formally-installed* v0.50.0 (booted the cached
+  binary, exercised the 025 deliverables: `speckit-guard` refuses `/speckit-implement` and
+  redirects; `no-shortcuts-audit` / `execute-check` / `spec-governance-gate` present).
+  `roadmap advance multi:feature/unskippable-workflow-protocol --to shipped`; `close-related`
+  found no recorded resolved items. Left `impl:feature/terminal-closure` (023) at in-flight
+  intentionally — unpaid govern debt (TASK-144).
+- **Designed the backend-bypass follow-on through `/stack-control:design` → brainstorming.**
+  Found the existing node `design:gap/speckit-bypass-point-of-invocation-refusal`; the operator
+  reframed it from "guard that wraps backends" to **the stack-control agent-facing capability
+  API** — capability interfaces that *completely mediate* between an adopting agent and swappable
+  backends, with point-of-invocation interception as the enforcement that makes mediation complete.
+- **Locked four decisions:** refuse ALL fronted-backend calls; mechanism = cross-vendor
+  `PreToolUse` interceptor calling the `stackctl` guard (primary) + make-bypass-harmless gate
+  (backstop); umbrella capability-API node; plugin-shipped Claude Code hook is a permitted
+  enforcement surface (travels with install, unlike a git hook).
+- **Wrote the installation-anchored design record** (7 sections, 4 alternatives), reclassified
+  the node → `design:feature/capability-interface-mediation`, advanced to in-flight, recorded
+  the `design-approved` marker. **design-to-spec gate 7/7.** Checkpointed at the boundary before
+  `/stack-control:define` (operator's call).
+- Spun up a Tailscale-reachable markdown review server so the operator could read the design
+  record on their phone before approving.
+
+**Didn't Work:**
+- **Wrote the design record to the wrong directory first.** Put it under repo-root
+  `docs/superpowers/specs/` (where legacy ADRs live); the gate reads the pointer
+  *installation-anchored* (`plugins/stack-control/docs/...`) and showed 0/7 until I moved it.
+  Self-caught via the gate, not operator-caught. Captured as tooling friction.
+- **Reparent has no verb.** Attaching `part-of` edges from `backlog-backend-port` +
+  `execution-engine` to the new umbrella node is unsupported (`add` refuses an existing node);
+  deferred to TASK-137. Relationship captured in the design record + node body so nothing is lost.
+
+**Course Corrections:**
+- [PROCESS] **Reframe, not correction:** the operator's "think of this as a stack-control API for
+  adopting agents, not backend-wrapping" was scope-shaping captured into the design — the steer
+  that turned a small `gap` into the umbrella `feature`. The agent's own misstep this session was
+  the wrong record path (gate-caught), not an operator correction.
+
+**Insights:**
+- The capability-API / complete-mediation reframe **unifies the existing port nodes**
+  (`backlog-backend-port`, `execution-engine` are the *backend* side of a port) by adding the
+  missing *agent-facing* side: the interface is the only surface the agent may touch.
+- Point-of-invocation interception reads as a bolt-on guard until you see it as the *teeth* of a
+  mediation boundary — which is why "all fronted-backend calls" (not mutating-only) is the
+  coherent rule: an API you can reach around isn't an API.
+- The enforcement-lives-in-skills ADR's real test is "surfaces an adopter gets after
+  `claude plugin install`" — which *admits* plugin-shipped Claude Code hooks (they travel with
+  install) and only excludes git hooks (they don't). That distinction unblocked mechanism B.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 3
+  - roadmap(stack-control): reclassify capability-interface-mediation + record design approval
+  - design(stack-control): capability-interface mediation design record
+  - roadmap(stack-control): graduate 025 unskippable-workflow-protocol to shipped
+- Files changed: 2
+- Backlog touched: TASK-137, TASK-144
+
+## 2026-06-17: Execute 025 unskippable-workflow-protocol → ship to main (PR #483)
+
+**Goal:** Run the analyze-clean 025 spec through `/stack-control:execute` → native
+`/speckit-implement`, per-phase, governing at each boundary, then ship.
+
+**Accomplished:**
+- **All 5 user stories implemented + shipped to `main` (PR #483, merge `111d2fb8`).** 30 tasks,
+  full suite green (**264 test files / 1731 tests**), `spec-check` exit 0.
+  - US1: `all-phase-checkpoints-current` graduate gate (composed signal from the checkpoint
+    union; currency logic extracted from `govern.ts` with no clone; single-sourced
+    `featureCheckpointKey`). US2: `execute` per-phase govern cadence + oversized→TASK-75.
+    US3: mechanical commit-local-first→push, never `--no-verify`. US4: portable
+    `stackctl speckit-guard` + cross-vendor adapter + US1-gate teeth. US5: `no-shortcuts-audit`.
+- **Governance dogfooded — caught 2 cross-model HIGH bugs the 1731-test suite missed**
+  (checkpoint-key drift; false fail-loud docstring), both fixed TDD-first.
+- Composed the important follow-ons into governed roadmap nodes (`multi:feature/audit-barrage-convergence`
+  + 6 children/residuals); opened + auto-merged PR #483.
+
+**Didn't Work:**
+- **The retroactive per-phase govern sweep did not converge.** Run after the feature was
+  finished (whole-history diff base scoped to one phase's files), it manufactured
+  scoping-artifact false-positives (the barrage couldn't see fixes living in other phases'
+  files → flagged a committed+tested fix as "absent") and amplified the auditor oscillation.
+  Stopped it; recorded a `GOVERN_OVERRIDE` at the plateau (operator decision).
+- First govern run hit a fleet-floor shortfall — codex `killed-no-liveness` (60s stderr
+  window too tight for its silent reasoning on a real payload).
+
+**Course Corrections:**
+- [PROCESS] **US4 mechanism was invalid.** The spec said inject precondition blocks into the
+  adopter's `.claude/skills/speckit-*` — but those are the adopter's own Spec Kit (not
+  plugin-controlled) and `.claude/skills` is Claude-only (the plugin is cross-vendor). Operator
+  redirected to a portable `stackctl` verb + cross-vendor adapters + US1-gate teeth; amended the
+  spec; filed the point-of-invocation interception as a follow-on.
+- [PROCESS] **Build for the adopter environment, not the source repo** (GitHub #480): skill
+  bodies must invoke bare `stackctl` (on PATH in a host install), not `plugins/stack-control/bin/stackctl`.
+- [PROCESS] **Don't hardcode Claude-only deps** — the plugin is cross-vendor (Claude + Codex);
+  behavior lives in `stackctl`, hosts are thin adapters (specs/017 Decision 1).
+- [PROCESS] **codex fleet liveness** — operator chose to widen the window as a stopgap and
+  capture the better fix (emit reasoning summaries) as TASK-145, not paper over the floor.
+- [PROCESS] **Per-phase-vs-full-audit reconsideration** — operator surfaced that per-phase
+  (meant to shrink payloads for small models) didn't pay off and magnified the ringing;
+  captured TASK-154 + composed the `audit-barrage-convergence` roadmap feature.
+- [COMPLEXITY] **Override-and-graduate at the govern plateau** (operator) rather than grinding
+  8 retroactive barrages with finding-fix iterations.
+
+**Insights:**
+- **The barbell thesis validated live**: cross-model stochastic governance caught two real HIGH
+  bugs that 1731 deterministic tests did not (a key-drift latent only for adopter `--feature`
+  usage; a lying docstring). Detection over instruction.
+- **Per-phase govern is an anti-pattern when applied retroactively**: intended to shrink the
+  audit payload, it instead *multiplied* the audit surface (8 phases × N rounds), introduced
+  scoping blind spots, and amplified oscillation. The cadence belongs *during* implementation,
+  not as an end-of-feature sweep — which is exactly what TASK-154 / the convergence feature now
+  targets.
+- **025 gates itself**: the feature's own graduation now requires per-phase checkpoints it
+  didn't produce cleanly — the dogfood-eats-itself moment that surfaced the upgrade-migration
+  gap (TASK-153).
+
+**Governance / findings (per AUDIT-03 convention):**
+- Implement-mode govern caught 2 cross-model HIGH → both FIXED (commit `bd5366bc`). Plateau
+  residuals dispositioned: 1 false-positive (per-phase scoping, no-action), 1 won't-fix
+  (filed-follow-on reference is a disposition, not a deferral), 2 design forks SCOPED to roadmap
+  (`impl:gap/start-governing-enforcement`, `impl:gap/per-phase-gate-upgrade-migration`).
+  Recorded `GOVERN_OVERRIDE` (audit-log) at the plateau per operator. **0 open findings carried
+  silently** — every residual is scoped or dispositioned.
+- New backlog this session: TASK-145, 151, 152, 153, 154 (+ 13 GitHub issues imported).
+  Promoted to roadmap: TASK-60, 145, 146, 149, 152, 153, 154.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 13
+  - roadmap(stack-control): compose 025-session backlog items into governed roadmap nodes
+  - backlog(stack-control): TASK-154 — audit-granularity switch (per-phase opt-in vs full-audit-at-end)
+  - govern(stack-control): 025 GOVERN_OVERRIDE at the convergence plateau (operator decision 2026-06-17)
+  - fix(stack-control): 025 remediate Phase-1 govern cross-model findings (codex-01/claude-02 HIGH, claude-01 HIGH, claude-03/codex-02/claude-04)
+  - chore(stack-control): 025 Phase 8 polish — enforcement-home audit, honest boundary, file-size guard (T027-T030)
+  - feat(stack-control): 025 US5 — no agent-offered shortcuts audit (T024-T026)
+  - feat(stack-control): 025 US4 — portable speckit wrapper refusal + US1-gate defense-in-depth (T019-T023)
+  - feat(stack-control): 025 US3 — mechanical commit-and-push at each phase boundary (T016-T018)
+  - feat(stack-control): 025 US2 — execute fires per-phase govern at each boundary (T012-T015)
+  - feat(stack-control): 025 US1 per-phase graduate gate (T006-T011, MVP)
+  - spec(stack-control): 025 correct US4 to adopter-safe + cross-vendor; fleet + backlog remediation
+  - feat(stack-control): 025 Phase 2 — fail-loud phase enumeration (T003-T005)
+  - feat(stack-control): 025 Phase 1 setup — primitive inventory + multi-phase fixtures
+- Files changed: 48
+- Backlog touched: TASK-145, TASK-146, TASK-149, TASK-151, TASK-152, TASK-153, TASK-154, TASK-48, TASK-60, TASK-70, TASK-75
+
 ## 2026-06-16: session-end re-invocation (no new work since prior close)
 
 **Goal:** Operator re-invoked `/stack-control:session-end` immediately after the prior

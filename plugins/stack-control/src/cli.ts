@@ -55,6 +55,11 @@ import { runSessionEndCli } from './subcommands/session-end.js';
 import { runReleaseCheck } from './subcommands/release-check.js';
 import { runReleaseHelperCli } from './subcommands/release-helper.js';
 import { runConfigDomainCli } from './subcommands/config-domain.js';
+import { runMediateCheck } from './subcommands/mediate-check.js';
+import { runFrontDoor } from './subcommands/front-door.js';
+import { runIntercept } from './subcommands/intercept.js';
+import { runCapabilityCli } from './subcommands/capability.js';
+import { runReconcileCli } from './subcommands/capability-reconcile.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -126,6 +131,16 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // Portable release/update contract checks (017 / portability).
   'release-check': runReleaseCheck,
   'release-helper': runReleaseHelperCli,
+  // Capability-interface mediation (026): the decision verb + the front-door marker writer
+  // + the Claude PreToolUse adapter entry (bin/intercept dispatches here).
+  'mediate-check': runMediateCheck,
+  'front-door': runFrontDoor,
+  intercept: runIntercept,
+  // Agent-facing capability discovery (026 US2) + the US3 reconcile backstop. The
+  // `reconcile` subaction dispatches to its own module so the US2 `capability list` verb
+  // (capability.ts) stays list-only (its phase scope is not disturbed by US3).
+  capability: async (args: string[]): Promise<void> =>
+    args[0] === 'reconcile' ? runReconcileCli(args.slice(1)) : runCapabilityCli(args),
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "featureSlug": "026-capability-interface-mediation",
+  "phaseId": "3",
+  "checkpoint": "phase-3",
+  "auditLogSection": "phase-3",
+  "scopeFingerprint": "3e74eabec83015523ed76921d0f9cb0300e86fca132470254c0574baf77524f9",
+  "passedAt": "2026-06-18T05:53:33.541Z",
+  "governedPaths": [
+    "front-door enter/exit",
+    "src/__tests__/capability/marker.test.ts",
+    "src/capability/marker.ts",
+    "<installation>/.stack-control/state/front-door/<session>.json",
+    "src/__tests__/capability/mediate.test.ts",
+    "src/capability/mediate.ts",
+    "src/__tests__/subcommands/mediate-check.test.ts",
+    "--surface/--identity/--session/--at",
+    "src/subcommands/mediate-check.ts",
+    "src/__tests__/subcommands/front-door.test.ts",
+    "src/subcommands/front-door.ts",
+    "hooks/hooks.json",
+    "bin/intercept",
+    "src/subcommands/intercept.ts",
+    "src/capability/intercept.ts",
+    "src/__tests__/capability/intercept.test.ts",
+    "src/__tests__/capability/intercept-prefilter.test.ts",
+    "skills/define/SKILL.md",
+    "skills/extend/SKILL.md",
+    "skills/execute/SKILL.md",
+    "skills/backlog/SKILL.md",
+    "src/speckit-wrapper/refusal.ts",
+    "src/subcommands/speckit-guard.ts",
+    "src/__tests__/speckit-wrapper/wrapper-refusal.test.ts"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/src/capability/marker.ts",
+    "plugins/stack-control/src/subcommands/intercept.ts",
+    "plugins/stack-control/src/subcommands/mediate-check.ts"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "featureSlug": "026-capability-interface-mediation",
+  "phaseId": "7",
+  "checkpoint": "phase-7",
+  "auditLogSection": "phase-7",
+  "scopeFingerprint": "f2b898495199bc6b64d9eb54d9f9195c5d950f48be5cd6bb427dc3fac96c0803",
+  "passedAt": "2026-06-18T06:14:31.638Z",
+  "governedPaths": [
+    "src/__tests__/installation-isolation-probe.test.ts",
+    "front-door enter/exit",
+    ".claude/rules/enforcement-lives-in-skills.md",
+    "docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md",
+    "<installation>/.stack-control/state/**",
+    "src/__tests__/capability/no-backend-writes.test.ts"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/src/__tests__/installation-isolation-probe.test.ts"
+  ]
+}

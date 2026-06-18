@@ -1,5 +1,24 @@
 // `stackctl speckit-guard <skill-name>` (025 US4 — the portable refusal verb).
 //
+// DEPRECATED (026 T017): superseded by the capability interceptor (`bin/intercept` +
+// `stackctl mediate-check`), which refuses a raw backend at the point of invocation and
+// reads the session-keyed marker FILE. This verb is kept (frozen) per the documented-
+// subcommand contract; its skill→front-door mapping now DERIVES from the capability
+// registry (via refusal.ts), so there is one source. New adapters call `mediate-check`.
+//
+// BEHAVIORAL NOTE (026 T017, audit claude-07): because the mapping is now registry-derived,
+// this verb's refusal SET widened from the original four (025) to the seven speckit skills
+// the registry fronts — it now ALSO refuses a direct `speckit-clarify`/`speckit-checklist`/
+// `speckit-analyze` (correctly: those are fronted by /stack-control:define|extend, a 025
+// gap). The exit-code contract (0/1/2) is unchanged; only the membership widened.
+//
+// DIVERGENCE NOTE (026 T017, audit claude-04): this verb resolves "via front door" from
+// the legacy ENV marker (`STACKCTL_FRONT_DOOR === '1'`), while the 026 interceptor resolves
+// it from the session-keyed marker FILE. A context established via `front-door enter` (file)
+// is therefore NOT seen here — a `speckit-guard` call after a file-marker `enter` would
+// refuse. This is a deprecation artifact (the interceptor is the live path); reconciling the
+// frozen verb's decision to read the same file marker is tracked as TASK-165.
+//
 // The cross-vendor surface for the speckit wrapper: given a backend skill identity, it
 // refuses a DIRECT invocation and names the sanctioned stack-control front door, or
 // permits an invocation reached via its front door (the FRONT_DOOR_MARKER_ENV marker is
