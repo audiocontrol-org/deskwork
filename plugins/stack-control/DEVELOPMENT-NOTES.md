@@ -2,6 +2,65 @@
 
 ---
 
+## 2026-06-18: Execute 026 capability-interface-mediation (7 phases) → PR #484 merged → live T018 validation
+
+**Goal:** Pick up the in-flight, runnable 026 spec; drive native implementation
+phase-by-phase via `/stack-control:execute` with per-phase governance; open + merge the
+PR; then validate the feature in a formally-installed release and close it out if valid.
+
+**Accomplished:**
+- **Executed all 7 phases / 33 tasks of 026 RED-first** through `/stack-control:execute`,
+  each phase boundary governed by the cross-model audit-barrage (codex/gpt-5.5 +
+  claude/opus). Full suite **1862 GREEN**. Opened **PR #484**, merged to `main` (`d41600c4`).
+- **Live T018 validation in the installed release (0.51.0)** — the gate that was
+  harness-blocked during execute now passes for the Bash surface:
+  raw `backlog` **denied** with the registry redirect → `front-door enter` → **permit** →
+  `exit` → **refuse** again. **Session-id bridge proven** (a marker keyed by
+  `$CLAUDE_CODE_SESSION_ID` is found by the live hook → permit). **SC-003 no-false-positive**
+  confirmed live (`front-door enter --capability backlog`, backlog-as-arg, permitted).
+  **US3 backstop operational** (`capability reconcile` flags un-governed spec-execution work).
+  Scenario H self-dogfood holds.
+- **Captured the Skill-surface gap** (TASK-241) and tracked the spike+fix as roadmap node
+  `design:gap/skill-surface-mediation` (`part-of` 026; backlog→roadmap promotion recorded).
+  026 left **in-flight** (not closed) per operator decision.
+
+**Didn't Work:**
+- **The Skill-surface PreToolUse matcher is inert.** Claude Code does not fire PreToolUse for
+  skill invocations, so a raw `/speckit-implement` launches un-denied. The shipped decision
+  logic is correct (`stackctl intercept` denies the exact Skill payload) but `bin/intercept`
+  is never invoked for skills. The plan's D3 spike had concluded "PreToolUse fires on the
+  `Skill` tool" — **falsified live**; the real gate is likely `UserPromptExpansion` (docs
+  confirm it is a real, command-name-matchable, blocking event) — needs the new spike.
+- **`session-end` auto-derived `Commits: 0`** again (boundary bug TASK-39/TASK-59); re-derived
+  from `git log f68a6aa1..HEAD` and corrected the Quantitative block (AUDIT-04 convention).
+- **Two phase-checkpoint stale events during execute** (directory / shared-file scope
+  fingerprints) handled by reshaping task scope + override-refresh (TASK-160 class).
+
+**Course Corrections:**
+- [PROCESS] Operator chose **"Override & graduate"** at two governance diminishing-returns
+  plateaus (Phase 2 shell-parser; Phase 3 the unverifiable session-id linchpin) — recorded
+  substantive overrides rather than chasing the finding generator.
+- [PROCESS] On the Skill-gap finding, operator chose **"require the real fix before closing
+  026"** (not the US3-covered-limit acceptance), then **"capture the spike in the roadmap"**
+  rather than continuing inline in an oversized session.
+
+**Insights:**
+- The barrage caught the inert Skill matcher *as a self-contradiction* during execute, but the
+  deeper truth — PreToolUse doesn't fire for skills at all — only surfaced at **live install**,
+  exactly as the "verify in a formally-installed release" rule predicts. Cross-model audit and
+  live-install verification are complementary, not redundant.
+- The interceptor is **best-effort by design** (FR-017); the load-bearing guarantee is the
+  **US3 graduate gate**, which held. The Skill-surface gap degrades defense-in-depth, not the
+  core "bypassed work cannot graduate" guarantee — which is why the spec itself hedged
+  Scenario F step 3 onto Scenario G.
+
+**Quantitative (re-derived from `git log f68a6aa1..HEAD`; auto-derive reported 0 — boundary bug TASK-39/TASK-59):**
+- Commits: **10** on `feature/stack-control` (8 feat/fix across the 7-phase execute + 1 roadmap + 1 session-end), plus **PR #484** merged to `main` (`d41600c4`).
+- Files changed: **141 files, +7515 / −85**.
+- Tests: **1862 GREEN** (full suite at merge).
+- Backlog touched/referenced: TASK-155, -156, -159, -160, -162, -163, -164, -165 (execute follow-ons/friction), **TASK-241** (skill-surface gap, new).
+- Tooling friction captured: 1 (`.stack-control/state/` not gitignored — transient markers risk accidental commit).
+
 ## 2026-06-18: Author the 026 capability-interface-mediation spec (full Spec Kit chain)
 
 **Goal:** Mark 025 shipped on the roadmap, then pick up the in-flight effort from the

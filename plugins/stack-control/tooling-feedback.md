@@ -79,3 +79,6 @@
 
 ## session-end 2026-06-18
 - define compass-gate path (roadmap node already exists) does not auto-record the spec: correspondence on the node, so the freshly-authored spec dir is left orphaned until manually linked (reconcile flags it; no unorphan verb — related to TASK-133). define's capture-fusion only creates the node+spec link on the node-MISSING branch.
+
+## session-end 2026-06-18
+- .stack-control/state/ (front-door session markers) is not gitignored — transient per-session marker files show as untracked and can be accidentally committed; needs a gitignore entry.
