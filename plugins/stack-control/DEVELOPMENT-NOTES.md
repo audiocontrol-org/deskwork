@@ -2,27 +2,60 @@
 
 ---
 
-## 2026-06-18: <!-- session title -->
+## 2026-06-18: Author the 026 capability-interface-mediation spec (full Spec Kit chain)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Mark 025 shipped on the roadmap, then pick up the in-flight effort from the
+last journal entry (`design:feature/capability-interface-mediation`) and advance it.
 
 **Accomplished:**
-- <!-- compose -->
+- **025 was already shipped.** Confirmed `multi:feature/unskippable-workflow-protocol`
+  is `status: shipped` (last session's ceremony already did it). The session-start
+  "active spec → next /speckit-analyze" line is the TASK-130 bug, not real work — nothing
+  to change. Left the unrelated terminal-closure (023) drift alone.
+- **Authored specs/026 end-to-end through the `/stack-control:define` front door.** Drove
+  the full faithful Spec Kit chain in order — **specify → clarify → plan → checklist →
+  tasks → analyze** — for the capability-interface-mediation feature, from the design-approved
+  record. Compass `on-course` at entry. Spec is **runnable** (`execute-check` green).
+- **Clarify** resolved the 3 inline open questions (operator decisions): marker = file on
+  disk; v1 capability set = backlog / spec-definition / spec-execution; identity matching =
+  normalized `argv[0]`.
+- **Plan** dispatched two parallel research agents (Explore for the real code shapes;
+  claude-code-guide for the PreToolUse contract). Two findings reshaped the design — env-var
+  propagation is unreliable (confirms the marker-file decision), and **PreToolUse fires on the
+  `Skill` tool**, so the `/speckit-*` skill surfaces ARE observable (closes Approach-A / Open
+  Q4; no shadow-skills needed). Wrote research.md (D1–D8), data-model, 3 contracts, quickstart.
+- **Tasks**: 33 tasks, TDD-first (Constitution I overrides the "tests optional" default),
+  organized by user story (US1 = the refuse/permit MVP).
+- **Analyze**: 0 critical / 0 high. Applied the operator-chosen F1+A1+C1 remediations
+  (parity scoped to Bash for Codex; latency budget quantified; FR-018 coverage task).
+- **Linked the roadmap node to specs/026** (`spec:` correspondence + `analyze-clean`),
+  resolving the reconcile orphan-spec-dir finding. Node stays in-flight (not shipped).
 
 **Didn't Work:**
-- <!-- compose -->
+- **session-end auto-derived `Commits: 0`** on this long-lived branch (boundary resolution
+  failed silently — TASK-39 / TASK-59). Re-derived the real numbers from `git log` and
+  corrected the Quantitative block below, per the AUDIT-04 reconciliation convention.
+- **`define` compass-gate path left the spec dir orphaned.** Authoring a spec for an
+  *existing* roadmap node does not auto-record the `spec:` correspondence (capture-fusion only
+  links on the node-MISSING branch), so reconcile flagged specs/026 as orphan until a manual
+  ROADMAP edit. No unorphan verb (TASK-133). Captured as tooling friction.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Operator chose "fix F1+A1+C1, then stop" at the analyze gate — applied the three
+  precision fixes and stopped short of implementation, honoring the two-session
+  (orchestrator vs implementer) boundary rather than driving `/stack-control:execute` here.
 
 **Insights:**
-- <!-- compose -->
+- The biggest plan-phase risk (can a PreToolUse hook see a raw `/speckit-*` skill?) resolved
+  to a *spike*, not an operator decision — PreToolUse fires on the `Skill` tool, the only
+  unknown is the undocumented `tool_input` field name. Grounding the design in the real
+  `refusal.ts` / `house-rules.ts` instances (Principle II) made the registry shape fall out
+  cleanly rather than being imagined.
 
-**Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 0
-  - (no commits this session)
-- Files changed: 0
-- Backlog touched: (none)
+**Quantitative (re-derived from `git log b4f97717..HEAD`; auto-derivation reported 0 — boundary bug TASK-39/59):**
+- Commits: 8 (c8e249d2 spec · 5361052b clarify · 5000d4a1 plan · 8711b194 checklist · 45e56e54 tasks · 32f75e73 analyze-remediation · 89b8abbe roadmap-link · 375b5882 session-record)
+- Files changed: 16 (+968 / −4)
+- Backlog touched: none (no TASK refs in commits; 026 authored from the roadmap node, not a backlog promotion)
 
 ## 2026-06-17: Close 025 + design capability-interface mediation (the agent-facing API)
 
