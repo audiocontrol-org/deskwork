@@ -43,6 +43,8 @@ Resolves the spec's open questions that are plan-phase-resolvable, and grounds e
 
 **Docs-derived (NOT yet live-verified — the live gate is a T015/T018 acceptance check): the skill name IS in the PreToolUse payload.**
 
+> **UPDATE 2026-06-18 — live spike RESOLVED this, and FALSIFIED the field name.** The skill-surface-mediation spike (instrument the loaded plugin hook, invoke a skill via the `Skill` tool, observe the payload — see `skill-surface-spike-research.md`) proved: (1) PreToolUse **does** fire for an agent-initiated `Skill`-tool call (the "inert" T018 conclusion was a misdiagnosis); (2) the payload field is **`tool_input.skill`**, NOT `skill_name`. The `skill_name` references below are the original docs-derived (wrong) claim; read them as historical. The code, tests, and contract now read `tool_input.skill`.
+
 > Provenance: every claim below is from the official Claude Code hooks documentation, NOT an empirical capture (the live probe was harness-blocked, see Method). Treat the field shape and matcher behavior as a **docs-derived assumption** until the T015/T018 live-firing check confirms it; do not build a downstream branch that assumes more than docs establish.
 
 - **Field**: `tool_input.skill_name` (exact) carries the skill name; `tool_input.skill_arguments` carries the args. Top-level payload fields: `session_id`, `transcript_path`, `cwd`, `permission_mode`, `hook_event_name`, `tool_name`, `tool_input`. So the interceptor resolves the installation from `cwd`, the session from `session_id`, and the invoked identity from `tool_input.skill_name`.
