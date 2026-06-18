@@ -15,9 +15,9 @@ Tests are REQUIRED (Constitution Principle I — Test-First, NON-NEGOTIABLE): ea
 
 ## Phase 2 — Foundational (blocking prerequisites for US1 + US2)
 
-- [ ] T003 RED test `tests/cli/parser-adapter.test.ts`: the typed adapter yields a fully-typed options object for a sample command with zero `as`/`any` (CHK024); asserts unknown-flag and unknown-subaction error shapes + exit codes (contract §exit codes).
-- [ ] T004 Mount `roadmap` as a commander `Command` in `src/cli.ts`, delegating every un-migrated verb to the existing flat `SUBCOMMANDS` path unchanged (FR-006 non-regression).
-- [ ] T005 RED test `tests/roadmap/non-regression.test.ts`: every existing roadmap subaction (`next/blocked/order/graph/add/advance/decompose/reclassify/defer/reconcile/close-related`) keeps its current behavior + flags after mounting (FR-006, CHK022).
+- [X] T003 RED test `tests/cli/parser-adapter.test.ts`: the typed adapter yields a fully-typed options object for a sample command with zero `as`/`any` (CHK024); asserts unknown-flag and unknown-subaction error shapes + exit codes (contract §exit codes).
+- [X] T004 Mount `roadmap` as a commander `Command` in `src/cli.ts`, delegating every un-migrated verb to the existing flat `SUBCOMMANDS` path unchanged (FR-006 non-regression).
+- [X] T005 RED test `tests/roadmap/non-regression.test.ts`: every existing roadmap subaction (`next/blocked/order/graph/add/advance/decompose/reclassify/defer/reconcile/close-related`) keeps its current behavior + flags after mounting (FR-006, CHK022).
 
 ## Phase 3 — User Story 1: self-documenting roadmap (P1) 🎯 MVP
 

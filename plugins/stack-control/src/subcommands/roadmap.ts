@@ -43,7 +43,7 @@ import { resolveVerbDoc } from './working-file.js';
 // default lets the flag scanner report whether --doc was passed.
 const NO_DOC = '\0__roadmap_no_doc__';
 
-interface Flags {
+export interface Flags {
   readonly doc: string;
   readonly apply: boolean;
   readonly clear: boolean;
@@ -80,7 +80,7 @@ const ALL_VALUE_FLAGS: readonly string[] = [
 ];
 
 /** Scan flags via the shared subaction-verb scanner; `--apply`/`--clear` booleans. */
-function scanFlags(args: readonly string[]): Flags {
+export function scanFlags(args: readonly string[]): Flags {
   const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear'], ALL_VALUE_FLAGS);
   return {
     doc: s.doc,
@@ -275,21 +275,38 @@ function emitCloseRelated(model: RoadmapModel, flags: Flags): void {
   }
 }
 
-export async function runRoadmapCli(args: string[]): Promise<void> {
-  const subaction = args[0];
-  if (subaction === undefined || subaction.startsWith('--')) {
-    failUsage('roadmap', 'a subaction is required (usage: roadmap <next|blocked|add> [flags])');
-  }
-  // Reject an unknown subaction before resolving the doc, so an unknown verb is a
-  // usage error (exit 2) rather than triggering installation resolution.
-  if (SUBACTION_SPECS[subaction] === undefined) {
-    failUsage(
-      'roadmap',
-      `unknown subaction '${subaction}' (known: next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, reconcile, close-related)`,
-    );
-  }
-  const scanned = scanFlags(args.slice(1));
+// The sentinel `--doc`-absent value exported so the commander mount
+// (roadmap-command.ts) marks "no explicit --doc" identically to the flat scan
+// path, keeping installation resolution behavior byte-for-byte identical.
+export { NO_DOC, SUBACTION_SPECS };
+
+/**
+ * The AUDIT-hardened front-end validation, single-sourced for the commander mount
+ * (027 T004). Runs the shared subaction-verb scanner + per-subaction grammar
+ * validation on the RAW subaction args — preserving every exit-2 guard the flat
+ * path enforced, INCLUDING the forgot-value cases commander's own parser does not
+ * replicate (`--<value-flag>` immediately followed by a recognized flag → exit 2,
+ * AUDIT-20260608-04 / AUDIT-BARRAGE-claude-01). `subaction` MUST already be a known
+ * key of SUBACTION_SPECS (the caller rejects unknowns first). Returns the validated
+ * `Flags`; on any violation it `process.exit(2)`s via the shared `failUsage`.
+ */
+export function preflightRoadmapFlags(subaction: string, subActionArgs: readonly string[]): Flags {
+  const scanned = scanFlags(subActionArgs);
   validateSubactionFlags('roadmap', subaction, SUBACTION_SPECS[subaction], scanned);
+  return scanned;
+}
+
+/**
+ * The doc-resolution + dispatch + error-mapping core, shared by BOTH the flat
+ * hand-rolled path (`runRoadmapCli`) and the commander mount (roadmap-command.ts).
+ * `scanned` is a fully-validated `Flags` whose `doc` is either an explicit path
+ * or the `NO_DOC` sentinel. Subaction is assumed already validated as a known
+ * key of SUBACTION_SPECS (the caller rejects unknowns with exit 2 first).
+ *
+ * Single-sourcing this here keeps the InstallationError/DocumentModelError/
+ * BacklogError → exit-code mapping identical across both entry points (027 T004).
+ */
+export async function executeRoadmapSubaction(subaction: string, scanned: Flags): Promise<void> {
   try {
     const { doc, opts } = resolveVerbDoc({
       key: 'roadmap',
@@ -359,4 +376,27 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
     }
     throw err; // unexpected → dispatcher exits 1
   }
+}
+
+/**
+ * The original flat hand-rolled dispatcher, retained as the behavior reference
+ * and for any direct caller. The live dispatch path (`cli.ts`) now routes
+ * `roadmap` through the commander mount (roadmap-command.ts), which reuses
+ * `executeRoadmapSubaction` so both paths share one error-mapping core (027 T004).
+ */
+export async function runRoadmapCli(args: string[]): Promise<void> {
+  const subaction = args[0];
+  if (subaction === undefined || subaction.startsWith('--')) {
+    failUsage('roadmap', 'a subaction is required (usage: roadmap <next|blocked|add> [flags])');
+  }
+  // Reject an unknown subaction before resolving the doc, so an unknown verb is a
+  // usage error (exit 2) rather than triggering installation resolution.
+  if (SUBACTION_SPECS[subaction] === undefined) {
+    failUsage(
+      'roadmap',
+      `unknown subaction '${subaction}' (known: next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, reconcile, close-related)`,
+    );
+  }
+  const scanned = preflightRoadmapFlags(subaction, args.slice(1));
+  await executeRoadmapSubaction(subaction, scanned);
 }

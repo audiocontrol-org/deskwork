@@ -23,7 +23,7 @@ import { runGovern } from './subcommands/govern.js';
 import { runArchiveCli } from './subcommands/archive.js';
 import { runUnarchiveCli } from './subcommands/unarchive.js';
 import { runCurateCli } from './subcommands/curate.js';
-import { runRoadmapCli } from './subcommands/roadmap.js';
+import { runRoadmapCommand } from './subcommands/roadmap-command.js';
 import { runWorkflowCli } from './subcommands/workflow.js';
 import { runInboxCli } from './subcommands/inbox.js';
 import { runBacklogCli } from './subcommands/backlog.js';
@@ -85,8 +85,10 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   archive: runArchiveCli,
   unarchive: runUnarchiveCli,
   curate: runCurateCli,
-  // Roadmap protocol semantic layer (design/roadmap-protocol).
-  roadmap: runRoadmapCli,
+  // Roadmap protocol semantic layer (design/roadmap-protocol). First verb
+  // mounted onto the commander parser library (027 T004); the un-migrated verbs
+  // below stay on this flat dispatcher unchanged (FR-006 non-regression).
+  roadmap: runRoadmapCommand,
   // Parseable lifecycle workflow engine (022 parseable-lifecycle-workflow).
   workflow: runWorkflowCli,
   // Low-friction insight capture (design/insight-capture).
