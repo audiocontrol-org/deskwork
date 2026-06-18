@@ -76,3 +76,6 @@
 
 ## session-end 2026-06-17
 - design-record path is ambiguous between repo-root docs/superpowers/specs/ (legacy ADRs live there) and the installation-anchored plugins/stack-control/docs/superpowers/specs/ that the design-to-spec gate actually resolves (relative to install root). Repro: /stack-control:design step 1 says write to 'docs/superpowers/specs/<date>-<slug>-design.md'; I wrote to repo root and the gate read 0/7 (file-not-found) until moved under plugins/stack-control/. Workaround: write under the installation root. Suggested-fix: the design skill should state the install-anchored path explicitly, or link-design should warn when the resolved record path does not exist.
+
+## session-end 2026-06-18
+- define compass-gate path (roadmap node already exists) does not auto-record the spec: correspondence on the node, so the freshly-authored spec dir is left orphaned until manually linked (reconcile flags it; no unorphan verb — related to TASK-133). define's capture-fusion only creates the node+spec link on the node-MISSING branch.

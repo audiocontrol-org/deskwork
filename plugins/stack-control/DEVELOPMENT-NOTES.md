@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-06-18: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 0
+  - (no commits this session)
+- Files changed: 0
+- Backlog touched: (none)
+
 ## 2026-06-17: Close 025 + design capability-interface mediation (the agent-facing API)
 
 **Goal:** Verify the installed v0.50.0 release and run the 025 closing ceremony; then
