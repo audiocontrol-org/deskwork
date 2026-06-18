@@ -2108,3 +2108,160 @@ Surface:    src/__tests__/capability/purity.test.ts:19-21
 `stripComments` uses regex comment removal before scanning for vendor literals. The line-comment regex removes everything after `//` even when that sequence appears inside a string literal, so code such as `const endpoint = "https://claude.example"` would be reduced before the scan and the `"claude"` literal would be missed.
 
 The blast radius is low because this is a test blind spot, not runtime behavior, and the current audited diff does not add such a string. It still weakens the FR-006 guardrail: a future hardcoded vendor value in a URL-like string could pass the “decision core CODE branches on no vendor identity” test. A reasonable fix is to use a TypeScript parser/tokenizer for comment stripping, or avoid stripping comments for this assertion and whitelist known comment-only audit text explicitly.
+
+## 2026-06-18 — audit-barrage lift (20260618T060514686Z-026-capability-interface-mediation-phase-7)
+
+### AUDIT-20260618-149 — T032 `no-backend-writes` reinvents a weaker snapshot than the existing harness — blind to deletions and same-size in-place writes
+
+Finding-ID: AUDIT-20260618-149
+Status: migrated-to-backlog TASK-230
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/capability/no-backend-writes.test.ts:13-23 (the `listFiles` helper) and its two `it` bodies (:26-37, :40-57)
+
+The new test's own `listFiles` keys each file as `${childRel}:${statSync(...).size}` (line 21) and every assertion is of the form `[...listFiles(fx.root)].filter((f) => !before.has(f))` — i.e. it flags only files present in `after` but not in `before`. This detection has two blind spots against the FR-018 claim the file header makes ("the mediation layer NEVER writes to adopter backend artifacts"): (1) **deletions** are never detected — a path in `before` missing from `after` produces no failing entry; (2) **in-place same-size overwrites** are never detected — the key is `path:size`, so flipping bytes while preserving size yields an identical key and `before.has(f)` stays true. A "write" to a backend artifact includes truncating/overwriting/removing it, so the guard test for a load-bearing safety invariant would pass through exactly those regressions.
+
+The repository already ships the correct primitive: `snapshotOutsideInstallation` keys on `${size}:${mtimeMs}` and `diffSnapshots` explicitly emits `removed:` and `modified:` deltas (`src/__tests__/_isolation-harness.ts:201,212-222`) — and the *sibling* test in this same diff (`installation-isolation-probe.test.ts`) uses it. The blast radius is latent (current `mediateCheck`/`enterFrontDoor`/`exitFrontDoor` only create+rename under `state/`, so the test passes today), but the test underwrites a stronger claim than it verifies and is a DRY regression against an existing robust helper. Fix: reuse the harness snapshot, or at minimum add `mtimeMs` to the `listFiles` key and assert on removed paths (`for (const f of before) expect(after.has(f))…`).
+
+---
+
+### AUDIT-20260618-150 — T029 `mediate-check --at` test does not prove `--at` resolved the *nested* installation — refuse is the default for any markerless path
+
+Finding-ID: AUDIT-20260618-150
+Status: migrated-to-backlog TASK-231
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/installation-isolation-probe.test.ts:362-371 (the `mediate-check --at` it-block)
+
+The test is titled "mediate-check --at resolves the nested installation and writes nothing to the outer tree," but its only assertions are `result.code === 1` (refuse) and `diffSnapshots(before, after).toEqual([])`. The refuse verdict is the default outcome whenever a fronted backend has no active marker for *any* resolved path — `decideMediation` refuses on an empty active set regardless of whether resolution honored `--at`, fell back to `process.cwd()` (`mediate-check.ts:72`), or resolved some unrelated markerless directory. So `code === 1` does not distinguish "resolved the nested installation" from "resolved nothing / resolved elsewhere"; the positive-resolution half of the title is asserted by neither line. (The "writes nothing to the outer tree" half *is* well covered by the robust `diffSnapshots` harness.)
+
+An agent reading this suite would conclude `--at` resolution is under test when only the no-write + default-refuse path is. To actually pin resolution to the nested installation: seed a front-door marker *inside* `fx.installationRoot` and assert `code === 0` (permit) via `--at`, contrasted against the same call with the outer root / cwd yielding refuse — that delta is what proves `--at` is honored. As written the test would still pass if `--at` were silently ignored.
+
+---
+
+### AUDIT-20260618-151 — T032 comment claims "reads the real marker file" but the fixture has no marker — only the absent-marker branch runs
+
+Finding-ID: AUDIT-20260618-151
+Status: migrated-to-backlog TASK-232
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/capability/no-backend-writes.test.ts:30-34
+
+The comment asserts "resolveActive reads the real marker file (a read), exercising the read path." `makeCapabilityFixture` writes `.stack-control/config.yaml` but no front-door marker (`capability-fixtures.ts:44-46`), so `activeCapabilities(fx.root, 's')` hits `existsSync(path) === false` in `readMarker` and returns an empty set before any `readFileSync`/`JSON.parse`/staleness logic executes (`marker.ts:84-86,218-219`). The identity `backlog list` *is* a fronted bash capability (`registry.ts:50-52`), so `resolveActive` is genuinely invoked — but it short-circuits on the absent-marker branch, not the "real marker file" read the comment describes. The parse/validate path (where a hypothetical write-during-read regression would be most plausible) is never exercised. Low blast radius — the test still proves "no write occurred on this call" — but the comment overstates coverage; seeding an actual marker via `enterFrontDoor` first would make the claim true and strengthen the test.
+
+---
+
+### AUDIT-20260618-152 — Audited commit subject (T026-T028) does not match the diff content (T029 + T032)
+
+Finding-ID: AUDIT-20260618-152
+Status: migrated-to-backlog TASK-233
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    (the audited range vs. the diff)
+
+The named commit subject `3b9c5087 … (T026-T028)` describes cross-vendor parity + capability-not-vendor purity, but the diff under audit contains the T029 isolation rows and the new T032 `no-backend-writes` suite. The session's opening `git status` shows both files as *uncommitted* (`M …installation-isolation-probe.test.ts`, `?? …no-backend-writes.test.ts`), so the barrage is auditing working-tree changes, not the commit `3b9c5087`. No code defect — flagging so the operator knows the join key (commit subject) doesn't describe what was actually reviewed, and so T029/T032 land in a commit whose message names them (the project's commit-discipline rule).
+
+---
+
+A note on scope: I deliberately did not run the test suite or make any edits — this is a read-only audit and plan mode is active, so the findings above are my deliverable. The two tests are well-constructed on their happy paths (the enter/no-leak test at `installation-isolation-probe.test.ts:347-356` is solid, using the robust `diffSnapshots` harness for both the post-enter and post-exit checks); my findings concern assertion strength and a DRY/coverage gap in the FR-018 guard, not outright breakage.
+
+### AUDIT-20260618-153 — FR-018 tests miss destructive or same-size backend mutations
+
+Finding-ID: AUDIT-20260618-153
+Status: migrated-to-backlog TASK-234
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/__tests__/capability/no-backend-writes.test.ts:11-53`
+
+The new FR-018 probe snapshots files as `path:size`, but the assertions only inspect files present after the operation that were not in `before` (`filter((f) => !before.has(f))`, lines 34, 46, and 52). That catches newly-created files and size-changing rewrites, but it does not catch deletions, and it can miss same-size rewrites to existing backend artifacts. As written, `mediateCheck`, `enterFrontDoor`, or `exitFrontDoor` could remove `skills/*`, `bin/*`, `src/*`, or rewrite one with identical byte length and these tests would still pass.
+
+The blast radius is medium because this is test coverage for a stated safety contract, not runtime code in this diff, but it weakens the governance guarantee FR-018 is supposed to enforce. A reasonable fix is to compare the full before/after snapshot symmetrically, preferably with content hashes rather than size-only strings, while allowing only the expected `.stack-control/state/front-door/**` delta for marker enter/exit.
+
+## 2026-06-18 — audit-barrage lift (20260618T061041405Z-026-capability-interface-mediation-phase-7)
+
+### AUDIT-20260618-154 — mediate-check "writes nothing outside the install" assertions are vacuous — the function under test has no write path
+
+Finding-ID: AUDIT-20260618-154
+Status: migrated-to-backlog TASK-235
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/installation-isolation-probe.test.ts:359-372 and src/__tests__/capability/no-backend-writes.test.ts:33-47
+
+Both new blocks assert that `mediate-check` "writes nothing" (`diffSnapshots(before, snapshotOutsideInstallation(fx))).toEqual([])` at isolation-probe.ts:371; `changed(before, listFiles(fx.root))).toEqual([])` at no-backend-writes.ts:43). But `mediateCheck` (mediate-check.ts:33) is a *pure* function — it performs no filesystem I/O at all — and both tests inject a *read-only* resolver (`activeCapabilities`, which only does `existsSync`/`readFileSync`). There is no code path in either executed test that could write anything, anywhere. The zero-write assertion is therefore structurally incapable of failing regardless of implementation, so it provides no regression protection.
+
+The blast radius is false assurance: a reader of `no-backend-writes.test.ts` ("FR-018: mediation never writes to backend artifacts") or of the T029 block ("the same isolation invariant the table above polices for other verbs") will believe the `mediate-check` verb's write-safety is verified. It isn't — the production write-risk surface is `runMediateCheck` → `defaultResolveActive` → `findInstallation` (mediate-check.ts:83-96), and *none* of that is invoked here. Note the asymmetry with the rest of the same probe file: every `ROWS` entry runs the real CLI via `runCli` (isolation-probe.ts:320), whereas the mediate-check half runs only the pure core. This is exactly the "probe verifies the mechanism it imagined, not the contract" anti-pattern named in `.claude/rules/ui-verification.md`. A reasonable fix: drive `runMediateCheck`/`defaultResolveActive` (the real resolver) through the nested fixture, or scope the assertion's claim to "the decision core is pure" rather than to the verb's isolation. (The front-door halves of both blocks are *not* affected — `enterFrontDoor`/`exitFrontDoor` are real production writers, so those assertions are meaningful.)
+
+---
+
+### AUDIT-20260618-155 — `changed()` helper silently ignores deletions, so "never writes to backend artifacts" wouldn't catch a destructive regression
+
+Finding-ID: AUDIT-20260618-155 (claude-02 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-236
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/__tests__/capability/no-backend-writes.test.ts:36-38
+
+`changed(before, after)` is defined as `[...after].filter(([p, h]) => before.get(p) !== h)` — it reports paths that are new or content-changed, but a path present in `before` and absent from `after` (a deletion) is never examined. The test's stated contract is FR-018, "the mediation layer NEVER writes to adopter backend artifacts," and the file header frames it as catching any mutation. A future regression where front-door or a resolver *deletes* a backend file (e.g. an over-eager cleanup) would pass this test green.
+
+This is notable because the sibling helper `diffSnapshots` in `_isolation-harness.ts:212-222` — used by the very next test block in this feature — *does* detect removals (`for (const path of before.keys()) if (!after.has(path)) out.push('removed: ...')`). So the omission reads as an oversight rather than a deliberate scoping decision, and the two helpers now disagree on what "no change" means. Fix: add the removal check to `changed`, or reuse `diffSnapshots`.
+
+---
+
+### AUDIT-20260618-156 — T029 mediate-check test duplicates an existing `--at`-threading test while overstating what it proves
+
+Finding-ID: AUDIT-20260618-156
+Status: migrated-to-backlog TASK-237
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/installation-isolation-probe.test.ts:359-372
+
+The new block's comment claims it "proves --at resolved the nested install + read its marker." What it actually proves is narrower: that `mediateCheck` forwards the `--at` value into `deps.resolveActive` (mediate-check.ts:72, `at ?? process.cwd()`). The injected resolver `(at, session) => activeCapabilities(at, session)` deliberately bypasses production `defaultResolveActive`, which does `findInstallation(at)` *then* `activeCapabilities(installation.root, session)` (mediate-check.ts:85-88). The walk-up resolution (`findInstallation`) is never exercised; the test only coincidentally agrees with production because `--at` is handed the install root directly. Meanwhile `mediate-check.test.ts:73-85` ("passes the resolved --at + session to the resolver") already asserts the threading directly and less ambiguously, so the decision-logic portion of this new test is largely redundant.
+
+Blast radius is low — this is a comment/intent overstatement plus mild redundancy, not a correctness defect, and a future reader who trusts the comment would merely over-credit the coverage. Tightening the comment to "proves `--at` is threaded to the resolver" would make the assertion and its claim match.
+
+---
+
+### AUDIT-20260618-157 — Snapshot/diff logic is reimplemented in `no-backend-writes.test.ts` instead of reusing the feature's existing harness
+
+Finding-ID: AUDIT-20260618-157
+Status: migrated-to-backlog TASK-238
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/capability/no-backend-writes.test.ts:18-38
+
+`listFiles` (content-sha1 based) and `changed` are a third snapshot/diff implementation in this feature's test suite, parallel to `snapshotOutsideInstallation` + `diffSnapshots` in `_isolation-harness.ts:184-223` (size+mtime based, removal-aware) — which the adjacent T029 block already imports and uses. The two implementations have divergent semantics (content-hash vs size+mtime; removal-aware vs not — see AUDIT-BARRAGE-claude-02). Maintaining two snapshot idioms for the same isolation invariant is a DRY/code-quality concern: a future tightening of one (e.g. excluding `.lock`/tmp churn, handling symlinks) won't propagate to the other. The content-hash approach has a genuine merit (catches a same-size in-place edit that size+mtime could miss), so the right move is likely to consolidate that strength into the shared harness rather than to keep a divergent copy in one test file.
+
+---
+
+### AUDIT-20260618-158 — Marker state path is hardcoded in both tests instead of reusing the exported constant
+
+Finding-ID: AUDIT-20260618-158
+Status: migrated-to-backlog TASK-239
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/installation-isolation-probe.test.ts:353 and src/__tests__/capability/no-backend-writes.test.ts:51
+
+Both tests hardcode the front-door state location — `join(fx.installationRoot, '.stack-control', 'state', 'front-door', 'sess.json')` (isolation-probe.ts:353) and the prefix `'.stack-control/state/front-door/'` (no-backend-writes.ts:51) — even though `capability-fixtures.ts:14` exports `FRONT_DOOR_STATE_REL` for exactly this purpose (and `marker.ts:37` owns the canonical `STATE_REL`). `no-backend-writes.test.ts` already imports from `capability-fixtures.js`, so reusing the constant is zero-cost. If the marker location ever moves, the hardcoded prefix assertion in no-backend-writes.ts:51 could silently keep passing on the wrong basis (any path under a renamed dir would fail the `startsWith`, which is at least a loud failure — but the duplicated literal is still drift-prone). Low severity; pure hygiene.
+
+### AUDIT-20260618-159 — Front-door anchoring test bypasses the front-door command surface
+
+Finding-ID: AUDIT-20260618-159
+Status: migrated-to-backlog TASK-240
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/__tests__/installation-isolation-probe.test.ts:349-356`
+
+The test named “front-door enter writes the marker INSIDE the nested installation” calls `enterFrontDoor(fx.installationRoot, ...)` directly. That exercises the low-level marker writer with an already-correct installation root, but it does not exercise the `front-door enter` subcommand’s `--at` resolution or default anchoring logic. If the command layer resolved `--at` incorrectly, or anchored state to the outer root before calling the marker writer, this test would still pass.
+
+The blast radius is medium because this is a coverage/design issue in the isolation probe: it claims to police the front-door verb’s installation anchoring, but only proves that the marker helper respects the path it is handed. A reasonable fix is to invoke the actual `frontDoor` subcommand with `--at fx.installationRoot` and assert both the nested marker and unchanged outer snapshot.

@@ -77,11 +77,11 @@ description: "Task list for capability-interface mediation"
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T029 [P] Extend `src/__tests__/installation-isolation-probe.test.ts` to cover the new state-writing verbs (`front-door enter/exit`) and `mediate-check --at` (anchor invariant).
-- [ ] T030 [P] Amend `.claude/rules/enforcement-lives-in-skills.md` + `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` with the spec Decision 5 ruling (a plugin-shipped PreToolUse hook is a permitted enforcement surface; rationale + the bookkeeping-spiral distinction).
-- [ ] T031 [P] Update plugin docs (capability mediation overview; `stackctl capability`/`mediate-check`/`front-door` verbs) and confirm no new file exceeds the 300–500-line cap (Principle VI; refactor if needed).
-- [ ] T032 [P] Add a test asserting the mediation layer never writes to adopter backend artifacts (FR-018): `mediate-check` is pure-read, and `front-door`/`marker` writes target only `<installation>/.stack-control/state/**`, never a backend skill/CLI file path. In `src/__tests__/capability/no-backend-writes.test.ts`.
-- [ ] T033 Run the full `npx vitest` suite + the quickstart CLI scenarios (A–E, G); confirm green before `/stack-control:execute` governance.
+- [X] T029 [P] Extend `src/__tests__/installation-isolation-probe.test.ts` to cover the new state-writing verbs (`front-door enter/exit`) and `mediate-check --at` (anchor invariant).
+- [X] T030 [P] Amend `.claude/rules/enforcement-lives-in-skills.md` + `docs/superpowers/specs/2026-06-03-no-git-hook-enforcement.md` with the spec Decision 5 ruling (a plugin-shipped PreToolUse hook is a permitted enforcement surface; rationale + the bookkeeping-spiral distinction).
+- [X] T031 [P] Update plugin docs (capability mediation overview; `stackctl capability`/`mediate-check`/`front-door` verbs) and confirm no new file exceeds the 300–500-line cap (Principle VI; refactor if needed).
+- [X] T032 [P] Add a test asserting the mediation layer never writes to adopter backend artifacts (FR-018): `mediate-check` is pure-read, and `front-door`/`marker` writes target only `<installation>/.stack-control/state/**`, never a backend skill/CLI file path. In `src/__tests__/capability/no-backend-writes.test.ts`.
+- [X] T033 Run the full `npx vitest` suite + the quickstart CLI scenarios (A–E, G); confirm green before `/stack-control:execute` governance.
 
 ## Dependencies & ordering
 
