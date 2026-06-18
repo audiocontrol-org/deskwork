@@ -9,7 +9,9 @@ import { matchCapability } from './identity.js';
 import { decideMediation, type MediationDecision } from './mediate.js';
 import { CAPABILITY_REGISTRY, type CapabilityRegistry, type Surface } from './registry.js';
 
-/** The PreToolUse stdin payload fields this adapter reads (T002 spike: `skill_name`). */
+/** The PreToolUse stdin payload fields this adapter reads (`Skill` → `tool_input.skill`,
+ *  proven by the skill-surface-mediation live spike 2026-06-18; the T002 spike's `skill_name`
+ *  was falsified — Claude Code does not send that field). */
 export interface HookPayload {
   readonly tool_name?: unknown;
   readonly tool_input?: unknown;
@@ -40,7 +42,7 @@ function str(value: unknown, fallback = ''): string {
 
 /**
  * Decide an intercepted PreToolUse call. Resolves surface + identity from the payload
- * (`Bash` → `tool_input.command`; `Skill` → `tool_input.skill_name`), applies the cheap
+ * (`Bash` → `tool_input.command`; `Skill` → `tool_input.skill`), applies the cheap
  * pre-filter, and defers to the shared decision core. A non-Bash/Skill tool, or an
  * identity naming no fronted backend, permits without touching the marker.
  */
@@ -59,7 +61,7 @@ export function interceptDecision(payload: HookPayload, deps: InterceptDeps): Me
     identity = str(input.command);
   } else if (toolName === 'Skill') {
     surface = 'skill';
-    identity = str(input.skill_name);
+    identity = str(input.skill);
   } else {
     return { verdict: 'permit', capability: null, reason: 'not an intercepted tool' };
   }

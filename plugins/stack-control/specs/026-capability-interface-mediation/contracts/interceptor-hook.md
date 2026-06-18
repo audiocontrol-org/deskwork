@@ -25,11 +25,11 @@
   "cwd": "…",                   // → mediate-check --at (installation resolution)
   "hook_event_name": "PreToolUse",
   "tool_name": "Bash" | "Skill",
-  "tool_input": { … }            // Bash: { "command": "<str>" }; Skill: { <skill-name field>: "<name>" }
+  "tool_input": { … }            // Bash: { "command": "<str>" }; Skill: { "skill": "<name>" }
 }
 ```
 
-**Open shape (D3 spike)**: the exact `tool_input` field carrying the skill name for `tool_name: "Skill"` is undocumented. The FIRST implementation task is a throwaway spike that logs this payload to capture the real field; the adapter then reads that confirmed field. (If the spike falsifies skill-name visibility, the `Skill` matcher is dropped and `spec-*` falls to the Approach C backstop — the contingency in research D3.)
+**Shape RESOLVED (skill-surface-mediation live spike, 2026-06-18)**: the `tool_input` field carrying the skill name for `tool_name: "Skill"` is **`skill`** (e.g. `{"skill":"speckit-implement"}`). The original D3/T002 spike recorded `skill_name`; that was docs-derived and falsified by the live capture (see `skill-surface-spike-research.md`). PreToolUse **does** fire for an agent-initiated `Skill`-tool call, so the `Skill` matcher stands — the Approach C backstop is not needed for the agent reach-around threat. The adapter reads `tool_input.skill`.
 
 ## Adapter logic
 

@@ -448,3 +448,9 @@ codex lane trips killed-no-liveness on real payloads; emit reasoning summaries (
 - ref: TASK-153
 025 upgrade: pre-025 / in-flight features with no per-phase checkpoints become un-graduatable when all-phase-checkpoints-current lands; no backfill/grandfather/migration. Detail: TASK-153.
 
+## design:gap/skill-surface-mediation
+- status: in-flight
+- part-of: design:feature/capability-interface-mediation
+- ref: TASK-241
+SPIKE RESOLVED 2026-06-18 (live, this branch) — last session's 'PreToolUse Skill matcher is INERT' diagnosis was WRONG. The live spike (instrument the loaded plugin hook, invoke a skill via the Skill tool, observe the payload) proved PreToolUse DOES fire for an agent-initiated Skill-tool call; the bug was a one-field mismatch — the interceptor read tool_input.skill_name while the real Claude Code field is tool_input.skill, so every Skill payload extracted an empty identity and silently permitted the reach-around. FIX COMMITTED 5f88b40e (TDD-first: RED regression with the real {skill:...} shape; intercept.ts reads input.skill; research.md/tasks.md/contracts corrected; full suite 1863 GREEN). The hooks.json Skill matcher is CORRECT and stays — no new event (UserPromptExpansion etc.) is needed for the agent reach-around threat. Write-up: specs/026-capability-interface-mediation/skill-surface-spike-research.md. REMAINING before this and 026 can close: live re-validation in the NEXT installed release (raw /speckit-implement via the Skill tool -> denied end-to-end), per the verify-in-a-formally-installed-release rule. Out-of-threat-model residual (note only): a USER who types /speckit-implement bypasses PreToolUse via prompt-expansion; the US3 graduate gate covers it; gating it directly would need a separate, empirically-verified event. 026 stays in-flight until the release re-validation lands.
+

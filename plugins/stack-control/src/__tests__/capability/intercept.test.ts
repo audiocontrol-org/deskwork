@@ -1,7 +1,9 @@
 // 026 T015 — RED tests for the interceptor logic (contracts/interceptor-hook.md, D7).
-// Payload → decision mapping (Bash → tool_input.command; Skill → tool_input.skill_name —
-// the T002-confirmed field), the cheap pre-filter, the deny-output shape, and the
-// registry-derived Skill matcher pinned against the shipped hooks.json (FR-011, claude-04).
+// Payload → decision mapping (Bash → tool_input.command; Skill → tool_input.skill — the
+// field the live Claude Code PreToolUse payload actually carries; the original T002 spike
+// recorded `skill_name`, falsified by the skill-surface-mediation live spike 2026-06-18),
+// the cheap pre-filter, the deny-output shape, and the registry-derived Skill matcher
+// pinned against the shipped hooks.json (FR-011, claude-04).
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,13 +24,31 @@ describe('interceptDecision (026 T015)', () => {
     expect(d.capability).toBe('backlog');
   });
 
-  it('reads the Skill name from tool_input.skill_name (T002 spike)', () => {
+  it('refuses a raw Skill backend from tool_input.skill (real Claude Code payload field)', () => {
+    // The live skill-surface spike (2026-06-18) proved the PreToolUse `Skill` payload carries
+    // the skill name in `tool_input.skill` — NOT `skill_name` (the falsified T002 conclusion).
+    // Reading the wrong field extracted an empty identity → silent permit of every reach-around.
     const d = interceptDecision(
-      { tool_name: 'Skill', tool_input: { skill_name: 'speckit-implement' }, session_id: 's', cwd: '/x' },
+      { tool_name: 'Skill', tool_input: { skill: 'speckit-implement' }, session_id: 's', cwd: '/x' },
       { resolveActive: noMarker },
     );
     expect(d.verdict).toBe('refuse');
     expect(d.reason).toContain('/stack-control:execute');
+  });
+
+  it('permits a benign Skill (not a fronted backend) without resolving the marker (SC-003)', () => {
+    let called = false;
+    const d = interceptDecision(
+      { tool_name: 'Skill', tool_input: { skill: 'feature-help' }, session_id: 's', cwd: '/x' },
+      {
+        resolveActive: () => {
+          called = true;
+          return new Set();
+        },
+      },
+    );
+    expect(d.verdict).toBe('permit');
+    expect(called).toBe(false); // not a fronted backend → no marker resolution
   });
 
   it('permits a marked backend', () => {
