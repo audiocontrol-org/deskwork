@@ -5,10 +5,12 @@
 // That `any` is the ONE place untyped data crosses into the verb layer. This
 // module is the single audited place that seal is opened: `rawOpts()` widens
 // commander's `any` into `unknown` (a widening that needs NO cast), and every
-// field is then narrowed through a typed `OptionReader` that FAILS LOUD on a
-// shape mismatch (no fallback, no coercion — Principle V). A verb reads its
-// parsed flags through these scalar readers into its own typed options object,
-// so handler code never touches `any`.
+// field is then narrowed through a typed `OptionReader`. A shape mismatch FAILS
+// LOUD with no silent coercion (Principle V); the ONE intentional default is
+// `booleanOption` mapping an absent flag to `false` (commander's boolean
+// convention) — documented on the reader, not a hidden fallback. A verb reads
+// its parsed flags through these scalar readers into its own typed options
+// object, so handler code never touches `any`.
 //
 // Scope: this scaffold provides the seal + the claim-free scalar readers whose
 // behavior is verifiable in isolation. List/comma-split readers are flag-specific
@@ -58,7 +60,17 @@ function describe(raw: unknown): string {
 /**
  * A required string flag. Fails loud when absent, non-string, or empty/whitespace
  * — an empty required value is a usage error, never a silently-accepted "present"
- * (the fail-loud, no-coercion contract; AUDIT-BARRAGE-claude-02, Principle V).
+ * (the fail-loud, no-coercion contract; Principle V).
+ *
+ * Two deliberate policy notes for the verb-wiring author (US1/US2):
+ * - Non-empty is the policy for the REQUIRED scalar reader. A flag that
+ *   legitimately permits an empty value introduces its own reader when wired —
+ *   the same per-flag deferral applied to list readers above; emptiness is not
+ *   baked in for every future flag, it is this reader's contract.
+ * - Validation is presence-and-non-empty, NOT normalization: the value is
+ *   returned VERBATIM (leading/trailing whitespace preserved). A flag that needs
+ *   trimming/casefolding does it at the verb, so identity comparisons stay
+ *   explicit at the call site.
  */
 export const stringOption: OptionReader<string> = (raw, flagName) => {
   if (typeof raw !== 'string') {
