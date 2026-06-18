@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "featureSlug": "027-roadmap-edge-mutation-and-cluster",
+  "phaseId": "1",
+  "checkpoint": "phase-1",
+  "auditLogSection": "phase-1",
+  "scopeFingerprint": "c8818992c8cd80bef82a0c838f44299c14605ceba6e26260367a5cd6a2db3fb2",
+  "passedAt": "2026-06-18T23:40:00.580Z",
+  "governedPaths": [
+    "@types/node",
+    "src/cli-help/command-adapter.ts"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/src/cli-help/command-adapter.ts"
+  ]
+}
