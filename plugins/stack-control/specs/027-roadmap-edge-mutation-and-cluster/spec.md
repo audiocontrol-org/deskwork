@@ -10,7 +10,9 @@
 
 ## Context
 
-An adopting agent (the `offing` project, session `d98fc4fe`, 2026-06-18) was asked to *"group the cluster… change-runbook → env-promotion → behavior-validation."* It could neither discover how to mutate the roadmap (ran `roadmap --help` → error; probed a bogus status "to surface the vocabulary"; tested verbs to infer behavior; read the doc grammar by hand) nor perform the clustering through any verb — so it **hand-edited the governed `ROADMAP.md`**, contradicting that file's own *"do not hand-edit"* header. This feature makes roadmap mutation both **possible** and **obvious**, with `roadmap` as the first adopter of a stackctl-wide self-documenting convention. Scope was set with the operator (design forks 1–5): discoverability-first; stackctl-wide help convention with roadmap as proof; help derived from a shared parser (non-drift by construction); honest interim header; prove on roadmap and capture the rest.
+An adopting agent (the `offing` project, session `d98fc4fe`, 2026-06-18) was asked to *"group the cluster… change-runbook → env-promotion → behavior-validation."* It could neither discover how to mutate the roadmap (ran `roadmap --help` → error; probed a bogus status "to surface the vocabulary"; tested verbs to infer behavior; read the doc grammar by hand) nor perform the clustering through any verb — so it **hand-edited the governed `ROADMAP.md`**, contradicting that file's own *"do not hand-edit"* header. This feature makes roadmap mutation both **possible** and **obvious**, with `roadmap` as the first adopter of a stackctl-wide self-documenting convention. Scope was set with the operator (design forks 1–5): discoverability-first; stackctl-wide help convention with roadmap as proof; help derived from a single parser definition (non-drift by construction); honest interim header; prove on roadmap and capture the rest.
+
+**Re-scope (ADR `2026-06-18-governed-markdown-foundation-adr.md`):** after discovering that Backlog.md (an existing dependency) and the clap/Typer/Cobra/oclif ecosystem already commoditize self-documenting help, the discoverability pillar is re-scoped from *build a bespoke shared-parser combinator* to *adopt a mature parser library*. The governed-markdown foundation is kept (no migration to Backlog.md/Beads); the store seam (`roadmap-model` over `document-model`) is hardened so a future store swap stays contained. The novel core (lifecycle-coupled edges + workflow integration) is built regardless of store. This roughly halves the original build.
 
 ## Clarifications
 
@@ -90,12 +92,13 @@ An agent reading `ROADMAP.md` sees a header that names the mutation verbs that e
 
 **Shared help/parser foundation (proven on roadmap)**
 
-- **FR-001**: The system MUST provide a shared argument-parsing primitive from which a verb's `--help` text, complete top-level usage line, per-subaction help, and enumerated value vocabularies (e.g. the status set) are all DERIVED from a single declaration, such that help cannot describe a flag the verb does not accept, nor omit a flag it does accept (non-drift by construction).
-- **FR-002**: `roadmap` MUST be migrated onto the shared primitive as the first adopter, fully self-documenting: `roadmap --help`, `roadmap -h`, `roadmap` (no subaction), and `roadmap <subaction> --help` each print the relevant surface to stdout and exit 0.
+- **FR-001**: The system MUST adopt a mature argument-parser library (per ADR `2026-06-18-governed-markdown-foundation-adr.md` — NOT a hand-rolled combinator) such that a verb's `--help` text, complete top-level usage line, per-subaction help, and enumerated value vocabularies (e.g. the status set) are all DERIVED from a single command definition — so help cannot describe a flag the verb does not accept, nor omit a flag it does accept (non-drift by construction; the commodity pattern of clap/Typer/Cobra/oclif).
+- **FR-002**: `roadmap` MUST be the first verb migrated onto the adopted parser library, fully self-documenting: `roadmap --help`, `roadmap -h`, `roadmap` (no subaction), and `roadmap <subaction> --help` each print the relevant surface to stdout and exit 0.
 - **FR-003**: The no-subaction `roadmap` usage line MUST enumerate the COMPLETE subaction set (replacing today's truncated `<next|blocked|add>`).
 - **FR-004**: Per-subaction help MUST list that subaction's flags and any enumerated vocabulary (notably the roadmap status set), so the vocabulary is discoverable without triggering an error.
 - **FR-005**: The non-drift property MUST be mechanically guaranteed (e.g. a conformance/golden check that fails if rendered help and accepted flags diverge), not merely asserted in prose.
-- **FR-006**: Migration MUST be incremental and non-regressing — verbs that have not yet adopted the shared primitive continue to dispatch and behave unchanged.
+- **FR-006**: Migration MUST be incremental and non-regressing — verbs that have not yet migrated onto the adopted parser library continue to dispatch and behave unchanged.
+- **FR-006a**: The roadmap's typed-graph semantics (`roadmap-model`) MUST remain cleanly abstracted from its storage backend (`document-model`) — the store seam is hardened so a future store swap (per the ADR's revisit-if triggers) stays contained to that seam rather than spread through the verbs/views/mutations. (ADR consequence.)
 
 **Cluster convenience**
 
@@ -137,7 +140,7 @@ An agent reading `ROADMAP.md` sees a header that names the mutation verbs that e
 
 ## Assumptions
 
-- **Scope boundary — roadmap-only proof** (settled, Clarification 2026-06-18): This feature migrates ONLY `roadmap` onto the shared parser; the other ~49 verbs adopt it later under the captured surface-hygiene sibling. The shared parser is still built as a reusable primitive — roadmap's full adoption plus the conformance check are the generalization proof.
+- **Scope boundary — roadmap-only proof** (settled, Clarification 2026-06-18; refined by ADR 2026-06-18): This feature migrates ONLY `roadmap` onto the adopted parser library; the other ~49 verbs migrate later under the captured surface-hygiene sibling. Roadmap's full adoption is the proof the library + migration pattern generalizes. (Per the ADR, the help mechanism is an adopted library, not a bespoke primitive — which library to adopt is a `/speckit-plan` decision.)
 - **Atomicity mechanism**: FR-013's atomicity is a requirement, not a mechanism. Whether `cluster` reuses the existing roadmap mutation/write path (`src/roadmap/mutations.ts`) or introduces a small transactional buffer→validate→commit helper is a planning-phase (`/speckit-plan`) decision, not a spec concern.
 - **Multi-parent children** (settled, Clarification 2026-06-18): `cluster` ADDS a `part-of` edge to a child that already belongs to a different parent (multi-parent allowed, per the roadmap protocol); only an exact-duplicate edge is refused/no-op (FR-009).
 - **One-branch program**: Authoring runs on the single long-lived `feature/stack-control` branch with numbered spec dirs; the Spec Kit `before_specify` git-feature (branch creation) hook is intentionally not used here (consistent with specs 024–026 and the `/stack-control:define` resolve-via-marker note).
