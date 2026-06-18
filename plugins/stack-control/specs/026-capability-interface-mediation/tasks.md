@@ -13,15 +13,15 @@ description: "Task list for capability-interface mediation"
 
 ## Phase 1: Setup
 
-- [ ] T001 Create the module skeleton: `src/capability/` and `src/__tests__/capability/` directories, plus a shared tmp-installation fixture helper in `src/__tests__/fixtures/capability-fixtures.ts` (mirrors existing govern fixtures).
+- [X] T001 Create the shared tmp-installation fixture helper in `src/__tests__/fixtures/capability-fixtures.ts` (mirrors existing govern fixtures). The src/capability and src/__tests__/capability module trees come into existence as later phases add their first files into them — they are deliberately NOT declared as this setup phase's governed scope: a setup phase that owns container directories every later phase fills would make its per-phase checkpoint perpetually stale (TASK-160).
 
 ## Phase 2: Foundational (blocking — shared by US1 + US2)
 
-- [ ] T002 [SPIKE] Throwaway PreToolUse `Skill`-matcher probe: register a minimal hook that logs its stdin payload, invoke a skill, capture the exact `tool_input` field carrying the skill name (research D3); record the confirmed field name in `specs/026-capability-interface-mediation/research.md`; DELETE the probe. If the field is absent, stop and revisit D2/D3 (skill surface falls to backstop). Gates the `Skill` matcher in T015.
-- [ ] T003 [P] Write failing tests for registry invariants in `src/__tests__/capability/registry.test.ts`: id uniqueness; no backend identity in two capabilities; non-empty interface + identity union; single-source non-drift (the set the decision reads == the set discovery lists).
-- [ ] T004 Implement `src/capability/registry.ts` (the declarative `CapabilityRegistry` with v1 entries backlog / spec-definition / spec-execution per contracts/registry-schema.md) to pass T003.
-- [ ] T005 [P] Write failing tests for identity matching in `src/__tests__/capability/identity.test.ts`: `argv[0]` normalization (basename, strip `env`/`sudo` wrappers); the false-positive collision set (backend name in path/arg/comment must NOT match — SC-003); exact skill-name membership.
-- [ ] T006 Implement `src/capability/identity.ts` (argv0 normalization + membership helpers, research D4) to pass T005.
+- [X] T002 [SPIKE] Throwaway PreToolUse `Skill`-matcher probe: register a minimal hook that logs its stdin payload, invoke a skill, capture the exact `tool_input` field carrying the skill name (research D3); record the confirmed field name in `specs/026-capability-interface-mediation/research.md`; DELETE the probe. If the field is absent, stop and revisit D2/D3 (skill surface falls to backstop). Gates the `Skill` matcher in T015.
+- [X] T003 [P] Write failing tests for registry invariants in `src/__tests__/capability/registry.test.ts`: id uniqueness; no backend identity in two capabilities; non-empty interface + identity union; single-source non-drift (the set the decision reads == the set discovery lists).
+- [X] T004 Implement `src/capability/registry.ts` (the declarative `CapabilityRegistry` with v1 entries backlog / spec-definition / spec-execution per contracts/registry-schema.md) to pass T003.
+- [X] T005 [P] Write failing tests for identity matching in `src/__tests__/capability/identity.test.ts`: `argv[0]` normalization (basename, strip `env`/`sudo` wrappers); the false-positive collision set (backend name in path/arg/comment must NOT match — SC-003); exact skill-name membership.
+- [X] T006 Implement `src/capability/identity.ts` (argv0 normalization + membership helpers, research D4) to pass T005.
 
 ## Phase 3: User Story 1 — refuse raw reach-around, permit marked front-door (Priority: P1) 🎯 MVP
 
