@@ -2,8 +2,8 @@
   "version": 1,
   "mode": "impl",
   "item": "design:feature/capability-interface-mediation",
-  "scopeFingerprint": "41e09d2ec201a5eb5c194c64c35acb130c4a611057f4f67d11af8e01db0245b7",
+  "scopeFingerprint": "bc3151c4da625eccfc7cec43832b91a6d95918d7f495027a8c36cd14d32a5d19",
   "converged": true,
-  "recordedAt": "2026-06-18T05:07:54.735Z",
+  "recordedAt": "2026-06-18T05:33:03.813Z",
   "anchorRoot": "/Users/orion/work/deskwork-work/stack-control/plugins/stack-control"
 }

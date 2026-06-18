@@ -149,6 +149,12 @@ export function evaluateCriterion(c: Criterion, ctx: GateContext): boolean {
       // from this union — a standalone whole-feature record never satisfies it. Reads
       // only the per-phase checkpoints (no whole-feature payload); fails loud (FR-004)
       // on a spec with no resolvable dir or a malformed phase set. Pure read (Principle IV).
+      //
+      // 026 US3 (FR-015): this IS the per-capability harmless-bypass backstop for
+      // spec-execution — a feature implemented by reaching around the front door (no
+      // per-phase govern checkpoints) cannot graduate here, on any host, regardless of
+      // whether the interceptor observed the raw call. `capability reconcile` surfaces the
+      // same un-governed state this gate refuses (the report-only half of the backstop).
       if (c.target !== 'impl') {
         throw new WorkflowError(`criterion 'all-phase-checkpoints-current' has unknown target '${c.target}' (expected impl)`);
       }

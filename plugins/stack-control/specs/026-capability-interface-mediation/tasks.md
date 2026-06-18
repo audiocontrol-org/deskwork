@@ -60,10 +60,10 @@ description: "Task list for capability-interface mediation"
 
 **Independent test**: quickstart Scenario G.
 
-- [ ] T022 [P] [US3] Write failing tests for `capability reconcile` in `src/__tests__/subcommands/capability-reconcile.test.ts`: flags un-governed `spec-execution` state; report-only (exit 0; no mutation).
-- [ ] T023 [US3] Implement `capability reconcile` in `src/subcommands/capability.ts` reusing per-phase checkpoint status (`src/govern/phase-checkpoint-status.ts`) + register; pass T022.
-- [ ] T024 [US3] Confirm/generalize the `all-phase-checkpoints-current` graduate gate framing as the per-capability backstop in `src/workflow/gate-eval.ts`; add a test asserting bypassed work can't graduate (FR-015).
-- [ ] T025 [US3] Manual integration: quickstart Scenario G.
+- [X] T022 [P] [US3] Write failing tests for `capability reconcile` in `src/__tests__/subcommands/capability-reconcile.test.ts`: flags un-governed `spec-execution` state; report-only (exit 0; no mutation).
+- [X] T023 [US3] Implement `capability reconcile` in `src/subcommands/capability-reconcile.ts` (the `reconcileVerb` + `reconcileCapabilities` reusing per-phase checkpoint status from `src/govern/phase-checkpoint-status.ts`); dispatch the `reconcile` subaction from `cli.ts` so the US2 `capability.ts` list verb stays list-only (its phase scope is not disturbed). Pass T022.
+- [X] T024 [US3] Confirm/generalize the `all-phase-checkpoints-current` graduate gate framing as the per-capability backstop in `src/workflow/gate-eval.ts`; add a test asserting bypassed work can't graduate (FR-015).
+- [X] T025 [US3] Manual integration: quickstart Scenario G.
 
 ## Phase 6: User Story 4 — cross-vendor parity + capability-not-vendor purity (Priority: P3)
 

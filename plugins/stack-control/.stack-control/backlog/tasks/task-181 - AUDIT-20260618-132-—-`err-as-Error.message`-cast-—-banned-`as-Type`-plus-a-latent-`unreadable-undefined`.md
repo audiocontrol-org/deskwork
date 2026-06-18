@@ -1,0 +1,20 @@
+---
+id: TASK-181
+title: >-
+  AUDIT-20260618-132 — `(err as Error).message` cast — banned `as Type` plus a
+  latent `unreadable: undefined`
+status: To Do
+assignee: []
+created_date: '2026-06-18 05:33'
+labels:
+  - 'type:migrated-finding'
+  - 'feature:026-capability-interface-mediation'
+  - 'finding:AUDIT-20260618-132'
+dependencies: []
+references:
+  - 'audit:026-capability-interface-mediation:AUDIT-20260618-132'
+priority: medium
+ordinal: 181000
+---
+
+

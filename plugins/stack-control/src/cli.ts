@@ -59,6 +59,7 @@ import { runMediateCheck } from './subcommands/mediate-check.js';
 import { runFrontDoor } from './subcommands/front-door.js';
 import { runIntercept } from './subcommands/intercept.js';
 import { runCapabilityCli } from './subcommands/capability.js';
+import { runReconcileCli } from './subcommands/capability-reconcile.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -135,8 +136,11 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   'mediate-check': runMediateCheck,
   'front-door': runFrontDoor,
   intercept: runIntercept,
-  // Agent-facing capability discovery (026 US2) — the API spec is the registry listing.
-  capability: runCapabilityCli,
+  // Agent-facing capability discovery (026 US2) + the US3 reconcile backstop. The
+  // `reconcile` subaction dispatches to its own module so the US2 `capability list` verb
+  // (capability.ts) stays list-only (its phase scope is not disturbed by US3).
+  capability: async (args: string[]): Promise<void> =>
+    args[0] === 'reconcile' ? runReconcileCli(args.slice(1)) : runCapabilityCli(args),
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

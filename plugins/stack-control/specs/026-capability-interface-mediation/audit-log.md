@@ -1655,3 +1655,292 @@ Surface:    src/subcommands/capability.ts:5-6
 The file header says, “Phase 5 adds the `reconcile` subaction in its own module,” which is a deferred-work statement embedded in the implementation. The audit prompt explicitly rejects deferral phrases because they can normalize incomplete behavior as intentional scope rather than making the current contract stand on its own.
 
 The blast radius is low because this comment does not change runtime behavior for `stackctl capability list`, and the implemented `list` path appears coherent. A reasonable fix is to remove the future-phase note from the code comment or replace it with a present-tense description of this module’s current responsibility only.
+
+## 2026-06-18 — audit-barrage lift (20260618T051259160Z-026-capability-interface-mediation-phase-4)
+
+### AUDIT-20260618-117 — Reconcile branch breaks `capability()`'s "pure / hermetically testable" contract and throws uncaught
+
+Finding-ID: AUDIT-20260618-117
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/subcommands/capability.ts:49-56` (+ header :4-5); `src/config/installation.ts:120-127, :148-154`
+
+The header comment and `capability()` docstring promise a "Pure core ... hermetically testable" function with `runCapabilityCli` owning all I/O. The reconcile branch breaks both: `findInstallation(at ?? process.cwd())` reads the real cwd + filesystem (non-hermetic on the no-`--at` path), and the inline claim "No installation → empty report (exit 0)" is only true for `not-found`. `findInstallation` re-throws every other `InstallationError` (`ambiguous-domain`, `invalid-preference`, malformed config). With no try/catch, `capability(['reconcile'])` in a multi-candidate-domain tree throws an uncaught exception and crashes the verb instead of returning a `CapabilityResult` — the worst failure mode for a report-only backstop. Fix: catch the throwing installation cases into a `code: 2` result and scope the purity claim to the `list` path.
+
+---
+
+### AUDIT-20260618-118 — `--at` is silently accepted and ignored for `list`
+
+Finding-ID: AUDIT-20260618-118
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/capability.ts:40-47, :58-63`; USAGE :14
+
+The arg loop parses `--at <dir>` for every subaction, but `list` never reads `at`. `capability(['list','--at','/foo'])` returns exit 0 and ignores the directory; USAGE advertises `--at` generally. The "rejects unknown flag" test covers `--nope` but not this accepted-and-ignored no-op. An operator who thinks `--at` scopes the listing gets no error and no effect. Fix: reject `--at` for `list`, or wire it in — don't leave a parsed flag a silent no-op.
+
+---
+
+### AUDIT-20260618-119 — Module comments assert phase-scope isolation the file state contradicts
+
+Finding-ID: AUDIT-20260618-119 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   low
+Per-lane:   claude=medium, codex=low
+Decision:   agreement (gate-counted low)
+Surface:    `src/subcommands/capability.ts:4-5, :14, :32, :49-56`; `src/subcommands/capability-reconcile.ts:6-7`
+
+Both comments claim `capability.ts` is untouched by reconcile work ("keep this file's phase scope stable" / "is not edited by this phase"), but it was edited: USAGE names `reconcile`, the guard accepts it, it imports the reconcile functions, and dispatches at :49-56. The commit subject is Phase 4 US2 (`list` only, T019–T021) yet the diff carries Phase-5 reconcile wiring — committed and uncommitted phases conflated in one range. A reader trusting the comments mis-models the file's scope. Fix: say the reconcile *logic* is in a separate module while the thin *dispatch* lives here.
+
+---
+
+### AUDIT-20260618-120 — `process.cwd()` default + throwing-installation reconcile paths are untested
+
+Finding-ID: AUDIT-20260618-120
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/__tests__/subcommands/capability-reconcile.test.ts:49-60`
+
+Every dispatch test passes `--at fx.root`; nothing exercises `capability(['reconcile'])` via cwd or the throwing branch. The paths behind -01 have no RED test, so a crash-on-ambiguous-domain regression ships green. Companion to -01.
+
+---
+
+### AUDIT-20260618-121 — `process.exit()` after async writes can truncate piped stdout
+
+Finding-ID: AUDIT-20260618-121
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/capability.ts:81-85`
+
+`process.stdout.write(...)` then `process.exit(code)` can drop buffered output when stdout is a pipe — exactly the `--json | jq` case the `--json` form is built for. Prefer `process.exitCode = code` + return.
+
+---
+
+**Dropped after verification:** "reconcile dispatch is untested" — `capability-reconcile.test.ts:53` does drive `capability(['reconcile', ...])`. Also did **not** flag relative-vs-`@/` imports: the whole module tree uses relative imports, so it's a pre-existing project-wide pattern, not introduced here.
+
+The strongest cross-model signal to watch for is **-01** (the unhandled-throw + false purity claim) — it's the one with real runtime blast radius.
+
+Findings are persisted to the plan file. Since this was a read-only audit (no implementation to approve), there's nothing to execute — the deliverable is the findings above.
+
+## 2026-06-18 — audit-barrage lift (20260618T052001297Z-026-capability-interface-mediation-phase-5)
+
+### AUDIT-20260618-122 — `capability` verb usage + unknown-subaction error omits the `reconcile` subaction
+
+Finding-ID: AUDIT-20260618-122
+Status: migrated-to-backlog TASK-172
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/capability.ts:10 (USAGE), :36-37 (usageErr); cli.ts:142-143
+
+```
+The dispatcher routes two subactions (`cli.ts:142-143`: `args[0] === 'reconcile' ? runReconcileCli(...) : runCapabilityCli(args)`), so `capability reconcile` is real and supported. But `capability.ts`'s `USAGE` is `usage: stackctl capability <list> [--json]` and its guard returns `subaction must be 'list'` for anything else. So `stackctl capability` bare — or a `reconcile` typo — tells the operator/agent that `list` is the *only* subaction; reconcile is invisible from the verb's own help surface, and `capability.test.ts:46-50` locks that message in. **Blast radius:** an agent doing unattended discovery via the CLI's usage output concludes the US3 reconcile backstop doesn't exist and never invokes it — the exact surface US2 discovery exists to advertise. Fix: list `reconcile` in `USAGE` (or have the dispatcher own a usage line covering both).
+
+### AUDIT-20260618-123 — USAGE uses `<list>` angle-bracket notation for a literal subaction keyword
+
+Finding-ID: AUDIT-20260618-123
+Status: migrated-to-backlog TASK-173
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/capability.ts:10
+
+```
+`<list>` reads as a value-placeholder by CLI convention; `list` is a fixed keyword. Prefer `capability {list|reconcile}` or `capability list [--json]`. Cosmetic; folds into the claude-01 fix.
+
+### AUDIT-20260618-124 — Audited diff omits the reconcile impl + CLI wiring the new RED tests exercise
+
+Finding-ID: AUDIT-20260618-124 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=informational, codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    capability-reconcile.test.ts (present) vs. capability-reconcile.ts + cli.ts:62,139-143 (absent from diff)
+
+```
+The diff carries the T022/T024 tests but not the module they import nor the `cli.ts` dispatch — both untracked on disk, yet only the test surfaced. The tests can't be verified against their implementation from the diff alone; I read the on-disk `capability-reconcile.ts` to confirm the contract holds. Review-completeness observation, not a defect.
+
+### AUDIT-20260618-125 — `reconcileCapabilities` walk can throw an opaque exit on a non-directory `specs/` or dangling entry
+
+Finding-ID: AUDIT-20260618-125
+Status: migrated-to-backlog TASK-174
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/capability-reconcile.ts:27-33
+
+```
+`existsSync(specsDir)` then `readdirSync(specsDir)` throws `ENOTDIR` if `specs` is a file; `statSync(featureDir)` throws on a dangling symlink. `reconcileVerb`'s try/catch only catches `InstallationError`, so these escape as a top-level exit-1 stack trace — inconsistent with the clean exit-2 the module deliberately produces for ambiguous installs (`:96-99`). Report-only, so no data risk; a `statSync(specsDir).isDirectory()` guard keeps the failure mode uniform.
+
+### AUDIT-20260618-126 — Capability file carries a phase-forward ownership note
+
+Finding-ID: AUDIT-20260618-126
+Status: migrated-to-backlog TASK-175
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/capability.ts:5-6
+
+The file header says “Phase 5” owns the `reconcile` subaction, while this same audited diff includes reconcile tests and gate commentary. That phase-forward note is exactly the kind of operator-discipline trap this audit prompt asks reviewers to surface: it leaves future ownership encoded in source comments, and it can make later readers believe `capability.ts` must remain untouched for reasons that may already be stale.
+
+The blast radius is low because the line does not change runtime behavior. It is still worth correcting because this repository uses comments as workflow evidence; the comment should describe the current module boundary without encoding phase timing.
+
+## 2026-06-18 — audit-barrage lift (20260618T052520299Z-026-capability-interface-mediation-phase-5)
+
+### AUDIT-20260618-127 — Reconciler and graduate gate diverge on non-phased tasks.md — the report-only half lies about exactly what the gate refuses
+
+Finding-ID: AUDIT-20260618-127 (claude-01 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-176
+Severity:   medium
+Per-lane:   claude=high, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/subcommands/capability-reconcile.ts:30-43; cross-referenced against src/govern/compose-convergence.ts:51-52
+
+The reconciler's stated contract is that it "surfaces what the graduate gate would refuse" (capability-reconcile.ts:5) and renders findings as "un-governed backend state (**would not graduate**)" (line 60). T024 asserts this symmetry: "the reconciler surfaces exactly what the gate refuses (the two halves of the backstop)." But the two halves disagree on a `tasks.md` with **zero `## Phase` headers**.
+
+- **Gate** (`composeConvergedImpl` → `evaluatePhaseCheckpoints`): zero phases → `statuses.length === 0` → returns `{ met: false, unmet: [no-phases] }` (compose-convergence.ts:51-52). The feature is **refused** graduation.
+- **Reconciler** (`reconcileCapabilities`): zero phases → `resolvePhaseCheckpointStatuses` returns `[]` → `nonCurrent` is `[]` → **no finding pushed** (line 39). The feature is reported as **clean** ("no un-governed backend state found").
+
+So a non-phased or legacy `tasks.md` — precisely the shape a bypassed/un-governed feature is likely to have — is hard-refused by the gate but reported as governed-and-clean by the reconciler. The blast radius: an operator or an unattended agent runs `capability reconcile --json` to answer "is this feature un-governed?", gets an empty `findings` array, and concludes the front door was used — when the gate will in fact refuse the same feature. The report half (the operator-facing safety net) produces a false negative on the case the gate half is strictest about. Both tests use `PHASED_TASKS`, so the suite never exercises this. A fix: have `reconcileCapabilities` treat a present-`tasks.md`-with-zero-derivable-phases as a finding (mirror `no-phases` as a non-current reason), so the report and the gate agree.
+
+---
+
+### AUDIT-20260618-128 — A single malformed phase aborts the entire report-only scan with exit 1
+
+Finding-ID: AUDIT-20260618-128
+Status: migrated-to-backlog TASK-177
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/capability-reconcile.ts:33-35, 93-103
+
+`resolvePhaseCheckpointStatuses` is documented to **fail loud (FR-004)** when a phase exists but declares no authoritative file list (phase-checkpoint-status.ts:79-82; compose-convergence.ts:43-45 confirms "that throw propagates to the caller"). `reconcileCapabilities` calls it once per feature in a loop (line 35) with no per-feature guard, and `reconcileVerb`'s `try/catch` (lines 94-101) wraps **only** `findInstallation` — not the scan. So one feature with a malformed phase throws an uncaught exception out of `reconcileCapabilities` → out of `reconcileVerb` → caught by `main()`'s top-level handler (cli.ts:177-181) → **exit 1 with a bare error line**.
+
+This contradicts the module's own contract: "REPORT-ONLY (exit 0, never mutates) — it surfaces what the graduate gate would refuse, for operator attention" (lines 4-5), and the verb's promise of a clean exit-2 for bad input (lines 73-74). A reconciler whose job is to survey *all* features for residue of bypassed governance should not be aborted by one malformed `tasks.md` — and malformed/incomplete task files are correlated with the exact bypassed state being hunted. The remaining (governed or un-governed) features after the bad one are never reported. A fix: wrap the per-feature body in a try/catch and emit the malformed feature as its own finding (or a distinct diagnostic), so one bad feature degrades to a reported row rather than aborting the survey.
+
+---
+
+### AUDIT-20260618-129 — `s.state as 'missing' | 'stale'` is a type assertion banned by project guidelines
+
+Finding-ID: AUDIT-20260618-129
+Status: migrated-to-backlog TASK-178
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/capability-reconcile.ts:38
+
+Line 38 uses `state: s.state as 'missing' | 'stale'`. The project CLAUDE.md is explicit: "Never bypass typing — No `any`, no `as Type`, no `@ts-ignore`." The `.filter((s) => s.state !== 'current')` on line 37 removes `'current'` at runtime but TypeScript does not narrow the surviving array elements' `state` field, so the cast papers over the gap. It is runtime-safe today, but it's the precise construct the guideline forbids, and it will silently mis-narrow if `PhaseCheckpointStatus.state` ever gains a fourth member. Replace with a type-guarded filter, e.g. `.filter((s): s is PhaseCheckpointStatus & { state: 'missing' | 'stale' } => s.state !== 'current')`, which narrows without an assertion.
+
+---
+
+### AUDIT-20260618-130 — Unguarded `statSync` throws on a broken symlink in `specs/`
+
+Finding-ID: AUDIT-20260618-130
+Status: migrated-to-backlog TASK-179
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/capability-reconcile.ts:33
+
+`statSync(featureDir).isDirectory()` (line 33) follows symlinks and throws `ENOENT` on a dangling symlink under `specs/`. As in AUDIT-BARRAGE-claude-02, that throw is uncaught and aborts the whole report-only scan. This is the same fragility class — a survey tool that walks an operator-controlled directory should tolerate odd entries (broken symlinks, permission errors) per-entry rather than crashing the run. Using `statSync(featureDir, { throwIfNoEntry: false })` (or `lstatSync` + a guard) and `continue`-ing on a non-resolvable entry keeps the scan resilient.
+
+---
+
+### AUDIT-20260618-131 — `capability` field is hardcoded to `'spec-execution'` against an interface that implies generality
+
+Finding-ID: AUDIT-20260618-131
+Status: migrated-to-backlog TASK-180
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/subcommands/capability-reconcile.ts:15-22, 40
+
+`ReconcileFinding.capability` is typed `string` and documented as "One un-governed-state finding (data-model § UngovernedState)", but the only value ever produced is the literal `'spec-execution'` (line 40). For this phase that is the sole capability with backend state, so the scoping is reasonable — flagging it as context, not a defect. The note for downstream readers: the `string` type and the data-model reference promise a capability-keyed model the code does not yet deliver, so anyone consuming `--json` output should not assume more than one `capability` value will appear, and a future capability with un-governed state will need new detection logic here (the function does not generalize automatically). No fix required now; worth a one-line comment that the single value is intentional for this phase if the data-model entry suggests otherwise.
+
+## 2026-06-18 — audit-barrage lift (20260618T053056875Z-026-capability-interface-mediation-phase-5)
+
+### AUDIT-20260618-132 — `(err as Error).message` cast — banned `as Type` plus a latent `unreadable: undefined`
+
+Finding-ID: AUDIT-20260618-132
+Status: migrated-to-backlog TASK-181
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/capability-reconcile.ts:77 (the catch block in reconcileCapabilities)
+
+```
+
+The catch arm builds the reason string with `` `unreadable: ${(err as Error).message}` ``. Two problems. First, `as Error` is an explicit type assertion, which the project guidelines ban outright (CLAUDE.md: "Never bypass typing — No `any`, no `as Type`, no `@ts-ignore`"). Second — and the reason it matters at runtime — `resolvePhaseCheckpointStatuses` is third-party-ish to this module; if it ever throws a non-`Error` value (a string, a thrown object, a `Promise` rejection surfaced as a plain value), `.message` is `undefined` and the operator-facing reason becomes the literal `unreadable: undefined`, erasing the diagnostic this branch exists to provide.
+
+Blast-radius: this is the report-only "harmless bypass" backstop the operator reads to decide whether a feature is un-governed. A finding that renders `unreadable: undefined` gives the operator no actionable signal about *why* a feature couldn't be scanned, which is exactly the failure mode the catch was added (per the `claude-02` comment) to prevent. The fix is the standard narrowing: `err instanceof Error ? err.message : String(err)`, which both removes the banned cast and guarantees a non-empty message.
+
+### AUDIT-20260618-133 — `runReconcileCli` writes stdout then `process.exit()` — truncation risk for piped `--json` adapter output
+
+Finding-ID: AUDIT-20260618-133
+Status: migrated-to-backlog TASK-182
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/capability-reconcile.ts:133-138 (runReconcileCli)
+
+```
+
+`runReconcileCli` does `process.stdout.write(result.stdout)` immediately followed by `process.exit(result.code)`. On Node, `process.stdout.write` is asynchronous when stdout is a pipe (not a TTY/file), and `process.exit` does not wait for the write buffer to flush — so output can be truncated when the consumer is a pipe. The module's own doc-comment advertises `--json` as the surface "for adapters," and adapters consume by piping (`stackctl capability reconcile --json | jq …`). That is precisely the case where this footgun bites: a large findings list could be cut off mid-JSON, and the adapter parses garbage.
+
+Blast-radius: an adapter reading truncated JSON fails or, worse, silently sees a shorter findings list than reality — undercounting un-governed features in the exact backstop whose job is to not let un-governed state slip through. If the surrounding `cli.ts` verbs share this pattern it is a pre-existing convention, but this is a *new* instance introduced on a JSON-emitting path. The robust shape is to set `process.exitCode = result.code` and let the event loop drain, or to await a flushed write before exiting.
+
+### AUDIT-20260618-134 — No test for the clean (fully-governed) feature — the false-positive guard is unverified
+
+Finding-ID: AUDIT-20260618-134
+Status: migrated-to-backlog TASK-183
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/subcommands/capability-reconcile.test.ts:18-90 (whole reconcile suite)
+
+```
+
+The suite exercises: missing-checkpoint feature, empty (no features), non-phased tasks.md, unreadable feature, render shape, no-mutation, and bad flags. What it never asserts is the *negative*: a feature whose phases all have **current** checkpoints produces **no** finding. That is the load-bearing case for a report-only backstop — if `reconcileCapabilities` over-reports, the operator gets noise on every governed feature and learns to ignore the report. The `nonCurrent.length > 0` guard at line 67 is the only thing standing between "useful" and "cries wolf," and nothing tests it.
+
+Relatedly, `ReconcileFinding.phases` admits `'stale'`, the filter predicate at line 64 narrows to `'missing' | 'stale'`, but every test fixture only ever produces `'missing'`. The `'stale'` path through both `reconcileCapabilities` and `renderReconcile` (which formats `stale phase-N`) is unexercised. Blast-radius: a regression that made the reconciler emit findings for current checkpoints, or that mishandled the stale state, would pass the entire suite green. This is the project's documented "TDD spec tests have systematic blind spots" failure mode — passing the suite ≠ correct. Add a fixture that seeds current checkpoints (asserting empty findings) and one that seeds a stale checkpoint (asserting a `stale` finding).
+
+### AUDIT-20260618-135 — Hand-rolled type predicate masks any new checkpoint state
+
+Finding-ID: AUDIT-20260618-135
+Status: migrated-to-backlog TASK-184
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/capability-reconcile.ts:64-66
+
+```
+
+The filter uses an explicit user-defined guard: `.filter((s): s is typeof s & { state: 'missing' | 'stale' } => s.state !== 'current')`. The runtime check (`!== 'current'`) and the declared narrowing (`'missing' | 'stale'`) are coupled only by the author's assumption that the state union is exactly `{current, missing, stale}`. If `resolvePhaseCheckpointStatuses` later adds a fourth state, the runtime check would let it through while the type system would *believe* it is `missing | stale`, and it would be reported as a non-current phase with a state label the renderer wasn't designed for — silently, with no compiler error.
+
+Blast-radius: low today (the union is presumably three-valued), but it's a quiet trap for a future maintainer of `phase-checkpoint-status.ts`. If the underlying union is genuinely closed at three members, the predicate is unnecessary — a plain `.filter(s => s.state !== 'current')` narrows automatically and stays sound if a member is added (it would surface as a type error at the `.map`/push site instead). Prefer letting the compiler do the narrowing over asserting it by hand.
+
+### AUDIT-20260618-136 — Audited commit range names US2/T019–T021, but the diff is US3/T022–T024 (uncommitted)
+
+Finding-ID: AUDIT-20260618-136
+Status: migrated-to-backlog TASK-185
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    (audit harness metadata vs. the actual diff)
+
+```
+
+The "Commit subjects in the audited range" lists only `8c14ac88 … Phase 4 US2 — capability discovery (T019-T021)`, yet the diff under review is entirely US3/T022–T024 (`capability reconcile`) plus a comment edit to `gate-eval.ts`. Per the session git-status these three paths are working-tree changes (`?? capability-reconcile.ts`, `?? capability-reconcile.test.ts`, `M gate-eval.ts`), i.e. not yet committed. So the barrage is auditing uncommitted work against a HEAD~1 baseline whose named commit is a *different* user story.
+
+Blast-radius: none on the code — this is a heads-up that the audit-log provenance line will record this barrage against US2's commit subject while the findings concern US3, which could confuse later triage (and means the diff has not yet passed the per-phase govern checkpoint it describes). Worth a one-line note in the audit-log entry so the range mismatch is on the record.
+
+---
+
+These five are what I'd stand behind. I specifically checked and found **clean**: the flag parser (`--at` missing-value and unknown-flag both correctly exit 2, tested), the `existsSync(specsDir)` empty-install short-circuit, the deterministic `readdirSync().sort()`, the `isDirectorySafe` swallow-on-broken-symlink (correct for a report-only scan), and the report-only/no-mutation contract (verified by the `existsSync(phase-checkpoints) === false` assertion). The `gate-eval.ts` change is comment-only and its claims align with the reconciler's behavior. I did **not** flag the relative `../…js` imports vs. the global `@/` rule, because the sibling new test file and the NodeNext `.js` extensions indicate this package's actual convention is relative ESM imports — matching surrounding code is correct here.

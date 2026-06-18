@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "featureSlug": "026-capability-interface-mediation",
+  "phaseId": "5",
+  "checkpoint": "phase-5",
+  "auditLogSection": "phase-5",
+  "scopeFingerprint": "4415261c9e17936e44adf85834c15e46f7bbd1099cb1ec75877e0b42830d827c",
+  "passedAt": "2026-06-18T05:33:03.768Z",
+  "governedPaths": [
+    "src/__tests__/subcommands/capability-reconcile.test.ts",
+    "src/subcommands/capability-reconcile.ts",
+    "src/govern/phase-checkpoint-status.ts",
+    "src/workflow/gate-eval.ts"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/src/workflow/gate-eval.ts"
+  ]
+}
