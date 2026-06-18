@@ -10,8 +10,8 @@ Tests are REQUIRED (Constitution Principle I — Test-First, NON-NEGOTIABLE): ea
 
 ## Phase 1 — Setup
 
-- [ ] T001 Add `commander` (and `@types/node`-compatible types if needed) to `package.json` deps; `npm install`; confirm ESM import resolves under `tsx`.
-- [ ] T002 [P] Create the typed parser-adapter scaffold `src/cli-help/command-adapter.ts` (a thin typed wrapper turning a commander `Command` + parsed opts into a per-verb typed options object — the no-`as`/no-`any` boundary, research Decision 1).
+- [X] T001 Add `commander` (and `@types/node`-compatible types if needed) to `package.json` deps; `npm install`; confirm ESM import resolves under `tsx`.
+- [X] T002 [P] Create the typed parser-adapter scaffold `src/cli-help/command-adapter.ts` (a thin typed wrapper turning a commander `Command` + parsed opts into a per-verb typed options object — the no-`as`/no-`any` boundary, research Decision 1).
 
 ## Phase 2 — Foundational (blocking prerequisites for US1 + US2)
 
