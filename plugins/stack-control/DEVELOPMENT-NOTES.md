@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-06-18: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 0
+  - (no commits this session)
+- Files changed: 0
+- Backlog touched: (none)
+
 ## 2026-06-18: Skill-surface-mediation spike overturns the "inert hook" diagnosis — one-field fix, 026 graduated
 
 **Goal:** Pick up the next item from last session's log (`design:gap/skill-surface-mediation`),
