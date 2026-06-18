@@ -48,3 +48,40 @@ Together with `define` (author new) and `execute` (run), `extend` is sufficient 
 - It does not reimplement any `/speckit-*` step.
 - It does not branch on which tool authored the spec (Principle III — capability, not provider identity).
 - It does not paper over a missing spec or Spec Kit mechanism: a "cannot proceed" branch surfaces the underlying error verbatim (Principle V).
+
+## Front-door marker (026 — capability mediation)
+
+This skill is the sanctioned interface for the **spec-definition** capability. The plugin's
+PreToolUse interceptor refuses a RAW backend call (a direct the `/speckit-*` clarify / re-plan / re-tasks chain); a call this skill
+makes is permitted because the skill sets the front-door marker first. **Bracket the
+backend drive:**
+
+1. Confirm the session id is populated, then `enter` — it PRINTS a token value and fails
+   loud (exit 2) if `$CLAUDE_CODE_SESSION_ID` is empty (do NOT proceed to the backend if so):
+
+   ```bash
+   test -n "$CLAUDE_CODE_SESSION_ID" || { echo "no session id; cannot mediate — stop"; exit 1; }
+   stackctl front-door enter --capability spec-definition --session "$CLAUDE_CODE_SESSION_ID"
+   ```
+
+   Read the token value it printed. **Your `enter` and `exit` run in SEPARATE Bash tool
+   calls**, so a `$TOKEN` shell variable will NOT survive between them — carry the LITERAL
+   token value yourself.
+
+2. Drive the backend (the `/speckit-*` clarify / re-plan / re-tasks chain).
+
+3. **ALWAYS `exit` — on success AND on a failed/aborted drive** — passing the LITERAL token
+   value from step 1 (not a shell variable, which is gone by now; `exit` rejects an empty
+   token loudly). A skipped/empty `exit` leaks the marker (it would wrongly permit a later
+   raw call) until the staleness bound prunes it.
+
+   ```bash
+   stackctl front-door exit --token <the-token-value-printed-in-step-1> --session "$CLAUDE_CODE_SESSION_ID"
+   ```
+
+The marker is session-keyed and nesting-safe — a nested/parallel drive gets its own token
+and one `exit` never clears another's (FR-014a); writes are lock-serialized. NOTE (open
+spike, task-164): the permit path relies on `$CLAUDE_CODE_SESSION_ID` equalling the id the
+interceptor reads from the hook payload (`session_id`) — the expected mechanism, not yet
+live-verified. If a sanctioned drive is refused right after a successful `enter`, a
+session-id mismatch is the prime suspect (task-164).

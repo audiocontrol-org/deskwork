@@ -55,6 +55,9 @@ import { runSessionEndCli } from './subcommands/session-end.js';
 import { runReleaseCheck } from './subcommands/release-check.js';
 import { runReleaseHelperCli } from './subcommands/release-helper.js';
 import { runConfigDomainCli } from './subcommands/config-domain.js';
+import { runMediateCheck } from './subcommands/mediate-check.js';
+import { runFrontDoor } from './subcommands/front-door.js';
+import { runIntercept } from './subcommands/intercept.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -126,6 +129,11 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // Portable release/update contract checks (017 / portability).
   'release-check': runReleaseCheck,
   'release-helper': runReleaseHelperCli,
+  // Capability-interface mediation (026): the decision verb + the front-door marker writer
+  // + the Claude PreToolUse adapter entry (bin/intercept dispatches here).
+  'mediate-check': runMediateCheck,
+  'front-door': runFrontDoor,
+  intercept: runIntercept,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

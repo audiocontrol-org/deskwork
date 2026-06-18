@@ -89,3 +89,17 @@ In THIS repo, a maintainer's raw `backlog`/`/speckit-*` reach-around hits the sa
 
 - The pure-CLI scenarios (A–E, G) are deterministic and belong in the vitest suite. The in-session scenarios (F, H) are manual/integration checks against an installed plugin.
 - Implementation detail (the spike result, the marker file internals) is NOT duplicated here — see `contracts/` and `data-model.md`.
+
+## Integration record (T018 — Phase 3 / US1)
+
+The deterministic CLI scenarios are covered by the vitest suite (run from the installation root):
+
+| Scenario | Status | Where verified |
+|---|---|---|
+| A — CLI refuse raw / permit via front door (SC-001/002) | ✅ covered | `mediate-check.test.ts` (refuse→exit 1 names `/stack-control:backlog`; marker→permit) + `front-door.test.ts` (enter/exit round-trip) + `marker.test.ts` |
+| B — Skill surface (spec-execution) | ✅ covered | `mediate-check.test.ts` / `mediate.test.ts` (raw `speckit-implement` refused, names `/stack-control:execute`; marker→permit) |
+| C — precise identity, no false positives (SC-003) | ✅ covered | `identity.test.ts` (the SC-003 collision set + compound/wrapper/indirection battery) |
+| F — end-to-end interception under Claude Code (SC-001/002/005) | ⏳ deferred | the live PreToolUse hook (`hooks.json` + `bin/intercept`) requires 026 shipped in a formally-installed release; the in-tree smoke (`stackctl intercept` on a `backlog list` payload → deny JSON) passes. The **T015/T018 acceptance gate** (the registered hook actually fires + denies a fronted skill in a live session, and the hook payload's `session_id` equals `$CLAUDE_CODE_SESSION_ID`) is the post-release check. |
+| H — self-dogfood (SC-007) | ⏳ deferred | same — requires the installed hook; runs at post-release install verification. |
+
+D/E (US2) and G (US3) belong to later phases. F/H follow the project's "verify in a formally-installed release" rule — recorded here as pending post-release, not claimed.

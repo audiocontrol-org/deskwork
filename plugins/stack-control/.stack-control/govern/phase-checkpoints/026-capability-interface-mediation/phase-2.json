@@ -4,8 +4,8 @@
   "phaseId": "2",
   "checkpoint": "phase-2",
   "auditLogSection": "phase-2",
-  "scopeFingerprint": "a68fae2778d759da5a02e7e7e8b293438afea123241d415e2d04678243417796",
-  "passedAt": "2026-06-18T02:57:57.238Z",
+  "scopeFingerprint": "a706adef59e6ad6a9888e606d33b324675b55662c956d947a8094111039879cb",
+  "passedAt": "2026-06-18T03:39:05.606Z",
   "governedPaths": [
     "specs/026-capability-interface-mediation/research.md",
     "src/__tests__/capability/registry.test.ts",
@@ -14,6 +14,10 @@
     "src/capability/identity.ts"
   ],
   "auditedFiles": [
-    "plugins/stack-control/specs/026-capability-interface-mediation/research.md"
+    "plugins/stack-control/specs/026-capability-interface-mediation/research.md",
+    "plugins/stack-control/src/__tests__/capability/identity.test.ts",
+    "plugins/stack-control/src/__tests__/capability/registry.test.ts",
+    "plugins/stack-control/src/capability/identity.ts",
+    "plugins/stack-control/src/capability/registry.ts"
   ]
 }

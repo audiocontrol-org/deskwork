@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# stack-control PreToolUse interceptor (026 T015). The plugin's hooks.json registers this
+# for the Bash + Skill tools. It dispatches to `stackctl intercept`, reusing bin/stackctl's
+# tsx/runtime resolution — so there is no second copy of that logic. The hook payload is
+# read from stdin by the `intercept` verb; a refusal is emitted as PreToolUse deny JSON.
+#
+# Fast pre-filter (Phase-3 audit claude-04): this hook fires on EVERY Bash/Skill tool
+# call. The vast majority name no fronted backend, and the in-process pre-filter still
+# pays a Node/tsx cold-start. So grep the raw payload FIRST and only spawn stackctl when a
+# backend identity COULD be present — avoiding the interpreter spin-up for `ls`, `git
+# status`, etc. The pattern is a coarse superset of the registry's backend identities
+# (`backlog`, `speckit-*`); it is test-pinned (intercept-prefilter.test.ts) to cover every
+# registry backend, so adding a backend that the pattern misses fails CI rather than
+# silently disabling mediation for it. A pattern hit still defers the PRECISE decision
+# (incl. SC-003 no-false-positive) to the verb.
+# FAIL-CLOSED on an interceptor crash (Phase-3 audit codex-02): when the payload could
+# name a backend, evaluate it; if `stackctl intercept` cannot run (missing/tsx error/
+# throw) we must NOT silently `exit 0` (allow-by-default for exactly the calls this hook
+# mediates). The verb exits 0 for both permit (no output) and refuse (deny JSON on
+# stdout); a NON-zero exit means it could not evaluate → emit a deny with a diagnosable
+# reason so the failure is observable rather than a silent bypass.
+PAYLOAD=$(cat)
+if printf '%s' "$PAYLOAD" | grep -qE 'backlog|speckit-'; then
+  OUT=$(printf '%s' "$PAYLOAD" | "$(dirname "$0")/stackctl" intercept)
+  RC=$?
+  if [ "$RC" -ne 0 ]; then
+    printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"stack-control mediation could not be evaluated (interceptor error, exit '"$RC"'). Failing closed: use the capability front door (/stack-control:*), or fix bin/intercept / stackctl."}}'
+  else
+    printf '%s' "$OUT"
+  fi
+fi
+exit 0

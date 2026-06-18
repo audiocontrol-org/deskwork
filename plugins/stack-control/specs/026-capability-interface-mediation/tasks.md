@@ -29,18 +29,18 @@ description: "Task list for capability-interface mediation"
 
 **Independent test**: quickstart Scenarios A, B, C, F — raw `backlog`/`speckit-implement` refused; bracketed by `front-door enter/exit` permitted; collision commands not refused.
 
-- [ ] T007 [P] [US1] Write failing tests for the marker file in `src/__tests__/capability/marker.test.ts`: enter/exit by token; nested/concurrent entries isolate (one teardown can't clear another — FR-014a); staleness prune; session-keying (FR-014).
-- [ ] T008 [US1] Implement `src/capability/marker.ts` (atomic session-keyed marker file under `<installation>/.stack-control/state/front-door/<session>.json`, active-entry stack, stale prune) to pass T007.
-- [ ] T009 [P] [US1] Write failing tests for the pure decision rule in `src/__tests__/capability/mediate.test.ts`: permit non-backend identity; refuse backend w/o marker (reads included); permit backend w/ marker (truth table from data-model § MediationDecision).
-- [ ] T010 [US1] Implement `src/capability/mediate.ts` (registry + marker → `MediationDecision`, pure/read-only) to pass T009.
-- [ ] T011 [P] [US1] Write failing tests for the decision verb in `src/__tests__/subcommands/mediate-check.test.ts`: exit 0 permit / 1 refuse / 2 usage; strict flag parse (`--surface/--identity/--session/--at`); registry-sourced redirect message on stderr; `--json` shape (contracts/cli-verbs.md).
-- [ ] T012 [US1] Implement `src/subcommands/mediate-check.ts` + register in `src/cli.ts` `SUBCOMMANDS` to pass T011.
-- [ ] T013 [P] [US1] Write failing tests for the marker writer verbs in `src/__tests__/subcommands/front-door.test.ts`: `enter` returns a token + writes atomically; `exit` is safe after a crash (missing token = no-op success); installation-anchor refusal with no enclosing installation.
-- [ ] T014 [US1] Implement `src/subcommands/front-door.ts` (`enter`/`exit`) + register in `src/cli.ts` to pass T013.
-- [ ] T015 [US1] Add the Claude adapter: `hooks/hooks.json` (PreToolUse for `Bash` + `Skill`) + `bin/intercept` (tsx) mapping payload → `mediate-check` → `permissionDecision: deny`, with the cheap local pre-filter for latency (contracts/interceptor-hook.md, research D7). Uses the T002-confirmed `Skill` field.
-- [ ] T016 [US1] Update the front-door skill bodies (`skills/define/SKILL.md`, `skills/extend/SKILL.md`, `skills/execute/SKILL.md`, `skills/backlog/SKILL.md`) to bracket their backend drive with `stackctl front-door enter`/`exit` so sanctioned calls carry the marker.
-- [ ] T017 [US1] Migrate `src/speckit-wrapper/refusal.ts` (`WRAPPED_SKILLS`/`frontDoorsFor`) into the registry; make `src/subcommands/speckit-guard.ts` delegate to `mediate-check` (or retire it) and switch its marker check from env-var to the marker file; update `src/__tests__/speckit-wrapper/wrapper-refusal.test.ts`. Keep exit-code contract intact.
-- [ ] T018 [US1] Manual integration against an installed plugin: run quickstart Scenarios A, B, C, F; record verdicts/exit codes in `quickstart.md`.
+- [X] T007 [P] [US1] Write failing tests for the marker file in `src/__tests__/capability/marker.test.ts`: enter/exit by token; nested/concurrent entries isolate (one teardown can't clear another — FR-014a); staleness prune; session-keying (FR-014).
+- [X] T008 [US1] Implement `src/capability/marker.ts` (atomic session-keyed marker file under `<installation>/.stack-control/state/front-door/<session>.json`, active-entry stack, stale prune) to pass T007.
+- [X] T009 [P] [US1] Write failing tests for the pure decision rule in `src/__tests__/capability/mediate.test.ts`: permit non-backend identity; refuse backend w/o marker (reads included); permit backend w/ marker (truth table from data-model § MediationDecision).
+- [X] T010 [US1] Implement `src/capability/mediate.ts` (registry + marker → `MediationDecision`, pure/read-only) to pass T009.
+- [X] T011 [P] [US1] Write failing tests for the decision verb in `src/__tests__/subcommands/mediate-check.test.ts`: exit 0 permit / 1 refuse / 2 usage; strict flag parse (`--surface/--identity/--session/--at`); registry-sourced redirect message on stderr; `--json` shape (contracts/cli-verbs.md).
+- [X] T012 [US1] Implement `src/subcommands/mediate-check.ts` + register the verb in the `cli.ts` SUBCOMMANDS map to pass T011.
+- [X] T013 [P] [US1] Write failing tests for the marker writer verbs in `src/__tests__/subcommands/front-door.test.ts`: `enter` returns a token + writes atomically; `exit` is safe after a crash (missing token = no-op success); installation-anchor refusal with no enclosing installation.
+- [X] T014 [US1] Implement `src/subcommands/front-door.ts` (`enter`/`exit`) + register the verb in the `cli.ts` SUBCOMMANDS map to pass T013.
+- [X] T015 [US1] Add the Claude adapter: `hooks/hooks.json` (PreToolUse for `Bash` + `Skill` TOOLS — matcher = tool name) + `bin/intercept` (bash shim, fail-closed, with a fast pre-filter) dispatching to the `src/subcommands/intercept.ts` verb, whose decision-mapping core is `src/capability/intercept.ts` (payload to `decideMediation` to `permissionDecision: deny`), tested in `src/__tests__/capability/intercept.test.ts` and `src/__tests__/capability/intercept-prefilter.test.ts` (contracts/interceptor-hook.md, research D7). Reads the T002-confirmed `tool_input.skill_name`.
+- [X] T016 [US1] Update the front-door skill bodies (`skills/define/SKILL.md`, `skills/extend/SKILL.md`, `skills/execute/SKILL.md`, `skills/backlog/SKILL.md`) to bracket their backend drive with `stackctl front-door enter`/`exit` so sanctioned calls carry the marker.
+- [X] T017 [US1] Migrate `src/speckit-wrapper/refusal.ts` (`WRAPPED_SKILLS`/`frontDoorsFor`) into the registry; make `src/subcommands/speckit-guard.ts` delegate to `mediate-check` (or retire it) and switch its marker check from env-var to the marker file; update `src/__tests__/speckit-wrapper/wrapper-refusal.test.ts`. Keep exit-code contract intact.
+- [X] T018 [US1] Manual integration against an installed plugin: run quickstart Scenarios A, B, C, F; record verdicts/exit codes in `quickstart.md`.
 
 **Checkpoint**: US1 alone delivers the complete-mediation teeth for all three v1 capabilities (CLI + skill surfaces) on Claude.
 
@@ -51,7 +51,7 @@ description: "Task list for capability-interface mediation"
 **Independent test**: quickstart Scenarios D, E.
 
 - [ ] T019 [P] [US2] Write failing tests for discovery in `src/__tests__/subcommands/capability.test.ts`: `capability list` surfaces the 3 capabilities with interface/identities/policies; `--json` shape; reads the single registry (FR-009/010/012).
-- [ ] T020 [US2] Implement `capability list` in `src/subcommands/capability.ts` + register in `src/cli.ts` to pass T019.
+- [ ] T020 [US2] Implement `capability list` in `src/subcommands/capability.ts` + register the verb in the `cli.ts` SUBCOMMANDS map to pass T019.
 - [ ] T021 [US2] Manual integration: quickstart Scenarios D (add a temp registry entry → refused with no interceptor change) and E (discovery == API spec).
 
 ## Phase 5: User Story 3 — harmless-bypass backstop (Priority: P3)
