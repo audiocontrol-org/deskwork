@@ -1581,3 +1581,77 @@ Surface:    hooks/hooks.json:1-24; .claude-plugin/plugin.json:1-5; .codex-plugin
 The diff adds `hooks/hooks.json`, but the visible plugin manifests do not reference it. The Codex manifest only points at `./skills/`, and the Claude manifest is just name/version metadata. The hook-adjacent test asserts JSON shape and file existence, but it does not verify that an installed plugin actually registers the PreToolUse hook.
 
 Blast radius is medium: if the plugin loader does not auto-discover exactly this path and shape, the mediation code is inert with green unit tests. Add explicit manifest wiring if the plugin schema requires it, or add an install-level smoke that proves a raw fronted backend call reaches `bin/intercept`.
+
+## 2026-06-18 — audit-barrage lift (20260618T050530657Z-026-capability-interface-mediation-phase-4)
+
+### AUDIT-20260618-111 — `args[i]!` non-null assertion bypasses the project's strict-typing rule
+
+Finding-ID: AUDIT-20260618-111
+Status: migrated-to-backlog TASK-166
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/capability.ts:50 (`const arg = args[i]!;`)
+
+The flag-parsing loop reads `const arg = args[i]!;` under `for (let i = 1; i < args.length; i++)`. With `noUncheckedIndexedAccess`, `args[i]` is `string | undefined`, and the `!` non-null assertion silences that. The project guidelines (`CLAUDE.md`: "Never bypass typing — no `any`, no `as Type`, no `@ts-ignore`") prohibit typing bypasses; the non-null assertion is in the same family. Blast radius is effectively zero at runtime — the loop bound provably makes the index valid — so this is hygiene, not a correctness defect. The drift-free fix is `for (const arg of args.slice(1))`, which eliminates the assertion entirely and reads more clearly. Worth noting because the codebase otherwise holds a strict no-bypass line and this is the one spot that breaks it.
+
+### AUDIT-20260618-112 — `USAGE` angle-bracket notation labels a literal subcommand as a placeholder
+
+Finding-ID: AUDIT-20260618-112
+Status: migrated-to-backlog TASK-167
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/capability.ts:11 (`const USAGE = 'usage: stackctl capability <list> [--json]';`)
+
+The usage string renders `<list>` in angle brackets. By near-universal CLI convention, `<foo>` denotes a *required variable placeholder* the user substitutes, whereas `list` here is a literal subaction keyword (the only valid one — `capability.ts:35` rejects anything but `'list'`). An agent reading the error output (which is the only place this string surfaces, via `usageErr`) could plausibly read `<list>` as "supply a list argument here" rather than "type the word `list`". Since the audience is agents acting unattended on the usage line, the mild ambiguity is worth correcting to `usage: stackctl capability list [--json]` (or `capability {list}`). No behavioral consequence — purely the readability of the error surface.
+
+### AUDIT-20260618-113 — Forward-reference comment to "Phase 5 adds the reconcile subaction"
+
+Finding-ID: AUDIT-20260618-113
+Status: migrated-to-backlog TASK-168
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/capability.ts:5-6 (header comment)
+
+The header comment ends with "(Phase 5 adds the `reconcile` subaction in its own module to keep this file's phase scope stable.)". The project's `agent-discipline.md` rule ("Just for now is bullshit") and this barrage's hard constraints flag forward-phase references in comments as potential deferral/IOU breadcrumbs. This instance is defensible — it is a *scope-boundary note* explaining why `reconcile` is intentionally absent from this module, not an IOU promising to finish broken current functionality, and it does not gate any shipped behavior. It is surfaced per the constraint to call out future-phase phrases, with the recommendation to leave it as-is (it documents a deliberate modular split) or, if the rule is read strictly, point it at the tracking artifact (roadmap item / spec section) rather than a bare "Phase 5".
+
+### AUDIT-20260618-114 — Audited surface is untracked working-tree files, not the named commit range
+
+Finding-ID: AUDIT-20260618-114
+Status: migrated-to-backlog TASK-169
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/subcommands/capability.ts, src/__tests__/subcommands/capability.test.ts (both `new file`, untracked)
+
+Provenance note for the operator's triage, not a code defect. The barrage header names the audited commit range as `cca46ab0 — T007–T018`, but the two files under audit are headed `T019`/`T020` and are shown as `new file mode` (and appear as `??` untracked in the session's git status). So this review is of uncommitted working-tree work that post-dates the named commit, and `src/cli.ts` (which I read to confirm the wiring at line 139) is also modified-but-uncommitted. The implication: whatever pre-commit/governance gate runs at commit time has not yet exercised these files, and the test-suite delta these add is not yet reflected in any committed count. Flagging so the finding set is joined to the right SHA when these land.
+
+### AUDIT-20260618-115 — CLI wrapper `runCapabilityCli` (process.exit path) has no test
+
+Finding-ID: AUDIT-20260618-115
+Status: migrated-to-backlog TASK-170
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/subcommands/capability.ts:60-66 (`runCapabilityCli`)
+
+The pure core `capability()` is thoroughly tested (exit codes, `--json` shape, registry-equality, rejection cases). The thin wrapper `runCapabilityCli` — which does `process.stdout/stderr.write` and `process.exit(result.code)` — is not exercised by any test in the diff. This matches the established split in the file ("Pure core … hermetically testable; `runCapabilityCli` does the process I/O + exit") and mirrors how sibling subcommands are structured, so it is an accepted trade-off rather than a gap to fix. Surfaced only because a future refactor that moves logic *into* the wrapper (e.g. argv slicing, env reads) would silently escape coverage; the contract boundary to preserve is "the wrapper stays trivial." No action needed as written.
+
+---
+
+**Summary for triage:** No `blocking`/`high`/`medium` findings. The implementation is correct and well-factored — single-source registry read (FR-012) is honored verbatim by the `--json` equality test, the human render pulls every field from `CAPABILITY_REGISTRY`, exit codes are typed `0 | 2` with no magic, and all error paths (`bogus`, `--nope`, empty args) are covered. The five notes above are hygiene (`-01`, `-02`), a defensible-but-flagged comment (`-03`), and two provenance/coverage informationals (`-04`, `-05`). What I checked that came back clean: argument parsing edge cases (empty, duplicate `--json`, unknown flag/subaction), the `redirectFor` empty-interface throw path (unreachable for the static registry, which `validateRegistry` guards), CLI wiring (present at `cli.ts:139`), and registry/test data agreement.
+
+### AUDIT-20260618-116 — Deferral Phrase In Implementation Comment
+
+Finding-ID: AUDIT-20260618-116
+Status: migrated-to-backlog TASK-171
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/capability.ts:5-6
+
+The file header says, “Phase 5 adds the `reconcile` subaction in its own module,” which is a deferred-work statement embedded in the implementation. The audit prompt explicitly rejects deferral phrases because they can normalize incomplete behavior as intentional scope rather than making the current contract stand on its own.
+
+The blast radius is low because this comment does not change runtime behavior for `stackctl capability list`, and the implemented `list` path appears coherent. A reasonable fix is to remove the future-phase note from the code comment or replace it with a present-tense description of this module’s current responsibility only.

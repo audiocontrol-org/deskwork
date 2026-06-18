@@ -50,9 +50,9 @@ description: "Task list for capability-interface mediation"
 
 **Independent test**: quickstart Scenarios D, E.
 
-- [ ] T019 [P] [US2] Write failing tests for discovery in `src/__tests__/subcommands/capability.test.ts`: `capability list` surfaces the 3 capabilities with interface/identities/policies; `--json` shape; reads the single registry (FR-009/010/012).
-- [ ] T020 [US2] Implement `capability list` in `src/subcommands/capability.ts` + register the verb in the `cli.ts` SUBCOMMANDS map to pass T019.
-- [ ] T021 [US2] Manual integration: quickstart Scenarios D (add a temp registry entry → refused with no interceptor change) and E (discovery == API spec).
+- [X] T019 [P] [US2] Write failing tests for discovery in `src/__tests__/subcommands/capability.test.ts`: `capability list` surfaces the 3 capabilities with interface/identities/policies; `--json` shape; reads the single registry (FR-009/010/012).
+- [X] T020 [US2] Implement `capability list` in `src/subcommands/capability.ts` + register the verb in the `cli.ts` SUBCOMMANDS map to pass T019.
+- [X] T021 [US2] Manual integration: quickstart Scenarios D (add a temp registry entry → refused with no interceptor change) and E (discovery == API spec).
 
 ## Phase 5: User Story 3 — harmless-bypass backstop (Priority: P3)
 
