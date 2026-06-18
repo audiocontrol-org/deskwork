@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-18 07:07'
-updated_date: '2026-06-18 07:14'
+updated_date: '2026-06-18 09:02'
 labels:
   - agent-found
   - 'type:bug'
@@ -27,4 +27,7 @@ Live T018 validation in installed release 0.51.0 (session e5974019). Bash-surfac
 
 <!-- SECTION:NOTES:BEGIN -->
 - **Promoted-to:** roadmap:design:gap/skill-surface-mediation
+- **2026-06-18 — DIAGNOSIS CORRECTED by live spike (this finding's title/description are now falsified):** PreToolUse is NOT inert for skills. The spike (instrument the loaded plugin hook, invoke a skill via the Skill tool, observe the payload) proved PreToolUse DOES fire for an agent-initiated Skill-tool call. The real bug was a one-field mismatch — the interceptor read `tool_input.skill_name` while the live Claude Code field is `tool_input.skill`, so every Skill payload extracted an empty identity and silently permitted the reach-around. The "claude-code-guide says PreToolUse doesn't fire for skills" claim was docs-derived and wrong. The hooks.json 'Skill' matcher is correct and stays; no UserPromptExpansion gate is needed for the agent reach-around threat.
+- **Fix:** committed 5f88b40e (TDD-first; `intercept.ts` reads `input.skill`; RED regression with the real `{skill:...}` shape; research.md/tasks.md/contracts corrected; full suite 1863 GREEN). Write-up: `specs/026-capability-interface-mediation/skill-surface-spike-research.md`.
+- **Status kept To Do deliberately:** closes only after live re-validation in the NEXT installed release (raw `/speckit-implement` via the Skill tool → denied end-to-end), per the verify-in-a-formally-installed-release rule. Operator owns the transition.
 <!-- SECTION:NOTES:END -->
