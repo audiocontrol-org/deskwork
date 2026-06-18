@@ -60,19 +60,41 @@ The governed-doc contract ("do not hand-edit") is only credible if every graph m
 operator can ask for in words has a CLI path. Clustering — the most natural roadmap-curation
 verb an operator reaches for — has none.
 
+SECOND FRICTION — DISCOVERABILITY (agents burn cycles probing the surface every session)
+Before it could even hit the capability wall, the agent spent a run of turns just trying to
+LEARN how to mutate the roadmap — and so does every fresh agent. Observed in the same session:
+  - ran `stackctl roadmap --help` and `stackctl roadmap add --help` → both error
+    ("unknown flag --help"); there is no help surface.
+  - added a node with a bogus status deliberately "to surface the vocabulary" — the only way to
+    discover the valid status set is to trip the error.
+  - tested `add` on an existing id and `reclassify` on a no-op just "to see behavior."
+  - read the governed doc's grammar BY HAND (the `- depends-on:` / `- part-of:` metadata-line
+    format) because nothing tells an agent how the edges are written.
+Compounding it: a no-subaction `stackctl roadmap` prints only `usage: roadmap <next|blocked|add>`,
+yet the real subaction set is next / blocked / blocks / order / graph / add / advance / decompose
+/ reclassify / defer / reconcile / close-related — discoverable only by triggering an
+unknown-subaction error. The mutation surface is effectively undocumented at the point of use.
+
 REMEDIATION NEEDED
-- Edge-mutation verbs on existing nodes: add-edge / remove-edge for part-of and depends-on
-  (dry-run then --apply; graph-revalidating: refuse cycle / dangling / self / dup; zero-write
-  on failure — same guarantees the loader gives on read).
+- Edge-mutation verbs on existing nodes: add-edge / remove-edge / move-edge (reparent) for
+  part-of and depends-on (dry-run then --apply; graph-revalidating: refuse cycle / dangling /
+  self / dup; zero-write on failure — same guarantees the loader gives on read). This absorbs
+  the former reparent gap (TASK-137 = the move-edge case).
 - A one-move `roadmap cluster` (a.k.a. group) convenience that does the whole operator request
   atomically: create-or-reuse a parent epic + attach part-of on N existing children
   (+ optional --chain to wire a depends-on sequence among them) in a single governed,
   revalidating call. This is the literal shape the operator asked for.
+- Self-documenting discoverability so adopting agents stop probing: working `roadmap --help`
+  and per-subaction `--help` that enumerate the full verb + flag set and the status vocabulary;
+  a COMPLETE top-level usage line (not the truncated `<next|blocked|add>`); and a governed
+  ROADMAP.md header that names the mutation verbs with a worked clustering example instead of a
+  bare "manage with stackctl roadmap — do not hand-edit." It should be super-obvious to a fresh
+  agent how to use AND mutate the roadmap without probing.
 
-RELATIONSHIP TO EXISTING ROADMAP
-impl:gap/roadmap-reparent-verb (TASK-137) is the nearest existing item but is NARROWER — it
-only MOVES an existing edge between nodes. The offing case needed to ADD a brand-new part-of
-edge to nodes that had none, plus the high-level cluster convenience. Operator decision needed:
-fold the broader edge-mutation + cluster surface into the reparent gap, or keep this as a
-sibling that supersedes it. Flagging the merge decision rather than making it (capture ≠ scope).
+RELATIONSHIP TO EXISTING ROADMAP — FOLD DECIDED (2026-06-18)
+impl:gap/roadmap-reparent-verb (TASK-137) was the nearest existing item but NARROWER — it only
+MOVES an existing edge. Operator decision (this session): FOLD it in. The standalone reparent
+roadmap node was retired and TASK-137 re-pointed to impl:gap/roadmap-edge-mutation-and-cluster,
+which now carries all three parts above (move-edge = part 1). This task (TASK-242) is the
+backing evidence for that node.
 <!-- SECTION:DESCRIPTION:END -->
