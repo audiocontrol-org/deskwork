@@ -3,10 +3,10 @@ id: TASK-241
 title: >-
   026 Skill-surface PreToolUse interceptor is inert in installed release (live
   T018 finding)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-18 07:07'
-updated_date: '2026-06-18 09:02'
+updated_date: '2026-06-18 13:33'
 labels:
   - agent-found
   - 'type:bug'
