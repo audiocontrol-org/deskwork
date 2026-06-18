@@ -88,7 +88,7 @@ function readMarker(installRoot: string, session: string): FrontDoorMarker | nul
   try {
     parsed = JSON.parse(readFileSync(path, 'utf8'));
   } catch (err) {
-    throw new Error(`front-door marker ${path} is not valid JSON: ${(err as Error).message}`);
+    throw new Error(`front-door marker ${path} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
   }
   if (typeof parsed !== 'object' || parsed === null) {
     throw new Error(`front-door marker ${path} is malformed (expected an object)`);

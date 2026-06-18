@@ -1,0 +1,20 @@
+---
+id: TASK-215
+title: >-
+  AUDIT-20260618-101 — Marker validation does not bind file contents to the
+  requested session
+status: To Do
+assignee: []
+created_date: '2026-06-18 05:53'
+labels:
+  - 'type:migrated-finding'
+  - 'feature:026-capability-interface-mediation'
+  - 'finding:AUDIT-20260618-101'
+dependencies: []
+references:
+  - 'audit:026-capability-interface-mediation:AUDIT-20260618-101'
+priority: medium
+ordinal: 215000
+---
+
+

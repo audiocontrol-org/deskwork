@@ -71,9 +71,9 @@ description: "Task list for capability-interface mediation"
 
 **Independent test**: quickstart Scenario F under each adapter; the purity test.
 
-- [ ] T026 [P] [US4] Write failing purity tests in `src/__tests__/capability/purity.test.ts`: the decision core contains no vendor-identity branch and no hardcoded `.claude/skills` path (FR-006, static-scan + behavior).
-- [ ] T027 [US4] Add the Codex PreToolUse adapter (Bash-only, research D8) calling the same `mediate-check` verb; document the skill-surface backstop reliance on Codex.
-- [ ] T028 [US4] Cross-vendor parity test: identical verdict + exit code for the same raw Bash call across the Claude and Codex adapters (SC-005).
+- [X] T026 [P] [US4] Write failing purity tests in `src/__tests__/capability/purity.test.ts`: the decision core contains no vendor-identity branch and no hardcoded `.claude/skills` path (FR-006, static-scan + behavior).
+- [X] T027 [US4] Add the Codex PreToolUse adapter (Bash-only, research D8) calling the same `mediate-check` verb; document the skill-surface backstop reliance on Codex.
+- [X] T028 [US4] Cross-vendor parity test: identical verdict + exit code for the same raw Bash call across the Claude and Codex adapters (SC-005).
 
 ## Phase 7: Polish & cross-cutting
 

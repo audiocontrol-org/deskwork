@@ -872,7 +872,7 @@ Every sanctioned drive writes the marker with `--session "$CLAUDE_CODE_SESSION_I
 ### AUDIT-20260618-61 — `bin/intercept` pays a Node+tsx cold start on *every* Bash tool call, plugin-wide
 
 Finding-ID: AUDIT-20260618-61
-Status:     open
+Status: migrated-to-backlog TASK-191
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -885,7 +885,7 @@ The Bash matcher is `"Bash"`, so `${CLAUDE_PLUGIN_ROOT}/bin/intercept` runs for 
 ### AUDIT-20260618-62 — Marker read-modify-write is atomic-publish but not lost-update-safe; the "concurrent isolate" claim is only tested sequentially
 
 Finding-ID: AUDIT-20260618-62
-Status:     open
+Status: migrated-to-backlog TASK-192
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -898,7 +898,7 @@ Surface:    src/capability/marker.ts:enterFrontDoor (95-110), exitFrontDoor (118
 ### AUDIT-20260618-63 — `STALE_AGE_MS` 12-hour bound can prune an actively-bracketed drive → spurious refusal
 
 Finding-ID: AUDIT-20260618-63
-Status:     open
+Status: migrated-to-backlog TASK-193
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -911,7 +911,7 @@ The staleness prune (crash-safety: a crashed `enter` cannot leak a permanent mar
 ### AUDIT-20260618-64 — `speckit-guard` (a "frozen 025 contract" verb) silently widened its refusal set to three newly-wrapped skills
 
 Finding-ID: AUDIT-20260618-64
-Status:     open
+Status: migrated-to-backlog TASK-194
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -1054,7 +1054,7 @@ The blast radius: all three shipped SKILL.md blocks state the equality categoric
 ### AUDIT-20260618-73 — `hooks/hooks.json` is not declared in `plugin.json`, and no test/smoke verifies the hook is registered — if auto-discovery doesn't apply, the whole feature is inert
 
 Finding-ID: AUDIT-20260618-73
-Status:     open
+Status: migrated-to-backlog TASK-195
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1084,7 +1084,7 @@ Blast radius: the failure mode lands precisely when the hook IS working, so it c
 ### AUDIT-20260618-75 — The "no drift" derivation test is tautological — it compares `flatMap` to `flatMap` and can never fail
 
 Finding-ID: AUDIT-20260618-75
-Status:     open
+Status: migrated-to-backlog TASK-196
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -1099,7 +1099,7 @@ Blast radius: low (test-quality, not runtime). The cost is false confidence: the
 ### AUDIT-20260618-76 — `bin/intercept` fails open on any `stackctl` crash, with no signal that mediation was skipped
 
 Finding-ID: AUDIT-20260618-76
-Status:     open
+Status: migrated-to-backlog TASK-197
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -1129,7 +1129,7 @@ The blast radius is high because a runtime failure in the enforcement path becom
 ### AUDIT-20260618-78 — Session ids can escape the marker state directory
 
 Finding-ID: AUDIT-20260618-78
-Status:     open
+Status: migrated-to-backlog TASK-198
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -1142,7 +1142,7 @@ A reasonable fix is to validate session ids against a conservative filename-safe
 ### AUDIT-20260618-79 — False-positive payloads can still fail closed after reading a malformed marker
 
 Finding-ID: AUDIT-20260618-79
-Status:     open
+Status: migrated-to-backlog TASK-199
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -1155,7 +1155,7 @@ The blast radius is avoidable operator-facing denial for non-backend commands th
 ### AUDIT-20260618-80 — Malformed hook payloads permit instead of denying a backend-like event
 
 Finding-ID: AUDIT-20260618-80
-Status:     open
+Status: migrated-to-backlog TASK-200
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -1183,7 +1183,7 @@ This is high because downstream agents will follow these SKILL.md instructions u
 ### AUDIT-20260618-82 — No-installation context refuses the adopter's own backend with an unsatisfiable redirect
 
 Finding-ID: AUDIT-20260618-82
-Status:     open
+Status: migrated-to-backlog TASK-201
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1194,7 +1194,7 @@ Surface:    `src/subcommands/intercept.ts:11-14` + `src/capability/mediate.ts:30
 ### AUDIT-20260618-83 — A throw from `resolveActive` escapes `interceptDecision` — only `JSON.parse` is guarded
 
 Finding-ID: AUDIT-20260618-83
-Status:     open
+Status: migrated-to-backlog TASK-202
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1205,7 +1205,7 @@ Surface:    `src/subcommands/intercept.ts:25-45` + `src/capability/marker.ts` (`
 ### AUDIT-20260618-84 — cwd drift between `enter` and the hook payload silently refuses a sanctioned drive
 
 Finding-ID: AUDIT-20260618-84
-Status:     open
+Status: migrated-to-backlog TASK-203
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1216,7 +1216,7 @@ The marker is written under the installation resolved at `enter` time and read u
 ### AUDIT-20260618-85 — `backlog` SKILL.md block omits the empty-session guard the other three carry
 
 Finding-ID: AUDIT-20260618-85
-Status:     open
+Status: migrated-to-backlog TASK-204
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1227,7 +1227,7 @@ Surface:    `skills/backlog/SKILL.md:113-123` vs `skills/{define,execute,extend}
 ### AUDIT-20260618-86 — Editing-residue grammar in shipped agent-facing SKILL.md blocks
 
 Finding-ID: AUDIT-20260618-86
-Status:     open
+Status: migrated-to-backlog TASK-205
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1238,7 +1238,7 @@ Template artifacts: extend's "a direct **the** `/speckit-*` … chain" and execu
 ### AUDIT-20260618-87 — `frontDoorsFor` now throws (total→partial) — currently safe, latent foot-gun
 
 Finding-ID: AUDIT-20260618-87
-Status:     open
+Status: migrated-to-backlog TASK-206
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1249,7 +1249,7 @@ The `WrappedSkill` narrowing is gone; `frontDoorsFor` throws on a non-wrapped na
 ### AUDIT-20260618-88 — Hook wired into CLI but not registered in the plugin manifest (context)
 
 Finding-ID: AUDIT-20260618-88
-Status:     open
+Status: migrated-to-backlog TASK-207
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1301,7 +1301,7 @@ Blast radius is high because it breaks the main feature path for spec-definition
 ### AUDIT-20260618-91 — Legacy speckit-guard still ignores the new marker file
 
 Finding-ID: AUDIT-20260618-91
-Status:     open
+Status: migrated-to-backlog TASK-208
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -1329,7 +1329,7 @@ The fail-closed guarantee for this case lives entirely in `bin/intercept`'s `if 
 ### AUDIT-20260618-93 — A corrupt marker file permanently wedges a session — `enter` throws and the interceptor denies, with no recovery verb
 
 Finding-ID: AUDIT-20260618-93
-Status:     open
+Status: migrated-to-backlog TASK-209
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1355,7 +1355,7 @@ I'm surfacing it because the cross-model signal is the point of the barrage, not
 ### AUDIT-20260618-95 — Nothing in this diff wires `hooks/hooks.json` into the plugin — interceptor may be inert until T018
 
 Finding-ID: AUDIT-20260618-95
-Status:     open
+Status: migrated-to-backlog TASK-210
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1368,7 +1368,7 @@ This is expected for mid-feature work, so I'm rating it medium rather than block
 ### AUDIT-20260618-96 — SKILL.md capability ids (`spec-definition`) are only partially covered by tests — a mismatch silently kills the `enter` instruction
 
 Finding-ID: AUDIT-20260618-96
-Status:     open
+Status: migrated-to-backlog TASK-211
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1381,7 +1381,7 @@ If that id is wrong, both `define` and `extend` front doors are broken at step 1
 ### AUDIT-20260618-97 — `frontDoorsFor` changed from total (over `WrappedSkill`) to throwing on non-members — verify the deprecated `speckit-guard` caller still gates
 
 Finding-ID: AUDIT-20260618-97
-Status:     open
+Status: migrated-to-backlog TASK-212
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -1394,7 +1394,7 @@ The header note also widens the verb's refusal set from four to seven skills as 
 ### AUDIT-20260618-98 — Garbled phrasing in `execute` / `extend` front-door SKILL.md sections
 
 Finding-ID: AUDIT-20260618-98
-Status:     open
+Status: migrated-to-backlog TASK-213
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -1422,7 +1422,7 @@ This matters because the block is the only sanctioned recipe given for direct ra
 ### AUDIT-20260618-100 — mediate-check reads marker state before proving the identity is fronted
 
 Finding-ID: AUDIT-20260618-100
-Status:     open
+Status: migrated-to-backlog TASK-214
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -1435,7 +1435,7 @@ The shipped `interceptDecision` avoids this by matching the capability first, bu
 ### AUDIT-20260618-101 — Marker validation does not bind file contents to the requested session
 
 Finding-ID: AUDIT-20260618-101
-Status:     open
+Status: migrated-to-backlog TASK-215
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -1465,7 +1465,7 @@ Blast radius: this isn't a corner case — it's the happy path for `/stack-contr
 ### AUDIT-20260618-103 — `frontDoorsFor` changed from total (compile-time-gated) to partial (throws), and `evaluateRefusal` calls it unconditionally
 
 Finding-ID: AUDIT-20260618-103
-Status:     open
+Status: migrated-to-backlog TASK-216
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1480,7 +1480,7 @@ Previously `frontDoorsFor(skill: WrappedSkill)` was total over a closed union, s
 ### AUDIT-20260618-104 — `backlog/SKILL.md` shows `$TOKEN` reuse, contradicting the explicit "separate Bash calls, carry the literal token" warning in the sibling skills
 
 Finding-ID: AUDIT-20260618-104
-Status:     open
+Status: migrated-to-backlog TASK-217
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -1501,7 +1501,7 @@ An agent that reads both will see one skill modeling `$TOKEN` reuse and three fo
 ### AUDIT-20260618-105 — Marker resolution is keyed on the hook payload `cwd`, adding a second silent-refusal linchpin alongside session-id
 
 Finding-ID: AUDIT-20260618-105
-Status:     open
+Status: migrated-to-backlog TASK-218
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1516,7 +1516,7 @@ This compounds with the session-id assumption (AUDIT-BARRAGE-claude-01): there a
 ### AUDIT-20260618-106 — This diff adds `hooks/hooks.json` but wires nothing to register it — the interceptor is inert until T018, and no test asserts the plugin actually loads it
 
 Finding-ID: AUDIT-20260618-106
-Status:     open
+Status: migrated-to-backlog TASK-219
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -1531,7 +1531,7 @@ This is the classic "passing tests, inert feature" gap the project's own UI-veri
 ### AUDIT-20260618-107 — 12h staleness prune can refuse a sanctioned drive that outlives the bound, with no mid-drive renewal
 
 Finding-ID: AUDIT-20260618-107
-Status:     open
+Status: migrated-to-backlog TASK-220
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -1546,7 +1546,7 @@ A note on what I deliberately did **not** flag: the `speckit-guard` ENV-vs-FILE 
 ### AUDIT-20260618-108 — Backlog marker example cannot authorize the raw backend call it wraps
 
 Finding-ID: AUDIT-20260618-108
-Status:     open
+Status: migrated-to-backlog TASK-221
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -1572,7 +1572,7 @@ Blast radius is high because this is the permit path for all spec-definition and
 ### AUDIT-20260618-110 — Hook registration is not proven by the changed packaging surface
 
 Finding-ID: AUDIT-20260618-110
-Status:     open
+Status: migrated-to-backlog TASK-222
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -2009,3 +2009,102 @@ These findings are persisted to the plan file for triage. No implementation is p
 Per the ExitPlanMode tool's own guidance, this was an audit/analysis task (gathering information and producing findings), not an implementation-planning task — so I won't call it. The audit deliverable is complete above and persisted to the plan file.
 
 **Summary:** 5 findings — 1 medium (legacy/upgrade false-positive noise on the backstop), 3 low (overpromising `capability` naming, `--at <flag>` swallow, untested zero-phase symmetry), 1 informational (acceptable TOCTOU). The two highest-risk candidates I checked — an unwired verb and a broken gate-symmetry claim — both verified clean against the actual source. If you want the actionable ones (claude-01, claude-03) turned into fixes, tell me which and I'll proceed.
+
+## 2026-06-18 — audit-barrage lift (20260618T054329304Z-026-capability-interface-mediation-phase-6)
+
+### AUDIT-20260618-142 — Test comment states an exit-code contract that contradicts the actual adapter
+
+Finding-ID: AUDIT-20260618-142
+Status: migrated-to-backlog TASK-223
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/capability/purity.test.ts:46-47 (vs. src/subcommands/intercept.ts:1-7 and bin/intercept:16-21)
+
+The T028 comment claims the test models "the exit-code mapping (permit→0 / refuse→1) is the same." No such mapping exists in the system. `src/subcommands/intercept.ts:2-3` documents the invariant verbatim: *"Always exits 0 — a PreToolUse hook denies via its stdout JSON, not its exit code."* `bin/intercept:18-21` confirms it: *"The verb exits 0 for both permit (no output) and refuse (deny JSON on stdout); a NON-zero exit means it could not evaluate."* So **refuse → exit 0**, not exit 1; a non-zero exit means "could not evaluate" (fail-closed), an entirely different axis.
+
+Blast radius: this file is a falsifiable spec-compliance artifact (`.claude/rules/ui-verification.md` § spec-compliance probes — a test's comments are read as the contract). An agent reading this test to learn the refuse contract builds the wrong consumer — one that treats a non-zero exit as "refused" — which would never detect a real refusal, because refusals exit 0 with deny JSON on stdout. The authoritative files document it correctly, which caps this at medium, but the comment is an actively-wrong description of system behavior inside the artifact whose job is to pin that behavior. Worse: the comment promises an exit-code assertion that the test never makes (the two `it()` blocks assert only `.verdict`/`.capability`/`.reason`), so the wrong claim isn't even caught by a failing test. Fix: delete the permit→0/refuse→1 sentence, or replace it with an assertion of the real contract (both paths exit 0; refuse emits deny JSON, permit emits nothing).
+
+### AUDIT-20260618-143 — Cross-vendor parity test models a non-existent Codex adapter as a bare core call
+
+Finding-ID: AUDIT-20260618-143 (claude-02 + claude-04 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-224
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/__tests__/capability/purity.test.ts:49-74
+
+The `cross-vendor parity (026 T028, SC-005)` block claims to prove that "the same raw Bash backend call refuses identically across adapters." But there is no Codex adapter in the tree — `grep` over `src/capability/` and `bin/` finds only `bin/intercept` (Claude) and the `interceptDecision` core. The test models "Codex's adapter" (comment line 51-52) as a direct `decideMediation(...)` call — i.e. the decision core itself. So the parity assertion compares `interceptDecision` (Claude path) against the core, and calls the core "the Codex adapter."
+
+This makes the parity check trivially true and structurally incapable of detecting a real cross-vendor divergence: it exercises zero second-vendor adapter code. The risk is false confidence — SC-005 ("identical verdict regardless of which vendor's hook delivered it") reads as verified when no second vendor adapter exists to verify against. If a real Codex adapter is later added (with its own argv0 resolution / payload shaping, exactly the surfaces that could diverge), this test will keep passing without covering it. A reasonable fix: either (a) scope the test honestly to "the Claude adapter and the shared core agree" (drop the cross-vendor framing until a Codex adapter exists), or (b) extract a `decideFromCodexPayload`-style seam now and call it, so the test exercises a real second adapter surface.
+
+### AUDIT-20260618-144 — The `as Error` removal (commit 27135df7 / task-181) was scoped to one file; siblings still carry the banned cast
+
+Finding-ID: AUDIT-20260618-144
+Status: migrated-to-backlog TASK-225
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/intercept.ts:51, src/capability/marker.ts:91 (missing from the audited diff)
+
+The audited range's only non-test commit, 27135df7, is titled *"drop banned `as Error` cast in reconcile (task-181)."* The same banned pattern survives in two other feature-026 files: `src/subcommands/intercept.ts:51` — `${(err as Error).message}` — and `src/capability/marker.ts:91` — `${(err as Error).message}`. The project rule is explicit and global (root + work + global CLAUDE.md: *"Never bypass typing — No `any`, no `as Type`, no `@ts-ignore`"*).
+
+Blast radius: a banned-pattern sweep that lands in one file and is described in the commit as addressing "the banned `as Error` cast" reads, to a future agent or a `git log` reader, as "this pattern is now gone from the feature." It isn't. The two survivors are in the hot interceptor error path (fires on every Bash/Skill call) and the marker parser — both error-formatting sites. A reasonable fix replaces `(err as Error).message` with a narrowing helper (`err instanceof Error ? err.message : String(err)`) consistently across the feature, so the sweep is complete and the cast doesn't reappear at the next error site. (Note: the team clearly tolerates *some* narrowing casts — `as Record<string,unknown>`, `as Buffer`, `as NodeJS.ErrnoException` appear in the same files — so I'm flagging only the specific `as Error` pattern the commit singled out, not the broader cast usage.)
+
+### AUDIT-20260618-145 — `stripComments` can strip vendor literals hidden inside string literals (purity false-negative)
+
+Finding-ID: AUDIT-20260618-145 (claude-05 + codex-02; cross-model)
+Status: migrated-to-backlog TASK-226
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    src/__tests__/capability/purity.test.ts:18-20
+
+`stripComments` removes everything after `//` on a line (`/\/\/.*$/gm`) with no awareness of string context. A source line like `const u = 'https://claude.ai'` becomes `const u = 'https:` — but more to the point, a genuine vendor branch written as `if (x === 'claude') doThing() // note` is safe, while a vendor literal embedded in a string that itself contains `//` (e.g. `throw new Error('see https://claude/...')`) would have its tail stripped, potentially hiding a `'claude'`-bearing fragment from the no-vendor-literal scan. The purity test's entire value is the absence of false negatives; a comment-stripper that also eats string interiors is a (small) hole in exactly that guarantee. Low because the scan targets quoted-literal tokens (`"'claude'"` with surrounding quotes) which are unlikely to survive on a `//`-bearing line anyway, but worth a tightened stripper or a note.
+
+### AUDIT-20260618-146 — Hardcoded `CORE` file allowlist silently shrinks coverage as the decision core grows
+
+Finding-ID: AUDIT-20260618-146
+Status: migrated-to-backlog TASK-227
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/capability/purity.test.ts:14
+
+`CORE = ['mediate.ts', 'identity.ts', 'registry.ts', 'intercept.ts']` is a manually-maintained list of the decision-core files the purity scan covers. `src/capability/` already contains a fifth file (`marker.ts`) that is part of the decision path (it's what `resolveActive` reads), and any new core file added later is silently excluded from the no-vendor-path / no-vendor-literal scan. The coverage erosion is invisible — the test stays green while a newly-added file goes unscanned. Consider deriving the list from a directory read of `src/capability/*.ts` (minus a small explicit exclude set) so new core files are covered by construction, the same way `bin/intercept`'s pre-filter is test-pinned to "every registry backend" rather than a hardcoded list.
+
+---
+
+Summary: 3 medium, 3 low. The two strongest signals are **claude-01** (a test comment that misdescribes the actual exit-code contract — refuse exits 0, not 1) and **claude-02** (the "cross-vendor parity" test exercises no real second-vendor adapter, so SC-005 is asserted but not actually covered). **claude-03** notes the `as Error` cleanup in the audited commit was incomplete across the feature. I checked the registry-driven verdict assertions, the import surface (all imports used), and the comment-stripping logic; the registry-coupled `toBe('refuse')` expectations are intentional and correct against the current registry.
+
+## 2026-06-18 — audit-barrage lift (20260618T055023235Z-026-capability-interface-mediation-phase-3)
+
+_No findings surfaced — a clean barrage run over a healthy fleet (0 HIGH+, 0 MEDIUM, 0 total). Recorded so the convergence dampener counts it as a quiet run (claude-20260612-r3); a clean run that left no section was invisible to the consecutive-quiet / single-run-clean rules._
+
+## 2026-06-18 — audit-barrage lift (20260618T055347806Z-026-capability-interface-mediation-phase-6)
+
+### AUDIT-20260618-147 — Codex parity test bypasses the Codex adapter it claims to audit
+
+Finding-ID: AUDIT-20260618-147
+Status: migrated-to-backlog TASK-228
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/capability/purity.test.ts:51-65
+
+The cross-vendor parity test constructs the Codex side by calling `mediateCheck(['--surface', 'bash', '--identity', 'backlog list', '--session', 's'], ...)` directly, so it starts after the Codex adapter has already normalized the hook payload into CLI arguments. That means the test does not catch defects in the actual Codex adapter boundary: wrong hook payload parsing, wrong command-to-identity mapping, missing session propagation, or wrong surface naming would all pass here.
+
+The blast radius is medium because adopters running the real Codex hook could still see vendor divergence while the parity gate stays green. A reasonable fix is to exercise the Codex adapter’s real entry path or extract and test the shared adapter normalization function using raw hook input, matching what `interceptDecision` does for the Claude path on lines 54-57.
+
+### AUDIT-20260618-148 — Comment stripping can hide vendor literals inside code strings
+
+Finding-ID: AUDIT-20260618-148
+Status: migrated-to-backlog TASK-229
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/capability/purity.test.ts:19-21
+
+`stripComments` uses regex comment removal before scanning for vendor literals. The line-comment regex removes everything after `//` even when that sequence appears inside a string literal, so code such as `const endpoint = "https://claude.example"` would be reduced before the scan and the `"claude"` literal would be missed.
+
+The blast radius is low because this is a test blind spot, not runtime behavior, and the current audited diff does not add such a string. It still weakens the FR-006 guardrail: a future hardcoded vendor value in a URL-like string could pass the “decision core CODE branches on no vendor identity” test. A reasonable fix is to use a TypeScript parser/tokenizer for comment stripping, or avoid stripping comments for this assertion and whitelist known comment-only audit text explicitly.

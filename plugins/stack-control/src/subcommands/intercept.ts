@@ -48,7 +48,7 @@ export async function runIntercept(_args: string[]): Promise<void> {
   } catch (err) {
     process.stdout.write(
       denyOutput(
-        `stack-control mediation could not be evaluated (${(err as Error).message}) — failing closed. Use the capability front door (/stack-control:*).`,
+        `stack-control mediation could not be evaluated (${err instanceof Error ? err.message : String(err)}) — failing closed. Use the capability front door (/stack-control:*).`,
       ),
     );
     return;

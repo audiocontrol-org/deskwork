@@ -65,7 +65,7 @@ export function mediateCheck(args: readonly string[], deps: MediateCheckDeps): M
   // Prove the identity is a fronted backend BEFORE resolving the marker (codex — symmetry
   // with the interceptor): a non-backend permits without reading marker state, so a
   // malformed marker can't false-deny an unrelated command.
-  const surfaceTyped = surface as Surface;
+  const surfaceTyped: Surface = surface; // narrowed to 'bash'|'skill' by the guard above — no cast
   const active =
     matchCapability(CAPABILITY_REGISTRY, surfaceTyped, identity) === null
       ? new Set<string>()

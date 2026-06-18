@@ -1,0 +1,20 @@
+---
+id: TASK-205
+title: >-
+  AUDIT-20260618-86 — Editing-residue grammar in shipped agent-facing SKILL.md
+  blocks
+status: To Do
+assignee: []
+created_date: '2026-06-18 05:53'
+labels:
+  - 'type:migrated-finding'
+  - 'feature:026-capability-interface-mediation'
+  - 'finding:AUDIT-20260618-86'
+dependencies: []
+references:
+  - 'audit:026-capability-interface-mediation:AUDIT-20260618-86'
+priority: medium
+ordinal: 205000
+---
+
+

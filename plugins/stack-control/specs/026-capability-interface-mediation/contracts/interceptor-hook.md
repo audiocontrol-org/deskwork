@@ -50,6 +50,27 @@
 - On `deny`, `permissionDecisionReason` is the registry-sourced redirect (e.g. *"Direct `speckit-implement` is refused — drive it through `/stack-control:execute`."*). The agent sees the reason and can re-route.
 - The adapter contains **no decision logic** (Principle III) — it only marshals the payload and maps the verb's verdict.
 
-## Codex adapter (sequenced — D8)
+## Codex adapter (US4 / T027 — Bash-only, D8)
 
-Same `stackctl mediate-check` core. Codex PreToolUse is **Bash-only**, so the Codex adapter covers `cliArgv0` surfaces (`backlog`); `spec-*` skill surfaces on Codex rely on the Approach C backstop. Built as the US4 follow-on; not v1-blocking.
+The Codex adapter is a thin shell over the SAME vendor-neutral core — it contains no
+decision logic (Principle III; proven by the T026 purity test: the core branches on
+capability/identity only). It is **Bash-only** (research D8: Codex's PreToolUse equivalent
+intercepts Bash, not a Skill tool), so it covers the `cliArgv0` surfaces (`backlog`); the
+`spec-*` SKILL surfaces on Codex rely on the Approach C / US3 graduate-gate backstop.
+
+**Adapter contract** (the part that is vendor-neutral and pinned now):
+
+1. On a Codex Bash PreToolUse event, extract the command string, the session id, and cwd.
+2. Invoke `stackctl mediate-check --surface bash --identity "<command>" --session "<id>" --at "<cwd>" --json`.
+3. Map the verdict: exit 0 (permit) → allow; exit 1 (refuse) → block the call, surfacing the
+   registry-sourced redirect (`reason`/stderr) to the agent; exit 2 (usage) → fail loud, do
+   NOT silently permit a matched backend (mirrors the Claude adapter's fail-closed posture).
+
+Parity with the Claude adapter for the same raw Bash call is guaranteed because both call
+the same verb (asserted by the T028 cross-vendor parity test, SC-005).
+
+**Confirmed at Codex integration (live gate, like Claude's T018)**: the concrete Codex
+PreToolUse hook-registration config (its file format + the exact payload field carrying the
+command + its block-output schema) is intentionally NOT invented here — Codex's hook schema
+is "less-defined" (D8) and must be quoted from Codex's own docs at wiring time, not guessed.
+The vendor-neutral verb above is the stable contract the Codex shim binds to.
