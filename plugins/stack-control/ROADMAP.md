@@ -448,3 +448,9 @@ codex lane trips killed-no-liveness on real payloads; emit reasoning summaries (
 - ref: TASK-153
 025 upgrade: pre-025 / in-flight features with no per-phase checkpoints become un-graduatable when all-phase-checkpoints-current lands; no backfill/grandfather/migration. Detail: TASK-153.
 
+## design:gap/skill-surface-mediation
+- status: planned
+- part-of: design:feature/capability-interface-mediation
+- ref: TASK-241
+Live T018 validation of 026 in installed release 0.51.0 found the PreToolUse 'Skill' matcher is INERT: Claude Code does not fire PreToolUse for skill invocations, so a raw speckit-* reach-around launches un-denied. (Bash-surface mediation, session-id bridge, SC-003 no-false-positive, and the US3 graduate-gate backstop are all verified working live; see TASK-241.) Operator decision 2026-06-18: build the real skill-invocation gate before closing 026. SPIKE FIRST: authoritative hooks docs confirm UserPromptExpansion (matcher = command name; blocks via exit 2 or a decision:block JSON) is the dedicated command-expansion gate, while PreToolUse docs claim it gates a skill 'implemented as a tool' — contradicting the observed live non-fire. Open question the spike must resolve: does UserPromptExpansion (or any event) fire for AGENT-initiated Skill-tool invocations (the actual threat: agent reach-around), or only USER-typed slash commands? Transcript shows agent skill calls recorded under tool name 'Skill'. Then implement the gate TDD-first (a test exercising a live-style raw speckit-* refusal), reconcile/replace the inert hooks.json 'Skill' matcher, and correct the PR-body overclaim. 026 stays in-flight until this ships.
+
