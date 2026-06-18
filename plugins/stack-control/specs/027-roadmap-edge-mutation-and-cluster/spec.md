@@ -12,6 +12,14 @@
 
 An adopting agent (the `offing` project, session `d98fc4fe`, 2026-06-18) was asked to *"group the cluster… change-runbook → env-promotion → behavior-validation."* It could neither discover how to mutate the roadmap (ran `roadmap --help` → error; probed a bogus status "to surface the vocabulary"; tested verbs to infer behavior; read the doc grammar by hand) nor perform the clustering through any verb — so it **hand-edited the governed `ROADMAP.md`**, contradicting that file's own *"do not hand-edit"* header. This feature makes roadmap mutation both **possible** and **obvious**, with `roadmap` as the first adopter of a stackctl-wide self-documenting convention. Scope was set with the operator (design forks 1–5): discoverability-first; stackctl-wide help convention with roadmap as proof; help derived from a shared parser (non-drift by construction); honest interim header; prove on roadmap and capture the rest.
 
+## Clarifications
+
+### Session 2026-06-18
+
+- Q: Does this feature migrate ONLY roadmap onto the shared parser, or also 1–2 sibling verbs to prove generalization? → A: Roadmap-only; the other ~49 verbs migrate under the captured surface-hygiene sibling. The shared parser is still built as a reusable primitive; roadmap's full adoption + the conformance check are the proof.
+- Q: When cluster targets a child that already has a part-of edge to a DIFFERENT parent, what happens? → A: Allow — add the new part-of alongside the existing one (multi-parent is supported); refuse only on an exact-duplicate edge (already part-of THIS parent).
+- Q: When cluster CREATES a new parent epic, how is its description handled? → A: Optional `--summary`/`--scope` flag; if omitted, the parent is created bare (status planned, no description).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A fresh agent discovers how to drive the roadmap without probing (Priority: P1)
@@ -70,7 +78,7 @@ An agent reading `ROADMAP.md` sees a header that names the mutation verbs that e
 - `cluster` with a `--children` entry that does not exist → refuse with a clear error naming the missing id; no write.
 - `--children` empty or omitted → refuse with usage (a cluster needs children).
 - Parent id equals one of the children → refuse (self-grouping is meaningless).
-- A child already `part-of` a different parent → captured for clarification (refuse vs allow multi-parent); see Assumptions.
+- A child already `part-of` a different parent → ALLOW (add the new edge; multi-parent supported); refuse/no-op only on an exact-duplicate edge (FR-009).
 - `--chain` ordering that would introduce a cycle → refuse; file unchanged.
 - `roadmap <unknown-subaction>` and `roadmap <sub> --unknown-flag` → error names the offending token AND points at `--help`; exit code distinguishes usage error from operational failure.
 - A verb that has not yet adopted the shared parser → still dispatches and behaves exactly as before (incremental adoption must not regress un-migrated verbs).
@@ -92,8 +100,8 @@ An agent reading `ROADMAP.md` sees a header that names the mutation verbs that e
 **Cluster convenience**
 
 - **FR-007**: The system MUST provide a `roadmap cluster <parent-id> --children <id,...> [--chain] [--apply]` subaction (with `group` as an alias) that operates on EXISTING child nodes.
-- **FR-008**: `cluster` MUST create-or-reuse the parent: create it (status `planned`) if absent, group under it if present; never duplicate it.
-- **FR-009**: `cluster` MUST attach `part-of: <parent>` to each named existing child.
+- **FR-008**: `cluster` MUST create-or-reuse the parent: create it (status `planned`) if absent, group under it if present; never duplicate it. When creating a new parent, `cluster` MUST accept an optional `--summary`/`--scope` for the parent's description and, if omitted, create the parent bare (no description). (Clarification 2026-06-18.)
+- **FR-009**: `cluster` MUST attach `part-of: <parent>` to each named existing child. A child that already carries a `part-of` edge to a DIFFERENT parent MUST gain the new edge alongside it (multi-parent is allowed); only an exact-duplicate edge (already `part-of` THIS parent) is refused/no-op. (Clarification 2026-06-18.)
 - **FR-010**: With `--chain`, `cluster` MUST wire `depends-on` edges among the children in the given argument order.
 - **FR-011**: `cluster` MUST be dry-run by default and write only with `--apply`; a dry-run reports the intended mutation and writes nothing.
 - **FR-012**: `cluster` MUST revalidate the whole graph and REFUSE any mutation that introduces a cycle, dangling edge, self-edge, or duplicate.
@@ -129,9 +137,9 @@ An agent reading `ROADMAP.md` sees a header that names the mutation verbs that e
 
 ## Assumptions
 
-- **Scope boundary — roadmap-only proof**: This feature migrates ONLY `roadmap` onto the shared parser (the other ~49 verbs adopt it later, under the captured surface-hygiene sibling). Whether to opportunistically migrate 1–2 additional simple verbs to demonstrate the primitive generalizes is left to `/speckit-clarify` / `/speckit-plan`; the default here is roadmap-only (matches design fork 5, "prove on roadmap, capture rest").
+- **Scope boundary — roadmap-only proof** (settled, Clarification 2026-06-18): This feature migrates ONLY `roadmap` onto the shared parser; the other ~49 verbs adopt it later under the captured surface-hygiene sibling. The shared parser is still built as a reusable primitive — roadmap's full adoption plus the conformance check are the generalization proof.
 - **Atomicity mechanism**: FR-013's atomicity is a requirement, not a mechanism. Whether `cluster` reuses the existing roadmap mutation/write path (`src/roadmap/mutations.ts`) or introduces a small transactional buffer→validate→commit helper is a planning-phase (`/speckit-plan`) decision, not a spec concern.
-- **Multi-parent children**: `part-of` already supports a node belonging to multiple parents (per the roadmap protocol). The default is that `cluster` ADDS a `part-of` edge to a child that already has one elsewhere (multi-parent allowed), refusing only on exact-duplicate edges; to be confirmed in clarify.
+- **Multi-parent children** (settled, Clarification 2026-06-18): `cluster` ADDS a `part-of` edge to a child that already belongs to a different parent (multi-parent allowed, per the roadmap protocol); only an exact-duplicate edge is refused/no-op (FR-009).
 - **One-branch program**: Authoring runs on the single long-lived `feature/stack-control` branch with numbered spec dirs; the Spec Kit `before_specify` git-feature (branch creation) hook is intentionally not used here (consistent with specs 024–026 and the `/stack-control:define` resolve-via-marker note).
 - **Existing validation reused**: The loader's read-side graph validation (`roadmap order`) is the safety net `cluster` revalidates through; this feature does not re-implement graph validation.
 - **Governance**: Implementation is governed per-phase via the `after_implement` deskwork-governance hook (cross-model audit-barrage), per the standing workflow protocol.
