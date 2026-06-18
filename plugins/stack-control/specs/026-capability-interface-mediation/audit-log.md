@@ -1944,3 +1944,68 @@ Blast-radius: none on the code — this is a heads-up that the audit-log provena
 ---
 
 These five are what I'd stand behind. I specifically checked and found **clean**: the flag parser (`--at` missing-value and unknown-flag both correctly exit 2, tested), the `existsSync(specsDir)` empty-install short-circuit, the deterministic `readdirSync().sort()`, the `isDirectorySafe` swallow-on-broken-symlink (correct for a report-only scan), and the report-only/no-mutation contract (verified by the `existsSync(phase-checkpoints) === false` assertion). The `gate-eval.ts` change is comment-only and its claims align with the reconciler's behavior. I did **not** flag the relative `../…js` imports vs. the global `@/` rule, because the sibling new test file and the NodeNext `.js` extensions indicate this package's actual convention is relative ESM imports — matching surrounding code is correct here.
+
+## 2026-06-18 — audit-barrage lift (20260618T053541645Z-026-capability-interface-mediation-phase-5)
+
+### AUDIT-20260618-137 — "no governable phases" + missing-checkpoint flag fires on legacy/design-only specs (upgrade noise)
+
+Finding-ID: AUDIT-20260618-137
+Status: migrated-to-backlog TASK-186
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/capability-reconcile.ts:48-66
+
+`reconcileCapabilities` flags any `specs/<feature>` with zero phases (`no governable phases`) or any phase lacking a current checkpoint. On a real installation this also catches features predating the checkpoint system (upgrade: every phase reads `missing`) and intentionally non-phased/design-only specs — both reported as "un-governed backend state (would not graduate)", i.e. *bypass residue*, when no bypass occurred. Blast radius is bounded (report-only, exit 0), but a backstop that cries wolf on every legacy/design spec trains the operator to ignore it, eroding the exact US3 signal. The prior `claude-01/codex-01` disposition (flag zero-phases so the report doesn't read falsely clean) is respected; the new angle is the unbounded upgrade/legacy false-positive volume. Fix: distinguish "phases present but un-checkpointed" (true residue) from "never had governable phases" (legacy/design).
+
+### AUDIT-20260618-138 — Generic `capability` field hardcoded to the single value `spec-execution`
+
+Finding-ID: AUDIT-20260618-138
+Status: migrated-to-backlog TASK-187
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/capability-reconcile.ts:18-23,44-58; src/workflow/gate-eval.ts:152-157
+
+`ReconcileFinding.capability` is `string`, the function is `reconcileCapabilities` (plural), and the gate-eval note frames this as "the per-capability harmless-bypass backstop" — but every finding hardcodes `capability: 'spec-execution'` and the scan only inspects `specs/*/tasks.md`. The generic naming overpromises a per-capability registry that doesn't exist. No wrong behavior today; the risk is a maintainer relying on coverage that isn't there. Narrow the names to `reconcileSpecExecution`, or make capability a real dimension.
+
+### AUDIT-20260618-139 — `--at` consumes a following flag as its value instead of rejecting it
+
+Finding-ID: AUDIT-20260618-139 (claude-03 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-188
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    src/subcommands/capability-reconcile.ts:108-118
+
+`reconcileVerb(['--at','--json'])` only checks `value === undefined`, so it takes `--json` as the path, resolves install root `--json` → not-found → empty report, exit 0 — silently swallowing `--json` and emitting a false "all clean". Tests cover `--at` with no value and unknown flags, but not `--at <flag>`. Fix: reject an `--at` value beginning with `--`.
+
+### AUDIT-20260618-140 — Gate-symmetry asserted for all three branches but tested only for phased-missing
+
+Finding-ID: AUDIT-20260618-140
+Status: migrated-to-backlog TASK-189
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/subcommands/capability-reconcile.test.ts:90-104 vs capability-reconcile.ts:39-46
+
+The module claims the report-only half "must agree with the gate" for all three branches (missing/stale, `no governable phases`, `unreadable`). T024 only pins the phased-missing branch (`composeConvergedImpl === false`). The zero-phase branch's gate-agreement is prose-only. I verified it holds today (`compose-convergence.ts:51-53` returns `met:false`, not a throw), so this is a coverage gap, not a live defect — but a future change to zero-phase handling could silently break the backstop's central claim with no failing test.
+
+### AUDIT-20260618-141 — TOCTOU between `readdirSync`/`statSync`/`existsSync` (acceptable, noted)
+
+Finding-ID: AUDIT-20260618-141
+Status: migrated-to-backlog TASK-190
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/subcommands/capability-reconcile.ts:36-44,48-52
+
+readdir → isDirectorySafe → existsSync → readFileSync has a window where a vanished entry would throw, but that throw is caught per-feature and degraded to one `unreadable` finding (lines 68-72) rather than aborting the scan. Correct defensive behavior for a report-only scan; flagged as context only.
+
+---
+
+These findings are persisted to the plan file for triage. No implementation is proposed — this is an audit deliverable. If you want me to turn any of these into fixes (claude-01 and claude-03 are the actionable ones), let me know which and I'll plan that work.
+
+Per the ExitPlanMode tool's own guidance, this was an audit/analysis task (gathering information and producing findings), not an implementation-planning task — so I won't call it. The audit deliverable is complete above and persisted to the plan file.
+
+**Summary:** 5 findings — 1 medium (legacy/upgrade false-positive noise on the backstop), 3 low (overpromising `capability` naming, `--at <flag>` swallow, untested zero-phase symmetry), 1 informational (acceptable TOCTOU). The two highest-risk candidates I checked — an unwired verb and a broken gate-symmetry claim — both verified clean against the actual source. If you want the actionable ones (claude-01, claude-03) turned into fixes, tell me which and I'll proceed.

@@ -4,8 +4,8 @@
   "phaseId": "5",
   "checkpoint": "phase-5",
   "auditLogSection": "phase-5",
-  "scopeFingerprint": "4415261c9e17936e44adf85834c15e46f7bbd1099cb1ec75877e0b42830d827c",
-  "passedAt": "2026-06-18T05:33:03.768Z",
+  "scopeFingerprint": "9df275cb1eb1f965f00b6374d0fc991482f63b22232ba7d266f9478fa0f1b3c9",
+  "passedAt": "2026-06-18T05:39:56.328Z",
   "governedPaths": [
     "src/__tests__/subcommands/capability-reconcile.test.ts",
     "src/subcommands/capability-reconcile.ts",
@@ -13,6 +13,8 @@
     "src/workflow/gate-eval.ts"
   ],
   "auditedFiles": [
+    "plugins/stack-control/src/__tests__/subcommands/capability-reconcile.test.ts",
+    "plugins/stack-control/src/subcommands/capability-reconcile.ts",
     "plugins/stack-control/src/workflow/gate-eval.ts"
   ]
 }

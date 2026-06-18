@@ -66,7 +66,8 @@ export function reconcileCapabilities(installRoot: string): ReconcileFinding[] {
       }
     } catch (err) {
       // A malformed phase set in ONE feature is reported, not fatal to the scan (claude-02).
-      findings.push({ capability: 'spec-execution', evidence: entry, phases: [], reason: `unreadable: ${(err as Error).message}` });
+      const detail = err instanceof Error ? err.message : String(err); // no `as` (project rule)
+      findings.push({ capability: 'spec-execution', evidence: entry, phases: [], reason: `unreadable: ${detail}` });
     }
   }
   return findings;
