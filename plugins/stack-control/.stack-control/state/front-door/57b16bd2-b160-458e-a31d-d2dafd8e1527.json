@@ -1,4 +1,10 @@
 {
   "sessionId": "57b16bd2-b160-458e-a31d-d2dafd8e1527",
-  "active": []
+  "active": [
+    {
+      "capability": "spec-definition",
+      "token": "7ecb96ad-0f0c-4cfb-94d2-d1d3a390ed55",
+      "writtenAt": "2026-06-18T22:02:58.918Z"
+    }
+  ]
 }
