@@ -449,6 +449,7 @@ SPIKE RESOLVED 2026-06-18 (live, this branch) — last session's 'PreToolUse Ski
 
 ## impl:gap/roadmap-edge-mutation-and-cluster
 - status: planned
+- design: docs/superpowers/specs/2026-06-18-roadmap-edge-mutation-and-cluster-design.md
 - depends-on: design:feature/roadmap-protocol
 - part-of: multi:feature/lifecycle-industrialization
 - ref: TASK-242
