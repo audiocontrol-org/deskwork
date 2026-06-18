@@ -2,21 +2,55 @@
 
 ---
 
-## 2026-06-18: <!-- session title -->
+## 2026-06-18: Skill-surface-mediation spike overturns the "inert hook" diagnosis — one-field fix, 026 graduated
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up the next item from last session's log (`design:gap/skill-surface-mediation`),
+run the spike it called for, and — if resolvable — fix it, verify live, and close out 026.
 
 **Accomplished:**
-- <!-- compose -->
+- **Ran the spike empirically (live, this session) and overturned last session's diagnosis.**
+  Instrumented the loaded plugin hook, ran a Bash positive control, invoked a skill via the
+  `Skill` tool, and observed `tool_name":"Skill","tool_input":{"skill":"feature-help"}`.
+  PreToolUse DOES fire for agent-initiated Skill calls — it was never "inert." The real bug:
+  the interceptor read `tool_input.skill_name` while the live field is `tool_input.skill`, so
+  every Skill payload extracted an empty identity and silently permitted the reach-around.
+- **Fixed it TDD-first** (commit `5f88b40e`): RED regression with the real `{skill:...}` shape;
+  `intercept.ts` reads `input.skill`; corrected the falsified field in research.md/tasks.md/
+  contracts; wrote `skill-surface-spike-research.md`. Full suite **1862 → 1863 GREEN** (+1 test).
+- **PR #485 opened + merged to `main`** (merge `772294c8`). Operator released **0.51.1**
+  carrying the fix.
+- **Live re-validation PASSED in installed 0.51.1:** raw `/speckit-implement` via the Skill
+  tool → DENIED (spec-execution redirect); `/speckit-analyze` → DENIED (spec-definition);
+  benign `/feature-help` → PERMITTED (SC-003 no-false-positive). Full live chain verified.
+- **Closure bookkeeping via governed verbs:** `design:gap/skill-surface-mediation` → shipped;
+  TASK-241 → Done via `roadmap close-related` (023 terminal closure on the `ref:` edge);
+  `design:feature/capability-interface-mediation` (026) → shipped (its only closure blocker
+  resolved + live-verified).
 
 **Didn't Work:**
-- <!-- compose -->
+- **Last session's diagnosis was wrong**, and it cost real work — a roadmap node premised on
+  "the matcher is inert, find a new event (UserPromptExpansion)." The actual defect was a
+  one-field typo. Last session's intercept tests used `skill_name` on *both* sides, so they
+  passed green while the live surface permitted everything.
+- **`gh pr merge --auto --merge` merged #485 immediately while CI `test` was still pending** —
+  branch protection doesn't gate on that check. Relied on the local full-suite-green instead;
+  flagged honestly to the operator.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Operator chose to do the fix **inline** (small, well-scoped) rather than route it
+  through a separate implementation session.
+- [PROCESS] **Distrusted the docs answer** (claude-code-guide's, and the prior spike's
+  docs-derived field name) and settled the question **empirically** by instrumenting the live
+  hook — the project rule applies: when docs contradict observation, observe.
 
 **Insights:**
-- <!-- compose -->
+- This is the textbook "**tested against the implementation's own assumption, not the real
+  contract**" blind spot. Green unit tests AND cross-model audit-barrage both missed it; the
+  **live install caught it** — exactly what the verify-in-a-formally-installed-release rule
+  exists for. The two are complementary, not redundant.
+- A **denied PreToolUse Skill call does not execute the skill** (confirmed: speckit-analyze /
+  speckit-implement never ran — I got the refusal, not the body). That is what makes the
+  interceptor a real gate, not an advisory.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 3
