@@ -476,3 +476,9 @@ Edge-mutation verbs on EXISTING roadmap nodes: add-edge / remove-edge / move-edg
 - ref: specs/027-roadmap-edge-mutation-and-cluster
 Verb-surface consolidation rollout: migrate the remaining ~50 flat stackctl verbs onto the commander parser surface (as roadmap was in 027) — ~50 flat verbs to ~12-15 nouns, machine-adapter verbs marked internal, backwards-compat aliases for the old names, every verb adopting the self-documenting parser. DEFERRED sibling of specs/027-roadmap-edge-mutation-and-cluster (027 migrated only the roadmap verb as the proof). FR-017.
 
+## multi:gap/govern-per-phase-friction-burndown
+- status: planned
+- part-of: multi:feature/lifecycle-industrialization
+- ref: TASK-289
+Burn down the per-phase governance friction surfaced while implementing 027 — the dominant cost was govern tooling, not the feature code. Headline defects: TASK-289 (O(n^2) shared-file checkpoint staleness — a later phase editing an earlier phase's file re-stales its checkpoint, forcing repeated re-governance and ad-hoc overrides; the structural fix is fingerprinting per-phase HUNKS not whole files, or a govern-at-end mode for shared-file features); the audit-barrage severity NON-DETERMINISM (HIGH oscillated 2->0->2 and LOW->HIGH on identical code, defeating the convergence dampener and forcing overrides on phases 4+6); TASK-263 (per-phase scoping derives the payload from tasks.md backtick paths, so a file split out during implementation — e.g. cluster.ts — is excluded from its own audit, and the no-grounding claude lane then raises FALSE HIGHs it cannot disconfirm). Also fold in the 027 code residuals: TASK-288 (promote the no-grounding claude-lane fix to the shipped default), TASK-290 (test ! hygiene), TASK-291 (roadmap SKILL.md cluster doc), TASK-292 (uniform list-flag stray-comma handling + dead branch), TASK-293 (rewriteEdgeLine fence-awareness). Promoted from the 027 govern dogfood.
+
