@@ -3,9 +3,10 @@ id: TASK-242
 title: >-
   roadmap CLI has no edge-mutation verb for existing nodes — clustering existing
   items forces hand-editing the governed ROADMAP.md (offing dogfood)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-18 14:15'
+updated_date: '2026-06-19 05:01'
 labels:
   - agent-found
   - 'type:gap'
