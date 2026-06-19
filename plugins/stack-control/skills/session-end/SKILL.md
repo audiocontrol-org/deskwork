@@ -28,7 +28,7 @@ orientation** step the agent MAY run the compass against the active item to surf
 **off-rail** condition (e.g. a spec dir authored with no roadmap node) before closing:
 
 ```bash
-plugins/stack-control/bin/stackctl workflow compass <item> --intent session-end
+stackctl workflow compass <item> --intent session-end
 ```
 
 `session-end` is a phase-neutral finishing intent: the verdict is `on-course` on any **pipeline**
@@ -46,7 +46,7 @@ recorded compass warning into the verb is scoped to `multi:feature/unskippable-w
 ## What it does
 
 ```bash
-plugins/stack-control/bin/stackctl session-end \
+stackctl session-end \
   [--at <dir>] [--since <sha>] [--no-push] [--friction "<note>"]... [--json]
 ```
 

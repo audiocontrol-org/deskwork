@@ -25,7 +25,7 @@ directing you to `stackctl setup` (no bundled-copy fallback).
 ## What it reports
 
 ```bash
-plugins/stack-control/bin/stackctl session-start [--at <dir>] [--json]
+stackctl session-start [--at <dir>] [--json]
 ```
 
 1. **Roadmap** — the ready/next frontier and the blocked items (the 006 reasoner

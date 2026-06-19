@@ -28,7 +28,7 @@ Low-friction insight capture is a direct expression of the stack-control thesis 
 Dry-run first is optional for capture — it is a single fail-safe append — but `--apply` is required to write:
 
 ```bash
-plugins/stack-control/bin/stackctl inbox capture "<title>" \
+stackctl inbox capture "<title>" \
   --idea "<the idea>" \
   [--surfaced "<when/where it came up>"] \
   [--context "<background>"] \
@@ -43,10 +43,10 @@ plugins/stack-control/bin/stackctl inbox capture "<title>" \
 
 ```bash
 # Promote — record the graduation target (does NOT create it):
-plugins/stack-control/bin/stackctl inbox promote "<title>" --to "<spec|roadmap-id|issue-ref>" [--doc <path>] --apply
+stackctl inbox promote "<title>" --to "<spec|roadmap-id|issue-ref>" [--doc <path>] --apply
 
 # Drop — record why:
-plugins/stack-control/bin/stackctl inbox drop "<title>" --reason "<why>" [--doc <path>] --apply
+stackctl inbox drop "<title>" --reason "<why>" [--doc <path>] --apply
 ```
 
 - `promote`/`drop` are valid only from a `captured` entry. An absent or already-terminal entry is refused (exit 2, zero write).
@@ -57,7 +57,7 @@ plugins/stack-control/bin/stackctl inbox drop "<title>" --reason "<why>" [--doc 
 ## List
 
 ```bash
-plugins/stack-control/bin/stackctl inbox list [--doc <path>]
+stackctl inbox list [--doc <path>]
 ```
 
 Read-only — prints each entry's identifier + status. Never writes.

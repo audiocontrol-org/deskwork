@@ -14,7 +14,7 @@ surfaces are adapters, not separate release streams.
 **Before doing ANY of this skill's work**, consult the compass for the roadmap item being released, declaring this skill as the intent:
 
 ```bash
-plugins/stack-control/bin/stackctl workflow compass <item> --intent release
+stackctl workflow compass <item> --intent release
 ```
 
 A **non-zero exit is a hard refusal**: print the compass's reason and **STOP — perform none of this skill's work**. `release` maps to the back-half `shipped` target, so an item that has not reached `governing` returns `ahead` (naming the skipped step) — you cannot release un-governed work. Proceed only on exit 0. Per `.claude/rules/enforcement-lives-in-skills.md` the gate lives in this skill body + the `stackctl workflow compass` verb, never a git hook.
@@ -24,17 +24,17 @@ A **non-zero exit is a hard refusal**: print the compass's reason and **STOP —
 Start with the shared-core check:
 
 ```bash
-plugins/stack-control/bin/stackctl release-check
+stackctl release-check
 ```
 
 The portable helper subcommands also live behind `stackctl` now:
 
 ```bash
-plugins/stack-control/bin/stackctl release-helper check-preconditions
-plugins/stack-control/bin/stackctl release-helper validate-version <version> <last-tag>
-plugins/stack-control/bin/stackctl release-helper assert-not-published <version>
-plugins/stack-control/bin/stackctl release-helper assert-published <version>
-plugins/stack-control/bin/stackctl release-helper atomic-push <tag> <branch>
+stackctl release-helper check-preconditions
+stackctl release-helper validate-version <version> <last-tag>
+stackctl release-helper assert-not-published <version>
+stackctl release-helper assert-published <version>
+stackctl release-helper atomic-push <tag> <branch>
 ```
 
 This is the authoritative preflight for portability:

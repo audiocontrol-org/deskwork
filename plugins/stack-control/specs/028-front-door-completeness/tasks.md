@@ -103,26 +103,26 @@ Each family below: RED help-probe test first (asserts `<verb> [sub] --help` exit
 
 ### Verb reference + descriptor artifact (FR-004/052)
 
-- [ ] T038 [US1] RED: assert an auto-generated verb reference lists all 46 verbs + sub-actions + flags by walking the command tree (no hand-maintained list), in `src/__tests__/cli-help/verb-reference.test.ts` (FR-004).
-- [ ] T039 [US1] Implement the verb reference generator in `src/cli-help/verb-reference.ts` (walks `buildCommandSurface()`) and surface it as a reference verb / build emitter (FR-004) — makes T038 GREEN.
-- [ ] T040 [US1] RED: round-trip test asserting `emitDescriptorArtifact()` produces an oclif-manifest-style JSON containing EXACTLY the verbs/sub-actions/flags the live tree exposes (no missing, no extra), in `src/__tests__/cli-help/descriptor-artifact-roundtrip.test.ts` (FR-052; contract C5).
-- [ ] T041 [US1] Implement `emitDescriptorArtifact()` (oclif-manifest shape per contract C4) in `src/cli-help/verb-reference.ts`, derived from the command tree (never authored, FR-041) (FR-052) — makes T040 GREEN.
+- [x] T038 [US1] RED: assert an auto-generated verb reference lists all 46 verbs + sub-actions + flags by walking the command tree (no hand-maintained list), in `src/__tests__/cli-help/verb-reference.test.ts` (FR-004).
+- [x] T039 [US1] Implement the verb reference generator in `src/cli-help/verb-reference.ts` (walks `buildCommandSurface()`) and surface it as a reference verb / build emitter (FR-004) — makes T038 GREEN.
+- [x] T040 [US1] RED: round-trip test asserting `emitDescriptorArtifact()` produces an oclif-manifest-style JSON containing EXACTLY the verbs/sub-actions/flags the live tree exposes (no missing, no extra), in `src/__tests__/cli-help/descriptor-artifact-roundtrip.test.ts` (FR-052; contract C5).
+- [x] T041 [US1] Implement `emitDescriptorArtifact()` (oclif-manifest shape per contract C4) in `src/cli-help/verb-reference.ts`, derived from the command tree (never authored, FR-041) (FR-052) — makes T040 GREEN.
 
 ### SKILL.md accuracy sweep + discovery-output fixes + adopter docs (FR-005/006/007)
 
-- [ ] T042 [P] [US1] RED: assert `skills/roadmap/SKILL.md` documents the `cluster`/`group` sub-actions (the known lag) and that every verb it names exists in the command tree, in `src/__tests__/cli-help/skill-roadmap-accuracy.test.ts` (FR-005).
-- [ ] T043 [US1] Update `skills/roadmap/SKILL.md` to document `cluster`/`group` (FR-005) — makes T042 GREEN.
-- [ ] T044 [P] [US1] RED: assert `skills/backlog/SKILL.md` documents the empty-session guard + token handling residue accurately against the command tree, in `src/__tests__/cli-help/skill-backlog-accuracy.test.ts` (FR-005).
-- [ ] T045 [US1] Update `skills/backlog/SKILL.md` for the empty-session guard + token handling (FR-005) — makes T044 GREEN.
-- [ ] T046 [P] [US1] RED: assert `skills/execute/SKILL.md` and `skills/extend/SKILL.md` carry no stale editing residue and document only verbs/steps the surface exposes, in `src/__tests__/cli-help/skill-execute-extend-accuracy.test.ts` (FR-005).
-- [ ] T047 [US1] Update `skills/execute/SKILL.md` + `skills/extend/SKILL.md` to remove the editing residue (FR-005) — makes T046 GREEN.
-- [ ] T048 [US1] RED: assert `inferChainPosition` does NOT nominate a fully-implemented spec (tasks present + no remaining `/speckit-*` work) as "active" with a bogus next step, in `src/__tests__/session-active-spec-completeness.test.ts` (FR-006).
-- [ ] T049 [US1] Fix the active-spec inference in `src/session/chain-position.ts` so a complete spec is not reported as active-with-next-step (FR-006) — makes T048 GREEN.
-- [ ] T050 [US1] RED: assert `session-start` discovery output quotes no source-repo-only path that would 404 in a host install (every quoted path resolves through the resolved installation), in `src/__tests__/session-discovery-path-portability.test.ts` (FR-006).
-- [ ] T051 [US1] Fix the discovery path rendering in `src/session/report.ts` (and `src/session/orient.ts` if the path originates there) so quoted paths are installation-resolved, not source-repo-absolute (FR-006) — makes T050 GREEN.
-- [ ] T052 [P] [US1] RED: assert every `/stack-control:*` SKILL.md declares a capability id that matches `CAPABILITY_REGISTRY` (a mismatch cannot silently kill skill invocation), in `src/__tests__/capability/skill-capability-id-coverage.test.ts` (FR-007).
-- [ ] T053 [US1] Reconcile any SKILL.md capability-id mismatch the T052 test surfaces (edit the offending `skills/<name>/SKILL.md`) (FR-007) — makes T052 GREEN.
-- [ ] T054 [P] [US1] Add the Codex install path + route tooling-feedback guidance to GitHub issues (not an invisible local file) in the plugin `README.md` (FR-007).
+- [x] T042 [P] [US1] RED: assert `skills/roadmap/SKILL.md` documents the `cluster`/`group` sub-actions (the known lag) and that every verb it names exists in the command tree, in `src/__tests__/cli-help/skill-roadmap-accuracy.test.ts` (FR-005).
+- [x] T043 [US1] Update `skills/roadmap/SKILL.md` to document `cluster`/`group` (FR-005) — makes T042 GREEN.
+- [x] T044 [P] [US1] RED: assert `skills/backlog/SKILL.md` documents the empty-session guard + token handling residue accurately against the command tree, in `src/__tests__/cli-help/skill-backlog-accuracy.test.ts` (FR-005).
+- [x] T045 [US1] Update `skills/backlog/SKILL.md` for the empty-session guard + token handling (FR-005) — makes T044 GREEN.
+- [x] T046 [P] [US1] RED: assert `skills/execute/SKILL.md` and `skills/extend/SKILL.md` carry no stale editing residue and document only verbs/steps the surface exposes, in `src/__tests__/cli-help/skill-execute-extend-accuracy.test.ts` (FR-005).
+- [x] T047 [US1] Update `skills/execute/SKILL.md` + `skills/extend/SKILL.md` to remove the editing residue (FR-005) — makes T046 GREEN.
+- [x] T048 [US1] RED: assert `inferChainPosition` does NOT nominate a fully-implemented spec (tasks present + no remaining `/speckit-*` work) as "active" with a bogus next step, in `src/__tests__/session-active-spec-completeness.test.ts` (FR-006).
+- [x] T049 [US1] Fix the active-spec inference in `src/session/chain-position.ts` so a complete spec is not reported as active-with-next-step (FR-006) — makes T048 GREEN.
+- [x] T050 [US1] RED: assert `session-start` discovery output quotes no source-repo-only path that would 404 in a host install (every quoted path resolves through the resolved installation), in `src/__tests__/session-discovery-path-portability.test.ts` (FR-006).
+- [x] T051 [US1] Fix the discovery path rendering in `src/session/report.ts` (and `src/session/orient.ts` if the path originates there) so quoted paths are installation-resolved, not source-repo-absolute (FR-006) — makes T050 GREEN.
+- [x] T052 [P] [US1] RED: assert every `/stack-control:*` SKILL.md declares a capability id that matches `CAPABILITY_REGISTRY` (a mismatch cannot silently kill skill invocation), in `src/__tests__/capability/skill-capability-id-coverage.test.ts` (FR-007).
+- [x] T053 [US1] Reconcile any SKILL.md capability-id mismatch the T052 test surfaces (edit the offending `skills/<name>/SKILL.md`) (FR-007) — makes T052 GREEN.
+- [x] T054 [P] [US1] Add the Codex install path + route tooling-feedback guidance to GitHub issues (not an invisible local file) in the plugin `README.md` (FR-007).
 
 **Checkpoint**: SC-001 holds — 100% of verbs + sub-actions emit `--help` exit 0; the verb reference + descriptor artifact round-trip; SKILLs accurate; discovery output correct.
 

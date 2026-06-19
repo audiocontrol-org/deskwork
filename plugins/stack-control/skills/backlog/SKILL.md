@@ -30,7 +30,7 @@ labels, provenance) and otherwise gets out of the way.
 ## Capture (one move, mid-task)
 
 ```bash
-plugins/stack-control/bin/stackctl backlog capture "<title>" \
+stackctl backlog capture "<title>" \
   --type bug|gap \
   [--ref "<url-or-locator>"] \
   [--body "<detail>"]
@@ -44,7 +44,7 @@ plugins/stack-control/bin/stackctl backlog capture "<title>" \
 ## Review the pile (read-only)
 
 ```bash
-plugins/stack-control/bin/stackctl backlog list
+stackctl backlog list
 ```
 
 Prints each item's id + status + type and **writes nothing**, presented as a tier distinct from `ROADMAP.md`.
@@ -57,8 +57,8 @@ required part of the portable contract.
 ## Seed from open GitHub issues (one-time, idempotent)
 
 ```bash
-plugins/stack-control/bin/stackctl backlog import-github          # dry-run: report the would-import set
-plugins/stack-control/bin/stackctl backlog import-github --apply  # create one imported-issue item per open issue
+stackctl backlog import-github          # dry-run: report the would-import set
+stackctl backlog import-github --apply  # create one imported-issue item per open issue
 ```
 
 - Creates one `imported-issue` item per currently-open issue, backlinked `ref=gh-<number>`, carrying the issue's labels + body. GitHub is **never mutated** (read-only snapshot).
@@ -71,8 +71,8 @@ When the cross-model audit-barrage convergence loop parks (dampens) a residual M
 
 ```bash
 # One-time backfill of existing acknowledged-slush-pile entries:
-plugins/stack-control/bin/stackctl backlog import-slush --feature <slug>          # dry-run
-plugins/stack-control/bin/stackctl backlog import-slush --feature <slug> --apply  # migrate
+stackctl backlog import-slush --feature <slug>          # dry-run
+stackctl backlog import-slush --feature <slug> --apply  # migrate
 ```
 
 - Each parked finding becomes a `migrated-finding` item (priority from severity; provenance = feature slug + finding id; ref → audit-log entry), and its audit-log entry records `Status: migrated-to-backlog <task-id>` — leaving the audit-log a clean open/fixed ledger.
@@ -84,7 +84,7 @@ plugins/stack-control/bin/stackctl backlog import-slush --feature <slug> --apply
 This is the **seam between the two work-tracking tiers**: the lightweight backlog and the spec-driven feature rigor. When a backlog item earns the full treatment, `promote` records a navigable graduation linkage on the item so the thread is never lost — without creating the target.
 
 ```bash
-plugins/stack-control/bin/stackctl backlog promote <item-id> [<item-id>...] \
+stackctl backlog promote <item-id> [<item-id>...] \
   --to <target-ref> [--apply]
 ```
 
@@ -112,12 +112,30 @@ This skill is the sanctioned interface for the **backlog** capability. It drives
 `stackctl backlog` (the wrapper verb), NOT the raw `backlog` CLI — so the PreToolUse
 interceptor (which refuses a raw agent-level `backlog ...` Bash call and redirects here)
 does not fire on this skill's own calls. If a future change has this skill invoke the
-raw `backlog` CLI directly as an agent Bash call, bracket it with the front-door marker:
+raw `backlog` CLI directly as an agent Bash call, bracket it with the front-door marker.
 
-```bash
-TOKEN=$(stackctl front-door enter --capability backlog --session "$CLAUDE_CODE_SESSION_ID")
-# ... raw backlog CLI call ...
-stackctl front-door exit --token "$TOKEN" --session "$CLAUDE_CODE_SESSION_ID"
-```
+1. Confirm the session id is populated, then `enter` — it PRINTS a token value and fails
+   loud (exit 2) on an empty `$CLAUDE_CODE_SESSION_ID` (the marker would otherwise be
+   written under an empty-session key the interceptor never reads, silently refusing the
+   sanctioned call):
+
+   ```bash
+   test -n "$CLAUDE_CODE_SESSION_ID" || { echo "no session id; cannot mediate — stop"; exit 1; }
+   stackctl front-door enter --capability backlog --session "$CLAUDE_CODE_SESSION_ID"
+   ```
+
+   Read the token value it printed. **Your `enter` and `exit` run in SEPARATE Bash tool
+   calls**, so a `$TOKEN` shell variable will NOT survive between them — carry the LITERAL
+   token value yourself.
+
+2. Make the raw `backlog` CLI call.
+
+3. **ALWAYS `exit`** — passing the LITERAL token value from step 1 (a shell variable is gone
+   by now; `exit` rejects an empty token loudly). A skipped/empty `exit` leaks the marker
+   until the staleness bound prunes it:
+
+   ```bash
+   stackctl front-door exit --token <the-token-value-printed-in-step-1> --session "$CLAUDE_CODE_SESSION_ID"
+   ```
 
 The marker is session-keyed and nesting-safe (FR-014a); `exit` is crash-safe.

@@ -32,7 +32,7 @@ not *refuse*:
    operation:
 
    ```bash
-   plugins/stack-control/bin/stackctl roadmap add <id> --spec specs/NNN-<slug> --apply
+   stackctl roadmap add <id> --spec specs/NNN-<slug> --apply
    ```
 
    A spec dir is never left without a node (no orphan). Do **not** refuse.
@@ -41,7 +41,7 @@ not *refuse*:
    none of this skill's work:
 
    ```bash
-   plugins/stack-control/bin/stackctl workflow compass <id> --intent define
+   stackctl workflow compass <id> --intent define
    ```
 
 **Backstop (FR-009, mechanical):** any spec dir that still ends up with no roadmap node (e.g.
@@ -73,7 +73,7 @@ the discipline lives in this skill body + the `stackctl` verbs, never a git hook
 4. **Confirm artifact state as it advances.** After each authoring step that adds an artifact, run `stackctl spec-check` against the dir you resolved in step 3:
 
    ```bash
-   plugins/stack-control/bin/stackctl spec-check --spec <spec-dir>
+   stackctl spec-check --spec <spec-dir>
    ```
 
    It prints a machine-readable presence line (`spec=yes plan=yes tasks=no`). Use it to confirm the chain actually produced what you expect before moving to the next step — read it, do not assume.

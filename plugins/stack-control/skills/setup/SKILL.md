@@ -10,7 +10,7 @@ Bootstrap a **stack-control installation** — the governed working files the `i
 This is a thin adapter over the **CLI**, which is the sole capability path (FR-025): `stackctl setup` is runnable by any agent or human in a plain shell, no Claude Code surface required. Prefer the CLI directly when scripting.
 
 ```bash
-plugins/stack-control/bin/stackctl setup [--at <dir>] [--apply]
+stackctl setup [--at <dir>] [--apply]
 ```
 
 ## What it scaffolds (the managed set)
@@ -52,15 +52,15 @@ The config's **presence marks the installation root**. Verbs resolve their worki
 
 ```bash
 # fresh project — see the plan, then create
-plugins/stack-control/bin/stackctl setup            # dry run; writes nothing
-plugins/stack-control/bin/stackctl setup --apply    # scaffold the managed set
+stackctl setup            # dry run; writes nothing
+stackctl setup --apply    # scaffold the managed set
 
 # monorepo — set up one package as its own installation
-plugins/stack-control/bin/stackctl setup --at packages/foo --apply
+stackctl setup --at packages/foo --apply
 
 # custom locations — pre-author .stack-control/config.yaml with paths.roadmap: docs/ROADMAP.md,
 # then setup fills the rest and records the location
-plugins/stack-control/bin/stackctl setup --apply
+stackctl setup --apply
 ```
 
 > Per `.claude/rules/enforcement-lives-in-skills.md`, the setup discipline lives in this skill body + the `stackctl setup` verb it calls — not in a git hook.

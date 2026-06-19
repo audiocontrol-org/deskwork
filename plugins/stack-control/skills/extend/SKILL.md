@@ -21,7 +21,7 @@ Refine an **existing** Spec Kit spec through the stack-control front door (Featu
 1. **Resolve and report current state.** Resolve the target spec dir (arg, or the active feature's dir from the `<!-- SPECKIT START -->…<!-- SPECKIT END -->` marker in `CLAUDE.md` — the program uses one long-lived branch with numbered spec dirs, so the marker resolves the dir, not the branch name; TF-09). State which spec dir you resolved, then run:
 
    ```bash
-   plugins/stack-control/bin/stackctl spec-check --spec <spec-dir>
+   stackctl spec-check --spec <spec-dir>
    ```
 
    It prints a machine-readable presence line (`spec=yes plan=yes tasks=no`). This tells you what already exists and therefore what the loop needs to advance. Read it — do not assume the spec's state.
@@ -52,7 +52,7 @@ Together with `define` (author new) and `execute` (run), `extend` is sufficient 
 ## Front-door marker (026 — capability mediation)
 
 This skill is the sanctioned interface for the **spec-definition** capability. The plugin's
-PreToolUse interceptor refuses a RAW backend call (a direct the `/speckit-*` clarify / re-plan / re-tasks chain); a call this skill
+PreToolUse interceptor refuses a RAW backend call (a direct `/speckit-*` clarify / re-plan / re-tasks chain); a call this skill
 makes is permitted because the skill sets the front-door marker first. **Bracket the
 backend drive:**
 
