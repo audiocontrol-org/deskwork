@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-06-19: front-door-completeness — formal re-close (no-op; post-authoring Q&A only)
+
+**Goal:** Second `/stack-control:session-end` of the day. The substantive work — the front-door-completeness audit + the full 028 spec chain to runnable — was captured and pushed in the prior entry (commit `7d03ff69`). This is a formal re-close: nothing changed the worktree since (0 commits in range), so this entry is an honest no-op (run-as-asked; empty beats missed).
+
+**Accomplished:**
+- Nothing buildable — post-authoring Q&A only: (a) confirmed **no MCP component** exists or is planned (no `mcp` key in `plugin.json`, no MCP server); MCP appears in 028 only as a named *future consumer* of the FR-052 descriptor artifact. (b) Stated the **descriptor artifact format**: oclif-manifest-style JSON (`{ id, commands: { <verb>: { description, mediationClass, flags, subActions } } }`), generated from the command tree, round-trip tested — NOT OpenAPI.
+
+**Didn't Work:**
+- N/A — no changes attempted.
+
+**Course Corrections:**
+- [PROCESS] Operator's MCP question was *"i was just asking"* — answered, captured nothing, made no scope change (a question is not an instruction to act).
+
+**Insights:**
+- The substantive close already happened at `7d03ff69`; this duplicate-shaped sparse entry is the expected output of running the capture ceremony on a no-op tail. Bounded with `--since 7d03ff69` to avoid the long-lived-branch boundary sweep (TASK-39/59).
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 0
+  - (no commits this session)
+- Files changed: 0
+- Backlog touched: (none)
+
 ## 2026-06-19: front-door-completeness — audit the 026-teeth front-door gaps, register umbrella, author the full spec chain (028) to runnable
 
 **Goal:** Operator framing: now that 026 capability-mediation put teeth in the front door (agents can't reach *around* the `/stack-control:*` skills), the many front-door gaps that preclude basic operations + discovery have become hard walls. Look through the in-flight roadmap + backlog for reported front-door-as-built issues and come up with a systematic plan to make the intended operations possible and discoverable. Then (operator: *"do it"*) drive it into the lifecycle.
