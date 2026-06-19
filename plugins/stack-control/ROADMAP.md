@@ -17,8 +17,14 @@ satisfied only when the target is `shipped`), `part-of` (non-blocking grouping),
 `deferred-until` (a prose condition that blocks readiness until the operator
 clears it). Reason over the graph with `/stack-control:roadmap` (`next` /
 `blocked` / `blocks` / `order` / `graph` / `reconcile`) and keep it crisp with
-`add` / `advance` / `decompose` / `reclassify` / `defer`. Program vision +
-rationale live in
+`add` / `advance` / `decompose` / `reclassify` / `defer` / `cluster` (alias
+`group`) — e.g. `stackctl roadmap cluster multi:feature/epic --children
+design:feature/a,impl:feature/b --chain --apply` gathers existing items under a
+created-or-reused parent. Run `stackctl roadmap --help` for the full surface. For
+an edit that has no verb yet (e.g. moving a `part-of` / `depends-on` edge): edit
+this file directly, then run `stackctl roadmap order` to revalidate the graph (it
+fails loud on a cycle / dangling ref / duplicate id). Program vision + rationale
+live in
 `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md`;
 this document is the live feature queue.
 
@@ -366,15 +372,8 @@ One-move backlog->roadmap promotion: given a backlog item, PROPOSE the roadmap n
 - closes: TASK-19
 The centerpiece: a PARSEABLE, DETERMINISTIC lifecycle workflow that drives items through phases — not just a WORKFLOW.md doc. Apply the roadmap-protocol pattern to the process itself: a governed grammar-parsed workflow document (phases, per-phase entry/exit gates, the verb/skill executing each phase) plus an engine that, given an item, knows its current phase, the gate conditions to advance, and deterministically drives it to the next phase or reports why it's blocked. The human-readable WORKFLOW.md is one rendering of the parseable source of truth. Reuses document-primitives (governed parseable-doc engine) + roadmap-protocol grammar/DAG reasoning. Promoted from TASK-136.
 
-## impl:gap/roadmap-reparent-verb
-- status: planned
-- depends-on: design:feature/roadmap-protocol
-- part-of: multi:feature/lifecycle-industrialization
-- ref: TASK-137
-Add a roadmap reparent verb to move an existing part-of / depends-on edge between nodes (no mutation verb does this today; re-parenting requires hand-editing the governed ROADMAP.md). Shape: roadmap reparent <id> --part-of <target> | --depends-on <target> [--remove <target>], dry-run then --apply, graph-revalidating (refuse cycle/dangling/self), zero-write-on-failure. Promoted from TASK-137.
-
 ## impl:feature/terminal-closure
-- status: in-flight
+- status: shipped
 - part-of: multi:feature/lifecycle-industrialization
 - spec: specs/023-terminal-closure
 Mechanical terminal closure: roadmap close-related closes a terminal item's recorded closes:/ref: backlog ids in one deterministic move.
@@ -399,7 +398,7 @@ Make the lifecycle un-skippable: a workflow 'compass' primitive that orients an 
 Make the stack-control workflow protocol mechanically un-skippable for adopting agents (the 024 compass principle extended past the macro-lifecycle): per-phase governance gated at each tasks.md phase boundary (close the boundary-too-large batching hole); no agent-offered shortcuts (consistent protocol always); no bypassing stack-control:execute to reach the backend speckit-implement directly; commit-and-push automatic at phase boundaries (not operator-reminded). Enforcement lives in the governed WORKFLOW.md gates + skill bodies + CLI verbs (travels with install), never git hooks.
 
 ## design:feature/capability-interface-mediation
-- status: in-flight
+- status: shipped
 - spec: specs/026-capability-interface-mediation
 - design: docs/superpowers/specs/2026-06-17-capability-interface-mediation-design.md
 - design-approved: 2026-06-17
@@ -449,8 +448,37 @@ codex lane trips killed-no-liveness on real payloads; emit reasoning summaries (
 025 upgrade: pre-025 / in-flight features with no per-phase checkpoints become un-graduatable when all-phase-checkpoints-current lands; no backfill/grandfather/migration. Detail: TASK-153.
 
 ## design:gap/skill-surface-mediation
-- status: in-flight
+- status: shipped
 - part-of: design:feature/capability-interface-mediation
 - ref: TASK-241
-SPIKE RESOLVED 2026-06-18 (live, this branch) — last session's 'PreToolUse Skill matcher is INERT' diagnosis was WRONG. The live spike (instrument the loaded plugin hook, invoke a skill via the Skill tool, observe the payload) proved PreToolUse DOES fire for an agent-initiated Skill-tool call; the bug was a one-field mismatch — the interceptor read tool_input.skill_name while the real Claude Code field is tool_input.skill, so every Skill payload extracted an empty identity and silently permitted the reach-around. FIX COMMITTED 5f88b40e (TDD-first: RED regression with the real {skill:...} shape; intercept.ts reads input.skill; research.md/tasks.md/contracts corrected; full suite 1863 GREEN). The hooks.json Skill matcher is CORRECT and stays — no new event (UserPromptExpansion etc.) is needed for the agent reach-around threat. Write-up: specs/026-capability-interface-mediation/skill-surface-spike-research.md. REMAINING before this and 026 can close: live re-validation in the NEXT installed release (raw /speckit-implement via the Skill tool -> denied end-to-end), per the verify-in-a-formally-installed-release rule. Out-of-threat-model residual (note only): a USER who types /speckit-implement bypasses PreToolUse via prompt-expansion; the US3 graduate gate covers it; gating it directly would need a separate, empirically-verified event. 026 stays in-flight until the release re-validation lands.
+SPIKE RESOLVED 2026-06-18 (live, this branch) — last session's 'PreToolUse Skill matcher is INERT' diagnosis was WRONG. The live spike (instrument the loaded plugin hook, invoke a skill via the Skill tool, observe the payload) proved PreToolUse DOES fire for an agent-initiated Skill-tool call; the bug was a one-field mismatch — the interceptor read tool_input.skill_name while the real Claude Code field is tool_input.skill, so every Skill payload extracted an empty identity and silently permitted the reach-around. FIX COMMITTED 5f88b40e (TDD-first: RED regression with the real {skill:...} shape; intercept.ts reads input.skill; research.md/tasks.md/contracts corrected; full suite 1863 GREEN). The hooks.json Skill matcher is CORRECT and stays — no new event (UserPromptExpansion etc.) is needed for the agent reach-around threat. Write-up: specs/026-capability-interface-mediation/skill-surface-spike-research.md. LIVE RE-VALIDATION PASSED in installed release 0.51.1 (2026-06-18): raw /speckit-implement via the Skill tool -> DENIED (spec-execution redirect); /speckit-analyze -> DENIED (spec-definition redirect); benign /feature-help -> PERMITTED (SC-003 no-false-positive). The full live chain (agent Skill-tool call -> PreToolUse hook -> fixed interceptor reads tool_input.skill -> registry match -> deny) is verified end-to-end. SHIPPED; TASK-241 closed via roadmap close-related; 026 graduated to shipped. Out-of-threat-model residual (note only): a USER who types /speckit-implement bypasses PreToolUse via prompt-expansion; the US3 graduate gate covers it; gating it directly would need a separate, empirically-verified event.
+
+## impl:gap/roadmap-edge-mutation-and-cluster
+- status: in-flight
+- spec: specs/027-roadmap-edge-mutation-and-cluster
+- design: docs/superpowers/specs/2026-06-18-roadmap-edge-mutation-and-cluster-design.md
+- design-approved: 2026-06-18
+- analyze-clean: 2026-06-18
+- depends-on: design:feature/roadmap-protocol
+- part-of: multi:feature/lifecycle-industrialization
+- ref: TASK-242
+Make roadmap mutation both POSSIBLE and OBVIOUS for adopting agents — today it is neither, so agents burn cycles probing the surface every session and then hand-edit the governed ROADMAP.md anyway, contradicting its own 'do not hand-edit' header. Three parts. (1) Edge-mutation verbs on EXISTING nodes: add-edge / remove-edge / move-edge (reparent) for part-of and depends-on (dry-run then --apply, graph-revalidating: refuse cycle/dangling/self/dup, zero-write-on-failure — same shape as the other mutation verbs). This ABSORBS the former impl:gap/roadmap-reparent-verb (TASK-137, the move-edge case): re-parenting an existing edge had no CLI path (e.g. commit 85a46c6f hand-edit), and neither did ADDING a brand-new part-of to an un-edged node, nor REMOVING one. (2) A one-move roadmap cluster (group) convenience: create-or-reuse a parent epic + attach part-of on N existing children (+ optional --chain to wire a depends-on sequence) atomically — the literal 'group the cluster' operation an operator asks for in words. (3) Self-documenting discoverability so adopting agents stop probing: working `roadmap --help` and per-subaction `--help` that enumerate the full verb + flag set and the status vocabulary; a COMPLETE top-level usage line (today a no-subaction invocation prints only `<next|blocked|add>` though the real set is next/blocked/blocks/order/graph/add/advance/decompose/reclassify/defer/reconcile/close-related, surfaced only by triggering an unknown-subaction error); and a governed ROADMAP.md header that names the mutation verbs with a worked clustering example instead of a bare 'manage with stackctl roadmap — do not hand-edit'. Motivated by the offing dogfood (TASK-242): the agent ran `roadmap --help` (errored), probed a bogus status 'to surface the vocabulary', tested add-on-existing + reclassify to infer behavior, and read the doc grammar by hand before falling back to four hand-edits to cluster three nodes. Folds in TASK-137; promoted from TASK-242. RE-SCOPE (ADR docs/superpowers/specs/2026-06-18-governed-markdown-foundation-adr.md; spec specs/027-roadmap-edge-mutation-and-cluster): part (3)'s discoverability is delivered by ADOPTING a mature parser library (clap/Typer/Cobra/oclif-style; Backlog.md already self-documents this way), NOT a bespoke shared-parser combinator. The governed-markdown foundation is kept (no migration to Backlog.md/Beads); the document-model store seam is hardened so a future store swap stays contained; the novel core (lifecycle-coupled edges + workflow integration) is built regardless of store. Roughly halves the original build.
+
+## impl:gap/roadmap-edge-mutation-verbs
+- status: planned
+- part-of: multi:feature/lifecycle-industrialization
+- ref: specs/027-roadmap-edge-mutation-and-cluster
+Edge-mutation verbs on EXISTING roadmap nodes: add-edge / remove-edge / move-edge (=reparent) for part-of and depends-on, plus rename and remove-node — dry-run then --apply, graph-revalidating (refuse cycle/dangling/self/dup, zero-write-on-failure), same shape as the other mutation verbs. Absorbs TASK-137 (the move-edge/reparent case had no CLI path). DEFERRED sibling of specs/027-roadmap-edge-mutation-and-cluster (the cluster + self-documenting-help + honest-header slice shipped; this verb set did not). FR-017.
+
+## multi:gap/cli-verb-surface-consolidation
+- status: planned
+- part-of: multi:feature/lifecycle-industrialization
+- ref: specs/027-roadmap-edge-mutation-and-cluster
+Verb-surface consolidation rollout: migrate the remaining ~50 flat stackctl verbs onto the commander parser surface (as roadmap was in 027) — ~50 flat verbs to ~12-15 nouns, machine-adapter verbs marked internal, backwards-compat aliases for the old names, every verb adopting the self-documenting parser. DEFERRED sibling of specs/027-roadmap-edge-mutation-and-cluster (027 migrated only the roadmap verb as the proof). FR-017.
+
+## multi:gap/govern-per-phase-friction-burndown
+- status: planned
+- part-of: multi:feature/lifecycle-industrialization
+- ref: TASK-289
+Burn down the per-phase governance friction surfaced while implementing 027 — the dominant cost was govern tooling, not the feature code. Headline defects: TASK-289 (O(n^2) shared-file checkpoint staleness — a later phase editing an earlier phase's file re-stales its checkpoint, forcing repeated re-governance and ad-hoc overrides; the structural fix is fingerprinting per-phase HUNKS not whole files, or a govern-at-end mode for shared-file features); the audit-barrage severity NON-DETERMINISM (HIGH oscillated 2->0->2 and LOW->HIGH on identical code, defeating the convergence dampener and forcing overrides on phases 4+6); TASK-263 (per-phase scoping derives the payload from tasks.md backtick paths, so a file split out during implementation — e.g. cluster.ts — is excluded from its own audit, and the no-grounding claude lane then raises FALSE HIGHs it cannot disconfirm). Also fold in the 027 code residuals: TASK-288 (promote the no-grounding claude-lane fix to the shipped default), TASK-290 (test ! hygiene), TASK-291 (roadmap SKILL.md cluster doc), TASK-292 (uniform list-flag stray-comma handling + dead branch), TASK-293 (rewriteEdgeLine fence-awareness). Promoted from the 027 govern dogfood.
 

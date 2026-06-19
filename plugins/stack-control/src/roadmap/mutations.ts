@@ -39,17 +39,17 @@ function requireUnit(doc: GovernableDocument, identifier: string): Unit {
 }
 
 /** The verbatim source lines of a Unit (its `## head` through its last body line). */
-function unitBodyLines(doc: GovernableDocument, unit: Unit): string[] {
+export function unitBodyLines(doc: GovernableDocument, unit: Unit): string[] {
   return [...doc.sourceLines.slice(unit.span.startLine - 1, unit.span.endLine)];
 }
 
 /** Targets of a single edge field on a Unit ([] when absent). */
-function edgeTargets(unit: Unit, field: string): string[] {
+export function edgeTargets(unit: Unit, field: string): string[] {
   return [...(unit.edges.find((e) => e.field === field)?.targets ?? [])];
 }
 
 /** Rewrite a unit-ref edge line in a body, mapping its target list through `transform`. */
-function rewriteEdgeLine(
+export function rewriteEdgeLine(
   bodyLines: readonly string[],
   field: string,
   transform: (targets: readonly string[]) => readonly string[],
@@ -67,7 +67,7 @@ function rewriteEdgeLine(
 }
 
 /** Reassemble a document from its preamble, an ordered list of unit bodies, postamble. */
-function reassemble(doc: GovernableDocument, unitBodies: readonly string[]): string {
+export function reassemble(doc: GovernableDocument, unitBodies: readonly string[]): string {
   const firstStart = doc.units[0]!.span.startLine;
   const lastEnd = doc.units[doc.units.length - 1]!.span.endLine;
   const pre = doc.sourceLines.slice(0, firstStart - 1).join('\n');
@@ -87,18 +87,21 @@ export interface AddInput {
   readonly status?: string;
   readonly scope?: string;
   readonly dependsOn?: readonly string[];
-  readonly partOf?: string;
+  /** Parent groupings — a unit may belong to MULTIPLE parents (027 FR-009). */
+  readonly partOf?: readonly string[];
   readonly deferredUntil?: string;
   readonly spec?: string;
   readonly ref?: string;
 }
 
-function buildSection(input: AddInput): string[] {
+export function buildSection(input: AddInput): string[] {
   const lines = [`## ${input.identifier}`, `- status: ${input.status ?? DEFAULT_STATUS}`];
   if (input.dependsOn !== undefined && input.dependsOn.length > 0) {
     lines.push(`- depends-on: ${input.dependsOn.join(', ')}`);
   }
-  if (input.partOf !== undefined) lines.push(`- part-of: ${input.partOf}`);
+  if (input.partOf !== undefined && input.partOf.length > 0) {
+    lines.push(`- part-of: ${input.partOf.join(', ')}`);
+  }
   if (input.deferredUntil !== undefined) lines.push(`- deferred-until: ${input.deferredUntil}`);
   if (input.spec !== undefined) lines.push(`- spec: ${input.spec}`);
   if (input.ref !== undefined) lines.push(`- ref: ${input.ref}`);
@@ -221,7 +224,7 @@ export function decompose(
       // parts silently reset to `planned` (AUDIT-20260608-14).
       status: source.status,
       dependsOn: inheritedDeps.length > 0 ? inheritedDeps : undefined,
-      partOf: inheritedPartOf.length > 0 ? inheritedPartOf[0] : undefined,
+      partOf: inheritedPartOf.length > 0 ? inheritedPartOf : undefined,
       deferredUntil: source.deferredUntil ?? undefined,
       spec: source.spec ?? undefined,
       ref: source.ref ?? undefined,
@@ -229,8 +232,13 @@ export function decompose(
     }).join('\n'),
   );
 
-  const repoint = (targets: readonly string[]): readonly string[] =>
-    targets.flatMap((t) => (t === identifier ? into : [t]));
+  // Repoint an edge that referenced the decomposed item onto ALL its parts,
+  // de-duplicating: a unit already referencing one of `into` (e.g. grouped under
+  // both the decomposed item AND one of its parts) must not gain a duplicate
+  // target (AUDIT-BARRAGE-codex-02). Order-preserving dedup.
+  const repoint = (targets: readonly string[]): readonly string[] => [
+    ...new Set(targets.flatMap((t) => (t === identifier ? into : [t]))),
+  ];
 
   const bodies: string[] = [];
   for (const unit of doc.units) {
@@ -243,8 +251,10 @@ export function decompose(
       body = rewriteEdgeLine(body, 'depends-on', repoint);
     }
     if (edgeTargets(unit, 'part-of').includes(identifier)) {
-      // part-of is single-valued grouping; repoint onto the first part.
-      body = rewriteEdgeLine(body, 'part-of', (t) => t.flatMap((x) => (x === identifier ? [into[0]!] : [x])));
+      // part-of now supports multiple parents (027 FR-009): repoint a grouping
+      // under the decomposed item onto ALL of its parts, faithfully preserving
+      // the membership rather than collapsing to the first part.
+      body = rewriteEdgeLine(body, 'part-of', repoint);
     }
     bodies.push(body.join('\n'));
   }

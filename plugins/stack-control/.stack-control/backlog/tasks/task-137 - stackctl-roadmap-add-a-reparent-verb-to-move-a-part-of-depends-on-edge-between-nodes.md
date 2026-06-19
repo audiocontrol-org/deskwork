@@ -24,5 +24,6 @@ No verb re-parents an existing roadmap edge. roadmap has add (edges at creation)
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-- **Promoted-to:** roadmap:impl:gap/roadmap-reparent-verb
+- **Promoted-to:** roadmap:impl:gap/roadmap-edge-mutation-and-cluster
+- **Folded (2026-06-18):** the standalone roadmap node `impl:gap/roadmap-reparent-verb` was retired and this gap absorbed into `impl:gap/roadmap-edge-mutation-and-cluster` (ref TASK-242), which covers the full edge-mutation surface on existing nodes (add / remove / **move=reparent** edges) plus a cluster convenience and self-documenting discoverability. The move-edge (reparent) case captured here is part 1 of that node. Operator decision: fold (this session).
 <!-- SECTION:NOTES:END -->

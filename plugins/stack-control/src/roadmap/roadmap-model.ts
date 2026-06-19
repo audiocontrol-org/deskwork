@@ -19,7 +19,13 @@ export interface WorkItem {
   readonly kind: Kind;
   readonly status: string;
   readonly dependsOn: readonly string[];
-  readonly partOf: string | null;
+  /**
+   * Parent groupings (`part-of` targets). A unit may belong to MULTIPLE parents
+   * (027 FR-009 multi-parent clustering) — the grammar already emits an edge
+   * LIST, so this is the full projection (empty `[]` when the unit has no
+   * grouping). Readers that want "the first parent" take `partOf[0]`.
+   */
+  readonly partOf: readonly string[];
   readonly deferredUntil: string | null;
   readonly spec: string | null;
   readonly ref: string | null;
@@ -140,7 +146,7 @@ function toWorkItem(unit: Unit): WorkItem {
     kind,
     status: unit.status,
     dependsOn: edgeTargets(unit, 'depends-on'),
-    partOf: firstOrNull(edgeTargets(unit, 'part-of')),
+    partOf: edgeTargets(unit, 'part-of'),
     deferredUntil: deferred === null ? null : unquote(deferred),
     spec: spec === null ? null : unquote(spec),
     ref: ref === null ? null : unquote(ref),

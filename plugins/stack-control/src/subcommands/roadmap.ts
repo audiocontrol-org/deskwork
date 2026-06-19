@@ -22,6 +22,7 @@ import {
   type AddInput,
   type MutationResult,
 } from '../roadmap/mutations.js';
+import { cluster, type ClusterInput } from '../roadmap/cluster.js';
 import { globParent, reconcile } from '../roadmap/reconcile.js';
 import { loadRoadmap, type RoadmapModel } from '../roadmap/roadmap-model.js';
 import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
@@ -43,10 +44,11 @@ import { resolveVerbDoc } from './working-file.js';
 // default lets the flag scanner report whether --doc was passed.
 const NO_DOC = '\0__roadmap_no_doc__';
 
-interface Flags {
+export interface Flags {
   readonly doc: string;
   readonly apply: boolean;
   readonly clear: boolean;
+  readonly chain: boolean;
   readonly positionals: readonly string[];
   readonly values: ReadonlyMap<string, string>;
 }
@@ -70,6 +72,21 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   decompose: { valueFlags: ['into'], apply: true, clear: false, positionals: 1 },
   reclassify: { valueFlags: ['to'], apply: true, clear: false, positionals: 1 },
   defer: { valueFlags: ['until'], apply: true, clear: true, positionals: 1 },
+  cluster: {
+    valueFlags: ['children', 'summary'],
+    apply: true,
+    clear: false,
+    chain: true,
+    positionals: 1,
+  },
+  // `group` is an alias of `cluster` (same grammar + same handler).
+  group: {
+    valueFlags: ['children', 'summary'],
+    apply: true,
+    clear: false,
+    chain: true,
+    positionals: 1,
+  },
   'close-related': { valueFlags: [], apply: true, clear: false, positionals: 1 },
 };
 
@@ -79,13 +96,21 @@ const ALL_VALUE_FLAGS: readonly string[] = [
   ...new Set(Object.values(SUBACTION_SPECS).flatMap((s) => s.valueFlags)),
 ];
 
-/** Scan flags via the shared subaction-verb scanner; `--apply`/`--clear` booleans. */
-function scanFlags(args: readonly string[]): Flags {
-  const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear'], ALL_VALUE_FLAGS);
+/** The known-subaction list rendered in the unknown-subaction usage error —
+ * single-sourced so the flat path (`runRoadmapCli`) and the commander mount
+ * (`roadmap-command.ts`) emit the byte-identical message (FR-006; AUDIT-BARRAGE-
+ * codex-01). The order is the discovery order operators have learned, kept stable. */
+export const KNOWN_SUBACTIONS =
+  'next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, cluster, group, reconcile, close-related';
+
+/** Scan flags via the shared subaction-verb scanner; `--apply`/`--clear`/`--chain` booleans. */
+export function scanFlags(args: readonly string[]): Flags {
+  const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear', 'chain'], ALL_VALUE_FLAGS);
   return {
     doc: s.doc,
     apply: s.booleans.has('apply'),
     clear: s.booleans.has('clear'),
+    chain: s.booleans.has('chain'),
     positionals: s.positionals,
     values: s.values,
   };
@@ -127,12 +152,21 @@ function addInputFrom(flags: Flags): AddInput {
   if (identifier === undefined) failUsage('roadmap', 'add requires an <identifier> positional');
   const v = flags.values;
   const dependsOn = v.get('depends-on');
+  const partOfRaw = v.get('part-of');
+  const partOf = partOfRaw === undefined ? undefined : partOfRaw.split(',').map((s) => s.trim());
+  // A present-but-empty `--part-of` or a stray/trailing comma (`--part-of ,` or
+  // `a,,b`) is a malformed grouping flag, NOT "no parent": fail loud rather than
+  // silently dropping the edge and reporting a successful, ungrouped add
+  // (AUDIT-BARRAGE-codex-01; consistent with the `--children` empty-id guard).
+  if (partOf !== undefined && (partOf.length === 0 || partOf.some((s) => s.length === 0))) {
+    failUsage('roadmap', 'add: --part-of has an empty id (a stray or trailing comma)');
+  }
   return {
     identifier,
     status: v.get('status'),
     scope: v.get('scope'),
     dependsOn: dependsOn === undefined ? undefined : dependsOn.split(',').map((s) => s.trim()),
-    partOf: v.get('part-of'),
+    partOf,
     deferredUntil: v.get('deferred-until'),
     spec: v.get('spec'),
     ref: v.get('ref'),
@@ -174,6 +208,30 @@ function emitDefer(flags: Flags, opts: LoadOptions): void {
   const id = requireId(flags, 'defer');
   const change = flags.clear ? { clear: true } : { until: requireValue(flags, 'until') };
   reportMutation(defer(flags.doc, id, change, opts, flags.apply), 'defer', id);
+}
+
+/** Build the `cluster` input from the parsed flags (positional parent + --children). */
+function clusterInputFrom(flags: Flags, verb: string): ClusterInput {
+  const parentId = requireId(flags, verb);
+  const children = requireValue(flags, 'children').split(',').map((s) => s.trim());
+  // A stray/trailing comma yields an empty id; fail loud rather than silently
+  // dropping it (consistent with the empty `--part-of` guard; AUDIT-BARRAGE-codex-01).
+  if (children.some((s) => s.length === 0)) {
+    failUsage('roadmap', `${verb}: --children has an empty id (a stray or trailing comma)`);
+  }
+  return { parentId, children, chain: flags.chain, summary: flags.values.get('summary') };
+}
+
+/** `roadmap cluster <parent> --children <a,b,…> [--chain] [--summary] [--apply]`. */
+function emitCluster(flags: Flags, opts: LoadOptions, verb: string): void {
+  const input = clusterInputFrom(flags, verb);
+  const result = cluster(flags.doc, input, opts, flags.apply);
+  const chainNote = input.chain ? ' + depends-on chain' : '';
+  process.stdout.write(
+    result.applied
+      ? `roadmap ${verb}: grouped ${input.children.join(', ')} under ${input.parentId}${chainNote}\n`
+      : `roadmap ${verb}: dry-run — would group ${input.children.join(', ')} under ${input.parentId}${chainNote} (use --apply to write)\n`,
+  );
 }
 
 /**
@@ -275,21 +333,38 @@ function emitCloseRelated(model: RoadmapModel, flags: Flags): void {
   }
 }
 
-export async function runRoadmapCli(args: string[]): Promise<void> {
-  const subaction = args[0];
-  if (subaction === undefined || subaction.startsWith('--')) {
-    failUsage('roadmap', 'a subaction is required (usage: roadmap <next|blocked|add> [flags])');
-  }
-  // Reject an unknown subaction before resolving the doc, so an unknown verb is a
-  // usage error (exit 2) rather than triggering installation resolution.
-  if (SUBACTION_SPECS[subaction] === undefined) {
-    failUsage(
-      'roadmap',
-      `unknown subaction '${subaction}' (known: next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, reconcile, close-related)`,
-    );
-  }
-  const scanned = scanFlags(args.slice(1));
+// The sentinel `--doc`-absent value exported so the commander mount
+// (roadmap-command.ts) marks "no explicit --doc" identically to the flat scan
+// path, keeping installation resolution behavior byte-for-byte identical.
+export { NO_DOC, SUBACTION_SPECS };
+
+/**
+ * The AUDIT-hardened front-end validation, single-sourced for the commander mount
+ * (027 T004). Runs the shared subaction-verb scanner + per-subaction grammar
+ * validation on the RAW subaction args — preserving every exit-2 guard the flat
+ * path enforced, INCLUDING the forgot-value cases commander's own parser does not
+ * replicate (`--<value-flag>` immediately followed by a recognized flag → exit 2,
+ * AUDIT-20260608-04 / AUDIT-BARRAGE-claude-01). `subaction` MUST already be a known
+ * key of SUBACTION_SPECS (the caller rejects unknowns first). Returns the validated
+ * `Flags`; on any violation it `process.exit(2)`s via the shared `failUsage`.
+ */
+export function preflightRoadmapFlags(subaction: string, subActionArgs: readonly string[]): Flags {
+  const scanned = scanFlags(subActionArgs);
   validateSubactionFlags('roadmap', subaction, SUBACTION_SPECS[subaction], scanned);
+  return scanned;
+}
+
+/**
+ * The doc-resolution + dispatch + error-mapping core, shared by BOTH the flat
+ * hand-rolled path (`runRoadmapCli`) and the commander mount (roadmap-command.ts).
+ * `scanned` is a fully-validated `Flags` whose `doc` is either an explicit path
+ * or the `NO_DOC` sentinel. Subaction is assumed already validated as a known
+ * key of SUBACTION_SPECS (the caller rejects unknowns with exit 2 first).
+ *
+ * Single-sourcing this here keeps the InstallationError/DocumentModelError/
+ * BacklogError → exit-code mapping identical across both entry points (027 T004).
+ */
+export async function executeRoadmapSubaction(subaction: string, scanned: Flags): Promise<void> {
   try {
     const { doc, opts } = resolveVerbDoc({
       key: 'roadmap',
@@ -330,6 +405,10 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
       case 'defer':
         emitDefer(flags, opts);
         return;
+      case 'cluster':
+      case 'group':
+        emitCluster(flags, opts, subaction);
+        return;
       case 'reconcile':
         emitReconcile(flags, opts);
         return;
@@ -359,4 +438,24 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
     }
     throw err; // unexpected → dispatcher exits 1
   }
+}
+
+/**
+ * The original flat hand-rolled dispatcher, retained as the behavior reference
+ * and for any direct caller. The live dispatch path (`cli.ts`) now routes
+ * `roadmap` through the commander mount (roadmap-command.ts), which reuses
+ * `executeRoadmapSubaction` so both paths share one error-mapping core (027 T004).
+ */
+export async function runRoadmapCli(args: string[]): Promise<void> {
+  const subaction = args[0];
+  if (subaction === undefined || subaction.startsWith('--')) {
+    failUsage('roadmap', 'a subaction is required (usage: roadmap <next|blocked|add> [flags])');
+  }
+  // Reject an unknown subaction before resolving the doc, so an unknown verb is a
+  // usage error (exit 2) rather than triggering installation resolution.
+  if (SUBACTION_SPECS[subaction] === undefined) {
+    failUsage('roadmap', `unknown subaction '${subaction}' (known: ${KNOWN_SUBACTIONS})`);
+  }
+  const scanned = preflightRoadmapFlags(subaction, args.slice(1));
+  await executeRoadmapSubaction(subaction, scanned);
 }

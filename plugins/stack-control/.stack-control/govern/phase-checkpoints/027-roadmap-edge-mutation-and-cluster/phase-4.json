@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "featureSlug": "027-roadmap-edge-mutation-and-cluster",
+  "phaseId": "4",
+  "checkpoint": "phase-4",
+  "auditLogSection": "phase-4",
+  "scopeFingerprint": "3dc1ff6f38fbae75df14c9a5f75b93da82f4b892835d8b347487b751f1e34b21",
+  "passedAt": "2026-06-19T04:14:40.665Z",
+  "governedPaths": [
+    "tests/roadmap/cluster.test.ts",
+    "tests/roadmap/cluster-refusal.test.ts",
+    "src/roadmap/mutations.ts",
+    "src/roadmap/roadmap-model.ts",
+    "src/roadmap/cluster.ts",
+    "src/subcommands/roadmap.ts"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/src/roadmap/cluster.ts",
+    "plugins/stack-control/src/roadmap/mutations.ts",
+    "plugins/stack-control/src/roadmap/roadmap-model.ts",
+    "plugins/stack-control/src/subcommands/roadmap.ts",
+    "plugins/stack-control/tests/roadmap/cluster-refusal.test.ts",
+    "plugins/stack-control/tests/roadmap/cluster.test.ts"
+  ]
+}

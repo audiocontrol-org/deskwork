@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "featureSlug": "027-roadmap-edge-mutation-and-cluster",
+  "phaseId": "6",
+  "checkpoint": "phase-6",
+  "auditLogSection": "phase-6",
+  "scopeFingerprint": "8e43660e1a23fec3279f9098afa88ba2b107d0b82d87f3fcbf3998f4431be758",
+  "passedAt": "2026-06-19T04:29:03.577Z",
+  "governedPaths": [
+    "src/roadmap/mutations.ts",
+    "src/subcommands/roadmap.ts"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/src/roadmap/mutations.ts",
+    "plugins/stack-control/src/subcommands/roadmap.ts"
+  ]
+}

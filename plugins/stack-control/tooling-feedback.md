@@ -82,3 +82,7 @@
 
 ## session-end 2026-06-18
 - .stack-control/state/ (front-door session markers) is not gitignored — transient per-session marker files show as untracked and can be accidentally committed; needs a gitignore entry.
+
+## session-end 2026-06-18
+- roadmap: no verb to edit a node's prose body — correcting a falsified node description (skill-surface-mediation) required hand-editing ROADMAP.md. advance/reclassify/defer mutate structured fields only; the descriptive paragraph has no governed edit path.
+- backlog: no verb to annotate/append a note to an item — recording the corrected diagnosis on TASK-241 required hand-editing the task .md file. capture/list/import/promote/close exist; there is no 'add note' verb, and close-related only transitions status.

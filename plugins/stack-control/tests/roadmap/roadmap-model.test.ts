@@ -14,12 +14,12 @@ describe('roadmap-model loadRoadmap (T016)', () => {
     expect(b.kind).toBe('feature');
     expect(b.status).toBe('planned');
     expect(b.dependsOn).toEqual(['design:feature/a']);
-    expect(b.partOf).toBe('design:feature/a');
+    expect(b.partOf).toEqual(['design:feature/a']);
     expect(b.deferredUntil).toBeNull();
 
     const d = model.items.find((i) => i.identifier === 'multi:feature/d')!;
     expect(d.dependsOn).toEqual(['impl:feature/b', 'impl:feature/c']);
-    expect(d.partOf).toBeNull();
+    expect(d.partOf).toEqual([]);
   });
 
   it('populates deferredUntil, spec and ref from their fields', () => {

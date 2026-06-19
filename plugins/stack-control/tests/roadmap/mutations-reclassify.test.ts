@@ -26,7 +26,7 @@ describe('mutations.reclassify (T039)', () => {
     expect(model.byId.get('impl:feature/y')!.kind).toBe('feature');
     const d = model.byId.get('multi:feature/d')!;
     expect(d.dependsOn).toEqual(['impl:feature/y']);
-    expect(d.partOf).toBe('impl:feature/y');
+    expect(d.partOf).toEqual(['impl:feature/y']);
   });
 
   it('renaming onto an existing identifier is zero-write', () => {

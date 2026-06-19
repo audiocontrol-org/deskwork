@@ -13,6 +13,7 @@
     "ajv": "^8.17.0",
     "ajv-formats": "^3.0.0",
     "backlog.md": "1.46.0",
+    "commander": "^12.1.0",
     "jscpd": "^4.0.0",
     "markdown-it": "^14.1.0",
     "peggy": "^5.0.0",

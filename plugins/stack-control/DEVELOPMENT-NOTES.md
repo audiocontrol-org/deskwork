@@ -2,6 +2,97 @@
 
 ---
 
+## 2026-06-18: Offing friction → roadmap edge-mutation+cluster: design, prior-art, a foundational ADR, and a runnable spec
+
+**Goal:** Review the `offing` project's roadmap-clustering friction (from its Claude Code session), capture a remediation — and, as the operator pulled scope upward, design the feature, research prior art, settle a foundational store-architecture question, and author a runnable spec.
+
+**Accomplished:**
+- Captured the offing dogfood friction as backlog **TASK-242** + a roadmap remediation node; **folded the reparent gap (TASK-137)** into it; added the self-documenting requirement.
+- Fixed roadmap `reconcile` drift (`terminal-closure` in-flight → shipped).
+- Drove the **design front door**: brainstormed the feature (5 forks), operator-approved (designing gate **7/7**), design record on disk.
+- **Prior-art research** (deep-research workflow, 101 agents): mapped Backlog.md / Beads / Org-mode+Org Edna / markdown-plan / Airflow / clap·Typer·Cobra·oclif. Found that **Backlog.md (an existing dependency) already ships ~80% of 027's operations** (self-doc CLI, edit-existing deps, grouping, sequence).
+- **Foundational decision + ADR** (`2026-06-18-governed-markdown-foundation-adr.md`): keep the governed-markdown foundation; adopt a parser **library** for CLI ergonomics; harden the `roadmap-model ← document-model` seam; recorded revisit-if triggers. Added durable rule `.claude/rules/governed-markdown-foundation.md`.
+- **Re-scoped 027** accordingly (~half the build), then drove the full Spec Kit chain `specify → clarify → plan → checklist → tasks → analyze` to **runnable** (`spec=yes plan=yes tasks=yes`; execute-check runnable; analyze **0 CRITICAL / 0 HIGH**). Node advanced through `design-approved` + `analyze-clean` to the **implementing** phase. Implementation deferred to a separate session (orchestrator/implementer boundary).
+
+**Didn't Work:**
+- The deep-research **verification phase was rate-limited** → the harness reported "all 25 claims refuted / inconclusive," a false headline (the adversarial verifiers never ran; votes were `0-0`). Recovered by directly WebFetch-verifying the two decisive leads (Beads, markdown-plan).
+- `session-end` auto-derived **"Commits: 0"** — the known long-lived-branch boundary bug (**TASK-39**); re-derived by hand below (AUDIT-04 convention).
+- Accidentally committed a throwaway review-server script (`.review-server.mjs`) via `git add -A` in commit `3800ed0a`; removed in the session-end commit.
+
+**Course Corrections:**
+- [PROCESS] The operator pulled scope **upward twice** (027 → the store → document-primitives wholesale), forcing a foundational reconsideration **before** building — which caught reinvention of Backlog.md's machinery before any code was written. The leverage was in *not building*.
+- [PROCESS] "A question is not an instruction": the backlog.md-overlap and prior-art questions were *answered/researched*, not acted on blindly; the spec chain was paused, not pushed through.
+- [PROCESS] Throwaway-path hygiene: `git add -A` swept a bare `.review-server.*` throwaway into a commit; prefer in-tree gitignored or `mktemp` paths for throwaways.
+
+**Insights:**
+- The highest-leverage move was **stopping to research prior art** instead of building: it converted a full bespoke build (shared parser + edge-verb suite) into a half-size *adopt-a-lib* feature **plus** a durable foundational decision (the ADR + rule) that prevents the same re-litigation next time.
+- The roadmap's **own friction bit us repeatedly while operating it**: setting `design-approved`, `analyze-clean`, and the scope re-scope all required hand-edits (no verb for node markers / scope / rename) — live confirmation of exactly the gap 027 fixes. Dogfooding surfaced the tool's holes faster than reasoning about them.
+- The deep-research "all refuted" failure mode is a trap: a rate-limited verifier defaults to *refuted*, which reads as "claims are false" rather than "verification didn't run." Check the vote shape (`0-0` = no verifier ran), not just the headline.
+
+**Quantitative:**
+- Commits: **14** since session-start `90082afb` (re-derived by hand — `session-end` boundary auto-derivation returned 0 on this long-lived branch, TASK-39). Includes the session-end record + the review-server-removal.
+- Files changed: ~21 files, +1026 / −13 (`git diff --stat 90082afb..HEAD`).
+- Backlog touched: **TASK-242** (created — offing friction), **TASK-137** (folded/re-pointed to the edge-mutation node).
+- Audit findings: none — orchestration/authoring session; per-phase governance (audit-barrage) runs in the implementation session, not here.
+
+## 2026-06-18: Skill-surface-mediation spike overturns the "inert hook" diagnosis — one-field fix, 026 graduated
+
+**Goal:** Pick up the next item from last session's log (`design:gap/skill-surface-mediation`),
+run the spike it called for, and — if resolvable — fix it, verify live, and close out 026.
+
+**Accomplished:**
+- **Ran the spike empirically (live, this session) and overturned last session's diagnosis.**
+  Instrumented the loaded plugin hook, ran a Bash positive control, invoked a skill via the
+  `Skill` tool, and observed `tool_name":"Skill","tool_input":{"skill":"feature-help"}`.
+  PreToolUse DOES fire for agent-initiated Skill calls — it was never "inert." The real bug:
+  the interceptor read `tool_input.skill_name` while the live field is `tool_input.skill`, so
+  every Skill payload extracted an empty identity and silently permitted the reach-around.
+- **Fixed it TDD-first** (commit `5f88b40e`): RED regression with the real `{skill:...}` shape;
+  `intercept.ts` reads `input.skill`; corrected the falsified field in research.md/tasks.md/
+  contracts; wrote `skill-surface-spike-research.md`. Full suite **1862 → 1863 GREEN** (+1 test).
+- **PR #485 opened + merged to `main`** (merge `772294c8`). Operator released **0.51.1**
+  carrying the fix.
+- **Live re-validation PASSED in installed 0.51.1:** raw `/speckit-implement` via the Skill
+  tool → DENIED (spec-execution redirect); `/speckit-analyze` → DENIED (spec-definition);
+  benign `/feature-help` → PERMITTED (SC-003 no-false-positive). Full live chain verified.
+- **Closure bookkeeping via governed verbs:** `design:gap/skill-surface-mediation` → shipped;
+  TASK-241 → Done via `roadmap close-related` (023 terminal closure on the `ref:` edge);
+  `design:feature/capability-interface-mediation` (026) → shipped (its only closure blocker
+  resolved + live-verified).
+
+**Didn't Work:**
+- **Last session's diagnosis was wrong**, and it cost real work — a roadmap node premised on
+  "the matcher is inert, find a new event (UserPromptExpansion)." The actual defect was a
+  one-field typo. Last session's intercept tests used `skill_name` on *both* sides, so they
+  passed green while the live surface permitted everything.
+- **`gh pr merge --auto --merge` merged #485 immediately while CI `test` was still pending** —
+  branch protection doesn't gate on that check. Relied on the local full-suite-green instead;
+  flagged honestly to the operator.
+
+**Course Corrections:**
+- [PROCESS] Operator chose to do the fix **inline** (small, well-scoped) rather than route it
+  through a separate implementation session.
+- [PROCESS] **Distrusted the docs answer** (claude-code-guide's, and the prior spike's
+  docs-derived field name) and settled the question **empirically** by instrumenting the live
+  hook — the project rule applies: when docs contradict observation, observe.
+
+**Insights:**
+- This is the textbook "**tested against the implementation's own assumption, not the real
+  contract**" blind spot. Green unit tests AND cross-model audit-barrage both missed it; the
+  **live install caught it** — exactly what the verify-in-a-formally-installed-release rule
+  exists for. The two are complementary, not redundant.
+- A **denied PreToolUse Skill call does not execute the skill** (confirmed: speckit-analyze /
+  speckit-implement never ran — I got the refusal, not the body). That is what makes the
+  interceptor a real gate, not an advisory.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 3
+  - chore(stack-control): close skill-surface mediation + graduate 026 (live-verified 0.51.1)
+  - chore(stack-control): bookkeep skill-surface spike resolution (roadmap + TASK-241)
+  - fix(stack-control): 026 skill-surface mediation reads tool_input.skill, not skill_name
+- Files changed: 8
+- Backlog touched: TASK-241
+
 ## 2026-06-18: Execute 026 capability-interface-mediation (7 phases) → PR #484 merged → live T018 validation
 
 **Goal:** Pick up the in-flight, runnable 026 spec; drive native implementation
