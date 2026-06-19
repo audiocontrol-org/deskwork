@@ -54,4 +54,21 @@ describe('detectClonesViaJscpd', () => {
 
     await expect(detectClonesViaJscpd({ root: missing, ignore: [] })).rejects.toThrow();
   }, 60_000);
+
+  // TASK-295 RED — when no file matches the scan format (a non-TypeScript tree),
+  // jscpd exits 0 and writes no report. That is "found zero files", not an
+  // engine failure: the runner must return no clones, NOT throw.
+  it('returns no clones when no files match the scan format (does not throw)', async () => {
+    fx = makeFixture();
+    const a = fx.install('a');
+    fx.writeFile(
+      'a/deploy.sh',
+      '#!/usr/bin/env bash\nset -euo pipefail\nfor i in 1 2 3 4 5; do\n  echo "step $i"\ndone\n',
+    );
+    fx.writeFile('a/index.php', '<?php\nfunction f($x) {\n  return $x + 1;\n}\necho f(1);\n?>\n');
+
+    const groups = await detectClonesViaJscpd({ root: a, ignore: [] });
+
+    expect(groups).toEqual([]);
+  }, 60_000);
 });

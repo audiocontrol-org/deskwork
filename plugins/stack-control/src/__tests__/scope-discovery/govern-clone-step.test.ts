@@ -39,6 +39,39 @@ describe('runCloneDetectionStep (govern implement-mode clone step)', () => {
     expect(out).toMatch(/clone/i);
   }, 60_000);
 
+  // TASK-295 RED — CUSTOMER-BLOCKING: on a non-TypeScript adopter installation
+  // (offing's Bash/PHP/WordPress runbook), jscpd matches zero files of the
+  // hardcoded typescript,tsx format, writes no report, and the resulting throw
+  // ABORTED govern before the language-agnostic barrage. The advisory clone
+  // step must be non-fatal when it finds no matching files: report zero clones
+  // and let govern proceed.
+  it('is non-fatal on a non-TypeScript installation (zero matching files)', async () => {
+    fx = makeFixture();
+    const a = fx.install('a');
+    // A Bash/PHP installation with NO .ts/.tsx files — jscpd finds 0 files.
+    fx.writeFile(
+      'a/deploy.sh',
+      '#!/usr/bin/env bash\nset -euo pipefail\nfor i in 1 2 3 4 5; do\n  echo "step $i"\ndone\necho done\n',
+    );
+    fx.writeFile(
+      'a/index.php',
+      '<?php\nfunction greet($name) {\n  return "hello " . $name;\n}\necho greet("world");\n?>\n',
+    );
+
+    let out = '';
+    const result = await runCloneDetectionStep({
+      repoRoot: a,
+      write: (s) => {
+        out += s;
+      },
+    });
+
+    expect(result.ran).toBe(true);
+    expect(result.groupCount).toBe(0);
+    expect(result.newCount).toBe(0);
+    expect(out).toMatch(/clone/i);
+  }, 60_000);
+
   it('is advisory when the repo is not a stack-control installation (no fail)', async () => {
     fx = makeFixture(); // no installation marker
     fx.writeFile('src/x.ts', 'export const x = 1;\n');
