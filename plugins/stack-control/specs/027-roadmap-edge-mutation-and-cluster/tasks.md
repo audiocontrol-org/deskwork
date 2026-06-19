@@ -55,10 +55,10 @@ Tests are REQUIRED (Constitution Principle I — Test-First, NON-NEGOTIABLE): ea
 
 ## Phase 6 — Polish & cross-cutting
 
-- [ ] T018 [P] Record the TWO deferred sibling roadmap items (FR-017): a capability item (edge-mutation verb set, absorbs TASK-137) and a surface-hygiene item (verb-surface consolidation rollout), each `ref`-linked back from this feature (FR-018). Use `stackctl roadmap add` (or `cluster`, dogfooding).
-- [ ] T019 [P] Verify `src/roadmap/mutations.ts` and `src/subcommands/roadmap.ts` are within the 300–500-line cap; refactor if over (CHK025, Principle VI).
-- [ ] T020 Run the full quickstart (Scenarios 1–6) against a fixture roadmap; confirm all pass and the real `ROADMAP.md` is untouched.
-- [ ] T021 Per-phase governance: run `stackctl govern --mode implement --phase <id>` at each phase boundary (per-phase, not batched — `feedback_govern_per_phase_not_batched`).
+- [X] T018 [P] Record the TWO deferred sibling roadmap items (FR-017): a capability item (edge-mutation verb set, absorbs TASK-137) and a surface-hygiene item (verb-surface consolidation rollout), each `ref`-linked back from this feature (FR-018). Use `stackctl roadmap add` (or `cluster`, dogfooding).
+- [X] T019 [P] Verify `src/roadmap/mutations.ts` and `src/subcommands/roadmap.ts` are within the 300–500-line cap; refactor if over (CHK025, Principle VI).
+- [X] T020 Run the full quickstart (Scenarios 1–6) against a fixture roadmap; confirm all pass and the real `ROADMAP.md` is untouched.
+- [X] T021 Per-phase governance: run `stackctl govern --mode implement --phase <id>` at each phase boundary (per-phase, not batched — `feedback_govern_per_phase_not_batched`).
 
 ## Dependencies & order
 
