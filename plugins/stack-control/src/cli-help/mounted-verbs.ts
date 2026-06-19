@@ -39,6 +39,13 @@ const ROADMAP_MEDIATION: Readonly<Record<string, MediationClass>> = {
   cluster: 'mutating',
   group: 'mutating',
   'close-related': 'mutating',
+  // 028 US2 — edge-mutation + marker verbs (all mutating).
+  'add-edge': 'mutating',
+  'remove-edge': 'mutating',
+  'move-edge': 'mutating',
+  rename: 'mutating',
+  'remove-node': 'mutating',
+  'approve-design': 'mutating',
 };
 
 const BACKLOG_MEDIATION: Readonly<Record<string, MediationClass>> = {
@@ -47,6 +54,10 @@ const BACKLOG_MEDIATION: Readonly<Record<string, MediationClass>> = {
   'import-github': 'mutating',
   'import-slush': 'mutating',
   promote: 'mutating',
+  // 028 US2 — terminal lifecycle verbs (all mutating).
+  done: 'mutating',
+  archive: 'mutating',
+  unpromote: 'mutating',
 };
 
 const INBOX_MEDIATION: Readonly<Record<string, MediationClass>> = {
@@ -80,6 +91,9 @@ export const MOUNTED: readonly MountedVerb[] = [
           'import-github': 'one-time import of open GitHub issues into the pile (dry-run unless --apply)',
           'import-slush': 'route audit-barrage parked residuals into the pile (dry-run unless --apply)',
           promote: 'promote an item into the feature-rigor tier (dry-run unless --apply)',
+          done: 'close an item with a --reason, recording status Done (dry-run unless --apply)',
+          archive: 'move a Done item out of the live store, kept readable (preserve-not-delete; dry-run unless --apply)',
+          unpromote: 'remove the promotion linkage an item carries (dry-run unless --apply)',
         },
         flagDescriptions: {
           type: 'item type: bug | gap (required for capture)',
@@ -87,6 +101,7 @@ export const MOUNTED: readonly MountedVerb[] = [
           body: 'detail body for the item',
           feature: 'feature slug to scope the slush import',
           to: 'promotion target ref',
+          reason: 'why the item is being closed (required for done)',
         },
         positionalName: 'id',
       }),

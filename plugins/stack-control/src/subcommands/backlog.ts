@@ -11,7 +11,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createBacklogBackend, BacklogError } from '../backlog/backend.js';
+import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
 import { resolveInstallationBacklog } from '../backlog/root.js';
 import { InstallationError } from '../config/errors.js';
 import { scaffoldKey } from '../setup/scaffold.js';
@@ -19,10 +19,12 @@ import { CAPTURE_TYPES, isCaptureType, typeLabelStamp } from '../backlog/mapping
 import { parseTarget, allowsBatch, TargetRefError } from '../backlog/promote-targets.js';
 import {
   promote,
+  unpromote,
   PromoteAlreadyPromotedError,
   PromoteDuplicateIdError,
   PromoteItemMissingError,
   PromotePartialWriteError,
+  UnpromoteNotPromotedError,
   type PromoteResult,
 } from '../backlog/promote.js';
 import {
@@ -55,6 +57,10 @@ export const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   'import-github': { valueFlags: [], apply: true, positionals: 0 },
   'import-slush': { valueFlags: ['feature'], apply: true, positionals: 0 },
   promote: { valueFlags: ['to'], apply: true, positionals: 1, unboundedPositionals: true },
+  // 028 US2 — terminal lifecycle verbs (all mutating; BACKLOG_MEDIATION).
+  done: { valueFlags: ['reason'], apply: true, positionals: 1 },
+  archive: { valueFlags: [], apply: true, positionals: 1 },
+  unpromote: { valueFlags: [], apply: true, positionals: 1 },
 };
 
 const ALL_VALUE_FLAGS: readonly string[] = [
@@ -114,13 +120,127 @@ function emitCapture(flags: Flags): void {
   }
   const root = ensureBacklogProject();
   const ref = flags.values.get('ref');
-  const id = createBacklogBackend({ cwd: root }).create({
+  const backend = createBacklogBackend({ cwd: root });
+  // Dedupe by --ref (028 FR-013, TASK-38): when --ref matches an existing item,
+  // report the existing id rather than silently creating a duplicate. The
+  // backend's exists() fails loud on an undecidable-negative (malformed store),
+  // mapped to exit 2 by the dispatcher — never a duplicate-on-doubt.
+  if (ref !== undefined && backend.exists(ref)) {
+    const existing = backend.list().find((i) => i.refs.includes(ref))!;
+    process.stdout.write(`backlog capture: ${existing.id} (already captured for ref ${ref})\n`);
+    return;
+  }
+  // Filename safety (028 FR-013, TASK-299): a long title is slugify+truncated to
+  // a safe filename inside the backend while the FULL title is preserved.
+  const id = backend.create({
     title,
     labels: typeLabelStamp(type),
     refs: ref !== undefined ? [ref] : [],
     body: flags.values.get('body'),
   });
   process.stdout.write(`backlog capture: ${id}\n`);
+}
+
+/**
+ * Terminal closure (028 B1, FR-010): the ONE closure mechanism. Dry-run by
+ * default; `--apply` routes through `backend.close` (status → `Done`). Missing /
+ * empty `--reason` → exit 2 (usage). An unknown id surfaces as a BacklogError
+ * from backend.close → exit 1 (handled HERE so the generic BacklogError→2
+ * dispatcher mapping does not mask the runtime exit-1).
+ */
+function emitDone(flags: Flags): void {
+  const id = requirePositional('backlog', flags.positionals, 'done requires an <id> positional');
+  const reason = requireMapValue('backlog', flags.values, 'reason');
+  if (reason.trim() === '') failUsage('backlog', '--reason <reason> must be non-empty');
+  if (!flags.apply) {
+    process.stdout.write(
+      `backlog done: dry-run — would close ${id} (reason: ${reason}) (use --apply to write)\n`,
+    );
+    return;
+  }
+  const backend = createBacklogBackend({ cwd: ensureBacklogProject() });
+  try {
+    backend.close(id);
+  } catch (err) {
+    if (err instanceof BacklogError) {
+      process.stderr.write(`backlog: ${err.message}\n`);
+      process.exit(1);
+    }
+    throw err;
+  }
+  process.stdout.write(`backlog done: closed ${id} (reason: ${reason})\n`);
+}
+
+/**
+ * Preserve-not-delete archive (028 B2, FR-011): relocate a terminal (`Done`)
+ * item OUT of the live store while keeping it readable. Dry-run by default.
+ * Archiving a non-terminal item → exit 2 (usage). An unknown id surfaces as a
+ * BacklogError from backend.archive → exit 1.
+ */
+function emitArchive(flags: Flags): void {
+  const id = requirePositional('backlog', flags.positionals, 'archive requires an <id> positional');
+  const backend = createBacklogBackend({ cwd: ensureBacklogProject() });
+  const item = backend.list().find((i) => i.id === id);
+  // Unknown id → exit 1 (fail-loud runtime), not exit 2.
+  if (item === undefined) {
+    process.stderr.write(`backlog: backlog item '${id}' not found — cannot archive\n`);
+    process.exit(1);
+  }
+  // Non-terminal archive → exit 2 (usage: archive a done item, not an open one).
+  if (item.status !== BACKLOG_DONE_STATUS) {
+    failUsage(
+      'backlog',
+      `cannot archive '${id}' — status is '${item.status}', not '${BACKLOG_DONE_STATUS}' (close it first with \`backlog done\`)`,
+    );
+  }
+  if (!flags.apply) {
+    process.stdout.write(`backlog archive: dry-run — would archive ${id} (use --apply to write)\n`);
+    return;
+  }
+  try {
+    backend.archive(id);
+  } catch (err) {
+    if (err instanceof BacklogError) {
+      process.stderr.write(`backlog: ${err.message}\n`);
+      process.exit(1);
+    }
+    throw err;
+  }
+  process.stdout.write(`backlog archive: archived ${id} (preserved)\n`);
+}
+
+/**
+ * Remove the promotion linkage (028 B3, FR-012) — the inverse of `promote`.
+ * Dry-run by default. An item with no promotion linkage → exit 2 (usage). An
+ * unknown id → exit 1 (runtime fail-loud). The promote-specific exit mapping is
+ * handled HERE so the generic BacklogError→2 dispatcher mapping does not mask a
+ * runtime exit-1.
+ */
+function emitUnpromote(flags: Flags): void {
+  const id = requirePositional('backlog', flags.positionals, 'unpromote requires an <id> positional');
+  const backend = createBacklogBackend({ cwd: ensureBacklogProject() });
+  try {
+    const res = unpromote({ id, apply: flags.apply, backend });
+    if (res.applied) {
+      process.stdout.write(`backlog unpromote: removed promotion linkage on ${id}\n`);
+    } else {
+      process.stdout.write(
+        `backlog unpromote: dry-run — would remove promotion linkage on ${id} (use --apply to write)\n`,
+      );
+    }
+  } catch (err) {
+    // Nothing-to-unpromote → exit 2 (usage).
+    if (err instanceof UnpromoteNotPromotedError) {
+      process.stderr.write(`backlog: ${err.message}\n`);
+      process.exit(2);
+    }
+    // Unknown item / backend fail-loud → exit 1.
+    if (err instanceof PromoteItemMissingError || err instanceof BacklogError) {
+      process.stderr.write(`backlog: ${err.message}\n`);
+      process.exit(1);
+    }
+    throw err;
+  }
 }
 
 /** Resolve open issues for the import: a test seam reads a JSON file (no
@@ -268,7 +388,7 @@ export async function runBacklogCli(args: string[]): Promise<void> {
   if (subaction === undefined || subaction.startsWith('--')) {
     failUsage(
       'backlog',
-      'a subaction is required (usage: backlog <capture|list|import-github|import-slush|promote> [flags])',
+      'a subaction is required (usage: backlog <capture|list|import-github|import-slush|promote|done|archive|unpromote> [flags])',
     );
   }
   const flags = scanFlags(args.slice(1));
@@ -290,10 +410,19 @@ export async function runBacklogCli(args: string[]): Promise<void> {
       case 'promote':
         emitPromote(flags);
         return;
+      case 'done':
+        emitDone(flags);
+        return;
+      case 'archive':
+        emitArchive(flags);
+        return;
+      case 'unpromote':
+        emitUnpromote(flags);
+        return;
       default:
         failUsage(
           'backlog',
-          `unknown subaction '${subaction}' (known: capture, list, import-github, import-slush, promote)`,
+          `unknown subaction '${subaction}' (known: capture, list, import-github, import-slush, promote, done, archive, unpromote)`,
         );
     }
   } catch (err) {

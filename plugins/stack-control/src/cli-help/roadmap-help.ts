@@ -48,8 +48,15 @@ const SUMMARIES: Readonly<Record<string, string>> = {
   defer: 'set or clear an item\'s deferred-until condition (dry-run unless --apply)',
   cluster: 'group items under a created-or-reused parent, optionally chaining deps (dry-run unless --apply)',
   group: 'alias of cluster — group items under a created-or-reused parent (dry-run unless --apply)',
-  reconcile: 'report status drift, orphan spec dirs, and unresolved correspondences (report-only)',
+  reconcile:
+    'report status drift, orphan spec dirs, unresolved correspondences (report-only; --unorphan <spec> resolves an orphan into a node)',
   'close-related': 'close the backlog ids a terminal item resolves (dry-run unless --apply)',
+  'add-edge': 'add a typed edge (--field <f> --to <target>) and re-validate (dry-run unless --apply)',
+  'remove-edge': 'remove a typed edge target (--field <f> --to <target>) (dry-run unless --apply)',
+  'move-edge': 'reparent a typed edge (--field <f> --from <p> --to <p>) in one validated move (dry-run unless --apply)',
+  rename: 'rename a node and repoint every dependent edge (dry-run unless --apply)',
+  'remove-node': 'remove a node, refusing loud if it is still an edge target (dry-run unless --apply)',
+  'approve-design': 'record the design-approved marker (--analyze-clean for the symmetric one; --clear negates) (dry-run unless --apply)',
 };
 
 /** The summary for a subaction, failing loud if a registered subaction has none
@@ -80,6 +87,7 @@ export function flagNamesFor(grammar: SubactionGrammar): readonly string[] {
   if (grammar.apply) names.push('--apply');
   if (grammar.clear === true) names.push('--clear');
   if (grammar.chain === true) names.push('--chain');
+  if (grammar.analyzeClean === true) names.push('--analyze-clean');
   return names;
 }
 
@@ -87,7 +95,9 @@ export function flagNamesFor(grammar: SubactionGrammar): readonly string[] {
  * `--<value-flag> <value>`). The description column aligns to the widest such
  * token across the subaction's flag set. */
 function flagToken(flag: string): string {
-  if (flag === '--apply' || flag === '--clear' || flag === '--chain') return flag;
+  if (flag === '--apply' || flag === '--clear' || flag === '--chain' || flag === '--analyze-clean') {
+    return flag;
+  }
   if (flag === '--doc') return '--doc <path>';
   return `${flag} <value>`;
 }
@@ -107,6 +117,7 @@ function flagLine(
   else if (flag === '--apply') desc = 'write the change (default: dry-run)';
   else if (flag === '--clear') desc = 'clear the condition';
   else if (flag === '--chain') desc = 'wire a depends-on chain over the children (in argument order)';
+  else if (flag === '--analyze-clean') desc = 'record the symmetric analyze-clean marker';
   else {
     const isStatusFlag =
       (flag === '--to' && grammar === SUBACTION_SPECS.advance) || flag === '--status';

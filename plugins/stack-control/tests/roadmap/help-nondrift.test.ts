@@ -164,6 +164,34 @@ const VALID_INVOCATION: Readonly<Record<string, ValidInvocation>> = {
   // close-related needs a TERMINAL item; design:feature/a is `shipped` (terminal)
   // and records no resolved ids, so the dry-run exits 0 ("nothing to close").
   'close-related': { argv: ['design:feature/a'], expectExit0: true },
+  // 028 US2 edge-mutation + marker verbs — minimal valid invocations against the
+  // chain fixture (a shipped, b/c planned: c depends-on b depends-on a).
+  // add-edge: a part-of edge c→a (a shipped, no cycle).
+  'add-edge': {
+    argv: ['impl:feature/c', '--field', 'part-of', '--to', 'design:feature/a'],
+    expectExit0: true,
+  },
+  // remove-edge: c already has depends-on b — removing it is valid.
+  'remove-edge': {
+    argv: ['impl:feature/c', '--field', 'depends-on', '--to', 'impl:feature/b'],
+    expectExit0: true,
+  },
+  // move-edge: reparent c's depends-on from b onto a (a shipped, no cycle).
+  'move-edge': {
+    argv: [
+      'impl:feature/c',
+      '--field', 'depends-on',
+      '--from', 'impl:feature/b',
+      '--to', 'design:feature/a',
+    ],
+    expectExit0: true,
+  },
+  // rename: c is targeted by nothing, so renaming it repoints nothing — valid.
+  rename: { argv: ['impl:feature/c', '--to', 'impl:feature/c2'], expectExit0: true },
+  // remove-node: c is the leaf (no inbound edge) — removable.
+  'remove-node': { argv: ['impl:feature/c'], expectExit0: true },
+  // approve-design: exercise the --analyze-clean marker switch on any node.
+  'approve-design': { argv: ['design:feature/a', '--analyze-clean'], expectExit0: true },
 };
 
 /** The completeness guard: every registered subaction has a check (3) fixture.
