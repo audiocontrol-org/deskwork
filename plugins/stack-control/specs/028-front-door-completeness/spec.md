@@ -23,6 +23,15 @@ Ground truth (2026-06-19 audit): **34 skills, 46 `stackctl` verbs, but only 2 ve
 
 **Root cause:** the front door grew as N parallel, independently-maintained surfaces — SKILL.md vs. the verb's real flags vs. the source vs. the mediation registry — and the drift between them *is* the walls. The fix is a single source of truth plus a mechanical guard.
 
+## Clarifications
+
+### Session 2026-06-19
+
+- Q: Should read-only query verbs be exempt from 026 mediation? → A: Yes — mediation gates only mutation/state-bearing operations; read-only query verbs are exempt (FR-050).
+- Q: How does the registry enumerate fronted in-session `/speckit-*` ops that are not `stackctl` verbs? → A: Skill-declared capability ids — each skill declares the capabilities it fronts (the same declarations 026 uses); no separate hand-authored supplement (FR-051).
+- Q: Is the generated OpenAPI/JSON-schema descriptor artifact in scope for this feature? → A: Yes, in v1 — generated from the command tree, with a round-trip test (FR-052).
+- Q: Backlog terminal vocabulary — one disposition or distinct states? → A: One disposition (`done`) + `--reason`, with `archive` separate (preserve-not-delete) (FR-010/FR-011).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 — Discover any operation without reading source (Priority: P1)
@@ -155,11 +164,11 @@ A contributor adds a new backend verb, deletes a skill, or breaks a `--help`. `c
 - **FR-040**: New operations MUST be sub-actions of existing skills (not new skills), except the guardrail skill (`/stack-control:check-front-door`) and, if needed, the recovery verb under the existing `front-door`/`mediate-*` family.
 - **FR-041**: Any OpenAPI/JSON-schema descriptor artifact MUST be a generated downstream output of the command tree, never an authored source of truth.
 
-**Open — carried to `/speckit-clarify` (not silently resolved)**
+**Mediation boundary, registry source, and generated artifact (resolved — see Clarifications 2026-06-19)**
 
-- **FR-050**: Read-only query verbs (`roadmap next/blocked/graph`, `backlog list`, `session-start`) [NEEDS CLARIFICATION: are read-only query verbs mediation-exempt so the interceptor only gates mutation-bearing operations, or must they also be marker-bracketed? Impacts the security boundary and the `check-front-door` "mediation-registered" assertion.]
-- **FR-051**: The fronted-operations registry [NEEDS CLARIFICATION: how does it enumerate fronted operations that are in-session `/speckit-*` steps driven by execute/define and are NOT stackctl verbs in the command tree — via skill-declared capability ids, an explicit supplement, or both? Determines completeness of the guardrail.]
-- **FR-052**: The generated descriptor artifact [NEEDS CLARIFICATION: is the OpenAPI/JSON-schema-analogue artifact in scope for this feature, or a follow-on? It is downstream of the command tree either way (FR-041), so shipping it now is optional polish vs. deferred output.]
+- **FR-050**: Read-only query verbs (`roadmap next/blocked/graph`, `backlog list`, `session-start`, and the other non-mutating queries) MUST be mediation-exempt: the interceptor gates only mutation/state-bearing operations. `check-front-door`'s mediation-registered assertion (FR-031c) therefore applies ONLY to mutation-bearing operations — a read-only verb is conformant without a mediation registration. The registry MUST record each operation's mediation class (mutating vs. read-only) so the assertion is mechanical.
+- **FR-051**: The fronted-operations registry MUST enumerate fronted operations that are in-session `/speckit-*` steps (driven by `execute`/`define`, not `stackctl` verbs) via **skill-declared capability ids** — each `/stack-control:*` skill declares the capabilities/backend ops it fronts (the same declarations 026 mediation already uses, e.g. `spec-definition`, `spec-execution`). `check-front-door` reads those declarations together with the command tree; there is NO separate hand-authored supplement (single source per skill).
+- **FR-052**: The generated descriptor artifact (an OpenAPI/JSON-schema-analogue manifest for external consumers — docs site, MCP exposure, cross-vendor parity) IS in scope for this feature. It MUST be generated from the command tree (FR-041 — never an authored source) and emitted as a build/CLI artifact, with a test asserting it round-trips the command tree (every verb, sub-action, and flag present in the artifact).
 
 ### Key Entities
 
@@ -186,7 +195,7 @@ A contributor adds a new backend verb, deletes a skill, or breaks a `--help`. `c
 ## Assumptions
 
 - **Single-source descriptor = the existing parser's command tree** (commander, already in use), per the governed-markdown-foundation ADR ("adopt a parser library; help derives from one command definition") and the approved design record. No new parser framework is introduced.
-- **Backlog terminal vocabulary = one disposition (`done`/`closed`) + `--reason`, with `archive` separate.** A richer `closed` vs `done` distinction is a reasonable-default deferral flagged for `/speckit-clarify`; the default here is the single disposition (mirrors `inbox drop`).
+- **Backlog terminal vocabulary = one disposition (`done`) + `--reason`, with `archive` separate** (decided — Clarifications 2026-06-19). The `--reason` carries fixed-vs-wontfix nuance; mirrors `inbox drop`; databases preserve, never delete.
 - **Gate firing surfaces honor "no test infrastructure in CI"** (project rule): `check-front-door` runs as a local pre-PR smoke plus an `implement`/`review` skill-body gate and a `session-start` advisory — not a CI job. Flagged for `/speckit-clarify` to confirm exact surfaces.
 - **This program runs on one long-lived branch** with numbered spec dirs; the spec dir is resolved via the `CLAUDE.md` SPECKIT markers, not the git branch (TF-09). No per-feature branch is created.
 - **`multi:feature/lifecycle-industrialization` owns** the one-move promotion + post-release resolution mechanization (FR-019); this feature depends only on their raw operations existing and being fronted.

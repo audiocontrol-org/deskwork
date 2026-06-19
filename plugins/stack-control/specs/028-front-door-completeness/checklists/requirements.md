@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,10 +31,11 @@
 
 ## Notes
 
-- Three `[NEEDS CLARIFICATION]` markers remain by design (FR-050/051/052) — they are
-  the genuinely-open design forks the operator instructed be carried into
-  `/speckit-clarify`, not resolved silently in the spec. They are the next step's
-  input, not a blocker to writing the spec.
+- The three `[NEEDS CLARIFICATION]` markers (FR-050/051/052) were resolved with the
+  operator in the `/speckit-clarify` session 2026-06-19 and encoded into the spec
+  (read-only mediation exemption; skill-declared registry source; generated artifact
+  in v1). The terminal-vocabulary modeling choice was also settled. See the
+  `## Clarifications` section.
 - The command-tree-as-descriptor decision intentionally names a mechanism (a parser
   command tree) in the Assumptions section because it is a settled architectural
   decision from the approved design record + the governed-markdown-foundation ADR,
