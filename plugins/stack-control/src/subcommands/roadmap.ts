@@ -215,10 +215,12 @@ function emitDefer(flags: Flags, opts: LoadOptions): void {
 /** Build the `cluster` input from the parsed flags (positional parent + --children). */
 function clusterInputFrom(flags: Flags, verb: string): ClusterInput {
   const parentId = requireId(flags, verb);
-  const children = requireValue(flags, 'children')
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  const children = requireValue(flags, 'children').split(',').map((s) => s.trim());
+  // A stray/trailing comma yields an empty id; fail loud rather than silently
+  // dropping it (consistent with the empty `--part-of` guard; AUDIT-BARRAGE-codex-01).
+  if (children.some((s) => s.length === 0)) {
+    failUsage('roadmap', `${verb}: --children has an empty id (a stray or trailing comma)`);
+  }
   return { parentId, children, chain: flags.chain, summary: flags.values.get('summary') };
 }
 

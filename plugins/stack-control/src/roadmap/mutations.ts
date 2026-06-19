@@ -232,8 +232,13 @@ export function decompose(
     }).join('\n'),
   );
 
-  const repoint = (targets: readonly string[]): readonly string[] =>
-    targets.flatMap((t) => (t === identifier ? into : [t]));
+  // Repoint an edge that referenced the decomposed item onto ALL its parts,
+  // de-duplicating: a unit already referencing one of `into` (e.g. grouped under
+  // both the decomposed item AND one of its parts) must not gain a duplicate
+  // target (AUDIT-BARRAGE-codex-02). Order-preserving dedup.
+  const repoint = (targets: readonly string[]): readonly string[] => [
+    ...new Set(targets.flatMap((t) => (t === identifier ? into : [t]))),
+  ];
 
   const bodies: string[] = [];
   for (const unit of doc.units) {

@@ -49,6 +49,19 @@ describe('027 T011 — roadmap cluster refusals (exit 2, byte-for-byte unchanged
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
 
+  it('a stray comma in --children (a,,b) → exit 2, not a silent drop (codex-01)', () => {
+    const docPath = tmpGraph();
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'roadmap', 'cluster', 'multi:feature/grp',
+      '--children', 'impl:feature/b,,impl:feature/c',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('--children has an empty id');
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
   it('omitted --children → exit 2, zero write', () => {
     const docPath = tmpGraph();
     const before = readFileSync(docPath, 'utf8');
