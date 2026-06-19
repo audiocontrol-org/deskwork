@@ -380,3 +380,18 @@ Surface:    tests/cli/parser-adapter.test.ts:134-142
 The changed assertion strengthens the diagnostic text for `--bogus`, but it drops the explicit `expect(r.stderr).toContain('roadmap:')` check while the test name still says it verifies “the roadmap: message shape.” A regression like `error: unknown flag --bogus for 'advance'` would now pass line 141 and line 142, even though the mounted command would no longer preserve the flat dispatcher’s `roadmap:` prefix.
 
 Blast radius is low because this is a test-only hardening gap, not a runtime defect in the audited diff. It still matters because this feature is specifically about preserving usage-error shapes; the reasonable fix is to keep line 141 and also assert the full prefixed diagnostic, e.g. `roadmap: unknown flag --bogus for 'advance'`, or add a separate prefix assertion.
+
+## 2026-06-19 — audit-barrage lift (20260619T004848706Z-027-roadmap-edge-mutation-and-cluster-phase-3)
+
+### AUDIT-20260619-09 — `--part-of` is asserted as shown but never exercised as accepted
+
+Finding-ID: AUDIT-20260619-09
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/help-nondrift.test.ts:85-96
+
+The test name and header claim that every shown value flag is accepted by the parser, and line 90 specifically asserts that `--part-of` appears in `roadmap add --help`. But the actual CLI invocation on lines 91-95 only passes `--status`, `--scope`, and `--doc`; it never passes `--part-of`. That means a regression where help lists `--part-of` but the `add` parser rejects or mishandles it would still pass this acceptance check.
+
+The blast radius is low because this is a test-coverage defect, not an adopter-facing runtime defect in the diff itself. It weakens the stated CHK015 invariant and could let a help/parser drift bug escape. A reasonable fix is to include a valid `--part-of <id>` argument in the `roadmap add` invocation, or iterate over shown value flags with per-flag valid fixtures so each advertised flag is actually parsed.

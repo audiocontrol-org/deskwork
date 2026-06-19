@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "featureSlug": "027-roadmap-edge-mutation-and-cluster",
+  "phaseId": "3",
+  "checkpoint": "phase-3",
+  "auditLogSection": "phase-3",
+  "scopeFingerprint": "b1cfe9910cc01d56ed0dbe70182b9b807f79bc4b25e6f1d589384817993a39f5",
+  "passedAt": "2026-06-19T00:53:49.875Z",
+  "governedPaths": [
+    "tests/roadmap/help-nondrift.test.ts",
+    "tests/roadmap/help-surface.test.ts",
+    "src/subcommands/roadmap.ts"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/tests/roadmap/help-nondrift.test.ts",
+    "plugins/stack-control/tests/roadmap/help-surface.test.ts"
+  ]
+}
