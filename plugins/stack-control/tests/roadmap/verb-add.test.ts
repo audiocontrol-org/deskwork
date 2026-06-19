@@ -159,7 +159,20 @@ describe('stackctl roadmap add verb (T025)', () => {
       '--doc', docPath, '--apply',
     ]);
     expect(r.status).toBe(2);
-    expect(r.stderr).toContain('--part-of was given but lists no parent id');
+    expect(r.stderr).toContain('--part-of has an empty id');
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('a stray comma in --part-of (a,,b) → exit 2, not a silent drop (codex-01)', () => {
+    const docPath = tmpCopy('chain');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'roadmap', 'add', 'impl:gap/z2',
+      '--part-of', 'design:feature/a,,impl:feature/b',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('--part-of has an empty id');
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
 });

@@ -153,15 +153,13 @@ function addInputFrom(flags: Flags): AddInput {
   const v = flags.values;
   const dependsOn = v.get('depends-on');
   const partOfRaw = v.get('part-of');
-  const partOf =
-    partOfRaw === undefined
-      ? undefined
-      : partOfRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
-  // A present-but-empty `--part-of` (e.g. `--part-of ,`) is a malformed grouping
-  // flag, NOT "no parent": fail loud rather than silently dropping the edge and
-  // reporting a successful, ungrouped add (AUDIT-BARRAGE-codex-01).
-  if (partOf !== undefined && partOf.length === 0) {
-    failUsage('roadmap', 'add: --part-of was given but lists no parent id');
+  const partOf = partOfRaw === undefined ? undefined : partOfRaw.split(',').map((s) => s.trim());
+  // A present-but-empty `--part-of` or a stray/trailing comma (`--part-of ,` or
+  // `a,,b`) is a malformed grouping flag, NOT "no parent": fail loud rather than
+  // silently dropping the edge and reporting a successful, ungrouped add
+  // (AUDIT-BARRAGE-codex-01; consistent with the `--children` empty-id guard).
+  if (partOf !== undefined && (partOf.length === 0 || partOf.some((s) => s.length === 0))) {
+    failUsage('roadmap', 'add: --part-of has an empty id (a stray or trailing comma)');
   }
   return {
     identifier,
