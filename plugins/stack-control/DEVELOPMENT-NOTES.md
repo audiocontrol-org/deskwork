@@ -2,27 +2,40 @@
 
 ---
 
-## 2026-06-19: <!-- session title -->
+## 2026-06-19: TASK-295 customer blocker — govern clone-step non-fatal on non-TS repos; fixed, shipped 0.51.3, validated live, closed out
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Take up the next-session flag — the **CUSTOMER-BLOCKING** `impl:fix/govern-clone-step-language-agnostic` (TASK-295 / GH #487): govern's advisory clone step aborted on any non-TypeScript adopter repo (offing's Bash/PHP/WordPress runbook), making `/stack-control:execute` unusable there. Fix it, ship it, validate on a real install, close it out.
 
 **Accomplished:**
-- <!-- compose -->
+- **Root-caused by reproduction:** `runJscpd` hardcoded `--format typescript,tsx`; on a non-TS tree jscpd finds zero files, **exits 0, writes no report**, and the "did not write jscpd-report.json" throw propagated through the clone step and **aborted govern before the language-agnostic barrage**. Probed jscpd to establish the discriminator: clean exit (0) + no report = zero qualifying files (benign); non-zero exit + no report = genuine engine error.
+- **Fixed (operator-scoped: non-fatal only):** `runJscpd` returns `null` on clean-exit-with-no-report → `detectClonesViaJscpd` maps to zero clones; non-zero exit still throws (preserves the "missing scan root throws" contract). Clone **detection stays TS/TSX → no adopter baseline churn**. RED-first: a runner unit test + a govern-clone-step regression, both failing with the customer's exact throw pre-fix. Full suite **1968 green**.
+- **Shipped + verified live:** merged via **PR #489** (CI green); released **v0.51.3**. Validated on the **installed** plugins, same non-TS install: **0.51.2 → exit 2** (the abort) vs **0.51.3 → exit 0** ("No clone groups detected"). Posted the before/after evidence on #487.
+- **Closed out:** roadmap node advanced **planned → shipped** (sanctioned `roadmap advance`); #487 already closed (evidence comment added).
+- **Scope discipline:** asked the operator the one genuine fork (non-fatal-only vs multilingual detection) → non-fatal only; **captured TASK-296** (deferred multilingual clone detection) so it doesn't vanish with the shipped node.
+- **Rule refinement:** added a scope carve-out to `.claude/rules/agent-discipline.md` — the full spec-kit chain + per-phase governance is for spec-driven feature execution; **point fixes/targeted bugfixes skip govern** (operator decision).
 
 **Didn't Work:**
-- <!-- compose -->
+- **session-end auto-derived "Commits: 0"** again — the long-lived-branch boundary bug (TASK-39 / TASK-59). Re-derived by hand below (AUDIT-04). Likewise "backlog progressed (0)" despite commits referencing TASK-295/296/297.
+- **Could not close TASK-295 in the backlog through the sanctioned interface:** `stackctl backlog` has no Done/close/status verb, and the Backlog.md backend is (correctly) mediated by the 026 interceptor — so there was no sanctioned path to mark the completed item Done. The roadmap node carried the closure; captured the gap as **TASK-297**.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Operator: *"I don't care about governance for point solutions and targeted bug fixes"* — confirmed this fix didn't need the govern/barrage ceremony; recorded as a rule carve-out so future sessions don't reflexively govern a one-file bugfix.
+- [PROCESS] Operator: after validating, *"close out the roadmap item if valid"* — drove the live install verification → roadmap shipped, rather than stopping at the in-tree commit.
 
 **Insights:**
-- <!-- compose -->
+- The advisory clone step should have been **non-fatal from the start** — an advisory that can abort the thing it advises is a latent blocker for every non-TS adopter. The cross-model barrage (the real governance teeth) is already language-agnostic.
+- The **backlog has no closure operation** through its own interface (TASK-297). Mediation is working as designed (it blocked the backend CLI), but it exposed that "close a backlog item" isn't a sanctioned verb at all — a basic gap.
 
-**Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 0
-  - (no commits this session)
-- Files changed: 0
-- Backlog touched: (none)
+**Quantitative (re-derived from git; session boundary = prior session-end d7716997):**
+- Commits: 5 (+ PR #489 merged to main; auto-derivation reported 0 — boundary bug TASK-39/59)
+  - e59bec58 fix(govern): clone-step non-fatal on zero matching files (TASK-295 / #487)
+  - 870bc6f2 docs(rules): scope the workflow protocol — point fixes skip govern
+  - e0cb641c chore(backlog): TASK-296 — deferred multilingual clone-detection enhancement
+  - 83f777cd roadmap: close out impl:fix/govern-clone-step-language-agnostic (shipped, validated 0.51.3)
+  - 001bd1a4 docs(session): session-end record
+- Files changed: 9
+- Backlog touched: TASK-295 (fixed + roadmap-closed), TASK-296 (captured), TASK-297 (captured) — auto-derivation reported none (boundary bug)
+- Tests: 1966 → 1968 (+2: the TASK-295 RED runner-unit + govern-clone-step regression)
 
 ## 2026-06-19: 027 roadmap edge-mutation + cluster — implemented, governed (2 overrides), shipped 0.51.2; govern-tooling friction surfaced + captured
 
