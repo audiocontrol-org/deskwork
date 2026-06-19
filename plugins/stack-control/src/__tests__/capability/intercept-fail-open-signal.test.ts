@@ -38,4 +38,21 @@ describe('bin/intercept fail-open is observable (028 T091)', () => {
     // A diagnosable reason is surfaced (the underlying exit code and the front-door hint).
     expect(shim).toMatch(/could not be evaluated|mediation/i);
   });
+
+  // claude-06: the shell adapter is the PRODUCTION spawn-failure path (a stackctl spawn
+  // failure happens before any TS runs). `failOpenSignal` is the vendor-neutral, test-pinned
+  // SPECIFICATION of that notice's load-bearing content. This guard ties the two together so
+  // the TS helper is NOT dead code — its required phrases must also appear in the shipped
+  // shell notice, so an edit to either side that drops a load-bearing phrase fails CI.
+  it('shell spawn-unreachable notice carries the SAME load-bearing content as failOpenSignal', () => {
+    // The shell handles the stackctl-unreachable branch (`[ ! -x "$STACKCTL" ]`).
+    expect(shim).toMatch(/-x "\$STACKCTL"|! -x/);
+    // Both notices must name: the mediation skip, the best-effort permit, and that the
+    // per-phase graduate gate (not the interceptor) is the load-bearing guarantee.
+    const signal = failOpenSignal('unreachable');
+    for (const phrase of [/mediation/i, /best-effort|best effort/i, /graduate gate/i, /NOT a silent|not a silent bypass/i]) {
+      expect(signal).toMatch(phrase);
+      expect(shim).toMatch(phrase);
+    }
+  });
 });

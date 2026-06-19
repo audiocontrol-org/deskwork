@@ -7,6 +7,7 @@
 
 import { matchCapability } from './identity.js';
 import { decideMediation, type MediationDecision } from './mediate.js';
+import { mediationClassForIdentity } from './mediation-class.js';
 import { CAPABILITY_REGISTRY, type CapabilityRegistry, type Surface } from './registry.js';
 
 /** The PreToolUse stdin payload fields this adapter reads (`Skill` → `tool_input.skill`,
@@ -99,7 +100,12 @@ export function interceptDecision(payload: HookPayload, deps: InterceptDeps): Me
     };
   }
 
-  return decideMediation(registry, surface, identity, deps.resolveActive(cwd, session));
+  // Derive the op's mediation class so the FR-050 read-only exemption fires on the LIVE
+  // hook path symmetrically with mediate-check: a read-only fronted query (`backlog list`)
+  // permits even with no marker; every mutating fronted op still refuses unless marked
+  // (AUDIT-BARRAGE-codex-01 / claude-01).
+  const mediationClass = mediationClassForIdentity(surface, identity);
+  return decideMediation(registry, surface, identity, deps.resolveActive(cwd, session), mediationClass);
 }
 
 /**
@@ -109,6 +115,16 @@ export function interceptDecision(payload: HookPayload, deps: InterceptDeps): Me
  * the per-phase graduate gate, not the interceptor), but it must NEVER do so SILENTLY:
  * this notice is emitted so the skipped mediation is visible and diagnosable. FR-REQUIRED
  * loud fail-open, NOT a hidden fallback. `reason` carries the underlying failure detail.
+ *
+ * PRODUCTION CALL PATH (AUDIT-BARRAGE-claude-06): a stackctl SPAWN failure happens BEFORE
+ * any TypeScript runs (the interpreter never starts), so it can only be handled by the
+ * shell adapter `bin/intercept`, which emits its own stderr notice. This function is the
+ * VENDOR-NEUTRAL, test-pinned specification of that notice's required, load-bearing content
+ * (it names the skip, the best-effort permit, and the per-phase graduate-gate guarantee) —
+ * the single source a non-shell adapter (or a contract test) reuses so the two notices
+ * cannot silently diverge. It is intentionally NOT dead: `intercept-fail-open-signal.test.ts`
+ * asserts BOTH that this returns the required content AND that the shipped shell notice
+ * carries the same load-bearing phrases, so a future edit to either is caught by CI.
  */
 export function failOpenSignal(reason: string): string {
   return (

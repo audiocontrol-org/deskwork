@@ -15,9 +15,11 @@ const noMarker = (): ReadonlySet<string> => new Set<string>();
 const PLUGIN_ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', '..');
 
 describe('interceptDecision (026 T015)', () => {
-  it('refuses a raw Bash backend with no marker', () => {
+  it('refuses a raw MUTATING Bash backend with no marker', () => {
+    // `backlog capture` is mutating — mediation gates it. (`backlog list` is read-only and
+    // is now FR-050-exempt; covered by read-only-exemption-live.test.ts.)
     const d = interceptDecision(
-      { tool_name: 'Bash', tool_input: { command: 'backlog list' }, session_id: 's', cwd: '/x' },
+      { tool_name: 'Bash', tool_input: { command: 'backlog capture --type bug' }, session_id: 's', cwd: '/x' },
       { resolveActive: noMarker },
     );
     expect(d.verdict).toBe('refuse');
@@ -95,6 +97,26 @@ describe('interceptDecision (026 T015)', () => {
       { resolveActive: noMarker },
     );
     expect(d.verdict).toBe('permit'); // SC-003: argv0 is `cat`, not `backlog`
+  });
+
+  it('PERMITS a mutating fronted backend OUTSIDE any installation (FR-020 no-installation short-circuit)', () => {
+    // The production hook caller supplies `resolveInstalled: findInstallation(cwd) !== null`
+    // (AUDIT-BARRAGE-claude-02). Mirror that here with `() => false`: a mutating `backlog
+    // capture` issued outside an installation must permit, not refuse — and without resolving
+    // the marker (the short-circuit fires before decideMediation).
+    let resolvedActive = false;
+    const d = interceptDecision(
+      { tool_name: 'Bash', tool_input: { command: 'backlog capture --type bug' }, session_id: 's', cwd: '/x' },
+      {
+        resolveInstalled: () => false,
+        resolveActive: () => {
+          resolvedActive = true;
+          return new Set();
+        },
+      },
+    );
+    expect(d.verdict).toBe('permit');
+    expect(resolvedActive).toBe(false); // short-circuited before the marker read
   });
 });
 

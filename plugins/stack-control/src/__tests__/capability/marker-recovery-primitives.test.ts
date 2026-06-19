@@ -80,6 +80,42 @@ describe('listMarker (028 T083 — tolerant read)', () => {
       fx.cleanup();
     }
   });
+
+  // TOCTOU (claude-05): a concurrent clearMarker (which holds the lock) can delete the
+  // file between listMarker's existsSync check and its read. An ENOENT from that race is
+  // "the marker is gone" (no marker), NOT "the marker is corrupt". A real filesystem cannot
+  // reproduce the race deterministically, so the read is driven through the `readFile`
+  // injectable seam (the same pattern as `now`) — the file tree itself stays a real fixture.
+  describe('TOCTOU — concurrent delete after existsSync', () => {
+    it('classifies an ENOENT read as "no marker" (corrupt:false), not corrupt:true', () => {
+      const fx = makeCapabilityFixture();
+      try {
+        enterFrontDoor(fx.root, 's1', 'backlog'); // a real, valid marker exists at check-time
+        const enoent: NodeJS.ErrnoException = new Error('ENOENT: no such file');
+        enoent.code = 'ENOENT';
+        const r = listMarker(fx.root, 's1', {
+          readFile: () => {
+            throw enoent; // the concurrent delete landed between existsSync and the read
+          },
+        });
+        expect(r.corrupt).toBe(false);
+        expect(r.entries).toEqual([]);
+      } finally {
+        fx.cleanup();
+      }
+    });
+
+    it('STILL reports corrupt:true for a non-ENOENT read failure (genuine corruption)', () => {
+      const fx = makeCapabilityFixture();
+      try {
+        fx.write('.stack-control/state/front-door/s1.json', 'not json {{{');
+        const r = listMarker(fx.root, 's1'); // a real unparseable file
+        expect(r.corrupt).toBe(true);
+      } finally {
+        fx.cleanup();
+      }
+    });
+  });
 });
 
 describe('clearMarker (028 T083 — delete by path, no parse)', () => {

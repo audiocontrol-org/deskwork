@@ -33,8 +33,13 @@ describe('mediate-check no-installation short-circuit (028 T079)', () => {
     expect(r.code).toBe(0);
   });
 
-  it('STILL refuses the same backend when an installation exists with no marker (no over-permit)', () => {
-    const r = mediateCheck(['--surface', 'bash', '--identity', 'backlog list', '--session', 's'], installedNoMarker);
+  it('STILL refuses a MUTATING backend when an installation exists with no marker (no over-permit)', () => {
+    // `backlog capture` is a mutating sub-action — mediation gates it. (`backlog list` is
+    // read-only and is now exempt; see live-path read-only-exemption tests.)
+    const r = mediateCheck(
+      ['--surface', 'bash', '--identity', 'backlog capture --type bug', '--session', 's'],
+      installedNoMarker,
+    );
     expect(r.code).toBe(1);
     expect(r.stderr).toContain('/stack-control:backlog');
   });

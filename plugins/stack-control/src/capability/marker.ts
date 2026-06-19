@@ -50,6 +50,14 @@ export interface MarkerOptions {
   readonly now?: number;
 }
 
+/** Read options for the tolerant `listMarker` recovery read. `readFile` is an injectable
+ *  seam (like `now`) so a test can deterministically reproduce the unlocked-read TOCTOU
+ *  race — a concurrent delete landing between existsSync and the read raises ENOENT —
+ *  without mocking the filesystem module (claude-05). Production defaults to readFileSync. */
+export interface ListMarkerOptions extends MarkerOptions {
+  readonly readFile?: (path: string) => string;
+}
+
 /** Session ids become marker filenames, so they must be filename-safe — a `/` or `..`
  *  would let `--session` read/write/remove files OUTSIDE the state dir (codex-01). Guard
  *  at the marker boundary (covers every exported primitive), not just the CLI. */
@@ -257,14 +265,21 @@ export interface MarkerListing {
  * than dropping stale entries (the operator wants to SEE a leaked/stale marker before
  * recovering it). Honors `assertSafeSession`.
  */
-export function listMarker(installRoot: string, session: string, opts: MarkerOptions = {}): MarkerListing {
+export function listMarker(installRoot: string, session: string, opts: ListMarkerOptions = {}): MarkerListing {
   const now = opts.now ?? Date.now();
+  const readFile = opts.readFile ?? ((p: string) => readFileSync(p, 'utf8'));
   const path = markerPath(installRoot, session); // asserts session safety
   if (!existsSync(path)) return { corrupt: false, entries: [] };
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, 'utf8'));
-  } catch {
+    parsed = JSON.parse(readFile(path));
+  } catch (err) {
+    // TOCTOU (claude-05): listMarker reads WITHOUT the marker lock, so a concurrent
+    // clearMarker (which holds the lock) can delete the file between existsSync and
+    // readFileSync. An ENOENT from that race means "the marker is gone" — classify it as
+    // no-marker (corrupt:false), NOT corrupt. Any OTHER read/parse failure is genuine
+    // corruption (corrupt:true), the recovery surface's loud-but-tolerant signal.
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { corrupt: false, entries: [] };
     return { corrupt: true, entries: [] };
   }
   const marker = asValidMarker(parsed, session);

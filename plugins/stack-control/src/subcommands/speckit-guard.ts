@@ -23,7 +23,7 @@
 // Exit: 0 permitted (front-door / not a wrapped skill); 1 refused (direct invocation of a
 // wrapped skill); 2 usage error.
 
-import { activeCapabilities } from '../capability/marker.js';
+import { activeCapabilities, isSafeSession } from '../capability/marker.js';
 import { CAPABILITY_REGISTRY } from '../capability/registry.js';
 import { findInstallation } from '../config/installation.js';
 import { evaluateRefusal, isWrappedSkill, type RefusalVerdict } from '../speckit-wrapper/refusal.js';
@@ -47,6 +47,12 @@ function capabilityForSkill(skill: string): string | null {
 export function resolveViaFrontDoorFile(skill: string, session: string, cwd: string): boolean {
   const capability = capabilityForSkill(skill);
   if (capability === null) return false; // not a wrapped skill — caller gates with isWrappedSkill
+  // An empty or UNSAFE (path-traversal) session id cannot key a marker the interceptor ever
+  // wrote — treat it as "no front-door context" rather than letting markerPath's
+  // assertSafeSession throw an unhandled rejection in the async verb (claude-04). A
+  // compromised $CLAUDE_CODE_SESSION_ID therefore yields the normal refusal path, never a
+  // crash with a non-contract exit code.
+  if (!isSafeSession(session)) return false;
   const installation = findInstallation(cwd);
   if (installation === null) return false;
   return activeCapabilities(installation.root, session).has(capability);
@@ -97,8 +103,11 @@ export async function runSpeckitGuard(args: string[]): Promise<void> {
   // Resolve "via front door" from the 026 file marker (T090), keyed by the session id the
   // interceptor reads ($CLAUDE_CODE_SESSION_ID) + the enclosing installation — so this
   // verb and the interceptor agree on a `front-door enter`-established context.
+  // `resolveViaFrontDoorFile` is defensive against an empty / unsafe (path-traversal)
+  // session id — it returns false rather than throwing (claude-04) — so a compromised
+  // $CLAUDE_CODE_SESSION_ID yields the normal refusal path, never an unhandled rejection.
   const session = process.env.CLAUDE_CODE_SESSION_ID ?? '';
-  const viaFrontDoor = session.length > 0 && resolveViaFrontDoorFile(skill, session, process.cwd());
+  const viaFrontDoor = resolveViaFrontDoorFile(skill, session, process.cwd());
 
   const verdict = evaluateGuard(skill, viaFrontDoor);
   if (verdict.refused) {

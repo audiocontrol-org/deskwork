@@ -55,11 +55,14 @@ describe('cross-vendor parity (026 T028, SC-005)', () => {
   // Codex adapter — Bash-only, D8). Both must yield the same verdict + exit-code mapping.
   // (The concrete Codex hook-registration config is the T027 live integration gate.)
   it('the same raw Bash backend call refuses identically across the two adapter entry paths', () => {
+    // Use a MUTATING sub-action (`backlog capture`): mediation gates it, so the no-marker
+    // case refuses on both live paths. (`backlog list` is read-only and FR-050-exempt now —
+    // it would permit on both paths; covered by read-only-exemption-live.test.ts.)
     const claude = interceptDecision(
-      { tool_name: 'Bash', tool_input: { command: 'backlog list' }, session_id: 's', cwd: '/x' },
+      { tool_name: 'Bash', tool_input: { command: 'backlog capture --type bug' }, session_id: 's', cwd: '/x' },
       { resolveActive: () => new Set() },
     );
-    const codex = mediateCheck(['--surface', 'bash', '--identity', 'backlog list', '--session', 's'], {
+    const codex = mediateCheck(['--surface', 'bash', '--identity', 'backlog capture --type bug', '--session', 's'], {
       resolveActive: () => new Set(),
     });
     expect(claude.verdict).toBe('refuse');

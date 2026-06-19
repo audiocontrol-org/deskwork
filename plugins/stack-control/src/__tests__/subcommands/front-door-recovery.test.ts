@@ -101,6 +101,20 @@ describe('front-door mediate-recover / reset (028 T085 — mutating)', () => {
     }
   });
 
+  it('reports "no marker to clear" when an installation exists but the session has no marker (claude-03)', () => {
+    const fx = makeCapabilityFixture();
+    try {
+      // No enterFrontDoor — the session is already clean. clearMarker returns false; the
+      // message must reflect the no-op, not falsely claim "cleared marker".
+      const r = frontDoor(['mediate-recover', '--session', 's-clean', '--at', fx.root], realDeps());
+      expect(r.code).toBe(0);
+      expect(r.stdout).toContain('no marker to clear for session s-clean');
+      expect(r.stdout).not.toContain('cleared marker for session');
+    } finally {
+      fx.cleanup();
+    }
+  });
+
   it('alias `reset` behaves identically', () => {
     const fx = makeCapabilityFixture();
     try {

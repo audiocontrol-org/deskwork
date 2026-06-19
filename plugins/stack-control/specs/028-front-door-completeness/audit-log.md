@@ -1877,3 +1877,183 @@ Surface:    src/backlog/promote.ts:124-140, src/backlog/backend.ts:352-358
 `unpromote()` reads the whole notes block, strips `Promoted-to:` lines from that snapshot, then calls `backend.edit(... { setNotes })`, which maps to `task edit --notes <full replacement>`. This is a read-modify-write path over the entire notes section. If another process appends notes after `readNotes()` and before `edit()`, the stale `setNotes` replacement drops that intervening content.
 
 The blast radius is medium: it requires concurrent or near-concurrent edits, but the code comments and feature scope emphasize field-preserving mutations and avoiding clobbering operator notes. A safer fix would make the removal operation conditional on the current file contents, or use a backend primitive that removes only the promotion linkage line without replacing the whole notes section.
+
+## 2026-06-19 — audit-barrage lift (20260619T212507043Z-028-front-door-completeness-phase-3)
+
+### AUDIT-20260619-111 — `mediate-list` / `mediate-recover` implementation surfaces are absent from the diff
+
+Finding-ID: AUDIT-20260619-111
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    (the entire diff — missing surfaces)
+
+The commit title is "US3 — mediation recovery, never wedged or wrongly refused (T079-T098)," implying implementation of two new commands (`mediate-list`, `mediate-recover`) and the behavioral guarantee that backs them. The diff contains exactly one file: a test that adds two expectations to a `subActions` registration assertion. No implementation code is present — no command handler, no CLI verb registration, no capability-model update, no SKILL.md or help-text update for the new sub-actions.
+
+For the test at line 52–53 (`src/__tests__/cli-help/help-capability.test.ts`) to pass, the subactions must be registered somewhere. Either (a) the implementation exists in prior commits and was simply not included in the audit diff, or (b) the implementation is genuinely absent and the test is dead (would fail). If (a), the behavioral surfaces for `mediate-list` and `mediate-recover` are not auditable from this diff — the governance pass cannot verify correctness, error handling, or the wedged-state recovery cycle from these artifacts. If (b), this is a blocking defect: the test asserts things the implementation doesn't back.
+
+A complete audit of the "never wedged or wrongly refused" guarantee requires the command handler code, the state it reads, the mutations it makes, and how it handles partial failure.
+
+---
+
+### AUDIT-20260619-112 — Registration test does not verify the "never wedged or wrongly refused" guarantee
+
+Finding-ID: AUDIT-20260619-112
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/__tests__/cli-help/help-capability.test.ts:50–55`
+
+The added test lines confirm that `mediate-list` and `mediate-recover` appear in `frontDoor.subActions` with the correct `mediationClass` values. This is a structural registration test — it verifies the help system knows about these entries, not that they work. The commit's stated guarantee is behavioral: a user or agent that is wedged (a prior mediation check blocked an action) must always be able to escape, and legitimate operations must never be wrongly refused.
+
+Satisfying that guarantee requires tests that cover: (1) an initial `mediate-check` that refuses an action produces a detectable wedged state; (2) `mediate-list` surfaces the condition that caused the refusal; (3) `mediate-recover` clears it; (4) a subsequent `mediate-check` on the same action now passes. None of those behavioral steps are in the diff. The T079-T098 task range implies substantial test coverage was planned — if behavioral tests exist in other files, they are not in the auditable diff.
+
+Blast-radius: a registration test that passes while the behavioral guarantee is absent lets the feature graduate looking green while the core promise is unverified.
+
+---
+
+### AUDIT-20260619-113 — `mediate-check` is not in `subActions` but `mediate-list` and `mediate-recover` are — asymmetry unexplained
+
+Finding-ID: AUDIT-20260619-113
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/__tests__/cli-help/help-capability.test.ts:50–55` and line 57
+
+The test asserts that `subActions` contains `mediate-list` and `mediate-recover` but checks `mediate-check` via `byVerb.get('mediate-check')` separately. All three are `mediate-*` siblings, yet they are classified differently: two are sub-actions, one is a verb-only entry. The diff provides no comment or documentation explaining the distinction — is `mediate-check` invoked automatically (not user-initiated) and thus excluded from the user-facing sub-action list? Is there a design rule that `read-only` check commands don't appear as named sub-actions?
+
+If the asymmetry is intentional, a comment on the test or the capability model would prevent a future maintainer from "fixing" the test by adding `mediate-check` to the subActions array and accidentally changing the observable help surface. Currently the test enforces the exact-match invariant but doesn't explain the design decision, making it a potential source of confusion in downstream review.
+
+---
+
+### AUDIT-20260619-114 — Describe block labeled `028 US1` contains US3 assertions
+
+Finding-ID: AUDIT-20260619-114
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/__tests__/cli-help/help-capability.test.ts:50` (describe block label implied by context)
+
+The describe block is named `'capability family --help (028 US1)'` (visible from the context header in the diff). The added expectations for `mediate-list` and `mediate-recover` belong to US3. Mixing story-level assertions under a US1 describe block makes it harder to bisect failures by user story, and makes the test file's traceability to the spec ambiguous. If a future change breaks `mediate-recover` registration, the failing test block reports a US1 failure, not a US3 one.
+
+This is hygiene, not a correctness defect, but in a codebase that relies on test output to confirm per-phase graduation (the `after_implement` governance hook reads test results), mislabeled test blocks can produce misleading signals.
+
+### AUDIT-20260619-115 — Recovery alias is omitted from the audited help contract
+
+Finding-ID: AUDIT-20260619-115
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/cli-help/help-capability.test.ts:50-55
+
+The added `front-door` sub-action expectation covers `mediate-list` and `mediate-recover`, but it does not cover the documented recovery alias `reset`. In the current command surface, `front-door reset` is accepted as a true alias of `mediate-recover`, so the CLI help/descriptor contract should either expose that alias or have an explicit test proving aliases are intentionally excluded from descriptor output. As written, this test locks in an incomplete public help contract: downstream consumers generating docs or invoking `front-door reset --help` from the descriptor would not see a recovery path that the CLI accepts.
+
+Blast radius is low because the primary recovery command remains present and operators can still recover via `mediate-recover`; the defect is discoverability and descriptor drift rather than failed recovery behavior. A reasonable fix is to add `reset:mutating` to the descriptor expectation and command surface, or add a focused assertion/comment that aliases are deliberately hidden from descriptor artifacts while remaining accepted by the raw subcommand parser.
+
+## 2026-06-19 — audit-barrage lift (20260619T212704880Z-028-front-door-completeness-phase-5)
+
+### AUDIT-20260619-116 — FR-050 read-only exemption wired only at the unit level — dead code in all production call paths
+
+Finding-ID: AUDIT-20260619-116 (claude-01 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    src/capability/mediate.ts:24-56 / src/capability/intercept.ts:84-123 / src/subcommands/mediate-check.ts:72-99 / src/__tests__/capability/read-only-exemption.test.ts
+
+The diff introduces `OpMediationClass` and a `mediationClass` parameter (defaulting to `'mutating'`) on `decideMediation`. The read-only exemption logic fires correctly when `'read-only'` is passed and is exercised by `read-only-exemption.test.ts` (T081). However, neither production caller of `decideMediation` supplies the parameter:
+
+- `interceptDecision` (`intercept.ts:123`): `return decideMediation(registry, surface, identity, deps.resolveActive(cwd, session));` — no `mediationClass`.
+- `mediateCheck` (`mediate-check.ts:98`): `const decision = decideMediation(CAPABILITY_REGISTRY, surfaceTyped, identity, active);` — no `mediationClass`.
+
+There is also no mechanism in either caller to determine a per-identity mediation class (no registry lookup, no CLI flag, no payload field). The result is that `backlog list` — a read-only query FR-050 declares mediation-exempt — is refused whenever no marker is set, exactly like a mutating call. The test coverage is real but does not represent production behaviour: T081 passes because it calls `decideMediation` directly; the hook and the `mediate-check` verb ignore the parameter entirely. FR-050 is spec'd and tested in isolation, but does not hold end-to-end. Fix: either wire a mediation-class lookup from the capability registry into both callers, or add a `--class` argument to `mediate-check` and an equivalent field to the `InterceptDeps` resolver so callers can pass the correct class.
+
+---
+
+### AUDIT-20260619-117 — `interceptDecision` `resolveInstalled` defaults to `true` — FR-020 no-installation short-circuit will not fire for the hook path unless the production caller is updated
+
+Finding-ID: AUDIT-20260619-117
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/capability/intercept.ts:90-99 / src/subcommands/mediate-check.ts (updated) vs. the `stackctl intercept` CLI command (not in this diff)
+
+`InterceptDeps.resolveInstalled` is optional with `?? true` as the back-compat default (`intercept.ts` line 31, `interceptDecision` line 91: `const installed = deps.resolveInstalled?.(cwd) ?? true;`). The docstring acknowledges this: "the production adapter supplies the real probe." By contrast, `mediate-check` IS updated — `defaultResolveInstalled` is defined and wired into `runMediateCheck` (`mediate-check.ts:107-117`). The `stackctl intercept` subcommand (the TypeScript file that parses the PreToolUse JSON payload and calls `interceptDecision`) is not in this diff. If that caller is not similarly updated to supply `resolveInstalled: defaultResolveInstalled`, the hook will assume `installed = true` for every cwd — including cwd values outside any stack-control installation. In that case, a fronted backend call (e.g. `backlog list`) issued outside an installation will be refused instead of permitted (empty active set → refuse), contradicting FR-020 and breaking the contract that the hook and `mediate-check` agree. The `cwd-linchpin-reconcile.test.ts` tests exercise `mediateCheck` (not `interceptDecision`), so this gap is uncovered by the test suite in this diff. The "no-installation short-circuit" test (T079) targets `mediate-check`, not the hook. Fix: confirm the production `stackctl intercept` command provides `resolveInstalled: findInstallation(at) !== null` alongside `resolveActive`, or add a missing-dep test for `interceptDecision` that asserts the FR-020 permit with `resolveInstalled: () => false`.
+
+---
+
+### AUDIT-20260619-118 — `mediate-recover` discards `deps.clear()` return value; always emits "cleared marker" even on no-op
+
+Finding-ID: AUDIT-20260619-118
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/front-door.ts:114-119
+
+```typescript
+deps.clear(root, session);
+return { code: 0, stdout: `front-door mediate-recover: cleared marker for session ${session}\n`, stderr: '' };
+```
+
+`clearMarker` (and its `FrontDoorDeps.clear` seam) returns `boolean`: `true` if a file was removed, `false` if there was nothing to clear. The return value is not captured. The success message unconditionally says "cleared marker for session X" even when `clear` returns `false` (no marker existed). An operator running `mediate-recover` on a session that was already clean receives a misleading confirmation. For a recovery tool whose audience is an agent in a wedged state, message fidelity matters: "cleared marker" vs "no marker to clear" is the difference between "the recovery worked" and "the session was already clean before you ran this". The test suite covers the case where a marker IS cleared (`front-door-recovery.test.ts:97-111`) and the no-installation case (exit 0 + specific message), but there is no test for "installation exists, no marker for session" — the exact case where the misleading message fires. Fix: capture the return value and branch on it: `const removed = deps.clear(root, session); return { code: 0, stdout: removed ? 'cleared marker …' : 'no marker for session …', … }`.
+
+---
+
+### AUDIT-20260619-119 — `runSpeckitGuard` exposes unhandled-exception path when `CLAUDE_CODE_SESSION_ID` is a path-traversal string
+
+Finding-ID: AUDIT-20260619-119
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/speckit-guard.ts:94-107
+
+```typescript
+const session = process.env.CLAUDE_CODE_SESSION_ID ?? '';
+const viaFrontDoor = session.length > 0 && resolveViaFrontDoorFile(skill, session, process.cwd());
+```
+
+The `session.length > 0` guard prevents an empty-string session from reaching `resolveViaFrontDoorFile`, but it does not filter path-traversal values such as `'../evil'`. `resolveViaFrontDoorFile` calls `activeCapabilities(installation.root, session)` → `readMarker` → `markerPath` → `assertSafeSession(session)`, which throws a sync error with `/filename-safe/`. Since `runSpeckitGuard` is `async` and has no `try/catch`, the thrown error becomes a rejected promise, producing an unhandled rejection rather than a clean `process.exit(2)`. Node.js behaviour on unhandled rejection depends on version and flags (exit 1 or crash with stack trace), neither of which is the documented `2 = usage error` exit code. This path is in security-relevant code: a compromised environment variable could cause non-deterministic guard behaviour. Fix: add `isSafeSession(session)` (already imported into `marker.ts`) as a guard before calling `resolveViaFrontDoorFile`, returning a refusal (exit 1) or usage-error (exit 2) for an unsafe session id; or wrap the call in `try/catch` and treat any thrown error as "not via front door".
+
+---
+
+### AUDIT-20260619-120 — `listMarker` TOCTOU: ENOENT from concurrent delete misclassified as `corrupt`
+
+Finding-ID: AUDIT-20260619-120
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/capability/marker.ts:248-261
+
+```typescript
+if (!existsSync(path)) return { corrupt: false, entries: [] };
+let parsed: unknown;
+try {
+  parsed = JSON.parse(readFileSync(path, 'utf8'));
+} catch {
+  return { corrupt: true, entries: [] };
+}
+```
+
+`listMarker` reads without holding the marker lock. If a concurrent `clearMarker` (which does hold the lock) deletes the file between the `existsSync` check and the `readFileSync` call, `readFileSync` throws `ENOENT`. The bare `catch` collapses all exceptions — including `ENOENT` — into `{ corrupt: true, entries: [] }`. An operator running `mediate-list` concurrently with a `mediate-recover` (or a naturally-expiring session cleanup) would see the recovery tool report "corrupt (unparseable)" and then a subsequent `mediate-list` would show "(no marker)", which is confusing for a diagnostic surface. The fix is minimal: inspect the caught error for `code === 'ENOENT'` and return `{ corrupt: false, entries: [] }` in that branch rather than `corrupt: true`. This corrects the classification without changing any other behaviour.
+
+---
+
+### AUDIT-20260619-121 — `failOpenSignal` exported and tested but not called by any current production code path; shell script handles the same concern independently
+
+Finding-ID: AUDIT-20260619-121
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/capability/intercept.ts:104-115 / bin/intercept:28-31
+
+`failOpenSignal(reason: string): string` is exported from `intercept.ts` and verified by `intercept-fail-open-signal.test.ts` (T091). The shell `bin/intercept` handles the analogous concern (stackctl not found/executable → write hardcoded notice to stderr) independently, with slightly different wording ("SKIPPED" vs "was SKIPPED", "stackctl dispatcher not found/executable" vs "could not reach stackctl: …"). `failOpenSignal` is not called anywhere in the diff — neither from the shell script (which cannot call TypeScript directly) nor from any other TypeScript file visible here. If the current `bin/intercept` shell is the only production adapter, `failOpenSignal` is dead exported code: it has tests and a docstring that describe a TypeScript-layer spawn-failure scenario, but no caller. If a future TypeScript interceptor replaces the shell, the function is available; until then, any downstream reader of `failOpenSignal` may not realise it is not on the active code path. Fix: either document explicitly that `failOpenSignal` is reserved for a future TypeScript hook adapter, or add a `// used by: <future adapter>` note, or suppress the export until the caller exists. Not blocking, but the two independent notice texts (`failOpenSignal` vs the shell's `printf`) will diverge over time if one is maintained and the other is not.

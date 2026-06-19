@@ -8,6 +8,7 @@
 import { matchCapability } from '../capability/identity.js';
 import { activeCapabilities, isSafeSession } from '../capability/marker.js';
 import { decideMediation } from '../capability/mediate.js';
+import { mediationClassForIdentity } from '../capability/mediation-class.js';
 import { CAPABILITY_REGISTRY, type Surface } from '../capability/registry.js';
 import { findInstallation } from '../config/installation.js';
 
@@ -93,7 +94,11 @@ export function mediateCheck(args: readonly string[], deps: MediateCheckDeps): M
   }
 
   const active = isFronted ? deps.resolveActive(dir, session) : new Set<string>();
-  const decision = decideMediation(CAPABILITY_REGISTRY, surfaceTyped, identity, active);
+  // Derive the op's mediation class so the FR-050 read-only exemption fires on the LIVE
+  // path: a read-only fronted query (`backlog list`) is permitted even with no marker,
+  // while every mutating fronted op still refuses (AUDIT-BARRAGE-codex-01 / claude-01).
+  const mediationClass = mediationClassForIdentity(surfaceTyped, identity);
+  const decision = decideMediation(CAPABILITY_REGISTRY, surfaceTyped, identity, active, mediationClass);
   const code: 0 | 1 = decision.verdict === 'permit' ? 0 : 1;
 
   if (json) return { code, stdout: `${JSON.stringify(decision)}\n`, stderr: '' };

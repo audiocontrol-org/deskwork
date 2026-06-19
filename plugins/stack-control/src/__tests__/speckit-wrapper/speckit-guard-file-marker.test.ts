@@ -73,4 +73,29 @@ describe('speckit-guard file-marker resolution (028 T089)', () => {
     const viaFrontDoor = resolveViaFrontDoorFile('speckit-implement', 'sess', '/');
     expect(viaFrontDoor).toBe(false);
   });
+
+  it('an UNSAFE (path-traversal) session id resolves not-via-front-door, never throws (claude-04)', () => {
+    // A compromised $CLAUDE_CODE_SESSION_ID like `../evil` would make markerPath throw an
+    // unsafe-session error (an unhandled rejection in the async verb). The resolver must
+    // treat it as "no front-door context" (false) so the guard's normal refusal path runs.
+    const fx = makeCapabilityFixture();
+    try {
+      expect(() => resolveViaFrontDoorFile('speckit-implement', '../evil', fx.root)).not.toThrow();
+      expect(resolveViaFrontDoorFile('speckit-implement', '../evil', fx.root)).toBe(false);
+      // A guard fed an unsafe session still refuses a raw wrapped skill (not a false permit).
+      expect(evaluateGuard('speckit-implement', false).refused).toBe(true);
+    } finally {
+      fx.cleanup();
+    }
+  });
+
+  it('an empty session id resolves not-via-front-door, never throws (claude-04)', () => {
+    const fx = makeCapabilityFixture();
+    try {
+      expect(() => resolveViaFrontDoorFile('speckit-implement', '', fx.root)).not.toThrow();
+      expect(resolveViaFrontDoorFile('speckit-implement', '', fx.root)).toBe(false);
+    } finally {
+      fx.cleanup();
+    }
+  });
 });

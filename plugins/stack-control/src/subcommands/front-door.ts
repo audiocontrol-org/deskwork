@@ -114,8 +114,14 @@ export function frontDoor(args: readonly string[], deps: FrontDoorDeps): FrontDo
     if (root === null) {
       return { code: 0, stdout: `front-door mediate-recover: no installation — nothing to clear for session ${session}\n`, stderr: '' };
     }
-    deps.clear(root, session);
-    return { code: 0, stdout: `front-door mediate-recover: cleared marker for session ${session}\n`, stderr: '' };
+    // Use the clear() result so the confirmation is honest (claude-03): a no-op clear of an
+    // already-clean session must not falsely claim "cleared marker". Both branches exit 0 —
+    // recovering a clean session is a success, just a no-op one.
+    const removed = deps.clear(root, session);
+    const stdout = removed
+      ? `front-door mediate-recover: cleared marker for session ${session}\n`
+      : `front-door mediate-recover: no marker to clear for session ${session}\n`;
+    return { code: 0, stdout, stderr: '' };
   }
 
   if (sub === 'enter') {

@@ -16,8 +16,10 @@ describe('mediate-check verb (026 T011)', () => {
     expect(r.code).toBe(0);
   });
 
-  it('refuses a raw backend → exit 1 with the redirect on stderr', () => {
-    const r = mediateCheck(['--surface', 'bash', '--identity', 'backlog list', '--session', 's'], {
+  it('refuses a raw MUTATING backend → exit 1 with the redirect on stderr', () => {
+    // `backlog capture` is mutating — mediation gates it. (`backlog list` is read-only and
+    // FR-050-exempt; its no-marker permit is covered by read-only-exemption-live.test.ts.)
+    const r = mediateCheck(['--surface', 'bash', '--identity', 'backlog capture --type bug', '--session', 's'], {
       resolveActive: noMarker,
     });
     expect(r.code).toBe(1);
@@ -41,7 +43,7 @@ describe('mediate-check verb (026 T011)', () => {
 
   it('--json emits the decision shape on stdout', () => {
     const r = mediateCheck(
-      ['--surface', 'bash', '--identity', 'backlog list', '--session', 's', '--json'],
+      ['--surface', 'bash', '--identity', 'backlog capture --type bug', '--session', 's', '--json'],
       { resolveActive: noMarker },
     );
     expect(r.code).toBe(1);

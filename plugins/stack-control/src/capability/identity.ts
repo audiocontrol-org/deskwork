@@ -418,6 +418,53 @@ export function normalizeSkillName(name: string): string {
   return name.trim();
 }
 
+/** A resolved simple command: its normalized argv[0] plus the SUB-ACTION token — the
+ *  first bare positional that follows argv[0] (a flag like `--type` or its value is NOT a
+ *  sub-action). `subAction` is null when the command has no positional after argv[0]
+ *  (e.g. `backlog` alone). Used by `mediationClassForIdentity` to look the op's declared
+ *  mediation class up in the command surface (FR-050 live wiring). */
+export interface ResolvedCommand {
+  readonly argv0: string;
+  readonly subAction: string | null;
+}
+
+/** The sub-action token in `tokens` AFTER the resolved argv[0] (the first bare positional;
+ *  flags and their values are skipped). A multi-action CLI verb's sub-action is its first
+ *  positional, mirroring how commander dispatches `<verb> <sub-action> …`. */
+function subActionOfTokens(tokens: readonly string[], argv0: string): string | null {
+  // Find argv0's position, then return the first following bare (non-dash) positional.
+  const start = tokens.indexOf(argv0);
+  if (start < 0) {
+    // argv0 may be a basename of a path token (`/usr/bin/backlog`) or stripped of a
+    // wrapper/group prefix; fall back to the first bare positional after the LAST
+    // dash-free leading token. Conservative: no resolvable position → no sub-action.
+    return null;
+  }
+  for (let i = start + 1; i < tokens.length; i++) {
+    const tok = tokens[i]!;
+    if (tok.length === 0) continue;
+    if (tok.startsWith('-')) continue; // a flag — not a sub-action (its value is skipped below)
+    return tok;
+  }
+  return null;
+}
+
+/**
+ * Resolve EVERY simple command in a (compound/multi-line) command line into its argv[0]
+ * + sub-action, in order. The decision callers walk these to find the fronted-backend
+ * command and read its declared mediation class. Quote-aware (shares the bash parser with
+ * `argv0sOf`), so a backend in any position (`cd /x && backlog list`) is resolved.
+ */
+export function resolvedCommandsOf(command: string): ResolvedCommand[] {
+  const out: ResolvedCommand[] = [];
+  for (const tokens of parseCommands(command)) {
+    const argv0 = argv0OfTokens(tokens);
+    if (argv0 === null) continue;
+    out.push({ argv0, subAction: subActionOfTokens(tokens, argv0) });
+  }
+  return out;
+}
+
 /**
  * The capability that owns the raw intercepted identity on `surface`, or `null`
  * when it is not a fronted backend (→ permit). For `bash`, every simple command's
