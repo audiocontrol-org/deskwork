@@ -2027,3 +2027,237 @@ Decision:   single-model (gate-counted informational)
 Surface:    tests/roadmap/honest-header.test.ts (import line 13)
 
 The import `from '../../src/setup/scaffold.js'` uses the `.js` extension, which is the correct ESM TypeScript convention for this project (TypeScript resolves `.ts` source at the `.js` emit path). The named export `ROADMAP_SKELETON` is imported directly, so if the export is missing or renamed in `scaffold.ts`, the test fails loudly at import time rather than silently. The verb list `['add', 'advance', 'reclassify', 'defer', 'cluster', 'group']` covers the mutation surface the feature introduced; `order` is deliberately tested separately via the fallback assertion (line 39), not in the verb-list loop — a correct split. No fabricated behavior, no mock data, no swallowed exceptions, no hardcoded paths outside of the import path (which is structurally fixed by the test file's location).
+
+## 2026-06-19 — audit-barrage lift (20260619T042020946Z-027-roadmap-edge-mutation-and-cluster-phase-6)
+
+### AUDIT-20260619-98 — `--depends-on` flag missing stray-comma guard
+
+Finding-ID: AUDIT-20260619-98
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/roadmap.ts:159 (context line, unchanged)
+
+The diff introduces explicit fail-loud validation for both `--part-of` and `--children` when a stray or trailing comma produces an empty-string ID. The stated rationale (AUDIT-BARRAGE-codex-01) is *"consistent with the `--children` empty-id guard"* and applies equally to all comma-delimited ID lists. However, `--depends-on` receives no analogous guard. Its parsing (the unchanged context line) reads:
+
+```typescript
+dependsOn: dependsOn === undefined ? undefined : dependsOn.split(',').map((s) => s.trim()),
+```
+
+No `.filter()` and no empty-string check. `--depends-on a,,b` produces `['a', '', 'b']` in the `dependsOn` field, which propagates into the roadmap data model as a malformed edge referencing an empty-string identifier. Every consumer of `dependsOn` (rendering, topological sort, convergence checks) would then encounter a phantom dependency with no matching node — potentially silently wrong output or a misleading "not found" error at a much later call site rather than at the CLI boundary.
+
+The blast-radius reasoning: the validation philosophy introduced by this diff is "fail at the input boundary, not at a confusing downstream site." Leaving `--depends-on` unguarded means the exact failure mode the diff claims to prevent for `--part-of` and `--children` (phantom empty-string IDs in the graph) can still enter via `--depends-on`. A reasonable fix is to apply the same guard pattern:
+
+```typescript
+const dependsOnParsed = dependsOnRaw === undefined ? undefined : dependsOnRaw.split(',').map((s) => s.trim());
+if (dependsOnParsed !== undefined && dependsOnParsed.some((s) => s.length === 0)) {
+  failUsage('roadmap', 'add: --depends-on has an empty id (a stray or trailing comma)');
+}
+```
+
+---
+
+### AUDIT-20260619-99 — `partOf.length === 0` branch is dead code
+
+Finding-ID: AUDIT-20260619-99
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/roadmap.ts:161-163
+
+The guard reads:
+
+```typescript
+if (partOf !== undefined && (partOf.length === 0 || partOf.some((s) => s.length === 0))) {
+```
+
+The `partOf.length === 0` sub-condition is unreachable as written. `partOf` is derived from `partOfRaw.split(',').map(...)`, and `String.prototype.split` always returns an array containing at least one element — even `"".split(',')` returns `[""]` (length 1), not `[]`. The branch that catches an empty string is correctly `partOf.some((s) => s.length === 0)`, which fires for `[""]`. The `partOf.length === 0` arm cannot fire given any real string input from the flag parser.
+
+This is dead code: it neither harms correctness (the `some()` catches all real cases) nor produces incorrect output, but it signals to a future reader that there exists a code path producing a zero-length array from `split+map`, which there does not. A reader auditing the guard might trust that both conditions are needed and waste time hunting for the scenario that triggers `length === 0`. A one-line fix: drop `partOf.length === 0 ||`.
+
+### AUDIT-20260619-100 — `decompose --into` still silently drops empty ids
+
+Finding-ID: AUDIT-20260619-100
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    missing surface in `src/subcommands/roadmap.ts:193-198`, adjacent to changed `src/subcommands/roadmap.ts:216-220`
+
+The diff adds fail-loud empty-token guards for `add --part-of` and `cluster --children`, but the same comma-list boundary for `decompose --into` remains unchanged: it still does `split(',').map(trim).filter(length > 0)`. That means `roadmap decompose X --into a,,b --apply` succeeds as `a,b` instead of rejecting the malformed empty id, while the newly changed `--children` path rejects the same shape at lines 216-220.
+
+Blast radius is low because it requires a malformed operator invocation, but if shipped as-is the roadmap can still be mutated after silently dropping an input token on one of the edge-mutation verbs. A reasonable fix is to parse `--into` the same way as the new `--children` path: trim tokens, reject any empty token with `failUsage`, then pass the validated list to `decompose`.
+
+## 2026-06-19 — audit-barrage lift (20260619T042328566Z-027-roadmap-edge-mutation-and-cluster-phase-6)
+
+### AUDIT-20260619-101 — `--depends-on` missing empty-id guard — asymmetric validation
+
+Finding-ID: AUDIT-20260619-101
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/roadmap.ts:155-156` (in `addInputFrom`)
+
+The diff introduces fail-loud empty-id guards for both `--part-of` (lines 163–166) and `--children` (lines 222–224), motivated by the same principle: a stray or trailing comma must not silently produce a broken edge. But the `--depends-on` flag just below receives no equivalent guard:
+
+```typescript
+dependsOn: dependsOn === undefined ? undefined : dependsOn.split(',').map((s) => s.trim()),
+```
+
+`--depends-on 'feat-a,,feat-b'` or `--depends-on 'feat-a,'` will pass an empty string through `split`/`trim` without any error, producing an empty-string dependency ID that travels into the model layer. Downstream behavior depends on what the model does with an empty ID: a silent no-op creates an orphaned edge; a later parse error produces a confusing message that does not point back to the bad input. Either way, the invariant the commit establishes — "stray comma = fail loud, not silent drop" — is violated for this flag while it is enforced for its two siblings.
+
+Fix: apply the same pattern used for `--part-of`:
+
+```typescript
+const dependsOnRaw = v.get('depends-on');
+const dependsOn = dependsOnRaw === undefined ? undefined : dependsOnRaw.split(',').map((s) => s.trim());
+if (dependsOn !== undefined && dependsOn.some((s) => s.length === 0)) {
+  failUsage('roadmap', 'add: --depends-on has an empty id (a stray or trailing comma)');
+}
+```
+
+---
+
+### AUDIT-20260619-102 — Dead branch in `--part-of` empty-id guard
+
+Finding-ID: AUDIT-20260619-102
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/roadmap.ts:163-165`
+
+The guard reads:
+
+```typescript
+if (partOf !== undefined && (partOf.length === 0 || partOf.some((s) => s.length === 0))) {
+```
+
+`partOf.length === 0` can never be true. `String.prototype.split(',')` on any string (including the empty string `''`) returns an array of length ≥ 1: `''.split(',')` → `['']`. After `.map((s) => s.trim())`, the array still has length 1. The only branch that can fire is `partOf.some((s) => s.length === 0)`, which correctly catches both empty-string flag values and stray commas. The dead `partOf.length === 0` arm is harmless but misleading — a reader scanning the condition might treat it as meaningful invariant documentation when it is not reachable. Remove it to keep the guard honest.
+
+### AUDIT-20260619-103 — `decompose --into` still silently drops empty ids
+
+Finding-ID: AUDIT-20260619-103
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/roadmap.ts:192-198
+
+`clusterInputFrom` now treats empty comma-list tokens as malformed input, and `addInputFrom` does the same for `--part-of`, but `emitDecompose` still parses `--into` with `.filter((s) => s.length > 0)`. That means `roadmap decompose impl:feature/x --into impl:feature/x1, --apply` is accepted as a one-part decomposition instead of refusing the stray comma.
+
+The blast radius is high because this is a mutating roadmap command: an operator typo can remove the original item, create fewer replacement parts than requested, and repoint dependents to the reduced set. A reasonable fix is to parse `--into` the same way as `--children`: trim tokens, reject any empty token with `failUsage`, then pass the validated list to `decompose`.
+
+### AUDIT-20260619-104 — `decompose` can still rewrite fenced example metadata
+
+Finding-ID: AUDIT-20260619-104
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/mutations.ts:249-255
+
+The decompose repointing path still calls `rewriteEdgeLine` on the whole unit body whenever the real parsed edges include the decomposed identifier. `rewriteEdgeLine` matches any line that looks like `- depends-on:` or `- part-of:` in the body, with no fenced-code awareness, so a dependent unit that has both a real edge and a fenced roadmap example mentioning the same id will have its example prose rewritten too.
+
+The blast radius is medium: graph correctness remains protected by document revalidation, but roadmap prose/examples can be silently mutated during a valid operation. The cluster implementation already added fence-aware edge handling for the same class of issue; decompose should use a fence-aware rewrite helper or update `rewriteEdgeLine` itself so only real metadata lines are transformed.
+
+## 2026-06-19 — audit-barrage lift (20260619T042621825Z-027-roadmap-edge-mutation-and-cluster-phase-6)
+
+### AUDIT-20260619-105 — Dead code: `partOf.length === 0` guard is unreachable
+
+Finding-ID: AUDIT-20260619-105
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/roadmap.ts — the `addInputFrom` validation block (the `if (partOf !== undefined && …)` added in the diff)
+
+The guard reads:
+
+```typescript
+if (partOf !== undefined && (partOf.length === 0 || partOf.some((s) => s.length === 0))) {
+```
+
+`partOf` is produced by `partOfRaw.split(',').map((s) => s.trim())`. In JavaScript, `String.prototype.split` always returns an array with at least one element — even `''.split(',')` returns `['']`, not `[]`. Therefore `partOf.length === 0` can never be true when `partOf !== undefined`, making the left sub-expression of the `||` permanently dead. The real guard is entirely carried by the `.some()` branch on the right.
+
+This has no runtime impact, but it creates a misleading code shape: a future maintainer reading the guard may believe `split` can return an empty array under some inputs, cargo-cult the `length === 0` idiom into new validators elsewhere, or (more likely) waste time trying to construct a case that exercises it. A clean fix is to remove the dead sub-expression: `if (partOf !== undefined && partOf.some((s) => s.length === 0))`.
+
+---
+
+### AUDIT-20260619-106 — Asymmetric guard between `--part-of` and `--children` validators invites misreading
+
+Finding-ID: AUDIT-20260619-106
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/roadmap.ts — `addInputFrom` guard vs. `clusterInputFrom` guard
+
+The `--part-of` validator (in `addInputFrom`) has `partOf.length === 0 || partOf.some(…)`, while the parallel `--children` validator (in `clusterInputFrom`) has only `children.some(…)`. The two are behaviourally identical for all reachable inputs (see AUDIT-BARRAGE-claude-01 — the `length === 0` branch is dead), but they look different. A reader comparing the two guards will either:
+
+1. Conclude `--part-of` has an additional safety net that `--children` lacks and wonder why, or
+2. Decide the asymmetry is intentional and perpetuate it in the next validator they write.
+
+The fix is to drop the unreachable `partOf.length === 0` sub-expression from the `--part-of` guard so both guards share the same shape. Beyond symmetry, the comment block on the `--part-of` guard (which is good) has no counterpart on the `--children` guard — carrying the cross-reference comment to both call sites would also help.
+
+---
+
+### AUDIT-20260619-107 — Error messages cite "comma" as the cause for inputs that contain no comma
+
+Finding-ID: AUDIT-20260619-107
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/roadmap.ts — `failUsage` call in `addInputFrom` and `clusterInputFrom`
+
+Both new `failUsage` messages say "a stray or trailing comma":
+
+```
+'add: --part-of has an empty id (a stray or trailing comma)'
+`${verb}: --children has an empty id (a stray or trailing comma)`
+```
+
+The `.some((s) => s.length === 0)` test also fires for a plain empty-string input — e.g. `--part-of ""` or `--children ""` — where the user provided no comma at all. The diagnostic then blames "a stray or trailing comma" when no comma was present, which is confusing. A more precise message would cover both shapes: e.g. `"has an empty id — check for a stray, leading, or trailing comma, or an empty value"`. This is purely a developer-experience issue and has no effect on the validation logic itself.
+
+---
+
+### AUDIT-20260619-108 — No findings on the `repoint` dedup change in `mutations.ts`
+
+Finding-ID: AUDIT-20260619-108
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/roadmap/mutations.ts — `repoint` closure in `decompose`
+
+I examined the `repoint` change carefully. `Set` over strings uses strict equality, which is correct for identifier deduplication. JavaScript's `Set` is insertion-order-preserving, so the "order-preserving dedup" claim in the comment holds. The dedup applies across the combination of existing `targets` and the expanded `into` entries — exactly the scenario AUDIT-BARRAGE-codex-02 named. An edge case where `into` itself contains duplicate identifiers would also be silently deduplicated; this is arguably beneficial (duplicate targets are never desirable) and the `decompose` caller should be producing distinct `into` entries regardless. No correctness issue found here.
+
+### AUDIT-20260619-109 — `--depends-on` still silently accepts empty comma targets
+
+Finding-ID: AUDIT-20260619-109
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/roadmap.ts:154-168
+
+`addInputFrom` now fails loud for empty `--part-of` atoms, but the sibling unit-edge flag `--depends-on` still uses `dependsOn.split(',').map((s) => s.trim())` with no empty-id guard at line 168. The document edge parser later filters empty atoms, so `--depends-on a,,b` can be reported as a successful add while recording only `a, b`, the exact silent-drop shape this patch fixes for `--part-of`.
+
+The blast radius is medium because it affects malformed dependency-edge CLI input rather than the common path, but the command succeeds with a graph different from what the operator typed. A reasonable fix is to parse comma-list unit edges through one shared helper that trims and rejects empty atoms, then use it for both `depends-on` and `part-of`.
+
+### AUDIT-20260619-110 — Decompose repointing can still rewrite fenced examples
+
+Finding-ID: AUDIT-20260619-110
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/mutations.ts:250-257
+
+`decompose` calls `rewriteEdgeLine` for every body line when a real `depends-on` or `part-of` edge references the decomposed identifier. The shared rewriter is not fence-aware, so a unit that has real metadata plus a fenced Markdown example containing a matching `- part-of:` or `- depends-on:` line will have the example text rewritten too. This is the same class of content mutation the cluster implementation guarded against with fenced-code handling, but this edge-mutation surface was left unchanged.
+
+The blast radius is medium because the graph remains valid, but roadmap scope/prose can be altered unexpectedly during a successful mutation. A reasonable fix is to make `rewriteEdgeLine` use the same fenced-block awareness as cluster edge appending, so it rewrites only real metadata lines.
