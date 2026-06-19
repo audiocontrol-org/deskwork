@@ -9,11 +9,15 @@
 // Three sub-checks per subaction:
 //   (1) every flag the grammar declares appears in the help text;
 //   (2) no flag appears in the help that the grammar does NOT declare;
-//   (3) a flag the help does NOT show is rejected by the parser (exit 2), and
-//       every flag the help DOES show is accepted (not an unknown-flag exit 2).
+//   (3) a flag the help does NOT show is rejected by the parser (exit 2,
+//       `unknown flag`), and every flag the help DOES show is accepted (NOT an
+//       unknown-flag rejection — proven by exercising a MINIMAL VALID invocation
+//       of the subaction with all its declared flags).
 //
-// RED until T008/T009 build the self-documenting help surface (today `--help`
-// is an unknown option → exit 2 with no flag listing).
+// Checks (1)+(2) loop over every SUBACTION_SPECS key; check (3) loops over the
+// same set via the per-subaction VALID_INVOCATION fixture map below — closing the
+// gap the cross-model audit-barrage flagged (check (3) was hand-coded for only
+// `advance`/`add`, so 10 of 12 subactions had no flag-acceptance coverage).
 
 import { describe, it, expect } from 'vitest';
 import { copyFileSync, mkdtempSync } from 'node:fs';
@@ -34,18 +38,26 @@ function tmpChain(): string {
 /**
  * The long-form flag tokens DECLARED in a `--help` render (e.g. `--to`).
  *
- * Anchored to line-start (`^\s*--flag`, multiline) so it captures only the
- * structured flag-TABLE entries — never a flag token embedded in prose, a
- * description, an example, or the `(one of: …)` vocabulary suffix. Scanning the
- * whole text (the prior `/(--[a-z…])/g`) made the CHK015 non-drift gate unreliable:
- * a flag named only in a description would be a false "shown", and a removed flag
- * still mentioned in prose would spuriously fail check (2). The gate must measure
- * the declared surface, not every `--token` in the output (027 Phase 3 govern,
- * AUDIT-BARRAGE claude — no-grounding lane).
+ * Matches a `--long` flag that BEGINS a structured flag-table entry — either at
+ * line-start (`  --doc <path>`) OR immediately after a `-x, ` short-alias prefix
+ * (the conventional `  -t, --to <status>` two-column style). It deliberately does
+ * NOT match a `--flag` token embedded in a description, prose, an example, or the
+ * `(one of: …)` vocabulary suffix: those are not the declared surface, and
+ * counting them made the CHK015 gate unreliable (a flag named only in a
+ * description would be a false "shown"; a removed flag still mentioned in prose
+ * would spuriously fail check (2)).
+ *
+ * Robustness note (AUDIT-BARRAGE claude-01): the prior `/^[ \t]*(--[a-z…])/gm`
+ * anchored ONLY at line-start, so if the help table ever rendered the `-x, --long`
+ * short-alias style this regex would capture nothing and the gate would pass
+ * VACUOUSLY (every grammar flag "not shown", check (1) failing loudly is the only
+ * thing that would catch it — but check (2) would pass on an empty set). The
+ * optional `(?:-[A-Za-z], )?` prefix makes the gate measure the declared surface
+ * under BOTH formatter styles while keeping prose flags excluded.
  */
 function shownFlags(helpText: string): Set<string> {
   const found = new Set<string>();
-  for (const m of helpText.matchAll(/^[ \t]*(--[a-z][a-z0-9-]*)/gm)) {
+  for (const m of helpText.matchAll(/^[ \t]*(?:-[A-Za-z], )?(--[a-z][a-z0-9-]*)/gm)) {
     found.add(m[1]!);
   }
   return found;
@@ -74,8 +86,111 @@ describe('027 T006 — roadmap per-subaction help is non-drift vs the parser (CH
   }
 });
 
-describe('027 T006 — a flag NOT shown is rejected; a flag shown is accepted', () => {
-  it("advance: an undeclared --bogus is rejected (not in help) → exit 2", () => {
+// ── check (3) fixture map ───────────────────────────────────────────────────
+// One MINIMAL VALID invocation per subaction (argv AFTER the subaction token and
+// EXCLUDING `--doc`, which the harness appends as a tmp chain copy). Each entry
+// exercises every flag the subaction's grammar declares with a valid value, so
+// the dry-run exits 0 — proving every shown flag is ACCEPTED by the parser, not
+// rejected as unknown. Ids are taken from the `chain` fixture:
+//   design:feature/a (shipped — terminal), impl:feature/b (planned),
+//   impl:feature/c (planned).
+//
+// `expectExit0: false` marks a subaction whose valid invocation cannot cleanly
+// exit 0 for a reason UNRELATED to flag acceptance; for those the contract is
+// weaker but still load-bearing: the failure must NOT be an `unknown flag` /
+// `unknown subaction` shape (i.e. the flag was accepted; some other validation
+// failed). `reconcile` is the one such subaction here: against a bare tmp chain
+// copy it exits 2 with a DocumentModelError (no `specs/` glob-parent dir to
+// anchor spec correspondences) — a doc-resolution failure, not a flag rejection.
+// (close-related, by contrast, exits 0: its terminal-status `design:feature/a`
+// records no resolved ids → "nothing to close".)
+interface ValidInvocation {
+  readonly argv: readonly string[];
+  readonly expectExit0: boolean;
+}
+
+const VALID_INVOCATION: Readonly<Record<string, ValidInvocation>> = {
+  next: { argv: [], expectExit0: true },
+  blocked: { argv: [], expectExit0: true },
+  order: { argv: [], expectExit0: true },
+  graph: { argv: [], expectExit0: true },
+  // reconcile resolves spec paths against a `specs/` glob-parent dir; a bare tmp
+  // chain copy has none, so it exits 2 (DocumentModelError) — NOT a flag
+  // rejection. The flag-acceptance half of check (3) still holds (no `--`-flag is
+  // unknown); the bogus-flag half still asserts exit-2 `unknown flag`.
+  reconcile: { argv: [], expectExit0: false },
+  blocks: { argv: ['design:feature/a'], expectExit0: true },
+  add: {
+    argv: [
+      'impl:gap/probe',
+      '--status', 'planned',
+      '--scope', 'x',
+      '--depends-on', 'design:feature/a',
+      '--part-of', 'design:feature/a',
+      '--deferred-until', '2026-12-01',
+      '--spec', 'specs/x',
+      '--ref', 'TASK-1',
+    ],
+    expectExit0: true,
+  },
+  advance: { argv: ['impl:feature/b', '--to', 'in-flight'], expectExit0: true },
+  decompose: { argv: ['impl:feature/b', '--into', 'impl:gap/x1,impl:gap/x2'], expectExit0: true },
+  // reclassify renames an identifier: --to takes a NEW `<phase>:<kind>/<slug>` id,
+  // NOT a status (the task's `--to in-flight` is invalid against the id grammar).
+  reclassify: { argv: ['impl:feature/b', '--to', 'impl:feature/b2'], expectExit0: true },
+  defer: { argv: ['impl:feature/b', '--until', '2026-12-01'], expectExit0: true },
+  // close-related needs a TERMINAL item; design:feature/a is `shipped` (terminal)
+  // and records no resolved ids, so the dry-run exits 0 ("nothing to close").
+  'close-related': { argv: ['design:feature/a'], expectExit0: true },
+};
+
+/** The completeness guard: every registered subaction has a check (3) fixture.
+ * A new subaction without one fails loud here rather than silently skipping
+ * flag-acceptance coverage (the gap this hardening closes). */
+function invocationFor(sub: string): ValidInvocation {
+  const entry = VALID_INVOCATION[sub];
+  if (entry === undefined) {
+    throw new Error(`help-nondrift: no check-(3) VALID_INVOCATION fixture for subaction '${sub}'`);
+  }
+  return entry;
+}
+
+function isUnknownFlagOrSubaction(stderr: string): boolean {
+  return /unknown flag /.test(stderr) || /unknown subaction /.test(stderr);
+}
+
+describe('027 T006 — check (3): every shown flag is accepted; an unshown flag is rejected', () => {
+  for (const sub of SUBACTIONS) {
+    const invocation = invocationFor(sub);
+
+    it(`${sub}: the minimal valid invocation is accepted (no unknown-flag rejection)`, () => {
+      const docPath = tmpChain();
+      const r = runCli(['roadmap', sub, ...invocation.argv, '--doc', docPath]);
+      // Every flag the grammar declares (and thus the help shows) is passed in the
+      // fixture invocation; a parse-time unknown-flag rejection would prove drift.
+      expect(isUnknownFlagOrSubaction(r.stderr)).toBe(false);
+      if (invocation.expectExit0) {
+        // exit 0 dry-run proves every declared flag was accepted AND validated.
+        expect(r.status).toBe(0);
+      }
+    });
+
+    it(`${sub}: a bogus --zzz-not-a-flag is rejected (exit 2, unknown flag)`, () => {
+      expect(flagNamesFor(SUBACTION_SPECS[sub]!)).not.toContain('--zzz-not-a-flag');
+      const docPath = tmpChain();
+      const r = runCli([
+        'roadmap', sub, ...invocation.argv,
+        '--zzz-not-a-flag', 'bogus',
+        '--doc', docPath,
+      ]);
+      expect(r.status).toBe(2);
+      expect(r.stderr).toContain('unknown flag --zzz-not-a-flag');
+    });
+  }
+});
+
+describe('027 T006 — anchored flag-acceptance spot checks (advance + add)', () => {
+  it('advance: an undeclared --bogus is rejected (not in help) → exit 2', () => {
     const grammar = SUBACTION_SPECS.advance!;
     expect(flagNamesFor(grammar)).not.toContain('--bogus');
     const docPath = tmpChain();
@@ -97,11 +212,18 @@ describe('027 T006 — a flag NOT shown is rejected; a flag shown is accepted', 
     const docPath = tmpChain();
     const help = runCli(['roadmap', 'add', '--help']);
     const shown = shownFlags(help.stdout);
+    // Assert the shown set and the exercised set are consistent: every flag we
+    // assert is shown is ALSO passed to the parser below (cross-model codex-02 +
+    // claude-04 — the prior version asserted --part-of was shown but never passed
+    // it, so the "is it accepted?" half of check (3) never exercised --part-of).
     expect(shown.has('--status')).toBe(true);
+    expect(shown.has('--scope')).toBe(true);
     expect(shown.has('--part-of')).toBe(true);
     const r = runCli([
       'roadmap', 'add', 'impl:gap/z',
-      '--status', 'planned', '--scope', 'x',
+      '--status', 'planned',
+      '--scope', 'x',
+      '--part-of', 'design:feature/a',
       '--doc', docPath,
     ]);
     expect(r.status).toBe(0);
