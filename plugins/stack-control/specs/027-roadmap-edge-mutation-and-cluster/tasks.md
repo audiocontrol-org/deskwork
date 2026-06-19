@@ -50,8 +50,8 @@ Tests are REQUIRED (Constitution Principle I — Test-First, NON-NEGOTIABLE): ea
 **Goal**: the `ROADMAP.md` header never traps the agent between "do not hand-edit" and "no verb exists."
 **Independent test**: quickstart Scenario 5.
 
-- [ ] T016 [P] [US3] RED test `tests/roadmap/honest-header.test.ts`: the rendered header names the mutation verbs, includes a worked `cluster` example, and states the hand-edit-then-`roadmap order` fallback (FR-016, CHK023).
-- [ ] T017 [US3] Rewrite the `ROADMAP.md` header (and the `curate`/header-emitting code path if the header is generated) to the honest-interim form; make T016 GREEN.
+- [X] T016 [P] [US3] RED test `tests/roadmap/honest-header.test.ts`: the rendered header names the mutation verbs, includes a worked `cluster` example, and states the hand-edit-then-`roadmap order` fallback (FR-016, CHK023).
+- [X] T017 [US3] Rewrite the `ROADMAP.md` header (and the `curate`/header-emitting code path if the header is generated) to the honest-interim form; make T016 GREEN.
 
 ## Phase 6 — Polish & cross-cutting
 

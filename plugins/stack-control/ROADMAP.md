@@ -17,8 +17,14 @@ satisfied only when the target is `shipped`), `part-of` (non-blocking grouping),
 `deferred-until` (a prose condition that blocks readiness until the operator
 clears it). Reason over the graph with `/stack-control:roadmap` (`next` /
 `blocked` / `blocks` / `order` / `graph` / `reconcile`) and keep it crisp with
-`add` / `advance` / `decompose` / `reclassify` / `defer`. Program vision +
-rationale live in
+`add` / `advance` / `decompose` / `reclassify` / `defer` / `cluster` (alias
+`group`) — e.g. `stackctl roadmap cluster multi:feature/epic --children
+design:feature/a,impl:feature/b --chain --apply` gathers existing items under a
+created-or-reused parent. Run `stackctl roadmap --help` for the full surface. For
+an edit that has no verb yet (e.g. moving a `part-of` / `depends-on` edge): edit
+this file directly, then run `stackctl roadmap order` to revalidate the graph (it
+fails loud on a cycle / dangling ref / duplicate id). Program vision + rationale
+live in
 `docs/1.0/001-IN-PROGRESS/pluggable-lifecycle-providers/stack-control-roadmap.md`;
 this document is the live feature queue.
 
