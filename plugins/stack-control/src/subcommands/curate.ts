@@ -19,7 +19,9 @@ function assertNoDanglingTerminalEdge(docPath: string): void {
   const opts = grammarDirs();
   const { doc } = loadDocument(docPath, opts);
   const unitRefFields = new Set(
-    doc.grammar.edgeFields.filter((f) => f.references === 'unit').map((f) => f.name),
+    // `?? []` — a grammar that omits edgeFields (non-roadmap doc, older grammar)
+    // has no unit-ref edges to dangle; guard rather than TypeError (claude-03).
+    (doc.grammar.edgeFields ?? []).filter((f) => f.references === 'unit').map((f) => f.name),
   );
   if (unitRefFields.size === 0) return; // no unit-ref edges in this grammar — nothing to dangle
   const terminal = new Set(doc.grammar.terminalStatuses);

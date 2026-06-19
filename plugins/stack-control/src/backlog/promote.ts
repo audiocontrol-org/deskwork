@@ -131,9 +131,12 @@ export function unpromote(req: UnpromoteRequest): UnpromoteResult {
   }
 
   if (req.apply) {
+    // Only rewrite notes when a Promoted-to: line is actually present — passing
+    // setNotes for a label-only item would write `--notes ''` and could erase any
+    // other notes the item carries (data loss; AUDIT-BARRAGE-claude-01, Phase 4).
     req.backend.edit(req.id, {
       ...(hasLabel ? { removeLabel: PROMOTED_LABEL } : {}),
-      setNotes: stripPromotedToLines(notes),
+      ...(hasLine ? { setNotes: stripPromotedToLines(notes) } : {}),
     });
   }
 

@@ -54,7 +54,10 @@ export function emitReconcile(flags: Flags, opts: LoadOptions): void {
   // `reconcile` (no `--unorphan`) stays report-only below.
   const unorphan = flags.values.get('unorphan');
   if (unorphan !== undefined) {
-    const result = reconcileUnorphan(flags.doc, unorphan, opts, baseDir, flags.apply);
+    // `--type <phase>:<kind>` types the new node (default impl:feature). An orphan
+    // is not necessarily an impl:feature — design/multi specs need their own
+    // prefix or the node is mistyped (AUDIT-BARRAGE-claude-06).
+    const result = reconcileUnorphan(flags.doc, unorphan, opts, baseDir, flags.apply, flags.values.get('type'));
     process.stdout.write(
       result.applied
         ? `roadmap reconcile --unorphan: resolved ${unorphan} into a node\n`

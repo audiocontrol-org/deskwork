@@ -1285,3 +1285,282 @@ Surface:    src/cli-help/verb-reference.ts:31-64
 `emitDescriptorArtifact()` claims to emit the descriptor artifact with “EXACTLY the verbs / sub-actions / flags the live surface exposes,” but `ArtifactFlag` only carries `arg`, `required`, and `description`; `flagsObject()` omits `shortFlag` even though `FlagDescriptor` has it and `flagLine()` renders it into the human reference. A downstream manifest consumer cannot reconstruct aliases like `-h`/other short options from the artifact, so the artifact is not a true round-trip of the command surface.
 
 The blast radius is medium: this does not break help rendering directly, but it makes the new machine-readable artifact incomplete while the tests still pass because they only compare long flag names. A reasonable fix is to include `shortFlag: string | null` in `ArtifactFlag` and assert it in `descriptor-artifact-roundtrip.test.ts`.
+
+## 2026-06-19 — audit-barrage lift (20260619T201758854Z-028-front-door-completeness-phase-3)
+
+### AUDIT-20260619-75 — `--reason` is collected, validated, and echoed — but never persisted to the backing store
+
+Finding-ID: AUDIT-20260619-75
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/backlog.ts:147–173 (`emitDone`)
+
+`emitDone` requires `--reason`, validates it is non-empty, and writes it to stdout in the success message (`backlog done: closed ${id} (reason: ${reason})\n`). The user sees all the signals of a persisted audit trail. But `backend.close(id)` is called with only the ID — no `reason` argument. The reason is validated then silently dropped; it never reaches the backing store.
+
+If FR-010 specifies terminal closure with a captured reason (the flag's presence as a required named argument strongly implies this), the spec surface the operator sees — a mandatory `--reason` flag — sets an expectation that the backing store records it. That expectation is false. The blast radius is an audit trail that appears populated but isn't: every `done` closure from this point forward carries no reason in the store, and any downstream query, report, or review surface that tries to surface reasons will come back empty.
+
+Reasonable fix: extend `BacklogBackend.close(id, reason: string)` to accept the reason and store it (e.g. as a `closureReason` field in the item's YAML), then thread `reason` through the call here.
+
+---
+
+### AUDIT-20260619-76 — Dry-run in `emitDone` returns before validating item existence — inconsistent with `emitArchive`
+
+Finding-ID: AUDIT-20260619-76 (claude-02 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    src/subcommands/backlog.ts:153–157 (`emitDone`) vs. 177–199 (`emitArchive`)
+
+`emitDone` gates on `!flags.apply` and returns immediately — before any existence check. Dry-running against a nonexistent ID prints a success-looking message and exits 0. In apply mode, `backend.close(id)` will throw a `BacklogError` (assuming the backend fails loud on unknown IDs), which is caught and exits 1.
+
+`emitArchive` does the opposite: it performs the existence check and status guard *before* the dry-run gate, so `backlog archive --dry-run <bad-id>` exits 1. Dry-run is the operator's safety check before committing a write. When dry-run returns 0 for an input that apply would reject, the safety check is broken. The inconsistency means `done` and `archive` behave differently for the same class of input, and the operator cannot trust dry-run as a pre-flight for `done`.
+
+Reasonable fix: mirror `emitArchive`'s structure — call `backend.list().find(i => i.id === id)` before the dry-run gate, emit exit 1 if the item is absent, then continue to the dry-run/apply branch.
+
+---
+
+### AUDIT-20260619-77 — Non-null assertion `!` after a TOCTOU gap in `emitCapture`
+
+Finding-ID: AUDIT-20260619-77
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/backlog.ts:126–130 (`emitCapture`)
+
+```ts
+if (ref !== undefined && backend.exists(ref)) {
+  const existing = backend.list().find((i) => i.refs.includes(ref))!;
+```
+
+`backend.exists(ref)` and `backend.list().find(...)` are two separate reads. If the item is removed between the two calls — or if `exists()` and `list().find()` resolve against the store differently (e.g. one reads a cached view, the other a fresh scan) — the assertion `!` crashes at runtime with an unhandled `TypeError: Cannot read properties of undefined`. The comment on the `exists()` call notes it "fails loud on an undecidable-negative (malformed store)," which suggests store integrity issues are a real concern; if the store is partially malformed, the divergence between `exists()` and `list()` becomes more likely.
+
+Additionally, the project CLAUDE.md rule "Never bypass typing — No `as Type`, no `@ts-ignore`" extends to non-null assertion `!` as a semantically equivalent bypass of TypeScript's null safety: it suppresses the compiler's correct warning that `find` may return `undefined`. This should instead use a null guard and exit cleanly with an informative error.
+
+Reasonable fix: replace the non-null assertion with an explicit guard and a `BacklogError` path (or a `process.stderr` + `process.exit(1)`) so a store inconsistency produces a clean diagnostic rather than an uncaught exception.
+
+---
+
+### AUDIT-20260619-78 — `--analyze-clean` flag infrastructure wired in `roadmap-command.ts` with no visible grammar entries enabling it
+
+Finding-ID: AUDIT-20260619-78
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/roadmap-command.ts:68–75 (`flagsFromCommand`), 127–130 (`registerSubaction`)
+
+The diff adds `analyzeClean` to the skip list in `flagsFromCommand` and adds `--analyze-clean` registration to `registerSubaction` conditional on `grammar.analyzeClean === true`. But the diff does not show any roadmap subaction grammar definition that sets `analyzeClean: true`. In `backlog.ts` the analogous grammar table (`SUBACTION_SPECS`) is inline and visible; the absence of corresponding roadmap grammar entries from this diff leaves the wiring with no activating grammar — `--analyze-clean` will never be registered for any subcommand.
+
+If the grammar entries live in the non-diffed portion of `roadmap-command.ts`, this is a non-issue and the finding closes immediately on inspection. But if they are genuinely absent, the entire `analyzeClean` pathway is dead code: the `flagsFromCommand` skip, the boolean parse, and the `registerSubaction` branch are all inert, and `--analyze-clean` will not appear on any help surface or be accepted by any subcommand. An agent building from this diff alone (e.g. to wire a test or add a dependent feature) will not be able to discover which subcommand(s) accept the flag.
+
+Reasonable fix: verify the grammar definition exists and, if not, add the entry in the same commit so the flag is reachable.
+
+---
+
+### AUDIT-20260619-79 — `emitDone` does not guard against double-close (already-`Done` item)
+
+Finding-ID: AUDIT-20260619-79
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/backlog.ts:161–171 (`emitDone`)
+
+`emitDone` calls `backend.close(id)` without first checking whether the item is already in `Done` status. Whether double-close is safe depends entirely on `BacklogBackend.close`'s implementation — if it is idempotent (no-op on already-done items), the behavior is acceptable; if it overwrites a timestamp, re-emits a lifecycle event, or throws an uninformative error, it is a silent misbehavior.
+
+The analogous `emitArchive` explicitly guards the status: `if (item.status !== BACKLOG_DONE_STATUS) { failUsage(...) }`. There is no symmetric guard in `emitDone` (`if (item.status === BACKLOG_DONE_STATUS) { failUsage('already done') }`). The inconsistency means `archive` is explicit about preconditions and `done` is not, which makes the contract of `done` harder to reason about. The blast radius is small (single-item, non-destructive), but the idempotency assumption is implicit rather than stated.
+
+Reasonable fix: add a pre-call status check mirroring `emitArchive`'s guard, or document explicitly in the function comment that `backend.close` is idempotent so the assumption is visible.
+
+### AUDIT-20260619-80 — `backlog done` drops the required closure reason
+
+Finding-ID: AUDIT-20260619-80
+Status:     open
+Severity:   blocking
+Per-lane:   codex=blocking
+Decision:   single-model (gate-counted blocking)
+Surface:    src/subcommands/backlog.ts:151-171
+
+`emitDone` requires `--reason` and prints it, but the applied path only calls `backend.close(id)` at line 163. The backend close API sets status to `Done`; no reason is passed or recorded. That contradicts the feature contract for “one disposition (`done`) + `--reason`”, where the reason carries fixed-vs-wontfix nuance.
+
+Blast radius is blocking because an adopter can run the sanctioned terminal closure command exactly as documented and permanently lose the governance rationale. A reasonable fix would make closure persist the reason, likely by extending the backend close operation or composing `edit(... appendNotes ...)` with the status change while preserving fail-loud behavior.
+
+### AUDIT-20260619-81 — `roadmap close-related` still bypasses the new closure semantics
+
+Finding-ID: AUDIT-20260619-81
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    missing update to src/subcommands/roadmap.ts:291-315
+
+The feature requires `roadmap close-related` to be repointed so there is exactly one backlog closure mechanism. The existing handler still calls `backend.close(t)` directly at line 314, with no closure reason and no route through the new `backlog done` semantics added in `src/subcommands/backlog.ts`.
+
+Blast radius is high because two sanctioned front doors now close backlog items differently: `backlog done` requires a reason, while `roadmap close-related` silently closes without one. A reasonable fix would centralize closure behind a shared backend/helper that records the required reason and make both verbs call it.
+
+## 2026-06-19 — audit-barrage lift (20260619T202017087Z-028-front-door-completeness-phase-4)
+
+### AUDIT-20260619-82 — `unpromote` unconditionally calls `setNotes` even when only label is present, risking note erasure
+
+Finding-ID: AUDIT-20260619-82
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/backlog/promote.ts:103–112 (the `if (req.apply)` block)
+
+`unpromote` always includes `setNotes: stripPromotedToLines(notes)` in the `edit` call regardless of whether `hasLine` is true. When an item carries only the `promoted` label (no `Promoted-to:` line in the notes — e.g., a hand-tagged item, or a future code path that adds the label without the line), `notes` equals the result of `extractNotes`, which returns `''` when the `<!-- SECTION:NOTES:BEGIN -->` fence is absent. `stripPromotedToLines('')` returns `''`, and `setNotes: ''` is passed to `backend.edit`, which runs `task edit <id> --notes ''`. If the backlog binary interprets `--notes ''` as "replace the notes section with empty", any notes the item carried are silently erased.
+
+The blast radius is data loss on a write path with no undo in the backlog binary. The fix is to gate the `setNotes` on `hasLine`:
+
+```ts
+...(hasLine ? { setNotes: stripPromotedToLines(notes) } : {}),
+```
+
+Without that guard, any `unpromote --apply` on an item where the promote flow wrote the label but the `Promoted-to:` notes line was missing or stripped earlier will silently destroy the item's notes.
+
+---
+
+### AUDIT-20260619-83 — `move-edge.test.ts` "cycle detection" test never reaches the cycle-detection path
+
+Finding-ID: AUDIT-20260619-83
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/roadmap/move-edge.test.ts:103–133
+
+The test titled "zero-write when the move would create a cycle" constructs a fixture where `impl:feature/a` has NO `depends-on` edges. It then calls `moveEdge(docPath, 'impl:feature/a', 'depends-on', 'impl:feature/c', ...)` — asking to move a `depends-on: impl:feature/c` edge that does not exist on `a`. The test expects `DocumentModelError` and zero-write, which is correct, but the error is thrown by the "from edge not present" guard, NOT by the cycle-detection logic. The comment inside the test ("give `a` a dep on c, then move it to b → a depends-on b, while b depends-on a ⇒ cycle") describes an intent that the fixture does not implement.
+
+Blast radius: `moveEdge`'s cycle-prevention path has zero test coverage. A regression that silently accepts a cyclic reparent would go undetected. A correct cycle test would add `- depends-on: impl:feature/c` to `impl:feature/a`'s fixture block before calling `moveEdge`.
+
+---
+
+### AUDIT-20260619-84 — `assertNoDanglingTerminalEdge` accesses `doc.grammar.edgeFields` without a null guard
+
+Finding-ID: AUDIT-20260619-84
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/curate.ts:15–21
+
+```ts
+const unitRefFields = new Set(
+  doc.grammar.edgeFields.filter((f) => f.references === 'unit').map((f) => f.name),
+);
+```
+
+If the loaded document's grammar does not define `edgeFields` (e.g., a non-roadmap document type, an older grammar version, or a grammar that simply omits the field), this line throws a `TypeError: Cannot read properties of undefined (reading 'filter')` rather than the expected `DocumentModelError`. The existing `if (unitRefFields.size === 0) return;` guard only fires after a successful `.filter()` call; it does not protect against a missing property.
+
+Blast radius: any `curate` invocation on a document whose grammar lacks `edgeFields` crashes with an unhandled TypeError, exposing an unexpected stack trace instead of a clean `DocumentModelError`. Fix: `(doc.grammar.edgeFields ?? []).filter(...)`.
+
+---
+
+### AUDIT-20260619-85 — Two-step title restore (`create` + `edit --title`) leaves an orphan with a truncated title on partial failure
+
+Finding-ID: AUDIT-20260619-85
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/backlog/backend.ts:300–311
+
+```ts
+const id = m[1]!;
+if (safeTitle !== spec.title) {
+  run(['task', 'edit', id, '-t', spec.title, '--plain']);
+}
+return id;
+```
+
+If `task create` succeeds but the follow-up `task edit -t <full-title>` throws (binary crash, timeout, or any error propagated by `run()`), the item is permanently stranded in the live store with the truncated filename-safe title. The caller receives an exception and therefore does not hold the `id`. The item is unreachable by the caller and must be manually located and corrected.
+
+Blast radius: a partially-created item with a wrong title constitutes invisible data corruption in the backlog store — exactly the silent-failure mode the project rules prohibit. No test covers this path. A mitigation would be to have `create` return the id even on second-step failure and let the caller clean up, or to use a single atomic binary operation if the backlog binary supports it.
+
+---
+
+### AUDIT-20260619-86 — `normalize` called in `reconcile.ts` additions is not visible as an import or local definition in the diff
+
+Finding-ID: AUDIT-20260619-86
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/reconcile.ts — `nodeIdForOrphan` (new), `reconcileUnorphan` (new)
+
+Both new functions call `normalize(specRel)` and `normalize(spec)`, but the diff's import block for `reconcile.ts` adds only `basename` and `join` from `node:path` — `normalize` (i.e., `path.normalize`) is not imported. If `normalize` is not defined as a local helper elsewhere in the file (not visible in this diff because it predates this commit), both functions would throw `ReferenceError: normalize is not defined` at runtime.
+
+Blast radius: `reconcile --unorphan` and the `nodeIdForOrphan` helper both crash on first invocation if `normalize` is a missing import. Since the diff is not exhaustive (only shows changed lines), this may be a pre-existing local helper. However, the risk is high enough to warrant verification: confirm that `normalize` resolves to a defined symbol in the complete file before shipping.
+
+---
+
+### AUDIT-20260619-87 — `nodeIdForOrphan` hard-codes `impl:feature/` prefix — no mechanism for other node types
+
+Finding-ID: AUDIT-20260619-87
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/reconcile.ts — `nodeIdForOrphan` (new, ~line 139)
+
+```ts
+return `impl:feature/${slug}`;
+```
+
+Every orphan spec dir is resolved to an `impl:feature/<slug>` node. But orphan specs can represent design phases (`design:feature/…`), multi-feature umbrellas (`multi:feature/…`), or other node types. The operator has no way to override the inferred type when calling `reconcile --unorphan <spec>`. If the orphan corresponds to a design spec and the caller cannot supply a type flag, the command creates a structurally mistyped node.
+
+Blast radius: the roadmap type prefix is semantically load-bearing — `design:` nodes have different lifecycle semantics than `impl:` nodes (the `design-approved` marker, compass transitions). A silently wrong prefix corrupts the roadmap graph. The fix is to accept an optional `--type <prefix>` flag, or at minimum document the hard-coded default prominently and validate that the derived slug matches the expected prefix convention.
+
+---
+
+### AUDIT-20260619-88 — `edge-subactions-cli.test.ts` test name promises "bare reconcile exits 0" but never asserts it
+
+Finding-ID: AUDIT-20260619-88
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/roadmap/edge-subactions-cli.test.ts:121–133
+
+The `it` description reads: "reconcile --unorphan on a non-orphan → exit 2; bare reconcile stays report-only exit 0". The test body only exercises the `--unorphan specs/no-such-orphan --apply` path and asserts exit 2. The "bare reconcile stays report-only exit 0" half of the claim is never exercised by an assertion in the body.
+
+Blast radius: if a future change causes bare `stackctl roadmap reconcile` to exit non-zero or emit a mutation, this test would not catch it. The test names a safety invariant it doesn't enforce. Adding a `runCli(['roadmap', 'reconcile', '--doc', docPath])` call with `expect(r.status).toBe(0)` would close the gap.
+
+---
+
+### AUDIT-20260619-89 — `backlog-unpromote.test.ts` label-presence regex matches any label containing "promoted" as a substring
+
+Finding-ID: AUDIT-20260619-89
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/subcommands/backlog-unpromote.test.ts:53–54, 68–69
+
+```ts
+expect(file).toMatch(/labels:[\s\S]*promoted/);
+// ...
+expect(file).not.toMatch(/labels:[\s\S]*promoted/);
+```
+
+The regex `[\s\S]*promoted` matches any label that contains "promoted" as a substring (e.g., `promoted-candidate`, `not-yet-promoted`). If a future label schema introduces a label whose text includes "promoted", the assertions would produce false positives (before-check) or false negatives (after-check) without detecting a real defect.
+
+Blast radius: test correctness, not production correctness. No user-facing regression, but the test would silently pass even if the `promoted` label specifically was not removed while another label containing "promoted" remained. A more precise pattern — `/labels:[\s\S]*\bpromoted\b/` or checking for the exact YAML label line — would make the assertion unambiguous.
+
+### AUDIT-20260619-90 — `backlog done` dry-run reports success for unknown IDs
+
+Finding-ID: AUDIT-20260619-90
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/backlog.ts:151-171
+
+`emitDone` validates `<id>` and `--reason`, but on dry-run it returns before constructing the backend or checking that the item exists. That means `stackctl backlog done TASK-999999 --reason x` exits 0 and prints a “would close” line for an item that cannot be closed. The same verb treats unknown IDs as runtime exit 1 only in the `--apply` branch, via `backend.close`.
+
+The blast radius is medium: no data is corrupted, but the lifecycle verb gives operators false confidence during the default dry-run path. Other new lifecycle verbs validate existence before dry-run reporting (`archive` lists first; `unpromote` calls `unpromote` before reporting), and the feature contract describes unknown id as exit 1. A reasonable fix is to resolve the backend and verify the item exists before the dry-run message, while still only calling `backend.close` under `--apply`.

@@ -152,13 +152,21 @@ function emitDone(flags: Flags): void {
   const id = requirePositional('backlog', flags.positionals, 'done requires an <id> positional');
   const reason = requireMapValue('backlog', flags.values, 'reason');
   if (reason.trim() === '') failUsage('backlog', '--reason <reason> must be non-empty');
+  const backend = createBacklogBackend({ cwd: ensureBacklogProject() });
+  // Verify the item exists BEFORE the dry-run message — otherwise the default
+  // path reports a false "would close" for an unknown id (AUDIT-BARRAGE-codex-01,
+  // Phase 4). Unknown id → exit 1, matching the --apply backend.close behavior +
+  // the contract (and consistent with archive/unpromote, which resolve first).
+  if (backend.list().find((i) => i.id === id) === undefined) {
+    process.stderr.write(`backlog: no item '${id}'\n`);
+    process.exit(1);
+  }
   if (!flags.apply) {
     process.stdout.write(
       `backlog done: dry-run — would close ${id} (reason: ${reason}) (use --apply to write)\n`,
     );
     return;
   }
-  const backend = createBacklogBackend({ cwd: ensureBacklogProject() });
   try {
     backend.close(id);
   } catch (err) {

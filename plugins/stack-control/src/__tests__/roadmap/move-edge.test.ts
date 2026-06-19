@@ -98,6 +98,9 @@ describe('roadmap.moveEdge (T067)', () => {
     const docPath = writeTempRoadmap([
       '## impl:feature/a',
       '- status: planned',
+      // `a` genuinely HOLDS depends-on c, so the move reaches the CYCLE-detection
+      // path (not the from-edge-not-present guard) — AUDIT-BARRAGE-claude-02.
+      '- depends-on: impl:feature/c',
       '',
       '## impl:feature/b',
       '- status: planned',
@@ -107,8 +110,8 @@ describe('roadmap.moveEdge (T067)', () => {
       '- status: shipped',
     ]);
     const before = readFileSync(docPath, 'utf8');
-    // Move a's (nonexistent) edge — but here test the cycle path: give `a` a dep
-    // on c, then move it to b → a depends-on b, while b depends-on a ⇒ cycle.
+    // Move a's depends-on edge from c to b → a depends-on b while b depends-on a
+    // ⇒ cycle; the move must be refused by cycle detection, zero-write.
     expect(() =>
       moveEdge(
         docPath,

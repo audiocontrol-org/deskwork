@@ -133,14 +133,27 @@ export function reconcile(
  * The slug is sanitized to the grammar's `[^\s/:]+` slug shape (drop disallowed
  * chars); fail loud if nothing usable remains.
  */
-export function nodeIdForOrphan(specRel: string): string {
+/** Default node-type prefix for an unorphaned node when `--type` is not given. */
+export const DEFAULT_UNORPHAN_TYPE = 'impl:feature';
+
+export function nodeIdForOrphan(specRel: string, typePrefix: string = DEFAULT_UNORPHAN_TYPE): string {
   const slug = basename(normalize(specRel)).replace(/[\s/:]+/g, '-');
   if (slug.length === 0) {
     throw new DocumentModelError(
       `reconcile --unorphan: cannot derive a node slug from spec dir '${specRel}'`,
     );
   }
-  return `impl:feature/${slug}`;
+  // The type prefix (`<phase>:<kind>`, e.g. impl:feature / design:gap) is
+  // operator-supplied via --type — an orphan spec is not necessarily an
+  // impl:feature; defaulting every orphan to impl:feature would mistype a design
+  // or multi spec (AUDIT-BARRAGE-claude-06, Phase 4).
+  if (!/^[^\s/:]+:[^\s/:]+$/.test(typePrefix)) {
+    throw new DocumentModelError(
+      `reconcile --unorphan: --type '${typePrefix}' must be a '<phase>:<kind>' prefix ` +
+        `(e.g. impl:feature, design:gap, multi:feature)`,
+    );
+  }
+  return `${typePrefix}/${slug}`;
 }
 
 /**
@@ -158,6 +171,7 @@ export function reconcileUnorphan(
   opts: LoadOptions,
   baseDir: string,
   apply: boolean,
+  typePrefix?: string,
 ): MutationResult {
   const report = reconcile(docPath, opts, baseDir);
   const target = normalize(spec);
@@ -171,5 +185,5 @@ export function reconcileUnorphan(
   // `spec:` records the spec DIRECTORY (the project convention, e.g.
   // `specs/005-document-primitives`), NOT a path to `spec.md` — reconcile
   // resolves `<spec>/spec.md` itself.
-  return add(docPath, { identifier: nodeIdForOrphan(target), spec: target }, opts, apply);
+  return add(docPath, { identifier: nodeIdForOrphan(target, typePrefix), spec: target }, opts, apply);
 }

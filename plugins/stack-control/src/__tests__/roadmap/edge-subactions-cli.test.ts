@@ -5,7 +5,8 @@
 // RM1).
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { runCli } from '../_run-helpers.js';
 import { loadRoadmap } from '../../roadmap/roadmap-model.js';
 import { ROADMAP_OPTS, writeTempRoadmap } from './helpers.js';
@@ -129,5 +130,11 @@ describe('stackctl roadmap edge sub-actions (T071)', () => {
     expect(
       runCli(['roadmap', 'reconcile', '--unorphan', 'specs/no-such-orphan', '--doc', docPath, '--apply']).status,
     ).toBe(2);
+    // Bare reconcile (no --unorphan) stays report-only → exit 0 (the invariant the
+    // test name promises; AUDIT-BARRAGE-claude-07). Needs a specs/ glob-parent next
+    // to the doc so reconcile can resolve correspondences (else it fails loud).
+    mkdirSync(join(dirname(docPath), 'specs'), { recursive: true });
+    const bare = runCli(['roadmap', 'reconcile', '--doc', docPath]);
+    expect(bare.status, bare.stderr).toBe(0);
   });
 });

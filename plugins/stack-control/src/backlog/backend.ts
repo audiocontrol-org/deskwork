@@ -305,7 +305,20 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
       }
       const id = m[1]!;
       if (safeTitle !== spec.title) {
-        run(['task', 'edit', id, '-t', spec.title, '--plain']);
+        // The item is already created with the filename-safe (truncated) title;
+        // restoring the full title is a second step. If it fails, the item is
+        // NOT silently stranded with a wrong title — surface a loud error naming
+        // the created id + truncated title so the operator can recover it
+        // (no invisible corruption; AUDIT-BARRAGE-claude-04, Phase 4).
+        try {
+          run(['task', 'edit', id, '-t', spec.title, '--plain']);
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err);
+          throw new BacklogError(
+            `created ${id} but failed to restore its full title (it currently reads the ` +
+              `truncated "${safeTitle}"): ${detail}. Fix with: backlog task edit ${id} -t "<full title>".`,
+          );
+        }
       }
       return id;
     },

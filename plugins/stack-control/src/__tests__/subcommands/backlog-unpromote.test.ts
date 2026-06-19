@@ -45,7 +45,9 @@ describe('028 B3 — backlog unpromote dry-run (default)', () => {
     expect(r.stdout).toContain('use --apply');
     // linkage still present
     const file = taskFileFor(root, id);
-    expect(file).toMatch(/labels:[\s\S]*promoted/);
+    // Word-bounded so a future label merely CONTAINING "promoted" can't satisfy it
+    // (AUDIT-BARRAGE-claude-08).
+    expect(file).toMatch(/labels:[\s\S]*\bpromoted\b/);
     expect(file).toContain('**Promoted-to:**');
   });
 });
@@ -58,11 +60,28 @@ describe('028 B3 — backlog unpromote --apply (inverse of promote)', () => {
     expect(r.stdout).toContain(`backlog unpromote: removed promotion linkage on ${id}`);
 
     const file = taskFileFor(root, id);
-    expect(file).not.toMatch(/labels:[\s\S]*promoted/);
+    expect(file).not.toMatch(/labels:[\s\S]*\bpromoted\b/);
     expect(file).not.toContain('**Promoted-to:**');
     // other labels preserved
     expect(file).toMatch(/labels:[\s\S]*agent-found/);
     expect(file).toMatch(/labels:[\s\S]*type:gap/);
+  });
+
+  it('does NOT erase notes when the item has the promoted label but no Promoted-to line', () => {
+    // Data-loss regression (AUDIT-BARRAGE-claude-01, HIGH): a label-only item
+    // (promoted label + other notes, NO Promoted-to: line) must keep its notes —
+    // unpromote must NOT write `--notes ''` and wipe them.
+    const root = tmpBacklog();
+    dirs.push(root);
+    const backend = createBacklogBackend({ cwd: root });
+    const id = backend.create({ title: 'label-only promoted', labels: ['agent-found', 'type:gap'] });
+    backend.edit(id, { addLabel: 'promoted' });
+    backend.edit(id, { appendNotes: 'IMPORTANT operator note that must survive' });
+    const r = runCli(['backlog', 'unpromote', id, '--apply'], { env: { STACKCTL_BACKLOG_DIR: root } });
+    expect(r.status).toBe(0);
+    const file = taskFileFor(root, id);
+    expect(file).not.toMatch(/labels:[\s\S]*\bpromoted\b/); // label removed
+    expect(file).toContain('IMPORTANT operator note that must survive'); // notes NOT erased
   });
 });
 

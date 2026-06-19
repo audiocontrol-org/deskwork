@@ -70,7 +70,7 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   graph: { valueFlags: [], apply: false, clear: false, positionals: 0 },
   // `reconcile` is report-only by default (read-only); `--unorphan <spec>` is the
   // single mutating assist (resolves an orphan into a node + spec: edge).
-  reconcile: { valueFlags: ['unorphan'], apply: true, clear: false, positionals: 0 },
+  reconcile: { valueFlags: ['unorphan', 'type'], apply: true, clear: false, positionals: 0 },
   add: {
     valueFlags: ['status', 'scope', 'depends-on', 'part-of', 'deferred-until', 'spec', 'ref'],
     apply: true,

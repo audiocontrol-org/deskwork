@@ -4,8 +4,8 @@
   "phaseId": "3",
   "checkpoint": "phase-3",
   "auditLogSection": "phase-3",
-  "scopeFingerprint": "d60ac3382c9cea3bbd50fa500714f6c220418b6bbd6a34d6ce434d1858ae4dc6",
-  "passedAt": "2026-06-19T19:48:05.379Z",
+  "scopeFingerprint": "465624d8d0f759024c1259a843cc65e8bdf99d3b3767566f9b2f3e13c5d386f7",
+  "passedAt": "2026-06-19T20:20:14.533Z",
   "governedPaths": [
     "src/__tests__/cli-help/help-roadmap-govern.test.ts",
     "src/subcommands/roadmap-command.ts",
@@ -53,29 +53,7 @@
     "skills/<name>/SKILL.md"
   ],
   "auditedFiles": [
-    "plugins/stack-control/skills/backlog/SKILL.md",
-    "plugins/stack-control/skills/extend/SKILL.md",
-    "plugins/stack-control/skills/roadmap/SKILL.md",
-    "plugins/stack-control/src/__tests__/capability/skill-capability-id-coverage.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/descriptor-artifact-roundtrip.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/help-audit-barrage.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/help-backlog.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/help-capability.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/help-document-primitives.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/help-full-surface.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/help-inbox.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/help-scope-checks.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/help-scope-clones.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/help-scope-surface.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/help-session-setup.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/help-spec-misc.test.ts",
-    "plugins/stack-control/src/__tests__/cli-help/verb-reference.test.ts",
-    "plugins/stack-control/src/__tests__/session-active-spec-completeness.test.ts",
-    "plugins/stack-control/src/__tests__/session-discovery-path-portability.test.ts",
-    "plugins/stack-control/src/cli-help/verb-reference.ts",
-    "plugins/stack-control/src/cli.ts",
-    "plugins/stack-control/src/session/chain-position.ts",
     "plugins/stack-control/src/subcommands/backlog.ts",
-    "plugins/stack-control/src/subcommands/inbox.ts"
+    "plugins/stack-control/src/subcommands/roadmap-command.ts"
   ]
 }
