@@ -347,7 +347,7 @@ Config-domain discovery and sticky selection: resolve and persist the active con
 
 ## multi:feature/release-resolution-cycle
 - status: planned
-- part-of: multi:feature/lifecycle-industrialization
+- part-of: multi:feature/lifecycle-industrialization, multi:feature/front-door-completeness
 - depends-on: design:feature/roadmap-protocol
 - ref: TASK-134
 Mechanize the post-release+install resolution cycle: given an installed release, map the release delta to candidate items (commit refs, audit-log fixed-<sha>, newly-complete spec tasks), verify each against the FORMALLY-INSTALLED artifact (released-binary reconcile, fix present in the installed cache, released tests where deps allow) distinguishing verified-fixed from re-surfacing, propose closure with auto-written Resolution evidence, reconcile + advance roadmap nodes whose specs shipped, and surface loose ends that did not verify. Composes dw-lifecycle re-audit-fixed-findings/close-shipped/complete + stack-control roadmap reconcile/session-end; agent posts evidence, operator decides closure. Promoted from TASK-134.
@@ -359,7 +359,7 @@ Umbrella: industrialize the stack-control project lifecycle so the governing cer
 ## multi:feature/backlog-promotion-mechanization
 - status: planned
 - depends-on: design:feature/roadmap-protocol
-- part-of: multi:feature/lifecycle-industrialization
+- part-of: multi:feature/lifecycle-industrialization, multi:feature/front-door-completeness
 - ref: TASK-135
 One-move backlog->roadmap promotion: given a backlog item, PROPOSE the roadmap node derived from it (phase/kind from labels, slug from title, status planned, candidate edges, ref=TASK-id, description from body), dry-run the node + linkage, and on --apply CREATE the node AND record the promote linkage atomically — removing the two hand steps (roadmap add + backlog promote) run for TASK-134. Preserves the record-only-promote intent (bidirectional navigability). Promoted from TASK-135.
 
@@ -466,13 +466,13 @@ Make roadmap mutation both POSSIBLE and OBVIOUS for adopting agents — today it
 
 ## impl:gap/roadmap-edge-mutation-verbs
 - status: planned
-- part-of: multi:feature/lifecycle-industrialization
+- part-of: multi:feature/lifecycle-industrialization, multi:feature/front-door-completeness
 - ref: specs/027-roadmap-edge-mutation-and-cluster
 Edge-mutation verbs on EXISTING roadmap nodes: add-edge / remove-edge / move-edge (=reparent) for part-of and depends-on, plus rename and remove-node — dry-run then --apply, graph-revalidating (refuse cycle/dangling/self/dup, zero-write-on-failure), same shape as the other mutation verbs. Absorbs TASK-137 (the move-edge/reparent case had no CLI path). DEFERRED sibling of specs/027-roadmap-edge-mutation-and-cluster (the cluster + self-documenting-help + honest-header slice shipped; this verb set did not). FR-017.
 
 ## multi:gap/cli-verb-surface-consolidation
 - status: planned
-- part-of: multi:feature/lifecycle-industrialization
+- part-of: multi:feature/lifecycle-industrialization, multi:feature/front-door-completeness
 - ref: specs/027-roadmap-edge-mutation-and-cluster
 Verb-surface consolidation rollout: migrate the remaining ~50 flat stackctl verbs onto the commander parser surface (as roadmap was in 027) — ~50 flat verbs to ~12-15 nouns, machine-adapter verbs marked internal, backwards-compat aliases for the old names, every verb adopting the self-documenting parser. DEFERRED sibling of specs/027-roadmap-edge-mutation-and-cluster (027 migrated only the roadmap verb as the proof). FR-017.
 
@@ -487,4 +487,8 @@ Burn down the per-phase governance friction surfaced while implementing 027 — 
 - part-of: multi:feature/lifecycle-industrialization
 - ref: TASK-295
 CUSTOMER-BLOCKING (offing-team adopter friction, GitHub #487, imported as TASK-295). govern's advisory clone-detection step hardcodes --format typescript,tsx, so on a non-TypeScript adopter repo jscpd matches zero files, writes no report, and the resulting throw ABORTS govern before the (language-agnostic) cross-model barrage ever runs — making per-phase governance and therefore /stack-control:execute unusable on any non-TS adopter codebase (found running execute on offing's Bash/PHP/WordPress change-runbook feature, zero .ts files). Fix: the clone step must be language-aware (detect/extend formats) OR non-fatal when it finds no matching files (skip the advisory clone step, do not abort the language-agnostic barrage). Pulled out of multi:gap/govern-per-phase-friction-burndown as its own item because it is a live adopter blocker, not burndown-queue hygiene.
+
+## multi:feature/front-door-completeness
+- status: planned
+Umbrella: make the entire stack-control front door complete, discoverable, and governed now that 026 teeth forbid reaching around it. Every backend op reachable pre-026 gets a sanctioned skill+verb, --help parity, mediation/recovery, and a check-front-door guardrail. See docs/front-door-completeness/plan.md.
 
