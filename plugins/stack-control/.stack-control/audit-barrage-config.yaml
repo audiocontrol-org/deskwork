@@ -47,23 +47,38 @@ models:
 
   - name: claude
     binary: claude
-    # opus -> sonnet (operator decision 2026-06-19): opus TIMED OUT on a real
-    # per-phase payload — 027 Phase 2's 24 KB diff derived a 311s budget and opus
-    # was killed at 311s while still running, degrading the fleet to codex-only and
-    # forcing an override. sonnet-4.6 is current-gen frontier with large context and
-    # completes a ~24 KB per-phase payload well within budget, restoring the 2-of-2
-    # cross-family agreement signal for the normal (per-phase, FR-006a) flow.
-    # CAVEAT: this fleet is also referenced by whole-feature barrages, and
-    # claude-sonnet-4-6 was observed to produce 0 output on a ~186 KB whole-feature
-    # payload (2026-06-16, noted above). Per-phase governance never sends a payload
-    # that large (whole-feature exceeds the envelope -> boundary-too-large by design),
-    # so the swap is safe for the sanctioned flow; if a whole-feature barrage is ever
-    # run, revisit the lane model for that payload size.
+    # opus -> sonnet + no-grounding (operator decisions 2026-06-19). TWO changes,
+    # diagnosed empirically against 027 per-phase payloads:
+    #  (1) opus -> sonnet: opus TIMED OUT (027 Phase 2, 24 KB -> 311s budget, killed
+    #      at 311s) and Phase 3 (14 KB -> 300s, killed at 300s). sonnet-4.6 is
+    #      current-gen frontier with large context.
+    #  (2) DROP agentic file-grounding (`--permission-mode plan` -> `--disallowedTools`
+    #      via readonly_enforcement). The wall-clock killer was NOT token throughput:
+    #      `--permission-mode plan` let the model READ files to ground findings, and
+    #      the audit prompt instructs grounding, so the lane ran an unbounded
+    #      read/grep tool-loop that consumed the WHOLE budget (opus AND sonnet both
+    #      hit their cap). Disabling tools makes the lane a single text-only pass over
+    #      the payload (which already contains the diff under audit): measured
+    #      197-233s on the 14 KB Phase-3 payload — it COMPLETES with comfortable
+    #      margin and still surfaces real findings (it independently flagged a HIGH the
+    #      degraded Phase-3 govern missed). codex remains the deep file-grounding lane;
+    #      claude is now the fast cross-family text-diff lane. The residual ~200s is
+    #      the model's extended thinking (inherent to a frontier audit; no clean CLI
+    #      knob to cut it without a non-frontier model).
+    #  Floor raised 300 -> 420s purely for kill-cap headroom on larger phases — a
+    #  successful run still completes ~200-233s, so this does not slow good runs.
+    #  CAVEAT (whole-feature barrages): claude-sonnet-4-6 was observed to produce 0
+    #  output on a ~186 KB whole-feature payload (2026-06-16). Per-phase governance
+    #  never sends payloads that large (FR-006a -> boundary-too-large); if a
+    #  whole-feature barrage is ever run, revisit the lane for that payload size.
     model: sonnet
-    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
-    readonly_enforcement: "--permission-mode plan"
+    args_template: "-p --model {{model}} --output-format stream-json --verbose {{prompt-stdin}}"
+    # No-tools = readonly by construction (denies Write/Edit) AND no grounding loop
+    # (denies Read/Grep/Glob/Bash/Task/web). Comma-joined single token so it survives
+    # the harness's whitespace split (spawn-cli injects this fragment into argv).
+    readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookRead,NotebookEdit"
     output_mode: stream-json
     liveness_signal: stdout
     liveness_window_seconds: 60
-    timeout_floor_seconds: 300
+    timeout_floor_seconds: 420
     timeout_secs_per_kb: 13

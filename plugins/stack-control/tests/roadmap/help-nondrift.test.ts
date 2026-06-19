@@ -31,10 +31,21 @@ function tmpChain(): string {
   return docPath;
 }
 
-/** The long-form flag tokens present in a `--help` render (e.g. `--to`). */
+/**
+ * The long-form flag tokens DECLARED in a `--help` render (e.g. `--to`).
+ *
+ * Anchored to line-start (`^\s*--flag`, multiline) so it captures only the
+ * structured flag-TABLE entries — never a flag token embedded in prose, a
+ * description, an example, or the `(one of: …)` vocabulary suffix. Scanning the
+ * whole text (the prior `/(--[a-z…])/g`) made the CHK015 non-drift gate unreliable:
+ * a flag named only in a description would be a false "shown", and a removed flag
+ * still mentioned in prose would spuriously fail check (2). The gate must measure
+ * the declared surface, not every `--token` in the output (027 Phase 3 govern,
+ * AUDIT-BARRAGE claude — no-grounding lane).
+ */
 function shownFlags(helpText: string): Set<string> {
   const found = new Set<string>();
-  for (const m of helpText.matchAll(/(--[a-z][a-z0-9-]*)/g)) {
+  for (const m of helpText.matchAll(/^[ \t]*(--[a-z][a-z0-9-]*)/gm)) {
     found.add(m[1]!);
   }
   return found;
