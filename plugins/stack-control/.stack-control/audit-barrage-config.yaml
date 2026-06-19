@@ -10,8 +10,10 @@
 # lanes on a ~186 KB payload, while gpt-5.5 and opus completed). Do NOT add a
 # non-frontier lane to a large-scope fleet; it silently no-ops and degrades the run.
 #
-#   codex  / gpt-5.5  (OpenAI/codex family — frontier)
-#   claude / opus     (Anthropic/claude family — frontier, large context)
+#   codex  / gpt-5.5   (OpenAI/codex family — frontier)
+#   claude / sonnet-4.6 (Anthropic/claude family — frontier; swapped from opus
+#                        2026-06-19 after opus timed out on per-phase payloads —
+#                        see the per-lane note below)
 #
 # Two frontier lanes, one per family = cross-family genetic diversity; 2-of-2
 # AGREEMENT ACROSS families is the strong HIGH-confidence signal a same-family fleet
@@ -45,7 +47,19 @@ models:
 
   - name: claude
     binary: claude
-    model: opus
+    # opus -> sonnet (operator decision 2026-06-19): opus TIMED OUT on a real
+    # per-phase payload — 027 Phase 2's 24 KB diff derived a 311s budget and opus
+    # was killed at 311s while still running, degrading the fleet to codex-only and
+    # forcing an override. sonnet-4.6 is current-gen frontier with large context and
+    # completes a ~24 KB per-phase payload well within budget, restoring the 2-of-2
+    # cross-family agreement signal for the normal (per-phase, FR-006a) flow.
+    # CAVEAT: this fleet is also referenced by whole-feature barrages, and
+    # claude-sonnet-4-6 was observed to produce 0 output on a ~186 KB whole-feature
+    # payload (2026-06-16, noted above). Per-phase governance never sends a payload
+    # that large (whole-feature exceeds the envelope -> boundary-too-large by design),
+    # so the swap is safe for the sanctioned flow; if a whole-feature barrage is ever
+    # run, revisit the lane model for that payload size.
+    model: sonnet
     args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
     readonly_enforcement: "--permission-mode plan"
     output_mode: stream-json
