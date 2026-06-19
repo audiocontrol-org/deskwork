@@ -13,6 +13,15 @@ import { SUBACTION_SPECS as BACKLOG_SPECS } from '../subcommands/backlog.js';
 import { SUBACTION_SPECS as INBOX_SPECS } from '../subcommands/inbox.js';
 import type { MediationClass, MountedVerb } from './command-surface.js';
 import { buildGrammarSurfaceCommand } from './surface-builder.js';
+import { AUDIT_BARRAGE_VERBS } from './surfaces/audit-barrage.js';
+import { CAPABILITY_VERBS } from './surfaces/capability.js';
+import { DOCUMENT_PRIMITIVES_VERBS } from './surfaces/document-primitives.js';
+import { SCOPE_CHECKS_VERBS } from './surfaces/scope-checks.js';
+import { SCOPE_CLONES_VERBS } from './surfaces/scope-clones.js';
+import { SCOPE_SURFACE_VERBS } from './surfaces/scope-surface.js';
+import { SESSION_SETUP_VERBS } from './surfaces/session-setup.js';
+import { SPEC_MISC_VERBS } from './surfaces/spec-misc.js';
+import { WORKFLOW_VERBS } from './surfaces/workflow.js';
 
 /** Mediation class per roadmap sub-action (read-only query vs mutating write). */
 const ROADMAP_MEDIATION: Readonly<Record<string, MediationClass>> = {
@@ -107,4 +116,13 @@ export const MOUNTED: readonly MountedVerb[] = [
       }),
     meta: { deprecatedAliasOf: null, subActionMediation: INBOX_MEDIATION },
   },
+  ...DOCUMENT_PRIMITIVES_VERBS,
+  ...CAPABILITY_VERBS,
+  ...WORKFLOW_VERBS,
+  ...SCOPE_CLONES_VERBS,
+  ...SCOPE_CHECKS_VERBS,
+  ...SCOPE_SURFACE_VERBS,
+  ...AUDIT_BARRAGE_VERBS,
+  ...SESSION_SETUP_VERBS,
+  ...SPEC_MISC_VERBS,
 ];

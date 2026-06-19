@@ -12,6 +12,45 @@
 import { Command } from 'commander';
 import type { SubactionGrammar } from '../subcommands/document-verb-shared.js';
 
+/** A flag declaration for a flat (single-action) verb's help surface. */
+export interface FlagSpec {
+  /** Long name without dashes, e.g. "diff-base". */
+  readonly name: string;
+  /** Value placeholder without brackets, e.g. "ref"; omit for a boolean flag. */
+  readonly arg?: string;
+  /** One-line description. */
+  readonly description: string;
+}
+
+/** A positional declaration for a flat verb's help surface. */
+export interface PositionalSpec {
+  readonly name: string;
+  /** Default true; false renders `[name]`. */
+  readonly required?: boolean;
+}
+
+/** Inputs to describe one flat (single-action) verb's help surface. */
+export interface FlatSurfaceSpec {
+  readonly verb: string;
+  readonly description: string;
+  readonly flags?: readonly FlagSpec[];
+  readonly positionals?: readonly PositionalSpec[];
+}
+
+/** Build a help-only commander Command for a flat single-action verb (no
+ * sub-commands; just flags + positionals). The walker projects it with an empty
+ * `subActions` and the verb-level flags. */
+export function buildFlatSurfaceCommand(spec: FlatSurfaceSpec): Command {
+  const program = new Command(spec.verb).description(spec.description).helpOption(false);
+  for (const p of spec.positionals ?? []) {
+    program.argument(p.required === false ? `[${p.name}]` : `<${p.name}>`);
+  }
+  for (const flag of spec.flags ?? []) {
+    program.option(flag.arg ? `--${flag.name} <${flag.arg}>` : `--${flag.name}`, flag.description);
+  }
+  return program;
+}
+
 /** Inputs to describe one grammar-based verb's help surface. */
 export interface GrammarSurfaceSpec {
   readonly verb: string;
