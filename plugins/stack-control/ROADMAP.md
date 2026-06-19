@@ -490,7 +490,9 @@ CUSTOMER-BLOCKING (offing-team adopter friction, GitHub #487, imported as TASK-2
 
 ## multi:feature/front-door-completeness
 - status: in-flight
+- spec: specs/028-front-door-completeness
 - design: docs/superpowers/specs/2026-06-19-front-door-completeness-design.md
 - design-approved: 2026-06-19
+- analyze-clean: 2026-06-19
 Umbrella: make the entire stack-control front door complete, discoverable, and governed now that 026 teeth forbid reaching around it. Every backend op reachable pre-026 gets a sanctioned skill+verb, --help parity, mediation/recovery, and a check-front-door guardrail. See docs/front-door-completeness/plan.md.
 
