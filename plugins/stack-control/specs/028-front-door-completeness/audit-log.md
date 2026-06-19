@@ -1564,3 +1564,316 @@ Surface:    src/subcommands/backlog.ts:151-171
 `emitDone` validates `<id>` and `--reason`, but on dry-run it returns before constructing the backend or checking that the item exists. That means `stackctl backlog done TASK-999999 --reason x` exits 0 and prints a “would close” line for an item that cannot be closed. The same verb treats unknown IDs as runtime exit 1 only in the `--apply` branch, via `backend.close`.
 
 The blast radius is medium: no data is corrupted, but the lifecycle verb gives operators false confidence during the default dry-run path. Other new lifecycle verbs validate existence before dry-run reporting (`archive` lists first; `unpromote` calls `unpromote` before reporting), and the feature contract describes unknown id as exit 1. A reasonable fix is to resolve the backend and verify the item exists before the dry-run message, while still only calling `backend.close` under `--apply`.
+
+## 2026-06-19 — audit-barrage lift (20260619T203740527Z-028-front-door-completeness-phase-3)
+
+### AUDIT-20260619-91 — `backend.list()` call is unguarded by try/catch, inconsistent with `backend.close()` error handling
+
+Finding-ID: AUDIT-20260619-91
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/backlog.ts:157-161 (new lines)
+
+The new existence check (`backend.list().find((i) => i.id === id)`) is placed outside the try/catch that wraps `backend.close(id)`. `list()` is an I/O read operation — it can realistically fail for disk errors, a corrupted or partially-written backlog state file, or a race with a concurrent write. When it does, the caller receives a raw, unformatted exception stack trace rather than whatever error message the catch block would emit.
+
+The original code also placed `createBacklogBackend(...)` outside the try/catch, but backend instantiation is typically an in-memory operation (parsing config, constructing an object) rather than a full read of the item list. `backend.list()` is a materially different operation: it reads and decodes the full item store. Adding it outside the try/catch enlarges the unguarded I/O surface beyond what was there before.
+
+The blast radius: any disk-level or file-format failure during a `backlog done --apply` call now produces two distinct error paths — a raw exception for the pre-check and a formatted error for the close — depending on exactly which line faults. A user who hits a list-read failure on a malformed file gets an opaque stack trace instead of a diagnostic message.
+
+Reasonable fix: either wrap the entire `backend.list()` → `backend.close()` block in a single try/catch, or add a narrow try/catch around the `list()` call that emits the same formatted error as the rest of the error surface.
+
+---
+
+### AUDIT-20260619-92 — No test added for the new dry-run + unknown-ID exit path
+
+Finding-ID: AUDIT-20260619-92
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/backlog.ts:157-161 (new lines); expected: backlog.test.ts or equivalent
+
+The commit fixes a previously-untested code path (dry-run `backlog done` reporting "would close" for an unknown ID — the AUDIT-BARRAGE-codex-01 finding from Phase 4). The diff shows no corresponding test file change. Per the codebase's own testing rules ("Write tests alongside implementation, not after") and the stated TDD discipline ("a test that exercises the bug is written before the fix is implemented"), a regression test asserting `stderr contains "no item '<id>'"` + `exit code === 1` for a dry-run invocation with a non-existent ID should have landed in this commit.
+
+Without the test, the fix is one refactor of `emitDone` away from silent regression. This path is now specifically identified as previously-broken behavior, which makes it a high-value regression-test target. The absence is especially notable because the commit message explicitly references the barrage finding that triggered the fix (AUDIT-BARRAGE-codex-01) — TDD discipline requires the test to precede or accompany the implementation, not follow it.
+
+Blast radius: the next edit to `emitDone` (e.g., extracting validation helpers, adding a new flag, reordering the argument checks) could reintroduce the exact bug this commit fixes with no failing test to catch it.
+
+---
+
+### AUDIT-20260619-93 — Dry-run now requires an initialized backlog project — undocumented behavior change
+
+Finding-ID: AUDIT-20260619-93
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/backlog.ts:154 (new line, `ensureBacklogProject()`)
+
+Before this commit, `backlog done --id X --reason Y` (no `--apply`) executed with zero filesystem access: argument validation ran, the dry-run message printed, and the function returned. A user in an environment without an initialized backlog project could preview the command's effect.
+
+After this commit, the same invocation calls `ensureBacklogProject()` and `backend.list()` unconditionally, even when `--apply` is absent. If the project is not initialized, the command now exits with an error rather than printing the dry-run message.
+
+The comment in the diff ("consistent with archive/unpromote, which resolve first") indicates this was intentional alignment with sibling commands. That rationale is sound, but the behavior change isn't reflected in the commit message or any updated `--help` text / skill documentation visible in the diff. If a user has relied on dry-run as a "preview without setup" affordance, this silently breaks that usage.
+
+Blast radius: low — the intent is clearly correct (why would a dry-run be meaningful without a valid project?), and the comment documents the design choice. The gap is missing documentation coverage, not a logic error.
+
+### AUDIT-20260619-94 — Dry-run existence check treats malformed backlog files as definitely absent
+
+Finding-ID: AUDIT-20260619-94
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/backlog.ts:155-163
+
+`emitDone` now uses `backend.list().find((i) => i.id === id)` as an authoritative existence check before both dry-run and apply. But the backlog backend’s `list()` is an availability/read path: malformed task files are skipped with warnings rather than making the answer fail loud. That means a malformed task file for the requested id, or any malformed file that makes the negative answer undecidable, is reported as `backlog: no item '<id>'` at lines 160-162 instead of surfacing store corruption or allowing the backend’s mutation path to decide.
+
+The blast radius is medium because normal healthy stores behave correctly, but corrupted or partially edited stores now get a misleading “no item” runtime result on a mutating lifecycle verb. A reasonable fix would use an integrity-oriented existence helper for id lookup, analogous to the backend’s `exists(ref)` negative-answer handling, or add a backend method that resolves a task id while failing loud when malformed files make absence undecidable.
+
+## 2026-06-19 — audit-barrage lift (20260619T204004441Z-028-front-door-completeness-phase-4)
+
+### AUDIT-20260619-95 — `normalize` called in `reconcile.ts` but not present in the visible import diff
+
+Finding-ID: AUDIT-20260619-95
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/roadmap/reconcile.ts` (lines added at end of file — `nodeIdForOrphan`, `reconcileUnorphan`)
+
+The new `reconcileUnorphan` and `nodeIdForOrphan` functions call `normalize(specRel)` and `report.orphans.map(normalize)`, but the only change to the `node:path` import line is adding `basename` alongside the pre-existing `join`. `normalize` does not appear in that import. If there is no pre-existing local `normalize` helper in the unchanged portion of the file (between the imports and the last line of `reconcile()`), every call to either function would throw `ReferenceError: normalize is not defined` at runtime — silently breaking `roadmap reconcile --unorphan` and all tests that call `reconcileUnorphan` directly.
+
+The diff is not conclusive: unchanged content is not shown. The `reconcile.ts` file does export `globParent` (consumed by the now-removed `reconcileBaseDir` in `roadmap.ts`), so helper functions plausibly exist in the gap. However, that gap is also the most natural home for a `path.normalize` import alias. If `normalize` IS a local utility, it should be verified to handle the separator-normalization and trailing-slash-stripping that the call sites expect. If it is NOT defined, the fix is `import { basename, join, normalize } from 'node:path'`.
+
+---
+
+### AUDIT-20260619-96 — `backend.archive()` passes `--plain` to a subcommand that may not accept it
+
+Finding-ID: AUDIT-20260619-96
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/backlog/backend.ts:397` (`run(['task', 'archive', id, '--plain'])`)
+
+Every other `--plain` usage in `backend.ts` is paired with `task edit` (see `close()` at line 365, and the `task edit -t` restore call in `create()`). The `archive` method at line 397 passes `--plain` to `task archive`, but the backlog binary's `archive` subcommand is not shown to accept this flag. If `task archive` rejects `--plain` with a non-zero exit code, `run()` will throw a `BacklogError` on every invocation, making `backend.archive()` permanently broken. The post-run verification (`if (taskFilePath(id) !== undefined) throw`) would never be reached.
+
+The integration test `backlog-archive.test.ts` exercises the full CLI path and would catch this regression if run against the real binary; however, the diff does not include test-run output. The fix is to verify the backlog binary's `task archive` synopsis — if `--plain` is not valid, drop it and rely on the `taskFilePath` post-check alone.
+
+---
+
+### AUDIT-20260619-97 — Two-step `create()` assumes `task edit -t` updates frontmatter without renaming the file
+
+Finding-ID: AUDIT-20260619-97
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/backlog/backend.ts:303–325` (the `create()` title-restore block)
+
+The filename-safety strategy creates the item with a truncated title (≤ `TITLE_FILENAME_BUDGET` bytes), then restores the full title via `run(['task', 'edit', id, '-t', spec.title, '--plain'])`. The comment at line 303 asserts that `task edit -t` "updates frontmatter WITHOUT renaming the file — the slug is fixed at create time." This is a load-bearing claim about the binary's semantics. Many task-manager CLIs that expose `-t`/`--title` regenerate the file slug from the new title and rename the file. If the backlog binary does this, `task edit -t <very-long-title>` would trigger the same ENAMETOOLONG the strategy was designed to prevent — now on the edit step rather than the create step.
+
+The `backlog-capture-hardening.test.ts` test at line 36 checks `Buffer.byteLength(files[0]!, 'utf8') <= 255` after the create+restore cycle, which would catch this regression end-to-end. But because the test targets the on-disk filename after the complete two-step, it will only detect the bug if both steps succeed and the filename is then inspected. A rename-on-edit failure would surface as a `BacklogError` rather than a filename violation. The correct verification is to confirm, via the binary's docs or source, that `task edit -t` is a frontmatter-only operation.
+
+---
+
+### AUDIT-20260619-98 — `--reason` is required for `backlog done` but never persisted to the task file
+
+Finding-ID: AUDIT-20260619-98
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/backlog.ts:162–165` (`emitDone`); `src/backlog/backend.ts:363–366` (`close()`)
+
+`emitDone` enforces a non-empty `--reason` (exit 2 on missing or whitespace-only value), prints it in the confirmation line (`backlog done: closed ${id} (reason: ${reason})`), and routes to `backend.close()`. `backend.close()` calls `task edit -s Done --plain` — the reason string is not appended to notes, tags, or any persistent field. The reason appears only in the session's stdout.
+
+For a governance tool where audit trail matters, requiring an operator to articulate a reason but discarding it creates a false sense of accountability: the operator is gated on providing an explanation, but the task file carries no record of why it was closed. Future reads of the item see `status: Done` with no closure rationale. If the requirement is intentional (friction gate, not archival), the inline comment or the contract description should say so explicitly to prevent a future agent from "fixing" this by adding notes persistence and introducing an unintended side-effect.
+
+---
+
+### AUDIT-20260619-99 — `stripPromotedToLines` may leave consecutive internal blank lines in notes
+
+Finding-ID: AUDIT-20260619-99
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/backlog/promote.ts:96–102` (`stripPromotedToLines`)
+
+```typescript
+function stripPromotedToLines(notes: string): string {
+  return notes
+    .split('\n')
+    .filter((line) => !line.includes(PROMOTED_TO_TOKEN))
+    .join('\n')
+    .trim();
+}
+```
+
+When a notes block contains multiple `Promoted-to:` lines with blank separator lines between them — or when the `Promoted-to:` line sits between two paragraphs — removing the token lines leaves adjacent blank lines (`\n\n\n`) in the middle of the result. `trim()` removes only leading and trailing whitespace, not internal runs. The stripped notes are then written back via `setNotes`, so the task file may accumulate blank lines with each promote/unpromote cycle. This is cosmetic but compounds across multiple promotion operations on the same item and could confuse downstream parsers that treat blank lines as section delimiters.
+
+The fix is to collapse runs of blank lines after filtering: `.replace(/\n{3,}/g, '\n\n')` before `trim()`.
+
+---
+
+### AUDIT-20260619-100 — `--help` smoke tests accept any string containing the generic usage prefix
+
+Finding-ID: AUDIT-20260619-100 (claude-sonnet-06 + codex-01; cross-model)
+Status:     open
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    `src/__tests__/roadmap/edge-subactions-cli.test.ts:117–124` (the `--help` loop)
+
+```typescript
+for (const sub of ['add-edge', 'remove-edge', 'move-edge', 'rename', 'remove-node', 'approve-design']) {
+  const r = runCli(['roadmap', sub, '--help']);
+  expect(r.status, `${sub} --help exit`).toBe(0);
+  expect(r.stdout, `${sub} --help body`).toContain('Usage: stackctl roadmap');
+  expect(r.stdout.length, `${sub} --help non-empty`).toBeGreaterThan(0);
+}
+```
+
+The help assertion `toContain('Usage: stackctl roadmap')` is satisfied by ANY help output — including one that is wired to the wrong subcommand (e.g., `add-edge --help` routing to `rename`'s grammar) or to the generic `roadmap` parent help. The test neither checks that the subaction name appears in the usage line nor that the subaction-specific flags (e.g., `--field`, `--from`, `--to`, `--analyze-clean`) appear in the body. A routing bug that silently falls back to parent help would pass all three assertions. Adding `expect(r.stdout).toContain(sub)` to the loop would make the test actually verify per-subaction routing.
+
+---
+
+### AUDIT-20260619-101 — `assertNoDanglingTerminalEdge` loads the document a second time before `runCurate`
+
+Finding-ID: AUDIT-20260619-101
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    `src/subcommands/curate.ts:78–81` (`runCurateCli` body)
+
+`assertNoDanglingTerminalEdge(doc)` calls `loadDocument(docPath, opts)` to inspect grammar and units. `runCurate(doc, { apply, ...grammarDirs() })` loads the same document a second time internally. For ~50-node roadmaps the overhead is negligible. The issue worth noting is semantic: the precheck reads one snapshot of the document, then `runCurate` reads another. On a single-user tool this is safe, but if two concurrent `curate` invocations run simultaneously the edge check and the actual archival could see different states. Passing the loaded document (or its computed unit/edge snapshot) from the precheck into `runCurate` would eliminate the double load and close the TOCTOU window.
+
+### AUDIT-20260619-102 — Archive success is verified only by live removal, not preservation
+
+Finding-ID: AUDIT-20260619-102
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/backlog/backend.ts:377-389
+
+`archive()` claims the preserve-not-delete contract, but after `task archive` it only verifies that `taskFilePath(id)` no longer exists in the live store. If the backend deletes the file, moves it to an unexpected location, or otherwise fails the “still readable” part of FR-011 while removing it from live tasks, this method reports success.
+
+Blast radius is medium: with the current backend behavior this likely passes, but the feature’s stated safety property is preservation, and this adapter is the boundary that should enforce it. A reasonable fix is to resolve and verify the archived task under `backlog/archive/tasks/` after the command, ideally by parsing the archived file and confirming the same `id` is readable before returning success.
+
+## 2026-06-19 — audit-barrage lift (20260619T205002775Z-028-front-door-completeness-phase-4)
+
+### AUDIT-20260619-103 — `normalize` used in `reconcile.ts` without a visible import
+
+Finding-ID: AUDIT-20260619-103
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/roadmap/reconcile.ts:153–189 (new `nodeIdForOrphan` + `reconcileUnorphan` additions)
+
+Both `nodeIdForOrphan` and `reconcileUnorphan` call `normalize(...)` as a bare function — `normalize(specRel)`, `normalize(spec)`, `report.orphans.map(normalize)`. The file's import from `node:path` was changed by this diff from `import { join }` to `import { basename, join }`. `normalize` is **not in that import line**, and `normalize` is not a Node.js global. If no local `normalize` helper exists in the non-diffed portion of `reconcile.ts` (lines 13–124), every call to `reconcileUnorphan` or `nodeIdForOrphan` will throw `ReferenceError: normalize is not defined` at runtime.
+
+The diff is ambiguous: TypeScript compilation would have caught a truly undefined name, so a local `normalize` helper defined in the unchanged file body (lines 13–124) is possible — the diff does not show that region. But the import line was edited in this very commit, and `basename` was explicitly added; if the author meant to add `normalize` from `node:path` as well, the omission is a bug. The `reconcile-unorphan.test.ts` tests exercise this code path; if those tests pass with the new code, `normalize` exists somewhere. The finding warrants an explicit check: read the full `src/roadmap/reconcile.ts` file and confirm `normalize` is either (a) imported from `node:path` or (b) defined as a local helper before line 126. If neither, the `--unorphan` verb silently dies at runtime.
+
+---
+
+### AUDIT-20260619-104 — `setNotes: ''` edge case — binary behavior with empty notes unspecified
+
+Finding-ID: AUDIT-20260619-104
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/backlog/promote.ts:116–118 + src/backlog/backend.ts:352–361
+
+When an item's notes section contains **only** a `Promoted-to:` line and nothing else, `stripPromotedToLines(notes)` returns `''` after `trim()`. The spread in `unpromote` then passes `{ setNotes: '' }` to `backend.edit`, which generates `['task', 'edit', id, '--notes', '', '--plain']`. The downstream behavior of `--notes ''` with the backlog binary is not documented in the diff and is not tested.
+
+Two failure modes exist: (a) the binary interprets `--notes ''` as "clear the notes section entirely" — correct behavior; or (b) the binary interprets it as "no change" (empty string = no-op) — leaving the now-stripped `Promoted-to:` line behind; or (c) the binary rejects an empty `--notes` value and exits non-zero — turning a valid unpromote into an error. The test suite covers the inverse case (label-only promoted item where `hasLine` is false, so `setNotes` is never set), but there is no test for an item whose notes consist **solely** of a `Promoted-to:` line. A targeted test — create an item with the `promoted` label and exactly one notes line (`**Promoted-to:** spec:specs/012-x`), run unpromote, assert that `readNotes` returns `''` and the label is gone — would confirm or deny the binary's behavior here.
+
+---
+
+### AUDIT-20260619-105 — `reconcile --unorphan --type` CLI flag not exercised by any test
+
+Finding-ID: AUDIT-20260619-105
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/roadmap.ts:96 (`reconcile: { valueFlags: ['unorphan', 'type'], ... }`) + src/roadmap/reconcile.ts:153 (`nodeIdForOrphan` `typePrefix` parameter)
+
+`SUBACTION_SPECS.reconcile` advertises `valueFlags: ['unorphan', 'type']`, meaning `stackctl roadmap reconcile --unorphan <spec> --type <phase>:<kind>` is a documented call shape. `nodeIdForOrphan` and `reconcileUnorphan` both accept a `typePrefix` parameter that defaults to `'impl:feature'` when omitted. However, the dispatch handler (`emitReconcile` in `src/subcommands/roadmap-reconcile-emit.ts` — not in this diff) must read `flags.values.get('type')` and forward it to `reconcileUnorphan`. If that forwarding was omitted, `--type` is silently ignored: every spec reconciled via the CLI defaults to `impl:feature/<slug>` regardless of what the operator passes.
+
+No test in the diff exercises `roadmap reconcile --unorphan <spec> --type design:gap` (or any non-default type prefix). The only CLI-level `--unorphan` test in `edge-subactions-cli.test.ts` passes no `--type` flag. The `reconcile-unorphan.test.ts` tests call the library function directly with an explicit `typePrefix`, so they do not cover the CLI routing gap. A CLI-level test that passes `--type multi:feature` and asserts the created node identifier starts with `multi:feature/` would close this gap.
+
+---
+
+### AUDIT-20260619-106 — `emitDone` reports "would close" on an already-Done item (dry-run)
+
+Finding-ID: AUDIT-20260619-106
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/backlog.ts:148–174 (`emitDone`)
+
+`emitDone` verifies the item exists via `backend.list().find(...)` but does not check whether the item's status is already `BACKLOG_DONE_STATUS`. On a dry-run invocation against an already-closed item, the function prints `"backlog done: dry-run — would close <id> (reason: ...)"` — a misleading message since there is nothing to close. On an `--apply` invocation against an already-closed item, `backend.close` is called (which internally runs `task edit -s Done`); the binary's behavior (idempotent success vs. error) is not documented and not tested. If the binary returns non-zero for a redundant close, the handler exits with code 1 — treating a no-op as a runtime error. A test covering `backlog done <already-done-id> --apply` would resolve the ambiguity and prevent a confusing operator-facing error message.
+
+---
+
+### AUDIT-20260619-107 — `roadmap-edge-emit.ts` and `roadmap-reconcile-emit.ts` are out of diff scope — audit coverage gap
+
+Finding-ID: AUDIT-20260619-107 (claude-sonnet-4-6-05 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=informational, codex=medium
+Decision:   adjudicated (gate-counted medium) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — medium retained.
+Surface:    src/subcommands/roadmap-edge-emit.ts + src/subcommands/roadmap-reconcile-emit.ts (referenced but not in diff)
+
+`src/subcommands/roadmap.ts` imports `emitAddEdge`, `emitApproveDesign`, `emitMoveEdge`, `emitRemoveEdge`, `emitRemoveNode`, `emitRename` from `./roadmap-edge-emit.js` and `emitReconcile` from `./roadmap-reconcile-emit.js`. All six new edge-mutation verbs and the extended reconcile verb dispatch through these files, but neither file appears in the committed diff. The test suite exercises these handlers via `runCli` integration tests (T071 in `edge-subactions-cli.test.ts`) which provides meaningful behavioral coverage. However, the implementation details — flag extraction, error mapping, exit-code assignment, the `--type` forwarding gap noted in finding -03 — cannot be audited from this diff. Any correctness defect in those files (wrong exit code on an unknown node, flags silently dropped, wrong `DocumentModelError`→exit-2 mapping) would not surface here. The operator should confirm these files were reviewed in a prior session or request a separate diff that includes them.
+
+### AUDIT-20260619-108 — `backlog done --reason` discards the required reason
+
+Finding-ID: AUDIT-20260619-108
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/backlog.ts:151-179; src/backlog/backend.ts:362-367
+
+`emitDone` requires a non-empty `--reason`, but on `--apply` it only passes the id to `backend.close(id)` and prints the reason to stdout. The backend closure implementation only sets status to `Done`; it does not persist the reason into notes, comments, metadata, or any durable audit surface. A required operator-supplied reason that exists only in transient CLI output is effectively lost as soon as the process exits.
+
+The blast radius is medium: closure still works, so the lifecycle verb is not broken, but a downstream operator or unattended agent acting on the interface will reasonably assume the required reason is part of the governed record. A reasonable fix is to make the closure mechanism accept and persist the reason, for example by appending a closure note before/with `backend.close`, and update the shared `roadmap close-related` path deliberately if it should use the same mechanism.
+
+## 2026-06-19 — audit-barrage lift (20260619T205621544Z-028-front-door-completeness-phase-4)
+
+### AUDIT-20260619-109 — Archive success is not verifying preservation
+
+Finding-ID: AUDIT-20260619-109
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/backlog/backend.ts:377-389
+
+`archive()` implements the preserve-not-delete contract, but after running `task archive` it only verifies that `taskFilePath(id)` no longer exists in the live store. That proves removal from `backlog/tasks`, not preservation under `backlog/archive/tasks`. If the backend deletes the file, moves it somewhere unexpected, or changes archive layout, this method reports `backlog archive: archived ... (preserved)` even though the item is no longer readable.
+
+The blast radius is high because FR-011 is explicitly about preserving content databases, and an operator acting on the success message can lose the only live pointer to the item. A reasonable fix is to verify the archived item exists and parses after the command, for example by locating a matching `TASK-*` file under `backlog/archive/tasks/` and checking its frontmatter id before reporting success.
+
+### AUDIT-20260619-110 — Unpromote can clobber concurrent note edits
+
+Finding-ID: AUDIT-20260619-110
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/backlog/promote.ts:124-140, src/backlog/backend.ts:352-358
+
+`unpromote()` reads the whole notes block, strips `Promoted-to:` lines from that snapshot, then calls `backend.edit(... { setNotes })`, which maps to `task edit --notes <full replacement>`. This is a read-modify-write path over the entire notes section. If another process appends notes after `readNotes()` and before `edit()`, the stale `setNotes` replacement drops that intervening content.
+
+The blast radius is medium: it requires concurrent or near-concurrent edits, but the code comments and feature scope emphasize field-preserving mutations and avoiding clobbering operator notes. A safer fix would make the removal operation conditional on the current file contents, or use a backend primitive that removes only the promotion linkage line without replacing the whole notes section.
