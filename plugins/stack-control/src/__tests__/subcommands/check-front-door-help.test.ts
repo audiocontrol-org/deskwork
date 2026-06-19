@@ -15,6 +15,7 @@ function regWith(operationId: string): CheckFrontDoorDeps['registry'] {
         mediationClass: 'read-only',
         hasHelp: true,
         source: 'command-tree',
+        isFrontedBackend: false,
       },
     ],
   };

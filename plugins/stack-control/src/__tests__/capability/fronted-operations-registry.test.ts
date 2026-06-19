@@ -66,6 +66,22 @@ describe('buildFrontedOperationsRegistry — derivation (028 T099; R1/R2)', () =
     }
   });
 
+  it('isFrontedBackend is derived from CAPABILITY_REGISTRY backend identities, not requiredSkill (028 codex-02/claude-01)', () => {
+    const reg = buildFrontedOperationsRegistry();
+    // backlog IS a cliArgv0 backend identity → its mutating ops are fronted backends.
+    const backlogCapture = reg.operations.find((o) => o.operationId === 'backlog/capture');
+    expect(backlogCapture?.isFrontedBackend, 'backlog is a registered backend').toBe(true);
+    // roadmap / inbox are first-class verbs (no capability claims them as backends) →
+    // NOT fronted backends, so C2c mediation is N/A for them.
+    const roadmapAdd = reg.operations.find((o) => o.operationId === 'roadmap/add');
+    expect(roadmapAdd?.isFrontedBackend, 'roadmap/add is a first-class non-backend verb').toBe(false);
+    const inboxCapture = reg.operations.find((o) => o.operationId === 'inbox/capture');
+    expect(inboxCapture?.isFrontedBackend, 'inbox/capture is a first-class non-backend verb').toBe(false);
+    // skill-declaration capability entries are fronted backends.
+    const specExec = reg.operations.find((o) => o.operationId === 'spec-execution');
+    expect(specExec?.isFrontedBackend, 'capability entries are fronted backends').toBe(true);
+  });
+
   it('is BUILT not stored — mutating the command tree changes the built registry with no manifest edit (FR-030)', () => {
     // Inject a fixture verb that has a matching skill (`roadmap` reused as the
     // skill name) so the resolver finds a requiredSkill; the new verb must appear

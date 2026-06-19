@@ -20,7 +20,12 @@ Thin adapter over the `stackctl check-front-door` verb. It is the mechanical gua
 
 - **C2a — Skill exists.** The operation's `requiredSkill` resolves to `skills/<name>/SKILL.md`. A deleted skill → gap naming the missing skill.
 - **C2b — Working `--help`.** The verb and each sub-action emit `--help` at exit 0 with a usage body. A broken/missing `--help` → gap naming the verb.
-- **C2c — Mutating ops mediation-registered.** A `mutating` operation has a mediation registration; a `read-only` operation is conformant **without** one (the read-only exemption is mechanical, read from the registry's declared mediation class). An unfronted mutating verb → gap.
+- **C2c — Mutating ops mediation-registered.** A `read-only` operation is conformant **without** one (the read-only exemption is mechanical, read from the registry's declared mediation class). For a `mutating` operation, what "mediation-registered" means depends on whether it is a **fronted backend** (an identity the 026 interceptor mediates), derived from `CAPABILITY_REGISTRY` backend identities — not from "has a skill document":
+  - **Command-tree op that IS a fronted backend** (its verb is a `CAPABILITY_REGISTRY` `cliArgv0` backend identity — today `backlog`): it is reach-around-able, so it MUST be genuinely covered by the capability registry. A verb named as a backend identity but not actually covered → gap.
+  - **Command-tree op that is NOT a fronted backend** (a first-class `stackctl` verb — `roadmap`, `inbox`, `scope-*`): no capability claims it as a reach-around-able backend, so mediation is **N/A** — conformant. A verb you reach only through `stackctl` cannot be reached around.
+  - **Skill-declaration op** (a capability id, e.g. `spec-execution`): verified against the capability's backend-identity union in `CAPABILITY_REGISTRY`.
+
+  An unfronted mutating verb — a brand-new mutating verb that is named/claimed as a backend but has no covering registration — → gap.
 - **C2d — skill↔verb parity (both directions).** Every fronted verb/sub-action has a documenting skill (verb → skill); every verb a skill documents exists in the command tree (skill → verb). A deprecated alias is not a gap.
 
 ## Steps

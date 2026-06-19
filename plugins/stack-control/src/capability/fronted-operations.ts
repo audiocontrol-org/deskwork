@@ -23,10 +23,11 @@
 // is NO `fronted-operations.yaml`. Mutating the command tree changes the built
 // registry with no manifest edit (proven by the T099 test).
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCommandSurface, type CommandDescriptor, type MediationClass } from '../cli-help/command-surface.js';
+import { frontmatterName } from '../skills/frontmatter.js';
 import { CAPABILITY_REGISTRY, type CapabilityRegistry } from './registry.js';
 
 /** Where a registry entry was derived from (data-model §2). */
@@ -46,6 +47,24 @@ export interface FrontedOperation {
    *  it did not derive.) */
   readonly hasHelp: boolean;
   readonly source: OperationSource;
+  /**
+   * Is this operation's identity claimed as a FRONTED BACKEND by a capability —
+   * i.e. an identity the 026 interceptor mediates (the operation is reach-around-able
+   * and so MUST be genuinely covered by the capability registry)?
+   *
+   *  - command-tree: true iff the verb (first segment of operationId) is in the union
+   *    of `CAPABILITY_REGISTRY` `cliArgv0` backend identities (today: `backlog`). A
+   *    first-class stackctl verb that no capability claims as a backend (roadmap, inbox,
+   *    scope-*) is `false` — it is NOT interceptor-mediated, and (per contract C2c) its
+   *    mediation is N/A: a verb you reach only through `stackctl` is not reach-around-able.
+   *  - skill-declaration: true (a capability entry IS a fronted backend — its
+   *    `/speckit-*` skills are the mediated identities).
+   *
+   * This is the REAL signal C2c reads (replacing the vacuous `requiredSkill.length > 0`):
+   * a `true` value asserts the op must be genuinely covered by the registry; a `false`
+   * value asserts mediation is N/A for this first-class verb.
+   */
+  readonly isFrontedBackend: boolean;
 }
 
 /** The built registry (data-model §2). */
@@ -71,15 +90,16 @@ const REGISTRY_ID = 'stack-control-fronted-operations-v1';
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SKILLS_DIR = join(PLUGIN_ROOT, 'skills');
 
-/** Read a SKILL.md's frontmatter `name:` (the skill's declared id), or undefined. */
-function frontmatterName(skillMdPath: string): string | undefined {
-  const src = readFileSync(skillMdPath, 'utf8');
-  const match = src.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  const frontmatter = match?.[1];
-  if (frontmatter === undefined) return undefined;
-  const nameLine = frontmatter.split(/\r?\n/).find((line) => /^name:\s*/.test(line));
-  if (nameLine === undefined) return undefined;
-  return nameLine.replace(/^name:\s*/, '').trim().replace(/^["']|["']$/g, '');
+/** The union of every capability's `cliArgv0` backend identities — the verbs the 026
+ *  interceptor mediates as fronted BACKENDS (today: `backlog`). A command-tree verb in
+ *  this set is reach-around-able and so MUST be genuinely covered; a verb NOT in it is a
+ *  first-class stackctl verb whose mediation is N/A (contract C2c). */
+function backendVerbIdentities(registry: CapabilityRegistry): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const cap of registry.capabilities) {
+    for (const argv0 of cap.backendIdentities.cliArgv0) ids.add(argv0);
+  }
+  return ids;
 }
 
 /** The set of declared skill `name`s present on disk (frontmatter, not just dir name). */
@@ -118,12 +138,17 @@ function skillForCapabilityInterface(iface: string): string {
 function commandTreeEntries(
   surface: readonly CommandDescriptor[],
   requiredSkillFor: (verb: string) => string | null,
+  backendVerbs: ReadonlySet<string>,
 ): FrontedOperation[] {
   const entries: FrontedOperation[] = [];
   for (const verb of surface) {
     if (verb.deprecatedAliasOf !== null) continue; // a documented alias, not a fronted op
     const skill = requiredSkillFor(verb.verb);
     if (skill === null) continue; // operator/internal tool — outside the fronted invariant
+    // The verb is a fronted backend iff a capability claims its argv0 as a backend
+    // identity (today: `backlog`). Other mutating verbs (roadmap, inbox, …) are
+    // first-class — not interceptor-mediated — so mediation is N/A for them (C2c).
+    const isFrontedBackend = backendVerbs.has(verb.verb);
     if (verb.subActions.length === 0) {
       const cls = verb.mediationClass;
       if (cls === null) {
@@ -138,6 +163,7 @@ function commandTreeEntries(
         mediationClass: cls,
         hasHelp: true,
         source: 'command-tree',
+        isFrontedBackend,
       });
       continue;
     }
@@ -148,6 +174,7 @@ function commandTreeEntries(
         mediationClass: sub.mediationClass,
         hasHelp: true,
         source: 'command-tree',
+        isFrontedBackend,
       });
     }
   }
@@ -173,6 +200,9 @@ function skillDeclarationEntries(registry: CapabilityRegistry): FrontedOperation
       mediationClass: 'mutating',
       hasHelp: true,
       source: 'skill-declaration',
+      // A capability entry IS a fronted backend — its `/speckit-*` skills (or cliArgv0)
+      // are the mediated identities; C2c verifies it against the capability registry.
+      isFrontedBackend: true,
     });
   }
   return entries;
@@ -186,8 +216,9 @@ export function buildFrontedOperationsRegistry(deps: FrontedOperationsDeps = {})
   const surface = deps.surface ?? buildCommandSurface();
   const capabilityRegistry = deps.capabilityRegistry ?? CAPABILITY_REGISTRY;
   const requiredSkillFor = deps.requiredSkillFor ?? defaultRequiredSkillFor(liveSkillNames());
+  const backendVerbs = backendVerbIdentities(capabilityRegistry);
   const operations: FrontedOperation[] = [
-    ...commandTreeEntries(surface, requiredSkillFor),
+    ...commandTreeEntries(surface, requiredSkillFor, backendVerbs),
     ...skillDeclarationEntries(capabilityRegistry),
   ];
   return { id: REGISTRY_ID, operations };

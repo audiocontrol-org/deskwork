@@ -15,6 +15,7 @@ const REG: CheckRegistry = {
       mediationClass: 'read-only',
       hasHelp: true,
       source: 'command-tree',
+      isFrontedBackend: false,
     },
   ],
 };

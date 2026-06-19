@@ -7,7 +7,11 @@
 //
 //   C2a — Skill exists.            The op's requiredSkill resolves to skills/<name>/SKILL.md.
 //   C2b — Working --help.          `verb [sub] --help` exits 0 with a usage body.
-//   C2c — Mutating ops mediated.   A mutating op is mediation-registered (read-only exempt).
+//   C2c — Mutating ops mediated.   A mutating op that is a FRONTED BACKEND (its identity
+//                                  is claimed in CAPABILITY_REGISTRY backend identities)
+//                                  must be genuinely covered by the registry; a first-class
+//                                  non-backend verb is mediation-N/A; a skill-declaration
+//                                  capability is verified in the registry (read-only exempt).
 //   C2d — skill↔verb parity.       Every fronted verb is documented AND every documented
 //                                  verb exists in the tree (both directions).
 //
@@ -26,7 +30,12 @@ import {
   type FrontedOperation,
   type FrontedOperationsRegistry,
 } from '../capability/fronted-operations.js';
-import { CAPABILITY_REGISTRY } from '../capability/registry.js';
+import {
+  CAPABILITY_REGISTRY,
+  findCapabilityByIdentity,
+  type CapabilityRegistry,
+} from '../capability/registry.js';
+import { frontmatterName } from '../skills/frontmatter.js';
 
 /** Re-exported so tests can construct a minimal fixture registry. */
 export type CheckRegistry = FrontedOperationsRegistry;
@@ -130,16 +139,6 @@ function liveSkillExists(skillName: string): boolean {
   return false;
 }
 
-function frontmatterName(skillMdPath: string): string | undefined {
-  const src = readFileSync(skillMdPath, 'utf8');
-  const match = src.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  const frontmatter = match?.[1];
-  if (frontmatter === undefined) return undefined;
-  const nameLine = frontmatter.split(/\r?\n/).find((line) => /^name:\s*/.test(line));
-  if (nameLine === undefined) return undefined;
-  return nameLine.replace(/^name:\s*/, '').trim().replace(/^["']|["']$/g, '');
-}
-
 function resolveTsx(): string {
   let cur = PLUGIN_ROOT;
   for (;;) {
@@ -167,20 +166,47 @@ function liveHelpProbe(tsx: string): (op: FrontedOperation) => boolean {
   };
 }
 
-/** C2c live: a mutating op is mediation-registered when EITHER
- *   - it is a command-tree op fronted by a sanctioned skill (the skill IS the
- *     marker-bracketed front door that mediates its raw backend calls — its
- *     requiredSkill is non-empty by registry construction), OR
- *   - it is a skill-declaration op whose capability has backend identities in the
- *     capability registry (validateRegistry guarantees a non-empty union). */
-function liveMediationRegistered(op: FrontedOperation): boolean {
-  if (op.source === 'command-tree') {
-    return op.requiredSkill.length > 0;
-  }
-  const cap = CAPABILITY_REGISTRY.capabilities.find((c) => c.id === op.operationId);
-  if (cap === undefined) return false;
-  return cap.backendIdentities.skills.length + cap.backendIdentities.cliArgv0.length > 0;
+/**
+ * C2c live: is this MUTATING op genuinely covered by the mediation source of truth?
+ * This reads a REAL signal (the registry's derived `isFrontedBackend` + the capability
+ * registry's backend identities), NOT the tautological `requiredSkill.length > 0` — a
+ * command-tree entry ALWAYS has a non-empty requiredSkill by construction, so that
+ * predicate could never flag a mutating op (the vacuity this fix removes).
+ *
+ * The three classes (contract C2c):
+ *
+ *  1. Command-tree op that IS a fronted backend (`isFrontedBackend === true`) — its verb
+ *     is claimed by a capability as a `cliArgv0` backend identity (today: `backlog`). It
+ *     is reach-around-able, so it MUST be genuinely covered: verify the verb resolves to a
+ *     capability via the registry's bash-surface lookup (the SAME source of truth the 026
+ *     interceptor uses). A verb NAMED as a backend identity but not actually findable →
+ *     gap (impossible with a consistent registry, but the assertion is now non-vacuous).
+ *
+ *  2. Command-tree op that is NOT a fronted backend (`isFrontedBackend === false`) — a
+ *     first-class stackctl verb (roadmap, inbox, scope-*): no capability claims it as a
+ *     reach-around-able backend, so mediation is N/A → conformant (a verb you reach only
+ *     through `stackctl` cannot be reached around).
+ *
+ *  3. Skill-declaration op (a capability id) — verify the capability has a non-empty
+ *     backend-identity union (validateRegistry guarantees this; re-asserted here).
+ */
+export function mediationRegisteredAgainst(registry: CapabilityRegistry): (op: FrontedOperation) => boolean {
+  return (op: FrontedOperation): boolean => {
+    if (op.source === 'command-tree') {
+      if (!op.isFrontedBackend) return true; // first-class verb — mediation N/A (class 2)
+      // Class 1: it is named as a backend identity — verify it is genuinely covered.
+      const verb = op.operationId.split('/')[0] ?? op.operationId;
+      return findCapabilityByIdentity(registry, 'bash', verb) !== null;
+    }
+    // Class 3: a skill-declaration capability id.
+    const cap = registry.capabilities.find((c) => c.id === op.operationId);
+    if (cap === undefined) return false;
+    return cap.backendIdentities.skills.length + cap.backendIdentities.cliArgv0.length > 0;
+  };
 }
+
+/** Live C2c wiring against the production `CAPABILITY_REGISTRY`. */
+const liveMediationRegistered = mediationRegisteredAgainst(CAPABILITY_REGISTRY);
 
 /** C2d live (verb → skill side feeds documented; skill → verb side feeds live):
  *  the operationIds the live command tree exposes (verb + verb/sub). */

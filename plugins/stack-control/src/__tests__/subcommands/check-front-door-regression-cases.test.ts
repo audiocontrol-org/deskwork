@@ -8,7 +8,12 @@
 // regression is reproducible without mutating the real surface on disk.
 
 import { describe, expect, it } from 'vitest';
-import { checkFrontDoor, type CheckFrontDoorDeps, type CheckRegistry } from '../../subcommands/check-front-door.js';
+import {
+  checkFrontDoor,
+  mediationRegisteredAgainst,
+  type CheckFrontDoorDeps,
+  type CheckRegistry,
+} from '../../subcommands/check-front-door.js';
 
 /** A conformant baseline: one read-only op + one mutating op, both fronted + documented. */
 function conformantRegistry(): CheckRegistry {
@@ -21,6 +26,7 @@ function conformantRegistry(): CheckRegistry {
         mediationClass: 'read-only',
         hasHelp: true,
         source: 'command-tree',
+        isFrontedBackend: false,
       },
       {
         operationId: 'demo/write',
@@ -28,6 +34,7 @@ function conformantRegistry(): CheckRegistry {
         mediationClass: 'mutating',
         hasHelp: true,
         source: 'command-tree',
+        isFrontedBackend: false,
       },
     ],
   };
@@ -89,6 +96,9 @@ describe('check-front-door — the three FR-033 regression cases (028 T108/T109;
           mediationClass: 'mutating',
           hasHelp: true,
           source: 'command-tree',
+          // Modelling a NAMED-but-unregistered backend: it claims to be a fronted
+          // backend yet has no covering registration — the unfronted-verb shape.
+          isFrontedBackend: true,
         },
       ],
     };
@@ -97,8 +107,11 @@ describe('check-front-door — the three FR-033 regression cases (028 T108/T109;
       registry,
       skillExists: () => true,
       helpProbe: () => true,
-      // demo/danger is NOT mediation-registered.
-      mediationRegistered: (op) => op.operationId !== 'demo/danger',
+      // Use the REAL C2c predicate against an empty capability registry so the gap is
+      // produced by the production mediation logic — NOT a hand-coded boolean seam.
+      // demo/danger is a named backend (isFrontedBackend) with no covering capability,
+      // so the live predicate flags it; demo/write is first-class (mediation N/A).
+      mediationRegistered: mediationRegisteredAgainst({ id: 'empty', capabilities: [] }),
       // demo/danger is documented by no skill.
       verbsDocumentedBySkills: () => new Set(['demo/list', 'demo/write']),
       liveVerbSubActions: () => live,

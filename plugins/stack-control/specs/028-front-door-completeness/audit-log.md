@@ -2580,3 +2580,166 @@ Surface:    src/subcommands/speckit-guard.ts:47-58; src/cli.ts:221-224
 `resolveViaFrontDoorFile` now reads the session marker through `activeCapabilities`, but it does not catch malformed-marker errors. A corrupt marker therefore bubbles to the top-level CLI catch, which prints only the raw error and exits 1. That differs from the guard’s stated contract of rendering a permit/refusal verdict for wrapped skills, and it gives no recovery hint even though this feature adds `front-door mediate-list` / `mediate-recover` for exactly this marker state.
 
 Blast radius is medium: this affects the deprecated guard and only under corrupt marker state, but downstream users still see an exit-1 failure indistinguishable from a policy refusal by exit code and without the sanctioned front-door/recovery message. A reasonable fix is for `resolveViaFrontDoorFile` or `runSpeckitGuard` to catch marker corruption and render a diagnosable refusal/recovery message instead of falling into the generic dispatcher catch.
+
+## 2026-06-19 — audit-barrage lift (20260619T231554482Z-028-front-door-completeness-phase-1)
+
+### AUDIT-20260619-151 — `smoke-interceptor-loaded.sh` called without existence check; failure produces misleading message
+
+Finding-ID: AUDIT-20260619-151
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    scripts/smoke-front-door.sh:30-33
+
+The script invokes `bash "$PLUGIN_ROOT/scripts/smoke-interceptor-loaded.sh"` unconditionally. If that file is absent (wrong path, not yet committed on the branch, or a fresh clone missing it), bash exits with something like `bash: .../smoke-interceptor-loaded.sh: No such file or directory` and the `||` handler then prints `smoke-front-door: FAIL — interceptor-loaded smoke failed (see above)`. "See above" in that scenario points at a filesystem-not-found error, not an interceptor diagnostic — an operator seeing the failure cannot distinguish "the interceptor is broken" from "the helper script doesn't exist." A pre-flight `[[ -f "$PLUGIN_ROOT/scripts/smoke-interceptor-loaded.sh" ]] || { printf 'FAIL — smoke-interceptor-loaded.sh not found at %s\n' "$PLUGIN_ROOT/scripts/smoke-interceptor-loaded.sh" >&2; exit 1; }` before line 30 would produce an actionable diagnosis. Blast-radius: an operator running this gate after a partial checkout or a merge that drops the helper script gets an opaque failure and no path to fixing it.
+
+---
+
+### AUDIT-20260619-152 — No pre-flight check that `$STACKCTL` binary exists and is executable
+
+Finding-ID: AUDIT-20260619-152
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    scripts/smoke-front-door.sh:23-27
+
+`"$STACKCTL" check-front-door` is invoked directly. If `bin/stackctl` is absent or non-executable (e.g., a fresh clone where the bin shim hasn't been installed, or missing execute bit), the shell produces `Permission denied` or `No such file or directory`, and the `||` handler then prints `FAIL — check-front-door reported a gap (see above)`. That message implies the check ran and found a registry gap, when the actual failure is infrastructure-level. A two-line pre-flight — `[[ -x "$STACKCTL" ]] || { printf 'FAIL — stackctl not found or not executable at %s\n' "$STACKCTL" >&2; exit 1; }` — before line 24 narrows the failure scope clearly. Blast-radius: low (a developer re-runs with context), but the mismatch between the printed message and the actual failure adds friction on every fresh-install smoke.
+
+---
+
+### AUDIT-20260619-153 — Internal audit-barrage artifact ID embedded in adopter-facing script header
+
+Finding-ID: AUDIT-20260619-153
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    scripts/smoke-front-door.sh:7
+
+The header comment on line 7 reads `"moved here from the superseded T003 skeleton per 028 Phase 1 govern AUDIT-BARRAGE-codex-01: a skeleton smoke gate is inherently misleading"`. `AUDIT-BARRAGE-codex-01` is an internal planning artifact ID that carries no meaning for an adopter reading this script, and will become an orphaned reference as the audit log evolves. Script-level comments should describe what, why, and how for the script's purpose; internal triage IDs belong in commit messages and the audit log, not in the shipped script body. Blast-radius: informational for adopters, but it sets a precedent of leaking internal scaffolding into the public plugin surface.
+
+## 2026-06-19 — audit-barrage lift (20260619T231716626Z-028-front-door-completeness-phase-3)
+
+### AUDIT-20260619-154 — Top-level mutating verbs without a matching skill are excluded before the guard can flag them
+
+Finding-ID: AUDIT-20260619-154
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/capability/fronted-operations.ts:113-127; src/subcommands/check-front-door.ts:77-84
+
+`buildFrontedOperationsRegistry` drops any command-surface verb whose top-level verb has no matching skill: `if (skill === null) continue` at lines 123-127. That means a newly added mutating top-level `stackctl` verb with no `/stack-control:<verb>` skill never enters `registry.operations`, so the C2c loop in `checkFrontDoor` at lines 77-84 never sees it and cannot report the promised “unfronted mutating verb” gap.
+
+The downstream blast radius is high because `skills/execute/SKILL.md:45-48` tells unattended agents that `stackctl check-front-door` catches an unfronted mutating verb before execution. As implemented, the guard can return green while a new mutating command is entirely outside the skill/front-door surface. A reasonable fix is to include mutating command-tree entries even when `requiredSkillFor` returns null, then report them as C2a/C2c/C2d gaps instead of filtering them out.
+
+### AUDIT-20260619-155 — Skill-to-verb parity cannot detect documented phantom sub-actions
+
+Finding-ID: AUDIT-20260619-155
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/check-front-door.ts:223-264
+
+The C2d comments claim bidirectional parity, but the live implementation only detects phantom top-level verbs. `liveVerbsDocumentedBySkills` builds its documented set by iterating the live command surface, so it can never include a documented-but-missing sub-action. `documentedPhantomOps` then explicitly limits the skill-to-verb scan to `stackctl <verb>` and says sub-action phantoms are “intentionally NOT flagged” at lines 256-264.
+
+The blast radius is high because this feature’s contract says every documented verb/sub-action should exist, and this diff adds new skill-documented sub-actions such as `roadmap add-edge`, `roadmap rename`, and `backlog unpromote`. If a skill documents `stackctl roadmap renmae` or `stackctl backlog unpromote` after the parser drops/renames that sub-action, `check-front-door` can still pass, leaving agents to execute a non-existent front-door command. A reasonable fix is to parse literal `stackctl <verb> <subaction>` examples from skill code blocks or command tables and compare those documented sub-actions against `liveOperationIds`, while keeping prose-only token scanning conservative.
+
+## 2026-06-19 — audit-barrage lift (20260619T232051193Z-028-front-door-completeness-phase-6)
+
+### AUDIT-20260619-156 — C2c mediation check for command-tree ops is tautologically true — never flags
+
+Finding-ID: AUDIT-20260619-156 (claude-01 + claude-06 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    src/subcommands/check-front-door.ts:199-208
+
+`liveMediationRegistered` for command-tree operations returns `op.requiredSkill.length > 0`. By construction in `commandTreeEntries` (fronted-operations.ts), a verb is only added to the registry when `requiredSkillFor(verb)` returns a non-null, non-empty string — so `requiredSkill` is always non-empty for every command-tree entry. The predicate is tautologically true: C2c can never flag a command-tree mutating operation.
+
+The blast radius: a new command-tree mutating verb that acquires a matching skill (entering the registry) but has no interceptor registration — no backend marker, no `CAPABILITY_REGISTRY` identity — passes C2c without challenge. The `check-front-door` output says "all four assertions pass," but one assertion is vacuous for the class of operations it was designed to protect. The SKILL.md at `skills/check-front-door/SKILL.md` documents C2c as "A `mutating` operation has a mediation registration; a `read-only` operation is conformant **without** one," which creates the expectation that command-tree mutating ops are checked. They are not.
+
+This is separately from skill-declaration ops (capabilities), where C2c correctly queries `CAPABILITY_REGISTRY.capabilities` for backend identities. The fix is either: (a) have `liveMediationRegistered` for command-tree ops consult the `CAPABILITY_REGISTRY`'s backend identities union or the interceptor's deny-list to verify actual mediation registration, or (b) clarify in the SKILL.md and code comments that command-tree ops' mediation is verified exclusively by the interceptor smoke (`smoke-interceptor-loaded.sh`), and C2c is only load-bearing for skill-declaration ops — making that design choice auditable rather than implicit.
+
+---
+
+### AUDIT-20260619-157 — `frontmatterName` function is duplicated across two modules
+
+Finding-ID: AUDIT-20260619-157
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/capability/fronted-operations.ts:91-100 AND src/subcommands/check-front-door.ts:152-162
+
+The same `frontmatterName(skillMdPath: string): string | undefined` function appears verbatim in both modules: same regex (`/^---\r?\n([\s\S]*?)\r?\n---/`), same name-line extraction, same quote-stripping. Any future change to YAML frontmatter parsing (e.g., handling indented values, block scalars, or quoted multi-word names) must be applied in two places with no compiler enforcement.
+
+The blast radius: a bug fix in one copy that is not ported to the other creates a silent divergence in how the two modules resolve skill names — `buildFrontedOperationsRegistry` would use one parser, `liveSkillExists` / `skillBodyForVerb` in `check-front-door.ts` would use another. Because both functions are called inside the same `check-front-door` run, a divergence could cause a skill to appear "exists" via one path and "missing" via the other, producing inconsistent C2a and C2d results. Extract to a shared utility (e.g., `src/skills/frontmatter.ts`) and import it from both modules.
+
+---
+
+### AUDIT-20260619-158 — `liveHelpProbe` passes no timeout to `spawnSync` — hangs if any `--help` blocks
+
+Finding-ID: AUDIT-20260619-158
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/check-front-door.ts:185-196
+
+```typescript
+const r = spawnSync(tsx, args, { encoding: 'utf8' });
+```
+
+No `timeout` option is set. If any `stackctl <verb> [sub] --help` call blocks — waiting for stdin, hanging in a require() cycle, or otherwise not exiting — `check-front-door` hangs indefinitely with no recovery path. This is particularly fragile because `liveHelpProbe` spawns one process **per fronted operation**: N operations → N sequential `spawnSync` calls during the same CLI invocation.
+
+The blast radius: a single hung subprocess makes the entire regression gate unusable; an operator running `scripts/smoke-front-door.sh` in a pre-PR check would have no feedback that the tool has stalled. Add `timeout: 5000` (or a configurable value) so that a hung `--help` call produces a `C2b` gap ("exited with signal SIGTERM / did not exit within 5 s") rather than a hung gate. Also report `r.error` if `spawnSync` itself fails (e.g., tsx not found mid-traversal after `resolveTsx` has already run).
+
+---
+
+### AUDIT-20260619-159 — `mentionsWord` word-boundary check can produce false-positive C2d matches on common English words
+
+Finding-ID: AUDIT-20260619-159
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/check-front-door.ts:232-238 AND liveVerbsDocumentedBySkills ~265-282
+
+Sub-action names in this codebase include `next`, `list`, `add`, `order`, `graph`, `blocked`, `blocks`. These are common English words. The `mentionsWord` probe uses a word-boundary regex (`(?<![\w-])token(?![\w-])`) that fires on any prose occurrence — for example, a `roadmap` SKILL.md sentence like "proceed to the next phase" would be counted as documenting `roadmap/next`, and "add these items to the roadmap" would count for `roadmap/add`.
+
+The blast radius: false positives cause `verbsDocumentedBySkills` to return operation IDs that the skill does not actually document in a user-discoverable way. This silences C2d `verb → skill` gaps for those operations: `check-front-door` reports the front door as complete when a sub-action is only mentioned incidentally in prose rather than meaningfully documented. The fix is to scope the match more tightly — require the sub-action name to appear adjacent to the verb in a `stackctl <verb> <sub>` invocation pattern (similar to what `documentedPhantomOps` does for verb-level phantoms), or require it to appear in a structured context (code block, table, heading) rather than free prose.
+
+---
+
+### AUDIT-20260619-160 — `/stack-control:define` hard gate creates a circular dependency for fix-authoring
+
+Finding-ID: AUDIT-20260619-160
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    skills/define/SKILL.md (new "Front-door completeness gate" section)
+
+The `define` skill now hard-gates on `stackctl check-front-door` before any spec authoring or review. A non-zero exit causes a **hard stop: Refuse to proceed.** This means: if the front door is broken (a skill was deleted, a `--help` is broken, a mediation gap exists), the agent running `/stack-control:define` is blocked from authoring the spec that would fix the broken front door.
+
+The blast radius: a developer who needs to write a spec to add a new skill (closing a C2a gap) or document a new sub-action (closing a C2d gap) is caught in a procedural deadlock. The `execute` gate has the same pattern but is more defensible — you should not execute against a broken surface. The `define` gate applies to spec *authoring*, where the spec being authored might BE the remediation. A warning-only mode (emit the gap count, continue) rather than a hard stop would maintain visibility without blocking the fix path. The gate as written is analogous to refusing to file a bug report because there is already an open bug.
+
+---
+
+### AUDIT-20260619-161 — Live registry omits the unfronted mutating verbs it is supposed to catch
+
+Finding-ID: AUDIT-20260619-161
+Status:     open
+Severity:   blocking
+Per-lane:   codex=blocking
+Decision:   single-model (gate-counted blocking)
+Surface:    src/capability/fronted-operations.ts:123-127
+
+`commandTreeEntries` drops every command-surface verb whose name does not resolve to an existing skill: `if (skill === null) continue`. That means a newly mounted mutating command with no `/stack-control:*` skill is not present in the live fronted-operations registry at all, so `check-front-door` never evaluates C2a, C2b, C2c, or C2d for it.
+
+This directly breaks the advertised regression case: `skills/check-front-door/SKILL.md` says “An unfronted mutating verb → gap”, and `define`/`execute` describe unfronted mutating verbs as hard-stop regressions. The fixture test only catches the case when the bad operation is injected into the registry manually; the production builder excludes that shape before the checker can see it. A reasonable fix is for the registry to include relevant mounted mutating command-tree operations even when no skill resolves, with an empty/missing required skill represented as a C2a/C2d gap rather than filtering the operation out.
