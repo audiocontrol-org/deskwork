@@ -72,6 +72,14 @@ stackctl roadmap reconcile [--doc <path>]   # report-only status-drift proposals
 ... roadmap cluster <parent> --children a,b,c [--summary "…"] [--chain] [--apply]   # group items under a created-or-reused parent
 ... roadmap group   <parent> --children a,b,c [--summary "…"] [--chain] [--apply]   # alias of cluster
 ... roadmap close-related <id>                       [--apply]   # close the backlog ids the terminal item <id> resolves
+
+# Edge mutation + node lifecycle (028 US2) — all dry-run by default, --apply to write:
+... roadmap add-edge <from> <to> --type depends-on|part-of [--apply]   # add one typed edge
+... roadmap remove-edge <from> <to> --type depends-on|part-of [--apply] # remove one typed edge
+... roadmap move-edge <child> --from <oldParent> --to <newParent> [--apply] # reparent (remove+add in one validated move)
+... roadmap rename <id> --to <new-identifier>        [--apply]   # rename a node, repointing every dependent edge
+... roadmap remove-node <id>                         [--apply]   # edge-aware node removal (repoints/refuses rather than dangling)
+... roadmap approve-design <id> [--analyze-clean] [--clear] [--apply] # write/clear the design-approved / analyze-clean marker
 ```
 
 Every mutation **re-validates the whole graph before any write** and is

@@ -62,6 +62,22 @@ the discipline lives in this skill body + the `stackctl` verbs, never a git hook
   by design; FR-006/007).
 - The GitHub Spec Kit framework (`.specify/`) is present.
 
+### Front-door completeness gate (028 US4 — refuse when RED)
+
+`define` is the review surface for the spec-authoring loop (FR-005). Before authoring or
+reviewing, run the front-door regression guard as a **hard gate** (per
+`enforcement-lives-in-skills`, the gate lives in this skill body + the `stackctl
+check-front-door` verb — never a git hook):
+
+```bash
+stackctl check-front-door
+```
+
+- **Exit 0** → the front door is complete; proceed.
+- **Non-zero** → **STOP. Refuse to proceed.** A gap (deleted/renamed skill, broken
+  `--help`, unfronted mutating verb, or skill↔verb parity break) is a real regression —
+  print the named gaps and fix the surface first; never weaken the check to proceed.
+
 ## Steps
 
 1. **Establish the new feature's intent.** Capture what the operator wants the feature to do. Per Constitution Principle II (Integration-First) and the project's capture-don't-cut rule: capture everything known or knowably-implied; do **not** insert unrequested scope cuts ("YAGNI", "deferred", "not in v1"). Scoping is a separate, explicit, operator-driven pass.

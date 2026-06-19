@@ -15,8 +15,9 @@ const USAGE = /^Usage:/m;
 
 describe('capability family --help (028 US1)', () => {
   it('mounts every expected verb', () => {
+    // check-front-door (US4 guard) is mounted alongside the capability/mediation family.
     expect(SURFACE.map((d) => d.verb).sort()).toEqual(
-      ['capability', 'front-door', 'intercept', 'mediate-check', 'speckit-guard'],
+      ['capability', 'check-front-door', 'front-door', 'intercept', 'mediate-check', 'speckit-guard'],
     );
   });
 

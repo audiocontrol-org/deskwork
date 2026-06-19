@@ -100,6 +100,21 @@ stackctl backlog promote <item-id> [<item-id>...] \
 
 **Bidirectional navigability** (record-only side note): promote writes the backlog→target link now. The target→backlog back-reference is recorded **by convention when the target is created** — a new spec notes its origin in Context, a roadmap node carries the `TASK-<n>` ref, a `tasks.md` task line references the originating `TASK-<n>`. See [`/stack-control:roadmap`](../roadmap/SKILL.md) and [`/stack-control:define`](../define/SKILL.md) for the feature/roadmap tier's view of this seam.
 
+## Terminal lifecycle: done → archive, and unpromote (028 US2)
+
+A captured item runs its full lifecycle through the front door — no hand-edit of the store:
+
+```bash
+stackctl backlog done <id> --reason "<why>" [--apply]   # close an item, recording status Done
+stackctl backlog archive <id> [--apply]                 # move a Done item out of the live store, kept readable
+stackctl backlog unpromote <id> [--apply]               # remove the promotion linkage `promote` recorded
+```
+
+- **`done`** closes an item with a required `--reason`, routing through the SAME shared closure path `roadmap close-related` uses (one mechanism, not two). A missing `--reason` → exit 2; an unknown id → exit 1.
+- **`archive`** relocates a `Done` item out of the live store while keeping it **readable** (preserve-not-delete — a content store remembers terminal records, never deletes them). Archiving a non-terminal item → exit 2.
+- **`unpromote`** removes the promotion linkage `promote` wrote (the inverse of `promote`); an item with no linkage → exit 2.
+- All three are **dry-run by default**; `--apply` writes. A dry-run reports the intended change and writes nothing.
+
 ## Exit codes
 
 - `0` — success / no-op (including a dry-run that wrote nothing, and a promote recorded against a not-yet-created target).

@@ -62,6 +62,7 @@ import { runFrontDoor } from './subcommands/front-door.js';
 import { runIntercept } from './subcommands/intercept.js';
 import { runCapabilityCli } from './subcommands/capability.js';
 import { runReconcileCli } from './subcommands/capability-reconcile.js';
+import { runCheckFrontDoorCli } from './subcommands/check-front-door.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -145,6 +146,9 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // (capability.ts) stays list-only (its phase scope is not disturbed by US3).
   capability: async (args: string[]): Promise<void> =>
     args[0] === 'reconcile' ? runReconcileCli(args.slice(1)) : runCapabilityCli(args),
+  // Front-door regression guard (028 US4): the four-assertion check over the
+  // fronted-operations registry. Self-documenting (mounted on the command surface).
+  'check-front-door': runCheckFrontDoorCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

@@ -2,5 +2,6 @@
   "name": "stack-control",
   "version": "0.49.0",
   "description": "Provider-agnostic control plane for spec-driven development — define / extend / execute a Spec Kit spec in-session, with cross-model governance firing automatically after native execution. Successor to dw-lifecycle (absorb-then-retire).",
-  "license": "GPL-3.0-or-later"
+  "license": "GPL-3.0-or-later",
+  "hooks": "./hooks/hooks.json"
 }

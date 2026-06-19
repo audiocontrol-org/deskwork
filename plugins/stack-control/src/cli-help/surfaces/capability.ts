@@ -125,6 +125,16 @@ function buildSpeckitGuardCommand(): Command {
   });
 }
 
+function buildCheckFrontDoorCommand(): Command {
+  return buildFlatSurfaceCommand({
+    verb: 'check-front-door',
+    description: 'Front-door regression guard (028 US4): assert, over the derived fronted-operations registry, the four invariants — every op\'s skill exists, every verb/sub-action emits working --help, every mutating op is mediation-registered, and skill↔verb parity holds both directions. Exit 0 on a clean surface; exit non-zero naming each gap. Read-only.',
+    flags: [
+      { name: 'json', description: 'emit the structured result (gaps + checked count) instead of the human report' },
+    ],
+  });
+}
+
 /** The mounted `capability` family — projected by buildSurfaceFrom() into typed
  * CommandDescriptors that drive `--help`, the verb reference, and the registry. */
 export const CAPABILITY_VERBS: readonly MountedVerb[] = [
@@ -153,5 +163,11 @@ export const CAPABILITY_VERBS: readonly MountedVerb[] = [
     // call `mediate-check`, which is the front door this verb redirects callers to.
     // Read-only — it evaluates the refusal and prints; it writes no state.
     meta: { deprecatedAliasOf: 'mediate-check', verbMediation: 'read-only' },
+  },
+  {
+    build: buildCheckFrontDoorCommand,
+    // Read-only: it inspects the surface + skills + registry and reports gaps; it
+    // writes nothing.
+    meta: { deprecatedAliasOf: null, verbMediation: 'read-only' },
   },
 ];
