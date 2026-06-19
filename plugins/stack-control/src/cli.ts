@@ -8,6 +8,8 @@
 //   - --help/-h/help → usage to stdout, exit 0
 //   - no flag silently ignored (each subcommand validates its own flags)
 
+import { buildCommandSurface } from './cli-help/command-surface.js';
+import { renderSubActionHelp, renderVerbHelp } from './cli-help/render-help.js';
 import { setInstallationNoticeVerb } from './config/installation.js';
 import { runVersion } from './subcommands/version.js';
 import { runExecuteCheck } from './subcommands/execute-check.js';
@@ -150,6 +152,28 @@ function printUsage(stream: NodeJS.WriteStream): void {
   stream.write(`Verbs: ${Object.keys(SUBCOMMANDS).join(', ')}\n`);
 }
 
+/** Verbs whose own handler renders a richer `--help` (e.g. roadmap's status
+ * vocabulary). cli.ts does NOT intercept their help; their handler owns it. */
+const SELF_HELP_VERBS: ReadonlySet<string> = new Set(['roadmap']);
+
+/** Route `<verb> [sub] --help` to the descriptor renderer (028 US1 T037; FR-001/
+ * 002/003). Returns true (caller exits 0) when help was rendered; false when the
+ * verb is self-handling, un-mounted, or no help flag is present — then the flat
+ * handler runs unchanged (non-regression for not-yet-migrated verbs). */
+function tryRenderVerbHelp(verb: string, args: readonly string[]): boolean {
+  if (SELF_HELP_VERBS.has(verb)) return false;
+  if (!args.some((a) => a === '--help' || a === '-h')) return false;
+  const descriptor = buildCommandSurface().find((d) => d.verb === verb);
+  if (descriptor === undefined) return false;
+  const sub = args.find((a) => !a.startsWith('-'));
+  const body =
+    sub !== undefined && descriptor.subActions.some((s) => s.name === sub)
+      ? renderSubActionHelp(descriptor, sub)
+      : renderVerbHelp(descriptor);
+  process.stdout.write(body.endsWith('\n') ? body : `${body}\n`);
+  return true;
+}
+
 async function main(): Promise<void> {
   const verb = process.argv[2];
   const args = process.argv.slice(3);
@@ -168,6 +192,13 @@ async function main(): Promise<void> {
     process.stderr.write(`stackctl: unknown verb '${verb}'\n`);
     printUsage(process.stderr);
     process.exit(2);
+  }
+
+  // `<verb> [sub] --help` renders from the command-surface descriptor before
+  // dispatch (028 US1 T037). Self-handling verbs (roadmap) and not-yet-mounted
+  // verbs fall through to their flat handler unchanged.
+  if (tryRenderVerbHelp(verb, args)) {
+    process.exit(0);
   }
 
   // The shared resolver's legacy half-installation notice carries the

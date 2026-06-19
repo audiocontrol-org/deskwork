@@ -76,10 +76,10 @@ Each family below: RED help-probe test first (asserts `<verb> [sub] --help` exit
 
 - [ ] T012 [US1] RED: help-probe for the **roadmap + govern** family (already self-documenting) — assert exit 0 + usage for `roadmap`, every roadmap sub-action, and `govern`; this is the verify/skip baseline, in `src/__tests__/cli-help/help-roadmap-govern.test.ts` (FR-001/002).
 - [ ] T013 [US1] Verify `roadmap` (`src/subcommands/roadmap-command.ts`) + `govern` (`src/subcommands/govern.ts`) already render from the surface; adapt only if T012 surfaces a gap (no behavior change) (FR-001/003) — makes T012 GREEN.
-- [ ] T014 [P] [US1] RED: help-probe for the **backlog** family (`backlog` + `capture`/`list`/`import-github`/`import-slush`/`promote`) in `src/__tests__/cli-help/help-backlog.test.ts` (FR-001/002).
-- [ ] T015 [US1] Mount `backlog` (`src/subcommands/backlog.ts`) on the command surface so `backlog --help` + each sub-action `--help` render from the descriptor (exit 0) (FR-001/002/003) — makes T014 GREEN.
-- [ ] T016 [P] [US1] RED: help-probe for the **inbox** family in `src/__tests__/cli-help/help-inbox.test.ts` (FR-001/002).
-- [ ] T017 [US1] Mount `inbox` (`src/subcommands/inbox.ts`) sub-actions on the command surface (FR-001/002/003) — makes T016 GREEN.
+- [x] T014 [P] [US1] RED: help-probe for the **backlog** family (`backlog` + `capture`/`list`/`import-github`/`import-slush`/`promote`) in `src/__tests__/cli-help/help-backlog.test.ts` (FR-001/002).
+- [x] T015 [US1] Mount `backlog` (`src/subcommands/backlog.ts`) on the command surface so `backlog --help` + each sub-action `--help` render from the descriptor (exit 0) (FR-001/002/003) — makes T014 GREEN.
+- [x] T016 [P] [US1] RED: help-probe for the **inbox** family in `src/__tests__/cli-help/help-inbox.test.ts` (FR-001/002).
+- [x] T017 [US1] Mount `inbox` (`src/subcommands/inbox.ts`) sub-actions on the command surface (FR-001/002/003) — makes T016 GREEN.
 - [ ] T018 [P] [US1] RED: help-probe for the **workflow** family in `src/__tests__/cli-help/help-workflow.test.ts` (FR-001/002).
 - [ ] T019 [US1] Mount `workflow` (`src/subcommands/workflow.ts`) sub-actions on the command surface (FR-001/002/003) — makes T018 GREEN.
 - [ ] T020 [P] [US1] RED: help-probe for the **document-primitives** family (`archive`, `unarchive`, `curate`) in `src/__tests__/cli-help/help-document-primitives.test.ts` (FR-001/002).

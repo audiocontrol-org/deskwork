@@ -49,7 +49,7 @@ interface Flags {
   readonly values: ReadonlyMap<string, string>;
 }
 
-const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
+export const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   capture: { valueFlags: ['type', 'ref', 'body'], apply: false, positionals: 1 },
   list: { valueFlags: [], apply: false, positionals: 0 },
   'import-github': { valueFlags: [], apply: true, positionals: 0 },

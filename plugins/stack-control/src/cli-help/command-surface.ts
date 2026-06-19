@@ -89,7 +89,7 @@ export interface CommandDescriptor {
 // migration); Phase 3 mounts the remaining families and they appear here for free.
 
 import type { Command, Option } from 'commander';
-import { buildRoadmapCommand } from '../subcommands/roadmap-command.js';
+import { MOUNTED } from './mounted-verbs.js';
 
 /** Declared, non-derivable metadata for a mounted verb (Decision 4). `commander`
  * carries flags/positionals/sub-actions but not the mediation class, so it is
@@ -120,39 +120,6 @@ export interface MountedVerb {
   readonly build: () => Command;
   readonly meta: VerbMetadata;
 }
-
-/** Declared mediation class per roadmap sub-action (read-only query vs mutating
- * write). Single-sourced here as the roadmap verb's `VerbMetadata`. */
-const ROADMAP_SUBACTION_MEDIATION: Readonly<Record<string, MediationClass>> = {
-  next: 'read-only',
-  blocked: 'read-only',
-  blocks: 'read-only',
-  order: 'read-only',
-  graph: 'read-only',
-  reconcile: 'read-only',
-  add: 'mutating',
-  advance: 'mutating',
-  decompose: 'mutating',
-  reclassify: 'mutating',
-  defer: 'mutating',
-  cluster: 'mutating',
-  group: 'mutating',
-  'close-related': 'mutating',
-};
-
-/** The mounted commander verbs. Phase 3 appends each migrated family here. */
-const MOUNTED: readonly MountedVerb[] = [
-  {
-    build: buildRoadmapCommand,
-    meta: {
-      deprecatedAliasOf: null,
-      subActionMediation: ROADMAP_SUBACTION_MEDIATION,
-      // roadmap declares `[identifier]` in commander (so requireId owns the
-      // error) but every id-taking subaction requires it (AUDIT-BARRAGE-codex-01).
-      positionalsRequired: true,
-    },
-  },
-];
 
 /** Extract a flag's value placeholder (`<path>` / `[value]`) from a commander
  * option's flags string, or null for a boolean flag that takes no value. */
