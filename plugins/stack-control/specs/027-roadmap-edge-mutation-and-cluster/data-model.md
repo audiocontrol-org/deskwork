@@ -4,9 +4,9 @@ No new persistent schema — the roadmap remains the governed `ROADMAP.md` docum
 
 ## WorkItem (existing — `src/roadmap/roadmap-model.ts`)
 
-The typed projection of a roadmap Unit. Relevant fields: `identifier` (`<phase>:<kind>/<slug>`), `status`, `dependsOn: string[]`, `partOf: string | null`, `deferredUntil`, plus lifecycle markers. **`cluster` reads and mutates these via `roadmap-model` + `mutations.ts` only** (FR-006a store-seam discipline). Unchanged by this feature.
+The typed projection of a roadmap Unit. Relevant fields: `identifier` (`<phase>:<kind>/<slug>`), `status`, `dependsOn: string[]`, `partOf: readonly string[]`, `deferredUntil`, plus lifecycle markers. **`cluster` reads and mutates these via `roadmap-model` + `mutations.ts` only** (FR-006a store-seam discipline).
 
-> Note: `partOf` is currently modeled as `string | null` (single parent). Per the multi-parent clarification (FR-009), confirm during implementation whether the document-model already supports multiple `part-of` edges per unit (the grammar emits an edge list) and, if the projection collapses to one, widen the projection to `partOf: string[]`. This is a RED-test item, not a new entity.
+> SETTLED (was a to-confirm item): `partOf` was widened from `string | null` to `readonly string[]` (empty array when ungrouped; multiple entries allowed) — the document-model/grammar already emit a `part-of` edge as a target LIST, but the projection collapsed to the first via `firstOrNull`, which would have hidden multi-parent (FR-009) from every reader. The widening had no display consumers (graph/views/reconcile read `edgeTargets` directly); `decompose` was updated to preserve multi-parent too.
 
 ## ClusterRequest (new — input to the `cluster` verb)
 

@@ -19,26 +19,31 @@ Pass: each prints the real surface to stdout/stderr without erroring on `--help`
 
 ## Scenario 2 — cluster create-new parent + chain (US2)
 
+All ids are grammar-shaped `<phase>:<kind>/<slug>` and must name EXISTING roadmap
+units (the children); the parent is created-or-reused. Substitute ids present in
+your fixture roadmap.
+
 ```bash
-$SC roadmap cluster multi:feature/epic-x --children a,b,c --chain        # dry-run
-$SC roadmap cluster multi:feature/epic-x --children a,b,c --chain --apply
-$SC roadmap order                                                        # revalidates clean
+$SC roadmap cluster multi:feature/epic-x --children impl:feature/a,impl:feature/b,impl:feature/c --chain        # dry-run
+$SC roadmap cluster multi:feature/epic-x --children impl:feature/a,impl:feature/b,impl:feature/c --chain --apply
+$SC roadmap order                                                                                               # revalidates clean
 ```
-Pass: dry-run writes nothing; `--apply` creates `epic-x` (planned), each of `a,b,c` gains `part-of: epic-x`, `depends-on` chain `a→b→c` is wired, and `roadmap order` exits 0 (acyclic).
+Pass: dry-run writes nothing; `--apply` creates `multi:feature/epic-x` (planned), each child gains `part-of: multi:feature/epic-x`, the `depends-on` chain `a→b→c` is wired, and `roadmap order` exits 0 (acyclic).
 
 ## Scenario 3 — cluster reuse existing parent + multi-parent child
 
 ```bash
-$SC roadmap cluster multi:feature/epic-x --children d --apply   # epic-x already exists; d already part-of epic-y
+# multi:feature/epic-x already exists; impl:feature/d is already part-of multi:feature/epic-y
+$SC roadmap cluster multi:feature/epic-x --children impl:feature/d --apply
 ```
-Pass: `epic-x` reused (not duplicated); `d` now carries BOTH `part-of: epic-y` and `part-of: epic-x`.
+Pass: `multi:feature/epic-x` reused (not duplicated); `impl:feature/d` now carries BOTH `part-of: multi:feature/epic-y` and `part-of: multi:feature/epic-x`.
 
 ## Scenario 4 — refusals are atomic (FR-012/013/014/015)
 
 ```bash
 cp ROADMAP.md ROADMAP.bak
-$SC roadmap cluster multi:feature/epic-z --children a,nonexistent --apply ; echo "exit=$?"   # missing child
-$SC roadmap cluster multi:feature/epic-z --children a,b --chain --apply   ; echo "exit=$?"   # b has conflicting depends-on
+$SC roadmap cluster multi:feature/epic-z --children impl:feature/a,impl:feature/nonexistent --apply ; echo "exit=$?"   # missing child
+$SC roadmap cluster multi:feature/epic-z --children impl:feature/a,impl:feature/b --chain --apply    ; echo "exit=$?"   # b has conflicting depends-on
 diff ROADMAP.md ROADMAP.bak && echo "byte-for-byte unchanged"
 ```
 Pass: each refusal exits 2 and `diff` reports no change (zero-write-on-failure).
