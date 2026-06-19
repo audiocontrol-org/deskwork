@@ -422,3 +422,655 @@ Decision:   single-model (gate-counted informational)
 Surface:    src/cli-help/command-surface.ts:34-48 (SubActionDescriptor), src/cli-help/command-surface.ts:71-77 (CommandDescriptor)
 
 `CommandDescriptor` carries `deprecatedAliasOf: string | null` and documents its use with the concrete example `check-editor-symmetry → check-module-symmetry`. `SubActionDescriptor` has no equivalent field. The pattern of retiring a sub-action name while keeping the old name as an alias (e.g., `roadmap add-dep → roadmap add-edge`) is plausible as the surface matures. If that need arises, adding `deprecatedAliasOf` to `SubActionDescriptor` would be a structural addition to the type contract — any downstream consumer that exhaustively patterns over `SubActionDescriptor` fields would need an update. The asymmetry may be intentional (no sub-action aliases exist today), but it is undocumented in the type. A brief comment noting "no sub-action aliasing is modeled; add `deprecatedAliasOf` here if sub-action renames follow the top-level pattern" would make the design choice explicit and prevent a future agent from assuming the field is simply missing by oversight.
+
+## 2026-06-19 — audit-barrage lift (20260619T175717145Z-028-front-door-completeness-phase-1)
+
+### AUDIT-20260619-28 — Optional positional arguments always rendered as required `<arg>` notation
+
+Finding-ID: AUDIT-20260619-28 (claude-01 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=high, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/cli-help/command-surface.ts:230 (`projectSubAction`)
+
+`projectSubAction` builds the `positionals` array as:
+
+```typescript
+positionals: sub.registeredArguments.map((a) => `<${a.name()}>`),
+```
+
+Commander's `Argument` class distinguishes required (`<arg>`) from optional (`[arg]`) via its `required` boolean property — an argument declared as `command.argument('[path]', ...)` has `a.required === false` and `a.name()` returns `'path'` (just the identifier, no brackets). The current code unconditionally wraps every argument in `<...>`, rendering optional arguments as if they were required.
+
+Because the descriptor is the upstream source for the help renderer, the verb reference, and the mediation guard, a consumer building help text or validating invocations from `CommandDescriptor` will see `<path>` where the parser actually accepts `[path]`, causing misleading help output and potentially incorrect arity validation. The fix is to branch on `a.required`:
+
+```typescript
+positionals: sub.registeredArguments.map((a) =>
+  a.required ? `<${a.name()}>` : `[${a.name()}]`
+),
+```
+
+---
+
+### AUDIT-20260619-29 — Commander's auto-added `--help` option pollutes every descriptor's `flags` array
+
+Finding-ID: AUDIT-20260619-29
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/cli-help/command-surface.ts:240–250 (`projectCommand`)
+
+`projectCommand` builds `universalFlags` from `command.options` unfiltered:
+
+```typescript
+const universalFlags = command.options.map(projectFlag);
+```
+
+Commander adds a `-h, --help` option to every `Command` by default (and `-V, --version` on the root program). These live in `command.options` and are therefore projected into `universalFlags`. For a multi-action verb, they propagate into every `SubActionDescriptor.flags`; for a single-action verb, they appear in `CommandDescriptor.flags`. Every consumer of the descriptor (help renderer, verb reference, mediation guard) will see a `{name: 'help', shortFlag: 'h', ...}` entry that was never declared as part of the API contract — it is a framework implementation detail.
+
+A help renderer emitting `Flags: -h, --help  display help for command` inside a `--help` response is circular. A mediation guard checking whether any flag signals a write might special-case this flag unnecessarily. Filter framework-owned options before projecting:
+
+```typescript
+const universalFlags = command.options
+  .filter((o) => !['help', 'version'].includes((o.long ?? '').replace(/^--/, '')))
+  .map(projectFlag);
+```
+
+---
+
+### AUDIT-20260619-30 — Test files exist on disk as untracked but were not committed alongside the implementation
+
+Finding-ID: AUDIT-20260619-30
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    git status (session context): `?? src/__tests__/cli-help/command-surface.test.ts`, `?? src/__tests__/cli-help/render-help.test.ts`
+
+The session-start git status shows two untracked test files:
+
+```
+?? src/__tests__/cli-help/command-surface.test.ts
+?? src/__tests__/cli-help/render-help.test.ts
+```
+
+Commit `1315b4eb` lands both the descriptor type contracts (`command-surface.ts`) and the test harness (`command-surface-harness.ts`), but the test files that exercise the contracts were not staged or committed. The commit therefore shipped implementation without the tests that the harness is designed to support. Per the project's TDD discipline (`.claude/rules/testing.md`: "Write tests alongside implementation, not after"), these must be committed in the same phase — a test harness committed without the tests it serves is itself vacuous. The missing test files also mean CI cannot verify the descriptor contracts or the completeness guard fires correctly.
+
+---
+
+### AUDIT-20260619-31 — Short-only flags (no `--long` form) produce a `name` field with a leading `-` dash
+
+Finding-ID: AUDIT-20260619-31
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/cli-help/command-surface.ts:200–209 (`projectFlag`)
+
+```typescript
+const long = option.long ?? option.flags;
+return {
+  name: long.replace(/^--/, ''),
+  ...
+};
+```
+
+When a commander option has no long form (e.g., only `-v`), `option.long` is `undefined` and the fallback is `option.flags` — a string like `"-v"`. The `replace(/^--/, '')` pattern strips exactly `--`; it is a no-op against a single-dash string, leaving `name` as `"-v"` (with the dash), violating the contract described in the JSDoc ("Dashed long form, e.g. `depends-on`"). Any downstream consumer that assumes `name` is dash-free would misrender or misroute. The fix is to also strip a single leading dash in the fallback:
+
+```typescript
+name: long.replace(/^-+/, ''),
+```
+
+---
+
+### AUDIT-20260619-32 — Variadic positional arguments lose their variadic indicator in the descriptor
+
+Finding-ID: AUDIT-20260619-32
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/cli-help/command-surface.ts:230 (`projectSubAction`)
+
+Commander supports variadic arguments declared as `command.argument('<files...>', ...)`. The commander `Argument` class exposes this via a `variadic` boolean property. The current mapping:
+
+```typescript
+positionals: sub.registeredArguments.map((a) => `<${a.name()}>`),
+```
+
+produces `<files>` instead of `<files...>`, dropping the `...` indicator. A help renderer consuming this descriptor would show a fixed-arity positional where the CLI actually accepts one or more, silently misrepresenting the invocation contract. This compounds with finding -01 above (both stem from the same mapping not consulting `Argument` metadata). The fix:
+
+```typescript
+positionals: sub.registeredArguments.map((a) => {
+  const name = a.variadic ? `${a.name()}...` : a.name();
+  return a.required ? `<${name}>` : `[${name}]`;
+}),
+```
+
+---
+
+### AUDIT-20260619-33 — `isHelpConformant` can false-positive on a verb that exits 0 with structured output containing a `usage:` line
+
+Finding-ID: AUDIT-20260619-33
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/__tests__/cli-help/command-surface-harness.ts:89–108 (`isHelpConformant`)
+
+The conformance predicate is:
+
+```typescript
+return probe.status === 0 && /^usage:/im.test(probe.stdout);
+```
+
+The `m` (multiline) flag makes `^` match the start of ANY line, not just the document start. If a verb exits 0 while emitting structured output (JSON, YAML, or machine-readable text) that happens to contain a line beginning with `usage:` — e.g., `"usage": 5` in a JSON response, or a `usage: <count>` field in YAML — the predicate returns `true` and classifies the verb as help-conformant even though it printed no help text.
+
+The status-zero guard reduces this risk considerably (a non-help verb that exits 0 with structured data would need to specifically have a `usage:` key at line-start), and the code comment correctly identifies the design intent. The blast-radius is limited: a false-conformance reading causes a test to pass when the verb is not actually help-conformant, which is a missed regression rather than a data-corruption issue. Noted here for the operator's awareness if any query verbs are added that emit structured output on success; the predicate may need to also require, e.g., a `Usage:` line on stdout from a specific known prefix format.
+
+### AUDIT-20260619-34 — Command surface omits most live verbs
+
+Finding-ID: AUDIT-20260619-34
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/cli-help/command-surface.ts:83-89, src/cli-help/command-surface.ts:133-139
+
+`buildCommandSurface()` is documented as projecting the stack-control command surface, but `MOUNTED` contains only `roadmap`. The comments explicitly say this descriptor generalizes the roadmap-only pattern to all verbs, while the implementation hardcodes a one-entry registry and relies on a subsequent migration to append the other families.
+
+The blast radius is high because downstream consumers named in this file, such as the descriptor artifact, verb reference, and fronted-operations registry, would read an incomplete surface and treat every non-roadmap verb as absent. Nothing in `buildSurfaceFrom()` or `assertSurfaceComplete()` compares `MOUNTED` against the live `stackctl --help` verb set, so omissions pass cleanly. A reasonable fix is to add a guard that compares descriptor verbs with the live/declared top-level command registry, or rename/scope this API so consumers cannot mistake the roadmap-only subset for the full front door.
+
+## 2026-06-19 — audit-barrage lift (20260619T180308082Z-028-front-door-completeness-phase-1)
+
+### AUDIT-20260619-35 — `liveVerbs()` silently under-covers when the `Verbs:` line wraps
+
+Finding-ID: AUDIT-20260619-35
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/cli-help/command-surface-harness.ts:38-51
+
+The `liveVerbs()` function's parsing logic picks up exactly one line — the first line matching `l.startsWith('Verbs:')` — and treats it as the complete verb set. This is correct only if `printUsage` in `src/cli.ts` places all verbs on a single `\n`-terminated line. The harness comment cites the implementation (`Verbs: ${keys.join(', ')}\n`) as justification. That claim may be accurate today, but it creates implicit coupling to a distant implementation detail: if `printUsage` ever introduces a column-width wrap (e.g. for readability), `liveVerbs()` would silently return the verbs from only the first wrapped segment. The failure mode is particularly dangerous: with some verbs present, neither the empty-list guard nor the non-zero-exit guard fires. Every per-verb downstream loop would pass vacuously for the missing verbs, giving a "green" coverage signal while exercising a strict subset of the surface.
+
+A more robust alternative is to either (a) parse the entire block from `Verbs:` until the next blank line or section header, or (b) add an assertion that `liveVerbs().length` equals a known minimum, so a silently-incomplete parse trips a test before the per-verb suite runs. The current design converts a `printUsage` wrapping change (a cosmetic formatting decision) into an invisible regression in the test harness's coverage accuracy — the worst category of test-infrastructure failure.
+
+---
+
+### AUDIT-20260619-36 — `assertSurfaceComplete` does not check flag descriptions for completeness
+
+Finding-ID: AUDIT-20260619-36 (claude-02 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=low, codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/cli-help/command-surface.ts:268-289
+
+`assertSurfaceComplete` iterates over every `CommandDescriptor` and `SubActionDescriptor` and asserts that their `.description` fields are non-empty. The same completeness contract is not applied to `FlagDescriptor.description`. A commander option registered with an empty description string (e.g. `.option('--dry-run', '')`) passes through `projectFlag` (line ~206) with `description: option.description` — an empty string — and then through `assertSurfaceComplete` without any error. The descriptor's help renderer (a later phase) and the verb reference will then emit an empty help row for that flag, exactly the drift the completeness guard was designed to prevent.
+
+The fix is a third nested loop in `assertSurfaceComplete` that walks `verb.flags` and each `sub.flags`, throwing on any entry where `f.description.trim().length === 0`. Given that the guard already iterates the full surface, adding this loop is low cost.
+
+---
+
+### AUDIT-20260619-37 — `projectFlag` `name` field is corrupt when `option.long` is undefined
+
+Finding-ID: AUDIT-20260619-37
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/cli-help/command-surface.ts:196-208
+
+In `projectFlag`, the name is derived via:
+
+```ts
+const long = option.long ?? option.flags;
+return {
+  name: long.replace(/^-+/, ''),
+  ...
+};
+```
+
+When `option.long` is `undefined` (a short-only option such as `program.option('-v', 'verbose')`), the fallback is `option.flags`, which is the raw flags string as declared (e.g. `'-v'`). After `replace(/^-+/, '')` this yields `'v'` — a single-character opaque identifier rather than a meaningful long-form name. This results in a `FlagDescriptor` where `name: 'v'` and `shortFlag: 'v'` are identical, and the descriptor carries no semantic name. More critically, the `FRAMEWORK_FLAGS` filter on line ~224 uses the same `(o.long ?? '').replace(/^-+/, '')` path: if a framework-owned short-only flag were ever added, it would not be filtered out of the descriptor.
+
+No current stackctl verb appears to use a short-only option, so the blast radius is low today. It is still a latent correctness bug that becomes active the moment any such option is registered, and the fallback's intent (use `option.flags` as a last resort) will not produce a usable name for a multi-token flags string like `'-d, --depends-on <id>'` if `long` were somehow absent for such a definition.
+
+---
+
+### AUDIT-20260619-38 — `ROADMAP_SUBACTION_MEDIATION` completeness is not statically enforced against the live roadmap command
+
+Finding-ID: AUDIT-20260619-38
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/cli-help/command-surface.ts:148-173
+
+`ROADMAP_SUBACTION_MEDIATION` is a hand-authored `Record<string, MediationClass>` with 14 entries. It is declared parallel to the sub-actions that `buildRoadmapCommand()` registers, with no compile-time or test-time mechanism to verify they match. When a new sub-action is added to the roadmap command, `requireSubActionMediation` (lines ~232-240) will throw at runtime — a loud failure, not a silent one — but only at the point a test or production invocation calls `buildCommandSurface()`. There is no RED test that exercises "every sub-action registered on the live roadmap command has a mediation entry."
+
+This is already better than the alternative (silent default), and the pattern is consistent with Decision 4 (declared, not inferred). The improvement is a test that iterates `buildRoadmapCommand().commands` and asserts each name is a key in `ROADMAP_SUBACTION_MEDIATION` — catching the gap at test time rather than runtime.
+
+### AUDIT-20260619-39 — Deferral comments normalize missing front-door consumers
+
+Finding-ID: AUDIT-20260619-39
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/cli-help/command-surface.ts:5-12,57-63,133-139
+
+The diff contains explicit deferred-work comments: lines 5-12 describe several promised consumers while saying they do not exist yet, lines 57-63 defer a shared-flags shape to a backlog item, and lines 133-139 say additional mounted families are appended in a later phase. The audit prompt’s hard constraint says to surface deferral phrases found in the diff, and the project guide also calls placeholder/deferred comments operator-discipline traps.
+
+The immediate runtime blast radius is low because these comments do not change behavior. The risk is process drift: unattended agents may treat the missing renderer/artifact/registry/shared-flag work as already dispositioned by comment instead of enforcing the current feature boundary. A tighter fix is to remove or rephrase these as current-state constraints and encode pending work in the workplan/backlog, not in shipped source comments.
+
+## 2026-06-19 — audit-barrage lift (20260619T181252754Z-028-front-door-completeness-phase-2)
+
+### AUDIT-20260619-40 — `render-help.ts` committed without its test file
+
+Finding-ID: AUDIT-20260619-40
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/cli-help/render-help.ts (entire file); `src/__tests__/cli-help/render-help.test.ts` is absent from the diff
+
+`render-help.ts` is included in this commit — it ships `renderVerbHelp`, `renderSubActionHelp`, `flagToken`, and the private helpers `table` and `universalFlags`. None of these are covered by the tests in this diff. `src/__tests__/cli-help/render-help.test.ts` appears in the working-tree git status as `??` (untracked), meaning it exists on disk but was not staged or committed. The project's TDD discipline requires tests alongside implementation, not after.
+
+The blast radius is concrete: `renderVerbHelp` has several untested branches — multi-action vs. single-action, deprecated-alias annotation, the universal-flags re-extraction and rendering path, and the case of a verb with no flags. `renderSubActionHelp`'s error path (unknown sub-action name) and its positionals rendering are also untested. These are the primary user-visible outputs of the feature; a silent regression in any branch would not be caught by the existing test suite.
+
+Fix: commit `render-help.test.ts` alongside `render-help.ts`. At minimum cover: `flagToken` with and without a short flag; `renderVerbHelp` for a multi-action verb with universal flags, a single-action verb with flags, a deprecated alias, and a verb with no flags; `renderSubActionHelp` happy path, positionals rendering, and the unknown-sub-action throw.
+
+---
+
+### AUDIT-20260619-41 — `assertSurfaceComplete` does not validate flag descriptions
+
+Finding-ID: AUDIT-20260619-41
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/cli-help/command-surface.ts:254-270
+
+The completeness guard (T007) checks that every verb and sub-action carries a non-empty `description`, but it never inspects `FlagDescriptor.description`. A commander option registered with an empty or whitespace description — possible when a flag is added to the `roadmap-command` without a description string — passes the guard silently and then renders as a blank right-column in the help table or verb reference.
+
+```typescript
+// assertSurfaceComplete only checks:
+if (verb.description.trim().length === 0) { throw … }
+if (sub.description.trim().length === 0) { throw … }
+// flag.description is never checked
+```
+
+The stated purpose of the guard is to make description-drift a build-time failure. A flag with an empty description is exactly that failure: the registered surface and its documentation diverge. The blast radius is two surfaces: the help output (a blank row) and the verb-reference artifact (a gap in the flag table). Neither is caught by any existing test.
+
+Fix: extend the loop in `assertSurfaceComplete` to also check `flag.description.trim().length > 0` for every flag in `verb.flags` and `sub.flags`. Mirrors the existing verb/sub-action checks in shape.
+
+---
+
+### AUDIT-20260619-42 — Positional-count test normalizes to a boolean — would false-fail a correctly-implemented multi-positional sub-action
+
+Finding-ID: AUDIT-20260619-42
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/cli-help/command-surface.test.ts:49-57
+
+```typescript
+const expected = (grammar?.positionals ?? 0) >= 1 ? 1 : 0;
+expect(sub.positionals.length, `positionals for ${sub.name}`).toBe(expected);
+```
+
+The expression `(grammar?.positionals ?? 0) >= 1 ? 1 : 0` collapses any count ≥ 1 to the constant `1`. If a future roadmap sub-action requires two positionals (e.g. `add-edge <from> <to>`) and `grammar.positionals` is `2`, the `SubActionDescriptor` correctly projects `2` positionals — but the test asserts `2 === 1` and fails. The implementation is correct; the test reports it broken. This is a false failure that will cause a maintainer to look at the test before the implementation, and the misleading error (`expected 2, got 1`) obscures the actual problem.
+
+The fix is an exact-count assertion: `expect(sub.positionals.length).toBe(grammar?.positionals ?? 0)`. The test description already says "one `<identifier>` or none" — if that invariant holds for the current grammar, the simpler assertion is still satisfied; if a multi-positional sub-action is ever added, the test correctly fails with an exact mismatch rather than a misleading one.
+
+---
+
+### AUDIT-20260619-43 — Usage line always says `[flags]` even for flags-free single-action verbs
+
+Finding-ID: AUDIT-20260619-43
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/cli-help/render-help.ts:42-46
+
+```typescript
+lines.push(
+  isMulti
+    ? `Usage: stackctl ${descriptor.verb} <subaction> [flags]`
+    : `Usage: stackctl ${descriptor.verb} [flags]`,
+);
+```
+
+For a single-action verb with no flags (`descriptor.flags.length === 0`), `renderVerbHelp` renders `Usage: stackctl <verb> [flags]`. The `[flags]` token implies optional flags are accepted, but the "Flags:" section is omitted (`else if (descriptor.flags.length > 0)`). The resulting help body says `[flags]` in the usage line and then shows nothing under flags — a contradiction the operator would notice.
+
+`--help` and `--version` are filtered by `FRAMEWORK_FLAGS`, so they don't appear in the flag table, yet the usage line implicitly claims them via `[flags]`. For the current `roadmap` verb (multi-action, so this branch is not reached) this is invisible today, but any future single-action verb with no business-logic flags will exhibit the contradiction.
+
+Fix: conditionally include `[flags]` in the single-action usage line only when `descriptor.flags.length > 0`.
+
+---
+
+### AUDIT-20260619-44 — Unreachable guard after length check in `universalFlags` (render-help.ts)
+
+Finding-ID: AUDIT-20260619-44
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/cli-help/render-help.ts:28-35
+
+```typescript
+function universalFlags(subActions: readonly SubActionDescriptor[]): readonly FlagDescriptor[] {
+  if (subActions.length === 0) return [];
+  const first = subActions[0];
+  if (first === undefined) return [];   // ← unreachable
+  return first.flags.filter(…);
+}
+```
+
+After the `subActions.length === 0` guard returns early, the next line assigns `subActions[0]`, which is guaranteed to be a `SubActionDescriptor`. The `if (first === undefined) return []` check is dead code: control can only reach it when the array is non-empty, so `first` is never `undefined` at runtime.
+
+If `noUncheckedIndexedAccess` is enabled in `tsconfig`, TypeScript would type `subActions[0]` as `SubActionDescriptor | undefined` and require the guard for type safety. But the prior length check is the correct way to handle that — TypeScript's control-flow narrowing doesn't narrow array-index access after a length check, so the dead-code guard is the workaround. If that is the intent, a code comment clarifying the `noUncheckedIndexedAccess` motivation would prevent the next reader from incorrectly removing the check as obviously dead. Without such context the check reads as an oversight.
+
+---
+
+### AUDIT-20260619-45 — No mechanism to detect when a CLI verb is mounted in the parser but absent from `MOUNTED`
+
+Finding-ID: AUDIT-20260619-45
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/cli-help/command-surface.ts:134-138 (the `MOUNTED` constant)
+
+`MOUNTED` is a manually-maintained registration array. When Phase 3 adds the remaining verb families to the commander tree, each new verb must be explicitly added to `MOUNTED`. There is no test or runtime guard that detects a mounted-but-absent verb: a verb added to the CLI entry point without a corresponding `MOUNTED` entry would be silently omitted from the help surface, verb reference, and fronted-operations registry — exactly the drift the descriptor system exists to prevent.
+
+The test `'returns one descriptor per mounted verb'` checks that `roadmap` is present, but it does not assert that `MOUNTED.length` equals the number of verbs on the live `stackctl` program instance. A completeness test in this spirit — e.g., asserting that every sub-command registered on the root program appears in the surface — would close the gap. This is informational because the gap is structural to the current phase (only `roadmap` is mounted), but it becomes load-bearing in Phase 3 when additional families join.
+
+### AUDIT-20260619-46 — Required positionals are rendered as optional
+
+Finding-ID: AUDIT-20260619-46
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/cli-help/command-surface.ts:176-180; src/cli-help/render-help.ts:81-83
+
+`projectPositional()` preserves commander’s declared optional syntax, and `renderSubActionHelp()` prints that value directly. For roadmap, commander intentionally declares required semantic identifiers as `[identifier]` so missing-argument errors keep legacy behavior, but the operation still requires the identifier. The new descriptor therefore makes `roadmap add`, `advance`, `blocks`, `cluster`, etc. render as `stackctl roadmap add [identifier] [flags]`, even though running without the identifier fails.
+
+Blast radius is high because downstream help, descriptor artifacts, and agent consumers will treat a required operand as optional. A reasonable fix is to project semantic arity from the grammar/metadata, or add an explicit descriptor field distinguishing parser optionality from required operation input, and render required roadmap identifiers as `<identifier>`.
+
+### AUDIT-20260619-47 — Command surface omits almost every live verb
+
+Finding-ID: AUDIT-20260619-47
+Status:     open
+Severity:   blocking
+Per-lane:   codex=blocking
+Decision:   single-model (gate-counted blocking)
+Surface:    src/cli-help/command-surface.ts:83-89; src/cli-help/command-surface.ts:133-139; src/__tests__/cli-help/command-surface.test.ts:21-33
+
+`buildCommandSurface()` is advertised as the source that downstream help, verb reference, descriptor artifact, and fronted-operation registry consume, but `MOUNTED` contains only `roadmap`. The tests only assert that `roadmap` is present and matches `SUBACTION_SPECS`; they do not compare the descriptor surface to the live top-level verb set from `stackctl --help` / `SUBCOMMANDS`.
+
+Blast radius is blocking for front-door completeness: a consumer using this as the authoritative command surface will silently miss the rest of the shipped CLI verbs, so generated references and guardrails can pass while most operations remain undiscovered or ungoverned. A reasonable fix is to either build from the live dispatcher’s registered verbs or add a hard parity guard that fails until every live verb has a descriptor entry.
+
+## 2026-06-19 — audit-barrage lift (20260619T182427443Z-028-front-door-completeness-phase-1)
+
+### AUDIT-20260619-48 — `reconcile` declared `read-only` — requires verification against actual sub-action behavior
+
+Finding-ID: AUDIT-20260619-48
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/cli-help/command-surface.ts:162 (`reconcile: 'read-only'` in `ROADMAP_SUBACTION_MEDIATION`)
+
+In the `ROADMAP_SUBACTION_MEDIATION` map, `reconcile` is classified as `read-only`. The word "reconcile" in roadmap CLI contexts typically means "write derived state back to the file" or "sync computed graph state to disk." If `stackctl roadmap reconcile` actually writes to the roadmap markdown document, the mediation interceptor will allow the call through without prompting — silently bypassing the capability gate for a mutating write operation. The whole point of the `MediationClass` machinery (Decision 4, referenced throughout the file) is that `mutating` writes are gated. A wrong classification at the map level defeats that gate for exactly the operations where it matters most.
+
+This cannot be verified from the diff alone — the roadmap command implementation isn't in scope — but the classification must be confirmed against the actual sub-action behavior before the mediation guard goes live. A similar question applies to `order` (shown as `read-only`): if `roadmap order` rearranges entries in the file, it is also mutating. The blast radius of a wrong `read-only` classification is a write operation that bypasses the gate with no observable failure; the blast radius of a wrong `mutating` classification is only an unwanted prompt, which the operator can dismiss. Asymmetric risk argues for verifying both before proceeding.
+
+---
+
+### AUDIT-20260619-49 — `ROADMAP_SUBACTION_MEDIATION` has no exhaustiveness guard against the live command tree
+
+Finding-ID: AUDIT-20260619-49
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/cli-help/command-surface.ts:155–176 (`ROADMAP_SUBACTION_MEDIATION`), src/cli-help/command-surface.ts:215–225 (`requireSubActionMediation`)
+
+`ROADMAP_SUBACTION_MEDIATION` is a static object literal declaring mediation classes for 14 roadmap sub-actions. `requireSubActionMediation` throws at runtime if a sub-action name is missing from the map. The guard is loud, which is good, but it is late: the failure surfaces only when `buildCommandSurface()` is first called (e.g., when a help probe runs or the descriptor artifact is built), not when the sub-action is added to `buildRoadmapCommand()`. There is no compile-time or test-time assertion that the map's key set exactly matches the set of sub-commands actually registered in the commander tree.
+
+The practical failure mode: a developer adds a new sub-action to `buildRoadmapCommand()` without knowing to update `ROADMAP_SUBACTION_MEDIATION`. The build compiles cleanly; the unit tests that don't call `buildCommandSurface()` pass; the failure surfaces as a thrown error only when the surface is first exercised. Phase 3 explicitly plans to mount additional verb families; the same gap will recur for each new multi-action verb. A test that calls `buildCommandSurface()` — or even `buildSurfaceFrom(MOUNTED)` — at module load would catch this immediately, but the test files that would exercise it are untracked and not committed (see Finding-ID claude-04).
+
+A structural fix: add a type-level exhaustiveness check using a mapped type or a `satisfies` assertion against the live sub-command names. Alternatively, make the first line of the mounted verb's `build()` invocation compute the authoritative name set and cross-reference it against `subActionMediation` keys at surface-build time.
+
+---
+
+### AUDIT-20260619-50 — Parent command flags merged into sub-actions without deduplication or collision detection
+
+Finding-ID: AUDIT-20260619-50
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/cli-help/command-surface.ts:244 (`flags: [...universalFlags, ...projectFlags(sub.options)]` in `projectSubAction`)
+
+`universalFlags` are the parent verb's filtered options spread into every sub-action descriptor ahead of that sub-action's own options. If a sub-action declares a flag whose long name matches a universal flag (e.g., both the parent and a sub-action declare `--apply` or `--doc`), the resulting `FlagDescriptor[]` contains two entries with the same `name`. No deduplication or collision-detection guard exists anywhere in the projection path.
+
+Downstream consumers — the help renderer, the verb reference artifact, the mediation guard — all iterate over `flags`. A duplicate entry means the help surface renders the same flag twice, the verb reference has a repeated row, and any flag-name-keyed lookup (e.g., finding the mediation class from a flag name) picks whichever entry happens to come first. None of these are catastrophic for the current roadmap command (which may not have any collisions), but the contract is not enforced and will not be detected until the surface is rendered. Adding a post-merge uniqueness assertion — `throw if two FlagDescriptors share a name` — in `projectSubAction` would catch this at surface-build time.
+
+---
+
+### AUDIT-20260619-51 — `assertSurfaceComplete` does not validate `FlagDescriptor.description`, inconsistent with its stated scope
+
+Finding-ID: AUDIT-20260619-51
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/cli-help/command-surface.ts:271–310 (`assertSurfaceComplete`)
+
+The function's docstring says "Help, the verb reference, and the descriptor artifact all render a description per node, so a blank one is drift between the registered surface and its documentation — a defect to surface at build time." It then guards only verb-level and sub-action-level descriptions, not flag descriptions. Commander's `Option.description` is `''` for undocumented flags (no compiler error, no runtime throw). When the help renderer renders a flag row, a `description: ''` produces an empty description column — the exact drift the completeness guard is stated to prevent.
+
+The backlog task TASK-302 (visible in the working-tree status as an untracked file) acknowledges the gap: `assertSurfaceComplete-should-validate-FlagDescriptor.description-but-roadmap-flags-carry-empty-commander-descriptions-until-T013.md`. The problem: (a) the docstring as written implies completeness for "every node" but the implementation is narrower, and (b) the gap is real today — commander flags with no description will pass the guard and produce empty help rows. The TASK-302 note defers the fix to T013 based on the current roadmap flags carrying empty descriptions, but that is the generator, not the fix. Empty flag descriptions are the defect; the fix is to require descriptions on every flag at registration time (not wait for T013), or to narrow the docstring to match the implementation.
+
+---
+
+### AUDIT-20260619-52 — Committed harness has no committed consumers — dead exported code in the repo snapshot
+
+Finding-ID: AUDIT-20260619-52
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/cli-help/command-surface-harness.ts (entire file)
+
+`command-surface-harness.ts` is committed in this snapshot as a shared fixture exporting `liveVerbs()`, `probeHelp()`, `HelpProbe`, and `isHelpConformant()`. The git status shows `src/__tests__/cli-help/command-surface.test.ts` and `src/__tests__/cli-help/render-help.test.ts` as untracked (`??`), meaning they exist on disk but are not committed. No committed code imports any of the harness exports. In the committed state, every export in the harness is dead code: untested, unreachable by vitest, and silently decoupled from any downstream consumer.
+
+The risk is API drift: if the harness interface changes between this commit and the commit that adds the test files, the test files will require updating — and the gap will only be discovered when the tests are finally collected by vitest. A cleaner phase boundary would either commit the harness and the tests that use it together in the same commit, or leave the harness untracked until its consumers are ready. As-is, the harness is a spec artifact with no verification that it compiles correctly in the import graph (TypeScript will type-check it, but nothing exercises the exported functions end-to-end).
+
+---
+
+### AUDIT-20260619-53 — `positionalsRequired` override is verb-level with no per-sub-action escape hatch
+
+Finding-ID: AUDIT-20260619-53
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/cli-help/command-surface.ts:128–138 (`VerbMetadata.positionalsRequired`), src/cli-help/command-surface.ts:240 (usage in `projectSubAction`)
+
+`VerbMetadata.positionalsRequired: boolean` is applied uniformly to ALL sub-actions of the verb when `true`. The current use case (roadmap's `[identifier]` declared optional in commander but semantically required) works because every id-taking roadmap sub-action does in fact require the identifier. But the interface as designed cannot express a mixed verb where some sub-actions have optional positionals and some require them. A future verb author who sets `positionalsRequired: true` at the verb level to force a single sub-action's positional will silently misrepresent genuinely-optional positionals in every other sub-action as required — and the rendered help will mislead callers.
+
+The fix is straightforward: change `positionalsRequired?: boolean` in `VerbMetadata` to `positionalsRequired?: boolean | readonly string[]` (where the array form names specific sub-actions that override), or move the field to `subActionMediation`'s value type. This is a forward-compatibility concern rather than a current defect, but the interface is the public extension point Phase 3 authors will read; a misleading interface shape produces misleading verb registrations.
+
+### AUDIT-20260619-54 — `buildCommandSurface()` is named as full-surface but only returns `roadmap`
+
+Finding-ID: AUDIT-20260619-54
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/cli-help/command-surface.ts:83-89`, `src/cli-help/command-surface.ts:143-155`, `src/cli-help/command-surface.ts:278-284`
+
+`buildCommandSurface()` is documented as the command surface that “the single source `--help`, the verb reference, the descriptor artifact, and the fronted-operations registry all read” (`278-281`), but `MOUNTED` contains only `roadmap` (`143-155`). The file also acknowledges that the remaining verb families are not mounted (`83-89`). Any downstream completeness guard or generated reference that trusts this API as the full stackctl surface will silently omit every flat-dispatched verb still present in `stackctl --help`.
+
+The blast radius is high because the feature is about front-door completeness: a consumer acting on this descriptor as written can mark the surface complete while most real verbs are absent. A reasonable fix is to either make this builder cover the same top-level verb set as the live dispatcher, or rename/scope the API so only roadmap-specific consumers can use it until the full surface is represented.
+
+### AUDIT-20260619-55 — Collected tests for the new descriptor builder are missing from the audited diff
+
+Finding-ID: AUDIT-20260619-55
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    missing test surface for `src/cli-help/command-surface.ts`
+
+The diff adds nontrivial production logic in `src/cli-help/command-surface.ts`, including commander introspection, flag filtering, positional rendering, mediation-class enforcement, and completeness checks (`157-310`). The only test-adjacent file in the diff is `src/__tests__/cli-help/command-surface-harness.ts`, which explicitly says it is “NOT a *.test.ts” (`1-2`), so it is shared test support rather than a collected test.
+
+The blast radius is medium: the code may work for roadmap today, but regressions in descriptor projection or guard behavior would not be caught by this audited change. A reasonable fix is to include collected Vitest coverage that exercises `buildCommandSurface()`, `buildSurfaceFrom()`, mediation-class failures, and blank-description failures against controlled commander fixtures.
+
+## 2026-06-19 — audit-barrage lift (20260619T182805548Z-028-front-door-completeness-phase-2)
+
+### AUDIT-20260619-56 — `render-help.test.ts` exists on disk but was never committed alongside `render-help.ts`
+
+Finding-ID: AUDIT-20260619-56
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/cli-help/render-help.ts` (committed in this diff) vs. `src/__tests__/cli-help/render-help.test.ts` (untracked in git status, not in diff)
+
+The git status shows `?? src/__tests__/cli-help/render-help.test.ts` — the `??` prefix means the file exists on disk but was never staged or committed. The diff commits `render-help.ts` (100 lines, two exported functions with multiple non-trivial code paths) without committing its test. The testing rules and TDD discipline in `agent-discipline.md` both require tests alongside implementation, not after. The consequence is that the committed `render-help.ts` has zero test coverage in the repository's current state. Any CI run on this commit passes without exercising `renderVerbHelp` or `renderSubActionHelp`. The file must be committed as part of this phase or `render-help.ts` must be deferred until its tests are committed first.
+
+---
+
+### AUDIT-20260619-57 — `renderSubActionHelp` always emits `[flags]` in the usage line regardless of whether the sub-action carries any flags
+
+Finding-ID: AUDIT-20260619-57
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/cli-help/render-help.ts:82`
+
+```typescript
+lines.push(`Usage: stackctl ${descriptor.verb} ${sub.name}${positionals} [flags]`);
+```
+
+This line unconditionally appends `[flags]` to every sub-action usage line. The verb-level help renderer in the same file handles this correctly with a conditional:
+
+```typescript
+const flagsToken = isMulti || descriptor.flags.length > 0 ? ' [flags]' : '';
+```
+
+For a sub-action with an empty `flags` array, the rendered output would be:
+
+```
+Usage: stackctl roadmap next <identifier> [flags]
+
+<description>
+```
+
+— with no "Flags:" section below it, because that section is guarded by `if (sub.flags.length > 0)`. The usage line advertises flags that do not exist and are not documented. In the current implementation all roadmap sub-actions inherit the parent's `--doc` flag through `projectSubAction`, so `sub.flags` is never empty in practice. But the contract of `renderSubActionHelp` is general — it accepts any `CommandDescriptor` and sub-action name — and future verbs with flag-free sub-actions will emit misleading help. The fix is the same conditional applied at the verb level: `const flagsToken = sub.flags.length > 0 ? ' [flags]' : '';`.
+
+---
+
+### AUDIT-20260619-58 — `projectFlag` produces a malformed `name` for short-only Commander options
+
+Finding-ID: AUDIT-20260619-58
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/cli-help/command-surface.ts:163–175`
+
+```typescript
+function projectFlag(option: Option): FlagDescriptor {
+  const long = option.long ?? option.flags;
+  return {
+    name: long.replace(/^-+/, ''),
+    shortFlag: option.short ? option.short.replace(/^-+/, '') : null,
+    ...
+  };
+}
+```
+
+For a short-only Commander option (declared as `-v` with no `--verbose` long form), `option.long` is `undefined` and the fallback is `option.flags`. For a short-only option, `option.flags` is the full declaration string `-v`. After `replace(/^-+/, '')`, `name` becomes `'v'` (a single character). Since `option.short` is also `-v`, `shortFlag` also becomes `'v'`. `flagToken` then renders:
+
+```
+-v, --v
+```
+
+The `--v` form is not a valid long flag and was never declared. The framework-flags filter (`FRAMEWORK_FLAGS.has((o.long ?? '').replace(/^-+/, ''))`) also silently passes these options through because `o.long ?? ''` is `''` for short-only options, and `FRAMEWORK_FLAGS.has('')` is `false`. No mounted verb currently uses a short-only option, so this does not fire today. But it is a latent correctness bug in the projection layer — the component that is supposed to make drift "structurally impossible." A short-only option slipping through would produce a descriptor (and rendered help) that misrepresents the CLI's actual grammar.
+
+---
+
+### AUDIT-20260619-59 — `assertSurfaceComplete` does not validate `FlagDescriptor.description`, allowing silent help-row drift for flags
+
+Finding-ID: AUDIT-20260619-59
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/cli-help/command-surface.ts:282–298`
+
+```typescript
+export function assertSurfaceComplete(surface: readonly CommandDescriptor[]): void {
+  for (const verb of surface) {
+    if (verb.description.trim().length === 0) { ... }
+    for (const sub of verb.subActions) {
+      if (sub.description.trim().length === 0) { ... }
+    }
+  }
+}
+```
+
+The guard enforces non-empty descriptions for verbs and sub-actions but not for flags. A `FlagDescriptor` with an empty `description` passes the completeness guard and propagates into rendered help as a blank entry in the flag table — exactly the "blank help row = drift" the guard is designed to prevent. This is already tracked as `task-302` in the backlog (visible in the untracked file listing in git status), so the operator is aware. Noting it here because it is an active gap in the guard's contract and because the rationale in the guard's own JSDoc ("Help, the verb reference, and the descriptor artifact all render a description per node, so a blank one is drift") applies equally to flag rows. The fix and its dependency on T013 (roadmap flags currently carry empty commander descriptions) are already scoped; this finding is informational confirmation that the gap is real, not new.
+
+---
+
+### AUDIT-20260619-60 — `universalFlags` in `render-help.ts` uses name-only equality; flags with the same name but differing `arg`/`description` across sub-actions would silently render the first sub-action's version
+
+Finding-ID: AUDIT-20260619-60
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/cli-help/render-help.ts:28–35`
+
+```typescript
+return first.flags.filter((f) => subActions.every((s) => s.flags.some((g) => g.name === f.name)));
+```
+
+The predicate identifies "universal" flags (present on all sub-actions) by `name` alone. Two flags with the same `name` but different `arg`, `required`, or `description` values across sub-actions would be treated as the same flag; the rendered "Universal flags" section would show the first sub-action's version, silently dropping the divergent values. This is not an active defect in the current implementation: all sub-actions receive the same parent-command flags via the fixed `[...universalFlags, ...projectFlags(sub.options)]` projection in `projectSubAction`, so the values are identical across sub-actions. But the equality contract is weaker than the actual invariant the code relies on, and future verbs that construct sub-action flag lists differently could produce subtly wrong rendered help without any warning.
+
+### AUDIT-20260619-61 — Defers Required 028 Surfaces To Nonexistent Consumers
+
+Finding-ID: AUDIT-20260619-61
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/cli-help/command-surface.ts:6-11
+
+The header says the commander-tree walker, completeness guard, mediation-class guard, generic help renderer, verb reference, descriptor artifact, and fronted-operations registry “are derived FROM these shapes” and “are defined alongside,” but then immediately says “Until those consumers exist these are the contracts they build against.” In this diff, only the walker, completeness guard, mediation guard, and renderer exist; the verb reference, descriptor artifact, and fronted-operations registry are not present.
+
+That is a governance trap for 028-front-door-completeness: a downstream unattended consumer can read this as the feature already having the single-source derived surfaces, when several named surfaces are absent from the audited work product. Blast radius is high because the stated feature is about front-door completeness and drift prevention; shipping comments that claim missing derived surfaces exist weakens the audit signal and can hide unfinished required work. A reasonable fix is to either add the missing generated/derived surfaces in this change or rewrite the contract comments to state exactly which surfaces are implemented in this diff without implying absent ones exist.
+
+### AUDIT-20260619-62 — Universal Flag Detection Collapses Distinct Flags By Name Only
+
+Finding-ID: AUDIT-20260619-62
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/cli-help/render-help.ts:25-37
+
+`universalFlags()` decides a flag is universal if every sub-action has some flag with the same `name`: `s.flags.some((g) => g.name === f.name)`. It ignores `shortFlag`, `arg`, `required`, and `description`, so two sub-actions with the same long name but different value placeholders or semantics would be collapsed into one verb-level “Universal flags” row using the first sub-action’s descriptor.
+
+The current roadmap surface may not hit this today, but the renderer is explicitly generic for “ANY CommandDescriptor,” so this becomes a compounding design issue as more verbs are mounted. The blast radius is medium: it can produce misleading help for future migrated verbs without failing loud, but it does not break the current roadmap projection by itself. A reasonable fix is to compare the full rendered flag token plus description, or only mark flags universal when their complete descriptor fields match across all sub-actions.

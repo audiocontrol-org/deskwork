@@ -38,6 +38,7 @@ import {
   renderRoadmapHelp,
   renderRoadmapUsage,
   renderSubactionHelp,
+  summaryFor,
 } from '../cli-help/roadmap-help.js';
 import {
   executeRoadmapSubaction,
@@ -102,7 +103,11 @@ function registerSubaction(parent: Command, name: string): void {
   if (grammar === undefined) {
     throw new Error(`roadmap-command: no grammar for subaction '${name}' (registry drift)`);
   }
-  const sub = parent.command(name).helpOption(false).allowExcessArguments(false);
+  const sub = parent
+    .command(name)
+    .description(summaryFor(name))
+    .helpOption(false)
+    .allowExcessArguments(false);
   // Positional arity: each subaction that takes a positional consumes exactly one
   // `<identifier>`; declare it optional so a missing positional flows to the
   // existing `requireId`/`addInputFrom` exit-2 message rather than commander's.
@@ -124,6 +129,9 @@ function registerSubaction(parent: Command, name: string): void {
 /** Build the `roadmap` commander Command (exported for T003's mount assertions). */
 export function buildRoadmapCommand(): Command {
   const program = new Command('roadmap');
+  program.description(
+    'Governed-roadmap mutation and query verbs (next/blocked/order/graph + add/advance/decompose/defer/cluster).',
+  );
   program.exitOverride();
   program.helpOption(false);
   // `--doc` is universal: declared on the parent so it is accepted on every

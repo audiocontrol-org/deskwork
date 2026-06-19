@@ -51,14 +51,14 @@ Single-project CLI. Source under `plugins/stack-control/src/`; tests under `plug
 
 **⚠️ CRITICAL**: No user-story phase may begin until Phase 2 is complete.
 
-- [ ] T004 RED: assert `buildCommandSurface()` walks the live commander tree and returns one `CommandDescriptor` per registered verb (starting with the already-mounted `roadmap`), with sub-actions/flags/positionals matching `SUBACTION_SPECS` — failing until the walker exists, in `src/__tests__/cli-help/command-surface.test.ts` (FR-003).
-- [ ] T005 Implement `buildCommandSurface()` (the commander-tree walker) + the `CommandDescriptor` projection in `src/cli-help/command-surface.ts`, generalizing the `roadmap-help.ts` render-from-grammar pattern (derive flags from each `Command`'s options, not a hand-written string) (FR-003) — makes T004 GREEN.
-- [ ] T006 RED: assert a registered verb/sub-action whose descriptor lacks a `description` fails loud (the `roadmap-help.ts` completeness guard, generalized), in `src/__tests__/cli-help/command-surface.test.ts` (FR-003).
-- [ ] T007 Implement the completeness guard in `src/cli-help/command-surface.ts` (a registered node with no description/summary throws — non-drift) (FR-003) — makes T006 GREEN.
-- [ ] T008 RED: assert the descriptor carries a declared `mediationClass` (`'mutating' | 'read-only'`) per node and that an unclassified node fails loud (declared, not inferred from `--apply`), in `src/__tests__/cli-help/command-surface.test.ts` (FR-050; Decision 4).
-- [ ] T009 Implement the `mediationClass` field + the unclassified-node fail-loud in `src/cli-help/command-surface.ts` (FR-050) — makes T008 GREEN.
-- [ ] T010 RED: assert a generic `renderVerbHelp(descriptor)` / `renderSubActionHelp(descriptor, sub)` produces a non-empty usage body (description + sub-actions + flags + usage line) for any descriptor, in `src/__tests__/cli-help/command-surface.test.ts` (FR-001/002).
-- [ ] T011 Extract the generic help renderer from `roadmap-help.ts` into `src/cli-help/command-surface.ts` (or a sibling `src/cli-help/render-help.ts` if the file nears the cap) so any verb renders from its descriptor; keep `roadmap-help.ts` re-exporting the roadmap-specific vocabulary surfacing (FR-001/002/003) — makes T010 GREEN.
+- [x] T004 RED: assert `buildCommandSurface()` walks the live commander tree and returns one `CommandDescriptor` per registered verb (starting with the already-mounted `roadmap`), with sub-actions/flags/positionals matching `SUBACTION_SPECS` — failing until the walker exists, in `src/__tests__/cli-help/command-surface.test.ts` (FR-003).
+- [x] T005 Implement `buildCommandSurface()` (the commander-tree walker) + the `CommandDescriptor` projection in `src/cli-help/command-surface.ts`, generalizing the `roadmap-help.ts` render-from-grammar pattern (derive flags from each `Command`'s options, not a hand-written string) (FR-003) — makes T004 GREEN.
+- [x] T006 RED: assert a registered verb/sub-action whose descriptor lacks a `description` fails loud (the `roadmap-help.ts` completeness guard, generalized), in `src/__tests__/cli-help/command-surface.test.ts` (FR-003).
+- [x] T007 Implement the completeness guard in `src/cli-help/command-surface.ts` (a registered node with no description/summary throws — non-drift) (FR-003) — makes T006 GREEN.
+- [x] T008 RED: assert the descriptor carries a declared `mediationClass` (`'mutating' | 'read-only'`) per node and that an unclassified node fails loud (declared, not inferred from `--apply`), in `src/__tests__/cli-help/command-surface.test.ts` (FR-050; Decision 4).
+- [x] T009 Implement the `mediationClass` field + the unclassified-node fail-loud in `src/cli-help/command-surface.ts` (FR-050) — makes T008 GREEN.
+- [x] T010 RED: assert a generic `renderVerbHelp(descriptor)` / `renderSubActionHelp(descriptor, sub)` produces a non-empty usage body (description + sub-actions + flags + usage line) for any descriptor, in `src/__tests__/cli-help/command-surface.test.ts` (FR-001/002).
+- [x] T011 Extract the generic help renderer from `roadmap-help.ts` into `src/cli-help/command-surface.ts` (or a sibling `src/cli-help/render-help.ts` if the file nears the cap) so any verb renders from its descriptor; keep `roadmap-help.ts` re-exporting the roadmap-specific vocabulary surfacing (FR-001/002/003) — makes T010 GREEN.
 
 **Checkpoint**: A single typed descriptor exists; help renders generically from it; mediation class is declared and guarded. US1/US2/US3/US4 can now build.
 
