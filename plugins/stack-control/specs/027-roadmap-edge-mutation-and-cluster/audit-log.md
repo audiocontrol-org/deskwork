@@ -1866,3 +1866,164 @@ Surface:    src/roadmap/mutations.ts:52-66, src/roadmap/mutations.ts:253-257
 `cluster` added fence-aware handling because field-looking bullets inside code fences are prose, not metadata. `decompose` still uses `rewriteEdgeLine`, whose regex maps every line matching `- part-of:` regardless of whether it is inside a fenced block. If a unit has a real `part-of` edge to the decomposed item plus a fenced example mentioning the same id, the guard at lines 253-257 enters the rewrite path, and lines 57-66 mutate both the real metadata and the fenced example.
 
 That is content corruption in a repository whose core object is markdown content. The blast radius is medium because it only hits roadmap items containing fenced examples, but when it does, a valid mutation silently rewrites prose the document parser would have ignored. The fix should make shared edge rewrites use the same fence-awareness as `appendEdge` and `scopeOf`, then cover decompose/reclassify with a fenced-field regression test.
+
+## 2026-06-19 — audit-barrage lift (20260619T041505100Z-027-roadmap-edge-mutation-and-cluster-phase-5)
+
+### AUDIT-20260619-90 — Stale "RED until T017" comment misleads future readers
+
+Finding-ID: AUDIT-20260619-90
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/roadmap/honest-header.test.ts:9-12
+
+Lines 9–12 say *"RED until T017 rewrites the skeleton from the bare 'manage with stackctl roadmap — do not hand-edit' to the honest-interim form."* But commit `58db0117` (in the audited range) is titled `feat(027): Phase 5 US3 — honest-interim ROADMAP header (T016-T017)` — both tasks were landed together. This file *is* T016; T017 is the scaffold rewrite in the same commit. If the tests are passing (as expected after that commit), the skeleton no longer has the old text, so the comment is describing a state that no longer exists.
+
+The blast-radius: an agent picking up this worktree and reading the comment would believe T017 is still pending and either skip it or re-implement it. At minimum it creates confusion about which tasks in `tasks.md` are complete. Per the project rule against "just for now" / stale IOU comments, this is a bug-factory: the comment should have been updated (or removed) when T017 landed.
+
+Reasonable fix: replace lines 9-12 with a backwards-looking statement — e.g. *"T017 landed in the same commit; the skeleton is now the honest-interim form."* Or remove the RED-phase note entirely; the commit history is the authoritative record of when it turned green.
+
+---
+
+### AUDIT-20260619-91 — `toContain(verb)` assertions are too broad — match any occurrence, not CLI-command form
+
+Finding-ID: AUDIT-20260619-91
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/roadmap/honest-header.test.ts:25-28
+
+```ts
+for (const verb of ['add', 'advance', 'reclassify', 'defer', 'cluster']) {
+  expect(ROADMAP_SKELETON).toContain(verb);
+}
+```
+
+`toContain('add')` passes if the word "add" appears anywhere in the skeleton — including prose like "In *addition* to the above" or "you can *add* custom nodes". The intent (per the T016 comment and FR-016) is to verify that the skeleton *names the mutation verbs as CLI commands available to the agent*. A skeleton that mentions "add" only in explanatory prose, without ever presenting `stackctl roadmap add` as an invokable command, would make all five assertions green while the actual operator-discipline contract (agent knows what commands exist) remains unmet.
+
+Compare this to the next test (line 33), which anchors to the actual CLI syntax pattern `/roadmap cluster .*--children/`. Four of the five verbs get the weaker version. The blast-radius: an agent (or operator) reading green test output concludes the skeleton adequately names the mutation surface, when in fact the skeleton could have regressed to prose-only descriptions.
+
+Reasonable fix: replace `toContain(verb)` with `toMatch(new RegExp(`roadmap ${verb}`, 'i'))` (or the `stackctl` prefix if that's the documented form) for each verb — consistent with how the `cluster` verb's worked-example test is anchored.
+
+---
+
+### AUDIT-20260619-92 — `/edit|hand-edit/i` regex is logically equivalent to `/edit/i` — asserts too little
+
+Finding-ID: AUDIT-20260619-92
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/honest-header.test.ts:37
+
+```ts
+expect(ROADMAP_SKELETON).toMatch(/edit|hand-edit/i);
+```
+
+The alternation `edit|hand-edit` means "edit OR hand-edit". Since "hand-edit" is a superset of "edit" (it contains the substring), the `edit` branch will always win first if `hand-edit` is present, and the regex is logically identical to `/edit/i`. Any occurrence of the substring "edit" — including in words like "reclassify" being described as an "edit operation", or in surrounding docs referencing the editor — will make this assertion green.
+
+The intent is to verify the escape-hatch sentence: *"when no verb exists, hand-edit then revalidate"*. A pattern like `/hand.?edit/i` (requiring "hand" adjacent to "edit") would make the assertion mean what the comment claims. As written the assertion is nearly vacuous and would pass even if the hand-edit fallback were removed from the skeleton entirely, as long as "edit" appears anywhere else.
+
+---
+
+### AUDIT-20260619-93 — Implementation counterpart (`scaffold.ts`) absent from the provided diff
+
+Finding-ID: AUDIT-20260619-93
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/setup/scaffold.ts (not present in diff)
+
+Commit `58db0117` is titled `feat(027): Phase 5 US3 — honest-interim ROADMAP header (T016-T017)`. T016 is this test file; T017 is the rewrite of `ROADMAP_SKELETON` in `src/setup/scaffold.ts`. The diff provided for audit contains only the test file — `scaffold.ts` does not appear.
+
+This means the audit cannot verify:
+- that `ROADMAP_SKELETON` actually satisfies the contracts the four tests assert (e.g. does it contain `roadmap cluster --children` in a copy-pasteable form?);
+- that the "do not hand-edit" text is truly absent from the new skeleton;
+- that no other caller of `ROADMAP_SKELETON` (e.g. the `setup` command or the auto-scaffold read path mentioned in the test comment) was left with a stale reference.
+
+If the full diff was trimmed before being passed to this session, this informational note may be moot. If `scaffold.ts` genuinely wasn't changed in the audited range (implying T017 landed before commit `0737431f`), the test's own comment at lines 9-12 would then be describing a past-tense base commit rather than work in this range — which is consistent with finding -01 but warrants a cross-check against the actual `scaffold.ts` HEAD to confirm the skeleton matches what the tests assert.
+
+## 2026-06-19 — audit-barrage lift (20260619T041804131Z-027-roadmap-edge-mutation-and-cluster-phase-5)
+
+### AUDIT-20260619-94 — Regex dot won't match newline — cluster example test can silently skip multiline invocations
+
+Finding-ID: AUDIT-20260619-94
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/roadmap/honest-header.test.ts:32
+
+The assertion `expect(ROADMAP_SKELETON).toMatch(/roadmap cluster .*--children/)` uses JavaScript's default regex mode where `.` does not match `\n`. If the worked example in the skeleton spans two lines — the common readable form for CLI examples with flags:
+
+```
+stackctl roadmap cluster <slug>
+  --children child1,child2
+```
+
+— the regex fails to find a match, and `toMatch` fails rather than passes. That means the test is **not a false pass** — it would correctly fail. But the opposite fragility exists too: if someone updates the skeleton to the more readable multiline form, this test starts failing and the maintainer's first instinct may be to "fix the test" by loosening it, not to re-examine the intent. More concretely: the test claims "a concrete, copy-pasteable cluster invocation" but silently cannot verify that invocation if it spans lines.
+
+The fix is straightforward: add the `s` (dotAll) flag — `/roadmap cluster .*--children/s` — or use `/roadmap cluster[\s\S]*?--children/`. Either form handles both single-line and multiline invocations without changing the test's intent.
+
+Blast-radius: an agent reading ROADMAP_SKELETON at runtime is not harmed by this test gap — the skeleton ships whatever it ships. The harm is test-suite brittleness: a valid skeleton update would break this test for the wrong reason, and the test gives no signal about whether multiline invocations are actually present.
+
+---
+
+### AUDIT-20260619-95 — Fallback contract split into two disjoint assertions — proximity is untested
+
+Finding-ID: AUDIT-20260619-95
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/honest-header.test.ts:37–39
+
+The test "states the hand-edit-then-`roadmap order` fallback for a verb-less edit" asserts two things independently:
+
+```ts
+expect(ROADMAP_SKELETON).toMatch(/edit this file/i);
+expect(ROADMAP_SKELETON).toMatch(/roadmap order/);
+```
+
+Both assertions can pass even if "edit this file" appears in one section of the skeleton (say, a general editor note) and "roadmap order" appears in a completely different section (say, an ordering-only context unrelated to the fallback). The test claims to verify the *paired* fallback instruction — the "edit THIS file then revalidate with `roadmap order`" pattern — but nothing in the test enforces that the two halves are co-located or linked.
+
+A minimal tightening would be a single `toMatch` with both halves in one regex with proximity enforced, e.g. `/edit this file[\s\S]{0,200}roadmap order/i`, or a `toMatch` on the combined prose phrase if the skeleton's wording is stable enough. The current split assertions verify presence of two tokens, not the coherent instruction the comment describes.
+
+Blast-radius: an agent reading the skeleton could encounter the two fragments in unrelated sections and not construct the correct fallback mental model. This is a test-fidelity gap, not a runtime defect, but test fidelity is the load-bearing claim here (the commit message explicitly calls these RED-first, meaning the tests are the spec).
+
+---
+
+### AUDIT-20260619-96 — Negative assertion catches only one exact trap phrase
+
+Finding-ID: AUDIT-20260619-96 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    tests/roadmap/honest-header.test.ts:18
+
+```ts
+expect(ROADMAP_SKELETON).not.toMatch(/do not hand-edit/i);
+```
+
+This negative guard catches the specific documented prior bad form. Equivalent trap phrases — "do not edit", "do not manually edit", "never hand-edit", "this file is auto-generated, do not modify" — would all pass this test silently while still trapping an agent between "cannot edit" and "no verb exists."
+
+The comment calls out the exact phrase that was retired, so this is intentional targeting. But if the skeleton is regenerated from a template that uses a different "do not touch" idiom (common in auto-generated file headers), the guard misses it. Given the skeleton is authored in `scaffold.ts` under this project's control, the risk is bounded — but a future edit to the scaffold header by a less-context-aware contributor would bypass this guard silently.
+
+Blast-radius: low. The skeleton is a small, controlled constant. The test is documenting history as much as enforcing a contract. But noting it here for completeness since the test header explicitly frames this as the defect being retired.
+
+---
+
+### AUDIT-20260619-97 — No findings — the core export and import surface
+
+Finding-ID: AUDIT-20260619-97
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    tests/roadmap/honest-header.test.ts (import line 13)
+
+The import `from '../../src/setup/scaffold.js'` uses the `.js` extension, which is the correct ESM TypeScript convention for this project (TypeScript resolves `.ts` source at the `.js` emit path). The named export `ROADMAP_SKELETON` is imported directly, so if the export is missing or renamed in `scaffold.ts`, the test fails loudly at import time rather than silently. The verb list `['add', 'advance', 'reclassify', 'defer', 'cluster', 'group']` covers the mutation surface the feature introduced; `order` is deliberately tested separately via the fallback assertion (line 39), not in the verb-list loop — a correct split. No fabricated behavior, no mock data, no swallowed exceptions, no hardcoded paths outside of the import path (which is structurally fixed by the test file's location).
