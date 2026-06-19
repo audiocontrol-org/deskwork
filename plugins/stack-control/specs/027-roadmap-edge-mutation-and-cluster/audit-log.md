@@ -264,3 +264,119 @@ No behavioral consequence — this is pure hygiene. If the decision is "audit ID
 ---
 
 The substantive comment claims all check out against the code: `booleanOption` does map absent → `false` (line 90, matching the header); `stringOption` does fail loud on non-string (line 76, covering the "absent" case where commander yields `undefined`) and on empty/whitespace (line 79, `raw.trim().length === 0`); and it does return the value **verbatim** (line 82 `return raw;`, not the trimmed value), so the new "presence-and-non-empty, NOT normalization … whitespace preserved" note is accurate — `"  foo  "` passes and is returned with its padding intact. The "ONE intentional default" framing is defensible: `stringOption` throws on absence and `optionalStringOption` passes `undefined` through (identity, not a substituted value), so `booleanOption` is the only reader that substitutes a concrete value for an absent flag. My only real catch is the misattribution in AUDIT-BARRAGE-claude-01.
+
+## 2026-06-19 — audit-barrage lift (20260619T000011570Z-027-roadmap-edge-mutation-and-cluster-phase-2)
+
+### AUDIT-20260619-01 — Commander parse errors no longer preserve the roadmap error shape
+
+Finding-ID: AUDIT-20260619-01
+Status: migrated-to-backlog TASK-265
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/cli.ts:88-91; tests/cli/parser-adapter.test.ts:117-126
+
+The diff mounts `roadmap` onto `runRoadmapCommand`, and the new tests claim the mounted command preserves the existing dispatcher's “error shapes,” but the assertions only check exit status. The retained flat dispatcher emits `roadmap: unknown subaction 'frobnicate' (known: ...)`, while the live commander path now emits `error: unknown command 'frobnicate'` with the same exit code 2. That is a user-visible contract regression for operators or scripts matching the `roadmap:` diagnostic prefix or relying on the known-subaction list.
+
+The blast radius is medium: ordinary success paths still work and the exit code remains correct, but the stated non-regression goal is not fully enforced and parse-error diagnostics changed at the newly mounted boundary. A reasonable fix is to reject unknown subactions before invoking commander, or override commander error output so unknown-command/unknown-option diagnostics are mapped back to the old `failUsage('roadmap', ...)` message shape, then assert stderr in the tests at `tests/cli/parser-adapter.test.ts:117-126`.
+
+## 2026-06-19 — audit-barrage lift (20260619T000952185Z-027-roadmap-edge-mutation-and-cluster-phase-2)
+
+### AUDIT-20260619-02 — The diff fed to the barrage omits the two files that ARE the fix
+
+Finding-ID: AUDIT-20260619-02
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    audit harness input — "Under audit" diff vs. `git show --stat 28dc1566`
+
+`git show --stat 28dc1566` reports three changed files: `roadmap-command.ts` (+30), `roadmap.ts` (+12), `tests/cli/parser-adapter.test.ts` (+17). The "Under audit" payload contained only the test file. The load-bearing fix — moving the unknown-subaction guard + `preflightRoadmapFlags` *before* the commander parse so usage errors keep the `roadmap:` shape, plus single-sourcing `KNOWN_SUBACTIONS` — was withheld. A sibling model asked "is the fix correct?" can't see the fix; the natural reading of a test-only diff is "this commit only touched tests," which is wrong. Feed the full 3-file commit diff to the barrage.
+
+### AUDIT-20260619-03 — Unknown-flag test under-locks the shape it exists to guard
+
+Finding-ID: AUDIT-20260619-03 (claude-02 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-266
+Severity:   low
+Per-lane:   claude=medium, codex=low
+Decision:   agreement (gate-counted low)
+Surface:    tests/cli/parser-adapter.test.ts — the unknown-flag case
+
+The sibling test pins `"roadmap: unknown subaction 'frobnicate'"`. This one only asserts `toContain('roadmap:')`, `toContain('bogus')`, `not.toContain('unknown option')`. The two positives are weak: `'roadmap:'` prefixes nearly every roadmap line, and `'bogus'` is the flag the test itself passed in — both could pass against a generic/echoed error. The whole guard rests on the single negative. The impl emits `roadmap: unknown flag --bogus for 'advance'`; assert the discriminating `toContain("unknown flag --bogus")` to actually catch a shape regression.
+
+### AUDIT-20260619-04 — Hardcoded `'reconcile'` couples the test to one arbitrary subaction
+
+Finding-ID: AUDIT-20260619-04
+Status: migrated-to-backlog TASK-267
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/cli/parser-adapter.test.ts — `toContain('reconcile')`
+
+The known-list probe picks one arbitrary member of the single-sourced `KNOWN_SUBACTIONS` (`roadmap.ts:86-87`). Renaming/removing `reconcile` breaks this test for an unrelated reason. Hygiene only — assert against the exported constant or a stabler member if hardening.
+
+What I checked that came back clean: exit-code-2 production, the `roadmap:` prefix / "known:" list / commander-suppression behavior, and the byte-identical message single-sourcing across the flat and commander paths — all consistent between the test assertions and the implementation. The fix itself is correct; -02/-03 are test-quality, -01 is barrage-input.
+
+I've written the report plus the small test-hardening remediation (findings -02/-03) to the plan file.
+
+The audit deliverable is complete regardless of plan approval — the three findings are emitted above and the full report is at `/Users/orion/.claude/plans/audit-barrage-multi-model-async-blanket.md`.
+
+I'll hold here. The headline (`claude-01`) is feedback to the barrage harness — feed the full 3-file commit diff, not the test-only slice — and needs no repo change. The optional test-hardening edits (`claude-02`/`claude-03`) are staged in the plan but I won't touch the working tree until you direct. Let me know if you want me to apply the assertion tightening, or if this is purely going to barrage triage alongside the sibling models.
+
+## 2026-06-19 — audit-barrage lift (20260619T002455152Z-027-roadmap-edge-mutation-and-cluster-phase-2)
+
+### AUDIT-20260619-05 — Removing `toContain('reconcile')` drops the only independent check that the known-subaction list contains a real member
+
+Finding-ID: AUDIT-20260619-05
+Status: migrated-to-backlog TASK-268
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/cli/parser-adapter.test.ts:124-134 (diff hunk 1)
+
+The hunk replaces two assertions (`toContain('known:')` + `toContain('reconcile')`) with a single single-sourced assertion `toContain(\`(known: ${KNOWN_SUBACTIONS})\`)`. Because the test now imports the same `KNOWN_SUBACTIONS` constant that the production error path interpolates (`roadmap.ts:86` → consumed at `roadmap.ts:402` and `roadmap-command.ts:152`), both sides of the assertion read from one source. That correctly pins the byte-identical-across-paths contract (FR-006), but it also makes the list-contents dimension tautological: a typo that drops a real subaction (e.g. `reconcile`) from `KNOWN_SUBACTIONS` would change *both* the production message and the test's expected string in lockstep, so the test still passes. The removed `toContain('reconcile')` was the only assertion that independently verified a concrete, real subaction name actually appears in the operator-facing discovery list.
+
+Blast-radius: low. The deliberate trade-off (avoid coupling to one arbitrary member) is reasonable and documented in the comment, and a missing-subaction regression would likely be caught elsewhere (e.g. dispatch tests for that verb). But a belt-and-suspenders shape — keep the single-sourced full-list check *and* retain one concrete-member assertion like `toContain('reconcile')` — would preserve the regression net the commit gave up, at near-zero cost. A reasonable fix is to re-add a single concrete-member check alongside the single-sourced one.
+
+### AUDIT-20260619-06 — Sibling test hardcodes the flag diagnostic instead of single-sourcing it, inconsistent with the same commit's first hunk
+
+Finding-ID: AUDIT-20260619-06
+Status: migrated-to-backlog TASK-269
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/cli/parser-adapter.test.ts:138-141 (diff hunk 2)
+
+The second hunk tightens the assertion to the literal `toContain("unknown flag --bogus for 'advance'")`. That string is constructed in production at `document-verb-shared.ts:164` from the template `unknown flag --${name} for '${subaction}'`. Unlike hunk 1 — which the *same commit* deliberately single-sourced via the `KNOWN_SUBACTIONS` import to avoid duplicating the contract — this test duplicates the diagnostic format as a hand-copied literal. The two hunks therefore apply opposite standards to two adjacent message-shape contracts in one commit.
+
+Blast-radius: low. Pinning the literal is a legitimate contract-test choice and the substring is currently exact. The cost surfaces only if the `document-verb-shared.ts` template is reworded for readability (e.g. `unknown flag '--bogus' for subaction 'advance'`), which would break this test even though behavior is correct — the exact brittleness hunk 1 was rewritten to avoid. If single-sourcing was worth the import in hunk 1, the consistent move is to export the flag-diagnostic builder (or a format helper) from `document-verb-shared.ts` and assert against it here too; otherwise the hunk-1 effort is hard to justify. Either harmonize both or note the asymmetry explicitly.
+
+### AUDIT-20260619-07 — `toContain` substring checks do not verify the "byte-identical" claim the source comments assert
+
+Finding-ID: AUDIT-20260619-07
+Status: migrated-to-backlog TASK-270
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    tests/cli/parser-adapter.test.ts:124-141; cross-ref roadmap.ts:82-87
+
+The single-source comment block at `roadmap.ts:82-87` states the two emit "the byte-identical message," and the test-describe block is titled "preserves error shapes (contract...)". The test itself uses substring containment (`toContain`) against the mounted-command path only — it exercises one `runCli(['roadmap', 'advance', ...])` invocation and never runs the flat `runRoadmapCli` path to diff the two outputs. So the byte-identical guarantee rests entirely on source inspection (both sites interpolating the same constant), not on a test that runs both paths and compares.
+
+Blast-radius: none today — the structural single-sourcing does make the two messages identical by construction, and `toContain` is the right altitude for a shape-preservation contract test. Flagging only so the operator is aware the "byte-identical" wording is a construction guarantee, not an asserted one; if a true equivalence guarantee is wanted, a test that captures both paths' stderr and asserts equality would close the gap. No change required.
+
+---
+
+**Summary for triage:** The diff is a small, well-reasoned test-hardening commit. The `KNOWN_SUBACTIONS` single-sourcing (hunk 1) is correct and verified against source — not the brittle array-`.toString()` coupling it might appear to be, since the constant is a literal string. My only substantive note is AUDIT-BARRAGE-claude-01 (loss of an independent concrete-member assertion); claude-02 is a consistency observation; claude-03 is context. Nothing here is blocking or high.
+
+### AUDIT-20260619-08 — Unknown-flag test no longer pins the `roadmap:` prefix it claims to protect
+
+Finding-ID: AUDIT-20260619-08
+Status: migrated-to-backlog TASK-271
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/cli/parser-adapter.test.ts:134-142
+
+The changed assertion strengthens the diagnostic text for `--bogus`, but it drops the explicit `expect(r.stderr).toContain('roadmap:')` check while the test name still says it verifies “the roadmap: message shape.” A regression like `error: unknown flag --bogus for 'advance'` would now pass line 141 and line 142, even though the mounted command would no longer preserve the flat dispatcher’s `roadmap:` prefix.
+
+Blast radius is low because this is a test-only hardening gap, not a runtime defect in the audited diff. It still matters because this feature is specifically about preserving usage-error shapes; the reasonable fix is to keep line 141 and also assert the full prefixed diagnostic, e.g. `roadmap: unknown flag --bogus for 'advance'`, or add a separate prefix assertion.
