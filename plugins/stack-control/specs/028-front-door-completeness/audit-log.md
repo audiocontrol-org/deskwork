@@ -2306,3 +2306,277 @@ Both live paths derive the read-only exemption only after resolving active marke
 That means a read-only fronted query such as `backlog list` can still fail closed or crash when the session marker is corrupt, even though FR-050 says read-only query ops are mediation-exempt. The blast radius is high because an adopter can hit this on a normal read-only inspection command while trying to understand or recover marker state; the exemption is present in the pure decision core but not actually protected from marker-read failures on the live paths.
 
 A reasonable fix is to derive `mediationClassForIdentity(surface, identity)` before resolving active marker state, and skip `resolveActive` entirely when the class is `read-only`. Mutating fronted calls should keep the current strict marker read and fail-closed behavior.
+
+## 2026-06-19 — audit-barrage lift (20260619T222105228Z-028-front-door-completeness-phase-5)
+
+### AUDIT-20260619-137 — FR-020 no-installation short-circuit not provably wired in the production `stackctl intercept` handler
+
+Finding-ID: AUDIT-20260619-137
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/capability/intercept.ts:28-35 (`InterceptDeps`), cross-referenced against the absent `stackctl intercept` CLI entry point
+
+`InterceptDeps.resolveInstalled` is newly added in this diff as an **optional** field with a `?? true` default:
+
+```typescript
+export interface InterceptDeps {
+  readonly resolveActive: (cwd: string, session: string) => ReadonlySet<string>;
+  readonly resolveInstalled?: (cwd: string) => boolean;  // ← new, optional
+  readonly registry?: CapabilityRegistry;
+}
+```
+
+The diff adds the FR-020 no-installation short-circuit to `interceptDecision` and gates it on `deps.resolveInstalled?.(cwd) ?? true`. The `?? true` fallback exists for back-compat — callers that don't supply `resolveInstalled` silently opt out of FR-020 and behave as though an installation always exists.
+
+This diff does **not** show the production `stackctl intercept` CLI entry point (the handler that `bin/intercept` invokes via `"$STACKCTL" intercept`) being updated to supply `resolveInstalled`. Because the field is optional, TypeScript will not flag the omission. If the handler was authored before this diff and constructs `InterceptDeps` with only `resolveActive`, `installed` defaults to `true` on every hook invocation, meaning:
+
+- A mutating backend call (e.g., `backlog capture`) from a directory with no stack-control installation would resolve active capabilities as empty (correct — no marker) but **then refuse** rather than short-circuiting to permit.
+- This breaks the FR-020 contract ("a refusal implies an installation exists, so the `stackctl setup` redirect is always satisfiable") on the primary enforcement path (the PreToolUse hook).
+- Read-only identities (`backlog list`) would still pass via the FR-050 read-only exemption, so the failure only manifests on mutating ops.
+
+The counterpart path (`mediate-check`) is correctly updated: `runMediateCheck` explicitly supplies `defaultResolveInstalled`. That asymmetry is the evidence the hook path may not have received the same update. A reasonable fix is to make `resolveInstalled` **required** in `InterceptDeps` (forcing every callsite to audit), or to add an integration test that exercises `stackctl intercept` end-to-end from a non-installed directory with a mutating identity and asserts exit 0.
+
+---
+
+### AUDIT-20260619-138 — `cwd-linchpin-reconcile.test.ts` T1 test uses a read-only identity — T1 and T2 are not isolated
+
+Finding-ID: AUDIT-20260619-138
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/capability/cwd-linchpin-reconcile.test.ts:49-62
+
+The test named `'a cwd that LEFT the installation permits via the no-installation short-circuit (never silent refuse)'` asserts that `mediateCheck` with `--at /` (no installation) returns `code: 0`. The identity under test is `backlog list`:
+
+```typescript
+const r = mediateCheck(
+  ['--surface', 'bash', '--identity', 'backlog list', '--session', 'sess', '--at', '/'],
+  liveDeps(),
+);
+expect(r.code).toBe(0);
+```
+
+`backlog list` is a **read-only** identity. The test name claims the permit comes from the no-installation short-circuit (T1 / FR-020). But the identical `permit` verdict would be produced by the FR-050 read-only exemption (T2) even if T1 were completely broken — because the read-only path returns early without consulting `resolveInstalled` at all. If someone regresses T1 while T2 remains intact, this test stays green, giving false confidence that FR-020 is working on the `mediate-check` path.
+
+A precise T1 test needs a **mutating** identity (`backlog capture`, `backlog create`, or similar) paired with `resolveInstalled: () => false`. The result should be `code: 0` (permit), which can only be explained by T1, not T2. Without that test, T1 in `mediateCheck` is tested only via `mediate-check-no-installation-permit.test.ts` (which uses mocked deps, not the live resolver chain `liveDeps()` exercises here).
+
+---
+
+### AUDIT-20260619-139 — `interceptDecision` has no unit test for the no-installation short-circuit with a mutating identity
+
+Finding-ID: AUDIT-20260619-139
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/capability/intercept-cold-start-zero-io.test.ts (absent coverage)
+
+`interceptDecision` now contains FR-020 logic (lines ~90-98 of the new `intercept.ts`):
+
+```typescript
+const installed = deps.resolveInstalled?.(cwd) ?? true;
+if (!installed) {
+  return { verdict: 'permit', capability: null, reason: 'no stack-control installation ...' };
+}
+```
+
+None of the tests in `intercept-cold-start-zero-io.test.ts` supply `resolveInstalled` — the `countingResolver` provides only `resolveActive`. Every call therefore hits `?? true` and the no-installation branch is **never exercised** through `interceptDecision` in this diff's test suite. The cold-start zero-IO tests verify the read-only / non-backend paths; `cwd-linchpin-reconcile.test.ts` exercises `mediateCheck`, not `interceptDecision`.
+
+The missing test shape:
+
+```typescript
+it('permits a mutating backend with NO installation (FR-020)', () => {
+  const d = interceptDecision(
+    { tool_name: 'Bash', tool_input: { command: 'backlog capture --type bug' }, session_id: 's', cwd: '/x' },
+    {
+      resolveInstalled: () => false,
+      resolveActive: () => new Set(['backlog']), // irrelevant — should not be reached
+    },
+  );
+  expect(d.verdict).toBe('permit');
+  expect(d.reason).toMatch(/no stack-control installation/);
+});
+```
+
+Without this test the FR-020 code path in `interceptDecision` has zero coverage. Combined with the concern in AUDIT-BARRAGE-claude-01, if the production handler doesn't wire `resolveInstalled`, the gap is invisible at CI time.
+
+---
+
+### AUDIT-20260619-140 — `runSpeckitGuard` calls `findInstallation` twice, creating a TOCTOU window
+
+Finding-ID: AUDIT-20260619-140
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/speckit-guard.ts:111-119 (`runSpeckitGuard`)
+
+```typescript
+const viaFrontDoor = resolveViaFrontDoorFile(skill, session, cwd);  // findInstallation(cwd) ← call 1
+const installed = findInstallation(cwd) !== null;                    // ← call 2
+const verdict = evaluateGuard(skill, viaFrontDoor, installed);
+```
+
+`resolveViaFrontDoorFile` internally calls `findInstallation(cwd)` and `runSpeckitGuard` immediately calls it again. Between the two calls, the installation directory could appear or vanish (e.g., a concurrent `stackctl setup` or a filesystem unmount). The failure modes are bounded:
+
+- `viaFrontDoor = true`, `installed = false` (installation disappeared between calls): `evaluateGuard` returns `{ refused: false }` via the no-installation path — a harmless (safe-side) over-permit of what was a legitimately marked drive.
+- `viaFrontDoor = false`, `installed = true` (installation appeared between calls): `evaluateGuard` calls `evaluateRefusal(skill, false)` — an over-strict refuse of what is now a legitimate context.
+
+The simpler fix is to resolve the installation once and thread it:
+
+```typescript
+const installation = findInstallation(cwd);
+const installed = installation !== null;
+const viaFrontDoor = installed ? activeCapabilities(installation.root, session).has(capabilityForSkill(skill) ?? '') : false;
+```
+
+Severity is low because the TOCTOU window is tiny and both failure modes are recoverable (re-invocation). But the double `findInstallation` is also a readability smell — two probes for the same fact with no comment explaining the duplication.
+
+### AUDIT-20260619-141 — `reset` alias is not represented in the command surface
+
+Finding-ID: AUDIT-20260619-141
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/front-door.ts:59-70; missing update in src/cli-help/surfaces/capability.ts:52-57
+
+`frontDoor` now accepts `reset` as a true alias for `mediate-recover` by adding it to `SUBACTIONS` and normalizing it before dispatch. The mounted command-surface metadata for `front-door`, however, still declares only `enter`, `exit`, `mediate-list`, and `mediate-recover`; it does not include `reset` or a mutating mediation class for that alias.
+
+This matters because feature 028 is explicitly about front-door completeness and command-surface accuracy. A downstream consumer reading generated help / descriptor output will not see a shipped alias that the parser accepts. The fix is to add the `reset` subcommand/alias to the command-surface declaration, with the same mutating classification and description as `mediate-recover`.
+
+### AUDIT-20260619-142 — `speckit-guard` can crash on a corrupt marker instead of producing a controlled refusal
+
+Finding-ID: AUDIT-20260619-142
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/speckit-guard.ts:47-58; src/capability/marker.ts:103-121,228-236
+
+`resolveViaFrontDoorFile` calls `activeCapabilities(installation.root, session)` directly. That read path is intentionally strict: `readMarker` throws on invalid JSON or malformed marker contents. `runSpeckitGuard` does not catch that exception before calling `evaluateGuard`, so a corrupt marker makes the deprecated but still shipped guard terminate with an uncaught stack trace rather than the normal refusal message.
+
+The blast radius is limited to the deprecated `speckit-guard` path, so this is not high, but it is still a real recovery-path defect: this feature adds marker recovery specifically so sessions are not wedged by corrupt marker state. A reasonable fix is to catch marker-read errors in the guard resolver and treat them as not-via-front-door, or return a typed diagnostic that `runSpeckitGuard` renders as a controlled refusal with a recovery hint.
+
+## 2026-06-19 — audit-barrage lift (20260619T222831002Z-028-front-door-completeness-phase-5)
+
+### AUDIT-20260619-143 — Production `resolveInstalled` wiring absent from interceptor path — FR-020 broken on live hook
+
+Finding-ID: AUDIT-20260619-143
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/capability/intercept.ts:88-97 + src/subcommands/mediate-check.ts:110-117
+
+`InterceptDeps.resolveInstalled?` is optional and defaults to `?? true` in `interceptDecision` (line ~88). `mediateCheck`'s production runner (`runMediateCheck`) was correctly updated to supply `defaultResolveInstalled`. But no equivalent update to the interceptor's production runner (presumably `src/subcommands/intercept.ts` → `runIntercept`) is visible in this diff.
+
+If `runIntercept` was not updated, the production hook path defaults to `installed = true` on every call, meaning the FR-020 no-installation short-circuit never fires. A user running `backlog create` outside any stack-control installation would get refused (the marker is empty → `decideMediation` refuses the mutating op) instead of permitted. The `stackctl setup` redirect in the refusal message would be a dead end. This contradicts the specification and is a silent behavior regression — the exemption works correctly on `mediate-check` but fails silently on the live `PreToolUse` hook.
+
+The asymmetry is visible: `mediate-check.ts` was updated to wire `defaultResolveInstalled`, the `InterceptDeps` interface was updated to accept `resolveInstalled`, but no production-side caller update for the interceptor is in the diff. The tests in `intercept-cold-start-zero-io.test.ts` use `countingResolver()` which omits `resolveInstalled` entirely, so they exercise only the `?? true` fallback and provide no coverage of the production wiring gap.
+
+---
+
+### AUDIT-20260619-144 — "Short-circuit before `resolveActive`" test uses a read-only identity — no-installation guard is not actually pinned
+
+Finding-ID: AUDIT-20260619-144
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/subcommands/mediate-check-no-installation-permit.test.ts:51-61
+
+The test `'does NOT resolve the marker when there is no installation (short-circuit before decideMediation)'` (lines 51-61) asserts that `resolveActive` is never called when `resolveInstalled` returns false — but uses `backlog list` (a read-only identity) as the test input.
+
+The read-only exemption (FR-050) independently prevents any `resolveActive` call for `backlog list` regardless of the installation status. This means the test passes whether or not the `isFronted && !installed` early-return block exists in `mediateCheck`. Removing that block entirely would leave all other assertions in this file green, including this one, because the read-only exemption would still short-circuit the marker read.
+
+The correct identity to pin the no-installation guard is a **mutating** fronted call (e.g., `backlog create` or `backlog capture --type bug`): with `resolveInstalled=false`, `resolveActive` must not be called; with `resolveInstalled=true` and an empty marker, `resolveActive` must be called and the call must refuse. As written, the test cannot distinguish the two code paths it claims to discriminate.
+
+---
+
+### AUDIT-20260619-145 — Linchpin reconcile (FR-023) tested for `mediateCheck` only — `interceptDecision` production path uncovered
+
+Finding-ID: AUDIT-20260619-145
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/capability/cwd-linchpin-reconcile.test.ts + src/capability/intercept.ts:107-111
+
+`cwd-linchpin-reconcile.test.ts` exercises the linchpin reconcile — that a cwd drift within the installation still resolves the same root — via `mediateCheck` and `liveDeps()` (which correctly calls `findInstallation(at)?.root` before `activeCapabilities`). There is no parallel test that calls `interceptDecision` through a `liveDeps`-style resolver that exercises the same scenario.
+
+In `interceptDecision` (line ~107), `deps.resolveActive(cwd, session)` is called with the raw cwd. The production `resolveActive` for the interceptor must internally resolve the installation root (the same `findInstallation(at)?.root` pattern `defaultResolveActive` in `mediate-check.ts` follows) for the linchpin reconcile to hold. If the production interceptor's `resolveActive` passes raw cwd directly to `activeCapabilities(cwd, session)` without root resolution, a `front-door enter` at the installation root followed by a backend call from a subdirectory would be refused — exactly the scenario FR-023 is meant to permit.
+
+The production wiring of `InterceptDeps.resolveActive` is not shown in this diff, and no test exercises `interceptDecision` with a subdir cwd and a root-written marker. The gap is doubly exposed if Finding claude-01 is also present: the interceptor's production deps are not visible in this audit.
+
+---
+
+### AUDIT-20260619-146 — `skill-marker-example-authorizes.test.ts` ILLUSTRATIONS list requires manual maintenance
+
+Finding-ID: AUDIT-20260619-146
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/__tests__/capability/skill-marker-example-authorizes.test.ts:38-43
+
+The `ILLUSTRATIONS` array is hardcoded to four entries (`backlog`, `define`, `extend`, `execute`). Any new capability-interface skill added to `plugins/stack-control/skills/` with a `front-door enter --capability` example block will not be covered by this test unless the list is manually extended.
+
+The failure mode is the one the test was designed to prevent: a skill whose documented `--capability` example does not authorize the backend call it illustrates. A newly added `roadmap` or `inbox` skill could ship a wrong capability name in its example and this test would not catch it. An automated discovery approach — glob the skills directory for SKILL.md files, extract `front-door enter --capability` blocks, and assert each maps to a known registry capability — would make the test self-updating and eliminate the manual-maintenance burden.
+
+---
+
+### AUDIT-20260619-147 — `failOpenSignal` is production-unreachable — spawn failures happen before TypeScript starts
+
+Finding-ID: AUDIT-20260619-147
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/capability/intercept.ts:119-133
+
+`failOpenSignal(reason)` is documented in its inline comment as the "vendor-neutral, test-pinned SPECIFICATION of the shell adapter's notice content" — it is explicitly not called from the shell adapter (`bin/intercept`). A spawn failure (stackctl not executable) happens before the TypeScript interpreter runs, so the shell handles it with its own stderr notice. `failOpenSignal` exists to (a) be called by tests that assert the load-bearing phrases, and (b) serve as a reference for future non-shell adapters.
+
+The design is intentional and the comment describes it clearly. The practical consequence is that `failOpenSignal` is a dead function in the shipped binary — it is exported, compiled, and linked, but no production code path calls it. The only caller is `intercept-fail-open-signal.test.ts`. A future maintainer who sees `failOpenSignal` unused in production might remove it, breaking the contract test. The current approach is coherent but the single-source-of-truth value would be better served by an inline constant (the required phrases as `const REQUIRED_PHRASES`) rather than a function with a call signature that implies it has a production call site. This is a design note, not a defect.
+
+### AUDIT-20260619-148 — `reset` alias is accepted by the CLI but missing from the command surface
+
+Finding-ID: AUDIT-20260619-148
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/front-door.ts:59-70; src/cli-help/surfaces/capability.ts:48-57
+
+`frontDoor` accepts `reset` as a real subaction and normalizes it to `mediate-recover` (`SUBACTIONS` includes `reset`), but the command-surface descriptor only declares `enter`, `exit`, `mediate-list`, and `mediate-recover`. The descriptor is explicitly the source for help, verb reference, and mediation metadata, so this creates a drifted accepted operation that descriptor-driven tooling will not enumerate or validate.
+
+Blast radius is medium: the primary recovery path still works via `mediate-recover`, but an operator or unattended checker using the command surface will conclude `reset` is not part of the accepted API even though the parser accepts it. A reasonable fix is to either remove the parser alias or model `reset` as a deprecated alias in the command surface so generated help/checks and accepted syntax agree.
+
+### AUDIT-20260619-149 — `mediate-recover` can fail on a corrupt marker directory despite claiming one-command recovery
+
+Finding-ID: AUDIT-20260619-149
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/capability/marker.ts:300-305; src/subcommands/front-door.ts:110-124
+
+`clearMarker` deletes the marker path with `rmSync(path, { force: true })`. If the marker path exists as a directory rather than a file, `listMarker` reports it as corrupt through the tolerant read path, but `mediate-recover` will throw instead of clearing it because `rmSync` lacks `recursive: true`. `frontDoor` documents and implements the recovery branch as “Always exit 0” and “recovers even a corrupt marker in one command,” but this corrupt filesystem shape wedges that path.
+
+Blast radius is medium: this requires a malformed state path, but recovery surfaces exist specifically to handle malformed marker state. A reasonable fix is to make `clearMarker` deliberately handle non-file marker paths under the already session-safe marker location, or return a diagnosable result that the CLI renders instead of letting the dispatcher catch an unclassified exception.
+
+### AUDIT-20260619-150 — `speckit-guard` crashes on corrupt marker state instead of rendering the guard contract
+
+Finding-ID: AUDIT-20260619-150
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/speckit-guard.ts:47-58; src/cli.ts:221-224
+
+`resolveViaFrontDoorFile` now reads the session marker through `activeCapabilities`, but it does not catch malformed-marker errors. A corrupt marker therefore bubbles to the top-level CLI catch, which prints only the raw error and exits 1. That differs from the guard’s stated contract of rendering a permit/refusal verdict for wrapped skills, and it gives no recovery hint even though this feature adds `front-door mediate-list` / `mediate-recover` for exactly this marker state.
+
+Blast radius is medium: this affects the deprecated guard and only under corrupt marker state, but downstream users still see an exit-1 failure indistinguishable from a policy refusal by exit code and without the sanctioned front-door/recovery message. A reasonable fix is for `resolveViaFrontDoorFile` or `runSpeckitGuard` to catch marker corruption and render a diagnosable refusal/recovery message instead of falling into the generic dispatcher catch.
