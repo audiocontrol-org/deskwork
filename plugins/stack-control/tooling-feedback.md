@@ -89,3 +89,7 @@
 
 ## session-end 2026-06-19
 - 027 implementation was dominated by govern TOOLING friction, not feature code: ~9 barrage runs for 2 of 6 phases + 4 overrides. Three compounding causes — (1) shared-file checkpoint staleness: any fix touching roadmap.ts re-staled earlier phases, forcing repeated re-governance (O(n^2)); (2) audit-barrage severity NON-DETERMINISM: HIGH oscillated 2->0->2 and LOW->HIGH on identical unchanged code, defeating the convergence dampener; (3) per-phase scoping excludes a file split out during implementation (cluster.ts) from its own audit payload, so the no-grounding claude lane raised FALSE HIGHs it could not disconfirm. Tracked: multi:gap/govern-per-phase-friction-burndown + TASK-289/263. Key win: the fast no-grounding claude lane (--disallowedTools, replacing --permission-mode plan) made the fleet reliably COMPLETE (167s vs >300s timeout) and restored cross-model agreement.
+
+## session-end 2026-06-19
+- stackctl backlog has no sanctioned status/close/Done verb, and the Backlog.md backend is mediated (026 interceptor refuses direct CLI) — so a completed backlog item (TASK-295) cannot be closed through the interface. Captured as TASK-297.
+- govern's advisory clone-step aborted govern on any non-TS adopter repo (hardcoded jscpd --format typescript,tsx; zero files -> no report -> throw). Customer-blocking (TASK-295/#487). Fixed non-fatal-on-zero-files; the advisory step should arguably have been non-fatal from the start.
