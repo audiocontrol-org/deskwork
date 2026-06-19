@@ -18,7 +18,6 @@ import {
   buildSection,
   edgeTargets,
   reassemble,
-  rewriteEdgeLine,
   unitBodyLines,
 } from './mutations.js';
 
@@ -34,24 +33,43 @@ export interface ClusterInput {
   readonly summary?: string;
 }
 
-/** Add `target` to an existing edge target list, deduplicating an exact match. */
-function withTarget(existing: readonly string[], target: string): string[] {
-  return existing.includes(target) ? [...existing] : [...existing, target];
-}
-
 /**
- * Append (or set) `field: <target>` on a unit body. When the edge line already
- * exists its target list gains `target` (exact-duplicate is a no-op); otherwise a
- * new edge line is inserted directly after the heading (body line 0). This is the
- * multi-parent `part-of` append (FR-009) and the per-child `depends-on` wiring.
+ * Append `field: <target>` on a unit body. When the edge already exists its target
+ * list gains `target` (multi-parent `part-of`, FR-009; `depends-on` wiring);
+ * otherwise a new edge line is inserted directly after the heading (body line 0).
+ *
+ * The document engine MERGES repeated edge-field lines (a unit may carry two
+ * `- part-of:` lines), so the dedup + append operate on the AGGREGATE target set
+ * across every matching line, and a fresh target is appended to ONLY the first
+ * matching line. Rewriting every line independently (the prior behavior) re-added
+ * the target to each line and produced a duplicate in the merged edge list,
+ * breaking the exact-duplicate no-op + idempotency (AUDIT-BARRAGE-codex-02).
  */
 function appendEdge(body: readonly string[], field: string, target: string): string[] {
   const fieldRe = new RegExp(`^\\s*[-*]\\s+${field}\\s*:`, 'i');
-  if (body.some((line) => fieldRe.test(line))) {
-    return rewriteEdgeLine(body, field, (targets) => withTarget(targets, target));
+  const lineRe = new RegExp(`^(\\s*[-*]\\s+${field}\\s*:\\s*)(.*)$`, 'i');
+  const parseTargets = (line: string): string[] => {
+    const m = lineRe.exec(line);
+    const captured = m === null ? undefined : m[2];
+    return captured === undefined
+      ? []
+      : captured.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+  };
+  const firstIdx = body.findIndex((line) => fieldRe.test(line));
+  if (firstIdx < 0) {
+    const out = [...body];
+    out.splice(1, 0, `- ${field}: ${target}`);
+    return out;
   }
+  // Exact duplicate ANYWHERE in the unit's field lines → no-op.
+  const aggregate = body.filter((line) => fieldRe.test(line)).flatMap(parseTargets);
+  if (aggregate.includes(target)) return [...body];
+  const first = body[firstIdx];
+  const m = first === undefined ? null : lineRe.exec(first);
+  const prefix = m === null ? undefined : m[1];
+  if (first === undefined || prefix === undefined) return [...body]; // unreachable
   const out = [...body];
-  out.splice(1, 0, `- ${field}: ${target}`);
+  out[firstIdx] = `${prefix}${[...parseTargets(first), target].join(', ')}`;
   return out;
 }
 
@@ -68,13 +86,15 @@ function chainPredecessor(
   index: number,
 ): string | null {
   if (index === 0) return null;
-  const predecessor = children[index - 1]!;
-  const childUnit = findUnit(doc, children[index]!);
+  const predecessor = children[index - 1];
+  const childId = children[index];
+  if (predecessor === undefined || childId === undefined) return null; // unreachable: index in [1, len)
+  const childUnit = findUnit(doc, childId);
   if (childUnit === undefined) return predecessor; // existence already validated
   const existing = edgeTargets(childUnit, 'depends-on');
   if (existing.length > 0 && !existing.includes(predecessor)) {
     throw new DocumentModelError(
-      `cluster --chain: '${children[index]!}' already depends-on [${existing.join(', ')}], ` +
+      `cluster --chain: '${childId}' already depends-on [${existing.join(', ')}], ` +
         `which conflicts with the chain predecessor '${predecessor}' — refusing to overwrite a recorded dependency`,
     );
   }

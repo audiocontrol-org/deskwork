@@ -152,16 +152,23 @@ function addInputFrom(flags: Flags): AddInput {
   if (identifier === undefined) failUsage('roadmap', 'add requires an <identifier> positional');
   const v = flags.values;
   const dependsOn = v.get('depends-on');
-  const partOf = v.get('part-of');
+  const partOfRaw = v.get('part-of');
+  const partOf =
+    partOfRaw === undefined
+      ? undefined
+      : partOfRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+  // A present-but-empty `--part-of` (e.g. `--part-of ,`) is a malformed grouping
+  // flag, NOT "no parent": fail loud rather than silently dropping the edge and
+  // reporting a successful, ungrouped add (AUDIT-BARRAGE-codex-01).
+  if (partOf !== undefined && partOf.length === 0) {
+    failUsage('roadmap', 'add: --part-of was given but lists no parent id');
+  }
   return {
     identifier,
     status: v.get('status'),
     scope: v.get('scope'),
     dependsOn: dependsOn === undefined ? undefined : dependsOn.split(',').map((s) => s.trim()),
-    partOf:
-      partOf === undefined
-        ? undefined
-        : partOf.split(',').map((s) => s.trim()).filter((s) => s.length > 0),
+    partOf,
     deferredUntil: v.get('deferred-until'),
     spec: v.get('spec'),
     ref: v.get('ref'),

@@ -13,7 +13,7 @@ import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCli } from '../../src/__tests__/_run-helpers.js';
-import { loadRoadmap } from '../../src/roadmap/roadmap-model.js';
+import { loadRoadmap, type RoadmapModel } from '../../src/roadmap/roadmap-model.js';
 import { fixturePath, ROADMAP_OPTS, writeTempRoadmap } from './helpers.js';
 
 function tmpCopy(name: string): string {
@@ -23,11 +23,17 @@ function tmpCopy(name: string): string {
   return docPath;
 }
 
+/** Get a roadmap item or throw — keeps assertions cast-free (no `!`). */
+function item(model: RoadmapModel, id: string): RoadmapModel['items'][number] {
+  const it = model.byId.get(id);
+  if (it === undefined) throw new Error(`expected roadmap item '${id}'`);
+  return it;
+}
+
 describe('027 T010 — roadmap cluster', () => {
-  it('create-NEW parent + --chain: wires part-of on each child and depends-on a→b→c', () => {
+  it('create-NEW parent + part-of on each child; --chain on an already-satisfied dep is a no-op (no duplicate)', () => {
     // chain fixture: design:feature/a (shipped), impl:feature/b (planned, dep a),
-    // impl:feature/c (planned, dep b). We cluster b + c under a brand-new parent
-    // and chain them. The new parent must be created `planned`.
+    // impl:feature/c (planned, dep b). We cluster b + c under a brand-new parent.
     const docPath = tmpCopy('chain');
     const r = runCli([
       'roadmap', 'cluster', 'multi:feature/grp',
@@ -38,15 +44,16 @@ describe('027 T010 — roadmap cluster', () => {
     ]);
     expect(r.status).toBe(0);
     const model = loadRoadmap(docPath, ROADMAP_OPTS);
-    const parent = model.byId.get('multi:feature/grp');
-    expect(parent).toBeDefined();
-    expect(parent!.status).toBe('planned');
-    // Each child is grouped under the new parent.
-    expect(model.byId.get('impl:feature/b')!.partOf).toContain('multi:feature/grp');
-    expect(model.byId.get('impl:feature/c')!.partOf).toContain('multi:feature/grp');
-    // --chain wires depends-on in argument order: b → c (c depends on b). c already
-    // depended on b in the fixture, so this is a no-op-consistent edge, not a conflict.
-    expect(model.byId.get('impl:feature/c')!.dependsOn).toContain('impl:feature/b');
+    // The new parent is created `planned` (falsifiable: the id did not exist before).
+    expect(item(model, 'multi:feature/grp').status).toBe('planned');
+    // Each child is grouped under the new parent (falsifiable: the edge was added).
+    expect(item(model, 'impl:feature/b').partOf).toContain('multi:feature/grp');
+    expect(item(model, 'impl:feature/c').partOf).toContain('multi:feature/grp');
+    // c already depended on b in the fixture; --chain wiring b→c is a no-op-consistent
+    // edge — it must NOT duplicate the dependency (falsifiable: a chain that re-added
+    // `b` would make this 2). The fresh-children test below proves chain ADDS edges.
+    const cDepsB = item(model, 'impl:feature/c').dependsOn.filter((d) => d === 'impl:feature/b');
+    expect(cDepsB).toHaveLength(1);
   });
 
   it('--chain wires depends-on in argument order over fresh children (b→c→d)', () => {
@@ -139,9 +146,38 @@ describe('027 T010 — roadmap cluster', () => {
       '--doc', docPath, '--apply',
     ]);
     expect(r.status).toBe(0);
-    const child = loadRoadmap(docPath, ROADMAP_OPTS).byId.get('impl:feature/b')!;
     // The edge is listed exactly once — no duplicate target.
-    expect(child.partOf.filter((p) => p === 'multi:feature/p1').length).toBe(1);
+    const child = item(loadRoadmap(docPath, ROADMAP_OPTS), 'impl:feature/b');
+    expect(child.partOf.filter((p) => p === 'multi:feature/p1')).toHaveLength(1);
+  });
+
+  it('multi-LINE part-of: dedup is across BOTH lines; a new parent lands once (codex-02)', () => {
+    // The document engine merges repeated `- part-of:` lines. A child carrying two
+    // of them must dedup against the AGGREGATE: re-clustering under a parent already
+    // present (on the 2nd line) is a no-op, and a NEW parent must be appended to
+    // ONE line only — never re-added to each line (which duplicated the target).
+    const docPath = writeTempRoadmap([
+      '## multi:feature/p1',
+      '- status: planned',
+      '',
+      '## multi:feature/p2',
+      '- status: planned',
+      '',
+      '## impl:feature/b',
+      '- status: planned',
+      '- part-of: multi:feature/p1',
+      '- part-of: multi:feature/p2',
+    ]);
+    // (a) clustering under p2 (already present on the 2nd line) → no duplicate.
+    const dup = runCli(['roadmap', 'cluster', 'multi:feature/p2', '--children', 'impl:feature/b', '--doc', docPath, '--apply']);
+    expect(dup.status).toBe(0);
+    const afterDup = item(loadRoadmap(docPath, ROADMAP_OPTS), 'impl:feature/b');
+    expect(afterDup.partOf.filter((p) => p === 'multi:feature/p2')).toHaveLength(1);
+    // (b) a NEW parent (p3, created) appears exactly once across the merged list.
+    const add = runCli(['roadmap', 'cluster', 'multi:feature/p3', '--children', 'impl:feature/b', '--doc', docPath, '--apply']);
+    expect(add.status).toBe(0);
+    const afterAdd = item(loadRoadmap(docPath, ROADMAP_OPTS), 'impl:feature/b');
+    expect(afterAdd.partOf.filter((p) => p === 'multi:feature/p3')).toHaveLength(1);
   });
 
   it('dry-run default writes NOTHING; --apply performs the write', () => {

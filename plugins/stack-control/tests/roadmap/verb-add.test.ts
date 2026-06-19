@@ -147,4 +147,19 @@ describe('stackctl roadmap add verb (T025)', () => {
     expect(r.status).toBe(2);
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
+
+  it('a present-but-empty --part-of (`--part-of ,`) → exit 2, zero write (codex-01)', () => {
+    // The partOf widening comma-splits + filters empties; a malformed grouping flag
+    // must fail loud, not silently drop the edge and report a successful add.
+    const docPath = tmpCopy('chain');
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'roadmap', 'add', 'impl:gap/z',
+      '--part-of', ',',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('--part-of was given but lists no parent id');
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
 });
