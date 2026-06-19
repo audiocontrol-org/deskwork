@@ -686,3 +686,1183 @@ Surface:    tests/roadmap/help-surface.test.ts:21-32
 The test name and feature contract require `roadmap --help` / `-h` to list every subaction “with a summary,” but the assertion only checks that each subaction string appears somewhere in stdout, then checks two global prose fragments (`list the ready`, `dry-run unless --apply`). This would pass if most subactions were merely listed in a usage enum with no individual summary lines, which is exactly the self-documenting surface this feature is supposed to protect.
 
 Blast radius is low because this is a test-quality gap around documentation/help completeness, not a parser correctness issue. A tighter test would parse the help table rows and assert one row per `SUBACTION_SPECS` key with non-empty summary text, instead of using broad substring checks.
+
+## 2026-06-19 — audit-barrage lift (20260619T025209477Z-027-roadmap-edge-mutation-and-cluster-phase-2)
+
+### AUDIT-20260619-27 — `EXPECTED_SUBACTIONS` does not include `group`, so "full subaction set" assertion is false after Phase 4
+
+Finding-ID: AUDIT-20260619-27
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/cli/parser-adapter.test.ts:32-36, 99-108
+
+`EXPECTED_SUBACTIONS` enumerates 12 subactions (`next`, `blocked`, `blocks`, `order`, `graph`, `add`, `advance`, `decompose`, `reclassify`, `defer`, `reconcile`, `close-related`) and the describe label at line 99 claims this exercises "the full subaction set." Phase 4 (commit `0737431f`, T010-T015) adds a `group` verb. Because `tests/cli/parser-adapter.test.ts` is a new file whose full content is in this diff, `group` was never added. The test that checks `registered.toContain(sub)` for each entry in `EXPECTED_SUBACTIONS` will not catch a future regression where `group` is dropped from the commander mount, because `group` is never in the loop. Worse: if `KNOWN_SUBACTIONS` (imported at line 27 and used for the error-message assertion at line 130) already includes `group`, the error-message test pins `group` in the known list while the registration test does not check that `group` is actually mounted — a logical gap where the CLI could advertise `group` as known but fail to route it, and this test suite would stay green. Adding `'group'` to `EXPECTED_SUBACTIONS` and deriving both arrays from `KNOWN_SUBACTIONS` (see finding -03) closes both gaps at once.
+
+---
+
+### AUDIT-20260619-28 — `non-regression.test.ts` has no case for the `group` subaction
+
+Finding-ID: AUDIT-20260619-28
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/roadmap/non-regression.test.ts (entire file)
+
+The non-regression suite covers every subaction that existed through Phase 2 (`next`, `blocked`, `blocks`, `order`, `graph`, `add`, `advance`, `decompose`, `reclassify`, `defer`, `reconcile`, `close-related`) but has no `it` block for `group`, which Phase 4 (T010-T015) introduces. As a new file whose complete content is visible in this diff, the absence is unambiguous — Phase 4 did not add a `group` case. The non-regression file's stated purpose is a regression guard for the commander-mount surface; a new verb exercised nowhere in that guard means Phase 4's `group` verb could silently break (wrong exit code, wrong dry-run / --apply semantics, wrong `--doc` threading) without this suite catching it. A representative `group` invocation mirroring the style of the other 12 cases is the fix.
+
+---
+
+### AUDIT-20260619-29 — `EXPECTED_SUBACTIONS` is a local duplicate of the imported `KNOWN_SUBACTIONS`
+
+Finding-ID: AUDIT-20260619-29
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/cli/parser-adapter.test.ts:32-37 and line 27
+
+`KNOWN_SUBACTIONS` is imported from `../../src/subcommands/roadmap.js` at line 27 and used for the error-message assertion at line 130 (`(known: ${KNOWN_SUBACTIONS})`). At lines 32-37, a separate local constant `EXPECTED_SUBACTIONS` enumerates what should be an identical list for the registration check. These two lists can drift independently: if a new subaction is added to the source-of-truth `KNOWN_SUBACTIONS`, the error-message test automatically reflects it while the registration check does not (finding -01 demonstrates this already happened with `group`). The fix is to drop `EXPECTED_SUBACTIONS` and drive the registration loop from `KNOWN_SUBACTIONS` directly, making the two checks share one source of truth.
+
+---
+
+### AUDIT-20260619-30 — Describe block labels T003 for behavior that is T004's deliverable
+
+Finding-ID: AUDIT-20260619-30
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/cli/parser-adapter.test.ts:99
+
+The describe block at line 99 reads `'027 T003 — buildRoadmapCommand mounts the full subaction set onto commander'`. The file header (lines 1-14) is explicit that these tests are "RED until T004 mounts roadmap onto commander" — so T003 writes the tests, T004 delivers the implementation. The describe label claiming T003 owns the mount behavior is misleading to a future reader auditing which task is responsible for what surface, and makes it harder to trace a regression back to the implementing task. Changing the label to `T004` or `T003/T004` (RED-first by T003, GREEN by T004) accurately reflects the authorship split described in the header.
+
+---
+
+### AUDIT-20260619-31 — `runCli` `cwd` option in `reconcile` test is unverifiable from this diff
+
+Finding-ID: AUDIT-20260619-31
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/non-regression.test.ts:154
+
+Line 154 passes `{ cwd: baseDir }` as a second argument to `runCli`:
+
+```typescript
+const r = runCli(['roadmap', 'reconcile', '--doc', docPath], { cwd: baseDir });
+```
+
+`runCli` is imported from `../../src/__tests__/_run-helpers.js`, which is not in this diff. If `runCli` does not thread the `cwd` option through to the spawned subprocess, the `reconcile` verb will resolve relative spec-directory paths (`specs/x`, `specs/orphan`, `specs/missing`) against the test runner's working directory rather than `baseDir`. The test relies on finding `specs/orphan` as a discovered-but-unregistered spec to assert orphan detection; if `cwd` is silently dropped, that assertion passes vacuously (no orphan found) or fails with a different error. The fix is either to confirm `_run-helpers.ts` threads `cwd` (and add a brief comment here referencing it) or to convert the relative paths to absolute within the test.
+
+### AUDIT-20260619-32 — Parent `--doc` is declared but rejected before commander parses it
+
+Finding-ID: AUDIT-20260619-32
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/roadmap-command.ts:124-160; tests/roadmap/non-regression.test.ts:29-37; tests/cli/parser-adapter.test.ts:111-115
+
+`buildRoadmapCommand()` declares `--doc` on the parent command as a universal/global option, and the parser-adapter test asserts that this parent flag exists. But `runRoadmapCommand()` reads `args[0]` as the subaction and exits 2 whenever it starts with `--`, explicitly including `roadmap --doc x` in the usage-error comment. That means the normal commander/global form `stackctl roadmap --doc ROADMAP.md next` is rejected before commander can parse it.
+
+The regression suite only exercises `--doc` after the subaction, for example `roadmap next --doc <path>`, so it does not catch the broken global-option path. The blast radius is a real CLI failure for operators or unattended agents using the advertised parent option in the conventional position; no write occurs, but the command cannot run. A reasonable fix is to either support leading global options before subaction, or stop declaring/documenting `--doc` as a parent/global option and pin the accepted grammar in tests.
+
+## 2026-06-19 — audit-barrage lift (20260619T025526590Z-027-roadmap-edge-mutation-and-cluster-phase-3)
+
+### AUDIT-20260619-33 — `--chain` is silently accepted by the parser for every roadmap subaction, not just `cluster`/`group`
+
+Finding-ID: AUDIT-20260619-33
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/roadmap.ts` — the `scanFlags` function (the `scanVerbFlags` call, diffed lines near `['apply', 'clear', 'chain']`)
+
+`scanFlags` now registers `chain` in the universal boolean list passed to `scanVerbFlags`:
+
+```ts
+const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear', 'chain'], ALL_VALUE_FLAGS);
+```
+
+This makes `--chain` accepted without error for **every** roadmap subaction — `defer`, `advance`, `decompose`, `reclassify`, `add`, `blocks`, and all others whose `SUBACTION_SPECS` entries have no `chain` field. An operator who mistypes `stackctl roadmap defer impl:feature/x --until 2026-12-01 --chain` receives no parse error; the flag is consumed and silently ignored.
+
+The existing `apply`/`clear` globals are arguably intentional — `--apply` affects all mutation subactions and `--clear` is documented as affecting all. `--chain` is meaningful only for `cluster`/`group` (it threads a `depends-on` dependency chain through the children). Silently accepting it on unrelated subactions is an operator footgun: a copy-paste error or misremembering of which subaction supports `--chain` goes uncorrected.
+
+Blast radius: any operator who uses `--chain` with the wrong subaction gets a silent no-op instead of a helpful parse error. The fix is to gate `chain` in `scanVerbFlags` by inspecting the active subaction's grammar (i.e., include `chain` in the boolean list only when the subaction declares `chain: true`), or to validate and reject it post-scan when the active subaction doesn't permit it.
+
+---
+
+### AUDIT-20260619-34 — Nondrift check (3) cannot detect the "silently accepted but not declared" gap for `--chain`
+
+Finding-ID: AUDIT-20260619-34
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `tests/roadmap/help-nondrift.test.ts` — the `"${sub}: a bogus --zzz-not-a-flag is rejected"` loop (lines ~195–210)
+
+The check (3) bogus-flag test exclusively probes `--zzz-not-a-flag` — a token that is genuinely unknown to the parser. It does NOT test that `--chain` is rejected for subactions like `defer` or `advance`. Because the global boolean list (Finding 01) makes `--chain` accepted for all subactions, writing `roadmap defer ... --chain` would exit 0 today. A test asserting "defer rejects `--chain`" would fail if added. The test gap means Finding 01 cannot be caught by the existing suite.
+
+Blast radius: bounded. This is a test coverage gap that masks a usability bug; no data is corrupted. The fix is a spot-check assertion — symmetric with the existing `"advance: an undeclared --bogus is rejected"` block — that explicitly asserts `--chain` is rejected (exit 2, "unknown flag") for at least one non-cluster subaction such as `defer`. That assertion would fail today and would become the RED that drives the actual parser fix.
+
+---
+
+### AUDIT-20260619-35 — `emitCluster` bypasses `reportMutation`, creating an inconsistent error surface
+
+Finding-ID: AUDIT-20260619-35
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/roadmap.ts` — `emitCluster` function (diffed lines +220 to +232)
+
+Every other mutation emitter in `roadmap.ts` delegates output to `reportMutation`:
+
+```ts
+// emitDefer (context, not in diff — the pattern)
+reportMutation(defer(flags.doc, id, change, opts, flags.apply), 'defer', id);
+```
+
+`emitCluster`, by contrast, directly accesses `result.applied` and writes two custom strings to `process.stdout.write`:
+
+```ts
+const result = cluster(flags.doc, input, opts, flags.apply);
+process.stdout.write(
+  result.applied
+    ? `roadmap ${verb}: grouped …\n`
+    : `roadmap ${verb}: dry-run — would group …\n`,
+);
+```
+
+`reportMutation` is the shared surface for non-applied failure modes (unknown identifier, validation rejection, conflict). If `cluster()` can return an error-shaped result — and `cluster` is the most structurally complex mutation added in this feature, touching parent creation, child re-parenting, and optional `depends-on` chain wiring — `emitCluster` will either silently omit the error report or propagate an unhandled exception. The `cluster.js` implementation is not in this diff, so the assumption that `ClusterResult` is always either `{ applied: true }` or `{ applied: false }` with no error states cannot be verified.
+
+Blast radius: if `cluster()` throws on an invalid child identifier or a cycle, the exception surfaces as an unformatted stack trace instead of the "roadmap cluster: …" error message that `reportMutation` would emit. Operators get a different error presentation for cluster than for all other mutations. Fix: either adapt `ClusterResult` to `MutationResult` shape and use `reportMutation`, or explicitly handle every non-`applied` state in `emitCluster` with the same message format `reportMutation` would produce.
+
+---
+
+### AUDIT-20260619-36 — No CLI-layer guard against an empty `--children` list
+
+Finding-ID: AUDIT-20260619-36
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/roadmap.ts` — `clusterInputFrom` (diffed lines +208 to +214)
+
+```ts
+const children = requireValue(flags, 'children')
+  .split(',')
+  .map((s) => s.trim())
+  .filter((s) => s.length > 0);
+return { parentId, children, chain: flags.chain, summary: flags.values.get('summary') };
+```
+
+`requireValue` ensures `--children` was passed but makes no assertion about content. After `split/trim/filter`, `children` can still be `[]` — for example from `--children ""` or `--children ",,,"`. The empty array is forwarded directly to `cluster()` in `cluster.js` (not in this diff). Whether `cluster.js` validates non-emptiness is unknown; if it does not, the operation would create a parent cluster with zero children — a logically vacuous node that the roadmap graph would then carry permanently (unless `--apply` was omitted, in which case the dry-run would silently report nothing to group).
+
+Blast radius: bounded to misuse scenarios, but the CLI is the right place to reject this because `requireValue` already establishes the pattern of failing fast on bad input. Fix: add `if (children.length === 0) failUsage(verb, '--children must name at least one identifier')` immediately after the `filter` call.
+
+### AUDIT-20260619-37 — Flat dispatcher still emits the old truncated roadmap usage
+
+Finding-ID: AUDIT-20260619-37
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/roadmap.ts:99-104 and src/subcommands/roadmap.ts:436-445
+
+The diff updates `KNOWN_SUBACTIONS` at lines 99-104 and documents it as the single source so the flat path and commander mount emit the same discovery list. But `runRoadmapCli`, which the file still describes as “retained as the behavior reference and for any direct caller,” keeps the old hardcoded no-subaction message at lines 442-445: `roadmap <next|blocked|add> [flags]`.
+
+The live commander path appears to use `renderRoadmapUsage()`, so ordinary `stackctl roadmap` may be covered, but direct callers of `runRoadmapCli` still get an incomplete usage surface that omits `blocks`, `order`, `graph`, `cluster`, `group`, `reconcile`, and `close-related`. The blast radius is medium because it does not break the primary command path, but it violates the feature’s stated self-documenting surface for a preserved public/internal entry point. A reasonable fix is to replace the hardcoded literal with `renderRoadmapUsage()` or otherwise use the same complete subaction source here.
+
+## 2026-06-19 — audit-barrage lift (20260619T030042000Z-027-roadmap-edge-mutation-and-cluster-phase-4)
+
+### AUDIT-20260619-38 — `cluster.ts` implementation is entirely absent from the diff
+
+Finding-ID: AUDIT-20260619-38
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/roadmap/cluster.ts` (absent) — imported at `src/subcommands/roadmap.ts:23`
+
+The diff adds `import { cluster, type ClusterInput } from '../roadmap/cluster.js'` and routes both `cluster` and `group` verbs through `emitCluster`, which calls `cluster(flags.doc, input, opts, flags.apply)`. But `src/roadmap/cluster.ts` is entirely absent from the audited diff. All of the feature's load-bearing correctness logic lives there: cycle detection, FR-014 conflict detection, the multi-parent append that avoids duplicate edges, the atomic write sequence, and the refusal paths that must exit 2 and leave the file byte-for-byte unchanged (contracts asserted in `cluster-refusal.test.ts`). None of that is auditable from what was provided.
+
+The test suite covers the behavioral contracts at the CLI boundary, which is good, but the implementation that must satisfy those contracts is opaque. If `cluster.ts` was created in the same commit range but excluded from the diff by a filtering step, this is an audit gap that needs to be closed before any findings in this report can be considered complete. If the file is genuinely not present in the repo, the import would fail at runtime and every `cluster`/`group` invocation would throw a module-not-found error — which is a blocking defect.
+
+---
+
+### AUDIT-20260619-39 — T010 chain-wiring test is non-falsifiable against the `chain` fixture
+
+Finding-ID: AUDIT-20260619-39
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `tests/roadmap/cluster.test.ts:55–66`
+
+The first test in `cluster.test.ts` is titled "create-NEW parent + --chain: wires part-of on each child and **depends-on a→b→c**". Its chain-wiring assertion is:
+
+```typescript
+expect(model.byId.get('impl:feature/c')!.dependsOn).toContain('impl:feature/b');
+```
+
+The comment immediately above the test describes the `chain` fixture as already having `c depends-on b`. The `--chain` flag is supposed to ADD this dependency, but the assertion would pass even if `--chain` did nothing at all — the pre-existing fixture edge satisfies the `.toContain` check regardless. If `cluster --chain` silently dropped all chain logic, this test would still be green.
+
+The second test (`--chain wires depends-on in argument order over fresh children`, lines 69–94) correctly uses `writeTempRoadmap` with items that have no pre-existing dependencies and properly exercises the wiring. The first test should either use a fixture without a pre-existing `c→b` edge, or add an assertion that a dependency was ADDED where none existed before (e.g., assert an intermediate item gained a dep it did not have in the fixture). As written, the test provides no signal about chain-wiring correctness.
+
+---
+
+### AUDIT-20260619-40 — `WorkItem.partOf` type change from `string | null` to `readonly string[]` — consumers outside the diff are unverified
+
+Finding-ID: AUDIT-20260619-40
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/roadmap/roadmap-model.ts:22`, cross-cutting with all consumers of `WorkItem`
+
+`WorkItem.partOf` is changed from `string | null` to `readonly string[]`. The diff updates the model, the `toWorkItem` projection (`roadmap-model.ts:149`), and the two new test files. But the diff does not show any updates to the rendering/display paths that previously consumed `partOf` as a nullable string — for example, the `graph` subaction output, the `order` or `next` display code, or any template that previously had a null-check of the form `if (item.partOf !== null)` or stringified `partOf` directly.
+
+TypeScript strict mode should have caught all such call sites at compile time if they were not updated; the project rules prohibit `any`/`as` bypasses, so a clean compile would be evidence of correctness. However, the diff alone cannot confirm this. If any consumer was left with the old `string | null` assumption but bypassed the type system (dynamic access, JSON round-trips, or a widened type), it would silently produce `[object Object]` in rendered output or fail a null check. The operator should confirm that `tsc --noEmit` is clean on this branch before merging.
+
+---
+
+### AUDIT-20260619-41 — `--chain` is scanned as a global boolean flag for all roadmap subactions
+
+Finding-ID: AUDIT-20260619-41
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/roadmap.ts:105` (`scanFlags`)
+
+```typescript
+const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear', 'chain'], ALL_VALUE_FLAGS);
+```
+
+`chain` is added to the list of boolean flags parsed by the shared `scanFlags` function, which is called for every roadmap subaction before the subaction is dispatched. This means `--chain` is silently accepted (and silently ignored) by `add`, `advance`, `decompose`, `defer`, `reclassify`, and every other verb. Only `cluster`/`group` read `flags.chain`. An operator typo of `roadmap advance impl:foo --chain` would produce no error and no effect — the flag is consumed and discarded. The other subaction-specific value flags (`into`, `to`, `until`) appear to share the same global scan pattern (`ALL_VALUE_FLAGS`), so this is consistent with existing practice, but the introduction of a new silently-ignored boolean deserves acknowledgment. If `scanVerbFlags` supports per-verb flag allowlisting via the `SUBACTION_SPECS.chain` property, that mechanism should be confirmed to be active.
+
+---
+
+### AUDIT-20260619-42 — `emitCluster` dry-run message omits create-vs-reuse distinction
+
+Finding-ID: AUDIT-20260619-42
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/roadmap.ts:218–223`
+
+```typescript
+result.applied
+  ? `roadmap ${verb}: grouped ${input.children.join(', ')} under ${input.parentId}${chainNote}\n`
+  : `roadmap ${verb}: dry-run — would group ${input.children.join(', ')} under ${input.parentId}${chainNote} (use --apply to write)\n`
+```
+
+The `cluster` verb has two distinct behavior branches for the parent: it either **creates** a new `planned` unit or **reuses** an existing one (preserving its status). The dry-run message — the only user-visible output in the default no-`--apply` invocation — does not indicate which branch would be taken. An operator cannot tell from `dry-run — would group b, c under multi:feature/grp` whether `multi:feature/grp` is about to be created (and at what status) or reused. This is particularly consequential when the parent exists at a non-default status (`in-flight`, `shipped`), since the operator may not realize the reuse semantics will preserve that status rather than reset it to `planned`. The other mutation verbs (`defer`, `decompose`) emit messages that are unambiguous about their operation; `cluster` should follow the same principle.
+
+---
+
+### AUDIT-20260619-43 — `requireValue(flags, 'children')` exit code for the omitted-flag case is unverifiable from the diff
+
+Finding-ID: AUDIT-20260619-43
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/roadmap.ts:208` (`clusterInputFrom`)
+
+`cluster-refusal.test.ts` asserts that `roadmap cluster multi:feature/grp --doc <path> --apply` (no `--children`) exits with code 2. The `clusterInputFrom` function calls `requireValue(flags, 'children')`, which is a shared helper not shown in the diff. If `requireValue` exits with code 1 (a generic usage error) rather than code 2 (the spec's required exit code for refusals), the test would fail and the FR-011–015 zero-write contract would be untestable. The analogous `requireId` is used in `emitDecompose` and `emitDefer` under the same `failUsage`/`failMissing` pattern; those verbs' error cases presumably exit 2 already, but the diff provides no confirmation that `requireValue` shares that contract. If the helper exits 1 instead of 2, the refusal test for the omitted-`--children` case would be a false red rather than a specification failure — worth confirming before the test suite is trusted as the acceptance signal for FR-011.
+
+### AUDIT-20260619-44 — Empty `--part-of` is silently accepted
+
+Finding-ID: AUDIT-20260619-44
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/roadmap.ts:155-164; src/roadmap/mutations.ts:102-104
+
+`addInputFrom` now parses `--part-of` as a comma-list and filters empty tokens. When an operator runs `roadmap add impl:feature/x --part-of , --apply`, that produces `partOf: []`; then `buildSection` omits the `part-of` line entirely. The mutation succeeds and creates an ungrouped item, even though the operator supplied a malformed grouping flag.
+
+This is a multi-parent regression shape: the old scalar path would have emitted a malformed `- part-of: ,` edge and validation would fail loud. `cluster --children` already treats an empty parsed list as invalid, so `add --part-of` should do the same when the flag is present and parses to zero targets. Blast radius is medium: it does not corrupt the graph, but an adopter can ship a roadmap item without the requested parent edge and get a successful CLI result.
+
+### AUDIT-20260619-45 — Multi-line existing `part-of` fields can gain duplicate targets
+
+Finding-ID: AUDIT-20260619-45
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/cluster.ts:48-52; src/roadmap/mutations.ts:52-66
+
+`appendEdge` rewrites every matching edge line independently via `rewriteEdgeLine`. The document engine supports repeated edge-field lines by merging targets, so this is valid input: `- part-of: multi:feature/a` plus `- part-of: multi:feature/b`. If `roadmap cluster multi:feature/a --children <child>` runs on that child, the first line is unchanged but the second line is rewritten to include `multi:feature/a`, producing the same target twice in the merged edge list.
+
+That violates the advertised exact-duplicate no-op behavior and makes the mutation non-idempotent for a valid document shape. The downstream blast radius is medium: duplicated unit-edge targets can duplicate graph output and make later mutation behavior noisier, even though referential integrity still passes. A reasonable fix is to normalize the aggregate target set for the field before rewriting, either by collapsing repeated field lines into one canonical line or by only appending the target to one selected field line when it is already present anywhere in the unit.
+
+## 2026-06-19 — audit-barrage lift (20260619T031603143Z-027-roadmap-edge-mutation-and-cluster-phase-3)
+
+### AUDIT-20260619-46 — `--chain` is silently accepted by all subactions, not just `cluster`/`group`
+
+Finding-ID: AUDIT-20260619-46
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/roadmap.ts` — `scanFlags` function (diff hunk ~line 117)
+
+`--chain` is registered as a **global boolean** in `scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear', 'chain'], ALL_VALUE_FLAGS)`. This means the scanner accepts `--chain` for **every** roadmap subaction — including `advance`, `defer`, `decompose`, and all the others — silently ignoring it. Only `cluster` and `group` carry `chain: true` in `SUBACTION_SPECS`, so only those two subactions surface `--chain` in their `--help` output.
+
+The non-drift test's check (3) does not catch this gap. Check (3) only tests that a truly unknown flag (`--zzz-not-a-flag`) is rejected; it does not test that a globally-registered-but-locally-undeclared flag (like `--chain` for `advance`) is rejected. So `roadmap advance impl:feature/b --to in-flight --chain` exits 0 with no warning. The "strict non-drift" invariant the test comment promises holds for help→grammar and grammar→help, but not for parser→grammar on non-universal flags.
+
+The blast radius is UX confusion rather than data corruption: an operator who mistypes `roadmap defer impl:x --until 2027 --chain` (perhaps copying from a cluster invocation) gets a silent successful defer with no indication that `--chain` was ignored. A reasonable fix is either (a) add per-subaction flag validation after `scanFlags` that fatally errors on non-applicable flags, or (b) accept the global-passthrough design but add a note to the non-drift test explaining why check (3) intentionally does not assert per-subaction flag rejection for `--chain`.
+
+---
+
+### AUDIT-20260619-47 — Empty `--children` list not validated in `clusterInputFrom`
+
+Finding-ID: AUDIT-20260619-47
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/roadmap.ts` — `clusterInputFrom` function (diff hunk ~lines 219–228)
+
+The `clusterInputFrom` function computes `children` via the same split/trim/filter chain used in `addInputFrom`, but **omits the empty-result guard** that the immediately-adjacent `addInputFrom` fix introduces:
+
+```typescript
+// addInputFrom (added in this diff — correctly guards):
+if (partOf !== undefined && partOf.length === 0) {
+  failUsage('roadmap', 'add: --part-of was given but lists no parent id');
+}
+
+// clusterInputFrom (same diff — missing guard):
+const children = requireValue(flags, 'children')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+return { parentId, children, chain: flags.chain, summary: flags.values.get('summary') };
+// ← no check that children.length > 0
+```
+
+Passing `--children ","` or `--children "  "` produces `children = []`. That empty array is forwarded to `cluster()`. Depending on what `cluster.ts` does with zero children, the outcome is either a silent no-op (the parent node is created or reused but nothing is grouped) or a confusing error from deep in the mutation logic with no reference to the flag that caused it. The emitted success message `roadmap cluster: grouped  under <parentId>` (two spaces, empty list) is a visible symptom.
+
+The fix is a direct copy of the guard pattern already present in the same file:
+```typescript
+if (children.length === 0) {
+  failUsage('roadmap', 'cluster: --children was given but lists no child ids');
+}
+```
+
+The non-drift tests exercise `--children impl:feature/b,impl:feature/c` (valid, non-empty), so this path has no regression coverage.
+
+---
+
+### AUDIT-20260619-48 — `--part-of` silently changed from single-ID to multi-ID with no help-text update visible in the diff
+
+Finding-ID: AUDIT-20260619-48
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/roadmap.ts` — `addInputFrom` (diff hunk ~lines 154–169); `src/cli-help/roadmap-help.js` (absent from diff)
+
+The `addInputFrom` rewrite changes `--part-of` from a single scalar (`v.get('part-of')` → `string | undefined`) to a comma-separated multi-value field (`split(',').map(…).filter(…)` → `string[] | undefined`). This is a **behavioral extension**: `--part-of impl:a,impl:b` now produces two parent edges instead of one. The change must be propagated to at least three surfaces:
+
+1. **`AddInput.partOf` type** — was `string | undefined`, now must be `string[] | undefined`. The file where `AddInput` is defined (`src/roadmap/mutations.ts` or similar) is not in the diff. TypeScript strict mode would catch any mismatch at compile time, so this is almost certainly consistent — but it is invisible in this diff.
+2. **Help text** — `roadmap add --help` likely still says `--part-of <parent-id>` (singular), but the flag now accepts `<id[,id,…]>`. The file `src/cli-help/roadmap-help.js` (referenced by `flagNamesFor` in the test) is absent from the diff.
+3. **The `add` fixture in `help-nondrift.test.ts`** — tests `--part-of design:feature/a` (single ID). There is no test for `--part-of design:feature/a,impl:feature/b` (multi-ID), so the new multi-ID parse path has no regression coverage.
+
+Blast radius: an operator reading `add --help` and following the singular `<parent-id>` syntax would never discover comma-separation is supported. More importantly, if `roadmap-help.js` still describes `--part-of` as taking a single ID, the T007 and T006 help-surface tests pass while the documentation silently misrepresents the accepted grammar.
+
+### AUDIT-20260619-49 — Help-surface test can pass without per-subaction summaries
+
+Finding-ID: AUDIT-20260619-49
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/help-surface.test.ts:27-32
+
+The test claims `roadmap --help` lists every subaction plus a one-line summary, but it only checks that each subaction name appears somewhere in stdout, then checks two hardcoded summary fragments: `list the ready` and `dry-run unless --apply`. That does not prove every listed subaction has its own summary row. A renderer that printed all names but only summaries for `next` and one mutation verb would still satisfy these assertions.
+
+Blast radius is low because the current implementation in `src/cli-help/roadmap-help.ts` does render summaries through `summaryFor`, so this is a test-contract gap rather than a shipped behavior failure. A reasonable fix is to parse the `Subactions:` block row-by-row and assert each registered subaction has a non-empty description column, ideally keyed by exact subaction token rather than substring containment.
+
+## 2026-06-19 — audit-barrage lift (20260619T032003539Z-027-roadmap-edge-mutation-and-cluster-phase-4)
+
+### AUDIT-20260619-50 — `WorkItem.partOf` type changed from `string | null` to `readonly string[]` — not all consumers visible in diff
+
+Finding-ID: AUDIT-20260619-50
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/roadmap/roadmap-model.ts:19-26` and any consumer not shown in this diff
+
+`WorkItem.partOf` was widened from `string | null` to `readonly string[]`. Every consumer that previously accessed the field as a nullable string — branching on `item.partOf !== null`, interpolating it into a string, passing it to a function typed `string` — is now a TypeScript error. The diff confirms the `toWorkItem` projection was updated (`roadmap-model.ts:146`) and `decompose` in `mutations.ts` was updated. `addInputFrom` in `roadmap.ts` was also updated. However, the diff does not include the `--graph`, `--next`, `--blocked`, `--blocks` display paths, `reconcile.ts`, or any other roadmap consumer. The comment in the new interface says "Readers that want 'the first parent' take `partOf[0]`", which implies the author knew callers would need to be updated and directed them — but the diff doesn't prove all callers were in fact updated. If any consumer compiles against the old `string | null` shape, it will either produce a TS error (caught at build time) or, if it was widening-compatible by accident, silently produce wrong output (e.g., `[object Object]` when an array lands where a string is expected). The blast radius is every roadmap subcommand that reads group membership.
+
+A reasonable remediation: confirm via `grep -rn '\.partOf' src/` that every call site applies the new array interface correctly, particularly in display verbs (`graph`, `next`, `blocked`) and in `reconcile`.
+
+---
+
+### AUDIT-20260619-51 — "Creates a cycle" refusal test actually exercises conflict detection, not cycle detection — cycle path through `commitCandidate` is untested
+
+Finding-ID: AUDIT-20260619-51
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `tests/roadmap/cluster-refusal.test.ts:71-89`
+
+The test labeled "a --chain ordering that creates a cycle → exit 2, zero write" uses the fixture graph `a (shipped) → b → c` with `--children impl:feature/c,impl:feature/b`. For index 1 (b), `chainPredecessor` resolves predecessor = `impl:feature/c`. It then checks: `b` already has `depends-on: impl:feature/a`; `existing.length > 0` is true; `existing.includes('impl:feature/c')` is false → **conflict throw** before any write. Exit 2 is correct, but the mechanism is the pre-write `chainPredecessor` guard, not `commitCandidate`'s whole-graph cycle detection. The comment in `cluster.ts:14` specifically says "cycle/dangling/self are caught (also zero-write) by `commitCandidate`'s whole-graph revalidation — defense in depth", but this defense-in-depth path is never exercised by the test suite as shipped.
+
+A scenario that would test the actual cycle path: a fresh graph where `x` and `y` have no pre-existing `depends-on` edges, clustered with `--children y,x --chain` (setting `x.depends-on = y`). If the document also has `y.depends-on = x` already, then `chainPredecessor` for `x` (predecessor = `y`) would find `x` has NO existing deps, return `y`, and allow the build to proceed. `commitCandidate` would then catch the cycle. No such test exists. The consequence: if `commitCandidate`'s cycle check were accidentally removed or regressed, the labeled "cycle" test would continue to pass via the conflict path, providing false confidence.
+
+---
+
+### AUDIT-20260619-52 — `--summary` flag value is never asserted in the test suite
+
+Finding-ID: AUDIT-20260619-52
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `tests/roadmap/cluster.test.ts:31-57`
+
+The first `cluster` test passes `--summary 'the grouped work'` and asserts `status: 'planned'` and the presence of `part-of` edges, but never checks that the summary was actually written into the created parent. In `cluster.ts:parentBody`, `scope: input.summary` is forwarded to `buildSection`, which emits `- scope: <summary>` as a line in the parent section. If this line were accidentally dropped — for example, if `buildSection` were changed to handle `scope` differently or if `parentBody` stopped passing `summary` — no test would catch the regression. The `scope` field is operator-visible (`stackctl roadmap graph` presumably shows it), so silent loss is a user-facing regression.
+
+---
+
+### AUDIT-20260619-53 — `KNOWN_SUBACTIONS` string updated in `roadmap.ts` but the co-located comment names a second source of truth
+
+Finding-ID: AUDIT-20260619-53
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/roadmap.ts:103-105`
+
+The inline comment on `KNOWN_SUBACTIONS` says `(FR-006; AUDIT-BARRAGE-codex-01)` and notes "The order is the discovery order operators have learned, kept stable." The prior audit finding (`AUDIT-BARRAGE-codex-01`) flagged the need for byte-identical sync between `roadmap.ts` and `roadmap-command.ts`. The diff updates `roadmap.ts` to add `cluster, group` but does not show the corresponding change in `roadmap-command.ts`. If that file also carries a hardcoded subaction string, it was either updated in a commit not shown here or it has drifted. The operator receives the wrong error message on an unknown subcommand if only one of the two strings is updated.
+
+---
+
+### AUDIT-20260619-54 — Duplicate entries in `--children` produce a self-edge with an opaque error when `--chain` is active
+
+Finding-ID: AUDIT-20260619-54
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/roadmap/cluster.ts:106-115` (`clusterInputFrom` in `src/subcommands/roadmap.ts:213-219`)
+
+`clusterInputFrom` builds `childSet = new Set(input.children)` to dedup during the body walk, so duplicate children are silently collapsed for `part-of` writes. With `--chain`, however, `chainPredecessor` is called with the raw `input.children` array (including duplicates). For `--children a,a,b`, index 1 (the second `'a'`) resolves predecessor = `children[0]` = `'a'` — a self-reference. `predecessor.set('a', 'a')` is stored. During the body walk, unit `'a'` is processed once (via `childSet`) and `appendEdge(body, 'depends-on', 'a')` is called, producing `- depends-on: a` — a self-edge. `commitCandidate` catches this and returns exit 2 with zero write, but the error message describes a graph self-edge, not a duplicated `--children` argument. The operator gets a confusing "self-edge detected" message instead of "duplicate id in --children". No pre-write validation exists for this input shape, and no test covers it. The blast radius is limited to operator confusion, since correctness is preserved by `commitCandidate`.
+
+### AUDIT-20260619-55 — Cluster can write edges into fenced examples instead of real metadata
+
+Finding-ID: AUDIT-20260619-55
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/roadmap/cluster.ts:48-72, src/roadmap/cluster.ts:171-172
+
+`appendEdge` scans raw unit body lines with `fieldRe`/`lineRe` and treats the first matching `- part-of:` or `- depends-on:` line as metadata, regardless of whether that line is inside a fenced code block. The document edge extractor intentionally ignores field-looking bullets inside fences, so a child whose scope contains an example like ```` ```\n- part-of: example\n``` ```` before its real metadata, or without real metadata, will have the new cluster edge appended to prose/code instead of to an actual edge field. `commitCandidate` then revalidates successfully because no real dangling edge was added, and the CLI reports success even though the child was not grouped or chained.
+
+The blast radius is high because this is a silent false-success mutation on the primary new verb: adopters can run `roadmap cluster --apply`, get exit 0, and still have no effective `part-of`/`depends-on` edge for affected items. A reasonable fix is to make `appendEdge` use the same fence-aware field detection semantics as `extractEdges`/`scopeOf`, matching only real metadata bullets outside fenced code blocks and inserting a new metadata line when no real field exists.
+
+## 2026-06-19 — audit-barrage lift (20260619T033114047Z-027-roadmap-edge-mutation-and-cluster-phase-4)
+
+### AUDIT-20260619-56 — `SubactionGrammar` type likely missing `chain?: boolean` — TypeScript excess-property error
+
+Finding-ID: AUDIT-20260619-56
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/roadmap.ts:75-94
+
+`SUBACTION_SPECS` is typed as `Readonly<Record<string, SubactionGrammar>>`. The new `cluster` and `group` entries add `chain: true`, a property not present on any existing entry. TypeScript performs excess-property checking on nested object literals assigned to a typed record, so if `SubactionGrammar` doesn't declare an optional `chain?: boolean` field, both entries are a compile-time error. The diff contains no update to `SubactionGrammar` — it's either defined in a file not shown in the diff (and already has the field) or the type is more permissive than expected (e.g., an index signature). Worth verifying: `grep -n 'SubactionGrammar' src/subcommands/roadmap.ts` to confirm the interface includes `chain`.
+
+The blast-radius is bounded to the TypeScript compilation step — if the build currently fails, nothing ships. But if the type was quietly declared as a looser form (`{ [k: string]: unknown } & ...`), the `chain` field in `SUBACTION_SPECS` becomes unchecked documentation rather than a type-enforced contract, which means future callers that read `spec.chain` from the grammar object get `undefined` where they expect `true`.
+
+---
+
+### AUDIT-20260619-57 — `WorkItem.partOf` changed from `string | null` to `readonly string[]` — non-TypeScript consumers not updated in this diff
+
+Finding-ID: AUDIT-20260619-57
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/roadmap-model.ts:22, 149
+
+The `partOf` field on `WorkItem` changes from a nullable single-string to an array. TypeScript's compiler catches all in-tree callers that treat `partOf` as `string | null` — patterns like `if (item.partOf !== null)`, `item.partOf === 'some-id'`, or `item.partOf!.includes(...)` would be compile errors. The concern is runtime consumers outside the TypeScript type system: skill scripts that `JSON.parse` a `stackctl roadmap graph` or `stackctl roadmap next` JSON dump and read `.partOf` as a string; any documentation or quickstart that describes `partOf` as a single-parent field; and the `roadmap graph` output format (not in the diff) which may serialize `partOf` differently now that it is an array.
+
+The diff shows the type change in `roadmap-model.ts` and the new cluster tests use `.toContain()` (array-compatible), but no existing `roadmap add` or `roadmap graph` tests appear in the diff. If those tests previously asserted `expect(item.partOf).toBe('some-parent')`, they now fail; if they used `.toContain()` they pass. The fact that neither the skill files nor the quickstart shows changes means this surface is unverified. A quick `grep -rn '\.partOf' src/ tests/` would reveal whether any callsite still treats it as a non-array.
+
+---
+
+### AUDIT-20260619-58 — `appendEdge` inserts new edge at body[1] — places `part-of` before `- status:` on units with no prior grouping
+
+Finding-ID: AUDIT-20260619-58
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/roadmap/cluster.ts:79-82
+
+When `appendEdge` finds no existing real field of the target type, it does:
+
+```ts
+const out = [...body];
+out.splice(1, 0, `- ${field}: ${target}`);
+return out;
+```
+
+For a typical unit body `['## identifier', '- status: planned', ...]` this produces `['## identifier', '- part-of: X', '- status: planned', ...]` — the new edge lands before the `status` field. `buildSection` (the canonical constructor used by `roadmap add`) emits fields in the order `status → depends-on → part-of`. `applyChildEdges` applies `part-of` first, then `depends-on`, both at position 1, producing the reverse order `depends-on → part-of → status`.
+
+This is a cosmetic inconsistency: if the document engine is field-order-agnostic (which it appears to be, given that the tests pass), there is no functional defect. The blast-radius is limited to human-readable document format — an operator diffing a `cluster`-mutated ROADMAP against a hand-authored one will see a non-idiomatic field order. Worth noting as a quality issue that could be fixed by scanning for the `status` field's index and inserting after it, rather than always at index 1.
+
+---
+
+### AUDIT-20260619-59 — Newly-created parent section has no blank-line separator from the preceding unit
+
+Finding-ID: AUDIT-20260619-59
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/roadmap/cluster.ts:139-145, src/roadmap/mutations.ts:92-103 (`buildSection`)
+
+When `cluster` creates a new parent, it appends `newParentSection.join('\n')` to the `bodies` array:
+
+```ts
+if (newParentSection !== null) bodies.push(newParentSection.join('\n'));
+```
+
+`buildSection` returns lines without a leading or trailing blank line. `reassemble` joins all unit bodies with `'\n'`. If the last *existing* unit's `unitBodyLines` slice (from `span.endLine`) excludes the trailing blank line that conventionally separates units in the source document, the output will have the new parent immediately adjacent to the preceding unit with no separator:
+
+```
+## impl:feature/c
+- status: planned
+## multi:feature/grp     ← no blank line above
+- status: planned
+```
+
+Whether this matters depends on the document parser. If it's tolerant of missing inter-unit blank lines (only requiring `## ` to open a unit), this is cosmetic. If blank lines are part of the span convention (i.e., `span.endLine` always includes the trailing blank), then it is handled and this finding is moot. Neither the diff nor the visible test fixtures confirm which case applies. A dedicated test — "after `cluster` creates a new parent, the output document has a blank line before the new parent's heading" — would resolve the ambiguity.
+
+---
+
+### AUDIT-20260619-60 — `emitCluster` success/dry-run message is identical for parent-create and parent-reuse
+
+Finding-ID: AUDIT-20260619-60
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/subcommands/roadmap.ts:221-229
+
+The output line emitted by `emitCluster` is:
+
+```
+roadmap cluster: grouped impl:feature/b, impl:feature/c under multi:feature/grp
+```
+
+This message is the same whether `multi:feature/grp` was newly created (with `planned` status) or already existed with a different status (e.g., `in-flight`). An operator clustering items under an existing group has no indication that the operation left the parent's status untouched. A one-word annotation — `"grouped … under multi:feature/grp (new)"` vs `"grouped … under multi:feature/grp (existing)"` — would make the audit trail clearer and reduce operator surprise when a reused parent retains a non-`planned` status. No functional defect; the behavior is correct.
+
+### AUDIT-20260619-61 — Quickstart commands use invalid roadmap identifiers
+
+Finding-ID: AUDIT-20260619-61
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    specs/027-roadmap-edge-mutation-and-cluster/quickstart.md:22-42
+
+The quickstart says these are runnable scenarios, but the cluster examples use child ids `a,b,c,d` and `nonexistent`. The roadmap grammar requires identifiers shaped like `<phase>:<kind>/<slug>` (`impl:feature/foo`, `multi:feature/bar`, etc.), and the contract/code paths validate against existing roadmap units. An operator or unattended agent following this quickstart literally will not be exercising the intended success/refusal cases; the commands will fail for missing or invalid ids unless the reader silently rewrites them.
+
+Blast radius is medium: the implementation can still work, but the feature’s end-to-end validation artifact is misleading. Replace the sample ids with valid roadmap ids throughout the quickstart, for example `impl:feature/a,impl:feature/b,impl:feature/c`, and make the fixture prerequisite name those exact nodes.
+
+### AUDIT-20260619-62 — Data model still documents `partOf` as unchanged scalar state
+
+Finding-ID: AUDIT-20260619-62
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    specs/027-roadmap-edge-mutation-and-cluster/data-model.md:5-10
+
+The implemented model widened `WorkItem.partOf` to `readonly string[]` in `src/roadmap/roadmap-model.ts`, but the feature data model still says `partOf: string | null` and explicitly says the WorkItem projection is “Unchanged by this feature.” The next line frames widening as a to-confirm implementation question, but the code has already made the decision.
+
+Blast radius is medium because future work generated from this feature artifact can reasonably reintroduce scalar assumptions or miss multi-parent behavior. Update the data model to state the settled shape: `partOf: string[]`, empty array when ungrouped, multiple entries allowed.
+
+## 2026-06-19 — audit-barrage lift (20260619T034122507Z-027-roadmap-edge-mutation-and-cluster-phase-4)
+
+### AUDIT-20260619-63 — `WorkItem.partOf` empty-array is truthy — "has parent" boolean checks silently invert
+
+Finding-ID: AUDIT-20260619-63
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    `src/roadmap/roadmap-model.ts:19-31` (type change) + every caller not shown in this diff
+
+`WorkItem.partOf` changed from `string | null` to `readonly string[]`. For an item with no parent, the old value was `null` (falsy); the new value is `[]` (truthy — all arrays are truthy in JavaScript, including empty ones). Any call-site that tests presence with `if (item.partOf)` or the ternary `item.partOf ? A : B` or the guard `item.partOf && render(...)` now always enters the "has a parent" branch, even for completely ungrouped items. TypeScript strict-mode catches shape mismatches (passing a `readonly string[]` where a `string` is expected) but does **not** flag the boolean-context change — `if (someArray)` is valid TypeScript regardless of array length.
+
+The diff does not show changes to the graph renderer, the `next`/`blocked`/`blocks` subcommands, or any display layer that might filter or format `partOf`. If any of those paths contains the pattern `if (item.partOf)` — a natural guard for the previous nullable string — they now emit parent-group labels or apply parent-scoped filtering for every item in the roadmap, regardless of actual grouping. The blast radius is proportional to how many callers used the truthiness pattern. Given the previous type was `string | null`, that pattern was idiomatic and likely present. The fix is to sweep all callers and replace `if (item.partOf)` with `if (item.partOf.length > 0)`.
+
+---
+
+### AUDIT-20260619-64 — `rewriteEdgeLine` processes only the first matching line — decompose + multi-line `part-of` leaves dangling references
+
+Finding-ID: AUDIT-20260619-64
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/roadmap/mutations.ts:243-252` (decompose `part-of` rewrite) + `src/roadmap/mutations.ts:57-77` (`rewriteEdgeLine` body, not shown but implied by name)
+
+The cluster feature (this diff) explicitly creates and tests units with two `- part-of:` lines (the multi-LINE test in `cluster.test.ts:178-218`). The `decompose` verb now calls `rewriteEdgeLine(body, 'part-of', repoint)` instead of the old inline lambda. The function name is `rewriteEdge**Line**` (singular), and the diff's existing usage pattern for `depends-on` (which was always single-valued) suggests it rewrites the FIRST matching `- field:` line in the body.
+
+If a unit carries:
+```
+- part-of: A
+- part-of: P          ← P is being decomposed
+```
+and `rewriteEdgeLine` only touches the first matching line (`A`), the second line (`P`) is left verbatim. After decompose, the document contains a `part-of: P` reference to an item that no longer exists — a silent dangling reference. The graph validator downstream would flag a missing-target error at a later, unrelated operation with no clue about the source.
+
+No test in this diff covers the combination `cluster` (which creates multi-line `part-of`) followed by `decompose` of a parent. The correct fix is either (a) make `rewriteEdgeLine` rewrite ALL matching lines for the given field, or (b) document that the function's contract is limited to single-line fields and add an explicit guard that refuses `decompose` when the target unit carries multi-line `part-of` entries containing the identifier.
+
+---
+
+### AUDIT-20260619-65 — `--summary` silently discarded when the parent already exists — no warning, no test
+
+Finding-ID: AUDIT-20260619-65
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/roadmap/cluster.ts:116-121` (`parentBody`) + `src/roadmap/cluster.ts:171-181` (`emitCluster` output)
+
+`parentBody()` returns `null` for an existing parent, and `input.summary` is never used again:
+
+```ts
+function parentBody(doc: GovernableDocument, input: ClusterInput): string[] | null {
+  const existing = findUnit(doc, input.parentId);
+  if (existing !== undefined) return null; // reuse: emit verbatim from the unit walk
+  return buildSection({ identifier: input.parentId, status: 'planned', scope: input.summary });
+}
+```
+
+When `--summary "description"` is passed alongside a parent that already exists, the option is consumed by the flag scanner but has zero effect on the document. The CLI output is:
+
+```
+roadmap cluster: grouped a, b under existing-parent
+```
+
+There is no indication that `--summary` was silently dropped. The docstring on `ClusterInput.summary` says "for a NEWLY-created parent", so the intention is correct, but the interface makes the failure mode invisible. An operator who runs `roadmap cluster existing-parent --summary "updated description" --apply` and sees a 0-exit with no warning has no indication they need to use a different verb to amend the scope line. No test covers this case. The fix is to either emit a warning on stdout when `--summary` is given but ignored (`warning: --summary is ignored when parent already exists`), or treat it as a usage error and exit 2.
+
+---
+
+### AUDIT-20260619-66 — `appendEdge` inserts new field before the `status` line — formatting drift from canonical order
+
+Finding-ID: AUDIT-20260619-66
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/roadmap/cluster.ts:75-80` (`appendEdge` no-existing-line branch)
+
+When a unit has no existing `- part-of:` line, `appendEdge` inserts the new edge at body index 1 (immediately after the heading):
+
+```ts
+if (firstIdx === undefined) {
+  const out = [...body];
+  out.splice(1, 0, `- ${field}: ${target}`);
+  return out;
+}
+```
+
+For a typical unit:
+```
+## impl:feature/b          ← index 0
+- status: planned          ← index 1
+- depends-on: ...          ← index 2
+```
+
+The result is:
+```
+## impl:feature/b
+- part-of: parent          ← spliced in at 1
+- status: planned
+- depends-on: ...
+```
+
+`buildSection` (the canonical constructor) emits fields in the order: heading → status → depends-on → part-of → other. `appendEdge` produces the opposite: heading → part-of → status → depends-on. The document model parser is field-order agnostic, so this is not a correctness bug. But a document where some units have `status` first and others have `part-of` first (depending on whether they were created with or without a parent, or had one added later) is visually inconsistent when operators read the raw markdown. The fix is to find the first non-heading, non-fenced body line and insert AFTER it (or after the last `- field:` line, whichever is later), matching `buildSection`'s ordering.
+
+---
+
+### AUDIT-20260619-67 — "Cycle" refusal test exercises the conflict guard, not the cycle detector — mislabeled contract
+
+Finding-ID: AUDIT-20260619-67
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `tests/roadmap/cluster-refusal.test.ts:68-90` (test name + comment)
+
+The test titled `'a --chain ordering that creates a cycle → exit 2, zero write'` uses the fixture `a (shipped), b (dep a), c (dep b)` and clusters `c, b` with `--chain`. The chain predecessor for `b` (index 1 in `[c, b]`) is `c`. Child `b` already carries `depends-on: a`, and `a ≠ c`, so `chainPredecessor` fires the FR-014 conflict guard and throws before building any candidate. The test therefore exercises **the conflict refusal path**, not the downstream `commitCandidate` cycle detector.
+
+A separate test (`'a --chain that forms a real cycle → exit 2 via whole-graph revalidation, claude-02'`) correctly exercises the cycle detector. The mislabeled test is not wrong (it correctly exits 2), but the description — including the inline comment `"children c,b means b depends on c, while c already depends on b → cycle"` — conflates two distinct mechanisms. A future maintainer reading the test would believe the conflict guard is the cycle guard, might remove one thinking they're duplicates, and would lose coverage. The fix is to rename the test to `'a --chain child with a CONFLICTING different depends-on → exit 2 (conflict guard, not cycle detector)'` and update its inline comment accordingly.
+
+### AUDIT-20260619-68 — Empty `--children` entries are silently dropped
+
+Finding-ID: AUDIT-20260619-68
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/roadmap.ts:216-222
+
+`clusterInputFrom` parses `--children` with `split(',').map(trim).filter(nonEmpty)`, so a malformed list like `--children a,,b` or `--children a,` is accepted as `['a', 'b']` or `['a']`. The only empty-list refusal is downstream in `cluster()` after filtering, so partially empty input can still write a successful cluster while silently dropping an operator-supplied list entry.
+
+The blast radius is medium because this can produce a valid but incomplete grouping: the command exits 0, writes under `--apply`, and the operator has no signal that the requested child list was malformed. A reasonable fix is to reject any empty token before filtering, while still producing the existing clear refusal for an entirely empty `--children` value.
+
+### AUDIT-20260619-69 — `decompose` can duplicate `part-of` targets when repointing multi-parent groups
+
+Finding-ID: AUDIT-20260619-69
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/mutations.ts:235-252
+
+The new multi-parent repoint uses `targets.flatMap((t) => (t === identifier ? into : [t]))` for `part-of`. If an item is already grouped under the decomposed parent and also under one of the new parts, for example `part-of: parent, part-a` while decomposing `parent --into part-a,part-b`, the rewrite emits `part-a, part-b, part-a`. The graph validator shown here validates references and acyclicity, but this path does not deduplicate the rewritten target list.
+
+The blast radius is medium because the feature deliberately widened `partOf` into a multi-parent list and treats exact duplicate grouping as a no-op elsewhere; this path can reintroduce duplicate parent targets into the public roadmap model. A reasonable fix is to make the repoint transform preserve order while removing duplicate targets before `rewriteEdgeLine` serializes the edge.
+
+### AUDIT-20260619-70 — Roadmap skill guidance does not expose the new cluster/group verb
+
+Finding-ID: AUDIT-20260619-70
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    missing documentation update in skills/roadmap/SKILL.md:3,61-72
+
+The feature adds `roadmap cluster` and `group` as a user-facing mutation surface, but the shipped roadmap skill still describes mutations as only `add / advance / decompose / reclassify / defer` and its command block omits the new cluster/group syntax. That skill is the operator-facing wrapper guidance for `stackctl roadmap`, so an unattended agent using the installed skill will not discover the new governed grouping command from the skill text.
+
+The blast radius is medium: the CLI implementation may work, but the project relies on plugin-local skills for workflow discipline, and stale guidance can steer agents back to lower-level edits or awkward `add`/manual edge handling. The fix is to update the roadmap skill mutation list and command examples to include `cluster` and the `group` alias with `--children`, `--chain`, and dry-run/apply behavior.
+
+## 2026-06-19 — audit-barrage lift (20260619T035500279Z-027-roadmap-edge-mutation-and-cluster-phase-3)
+
+### AUDIT-20260619-71 — `--chain` flag silently accepted and ignored for all subactions, not just `cluster`/`group`
+
+Finding-ID: AUDIT-20260619-71
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/roadmap.ts:116` (the `scanFlags` function, `scanVerbFlags` call)
+
+`scanFlags` adds `'chain'` to the global boolean-flag list that `scanVerbFlags` accepts for every subaction:
+
+```typescript
+const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear', 'chain'], ALL_VALUE_FLAGS);
+```
+
+Only `cluster` and `group` have `chain: true` in their `SUBACTION_SPECS` grammar, but the parser accepts `--chain` for any subaction — `advance`, `defer`, `decompose`, etc. — without error. The `chain: true` grammar field is used only by the help renderer (via `flagNamesFor`), not by the per-subaction parser acceptance gate. So `roadmap advance impl:feature/b --chain --to shipped` parses, runs, and silently discards the flag.
+
+This is a "no parsed-but-unshown flag" violation in spirit: `--chain` is parsed-but-unshown for ten of the twelve subactions. The `VALID_INVOCATION` fixture in `help-nondrift.test.ts` does not pass `--chain` to non-cluster subactions, so check (3b)'s bogus-flag assertion (`--zzz-not-a-flag`) never verifies `--chain` is rejected. The test gap and the parser gap are the same root issue; the test only exercises a completely-unknown flag, not a globally-accepted-but-grammar-undeclared one.
+
+Blast radius: an operator script that copy-pastes a `cluster` invocation and changes the verb to `defer` keeps `--chain` in the argv; the mutation succeeds silently without the intended chaining behavior. No diagnostic surfaces. For an agent building unattended from the help surface, the help correctly omits `--chain` for non-cluster subactions, so the agent wouldn't reach this trap — but a human operator or a script that introspects the binary would.
+
+Fix: either (a) move `chain` out of the global boolean list and add per-subaction rejection in `executeRoadmapSubaction` (check `SUBACTION_SPECS[subaction].chain` before allowing the flag), or (b) add a check (3c) variant to the nondrift suite that asserts globally-accepted flags not declared in a subaction's grammar are rejected by that subaction.
+
+---
+
+### AUDIT-20260619-72 — `emitCluster` bypasses `reportMutation` — error/warning output from `cluster()` is silently dropped
+
+Finding-ID: AUDIT-20260619-72 (claude-02 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    `src/subcommands/roadmap.ts:223-231` (`emitCluster` function)
+
+Every other mutation emitter routes through the shared helper:
+```typescript
+reportMutation(defer(flags.doc, id, change, opts, flags.apply), 'defer', id);
+```
+
+`emitCluster` instead rolls its own output, checking only `result.applied`:
+```typescript
+const result = cluster(flags.doc, input, opts, flags.apply);
+process.stdout.write(
+  result.applied
+    ? `roadmap ${verb}: grouped ${input.children.join(', ')} under ...`
+    : `roadmap ${verb}: dry-run — would group ...`
+);
+```
+
+If `MutationResult` carries an error field, a per-child validation message, or a partial-failure signal (plausible for a multi-child mutation), none of those reach the operator. The dry-run branch is taken whenever `result.applied === false`, whether that means "dry-run mode as intended" or "applied but failed." The two states are conflated.
+
+Blast radius: an operator running `roadmap cluster multi:grp --children impl:feature/x,impl:feature/missing --apply` with one missing child id would see the dry-run success message ("would group…") rather than an error, because the check is on `result.applied` alone. Depending on how `cluster.js` signals partial failure, the roadmap could be left in a partially-mutated state with no diagnostic.
+
+Fix: either call `reportMutation` (extending its label/message for the multi-child format), or explicitly check `result.error` (or equivalent) in `emitCluster` and emit errors to stderr before emitting the success line. At minimum, the dry-run branch should guard `!flags.apply` rather than `!result.applied`.
+
+---
+
+### AUDIT-20260619-73 — `--children` accepts a single-element list — degenerate single-child cluster passes silently
+
+Finding-ID: AUDIT-20260619-73
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/roadmap.ts:215-228` (`clusterInputFrom` function)
+
+The validation after splitting `--children` on commas checks for empty ids but not for list length:
+
+```typescript
+if (children.some((s) => s.length === 0)) {
+  failUsage('roadmap', `${verb}: --children has an empty id ...`);
+}
+return { parentId, children, chain: flags.chain, summary: flags.values.get('summary') };
+```
+
+`roadmap cluster multi:grp --children impl:feature/b --apply` would succeed, creating a grouping node with a single child. A single-child cluster is logically degenerate — the parent adds no structural information and the `part-of` edge duplicates what a direct `add --part-of` would express.
+
+Blast radius: a script that builds `--children` dynamically (e.g. from a filtered list that reduces to one item) would silently produce a degenerate roadmap entry with no diagnostic. Combined with `--chain`, a single-child cluster would also create a single `depends-on` edge that an operator might not expect.
+
+Fix: add `if (children.length < 2) failUsage('roadmap', ...)` immediately after the empty-id guard, or document in the help text and spec that single-child clusters are intentionally permitted.
+
+---
+
+### AUDIT-20260619-74 — `AddInput.partOf` changed from `string` to `string[]` but `mutations.ts` is absent from the diff
+
+Finding-ID: AUDIT-20260619-74
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/subcommands/roadmap.ts:155-167` (`addInputFrom`); cross-reference: `src/roadmap/mutations.ts` (not in diff)
+
+The diff changes how `--part-of` is parsed:
+
+```typescript
+// Before (implied by the removal):
+partOf: v.get('part-of'),   // string | undefined
+
+// After:
+const partOf = partOfRaw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+// ...
+partOf,   // string[] | undefined
+```
+
+`AddInput` is imported from `mutations.ts` which is not in the diff. If `AddInput.partOf` is still typed `string | undefined`, TypeScript strict mode would produce a compile error — so the build either already fails, or `mutations.ts` was updated in a commit outside this diff window (possibly one of the Phase 1–3 commits). The diff cannot confirm which.
+
+The runtime risk goes beyond the type: any code in `mutations.ts` or the markdown writer that serializes `partOf` as a single id into the roadmap document now receives an array. If that serialization path was not updated, the ROADMAP.md would receive `["design:feature/a"]` (array `.toString()`) instead of `design:feature/a` for the single-parent case — silently corrupting the edge.
+
+Blast radius: if the downstream serializer was not updated, every `add --part-of` invocation (the common case) would write a malformed parent edge that the roadmap parser would subsequently fail to load or would silently misinterpret. This is a latent data-corruption risk for existing adopters upgrading.
+
+Fix: confirm `mutations.ts` declares `partOf?: string[]` and the ROADMAP.md serializer writes comma-separated ids (or one per line, per the document format spec); add a test that asserts a single `--part-of` id round-trips through `add` to the expected markdown form.
+
+---
+
+### AUDIT-20260619-75 — Nondrift test check (3) leaves a systematic gap: globally-accepted undeclared flags are not asserted rejected
+
+Finding-ID: AUDIT-20260619-75
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `tests/roadmap/help-nondrift.test.ts:161-184` (check (3b) loop)
+
+The test comment claims full coverage of "no parsed-but-unshown flag":
+
+> "no shown-but-unparsed flag, no parsed-but-unshown flag"
+
+But check (3b) only verifies this for a completely-synthetic bogus flag (`--zzz-not-a-flag`):
+
+```typescript
+const r = runCli(['roadmap', sub, ...invocation.argv, '--zzz-not-a-flag', 'bogus', '--doc', docPath]);
+expect(r.status).toBe(2);
+expect(r.stderr).toContain('unknown flag --zzz-not-a-flag');
+```
+
+The globally-accepted boolean flags (`apply`, `clear`, `chain`) are not in the grammar for every subaction (`chain` is absent from ten of twelve; `apply`/`clear` are absent from read-only subactions like `next`, `blocked`). These are real flags the parser would accept without error even when the subaction's grammar doesn't declare them and the help text doesn't show them. The test never exercises this surface.
+
+As a result, Finding 01 (`--chain` silently accepted for non-cluster subactions) would pass this test suite with zero failures. The nondrift gate certifies as "clean" a surface that has a parseable-but-undeclared flag gap.
+
+Blast radius: the test is load-bearing for the CHK015 invariant and is cited as the mechanism that prevents help/parser drift. If the test's coverage claim is incorrect, the invariant is weaker than documented. Any tooling or governance step that treats a green nondrift suite as proof of full non-drift would be misled.
+
+Fix: add a check (3c) loop that, for each globally-declared boolean flag not in the subaction's grammar, asserts that passing it produces `exit 2 unknown flag`. For the current three global flags (`apply`, `clear`, `chain`), this would be six additional assertions per subaction and would have caught Finding 01 in the test suite itself.
+
+## 2026-06-19 — audit-barrage lift (20260619T040305585Z-027-roadmap-edge-mutation-and-cluster-phase-3)
+
+### AUDIT-20260619-76 — `--chain` silently accepted by all subactions but declared only in `cluster`/`group` — CHK015 parser-grammar gap
+
+Finding-ID: AUDIT-20260619-76 (claude-01 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=high, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    `src/subcommands/roadmap.ts` lines ~115–120 (scanFlags), ~72–88 (SUBACTION_SPECS)
+
+`scanFlags` adds `'chain'` to the **global** boolean list it passes to `scanVerbFlags`:
+
+```ts
+const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear', 'chain'], ALL_VALUE_FLAGS);
+```
+
+This means the underlying scanner accepts `--chain` for **every** roadmap subaction regardless of grammar declaration. Only `cluster` and `group` carry `chain: true` in their `SUBACTION_SPECS` entry, so only they surface `--chain` in per-subaction help. Every other subaction — `advance`, `add`, `defer`, `decompose`, etc. — will silently swallow `--chain` and ignore it.
+
+This is a "parsed-but-unshown flag" for all non-cluster subactions, which the CHK015 non-drift invariant explicitly forbids. The CHK015 test in `help-nondrift.test.ts` does not catch it because:
+
+1. Checks (1) and (2) verify bijection between `flagNamesFor(grammar)` and `shownFlags(help_text)`. For `advance`, `flagNamesFor` does not return `--chain` (the grammar doesn't declare it), and the help doesn't show it, so the check passes — but the **parser** still accepts it.
+2. The bogus-flag test (check 3b) probes `--zzz-not-a-flag`, not `--chain`. A subaction-unaware global flag evades this probe entirely.
+
+Blast-radius: an AI agent that copy-pastes a `cluster` invocation and adapts it to `advance` may carry `--chain` across. The flag is silently accepted, the dependency chain is **never created**, and no error surfaces. For an unattended build this is an invisible correctness failure.
+
+Fix: either (a) gate `--chain` in the scanner on whether the active subaction's grammar declares `chain: true`, or (b) add a test per non-cluster subaction confirming that `--chain` exits 2 with "unknown flag" (requiring the scanner to enforce subaction-local flag sets).
+
+---
+
+### AUDIT-20260619-77 — `--part-of` parsing changed to array but multi-parent semantics are unvalidated
+
+Finding-ID: AUDIT-20260619-77
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/roadmap.ts` lines ~152–166 (`addInputFrom`)
+
+The `--part-of` handling changed from `v.get('part-of')` (single `string | undefined`) to:
+
+```ts
+const partOf = partOfRaw === undefined ? undefined : partOfRaw.split(',').map((s) => s.trim());
+```
+
+The guard rejects empty IDs (stray/trailing commas), but it does **not** reject `--part-of a,b` when both `a` and `b` are valid, non-empty IDs. The stated intent is "stray comma detection" (the comment explicitly frames the error case as "a stray or trailing comma"), yet the code silently accepts multiple parents.
+
+If `AddInput.partOf` is `string[] | undefined` and the mutations layer was updated to iterate the array, then `add --part-of a,b` creates two `part-of` edges — multi-parent assignment — with no warning or explicit opt-in. If the data model intends single-parent only, the validation is incomplete: the guard should additionally assert `partOf.length <= 1` and emit a focused error (`add: --part-of takes exactly one parent id; got N`).
+
+If multi-parent is intentional, the comment, error message, and help text all need to say so. As written, the comment frames `a,b` as a mistake (stray comma) and only catches the empty-string case, leaving the two-parent case semantically ambiguous.
+
+Blast-radius: an agent reading the comment ("stray comma guard") builds the mental model that `--part-of a,b` is invalid; but the code accepts it and may silently assign multiple parents. Conversely, a human operator trying to express "this item belongs to both groups" gets no feedback that this use is experimental or unsupported.
+
+---
+
+### AUDIT-20260619-78 — Empty-ID validation paths for `--children` and `--part-of` have no regression tests
+
+Finding-ID: AUDIT-20260619-78
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `tests/roadmap/help-nondrift.test.ts` (absent), `src/subcommands/roadmap.ts` lines ~222 and ~160
+
+Two `failUsage` guards were added explicitly in response to audit findings (both cite AUDIT-BARRAGE-codex-01):
+
+```ts
+// clusterInputFrom (~line 222)
+if (children.some((s) => s.length === 0)) {
+  failUsage('roadmap', `${verb}: --children has an empty id (a stray or trailing comma)`);
+}
+
+// addInputFrom (~line 160)
+if (partOf !== undefined && (partOf.length === 0 || partOf.some((s) => s.length === 0))) {
+  failUsage('roadmap', 'add: --part-of has an empty id (a stray or trailing comma)');
+}
+```
+
+Neither failure path has a corresponding negative test in this diff. The VALID_INVOCATION fixtures in `help-nondrift.test.ts` exercise only the happy path (well-formed IDs). The cases not covered:
+
+- `cluster parent --children ,child` → leading stray comma → `['', 'child']`
+- `cluster parent --children child,` → trailing stray comma → `['child', '']`
+- `cluster parent --children ,,` → only stray commas → `['', '', '']`
+- `add id --part-of ,` → stray comma for part-of → `['', '']`
+- `add id --part-of child,` → trailing comma on single ID → `['child', '']`
+
+The guard logic is non-trivial (split then trim then `some(s.length === 0)`) and was written specifically to address found bugs. Without at least one negative test per guard, any future refactoring of the split/trim/validate pipeline can silently regress these invariants while CHK015 continues to pass.
+
+---
+
+### AUDIT-20260619-79 — `cluster`/`group` VALID_INVOCATION fixtures reference a parent ID absent from the chain fixture — implicit contract is undocumented
+
+Finding-ID: AUDIT-20260619-79
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `tests/roadmap/help-nondrift.test.ts` lines ~170–189 (cluster/group VALID_INVOCATION entries)
+
+The cluster and group check-(3) fixtures use `multi:feature/grp` and `multi:feature/grp2` respectively as the parent positional. The chain fixture (used via `tmpChain()`) contains only `design:feature/a`, `impl:feature/b`, and `impl:feature/c`. Neither `multi:feature/grp` nor `multi:feature/grp2` exist in the fixture document.
+
+The `expectExit0: true` annotation implies that a dry-run cluster against a non-existent parent succeeds. This is load-bearing behavior: it documents that `cluster` **creates** the parent node on apply (and therefore on dry-run reports "would create") rather than requiring the parent to already exist. But the test fixture comment says nothing about this, so a future reader cannot tell whether `expectExit0: true` is correct-by-design or accidentally passing because the validation is deferred.
+
+Adding a one-sentence comment to the cluster/group fixture entries explaining the "creates-or-reuses parent" contract would make the test self-documenting and prevent a well-intentioned future edit from changing `expectExit0` to `false` under the false assumption that the parent must pre-exist.
+
+---
+
+### AUDIT-20260619-80 — `help-surface.test.ts` matches specific prose substrings that are brittle against wording changes
+
+Finding-ID: AUDIT-20260619-80
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `tests/roadmap/help-surface.test.ts` lines ~31–32
+
+```ts
+expect(r.stdout).toMatch(/list the ready/);
+expect(r.stdout).toMatch(/dry-run unless --apply/);
+```
+
+These probe for specific inner phrases in the `roadmap --help` output. They serve as sanity checks that the help text is substantive (not empty). But they are more brittle than necessary: capitalizing "List", rewording to "Lists ready items", or rephrasing the dry-run note would fail these tests while the feature contract (help is present and non-empty, all subactions are listed) is entirely intact.
+
+A more stable alternative: assert `r.stdout.length > 200` (or similar floor) and rely on the per-subaction name loop (`for (const sub of SUBACTIONS) { expect(r.stdout).toContain(sub); }`) that already follows. The wording assertions contribute friction without load-bearing signal, because the CHK013/014 coverage is already carried by the per-subaction name loop and the status-vocabulary tests below.
+
+### AUDIT-20260619-81 — Flat roadmap dispatcher still has the truncated no-subaction usage
+
+Finding-ID: AUDIT-20260619-81
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/roadmap.ts:449-452
+
+The new help tests assert that `roadmap` with no subaction enumerates the complete subaction set, but the exported flat dispatcher still emits the old hardcoded `roadmap <next|blocked|add> [flags]` message. The live commander path may avoid this, but the file comments describe `runRoadmapCli` as a retained behavior reference, so this is documentation/help drift in an exported surface.
+
+The blast radius is low because normal CLI users likely hit the commander mount, not this retained function. Still, any direct test harness or caller using `runRoadmapCli([])` gets stale guidance that omits `cluster`, `group`, and the other roadmap verbs. The fix is to route this branch through `renderRoadmapUsage()` or `KNOWN_SUBACTIONS` rather than the old literal.
+
+## 2026-06-19 — audit-barrage lift (20260619T040844872Z-027-roadmap-edge-mutation-and-cluster-phase-4)
+
+### AUDIT-20260619-82 — `WorkItem.partOf` type change (`string | null` → `readonly string[]`) — consumers not visible in diff
+
+Finding-ID: AUDIT-20260619-82
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/roadmap-model.ts:19-27, :146
+
+`roadmap-model.ts` changes the exported `WorkItem.partOf` field from `string | null` to `readonly string[]`. This is a breaking change on an exported interface. The diff contains no updates to any code that reads `workItem.partOf` downstream — display commands (`roadmap graph`, `roadmap next`, `roadmap blocked`, `roadmap blocks`), formatters, or JSON/text renderers would all have needed parallel updates. TypeScript strict mode would catch direct type misassignments at compile time, but two failure modes survive compilation: (1) any code that was doing a truthy check `if (item.partOf)` now receives a truthy `[]` where it previously received a falsy `null` — the branch fires even when the item has no grouping; (2) any output path that embeds `partOf` in a template or serializes it would silently change from `null` / `"A"` to `[]` / `["A","B"]`. If `roadmap graph` renders group membership it almost certainly reads this field. The blast-radius is bounded by TypeScript enforcement but not eliminated by it; a consumer passing `item.partOf` into a function that expects `string | null` would compile only if that function also uses a loose type — but display paths built with template strings compile fine with either type. Confirm all consumers are covered, specifically the graph/next/blocked output paths.
+
+---
+
+### AUDIT-20260619-83 — Missing test for `roadmap add --part-of a,b` multi-parent add
+
+Finding-ID: AUDIT-20260619-83
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/roadmap.ts:154-168 (addInputFrom); tests/roadmap/ (no matching test)
+
+The `addInputFrom` function now parses `--part-of` as a comma-separated list and produces `readonly string[]`, enabling a unit to be added to multiple parents in one command. The two new test files in the diff cover `cluster` and `cluster` refusals exclusively; no test in the diff exercises `roadmap add --part-of p1,p2` (multi-parent add). The golden path (two parents both land on the unit), the dedup no-op (one parent already on the unit), and the stray-comma guard for `--part-of` itself are all untested by the visible diff. The stray-comma guard (`partOf.some(s => s.length === 0)`) is tested only indirectly through the `--children` guard path. Given the guard wording is `'add: --part-of has an empty id'` and the PR comment at lines 157-162 names this as a fix for `AUDIT-BARRAGE-codex-01`, the intended invariant exists but lacks a test that would catch a regression.
+
+---
+
+### AUDIT-20260619-84 — `appendEdge` inserts new `part-of` edge BEFORE `- status:` — cosmetic ordering inversion
+
+Finding-ID: AUDIT-20260619-84
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/roadmap/cluster.ts:84-87
+
+When a unit has no existing `- part-of:` line outside a fence, `appendEdge` inserts the new edge at index 1 of the body array — directly after the `## heading` line, before any other metadata including `- status:`. Compare with `buildSection` (`mutations.ts:95`) which always places `- status:` first. The result for a unit like:
+
+```
+## impl:feature/b
+- status: planned
+- depends-on: design:feature/a
+```
+
+after clustering becomes:
+
+```
+## impl:feature/b
+- part-of: multi:feature/grp
+- status: planned
+- depends-on: design:feature/a
+```
+
+The document parser handles either order, so this is functionally correct — all tests pass. But it produces a diff that inverts the conventional field order and will look odd in code review. A reviewer reading the live `ROADMAP.md` post-cluster would see a metadata ordering inconsistency that differs from both `buildSection`-generated sections and the unit's original shape. A straightforward fix: scan for the last metadata line (any `\s*[-*]\s+\w+:` line outside fences) and insert after it rather than at index 1.
+
+---
+
+### AUDIT-20260619-85 — `partOf.length === 0` branch in `--part-of` guard is unreachable dead code
+
+Finding-ID: AUDIT-20260619-85
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/roadmap.ts:157-162
+
+```typescript
+const partOf = partOfRaw === undefined ? undefined : partOfRaw.split(',').map((s) => s.trim());
+if (partOf !== undefined && (partOf.length === 0 || partOf.some((s) => s.length === 0))) {
+```
+
+`String.prototype.split(',')` always returns an array with at least one element — the empty string `''` produces `['']`, not `[]`. When `partOfRaw` is defined, `partOf.length` is always ≥ 1, so `partOf.length === 0` is never true. The only live branch is `partOf.some(s => s.length === 0)`, which correctly catches explicit empty strings and stray commas. The dead branch suggests the guard was written with an incorrect mental model of `split`'s contract (perhaps assuming it could return `[]` for an empty input). This is purely cosmetic — the observable behavior is correct — but the dead branch is a maintenance hazard: a future reader might reason backward from the guard and conclude there is some code path where `split` returns `[]`, leading to incorrect assumptions. Remove the dead clause.
+
+---
+
+### AUDIT-20260619-86 — `chain: true` in `SUBACTION_SPECS` — likely dead code or type violation
+
+Finding-ID: AUDIT-20260619-86
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/roadmap.ts:73-84
+
+Both `cluster` and `group` entries in `SUBACTION_SPECS` include `chain: true`. Every other entry in `SUBACTION_SPECS` (decompose, reclassify, defer, etc.) has only `valueFlags`, `apply`, `clear`, and `positionals`. If `SubactionGrammar` does not declare a `chain` field, TypeScript strict mode would produce a compile error here — meaning either `SubactionGrammar` was updated in a prior commit (not visible in this diff) or the field is permitted via an index signature. Either way, `chain` in `SUBACTION_SPECS` is not consumed by any visible code path: the `--chain` boolean is registered directly in `scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear', 'chain'], ...)` at line 103, not derived from `SUBACTION_SPECS`. The entry in `SUBACTION_SPECS` is decorative at best. This either needs to be removed (if dead code) or `SubactionGrammar` needs a visible `chain?: boolean` field and the consuming scan logic updated to read it from the spec instead of hardcoding it in `scanFlags`.
+
+---
+
+### AUDIT-20260619-87 — `--chain` with a single child silently no-ops
+
+Finding-ID: AUDIT-20260619-87
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/roadmap/cluster.ts:133-138 (chainPredecessor at index 0); src/roadmap/roadmap.ts:218-220
+
+When `--chain` is passed with exactly one child, `chainPredecessor(doc, children, 0)` returns `null` (by design — no predecessor for the first element). The `predecessor` map stays empty, no `depends-on` edges are written, and the `--chain` flag has zero observable effect. The operator receives no warning that the flag was accepted but did nothing. A common UX mistake here: an operator who misremembers that `--chain` means "chain this child to an existing predecessor" (rather than "chain the children to each other") would pass `--children single-item --chain` and see a successful exit with silent no-op on the dependency wiring. A short note in the success output (or a `process.stderr.write` warning) when `chain: true && children.length === 1` would surface this. Not a correctness defect, but a discoverability gap.
+
+### AUDIT-20260619-88 — Decompose dedups only within each `part-of` line, not across the unit
+
+Finding-ID: AUDIT-20260619-88
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/mutations.ts:52-66, src/roadmap/mutations.ts:235-257
+
+`decompose` now claims to de-duplicate repointed edges when an item already references one of the new parts, but the implementation runs `repoint` through `rewriteEdgeLine`, which transforms each matching line independently. That means repeated `part-of` lines can still produce duplicate merged targets. Example: a unit with `- part-of: multi:feature/old` and another line `- part-of: impl:feature/a`; decomposing `multi:feature/old` into `impl:feature/a, impl:feature/b` rewrites the first line to `a, b` and leaves the second line as `a`, so the parsed aggregate becomes `a, b, a`.
+
+This matters because the feature explicitly widened `part-of` to multi-parent and the nearby `cluster` tests assert aggregate dedup for repeated `part-of` lines, but the related `decompose` path still violates that contract. Blast radius is medium: it does not usually break validation, but it creates duplicate graph metadata that downstream views or later mutations consume as real targets. A reasonable fix is to replace the line-local rewrite for edge fields with an aggregate real-edge-line rewrite, or add a dedicated `rewriteEdgeTargets` helper that collects all real lines for a field, applies the transform once, and writes a deduped target list back once.
+
+### AUDIT-20260619-89 — Decompose still rewrites fenced `part-of` examples as metadata
+
+Finding-ID: AUDIT-20260619-89
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/mutations.ts:52-66, src/roadmap/mutations.ts:253-257
+
+`cluster` added fence-aware handling because field-looking bullets inside code fences are prose, not metadata. `decompose` still uses `rewriteEdgeLine`, whose regex maps every line matching `- part-of:` regardless of whether it is inside a fenced block. If a unit has a real `part-of` edge to the decomposed item plus a fenced example mentioning the same id, the guard at lines 253-257 enters the rewrite path, and lines 57-66 mutate both the real metadata and the fenced example.
+
+That is content corruption in a repository whose core object is markdown content. The blast radius is medium because it only hits roadmap items containing fenced examples, but when it does, a valid mutation silently rewrites prose the document parser would have ignored. The fix should make shared edge rewrites use the same fence-awareness as `appendEdge` and `scopeOf`, then cover decompose/reclassify with a fenced-field regression test.

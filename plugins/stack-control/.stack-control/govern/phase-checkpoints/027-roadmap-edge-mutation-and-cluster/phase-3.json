@@ -4,14 +4,15 @@
   "phaseId": "3",
   "checkpoint": "phase-3",
   "auditLogSection": "phase-3",
-  "scopeFingerprint": "606138776a551d2f4b97d875ddf981174e39a988a267925df0ac4ed12c476175",
-  "passedAt": "2026-06-19T01:35:22.645Z",
+  "scopeFingerprint": "2e23e8fc29d69ba489b34c00caff998a3acfd34aa23fd7ab34809f3b395aef11",
+  "passedAt": "2026-06-19T04:08:22.731Z",
   "governedPaths": [
     "tests/roadmap/help-nondrift.test.ts",
     "tests/roadmap/help-surface.test.ts",
     "src/subcommands/roadmap.ts"
   ],
   "auditedFiles": [
+    "plugins/stack-control/src/subcommands/roadmap.ts",
     "plugins/stack-control/tests/roadmap/help-nondrift.test.ts",
     "plugins/stack-control/tests/roadmap/help-surface.test.ts"
   ]

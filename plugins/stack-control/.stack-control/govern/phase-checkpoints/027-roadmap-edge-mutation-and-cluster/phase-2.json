@@ -4,8 +4,8 @@
   "phaseId": "2",
   "checkpoint": "phase-2",
   "auditLogSection": "phase-2",
-  "scopeFingerprint": "af05d2736a3c7c4ea0f0587d75501b66b05fa4db0772dac6c89a90c947e0a944",
-  "passedAt": "2026-06-19T00:27:22.160Z",
+  "scopeFingerprint": "25b2825bd31b8e591fd6bdc314ff23d63e061295957e4c2477cc8befbb75cb9c",
+  "passedAt": "2026-06-19T02:55:02.513Z",
   "governedPaths": [
     "tests/cli/parser-adapter.test.ts",
     "src/cli.ts",
@@ -13,6 +13,8 @@
     "next/blocked/order/graph/add/advance/decompose/reclassify/defer/reconcile/close-related"
   ],
   "auditedFiles": [
-    "plugins/stack-control/tests/cli/parser-adapter.test.ts"
+    "plugins/stack-control/src/cli.ts",
+    "plugins/stack-control/tests/cli/parser-adapter.test.ts",
+    "plugins/stack-control/tests/roadmap/non-regression.test.ts"
   ]
 }
