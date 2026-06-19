@@ -37,11 +37,11 @@ Single-project CLI. Source under `plugins/stack-control/src/`; tests under `plug
 
 **Purpose**: Stand up the command-surface descriptor module skeleton and its test harness so Phase 2 generalization has a typed home and a RED target.
 
-- [ ] T001 Create the `CommandDescriptor` / `SubActionDescriptor` / `FlagDescriptor` / `MediationClass` type skeleton (types only, no walker yet) in `src/cli-help/command-surface.ts` per data-model §1 (FR-003).
-- [ ] T002 [P] Create the command-surface test harness skeleton (shared fixtures: the live verb set, a helper that runs `stackctl <verb> [sub] --help` and captures exit + stdout) in `src/__tests__/cli-help/command-surface-harness.ts` (FR-001/002).
-- [ ] T003 [P] Add a `scripts/smoke-front-door.sh` skeleton (invokes `stackctl check-front-door` + the interceptor smoke; non-zero on any gap; documented as local pre-PR, not CI) — stubbed to exit 0 until US4 wires it (FR-034).
+- [x] T001 Create the `CommandDescriptor` / `SubActionDescriptor` / `FlagDescriptor` / `MediationClass` type skeleton (types only, no walker yet) in `src/cli-help/command-surface.ts` per data-model §1 (FR-003).
+- [x] T002 [P] Create the command-surface test harness skeleton (shared fixtures: the live verb set, a helper that runs `stackctl <verb> [sub] --help` and captures exit + stdout) in `src/__tests__/cli-help/command-surface-harness.ts` (FR-001/002).
+- [x] T003 [P] ~~Add a `scripts/smoke-front-door.sh` skeleton~~ — **superseded by T118 per 028 Phase 1 govern (AUDIT-BARRAGE-codex-01).** A skeleton smoke *gate* is inherently misleading: exit 0 is a false green, exit 1 is a false red, and the checks it must invoke (`check-front-door` T107, `smoke-interceptor-loaded.sh` T117) do not exist until US4. The structural fix is to NOT ship a non-functional gate in Setup; `scripts/smoke-front-door.sh` is **created born-wired in T118** (no scope cut — it still ships in US4) (FR-034).
 
-**Checkpoint**: The descriptor types compile; the help-probe harness is importable; the smoke script exists.
+**Checkpoint**: The descriptor types compile; the help-probe harness is importable. (The smoke script is created born-wired in T118, not as a Setup skeleton — see T003 note.)
 
 ---
 
@@ -224,7 +224,7 @@ Each family below: RED help-probe test first (asserts `<verb> [sub] --help` exit
 - [ ] T115 [P] [US4] Wire `check-front-door` as a gate into the review surface skill body (`skills/define/SKILL.md` review/precondition section, or the dedicated review skill body if present) (FR-034 — skill body, never a git hook).
 - [ ] T116 [US4] RED: interceptor-loaded smoke assertions — `hooks/hooks.json` declares the `PreToolUse` `Bash`+`Skill` matchers → `${CLAUDE_PLUGIN_ROOT}/bin/intercept` and is auto-discovered via the plugin manifest; feeding `bin/intercept` a fronted-no-marker payload emits `deny`, a non-backend payload permits, in `src/__tests__/capability/interceptor-loaded.test.ts` (FR-035; contract T7; SC-007).
 - [ ] T117 [US4] Implement `scripts/smoke-interceptor-loaded.sh` (registration + firing assertions per contract T7) and confirm `.claude-plugin/plugin.json` auto-discovers `hooks/hooks.json` (FR-035) — makes T116 GREEN.
-- [ ] T118 [US4] Wire `scripts/smoke-front-door.sh` (from T003) to invoke `stackctl check-front-door` + `scripts/smoke-interceptor-loaded.sh`, non-zero on any gap (FR-034/035).
+- [ ] T118 [US4] **Create AND wire** `scripts/smoke-front-door.sh` (creation moved here from T003 per 028 Phase 1 govern AUDIT-BARRAGE-codex-01 — born wired, never a non-functional skeleton) to invoke `stackctl check-front-door` + `scripts/smoke-interceptor-loaded.sh`, non-zero on any gap; documented as local pre-PR, not CI (FR-034/035).
 
 **Checkpoint**: SC-006/SC-007 hold — `check-front-door` exits 0 on the complete surface, RED on each injected gap; the interceptor is provably loaded and firing.
 

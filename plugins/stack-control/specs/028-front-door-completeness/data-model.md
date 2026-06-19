@@ -26,6 +26,7 @@ surface to all 46 verbs.
 /** A flag on a verb or sub-action (derived from the commander option definition). */
 export interface FlagDescriptor {
   readonly name: string;          // dashed long form, e.g. "depends-on"
+  readonly shortFlag: string | null; // short alias without dash, e.g. "d"; null when none
   readonly arg: string | null;    // value placeholder, e.g. "<value>"; null for a boolean flag
   readonly required: boolean;     // whether the flag is mandatory for the operation
   readonly description: string;   // one-line help text
@@ -38,7 +39,7 @@ export type MediationClass = 'mutating' | 'read-only';
 export interface SubActionDescriptor {
   readonly name: string;                       // e.g. "add-edge"
   readonly description: string;                 // one-line summary (the SUMMARIES analogue)
-  readonly positional: string | null;          // "<identifier>" when the sub-action takes one, else null
+  readonly positionals: readonly string[];      // ordered positional args, e.g. ["<from>","<to>"]; [] when none
   readonly flags: readonly FlagDescriptor[];
   readonly mediationClass: MediationClass;      // declared, not inferred (Decision 4)
 }
@@ -49,10 +50,29 @@ export interface CommandDescriptor {
   readonly description: string;
   readonly subActions: readonly SubActionDescriptor[]; // [] for a single-action verb
   readonly flags: readonly FlagDescriptor[];           // verb-level flags (single-action verbs)
-  readonly mediationClass: MediationClass;             // for a single-action verb; multi-action class is per-sub-action
+  readonly mediationClass: MediationClass | null;      // single-action class; `null` for a multi-action verb (class is per-sub-action)
   readonly deprecatedAliasOf: string | null;           // e.g. check-editor-symmetry → check-module-symmetry
 }
 ```
+
+> **Govern refinement (028 Phase 1, AUDIT-BARRAGE-claude-01).** `mediationClass` on
+> `CommandDescriptor` is typed `MediationClass | null` rather than always-present:
+> for a multi-action verb the verb-level class is meaningless (the real class is
+> per-`SubActionDescriptor`), so it is `null`. The `| null` is deliberate — it
+> forces every consumer (the completeness/mediation guards in T007/T009, the
+> fronted-operations derivation) to branch on the multi-action case at compile
+> time instead of silently consuming a default that would mis-classify a mutating
+> sub-action as read-only. The full discriminated-union alternative is captured for
+> later operator consideration (backlog TASK-300); the nullable field is the
+> minimal compile-time-safe form adopted now.
+>
+> Two further Phase-1 govern refinements to the same shapes: (1) `SubActionDescriptor`
+> carries `positionals: readonly string[]` (ordered) rather than a single
+> `positional: string | null`, so a multi-positional sub-action (e.g. a reparent
+> `<from> <to>`) is representable instead of silently truncated (AUDIT-BARRAGE-claude-01,
+> round 4). (2) `FlagDescriptor` carries `shortFlag: string | null` so the walker
+> preserves a commander option's short alias (`-d, --depends-on`) and the renderer can
+> emit the canonical form rather than dropping it from help (AUDIT-BARRAGE-claude-03).
 
 **Relationships.** Built by walking the live commander `Command` tree (the same tree
 `roadmap-command.ts` builds). `--help`, the verb reference, the descriptor artifact,

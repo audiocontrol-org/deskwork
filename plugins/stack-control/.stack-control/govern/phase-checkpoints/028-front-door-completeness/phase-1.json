@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "featureSlug": "028-front-door-completeness",
+  "phaseId": "1",
+  "checkpoint": "phase-1",
+  "auditLogSection": "phase-1",
+  "scopeFingerprint": "883a98e68347e8bc8ab539e011ca99be2a056c8c170ce47e65ecbe03ac9b4a34",
+  "passedAt": "2026-06-19T17:24:48.236Z",
+  "governedPaths": [
+    "src/cli-help/command-surface.ts",
+    "src/__tests__/cli-help/command-surface-harness.ts",
+    "scripts/smoke-front-door.sh"
+  ],
+  "auditedFiles": []
+}
