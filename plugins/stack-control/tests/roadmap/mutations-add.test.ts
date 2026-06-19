@@ -27,7 +27,7 @@ describe('mutations.add (T023)', () => {
         identifier: 'impl:fix/escaped-pipe',
         scope: 'found mid-build',
         dependsOn: ['design:feature/a'],
-        partOf: 'impl:feature/b',
+        partOf: ['impl:feature/b'],
       },
       ROADMAP_OPTS,
       true,
@@ -38,7 +38,7 @@ describe('mutations.add (T023)', () => {
     expect(item.phase).toBe('impl');
     expect(item.status).toBe('planned');
     expect(item.dependsOn).toEqual(['design:feature/a']);
-    expect(item.partOf).toBe('impl:feature/b');
+    expect(item.partOf).toEqual(['impl:feature/b']);
     expect(item.scope).toContain('found mid-build');
   });
 

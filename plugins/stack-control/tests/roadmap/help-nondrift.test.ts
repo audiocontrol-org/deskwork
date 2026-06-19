@@ -139,6 +139,28 @@ const VALID_INVOCATION: Readonly<Record<string, ValidInvocation>> = {
   // NOT a status (the task's `--to in-flight` is invalid against the id grammar).
   reclassify: { argv: ['impl:feature/b', '--to', 'impl:feature/b2'], expectExit0: true },
   defer: { argv: ['impl:feature/b', '--until', '2026-12-01'], expectExit0: true },
+  // cluster groups existing children under a created-or-reused parent; exercise
+  // every declared flag (--children, --summary, --chain) with valid values against
+  // the chain fixture (b before c keeps the chain acyclic and conflict-free).
+  cluster: {
+    argv: [
+      'multi:feature/grp',
+      '--children', 'impl:feature/b,impl:feature/c',
+      '--summary', 'grouped work',
+      '--chain',
+    ],
+    expectExit0: true,
+  },
+  // group is the alias of cluster — identical grammar + valid invocation.
+  group: {
+    argv: [
+      'multi:feature/grp2',
+      '--children', 'impl:feature/b,impl:feature/c',
+      '--summary', 'grouped work',
+      '--chain',
+    ],
+    expectExit0: true,
+  },
   // close-related needs a TERMINAL item; design:feature/a is `shipped` (terminal)
   // and records no resolved ids, so the dry-run exits 0 ("nothing to close").
   'close-related': { argv: ['design:feature/a'], expectExit0: true },

@@ -46,6 +46,8 @@ const SUMMARIES: Readonly<Record<string, string>> = {
   decompose: 'split an item into children, repointing dependents (dry-run unless --apply)',
   reclassify: 'rename an item\'s identifier (dry-run unless --apply)',
   defer: 'set or clear an item\'s deferred-until condition (dry-run unless --apply)',
+  cluster: 'group items under a created-or-reused parent, optionally chaining deps (dry-run unless --apply)',
+  group: 'alias of cluster — group items under a created-or-reused parent (dry-run unless --apply)',
   reconcile: 'report status drift, orphan spec dirs, and unresolved correspondences (report-only)',
   'close-related': 'close the backlog ids a terminal item resolves (dry-run unless --apply)',
 };
@@ -77,6 +79,7 @@ export function flagNamesFor(grammar: SubactionGrammar): readonly string[] {
   for (const flag of grammar.valueFlags) names.push(`--${flag}`);
   if (grammar.apply) names.push('--apply');
   if (grammar.clear === true) names.push('--clear');
+  if (grammar.chain === true) names.push('--chain');
   return names;
 }
 
@@ -84,7 +87,7 @@ export function flagNamesFor(grammar: SubactionGrammar): readonly string[] {
  * `--<value-flag> <value>`). The description column aligns to the widest such
  * token across the subaction's flag set. */
 function flagToken(flag: string): string {
-  if (flag === '--apply' || flag === '--clear') return flag;
+  if (flag === '--apply' || flag === '--clear' || flag === '--chain') return flag;
   if (flag === '--doc') return '--doc <path>';
   return `${flag} <value>`;
 }
@@ -103,6 +106,7 @@ function flagLine(
   if (flag === '--doc') desc = 'roadmap document (default: resolve through the installation)';
   else if (flag === '--apply') desc = 'write the change (default: dry-run)';
   else if (flag === '--clear') desc = 'clear the condition';
+  else if (flag === '--chain') desc = 'wire a depends-on chain over the children (in argument order)';
   else {
     const isStatusFlag =
       (flag === '--to' && grammar === SUBACTION_SPECS.advance) || flag === '--status';

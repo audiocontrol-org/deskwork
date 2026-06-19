@@ -22,6 +22,7 @@ import {
   type AddInput,
   type MutationResult,
 } from '../roadmap/mutations.js';
+import { cluster, type ClusterInput } from '../roadmap/cluster.js';
 import { globParent, reconcile } from '../roadmap/reconcile.js';
 import { loadRoadmap, type RoadmapModel } from '../roadmap/roadmap-model.js';
 import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
@@ -47,6 +48,7 @@ export interface Flags {
   readonly doc: string;
   readonly apply: boolean;
   readonly clear: boolean;
+  readonly chain: boolean;
   readonly positionals: readonly string[];
   readonly values: ReadonlyMap<string, string>;
 }
@@ -70,6 +72,21 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   decompose: { valueFlags: ['into'], apply: true, clear: false, positionals: 1 },
   reclassify: { valueFlags: ['to'], apply: true, clear: false, positionals: 1 },
   defer: { valueFlags: ['until'], apply: true, clear: true, positionals: 1 },
+  cluster: {
+    valueFlags: ['children', 'summary'],
+    apply: true,
+    clear: false,
+    chain: true,
+    positionals: 1,
+  },
+  // `group` is an alias of `cluster` (same grammar + same handler).
+  group: {
+    valueFlags: ['children', 'summary'],
+    apply: true,
+    clear: false,
+    chain: true,
+    positionals: 1,
+  },
   'close-related': { valueFlags: [], apply: true, clear: false, positionals: 1 },
 };
 
@@ -84,15 +101,16 @@ const ALL_VALUE_FLAGS: readonly string[] = [
  * (`roadmap-command.ts`) emit the byte-identical message (FR-006; AUDIT-BARRAGE-
  * codex-01). The order is the discovery order operators have learned, kept stable. */
 export const KNOWN_SUBACTIONS =
-  'next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, reconcile, close-related';
+  'next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, cluster, group, reconcile, close-related';
 
-/** Scan flags via the shared subaction-verb scanner; `--apply`/`--clear` booleans. */
+/** Scan flags via the shared subaction-verb scanner; `--apply`/`--clear`/`--chain` booleans. */
 export function scanFlags(args: readonly string[]): Flags {
-  const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear'], ALL_VALUE_FLAGS);
+  const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear', 'chain'], ALL_VALUE_FLAGS);
   return {
     doc: s.doc,
     apply: s.booleans.has('apply'),
     clear: s.booleans.has('clear'),
+    chain: s.booleans.has('chain'),
     positionals: s.positionals,
     values: s.values,
   };
@@ -134,12 +152,16 @@ function addInputFrom(flags: Flags): AddInput {
   if (identifier === undefined) failUsage('roadmap', 'add requires an <identifier> positional');
   const v = flags.values;
   const dependsOn = v.get('depends-on');
+  const partOf = v.get('part-of');
   return {
     identifier,
     status: v.get('status'),
     scope: v.get('scope'),
     dependsOn: dependsOn === undefined ? undefined : dependsOn.split(',').map((s) => s.trim()),
-    partOf: v.get('part-of'),
+    partOf:
+      partOf === undefined
+        ? undefined
+        : partOf.split(',').map((s) => s.trim()).filter((s) => s.length > 0),
     deferredUntil: v.get('deferred-until'),
     spec: v.get('spec'),
     ref: v.get('ref'),
@@ -181,6 +203,28 @@ function emitDefer(flags: Flags, opts: LoadOptions): void {
   const id = requireId(flags, 'defer');
   const change = flags.clear ? { clear: true } : { until: requireValue(flags, 'until') };
   reportMutation(defer(flags.doc, id, change, opts, flags.apply), 'defer', id);
+}
+
+/** Build the `cluster` input from the parsed flags (positional parent + --children). */
+function clusterInputFrom(flags: Flags, verb: string): ClusterInput {
+  const parentId = requireId(flags, verb);
+  const children = requireValue(flags, 'children')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return { parentId, children, chain: flags.chain, summary: flags.values.get('summary') };
+}
+
+/** `roadmap cluster <parent> --children <a,b,…> [--chain] [--summary] [--apply]`. */
+function emitCluster(flags: Flags, opts: LoadOptions, verb: string): void {
+  const input = clusterInputFrom(flags, verb);
+  const result = cluster(flags.doc, input, opts, flags.apply);
+  const chainNote = input.chain ? ' + depends-on chain' : '';
+  process.stdout.write(
+    result.applied
+      ? `roadmap ${verb}: grouped ${input.children.join(', ')} under ${input.parentId}${chainNote}\n`
+      : `roadmap ${verb}: dry-run — would group ${input.children.join(', ')} under ${input.parentId}${chainNote} (use --apply to write)\n`,
+  );
 }
 
 /**
@@ -353,6 +397,10 @@ export async function executeRoadmapSubaction(subaction: string, scanned: Flags)
         return;
       case 'defer':
         emitDefer(flags, opts);
+        return;
+      case 'cluster':
+      case 'group':
+        emitCluster(flags, opts, subaction);
         return;
       case 'reconcile':
         emitReconcile(flags, opts);

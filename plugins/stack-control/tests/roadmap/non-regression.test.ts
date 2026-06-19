@@ -91,7 +91,7 @@ describe('027 T005 — roadmap subactions non-regression after commander mount',
     expect(apply.status).toBe(0);
     const item = loadRoadmap(docPath, ROADMAP_OPTS).byId.get('impl:fix/escaped-pipe')!;
     expect(item.kind).toBe('fix');
-    expect(item.partOf).toBe('impl:feature/b');
+    expect(item.partOf).toEqual(['impl:feature/b']);
     expect(item.dependsOn).toEqual(['design:feature/a']);
   });
 

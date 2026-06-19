@@ -45,7 +45,7 @@ describe('stackctl roadmap add verb (T025)', () => {
     const model = loadRoadmap(docPath, ROADMAP_OPTS);
     const item = model.byId.get('impl:fix/escaped-pipe')!;
     expect(item.kind).toBe('fix');
-    expect(item.partOf).toBe('impl:feature/b');
+    expect(item.partOf).toEqual(['impl:feature/b']);
     expect(item.dependsOn).toEqual(['design:feature/a']);
   });
 

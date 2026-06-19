@@ -36,12 +36,12 @@ Tests are REQUIRED (Constitution Principle I — Test-First, NON-NEGOTIABLE): ea
 **Goal**: group N existing items under a (created-or-reused) parent + optional dependency chain, atomically, no hand-edit.
 **Independent test**: quickstart Scenarios 2–4.
 
-- [ ] T010 [P] [US2] RED test `tests/roadmap/cluster.test.ts`: create-new parent + `--chain` wires `part-of` on each child and `depends-on` `a→b→c`; reuse existing parent (no duplicate); multi-parent child gains the edge alongside an existing different-parent `part-of` (FR-008/009/010, CHK001/007/008/020).
-- [ ] T011 [P] [US2] RED test `tests/roadmap/cluster-refusal.test.ts`: missing child / empty `--children` / `parent==child` / cycle / conflicting-`depends-on`-under-`--chain` each refuse (exit 2) and leave `ROADMAP.md` byte-for-byte unchanged; dry-run default writes nothing (FR-011/012/013/014/015, CHK002/003/004/009/011).
-- [ ] T012 [US2] Confirm the atomicity-reuse assumption against `src/roadmap/mutations.ts` (build→revalidate→write; `reclassify` multi-edge precedent) — record finding; if absent, STOP and surface (research Decision 2, CHK027).
-- [ ] T013 [US2] If the projection collapses multi-`part-of`, widen `WorkItem.partOf` to `string[]` in `src/roadmap/roadmap-model.ts` and adjust readers (data-model note, CHK028); else record that it already supports it.
-- [ ] T014 [US2] Implement `cluster(parentId, children, {chain, summary, apply})` in `src/roadmap/mutations.ts` composing `add`/`setField`/`rewriteEdgeLine` inside one build→revalidate→write (FR-007..015). Split `mutations.ts` into per-mutation modules if it exceeds the 500-line cap (CHK025).
-- [ ] T015 [US2] Add the `cluster` (+ `group` alias) commander sub-command definition + handler in `src/subcommands/roadmap.ts` (dry-run default, `--apply`, `--children`, `--chain`, `--summary`); surfaced in `--help` via the same definition.
+- [X] T010 [P] [US2] RED test `tests/roadmap/cluster.test.ts`: create-new parent + `--chain` wires `part-of` on each child and `depends-on` `a→b→c`; reuse existing parent (no duplicate); multi-parent child gains the edge alongside an existing different-parent `part-of` (FR-008/009/010, CHK001/007/008/020).
+- [X] T011 [P] [US2] RED test `tests/roadmap/cluster-refusal.test.ts`: missing child / empty `--children` / `parent==child` / cycle / conflicting-`depends-on`-under-`--chain` each refuse (exit 2) and leave `ROADMAP.md` byte-for-byte unchanged; dry-run default writes nothing (FR-011/012/013/014/015, CHK002/003/004/009/011).
+- [X] T012 [US2] Confirm the atomicity-reuse assumption against `src/roadmap/mutations.ts` (build→revalidate→write; `reclassify` multi-edge precedent) — record finding; if absent, STOP and surface (research Decision 2, CHK027).
+- [X] T013 [US2] If the projection collapses multi-`part-of`, widen `WorkItem.partOf` to `string[]` in `src/roadmap/roadmap-model.ts` and adjust readers (data-model note, CHK028); else record that it already supports it.
+- [X] T014 [US2] Implement `cluster(parentId, children, {chain, summary, apply})` in `src/roadmap/mutations.ts` composing `add`/`setField`/`rewriteEdgeLine` inside one build→revalidate→write (FR-007..015). Split `mutations.ts` into per-mutation modules if it exceeds the 500-line cap (CHK025).
+- [X] T015 [US2] Add the `cluster` (+ `group` alias) commander sub-command definition + handler in `src/subcommands/roadmap.ts` (dry-run default, `--apply`, `--children`, `--chain`, `--summary`); surfaced in `--help` via the same definition.
 
 **Checkpoint**: US2 independently testable — quickstart Scenarios 2–4 pass; US1 still green.
 
