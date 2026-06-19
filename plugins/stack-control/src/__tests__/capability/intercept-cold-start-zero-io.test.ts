@@ -48,12 +48,24 @@ describe('cold-start zero marker I/O for non-backend calls (028 T095)', () => {
     expect(r.calls).toBe(0);
   });
 
-  it('a backend identity DOES resolve the marker exactly once (the bound is paid only when needed)', () => {
+  it('a MUTATING backend identity DOES resolve the marker exactly once (the bound is paid only when needed)', () => {
+    // A mutating fronted op is the one that consults the marker. (A read-only fronted op
+    // like `backlog list` is exempt and skips the marker read entirely — codex-01 r3 —
+    // so the bound is paid only when a mutating call genuinely needs it.)
+    const r = countingResolver();
+    interceptDecision(
+      { tool_name: 'Bash', tool_input: { command: 'backlog capture --type bug' }, session_id: 's', cwd: '/x' },
+      r.deps,
+    );
+    expect(r.calls).toBe(1);
+  });
+
+  it('a READ-ONLY backend identity resolves the marker ZERO times (exempt, no marker I/O)', () => {
     const r = countingResolver();
     interceptDecision(
       { tool_name: 'Bash', tool_input: { command: 'backlog list' }, session_id: 's', cwd: '/x' },
       r.deps,
     );
-    expect(r.calls).toBe(1);
+    expect(r.calls).toBe(0);
   });
 });

@@ -93,11 +93,15 @@ export function mediateCheck(args: readonly string[], deps: MediateCheckDeps): M
     return { code: 0, stdout: '', stderr: '' };
   }
 
-  const active = isFronted ? deps.resolveActive(dir, session) : new Set<string>();
   // Derive the op's mediation class so the FR-050 read-only exemption fires on the LIVE
   // path: a read-only fronted query (`backlog list`) is permitted even with no marker,
   // while every mutating fronted op still refuses (AUDIT-BARRAGE-codex-01 / claude-01).
   const mediationClass = mediationClassForIdentity(surfaceTyped, identity);
+  // Resolve active marker state ONLY for a mutating fronted op — a read-only query is
+  // exempt and must NOT read the marker, so a CORRUPT marker can never fail-close a
+  // read-only inspection command (AUDIT-BARRAGE-codex-01, round 3).
+  const active =
+    isFronted && mediationClass === 'mutating' ? deps.resolveActive(dir, session) : new Set<string>();
   const decision = decideMediation(CAPABILITY_REGISTRY, surfaceTyped, identity, active, mediationClass);
   const code: 0 | 1 = decision.verdict === 'permit' ? 0 : 1;
 

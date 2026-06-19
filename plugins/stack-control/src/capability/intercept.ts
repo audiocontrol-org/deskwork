@@ -105,7 +105,11 @@ export function interceptDecision(payload: HookPayload, deps: InterceptDeps): Me
   // permits even with no marker; every mutating fronted op still refuses unless marked
   // (AUDIT-BARRAGE-codex-01 / claude-01).
   const mediationClass = mediationClassForIdentity(surface, identity);
-  return decideMediation(registry, surface, identity, deps.resolveActive(cwd, session), mediationClass);
+  // Resolve active marker state ONLY for a mutating fronted op — a read-only query is
+  // exempt and must NOT read the marker, so a corrupt marker can't fail-close a read-only
+  // call (AUDIT-BARRAGE-codex-01, round 3).
+  const active = mediationClass === 'mutating' ? deps.resolveActive(cwd, session) : new Set<string>();
+  return decideMediation(registry, surface, identity, active, mediationClass);
 }
 
 /**

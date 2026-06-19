@@ -2196,3 +2196,113 @@ Surface:    src/capability/mediation-class.ts:52-56; src/capability/mediate.ts:4
 `mediationClassForIdentity` returns the class for the first fronted backend command it sees. If the Bash payload is `backlog list && backlog capture --type bug`, lines 52-56 classify the whole intercepted tool call as `read-only` because the first `backlog` command is `list`. `decideMediation` then permits the entire identity on the read-only exemption at lines 45-52, so the later mutating `backlog capture` runs without a marker.
 
 The blast radius is high because compound shell commands are explicitly supported by the identity parser, and this turns the new FR-050 exemption into a practical unmarked mutation bypass. A reasonable fix is to derive mediation over every matched fronted command in the payload: permit as read-only only if every fronted backend invocation in the command line is declared read-only; otherwise classify the invocation as mutating and require the marker.
+
+## 2026-06-19 — audit-barrage lift (20260619T221103127Z-028-front-door-completeness-phase-5)
+
+### AUDIT-20260619-129 — `runIntercept` production wrapper absent — `resolveInstalled` default breaks FR-020 on the hook path
+
+Finding-ID: AUDIT-20260619-129
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/capability/intercept.ts:27-31` (interface change) + missing `src/subcommands/intercept.ts` or equivalent runner
+
+The `InterceptDeps` interface gains an optional `resolveInstalled?: (cwd: string) => boolean` with a default of `?? true` ("assume an installation exists"). The doc-comment on the interface explicitly states: *"the production adapter supplies the real probe so the no-installation short-circuit-to-permit (FR-020) fires symmetrically with `mediate-check`."* That adapter — `runIntercept` or whatever wraps `interceptDecision` for `stackctl intercept` — is **entirely absent from this diff**.
+
+`mediate-check`'s production runner (`runMediateCheck`) was updated in this same diff to explicitly supply `resolveInstalled: defaultResolveInstalled`. No equivalent change appears for the hook's runner. Because the optional field defaults to `true` (present installation), an `interceptDecision` call made without `resolveInstalled` wired will skip the no-installation short-circuit entirely: the verb falls through to `resolveActive`, which returns an empty active set for a non-installation directory, causing `decideMediation` to **refuse** a fronted backend. A `backlog create` issued from a directory that has no enclosing stack-control installation will be denied by the hook even though FR-020 requires it to be permitted. The `stackctl setup` redirect named in the refusal message would be unsatisfiable (no installation → setup makes no sense), creating a dead-end for the operator. The only test that exercises the `interceptDecision` no-installation code-path (`cwd-linchpin-reconcile.test.ts` line 51) calls `mediateCheck`, not `interceptDecision`, so the gap is not caught by the new tests in this diff.
+
+---
+
+### AUDIT-20260619-130 — SKILL.md for `speckit-guard` still describes the retired `STACKCTL_FRONT_DOOR` env-var path
+
+Finding-ID: AUDIT-20260619-130
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    `plugins/stack-control/skills/speckit-guard/SKILL.md` (not in the diff — the file was not updated)
+
+The implementation change in `src/subcommands/speckit-guard.ts` explicitly retires the `FRONT_DOOR_MARKER_ENV` / `STACKCTL_FRONT_DOOR` lookup and replaces it with the 026 session-keyed file marker. The header comment in the source file tracks this correctly. However, the shipping SKILL.md (visible from the skill invocation above) still reads: *"Exit `0` → reached via its front door (the `STACKCTL_FRONT_DOOR` marker is set) or not a wrapped skill — permitted."*
+
+An agent or adopter reading the skill to understand how to establish a permitted context will believe they need to set `STACKCTL_FRONT_DOOR=1` in the environment. They will do so, and the new implementation will ignore it — `resolveViaFrontDoorFile` reads only the file marker, never the env var. The result is a raw speckit skill invocation that is refused despite the operator following the documented path. Because agents act on SKILL.md text as executable specification, this is a high-severity documentation/behavior divergence: the more natural reading (set the env var) is the wrong one, and nothing in the artifact currently corrects it. The fix is to update the skill's description of the permit condition to reflect the file-marker path established by `front-door enter --capability <id> --session <id>`.
+
+---
+
+### AUDIT-20260619-131 — `interceptDecision` no-installation short-circuit has no direct test coverage in this diff
+
+Finding-ID: AUDIT-20260619-131
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/capability/intercept.ts:95-103` (new short-circuit block) + `src/__tests__/capability/` (no new test for `interceptDecision` + no-installation scenario)
+
+The new `if (!installed) { return { verdict: 'permit', ... } }` branch in `interceptDecision` (lines 95–103) has no dedicated test. Every other FR-020 surface in this diff gets its own test file: `mediate-check-no-installation-permit.test.ts` exercises `mediateCheck`, and `speckit-guard-file-marker.test.ts` exercises `evaluateGuard(..., installed=false)`. The `interceptDecision` no-installation path is structurally identical but untested. The `intercept-cold-start-zero-io.test.ts` exercises the identity pre-filter (zero marker reads for non-backend calls) but never supplies `resolveInstalled: () => false`, so the short-circuit branch on line 97 is never exercised by the new tests. If `runIntercept` (finding -01) were later wired correctly and `resolveInstalled` supplied, a regression in the `installed` check would be caught only by the `mediate-check` tests (which test a different entry point), not by a test that exercises `interceptDecision` directly. A single test case analogous to `mediate-check-no-installation-permit.test.ts` line 27 but calling `interceptDecision` with a `resolveInstalled: () => false` dep would close this gap.
+
+---
+
+### AUDIT-20260619-132 — Non-ENOENT I/O errors in `listMarker` silently classified as `corrupt: true`
+
+Finding-ID: AUDIT-20260619-132
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/capability/marker.ts:267-270` (`listMarker` catch block)
+
+The catch in `listMarker` has two branches: ENOENT → `{ corrupt: false, entries: [] }`; anything else → `{ corrupt: true, entries: [] }`. The "anything else" bucket includes both genuine parse failures (the intended case) and non-ENOENT I/O errors such as `EACCES` (permission denied), `EMFILE` (too many open files), or `EIO` (I/O error). An operator running `front-door mediate-list` against a marker they cannot read due to permissions will see `corrupt (unparseable) — run front-door mediate-recover --session <id> to clear it`, which is factually wrong (the file may not be corrupt at all) and suggests a destructive recovery action that would delete a readable-on-the-next-try file. The blast radius is low (operator confusion rather than silent data loss), but the misleading error text is a user-trust issue. A straightforward fix: distinguish the error code in the catch — EACCES/EIO → a new `{ corrupt: false, entries: [], ioError: err.message }` variant, or at minimum include the underlying error code in the `corrupt: true` return so `renderListing` can surface a more accurate description.
+
+---
+
+### AUDIT-20260619-133 — Double `findInstallation(cwd)` call in `runSpeckitGuard`
+
+Finding-ID: AUDIT-20260619-133
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/speckit-guard.ts:111-118` (`runSpeckitGuard` production path)
+
+`findInstallation(cwd)` is called twice in the hot path of `runSpeckitGuard`: once inside `resolveViaFrontDoorFile` (line 63 of the new function) and once for the `installed` flag on line 117 (`const installed = findInstallation(cwd) !== null`). The function presumably walks the directory tree upward on each call. For a skill invocation this happens synchronously per-call, so the double probe doubles the filesystem traversal cost. More subtly, there is a TOCTOU window: if `findInstallation` is not referentially transparent (e.g., the `.stack-control/` marker directory appears or disappears between the two calls), `viaFrontDoor` and `installed` could reflect different installation states. In practice this race is negligible, but the design is cleaner if `resolveViaFrontDoorFile` returns the installation it found alongside the boolean (or if `runSpeckitGuard` does one `findInstallation` call and threads the result into both consumers). No correctness bug under normal conditions; the issue is maintainability and efficiency.
+
+---
+
+### AUDIT-20260619-134 — `ILLUSTRATIONS` list in `skill-marker-example-authorizes.test.ts` must be manually maintained
+
+Finding-ID: AUDIT-20260619-134
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/__tests__/capability/skill-marker-example-authorizes.test.ts:32-37`
+
+The `ILLUSTRATIONS` array is a static list of four `{ skill, surface, backend }` triples. The test's claimed contract is: *"a shipped SKILL.md marker example must AUTHORIZE the backend call it illustrates."* Adding a new capability-interface skill to the registry without adding its entry to `ILLUSTRATIONS` silently drops it from the contract verification; a misconfigured new skill whose marker example doesn't authorize its backend would ship without the test catching it. The `documentedCapability` function extracts the capability by parsing the SKILL.md, so the per-skill logic is general — the only static part is the membership of `ILLUSTRATIONS`. A `TODO: add new capability-interface skills here` comment without a GitHub issue number would be a deferral-comment per project rules; but the real fix is to derive `ILLUSTRATIONS` dynamically from `CAPABILITY_REGISTRY.capabilities` by reading each skill's SKILL.md at test time (if the skill list is discoverable from the registry or a directory glob), removing the need for manual maintenance. This is a test-design issue that compounds with every new skill added.
+
+---
+
+### AUDIT-20260619-135 — `(no marker)` renders identically for "no installation" vs "no marker file" in `mediate-list`
+
+Finding-ID: AUDIT-20260619-135
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/front-door.ts:99-101` (`mediate-list` branch) + `renderListing` line returning `'(no marker)\n'`
+
+When `mediate-list` is invoked with no enclosing installation (`root === null`), it returns `{ code: 0, stdout: '(no marker)\n' }` — the same output as a genuine "no marker file for this session in a real installation." An operator diagnosing a wedged session cannot distinguish the two from the command output: they will not know whether they are in the wrong directory (outside any stack-control installation) or correctly inside an installation but with a clean session. This matters because the recovery action differs: for "wrong directory," the operator should `cd` into their project; for "genuinely no marker," there is nothing to recover. The fix is to return a distinct message for the no-installation case, e.g. `"(no installation at <at>)\n"`. This is a UX-clarity issue with no correctness consequence; low severity.
+
+### AUDIT-20260619-136 — Read-only calls still read the strict marker before exemption
+
+Finding-ID: AUDIT-20260619-136
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/mediate-check.ts:96-101; src/capability/intercept.ts:103-108
+
+Both live paths derive the read-only exemption only after resolving active marker state. `mediateCheck` calls `deps.resolveActive(dir, session)` at line 96 before `mediationClassForIdentity` and `decideMediation` at lines 100-101. `interceptDecision` does the same at lines 107-108. In production, `resolveActive` uses `activeCapabilities`, whose strict read throws on malformed marker files.
+
+That means a read-only fronted query such as `backlog list` can still fail closed or crash when the session marker is corrupt, even though FR-050 says read-only query ops are mediation-exempt. The blast radius is high because an adopter can hit this on a normal read-only inspection command while trying to understand or recover marker state; the exemption is present in the pure decision core but not actually protected from marker-read failures on the live paths.
+
+A reasonable fix is to derive `mediationClassForIdentity(surface, identity)` before resolving active marker state, and skip `resolveActive` entirely when the class is `read-only`. Mutating fronted calls should keep the current strict marker read and fail-closed behavior.

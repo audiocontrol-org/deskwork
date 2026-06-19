@@ -54,6 +54,20 @@ describe('FR-050 read-only exemption — mediate-check live path (028 US3)', () 
     const r = mediateCheck(['--surface', 'skill', '--identity', 'speckit-implement', '--session', 's'], installedNoMarker);
     expect(r.code).toBe(1);
   });
+
+  it('PERMITS `backlog list` even when the marker read would THROW (corrupt marker; codex-01 r3)', () => {
+    // A read-only op must NOT read the marker at all — a corrupt marker can't fail-close a
+    // read-only inspection command. resolveActive throwing proves it is never called.
+    const corruptMarker: MediateCheckDeps = {
+      resolveInstalled: () => true,
+      resolveActive: () => {
+        throw new Error('corrupt marker');
+      },
+    };
+    const r = mediateCheck(['--surface', 'bash', '--identity', 'backlog list', '--session', 's'], corruptMarker);
+    expect(r.code).toBe(0);
+    expect(r.stderr).toBe('');
+  });
 });
 
 describe('FR-050 read-only exemption — interceptDecision live path (028 US3)', () => {
