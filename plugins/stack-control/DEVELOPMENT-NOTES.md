@@ -2,6 +2,46 @@
 
 ---
 
+## 2026-06-19: front-door-completeness — audit the 026-teeth front-door gaps, register umbrella, author the full spec chain (028) to runnable
+
+**Goal:** Operator framing: now that 026 capability-mediation put teeth in the front door (agents can't reach *around* the `/stack-control:*` skills), the many front-door gaps that preclude basic operations + discovery have become hard walls. Look through the in-flight roadmap + backlog for reported front-door-as-built issues and come up with a systematic plan to make the intended operations possible and discoverable. Then (operator: *"do it"*) drive it into the lifecycle.
+
+**Accomplished:**
+- **Audit (3 parallel Explore passes + direct probes):** backlog front-door-gap census, roadmap-coverage map, and a first-principles surface inventory — ground truth: **34 skills, 46 verbs, only 2 self-documenting (`govern`/`roadmap`); 37 have no `--help`.** Corrected two stale reports: `roadmap advance` and roadmap-family `--help` already shipped in 027 (do not re-plan).
+- **Captured the comprehensive plan** to `docs/front-door-completeness/plan.md` (anti-scope-cut artifact) — four workstreams: discoverability parity, the missing operation set, teeth recovery, and a governed `check-front-door` guardrail.
+- **Registered the umbrella** `multi:feature/front-door-completeness` and folded the 4 overlapping planned items under it as `part-of` (via `roadmap cluster`).
+- **Drove the full lifecycle (orchestrator session):** `/stack-control:design` (design record + 3 alternatives; operator approved) → `/stack-control:define` → the **complete speckit chain bracketed by the 026 front-door marker**: specify → clarify → plan → checklist → tasks → analyze.
+- **Artifacts (`specs/028-front-door-completeness/`):** spec.md (35 FRs, US1–4, SC-001..007), plan.md, research.md, data-model.md, 6 CLI contracts, quickstart.md, coverage checklist, **tasks.md (122 tasks, 7 phases, RED-first)**. Analyze: **0 critical / 0 high, 100% buildable-FR coverage.** Node now at **`implementing`** phase (design-approved + analyze-clean recorded), ready for `/stack-control:execute` in a separate impl session.
+- **Architecture decision (settled the operator's "would OpenAPI help?" steer):** the commander **command tree is the single source of truth**; `--help`, the verb reference, the generated descriptor artifact, the fronted-operations registry, and `check-front-door` all DERIVE from it. OpenAPI-as-source rejected (HTTP impedance mismatch); the artifact is a generated downstream output (operator: include in v1).
+
+**Didn't Work:**
+- **No sanctioned verb writes the `design-approved` / `analyze-clean` roadmap markers** — recording approval + analyze-clean required the governed-doc direct-edit-then-`roadmap order` path (sanctioned by the ROADMAP header, but no verb). Hit it **twice** live. Captured as **TASK-298** — and it is itself exactly the class of front-door gap THIS feature fixes (recursion).
+- **`backlog capture` ENAMETOOLONG** — the on-disk filename is derived from the full untruncated title; a long capture title crashed the write. Captured as **TASK-299**; worked around with a short title.
+
+**Course Corrections:**
+- [PROCESS] Operator, hard: *"STOP TRYING TO CUT SCOPE. DO THE WHOLE GODDAMNED THING."* — my "which workstream leads first?" question was itself a scope-cut frame (the pathology that created these gaps). Dropped tiering; the whole front door is one feature, no deferral.
+- [PROCESS] FR-052 (ship the generated descriptor artifact?) — I recommended *defer*; operator chose **include in v1**. Encoded.
+- [PROCESS] *"why did you stop?"* (×2) — once at the legitimate `design-approved` operator-judgment gate (correct to pause), once perceived mid-tool-sequence. Lesson: when pausing at a real gate, say so explicitly up front so it doesn't read as stalling.
+
+**Insights:**
+- **Dogfooding the front door while authoring a feature ABOUT the front door is a finding-generator** — two real bugs (TASK-298/299) surfaced just from driving the marker + backlog ceremony. The agent building it is the most demanding adopter, exactly as the dogfood rule predicts.
+- The **086 marker bracket is heavy for the speckit chain** — six `enter`/`exit` cycles for one authoring chain (specify/clarify/plan/checklist/tasks/analyze). Worked correctly (no leaks), but the per-step ceremony is friction worth noting against the cold-start/UX goals already in 028's scope.
+- Passing **`--since <sha>` to session-end** sidesteps the long-lived-branch boundary bug (TASK-39/59) — the auto-derivation was correct this session (9 commits) where prior sessions reported 0.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 9
+  - roadmap(028): link spec + record analyze-clean (specifying complete)
+  - tasks(028): 122-task dependency-ordered plan across the four workstreams
+  - checklist(028): coverage/completeness requirements-quality checklist
+  - plan(028): impl plan + research/data-model/contracts/quickstart
+  - spec(028): clarify — resolve FR-050/051/052 + terminal vocab
+  - spec(028-front-door-completeness): author spec from approved design record
+  - roadmap(front-door-completeness): record design-approved, advance to in-flight; capture TASK-298/299
+  - design(front-door-completeness): open designing phase + design record
+  - roadmap: register front-door-completeness umbrella + capture comprehensive plan
+- Files changed: 21
+- Backlog touched: TASK-148, TASK-201, TASK-209, TASK-298, TASK-299
+
 ## 2026-06-19: TASK-295 customer blocker — govern clone-step non-fatal on non-TS repos; fixed, shipped 0.51.3, validated live, closed out
 
 **Goal:** Take up the next-session flag — the **CUSTOMER-BLOCKING** `impl:fix/govern-clone-step-language-agnostic` (TASK-295 / GH #487): govern's advisory clone step aborted on any non-TypeScript adopter repo (offing's Bash/PHP/WordPress runbook), making `/stack-control:execute` unusable there. Fix it, ship it, validate on a real install, close it out.
