@@ -23,6 +23,7 @@ import {
   optionalStringOption,
 } from '../../src/cli-help/command-adapter.js';
 import { buildRoadmapCommand } from '../../src/subcommands/roadmap-command.js';
+import { KNOWN_SUBACTIONS } from '../../src/subcommands/roadmap.js';
 import { runCli } from '../../src/__tests__/_run-helpers.js';
 import { fixturePath } from '../roadmap/helpers.js';
 
@@ -123,17 +124,21 @@ describe('027 T003 — mounted roadmap command preserves error shapes (contract 
     // — it preserves the flat dispatcher's prefix AND the known-subaction
     // discovery list, not just the exit code.
     expect(r.stderr).toContain("roadmap: unknown subaction 'frobnicate'");
-    expect(r.stderr).toContain('known:');
-    expect(r.stderr).toContain('reconcile');
-    expect(r.stderr).not.toContain('unknown command');
+    // Pin the single-sourced known-subaction discovery list verbatim, not one
+    // arbitrary member (AUDIT-BARRAGE claude-03/codex-01 — avoid coupling to
+    // 'reconcile' alone).
+    expect(r.stderr).toContain(`(known: ${KNOWN_SUBACTIONS})`);
+    expect(r.stderr).not.toContain('unknown command'); // commander's shape must not leak
   });
 
   it('an unknown flag for a known subaction → exit 2 with the roadmap: message shape (codex-01)', () => {
     const docPath = tmpChain();
     const r = runCli(['roadmap', 'advance', 'impl:feature/b', '--bogus', 'x', '--to', 'in-flight', '--doc', docPath, '--apply']);
     expect(r.status).toBe(2);
-    expect(r.stderr).toContain('roadmap:');
-    expect(r.stderr).toContain('bogus');
+    // Pin the discriminating flat-dispatcher diagnostic, not just the prefix
+    // (AUDIT-BARRAGE-claude-02 — the weak contains('roadmap:')+contains('bogus')
+    // would pass against a generic/echoed error).
+    expect(r.stderr).toContain("unknown flag --bogus for 'advance'");
     expect(r.stderr).not.toContain('unknown option'); // commander's shape must not leak
   });
 
