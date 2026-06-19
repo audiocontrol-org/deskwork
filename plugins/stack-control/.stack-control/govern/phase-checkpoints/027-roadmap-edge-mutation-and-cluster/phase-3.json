@@ -4,8 +4,8 @@
   "phaseId": "3",
   "checkpoint": "phase-3",
   "auditLogSection": "phase-3",
-  "scopeFingerprint": "b1cfe9910cc01d56ed0dbe70182b9b807f79bc4b25e6f1d589384817993a39f5",
-  "passedAt": "2026-06-19T00:53:49.875Z",
+  "scopeFingerprint": "606138776a551d2f4b97d875ddf981174e39a988a267925df0ac4ed12c476175",
+  "passedAt": "2026-06-19T01:35:22.645Z",
   "governedPaths": [
     "tests/roadmap/help-nondrift.test.ts",
     "tests/roadmap/help-surface.test.ts",

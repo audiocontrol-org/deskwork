@@ -386,7 +386,7 @@ Blast radius is low because this is a test-only hardening gap, not a runtime def
 ### AUDIT-20260619-09 — `--part-of` is asserted as shown but never exercised as accepted
 
 Finding-ID: AUDIT-20260619-09
-Status:     open
+Status: migrated-to-backlog TASK-272
 Severity:   low
 Per-lane:   codex=low
 Decision:   single-model (gate-counted low)
@@ -395,3 +395,294 @@ Surface:    tests/roadmap/help-nondrift.test.ts:85-96
 The test name and header claim that every shown value flag is accepted by the parser, and line 90 specifically asserts that `--part-of` appears in `roadmap add --help`. But the actual CLI invocation on lines 91-95 only passes `--status`, `--scope`, and `--doc`; it never passes `--part-of`. That means a regression where help lists `--part-of` but the `add` parser rejects or mishandles it would still pass this acceptance check.
 
 The blast radius is low because this is a test-coverage defect, not an adopter-facing runtime defect in the diff itself. It weakens the stated CHK015 invariant and could let a help/parser drift bug escape. A reasonable fix is to include a valid `--part-of <id>` argument in the `roadmap add` invocation, or iterate over shown value flags with per-flag valid fixtures so each advertised flag is actually parsed.
+
+## 2026-06-19 — audit-barrage lift (20260619T011330356Z-027-roadmap-edge-mutation-and-cluster-phase-3)
+
+### AUDIT-20260619-10 — `shownFlags` regex cannot capture `--flag` when preceded by a short-form alias on the same line
+
+Finding-ID: AUDIT-20260619-10
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    tests/roadmap/help-nondrift.test.ts:38-44
+
+The regex `/^[ \t]*(--[a-z][a-z0-9-]*)/gm` anchors to line-start then requires `--` to be the first non-whitespace token. If the help formatter renders short+long form on one line (the conventional style: `  -t, --to   <status>`) the pattern will not match at all on that line: after stripping leading whitespace it encounters `-t`, not `--`, so the match fails and `--to` is absent from the `shown` set. This turns check (1) — "every declared flag appears in help" — into a permanent false-positive failure for any subaction whose flags have short aliases, even when the implementation is completely correct.
+
+The fix used to justify this regex change (commit commentary at lines 36-44: "Anchored to line-start so it captures only structured flag-TABLE entries — never a flag token embedded in prose") is sound reasoning, but the anchor as written has the implicit assumption that all flags are listed without a short-form prefix. That assumption is not validated anywhere and is contrary to the de-facto CLI help style (oclif, commander, yargs all default to `-s, --long` format). If `roadmap-help.ts` (T008/T009, not in this diff) ever emits the conventional two-column style, the CHK015 gate silently becomes non-functional — all checks (1) pass vacuously because `shown` is empty, and the test suite stays green while drift accumulates.
+
+Concrete fix: either tighten the parser to handle the `-s, --long` pattern (e.g. `/(--[a-z][a-z0-9-]*)/g` once per line after stripping the leading `-x, ` prefix) or document in the help-formatter contract (T008/T009) that long-form flags MUST appear at the start of the line, and add a test of the formatter's output shape.
+
+---
+
+### AUDIT-20260619-11 — `--help` flag itself will appear in the flag table and break check (2) for every subaction
+
+Finding-ID: AUDIT-20260619-11
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/roadmap/help-nondrift.test.ts:62-68
+
+Check (2) — "no flag is shown that the grammar does not declare" — iterates over every flag captured by `shownFlags` and asserts `accepted.has(flag)`, where `accepted` is derived from `flagNamesFor(grammar)` (line 52). Standard CLI help formatters include `--help` itself in the flag table:
+
+```
+  --help   show this help and exit
+```
+
+When that line is emitted, the regex at line 38 captures `--help` and adds it to `shown`. Unless `flagNamesFor` explicitly enumerates `--help` as part of `SUBACTION_SPECS[sub]` — which is unlikely since `--help` is a meta-option handled outside the per-subaction grammar — `accepted.has('--help')` will be `false`, and check (2) will fail for every subaction, in every run, the moment T008/T009 land. The tests are annotated as RED until T008/T009, which means this defect will surface exactly at the moment the feature is declared done, with no diagnostic pointing at the cause.
+
+The same failure mode applies to a potential `--doc` or `--apply` flag if those are globally-injected rather than per-subaction-declared. Without seeing `flagNamesFor`'s implementation (not in this diff), it is impossible to confirm how many global flags are in this blind spot.
+
+Fix: either exclude `--help` (and any other globally-injected flags) from the `shown` set before running check (2), or add them explicitly to `flagNamesFor`'s output.
+
+---
+
+### AUDIT-20260619-12 — Check (3) coverage is limited to two hardcoded subactions, breaking the per-subaction contract stated in the comment
+
+Finding-ID: AUDIT-20260619-12 (claude-03 + claude-04 + codex-01 + codex-02; cross-model)
+Status: migrated-to-backlog TASK-273
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    tests/roadmap/help-nondrift.test.ts:1-15 (comment) vs 75-109 (implementation)
+
+The file header at lines 9-12 states:
+
+```
+// Three sub-checks per subaction:
+//   (1) every flag the grammar declares appears in the help text;
+//   (2) no flag appears in the help that the grammar does NOT declare;
+//   (3) a flag the help does NOT show is rejected by the parser (exit 2), and
+//       every flag the help DOES show is accepted (not an unknown-flag exit 2).
+```
+
+The loop at lines 54-70 covers checks (1) and (2) for every subaction enumerated in `SUBACTION_SPECS`. Check (3) is tested only for `advance` (rejection of `--bogus`; acceptance of `--to`) and `add` (acceptance of `--status`/`--scope`). Subactions added in future phases — or any currently-declared subaction other than these two — have no check-3 coverage. If a new subaction's help text shows a flag that the parser silently ignores (or vice versa), the CHK015 gate will not catch it.
+
+This is not a latent issue only: `SUBACTIONS = Object.keys(SUBACTION_SPECS)` drives the check-(1)/(2) loop (line 50), so the loop IS the complete set. The isolation of check (3) to two hardcoded subactions is a coverage gap that will widen every time a subaction is added. Fix: either extend the loop to include check (3) inline (picking a stable inert flag per subaction), or add a note to `SUBACTION_SPECS` that each subaction entry must carry a probe pair (`bogusFlag`, `validFlag`+`validValue`) for the gate harness to iterate over.
+
+---
+
+### AUDIT-20260619-13 — T007 non-drift summary check uses brittle hardcoded prose fragments
+
+Finding-ID: AUDIT-20260619-13
+Status: migrated-to-backlog TASK-274
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/help-surface.test.ts:34-35
+
+The assertion that "a summary is present (at least one descriptive line beyond the names)" is implemented by matching two specific phrases:
+
+```typescript
+expect(r.stdout).toMatch(/list the ready/);
+expect(r.stdout).toMatch(/dry-run unless --apply/);
+```
+
+These are fragments from the current wording of two specific subaction summaries. If those summaries are rephrased during any normal maintenance cycle (e.g., "list ready nodes" → "show actionable nodes"), the test will fail for a reason that has nothing to do with the help surface's structural correctness. The comment says "a summary is present" but the assertion tests specific wording, not structure. This conflates content-correctness with structural-presence.
+
+Fix: replace with a structural assertion such as `expect(lines with a subaction name).every(line => line.length > subactionNameLength + N)` to verify each subaction has trailing content, without coupling to exact phrasing.
+
+---
+
+### AUDIT-20260619-14 — `tmpChain()` creates a temp directory per test with no cleanup
+
+Finding-ID: AUDIT-20260619-14
+Status: migrated-to-backlog TASK-275
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/help-nondrift.test.ts:28-33
+
+`tmpChain` calls `mkdtempSync` to create a fresh temp directory each time it is called. There is no `afterEach`, `afterAll`, or `rm -rf` cleanup. Across repeated test runs the `/tmp/roadmap-help-nondrift-*` directories accumulate indefinitely. In CI environments with shared `/tmp` namespaces this causes slow disk-fill on long-lived runners. The `fixturePath('chain')` source file is read-only, so the fixture itself is not at risk — this is purely a resource hygiene issue.
+
+Fix: return both the `dir` and `docPath` from `tmpChain`, and wrap the call sites in a `try/finally { rmdirSync(dir, { recursive: true }) }` block, or use `afterEach` to track and remove created directories.
+
+## 2026-06-19 — audit-barrage lift (20260619T012527622Z-027-roadmap-edge-mutation-and-cluster-phase-3)
+
+### AUDIT-20260619-15 — `shownFlags` regex can silently capture non-option tokens that start a help line
+
+Finding-ID: AUDIT-20260619-15
+Status: migrated-to-backlog TASK-276
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/roadmap/help-nondrift.test.ts:44-55
+
+The `shownFlags` function captures any `--word` token that appears at the start of a line (after optional whitespace and an optional `-x, ` short-alias prefix). The comment correctly explains that INLINE flag mentions (embedded in prose or a `(one of: …)` suffix on the same line) are excluded — but a flag-like token that STARTS a new line is not excluded. If the help formatter ever indents vocabulary items on their own lines using `--`-prefixed tokens (e.g. `\n    --planned\n    --in-flight` under a "valid values:" header), each such token would be added to `shown` and check (2) would spuriously fail because it is absent from the grammar's `accepted` set. Conversely, if a stale flag name appears only in a description sub-list (not in the flag table), check (2) would produce a false alarm rather than catching drift. The current help formatter presumably avoids this shape, but the guard is structural (whitespace + `--word` at line-start) not semantic (declared flag-table entry vs. description content), so any future change to the formatter that introduces indented `--`-prefixed enumerations will break the CHK015 gate non-obviously. A tighter anchor — e.g. requiring a trailing flag-value placeholder pattern like `<…>` or a column-stop separator — would eliminate this class of false positive/false negative.
+
+---
+
+### AUDIT-20260619-16 — `decompose` VALID_INVOCATION passes children as a comma-joined string; semantic handling is unverified
+
+Finding-ID: AUDIT-20260619-16
+Status: migrated-to-backlog TASK-277
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/roadmap/help-nondrift.test.ts:134-137
+
+```typescript
+decompose: { argv: ['impl:feature/b', '--into', 'impl:gap/x1,impl:gap/x2'], expectExit0: true },
+```
+
+The fixture passes two child identifiers to `--into` as a single comma-separated string rather than as repeated `--into` flags. Check (3)'s flag-acceptance contract is still served regardless — if `--into` were an unknown flag, the parser would reject it with "unknown flag" and `isUnknownFlagOrSubaction(r.stderr) === true` would fail the test. But the semantic contract for `decompose` (that it correctly decomposes one item into two children) is NOT verified. There are two failure modes: (a) if the parser treats the comma-joined string as a single id `impl:gap/x1,impl:gap/x2`, the command might silently succeed with a malformed graph entry, which `expectExit0: true` cannot distinguish from correct behaviour; (b) if the parser rejects the comma-joined string as an invalid id, the command exits non-zero and `expectExit0: true` fails loudly — catching the error. The diff does not include `SUBACTION_SPECS` for `decompose`, so the intended grammar for `--into` (comma-split string vs. repeatable flag) cannot be verified here, but the fixture should document which form the grammar actually accepts, and if it is a comma-split string, that should be reflected in the grammar's value schema.
+
+---
+
+### AUDIT-20260619-17 — `tmpChain()` creates temp directories without cleanup, accumulating across test runs
+
+Finding-ID: AUDIT-20260619-17
+Status: migrated-to-backlog TASK-278
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/help-nondrift.test.ts:31-36
+
+```typescript
+function tmpChain(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'roadmap-help-nondrift-'));
+  const docPath = join(dir, 'ROADMAP.md');
+  copyFileSync(fixturePath('chain'), docPath);
+  return docPath;
+}
+```
+
+`tmpChain()` is called once per test case in the check-(3) loops (12 subactions × 2 tests = 24 calls per suite run) plus the three spot-check tests, with no corresponding `afterEach` or `afterAll` to remove the directories. The OS will eventually reclaim them, but in a busy CI runner that executes many suite runs, these accumulate in `tmpdir()`. This is purely a hygiene issue — no correctness impact — but `fs.rmSync(dir, { recursive: true })` in the test body after the assertions, or a shared cleanup via `afterEach`, is the standard fix.
+
+---
+
+### AUDIT-20260619-18 — Hardcoded prose strings couple `help-surface.test.ts` tightly to help wording
+
+Finding-ID: AUDIT-20260619-18
+Status: migrated-to-backlog TASK-279
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/help-surface.test.ts:33-34
+
+```typescript
+expect(r.stdout).toMatch(/list the ready/);
+expect(r.stdout).toMatch(/dry-run unless --apply/);
+```
+
+These two regex patterns assert specific phrasing from the `roadmap --help` output. The contract they intend to verify (that the help conveys what `next`/`blocked` do, and that mutations require `--apply`) is real and worth testing, but anchoring to exact prose makes the assertions fail whenever the help text is reworded — even if the contract is unchanged. The same contract can be expressed more durably against structural elements already covered elsewhere (e.g. verifying that `next` and `blocked` appear with accompanying text, or that `--apply` is present as a declared flag per CHK015). If the prose phrases are intended to be stable identifiers, that contract should be noted in the source.
+
+---
+
+### AUDIT-20260619-19 — Spot-check title "all accepted" covers only 3 of `add`'s flags
+
+Finding-ID: AUDIT-20260619-19
+Status: migrated-to-backlog TASK-280
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/help-nondrift.test.ts:168-196
+
+```typescript
+it('add: the shown value-flags are all accepted by the parser', () => {
+  …
+  expect(shown.has('--status')).toBe(true);
+  expect(shown.has('--scope')).toBe(true);
+  expect(shown.has('--part-of')).toBe(true);
+  const r = runCli([
+    'roadmap', 'add', 'impl:gap/z',
+    '--status', 'planned',
+    '--scope', 'x',
+    '--part-of', 'design:feature/a',
+    '--doc', docPath,
+  ]);
+```
+
+The title asserts "all accepted" but the test only exercises `--status`, `--scope`, and `--part-of`. The remaining `add` flags — `--depends-on`, `--deferred-until`, `--spec`, `--ref` — are not asserted or passed here. The VALID_INVOCATION entry for `add` in the check-(3) describe block does exercise all flags, so there is no actual coverage gap in the overall test suite. The misleading title is a documentation concern: a future maintainer reading the spot-check test may conclude it is comprehensive and skip adding fixtures for new `add` flags — exactly the pattern the comment at lines 178–180 says this third describe block was written to fix for `--part-of`.
+
+### AUDIT-20260619-20 — Boolean flags are listed but never exercised by the non-drift acceptance check
+
+Finding-ID: AUDIT-20260619-20
+Status: migrated-to-backlog TASK-281
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/roadmap/help-nondrift.test.ts:89-144, tests/roadmap/help-nondrift.test.ts:166-175
+
+The test claims each `VALID_INVOCATION` “exercises every flag the subaction's grammar declares” and that exit 0 proves “every declared flag was accepted,” but the fixture argv omits the boolean flags that the grammar/help surface declares. In the current grammar, mutation subactions include `--apply`, and `defer` also includes `--clear`; the fixtures for `add`, `advance`, `decompose`, `reclassify`, `defer`, and `close-related` never pass those boolean flags. That leaves a real CHK015 gap: `roadmap defer --help` could list `--clear` while the parser rejects `--clear`, and this acceptance half would still pass.
+
+The blast radius is medium because this is a governance/test defect rather than a runtime defect, but it directly weakens the stated non-drift invariant for operator-facing roadmap mutation flags. A reasonable fix is to mechanically derive the declared flags per subaction and assert each one appears in the exercised argv, or add per-flag acceptance invocations for boolean flags as well as value flags, with valid combinations such as `defer <id> --clear` separate from `defer <id> --until <date>`.
+
+## 2026-06-19 — audit-barrage lift (20260619T013111545Z-027-roadmap-edge-mutation-and-cluster-phase-3)
+
+### AUDIT-20260619-21 — `isUnknownFlagOrSubaction` discriminator has a case-sensitive trailing-space dependency that creates a false-negative risk for the `reconcile` weak-gate test
+
+Finding-ID: AUDIT-20260619-21
+Status: migrated-to-backlog TASK-282
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/roadmap/help-nondrift.test.ts:154-157, 166-172
+
+`isUnknownFlagOrSubaction` is the sole discriminator used to decide whether `reconcile`'s expected non-zero exit is a flag-rejection (bad) or a doc-resolution failure (acceptable). It relies on two fixed, case-sensitive substrings: `"unknown flag "` (with a trailing space) and `"unknown subaction "`. If the CLI emits either without the trailing space, capitalizes the first word (`"Unknown flag …"`), or changes phrasing (e.g., `"unrecognized option: --doc"`), the function returns `false` — telling the test "this is not a flag rejection" — when it actually is. The test at line 170 (`expect(isUnknownFlagOrSubaction(r.stderr)).toBe(false)`) would then pass, silently masking a real flag-acceptance defect for `reconcile`. The blast radius is narrow (one subaction, only the weak-gate path), but the semantic contract of check (3) is that ALL subaction flags are accepted; a false-passing `reconcile` test severs that guarantee. A fix would assert the actual exit-2 reason positively — e.g., expect a `DocumentModelError` or a doc-resolution phrase in stderr — rather than negating an incomplete pattern.
+
+---
+
+### AUDIT-20260619-22 — `shownFlags` regex is vacuously safe today but silently fails if the help table adopts a short-flag column style without a comma separator
+
+Finding-ID: AUDIT-20260619-22
+Status: migrated-to-backlog TASK-283
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/roadmap/help-nondrift.test.ts:38-57
+
+The comment at line 45 documents one upgrade from the prior implementation: the optional `(?:-[A-Za-z], )?` prefix now handles the `-x, --long` two-column style. However, the short-alias prefix is strictly `[one letter][comma][space]`. If the help formatter ever renders the alias without the comma (` -x --long`, i.e., space-separated without comma) or renders a two-letter alias (`--st, --status`), the optional group fails to match and the `^[ \t]*` anchor requires `--` immediately after leading whitespace. That means every flag in a `-x --long`-style table would be captured under the `--long` form (acceptable), but any entry whose line starts with only the short alias (no `--long` on the same line) would be missed entirely by check (1) — causing a false FAIL on "every declared flag is shown." Conversely, a check (2) false PASS could occur if an added alias in a description line looks like `  -d, --doc`. The fix is to add a test variant that checks `shownFlags` against a known multi-style snippet, ensuring the regex stays calibrated as the formatter evolves.
+
+---
+
+### AUDIT-20260619-23 — `advance --help` status-vocabulary test may require the subcommand to enumerate ALL grammar statuses even if `advance` legitimately accepts only a subset
+
+Finding-ID: AUDIT-20260619-23
+Status: migrated-to-backlog TASK-284
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/roadmap/help-surface.test.ts:49-64
+
+The test at lines 49–57 calls `roadmapStatusVocabulary()` and asserts every returned value appears in `advance --help`. If `roadmapStatusVocabulary()` returns the union of all statuses across the entire grammar (e.g., `planned | in-flight | complete | shipped | blocked | deferred`), but `advance` semantically only allows forward transitions (`in-flight | complete | shipped`), the test forces the help text to advertise statuses `advance` cannot validly accept. This is misleading UX — a user reading `advance --help` would see `planned` or `deferred` as options and get a validation error at runtime. The blast radius: any future agent building from the help text would construct invalid invocations based on the advertised-but-rejected statuses. A correct test would assert that `advance --help` shows the statuses accepted by `advance`'s grammar — derived from the `advance` entry in `SUBACTION_SPECS`, not from the global vocabulary. The equivalent logic already exists in `help-nondrift.test.ts` (check (1) verifies every grammar-declared flag appears in help), but it operates on flags, not flag values.
+
+---
+
+### AUDIT-20260619-24 — `VALID_INVOCATION` has no guard against phantom entries for removed subactions
+
+Finding-ID: AUDIT-20260619-24
+Status: migrated-to-backlog TASK-285
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/help-nondrift.test.ts:90-140, 141-152
+
+`invocationFor` (lines 141–152) correctly throws if a subaction in `SUBACTION_SPECS` lacks a `VALID_INVOCATION` entry — loud failure, good. But the inverse is not enforced: if a subaction is removed from `SUBACTION_SPECS`, its `VALID_INVOCATION` entry becomes a ghost (a key in `VALID_INVOCATION` that no test loop will ever exercise). The ghost neither causes a test failure nor fires any completeness check. Over time, `VALID_INVOCATION` accumulates stale fixtures that don't represent real subactions. The fix is a symmetric guard in a separate `it` block or a `beforeAll`: `Object.keys(VALID_INVOCATION).forEach(sub => expect(SUBACTIONS).toContain(sub))`. This mirrors the existing completeness guard's intent in the reverse direction.
+
+---
+
+### AUDIT-20260619-25 — `add` spot-check comment overstates its own flag-acceptance coverage relative to what the test actually exercises
+
+Finding-ID: AUDIT-20260619-25 (claude-05 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-286
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    tests/roadmap/help-nondrift.test.ts:215-231
+
+The comment at lines 220–222 states: *"every flag we assert is shown is ALSO passed to the parser below (cross-model codex-02 + claude-04 — the prior version asserted --part-of was shown but never passed it)"*. The test asserts three flags are shown (`--status`, `--scope`, `--part-of`) and passes those same three. However, `VALID_INVOCATION.add` (lines 107–117) includes five additional flags: `--depends-on`, `--deferred-until`, `--spec`, `--ref`, and a positional id — these are covered by check (3) in the preceding describe block, not here. A reader of this spot-check test in isolation could conclude that `--depends-on`, `--deferred-until`, `--spec`, and `--ref` are NOT tested for acceptance, missing the fact that check (3) covers them. The comment should be updated to say "the three flags asserted here are also passed to the parser; the remaining add flags are covered by check (3) via VALID_INVOCATION.add" to prevent a future maintainer from removing the check (3) fixture under the impression this spot-check covers the same ground.
+
+### AUDIT-20260619-26 — Top-level help test can pass without per-subaction summaries
+
+Finding-ID: AUDIT-20260619-26
+Status: migrated-to-backlog TASK-287
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/help-surface.test.ts:21-32
+
+The test name and feature contract require `roadmap --help` / `-h` to list every subaction “with a summary,” but the assertion only checks that each subaction string appears somewhere in stdout, then checks two global prose fragments (`list the ready`, `dry-run unless --apply`). This would pass if most subactions were merely listed in a usage enum with no individual summary lines, which is exactly the self-documenting surface this feature is supposed to protect.
+
+Blast radius is low because this is a test-quality gap around documentation/help completeness, not a parser correctness issue. A tighter test would parse the help table rows and assert one row per `SUBACTION_SPECS` key with non-empty summary text, instead of using broad substring checks.
