@@ -46,6 +46,8 @@ describe('027 T010 — roadmap cluster', () => {
     const model = loadRoadmap(docPath, ROADMAP_OPTS);
     // The new parent is created `planned` (falsifiable: the id did not exist before).
     expect(item(model, 'multi:feature/grp').status).toBe('planned');
+    // --summary is written as the new parent's scope prose (claude-03).
+    expect(item(model, 'multi:feature/grp').scope).toContain('the grouped work');
     // Each child is grouped under the new parent (falsifiable: the edge was added).
     expect(item(model, 'impl:feature/b').partOf).toContain('multi:feature/grp');
     expect(item(model, 'impl:feature/c').partOf).toContain('multi:feature/grp');
@@ -178,6 +180,30 @@ describe('027 T010 — roadmap cluster', () => {
     expect(add.status).toBe(0);
     const afterAdd = item(loadRoadmap(docPath, ROADMAP_OPTS), 'impl:feature/b');
     expect(afterAdd.partOf.filter((p) => p === 'multi:feature/p3')).toHaveLength(1);
+  });
+
+  it('a child whose scope has a FENCED part-of example gets a REAL edge, not one in the fence (codex-01)', () => {
+    // The document edge extractor ignores field-looking bullets inside ``` fences;
+    // appendEdge must too. A child with only a fenced `- part-of:` example (and no
+    // real metadata field) must gain a NEW real edge line — not have the edge
+    // appended into the code fence, which would silently leave it ungrouped.
+    const docPath = writeTempRoadmap([
+      '## multi:feature/p',
+      '- status: planned',
+      '',
+      '## impl:feature/b',
+      '- status: planned',
+      'Scope prose with a fenced example:',
+      '```',
+      '- part-of: multi:feature/example-not-real',
+      '```',
+    ]);
+    const r = runCli(['roadmap', 'cluster', 'multi:feature/p', '--children', 'impl:feature/b', '--doc', docPath, '--apply']);
+    expect(r.status).toBe(0);
+    const child = item(loadRoadmap(docPath, ROADMAP_OPTS), 'impl:feature/b');
+    // The REAL edge was created (child IS grouped); the fenced example is not an edge.
+    expect(child.partOf).toContain('multi:feature/p');
+    expect(child.partOf).not.toContain('multi:feature/example-not-real');
   });
 
   it('dry-run default writes NOTHING; --apply performs the write', () => {

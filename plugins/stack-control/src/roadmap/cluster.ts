@@ -48,6 +48,7 @@ export interface ClusterInput {
 function appendEdge(body: readonly string[], field: string, target: string): string[] {
   const fieldRe = new RegExp(`^\\s*[-*]\\s+${field}\\s*:`, 'i');
   const lineRe = new RegExp(`^(\\s*[-*]\\s+${field}\\s*:\\s*)(.*)$`, 'i');
+  const fenceRe = /^\s*(```|~~~)/;
   const parseTargets = (line: string): string[] => {
     const m = lineRe.exec(line);
     const captured = m === null ? undefined : m[2];
@@ -55,14 +56,28 @@ function appendEdge(body: readonly string[], field: string, target: string): str
       ? []
       : captured.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
   };
-  const firstIdx = body.findIndex((line) => fieldRe.test(line));
-  if (firstIdx < 0) {
+  // Indices of REAL metadata field lines — those OUTSIDE a fenced code block.
+  // A `- part-of:`-looking bullet inside a ``` / ~~~ fence is example prose, not
+  // metadata; the document edge extractor ignores it, so appending an edge to
+  // such a line would write into the scope example and silently create no real
+  // edge (exit 0, ungrouped child) — AUDIT-BARRAGE-codex-01. Mirror scopeOf's
+  // fence handling so dedup + append operate only on real metadata.
+  const realFieldIdxs: number[] = [];
+  let inFence = false;
+  for (let i = 0; i < body.length; i++) {
+    const line = body[i];
+    if (line === undefined) continue;
+    if (fenceRe.test(line)) { inFence = !inFence; continue; }
+    if (!inFence && fieldRe.test(line)) realFieldIdxs.push(i);
+  }
+  const firstIdx = realFieldIdxs[0];
+  if (firstIdx === undefined) {
     const out = [...body];
     out.splice(1, 0, `- ${field}: ${target}`);
     return out;
   }
-  // Exact duplicate ANYWHERE in the unit's field lines → no-op.
-  const aggregate = body.filter((line) => fieldRe.test(line)).flatMap(parseTargets);
+  // Exact duplicate ANYWHERE in the unit's REAL field lines → no-op.
+  const aggregate = realFieldIdxs.flatMap((i) => parseTargets(body[i] ?? ''));
   if (aggregate.includes(target)) return [...body];
   const first = body[firstIdx];
   const m = first === undefined ? null : lineRe.exec(first);
@@ -127,6 +142,13 @@ export function cluster(
     throw new DocumentModelError(
       `cluster: parent '${input.parentId}' cannot also be one of its own --children`,
     );
+  }
+  // Reject a duplicate child up front with a clear message — otherwise a
+  // `--children a,a` under `--chain` builds a self-edge (`a depends-on a`) that
+  // surfaces only as an opaque downstream "self-edge" error (AUDIT-BARRAGE-claude-05).
+  const dupChild = input.children.find((c, i) => input.children.indexOf(c) !== i);
+  if (dupChild !== undefined) {
+    throw new DocumentModelError(`cluster: '${dupChild}' is listed more than once in --children`);
   }
   const { doc } = loadDocument(docPath, opts);
   for (const child of input.children) {

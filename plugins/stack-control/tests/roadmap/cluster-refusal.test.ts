@@ -125,4 +125,44 @@ describe('027 T011 — roadmap cluster refusals (exit 2, byte-for-byte unchanged
     expect(r.status).toBe(0);
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
+
+  it('a --chain that forms a real cycle → exit 2 via whole-graph revalidation, zero write (claude-02)', () => {
+    // x and y have NO pre-existing depends-on between them in chain order, so the
+    // pre-write chainPredecessor conflict guard does NOT fire — this exercises
+    // commitCandidate's whole-graph cycle detection (the defense-in-depth path the
+    // prior 'cycle' test actually triggered via the conflict guard, not the cycle).
+    // Setup: y already depends-on x; cluster --children y,x --chain adds x→y,
+    // closing the cycle x→y→x.
+    const docPath = writeTempRoadmap([
+      '## impl:feature/x',
+      '- status: planned',
+      '',
+      '## impl:feature/y',
+      '- status: planned',
+      '- depends-on: impl:feature/x',
+    ]);
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'roadmap', 'cluster', 'multi:feature/grp',
+      '--children', 'impl:feature/y,impl:feature/x',
+      '--chain',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('a duplicate id in --children → exit 2 with a clear message, zero write (claude-05)', () => {
+    const docPath = tmpGraph();
+    const before = readFileSync(docPath, 'utf8');
+    const r = runCli([
+      'roadmap', 'cluster', 'multi:feature/grp',
+      '--children', 'impl:feature/b,impl:feature/b',
+      '--chain',
+      '--doc', docPath, '--apply',
+    ]);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain('listed more than once in --children');
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
 });
