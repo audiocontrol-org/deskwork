@@ -2,7 +2,7 @@
 // FULLY-IMPLEMENTED spec (tasks.md present with no remaining `- [ ]` work) as the
 // "active" spec with a bogus next /speckit-* step.
 
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -10,6 +10,9 @@ import { inferChainPosition } from '../session/chain-position.js';
 
 const roots: string[] = [];
 afterEach(() => {
+  // Remove the fixture trees, not just the tracking array — otherwise every run
+  // leaves sc-active-spec-* dirs in the OS tmpdir (AUDIT-BARRAGE-codex-02/claude-03).
+  for (const root of roots) rmSync(root, { recursive: true, force: true });
   roots.length = 0;
 });
 

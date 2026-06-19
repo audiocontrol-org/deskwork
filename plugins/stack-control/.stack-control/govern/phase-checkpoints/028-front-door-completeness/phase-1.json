@@ -4,15 +4,12 @@
   "phaseId": "1",
   "checkpoint": "phase-1",
   "auditLogSection": "phase-1",
-  "scopeFingerprint": "b3f446441f38b35fa77d38bdf3771d5d83ee38f3b3844efd20e59a50be691df9",
-  "passedAt": "2026-06-19T18:27:44.661Z",
+  "scopeFingerprint": "aef17881288220e1b518886ffac040dee66e416bfa05af2499691033c826b189",
+  "passedAt": "2026-06-19T19:26:40.951Z",
   "governedPaths": [
     "src/cli-help/command-surface.ts",
     "src/__tests__/cli-help/command-surface-harness.ts",
     "scripts/smoke-front-door.sh"
   ],
-  "auditedFiles": [
-    "plugins/stack-control/src/__tests__/cli-help/command-surface-harness.ts",
-    "plugins/stack-control/src/cli-help/command-surface.ts"
-  ]
+  "auditedFiles": []
 }

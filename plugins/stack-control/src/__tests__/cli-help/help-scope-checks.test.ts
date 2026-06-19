@@ -11,13 +11,17 @@ const surface = buildSurfaceFrom(SCOPE_CHECKS_VERBS);
 
 describe('scope-checks --help (US1)', () => {
   it('mounts every declared scope-check verb', () => {
-    expect(surface.map((d) => d.verb)).toEqual([
-      'check-anti-patterns',
-      'check-adopters',
-      'check-module-symmetry',
-      'check-editor-symmetry',
-      'check-deprecations',
-    ]);
+    // Assert SET membership, not declaration order (sort both sides) — matches the
+    // peer family tests and avoids a fragile order dependency (AUDIT-BARRAGE-claude-02).
+    expect(surface.map((d) => d.verb).sort()).toEqual(
+      [
+        'check-anti-patterns',
+        'check-adopters',
+        'check-module-symmetry',
+        'check-editor-symmetry',
+        'check-deprecations',
+      ].sort(),
+    );
   });
 
   it('every verb renders a non-empty usage body', () => {

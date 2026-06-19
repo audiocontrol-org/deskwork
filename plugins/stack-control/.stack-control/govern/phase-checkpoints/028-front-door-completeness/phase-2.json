@@ -4,15 +4,13 @@
   "phaseId": "2",
   "checkpoint": "phase-2",
   "auditLogSection": "phase-2",
-  "scopeFingerprint": "9f004c73a6f30afb60a6a940319d9068a03a843f89bac8d38b27d885f201e74e",
-  "passedAt": "2026-06-19T18:31:46.679Z",
+  "scopeFingerprint": "22910ec0704880e8952a5484dc7f391ee57c84295f3afa795ac4db944ec9616b",
+  "passedAt": "2026-06-19T19:33:44.869Z",
   "governedPaths": [
     "src/cli-help/command-adapter.ts",
     "src/cli-help/command-surface.ts",
     "src/__tests__/cli-help/command-surface.test.ts",
     "src/cli-help/render-help.ts"
   ],
-  "auditedFiles": [
-    "plugins/stack-control/src/cli-help/command-surface.ts"
-  ]
+  "auditedFiles": []
 }

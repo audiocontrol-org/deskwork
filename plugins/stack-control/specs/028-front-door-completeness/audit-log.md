@@ -1074,3 +1074,214 @@ Surface:    src/cli-help/render-help.ts:25-37
 `universalFlags()` decides a flag is universal if every sub-action has some flag with the same `name`: `s.flags.some((g) => g.name === f.name)`. It ignores `shortFlag`, `arg`, `required`, and `description`, so two sub-actions with the same long name but different value placeholders or semantics would be collapsed into one verb-level “Universal flags” row using the first sub-action’s descriptor.
 
 The current roadmap surface may not hit this today, but the renderer is explicitly generic for “ANY CommandDescriptor,” so this becomes a compounding design issue as more verbs are mounted. The blast radius is medium: it can produce misleading help for future migrated verbs without failing loud, but it does not break the current roadmap projection by itself. A reasonable fix is to compare the full rendered flag token plus description, or only mark flags universal when their complete descriptor fields match across all sub-actions.
+
+## 2026-06-19 — audit-barrage lift (20260619T192019422Z-028-front-door-completeness-phase-1)
+
+### AUDIT-20260619-63 — Verb reference and descriptor artifact are not surfaced as CLI/build artifacts
+
+Finding-ID: AUDIT-20260619-63
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/src/cli-help/verb-reference.ts:16-30 and plugins/stack-control/src/cli-help/verb-reference.ts:93-99; missing CLI/build surface
+
+The implementation adds `renderVerbReference()` and `emitDescriptorArtifact()` as exported TypeScript helpers, but the audited diff does not add any `stackctl` subcommand, package script, bin entry, generated file, or build step that exposes either output. That conflicts with the marked-complete work item at `plugins/stack-control/specs/028-front-door-completeness/tasks.md:107`, which says the reference must be surfaced as a reference verb or build emitter, and with `spec.md:171`, which requires the descriptor artifact to be emitted as a build/CLI artifact.
+
+The blast radius is high because external consumers named by FR-052, such as docs-site, MCP, and cross-vendor parity consumers, cannot obtain the promised artifact from the installed plugin; only in-repo TypeScript tests can import the helper. A reasonable fix is to add an actual `stackctl` reference/artifact command or a package build emitter that prints/writes these derived outputs, and test that installed consumers can invoke it without importing source modules.
+
+### AUDIT-20260619-64 — Descriptor artifact emits `null` for command mediation where the contract promises a string
+
+Finding-ID: AUDIT-20260619-64
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    plugins/stack-control/src/cli-help/verb-reference.ts:49-53 and plugins/stack-control/src/cli-help/verb-reference.ts:80-83
+
+The descriptor artifact type allows `ArtifactCommand.mediationClass` to be `string | null`, and `commandObject()` copies `descriptor.mediationClass` directly into the artifact. Multi-action verbs have `descriptor.mediationClass === null`, so the emitted JSON contains `"mediationClass": null` for those commands. The published C4 contract at `plugins/stack-control/specs/028-front-door-completeness/contracts/command-surface.md:78-86` documents command-level `mediationClass` as `"mutating" | "read-only"`.
+
+The blast radius is high because a downstream consumer validating the generated artifact against the published shape will reject common multi-action verbs, while a looser consumer may treat `null` as an unclassified operation. The fix is to make the artifact shape and contract agree: either emit only per-sub-action mediation for multi-action verbs and update the schema accordingly, or provide a non-null command-level classification that external consumers can rely on.
+
+## 2026-06-19 — audit-barrage lift (20260619T192643482Z-028-front-door-completeness-phase-2)
+
+### AUDIT-20260619-65 — Verb reference and descriptor artifact are implemented but not surfaced
+
+Finding-ID: AUDIT-20260619-65
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/028-front-door-completeness/tasks.md:106-109; plugins/stack-control/src/cli-help/verb-reference.ts:16-30,93-98
+
+The workplan marks T039 complete with “surface it as a reference verb / build emitter,” and T041 complete for the descriptor artifact. The implementation only adds library functions: `renderVerbReference()` and `emitDescriptorArtifact()`. The new tests call those functions directly, but no changed CLI/subcommand/build surface exposes either artifact to an adopter or agent.
+
+Blast radius: a downstream consumer acting on the completed task and SC-001 claim cannot actually obtain the generated verb reference or descriptor through `stackctl`; the artifact exists only inside test/import code. A reasonable fix is to add an explicit `stackctl` surface or build emitter for both outputs, document it, and test it through the public command path rather than only through direct function calls.
+
+## 2026-06-19 — audit-barrage lift (20260619T193413542Z-028-front-door-completeness-phase-3)
+
+### AUDIT-20260619-66 — Sub-action detection in `tryRenderVerbHelp` is defeated by `--doc path` or any `--flag value` placed before the sub-action
+
+Finding-ID: AUDIT-20260619-66
+Status: migrated-to-backlog TASK-303
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/cli.ts:163-175`
+
+`tryRenderVerbHelp` locates the sub-action name with:
+
+```typescript
+const sub = args.find((a) => !a.startsWith('-'));
+```
+
+This returns the first non-flag token in `args`. Because `--doc <path>` is documented as a "universal" (allowed everywhere) flag in the inbox and other handlers — see the comment at `src/subcommands/inbox.ts` ("--doc is universal") and the backlog SKILL.md examples that pass `--doc` inline — a realistic invocation like `stackctl inbox --doc /some/INBOX.md list --help` produces `args = ['--doc', '/some/INBOX.md', 'list', '--help']`. The find returns `'/some/INBOX.md'`, which fails the sub-action lookup, and `renderVerbHelp` is rendered instead of `renderSubActionHelp(descriptor, 'list')`. The user gets verb-level help when they asked for sub-action help.
+
+The test coverage in `help-full-surface.test.ts` calls `probeHelp(descriptor.verb, sub.name)` which spawns `stackctl <verb> <sub> --help` with no preceding flags, so this case is never exercised. A minimal fix is to skip tokens that are the value of a preceding `--flag` — or, since sub-action names in this CLI never begin with a path separator or digit, filter more tightly. An alternative: only attempt sub-action routing when the first token that doesn't begin with `-` appears at `args[0]` (i.e., before any flags), which matches every real usage pattern in the codebase's SKILL.md examples.
+
+---
+
+### AUDIT-20260619-67 — `help-scope-checks.test.ts` asserts verb order while every peer test sorts — fragile ordering dependency
+
+Finding-ID: AUDIT-20260619-67
+Status: migrated-to-backlog TASK-304
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/__tests__/cli-help/help-scope-checks.test.ts:18-25`
+
+```typescript
+it('mounts every declared scope-check verb', () => {
+    expect(surface.map((d) => d.verb)).toEqual([
+      'check-anti-patterns',
+      'check-adopters',
+      'check-module-symmetry',
+      'check-editor-symmetry',
+      'check-deprecations',
+    ]);
+  });
+```
+
+No `.sort()` is applied to either side, so the test asserts both PRESENCE and DECLARATION ORDER. Every peer test in this diff (`help-scope-clones.test.ts:18-27`, `help-capability.test.ts:19-24`) calls `.sort()` on both sides, testing only set membership. If the order of `SCOPE_CHECKS_VERBS` changes for any reason (alphabetical re-sort, newly inserted verb, refactor) this test breaks while the scope-clones and capability tests do not. The inconsistency means a maintainer adding a new scope-check verb must know to insert it at a specific position — an invisible convention not captured in any comment.
+
+---
+
+### AUDIT-20260619-68 — `afterEach` in `session-active-spec-completeness.test.ts` clears the tracking array but never deletes the temp directories
+
+Finding-ID: AUDIT-20260619-68 (claude-03 + codex-02; cross-model)
+Status: migrated-to-backlog TASK-305
+Severity:   low
+Per-lane:   claude=low, codex=low
+Decision:   agreement (gate-counted low)
+Surface:    `src/__tests__/session-active-spec-completeness.test.ts:14-16`
+
+```typescript
+afterEach(() => {
+  roots.length = 0;
+});
+```
+
+`makeFeature` calls `mkdtempSync(join(tmpdir(), 'sc-active-spec-'))` and appends the path to `roots`, but `afterEach` only truncates the array — it never calls `rmSync`. Each test run leaves three `sc-active-spec-*` directories in `/tmp`. In CI environments that reuse an agent across many runs, these accumulate indefinitely. The fix is:
+
+```typescript
+afterEach(() => {
+  for (const root of roots) rmSync(root, { recursive: true, force: true });
+  roots.length = 0;
+});
+```
+
+`rmSync` is available in `node:fs` (Node 14.14+) and is already imported by the surrounding code pattern.
+
+---
+
+### AUDIT-20260619-69 — `session-discovery-path-portability.test.ts` only scans `src/session/` — hardcoded paths in other `src/` modules are invisible to it
+
+Finding-ID: AUDIT-20260619-69
+Status: migrated-to-backlog TASK-306
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    `src/__tests__/session-discovery-path-portability.test.ts:13-23`
+
+The test guards the literal string `plugins/stack-control/bin/stackctl` in `src/session/*.ts` files only. Source files in `src/subcommands/`, `src/capability/`, `src/cli-help/`, and other subdirectories are not scanned. Given that the SKILL.md updates in this diff (backlog, extend, roadmap) replace the full path in documentation, and the separate `session/` test ensures the session module is clean, the scope is intentional — but a stale path reference introduced in e.g. a new subcommand file would not be caught by any test, only discovered at adopter install time. Worth a comment in the test to make the intentional scope explicit, or a broader sibling test that walks all `src/` TypeScript files.
+
+### AUDIT-20260619-70 — Unknown sub-action help exits successfully as parent help
+
+Finding-ID: AUDIT-20260619-70
+Status: migrated-to-backlog TASK-307
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/cli.ts:163-174
+
+`tryRenderVerbHelp` treats any argv containing `--help`/`-h` as a successful help request, then picks the first non-flag token as a possible sub-action. If that token is not a known sub-action, lines 169-172 fall back to `renderVerbHelp(descriptor)` and line 174 returns `true`, so `main()` exits 0 at lines 200-201. That means a typo like `stackctl workflow statuz --help` or `stackctl backlog captuer --help` is reported as successful parent help instead of an unknown sub-action.
+
+The blast radius is medium because agents and scripts commonly use `--help` exit status to probe whether an operation exists. As written, invalid sub-actions become false positives. A reasonable fix is to distinguish “no sub-action requested” from “unknown sub-action token requested”: render parent help only when there is no positional token, render sub-action help for a known sub-action, and return/throw a usage error for an unknown sub-action.
+
+## 2026-06-19 — audit-barrage lift (20260619T194135545Z-028-front-door-completeness-phase-3)
+
+### AUDIT-20260619-71 — `SELF_HELP_VERBS` is a manually-maintained denylist with no in-band declaration mechanism
+
+Finding-ID: AUDIT-20260619-71
+Status: migrated-to-backlog TASK-308
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/cli.ts:157-188
+
+`tryRenderVerbHelp` short-circuits on `SELF_HELP_VERBS.has(verb)` before it ever consults the descriptor registry. The denylist is a bare hardcoded `Set<string>` containing only `'roadmap'`. There is no reciprocal flag in the `CommandDescriptor` type (e.g., `selfHandlesHelp: boolean`) that would let the verb declare its own preference; the denylist is the only mechanism.
+
+The blast-radius scenario: a developer mounts a new self-documenting verb (one whose flat handler already emits rich, context-aware `--help`) into the command surface, publishes a descriptor for it (so the capability-coverage test stays green), but forgets to add it to `SELF_HELP_VERBS`. From that commit forward, `tryRenderVerbHelp` will intercept every `<verb> --help` invocation, render the descriptor-based body, and exit 0 before the flat handler runs — silently discarding the richer output the handler was built to produce. The regression is invisible to the developer because `help-full-surface.test.ts` passes (it only asserts `Usage:` presence and `exit 0`, not that the right renderer fired) and there is no compile-time or test-time enforcement of the denylist membership.
+
+The fix is to move the opt-out onto the descriptor: add an optional `selfHandlesHelp: true` field to `CommandDescriptor`, set it on the roadmap entry, and replace the `SELF_HELP_VERBS.has(verb)` check with `descriptor?.selfHandlesHelp`. Then forgetting to set the field defaults to descriptor-based help (no silent override), and the annotation is visible alongside the descriptor that defines the verb.
+
+---
+
+### AUDIT-20260619-72 — `inferChainPosition` hardcodes `'tasks.md'` independently of the artifact path table
+
+Finding-ID: AUDIT-20260619-72
+Status: migrated-to-backlog TASK-309
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/session/chain-position.ts:103-106
+
+The new guard block reads:
+
+```typescript
+if (present.has('tasks') && isFullyImplemented(join(featureAbs, 'tasks.md'))) {
+  return null;
+}
+```
+
+`present.has('tasks')` is populated by iterating the `ARTIFACTS` table (not in this diff) which maps the `'tasks'` key to its on-disk filename — almost certainly via `existsSync(join(featureAbs, 'tasks.md'))`. The guard then independently re-constructs the same path `join(featureAbs, 'tasks.md')` without going through that table.
+
+The coupling is benign as long as both sides agree, but they can drift silently: if the artifact table ever changes the filename or the `isFullyImplemented` call site is copied into another function with a different path expression, `present.has('tasks')` can be true while `isFullyImplemented` reads a different (or nonexistent) file — causing it to return `false` and never suppress the stale "active spec" signal (the TASK-130 bug re-emerges). The fix is to have `isFullyImplemented` receive the resolved path from the same table lookup that established `present.has('tasks')` — or to expose the artifact→path mapping as a constant that both sites import.
+
+---
+
+### AUDIT-20260619-73 — `session-discovery-path-portability.test.ts` guards only `src/session/` while the forbidden path may leak elsewhere in `src/`
+
+Finding-ID: AUDIT-20260619-73
+Status: migrated-to-backlog TASK-310
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/__tests__/session-discovery-path-portability.test.ts:1-28
+
+The test correctly identifies `plugins/stack-control/bin/stackctl` as a source-repo-only path that must not appear in adopter-visible output, and it scans every `.ts` file under `src/session/`. The accompanying scope note acknowledges this is intentional: "a stale path in another src/ subtree would surface elsewhere."
+
+That "elsewhere" is unspecified. Subcommand files, capability modules, and any new helper that emits user-facing advice about how to invoke `stackctl` are all plausible leak sites. The three SKILL.md files updated in this diff (`backlog`, `extend`, `roadmap`) were the immediate source of the path leaks; the test guards the programmatic discovery code specifically. A broader grep-based test over all of `src/` (not just `src/session/`) would close the remaining gap at low cost, but the current scoping is explicitly documented and represents a reasonable triage decision rather than an oversight.
+
+### AUDIT-20260619-74 — Descriptor artifact drops short flag aliases
+
+Finding-ID: AUDIT-20260619-74
+Status: migrated-to-backlog TASK-311
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/cli-help/verb-reference.ts:31-64
+
+`emitDescriptorArtifact()` claims to emit the descriptor artifact with “EXACTLY the verbs / sub-actions / flags the live surface exposes,” but `ArtifactFlag` only carries `arg`, `required`, and `description`; `flagsObject()` omits `shortFlag` even though `FlagDescriptor` has it and `flagLine()` renders it into the human reference. A downstream manifest consumer cannot reconstruct aliases like `-h`/other short options from the artifact, so the artifact is not a true round-trip of the command surface.
+
+The blast radius is medium: this does not break help rendering directly, but it makes the new machine-readable artifact incomplete while the tests still pass because they only compare long flag names. A reasonable fix is to include `shortFlag: string | null` in `ArtifactFlag` and assert it in `descriptor-artifact-roundtrip.test.ts`.

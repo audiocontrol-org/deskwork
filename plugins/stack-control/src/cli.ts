@@ -165,11 +165,22 @@ function tryRenderVerbHelp(verb: string, args: readonly string[]): boolean {
   if (!args.some((a) => a === '--help' || a === '-h')) return false;
   const descriptor = buildCommandSurface().find((d) => d.verb === verb);
   if (descriptor === undefined) return false;
-  const sub = args.find((a) => !a.startsWith('-'));
-  const body =
-    sub !== undefined && descriptor.subActions.some((s) => s.name === sub)
-      ? renderSubActionHelp(descriptor, sub)
-      : renderVerbHelp(descriptor);
+  // The sub-action, if any, is the LEADING token — every skill usage puts it
+  // first (`verb <sub> [flags]`). We do NOT scan past flags for a sub-action:
+  // that would pick a flag VALUE (e.g. the path in `inbox --doc /p list --help`)
+  // as the sub-action (AUDIT-BARRAGE-claude-01). A leading flag → verb-level help.
+  const lead = args[0];
+  if (descriptor.subActions.length > 0 && lead !== undefined && !lead.startsWith('-')) {
+    // An UNKNOWN leading token on a multi-action verb is a typo, not a request
+    // for parent help — fall through to the flat handler so it emits its
+    // unknown-subaction usage error (exit 2), never a false-positive exit-0
+    // "help" (AUDIT-BARRAGE-codex-01).
+    if (!descriptor.subActions.some((s) => s.name === lead)) return false;
+    const subBody = renderSubActionHelp(descriptor, lead);
+    process.stdout.write(subBody.endsWith('\n') ? subBody : `${subBody}\n`);
+    return true;
+  }
+  const body = renderVerbHelp(descriptor);
   process.stdout.write(body.endsWith('\n') ? body : `${body}\n`);
   return true;
 }

@@ -11,6 +11,9 @@ import { describe, expect, it } from 'vitest';
 const SESSION_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'session');
 const FORBIDDEN = 'plugins/stack-control/bin/stackctl';
 
+// Scope note (AUDIT-BARRAGE-claude-04): this guards the SESSION discovery module
+// specifically (the surface TASK-147 named). The cross-skill path fix lives in the
+// SKILL.md bodies; a stale path in another src/ subtree would surface elsewhere.
 describe('session discovery output is install-portable (T051)', () => {
   it('no src/session module hardcodes the source-repo-only stackctl path', () => {
     const offenders: string[] = [];
