@@ -50,12 +50,20 @@ const BASE_IGNORE: readonly string[] = [
  * relative to `root`. We use the subprocess approach (not jscpd's programmatic
  * API) so "what the gate sees" matches "what the dev would type at the shell".
  * jscpd exits non-zero when the duplication threshold trips; that is DATA, not
- * an error — only a kill-signal (code null) or a missing report is a real error.
+ * an error — only a kill-signal (code null) or a missing report AFTER a failing
+ * exit is a real error.
+ *
+ * Returns the report path, or `null` when jscpd found zero files to scan. jscpd
+ * writes NO report and exits 0 when no file matches the scan format (a
+ * non-TypeScript adopter tree) or every candidate is below the line limits — an
+ * empty-scan outcome, not an error (TASK-295 / #487: the hardcoded
+ * `typescript,tsx` format previously turned every non-TS adopter codebase into
+ * a govern-aborting throw, before the language-agnostic barrage ever ran).
  */
 export async function runJscpd(opts: {
   readonly root: string;
   readonly ignore: readonly string[];
-}): Promise<string> {
+}): Promise<string | null> {
   const outputDir = await mkdtemp(join(tmpdir(), 'jscpd-out-'));
   const reportAbs = join(outputDir, JSCPD_REPORT_FILE);
   try {
@@ -91,7 +99,7 @@ export async function runJscpd(opts: {
   ];
 
   let stderr = '';
-  await new Promise<void>((resolvePromise, rejectPromise) => {
+  const exitCode = await new Promise<number>((resolvePromise, rejectPromise) => {
     const proc = spawn(process.execPath, jscpdArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
     proc.stdout?.on('data', () => {
       /* swallow jscpd progress; we read the JSON report instead */
@@ -104,7 +112,7 @@ export async function runJscpd(opts: {
       if (code === null) {
         rejectPromise(new Error(`jscpd terminated by signal; stderr:\n${stderr}`));
       } else {
-        resolvePromise();
+        resolvePromise(code);
       }
     });
   });
@@ -113,9 +121,14 @@ export async function runJscpd(opts: {
     await stat(reportAbs);
   } catch (err) {
     if (isEnoent(err)) {
+      // No report. A CLEAN exit (0) with no report means jscpd found zero files
+      // to scan (no format match / all below line limits) — an empty scan, not
+      // an error. A NON-ZERO exit with no report is a genuine engine failure
+      // (e.g. an unreadable scan root → exit 1) and must surface.
+      if (exitCode === 0) return null;
       throw new Error(
-        `jscpd ran over ${opts.root} but did not write ${JSCPD_REPORT_FILE}.\n` +
-          `stderr from npx:\n${stderr || '(empty)'}`,
+        `jscpd exited ${exitCode} over ${opts.root} without writing ${JSCPD_REPORT_FILE}.\n` +
+          `stderr from jscpd:\n${stderr || '(empty)'}`,
       );
     }
     throw err;
@@ -129,6 +142,9 @@ export async function detectClonesViaJscpd(opts: {
   readonly ignore: readonly string[];
 }): Promise<CloneGroup[]> {
   const reportAbs = await runJscpd(opts);
+  // null = jscpd found zero files to scan (no format match / all below limits).
+  // No report to parse; the codebase has no detectable clones of this format.
+  if (reportAbs === null) return [];
   try {
     const reportText = await readFile(reportAbs, 'utf8');
     return parseJscpdReport(reportText);
