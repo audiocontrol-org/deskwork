@@ -2057,3 +2057,142 @@ Decision:   single-model (gate-counted low)
 Surface:    src/capability/intercept.ts:104-115 / bin/intercept:28-31
 
 `failOpenSignal(reason: string): string` is exported from `intercept.ts` and verified by `intercept-fail-open-signal.test.ts` (T091). The shell `bin/intercept` handles the analogous concern (stackctl not found/executable → write hardcoded notice to stderr) independently, with slightly different wording ("SKIPPED" vs "was SKIPPED", "stackctl dispatcher not found/executable" vs "could not reach stackctl: …"). `failOpenSignal` is not called anywhere in the diff — neither from the shell script (which cannot call TypeScript directly) nor from any other TypeScript file visible here. If the current `bin/intercept` shell is the only production adapter, `failOpenSignal` is dead exported code: it has tests and a docstring that describe a TypeScript-layer spawn-failure scenario, but no caller. If a future TypeScript interceptor replaces the shell, the function is available; until then, any downstream reader of `failOpenSignal` may not realise it is not on the active code path. Fix: either document explicitly that `failOpenSignal` is reserved for a future TypeScript hook adapter, or add a `// used by: <future adapter>` note, or suppress the export until the caller exists. Not blocking, but the two independent notice texts (`failOpenSignal` vs the shell's `printf`) will diverge over time if one is maintained and the other is not.
+
+## 2026-06-19 — audit-barrage lift (20260619T215433722Z-028-front-door-completeness-phase-3)
+
+### AUDIT-20260619-122 — Path-qualified backend invocations lose the read-only exemption
+
+Finding-ID: AUDIT-20260619-122
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/capability/identity.ts:434-447
+
+`argv0OfTokens()` normalizes a path-qualified backend with `basename(tok)`, so `/usr/local/bin/backlog list` is correctly recognized as the fronted `backlog` backend. The new `subActionOfTokens()` then tries to locate that normalized `argv0` with `tokens.indexOf(argv0)`, but the token array still contains `/usr/local/bin/backlog`, not `backlog`, so it returns `null` at lines 436-441. `mediationClassForIdentity()` treats that as mutating, so a declared read-only operation like `backlog list` is refused when invoked via an absolute or relative path.
+
+The blast radius is bounded to path-qualified backend calls, but it violates the feature’s stated end-to-end read-only exemption for a normal shell invocation form. A reasonable fix is to preserve the resolved token index from argv0 resolution, or make sub-action lookup compare `basename(token)` against the normalized backend while still respecting wrapper parsing.
+
+## 2026-06-19 — audit-barrage lift (20260619T215709246Z-028-front-door-completeness-phase-5)
+
+### AUDIT-20260619-123 — `resolveInstalled` not wired in the production `stackctl intercept` CLI entry point
+
+Finding-ID: AUDIT-20260619-123
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/capability/intercept.ts:85-96 and the (absent) production `runIntercept` CLI wrapper
+
+`interceptDecision` adds `resolveInstalled?: (cwd: string) => boolean` as an optional dep defaulting to `true` — meaning "always assume an installation exists." The no-installation short-circuit (FR-020) only fires when `deps.resolveInstalled?.(cwd) ?? true` evaluates to `false`. The production `runMediateCheck` IS updated in this diff to supply `resolveInstalled: defaultResolveInstalled` (visible in `mediate-check.ts`). But the production entry point for `stackctl intercept` — the TypeScript function that receives the PreToolUse payload from `bin/intercept` and calls `interceptDecision` — is NOT in this diff.
+
+If that entry point was not updated to supply `resolveInstalled: (cwd) => findInstallation(cwd) !== null`, every call to `interceptDecision` in production runs with `installed = true` and skips the no-installation guard entirely. A user or agent running `backlog create` (or any mutating backend op) in a directory that has the plugin installed but no enclosing stack-control installation reaches `decideMediation` with an empty active set → refuse → the agent is told to use `/stack-control:backlog`, which is a dead end because no installation exists. The spec requires (SC-004 / FR-020) that a refusal implies an installation is present, so the setup redirect is always satisfiable. The default `?? true` breaks that guarantee on the live hook path.
+
+The `mediate-check` and `interceptDecision` paths are supposed to be symmetric (the cwd-linchpin tests verify `mediateCheck` for this case; `T079` in `mediate-check-no-installation-permit.test.ts` covers the `mediate-check` production path). But no test in this diff exercises `interceptDecision` through a production `runIntercept` wrapper — all intercept tests call `interceptDecision` directly with custom deps. A missing `resolveInstalled` in the production wrapper would not be caught by CI.
+
+---
+
+### AUDIT-20260619-124 — `interceptDecision` has no no-installation test coverage — only `mediateCheck` does
+
+Finding-ID: AUDIT-20260619-124 (claude-02 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    src/__tests__/capability (all intercept tests), src/__tests__/subcommands/mediate-check-no-installation-permit.test.ts
+
+The no-installation short-circuit (FR-020 / T1) is implemented symmetrically in both `interceptDecision` (`intercept.ts:88-96`) and `mediateCheck` (`mediate-check.ts:82-93`). The test `028 T079` in `mediate-check-no-installation-permit.test.ts` covers the `mediate-check` path end-to-end, including both the short-circuit itself and the "does NOT resolve the marker when there is no installation" invariant. However, none of the intercept-specific tests (`intercept-cold-start-zero-io.test.ts`, `intercept-fail-open-signal.test.ts`, `cwd-linchpin-reconcile.test.ts`) supply `resolveInstalled: () => false` to `interceptDecision`. All intercept tests run with the default (`installed = true`).
+
+The `cwd-linchpin-reconcile.test.ts` test "a cwd that LEFT the installation permits via the no-installation short-circuit" (line 47) uses `mediateCheck` with `liveDeps()`, not `interceptDecision`. The two functions share the same logical path but are separate implementations. If the intercept path's no-installation branch has a subtle difference (e.g., the `!installed` guard fires after `resolveActive` is already called instead of before), CI would not catch it. Given that finding 01 above flags a likely wiring gap on the production interceptor path, the absence of direct interceptor-path coverage for the no-installation case means the gap would also go undetected in tests.
+
+A straightforward fix: add one test in the intercept suite that passes `resolveInstalled: () => false` to `interceptDecision` for a mutating backend identity and asserts `verdict === 'permit'`.
+
+---
+
+### AUDIT-20260619-125 — Hardcoded `ILLUSTRATIONS` in T097 test won't catch future capability-interface skills
+
+Finding-ID: AUDIT-20260619-125
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/capability/skill-marker-example-authorizes.test.ts:35-40
+
+The test `028 T097` is stated as verifying that "each capability-interface skill documents a `front-door enter --capability <id>` block" and that the documented marker authorizes the illustrated backend call. The preamble comment says "reads the documented `--capability` from each skill's marker block." In practice the test covers only four hardcoded entries:
+
+```typescript
+const ILLUSTRATIONS: readonly SkillIllustration[] = [
+  { skill: 'backlog', surface: 'bash', backend: 'backlog list' },
+  { skill: 'define', surface: 'skill', backend: 'speckit-specify' },
+  { skill: 'extend', surface: 'skill', backend: 'speckit-specify' },
+  { skill: 'execute', surface: 'skill', backend: 'speckit-implement' },
+];
+```
+
+If a new capability-interface skill is added (e.g., `roadmap`, `inbox`, `design`) with a SKILL.md marker example that names a wrong `--capability` id or illustrates a backend call that is not authorized by that capability, this test will not catch it. The test's documented contract ("each capability-interface skill") is stronger than its implementation (four static entries). The `documentedCapability` regex (`/front-door enter --capability (\S+)/`) is also sensitive to exact SKILL.md formatting — a multi-line block or extra whitespace would silently produce a null match and throw rather than fail the assertion, which is correct but fragile.
+
+A more robust approach: glob `skills/*/SKILL.md`, filter to files that contain a `front-door enter --capability` block, and derive the illustrations dynamically so new skills are automatically enrolled. This doesn't require changing the test contract, just the discovery mechanism.
+
+---
+
+### AUDIT-20260619-126 — `clearMarker` returns `true` when `rmSync({ force: true })` silently absorbs an ENOENT outside the lock
+
+Finding-ID: AUDIT-20260619-126
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/capability/marker.ts:280-287 (the `clearMarker` implementation)
+
+```typescript
+export function clearMarker(installRoot: string, session: string): boolean {
+  const path = markerPath(installRoot, session);
+  return withMarkerLock(installRoot, session, () => {
+    if (!existsSync(path)) return false;
+    rmSync(path, { force: true });
+    return true;
+  });
+}
+```
+
+`withMarkerLock` serializes concurrent marker operations (enter, exit, clear) for the same session. Within the lock, another marker operation cannot delete the file. However, if a non-lock-mediated deletion occurs between `existsSync` returning `true` and `rmSync` executing — for example, a manual `rm` by the operator, an OS tmp-cleaner, or a test harness teardown — `rmSync({ force: true })` silently absorbs the ENOENT and returns without error, but the function returns `true` claiming it removed a file that was already gone.
+
+The practical consequence is that the caller (`front-door.ts`, line ~113) prints `"cleared marker for session ${session}"` when it should print `"no marker to clear"`. The state outcome is correct (marker is gone either way), but the confirmation message is misleading. The test in `front-door-recovery.test.ts` at line 116 ("reports 'no marker to clear' when an installation exists but the session has no marker") only tests the case where `existsSync` returns `false` from the start, not the race. In operator-facing recovery flows the honesty of the confirmation message matters — an agent or operator relying on "cleared marker" as evidence of a successful recovery is misled if it fires for a pre-existing deletion.
+
+---
+
+### AUDIT-20260619-127 — `mediate-list` output exposes marker tokens in plaintext
+
+Finding-ID: AUDIT-20260619-127
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/front-door.ts:48-54 (`renderListing`)
+
+```typescript
+function renderListing(listing: MarkerListing): string {
+  ...
+  return listing.entries
+    .map((e) => `${e.capability}  token=${e.token}  writtenAt=${e.writtenAt}  ${e.fresh ? 'fresh' : 'stale'}`)
+    .join('\n')
+    .concat('\n');
+}
+```
+
+The `token` field is the opaque authorization token written by `enterFrontDoor` and consumed by `exitFrontDoor --token <tok>` to deauthorize a capability. Exposing it in the `mediate-list` output means any agent or process that can read stdout from `stackctl front-door mediate-list` can harvest the active token and call `front-door exit --token <tok> --session <id>` to prematurely terminate an authorized capability window. Within a normally operating session this is low-risk (the agent is trusted and the capability window is expected to close after the drive). The concern is elevated if `mediate-list` output is captured in a log or if multiple agents share a session context.
+
+`mediate-recover` (the mutating recovery verb) deliberately does NOT require a token — it clears by path alone — so the token does not need to be shown to enable recovery. The listing can omit or truncate the token (e.g., show the first 8 characters with an ellipsis) with no loss of recovery functionality. The only field needed for diagnosis is `capability`, `writtenAt`, and `fresh`.
+
+### AUDIT-20260619-128 — Compound Bash commands can bypass mutation mediation after a read-only backend
+
+Finding-ID: AUDIT-20260619-128
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/capability/mediation-class.ts:52-56; src/capability/mediate.ts:45-52; src/capability/intercept.ts:103-108
+
+`mediationClassForIdentity` returns the class for the first fronted backend command it sees. If the Bash payload is `backlog list && backlog capture --type bug`, lines 52-56 classify the whole intercepted tool call as `read-only` because the first `backlog` command is `list`. `decideMediation` then permits the entire identity on the read-only exemption at lines 45-52, so the later mutating `backlog capture` runs without a marker.
+
+The blast radius is high because compound shell commands are explicitly supported by the identity parser, and this turns the new FR-050 exemption into a practical unmarked mutation bypass. A reasonable fix is to derive mediation over every matched fronted command in the payload: permit as read-only only if every fronted backend invocation in the command line is declared read-only; otherwise classify the invocation as mutating and require the marker.

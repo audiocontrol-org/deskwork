@@ -45,15 +45,22 @@ export function mediationClassForIdentity(surface: Surface, identity: string): O
   const cap = matchCapability(CAPABILITY_REGISTRY, surface, identity);
   if (cap === null) return 'mutating'; // not a fronted backend — the class is moot; stay safe
 
-  // Find the simple command whose argv0 is one of this capability's fronted cli identities,
-  // then read its sub-action. The capability's cli identity == the command-surface verb
-  // (e.g. `backlog`), so the verb lookup uses that same token.
+  // Classify EVERY fronted backend command in the payload — a compound command like
+  // `backlog list && backlog capture --type bug` must NOT be permitted read-only just
+  // because its FIRST fronted command is a read query: the later mutating `capture` would
+  // then run without a marker (AUDIT-BARRAGE-codex-01 — a real unmarked-mutation bypass).
+  // The whole intercepted call is read-only ONLY when EVERY fronted backend command in it
+  // is declared read-only; any mutating (or unresolvable, or bare-verb) fronted command
+  // makes the whole call mutating (fail safe, Decision 4).
   const cliIdentities = new Set(cap.backendIdentities.cliArgv0);
+  let sawFronted = false;
   for (const command of resolvedCommandsOf(identity)) {
     if (!cliIdentities.has(command.argv0)) continue;
-    if (command.subAction === null) return 'mutating'; // bare verb, no sub-action → mutating
-    const declared = declaredClassFor(command.argv0, command.subAction);
-    return declared ?? 'mutating';
+    sawFronted = true;
+    if (command.subAction === null) return 'mutating'; // a bare fronted verb → mutating
+    if ((declaredClassFor(command.argv0, command.subAction) ?? 'mutating') === 'mutating') {
+      return 'mutating'; // any mutating fronted command makes the whole call mutating
+    }
   }
-  return 'mutating';
+  return sawFronted ? 'read-only' : 'mutating';
 }

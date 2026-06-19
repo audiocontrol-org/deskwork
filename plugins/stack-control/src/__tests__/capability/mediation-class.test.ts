@@ -46,4 +46,14 @@ describe('mediationClassForIdentity (028 US3 — live FR-050 wiring)', () => {
     // argv-of-every-command parsing: `cd /x && backlog list` still surfaces `backlog list`.
     expect(mediationClassForIdentity('bash', 'cd /x && backlog list')).toBe('read-only');
   });
+
+  it('a compound command with ANY mutating fronted op is mutating (no read-only bypass; codex-01)', () => {
+    // `backlog list && backlog capture` must NOT be permitted read-only on the strength of
+    // the leading read query — the later mutating capture would otherwise run unmarked.
+    expect(mediationClassForIdentity('bash', 'backlog list && backlog capture --type bug')).toBe('mutating');
+    // order-independent: mutating op first is also mutating.
+    expect(mediationClassForIdentity('bash', 'backlog capture --type bug && backlog list')).toBe('mutating');
+    // an all-read-only compound stays read-only.
+    expect(mediationClassForIdentity('bash', 'backlog list && backlog list')).toBe('read-only');
+  });
 });

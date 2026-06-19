@@ -60,16 +60,27 @@ export function resolveViaFrontDoorFile(skill: string, session: string, cwd: str
 
 /**
  * Pure decision core: a non-wrapped skill permits; a wrapped skill is refused unless
- * `viaFrontDoor` (resolved from the file marker). Hermetically testable — the caller
- * resolves `viaFrontDoor`.
+ * `viaFrontDoor` (resolved from the file marker) — EXCEPT with no enclosing installation
+ * (`installed === false`), where it PERMITS, matching the interceptor's FR-020 no-installation
+ * short-circuit (AUDIT-BARRAGE-codex-02): mediation fires only inside an installation, so a
+ * raw wrapped skill outside one is unmediated, not refused (otherwise the redirect to a
+ * front door is a dead end). Hermetically testable — the caller resolves both signals.
  */
-export function evaluateGuard(skill: string, viaFrontDoor: boolean): RefusalVerdict {
+export function evaluateGuard(skill: string, viaFrontDoor: boolean, installed: boolean): RefusalVerdict {
   if (!isWrappedSkill(skill)) {
     return {
       refused: false,
       skill,
       frontDoors: [],
       message: `'${skill}' is not a wrapped backend skill — permitted.`,
+    };
+  }
+  if (!installed) {
+    return {
+      refused: false,
+      skill,
+      frontDoors: [],
+      message: `no stack-control installation — mediation fires only inside an installation (FR-020); '${skill}' permitted.`,
     };
   }
   return evaluateRefusal(skill, viaFrontDoor);
@@ -107,9 +118,12 @@ export async function runSpeckitGuard(args: string[]): Promise<void> {
   // session id — it returns false rather than throwing (claude-04) — so a compromised
   // $CLAUDE_CODE_SESSION_ID yields the normal refusal path, never an unhandled rejection.
   const session = process.env.CLAUDE_CODE_SESSION_ID ?? '';
-  const viaFrontDoor = resolveViaFrontDoorFile(skill, session, process.cwd());
+  const cwd = process.cwd();
+  const viaFrontDoor = resolveViaFrontDoorFile(skill, session, cwd);
+  // FR-020 parity with the interceptor: no enclosing installation → permit (codex-02).
+  const installed = findInstallation(cwd) !== null;
 
-  const verdict = evaluateGuard(skill, viaFrontDoor);
+  const verdict = evaluateGuard(skill, viaFrontDoor, installed);
   if (verdict.refused) {
     process.stderr.write(`speckit-guard: REFUSED — ${verdict.message}\n`);
     process.exit(1);

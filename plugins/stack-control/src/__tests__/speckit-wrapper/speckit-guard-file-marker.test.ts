@@ -20,7 +20,7 @@ describe('speckit-guard file-marker resolution (028 T089)', () => {
       enterFrontDoor(fx.root, 'sess', 'spec-execution');
       const viaFrontDoor = resolveViaFrontDoorFile('speckit-implement', 'sess', fx.root);
       expect(viaFrontDoor).toBe(true);
-      const v = evaluateGuard('speckit-implement', viaFrontDoor);
+      const v = evaluateGuard('speckit-implement', viaFrontDoor, true);
       expect(v.refused).toBe(false);
     } finally {
       fx.cleanup();
@@ -32,7 +32,7 @@ describe('speckit-guard file-marker resolution (028 T089)', () => {
     try {
       const viaFrontDoor = resolveViaFrontDoorFile('speckit-implement', 'sess', fx.root);
       expect(viaFrontDoor).toBe(false);
-      const v = evaluateGuard('speckit-implement', viaFrontDoor);
+      const v = evaluateGuard('speckit-implement', viaFrontDoor, true);
       expect(v.refused).toBe(true);
       expect(v.message).toMatch(/stack-control:execute/);
     } finally {
@@ -57,15 +57,23 @@ describe('speckit-guard file-marker resolution (028 T089)', () => {
       enterFrontDoor(fx.root, 'sess', 'spec-definition');
       const viaFrontDoor = resolveViaFrontDoorFile('speckit-analyze', 'sess', fx.root);
       expect(viaFrontDoor).toBe(true);
-      expect(evaluateGuard('speckit-analyze', viaFrontDoor).refused).toBe(false);
+      expect(evaluateGuard('speckit-analyze', viaFrontDoor, true).refused).toBe(false);
     } finally {
       fx.cleanup();
     }
   });
 
   it('a non-wrapped skill is permitted regardless of marker', () => {
-    const v = evaluateGuard('not-a-speckit-skill', false);
+    const v = evaluateGuard('not-a-speckit-skill', false, true);
     expect(v.refused).toBe(false);
+  });
+
+  it('a wrapped skill with NO installation is permitted (FR-020 parity with interceptor; codex-02)', () => {
+    // Outside any installation, mediation does not fire — the guard must PERMIT a raw
+    // wrapped skill (matching the interceptor), not refuse with a dead-end redirect.
+    const v = evaluateGuard('speckit-implement', false, false);
+    expect(v.refused).toBe(false);
+    expect(v.message).toMatch(/no stack-control installation/);
   });
 
   it('with no installation, the file resolver reports not-via-front-door (no throw)', () => {
@@ -83,7 +91,7 @@ describe('speckit-guard file-marker resolution (028 T089)', () => {
       expect(() => resolveViaFrontDoorFile('speckit-implement', '../evil', fx.root)).not.toThrow();
       expect(resolveViaFrontDoorFile('speckit-implement', '../evil', fx.root)).toBe(false);
       // A guard fed an unsafe session still refuses a raw wrapped skill (not a false permit).
-      expect(evaluateGuard('speckit-implement', false).refused).toBe(true);
+      expect(evaluateGuard('speckit-implement', false, true).refused).toBe(true);
     } finally {
       fx.cleanup();
     }
