@@ -115,15 +115,26 @@ describe('027 T003 — buildRoadmapCommand mounts the full subaction set onto co
 });
 
 describe('027 T003 — mounted roadmap command preserves error shapes (contract §exit codes)', () => {
-  it('an unknown subaction → exit 2', () => {
+  it('an unknown subaction → exit 2 with the roadmap: message shape + known list (codex-01)', () => {
     const docPath = tmpChain();
-    expect(runCli(['roadmap', 'frobnicate', '--doc', docPath]).status).toBe(2);
+    const r = runCli(['roadmap', 'frobnicate', '--doc', docPath]);
+    expect(r.status).toBe(2);
+    // FR-006: the mounted path must NOT leak commander's `error: unknown command`
+    // — it preserves the flat dispatcher's prefix AND the known-subaction
+    // discovery list, not just the exit code.
+    expect(r.stderr).toContain("roadmap: unknown subaction 'frobnicate'");
+    expect(r.stderr).toContain('known:');
+    expect(r.stderr).toContain('reconcile');
+    expect(r.stderr).not.toContain('unknown command');
   });
 
-  it('an unknown flag for a known subaction → exit 2', () => {
+  it('an unknown flag for a known subaction → exit 2 with the roadmap: message shape (codex-01)', () => {
     const docPath = tmpChain();
     const r = runCli(['roadmap', 'advance', 'impl:feature/b', '--bogus', 'x', '--to', 'in-flight', '--doc', docPath, '--apply']);
     expect(r.status).toBe(2);
+    expect(r.stderr).toContain('roadmap:');
+    expect(r.stderr).toContain('bogus');
+    expect(r.stderr).not.toContain('unknown option'); // commander's shape must not leak
   });
 
   it('no subaction → exit 2', () => {

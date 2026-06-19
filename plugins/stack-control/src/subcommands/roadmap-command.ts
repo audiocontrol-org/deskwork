@@ -35,6 +35,7 @@ import {
   executeRoadmapSubaction,
   preflightRoadmapFlags,
   SUBACTION_SPECS,
+  KNOWN_SUBACTIONS,
   NO_DOC,
   type Flags,
 } from './roadmap.js';
@@ -96,20 +97,14 @@ function registerSubaction(parent: Command, name: string): void {
   if (grammar.apply) sub.option('--apply', 'write the change (default: dry-run)');
   if (grammar.clear === true) sub.option('--clear', 'clear the condition');
   sub.action(async function (this: Command) {
-    // Preserve the AUDIT-hardened forgot-value + grammar guards on the raw args
-    // (the slice after the subaction token). `this.args` holds the operands;
-    // for the full hardened scan we re-derive from the parent's parsed argv.
-    const subActionArgs = rawSubactionArgs;
-    preflightRoadmapFlags(name, subActionArgs);
+    // Flags were already validated by `preflightRoadmapFlags` in
+    // `runRoadmapCommand` (BEFORE commander parse, so usage errors keep the
+    // `roadmap: …` message shape). This action only reads the typed options for
+    // dispatch.
     const flags = dashedFlags(flagsFromCommand(this, this.args));
     await executeRoadmapSubaction(name, flags);
   });
 }
-
-// commander's action callback does not receive the raw argv slice for the
-// subaction; `runRoadmapCommand` records it here for the preflight guard. Set
-// immediately before `parse`, read synchronously at action entry.
-let rawSubactionArgs: readonly string[] = [];
 
 /** Build the `roadmap` commander Command (exported for T003's mount assertions). */
 export function buildRoadmapCommand(): Command {
@@ -145,7 +140,20 @@ export async function runRoadmapCommand(args: string[]): Promise<void> {
     );
     process.exit(2);
   }
-  rawSubactionArgs = args.slice(1);
+  // Unknown-subaction + flag/arity validation run BEFORE commander parse so usage
+  // errors keep the flat path's `roadmap: …` message shape — including the
+  // known-subaction discovery list — rather than leaking commander's own
+  // `error: unknown command …` / `unknown option …` diagnostics (FR-006
+  // non-regression; AUDIT-BARRAGE-codex-01, Phase 2). These mirror the flat
+  // runRoadmapCli guards exactly (the unknown-subaction message is single-sourced
+  // with that path's literal).
+  if (SUBACTION_SPECS[subaction] === undefined) {
+    process.stderr.write(
+      `roadmap: unknown subaction '${subaction}' (known: ${KNOWN_SUBACTIONS})\n`,
+    );
+    process.exit(2);
+  }
+  preflightRoadmapFlags(subaction, args.slice(1));
   const program = buildRoadmapCommand();
   try {
     await program.parseAsync(args, { from: 'user' });

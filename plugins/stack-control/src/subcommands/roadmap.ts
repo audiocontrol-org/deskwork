@@ -79,6 +79,13 @@ const ALL_VALUE_FLAGS: readonly string[] = [
   ...new Set(Object.values(SUBACTION_SPECS).flatMap((s) => s.valueFlags)),
 ];
 
+/** The known-subaction list rendered in the unknown-subaction usage error —
+ * single-sourced so the flat path (`runRoadmapCli`) and the commander mount
+ * (`roadmap-command.ts`) emit the byte-identical message (FR-006; AUDIT-BARRAGE-
+ * codex-01). The order is the discovery order operators have learned, kept stable. */
+export const KNOWN_SUBACTIONS =
+  'next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, reconcile, close-related';
+
 /** Scan flags via the shared subaction-verb scanner; `--apply`/`--clear` booleans. */
 export function scanFlags(args: readonly string[]): Flags {
   const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear'], ALL_VALUE_FLAGS);
@@ -392,10 +399,7 @@ export async function runRoadmapCli(args: string[]): Promise<void> {
   // Reject an unknown subaction before resolving the doc, so an unknown verb is a
   // usage error (exit 2) rather than triggering installation resolution.
   if (SUBACTION_SPECS[subaction] === undefined) {
-    failUsage(
-      'roadmap',
-      `unknown subaction '${subaction}' (known: next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, reconcile, close-related)`,
-    );
+    failUsage('roadmap', `unknown subaction '${subaction}' (known: ${KNOWN_SUBACTIONS})`);
   }
   const scanned = preflightRoadmapFlags(subaction, args.slice(1));
   await executeRoadmapSubaction(subaction, scanned);
