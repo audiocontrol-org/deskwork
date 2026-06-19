@@ -24,10 +24,10 @@ Tests are REQUIRED (Constitution Principle I — Test-First, NON-NEGOTIABLE): ea
 **Goal**: a fresh agent learns the full roadmap surface from `--help`/usage alone, no probing.
 **Independent test**: quickstart Scenario 1 — `roadmap --help`, `roadmap`, `roadmap <sub> --help` each print the real surface; flags shown == flags accepted.
 
-- [ ] T006 [P] [US1] RED test `tests/roadmap/help-nondrift.test.ts`: for every roadmap subaction, the flags enumerated in `--help` are exactly the flags the parser accepts (no shown-but-unparsed / parsed-but-unshown) (FR-005, CHK015).
-- [ ] T007 [P] [US1] RED test `tests/roadmap/help-surface.test.ts`: `roadmap --help` lists every subaction + summary (exit 0); `roadmap` (no subaction) prints the COMPLETE subaction set (exit 2); `roadmap advance --help` surfaces the status vocabulary (FR-002/003/004, CHK013/014).
-- [ ] T008 [US1] Express each existing roadmap subaction as a commander sub-command definition (name, summary, options, value vocabularies incl. the status set) in `src/subcommands/roadmap.ts` — the single source rendering help AND driving parse (FR-001/004, data-model VerbCommandDefinition).
-- [ ] T009 [US1] Wire `--help`/`-h`/no-subaction usage through the adapter so all of T006/T007 pass GREEN; confirm zero `as`/`any` at the boundary (CHK024).
+- [X] T006 [P] [US1] RED test `tests/roadmap/help-nondrift.test.ts`: for every roadmap subaction, the flags enumerated in `--help` are exactly the flags the parser accepts (no shown-but-unparsed / parsed-but-unshown) (FR-005, CHK015).
+- [X] T007 [P] [US1] RED test `tests/roadmap/help-surface.test.ts`: `roadmap --help` lists every subaction + summary (exit 0); `roadmap` (no subaction) prints the COMPLETE subaction set (exit 2); `roadmap advance --help` surfaces the status vocabulary (FR-002/003/004, CHK013/014).
+- [X] T008 [US1] Express each existing roadmap subaction as a commander sub-command definition (name, summary, options, value vocabularies incl. the status set) in `src/subcommands/roadmap.ts` — the single source rendering help AND driving parse (FR-001/004, data-model VerbCommandDefinition).
+- [X] T009 [US1] Wire `--help`/`-h`/no-subaction usage through the adapter so all of T006/T007 pass GREEN; confirm zero `as`/`any` at the boundary (CHK024).
 
 **Checkpoint**: US1 independently testable — quickstart Scenario 1 passes.
 

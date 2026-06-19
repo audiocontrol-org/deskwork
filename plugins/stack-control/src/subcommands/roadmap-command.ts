@@ -14,10 +14,13 @@
 //   - `exitOverride()` turns commander's parse failures into a `CommanderError`
 //     we map to exit 2 (or exit 0 for an explicit help display) — never letting
 //     commander call `process.exit` with its own code.
-//   - the built-in `--help`/`-h` option is DISABLED (`helpOption(false)`) on the
-//     parent and every sub-command, so `--help` is an unknown option → exit 2,
-//     matching today's behavior. The rich self-documenting help surface is
-//     Phase 3 (T006–T009), explicitly NOT built here.
+//   - the built-in `--help`/`-h` option stays DISABLED on commander
+//     (`helpOption(false)`) — but `--help`/`-h` is now INTERCEPTED before parse
+//     (027 US1, T009) and rendered from the single grammar-derived help source
+//     (cli-help/roadmap-help.ts) at exit 0. This intentionally CHANGES the
+//     Phase-2 behavior (`roadmap --help` → exit 2 unknown-flag): US1's contract
+//     is a self-documenting surface (FR-001/002/003/004). The subaction
+//     behavior (parse/usage exit-2 shapes) stays byte-identical (FR-006).
 //   - the AUDIT-hardened forgot-value guard (a `--<value-flag>` immediately
 //     followed by a recognized flag → exit 2, AUDIT-20260608-04) that commander's
 //     parser does NOT replicate is preserved by running `preflightRoadmapFlags`
@@ -32,6 +35,11 @@
 import { Command, CommanderError } from 'commander';
 import { booleanOption, optionalStringOption, rawOpts, stringOption } from '../cli-help/command-adapter.js';
 import {
+  renderRoadmapHelp,
+  renderRoadmapUsage,
+  renderSubactionHelp,
+} from '../cli-help/roadmap-help.js';
+import {
   executeRoadmapSubaction,
   preflightRoadmapFlags,
   SUBACTION_SPECS,
@@ -39,6 +47,11 @@ import {
   NO_DOC,
   type Flags,
 } from './roadmap.js';
+
+/** Whether an argv token is a help request (`--help`/`-h`). */
+function isHelpFlag(token: string): boolean {
+  return token === '--help' || token === '-h';
+}
 
 /** Build the `Flags` shape the execution core consumes from a sub-command's
  * parsed options, read through the typed adapter (no `any`). `--doc` absent maps
@@ -131,13 +144,18 @@ function exitForCommanderError(err: CommanderError): never {
 /** Live entry point for `stackctl roadmap …` (dispatched from cli.ts). */
 export async function runRoadmapCommand(args: string[]): Promise<void> {
   const subaction = args[0];
-  // No subaction (or a leading flag, e.g. `roadmap --doc x`) is a usage error —
-  // exit 2 with the full subaction list, matching the flat path exactly. The rich
-  // help surface (a clean COMPLETE-list render) is Phase 3.
+  // `roadmap --help` / `roadmap -h` (or any leading help flag) → the
+  // self-documenting subaction listing at exit 0 (027 US1, FR-002 — the
+  // intentional change from Phase 2's exit-2 unknown-flag behavior).
+  if (subaction !== undefined && isHelpFlag(subaction)) {
+    process.stdout.write(renderRoadmapHelp());
+    process.exit(0);
+  }
+  // No subaction (or some other leading flag, e.g. `roadmap --doc x`) is a usage
+  // error — exit 2 with the COMPLETE subaction set on stderr (027 US1, FR-003 —
+  // the truncated `<next|blocked|add>` of Phase 2 is replaced).
   if (subaction === undefined || subaction.startsWith('--')) {
-    process.stderr.write(
-      'roadmap: a subaction is required (usage: roadmap <next|blocked|add> [flags])\n',
-    );
+    process.stderr.write(`${renderRoadmapUsage()}\n`);
     process.exit(2);
   }
   // Unknown-subaction + flag/arity validation run BEFORE commander parse so usage
@@ -152,6 +170,14 @@ export async function runRoadmapCommand(args: string[]): Promise<void> {
       `roadmap: unknown subaction '${subaction}' (known: ${KNOWN_SUBACTIONS})\n`,
     );
     process.exit(2);
+  }
+  // `roadmap <subaction> --help` / `-h` → that subaction's flags + value
+  // vocabularies at exit 0 (027 US1, FR-004). Rendered before preflight so a help
+  // request never trips the flag/arity validation (a help-with-flags request is
+  // still help, not a parse of those flags).
+  if (args.slice(1).some(isHelpFlag)) {
+    process.stdout.write(renderSubactionHelp(subaction));
+    process.exit(0);
   }
   preflightRoadmapFlags(subaction, args.slice(1));
   const program = buildRoadmapCommand();
