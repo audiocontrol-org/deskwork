@@ -9,9 +9,17 @@ import { interceptDecision, denyOutput } from '../capability/intercept.js';
 import { activeCapabilities } from '../capability/marker.js';
 import { findInstallation } from '../config/installation.js';
 
+// Both seams resolve the enclosing installation via `findInstallation(cwd)` — so the
+// marker is keyed by the RESOLVED installation root (the cwd linchpin reconcile, FR-023),
+// matching `front-door enter`, and the no-installation case short-circuits to permit
+// (FR-020) inside `interceptDecision` rather than refusing on an empty active set.
 function resolveActive(cwd: string, session: string): ReadonlySet<string> {
   const installation = findInstallation(cwd);
   return installation === null ? new Set() : activeCapabilities(installation.root, session);
+}
+
+function resolveInstalled(cwd: string): boolean {
+  return findInstallation(cwd) !== null;
 }
 
 async function readStdin(): Promise<string> {
@@ -44,7 +52,7 @@ export async function runIntercept(_args: string[]): Promise<void> {
   // not reliant on the bash wrapper's non-zero-exit handling.
   let decision;
   try {
-    decision = interceptDecision(payload as Record<string, unknown>, { resolveActive });
+    decision = interceptDecision(payload as Record<string, unknown>, { resolveActive, resolveInstalled });
   } catch (err) {
     process.stdout.write(
       denyOutput(

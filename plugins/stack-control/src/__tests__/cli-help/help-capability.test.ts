@@ -50,6 +50,8 @@ describe('capability family --help (028 US1)', () => {
     expect(frontDoor?.subActions.map((s) => `${s.name}:${s.mediationClass}`).sort()).toEqual([
       'enter:mutating',
       'exit:mutating',
+      'mediate-list:read-only',
+      'mediate-recover:mutating',
     ]);
 
     expect(byVerb.get('mediate-check')?.mediationClass).toBe('read-only');

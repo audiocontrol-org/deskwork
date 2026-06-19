@@ -45,17 +45,20 @@ function buildCapabilityCommand(): Command {
   return c;
 }
 
-// ── front-door (multi-action: enter | exit) ─────────────────────────────────
-// Both write the session-keyed marker store (enter pushes an entry, exit removes
-// one) → mutating.
+// ── front-door (multi-action: enter | exit | mediate-list | mediate-recover) ──
+// enter/exit/mediate-recover write the session-keyed marker store (enter pushes an
+// entry, exit removes one, mediate-recover clears the file) → mutating. mediate-list
+// is a tolerant READ of the marker (recovery inspection) → read-only (028 T086).
 const FRONT_DOOR_MEDIATION: Readonly<Record<string, MediationClass>> = {
   enter: 'mutating',
   exit: 'mutating',
+  'mediate-list': 'read-only',
+  'mediate-recover': 'mutating',
 };
 
 function buildFrontDoorCommand(): Command {
   const c = new Command('front-door')
-    .description('Marker writer the capability-interface skills call to bracket a sanctioned backend drive: enter pushes a session-keyed marker and prints its token; exit removes that token\'s entry.')
+    .description('Marker writer the capability-interface skills call to bracket a sanctioned backend drive: enter pushes a session-keyed marker and prints its token; exit removes that token\'s entry. mediate-list / mediate-recover are the recovery surface (inspect / clear a session marker).')
     .helpOption(false);
 
   const enter = c
@@ -73,6 +76,20 @@ function buildFrontDoorCommand(): Command {
   exit.option('--token <tok>', 'the literal token value that `enter` printed');
   exit.option('--session <id>', 'the session id the marker was keyed under');
   exit.option('--at <dir>', 'anchor the marker removal to the installation enclosing this directory (default: cwd)');
+
+  const mediateList = c
+    .command('mediate-list')
+    .description('list the active front-door entries for a session (or (no marker) / corrupt (unparseable)) — a tolerant read-only inspection of the recovery surface')
+    .helpOption(false);
+  mediateList.option('--session <id>', 'the session id whose marker to list');
+  mediateList.option('--at <dir>', 'resolve the enclosing installation from this directory (default: cwd)');
+
+  const mediateRecover = c
+    .command('mediate-recover')
+    .description('clear a session\'s front-door marker by path (recovers even a corrupt marker in one command; alias: reset) — exit 0, a safe no-op with no installation')
+    .helpOption(false);
+  mediateRecover.option('--session <id>', 'the session id whose marker to clear');
+  mediateRecover.option('--at <dir>', 'resolve the enclosing installation from this directory (default: cwd)');
 
   return c;
 }

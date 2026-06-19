@@ -3,37 +3,71 @@
 // DEPRECATED (026 T017): superseded by the capability interceptor (`bin/intercept` +
 // `stackctl mediate-check`), which refuses a raw backend at the point of invocation and
 // reads the session-keyed marker FILE. This verb is kept (frozen) per the documented-
-// subcommand contract; its skill→front-door mapping now DERIVES from the capability
-// registry (via refusal.ts), so there is one source. New adapters call `mediate-check`.
+// subcommand contract; its skill→front-door mapping DERIVES from the capability registry
+// (via refusal.ts), so there is one source. New adapters call `mediate-check`.
 //
-// BEHAVIORAL NOTE (026 T017, audit claude-07): because the mapping is now registry-derived,
-// this verb's refusal SET widened from the original four (025) to the seven speckit skills
-// the registry fronts — it now ALSO refuses a direct `speckit-clarify`/`speckit-checklist`/
-// `speckit-analyze` (correctly: those are fronted by /stack-control:define|extend, a 025
-// gap). The exit-code contract (0/1/2) is unchanged; only the membership widened.
+// 028 T090 (FR-024 / contract T5): this verb now resolves "via front door" from the 026
+// session-keyed marker FILE (via `activeCapabilities`), NOT the legacy `STACKCTL_FRONT_DOOR`
+// env var — so its decision MATCHES the interceptor (a context established via
+// `front-door enter` is seen by both). This resolves the TASK-165 divergence the header
+// previously documented. The env-var path is retired here.
 //
-// DIVERGENCE NOTE (026 T017, audit claude-04): this verb resolves "via front door" from
-// the legacy ENV marker (`STACKCTL_FRONT_DOOR === '1'`), while the 026 interceptor resolves
-// it from the session-keyed marker FILE. A context established via `front-door enter` (file)
-// is therefore NOT seen here — a `speckit-guard` call after a file-marker `enter` would
-// refuse. This is a deprecation artifact (the interceptor is the live path); reconciling the
-// frozen verb's decision to read the same file marker is tracked as TASK-165.
-//
-// The cross-vendor surface for the speckit wrapper: given a backend skill identity, it
-// refuses a DIRECT invocation and names the sanctioned stack-control front door, or
-// permits an invocation reached via its front door (the FRONT_DOOR_MARKER_ENV marker is
-// set). Behavior lives here in `stackctl` (specs/017 Decision 1); the plugin's
-// cross-vendor command/skill adapters call it. It patches nothing it does not ship — the
-// US1 per-phase graduate gate is the real defense-in-depth (FR-014).
+// BEHAVIORAL NOTE (026 T017, audit claude-07): because the mapping is registry-derived,
+// this verb's refusal SET is the seven speckit skills the registry fronts — it refuses a
+// direct `speckit-clarify`/`speckit-checklist`/`speckit-analyze` (correctly: those are
+// fronted by /stack-control:define|extend, a 025 gap). The widened set is JUSTIFIED: each
+// is a state-bearing spec-authoring backend the `define`/`extend` front doors mediate;
+// refusing the raw call is the correct, not over-broad, behavior. The exit-code contract
+// (0/1/2) is unchanged; only the membership widened (audited per T5).
 //
 // Exit: 0 permitted (front-door / not a wrapped skill); 1 refused (direct invocation of a
 // wrapped skill); 2 usage error.
 
-import {
-  FRONT_DOOR_MARKER_ENV,
-  evaluateRefusal,
-  isWrappedSkill,
-} from '../speckit-wrapper/refusal.js';
+import { activeCapabilities } from '../capability/marker.js';
+import { CAPABILITY_REGISTRY } from '../capability/registry.js';
+import { findInstallation } from '../config/installation.js';
+import { evaluateRefusal, isWrappedSkill, type RefusalVerdict } from '../speckit-wrapper/refusal.js';
+
+/** The capability id that fronts a wrapped speckit skill (the registry capability whose
+ *  `backendIdentities.skills` includes it), or null when `skill` is not wrapped. */
+function capabilityForSkill(skill: string): string | null {
+  for (const cap of CAPABILITY_REGISTRY.capabilities) {
+    if (cap.backendIdentities.skills.includes(skill)) return cap.id;
+  }
+  return null;
+}
+
+/**
+ * Resolve "via front door" from the 026 session-keyed marker FILE (T090 / FR-024). True
+ * when the enclosing installation's marker for `session` has an ACTIVE entry for the
+ * capability that fronts `skill` — exactly the signal the interceptor reads. With no
+ * enclosing installation, or no marker, the answer is false (a direct invocation). Never
+ * throws on a missing installation/marker (it is a probe).
+ */
+export function resolveViaFrontDoorFile(skill: string, session: string, cwd: string): boolean {
+  const capability = capabilityForSkill(skill);
+  if (capability === null) return false; // not a wrapped skill — caller gates with isWrappedSkill
+  const installation = findInstallation(cwd);
+  if (installation === null) return false;
+  return activeCapabilities(installation.root, session).has(capability);
+}
+
+/**
+ * Pure decision core: a non-wrapped skill permits; a wrapped skill is refused unless
+ * `viaFrontDoor` (resolved from the file marker). Hermetically testable — the caller
+ * resolves `viaFrontDoor`.
+ */
+export function evaluateGuard(skill: string, viaFrontDoor: boolean): RefusalVerdict {
+  if (!isWrappedSkill(skill)) {
+    return {
+      refused: false,
+      skill,
+      frontDoors: [],
+      message: `'${skill}' is not a wrapped backend skill — permitted.`,
+    };
+  }
+  return evaluateRefusal(skill, viaFrontDoor);
+}
 
 function parseArgs(args: string[]): { skill: string } {
   let skill: string | undefined;
@@ -60,14 +94,13 @@ function parseArgs(args: string[]): { skill: string } {
 export async function runSpeckitGuard(args: string[]): Promise<void> {
   const { skill } = parseArgs(args);
 
-  // A non-wrapped skill is not this verb's concern → permit (exit 0).
-  if (!isWrappedSkill(skill)) {
-    process.stdout.write(`speckit-guard: '${skill}' is not a wrapped backend skill — permitted.\n`);
-    return;
-  }
+  // Resolve "via front door" from the 026 file marker (T090), keyed by the session id the
+  // interceptor reads ($CLAUDE_CODE_SESSION_ID) + the enclosing installation — so this
+  // verb and the interceptor agree on a `front-door enter`-established context.
+  const session = process.env.CLAUDE_CODE_SESSION_ID ?? '';
+  const viaFrontDoor = session.length > 0 && resolveViaFrontDoorFile(skill, session, process.cwd());
 
-  const viaFrontDoor = process.env[FRONT_DOOR_MARKER_ENV] === '1';
-  const verdict = evaluateRefusal(skill, viaFrontDoor);
+  const verdict = evaluateGuard(skill, viaFrontDoor);
   if (verdict.refused) {
     process.stderr.write(`speckit-guard: REFUSED — ${verdict.message}\n`);
     process.exit(1);

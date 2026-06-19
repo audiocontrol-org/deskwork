@@ -6,18 +6,31 @@
 // is a no-op success when there is nothing to anchor (crash-safety). Pure core
 // (`frontDoor`) is hermetically testable; `runFrontDoor` does process I/O + exit.
 
-import { enterFrontDoor, exitFrontDoor, isSafeSession } from '../capability/marker.js';
+import {
+  clearMarker,
+  enterFrontDoor,
+  exitFrontDoor,
+  isSafeSession,
+  listMarker,
+  type MarkerListing,
+} from '../capability/marker.js';
 import { CAPABILITY_REGISTRY } from '../capability/registry.js';
 import { findInstallation } from '../config/installation.js';
 
 const USAGE =
-  'usage: stackctl front-door <enter --capability <id> --session <id> | exit --token <tok> --session <id>> [--at <dir>]';
+  'usage: stackctl front-door <enter --capability <id> --session <id> | exit --token <tok> --session <id> | ' +
+  'mediate-list --session <id> | mediate-recover --session <id> (alias reset)> [--at <dir>]';
 
 /** Injectable seams so the verb logic is tested without disk/installation. */
 export interface FrontDoorDeps {
   readonly resolveRoot: (at: string) => string | null;
   readonly enter: (root: string, session: string, capability: string) => string;
   readonly exit: (root: string, session: string, token: string) => void;
+  /** Tolerant listing of a session's marker (recovery — T086). */
+  readonly list: (root: string, session: string) => MarkerListing;
+  /** Clear a session's marker by path, no parse (recovery — T086). Returns whether a file
+   *  was removed (false = nothing to clear). */
+  readonly clear: (root: string, session: string) => boolean;
 }
 
 export interface FrontDoorResult {
@@ -30,12 +43,31 @@ function usageErr(message: string): FrontDoorResult {
   return { code: 2, stdout: '', stderr: `front-door: ${message}\n${USAGE}\n` };
 }
 
+/** Render a tolerant marker listing for `mediate-list` (T086): a corrupt file is reported
+ *  as `corrupt (unparseable)`, an empty listing as `(no marker)`, else one line per entry. */
+function renderListing(listing: MarkerListing): string {
+  if (listing.corrupt) {
+    return 'corrupt (unparseable) — run `front-door mediate-recover --session <id>` to clear it\n';
+  }
+  if (listing.entries.length === 0) return '(no marker)\n';
+  return listing.entries
+    .map((e) => `${e.capability}  token=${e.token}  writtenAt=${e.writtenAt}  ${e.fresh ? 'fresh' : 'stale'}`)
+    .join('\n')
+    .concat('\n');
+}
+
+/** The recognized sub-actions (`reset` is a true alias of `mediate-recover`). */
+const SUBACTIONS = new Set(['enter', 'exit', 'mediate-list', 'mediate-recover', 'reset']);
+
 /** Pure core: parse strictly, drive the marker via injected deps, render. */
 export function frontDoor(args: readonly string[], deps: FrontDoorDeps): FrontDoorResult {
-  const sub = args[0];
-  if (sub !== 'enter' && sub !== 'exit') {
-    return usageErr(`subaction must be 'enter' or 'exit' (got '${sub ?? ''}')`);
+  const rawSub = args[0];
+  if (rawSub === undefined || !SUBACTIONS.has(rawSub)) {
+    return usageErr(
+      `subaction must be 'enter', 'exit', 'mediate-list', 'mediate-recover', or 'reset' (got '${rawSub ?? ''}')`,
+    );
   }
+  const sub = rawSub === 'reset' ? 'mediate-recover' : rawSub; // normalize the alias
 
   let capability: string | undefined;
   let session: string | undefined;
@@ -66,6 +98,25 @@ export function frontDoor(args: readonly string[], deps: FrontDoorDeps): FrontDo
     return usageErr(`--session '${session}' is not filename-safe (allowed: letters, digits, '.', '_', '-')`);
   }
   const root = deps.resolveRoot(at ?? process.cwd());
+
+  if (sub === 'mediate-list') {
+    // Read-only recovery surface (T086): list the session's marker (no installation →
+    // (no marker)). Always exit 0 — inspecting state never refuses.
+    if (root === null) return { code: 0, stdout: '(no marker)\n', stderr: '' };
+    const listing = deps.list(root, session);
+    return { code: 0, stdout: renderListing(listing), stderr: '' };
+  }
+
+  if (sub === 'mediate-recover') {
+    // Mutating recovery surface (T086, SC-005): clear the session's marker by path (no
+    // parse → a corrupt file is recoverable in one command). No installation → safe no-op
+    // success (nothing to anchor). Always exit 0.
+    if (root === null) {
+      return { code: 0, stdout: `front-door mediate-recover: no installation — nothing to clear for session ${session}\n`, stderr: '' };
+    }
+    deps.clear(root, session);
+    return { code: 0, stdout: `front-door mediate-recover: cleared marker for session ${session}\n`, stderr: '' };
+  }
 
   if (sub === 'enter') {
     if (capability === undefined) return usageErr('enter requires --capability');
@@ -101,6 +152,8 @@ function defaultDeps(): FrontDoorDeps {
     resolveRoot: (at) => findInstallation(at)?.root ?? null,
     enter: enterFrontDoor,
     exit: exitFrontDoor,
+    list: listMarker,
+    clear: clearMarker,
   };
 }
 

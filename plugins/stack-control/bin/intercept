@@ -19,14 +19,27 @@
 # mediates). The verb exits 0 for both permit (no output) and refuse (deny JSON on
 # stdout); a NON-zero exit means it could not evaluate → emit a deny with a diagnosable
 # reason so the failure is observable rather than a silent bypass.
+# OBSERVABLE fail-open vs fail-closed (028 T092, FR-025): two distinct failure modes.
+#   * The stackctl dispatcher is UNREACHABLE (missing/not-executable) — mediation cannot
+#     run AT ALL. Per FR-025/contract-T6 we fail OPEN (permit best-effort; the per-phase
+#     graduate gate is the load-bearing guarantee) but emit a VISIBLE skip notice to stderr
+#     — NEVER a silent permit.
+#   * The verb RAN but exited non-zero (evaluable-but-errored) — fail CLOSED (deny) with a
+#     diagnosable reason, the 026 codex-02 contract (an evaluable backend-like event must
+#     not silently bypass).
 PAYLOAD=$(cat)
 if printf '%s' "$PAYLOAD" | grep -qE 'backlog|speckit-'; then
-  OUT=$(printf '%s' "$PAYLOAD" | "$(dirname "$0")/stackctl" intercept)
-  RC=$?
-  if [ "$RC" -ne 0 ]; then
-    printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"stack-control mediation could not be evaluated (interceptor error, exit '"$RC"'). Failing closed: use the capability front door (/stack-control:*), or fix bin/intercept / stackctl."}}'
+  STACKCTL="$(dirname "$0")/stackctl"
+  if [ ! -x "$STACKCTL" ]; then
+    printf '%s\n' "stack-control: WARNING — capability mediation SKIPPED (stackctl dispatcher not found/executable at $STACKCTL). Permitting best-effort; this is NOT a silent bypass — the per-phase graduate gate remains the guarantee. Fix bin/intercept / stackctl to restore mediation." 1>&2
   else
-    printf '%s' "$OUT"
+    OUT=$(printf '%s' "$PAYLOAD" | "$STACKCTL" intercept)
+    RC=$?
+    if [ "$RC" -ne 0 ]; then
+      printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"stack-control mediation could not be evaluated (interceptor error, exit '"$RC"'). Failing closed: use the capability front door (/stack-control:*), or fix bin/intercept / stackctl."}}'
+    else
+      printf '%s' "$OUT"
+    fi
   fi
 fi
 exit 0

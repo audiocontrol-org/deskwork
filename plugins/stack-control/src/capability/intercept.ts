@@ -19,9 +19,16 @@ export interface HookPayload {
   readonly cwd?: unknown;
 }
 
-/** Injectable marker resolver (the only side-effecting dependency) — keeps the logic pure. */
+/** Injectable seams (the only side-effecting dependencies) — keeps the logic pure.
+ *  - `resolveActive`: the active front-door capabilities for (installation@cwd, session),
+ *    keyed by the RESOLVED installation root (the cwd linchpin reconcile, FR-023).
+ *  - `resolveInstalled`: whether an enclosing installation exists at `cwd`. Optional for
+ *    back-compat (defaults to `true`); the production adapter supplies the real probe so
+ *    the no-installation short-circuit-to-permit (FR-020) fires symmetrically with
+ *    `mediate-check`. */
 export interface InterceptDeps {
   readonly resolveActive: (cwd: string, session: string) => ReadonlySet<string>;
+  readonly resolveInstalled?: (cwd: string) => boolean;
   readonly registry?: CapabilityRegistry;
 }
 
@@ -77,7 +84,38 @@ export function interceptDecision(payload: HookPayload, deps: InterceptDeps): Me
 
   const session = str(payload.session_id);
   const cwd = str(payload.cwd, process.cwd());
+
+  // No-installation short-circuit-to-permit (FR-020, T1) — mirrors `mediate-check`. With
+  // no enclosing installation, an adopter's own backend call is PERMITTED (mediation fires
+  // only inside an installation). FR-REQUIRED deliberate permit, not a silent fallback: a
+  // refusal therefore implies an installation exists, so the `setup` redirect is always
+  // satisfiable. Resolved BEFORE the marker read (a non-installed context needs no marker).
+  const installed = deps.resolveInstalled?.(cwd) ?? true;
+  if (!installed) {
+    return {
+      verdict: 'permit',
+      capability: null,
+      reason: 'no stack-control installation — mediation fires only inside an installation (FR-020)',
+    };
+  }
+
   return decideMediation(registry, surface, identity, deps.resolveActive(cwd, session));
+}
+
+/**
+ * The OBSERVABLE fail-open notice (028 T092, FR-025). When the interceptor cannot REACH
+ * `stackctl` (spawn / runtime failure — distinct from the verb running and returning a
+ * decision), the adapter permits best-effort (026 FR-014 — the load-bearing guarantee is
+ * the per-phase graduate gate, not the interceptor), but it must NEVER do so SILENTLY:
+ * this notice is emitted so the skipped mediation is visible and diagnosable. FR-REQUIRED
+ * loud fail-open, NOT a hidden fallback. `reason` carries the underlying failure detail.
+ */
+export function failOpenSignal(reason: string): string {
+  return (
+    `stack-control: WARNING — capability mediation was SKIPPED (could not reach stackctl: ${reason}). ` +
+    `The backend call is permitted best-effort; this is NOT a silent bypass — the per-phase graduate ` +
+    `gate remains the load-bearing guarantee. Fix bin/intercept / stackctl to restore mediation.`
+  );
 }
 
 /** The PreToolUse hook stdout that DENIES a tool call with a reason (T002 spike contract). */
