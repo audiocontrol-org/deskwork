@@ -87,6 +87,27 @@ describe('dampener: degraded run is never a quiet run (US2, FR-007/008)', () => 
     expect(r.recentRunCounts.every((c) => c.degraded === false)).toBe(true);
   });
 
+  it('does NOT flag a healthy run whose finding HEADING merely names the marker (claude-02)', () => {
+    // A healthy 0-HIGH run whose (only) finding is ABOUT degraded-fleet logic —
+    // its heading contains "Fleet: DEGRADED". The marker lives only in the
+    // preamble; a heading mention must not spuriously flag the run degraded.
+    const section = [
+      `## 2026-06-20 — audit-barrage lift (run-healthy)`,
+      '',
+      `### AUDIT-20260620-01 — Fleet: DEGRADED handling is subtly wrong`,
+      '',
+      `Finding-ID: AUDIT-20260620-01`,
+      `Status:     open`,
+      `Severity:   medium`,
+      `Surface:    src/x.ts:1`,
+      '',
+      'the body also mentions Fleet: DEGRADED as a concept',
+      '',
+    ].join('\n');
+    const r = checkBarrageDampener({ auditLogText: `${HEADER}\n${section}\n`, threshold: 2 });
+    expect(r.recentRunCounts[0]?.degraded).toBe(false);
+  });
+
   it('a single HEALTHY pristine run dampens; a single DEGRADED run does not (FR-007/008)', () => {
     expect(
       checkBarrageDampener({

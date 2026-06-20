@@ -319,20 +319,6 @@ export async function runAuditBarrageLift(
     warn: (m) => stderr.write(`${m}\n`),
     ...(includeModels !== undefined ? { includeModels } : {}),
   });
-  // FR-007: zero findings over a DEGRADED fleet is NEVER a clean signal — the
-  // killed lanes simply produced nothing. Record NOTHING (not even a quiet
-  // section): a degraded run must never be counted as a converged-eligible quiet
-  // run by the dampener (claude-20260612-r3 keeps this branch unrecorded).
-  if (findings.length === 0 && fleet !== undefined && fleet.produced < fleet.configured) {
-    stderr.write(
-      `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a ` +
-        `DEGRADED fleet (produced ${fleet.produced} of ${fleet.configured} ` +
-        `configured) — absence of findings from non-completed lanes is NOT a ` +
-        `clean signal.\n`,
-    );
-    return 0;
-  }
-
   const reader = args.read ?? ((p: string) => readFile(p, 'utf8'));
   // Per AUDIT-20260530-04: the audit-log is precious historical
   // record under the project's preservation rule. Use the atomic
@@ -348,16 +334,27 @@ export async function runAuditBarrageLift(
     ? buildAuditLogHeader(opts.featureSlug, deriveTargetVersion(feature))
     : await reader(auditLogPath);
 
-  // claude-20260612-r3: a clean run over a HEALTHY fleet (or a pre-014 run with no
-  // INDEX) records a QUIET lift section so the convergence dampener counts it. The
-  // dampener counts lift SECTIONS; a clean run that left no section was invisible to
-  // its consecutive-quiet / single-run-clean rules, so a prior HIGH section stayed
-  // in the window forever and the gate could never reach OPEN after genuinely-clean
-  // runs. The degraded case returned above; only healthy/pre-014 clean runs reach here.
+  // A 0-finding run ALWAYS records a lift section so the convergence dampener
+  // (which counts SECTIONS) sees it as the most-recent run:
+  //   - HEALTHY fleet → a QUIET section (0 Severity lines) the dampener counts
+  //     as a clean run (claude-20260612-r3).
+  //   - DEGRADED fleet → a section carrying the `Fleet: DEGRADED` marker, so the
+  //     dampener flags it and NEVER counts it as quiet (FR-007 / AUDIT-BARRAGE-
+  //     codex-01). Recording NOTHING for a degraded clean run (the prior
+  //     behavior) left a STALE prior clean section as "most recent", letting
+  //     single-run-clean dampen on it — exactly "degraded is convergence", the
+  //     failure this feature exists to remove.
   if (findings.length === 0) {
+    const degradedFleet =
+      fleet !== undefined && fleet.produced < fleet.configured ? fleet : undefined;
     stderr.write(
-      `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a healthy ` +
-        `fleet; recording a quiet run section so the convergence dampener counts it.\n`,
+      degradedFleet !== undefined
+        ? `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a DEGRADED ` +
+            `fleet (produced ${degradedFleet.produced} of ${degradedFleet.configured} ` +
+            `configured) — absence over non-completed lanes is NOT a clean signal; recording ` +
+            `a DEGRADED-marked section so the dampener never counts it as quiet (FR-007).\n`
+        : `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a healthy ` +
+            `fleet; recording a quiet run section so the convergence dampener counts it.\n`,
     );
     if (!opts.apply) {
       stderr.write('audit-barrage-lift: dry-run (re-run with --apply to write).\n');
@@ -365,10 +362,19 @@ export async function runAuditBarrageLift(
     }
     const trimmedExisting = auditLogText.replace(/\s+$/, '');
     const separator = trimmedExisting.length > 0 ? '\n\n' : '\n';
-    const quiet = renderQuietSection(opts.date, basename(opts.runDir.replace(/\/$/, '')));
+    const quiet = renderQuietSection(
+      opts.date,
+      basename(opts.runDir.replace(/\/$/, '')),
+      degradedFleet !== undefined
+        ? { produced: degradedFleet.produced, configured: degradedFleet.configured }
+        : undefined,
+    );
     const quietContent = `${trimmedExisting}${separator}${quiet}`;
     await writer(auditLogPath, quietContent.endsWith('\n') ? quietContent : `${quietContent}\n`);
-    stderr.write(`audit-barrage-lift: recorded a quiet run section in ${auditLogPath}.\n`);
+    stderr.write(
+      `audit-barrage-lift: recorded a ${degradedFleet !== undefined ? 'DEGRADED' : 'quiet'} ` +
+        `run section in ${auditLogPath}.\n`,
+    );
     return 0;
   }
 

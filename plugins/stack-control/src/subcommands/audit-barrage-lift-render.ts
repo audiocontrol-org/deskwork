@@ -89,9 +89,28 @@ function renderEntry(finding: ExtractedFinding, date: string, nn: number): strin
  * (Degraded clean runs are NOT recorded — FR-007: absence over killed lanes is not
  * a clean signal; that branch is gated in the lift, not here.)
  */
-export function renderQuietSection(date: string, runDirBasename: string): string {
+export function renderQuietSection(
+  date: string,
+  runDirBasename: string,
+  fleet?: SectionFleetStatus,
+): string {
+  const header = `## ${isoDate(date)} — audit-barrage lift (${runDirBasename})\n\n`;
+  // specs/029 US2 (FR-007 / AUDIT-BARRAGE-codex-01): a 0-finding run over a
+  // DEGRADED fleet must STILL record a section — carrying the `Fleet: DEGRADED`
+  // marker — so it is the dampener's most-recent run and BLOCKS convergence.
+  // Recording nothing (the prior behavior) left a stale prior clean section as
+  // "most recent", letting the single-run-clean rule dampen on it. A degraded
+  // clean run is the opposite of a clean signal; it must be visible AND flagged.
+  if (fleet !== undefined && fleet.produced < fleet.configured) {
+    return (
+      header +
+      `_Fleet: DEGRADED (produced ${fleet.produced} of ${fleet.configured} configured) — ` +
+      `0 findings, but absence over killed/timed-out lanes is NOT a clean signal. This run ` +
+      `is NOT counted as a quiet run by the convergence dampener (FR-007)._\n`
+    );
+  }
   return (
-    `## ${isoDate(date)} — audit-barrage lift (${runDirBasename})\n\n` +
+    header +
     `_No findings surfaced — a clean barrage run over a healthy fleet (0 HIGH+, ` +
     `0 MEDIUM, 0 total). Recorded so the convergence dampener counts it as a quiet ` +
     `run (claude-20260612-r3); a clean run that left no section was invisible to the ` +

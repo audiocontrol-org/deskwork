@@ -38,8 +38,8 @@
 **Independent test**: a forced timed-out lane is reported distinctly and does not increment the quiet streak; a healthy zero-finding run does.
 
 - [x] T008 [P] [US2] RED test: per-lane terminal state (completed / timed-out / killed-no-liveness / killed-external / zero-byte) surfaced distinctly at synthesis + lift — in `tests/audit-barrage/terminal-state.test.ts` (FR-006)
-- [x] T009 [US2] Surface per-lane terminal state in `src/scope-discovery/audit-barrage/run-artifacts.ts` (INDEX/synthesis rendering) (FR-006)
-- [x] T010 [US2] Surface degraded-lane state in `src/subcommands/audit-barrage-lift.ts` fleet filter (distinct from "no findings") (FR-006)
+- [x] T009 [US2] Surface per-lane terminal state in `src/scope-discovery/audit-barrage/run-artifacts.ts` (INDEX/synthesis rendering) + name the zero-byte sub-state distinctly in `src/scope-discovery/audit-barrage/types.ts` (`completedNonConvergedAnnotation`) (FR-006)
+- [x] T010 [US2] Surface degraded-lane state in `src/subcommands/audit-barrage-lift.ts` fleet filter (distinct from "no findings") + stamp the `Fleet: DEGRADED` section marker in `src/subcommands/audit-barrage-lift-render.ts` (`renderSection`/`renderQuietSection`), incl. the degraded-zero-findings section (FR-006/007)
 - [x] T011 [P] [US2] RED test: a run with a degraded lane does NOT increment the dampener quiet streak; a fully-healthy zero-finding run DOES — in `tests/promote-findings/degraded-not-quiet.test.ts` (FR-007/008)
 - [x] T012 [US2] Guard the quiet-run count on degraded-fleet in `src/scope-discovery/promote-findings/check-barrage-dampener.ts` (FR-007/008)
 - [ ] T013 [US2] Close the `audit-barrage-timeout-observability` gap node; record the phase-2 govern checkpoint

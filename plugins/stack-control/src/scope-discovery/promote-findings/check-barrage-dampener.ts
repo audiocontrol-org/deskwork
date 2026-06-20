@@ -128,14 +128,20 @@ function countHighPlusInSection(
   let mediumRaw = 0;
   let total = 0;
   let degraded = false;
+  // AUDIT-BARRAGE-claude-02: the `Fleet: DEGRADED` marker lives in the section
+  // PREAMBLE (between the `## … lift (…)` header and the first `### AUDIT-…`
+  // entry). Only scan there — a finding heading/body that merely names the
+  // concept must not spuriously flag the run degraded.
+  let sawEntry = false;
   let i = section.headerIndex + 1;
   while (i < section.endIndex) {
     const line = lines[i] ?? '';
-    if (DEGRADED_MARKER_RE.test(line)) degraded = true;
     if (!ENTRY_HEADER_RE.test(line)) {
+      if (!sawEntry && DEGRADED_MARKER_RE.test(line)) degraded = true;
       i += 1;
       continue;
     }
+    sawEntry = true;
     let severity: string | undefined;
     let status: string | undefined;
     let j = i + 1;
