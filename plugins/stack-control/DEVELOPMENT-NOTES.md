@@ -2,6 +2,37 @@
 
 ---
 
+## 2026-06-20: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 10
+  - chore(029): US4 — reconcile the fixed phase-4-round findings (loop-hygiene dogfood)
+  - chore(029): US4/Phase 4 graduated — phase-4 checkpoint + govern artifacts; task-360 return-type cleanup
+  - fix(029): US4 — record-first ordering on BOTH paths; accurate per-write FATAL messages; self-enforcing write guard (codex-01/02 + claude-01..05)
+  - fix(029): US4 — override writes record before checkpoint (no half-write); fail-loud phaseStatus; dead-code + dry-run reconcile preview (codex-01 + claude-01..04)
+  - fix(029): US4 — record-write failure FATALs (CLI⟺gate); env-var override guard; reconcile closes all matching tasks (codex-01/02/03 + claude-01..04)
+  - fix(029): US4 — re-attach orphaned re-report JSDoc; fail loud on empty re-report section; unify mixed-section predicate
+  - fix(029): US4 — re-report blocks name their canonical AUDIT-NN entry (Tracked-by); suppression accounting (codex-01/claude-01/03/04/05)
+  - fix(029): US4 — override short-circuit fails loud on empty/no-node; validates impossible record states (FR-017/018)
+  - fix(029): US4 — durable override attribution in the convergence record (FR-018)
+  - fix(029): US4 — deduped persistent HIGH must not become a false-pristine run (FR-016)
+- Files changed: 46
+- Backlog touched: TASK-358, TASK-364, TASK-366, TASK-367, TASK-369, TASK-377, TASK-378, TASK-379, TASK-380
+
 ## 2026-06-20: govern-operability (029) — execute Phases 1–4 (P1 MVP) + US7; deep per-phase-govern entanglement; FR-017 regression handoff
 
 **Goal:** Pick up 029-govern-operability where the prior session left off (runnable spec at the `/speckit-analyze` gate) and drive `/stack-control:execute` — burn the per-phase govern of the whole govern-operability umbrella down through the lifecycle.
