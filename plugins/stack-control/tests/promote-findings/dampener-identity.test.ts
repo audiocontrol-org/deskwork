@@ -70,6 +70,38 @@ const FILE_A = 'src/spawn-cli.ts';
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 describe('dampener: identity-keyed new-HIGH counting (US3, FR-009/010/011)', () => {
+  it('single-run-clean does NOT fire on a most-recent run that RAW-surfaced a HIGH, even jitter (codex-01, phase-3)', () => {
+    // The aggressive one-run fast-path must require a GENUINELY pristine run (raw
+    // 0 HIGH + 0 MEDIUM). A run that visibly shows `Severity: high` — even a
+    // same-epoch re-rate (newHighPlusCount === 0) — must NOT immediately
+    // graduate; jitter tolerance lives in the 2-run N-quiet streak only.
+    const earlier = section(
+      'run-earlier',
+      '2026-06-20',
+      [
+        entry({ id: 'AUDIT-20260620-01', heading: HEADING_A, severity: 'low', surface: `${FILE_A}:42` }),
+        // A genuine new HIGH here keeps the N-quiet streak from engaging, so the
+        // single-run rule is the only path that could dampen.
+        entry({ id: 'AUDIT-20260620-02', heading: 'a different real high', severity: 'high', surface: 'src/y.ts:1' }),
+      ],
+      SHA_A,
+    );
+    const recent = section(
+      'run-recent',
+      '2026-06-21',
+      [entry({ id: 'AUDIT-20260621-01', heading: HEADING_A, severity: 'high', surface: `${FILE_A}:7-9` })],
+      SHA_A,
+    );
+    const log = `${HEADER}\n${earlier}\n\n${recent}\n`;
+    const r = checkBarrageDampener({ auditLogText: log, threshold: 2 });
+    // The recent run is jitter (newHighPlusCount 0) but RAW-surfaced a HIGH.
+    expect(r.recentRunCounts[0]?.newHighPlusCount).toBe(0);
+    expect(r.recentRunCounts[0]?.rawHighPlusCount).toBe(1);
+    // N-quiet can't engage (the earlier run has a genuine new HIGH); single-run
+    // can't engage (raw HIGH > 0). So the gate stays BLOCKED.
+    expect(r.dampened).toBe(false);
+  });
+
   it('a HIGH whose signature appeared in an EARLIER section is NOT new (FR-010)', () => {
     // Earlier section: the same heading+file at severity LOW.
     // Most-recent section: the SAME heading+file re-rated to HIGH (jitter).

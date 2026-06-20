@@ -370,17 +370,20 @@ export function checkBarrageDampener(
     recentRunCounts.length >= threshold &&
     recentRunCounts.every((r) => r.newHighPlusCount === 0 && !r.degraded);
 
-  // Rule 2 — single-run-clean (operator directive 2026-05-31): the MOST RECENT
-  // run surfaced 0 NEW-or-PERSISTENT HIGH+ (FR-009/010/011 + SC-001 — only a
-  // re-rate-UP seen HIGH is jitter; a persistent HIGH still blocks) AND 0 MEDIUM.
-  // MEDIUM still uses the RAW count (#432): a
-  // run whose MEDIUMs were slushed before the gate still "had" those MEDIUMs — so
-  // a fresh medium still blocks this path, matching prior behavior.
+  // Rule 2 — single-run-clean (operator directive 2026-05-31): the AGGRESSIVE
+  // fast-path — graduate immediately on ONE genuinely-pristine run. This rule
+  // uses RAW counts on BOTH axes (AUDIT-BARRAGE-codex-01, phase-3): a run that
+  // VISIBLY surfaced `Severity: high` must NOT trigger immediate single-run
+  // graduation even if that HIGH is same-epoch re-rate jitter — the jitter
+  // tolerance (newHighPlusCount) belongs to the safer 2-run N-quiet streak
+  // (Rule 1), not to the one-run fast-path. A pristine run is rawHighPlusCount
+  // === 0 AND rawMediumCount === 0 (no HIGH and no MEDIUM at all). (#432: raw
+  // ignores `Status:`, so a between-run disposition can't fabricate a clean run.)
   const mostRecent = recentRunCounts[0];
   const singleRunCleanEngages =
     mostRecent !== undefined &&
     !mostRecent.degraded &&
-    mostRecent.newHighPlusCount === 0 &&
+    mostRecent.rawHighPlusCount === 0 &&
     mostRecent.rawMediumCount === 0;
 
   const dampened = consecutiveQuietEngages || singleRunCleanEngages;
