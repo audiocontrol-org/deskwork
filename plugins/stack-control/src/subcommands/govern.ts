@@ -84,7 +84,7 @@ import type { Installation } from '../config/types.js';
 import { checkLifecyclePrecondition } from '../lifecycle-precondition.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
-import { writePhaseCheckpoint } from '../govern/checkpoint-state.js';
+import { computePhaseHunkBlocks, writePhaseCheckpoint } from '../govern/checkpoint-state.js';
 import { type LaneCapabilityProfile } from '../govern/lane-capabilities.js';
 import { negotiateFleet } from '../govern/fleet-negotiation.js';
 import { selectRequestedLaneCapabilities } from '../govern/protocol.js';
@@ -890,6 +890,19 @@ export async function runGovern(args: string[]): Promise<void> {
           phaseUnit.diffScope.base,
           phaseStatus.files,
         );
+        // 029 US7 (FR-026/027/028, TASK-289): capture the phase's OWN changed line-blocks
+        // (content-hash + count) keyed off its diff-base — the EXACT audited files, not the
+        // declared directory scope. Freshness then checks content-presence (no diff-base),
+        // so a later phase editing a DIFFERENT region of a shared file does NOT stale this
+        // checkpoint (O(n), not O(n²)). If git is unavailable at write time computePhaseHunkBlocks
+        // skips per-file and returns [] → we write WITHOUT hunkBlocks and degrade to the
+        // whole-file scopeFingerprint behavior (graceful, never a crash). scopeFingerprint is
+        // still written for back-compat + the convergence-record consumer.
+        const hunkBlocks = computePhaseHunkBlocks(
+          repoRoot,
+          auditedFiles,
+          phaseUnit.diffScope.base,
+        );
         writePhaseCheckpoint(repoRoot, {
           version: 1,
           // Canonical key (AUDIT codex-01/claude-02) — what the US1 gate reads under.
@@ -901,6 +914,7 @@ export async function runGovern(args: string[]): Promise<void> {
           passedAt: new Date().toISOString(),
           governedPaths: phaseStatus.files,
           auditedFiles,
+          ...(hunkBlocks.length > 0 ? { hunkBlocks } : {}),
         });
       }
     }

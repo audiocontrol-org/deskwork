@@ -11,6 +11,14 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import {
+  type HunkBlock,
+  allHunkBlocksPresent,
+  computePhaseHunkBlocks,
+} from './hunk-fingerprint.js';
+
+export type { HunkBlock } from './hunk-fingerprint.js';
+export { computePhaseHunkBlocks } from './hunk-fingerprint.js';
 
 export interface PhaseCheckpointRecord {
   readonly version: 1;
@@ -31,6 +39,16 @@ export interface PhaseCheckpointRecord {
    * conservatively re-audited rather than carried.
    */
   readonly auditedFiles?: readonly string[];
+  /**
+   * The phase's OWN changed line-blocks (post-image content-hash + line-count), captured
+   * at govern-write time from its diff-base (029 US7, FR-026/027/028, TASK-289). Freshness
+   * checks each block still appears as consecutive lines in the current governed file —
+   * WITHOUT a diff-base — so a later phase editing a DIFFERENT region of a shared file does
+   * NOT stale this checkpoint, while an edit to the SAME region this phase owned DOES.
+   * Optional for back-compat: a pre-US7 checkpoint omits it and falls back to whole-file
+   * scope-fingerprint freshness.
+   */
+  readonly hunkBlocks?: readonly HunkBlock[];
 }
 
 interface ParsedCheckpointRecord {
@@ -43,6 +61,7 @@ interface ParsedCheckpointRecord {
   readonly passedAt?: unknown;
   readonly governedPaths?: unknown;
   readonly auditedFiles?: unknown;
+  readonly hunkBlocks?: unknown;
 }
 
 const CHECKPOINTS_REL = join('.stack-control', 'govern', 'phase-checkpoints');
@@ -158,6 +177,33 @@ export function isCheckpointFresh(
     record.auditLogSection === current.auditLogSection &&
     record.scopeFingerprint === current.scopeFingerprint
   );
+}
+
+/**
+ * Hunk-aware (content-presence) freshness (029 US7, FR-026/027/028). The checkpoint/
+ * audit-log section must match `section` (same as the whole-file path). THEN:
+ *   - When `record.hunkBlocks` is present and non-empty, the checkpoint is fresh iff
+ *     EVERY stored block still appears as consecutive lines somewhere in the current
+ *     content of its governed file (content-presence — no diff-base needed). A later edit
+ *     to a DIFFERENT region leaves the blocks present (fresh); an edit to the SAME region
+ *     the phase owned makes a block absent (stale). A missing file makes its block absent.
+ *   - When `record.hunkBlocks` is absent (old-format checkpoint), FALL BACK to the
+ *     whole-file scope-fingerprint behavior so pre-US7 checkpoints keep working.
+ */
+export function isCheckpointFreshHunks(
+  installationRoot: string,
+  record: PhaseCheckpointRecord,
+  section: string,
+): boolean {
+  if (record.version !== 1 || record.checkpoint !== section || record.auditLogSection !== section) {
+    return false;
+  }
+  if (record.hunkBlocks !== undefined && record.hunkBlocks.length > 0) {
+    return allHunkBlocksPresent(installationRoot, record.hunkBlocks);
+  }
+  // Old-format checkpoint: re-derive the whole-file fingerprint and string-compare.
+  const scopeFingerprint = computeScopeFingerprint(installationRoot, record.governedPaths);
+  return record.scopeFingerprint === scopeFingerprint;
 }
 
 export function computeScopeFingerprint(
@@ -370,6 +416,10 @@ function validateCheckpointRecord(
     }
     auditedFiles = parsed.auditedFiles;
   }
+  // hunkBlocks is optional (back-compat — pre-US7 checkpoints omit it). When present it
+  // must be an array of {file:string, hash:string, lines:positive-int}; a malformed value
+  // fails loud rather than being silently dropped (no fallbacks outside test code).
+  const hunkBlocks = parseHunkBlocks(parsed.hunkBlocks, path);
   return {
     version: 1,
     featureSlug: parsed.featureSlug,
@@ -380,5 +430,34 @@ function validateCheckpointRecord(
     passedAt: parsed.passedAt,
     governedPaths: parsed.governedPaths,
     ...(auditedFiles !== undefined ? { auditedFiles } : {}),
+    ...(hunkBlocks !== undefined ? { hunkBlocks } : {}),
   };
+}
+
+function parseHunkBlocks(value: unknown, path: string): readonly HunkBlock[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`${path}: phase checkpoint hunkBlocks must be an array when present`);
+  }
+  const blocks: HunkBlock[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) {
+      throw new Error(`${path}: phase checkpoint hunkBlocks entries must be objects`);
+    }
+    const record: Record<string, unknown> = entry;
+    const { file, hash, lines } = record;
+    if (typeof file !== 'string' || file.length === 0) {
+      throw new Error(`${path}: phase checkpoint hunkBlocks entry 'file' must be a non-empty string`);
+    }
+    if (typeof hash !== 'string' || hash.length === 0) {
+      throw new Error(`${path}: phase checkpoint hunkBlocks entry 'hash' must be a non-empty string`);
+    }
+    if (typeof lines !== 'number' || !Number.isInteger(lines) || lines <= 0) {
+      throw new Error(`${path}: phase checkpoint hunkBlocks entry 'lines' must be a positive integer`);
+    }
+    blocks.push({ file, hash, lines });
+  }
+  return blocks;
 }

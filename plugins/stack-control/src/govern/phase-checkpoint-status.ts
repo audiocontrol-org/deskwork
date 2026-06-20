@@ -14,7 +14,7 @@ import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.
 import { enumeratePhases } from '../workflow/phase-enumeration.js';
 import {
   computeScopeFingerprint,
-  isCheckpointFresh,
+  isCheckpointFreshHunks,
   phaseCheckpointSection,
   readPhaseCheckpoint,
 } from './checkpoint-state.js';
@@ -98,14 +98,10 @@ export function resolvePhaseCheckpointStatuses(
       files: governedPaths,
       auditedFiles: record.auditedFiles,
       scopeFingerprint,
-      state: isCheckpointFresh(record, {
-        version: 1,
-        checkpoint: section,
-        auditLogSection: section,
-        scopeFingerprint,
-      })
-        ? 'current'
-        : 'stale',
+      // 029 US7: hunk-aware (content-presence) freshness when the record carries
+      // hunkBlocks; falls back to whole-file scope-fingerprint for pre-US7 records
+      // (the fallback lives inside isCheckpointFreshHunks).
+      state: isCheckpointFreshHunks(installationRoot, record, section) ? 'current' : 'stale',
     };
   });
 }

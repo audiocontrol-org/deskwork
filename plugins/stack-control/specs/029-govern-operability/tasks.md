@@ -109,9 +109,9 @@
 **Goal**: hunk-granularity fingerprints keep shared-file features O(n). Closes TASK-289.
 **Independent test**: a different-hunk later edit does not stale an earlier checkpoint; a same-region edit does.
 
-- [ ] T040 [P] [US7] RED test: a later-phase edit to a DIFFERENT hunk of a shared file does not stale an earlier checkpoint; a SAME-region edit does; total work O(n) — in `tests/govern/hunk-fingerprint.test.ts` (FR-026/027/028)
-- [ ] T041 [US7] Change `computeScopeFingerprint` to hash the phase's own changed diff hunks (post-image content), not whole-file, in `src/govern/checkpoint-state.ts` (FR-026)
-- [ ] T042 [US7] Update freshness evaluation in `src/govern/phase-checkpoint-status.ts` for hunk-level staleness (FR-027/028)
+- [x] T040 [P] [US7] RED test: a later-phase edit to a DIFFERENT hunk of a shared file does not stale an earlier checkpoint; a SAME-region edit does; total work O(n) — in `tests/govern/hunk-fingerprint.test.ts` (FR-026/027/028)
+- [x] T041 [US7] Change `computeScopeFingerprint` to hash the phase's own changed diff hunks (post-image content), not whole-file, in `src/govern/checkpoint-state.ts` (FR-026)
+- [x] T042 [US7] Update freshness evaluation in `src/govern/phase-checkpoint-status.ts` for hunk-level staleness (FR-027/028)
 - [ ] T043 [US7] Close TASK-289; record the phase-7 govern checkpoint
 
 ---
