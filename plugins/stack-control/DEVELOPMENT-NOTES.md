@@ -2,6 +2,37 @@
 
 ---
 
+## 2026-06-20: govern-operability — cluster the umbrella, design + author the full spec chain (029) to runnable
+
+**Goal:** Operator: take up `multi:feature/govern-operability` and *"design an execution plan to burn down the entire thing at once — no fake yagni bullshit, no scope shirking. I just want it all fixed."* Then drive it through the lifecycle to a runnable spec.
+
+**Accomplished:**
+- **Clustered the umbrella:** created top-level `multi:feature/govern-operability` (part-of `lifecycle-industrialization`) via `roadmap cluster`, grouping the scattered governance friction (audit-barrage-convergence, govern-per-phase-friction-burndown, codex-liveness, timeout-observability); deduped redundant part-of edges; captured TASK-316 (out-of-window false alarms) + TASK-317 (lift cross-run dedup).
+- **Designed it:** design record (`docs/superpowers/specs/2026-06-19-govern-operability-design.md`) with 3 weighed alternatives + a 9-phase sharpen-the-saw plan. Operator resolved the one real fork (granularity) → **either-of gate, default per-phase**; operator approved.
+- **Folded in two operator-named frictions** before approval: **(a)** never lift an already-`fixed-<sha>` finding (FR-013); **(b)** override is terminal — `--override` short-circuits the barrage entirely (FR-017/018, **TASK-318** filed). Grounded (b) in the smoking gun at `convergence-loop.ts:20-25`.
+- **Drove the full speckit chain** bracketed by the 026 front-door marker: specify → clarify → plan → checklist → tasks → analyze. Resolved 3 clarifications (finding-signature = normalized-heading+primary-file; hunk-fingerprint = the phase's own diff hunks; override = short-circuit-only).
+- **Artifacts (`specs/029-govern-operability/`):** spec (9 US, 34 FR, 9 SC), plan, research, data-model, contracts, quickstart, **tasks.md (58 tasks, phases 1:1 with US1–US9)**, 2 checklists. Analyze: **0 critical / 0 high, 100% FR coverage.** Node at **`implementing`** (design-approved + analyze-clean recorded), ready for `/stack-control:execute`.
+- **Held execute** on the operator's explicit choice ("Hold — spec is enough for now").
+
+**Didn't Work:**
+- **`spec-check` / `check-prerequisites` resolve `--spec` + paths relative to cwd** — running from the repo root (not the installation dir) gave a confusing `spec dir not found` FATAL; had to `cd plugins/stack-control`. Captured to tooling-feedback.
+- **session-end auto-derive boundary missed this session** — the merge-base/HEAD~N boundary on the long-lived branch reported `Commits: 0`; re-derived manually from `dd29ad2c..HEAD` (TASK-39/59 long-lived-branch boundary sweep).
+
+**Course Corrections:**
+- [PROCESS] Operator added the two frictions mid-design, pre-approval — folded both into the design + spec as first-class **P1** requirements rather than deferring (capture-don't-cut).
+- [PROCESS] Did NOT barrel into the 58-task execute burndown after authoring; surfaced the define→execute boundary and let the operator own the pace (they chose Hold).
+- [PROCESS] Skipped the `git.feature` branch hook (program runs on one long-lived branch; 028 precedent) — documented as the program override of the spec-kit default, not an offroad.
+
+**Insights:**
+- The recursion is the point: friction (a) lift-already-fixed and (b) override-still-barrages are themselves the operator-vigilance taxes this feature exists to remove — capturing them *as the work* is correct.
+- Sharpen-the-saw ordering means phases 1–2 will still be governed with the *current* ringing config (US1–US3 fix it only as they land) — a deliberate, named cost in the design.
+
+**Quantitative (re-derived from git `dd29ad2c..HEAD`; auto-derive reported 0 due to the long-lived-branch boundary, TASK-39/59):**
+- Commits: 10
+  - roadmap cluster umbrella; design record (+frictions fold); spec author; clarify; plan; checklist; tasks; markers; session-end record
+- Files changed: 18 (+1285 / −7)
+- Backlog touched: TASK-316, TASK-317, TASK-318 (all captured this session)
+
 ## 2026-06-19: front-door-completeness — formal re-close (no-op; post-authoring Q&A only)
 
 **Goal:** Second `/stack-control:session-end` of the day. The substantive work — the front-door-completeness audit + the full 028 spec chain to runnable — was captured and pushed in the prior entry (commit `7d03ff69`). This is a formal re-close: nothing changed the worktree since (0 commits in range), so this entry is an honest no-op (run-as-asked; empty beats missed).

@@ -93,3 +93,6 @@
 ## session-end 2026-06-19
 - stackctl backlog has no sanctioned status/close/Done verb, and the Backlog.md backend is mediated (026 interceptor refuses direct CLI) — so a completed backlog item (TASK-295) cannot be closed through the interface. Captured as TASK-297.
 - govern's advisory clone-step aborted govern on any non-TS adopter repo (hardcoded jscpd --format typescript,tsx; zero files -> no report -> throw). Customer-blocking (TASK-295/#487). Fixed non-fatal-on-zero-files; the advisory step should arguably have been non-fatal from the start.
+
+## session-end 2026-06-20
+- spec-check / check-prerequisites resolve --spec and paths relative to cwd; running from the repo root instead of the installation dir (plugins/stack-control) gives a confusing 'spec dir not found' FATAL. A clearer error naming the installation-root expectation, or installation-relative --spec resolution, would remove a stumble in the define chain.
