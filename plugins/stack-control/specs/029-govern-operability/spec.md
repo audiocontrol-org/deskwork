@@ -16,6 +16,14 @@ The "user" throughout is the **operator** (and the autonomous agent acting on th
 
 User stories are listed in **build order** (sharpen-the-saw: the phases that make our own per-phase govern of this feature bearable land first). Priority (P1/P2/P3) reflects value/criticality and is largely aligned with that order.
 
+## Clarifications
+
+### Session 2026-06-19
+
+- Q: Canonical finding-signature definition (FR-019)? → A: The tuple `(normalized-heading, primary-file-path)`, where normalization mirrors the existing cross-model cluster-merge (lowercase, punctuation-stripped, the ≥12-char heading-overlap basis). One definition, shared by the dampener identity-key (FR-009) and the lift dedup (FR-016).
+- Q: Hunk-fingerprint unit (FR-026)? → A: The phase's own changed **diff hunks** — the contiguous changed line-ranges its commits introduce to each file, fingerprinted by their post-image content (not whole-file, not per-symbol). Per-symbol/AST granularity is explicitly out of scope (needs language parsing; over-engineered for the staleness fix).
+- Q: Override persistence (FR-018)? → A: **Short-circuit only** (operator 2026-06-19). `--override` graduates the invocation it's on with zero barrage runs; it does NOT persist a fingerprint-keyed marker across invocations. The residual "re-run on unchanged code re-audits" cost is already removed in practice by the US7 hunk-fingerprint (an unchanged phase is not re-governed). Persistence across code changes is explicitly not built (a fresh audit after a real change is correct).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Fleet reliability foundation (Priority: P1)
@@ -205,8 +213,8 @@ US4 — Loop hygiene:
 - **FR-015**: When a finding's audit-log entry flips to `fixed-<sha>`, any backlog task referencing it MUST be reconciled/closed; a `backlog done` (close) verb MUST exist for this.
 - **FR-016**: Lifted findings MUST be deduped across runs by finding-signature so convergence iterations do not multiply near-duplicate tasks.
 - **FR-017**: When `--override` is supplied, govern MUST short-circuit the convergence pass entirely — record the override reason in the audit trail and graduate, firing NO render/barrage/lift/slush pass.
-- **FR-018**: An override graduation MUST be attributable in the audit trail (distinguishable from a convergence graduation) [NEEDS CLARIFICATION: should an override also PERSIST — a fingerprint-keyed marker so later govern invocations on unchanged code also skip the barrage, invalidated when code changes — or is the per-invocation short-circuit sufficient?].
-- **FR-019**: The finding-signature MUST be defined once and shared between the dampener identity-key (FR-009) and the lift dedup (FR-016) [NEEDS CLARIFICATION: canonical finding-signature definition — candidate is normalized heading + primary file path, mirroring the existing ≥12-char heading-overlap cluster merge].
+- **FR-018**: An override graduation MUST be attributable in the audit trail (distinguishable from a convergence graduation). The override is **per-invocation short-circuit only** — it MUST NOT persist a fingerprint-keyed marker across invocations (operator decision 2026-06-19); the residual re-run-on-unchanged-code cost is addressed by the US7 hunk-fingerprint (an unchanged phase is not re-governed).
+- **FR-019**: The finding-signature MUST be defined once and shared between the dampener identity-key (FR-009) and the lift dedup (FR-016). The signature is the tuple `(normalized-heading, primary-file-path)`, normalization mirroring the existing cross-model cluster-merge (lowercase, punctuation-stripped, ≥12-char heading-overlap basis).
 
 US5 — Payload correctness:
 - **FR-020**: Per-phase govern MUST assemble the payload from the union of the phase's changed files across all its commits (diff-base resolved to the pre-phase commit), not only the `HEAD~1` delta.
@@ -219,7 +227,7 @@ US6 — Granularity:
 - **FR-025**: The 025 "compose, reject augment" clarify record MUST be amended to document the re-admitted whole-feature graduate path.
 
 US7 — Staleness:
-- **FR-026**: Per-phase checkpoint fingerprints MUST be computed at hunk granularity (the phase's own changes), so unrelated later-phase edits to a shared file do not stale an earlier checkpoint [NEEDS CLARIFICATION: hunk-fingerprint unit — hunk boundaries vs line-range vs per-symbol — that stays stable without missing a real later edit to the same region].
+- **FR-026**: Per-phase checkpoint fingerprints MUST be computed at hunk granularity — the phase's own changed diff hunks (the contiguous changed line-ranges its commits introduce to each file), fingerprinted by post-image content — so unrelated later-phase edits to a shared file do not stale an earlier checkpoint. Per-symbol/AST granularity is out of scope.
 - **FR-027**: A later-phase edit to the SAME region an earlier phase owned MUST correctly stale the earlier checkpoint (no missed real change).
 - **FR-028**: Governing a shared-file N-phase feature MUST be O(n) (each phase governs only its own unit), not O(n²).
 

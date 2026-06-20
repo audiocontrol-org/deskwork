@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,10 +31,10 @@
 
 ## Notes
 
-- Three [NEEDS CLARIFICATION] markers remain by design, to be resolved in `/speckit-clarify`:
-  FR-018 (override persistence), FR-019 (finding-signature definition), FR-026 (hunk-fingerprint
-  unit). These are genuine, scope/testability-impacting open questions from the approved design
-  record — appropriate to carry into clarify rather than guess. (FR-012 hysteresis window was
-  resolved with an informed default in Assumptions.) All other quality items pass.
+- All [NEEDS CLARIFICATION] markers resolved in `/speckit-clarify` (Session 2026-06-19):
+  FR-019 (finding-signature = normalized-heading + primary-file-path), FR-026 (hunk-fingerprint
+  = the phase's own diff hunks; per-symbol out of scope) resolved with informed defaults; FR-018
+  (override = short-circuit only, no persistence) resolved by operator decision. FR-012
+  hysteresis window resolved with an informed default in Assumptions. Checklist fully passing.
 - The spec describes operator-observable governance behavior; "user" = the operator/agent
   running per-phase govern. Success criteria are framed as governance outcomes, not internals.
