@@ -40,6 +40,10 @@ export interface PhaseCheckpointStatus {
   /** The files the recorded checkpoint actually audited (TASK-129); undefined
    * when no record exists or a pre-TASK-129 checkpoint omitted them. */
   readonly auditedFiles: readonly string[] | undefined;
+  /** The git HEAD this phase was governed at (029 US5, FR-020); undefined when no
+   * record exists or a pre-US5 checkpoint omitted it. A LATER phase resolves its
+   * diff-base to the latest prior phase's governedSha (the pre-phase commit). */
+  readonly governedSha: string | undefined;
   readonly scopeFingerprint: string;
   readonly state: 'current' | 'missing' | 'stale';
 }
@@ -89,6 +93,7 @@ export function resolvePhaseCheckpointStatuses(
         phaseId: phase.phaseId,
         files: governedPaths,
         auditedFiles: undefined,
+        governedSha: undefined,
         scopeFingerprint,
         state: 'missing',
       };
@@ -97,6 +102,7 @@ export function resolvePhaseCheckpointStatuses(
       phaseId: phase.phaseId,
       files: governedPaths,
       auditedFiles: record.auditedFiles,
+      governedSha: record.governedSha,
       scopeFingerprint,
       // 029 US7: hunk-aware (content-presence) freshness when the record carries
       // hunkBlocks; falls back to whole-file scope-fingerprint for pre-US7 records

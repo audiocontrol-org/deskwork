@@ -65,6 +65,7 @@ import { runConvergenceLoop } from '../govern/convergence-loop.js';
 import {
   carriedFilesForComposition,
   resolvePhaseUnit,
+  resolvePrePhaseDiffBase,
 } from '../govern/incremental-audit.js';
 import {
   featureCheckpointKey,
@@ -432,6 +433,21 @@ function resolveAuditedFiles(
 }
 
 /**
+ * The current git HEAD sha at `repoRoot`, recorded on the phase checkpoint so a
+ * LATER phase can resolve its diff-base to THIS phase's governed commit (029 US5,
+ * FR-020). Returns undefined when git is unavailable / HEAD is unresolvable
+ * (detached pre-first-commit, no git) — the checkpoint is then written WITHOUT a
+ * governedSha and the next phase's resolver falls back to --diff-base/HEAD~1
+ * (graceful, mirroring computePhaseHunkBlocks).
+ */
+function currentHeadSha(repoRoot: string): string | undefined {
+  const r = spawnSync('git', ['-C', repoRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
+  if (r.status !== 0 || typeof r.stdout !== 'string') return undefined;
+  const sha = r.stdout.trim();
+  return sha.length > 0 ? sha : undefined;
+}
+
+/**
  * Write (or refresh) the per-phase checkpoint for a resolved `phase`-granularity
  * unit at the CURRENT tree state — the single home shared by the normal
  * convergence-graduation path AND the per-phase `--override` short-circuit
@@ -457,6 +473,9 @@ function writeResolvedPhaseCheckpoint(args: {
   const { repoRoot, phaseUnit, phaseStatus, phaseCheckpointKey, slug } = args;
   const auditedFiles = resolveAuditedFiles(repoRoot, phaseUnit.diffScope.base, phaseStatus.files);
   const hunkBlocks = computePhaseHunkBlocks(repoRoot, auditedFiles, phaseUnit.diffScope.base);
+  // 029 US5 (FR-020): record the governed HEAD so a LATER phase resolves its
+  // diff-base to this phase's pre-phase commit (the union-payload anchor).
+  const governedSha = currentHeadSha(repoRoot);
   writePhaseCheckpoint(repoRoot, {
     version: 1,
     // Canonical key (AUDIT codex-01/claude-02) — what the US1 gate reads under.
@@ -471,6 +490,7 @@ function writeResolvedPhaseCheckpoint(args: {
     passedAt: new Date().toISOString(),
     governedPaths: phaseStatus.files,
     auditedFiles,
+    ...(governedSha !== undefined ? { governedSha } : {}),
     ...(hunkBlocks.length > 0 ? { hunkBlocks } : {}),
   });
 }
@@ -756,11 +776,25 @@ export async function runGovern(args: string[]): Promise<void> {
           `govern: FATAL — --phase given but tasks.md not found at ${tasksPath}.`,
         );
       }
-      const diffBase =
+      const fallbackBase =
         flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
       phaseCheckpointKey = featureCheckpointKey(root);
       phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, phaseCheckpointKey, tasksPath);
       assertPriorPhaseCheckpointsCurrent(phaseCheckpointStatuses, flags.phase);
+      // 029 US5 (FR-020): resolve the diff-base to the PRE-PHASE commit — the
+      // governed HEAD of the latest prior phase — so the payload audits the UNION
+      // of this phase's changed files across ALL its commits, not just the HEAD~1
+      // delta (the TASK-263 "diff omits the fix" under-scope). An explicit
+      // --diff-base / GOVERN_DIFF_BASE still wins as the fallback (phase 1, or a
+      // pre-US5 prior checkpoint with no governedSha).
+      const diffBase = resolvePrePhaseDiffBase({
+        phaseId: flags.phase,
+        orderedPhaseIds: phaseCheckpointStatuses.map((status) => status.phaseId),
+        governedShaByPhase: new Map(
+          phaseCheckpointStatuses.map((status) => [status.phaseId, status.governedSha]),
+        ),
+        fallbackBase,
+      });
       phaseUnit = resolvePhaseUnit({ tasksPath, phaseId: flags.phase, diffBase });
       payloadPathScope = normalizeGovernedPaths(repoRoot, phaseUnit.diffScope.files);
       if (payloadPathScope.length === 0) {

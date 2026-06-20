@@ -83,10 +83,10 @@
 **Goal**: kill harness-induced false HIGHs. Closes TASK-263, TASK-316.
 **Independent test**: a multi-commit phase with a present out-of-window reference raises no false HIGH; a missing impl still raises one.
 
-- [ ] T030 [P] [US5] RED test: per-phase payload = union of the phase's changed files across all its commits (diff-base = pre-phase, not HEAD~1) — in `tests/govern/payload-union.test.ts` (FR-020)
-- [ ] T031 [US5] Resolve diff-base to the pre-phase commit + assemble the union of the phase's changed files in `src/govern/incremental-audit.ts` + `src/subcommands/govern.ts` (FR-020)
-- [ ] T032 [P] [US5] RED test: a present out-of-window referenced file raises no false "absent/not-imported" HIGH; a genuinely-missing impl still raises a HIGH — in `tests/govern/out-of-window.test.ts` (FR-021/022)
-- [ ] T033 [US5] Widen the payload to referenced-but-out-of-window deps in `src/govern/payload-implement.ts` AND teach the auditor (audit prompt template) that out-of-window = not-this-phase-scope (FR-021/022)
+- [x] T030 [P] [US5] RED test: per-phase payload = union of the phase's changed files across all its commits (diff-base = pre-phase, not HEAD~1) — in `tests/govern/payload-union.test.ts` (FR-020)
+- [x] T031 [US5] Resolve diff-base to the pre-phase commit + assemble the union of the phase's changed files in `src/govern/incremental-audit.ts` + `src/subcommands/govern.ts` — the pre-phase-commit anchor is the latest prior phase's recorded `governedSha`, persisted on the checkpoint via `src/govern/checkpoint-state.ts` + `src/govern/phase-checkpoint-status.ts` (FR-020)
+- [x] T032 [P] [US5] RED test: a present out-of-window referenced file raises no false "absent/not-imported" HIGH; a genuinely-missing impl still raises a HIGH — in `tests/govern/out-of-window.test.ts` (FR-021/022)
+- [x] T033 [US5] Widen the payload to referenced-but-out-of-window deps in `src/govern/payload-implement.ts` AND teach the auditor (audit prompt template) that out-of-window = not-this-phase-scope (FR-021/022)
 - [ ] T034 [US5] Close TASK-263, TASK-316; record the phase-5 govern checkpoint
 
 ---

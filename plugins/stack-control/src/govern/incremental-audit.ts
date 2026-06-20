@@ -127,6 +127,43 @@ export function resolvePhaseUnit(args: ResolvePhaseUnitArgs): AuditUnit {
   };
 }
 
+export interface ResolvePrePhaseDiffBaseArgs {
+  /** The phase whose diff-base is being resolved. */
+  readonly phaseId: string;
+  /** Every phase id in tasks.md order (parsePhases order). */
+  readonly orderedPhaseIds: readonly string[];
+  /** governedSha by phase id (undefined for a phase with no recorded sha). */
+  readonly governedShaByPhase: ReadonlyMap<string, string | undefined>;
+  /** Used when no prior phase recorded a sha (phase 1 / pre-US5 checkpoints). */
+  readonly fallbackBase: string;
+}
+
+/**
+ * FR-020: resolve a phase's diff-base to the PRE-PHASE commit so the per-phase
+ * payload audits the UNION of the phase's changed files across ALL its commits —
+ * not just the `HEAD~1` delta (the under-scope that produced the TASK-263 "the
+ * diff omits the fix" false HIGH when a phase's impl and test landed in separate
+ * commits).
+ *
+ * The pre-phase commit is the governed HEAD of the LATEST prior phase (in tasks.md
+ * order) that recorded one: each phase boundary commits + governs before the next
+ * phase's work starts, so that prior phase's `governedSha` is exactly the tree
+ * state at which THIS phase's work began. A prior phase with no recorded sha (a
+ * pre-US5 legacy checkpoint, or one never governed) is skipped; when none qualifies
+ * (phase 1, or every prior checkpoint is legacy) it falls back to `fallbackBase`
+ * (the explicit `--diff-base`/`GOVERN_DIFF_BASE`/`HEAD~1`).
+ */
+export function resolvePrePhaseDiffBase(args: ResolvePrePhaseDiffBaseArgs): string {
+  const idx = args.orderedPhaseIds.indexOf(args.phaseId);
+  if (idx > 0) {
+    for (let i = idx - 1; i >= 0; i -= 1) {
+      const sha = args.governedShaByPhase.get(args.orderedPhaseIds[i]!);
+      if (sha !== undefined && sha.length > 0) return sha;
+    }
+  }
+  return args.fallbackBase;
+}
+
 // NOTE: the whole-feature `after_implement` unit is composed EXCLUSION-side by the
 // govern command itself (specs/021 US1 true-composition): it carries converged +
 // unchanged phases by adding their files to the payload `excludePaths`, so the
