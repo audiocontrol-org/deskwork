@@ -5,14 +5,19 @@
 // `check-front-door` quantifies over. Two composed sources:
 //
 //   1. The command surface (`buildCommandSurface()`) → one `command-tree` entry per
-//      FRONTED verb/sub-action. A verb is fronted iff a matching `/stack-control:*`
-//      skill exists (verb name === `skills/<name>/SKILL.md` frontmatter `name`). A
-//      verb with no matching skill is an OPERATOR/INTERNAL tool OUTSIDE the fronted
-//      invariant — mirroring how `CAPABILITY_REGISTRY` keeps scope-discovery /
-//      audit-barrage / roadmap outside its v1 invariant (registry.ts). This is a
-//      documented derivation, NOT a silent omission: a deprecated alias is excluded
-//      via `deprecatedAliasOf`; every remaining verb either resolves to a skill or is
-//      a known operator tool.
+//      FRONTED verb/sub-action. A verb is fronted-BY-CONVENTION: every non-alias
+//      command-surface verb requires a skill (verb name === `skills/<verb>/SKILL.md`)
+//      UNLESS it is a DECLARED-INTERNAL verb (the `INTERNAL_VERBS` set — version /
+//      govern / mediate-check / audit-barrage / scope-* internals, …), which is an
+//      OPERATOR/INTERNAL tool OUTSIDE the fronted invariant. Crucially the fronted set
+//      is STABLE: a fronted verb's op is included with its convention requiredSkill
+//      REGARDLESS of whether the skill file currently exists, so deleting a skill is
+//      reported by C2a (file-existence probe) rather than silently dropping the op from
+//      the registry (028 codex-01). Mirrors how `CAPABILITY_REGISTRY` keeps
+//      scope-discovery / audit-barrage / roadmap outside its v1 invariant (registry.ts).
+//      A documented derivation, NOT a silent omission: a deprecated alias is excluded
+//      via `deprecatedAliasOf`; every remaining verb is fronted-by-convention or a
+//      declared-internal tool.
 //
 //   2. `CAPABILITY_REGISTRY` → one `skill-declaration` entry per capability interface
 //      that fronts in-session `/speckit-*` ops (e.g. `spec-definition`,
@@ -23,11 +28,7 @@
 // is NO `fronted-operations.yaml`. Mutating the command tree changes the built
 // registry with no manifest edit (proven by the T099 test).
 
-import { existsSync, readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { buildCommandSurface, type CommandDescriptor, type MediationClass } from '../cli-help/command-surface.js';
-import { frontmatterName } from '../skills/frontmatter.js';
 import { CAPABILITY_REGISTRY, type CapabilityRegistry } from './registry.js';
 
 /** Where a registry entry was derived from (data-model §2). */
@@ -81,14 +82,14 @@ export interface FrontedOperationsDeps {
   /** Override the capability registry. */
   readonly capabilityRegistry?: CapabilityRegistry;
   /** Resolve a verb's required skill, or null when the verb is not fronted (operator
-   *  tool). Default: match by name against the live `skills/` directory. */
+   *  tool). Default: `conventionRequiredSkillFor` — a verb is fronted-by-convention
+   *  (requiredSkill === verb name) unless it is a declared-internal verb. This does NOT
+   *  consult the filesystem, so the fronted op set is STABLE against a deleted skill and
+   *  C2a can report the absence (028 codex-01). */
   readonly requiredSkillFor?: (verb: string) => string | null;
 }
 
 const REGISTRY_ID = 'stack-control-fronted-operations-v1';
-
-const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const SKILLS_DIR = join(PLUGIN_ROOT, 'skills');
 
 /** The union of every capability's `cliArgv0` backend identities — the verbs the 026
  *  interceptor mediates as fronted BACKENDS (today: `backlog`). A command-tree verb in
@@ -102,24 +103,60 @@ function backendVerbIdentities(registry: CapabilityRegistry): ReadonlySet<string
   return ids;
 }
 
-/** The set of declared skill `name`s present on disk (frontmatter, not just dir name). */
-function liveSkillNames(): ReadonlySet<string> {
-  if (!existsSync(SKILLS_DIR)) return new Set();
-  const names = new Set<string>();
-  for (const dir of readdirSync(SKILLS_DIR)) {
-    const skillMd = join(SKILLS_DIR, dir, 'SKILL.md');
-    if (!existsSync(skillMd)) continue;
-    const name = frontmatterName(skillMd);
-    if (name !== undefined && name.length > 0) names.add(name);
-  }
-  return names;
-}
+/**
+ * Declared operator/internal/CLI verbs that are OUTSIDE the fronted invariant — they
+ * have NO `/stack-control:*` front-door skill BY DESIGN (`version`, `govern`,
+ * `mediate-check`, `intercept`, `audit-barrage*`, `scope-*` internals, release/spec
+ * tooling, etc.). This set is the STABLE, file-independent boundary between fronted
+ * verbs and internal tools (028 codex-01): a verb is fronted-by-convention iff it is
+ * a non-alias command-surface verb NOT in this set, and a fronted verb's
+ * `requiredSkill` is its name by convention (verb → `skills/<verb>/SKILL.md`) —
+ * derived REGARDLESS of whether the file currently exists. That stability is what lets
+ * C2a report a DELETED skill: removing `skills/roadmap/SKILL.md` no longer drops
+ * roadmap's ops from the registry; the ops remain (bound to `requiredSkill: 'roadmap'`)
+ * and C2a's on-disk existence probe fails loud. Conversely, an internal verb here never
+ * becomes a false missing-skill gap.
+ *
+ * Mirrors how `CAPABILITY_REGISTRY` keeps scope-discovery / audit-barrage / roadmap
+ * outside its v1 invariant: a documented derivation, not a silent omission. Adding a
+ * new internal verb is one entry here; adding a fronted verb requires no edit (it is
+ * fronted by convention and C2a enforces its skill).
+ */
+const INTERNAL_VERBS: ReadonlySet<string> = new Set([
+  'version',
+  'govern',
+  'mediate-check',
+  'intercept',
+  'audit-barrage',
+  'audit-barrage-lift',
+  'audit-barrage-render',
+  'capability',
+  'config-domain',
+  'execute-check',
+  'front-door',
+  'no-shortcuts-audit',
+  'release-check',
+  'release-helper',
+  'slush-findings',
+  'spec-check',
+  'spec-governance-gate',
+  'validate-return',
+  'workflow',
+  'wrap-prompt',
+]);
 
-/** Default requiredSkill resolver: a verb is fronted iff a `/stack-control:*` skill
- *  whose frontmatter `name` equals the verb name exists. Returns the skill name or
- *  null (not fronted — an operator/internal tool, outside the registry). */
-function defaultRequiredSkillFor(skills: ReadonlySet<string>): (verb: string) => string | null {
-  return (verb: string): string | null => (skills.has(verb) ? verb : null);
+/**
+ * The DEFAULT (production) requiredSkill resolver: a verb is fronted iff it is NOT a
+ * declared-internal verb, and a fronted verb's required skill is its name BY CONVENTION
+ * (verb → `skills/<verb>/SKILL.md`). This deliberately does NOT consult the filesystem
+ * — that is the fix for codex-01: the fronted, skill-requiring op set is STABLE against
+ * a deleted/renamed skill file, so C2a (which checks file existence) can report the
+ * absence instead of the op silently vanishing from the registry. Returns the
+ * convention skill name, or null for a declared-internal/operator tool (outside the
+ * fronted invariant — must never become a C2a gap).
+ */
+export function conventionRequiredSkillFor(verb: string): string | null {
+  return INTERNAL_VERBS.has(verb) ? null : verb;
 }
 
 /** The capability id a skill name fronts in-session, used to resolve a
@@ -133,8 +170,11 @@ function skillForCapabilityInterface(iface: string): string {
 /** Build the command-tree entries from the command surface. A multi-action verb
  *  contributes one entry per sub-action (operationId `verb/sub`); a single-action
  *  verb contributes one entry (operationId `verb`). A deprecated alias is excluded
- *  (it is a documented alias, not a distinct fronted op). A verb with no matching
- *  skill is excluded (operator/internal tool, outside the fronted invariant). */
+ *  (it is a documented alias, not a distinct fronted op). A DECLARED-INTERNAL verb is
+ *  excluded (operator/internal tool, outside the fronted invariant). A fronted verb's
+ *  requiredSkill is its convention skill name — included REGARDLESS of whether the
+ *  skill file exists (the stable set codex-01 requires, so C2a can flag a deleted
+ *  skill rather than the op silently vanishing). */
 function commandTreeEntries(
   surface: readonly CommandDescriptor[],
   requiredSkillFor: (verb: string) => string | null,
@@ -144,7 +184,7 @@ function commandTreeEntries(
   for (const verb of surface) {
     if (verb.deprecatedAliasOf !== null) continue; // a documented alias, not a fronted op
     const skill = requiredSkillFor(verb.verb);
-    if (skill === null) continue; // operator/internal tool — outside the fronted invariant
+    if (skill === null) continue; // declared-internal/operator tool — outside the fronted invariant
     // The verb is a fronted backend iff a capability claims its argv0 as a backend
     // identity (today: `backlog`). Other mutating verbs (roadmap, inbox, …) are
     // first-class — not interceptor-mediated — so mediation is N/A for them (C2c).
@@ -215,7 +255,7 @@ function skillDeclarationEntries(registry: CapabilityRegistry): FrontedOperation
 export function buildFrontedOperationsRegistry(deps: FrontedOperationsDeps = {}): FrontedOperationsRegistry {
   const surface = deps.surface ?? buildCommandSurface();
   const capabilityRegistry = deps.capabilityRegistry ?? CAPABILITY_REGISTRY;
-  const requiredSkillFor = deps.requiredSkillFor ?? defaultRequiredSkillFor(liveSkillNames());
+  const requiredSkillFor = deps.requiredSkillFor ?? conventionRequiredSkillFor;
   const backendVerbs = backendVerbIdentities(capabilityRegistry);
   const operations: FrontedOperation[] = [
     ...commandTreeEntries(surface, requiredSkillFor, backendVerbs),

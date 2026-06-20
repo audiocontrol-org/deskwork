@@ -4,7 +4,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { checkFrontDoor, type CheckFrontDoorDeps } from '../../subcommands/check-front-door.js';
-import { buildFrontedOperationsRegistry } from '../../capability/fronted-operations.js';
+import {
+  buildFrontedOperationsRegistry,
+  conventionRequiredSkillFor,
+} from '../../capability/fronted-operations.js';
 
 /** A registry with a single op whose required skill we control via skillExists. */
 function regWith(requiredSkill: string): CheckFrontDoorDeps['registry'] {
@@ -62,5 +65,39 @@ describe('check-front-door C2a — skill exists (028 T103)', () => {
     });
     const c2aGaps = result.gaps.filter((g) => g.startsWith('C2a'));
     expect(c2aGaps, c2aGaps.join('\n')).toEqual([]);
+  });
+
+  it('the DEFAULT requiredSkill resolver binds by CONVENTION, NOT by file existence (028 codex-01): a fronted verb resolves to its convention skill regardless of disk; only declared-internal verbs are null', () => {
+    // The stable fronted set is the load-bearing fix: `conventionRequiredSkillFor`
+    // (the production default) does NOT consult the filesystem. A fronted verb always
+    // resolves to its convention skill name (verb → skills/<verb>/SKILL.md); only a
+    // declared-internal operator/CLI verb is null. This is what keeps a deleted skill's
+    // ops in the registry so C2a can report the absence (rather than dropping the verb).
+    expect(conventionRequiredSkillFor('roadmap')).toBe('roadmap');
+    expect(conventionRequiredSkillFor('backlog')).toBe('backlog');
+    // declared-internal verbs (no front-door skill by design) are null → excluded.
+    expect(conventionRequiredSkillFor('version')).toBeNull();
+    expect(conventionRequiredSkillFor('govern')).toBeNull();
+    expect(conventionRequiredSkillFor('mediate-check')).toBeNull();
+  });
+
+  it('the LIVE registry catches a deleted skill via C2a (028 codex-01): roadmap\'s ops stay registered (stable set), so denying its skill in skillExists yields a C2a gap', () => {
+    // Drive the LIVE command surface + DEFAULT convention resolver (no injection). The
+    // registry MUST retain roadmap's ops bound to 'roadmap' independent of the file. We
+    // then simulate the deletion at the C2a check seam (skillExists denies 'roadmap') —
+    // the deterministic, race-free equivalent of removing the file — and require a gap.
+    const registry = buildFrontedOperationsRegistry();
+    const roadmapOps = registry.operations.filter((o) => o.requiredSkill === 'roadmap');
+    expect(roadmapOps.length, 'live registry retains roadmap ops bound to skill roadmap').toBeGreaterThan(0);
+
+    const result = checkFrontDoor({
+      registry,
+      skillExists: (name) => name !== 'roadmap', // skills/roadmap/SKILL.md "deleted"
+      ...ALL_PASS,
+    });
+    const c2aGaps = result.gaps.filter((g) => g.startsWith('C2a'));
+    expect(result.ok).toBe(false);
+    expect(c2aGaps.length, 'a deleted skill must produce a C2a gap, not a shrunk checked count').toBeGreaterThan(0);
+    expect(c2aGaps.join('\n')).toMatch(/roadmap/);
   });
 });

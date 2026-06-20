@@ -279,32 +279,107 @@ function liveVerbsDocumentedBySkills(surface: readonly CommandDescriptor[]): () 
   };
 }
 
+/** Is `token` a documented POSITIONAL placeholder (`<id>` / `[identifier]`) rather than
+ *  a literal sub-action token? Positionals are bracketed in skill prose. */
+function isPositionalPlaceholder(token: string): boolean {
+  return /^[<[].*[>\]]$/.test(token);
+}
+
+/** Is `token` a flag (`--json`, `-d`) rather than a verb/sub-action token? */
+function isFlagToken(token: string): boolean {
+  return token.startsWith('-');
+}
+
+/** The literal `stackctl <verb> [<sub>]` invocations in a skill body. Each match
+ *  captures the verb token and the FOLLOWING token (sub-action position), if any.
+ *  Tokens are the whitespace-delimited words after `stackctl`. */
+interface DocumentedInvocation {
+  readonly verb: string;
+  /** The token in the sub-action position (the next word), or null when none follows. */
+  readonly next: string | null;
+}
+
+/** Extract every `stackctl <verb> [<next>]` invocation from a body. The verb token
+ *  requires ≥3 leading lowercase chars (kebab tail allowed) so 2-char prose words
+ *  (`stackctl to verify`) are not mistaken for verbs (028 claude-04). The `next` token
+ *  is one of the three shapes that can follow a verb in documented prose — a sub-action
+ *  (`[a-z]…`), a flag (`-…`), or a bracketed positional (`<id>` / `[id]`) — captured
+ *  with its own delimiters so trailing markdown punctuation (backticks, periods,
+ *  parens) is never folded into the token. A `next` of any OTHER shape (a quoted value,
+ *  a version literal like `1.2.3`, prose) is not a command token → recorded as null so
+ *  it is never mistaken for a phantom sub-action. */
+function documentedInvocations(body: string): DocumentedInvocation[] {
+  const invocations: DocumentedInvocation[] = [];
+  const verbToken = '[a-z]{3,}(?:-[a-z]+)*';
+  // a sub-action token | a flag | a bracketed positional placeholder.
+  const nextToken = '([a-z][a-z0-9]*(?:-[a-z0-9]+)*|--?[a-z][a-z0-9-]*|[<[][^>\\]]+[>\\]])';
+  const re = new RegExp(`\\bstackctl\\s+(${verbToken})(?:\\s+${nextToken})?`, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null) {
+    const verb = m[1];
+    if (verb === undefined) continue;
+    invocations.push({ verb, next: m[2] ?? null });
+  }
+  return invocations;
+}
+
 /**
- * C2d skill → verb direction: a skill INVOKING a literal `stackctl <verb>` for a verb
- * the live command tree does NOT expose (a phantom verb). This is the high-signal
- * skill→verb gap — a documented invocation that would fail at runtime. Sub-action-level
- * phantoms are intentionally NOT flagged from prose: skills name sub-actions in prose,
- * tables, and positionals (`stackctl customize scope-discovery <name>` — `scope-discovery`
- * is a POSITIONAL, not a sub-action), so a token-level scan there produces false
- * positives. The verb→skill direction (`liveOperationIds − documented`) is the
- * load-bearing per-sub-action parity check; this catches the wholly-unknown verb.
+ * C2d skill → verb direction (028 codex-02): a skill INVOKING a literal `stackctl …`
+ * form the live command tree does NOT expose. Two phantom shapes, both high-signal
+ * (a documented invocation that would fail at runtime):
+ *
+ *   1. PHANTOM VERB — `stackctl <verb>` where `<verb>` is not in the command tree.
+ *      Returned as `<verb>`.
+ *   2. PHANTOM SUB-ACTION — `stackctl <verb> <sub>` where `<verb>` is a MULTI-action
+ *      verb but `<sub>` is not one of its known sub-action names. Returned as
+ *      `<verb>/<sub>` so it flows through the same `documented − live` gap path and
+ *      names the gap as `<verb>/<sub>`.
+ *
+ * False-positive guards (so legitimate documentation is NOT flagged):
+ *   - A documented POSITIONAL (`stackctl roadmap add <id>` → `<id>`) is bracketed →
+ *     never a sub-action token. (`add`, the real sub-action, occupies the sub-action
+ *     position; `<id>` is the position AFTER it, which this scan does not treat as a
+ *     sub-action.)
+ *   - A FLAG (`stackctl roadmap --json`) starts with `-` → not a sub-action.
+ *   - A SINGLE-action verb (`stackctl version 1.2.3`) has NO sub-actions, so its next
+ *     token is a positional/arg — never flagged as a phantom sub-action.
+ *
+ * Pure + injectable: `skillBodies` supplies the skill SKILL.md bodies (the live caller
+ * reads them from disk; tests inject fixtures), so the parser is unit-testable.
  */
-function documentedPhantomOps(surface: readonly CommandDescriptor[]): readonly string[] {
-  const knownVerbs = new Set(surface.map((v) => v.verb));
+export function documentedPhantomOps(
+  surface: readonly CommandDescriptor[],
+  skillBodies: () => readonly string[],
+): readonly string[] {
+  const byVerb = new Map<string, CommandDescriptor>(surface.map((v) => [v.verb, v]));
   const phantoms = new Set<string>();
-  if (!existsSync(SKILLS_DIR)) return [];
-  for (const dir of readdirSync(SKILLS_DIR)) {
-    const skillMd = join(SKILLS_DIR, dir, 'SKILL.md');
-    if (!existsSync(skillMd)) continue;
-    const body = readFileSync(skillMd, 'utf8');
-    const re = /\bstackctl\s+([a-z][a-z][a-z-]*)/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(body)) !== null) {
-      const verb = m[1];
-      if (verb !== undefined && !knownVerbs.has(verb)) phantoms.add(verb);
+  for (const body of skillBodies()) {
+    for (const { verb, next } of documentedInvocations(body)) {
+      const descriptor = byVerb.get(verb);
+      if (descriptor === undefined) {
+        phantoms.add(verb); // shape 1 — phantom verb
+        continue;
+      }
+      // shape 2 — phantom sub-action (multi-action verbs only).
+      if (descriptor.subActions.length === 0) continue; // single-action: next is a positional
+      if (next === null || isFlagToken(next) || isPositionalPlaceholder(next)) continue;
+      const knownSubs = new Set(descriptor.subActions.map((s) => s.name));
+      if (!knownSubs.has(next)) phantoms.add(`${verb}/${next}`);
     }
   }
   return [...phantoms];
+}
+
+/** The bodies of every shipped SKILL.md (the live skill-body source for C2d). */
+function liveSkillBodies(): readonly string[] {
+  if (!existsSync(SKILLS_DIR)) return [];
+  const bodies: string[] = [];
+  for (const dir of readdirSync(SKILLS_DIR)) {
+    const skillMd = join(SKILLS_DIR, dir, 'SKILL.md');
+    if (!existsSync(skillMd)) continue;
+    bodies.push(readFileSync(skillMd, 'utf8'));
+  }
+  return bodies;
 }
 
 /** Build the live deps for the CLI run. */
@@ -312,9 +387,9 @@ function liveDeps(): CheckFrontDoorDeps {
   const registry = buildFrontedOperationsRegistry();
   const surface = buildCommandSurface();
   const liveIds = liveOperationIds(surface);
-  const phantoms = documentedPhantomOps(surface);
-  // Feed phantom verbs into the documented set so the caller's skill→verb check
-  // (documented − live) surfaces them as gaps.
+  const phantoms = documentedPhantomOps(surface, liveSkillBodies);
+  // Feed phantom verbs + phantom sub-actions into the documented set so the caller's
+  // skill→verb check (documented − live) surfaces them as gaps.
   const documented = liveVerbsDocumentedBySkills(surface);
   const tsx = resolveTsx();
   return {

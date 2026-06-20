@@ -2743,3 +2743,150 @@ Surface:    src/capability/fronted-operations.ts:123-127
 `commandTreeEntries` drops every command-surface verb whose name does not resolve to an existing skill: `if (skill === null) continue`. That means a newly mounted mutating command with no `/stack-control:*` skill is not present in the live fronted-operations registry at all, so `check-front-door` never evaluates C2a, C2b, C2c, or C2d for it.
 
 This directly breaks the advertised regression case: `skills/check-front-door/SKILL.md` says “An unfronted mutating verb → gap”, and `define`/`execute` describe unfronted mutating verbs as hard-stop regressions. The fixture test only catches the case when the bad operation is injected into the registry manually; the production builder excludes that shape before the checker can see it. A reasonable fix is for the registry to include relevant mounted mutating command-tree operations even when no skill resolves, with an empty/missing required skill represented as a C2a/C2d gap rather than filtering the operation out.
+
+## 2026-06-19 — audit-barrage lift (20260619T234034134Z-028-front-door-completeness-phase-6)
+
+### AUDIT-20260619-162 — TypeScript strict-mode violations — `isFrontedBackend` field missing from operation literals in `check-front-door-mediation.test.ts`
+
+Finding-ID: AUDIT-20260619-162
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/__tests__/subcommands/check-front-door-mediation.test.ts:40-84`
+
+The first `describe` block (`'check-front-door C2c — mutating ops mediation-registered'`) contains three test cases that construct `FrontedOperation` objects via the local `regWith` helper but omit the `isFrontedBackend: boolean` field, which is required (non-optional) on `FrontedOperation`. The `regWith` function signature is `(op: CheckRegistry['operations'][number]): CheckRegistry`, where `CheckRegistry['operations'][number]` resolves to `FrontedOperation`. TypeScript strict mode (and the project's explicit rule against `any`, `as Type`, and `@ts-ignore`) would reject these object literals:
+
+```ts
+// lines ~42-54 — isFrontedBackend absent
+registry: regWith({
+  operationId: 'backlog/list',
+  requiredSkill: 'backlog',
+  mediationClass: 'read-only',
+  hasHelp: true,
+  source: 'command-tree',
+  // isFrontedBackend is missing
+}),
+```
+
+The same omission appears in the `'a mutating op WITH a registration passes'` (~56-68) and `'a mutating op WITHOUT a registration → gap naming the op'` (~70-84) cases. The later `describe` block (the non-vacuity suite) uses `ctOp` which correctly provides `isFrontedBackend: false` as a default — so the bug is confined to these three cases.
+
+At runtime, `tsx` transpiles without type checking so the tests pass (the missing field is `undefined`, which the injected `mediationRegistered: () => false` / `() => true` never inspects). But `tsc --noEmit` would fail, and the project mandate "never bypass typing" is violated. The blast radius is that a CI step running the TypeScript compiler would block the branch, and the three test cases as written do not actually prove the C2c predicate for the typed `FrontedOperation` shape — they test the predicate against malformed inputs.
+
+Fix: add `isFrontedBackend: false` (the non-backend baseline) to each bare object literal in the first describe block, paralleling the `ctOp` pattern used in the second.
+
+---
+
+### AUDIT-20260619-163 — C2b self-referential gap — `check-front-door --help` exits 2, not 0
+
+Finding-ID: AUDIT-20260619-163
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/check-front-door.ts:318-330` (CLI handler) + `src/subcommands/check-front-door.ts:240-260` (C2b live probe)
+
+`runCheckFrontDoorCli` treats any argument other than `--json` as unexpected and exits 2 with an error to stderr:
+
+```ts
+const unknown = args.find((a) => a !== '--json');
+if (unknown !== undefined) {
+  process.stderr.write(`check-front-door: unexpected argument '${unknown}'\n`);
+  process.stderr.write('Usage: stackctl check-front-door [--json]\n');
+  process.exit(2);
+}
+```
+
+The C2b live probe (`liveHelpProbe`) passes `--help` to every command-tree operation and requires `exit 0` AND a `Usage:` pattern on stdout:
+
+```ts
+const r = spawnSync(tsx, args, { encoding: 'utf8' });
+return r.status === 0 && /^usage:/im.test(r.stdout ?? '');
+```
+
+If `check-front-door` itself appears in the fronted-operations registry as a command-tree entry (which it should, given a matching `skills/check-front-door/SKILL.md` now exists), `liveHelpProbe` will run `tsx cli.ts check-front-door --help`. `runCheckFrontDoorCli` receives `['--help']`, writes to stderr, and exits 2. The probe returns `false`.
+
+Result: `stackctl check-front-door` reports `C2b working-help: operation 'check-front-door' --help does not exit 0` — the guard flags itself as broken. Because `define` and `execute` are configured as hard gates that refuse to proceed on a non-zero check, this self-referential C2b gap could block both skills from operating.
+
+This can only be avoided if `cli.ts` has a global `--help` interceptor that fires *before* dispatching to the registered subcommand handler and emits a `Usage:` line with exit 0. The diff does not show such an interceptor and `runCheckFrontDoorCli` has no `--help` branch. If one already exists in `cli.ts` outside the diff, the bug is absent; if not, it is blocking.
+
+Fix: add an explicit `--help` branch to `runCheckFrontDoorCli` (print usage to stdout, exit 0), or confirm that a global pre-dispatch help interceptor handles this uniformly for all subcommands.
+
+---
+
+### AUDIT-20260619-164 — `smoke-interceptor-loaded.sh` permit-check swallows interceptor crash
+
+Finding-ID: AUDIT-20260619-164
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `scripts/smoke-interceptor-loaded.sh:73-79`
+
+The firing check for the non-backend permit case is:
+
+```bash
+PERMIT_OUT="$(... | "$INTERCEPT")"
+if printf '%s' "$PERMIT_OUT" | grep -q '"deny"'; then
+  fail "non-backend (ls -la) emitted a deny: $PERMIT_OUT"
+fi
+```
+
+The assertion is "output does not contain `"deny"`". If the interceptor crashes (exits non-zero, writes nothing or an error to stderr), `PERMIT_OUT` is empty and `grep -q '"deny"'` returns non-zero — the check PASSES. The smoke reports `PASS` even though the interceptor never evaluated the payload.
+
+Contrast with the deny assertion (line ~66):
+
+```bash
+printf '%s' "$DENY_OUT" | grep -q '"permissionDecision":"deny"' || fail "..."
+```
+
+Here a missing or empty output causes the check to FAIL (correctly). The asymmetry means a crashing interceptor looks like a "permits everything" interceptor on the permit branch.
+
+Fix: also check the interceptor's exit code for the permit case, or assert a positive signal that a permit response actually emitted (e.g. an empty-or-no-deny JSON response at exit 0, not just "absence of deny").
+
+---
+
+### AUDIT-20260619-165 — `documentedPhantomOps` regex minimum-length allows 2-char tokens that match natural prose
+
+Finding-ID: AUDIT-20260619-165
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/check-front-door.ts:293`
+
+```ts
+const re = /\bstackctl\s+([a-z][a-z][a-z-]*)/g;
+```
+
+The capture group requires exactly two or more lowercase characters (or hyphens after position 1). Any skill body that happens to write prose like `"invoke stackctl to verify"` or `"pass stackctl is available"` would extract `to` or `is` as candidate verb tokens. Since these 2-character tokens are not in `knownVerbs`, they enter the phantom set and produce a `C2d parity (skill → verb)` gap on the next `check-front-door` run.
+
+The risk is low because skill authors routinely write only real verb invocations after `stackctl`, and the current skill bodies in this diff (`define`, `execute`, `session-start`, `check-front-door`) use real verb names. But as the skill surface grows, prose constructions adjacent to `stackctl` could trigger false positives without any author being aware the regex scans free-form prose.
+
+Fix: require at least 3 non-hyphen characters at the start (`[a-z]{3}[a-z-]*`) or limit the regex to known kebab-case verb shapes (`[a-z]{3,}(?:-[a-z]+)*`). Either reduces accidental 2-char matches without excluding any real verb in the current or anticipated command surface.
+
+### AUDIT-20260619-166 — Deleted command-skill regressions disappear from the registry before C2a can catch them
+
+Finding-ID: AUDIT-20260619-166
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/capability/fronted-operations.ts:118-147
+
+`buildFrontedOperationsRegistry()` defines a command-tree verb as fronted only when a matching skill currently exists, then drops the verb when `requiredSkillFor()` returns `null`. That means deleting `skills/roadmap/SKILL.md` or another command skill removes the affected operations from the registry at lines 146-147, so `check-front-door` never gets an operation to evaluate and C2a cannot report the deleted skill.
+
+This contradicts the stated contract that a deleted/renamed skill is a gap. The blast radius is high because the new gate is intended to prevent exactly this regression, but the live path silently turns it into a smaller `checked` count. A reasonable fix is to derive expected command-skill bindings from the command surface or a stable command-to-skill convention, include those operations even when the skill file is missing, and let C2a report the missing skill.
+
+### AUDIT-20260619-167 — Skill-to-verb parity misses stale sub-action documentation
+
+Finding-ID: AUDIT-20260619-167
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/check-front-door.ts:282-307
+
+The live skill-to-verb parity check only detects wholly unknown verbs from literal `stackctl <verb>` invocations. Lines 282-290 explicitly exclude sub-action-level phantoms, and `documentedPhantomOps()` only captures the first token after `stackctl` at lines 300-304. A stale skill command like `stackctl roadmap frobnicate` would not be reported because `roadmap` is a known verb, even though `frobnicate` is not in the command tree.
+
+This violates C2d’s “skill → verb” direction for verb/sub-action parity. The blast radius is high because an operator or unattended agent can follow a shipped skill body into a non-existent sub-action while `check-front-door` reports green. A reasonable fix is to parse literal `stackctl <verb> <sub>` forms against the command descriptor’s known sub-actions, while using descriptor metadata to avoid treating documented positionals as sub-actions.

@@ -107,6 +107,35 @@ describe('buildFrontedOperationsRegistry — derivation (028 T099; R1/R2)', () =
     expect(afterIds.has('roadmap-fixture-xyz')).toBe(true);
   });
 
+  it('RETAINS a fronted verb\'s ops (with its convention requiredSkill) even when the skill file is ABSENT — so C2a can report the deleted skill (028 codex-01)', () => {
+    // The fronted, skill-requiring op set must be STABLE: independent of whether the
+    // skill file currently exists. Simulate `skills/roadmap/SKILL.md` deleted by a
+    // resolver that finds NO skill on disk for any verb — the registry must STILL
+    // include roadmap's ops bound to their convention requiredSkill ('roadmap'), so
+    // C2a sees an op to check and reports the absence (rather than silently shrinking).
+    const reg = buildFrontedOperationsRegistry({
+      // Default-convention resolver but pretend NOTHING is on disk: a fronted verb
+      // still resolves to its convention skill name; only declared-internal verbs are null.
+      requiredSkillFor: (verb: string): string | null =>
+        verb === 'version' || verb === 'govern' || verb === 'mediate-check' || verb === 'intercept'
+          ? null
+          : verb,
+    });
+    const roadmapOps = reg.operations.filter((o) => o.operationId.startsWith('roadmap/'));
+    expect(roadmapOps.length, 'roadmap ops retained even with skill file absent').toBeGreaterThan(0);
+    for (const op of roadmapOps) expect(op.requiredSkill).toBe('roadmap');
+  });
+
+  it('does NOT include a declared-internal/no-skill verb as a fronted op (version/govern/mediate-check must not become C2a gaps) (028 codex-01)', () => {
+    // The LIVE registry: internal operator/CLI verbs (no front-door skill by design)
+    // must be EXCLUDED — they must never surface as a missing-skill C2a gap.
+    const reg = buildFrontedOperationsRegistry();
+    const ids = new Set(reg.operations.map((o) => o.operationId.split('/')[0]));
+    for (const internal of ['version', 'govern', 'mediate-check', 'intercept', 'audit-barrage']) {
+      expect(ids.has(internal), `internal verb '${internal}' must NOT be a fronted op`).toBe(false);
+    }
+  });
+
   it('the live MountedVerb shape is importable (type-only smoke)', () => {
     // Compile-time guard that the registry depends on the same MountedVerb contract.
     const noop = (m: readonly MountedVerb[]): number => m.length;
