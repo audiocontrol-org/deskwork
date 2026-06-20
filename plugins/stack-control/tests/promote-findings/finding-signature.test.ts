@@ -27,6 +27,16 @@ describe('finding-signature (US3, FR-019)', () => {
     expect(primaryFilePath('src/no-line.ts')).toBe('src/no-line.ts');
   });
 
+  it('primaryFilePath unwraps markdown code-span backticks (codex, phase-3)', () => {
+    expect(primaryFilePath('`src/x.ts:89`')).toBe('src/x.ts');
+    expect(primaryFilePath('`src/x.ts:89-91`')).toBe('src/x.ts');
+    expect(primaryFilePath('`src/x.ts`')).toBe('src/x.ts');
+    // Backticked and bare forms of the same finding share a signature.
+    expect(findingSignature('a race', '`src/x.ts:89`')).toBe(
+      findingSignature('a race', 'src/x.ts:90-92'),
+    );
+  });
+
   it('primaryFilePath strips line RANGES, not just single lines (codex-02)', () => {
     // The audit-barrage prompt has models emit ranges like path:89-91; all
     // locator shapes for the same file must reduce to the same path so the

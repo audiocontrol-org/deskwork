@@ -148,7 +148,13 @@ export function normalizeHeading(heading: string): string {
  */
 export function primaryFilePath(surface: string): string {
   const first = surface.split(/[;,]/)[0]?.trim() ?? '';
-  return first.replace(/:\d+(?:[:-]\d+)*\s*$/, '').trim();
+  // Unwrap optional markdown code-span delimiters (`` `path:line` ``) before
+  // stripping the locator — audit-log surfaces sometimes wrap the ref in
+  // backticks (AUDIT-BARRAGE-codex, phase-3). Without this the trailing backtick
+  // defeats the `:N…$` strip, so the same finding gets different signatures
+  // depending on whether a model/section backticked the surface.
+  const unwrapped = first.replace(/^`+/, '').replace(/`+$/, '').trim();
+  return unwrapped.replace(/:\d+(?:[:-]\d+)*\s*$/, '').trim();
 }
 
 /**
