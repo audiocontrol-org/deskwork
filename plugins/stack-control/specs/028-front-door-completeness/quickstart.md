@@ -140,3 +140,18 @@ present-but-misrouted hook fails the firing assertion.
 | SC-005 | corrupt marker recovered in one verb | teeth-recovery T3 |
 | SC-006 | check-front-door clean=0; RED on 3 gaps | check-front-door C1/C2/C3 |
 | SC-007 | interceptor loaded + firing smoke | teeth-recovery T7 |
+
+---
+
+## Validation results (Phase 7, T119)
+
+Verified 2026-06-20 on `feature/stack-control`:
+
+- **SC-001** — `help-full-surface.test.ts` GREEN: every live verb + sub-action emits `--help` exit 0 with a usage body; `check-front-door` C2b passes for all 62 fronted operations.
+- **SC-002 / SC-003** — lifecycle drives through the verbs (backlog capture→done→archive, unpromote; roadmap edge mutations + approve-design + reconcile --unorphan) with 0 forbidden hand-edits; covered by the backlog/roadmap subcommand + terminal-closure suites.
+- **SC-004** — `mediate-check-no-installation-permit.test.ts` GREEN: no false refusals with no installation.
+- **SC-005** — `marker-recovery-primitives.test.ts` + `front-door-recovery.test.ts` GREEN: a corrupt marker recovers through one `front-door mediate-recover` invocation.
+- **SC-006** — `stackctl check-front-door` exits 0 on the complete surface (62 ops, all four assertions); `check-front-door-regression-cases.test.ts` proves it goes RED on each injected gap (deleted skill, broken --help, unfronted mutating verb).
+- **SC-007** — `scripts/smoke-interceptor-loaded.sh` PASS: the PreToolUse hook is registered (plugin.json → hooks/hooks.json) and fires deny on a fronted-no-marker payload, permit on a non-backend payload.
+
+`scripts/smoke-front-door.sh` → PASS (exit 0). Full suite: 2273 tests GREEN. No gaps found.

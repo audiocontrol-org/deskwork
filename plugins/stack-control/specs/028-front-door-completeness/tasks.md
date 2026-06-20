@@ -234,10 +234,10 @@ Each family below: RED help-probe test first (asserts `<verb> [sub] --help` exit
 
 **Purpose**: Run the quickstart validation scenarios as a local smoke; enforce the file-size cap; full suite green.
 
-- [ ] T119 Run the quickstart SC-001..SC-007 scenarios end-to-end as a local smoke (`specs/028-front-door-completeness/quickstart.md`); record results; capture any gap as a finding (do not paper over) — drive via `scripts/smoke-front-door.sh` + manual lifecycle walk.
-- [ ] T120 [P] Verify no new file exceeds the 300–500 line cap (`src/cli-help/command-surface.ts`, `src/cli-help/verb-reference.ts`, `src/capability/fronted-operations.ts`, `src/subcommands/check-front-door.ts`); split any offender into a sibling module + task before commit (govern.ts debt is TASK-151, untouched here).
-- [ ] T121 [P] Audit the diff for `any`/`as Type`/`@ts-ignore` and for `for now`/`TODO`/`stub`/`placeholder` residue; remove or file (no IOUs).
-- [ ] T122 Full `vitest` suite green (`npm --workspace plugins/stack-control test`); `claude plugin validate plugins/stack-control` passes; the marketplace smoke is unaffected.
+- [x] T119 Run the quickstart SC-001..SC-007 scenarios end-to-end as a local smoke (`specs/028-front-door-completeness/quickstart.md`); record results; capture any gap as a finding (do not paper over) — drive via `scripts/smoke-front-door.sh` + manual lifecycle walk.
+- [x] T120 [P] Verify no new file exceeds the 300–500 line cap (`src/cli-help/command-surface.ts`, `src/cli-help/verb-reference.ts`, `src/capability/fronted-operations.ts`, `src/subcommands/check-front-door.ts`); split any offender into a sibling module + task before commit (govern.ts debt is TASK-151, untouched here).
+- [x] T121 [P] Audit the diff for `any`/`as Type`/`@ts-ignore` and for `for now`/`TODO`/`stub`/`placeholder` residue; remove or file (no IOUs).
+- [x] T122 Full `vitest` suite green (`npm --workspace plugins/stack-control test`); `claude plugin validate plugins/stack-control` passes; the marketplace smoke is unaffected.
 
 ---
 
