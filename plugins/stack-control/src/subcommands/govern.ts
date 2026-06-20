@@ -793,13 +793,61 @@ export async function runGovern(args: string[]): Promise<void> {
     // gate would refuse to let LATER phases advance). A whole-feature override (no
     // `--phase`) writes no per-phase checkpoint (there is no single phase to record).
     // Per-invocation only: no fingerprint-keyed marker persists.
+    // specs/029 US4 (FINDING 1, claude HIGH): an EXPLICITLY-supplied but blank
+    // `--override ""` / `--override "   "` must FAIL LOUD, never silently fall
+    // through to a full barrage. A genuinely-absent `--override` (undefined) is
+    // unchanged (normal barrage path below). Guard on the explicit flag (not the
+    // pick result, which also reads the env) so the loud error names the flag.
+    if (flags.override !== undefined && flags.override.trim().length === 0) {
+      process.stderr.write(
+        'govern: FATAL — --override requires a non-empty reason (an empty or ' +
+          'whitespace-only reason is rejected so a blank flag cannot silently ' +
+          'short-circuit into — or fall through to — a full barrage).\n',
+      );
+      emitTerminalOutcome('fatal');
+      process.exit(2);
+    }
     const overrideReason = pick(flags.override, process.env.GOVERN_OVERRIDE);
     if (overrideReason !== undefined && overrideReason.length > 0) {
       const { root: overrideRoot } = await resolveGovernFeatureRoot(repoRoot, slug);
+      // specs/029 US4 (FINDING 2, codex HIGH): the override's CLI success MUST NOT
+      // diverge from the durable convergence record (the `governing -> shipped` gate
+      // signal). Resolve the canonical roadmap node FIRST — before any per-phase
+      // checkpoint write, so nothing is half-written — and FAIL LOUD when it cannot
+      // resolve (throws OR yields undefined: orphan/legacy/standalone with no node).
+      // Previously this WARNED and still graduated (printed "(overridden)", emitted
+      // `graduated`, exited 0) while NO record was written, so an unattended consumer
+      // saw a green CLI for a state the durable gate considers non-graduated. A clean
+      // override graduation now ALWAYS leaves a durable `override: true` record.
+      let convergenceItem: string | undefined;
+      try {
+        convergenceItem = resolveConvergenceItem(installation, overrideRoot, slug);
+      } catch (err) {
+        process.stderr.write(
+          `govern: FATAL — --override could not resolve a roadmap node for '${slug}' ` +
+            `(${errorMessage(err)}); the durable convergence record (the governing -> ` +
+            `shipped gate signal) cannot be written, so this override does NOT graduate. ` +
+            `Capture the feature on the roadmap (a node whose spec: pointer names the ` +
+            `feature dir) before overriding.\n`,
+        );
+        emitTerminalOutcome('fatal');
+        process.exit(2);
+      }
+      if (convergenceItem === undefined) {
+        process.stderr.write(
+          `govern: FATAL — --override could not resolve a roadmap node for '${slug}'; ` +
+            `the durable convergence record (the governing -> shipped gate signal) cannot ` +
+            `be written, so this override does NOT graduate. Capture the feature on the ` +
+            `roadmap (a node whose spec: pointer names the feature dir) before overriding.\n`,
+        );
+        emitTerminalOutcome('fatal');
+        process.exit(2);
+      }
       // Per-phase override: refresh the `phase-<id>` checkpoint so the overridden
       // phase is recorded governed at the current tree state — identical field shape
       // to the normal graduation write, no barrage. The whole-feature override branch
-      // (phaseUnit?.granularity !== 'phase') writes nothing here.
+      // (phaseUnit?.granularity !== 'phase') writes nothing here. Runs ONLY after the
+      // node resolved above, so a FATAL leaves nothing half-written.
       if (
         phaseUnit?.granularity === 'phase' &&
         phaseUnit.phaseId !== undefined &&
@@ -821,25 +869,10 @@ export async function runGovern(args: string[]): Promise<void> {
           });
         }
       }
-      // The convergence record is keyed by the canonical roadmap node id. When no
-      // node resolves (orphan/legacy/standalone fixture) the record is skipped with
-      // a WARNING — the `governing -> shipped` gate stays CLOSED until it is
-      // recorded, exactly as the convergence-graduation path treats a record-write
-      // failure (fail-safe; never a FATAL that blocks the deliberate override).
-      let convergenceItem: string | undefined;
-      try {
-        convergenceItem = resolveConvergenceItem(installation, overrideRoot, slug);
-      } catch (err) {
-        process.stderr.write(
-          `govern: WARNING — override graduation could not resolve a roadmap node ` +
-            `(${errorMessage(err)}); no convergence record written (the governing -> ` +
-            `shipped gate stays CLOSED until it is recorded).\n`,
-        );
-      }
       recordOverrideGraduation({
         installationRoot: repoRoot,
         mode: flags.mode === 'spec' ? 'spec' : 'impl',
-        ...(convergenceItem !== undefined ? { convergenceItem } : {}),
+        convergenceItem,
         scopePaths: overrideRoot !== undefined ? [overrideRoot] : [],
         feature: slug,
         reason: overrideReason,

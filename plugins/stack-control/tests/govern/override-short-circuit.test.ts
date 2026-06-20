@@ -29,6 +29,7 @@ import {
   readPhaseCheckpoint,
   writePhaseCheckpoint,
 } from '../../src/govern/checkpoint-state.js';
+import { readGovernConvergenceRecord } from '../../src/govern/convergence-record.js';
 
 // A barrage stub that TOUCHES a marker the moment ANY verb is invoked. The
 // override short-circuit must NEVER spawn it, so the marker must NOT exist.
@@ -47,14 +48,43 @@ function writeMarkerStub(dir: string, marker: string): string {
   return stub;
 }
 
-function makeRepo(slug: string): string {
+// Finding 2 (codex HIGH): an override now FAILS LOUD when no roadmap node resolves
+// (the durable convergence record cannot be keyed, so the override does NOT
+// graduate). The graduates-path therefore requires the fixture to carry a ROADMAP.md
+// node whose `spec:` pointer names the feature dir. Mirrors makeWorkflowFixture's
+// roadmap shape (doc-grammar: roadmap; `## <id>` heading + `- spec: <pointer>`).
+function writeRoadmapWithNode(repo: string, slug: string, specDirRel: string): void {
+  const body = [
+    '---',
+    'doc-grammar: roadmap',
+    '---',
+    '',
+    '# Roadmap',
+    '',
+    `## impl:feature/${slug}`,
+    '',
+    '- status: in-flight',
+    `- spec: ${specDirRel}`,
+    '',
+    `impl:feature/${slug} scope prose.`,
+    '',
+  ].join('\n');
+  writeFileSync(join(repo, 'ROADMAP.md'), body, 'utf8');
+}
+
+function makeRepo(slug: string, opts: { withRoadmapNode?: boolean } = {}): string {
   const repo = mkdtempSync(join(tmpdir(), 'gov-override-'));
   mkdirSync(join(repo, '.stack-control'), { recursive: true });
   writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   seedDefaultFleetKnowledge(repo);
-  const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
+  const specDirRel = join('docs', '1.0', '001-IN-PROGRESS', slug);
+  const dir = join(repo, specDirRel);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'audit-log.md'), `# Audit Log — ${slug}\n`, 'utf8');
+  // Default: give the override a resolvable roadmap node so the graduates-path is
+  // exercised WITH a durable convergence record. Opt out (no node) to exercise the
+  // no-node FATAL.
+  if (opts.withRoadmapNode !== false) writeRoadmapWithNode(repo, slug, specDirRel);
   return repo;
 }
 
@@ -103,6 +133,58 @@ describe('govern --override short-circuit (US4, T027, FR-017/018)', () => {
       // Attributable: the "OPEN by override" record names the reason.
       expect(`${r.stdout}${r.stderr}`).toMatch(/override/i);
       expect(`${r.stdout}${r.stderr}`).toMatch(/operator accepts residual/);
+      // Finding 2 (codex HIGH): a clean override graduation ALWAYS leaves a durable
+      // `override: true` convergence record — CLI success matches the gate signal.
+      const rec = readGovernConvergenceRecord(repo, 'spec', 'impl:feature/feat');
+      expect(rec).not.toBeNull();
+      if (rec === null) throw new Error('convergence record missing');
+      expect(rec.converged).toBe(true);
+      expect(rec.override).toBe(true);
+      expect(rec.overrideReason).toBe('operator accepts residual');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
+
+  // Finding 2 (codex HIGH): when NO roadmap node resolves, the override cannot write
+  // the durable convergence record (the governing -> shipped gate signal), so it must
+  // FAIL LOUD (exit 2, terminal fatal) rather than print a clean "graduated". The
+  // barrage must STILL fire zero passes (the FATAL precedes the barrage path).
+  it('FATALs (exit 2) when no roadmap node resolves — no clean graduation', () => {
+    const repo = makeRepo('feat', { withRoadmapNode: false });
+    const fx = mkdtempSync(join(tmpdir(), 'gov-override-stub-'));
+    const marker = join(fx, 'barrage-ran.marker');
+    const stub = writeMarkerStub(fx, marker);
+    const spec = join(repo, 'spec.md');
+    writeFileSync(spec, 'A spec under audit.\n');
+    try {
+      const r = runGovern(
+        [
+          '--mode',
+          'spec',
+          '--feature',
+          'feat',
+          '--at',
+          repo,
+          '--spec-path',
+          spec,
+          '--override',
+          'operator accepts residual',
+        ],
+        { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run') },
+      );
+      // Failed loud, not a clean graduation.
+      expect(r.status).toBe(2);
+      expect(`${r.stdout}${r.stderr}`).toMatch(/FATAL/);
+      expect(`${r.stdout}${r.stderr}`).toMatch(/could not resolve a roadmap node/);
+      expect(`${r.stdout}${r.stderr}`).not.toMatch(/may graduate|governed \(overridden\)/);
+      // Still zero barrage — the FATAL precedes the barrage path.
+      expect(existsSync(marker)).toBe(false);
+      expect(existsSync(join(fx, 'run'))).toBe(false);
+      // No durable convergence record was written.
+      const rec = readGovernConvergenceRecord(repo, 'spec', 'impl:feature/feat');
+      expect(rec).toBeNull();
     } finally {
       rmSync(repo, { recursive: true, force: true });
       rmSync(fx, { recursive: true, force: true });
@@ -181,10 +263,14 @@ function makePhaseRepo(slug: string): string {
   mkdirSync(join(repo, '.stack-control'), { recursive: true });
   writeFileSync(join(repo, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   seedDefaultFleetKnowledge(repo);
-  const dir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', slug);
+  const specDirRel = join('docs', '1.0', '001-IN-PROGRESS', slug);
+  const dir = join(repo, specDirRel);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'audit-log.md'), `# Audit Log — ${slug}\n`, 'utf8');
   writeFileSync(join(dir, 'tasks.md'), TASKS_MD, 'utf8');
+  // Finding 2 (codex HIGH): a resolvable roadmap node so the override graduates with
+  // a durable convergence record (committed below as part of the base commit).
+  writeRoadmapWithNode(repo, slug, specDirRel);
   mkdirSync(join(repo, 'src'), { recursive: true });
   const aLines = Array.from({ length: 20 }, (_, i) => `export const a${i} = ${i};`);
   writeFileSync(join(repo, 'src', 'a.ts'), `${aLines.join('\n')}\n`, 'utf8');

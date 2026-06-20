@@ -151,6 +151,23 @@ function validate(
       `${path}: govern-convergence record overrideReason must be a non-empty string when present`,
     );
   }
+  // specs/029 US4 (FINDING 3, codex MEDIUM): the writer only ever emits the two
+  // fields TOGETHER (`override: true` + a non-empty `overrideReason`) or NEITHER.
+  // Reject the impossible combinations a corrupt/hand-edited record could carry —
+  // `override: true` REQUIRES a reason; a present `overrideReason` REQUIRES
+  // `override === true` — so they cannot silently desync the gate signal.
+  if (parsed.override === true && parsed.overrideReason === undefined) {
+    throw new Error(
+      `${path}: govern-convergence record override is true but overrideReason is absent ` +
+        `(an override graduation must carry its reason)`,
+    );
+  }
+  if (parsed.overrideReason !== undefined && parsed.override !== true) {
+    throw new Error(
+      `${path}: govern-convergence record carries an overrideReason without override: true ` +
+        `(a reason is only valid on an override graduation)`,
+    );
+  }
   return {
     version: 1,
     mode: parsed.mode,

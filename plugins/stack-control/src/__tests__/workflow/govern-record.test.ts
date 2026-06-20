@@ -138,4 +138,41 @@ describe('US6 — the record mechanism (symmetric, mode-keyed)', () => {
     expect(() => readGovernConvergenceRecord(f.root, 'impl', KEY)).toThrow(/corrupt or torn/);
     expect(path).toContain('022-x');
   });
+
+  // specs/029 US4 (FINDING 3, codex MEDIUM): the writer only ever emits the two
+  // override fields TOGETHER or NEITHER. A hand-edited/corrupt record with one but
+  // not the other is an impossible state — `readGovernConvergenceRecord` must throw.
+  function writeRawRecord(f: WorkflowFixture, fields: Record<string, unknown>): void {
+    f.write(
+      `.stack-control/govern/convergence/impl__${KEY}.json`,
+      JSON.stringify({
+        version: 1,
+        mode: 'impl',
+        item: KEY,
+        scopeFingerprint: 'a'.repeat(64),
+        converged: true,
+        recordedAt: '2026-06-16T00:00:00Z',
+        anchorRoot: f.root,
+        ...fields,
+      }),
+    );
+  }
+
+  it('override: true WITHOUT overrideReason fails loud (impossible state)', () => {
+    const f = makeWorkflowFixture();
+    fixtures.push(f);
+    writeRawRecord(f, { override: true });
+    expect(() => readGovernConvergenceRecord(f.root, 'impl', KEY)).toThrow(
+      /override is true but overrideReason is absent/,
+    );
+  });
+
+  it('overrideReason WITHOUT override: true fails loud (impossible state)', () => {
+    const f = makeWorkflowFixture();
+    fixtures.push(f);
+    writeRawRecord(f, { overrideReason: 'orphaned reason' });
+    expect(() => readGovernConvergenceRecord(f.root, 'impl', KEY)).toThrow(
+      /overrideReason without override: true/,
+    );
+  });
 });

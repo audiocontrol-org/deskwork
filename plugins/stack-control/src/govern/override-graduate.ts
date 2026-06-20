@@ -21,11 +21,12 @@ export interface OverrideGraduateArgs {
   readonly installationRoot: string;
   readonly mode: GovernMode;
   /**
-   * The canonical roadmap node id the convergence record is keyed by. Absent when
-   * no node resolves (orphan/legacy/standalone) — the record is then skipped (the
-   * `governing -> shipped` gate stays CLOSED until it can be recorded).
+   * The canonical roadmap node id the convergence record is keyed by. specs/029 US4
+   * (FINDING 2): REQUIRED — the caller resolves it (failing loud when no node
+   * resolves) BEFORE calling this, so a clean override graduation ALWAYS writes a
+   * durable record and the CLI success never diverges from the gate signal.
    */
-  readonly convergenceItem?: string;
+  readonly convergenceItem: string;
   /** Scope paths fingerprinted into the record (the resolved feature root, if any). */
   readonly scopePaths: readonly string[];
   readonly feature: string;
@@ -40,9 +41,11 @@ export interface OverrideGraduateArgs {
  * existing override-attribution content (a consumer keying on it sees the same
  * record whether the gate or the short-circuit produced it). The convergence
  * record makes the workflow `governing → shipped` gate mechanical even on an
- * override graduation. A record-write failure is surfaced as a WARNING (the gate
- * stays CLOSED until the record lands) but does not block the short-circuit's exit
- * path — mirroring the convergence graduation's fail-safe.
+ * override graduation. The caller resolves `convergenceItem` (failing loud when no
+ * node resolves) BEFORE calling this, so a clean override graduation ALWAYS writes
+ * the record. A subsequent record-write failure (fs error) is surfaced as a WARNING
+ * (the gate stays CLOSED until the record lands) — mirroring the convergence
+ * graduation's fail-safe.
  */
 export function recordOverrideGraduation(args: OverrideGraduateArgs): void {
   // Attributable in the audit trail (FR-018) — distinguishable from a convergence
@@ -55,7 +58,6 @@ export function recordOverrideGraduation(args: OverrideGraduateArgs): void {
       `(FR-017: zero render/barrage/lift/slush). Per-invocation only (FR-018): no ` +
       `marker persists across invocations.\n`,
   );
-  if (args.convergenceItem === undefined) return;
   try {
     // FR-018: pass the override reason so the DURABLE convergence record carries
     // `override: true` + `overrideReason` — a downstream consumer can distinguish
