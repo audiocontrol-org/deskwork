@@ -80,6 +80,13 @@ models:
     readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookEdit"
     output_mode: stream-json
     liveness_signal: stdout
-    liveness_window_seconds: 60
+    # Widened 60 -> 300 (specs/029 US1, lockstep with the template): the
+    # no-grounding single-pass lane's only stdout pulse is bursty thinking_tokens
+    # with >60s gaps that FALSE-killed a healthy lane (observed Phase-1 govern),
+    # but it must stay MONITORED — fleet-negotiation rejects an unmonitored lane
+    # as non-viable. 300s exceeds the ~170-233s healthy completion (no false-kill)
+    # and stays under the 420s timeout. codex keeps its tight stderr
+    # reasoning-summary window.
+    liveness_window_seconds: 300
     timeout_floor_seconds: 420
     timeout_secs_per_kb: 13

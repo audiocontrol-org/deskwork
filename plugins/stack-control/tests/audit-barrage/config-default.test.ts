@@ -112,6 +112,27 @@ describe('shipped audit-barrage template — no-grounding Anthropic lanes (US1)'
     }
   });
 
+  it('keeps the no-grounding Anthropic lanes monitored on a WIDE window, not a tight 60s one (FR-002, US1 reliability)', async () => {
+    // Removing grounding removed the lanes' incidental stdout tool-call pulses;
+    // the no-grounding single pass emits only bursty `thinking_tokens` whose
+    // gaps exceed 60s and FALSE-killed a healthy lane mid-govern. The lane must
+    // stay MONITORED (fleet-negotiation rejects an unmonitored lane as
+    // non-viable, dropping the --require-models floor), so the fix is a WIDE
+    // window (> the ~233s healthy completion, < the 420s timeout), NOT the tight
+    // 60s window that false-killed. Regression-lock: monitored + window well
+    // above 60s.
+    const models = await loadTemplate();
+    for (const name of ['claude', 'sonnet']) {
+      const lane = byName(models, name);
+      expect(lane.livenessSignal).toBe('stdout');
+      expect(lane.livenessWindowSeconds).toBeGreaterThanOrEqual(240);
+      const floor = lane.timeoutFloorSeconds;
+      if (floor === undefined) throw new Error(`${name} lane missing timeout floor`);
+      // Stay under the timeout so liveness still pre-empts a true infinite hang.
+      expect(lane.livenessWindowSeconds).toBeLessThan(floor);
+    }
+  });
+
   it('raises the timeout floor above the old 300s for the no-grounding Anthropic lanes (FR-002)', async () => {
     const models = await loadTemplate();
     for (const name of ['claude', 'sonnet']) {

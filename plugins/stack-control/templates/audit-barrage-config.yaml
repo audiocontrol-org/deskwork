@@ -112,9 +112,23 @@ models:
     readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookEdit"
     output_mode: stream-json
     liveness_signal: stdout
-    liveness_window_seconds: 60
+    # Widened from 60s (specs/029 US1): removing the grounding tool-loop (above)
+    # ALSO removed the lane's incidental stdout pulses — `--permission-mode plan`
+    # made Read/Grep tool calls that chattered on stdout and reset a tight
+    # watchdog. The no-grounding single pass emits only bursty `thinking_tokens`
+    # events whose gaps exceed 60s on larger payloads (observed Phase-1 govern: a
+    # healthy lane reached ~2768 thinking tokens, then a >60s gap tripped a FALSE
+    # killed-no-liveness, degrading the fleet). The lane MUST stay monitored —
+    # `fleet-negotiation.ts` deems an unmonitored (`none`) lane non-viable, which
+    # would drop the fleet below the --require-models floor. Unlike codex
+    # (reasoning summaries are a reliable stderr pulse → tight 60s window kept),
+    # this lane has no tighter pulse knob, so the capability-appropriate fix
+    # (Principle III) is a WIDE monitored window: 300s comfortably exceeds the
+    # ~170-233s healthy completion (never false-kills) while staying under the
+    # 420s timeout so a true infinite hang is still caught before the budget.
+    liveness_window_seconds: 300
     # Floor raised 300 -> 420 for kill-cap headroom on larger phases; a
-    # successful no-grounding run still completes ~200-233s, so this does not
+    # successful no-grounding run still completes ~170-233s, so this does not
     # slow good runs (FR-002).
     timeout_floor_seconds: 420
     timeout_secs_per_kb: 13
@@ -152,7 +166,12 @@ models:
     readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookEdit"
     output_mode: stream-json
     liveness_signal: stdout
-    liveness_window_seconds: 60
+    # Widened 60 -> 300 — same rationale as the claude/opus lane: the no-grounding
+    # single-pass lane's only stdout pulse is bursty thinking_tokens (>60s gaps),
+    # and the lane must stay MONITORED for fleet-negotiation viability. 300s
+    # exceeds the ~170-233s healthy completion (no false-kill) but stays under the
+    # 420s timeout.
+    liveness_window_seconds: 300
     timeout_floor_seconds: 420
     timeout_secs_per_kb: 13
   # gemini — DISABLED (commented out). gemini-cli was failing 94.1% of runs
