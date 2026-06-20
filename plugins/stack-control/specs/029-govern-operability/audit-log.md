@@ -2145,7 +2145,7 @@ Fix: remove the try-catch in `recordOverrideGraduation` and let `recordGovernCon
 ### AUDIT-20260620-122 — `GOVERN_OVERRIDE` env-var whitespace-only reason bypasses the empty-reason guard
 
 Finding-ID: AUDIT-20260620-122 (claude-02 + codex-02; cross-model)
-Status: migrated-to-backlog TASK-358
+Status:     fixed-7c064bc3
 Severity:   medium
 Per-lane:   claude=medium, codex=medium
 Decision:   agreement (gate-counted medium)
@@ -2171,7 +2171,7 @@ The blast radius is bounded—`GOVERN_OVERRIDE` is an internal env var unlikely 
 ### AUDIT-20260620-123 — `slush-findings` dry-run silently skips `reconcileFixedFindings`, giving incomplete preview
 
 Finding-ID: AUDIT-20260620-123
-Status: migrated-to-backlog TASK-359
+Status:     fixed-89849396
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -2195,7 +2195,7 @@ This is an ergonomics/trust issue: the dry-run contract is "show me what `--appl
 ### AUDIT-20260620-124 — `writeResolvedPhaseCheckpoint` declares `string` return type that both callers ignore
 
 Finding-ID: AUDIT-20260620-124
-Status: migrated-to-backlog TASK-360
+Status:     fixed-d3ef54fc
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -2211,7 +2211,7 @@ Code-sha: 3f64cc86acf1b643ee521d85f43b6bea7f971d46
 ### AUDIT-20260620-125 — `reconcileFixedFindings` uses a stale `list()` snapshot — potential double-close on repeat finding IDs
 
 Finding-ID: AUDIT-20260620-125
-Status: migrated-to-backlog TASK-361
+Status:     fixed-7c064bc3
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -2224,7 +2224,7 @@ Surface:    src/backlog/reconcile-fixed.ts:54-64
 ### AUDIT-20260620-126 — `GOVERN_OVERRIDE` env var with whitespace-only value bypasses the explicit-flag guard and produces a blank attribution reason
 
 Finding-ID: AUDIT-20260620-126 (claude-02 + codex-02; cross-model)
-Status: migrated-to-backlog TASK-362
+Status:     fixed-7c064bc3
 Severity:   low
 Per-lane:   claude=low, codex=medium
 Decision:   agreement (gate-counted low)
@@ -2237,7 +2237,7 @@ The explicit-flag guard fires only when `flags.override !== undefined && flags.o
 ### AUDIT-20260620-127 — `recordOverrideGraduation` catch-and-continue exits 0 while the durable gate signal stays closed
 
 Finding-ID: AUDIT-20260620-127 (claude-03 + codex-01; cross-model)
-Status:     open
+Status:     fixed-7c064bc3
 Severity:   high
 Per-lane:   claude=low, codex=high
 Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
@@ -2250,7 +2250,7 @@ When `recordGovernConvergence` throws (filesystem error), the catch block emits 
 ### AUDIT-20260620-128 — `built.checkpoint === phaseUnit.auditLogSection` invariant for phase units enforced only by code comment
 
 Finding-ID: AUDIT-20260620-128
-Status: migrated-to-backlog TASK-363
+Status:     fixed-7c064bc3
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -2274,7 +2274,7 @@ The zero-new-liftable-findings path (`liftableFindings.length === 0`) previously
 ### AUDIT-20260620-130 — Auto-reconcile closes only the first backlog task matching a fixed finding
 
 Finding-ID: AUDIT-20260620-130
-Status: migrated-to-backlog TASK-365
+Status:     fixed-7c064bc3
 Severity:   medium
 Per-lane:   codex=medium
 Decision:   single-model (gate-counted medium)
@@ -2344,7 +2344,7 @@ Blast-radius: the dampener's `rawHighPlusCount` for the most-recent section is t
 ### AUDIT-20260620-134 — Phase-checkpoint write in override path is unwrapped; an I/O failure produces an opaque uncaught error
 
 Finding-ID: AUDIT-20260620-134 (claude-04 + codex-01; cross-model)
-Status:     open
+Status:     fixed-21c1fe27
 Severity:   high
 Per-lane:   claude=low, codex=high
 Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
@@ -2390,7 +2390,7 @@ Code-sha: 7c064bc321f3b0d2a792e197ce23bd8e537903e5
 ### AUDIT-20260620-136 — Phase checkpoint may be written without a convergence record on override path
 
 Finding-ID: AUDIT-20260620-136 (claude-01 + codex-01; cross-model)
-Status: migrated-to-backlog TASK-370
+Status:     fixed-89849396
 Severity:   medium
 Per-lane:   claude=medium, codex=high
 Decision:   agreement (gate-counted medium)
@@ -2411,7 +2411,7 @@ A minimal fix is to reverse the write order: write the convergence record first 
 ### AUDIT-20260620-137 — `overrideReason.length > 0` guard is dead code after the blank-reason FATAL
 
 Finding-ID: AUDIT-20260620-137
-Status: migrated-to-backlog TASK-371
+Status:     fixed-89849396
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -2433,7 +2433,7 @@ At the point the second condition is evaluated, `overrideReason` can only be `un
 ### AUDIT-20260620-138 — Silent skip when `phaseStatus` resolves to `undefined` — should be fail-loud
 
 Finding-ID: AUDIT-20260620-138
-Status: migrated-to-backlog TASK-372
+Status:     fixed-89849396
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -2454,7 +2454,7 @@ If `find` returns `undefined` — meaning the resolved `phaseId` has no correspo
 ### AUDIT-20260620-139 — `slush-findings` dry-run does not report what `reconcileFixedFindings` would close
 
 Finding-ID: AUDIT-20260620-139
-Status: migrated-to-backlog TASK-373
+Status:     fixed-89849396
 Severity:   low
 Per-lane:   claude=low
 Decision:   single-model (gate-counted low)
@@ -2468,7 +2468,7 @@ Code-sha: 898493961b7df1e13142410e94f01e9e23694e2e
 ### AUDIT-20260620-140 — Override catch block emits incorrect gate-state message when record write succeeds but checkpoint write fails
 
 Finding-ID: AUDIT-20260620-140 (claude-01 + claude-02 + claude-04 + claude-05 + codex-01 + codex-02 + codex-03; cross-model)
-Status:     open
+Status:     fixed-21c1fe27
 Severity:   high
 Per-lane:   claude=high, codex=high
 Decision:   agreement (gate-counted high)
@@ -2489,7 +2489,7 @@ Fix: either (a) separate the two operations into independent try/catch blocks, e
 ### AUDIT-20260620-141 — Override path calls `resolveGovernFeatureRoot` redundantly when `featureRoot` is already in scope
 
 Finding-ID: AUDIT-20260620-141
-Status: migrated-to-backlog TASK-374
+Status:     fixed-21c1fe27
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)
@@ -2511,7 +2511,7 @@ Code-sha: 898493961b7df1e13142410e94f01e9e23694e2e
 ### AUDIT-20260620-142 — Checkpoint-write FATAL message misrepresents gate state when record succeeds but checkpoint fails
 
 Finding-ID: AUDIT-20260620-142 (claude-01 + claude-05 + codex-01 + codex-02 + codex-03; cross-model)
-Status: migrated-to-backlog TASK-375
+Status:     fixed-21c1fe27
 Severity:   medium
 Per-lane:   claude=medium, codex=high
 Decision:   agreement (gate-counted medium)
@@ -2530,7 +2530,7 @@ The intent (per the inline comment) is: "a checkpoint failure FATALs without pri
 ### AUDIT-20260620-143 — `resolveGovernFeatureRoot` called twice in override path — `overrideRoot` duplicates already-resolved `featureRoot`
 
 Finding-ID: AUDIT-20260620-143
-Status: migrated-to-backlog TASK-376
+Status:     fixed-21c1fe27
 Severity:   medium
 Per-lane:   claude=medium
 Decision:   single-model (gate-counted medium)

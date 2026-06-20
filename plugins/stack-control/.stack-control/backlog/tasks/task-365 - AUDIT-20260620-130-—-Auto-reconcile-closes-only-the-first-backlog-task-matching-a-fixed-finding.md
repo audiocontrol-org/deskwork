@@ -3,9 +3,10 @@ id: TASK-365
 title: >-
   AUDIT-20260620-130 — Auto-reconcile closes only the first backlog task
   matching a fixed finding
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 19:07'
+updated_date: '2026-06-20 19:21'
 labels:
   - 'type:migrated-finding'
   - 'feature:029-govern-operability'
