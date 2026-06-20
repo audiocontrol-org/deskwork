@@ -431,6 +431,45 @@ function resolveAuditedFiles(
     .filter((line) => line.length > 0);
 }
 
+/**
+ * Write (or refresh) the per-phase checkpoint for a resolved `phase`-granularity
+ * unit at the CURRENT tree state — the single home shared by the normal
+ * convergence-graduation path AND the per-phase `--override` short-circuit
+ * (specs/029 US4 + US7). A per-phase override graduates THIS phase's findings, so
+ * its checkpoint must still be written/refreshed — otherwise the phase has no
+ * current checkpoint and the `all-phase-checkpoints-current` gate refuses to let
+ * LATER phases advance. The `checkpoint` field is passed by the caller (the normal
+ * path threads `built.checkpoint`; the override path threads
+ * `phaseUnit.auditLogSection` — they are equal for a phase unit). If git is
+ * unavailable, `computePhaseHunkBlocks` returns [] and we write WITHOUT hunkBlocks
+ * (graceful, same as the normal path). No-op when the phase has no resolved status.
+ */
+function writeResolvedPhaseCheckpoint(args: {
+  readonly repoRoot: string;
+  readonly phaseUnit: AuditUnit & { readonly phaseId: string };
+  readonly phaseStatus: PhaseCheckpointStatus;
+  readonly checkpoint: string;
+  readonly phaseCheckpointKey: string | undefined;
+  readonly slug: string;
+}): string {
+  const { repoRoot, phaseUnit, phaseStatus, checkpoint, phaseCheckpointKey, slug } = args;
+  const auditedFiles = resolveAuditedFiles(repoRoot, phaseUnit.diffScope.base, phaseStatus.files);
+  const hunkBlocks = computePhaseHunkBlocks(repoRoot, auditedFiles, phaseUnit.diffScope.base);
+  return writePhaseCheckpoint(repoRoot, {
+    version: 1,
+    // Canonical key (AUDIT codex-01/claude-02) — what the US1 gate reads under.
+    featureSlug: phaseCheckpointKey ?? featureCheckpointKey(slug),
+    phaseId: phaseUnit.phaseId,
+    checkpoint,
+    auditLogSection: phaseUnit.auditLogSection,
+    scopeFingerprint: phaseStatus.scopeFingerprint,
+    passedAt: new Date().toISOString(),
+    governedPaths: phaseStatus.files,
+    auditedFiles,
+    ...(hunkBlocks.length > 0 ? { hunkBlocks } : {}),
+  });
+}
+
 function renderCheckpointRequirements(statuses: readonly PhaseCheckpointStatus[]): string {
   return statuses.map((status) => `${status.state} phase-${status.phaseId}`).join(', ');
 }
@@ -647,68 +686,17 @@ export async function runGovern(args: string[]): Promise<void> {
       featureRootExists: (s) => existingSlugs.has(s),
     });
 
-    // specs/029 US4 (FR-017/018): the `--override` SHORT-CIRCUIT. When an override
-    // reason is supplied, govern graduates THIS invocation with ZERO
-    // render/barrage/lift/slush — it records the attributable override graduation
-    // (the "OPEN by override" line + the convergence record) and returns. Detected
-    // HERE, before the barrage bin / fleet preflight / payload / loop, so none of
-    // that work fires. Per-invocation only: no fingerprint-keyed marker persists.
-    const overrideReason = pick(flags.override, process.env.GOVERN_OVERRIDE);
-    if (overrideReason !== undefined && overrideReason.length > 0) {
-      const { root: overrideRoot } = await resolveGovernFeatureRoot(repoRoot, slug);
-      // The convergence record is keyed by the canonical roadmap node id. When no
-      // node resolves (orphan/legacy/standalone fixture) the record is skipped with
-      // a WARNING — the `governing -> shipped` gate stays CLOSED until it is
-      // recorded, exactly as the convergence-graduation path treats a record-write
-      // failure (fail-safe; never a FATAL that blocks the deliberate override).
-      let convergenceItem: string | undefined;
-      try {
-        convergenceItem = resolveConvergenceItem(installation, overrideRoot, slug);
-      } catch (err) {
-        process.stderr.write(
-          `govern: WARNING — override graduation could not resolve a roadmap node ` +
-            `(${errorMessage(err)}); no convergence record written (the governing -> ` +
-            `shipped gate stays CLOSED until it is recorded).\n`,
-        );
-      }
-      recordOverrideGraduation({
-        installationRoot: repoRoot,
-        mode: flags.mode === 'spec' ? 'spec' : 'impl',
-        ...(convergenceItem !== undefined ? { convergenceItem } : {}),
-        scopePaths: overrideRoot !== undefined ? [overrideRoot] : [],
-        feature: slug,
-        reason: overrideReason,
-        recordedAt: new Date().toISOString(),
-        stderr: (s) => process.stderr.write(s),
-      });
-      process.stderr.write(
-        flags.mode === 'spec'
-          ? 'govern: spec may graduate (overridden).\n'
-          : 'govern: implementation governed (overridden).\n',
-      );
-      emitTerminalOutcome('graduated');
-      process.exit(0);
-    }
-
-    const barrageBin = resolveBarrageBin();
-    assertBarrageBinPresent(barrageBin);
-    const stackctl = join(PLUGIN_ROOT, 'bin', 'stackctl');
-
     // specs/015 US4 (FR-007 / T025): a `--phase <id>` selector audits ONE
     // tasks.md phase as a bounded unit — the SAME convergence protocol/loop, a
     // smaller payload. Resolve the phase unit from the feature's tasks.md, scope
     // the untracked fold + committed diff to the phase's files, and run the loop
     // under the per-phase checkpoint (`phase-<id>`). `--phase` is implement only.
-    const requestedModels = pick(undefined, process.env.GOVERN_MODELS);
-    const laneCapabilities =
-      flags.mode === 'implement'
-        ? preflightNegotiatedFleet(
-            await loadLaneCapabilitiesGoverned(repoRoot),
-            requestedModels,
-            requireModels,
-          )
-        : undefined;
-
+    //
+    // 029 US4 (FR-017): this per-phase resolution runs BEFORE the `--override`
+    // short-circuit below — and BEFORE the barrage-bin / fleet preflight / payload /
+    // loop — so a per-phase override can write the SAME `phase-<id>` checkpoint a
+    // normal graduation would, while still firing ZERO render/barrage/lift/slush. It
+    // does NO barrage work (it resolves the unit + the prior-phase staleness gate).
     let phaseUnit: AuditUnit | undefined;
     let payloadPathScope: readonly string[] | undefined;
     let phaseCheckpointStatuses: readonly PhaseCheckpointStatus[] | undefined;
@@ -792,6 +780,94 @@ export async function runGovern(args: string[]): Promise<void> {
         }
       }
     }
+
+    // specs/029 US4 (FR-017/018): the `--override` SHORT-CIRCUIT. When an override
+    // reason is supplied, govern graduates THIS invocation with ZERO
+    // render/barrage/lift/slush — it records the attributable override graduation
+    // (the "OPEN by override" line + the convergence record) and returns. Detected
+    // HERE — AFTER the per-phase unit + prior-phase staleness gate resolve above, but
+    // BEFORE the barrage bin / fleet preflight / payload / loop below — so none of the
+    // barrage work fires. A per-phase override (`--phase <id> --override`) STILL writes
+    // the `phase-<id>` checkpoint at the current tree state (029 US7 — otherwise the
+    // graduated phase has no current checkpoint and the all-phase-checkpoints-current
+    // gate would refuse to let LATER phases advance). A whole-feature override (no
+    // `--phase`) writes no per-phase checkpoint (there is no single phase to record).
+    // Per-invocation only: no fingerprint-keyed marker persists.
+    const overrideReason = pick(flags.override, process.env.GOVERN_OVERRIDE);
+    if (overrideReason !== undefined && overrideReason.length > 0) {
+      const { root: overrideRoot } = await resolveGovernFeatureRoot(repoRoot, slug);
+      // Per-phase override: refresh the `phase-<id>` checkpoint so the overridden
+      // phase is recorded governed at the current tree state — identical field shape
+      // to the normal graduation write, no barrage. The whole-feature override branch
+      // (phaseUnit?.granularity !== 'phase') writes nothing here.
+      if (
+        phaseUnit?.granularity === 'phase' &&
+        phaseUnit.phaseId !== undefined &&
+        phaseCheckpointStatuses !== undefined
+      ) {
+        const phaseId = phaseUnit.phaseId;
+        const phaseStatus = phaseCheckpointStatuses.find((status) => status.phaseId === phaseId);
+        if (phaseStatus !== undefined) {
+          writeResolvedPhaseCheckpoint({
+            repoRoot,
+            phaseUnit: { ...phaseUnit, phaseId },
+            phaseStatus,
+            // For a phase unit `built.checkpoint` equals `phaseUnit.auditLogSection`
+            // (`buildImplementVars` is passed the section as its checkpoint flag), so
+            // the override write threads the SAME value the normal path would.
+            checkpoint: phaseUnit.auditLogSection,
+            phaseCheckpointKey,
+            slug,
+          });
+        }
+      }
+      // The convergence record is keyed by the canonical roadmap node id. When no
+      // node resolves (orphan/legacy/standalone fixture) the record is skipped with
+      // a WARNING — the `governing -> shipped` gate stays CLOSED until it is
+      // recorded, exactly as the convergence-graduation path treats a record-write
+      // failure (fail-safe; never a FATAL that blocks the deliberate override).
+      let convergenceItem: string | undefined;
+      try {
+        convergenceItem = resolveConvergenceItem(installation, overrideRoot, slug);
+      } catch (err) {
+        process.stderr.write(
+          `govern: WARNING — override graduation could not resolve a roadmap node ` +
+            `(${errorMessage(err)}); no convergence record written (the governing -> ` +
+            `shipped gate stays CLOSED until it is recorded).\n`,
+        );
+      }
+      recordOverrideGraduation({
+        installationRoot: repoRoot,
+        mode: flags.mode === 'spec' ? 'spec' : 'impl',
+        ...(convergenceItem !== undefined ? { convergenceItem } : {}),
+        scopePaths: overrideRoot !== undefined ? [overrideRoot] : [],
+        feature: slug,
+        reason: overrideReason,
+        recordedAt: new Date().toISOString(),
+        stderr: (s) => process.stderr.write(s),
+      });
+      process.stderr.write(
+        flags.mode === 'spec'
+          ? 'govern: spec may graduate (overridden).\n'
+          : 'govern: implementation governed (overridden).\n',
+      );
+      emitTerminalOutcome('graduated');
+      process.exit(0);
+    }
+
+    const barrageBin = resolveBarrageBin();
+    assertBarrageBinPresent(barrageBin);
+    const stackctl = join(PLUGIN_ROOT, 'bin', 'stackctl');
+
+    const requestedModels = pick(undefined, process.env.GOVERN_MODELS);
+    const laneCapabilities =
+      flags.mode === 'implement'
+        ? preflightNegotiatedFleet(
+            await loadLaneCapabilitiesGoverned(repoRoot),
+            requestedModels,
+            requireModels,
+          )
+        : undefined;
 
     // specs/014 US5: resolve the audit-log excerpt (spec mode), the feature root
     // and the full feature-root list (excludeRoots) so the implement payload is
@@ -924,41 +1000,26 @@ export async function runGovern(args: string[]): Promise<void> {
       emitTerminalOutcome('blocked');
       process.exit(1);
     }
-    if (phaseUnit?.granularity === 'phase' && phaseCheckpointStatuses !== undefined) {
-      const phaseStatus = phaseCheckpointStatuses.find((status) => status.phaseId === phaseUnit.phaseId);
+    if (
+      phaseUnit?.granularity === 'phase' &&
+      phaseUnit.phaseId !== undefined &&
+      phaseCheckpointStatuses !== undefined
+    ) {
+      const phaseId = phaseUnit.phaseId;
+      const phaseStatus = phaseCheckpointStatuses.find((status) => status.phaseId === phaseId);
       if (phaseStatus !== undefined) {
-        // Record the files this phase's audit ACTUALLY covered (TASK-129) so a later
-        // whole-feature compose carries them exactly, never the declared directory.
-        const auditedFiles = resolveAuditedFiles(
+        // Record the phase governed at the current tree state (TASK-129 auditedFiles +
+        // 029 US7 hunkBlocks). The SAME write the per-phase `--override` short-circuit
+        // performs above — shared via writeResolvedPhaseCheckpoint so the two paths can
+        // never drift. If git is unavailable computePhaseHunkBlocks returns [] and the
+        // checkpoint is written WITHOUT hunkBlocks (graceful whole-file fallback).
+        writeResolvedPhaseCheckpoint({
           repoRoot,
-          phaseUnit.diffScope.base,
-          phaseStatus.files,
-        );
-        // 029 US7 (FR-026/027/028, TASK-289): capture the phase's OWN changed line-blocks
-        // (content-hash + count) keyed off its diff-base — the EXACT audited files, not the
-        // declared directory scope. Freshness then checks content-presence (no diff-base),
-        // so a later phase editing a DIFFERENT region of a shared file does NOT stale this
-        // checkpoint (O(n), not O(n²)). If git is unavailable at write time computePhaseHunkBlocks
-        // skips per-file and returns [] → we write WITHOUT hunkBlocks and degrade to the
-        // whole-file scopeFingerprint behavior (graceful, never a crash). scopeFingerprint is
-        // still written for back-compat + the convergence-record consumer.
-        const hunkBlocks = computePhaseHunkBlocks(
-          repoRoot,
-          auditedFiles,
-          phaseUnit.diffScope.base,
-        );
-        writePhaseCheckpoint(repoRoot, {
-          version: 1,
-          // Canonical key (AUDIT codex-01/claude-02) — what the US1 gate reads under.
-          featureSlug: phaseCheckpointKey ?? featureCheckpointKey(slug),
-          phaseId: phaseUnit.phaseId,
+          phaseUnit: { ...phaseUnit, phaseId },
+          phaseStatus,
           checkpoint: built.checkpoint,
-          auditLogSection: phaseUnit.auditLogSection,
-          scopeFingerprint: phaseStatus.scopeFingerprint,
-          passedAt: new Date().toISOString(),
-          governedPaths: phaseStatus.files,
-          auditedFiles,
-          ...(hunkBlocks.length > 0 ? { hunkBlocks } : {}),
+          phaseCheckpointKey,
+          slug,
         });
       }
     }
