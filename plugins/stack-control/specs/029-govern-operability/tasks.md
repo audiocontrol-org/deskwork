@@ -53,9 +53,9 @@
 
 - [x] T014 [P] [US3] RED test: finding-signature `(normalized-heading, primary-file-path)` equality (reuses cluster-merge normalization) — in `tests/promote-findings/finding-signature.test.ts` (FR-019)
 - [x] T015 [US3] Implement the shared finding-signature in `src/scope-discovery/promote-findings/extract-barrage-findings.ts` (single normalizer, no second one) (FR-019)
-- [ ] T016 [P] [US3] RED test: a re-rated already-seen finding on unchanged code does not reset the quiet streak; a new previously-unseen HIGH does — in `tests/promote-findings/dampener-identity.test.ts` (FR-009/010/011)
-- [ ] T017 [US3] Key the dampener on finding-identity (count new vs seen) in `src/scope-discovery/promote-findings/check-barrage-dampener.ts` (FR-009/010/011)
-- [ ] T018 [US3] Add cross-round severity hysteresis (default window = the 2-consecutive-quiet threshold) in `src/scope-discovery/promote-findings/cluster-severity.ts` + `adjudicate-findings.ts` (FR-012)
+- [x] T016 [P] [US3] RED test: a re-rated already-seen finding on unchanged code does not reset the quiet streak; a new previously-unseen HIGH does — in `tests/promote-findings/dampener-identity.test.ts` (FR-009/010/011)
+- [x] T017 [US3] Key the dampener on finding-identity (count new vs seen) in `src/scope-discovery/promote-findings/check-barrage-dampener.ts` (FR-009/010/011)
+- [x] T018 [US3] Add cross-round severity hysteresis (default window = the 2-consecutive-quiet threshold) in `src/scope-discovery/promote-findings/cluster-severity.ts` + `adjudicate-findings.ts` (FR-012)
 - [ ] T019 [US3] Close TASK-146; record the phase-3 govern checkpoint
 
 ---
