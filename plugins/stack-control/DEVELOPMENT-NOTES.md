@@ -2,6 +2,86 @@
 
 ---
 
+## 2026-06-20: govern-operability (029) — execute Phases 1–4 (P1 MVP) + US7; deep per-phase-govern entanglement; FR-017 regression handoff
+
+**Goal:** Pick up 029-govern-operability where the prior session left off (runnable spec at the `/speckit-analyze` gate) and drive `/stack-control:execute` — burn the per-phase govern of the whole govern-operability umbrella down through the lifecycle.
+
+**Accomplished:**
+- **Phases 1, 2, 3 (all P1) graduated**, all committed + pushed. US1 fleet reliability (no-grounding lanes promoted to the shipped template + codex reasoning-summary liveness; opus calibrated live at 172s); US2 degraded-is-never-convergence (per-lane terminal state + the `Fleet: DEGRADED` section marker + dampener degraded-awareness); US3 determinism (the shared finding-signature + identity-keyed new-vs-seen dampener + **code-epoch-scoped** re-rate suppression honoring FR-010 "unchanged code").
+- **US7 brought forward** (operator-approved, out of order): hunk-granularity, content-presence checkpoint fingerprint — the root-fix for the O(n²) staleness that blocked Phase 3. Implemented + full-suite-green; not yet phase-governed.
+- **Phase 4 (US4, last P1) implemented + full-suite-green (2327 tests)**: `--override` short-circuit, skip-`fixed-<sha>`, cross-run signature dedup, `backlog done` auto-reconcile, + per-phase-override-writes-checkpoint. **Not yet governed.**
+- Governance earned its keep repeatedly — the cross-model barrage caught real bugs my own fixes introduced: the no-grounding-lane liveness regression (US1), the invisible degraded-clean-run bug (US2/codex-01 BLOCKING), the `findingSignature` NUL-byte-makes-git-see-binary bug (US3), line-range + markdown-code-span signature non-normalization (US3), and the too-aggressive single-run-clean rule (US3).
+- Closed TASK-145, TASK-146, TASK-288; shipped the `audit-barrage-timeout-observability` gap node; captured TASK-353/354 + ~30 slushed residuals.
+
+**Didn't Work:**
+- **Per-phase-govern entanglement (the dominant cost):** US2/US3/US4 all rewrite `check-barrage-dampener.ts` + `audit-barrage-lift.ts` in OVERLAPPING regions, so each later phase re-stales the earlier phases' checkpoints. US7's hunk-fingerprint only helps for DIFFERENT-region edits (FR-026); same-region overlap is legitimate FR-027 staleness → a re-govern loop. Many barrage cycles spent re-governing Phase 2/3 to unblock the next phase.
+- **Implement-audit plateaus into a finding-GENERATOR** on the dampener/signature code — each round surfaced a narrower defensive edge (line-ranges → code-spans → tip.sha input-validation). Phase 3 needed an **operator-approved `--override`** to exit the plateau.
+- **The intermittent no-grounding-lane timeout (TASK-354)** produced degraded rounds that blocked convergence on the larger phase-3 payload.
+- **I regressed FR-017** with the override-checkpoint fix (`b756cd0b`): per-phase `--override` now runs a barrage instead of short-circuiting (the short-circuit branch at `govern.ts:797` is bypassed in the real path; the unit test still passes → a test/real-path gap). Caught at session end → handoff.
+
+**Course Corrections:**
+- [PROCESS] First govern used `--item`, tripping the TASK-155 compass `governing`-transition gate; corrected to the canonical `--feature` per-phase form (the SKILL.md form; 028 precedent).
+- [PROCESS] Brought US7 forward (operator-approved) as the root-fix when Phase 3 hit the O(n²) staleness, rather than paying the re-govern grind — per "root-fix over workaround-menu."
+- [PROCESS] Operator-approved `--override` to exit the Phase-3 implement-audit plateau (defensive over-ratings on trusted git output; core sound + fully tested).
+- [COMPLEXITY] Per-phase granularity is too fine for tightly-coupled consecutive phases — the entanglement re-stale loop dominated the session.
+
+**Insights:**
+- The feature is acutely experiencing the govern-operability frictions it exists to fix — the entanglement re-stale loop, the lane timeout, and the override-not-short-circuiting are all live during its own construction. That recursion is informative: per-phase govern of a feature whose phases share a small set of files is structurally O(n²), and US7 only addresses the different-region case. A co-govern / batch-graduate path for coupled phases (TASK-353) is the missing piece.
+- Implement-mode audit-barrage can plateau into a generator (like spec-mode, but the residuals are defensive over-ratings rather than under-specification); the `--override` short-circuit (US4/FR-017) is exactly the plateau-exit, and needing it mid-build validates the requirement.
+- Stop-and-handoff was the right call once I introduced a regression under heavy context — better a clean fresh-session continuation than compounding errors in deep `govern.ts` control flow.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 16
+  - fix(029): US4 — per-phase --override must write the phase checkpoint (FR-017)
+  - feat(029): US4 — loop hygiene + override short-circuit (T020-T028)
+  - chore(029): US3 (Phase 3) graduated by override — govern checkpoint + closed TASK-146
+  - fix(029): US3 govern triage — unwrap markdown code-span surfaces (codex, phase-3)
+  - fix(029): US3 govern triage — single-run-clean uses RAW HIGH (codex-01, phase-3)
+  - fix(029): US3 govern triage — NUL byte, line-range signature, code-epoch suppression
+  - feat(029): US7 — hunk-granularity checkpoint fingerprint (T040-T042, brought forward)
+  - feat(029): US3 part 2 — dampener identity-keying + severity determinism (T016-T018)
+  - feat(029): US3 part 1 — shared finding-signature (T014-T015)
+  - chore(029): US2 (Phase 2) graduated — govern checkpoint + gap node shipped
+  - fix(029): US2 govern triage — degraded clean run must record a marked section
+  - feat(029): US2 — fleet observability: degraded is never convergence (T008-T012)
+  - chore(029): US1 (Phase 1) graduated — govern checkpoint + closed TASK-288/145
+  - fix(029): US1 govern round-2 — widen no-grounding lane liveness window, clarify override
+  - fix(029): US1 govern triage — codex bare flag, real-tool deny-list, opus calibrated
+  - feat(029): US1 — fleet reliability foundation (T001-T006)
+- Files changed: 82
+- Backlog touched: TASK-145, TASK-146, TASK-288, TASK-289, TASK-319, TASK-353, TASK-354
+
+## 2026-06-20: govern-operability — cluster the umbrella, design + author the full spec chain (029) to runnable
+
+**Goal:** Operator: take up `multi:feature/govern-operability` and *"design an execution plan to burn down the entire thing at once — no fake yagni bullshit, no scope shirking. I just want it all fixed."* Then drive it through the lifecycle to a runnable spec.
+
+**Accomplished:**
+- **Clustered the umbrella:** created top-level `multi:feature/govern-operability` (part-of `lifecycle-industrialization`) via `roadmap cluster`, grouping the scattered governance friction (audit-barrage-convergence, govern-per-phase-friction-burndown, codex-liveness, timeout-observability); deduped redundant part-of edges; captured TASK-316 (out-of-window false alarms) + TASK-317 (lift cross-run dedup).
+- **Designed it:** design record (`docs/superpowers/specs/2026-06-19-govern-operability-design.md`) with 3 weighed alternatives + a 9-phase sharpen-the-saw plan. Operator resolved the one real fork (granularity) → **either-of gate, default per-phase**; operator approved.
+- **Folded in two operator-named frictions** before approval: **(a)** never lift an already-`fixed-<sha>` finding (FR-013); **(b)** override is terminal — `--override` short-circuits the barrage entirely (FR-017/018, **TASK-318** filed). Grounded (b) in the smoking gun at `convergence-loop.ts:20-25`.
+- **Drove the full speckit chain** bracketed by the 026 front-door marker: specify → clarify → plan → checklist → tasks → analyze. Resolved 3 clarifications (finding-signature = normalized-heading+primary-file; hunk-fingerprint = the phase's own diff hunks; override = short-circuit-only).
+- **Artifacts (`specs/029-govern-operability/`):** spec (9 US, 34 FR, 9 SC), plan, research, data-model, contracts, quickstart, **tasks.md (58 tasks, phases 1:1 with US1–US9)**, 2 checklists. Analyze: **0 critical / 0 high, 100% FR coverage.** Node at **`implementing`** (design-approved + analyze-clean recorded), ready for `/stack-control:execute`.
+- **Held execute** on the operator's explicit choice ("Hold — spec is enough for now").
+
+**Didn't Work:**
+- **`spec-check` / `check-prerequisites` resolve `--spec` + paths relative to cwd** — running from the repo root (not the installation dir) gave a confusing `spec dir not found` FATAL; had to `cd plugins/stack-control`. Captured to tooling-feedback.
+- **session-end auto-derive boundary missed this session** — the merge-base/HEAD~N boundary on the long-lived branch reported `Commits: 0`; re-derived manually from `dd29ad2c..HEAD` (TASK-39/59 long-lived-branch boundary sweep).
+
+**Course Corrections:**
+- [PROCESS] Operator added the two frictions mid-design, pre-approval — folded both into the design + spec as first-class **P1** requirements rather than deferring (capture-don't-cut).
+- [PROCESS] Did NOT barrel into the 58-task execute burndown after authoring; surfaced the define→execute boundary and let the operator own the pace (they chose Hold).
+- [PROCESS] Skipped the `git.feature` branch hook (program runs on one long-lived branch; 028 precedent) — documented as the program override of the spec-kit default, not an offroad.
+
+**Insights:**
+- The recursion is the point: friction (a) lift-already-fixed and (b) override-still-barrages are themselves the operator-vigilance taxes this feature exists to remove — capturing them *as the work* is correct.
+- Sharpen-the-saw ordering means phases 1–2 will still be governed with the *current* ringing config (US1–US3 fix it only as they land) — a deliberate, named cost in the design.
+
+**Quantitative (re-derived from git `dd29ad2c..HEAD`; auto-derive reported 0 due to the long-lived-branch boundary, TASK-39/59):**
+- Commits: 10
+  - roadmap cluster umbrella; design record (+frictions fold); spec author; clarify; plan; checklist; tasks; markers; session-end record
+- Files changed: 18 (+1285 / −7)
+- Backlog touched: TASK-316, TASK-317, TASK-318 (all captured this session)
+
 ## 2026-06-19: front-door-completeness — formal re-close (no-op; post-authoring Q&A only)
 
 **Goal:** Second `/stack-control:session-end` of the day. The substantive work — the front-door-completeness audit + the full 028 spec chain to runnable — was captured and pushed in the prior entry (commit `7d03ff69`). This is a formal re-close: nothing changed the worktree since (0 commits in range), so this entry is an honest no-op (run-as-asked; empty beats missed).

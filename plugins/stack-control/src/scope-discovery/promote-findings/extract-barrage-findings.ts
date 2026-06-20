@@ -126,13 +126,52 @@ export function normalizeSeverity(raw: string): NormalizedSeverity {
   return 'high';
 }
 
-function stripHeading(heading: string): string {
+/**
+ * specs/029 US3 (FR-019): THE single heading normalizer — lowercase,
+ * punctuation→space, whitespace-collapsed. Shared by the cross-model
+ * cluster-merge (`headingsAgree`) AND the finding-signature
+ * (`findingSignature`); there is exactly one, never a second.
+ */
+export function normalizeHeading(heading: string): string {
   return heading.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * specs/029 US3 (FR-019): the primary file path of a finding's `Surface:`
+ * field — the FIRST path token, with any trailing line locator stripped.
+ * Surfaces list one or more refs separated by `;` or `,`, and the audit-barrage
+ * prompt has models emit a variety of locator shapes: `path:89`, `path:89:3`
+ * (line:col), and `path:89-91` (line RANGE — AUDIT-BARRAGE-codex-02). All must
+ * reduce to the same `path` so the same finding on the same file gets ONE
+ * signature regardless of which line range a model reported. The trailing
+ * `:N(-N|:N)*` group strips every line/col/range tail.
+ */
+export function primaryFilePath(surface: string): string {
+  const first = surface.split(/[;,]/)[0]?.trim() ?? '';
+  // Unwrap optional markdown code-span delimiters (`` `path:line` ``) before
+  // stripping the locator — audit-log surfaces sometimes wrap the ref in
+  // backticks (AUDIT-BARRAGE-codex, phase-3). Without this the trailing backtick
+  // defeats the `:N…$` strip, so the same finding gets different signatures
+  // depending on whether a model/section backticked the surface.
+  const unwrapped = first.replace(/^`+/, '').replace(/`+$/, '').trim();
+  return unwrapped.replace(/:\d+(?:[:-]\d+)*\s*$/, '').trim();
+}
+
+/**
+ * specs/029 US3 (FR-019): the finding-signature — the tuple
+ * `(normalized-heading, primary-file-path)` as a stable string key. Used by
+ * the dampener identity-key (FR-009) and the lift cross-run dedup (FR-016). The
+ * components join with a space; the join is unambiguous because a normalized
+ * heading is only `[a-z0-9 ]` while a file path carries `/`/`.`/`-` — the path
+ * portion is always distinguishable from the heading text.
+ */
+export function findingSignature(heading: string, surface: string): string {
+  return `${normalizeHeading(heading)} ${primaryFilePath(surface)}`;
+}
+
 function headingsAgree(a: string, b: string): boolean {
-  const sa = stripHeading(a);
-  const sb = stripHeading(b);
+  const sa = normalizeHeading(a);
+  const sb = normalizeHeading(b);
   if (sa.length < MIN_HEADING_SUBSTRING_LEN || sb.length < MIN_HEADING_SUBSTRING_LEN) {
     return false;
   }

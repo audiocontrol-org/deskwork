@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "featureSlug": "029-govern-operability",
+  "phaseId": "4",
+  "checkpoint": "phase-4",
+  "auditLogSection": "phase-4",
+  "scopeFingerprint": "52b0f1951dfd3ec82deb71a0e9cce8279cbea142c7d10c0b8cca8903168d002a",
+  "passedAt": "2026-06-20T19:08:01.032Z",
+  "governedPaths": [
+    "tests/promote-findings/never-lift-fixed.test.ts",
+    "src/subcommands/slush-findings.ts",
+    "src/subcommands/audit-barrage-lift.ts",
+    "src/govern/convergence-loop.ts",
+    "tests/promote-findings/lift-dedup.test.ts",
+    "tests/backlog/done.test.ts",
+    "src/backlog",
+    "tests/govern/override-short-circuit.test.ts",
+    "src/subcommands/govern.ts",
+    "src/govern/convergence-types.ts",
+    "src/govern/override-graduate.ts",
+    "src/govern/convergence-record.ts",
+    "src/workflow/workflow-types.ts"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/src/backlog/reconcile-fixed.ts",
+    "plugins/stack-control/src/govern/convergence-loop.ts",
+    "plugins/stack-control/src/govern/convergence-record.ts",
+    "plugins/stack-control/src/govern/convergence-types.ts",
+    "plugins/stack-control/src/govern/override-graduate.ts",
+    "plugins/stack-control/src/subcommands/audit-barrage-lift.ts",
+    "plugins/stack-control/src/subcommands/govern.ts",
+    "plugins/stack-control/src/subcommands/slush-findings.ts",
+    "plugins/stack-control/src/workflow/workflow-types.ts",
+    "plugins/stack-control/tests/backlog/done.test.ts",
+    "plugins/stack-control/tests/govern/override-short-circuit.test.ts",
+    "plugins/stack-control/tests/promote-findings/lift-dedup.test.ts",
+    "plugins/stack-control/tests/promote-findings/never-lift-fixed.test.ts"
+  ]
+}

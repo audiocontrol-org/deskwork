@@ -39,11 +39,15 @@ import { basename, dirname, join } from 'node:path';
 import { resolveCodebaseBoundary } from '../scope-discovery/codebase-boundary.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import { extractBarrageFindings } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
+import { partitionLiftableFindings } from '../govern/loop-hygiene.js';
 import {
+  appendSection,
   buildAuditLogHeader,
   renderSection,
-  renderQuietSection,
+  renderRereportEntries,
+  REREPORT_MIXED_LABEL,
 } from './audit-barrage-lift-render.js';
+import { recordNoNewFindingsSection } from './record-no-new-findings-section.js';
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
 import {
   computeFleetReportFromParsedLanes,
@@ -306,6 +310,18 @@ export async function runAuditBarrageLift(
       stderr.write(`${renderFleetReportLines(fleet).join('\n')}\n`);
     }
   }
+  // specs/029 US3 (AUDIT-BARRAGE-codex-01): read the audited code epoch from the
+  // run-dir's `tip.sha` (a single 40-hex line the barrage writes when the tip was
+  // resolvable). An outage run omits the file; a missing/empty tip.sha is NOT an
+  // error — it is plumbed as `undefined` and the section omits the `Code-sha:`
+  // marker, isolating the run's epoch in the dampener (never cross-suppressing).
+  const tipShaPath = join(opts.runDir, 'tip.sha');
+  let tipSha: string | undefined;
+  if (existsSync(tipShaPath)) {
+    const raw = (await (args.read ?? ((p: string) => readFile(p, 'utf8')))(tipShaPath)).trim();
+    if (raw.length > 0) tipSha = raw;
+  }
+
   const auditLogPath = join(feature.root, 'audit-log.md');
   // Spec 013 US2: a brand-new feature's first barrage has no audit-log
   // yet. Instead of aborting (the old `return 2`), scaffold the
@@ -319,20 +335,6 @@ export async function runAuditBarrageLift(
     warn: (m) => stderr.write(`${m}\n`),
     ...(includeModels !== undefined ? { includeModels } : {}),
   });
-  // FR-007: zero findings over a DEGRADED fleet is NEVER a clean signal — the
-  // killed lanes simply produced nothing. Record NOTHING (not even a quiet
-  // section): a degraded run must never be counted as a converged-eligible quiet
-  // run by the dampener (claude-20260612-r3 keeps this branch unrecorded).
-  if (findings.length === 0 && fleet !== undefined && fleet.produced < fleet.configured) {
-    stderr.write(
-      `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a ` +
-        `DEGRADED fleet (produced ${fleet.produced} of ${fleet.configured} ` +
-        `configured) — absence of findings from non-completed lanes is NOT a ` +
-        `clean signal.\n`,
-    );
-    return 0;
-  }
-
   const reader = args.read ?? ((p: string) => readFile(p, 'utf8'));
   // Per AUDIT-20260530-04: the audit-log is precious historical
   // record under the project's preservation rule. Use the atomic
@@ -348,45 +350,65 @@ export async function runAuditBarrageLift(
     ? buildAuditLogHeader(opts.featureSlug, deriveTargetVersion(feature))
     : await reader(auditLogPath);
 
-  // claude-20260612-r3: a clean run over a HEALTHY fleet (or a pre-014 run with no
-  // INDEX) records a QUIET lift section so the convergence dampener counts it. The
-  // dampener counts lift SECTIONS; a clean run that left no section was invisible to
-  // its consecutive-quiet / single-run-clean rules, so a prior HIGH section stayed
-  // in the window forever and the gate could never reach OPEN after genuinely-clean
-  // runs. The degraded case returned above; only healthy/pre-014 clean runs reach here.
-  if (findings.length === 0) {
-    stderr.write(
-      `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a healthy ` +
-        `fleet; recording a quiet run section so the convergence dampener counts it.\n`,
-    );
-    if (!opts.apply) {
-      stderr.write('audit-barrage-lift: dry-run (re-run with --apply to write).\n');
-      return 0;
-    }
-    const trimmedExisting = auditLogText.replace(/\s+$/, '');
-    const separator = trimmedExisting.length > 0 ? '\n\n' : '\n';
-    const quiet = renderQuietSection(opts.date, basename(opts.runDir.replace(/\/$/, '')));
-    const quietContent = `${trimmedExisting}${separator}${quiet}`;
-    await writer(auditLogPath, quietContent.endsWith('\n') ? quietContent : `${quietContent}\n`);
-    stderr.write(`audit-barrage-lift: recorded a quiet run section in ${auditLogPath}.\n`);
-    return 0;
+  // specs/029 US4 (FR-013/FR-016): keep the loop hygienic — partition the fresh
+  // extraction BEFORE assigning IDs / appending a section. `liftable` is neither
+  // resolved (`fixed-<sha>`, FR-013) nor already-present (cross-run dedup, FR-016).
+  // `dedupSuppressedOpen` is the FR-016-deduped-but-NOT-resolved set: still-open
+  // findings re-surfacing on a later round. They get NO new entry/task (FR-016:
+  // ≤1 task per signature) BUT must STILL be visible to the dampener so a
+  // persistent OPEN finding keeps blocking (US3 SC-001 — the graduation-safety
+  // bug: a single-bucket filter dropped these, rendering an all-deduped re-run as
+  // a PRISTINE quiet section that the single-run-clean rule graduated). The
+  // selection logic + signature keying live in the shared loop-hygiene helper.
+  const { liftable: liftableFindings, dedupSuppressedOpen, resolvedSuppressed } =
+    partitionLiftableFindings(findings, auditLogText, (m) => stderr.write(`${m}\n`));
+
+  // A run with no NEW liftable findings ALWAYS records a section so the convergence
+  // dampener (which counts SECTIONS) sees it as the most-recent run — re-report /
+  // degraded / quiet, in that priority order. The three sub-cases (and why each
+  // exists) live in `recordNoNewFindingsSection`.
+  if (liftableFindings.length === 0) {
+    return recordNoNewFindingsSection({
+      dedupSuppressedOpen,
+      fleet,
+      date: opts.date,
+      runDir: opts.runDir,
+      tipSha,
+      auditLogText,
+      auditLogPath,
+      apply: opts.apply,
+      stderr,
+      write: writer,
+    });
   }
 
   const highest = highestExistingNn(auditLogText, opts.date);
   const startingNn = highest + 1;
+  // specs/029 US2 (FR-007): when this findings-section is recorded over a
+  // DEGRADED fleet (a surviving lane found something while others were killed),
+  // stamp the `Fleet: DEGRADED` marker so the dampener never counts this run as
+  // quiet (the degraded+0-findings branch above already records nothing; this
+  // covers degraded+findings, where 0 HIGH+ from the survivors is not clean).
   const { section, assignedIds } = renderSection(
-    findings,
+    liftableFindings,
     opts.date,
     startingNn,
     basename(opts.runDir.replace(/\/$/, '')),
+    fleet !== undefined ? { produced: fleet.produced, configured: fleet.configured } : undefined,
+    tipSha,
   );
 
+  // claude-03/claude-05: report the TOTAL extracted plus the suppression breakdown
+  // so an operator correlating this line against the raw run files can reconstruct
+  // the arithmetic (new + persistent-re-surfaced + already-resolved = total).
   stderr.write(
-    `audit-barrage-lift: extracted ${findings.length} finding(s) from ${opts.runDir}; ` +
+    `audit-barrage-lift: extracted ${findings.length} finding(s) from ${opts.runDir} ` +
+      `(${liftableFindings.length} new, ${dedupSuppressedOpen.length} persistent-open re-surfaced, ` +
+      `${resolvedSuppressed.length} already-resolved suppressed); ` +
       `assigning ${assignedIds[0]}..${assignedIds[assignedIds.length - 1]}.\n`,
   );
-  for (let i = 0; i < findings.length; i += 1) {
-    const f = findings[i]!;
+  for (let i = 0; i < liftableFindings.length; i += 1) {
+    const f = liftableFindings[i]!;
     const id = assignedIds[i]!;
     const cm = f.crossModelAgreement
       ? ` (cross-model: ${f.sourceModels.join(' + ')})`
@@ -399,12 +421,30 @@ export async function runAuditBarrageLift(
     return 0;
   }
 
-  const trimmedExisting = auditLogText.replace(/\s+$/, '');
-  const separator = trimmedExisting.length > 0 ? '\n\n' : '\n';
-  const newContent = `${trimmedExisting}${separator}${section}`;
-  await writer(auditLogPath, newContent.endsWith('\n') ? newContent : `${newContent}\n`);
+  // specs/029 US4 (graduation-safety): when a run ALSO re-surfaces already-tracked
+  // findings (FR-016 dedup), append their re-report entries to THIS section so the
+  // run's full surfaced severity (new + persistent) is recorded in one place — a
+  // persistent OPEN HIGH keeps blocking (US3 SC-001) even on a round that produced
+  // some new findings. The re-report entries carry a `Severity:` line (counted by
+  // the dampener) and a non-open `Status:` (never re-slushed into a duplicate task,
+  // FR-016). Empty set → empty string → no-op.
+  // claude-04: label the re-report block so the mixed section's two categories
+  // (new liftable entries vs re-surfaced already-tracked ones) are distinguishable
+  // at a glance — parity with the pure-re-report section's preamble. One predicate
+  // (`dedupSuppressedOpen.length`) gates both the composition and the stderr note.
+  const hasRereports = dedupSuppressedOpen.length > 0;
+  const sectionWithRereports = hasRereports
+    ? `${section}\n${REREPORT_MIXED_LABEL}\n\n${renderRereportEntries(dedupSuppressedOpen)}`
+    : section;
+  if (hasRereports) {
+    stderr.write(
+      `audit-barrage-lift: also re-reported ${dedupSuppressedOpen.length} already-tracked ` +
+        `finding(s) in this section (no new IDs/tasks; dampener still counts their severity — US3 SC-001).\n`,
+    );
+  }
+  await writer(auditLogPath, appendSection(auditLogText, sectionWithRereports));
   stderr.write(
-    `audit-barrage-lift: wrote ${findings.length} new entry(ies) to ${auditLogPath}.\n`,
+    `audit-barrage-lift: wrote ${liftableFindings.length} new entry(ies) to ${auditLogPath}.\n`,
   );
   return 0;
 }

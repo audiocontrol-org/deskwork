@@ -74,6 +74,8 @@ interface ParsedRecord {
   readonly converged?: unknown;
   readonly recordedAt?: unknown;
   readonly anchorRoot?: unknown;
+  readonly override?: unknown;
+  readonly overrideReason?: unknown;
 }
 
 /** Read the mode-keyed record for an item; null when none exists. Fail loud on corruption. */
@@ -135,6 +137,39 @@ function validate(
         `installation root '${installationRoot}' (a record from another installation is not authoritative)`,
     );
   }
+  // specs/029 US4 (FR-018): optional override attribution. When present, `override`
+  // must be boolean and `overrideReason` a non-empty string — a malformed marker is
+  // a corrupt record (fail loud), not silently dropped.
+  if (parsed.override !== undefined && typeof parsed.override !== 'boolean') {
+    throw new Error(`${path}: govern-convergence record override must be a boolean when present`);
+  }
+  if (
+    parsed.overrideReason !== undefined &&
+    (typeof parsed.overrideReason !== 'string' || parsed.overrideReason.trim().length === 0)
+  ) {
+    // AUDIT-BARRAGE codex-02/claude-02: a whitespace-only reason is as meaningless as
+    // an empty one — reject both so the durable FR-018 attribution is always informative.
+    throw new Error(
+      `${path}: govern-convergence record overrideReason must be a non-empty (non-whitespace) string when present`,
+    );
+  }
+  // specs/029 US4 (FINDING 3, codex MEDIUM): the writer only ever emits the two
+  // fields TOGETHER (`override: true` + a non-empty `overrideReason`) or NEITHER.
+  // Reject the impossible combinations a corrupt/hand-edited record could carry —
+  // `override: true` REQUIRES a reason; a present `overrideReason` REQUIRES
+  // `override === true` — so they cannot silently desync the gate signal.
+  if (parsed.override === true && parsed.overrideReason === undefined) {
+    throw new Error(
+      `${path}: govern-convergence record override is true but overrideReason is absent ` +
+        `(an override graduation must carry its reason)`,
+    );
+  }
+  if (parsed.overrideReason !== undefined && parsed.override !== true) {
+    throw new Error(
+      `${path}: govern-convergence record carries an overrideReason without override: true ` +
+        `(a reason is only valid on an override graduation)`,
+    );
+  }
   return {
     version: 1,
     mode: parsed.mode,
@@ -143,6 +178,10 @@ function validate(
     converged: parsed.converged,
     recordedAt: parsed.recordedAt,
     anchorRoot: parsed.anchorRoot,
+    ...(parsed.override === true ? { override: true } : {}),
+    ...(typeof parsed.overrideReason === 'string' && parsed.overrideReason.length > 0
+      ? { overrideReason: parsed.overrideReason }
+      : {}),
   };
 }
 
@@ -188,7 +227,21 @@ export function recordGovernConvergence(
   item: string,
   scopePaths: readonly string[],
   recordedAt: string,
+  // specs/029 US4 (FR-018): when present, this graduation is an operator
+  // `--override` short-circuit, recorded durably so a downstream consumer can
+  // DISTINGUISH it from a real convergence (the record is the only durable
+  // artifact — FR-017 fires zero barrage).
+  overrideReason?: string,
 ): string {
+  // AUDIT-BARRAGE claude-02: the write boundary is self-enforcing — reject a blank
+  // overrideReason HERE so the function can never persist a record the read-side
+  // `validate` would reject (a write-what-you-can't-read corruption window). Callers
+  // already guard, but the public signature must not depend on every caller doing so.
+  if (overrideReason !== undefined && overrideReason.trim().length === 0) {
+    throw new Error(
+      'recordGovernConvergence: overrideReason must be a non-empty (non-whitespace) string when present',
+    );
+  }
   return writeGovernConvergenceRecord(installationRoot, {
     version: 1,
     mode,
@@ -196,5 +249,8 @@ export function recordGovernConvergence(
     scopeFingerprint: convergenceFingerprint(installationRoot, item, scopePaths),
     converged: true,
     recordedAt,
+    ...(overrideReason !== undefined
+      ? { override: true, overrideReason }
+      : {}),
   });
 }

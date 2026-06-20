@@ -31,6 +31,7 @@
 import { existsSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { recordGovernConvergence } from '../govern/convergence-record.js';
+import { recordOverrideGraduation } from '../govern/override-graduate.js';
 import { fileURLToPath } from 'node:url';
 import {
   GovernProtocolError,
@@ -84,7 +85,7 @@ import type { Installation } from '../config/types.js';
 import { checkLifecyclePrecondition } from '../lifecycle-precondition.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
-import { writePhaseCheckpoint } from '../govern/checkpoint-state.js';
+import { computePhaseHunkBlocks, writePhaseCheckpoint } from '../govern/checkpoint-state.js';
 import { type LaneCapabilityProfile } from '../govern/lane-capabilities.js';
 import { negotiateFleet } from '../govern/fleet-negotiation.js';
 import { selectRequestedLaneCapabilities } from '../govern/protocol.js';
@@ -430,6 +431,80 @@ function resolveAuditedFiles(
     .filter((line) => line.length > 0);
 }
 
+/**
+ * Write (or refresh) the per-phase checkpoint for a resolved `phase`-granularity
+ * unit at the CURRENT tree state — the single home shared by the normal
+ * convergence-graduation path AND the per-phase `--override` short-circuit
+ * (specs/029 US4 + US7). A per-phase override graduates THIS phase's findings, so
+ * its checkpoint must still be written/refreshed — otherwise the phase has no
+ * current checkpoint and the `all-phase-checkpoints-current` gate refuses to let
+ * LATER phases advance. The `checkpoint` field is derived INTERNALLY from
+ * `phaseUnit.auditLogSection` (AUDIT-BARRAGE claude-04) — neither caller supplies it,
+ * so the normal-graduation and `--override` paths can never write divergent values. If
+ * git is unavailable, `computePhaseHunkBlocks` returns [] and we write WITHOUT
+ * hunkBlocks (graceful). No-op when the phase has no resolved status.
+ */
+function writeResolvedPhaseCheckpoint(args: {
+  readonly repoRoot: string;
+  readonly phaseUnit: AuditUnit & { readonly phaseId: string };
+  readonly phaseStatus: PhaseCheckpointStatus;
+  readonly phaseCheckpointKey: string | undefined;
+  readonly slug: string;
+}): void {
+  // AUDIT-20260620-124 (task-360): both call sites (now via
+  // writePhaseCheckpointAfterRecordOrFatal) ignore the written path — return void
+  // rather than declaring a `string` no caller consumes.
+  const { repoRoot, phaseUnit, phaseStatus, phaseCheckpointKey, slug } = args;
+  const auditedFiles = resolveAuditedFiles(repoRoot, phaseUnit.diffScope.base, phaseStatus.files);
+  const hunkBlocks = computePhaseHunkBlocks(repoRoot, auditedFiles, phaseUnit.diffScope.base);
+  writePhaseCheckpoint(repoRoot, {
+    version: 1,
+    // Canonical key (AUDIT codex-01/claude-02) — what the US1 gate reads under.
+    featureSlug: phaseCheckpointKey ?? featureCheckpointKey(slug),
+    phaseId: phaseUnit.phaseId,
+    // AUDIT-BARRAGE claude-04: derive `checkpoint` from the SINGLE source
+    // (`phaseUnit.auditLogSection`) inside the shared helper, so the normal-graduation
+    // and `--override` paths can NEVER write divergent checkpoint values through it.
+    checkpoint: phaseUnit.auditLogSection,
+    auditLogSection: phaseUnit.auditLogSection,
+    scopeFingerprint: phaseStatus.scopeFingerprint,
+    passedAt: new Date().toISOString(),
+    governedPaths: phaseStatus.files,
+    auditedFiles,
+    ...(hunkBlocks.length > 0 ? { hunkBlocks } : {}),
+  });
+}
+
+/**
+ * Write the per-phase checkpoint AFTER the convergence record has landed (record-first
+ * ordering — AUDIT-BARRAGE codex-01/codex-02/claude-01). A checkpoint-write failure here
+ * is FATAL with an ACCURATE message: the convergence record IS already written, so the
+ * failure does NOT wrongly advance the lifecycle — the `governing → shipped` gate stays
+ * CLOSED because `all-phase-checkpoints-current` is unmet until the checkpoint lands.
+ * Re-running writes it. A `GovernProtocolError` from the caller's contract checks is NOT
+ * caught here (it propagates to the main handler).
+ */
+function writePhaseCheckpointAfterRecordOrFatal(args: {
+  readonly repoRoot: string;
+  readonly phaseUnit: AuditUnit & { readonly phaseId: string };
+  readonly phaseStatus: PhaseCheckpointStatus;
+  readonly phaseCheckpointKey: string | undefined;
+  readonly slug: string;
+}): void {
+  try {
+    writeResolvedPhaseCheckpoint(args);
+  } catch (err) {
+    process.stderr.write(
+      `govern: FATAL — the convergence record IS written, but the per-phase checkpoint ` +
+        `write failed (${errorMessage(err)}); the governing -> shipped gate stays CLOSED ` +
+        `(all-phase-checkpoints-current is unmet) until the checkpoint lands — no wrong ` +
+        `advance. Re-run to write the checkpoint.\n`,
+    );
+    emitTerminalOutcome('fatal');
+    process.exit(1);
+  }
+}
+
 function renderCheckpointRequirements(statuses: readonly PhaseCheckpointStatus[]): string {
   return statuses.map((status) => `${status.state} phase-${status.phaseId}`).join(', ');
 }
@@ -646,25 +721,17 @@ export async function runGovern(args: string[]): Promise<void> {
       featureRootExists: (s) => existingSlugs.has(s),
     });
 
-    const barrageBin = resolveBarrageBin();
-    assertBarrageBinPresent(barrageBin);
-    const stackctl = join(PLUGIN_ROOT, 'bin', 'stackctl');
-
     // specs/015 US4 (FR-007 / T025): a `--phase <id>` selector audits ONE
     // tasks.md phase as a bounded unit — the SAME convergence protocol/loop, a
     // smaller payload. Resolve the phase unit from the feature's tasks.md, scope
     // the untracked fold + committed diff to the phase's files, and run the loop
     // under the per-phase checkpoint (`phase-<id>`). `--phase` is implement only.
-    const requestedModels = pick(undefined, process.env.GOVERN_MODELS);
-    const laneCapabilities =
-      flags.mode === 'implement'
-        ? preflightNegotiatedFleet(
-            await loadLaneCapabilitiesGoverned(repoRoot),
-            requestedModels,
-            requireModels,
-          )
-        : undefined;
-
+    //
+    // 029 US4 (FR-017): this per-phase resolution runs BEFORE the `--override`
+    // short-circuit below — and BEFORE the barrage-bin / fleet preflight / payload /
+    // loop — so a per-phase override can write the SAME `phase-<id>` checkpoint a
+    // normal graduation would, while still firing ZERO render/barrage/lift/slush. It
+    // does NO barrage work (it resolves the unit + the prior-phase staleness gate).
     let phaseUnit: AuditUnit | undefined;
     let payloadPathScope: readonly string[] | undefined;
     let phaseCheckpointStatuses: readonly PhaseCheckpointStatus[] | undefined;
@@ -748,6 +815,150 @@ export async function runGovern(args: string[]): Promise<void> {
         }
       }
     }
+
+    // specs/029 US4 (FR-017/018): the `--override` SHORT-CIRCUIT. When an override
+    // reason is supplied, govern graduates THIS invocation with ZERO
+    // render/barrage/lift/slush — it records the attributable override graduation
+    // (the "OPEN by override" line + the convergence record) and returns. Detected
+    // HERE — AFTER the per-phase unit + prior-phase staleness gate resolve above, but
+    // BEFORE the barrage bin / fleet preflight / payload / loop below — so none of the
+    // barrage work fires. A per-phase override (`--phase <id> --override`) STILL writes
+    // the `phase-<id>` checkpoint at the current tree state (029 US7 — otherwise the
+    // graduated phase has no current checkpoint and the all-phase-checkpoints-current
+    // gate would refuse to let LATER phases advance). A whole-feature override (no
+    // `--phase`) writes no per-phase checkpoint (there is no single phase to record).
+    // Per-invocation only: no fingerprint-keyed marker persists.
+    // specs/029 US4 (FR-017/018; AUDIT-BARRAGE codex-02/claude-02): a SUPPLIED-but-blank
+    // override reason — from the `--override` flag OR the `GOVERN_OVERRIDE` env var —
+    // must FAIL LOUD, never silently graduate with a blank attribution NOR fall through
+    // to a full barrage. A genuinely-absent override (both undefined) is unchanged (the
+    // normal barrage path below). Guard the PICKED value so BOTH sources are covered,
+    // trim-based so whitespace is rejected on either surface.
+    const overrideReasonRaw = pick(flags.override, process.env.GOVERN_OVERRIDE);
+    if (overrideReasonRaw !== undefined && overrideReasonRaw.trim().length === 0) {
+      process.stderr.write(
+        'govern: FATAL — --override / GOVERN_OVERRIDE requires a non-empty reason (an ' +
+          'empty or whitespace-only reason is rejected so a blank override cannot ' +
+          'silently short-circuit into — or fall through to — a full barrage).\n',
+      );
+      emitTerminalOutcome('fatal');
+      process.exit(2);
+    }
+    // Store the TRIMMED reason so the durable attribution carries no surrounding blank.
+    // AUDIT-BARRAGE claude-02: the blank-reason FATAL above already eliminated every
+    // empty/whitespace case, so a defined `overrideReason` is necessarily non-empty —
+    // no redundant `.length > 0` re-check.
+    const overrideReason = overrideReasonRaw?.trim();
+    if (overrideReason !== undefined) {
+      // AUDIT-BARRAGE claude-03 (not a redundant resolve): the normal-path `featureRoot`
+      // is resolved LATER (below), and the override path `process.exit`s before reaching
+      // it — the two resolves are mutually exclusive, so exactly ONE runs per invocation.
+      const { root: overrideRoot } = await resolveGovernFeatureRoot(repoRoot, slug);
+      // specs/029 US4 (FINDING 2, codex HIGH): the override's CLI success MUST NOT
+      // diverge from the durable convergence record (the `governing -> shipped` gate
+      // signal). Resolve the canonical roadmap node FIRST — before any per-phase
+      // checkpoint write, so nothing is half-written — and FAIL LOUD when it cannot
+      // resolve (throws OR yields undefined: orphan/legacy/standalone with no node).
+      // Previously this WARNED and still graduated (printed "(overridden)", emitted
+      // `graduated`, exited 0) while NO record was written, so an unattended consumer
+      // saw a green CLI for a state the durable gate considers non-graduated. A clean
+      // override graduation now ALWAYS leaves a durable `override: true` record.
+      let convergenceItem: string | undefined;
+      try {
+        convergenceItem = resolveConvergenceItem(installation, overrideRoot, slug);
+      } catch (err) {
+        process.stderr.write(
+          `govern: FATAL — --override could not resolve a roadmap node for '${slug}' ` +
+            `(${errorMessage(err)}); the durable convergence record (the governing -> ` +
+            `shipped gate signal) cannot be written, so this override does NOT graduate. ` +
+            `Capture the feature on the roadmap (a node whose spec: pointer names the ` +
+            `feature dir) before overriding.\n`,
+        );
+        emitTerminalOutcome('fatal');
+        process.exit(2);
+      }
+      if (convergenceItem === undefined) {
+        process.stderr.write(
+          `govern: FATAL — --override could not resolve a roadmap node for '${slug}'; ` +
+            `the durable convergence record (the governing -> shipped gate signal) cannot ` +
+            `be written, so this override does NOT graduate. Capture the feature on the ` +
+            `roadmap (a node whose spec: pointer names the feature dir) before overriding.\n`,
+        );
+        emitTerminalOutcome('fatal');
+        process.exit(2);
+      }
+      // AUDIT-BARRAGE codex-01 (HIGH) / claude-01: record-first ordering, with the two
+      // durable writes in SEPARATE fail-loud blocks carrying ACCURATE messages. The
+      // record is written FIRST: a record failure FATALs with "nothing written, gate
+      // closed" before the checkpoint is touched (no orphan checkpoint). The checkpoint
+      // is written SECOND via the shared helper: a checkpoint failure FATALs with "the
+      // record IS written; the shipped gate stays CLOSED via all-phase-checkpoints-current
+      // until the checkpoint lands" — the accurate state (NOT "gate closed"), and the
+      // failure never wrongly advances the lifecycle.
+      try {
+        recordOverrideGraduation({
+          installationRoot: repoRoot,
+          mode: flags.mode === 'spec' ? 'spec' : 'impl',
+          convergenceItem,
+          scopePaths: overrideRoot !== undefined ? [overrideRoot] : [],
+          feature: slug,
+          reason: overrideReason,
+          recordedAt: new Date().toISOString(),
+          stderr: (s) => process.stderr.write(s),
+        });
+      } catch (err) {
+        process.stderr.write(
+          `govern: FATAL — override graduation could not write the durable convergence ` +
+            `record (${errorMessage(err)}); nothing was written, the governing -> shipped gate ` +
+            `stays CLOSED, and this override does NOT graduate. Fix the write error and re-run.\n`,
+        );
+        emitTerminalOutcome('fatal');
+        process.exit(1);
+      }
+      // Per-phase override: refresh the `phase-<id>` checkpoint AFTER the record landed.
+      // The whole-feature override branch (granularity !== 'phase') writes no checkpoint.
+      if (phaseUnit?.granularity === 'phase' && phaseUnit.phaseId !== undefined) {
+        const phaseId = phaseUnit.phaseId;
+        // AUDIT-BARRAGE claude-03: a resolved phase with no status is a contract
+        // violation (phase resolved + prior-phase gate passed), not a normal skip —
+        // fail loud (propagates to the main handler) rather than silently omit it.
+        const phaseStatus = phaseCheckpointStatuses?.find((status) => status.phaseId === phaseId);
+        if (phaseStatus === undefined) {
+          throw new GovernProtocolError(
+            `govern: FATAL — phase '${phaseId}' resolved for --override but has no ` +
+              `checkpoint status; cannot record the per-phase checkpoint.`,
+          );
+        }
+        writePhaseCheckpointAfterRecordOrFatal({
+          repoRoot,
+          phaseUnit: { ...phaseUnit, phaseId },
+          phaseStatus,
+          phaseCheckpointKey,
+          slug,
+        });
+      }
+      process.stderr.write(
+        flags.mode === 'spec'
+          ? 'govern: spec may graduate (overridden).\n'
+          : 'govern: implementation governed (overridden).\n',
+      );
+      emitTerminalOutcome('graduated');
+      process.exit(0);
+    }
+
+    const barrageBin = resolveBarrageBin();
+    assertBarrageBinPresent(barrageBin);
+    const stackctl = join(PLUGIN_ROOT, 'bin', 'stackctl');
+
+    const requestedModels = pick(undefined, process.env.GOVERN_MODELS);
+    const laneCapabilities =
+      flags.mode === 'implement'
+        ? preflightNegotiatedFleet(
+            await loadLaneCapabilitiesGoverned(repoRoot),
+            requestedModels,
+            requireModels,
+          )
+        : undefined;
 
     // specs/014 US5: resolve the audit-log excerpt (spec mode), the feature root
     // and the full feature-root list (excludeRoots) so the implement payload is
@@ -850,9 +1061,10 @@ export async function runGovern(args: string[]): Promise<void> {
     // agent's only in-loop action — never an auto-edit), and the ceiling — then
     // the driver owns the iterate/stop decision and the bound. A runProtocol
     // rejection (e.g. barrage OUTAGE) propagates loud through the driver to the
-    // catch below (no silent stop). The `--override` path stays routed through
-    // the gate (it records the override in the audit trail and returns gateOpen),
-    // so an overridden run still produces a barrage record.
+    // catch below (no silent stop). specs/029 US4 (FR-017): the `--override` path
+    // NO LONGER reaches the driver — it short-circuits the whole pass above
+    // (recordOverrideGraduation), so a driver run here is always a real,
+    // unoverridden convergence attempt.
     const ceiling = resolveCeiling(pick(flags.ceiling, process.env.GOVERN_CEILING));
     const outcome: ConvergenceOutcome = await runConvergenceLoop({
       ceiling,
@@ -866,10 +1078,9 @@ export async function runGovern(args: string[]): Promise<void> {
     });
 
     // Map the recorded terminal to govern's exit: `converged` may graduate
-    // (exit 0) — an operator `--override` reaches here as `converged` because it
-    // is routed through the gate (records the reason, returns OPEN with a barrage
-    // record), not a driver terminal; `non-converged` is a bounded refusal
-    // (exit 1). The agent never held the iterate/stop decision (SC-004).
+    // (exit 0); `non-converged` is a bounded refusal (exit 1). An operator
+    // `--override` never reaches here — it short-circuits above (FR-017). The
+    // agent never held the iterate/stop decision (SC-004).
     if (outcome.kind === 'non-converged') {
       process.stderr.write(
         (flags.mode === 'spec'
@@ -880,66 +1091,91 @@ export async function runGovern(args: string[]): Promise<void> {
       emitTerminalOutcome('blocked');
       process.exit(1);
     }
-    if (phaseUnit?.granularity === 'phase' && phaseCheckpointStatuses !== undefined) {
-      const phaseStatus = phaseCheckpointStatuses.find((status) => status.phaseId === phaseUnit.phaseId);
-      if (phaseStatus !== undefined) {
-        // Record the files this phase's audit ACTUALLY covered (TASK-129) so a later
-        // whole-feature compose carries them exactly, never the declared directory.
-        const auditedFiles = resolveAuditedFiles(
-          repoRoot,
-          phaseUnit.diffScope.base,
-          phaseStatus.files,
-        );
-        writePhaseCheckpoint(repoRoot, {
-          version: 1,
-          // Canonical key (AUDIT codex-01/claude-02) — what the US1 gate reads under.
-          featureSlug: phaseCheckpointKey ?? featureCheckpointKey(slug),
-          phaseId: phaseUnit.phaseId,
-          checkpoint: built.checkpoint,
-          auditLogSection: phaseUnit.auditLogSection,
-          scopeFingerprint: phaseStatus.scopeFingerprint,
-          passedAt: new Date().toISOString(),
-          governedPaths: phaseStatus.files,
-          auditedFiles,
-        });
-      }
-    }
     // 022 US6 / T029 (FR-028/FR-029): on convergence, write the durable, mode-keyed
     // govern-convergence record inside the installation so the workflow's
     // `governing → shipped` gate (impl) — and the opt-in `specifying → implementing`
     // gate (spec) — is mechanical, not agent say-so. 024 FR-013 / TASK-139: keyed by
     // the CANONICAL node id (`resolveConvergenceItem`), matching the workflow read-side.
-    // There is NO spec-dir fallback: when no node resolves (orphan/legacy),
-    // `resolveConvergenceItem` FAILS LOUD (AUDIT-BARRAGE claude-01 — the comment matches
-    // the code). A write failure leaves the gate CLOSED (fail-safe): the workflow
-    // `governing → shipped` gate reads the record, so an absent record means the feature
-    // simply cannot advance — graduation is impossible regardless of this exit code.
-    // KNOWN CAVEAT (AUDIT-BARRAGE codex-03, scoped T041): a node-less govern still prints
-    // "governed" + exits 0 here, which is a misleading exit code for a WORKFLOW-driven
-    // orphan (the gate stays closed, so no actual un-governed graduation). The correct
-    // fix distinguishes a workflow-driven orphan (refuse non-zero) from a legitimate
-    // STANDALONE govern with no workflow node (the test fixtures) — tracked as T041.
+    // AUDIT-BARRAGE codex-02 (HIGH): record-FIRST ordering — the convergence record is
+    // written BEFORE the per-phase checkpoint (the override path does the same), so a
+    // record-write failure FATALs before any checkpoint is touched (no orphan checkpoint
+    // that would let a later phase advance without the feature-level record).
+    // T041 (caveat): a node-less govern (orphan/legacy/standalone fixture) cannot key
+    // the record; that case WARNS + still exits 0 (the workflow gate stays closed, so
+    // no un-governed graduation actually occurs) — distinguishing a workflow-driven
+    // orphan from a legitimate standalone govern is deferred to T041.
+    let convergenceItem: string | undefined;
     try {
-      const convergenceItem = resolveConvergenceItem(installation, featureRoot, slug);
-      const scopePaths = featureRoot !== undefined ? [featureRoot] : [];
-      recordGovernConvergence(
-        repoRoot,
-        flags.mode === 'spec' ? 'spec' : 'impl',
-        convergenceItem,
-        scopePaths,
-        new Date().toISOString(),
-      );
+      convergenceItem = resolveConvergenceItem(installation, featureRoot, slug);
     } catch (err) {
       process.stderr.write(
-        `govern: WARNING — could not write the govern-convergence record (${errorMessage(err)}); ` +
-          `the governing -> shipped gate stays CLOSED until it is recorded (the feature cannot ` +
-          `graduate in the workflow regardless of this exit code; see T041).\n`,
+        `govern: WARNING — could not resolve a roadmap node for the convergence record ` +
+          `(${errorMessage(err)}); the governing -> shipped gate stays CLOSED until it is ` +
+          `recorded (the feature cannot graduate in the workflow regardless of this exit ` +
+          `code; see T041).\n`,
       );
     }
+    if (convergenceItem !== undefined) {
+      // AUDIT-BARRAGE codex-01 (HIGH) / claude-03: a record-WRITE failure is FATAL — the
+      // CLI must not report graduation the durable gate signal does not back (US4
+      // Finding-2). Nothing else is written yet, so the message is "nothing written".
+      try {
+        recordGovernConvergence(
+          repoRoot,
+          flags.mode === 'spec' ? 'spec' : 'impl',
+          convergenceItem,
+          featureRoot !== undefined ? [featureRoot] : [],
+          new Date().toISOString(),
+        );
+      } catch (err) {
+        process.stderr.write(
+          `govern: FATAL — could not write the govern-convergence record (${errorMessage(err)}); ` +
+            `nothing was written, the governing -> shipped gate stays CLOSED, and this run does ` +
+            `NOT graduate. Fix the write error and re-run.\n`,
+        );
+        emitTerminalOutcome('fatal');
+        process.exit(1);
+      }
+    }
+    // Phase checkpoint AFTER the record (record-first — codex-02), via the shared helper
+    // so a checkpoint-write failure carries the accurate "the record IS written" message
+    // and never wrongly advances the lifecycle. claude-03: a resolved phase with no
+    // status fails loud (contract violation). claude-04: the invariant assert guards a
+    // future buildImplementVars change that would break checkpoint === auditLogSection.
+    if (
+      phaseUnit?.granularity === 'phase' &&
+      phaseUnit.phaseId !== undefined &&
+      phaseCheckpointStatuses !== undefined
+    ) {
+      const phaseId = phaseUnit.phaseId;
+      const phaseStatus = phaseCheckpointStatuses.find((status) => status.phaseId === phaseId);
+      if (phaseStatus === undefined) {
+        throw new GovernProtocolError(
+          `govern: FATAL — phase '${phaseId}' resolved for graduation but has no ` +
+            `checkpoint status; cannot record the per-phase checkpoint.`,
+        );
+      }
+      if (built.checkpoint !== phaseUnit.auditLogSection) {
+        throw new GovernProtocolError(
+          `govern: FATAL — phase-checkpoint invariant broken: built.checkpoint ` +
+            `'${built.checkpoint}' != phaseUnit.auditLogSection '${phaseUnit.auditLogSection}' ` +
+            `(buildImplementVars must thread the audit-log section as the checkpoint flag).`,
+        );
+      }
+      writePhaseCheckpointAfterRecordOrFatal({
+        repoRoot,
+        phaseUnit: { ...phaseUnit, phaseId },
+        phaseStatus,
+        phaseCheckpointKey,
+        slug,
+      });
+    }
+    // AUDIT-BARRAGE claude-04: the override path short-circuits earlier (FR-017), so an
+    // override never reaches here — the success message names only convergence.
     process.stderr.write(
       flags.mode === 'spec'
-        ? 'govern: spec may graduate (convergence gate satisfied or overridden).\n'
-        : 'govern: implementation governed (convergence gate satisfied or overridden).\n',
+        ? 'govern: spec may graduate (convergence gate satisfied).\n'
+        : 'govern: implementation governed (convergence gate satisfied).\n',
     );
     emitTerminalOutcome('graduated');
     process.exit(0);

@@ -344,8 +344,13 @@ export function completedNonConvergedAnnotation(lane: {
 }): string {
   if (lane.terminalState !== 'completed') return '';
   if (lane.exitCode === 0 && lane.reportBytes > 0) return '';
+  // specs/029 US2 (FR-006): name the zero-byte degraded sub-state distinctly so
+  // a `completed` lane that produced nothing is never mistaken for a healthy
+  // one. zero-byte (settled completed, 0 report bytes) is in the degraded set
+  // alongside timed-out / killed-* — surface it by name, not just by byte count.
+  const kind = lane.reportBytes === 0 ? 'zero-byte' : `nonzero-exit (${lane.exitCode})`;
   return (
-    ` — completed but non-converged (exit ${lane.exitCode}, ` +
+    ` — completed but DEGRADED [${kind}] (exit ${lane.exitCode}, ` +
     `report bytes ${lane.reportBytes}); not counted as produced`
   );
 }

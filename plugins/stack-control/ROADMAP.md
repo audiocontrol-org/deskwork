@@ -270,8 +270,8 @@ Barrage claude entry pins no model: bare 'claude -p' floats on the user's defaul
 Barrage spawns inherit ambient permissions — read-only is held by model disposition, not mechanism. 2026-06-10: sonnet 4.6 violated PROMPT.md's explicit read-only instruction during a replay, fixed the findings instead, committed 6ce58543 and pushed to origin/feature/design-control mid-audit. Mechanically enforce read-only on barrage spawns (disallowed mutation tools / permission mode), spike-verified.
 
 ## multi:gap/audit-barrage-timeout-observability
-- status: planned
-- part-of: multi:feature/migrate-audit-barrage
+- status: shipped
+- part-of: multi:feature/govern-operability
 A timed-out barrage model leaves a zero-byte stdout artifact; the kill is visible only in the run INDEX.md (exit 143, timed out: yes). Nothing at the synthesis/lift layer distinguishes 'produced nothing because SIGTERMed' from 'clean, no findings' — the fleet silently degrades (design-control ran 17 one-model rounds). Surface per-model timeout/failure state at synthesis.
 
 ## design:feature/backlog-backend-port
@@ -408,7 +408,7 @@ The stack-control agent-facing capability API: capability interfaces (backlog-li
 
 ## multi:feature/audit-barrage-convergence
 - status: planned
-- part-of: multi:feature/lifecycle-industrialization
+- part-of: multi:feature/govern-operability
 - ref: TASK-60
 Make cross-model audit-barrage governance converge cleanly instead of ringing. Problem (TASK-60): myopic convergence — many rounds where few were needed, fix-induced surface growth, serial single-fleet discovery. Confirmed live in the 025 dogfood: auditors get ever nit-pickier each round. Children address the levers (granularity, severity determinism, dampener-in-loop).
 
@@ -431,6 +431,7 @@ Severity must be stable across rounds on unchanged code; re-rating LOW->HIGH def
 govern dampener migrates findings to the backlog while they are being fixed in the same loop. Detail: TASK-149 (gh-471).
 
 ## multi:gap/audit-barrage-codex-liveness
+- part-of: multi:feature/govern-operability
 - status: planned
 - ref: TASK-145
 codex lane trips killed-no-liveness on real payloads; emit reasoning summaries (or --json events) for genuine stderr liveness pulses so the window can stay tight, instead of widening it blindly. Update installation + template config. Detail: TASK-145.
@@ -478,7 +479,7 @@ Verb-surface consolidation rollout: migrate the remaining ~50 flat stackctl verb
 
 ## multi:gap/govern-per-phase-friction-burndown
 - status: planned
-- part-of: multi:feature/lifecycle-industrialization
+- part-of: multi:feature/govern-operability
 - ref: TASK-289
 Burn down the per-phase governance friction surfaced while implementing 027 — the dominant cost was govern tooling, not the feature code. Headline defects: TASK-289 (O(n^2) shared-file checkpoint staleness — a later phase editing an earlier phase's file re-stales its checkpoint, forcing repeated re-governance and ad-hoc overrides; the structural fix is fingerprinting per-phase HUNKS not whole files, or a govern-at-end mode for shared-file features); the audit-barrage severity NON-DETERMINISM (HIGH oscillated 2->0->2 and LOW->HIGH on identical code, defeating the convergence dampener and forcing overrides on phases 4+6); TASK-263 (per-phase scoping derives the payload from tasks.md backtick paths, so a file split out during implementation — e.g. cluster.ts — is excluded from its own audit, and the no-grounding claude lane then raises FALSE HIGHs it cannot disconfirm). Also fold in the 027 code residuals: TASK-288 (promote the no-grounding claude-lane fix to the shipped default), TASK-290 (test ! hygiene), TASK-291 (roadmap SKILL.md cluster doc), TASK-292 (uniform list-flag stray-comma handling + dead branch), TASK-293 (rewriteEdgeLine fence-awareness). OFFING-TEAM ADOPTER FRICTION: TASK-294 (tooling-feedback guidance should route adopter friction to GitHub issues against audiocontrol-org/deskwork, not a local tooling-feedback.md the maintainers never see — overlaps TASK-16; imported from GitHub #488, now closed). NOTE: the CUSTOMER-BLOCKING govern clone-step non-TS blocker (#487 / TASK-295) was PULLED OUT into its own dedicated item `impl:fix/govern-clone-step-language-agnostic` — it is a live adopter blocker, not burndown-queue hygiene, and is not tracked here. Promoted from the 027 govern dogfood + the offing adopter dogfood.
 
@@ -489,10 +490,31 @@ Burn down the per-phase governance friction surfaced while implementing 027 — 
 CUSTOMER-BLOCKING (offing-team adopter friction, GitHub #487, imported as TASK-295). govern's advisory clone-detection step hardcodes --format typescript,tsx, so on a non-TypeScript adopter repo jscpd matches zero files, writes no report, and the resulting throw ABORTS govern before the (language-agnostic) cross-model barrage ever runs — making per-phase governance and therefore /stack-control:execute unusable on any non-TS adopter codebase (found running execute on offing's Bash/PHP/WordPress change-runbook feature, zero .ts files). Fix: the clone step must be language-aware (detect/extend formats) OR non-fatal when it finds no matching files (skip the advisory clone step, do not abort the language-agnostic barrage). Pulled out of multi:gap/govern-per-phase-friction-burndown as its own item because it is a live adopter blocker, not burndown-queue hygiene.
 
 ## multi:feature/front-door-completeness
-- status: in-flight
+- status: shipped
 - spec: specs/028-front-door-completeness
 - design: docs/superpowers/specs/2026-06-19-front-door-completeness-design.md
 - design-approved: 2026-06-19
 - analyze-clean: 2026-06-19
 Umbrella: make the entire stack-control front door complete, discoverable, and governed now that 026 teeth forbid reaching around it. Every backend op reachable pre-026 gets a sanctioned skill+verb, --help parity, mediation/recovery, and a check-front-door guardrail. See docs/front-door-completeness/plan.md.
+
+## multi:gap/audit-payload-out-of-window-false-alarms
+- status: planned
+- part-of: multi:gap/govern-per-phase-friction-burndown
+- ref: TASK-316
+Per-phase barrage flags referenced-but-out-of-window files as absent/not-imported and raises FALSE HIGHs it cannot disconfirm. Recurred 3x in 028 US3/US4 (runIntercept resolveInstalled, the normalize import, the extend gate — all present, all flagged absent because outside the per-phase payload window), each forcing an override. Sibling of TASK-263 (in-window exclusion). Fix: widen payload to referenced-out-of-window deps, OR give the auditor context to disconfirm 'absent', OR teach it out-of-window = not-this-phase-scope. Detail: TASK-316.
+
+## multi:gap/govern-lift-cross-run-dedup
+- status: planned
+- part-of: multi:feature/audit-barrage-convergence
+- ref: TASK-317
+govern finding-lift has no cross-run dedup, so convergence iterations multiply near-duplicate backlog tasks. 028: the dampener slushed TASK-303..312, several duplicating findings fixed in the same loop (compounds govern-dampener-in-loop). Fix: dedup lifted findings by signature against prior runs + in-loop fixes before creating tasks. Detail: TASK-317, gh-490.
+
+## multi:feature/govern-operability
+- status: planned
+- analyze-clean: yes
+- spec: specs/029-govern-operability
+- design-approved: yes
+- design: docs/superpowers/specs/2026-06-19-govern-operability-design.md
+- part-of: multi:feature/lifecycle-industrialization
+Umbrella: make cross-model governance OPERABLE — converge reliably and stay cheap to run per phase, so per-phase govern is a deterministic gate rather than an operator-vigilance tax. Groups the governance-friction surfaced by dogfooding the workflow protocol (027, 028): convergence ringing (audit-barrage-convergence — severity non-determinism, dampener-in-loop, lift cross-run dedup, granularity switch), per-phase friction (govern-per-phase-friction-burndown — O(n^2) shared-file checkpoint staleness with no cheap refresh, out-of-window false alarms), and fleet observability/liveness (codex-liveness, timeout-observability — a SIGTERMed model silently degrades the fleet). Realizes the thesis ('industrialize execution') specifically for the governance ceremony. Children are part-of this node.
 

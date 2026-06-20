@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "featureSlug": "029-govern-operability",
+  "phaseId": "2",
+  "checkpoint": "phase-2",
+  "auditLogSection": "phase-2",
+  "scopeFingerprint": "469bc125f5c8040e390c7cedf4534e36cd6717ae4b9b7413f6f2fb2494c66718",
+  "passedAt": "2026-06-20T17:06:03.374Z",
+  "governedPaths": [
+    "tests/audit-barrage/terminal-state.test.ts",
+    "src/scope-discovery/audit-barrage/run-artifacts.ts",
+    "src/scope-discovery/audit-barrage/types.ts",
+    "src/subcommands/audit-barrage-lift.ts",
+    "src/subcommands/audit-barrage-lift-render.ts",
+    "tests/promote-findings/degraded-not-quiet.test.ts",
+    "src/scope-discovery/promote-findings/check-barrage-dampener.ts"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/src/subcommands/audit-barrage-lift-render.ts",
+    "plugins/stack-control/src/subcommands/audit-barrage-lift.ts"
+  ]
+}

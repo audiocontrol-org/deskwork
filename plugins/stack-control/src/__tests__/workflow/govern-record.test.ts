@@ -111,6 +111,22 @@ describe('US6 — the record mechanism (symmetric, mode-keyed)', () => {
     const rec = readGovernConvergenceRecord(f.root, 'impl', KEY);
     expect(rec?.scopeFingerprint).toMatch(/^[0-9a-f]{64}$/); // 021 fingerprint shape
     expect(rec?.anchorRoot).toBe(f.root);
+    // FR-018: a genuine convergence record carries NO override marker.
+    expect(rec?.override).toBeUndefined();
+    expect(rec?.overrideReason).toBeUndefined();
+  });
+
+  it('records DURABLE override attribution when an override reason is supplied (US4, FR-018)', () => {
+    const f = makeWorkflowFixture();
+    fixtures.push(f);
+    recordGovernConvergence(f.root, 'impl', KEY, [], '2026-06-16T00:00:00Z', 'operator accepts residual edges');
+    const rec = readGovernConvergenceRecord(f.root, 'impl', KEY);
+    // Distinguishable from a real convergence by a durable marker (not just stderr).
+    expect(rec?.override).toBe(true);
+    expect(rec?.overrideReason).toBe('operator accepts residual edges');
+    // Still counts as graduated for the governing -> shipped gate.
+    expect(rec?.converged).toBe(true);
+    expect(isModeConverged(f.root, 'impl', KEY)).toBe(true);
   });
 
   it('a corrupt record fails loud (no silent fallback)', () => {
@@ -121,5 +137,42 @@ describe('US6 — the record mechanism (symmetric, mode-keyed)', () => {
     f.write('.stack-control/govern/convergence/impl__022-x.json', '{ not json');
     expect(() => readGovernConvergenceRecord(f.root, 'impl', KEY)).toThrow(/corrupt or torn/);
     expect(path).toContain('022-x');
+  });
+
+  // specs/029 US4 (FINDING 3, codex MEDIUM): the writer only ever emits the two
+  // override fields TOGETHER or NEITHER. A hand-edited/corrupt record with one but
+  // not the other is an impossible state — `readGovernConvergenceRecord` must throw.
+  function writeRawRecord(f: WorkflowFixture, fields: Record<string, unknown>): void {
+    f.write(
+      `.stack-control/govern/convergence/impl__${KEY}.json`,
+      JSON.stringify({
+        version: 1,
+        mode: 'impl',
+        item: KEY,
+        scopeFingerprint: 'a'.repeat(64),
+        converged: true,
+        recordedAt: '2026-06-16T00:00:00Z',
+        anchorRoot: f.root,
+        ...fields,
+      }),
+    );
+  }
+
+  it('override: true WITHOUT overrideReason fails loud (impossible state)', () => {
+    const f = makeWorkflowFixture();
+    fixtures.push(f);
+    writeRawRecord(f, { override: true });
+    expect(() => readGovernConvergenceRecord(f.root, 'impl', KEY)).toThrow(
+      /override is true but overrideReason is absent/,
+    );
+  });
+
+  it('overrideReason WITHOUT override: true fails loud (impossible state)', () => {
+    const f = makeWorkflowFixture();
+    fixtures.push(f);
+    writeRawRecord(f, { overrideReason: 'orphaned reason' });
+    expect(() => readGovernConvergenceRecord(f.root, 'impl', KEY)).toThrow(
+      /overrideReason without override: true/,
+    );
   });
 });

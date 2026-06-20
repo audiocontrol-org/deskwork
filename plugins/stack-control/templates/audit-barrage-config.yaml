@@ -97,17 +97,56 @@ models:
   - name: claude
     binary: claude
     model: opus
-    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
-    readonly_enforcement: "--permission-mode plan"
+    # No-grounding (specs/029 US1 / TASK-288): `--permission-mode plan` let the
+    # model READ files to ground findings, and the audit prompt instructs
+    # grounding, so the lane ran an unbounded read/grep tool-loop that consumed
+    # the whole budget. Dropping it (and denying tools via readonly_enforcement)
+    # makes the lane a single text-only pass over the payload (which already
+    # contains the diff under audit) — measured 167-233s on 14-24KB no-grounding
+    # payloads. codex remains the deep file-grounding lane; claude/sonnet are the
+    # fast cross-family text-diff lanes.
+    args_template: "-p --model {{model}} --output-format stream-json --verbose {{prompt-stdin}}"
+    # No-tools = readonly by construction (denies Write/Edit) AND no grounding
+    # loop (denies Read/Grep/Glob/Bash/Task/web). Comma-joined single token so it
+    # survives the harness's whitespace split (spawn-cli injects it into argv).
+    readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookEdit"
     output_mode: stream-json
     liveness_signal: stdout
-    liveness_window_seconds: 60
-    timeout_floor_seconds: 300
+    # Widened from 60s (specs/029 US1): removing the grounding tool-loop (above)
+    # ALSO removed the lane's incidental stdout pulses — `--permission-mode plan`
+    # made Read/Grep tool calls that chattered on stdout and reset a tight
+    # watchdog. The no-grounding single pass emits only bursty `thinking_tokens`
+    # events whose gaps exceed 60s on larger payloads (observed Phase-1 govern: a
+    # healthy lane reached ~2768 thinking tokens, then a >60s gap tripped a FALSE
+    # killed-no-liveness, degrading the fleet). The lane MUST stay monitored —
+    # `fleet-negotiation.ts` deems an unmonitored (`none`) lane non-viable, which
+    # would drop the fleet below the --require-models floor. Unlike codex
+    # (reasoning summaries are a reliable stderr pulse → tight 60s window kept),
+    # this lane has no tighter pulse knob, so the capability-appropriate fix
+    # (Principle III) is a WIDE monitored window: 300s comfortably exceeds the
+    # ~170-233s healthy completion (never false-kills) while staying under the
+    # 420s timeout so a true infinite hang is still caught before the budget.
+    liveness_window_seconds: 300
+    # Floor raised 300 -> 420 for kill-cap headroom on larger phases; a
+    # successful no-grounding run still completes ~170-233s, so this does not
+    # slow good runs (FR-002).
+    timeout_floor_seconds: 420
     timeout_secs_per_kb: 13
   - name: codex
     binary: codex
     model: gpt-5.5
-    args_template: "exec -m {{model}} --sandbox read-only {{prompt-stdin}}"
+    # Reasoning-summary liveness (specs/029 US1 / TASK-145): codex reasons
+    # silently for >60s on a real per-phase payload before its first stderr
+    # pulse, tripping killed-no-liveness on a tight window. model_reasoning_
+    # summary="detailed" makes codex emit reasoning summaries to stderr DURING
+    # reasoning, so the watchdog gets genuine pulses inside the tight 60s window
+    # instead of widening the window blindly (FR-003).
+    # Bare `key=value` (no quotes): the value travels as a literal argv element
+    # (programmatic spawn, no shell to strip quotes). codex parses the `-c` value
+    # as TOML and, on TOML-parse-failure of a bare word, uses the raw string as a
+    # literal — so `detailed` lands as the string `detailed` either way. Bare
+    # avoids embedding literal quote characters in argv (AUDIT-BARRAGE-claude-01).
+    args_template: "exec -m {{model}} -c model_reasoning_summary=detailed --sandbox read-only {{prompt-stdin}}"
     readonly_enforcement: "--sandbox read-only"
     output_mode: text
     liveness_signal: stderr
@@ -120,12 +159,20 @@ models:
   - name: sonnet
     binary: claude
     model: claude-sonnet-4-6
-    args_template: "-p --model {{model}} --permission-mode plan --output-format stream-json --verbose {{prompt-stdin}}"
-    readonly_enforcement: "--permission-mode plan"
+    # No-grounding (specs/029 US1 / TASK-288) — same as the claude/opus lane:
+    # drop `--permission-mode plan` + deny tools so the lane is a single
+    # text-only read-only pass over the payload, not an unbounded grounding loop.
+    args_template: "-p --model {{model}} --output-format stream-json --verbose {{prompt-stdin}}"
+    readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookEdit"
     output_mode: stream-json
     liveness_signal: stdout
-    liveness_window_seconds: 60
-    timeout_floor_seconds: 300
+    # Widened 60 -> 300 — same rationale as the claude/opus lane: the no-grounding
+    # single-pass lane's only stdout pulse is bursty thinking_tokens (>60s gaps),
+    # and the lane must stay MONITORED for fleet-negotiation viability. 300s
+    # exceeds the ~170-233s healthy completion (no false-kill) but stays under the
+    # 420s timeout.
+    liveness_window_seconds: 300
+    timeout_floor_seconds: 420
     timeout_secs_per_kb: 13
   # gemini — DISABLED (commented out). gemini-cli was failing 94.1% of runs
   # (16 of 17 across the graphical-entries Phase 0 audit cycle) on cascading

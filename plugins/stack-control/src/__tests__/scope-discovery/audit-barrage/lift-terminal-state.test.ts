@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runAuditBarrageLift } from '../../../subcommands/audit-barrage-lift.js';
+import { checkBarrageDampener } from '../../../scope-discovery/promote-findings/check-barrage-dampener.js';
 import {
   renderIndexBody,
   safeModelName,
@@ -261,12 +262,12 @@ describe('fleet report repeated when degraded (FR-007 / SC-003)', () => {
     // to the fleet's exclusion — a bare "completed" next to "produced: 1
     // of 2" leaves the operator with nothing linking the two.
     expect(err).toMatch(
-      /codex — completed \[enforced, monitored\] — completed but non-converged \(exit 1, report bytes 28\); not counted as produced/,
+      /codex — completed \[enforced, monitored\] — completed but DEGRADED \[nonzero-exit \(1\)\] \(exit 1, report bytes 28\); not counted as produced/,
     );
     // AUDIT-20260611-11: the fleet report block repeats the same annotation
     // on its per-lane line — one vocabulary across all four surfaces.
     expect(err).toContain(
-      '- codex: completed [enforced, monitored] — completed but non-converged (exit 1, report bytes 28); not counted as produced',
+      '- codex: completed [enforced, monitored] — completed but DEGRADED [nonzero-exit (1)] (exit 1, report bytes 28); not counted as produced',
     );
   });
 });
@@ -313,6 +314,61 @@ describe('never "clean" from a killed lane (FR-007)', () => {
     expect(exit).toBe(0);
     expect(err).toMatch(/DEGRADED/);
     expect(err).toMatch(/NOT a clean signal/i);
+  });
+
+  // specs/029 US2 / AUDIT-BARRAGE-codex-01 (BLOCKING): a degraded 0-finding run
+  // used to record NOTHING, leaving a stale prior clean section as the dampener's
+  // "most recent" — so it could dampen on stale evidence ("degraded is
+  // convergence"). It must now record a `Fleet: DEGRADED`-marked section that the
+  // dampener flags and never counts as quiet.
+  it('records a Fleet: DEGRADED-marked section that blocks the dampener (FR-007, codex-01)', async () => {
+    const fixture = makeFixture({
+      slug: 'deg-clean-apply',
+      modelFiles: {},
+      results: [
+        laneResult({
+          name: 'codex',
+          terminalState: 'killed-no-liveness',
+          exitCode: -1,
+          reportBytes: 0,
+          stdoutBytes: 0,
+        }),
+        laneResult({ name: 'claude', reportBytes: 0, stdoutBytes: 0, exitCode: 0 }),
+      ],
+    });
+    const auditLogPath = join(
+      fixture.repo,
+      'docs',
+      '1.0',
+      '001-IN-PROGRESS',
+      'deg-clean-apply',
+      'audit-log.md',
+    );
+    // Seed a prior HEALTHY quiet section so the bug (dampening on stale clean
+    // evidence) would manifest if the degraded run recorded nothing.
+    writeFileSync(
+      auditLogPath,
+      '# Audit Log\n\n## 2026-06-10 — audit-barrage lift (20260610T000000000Z-deg-clean-apply)\n\n_No findings surfaced — a clean barrage run over a healthy fleet (0 HIGH+, 0 MEDIUM, 0 total)._\n',
+      'utf8',
+    );
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const exit = await runAuditBarrageLift({
+      opts: { featureSlug: 'deg-clean-apply', runDir: fixture.runDir, date: '20260611', apply: true },
+      projectRoot: fixture.repo,
+      stdout,
+      stderr,
+    });
+    expect(exit).toBe(0);
+    const log = readFileSync(auditLogPath, 'utf8');
+    // The degraded run is now recorded as the most-recent section, marked.
+    expect(log).toMatch(/audit-barrage lift \(20260611T000000000Z-deg-clean-apply\)/);
+    expect(log).toMatch(/Fleet:\s*DEGRADED/);
+    // And the dampener refuses to dampen on it (the prior clean section is no
+    // longer "most recent").
+    const r = checkBarrageDampener({ auditLogText: log, threshold: 2 });
+    expect(r.recentRunCounts[0]?.degraded).toBe(true);
+    expect(r.dampened).toBe(false);
   });
 });
 
@@ -402,7 +458,11 @@ describe('a clean HEALTHY run records a quiet lift section so the dampener count
     expect(log).not.toMatch(/^Severity:/m);
   });
 
-  it('a DEGRADED clean run still records NO section (FR-007 — absence over killed lanes is not clean)', async () => {
+  // specs/029 US2 / AUDIT-BARRAGE-codex-01 (BLOCKING): a DEGRADED clean run now
+  // RECORDS a `Fleet: DEGRADED`-marked section (it used to record nothing, which
+  // left a stale prior clean section as the dampener's most-recent and let it
+  // dampen on stale evidence). The marker makes the run visible AND non-quiet.
+  it('a DEGRADED clean run records a Fleet: DEGRADED section that is never counted quiet (FR-007)', async () => {
     const fixture = makeFixture({
       slug: 'clean-degraded',
       modelFiles: {},
@@ -418,12 +478,14 @@ describe('a clean HEALTHY run records a quiet lift section so the dampener count
         }),
       ],
     });
-    const logPath = join(fixture.repo, 'docs', '1.0', '001-IN-PROGRESS', 'clean-degraded', 'audit-log.md');
-    const before = readFileSync(logPath, 'utf8');
     const { exit, log } = await liftApply(fixture, 'clean-degraded');
     expect(exit).toBe(0);
-    // No section appended — the degraded clean run is not recorded as a quiet run.
-    expect(log).toBe(before);
-    expect(log).not.toMatch(/audit-barrage\s+lift/);
+    // A section IS appended now — header matches the dampener regex — but it
+    // carries the DEGRADED marker so it never counts as a quiet run.
+    expect(log).toMatch(/^##\s+\d{4}-\d{2}-\d{2}\s+—\s+audit-barrage\s+lift\s+\(/m);
+    expect(log).toMatch(/Fleet:\s*DEGRADED/);
+    const r = checkBarrageDampener({ auditLogText: log, threshold: 2 });
+    expect(r.recentRunCounts[0]?.degraded).toBe(true);
+    expect(r.dampened).toBe(false);
   });
 });

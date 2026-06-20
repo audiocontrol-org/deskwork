@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "featureSlug": "029-govern-operability",
+  "phaseId": "1",
+  "checkpoint": "phase-1",
+  "auditLogSection": "phase-1",
+  "scopeFingerprint": "7c0b7a7e5e7cec3540f9dcc44ac468850ded017e3417f0b093d8634840d96184",
+  "passedAt": "2026-06-20T07:47:00.271Z",
+  "governedPaths": [
+    "templates/audit-barrage-config.yaml",
+    "tests/audit-barrage/config-default.test.ts",
+    ".stack-control/audit-barrage-config.yaml",
+    "tests/audit-barrage/spawn-liveness.test.ts",
+    "src/scope-discovery/audit-barrage/spawn-cli.ts",
+    "specs/029-govern-operability/research.md"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/.stack-control/audit-barrage-config.yaml",
+    "plugins/stack-control/specs/029-govern-operability/research.md",
+    "plugins/stack-control/templates/audit-barrage-config.yaml",
+    "plugins/stack-control/tests/audit-barrage/config-default.test.ts",
+    "plugins/stack-control/tests/audit-barrage/spawn-liveness.test.ts"
+  ]
+}

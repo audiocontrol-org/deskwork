@@ -27,6 +27,7 @@ import { filterByCheckpoint } from '../scope-discovery/promote-findings/checkpoi
 import { createBacklogBackend } from '../backlog/backend.js';
 import { backlogRoot } from '../backlog/root.js';
 import { migrateFindings } from '../backlog/slush-migrate.js';
+import { reconcileFixedFindings } from '../backlog/reconcile-fixed.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 
 /** Expected status at each flip's recorded location (specs/014 US4 guard). */
@@ -147,6 +148,50 @@ export async function runSlushFindings(args: string[]): Promise<void> {
     process.exit(2);
   }
   const text = await readFile(auditLogPath, 'utf8');
+
+  // specs/029 US4 (FR-013): a `fixed-<sha>` finding is RESOLVED — it must never be
+  // migrated to the backlog. The slush picks ONLY `Status: open` findings
+  // (slush-remaining's STATUS_OPEN_RE gate; the migrate path additionally asserts
+  // expectedStatusRe = STATUS_OPEN_RE), so a `fixed-<sha>` entry is structurally
+  // excluded from the flip set — there is no separate filter to apply here, by
+  // construction. Locked by tests/promote-findings/never-lift-fixed.test.ts.
+  //
+  // specs/029 US4 (FR-015): auto-reconcile — close any backlog task referenced by
+  // a now-`fixed-<sha>` finding via the SAME terminal `backlog done` close path.
+  // The audit-log is the source of truth for "fixed"; the migrated-finding task
+  // follows it. Idempotent (already-Done / no-task → no-op), so running it on
+  // --apply (the protocol invokes slush only at the loop terminal, FR-014) is
+  // safe. A backend close error is fail-loud (exit 1).
+  // AUDIT-BARRAGE claude-04: run reconcile on BOTH paths. On --apply it closes; on a
+  // dry-run it PREVIEWS the would-close set (no mutation) so the dry-run output is
+  // complete — an operator previewing slush sees the reconcile candidates too.
+  // AUDIT-BARRAGE claude-05: reconcile is DELIBERATELY holistic — it reads the FULL
+  // audit log (`text`), NOT the `--checkpoint`-scoped slice the slush pass uses. A
+  // `fixed-<sha>` finding's burn-down task must close whenever reconcile runs,
+  // regardless of which checkpoint a slush pass targets (FR-015: "ANY backlog task
+  // that referenced that finding"); scoping it would leave a fixed finding's task open
+  // just because the slush ran against a different checkpoint. The stderr line below
+  // names every task closed, so the holistic effect is visible.
+  try {
+    const reconcileBackend = createBacklogBackend({ cwd: backlogRoot(repoRoot) });
+    const rec = reconcileFixedFindings({
+      auditLogText: text,
+      backend: reconcileBackend,
+      featureSlug: opts.feature,
+      dryRun: !opts.apply,
+    });
+    if (rec.reconciled.length > 0) {
+      const detail = rec.reconciled.map((r) => `${r.taskId} (${r.findingId})`).join(', ');
+      process.stdout.write(
+        opts.apply
+          ? `slush-findings: reconciled ${rec.reconciled.length} fixed finding(s) — closed ${detail}\n`
+          : `slush-findings: [dry-run] would close ${rec.reconciled.length} reconciled task(s) — ${detail}\n`,
+      );
+    }
+  } catch (err) {
+    process.stderr.write(`slush-findings: FATAL — auto-reconcile failed: ${errorMessage(err)}\n`);
+    process.exit(1);
+  }
 
   const decisionAuditLogText =
     opts.checkpoint !== undefined ? filterByCheckpoint(text, opts.checkpoint) : undefined;

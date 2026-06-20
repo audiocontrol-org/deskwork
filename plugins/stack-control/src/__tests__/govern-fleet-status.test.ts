@@ -107,11 +107,11 @@ describe('govern round status includes the fleet report (T020 / FR-007)', () => 
     const err = collect(runDir);
     expect(err).toContain('govern: fleet — configured 2, produced 1  ⚠ DEGRADED');
     expect(err).toContain(
-      'govern:   codex: completed [enforced, monitored] — completed but non-converged (exit 1, report bytes 28); not counted as produced',
+      'govern:   codex: completed [enforced, monitored] — completed but DEGRADED [nonzero-exit (1)] (exit 1, report bytes 28); not counted as produced',
     );
     // The converged lane keeps its bare line shape.
     expect(err).toContain('govern:   claude: completed [enforced, monitored]\n');
-    expect(err).not.toMatch(/claude: completed \[enforced, monitored\] — completed but non-converged/);
+    expect(err).not.toMatch(/claude: completed \[enforced, monitored\] — completed but DEGRADED/);
   });
 
   it('an empty completed text lane (exit 0, report bytes 0) reads DEGRADED even though <model>.md exists on disk', () => {
