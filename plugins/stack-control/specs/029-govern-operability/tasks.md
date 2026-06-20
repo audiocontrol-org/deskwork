@@ -22,12 +22,12 @@
 **Goal**: the shipped fleet completes read-only within budget; codex emits liveness pulses. Closes TASK-288, TASK-145.
 **Independent test**: a per-phase barrage on the shipped default config completes read-only within the timeout floor; codex pulses within the tight window.
 
-- [ ] T001 [P] [US1] RED test: shipped `templates/audit-barrage-config.yaml` Anthropic lanes carry no `--permission-mode plan`, a non-empty `--disallowedTools` set, raised timeout floor; codex args include `model_reasoning_summary=detailed` — in `tests/audit-barrage/config-default.test.ts` (FR-001/002/003/005)
-- [ ] T002 [US1] Update `templates/audit-barrage-config.yaml`: remove `--permission-mode plan` from the Anthropic lanes; add the read-only `--disallowedTools` set; raise `timeout_floor_seconds`; add codex `model_reasoning_summary=detailed` + tight liveness window; leave fleet composition (opus+codex+sonnet) unchanged (FR-001/002/003/005)
-- [ ] T003 [US1] Update the installation `.stack-control/audit-barrage-config.yaml` in lockstep with the template (FR-004)
-- [ ] T004 [P] [US1] RED test: codex lane emits a liveness pulse within the tight window on a real payload (no false `killed-no-liveness`) — in `tests/audit-barrage/spawn-liveness.test.ts` (FR-003)
-- [ ] T005 [US1] Wire codex reasoning-summary liveness handling + restore the tight liveness window in `src/scope-discovery/audit-barrage/spawn-cli.ts` (FR-003)
-- [ ] T006 [US1] Calibrate opus no-grounding; if it cannot meet the timeout envelope, surface a fleet-composition decision to the operator (do NOT drop it unilaterally) — note result in `specs/029-govern-operability/research.md` (Assumptions)
+- [x] T001 [P] [US1] RED test: shipped `templates/audit-barrage-config.yaml` Anthropic lanes carry no `--permission-mode plan`, a non-empty `--disallowedTools` set, raised timeout floor; codex args include `model_reasoning_summary=detailed` — in `tests/audit-barrage/config-default.test.ts` (FR-001/002/003/005)
+- [x] T002 [US1] Update `templates/audit-barrage-config.yaml`: remove `--permission-mode plan` from the Anthropic lanes; add the read-only `--disallowedTools` set; raise `timeout_floor_seconds`; add codex `model_reasoning_summary=detailed` + tight liveness window; leave fleet composition (opus+codex+sonnet) unchanged (FR-001/002/003/005)
+- [x] T003 [US1] Update the installation `.stack-control/audit-barrage-config.yaml` in lockstep with the template (FR-004)
+- [x] T004 [P] [US1] RED test: codex lane emits a liveness pulse within the tight window on a real payload (no false `killed-no-liveness`) — in `tests/audit-barrage/spawn-liveness.test.ts` (FR-003)
+- [x] T005 [US1] Wire codex reasoning-summary liveness handling + restore the tight liveness window in `src/scope-discovery/audit-barrage/spawn-cli.ts` (FR-003)
+- [x] T006 [US1] Calibrate opus no-grounding; if it cannot meet the timeout envelope, surface a fleet-composition decision to the operator (do NOT drop it unilaterally) — note result in `specs/029-govern-operability/research.md` (Assumptions)
 - [ ] T007 [US1] Close TASK-288, TASK-145 (`stackctl backlog done`); record the phase-1 govern checkpoint
 
 ---

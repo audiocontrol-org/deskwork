@@ -32,16 +32,17 @@ models:
   - name: codex
     binary: codex
     model: gpt-5.5
-    args_template: "exec -m {{model}} --sandbox read-only {{prompt-stdin}}"
+    # Reasoning-summary liveness (specs/029 US1 / TASK-145), in lockstep with the
+    # shipped template (FR-004): model_reasoning_summary="detailed" makes codex
+    # emit reasoning summaries to stderr DURING reasoning, so genuine pulses
+    # arrive inside a TIGHT window — the 300s widening stopgap below is RESTORED
+    # to 60s (the watchdog now fires only on a genuine hang, not on codex's
+    # silent-reasoning latency, because reasoning is no longer silent).
+    args_template: "exec -m {{model}} -c model_reasoning_summary=\"detailed\" --sandbox read-only {{prompt-stdin}}"
     readonly_enforcement: "--sandbox read-only"
     output_mode: text
     liveness_signal: stderr
-    # 60s was too tight: codex (gpt-5.5) reasons silently on a real ~17KB audit
-    # payload for >60s before its first stderr pulse, tripping killed-no-liveness
-    # well before the 300s timeout (observed 2026-06-16, 025 phase-1 govern). Widen
-    # to the timeout floor so the watchdog only fires on a genuine hang, not on
-    # codex's silent-reasoning latency.
-    liveness_window_seconds: 300
+    liveness_window_seconds: 60
     timeout_floor_seconds: 300
     timeout_secs_per_kb: 7
 
