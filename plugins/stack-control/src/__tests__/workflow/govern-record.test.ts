@@ -111,6 +111,22 @@ describe('US6 — the record mechanism (symmetric, mode-keyed)', () => {
     const rec = readGovernConvergenceRecord(f.root, 'impl', KEY);
     expect(rec?.scopeFingerprint).toMatch(/^[0-9a-f]{64}$/); // 021 fingerprint shape
     expect(rec?.anchorRoot).toBe(f.root);
+    // FR-018: a genuine convergence record carries NO override marker.
+    expect(rec?.override).toBeUndefined();
+    expect(rec?.overrideReason).toBeUndefined();
+  });
+
+  it('records DURABLE override attribution when an override reason is supplied (US4, FR-018)', () => {
+    const f = makeWorkflowFixture();
+    fixtures.push(f);
+    recordGovernConvergence(f.root, 'impl', KEY, [], '2026-06-16T00:00:00Z', 'operator accepts residual edges');
+    const rec = readGovernConvergenceRecord(f.root, 'impl', KEY);
+    // Distinguishable from a real convergence by a durable marker (not just stderr).
+    expect(rec?.override).toBe(true);
+    expect(rec?.overrideReason).toBe('operator accepts residual edges');
+    // Still counts as graduated for the governing -> shipped gate.
+    expect(rec?.converged).toBe(true);
+    expect(isModeConverged(f.root, 'impl', KEY)).toBe(true);
   });
 
   it('a corrupt record fails loud (no silent fallback)', () => {

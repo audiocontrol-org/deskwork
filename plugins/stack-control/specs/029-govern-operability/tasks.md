@@ -73,7 +73,7 @@
 - [x] T025 [P] [US4] RED test: `backlog done <id>` closes a task; a finding flip to `fixed-<sha>` auto-reconciles its task — in `tests/backlog/done.test.ts` (FR-015)
 - [x] T026 [US4] Add the `backlog done`/close verb in `src/backlog/` + auto-reconcile on `fixed-<sha>` (FR-015)
 - [x] T027 [P] [US4] RED test: `govern --override "<reason>"` fires 0 barrage runs and records an attributable override graduation — in `tests/govern/override-short-circuit.test.ts` (FR-017/018)
-- [x] T028 [US4] Short-circuit the barrage on `--override` (record reason + graduate, NO render/barrage/lift/slush) in `src/subcommands/govern.ts` + `src/govern/convergence-loop.ts` + `src/govern/convergence-types.ts` (FR-017/018)
+- [x] T028 [US4] Short-circuit the barrage on `--override` (record reason + graduate, NO render/barrage/lift/slush) in `src/subcommands/govern.ts` + `src/govern/convergence-loop.ts` + `src/govern/convergence-types.ts` + `src/govern/override-graduate.ts`; per-phase `--override` writes the phase checkpoint; FR-018 durable attribution = `override`/`overrideReason` persisted in the convergence record (`src/govern/convergence-record.ts` + `src/workflow/workflow-types.ts`) so an override graduation is distinguishable from a real convergence, not just on stderr (FR-017/018)
 - [ ] T029 [US4] Close TASK-149, TASK-317, TASK-318; record the phase-4 govern checkpoint
 
 ---

@@ -74,6 +74,8 @@ interface ParsedRecord {
   readonly converged?: unknown;
   readonly recordedAt?: unknown;
   readonly anchorRoot?: unknown;
+  readonly override?: unknown;
+  readonly overrideReason?: unknown;
 }
 
 /** Read the mode-keyed record for an item; null when none exists. Fail loud on corruption. */
@@ -135,6 +137,20 @@ function validate(
         `installation root '${installationRoot}' (a record from another installation is not authoritative)`,
     );
   }
+  // specs/029 US4 (FR-018): optional override attribution. When present, `override`
+  // must be boolean and `overrideReason` a non-empty string — a malformed marker is
+  // a corrupt record (fail loud), not silently dropped.
+  if (parsed.override !== undefined && typeof parsed.override !== 'boolean') {
+    throw new Error(`${path}: govern-convergence record override must be a boolean when present`);
+  }
+  if (
+    parsed.overrideReason !== undefined &&
+    (typeof parsed.overrideReason !== 'string' || parsed.overrideReason.length === 0)
+  ) {
+    throw new Error(
+      `${path}: govern-convergence record overrideReason must be a non-empty string when present`,
+    );
+  }
   return {
     version: 1,
     mode: parsed.mode,
@@ -143,6 +159,10 @@ function validate(
     converged: parsed.converged,
     recordedAt: parsed.recordedAt,
     anchorRoot: parsed.anchorRoot,
+    ...(parsed.override === true ? { override: true } : {}),
+    ...(typeof parsed.overrideReason === 'string' && parsed.overrideReason.length > 0
+      ? { overrideReason: parsed.overrideReason }
+      : {}),
   };
 }
 
@@ -188,6 +208,11 @@ export function recordGovernConvergence(
   item: string,
   scopePaths: readonly string[],
   recordedAt: string,
+  // specs/029 US4 (FR-018): when present, this graduation is an operator
+  // `--override` short-circuit, recorded durably so a downstream consumer can
+  // DISTINGUISH it from a real convergence (the record is the only durable
+  // artifact — FR-017 fires zero barrage).
+  overrideReason?: string,
 ): string {
   return writeGovernConvergenceRecord(installationRoot, {
     version: 1,
@@ -196,5 +221,8 @@ export function recordGovernConvergence(
     scopeFingerprint: convergenceFingerprint(installationRoot, item, scopePaths),
     converged: true,
     recordedAt,
+    ...(overrideReason !== undefined
+      ? { override: true, overrideReason }
+      : {}),
   });
 }

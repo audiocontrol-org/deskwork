@@ -57,12 +57,16 @@ export function recordOverrideGraduation(args: OverrideGraduateArgs): void {
   );
   if (args.convergenceItem === undefined) return;
   try {
+    // FR-018: pass the override reason so the DURABLE convergence record carries
+    // `override: true` + `overrideReason` — a downstream consumer can distinguish
+    // this short-circuit graduation from a real convergence (stderr is transient).
     recordGovernConvergence(
       args.installationRoot,
       args.mode,
       args.convergenceItem,
       args.scopePaths,
       args.recordedAt,
+      args.reason,
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

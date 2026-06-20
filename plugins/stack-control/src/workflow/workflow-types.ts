@@ -178,6 +178,15 @@ export interface GovernConvergenceRecord {
   readonly recordedAt: string;
   /** The installation root the record is written under. */
   readonly anchorRoot: string;
+  /**
+   * specs/029 US4 (FR-018): true when this graduation was an operator `--override`
+   * short-circuit, NOT a real convergence — so a durable downstream consumer can
+   * DISTINGUISH the two (stderr is transient; FR-017 fires zero barrage so there is
+   * no run artifact either). Absent/false on a genuine convergence graduation.
+   */
+  readonly override?: boolean;
+  /** specs/029 US4 (FR-018): the operator's `--override` reason, when `override` is true. */
+  readonly overrideReason?: string;
 }
 
 /** How strongly a house rule is enforced (data-model § HouseRulesBlock). */
