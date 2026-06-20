@@ -2890,3 +2890,111 @@ Surface:    src/subcommands/check-front-door.ts:282-307
 The live skill-to-verb parity check only detects wholly unknown verbs from literal `stackctl <verb>` invocations. Lines 282-290 explicitly exclude sub-action-level phantoms, and `documentedPhantomOps()` only captures the first token after `stackctl` at lines 300-304. A stale skill command like `stackctl roadmap frobnicate` would not be reported because `roadmap` is a known verb, even though `frobnicate` is not in the command tree.
 
 This violates C2d’s “skill → verb” direction for verb/sub-action parity. The blast radius is high because an operator or unattended agent can follow a shipped skill body into a non-existent sub-action while `check-front-door` reports green. A reasonable fix is to parse literal `stackctl <verb> <sub>` forms against the command descriptor’s known sub-actions, while using descriptor metadata to avoid treating documented positionals as sub-actions.
+
+## 2026-06-20 — audit-barrage lift (20260620T000513094Z-028-front-door-completeness-phase-6)
+
+### AUDIT-20260620-01 — Missing required `isFrontedBackend` field in three test-fixture objects
+
+Finding-ID: AUDIT-20260620-01
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/__tests__/subcommands/check-front-door-mediation.test.ts` — the first three `it` blocks inside `describe('check-front-door C2c — mutating ops mediation-registered (028 T105)')`
+
+The three unit-test cases at lines ~61–94 pass object literals to `regWith(op: CheckRegistry['operations'][number])` where `CheckRegistry['operations'][number]` resolves to `FrontedOperation`. The `FrontedOperation` interface (added in this same diff at `src/capability/fronted-operations.ts`) declares `isFrontedBackend: boolean` as a non-optional, required field. All three fixture objects — `{operationId: 'backlog/list', …}`, `{operationId: 'backlog/capture', …}` twice — omit `isFrontedBackend` entirely. This is a TypeScript compile-time error.
+
+At runtime the tests pass because Vitest uses esbuild (or swc) which strips types without checking them. The missing field is never read in those specific test scenarios (the tests supply hand-coded `mediationRegistered` functions that don't consult `isFrontedBackend`). But a bare `tsc --noEmit` on the workspace would reject the file. The blast-radius: any developer or CI step that runs type-checking finds three errors in freshly-added test code, eroding confidence in the test suite and blocking adoption of stricter CI type gates. The later C2c non-vacuity tests in the same file do use `ctOp()` (which includes the field) — the gap is isolated to the earlier describe block.
+
+Fix: add `isFrontedBackend: false` to the three missing fixtures (read-only `backlog/list` cannot be a fronted backend; `backlog/capture` when passed without the real predicate can default to `false` for the unit).
+
+---
+
+### AUDIT-20260620-02 — `liveHelpProbe` spawns one `tsx` process per fronted operation — O(N) subprocess overhead
+
+Finding-ID: AUDIT-20260620-02
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/check-front-door.ts:261–275` (`liveHelpProbe`) and `src/scope-discovery/doctor-rules/front-door-completeness.ts:29` (doctor rule invokes `runLiveCheckFrontDoor`)
+
+`liveHelpProbe` calls `spawnSync(tsx, [CLI, verb, sub, '--help'])` synchronously for every command-tree entry in the fronted-operations registry. The registry has at minimum every sub-action of every fronted verb (`roadmap/{add,next,blocked,blocks,order,graph}`, `backlog/{capture,list}`, `inbox/capture`, `check-front-door`, plus skill-declaration entries). That is comfortably 15–25 operations. Each `tsx` invocation cold-starts the TypeScript compiler/transformer — empirically 300–700 ms per spawn. Total wall-clock for C2b alone: 5–15 seconds. All spawns are sequential (`spawnSync` in a loop).
+
+This matters in two contexts: (a) `stackctl check-front-door` as an interactive CLI gate feels sluggish and operators will work around it; (b) `runLiveCheckFrontDoor()` is called synchronously inside the `front-door-completeness` doctor rule (line 29 of `front-door-completeness.ts`), which is registered in `SCOPE_DISCOVERY_DOCTOR_RULES`. Every `scope-doctor` pass now pays this cost. The blast-radius for (b) is that a routine doctor-rule sweep (run from `session-start`, etc.) becomes noticeably slower — a friction source the project's own tooling-feedback discipline requires logging.
+
+The help probe is also the seam most likely to produce flaky results under system load (tsx may time out or produce no stdout if the system is saturated). `spawnSync` has no timeout parameter in this call, so a hung tsx invocation hangs the entire check.
+
+A targeted fix: spawn all C2b probes in parallel (`Promise.all` with `spawn` instead of `spawnSync`), or cache tsx invocations keyed by verb (many sub-actions share the same verb, so `roadmap --help` covers all `roadmap/*` ops). A structural fix: move `--help` probing outside the critical path (run it lazily or only on demand via `--probe-help`).
+
+---
+
+### AUDIT-20260620-03 — `check-front-door` verb may fail its own C2b assertion depending on main CLI dispatch
+
+Finding-ID: AUDIT-20260620-03 (claude-03 + claude-05 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    `src/subcommands/check-front-door.ts:400–410` (`runCheckFrontDoorCli` unknown-arg handler) and `src/subcommands/check-front-door.ts:261–275` (`liveHelpProbe`)
+
+`runCheckFrontDoorCli` treats `--help` as an unknown argument:
+
+```typescript
+const unknown = args.find((a) => a !== '--json');
+if (unknown !== undefined) {
+  process.stderr.write(`check-front-door: unexpected argument '${unknown}'\n`);
+  process.stderr.write('Usage: stackctl check-front-door [--json]\n');
+  process.exit(2);
+}
+```
+
+The C2b live probe asserts `r.status === 0 && /^usage:/im.test(r.stdout ?? '')`. When `--help` is received by this handler: exit code is `2` (not 0), and "Usage:" is on **stderr** (not stdout). Both conditions fail; `liveHelpProbe` returns `false` for `check-front-door`.
+
+Whether this produces a live C2b gap depends entirely on whether the main CLI dispatcher (`src/cli.ts`, not shown in the diff) intercepts `--help` before calling `runCheckFrontDoorCli`. Existing fronted verbs (`roadmap`, `backlog`, etc.) presumably pass C2b, which implies the main CLI *does* have a global `--help` handler. But that handler is not exercised in any test in this diff — no test calls `stackctl check-front-door --help` end-to-end and asserts exit 0.
+
+If the main CLI passes `--help` through to subcommand handlers (as some dispatchers do), every run of `stackctl check-front-door` would report:
+
+```
+C2b working-help: operation 'check-front-door' --help does not exit 0 with a usage body.
+```
+
+Because the gate in `define` and `execute` is hard (refuse on non-zero), this self-referential gap would block both skills every time. The doctor rule would also surface it on every `scope-doctor` pass.
+
+Fix options: (a) confirm the main dispatcher handles `--help` globally and add an integration test for `stackctl check-front-door --help` → exit 0 + "Usage:" on stdout; (b) handle `--help` explicitly in `runCheckFrontDoorCli` (write usage to stdout, exit 0).
+
+---
+
+### AUDIT-20260620-04 — `mentionsWord` uses a structurally incorrect regex to escape metacharacters
+
+Finding-ID: AUDIT-20260620-04
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/check-front-door.ts` — `mentionsWord` function, the `.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')` call
+
+The intent is to escape regex metacharacters in the sub-action `token` before embedding it in a `new RegExp(...)`. The regex literal `/[.*+?^${}()|[\\]\\\\]/g` is parsed by the JS engine as:
+
+- **Character class** `[.*+?^${}()|[\\]` — contains `.`, `*`, `+`, `?`, `^`, `$`, `{`, `}`, `(`, `)`, `|`, `[`, and `\` (via `\\`); the `]` closes the class.
+- After the class: `\\\\` — two `\\` pairs = matches the two-character sequence `\\`.
+- Then a literal `]`.
+
+So the full regex matches the **four-character sequence**: (one char from the class)(backslash)(backslash)(`]`). It will never match in practice on typical sub-action names, so the `.replace()` is effectively a no-op. The standard correct pattern is `/[.*+?^${}()|[\]\\]/g` (where `\]` escapes the bracket inside the class and `\\` handles the backslash).
+
+Practically: all current sub-action names (`next`, `add`, `blocked`, `capture`, …) are pure lowercase kebab-case and contain no regex metacharacters, so the broken escape never triggers. The risk is latent — a future verb name containing `.`, `(`, or `^` would be treated as a regex pattern fragment in the lookbehind/lookahead, producing false positives or errors. Given the project's naming conventions this is unlikely, but the function claims to escape and does not.
+
+---
+
+### AUDIT-20260620-05 — Multi-interface capabilities only check the first skill
+
+Finding-ID: AUDIT-20260620-05
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/capability/fronted-operations.ts:224-240
+
+`skillDeclarationEntries` creates one entry per capability and sets `requiredSkill` from only `cap.interface[0]`. That misses additional sanctioned front-door skills on the same capability. The existing registry has `spec-definition` with both `stack-control:define` and `stack-control:extend`, so `check-front-door` will verify `define` exists but will not verify `extend` exists.
+
+The blast radius is a false-green enforcement gate: deleting or renaming `skills/extend/SKILL.md` would not produce the promised C2a gap, even though `extend` is a sanctioned front door for a mediated capability. A reasonable fix is to emit one `skill-declaration` entry per interface skill, or otherwise have C2a iterate all `cap.interface` entries instead of only the first.

@@ -16,6 +16,23 @@ Refine an **existing** Spec Kit spec through the stack-control front door (Featu
   current portability targets; no headless/batch CLI dependency; FR-006/007).
 - The spec dir already exists (this is `extend`, not `define`).
 
+## Front-door completeness gate (028 US4 — refuse when RED)
+
+`extend` is the other sanctioned `spec-definition` front door (with `define`) and drives
+the same `/speckit-*` backend family, so it carries the same hard gate. Before resolving
+or iterating the spec, run the front-door regression guard (per
+`enforcement-lives-in-skills`, the gate lives in this skill body + the `stackctl
+check-front-door` verb — never a git hook):
+
+```bash
+stackctl check-front-door
+```
+
+- **Exit 0** → the front door is complete; proceed.
+- **Non-zero** → **STOP. Refuse to proceed.** A gap (deleted/renamed skill, broken
+  `--help`, unfronted mutating verb, or skill↔verb parity break) is a real regression —
+  print the named gaps and fix the surface first; never weaken the check to proceed.
+
 ## Steps
 
 1. **Resolve and report current state.** Resolve the target spec dir (arg, or the active feature's dir from the `<!-- SPECKIT START -->…<!-- SPECKIT END -->` marker in `CLAUDE.md` — the program uses one long-lived branch with numbered spec dirs, so the marker resolves the dir, not the branch name; TF-09). State which spec dir you resolved, then run:

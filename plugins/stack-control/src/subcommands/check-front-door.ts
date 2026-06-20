@@ -198,8 +198,12 @@ export function mediationRegisteredAgainst(registry: CapabilityRegistry): (op: F
       const verb = op.operationId.split('/')[0] ?? op.operationId;
       return findCapabilityByIdentity(registry, 'bash', verb) !== null;
     }
-    // Class 3: a skill-declaration capability id.
-    const cap = registry.capabilities.find((c) => c.id === op.operationId);
+    // Class 3: a skill-declaration entry. Its operationId is the capability id, OR
+    // `<capId>/<skill>` for a capability's additional interface skills — derive the
+    // capability id from the prefix so a multi-interface entry (spec-definition/extend)
+    // resolves to its capability (AUDIT-BARRAGE-codex-01, Phase 6 round 3).
+    const capId = op.operationId.split('/')[0] ?? op.operationId;
+    const cap = registry.capabilities.find((c) => c.id === capId);
     if (cap === undefined) return false;
     return cap.backendIdentities.skills.length + cap.backendIdentities.cliArgv0.length > 0;
   };

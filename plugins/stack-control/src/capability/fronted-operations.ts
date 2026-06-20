@@ -221,28 +221,35 @@ function commandTreeEntries(
   return entries;
 }
 
-/** Build the skill-declaration entries from the capability registry — one per
- *  capability (operationId = capability id, mutating, fronted by the first interface
- *  skill). Enumerates in-session /speckit-* ops that are NOT verbs (FR-051). */
+/** Build the skill-declaration entries from the capability registry — ONE PER
+ *  INTERFACE SKILL (a capability can be fronted by more than one skill, e.g.
+ *  spec-definition → define AND extend; each is a sanctioned front door C2a must
+ *  verify). The first interface keeps operationId = the capability id (the
+ *  registry's identity); additional interfaces get a distinct reportable id.
+ *  Enumerates in-session /speckit-* ops that are NOT verbs (FR-051). */
 function skillDeclarationEntries(registry: CapabilityRegistry): FrontedOperation[] {
   const entries: FrontedOperation[] = [];
   for (const cap of registry.capabilities) {
-    const firstInterface = cap.interface[0];
-    if (firstInterface === undefined) {
+    if (cap.interface[0] === undefined) {
       throw new Error(
         `fronted-operations: capability '${cap.id}' has an empty interface ` +
           `(validateRegistry should have caught this — registry.ts)`,
       );
     }
-    entries.push({
-      operationId: cap.id,
-      requiredSkill: skillForCapabilityInterface(firstInterface),
-      mediationClass: 'mutating',
-      hasHelp: true,
-      source: 'skill-declaration',
-      // A capability entry IS a fronted backend — its `/speckit-*` skills (or cliArgv0)
-      // are the mediated identities; C2c verifies it against the capability registry.
-      isFrontedBackend: true,
+    // One entry per interface skill so a deleted skills/<extra-interface>/SKILL.md
+    // is a C2a gap, not a silent omission (AUDIT-BARRAGE-codex-01, Phase 6).
+    cap.interface.forEach((iface, index) => {
+      const skill = skillForCapabilityInterface(iface);
+      entries.push({
+        operationId: index === 0 ? cap.id : `${cap.id}/${skill}`,
+        requiredSkill: skill,
+        mediationClass: 'mutating',
+        hasHelp: true,
+        source: 'skill-declaration',
+        // A capability entry IS a fronted backend — its `/speckit-*` skills (or cliArgv0)
+        // are the mediated identities; C2c verifies it against the capability registry.
+        isFrontedBackend: true,
+      });
     });
   }
   return entries;
