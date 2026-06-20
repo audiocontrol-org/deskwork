@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "featureSlug": "028-front-door-completeness",
+  "phaseId": "7",
+  "checkpoint": "phase-7",
+  "auditLogSection": "phase-7",
+  "scopeFingerprint": "c75591f99161bed903c4367b4b97f800ac6639b83983fc2e489d97f3085ab7cd",
+  "passedAt": "2026-06-20T00:43:49.850Z",
+  "governedPaths": [
+    "specs/028-front-door-completeness/quickstart.md",
+    "scripts/smoke-front-door.sh",
+    "src/cli-help/command-surface.ts",
+    "src/cli-help/verb-reference.ts",
+    "src/capability/fronted-operations.ts",
+    "src/subcommands/check-front-door.ts",
+    "npm --workspace plugins/stack-control test",
+    "claude plugin validate plugins/stack-control"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/specs/028-front-door-completeness/quickstart.md"
+  ]
+}

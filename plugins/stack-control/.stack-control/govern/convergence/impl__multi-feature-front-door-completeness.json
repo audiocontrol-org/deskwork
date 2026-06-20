@@ -2,8 +2,8 @@
   "version": 1,
   "mode": "impl",
   "item": "multi:feature/front-door-completeness",
-  "scopeFingerprint": "545ce86bbd80b460f0922b82aa1dcca51d4dfa68a95a5c1ff326732bf42dca1b",
+  "scopeFingerprint": "ec6ad269778cabdd8c992f5551531a017c838a65b58f88826816f1c88ccf15f6",
   "converged": true,
-  "recordedAt": "2026-06-20T00:39:44.287Z",
+  "recordedAt": "2026-06-20T00:43:49.874Z",
   "anchorRoot": "/Users/orion/work/deskwork-work/stack-control/plugins/stack-control"
 }

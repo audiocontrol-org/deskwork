@@ -3353,3 +3353,42 @@ But `skills/define/SKILL.md` was updated in this same diff to add a hard gate id
 Blast-radius: low — the gate is actually present in `define/SKILL.md` and will fire. The issue is that the canonical reference (`check-front-door/SKILL.md`) is incomplete, which erodes the document's value as the single source of truth for "where does this gate fire."
 
 Fix: update the "When to use" bullet to read `**`define` / `execute` / review**` run it as a gate — and if finding 02 is resolved (gate extend added), include `extend` as well.
+
+## 2026-06-20 — audit-barrage lift (20260620T004232208Z-028-front-door-completeness-phase-7)
+
+### AUDIT-20260620-23 — Future date in validation record
+
+Finding-ID: AUDIT-20260620-23
+Status: migrated-to-backlog TASK-313
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    specs/028-front-door-completeness/quickstart.md:149
+
+The validation record reads "Verified 2026-06-20 on `feature/stack-control`" but the system context shows today is 2026-06-19. The record asserts verification occurred one day in the future. This could indicate the section was written speculatively before verification actually ran, or it's a one-day date error. Either way the document claims an event that had not yet occurred at the time of the commit (b18894c7). No behavioral consequence — the tests and smoke scripts stand independently — but a validation record that claims a future verification date slightly undermines its own credibility as an audit artifact. Fix: correct to 2026-06-19 to match the actual commit date, or verify and re-run on the correct date.
+
+---
+
+### AUDIT-20260620-24 — SC-002 and SC-003 consolidated into a single verification entry
+
+Finding-ID: AUDIT-20260620-24
+Status: migrated-to-backlog TASK-314
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    specs/028-front-door-completeness/quickstart.md:153
+
+The quickstart scenario table lists SC-002 and SC-003 as distinct rows (each scenario mapping to separate suites or concerns), but the validation section folds them into one bullet: `- **SC-002 / SC-003**`. The diff shows the bottom of the table (SC-005/SC-006/SC-007) but not the SC-002 or SC-003 rows, so the specific criteria they gate are inferred from the bullet text ("backlog capture→done→archive, unpromote; roadmap edge mutations + approve-design + reconcile --unorphan"). If SC-002 and SC-003 are structurally independent acceptance gates — testing different command families — a single combined entry obscures which scenario maps to which suite and makes it harder for a future reviewer to re-run targeted verification. No test correctness concern; the suites named are real. Impact is limited to audit-trail legibility. Suggested fix: split into two entries matching the scenario table shape.
+
+---
+
+### AUDIT-20260620-25 — No findings of higher severity
+
+Finding-ID: AUDIT-20260620-25
+Status: migrated-to-backlog TASK-315
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    (entire diff)
+
+The diff is documentation-only: a single Validation Results section appended to `quickstart.md`. I checked for: fabricated or internally inconsistent claims (the "62 ops" count appears consistently in both SC-001 and SC-006 bullets; the 3 injected-gap types in SC-006 match the quickstart's "RED on 3 gaps" description), deferral phrases or TODO language (none present), placeholder or mock-data markers (none), and cross-cutting spec drift (the validation entries map cleanly to the prior scenario table rows). The two findings above (future date; combined SC-002/SC-003 entry) are the only discrepancies. The self-certified nature of the record is expected for a quickstart validation format; the operator is the appropriate party to accept or re-run the evidence.
