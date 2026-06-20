@@ -38,7 +38,7 @@ models:
     # arrive inside a TIGHT window — the 300s widening stopgap below is RESTORED
     # to 60s (the watchdog now fires only on a genuine hang, not on codex's
     # silent-reasoning latency, because reasoning is no longer silent).
-    args_template: "exec -m {{model}} -c model_reasoning_summary=\"detailed\" --sandbox read-only {{prompt-stdin}}"
+    args_template: "exec -m {{model}} -c model_reasoning_summary=detailed --sandbox read-only {{prompt-stdin}}"
     readonly_enforcement: "--sandbox read-only"
     output_mode: text
     liveness_signal: stderr
@@ -77,7 +77,7 @@ models:
     # No-tools = readonly by construction (denies Write/Edit) AND no grounding loop
     # (denies Read/Grep/Glob/Bash/Task/web). Comma-joined single token so it survives
     # the harness's whitespace split (spawn-cli injects this fragment into argv).
-    readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookRead,NotebookEdit"
+    readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookEdit"
     output_mode: stream-json
     liveness_signal: stdout
     liveness_window_seconds: 60

@@ -109,7 +109,7 @@ models:
     # No-tools = readonly by construction (denies Write/Edit) AND no grounding
     # loop (denies Read/Grep/Glob/Bash/Task/web). Comma-joined single token so it
     # survives the harness's whitespace split (spawn-cli injects it into argv).
-    readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookRead,NotebookEdit"
+    readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookEdit"
     output_mode: stream-json
     liveness_signal: stdout
     liveness_window_seconds: 60
@@ -127,7 +127,12 @@ models:
     # summary="detailed" makes codex emit reasoning summaries to stderr DURING
     # reasoning, so the watchdog gets genuine pulses inside the tight 60s window
     # instead of widening the window blindly (FR-003).
-    args_template: "exec -m {{model}} -c model_reasoning_summary=\"detailed\" --sandbox read-only {{prompt-stdin}}"
+    # Bare `key=value` (no quotes): the value travels as a literal argv element
+    # (programmatic spawn, no shell to strip quotes). codex parses the `-c` value
+    # as TOML and, on TOML-parse-failure of a bare word, uses the raw string as a
+    # literal — so `detailed` lands as the string `detailed` either way. Bare
+    # avoids embedding literal quote characters in argv (AUDIT-BARRAGE-claude-01).
+    args_template: "exec -m {{model}} -c model_reasoning_summary=detailed --sandbox read-only {{prompt-stdin}}"
     readonly_enforcement: "--sandbox read-only"
     output_mode: text
     liveness_signal: stderr
@@ -144,7 +149,7 @@ models:
     # drop `--permission-mode plan` + deny tools so the lane is a single
     # text-only read-only pass over the payload, not an unbounded grounding loop.
     args_template: "-p --model {{model}} --output-format stream-json --verbose {{prompt-stdin}}"
-    readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookRead,NotebookEdit"
+    readonly_enforcement: "--disallowedTools Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch,Task,NotebookEdit"
     output_mode: stream-json
     liveness_signal: stdout
     liveness_window_seconds: 60

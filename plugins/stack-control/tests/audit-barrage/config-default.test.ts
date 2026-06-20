@@ -18,6 +18,23 @@
  *
  * Reads the real shipped template through the real loader (no fs mocking,
  * per .claude/rules/testing.md).
+ *
+ * Verified-CLI-contract note (AUDIT-BARRAGE-claude-02 refutation +
+ * claude-04 boundary): the two load-bearing argv shapes here are confirmed
+ * against the CLIs' own `--help`, not assumed:
+ *   - `claude --help`: `--disallowedTools <tools...>` is "Comma OR space-
+ *     separated list of tool names to deny" — so the comma-joined single
+ *     token is a valid value (claude-02 is a false alarm).
+ *   - `codex --help`: `-c <key=value>` value "is parsed as TOML; if it fails
+ *     to parse as TOML, the raw string is used as a literal" — so bare
+ *     `model_reasoning_summary=detailed` lands as the string `detailed`.
+ * These are SHAPE assertions. The emergent runtime behavior (tools actually
+ * unavailable; codex actually pulsing on stderr) is verified out-of-band —
+ * the live per-phase barrage (both lanes `completed [enforced]` on the real
+ * payload) and the hostile `scripts/probe-readonly-spawn.sh` write-probe —
+ * NOT by spawning a real model subprocess in a unit test (.claude/rules/
+ * testing.md: do not test Claude Code internals / non-deterministic model
+ * responses).
  */
 
 import { readFile } from 'node:fs/promises';
@@ -68,9 +85,29 @@ describe('shipped audit-barrage template — no-grounding Anthropic lanes (US1)'
     for (const name of ['claude', 'sonnet']) {
       const lane = byName(models, name);
       expect(lane.readonlyEnforcement).toContain('--disallowedTools');
-      // The denial list must actually deny the file-mutating + grounding tools.
-      for (const tool of ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Glob']) {
+      // EVERY repo-mutating Claude Code tool must be denied (Write/Edit/
+      // NotebookEdit) plus the grounding tools (Read/Grep/Glob/Bash/Task/web)
+      // so there is no tool-loop.
+      for (const tool of [
+        'Write',
+        'Edit',
+        'NotebookEdit',
+        'Read',
+        'Grep',
+        'Glob',
+        'Bash',
+        'Task',
+      ]) {
         expect(lane.readonlyEnforcement).toContain(tool);
+      }
+      // Regression lock (empirical, opus calibration 2026-06-20): `MultiEdit`
+      // and `NotebookRead` are NOT known tools in this Claude Code version —
+      // `claude -p` warns "Permission deny rule '<name>' matches no known
+      // tool". codex-01 (HIGH) asked to add MultiEdit; the deny rule would be
+      // an inert no-op that pollutes stderr (and the real mutating tools were
+      // already denied). Keep stale/unknown tool names OUT of the deny-list.
+      for (const stale of ['MultiEdit', 'NotebookRead']) {
+        expect(lane.readonlyEnforcement).not.toContain(stale);
       }
     }
   });
