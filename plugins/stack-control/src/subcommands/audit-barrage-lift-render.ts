@@ -15,6 +15,20 @@ export function isoDate(yyyymmdd: string): string {
 }
 
 /**
+ * Append a rendered `section` to the existing audit-log text — the single
+ * purely-additive composition every lift write goes through (preservation rule:
+ * pre-existing content is kept verbatim). Trailing whitespace on the existing text
+ * is trimmed, a blank-line separator inserted (or a single newline when the log was
+ * empty), and a trailing newline guaranteed.
+ */
+export function appendSection(existing: string, section: string): string {
+  const trimmed = existing.replace(/\s+$/, '');
+  const separator = trimmed.length > 0 ? '\n\n' : '\n';
+  const composed = `${trimmed}${separator}${section}`;
+  return composed.endsWith('\n') ? composed : `${composed}\n`;
+}
+
+/**
  * Spec 013 US2: the canonical audit-log header scaffolded at a resolved feature
  * root that has none yet. `targetVersion` carries the legacy-docs version axis
  * (derived from the resolved path); a speckit feature has no version axis, so it
@@ -123,6 +137,78 @@ export function renderQuietSection(
     `run (claude-20260612-r3); a clean run that left no section was invisible to the ` +
     `consecutive-quiet / single-run-clean rules._\n`
   );
+}
+
+/**
+ * specs/029 US4 (graduation-safety fix): a section that records ONLY findings the
+ * FR-016 cross-run dedup suppressed (already present in the audit-log at an OPEN
+ * status; NOT `fixed-<sha>`). These re-reported findings get NO fresh `AUDIT-NN`
+ * id and NO new backlog task (FR-016: ≤1 task per signature) — but the section
+ * MUST carry their `Severity:` lines so the convergence dampener still counts the
+ * run's surfaced severity. Without this, an all-deduped re-run rendered a PRISTINE
+ * quiet section (zero `Severity:` lines) and the single-run-clean rule graduated a
+ * feature with a real, still-open, still-unfixed HIGH (US3 SC-001 defeated).
+ *
+ * The entries deliberately do NOT use `Status:     open` — the slush path picks
+ * ONLY open entries to migrate to the backlog, so an open re-report would
+ * manufacture the duplicate task FR-016 exists to prevent. They carry
+ * `Status:     re-reported` (a non-open, dampener-irrelevant status — the dampener
+ * RAW count ignores `Status:` entirely) plus a pointer back to the canonical entry
+ * that already tracks this finding. The dampener's RAW count (`rawHighPlusCount` /
+ * `rawMediumCount`, used by single-run-clean) sees the `Severity:` line regardless
+ * of status, and its identity-keyed `newHighPlusCount` (used by N-consecutive-quiet)
+ * folds these `(signature, severity)` pairs so a persistent HIGH keeps blocking.
+ */
+function renderRereportEntry(finding: ExtractedFinding): string {
+  const suffix = finding.crossModelAgreement
+    ? ` (${finding.sourceModels.join(' + ')}; cross-model)`
+    : '';
+  return [
+    `### ${finding.heading}`,
+    '',
+    `Status:     re-reported (already tracked${suffix})`,
+    `Severity:   ${finding.severity}`,
+    `Surface:    ${finding.surface}`,
+    '',
+  ].join('\n');
+}
+
+/**
+ * Render only the re-report ENTRY blocks (no section header) for a set of
+ * already-tracked findings — used to APPEND re-reports to a section that also
+ * carries new liftable entries, so a run's full surfaced severity (new + persistent)
+ * is recorded in one section. Each entry carries a `Severity:` line (counted by the
+ * dampener) and a non-open `Status:` (so the slush path never migrates a duplicate
+ * backlog task). Empty input → empty string (nothing to append).
+ */
+export function renderRereportEntries(findings: readonly ExtractedFinding[]): string {
+  if (findings.length === 0) return '';
+  return findings.map(renderRereportEntry).join('\n');
+}
+
+export function renderRereportSection(
+  findings: readonly ExtractedFinding[],
+  date: string,
+  runDirBasename: string,
+  fleet?: SectionFleetStatus,
+  tipSha?: string,
+): string {
+  const isoDateStr = isoDate(date);
+  const degradedMarker =
+    fleet !== undefined && fleet.produced < fleet.configured
+      ? `_Fleet: DEGRADED (produced ${fleet.produced} of ${fleet.configured} configured) — ` +
+        `this run is NOT counted as a quiet run by the convergence dampener; 0 HIGH+ over ` +
+        `killed/timed-out lanes is not a clean signal (FR-007)._\n\n`
+      : '';
+  const codeShaLine = tipSha !== undefined && tipSha.length > 0 ? `Code-sha: ${tipSha}\n` : '';
+  const preamble =
+    `_No NEW findings — every finding this run surfaced is already tracked in the audit-log ` +
+    `(FR-016 cross-run dedup). Re-reported here, WITHOUT new IDs or backlog tasks, so the ` +
+    `convergence dampener still sees their severity: a persistent OPEN finding keeps blocking ` +
+    `(US3 SC-001). Resolve the canonical entries (mark them \`fixed-<sha>\`) to converge._\n\n`;
+  const heading =
+    `## ${isoDateStr} — audit-barrage lift (${runDirBasename})\n\n${codeShaLine}${degradedMarker}${preamble}`;
+  return heading + renderRereportEntries(findings);
 }
 
 /**

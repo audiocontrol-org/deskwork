@@ -39,12 +39,14 @@ import { basename, dirname, join } from 'node:path';
 import { resolveCodebaseBoundary } from '../scope-discovery/codebase-boundary.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import { extractBarrageFindings } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
-import { selectLiftableFindings } from '../govern/loop-hygiene.js';
+import { partitionLiftableFindings } from '../govern/loop-hygiene.js';
 import {
+  appendSection,
   buildAuditLogHeader,
   renderSection,
-  renderQuietSection,
+  renderRereportEntries,
 } from './audit-barrage-lift-render.js';
+import { recordNoNewFindingsSection } from './record-no-new-findings-section.js';
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
 import {
   computeFleetReportFromParsedLanes,
@@ -347,57 +349,39 @@ export async function runAuditBarrageLift(
     ? buildAuditLogHeader(opts.featureSlug, deriveTargetVersion(feature))
     : await reader(auditLogPath);
 
-  // specs/029 US4 (FR-013/FR-016): keep the loop hygienic — drop already-resolved
-  // (`fixed-<sha>`) and already-present (cross-run dedup) findings BEFORE assigning
-  // IDs / appending a section. The selection logic + signature keying live in the
-  // shared loop-hygiene helper.
-  const liftableFindings = selectLiftableFindings(findings, auditLogText, (m) =>
-    stderr.write(`${m}\n`),
+  // specs/029 US4 (FR-013/FR-016): keep the loop hygienic — partition the fresh
+  // extraction BEFORE assigning IDs / appending a section. `liftable` is neither
+  // resolved (`fixed-<sha>`, FR-013) nor already-present (cross-run dedup, FR-016).
+  // `dedupSuppressedOpen` is the FR-016-deduped-but-NOT-resolved set: still-open
+  // findings re-surfacing on a later round. They get NO new entry/task (FR-016:
+  // ≤1 task per signature) BUT must STILL be visible to the dampener so a
+  // persistent OPEN finding keeps blocking (US3 SC-001 — the graduation-safety
+  // bug: a single-bucket filter dropped these, rendering an all-deduped re-run as
+  // a PRISTINE quiet section that the single-run-clean rule graduated). The
+  // selection logic + signature keying live in the shared loop-hygiene helper.
+  const { liftable: liftableFindings, dedupSuppressedOpen } = partitionLiftableFindings(
+    findings,
+    auditLogText,
+    (m) => stderr.write(`${m}\n`),
   );
 
-  // A 0-finding run ALWAYS records a lift section so the convergence dampener
-  // (which counts SECTIONS) sees it as the most-recent run:
-  //   - HEALTHY fleet → a QUIET section (0 Severity lines) the dampener counts
-  //     as a clean run (claude-20260612-r3).
-  //   - DEGRADED fleet → a section carrying the `Fleet: DEGRADED` marker, so the
-  //     dampener flags it and NEVER counts it as quiet (FR-007 / AUDIT-BARRAGE-
-  //     codex-01). Recording NOTHING for a degraded clean run (the prior
-  //     behavior) left a STALE prior clean section as "most recent", letting
-  //     single-run-clean dampen on it — exactly "degraded is convergence", the
-  //     failure this feature exists to remove.
+  // A run with no NEW liftable findings ALWAYS records a section so the convergence
+  // dampener (which counts SECTIONS) sees it as the most-recent run — re-report /
+  // degraded / quiet, in that priority order. The three sub-cases (and why each
+  // exists) live in `recordNoNewFindingsSection`.
   if (liftableFindings.length === 0) {
-    const degradedFleet =
-      fleet !== undefined && fleet.produced < fleet.configured ? fleet : undefined;
-    stderr.write(
-      degradedFleet !== undefined
-        ? `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a DEGRADED ` +
-            `fleet (produced ${degradedFleet.produced} of ${degradedFleet.configured} ` +
-            `configured) — absence over non-completed lanes is NOT a clean signal; recording ` +
-            `a DEGRADED-marked section so the dampener never counts it as quiet (FR-007).\n`
-        : `audit-barrage-lift: extracted 0 findings from ${opts.runDir} over a healthy ` +
-            `fleet; recording a quiet run section so the convergence dampener counts it.\n`,
-    );
-    if (!opts.apply) {
-      stderr.write('audit-barrage-lift: dry-run (re-run with --apply to write).\n');
-      return 0;
-    }
-    const trimmedExisting = auditLogText.replace(/\s+$/, '');
-    const separator = trimmedExisting.length > 0 ? '\n\n' : '\n';
-    const quiet = renderQuietSection(
-      opts.date,
-      basename(opts.runDir.replace(/\/$/, '')),
-      degradedFleet !== undefined
-        ? { produced: degradedFleet.produced, configured: degradedFleet.configured }
-        : undefined,
+    return recordNoNewFindingsSection({
+      dedupSuppressedOpen,
+      fleet,
+      date: opts.date,
+      runDir: opts.runDir,
       tipSha,
-    );
-    const quietContent = `${trimmedExisting}${separator}${quiet}`;
-    await writer(auditLogPath, quietContent.endsWith('\n') ? quietContent : `${quietContent}\n`);
-    stderr.write(
-      `audit-barrage-lift: recorded a ${degradedFleet !== undefined ? 'DEGRADED' : 'quiet'} ` +
-        `run section in ${auditLogPath}.\n`,
-    );
-    return 0;
+      auditLogText,
+      auditLogPath,
+      apply: opts.apply,
+      stderr,
+      write: writer,
+    });
   }
 
   const highest = highestExistingNn(auditLogText, opts.date);
@@ -434,10 +418,23 @@ export async function runAuditBarrageLift(
     return 0;
   }
 
-  const trimmedExisting = auditLogText.replace(/\s+$/, '');
-  const separator = trimmedExisting.length > 0 ? '\n\n' : '\n';
-  const newContent = `${trimmedExisting}${separator}${section}`;
-  await writer(auditLogPath, newContent.endsWith('\n') ? newContent : `${newContent}\n`);
+  // specs/029 US4 (graduation-safety): when a run ALSO re-surfaces already-tracked
+  // findings (FR-016 dedup), append their re-report entries to THIS section so the
+  // run's full surfaced severity (new + persistent) is recorded in one place — a
+  // persistent OPEN HIGH keeps blocking (US3 SC-001) even on a round that produced
+  // some new findings. The re-report entries carry a `Severity:` line (counted by
+  // the dampener) and a non-open `Status:` (never re-slushed into a duplicate task,
+  // FR-016). Empty set → empty string → no-op.
+  const rereportEntries = renderRereportEntries(dedupSuppressedOpen);
+  const sectionWithRereports =
+    rereportEntries.length > 0 ? `${section}\n${rereportEntries}` : section;
+  if (dedupSuppressedOpen.length > 0) {
+    stderr.write(
+      `audit-barrage-lift: also re-reported ${dedupSuppressedOpen.length} already-tracked ` +
+        `finding(s) in this section (no new IDs/tasks; dampener still counts their severity — US3 SC-001).\n`,
+    );
+  }
+  await writer(auditLogPath, appendSection(auditLogText, sectionWithRereports));
   stderr.write(
     `audit-barrage-lift: wrote ${liftableFindings.length} new entry(ies) to ${auditLogPath}.\n`,
   );

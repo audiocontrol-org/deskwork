@@ -76,32 +76,83 @@ export interface SignaturedFinding {
 }
 
 /**
- * Drop the loop-hygiene-excluded findings from a fresh extraction (FR-013/FR-016):
- *   - already RESOLVED (`Status: fixed-<sha>`) in the audit-log — re-lifting would
- *     manufacture a fresh open task for work already done (FR-013).
- *   - already PRESENT in the audit-log at any status — a later convergence round
- *     re-surfacing the same signature must not multiply near-duplicate entries
- *     (FR-016 cross-run dedup).
+ * specs/029 US4 (FR-013/FR-016) — the result of partitioning a fresh extraction
+ * against the audit-log's loop-hygiene state. The lift needs THREE buckets, not a
+ * single filtered list, because the FR-013 and FR-016 drops mean DIFFERENT things
+ * to the convergence dampener:
+ *
+ *   - `liftable` — neither resolved nor already-present. These get fresh
+ *     `AUDIT-<date>-NN` IDs + a new audit-log entry (and become slushable/backlog
+ *     work).
+ *   - `dedupSuppressedOpen` — already PRESENT in the audit-log (FR-016 cross-run
+ *     dedup) but NOT resolved. These are STILL-UNADDRESSED findings re-surfacing on
+ *     a later round. They must NOT get a second backlog entry (FR-016: ≤1 task per
+ *     signature) — but they must STILL be visible to the dampener as the run's
+ *     surfaced severity, so a persistent OPEN HIGH keeps blocking (US3 SC-001). The
+ *     prior single-bucket filter dropped these too, which let an all-deduped re-run
+ *     render as a PRISTINE quiet section → the single-run-clean rule graduated a
+ *     feature with a real unfixed HIGH (the graduation-safety bug this fix closes).
+ *
+ * Findings already RESOLVED (`Status: fixed-<sha>`, FR-013) appear in NEITHER bucket
+ * — they are done, so they neither create work nor count toward the dampener. A
+ * finding that is BOTH fixed and (separately) present is treated as resolved (FR-013
+ * wins): re-surfacing a fixed finding is genuine jitter on done work, not a
+ * persistent open defect.
+ */
+export interface PartitionedFindings<T extends SignaturedFinding> {
+  /** Neither resolved nor already-present → fresh IDs + new entry. */
+  readonly liftable: T[];
+  /**
+   * Already-present (FR-016) and NOT resolved → no new backlog entry, but the
+   * dampener must still see their severity (US3 SC-001). The lift renders these
+   * as a non-pristine re-report section when `liftable` is empty.
+   */
+  readonly dedupSuppressedOpen: T[];
+}
+
+/**
+ * Partition a fresh extraction into the loop-hygiene buckets (FR-013/FR-016).
  * Both sets are keyed by the single shared `findingSignature(heading, surface)`.
  * Each drop is announced through `warn` for an auditable trail.
+ */
+export function partitionLiftableFindings<T extends SignaturedFinding>(
+  findings: readonly T[],
+  auditLogText: string,
+  warn: (message: string) => void,
+): PartitionedFindings<T> {
+  const fixed = collectFixedSignatures(auditLogText);
+  const lifted = collectLiftedSignatures(auditLogText);
+  const liftable: T[] = [];
+  const dedupSuppressedOpen: T[] = [];
+  for (const f of findings) {
+    const sig = findingSignature(f.heading, f.surface);
+    if (fixed.has(sig)) {
+      warn(`audit-barrage-lift: skipping ${f.heading} — already resolved (fixed-<sha>); not re-lifted (FR-013).`);
+      continue;
+    }
+    if (lifted.has(sig)) {
+      warn(
+        `audit-barrage-lift: ${f.heading} — already present in the audit-log (same signature); ` +
+          `no new entry (FR-016 cross-run dedup), but its severity is re-reported so a ` +
+          `persistent open finding keeps the dampener engaged (US3 SC-001).`,
+      );
+      dedupSuppressedOpen.push(f);
+      continue;
+    }
+    liftable.push(f);
+  }
+  return { liftable, dedupSuppressedOpen };
+}
+
+/**
+ * Drop the loop-hygiene-excluded findings from a fresh extraction (FR-013/FR-016).
+ * Thin wrapper over `partitionLiftableFindings` returning only the `liftable`
+ * bucket — retained for callers that do not need the dedup-suppressed-open set.
  */
 export function selectLiftableFindings<T extends SignaturedFinding>(
   findings: readonly T[],
   auditLogText: string,
   warn: (message: string) => void,
 ): T[] {
-  const fixed = collectFixedSignatures(auditLogText);
-  const lifted = collectLiftedSignatures(auditLogText);
-  return findings.filter((f) => {
-    const sig = findingSignature(f.heading, f.surface);
-    if (fixed.has(sig)) {
-      warn(`audit-barrage-lift: skipping ${f.heading} — already resolved (fixed-<sha>); not re-lifted (FR-013).`);
-      return false;
-    }
-    if (lifted.has(sig)) {
-      warn(`audit-barrage-lift: skipping ${f.heading} — already present in the audit-log (same signature); deduped across runs (FR-016).`);
-      return false;
-    }
-    return true;
-  });
+  return partitionLiftableFindings(findings, auditLogText, warn).liftable;
 }
