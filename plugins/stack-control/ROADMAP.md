@@ -270,7 +270,7 @@ Barrage claude entry pins no model: bare 'claude -p' floats on the user's defaul
 Barrage spawns inherit ambient permissions — read-only is held by model disposition, not mechanism. 2026-06-10: sonnet 4.6 violated PROMPT.md's explicit read-only instruction during a replay, fixed the findings instead, committed 6ce58543 and pushed to origin/feature/design-control mid-audit. Mechanically enforce read-only on barrage spawns (disallowed mutation tools / permission mode), spike-verified.
 
 ## multi:gap/audit-barrage-timeout-observability
-- status: planned
+- status: shipped
 - part-of: multi:feature/govern-operability
 A timed-out barrage model leaves a zero-byte stdout artifact; the kill is visible only in the run INDEX.md (exit 143, timed out: yes). Nothing at the synthesis/lift layer distinguishes 'produced nothing because SIGTERMed' from 'clean, no findings' — the fleet silently degrades (design-control ran 17 one-model rounds). Surface per-model timeout/failure state at synthesis.
 

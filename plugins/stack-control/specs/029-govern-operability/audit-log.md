@@ -317,3 +317,268 @@ Surface:    tests/audit-barrage/config-default.test.ts:83-102
 The test claims to enforce the no-grounding `--disallowedTools` set, and the template currently includes `WebFetch`/`WebSearch`, but the assertion loop only checks `Write`, `Edit`, `NotebookEdit`, `Read`, `Grep`, `Glob`, `Bash`, and `Task`. That leaves the web grounding part of the contract untested even though the surrounding comments and config treat web access as part of the tool loop being disabled.
 
 The blast radius is medium: the shipped config is correct in this diff, but a later edit could drop `WebFetch` or `WebSearch` while this contract test still passes, silently weakening the “single text-only pass over the payload” invariant. The fix is to assert the full required deny-list, ideally by parsing the comma-separated value and comparing exact tool names rather than substring containment.
+
+## 2026-06-20 — audit-barrage lift (20260620T080151824Z-029-govern-operability-phase-2)
+
+### AUDIT-20260620-21 — `DEGRADED_MARKER_RE` scans entire section body, not just the section preamble
+
+Finding-ID: AUDIT-20260620-21 (claude-01 + codex-02; cross-model)
+Status: migrated-to-backlog TASK-334
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/scope-discovery/promote-findings/check-barrage-dampener.ts:131-140 (new lines in `countHighPlusInSection`)
+
+The `DEGRADED_MARKER_RE` check fires on **every line** inside the section, including the body text of individual findings (the `if (!ENTRY_HEADER_RE.test(line)) { i += 1; continue; }` block skips non-header lines from finding-count perspective, but the DEGRADED check happens *before* that guard and is not short-circuited). The pattern `/Fleet:\s*DEGRADED\b/i` is specific, but any finding whose body discusses the fleet-degradation feature — for example, an audit finding that quotes the marker, references the dampener behavior, or audits this very feature (029) — would false-positive set `degraded = true` for that section, causing the dampener to refuse convergence on what is actually a healthy run. This is a self-inflicted risk: `stack-control` is a self-hosted tool, so running audit-barrage *against itself* (as happened in the 029 session) will produce finding bodies that say things like `"The Fleet: DEGRADED marker is written when produced < configured…"`. Any such section in the audit log would be permanently un-dampenable regardless of how many subsequent clean runs follow. The fix is to restrict the scan: before the first `###` entry header is encountered, scan normally for the Fleet marker; once the first `ENTRY_HEADER_RE` match is seen, stop checking for the marker (it will never appear in a well-formed section preamble after that point). Alternatively, anchor the regex to a line that starts with `_Fleet:` or matches the exact escaped-markdown format the lift renders.
+
+---
+
+### AUDIT-20260620-22 — `singleRunCleanEngages` degraded-flag path has no isolated test
+
+Finding-ID: AUDIT-20260620-22
+Status: migrated-to-backlog TASK-335
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/promote-findings/degraded-not-quiet.test.ts:86-103
+
+The new code adds `!mostRecent.degraded` to `singleRunCleanEngages` (line 204 in the diff), but no test case isolates this check. Every test that exercises a single degraded run uses `degradedSection`, which includes a MEDIUM finding — meaning `rawMediumCount > 0` already prevents `singleRunCleanEngages` from engaging, independent of the `!degraded` guard. A regression that removed `!mostRecent.degraded` while leaving the MEDIUM-count check intact would still pass all tests. A targeted case is: a degraded section containing 0 findings (or findings that are all status=`closed`/non-open) so `rawMediumCount === 0` and `rawHighPlusCount === 0`; in that configuration the new guard is the only thing preventing single-run dampening, and no test exercises it. The fix is to add one test case: a single degraded section with 0 HIGH+ and 0 MEDIUM finds, asserting `dampened === false`.
+
+---
+
+### AUDIT-20260620-23 — Diagnostic message silences degraded status when HIGH+ runs coexist in the window
+
+Finding-ID: AUDIT-20260620-23
+Status: migrated-to-backlog TASK-336
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/scope-discovery/promote-findings/check-barrage-dampener.ts:231-249 (diagnostic block ordering)
+
+The `notQuiet` (HIGH+) diagnostic check fires before the degraded diagnostic check. When the recent window contains both a run with HIGH+ findings and a run with `degraded: true`, only the HIGH+ message is returned — the degraded run is never surfaced in the operator-facing reason. After the operator resolves the HIGH+ findings and re-runs, the dampener will produce the degraded message on the *next* invocation; but the first invocation's reason is incomplete. This means an operator who sees "1 run surfaced N HIGH+" and then fixes those N findings may expect the next clean healthy run to converge, not realising there is *also* a degraded run in the window requiring a full healthy re-run. The blast radius is a surprised operator on the re-run, not incorrect dampening. A straightforward fix: collect both the HIGH+ reason and the degraded reason and surface them together (e.g. by building a list of reasons rather than returning on first match).
+
+---
+
+### AUDIT-20260620-24 — Degraded runs with zero surviving findings are invisible to the dampener
+
+Finding-ID: AUDIT-20260620-24 (claude-04 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=informational, codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/subcommands/audit-barrage-lift.ts:388-393 (comment), and the dampener as a whole
+
+The comment in `audit-barrage-lift.ts` says `"the degraded+0-findings branch above already records nothing"` — when the fleet is degraded but zero findings came out of the surviving lanes, no section is written to the audit log. This means the dampener, which reads only the log, cannot see that a degraded run occurred. Consider the sequence: two clean healthy runs (sections in log), then a degraded+0-findings run (no section), then one more healthy clean run. The dampener sees three sections — all three clean — and may dampen even though an uninspected degraded run sits between the prior two clean runs and the latest one. Whether this is a correctness gap depends on spec intent: the spec may have decided that a degraded run producing nothing is not meaningful enough to block convergence, which is a defensible position (the surviving lanes produced no findings either). The current code and tests don't document this edge case or assert the intended behavior, making it a silent design assumption. Adding a spec comment or test asserting the intended behavior (either "degraded+0-findings is invisible and that is intentional" or "we should write a sentinel-only section to mark the degraded run") would close the documentation gap and prevent a future maintainer from patching the lift to write sentinel sections on degraded-0-findings runs, inadvertently changing the dampening semantics.
+
+## 2026-06-20 — audit-barrage lift (20260620T080601577Z-029-govern-operability-phase-2)
+
+### AUDIT-20260620-25 — T008 implementation surfaces absent from the diff — zero-byte detection and `Fleet: DEGRADED` stamp cannot be audited
+
+Finding-ID: AUDIT-20260620-25
+Status: migrated-to-backlog TASK-337
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/audit-barrage/terminal-state.test.ts:13-19 (imports); src/subcommands/audit-barrage-lift.ts (renderSection call site)
+
+The two test files added in this commit import two symbols that must exist in implementation files, but neither implementation file appears in the diff:
+
+- `completedNonConvergedAnnotation` from `src/scope-discovery/audit-barrage/types.ts` (tested in `terminal-state.test.ts` lines 13, 42–62)
+- `renderSection` and the exported type `SectionFleetStatus` from `src/subcommands/audit-barrage-lift-render.ts` (tested in `terminal-state.test.ts` lines 15–18, and called in the modified `audit-barrage-lift.ts`)
+
+The test docblock explicitly labels its coverage as `(T008, RED)` — meaning these tests are written in the RED phase and the GREEN implementation is not visible here. Yet the commit subject claims `T008-T012` complete. This creates an auditable gap: the correctness of the zero-byte lane detection contract (FR-006: `completed + exitCode=0 + reportBytes=0` → `zero-byte` annotation, not bare `completed`) and the actual prose shape of the `Fleet: DEGRADED` stamp that the dampener's regex reads back are both invisible in this diff. If those functions do not yet carry the expected signatures, TypeScript strict mode would reject the import at compile time and CI would fail. If they were silently added in a prior US1 commit without a test, the RED/GREEN split is inverted. Either way, the audit cannot verify the core T008 surface — the implementation files should be in the diff.
+
+A reasonable fix: if the implementations were authored as part of this same commit but the diff was rendered selectively, re-run the diff to confirm all changed files are included. If the implementations were added in US1 (`11192f69`), the test docblock annotation should read `(T008, GREEN: impl in US1)` to avoid the confusion, and the audit log should confirm the T008 contract was governed then.
+
+---
+
+### AUDIT-20260620-26 — `DEGRADED_MARKER_RE` scans finding body lines — false-positive degraded detection possible
+
+Finding-ID: AUDIT-20260620-26
+Status: migrated-to-backlog TASK-338
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/scope-discovery/promote-findings/check-barrage-dampener.ts:130–133 (new lines in `countHighPlusInSection`)
+
+The new degraded-detection line fires on every line the inner `while` loop visits before the `continue`:
+
+```typescript
+if (DEGRADED_MARKER_RE.test(line)) degraded = true;
+if (!ENTRY_HEADER_RE.test(line)) {
+  i += 1;
+  continue;
+}
+```
+
+Lines that are NOT an entry header (`### AUDIT-…`) are skipped via `continue`, but the degraded check already executed on them. This is correct for the section preamble (where the marker lives), but the loop also visits finding body lines — text that appears after a `### AUDIT-…` header but before the next `###` or the section end. If a finding body happens to contain the string `Fleet: DEGRADED` (e.g., a finding reporting on degraded-fleet logic), the section would be spuriously flagged as degraded.
+
+The consequence is conservative rather than hazardous: a false-positive prevents dampening instead of allowing it. But it would produce a misleading diagnostic message ("Not dampened: … DEGRADED fleet") when the fleet was actually healthy and the finding body just happened to name the concept. The fix is to scan only the non-entry lines between the section header and the first `###` entry, or add an anchor to the marker regex (e.g., `^[_\s]*Fleet:\s*DEGRADED\b` checked only while `currentEntryHeader === null`).
+
+---
+
+### AUDIT-20260620-27 — `consecutiveQuietEngages` applies `every()` across the full `recentRunCounts` window — a single historical degraded run outside the threshold can block convergence indefinitely
+
+Finding-ID: AUDIT-20260620-27 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   blocking
+Per-lane:   claude=informational, codex=blocking
+Decision:   adjudicated (gate-counted blocking) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — blocking retained.
+Surface:    src/scope-discovery/promote-findings/check-barrage-dampener.ts:193–196 (`consecutiveQuietEngages`)
+
+```typescript
+const consecutiveQuietEngages =
+    recentRunCounts.length >= threshold &&
+    recentRunCounts.every((r) => r.rawHighPlusCount === 0 && !r.degraded);
+```
+
+`recentRunCounts.every(…)` checks ALL elements of the window, not just the most recent `threshold` of them. If the window holds more than `threshold` entries, a degraded run at position `threshold+1` (older than the threshold horizon) would still cause `every()` to return false, preventing `consecutiveQuietEngages` from firing even after `threshold` subsequent healthy+clean runs have been recorded.
+
+The test suite exercises only exact threshold-sized windows (threshold=2, 2 runs in each test), so this scenario is untested. The US2 change only adds `&& !r.degraded` to the pre-existing `rawHighPlusCount === 0` condition, so this is a latent shape issue rather than a US2 regression — but the new condition makes it newly reachable in practice: before US2, a run with 0 HIGH+ could not block `consecutiveQuietEngages` regardless of how old it was; now a degraded-but-0-HIGH+ run at position threshold+1 can. Whether the window is genuinely capped at `threshold` (making `every()` correct) or is open-ended depends on the `recentRunCounts` construction upstream, which is not visible in this diff. The fix is either to confirm the window is capped, or to change the check to `recentRunCounts.slice(0, threshold).every(…)` to make the intent explicit.
+
+## 2026-06-20 — audit-barrage lift (20260620T082027834Z-029-govern-operability-phase-2)
+
+### AUDIT-20260620-28 — Integration gap: `renderQuietSection` degraded branch is not tested through the render→parse contract
+
+Finding-ID: AUDIT-20260620-28
+Status: migrated-to-backlog TASK-339
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `tests/promote-findings/degraded-not-quiet.test.ts:28-43` and `src/subcommands/audit-barrage-lift-render.ts:91-109`
+
+The dampener tests in `degraded-not-quiet.test.ts` drive `checkBarrageDampener` with hand-crafted section text (the `degradedSection()` helper, lines 28–43), not with the actual output of `renderQuietSection`. The `terminal-state.test.ts` file does verify that `renderSection` stamps `Fleet: DEGRADED` when degraded (lines 67–73), but there is no parallel test for the zero-findings branch — `renderQuietSection` with a degraded fleet — whose output format differs from `renderSection`'s degraded output.
+
+The two functions produce different prose. `renderQuietSection` (degraded path, lift-render.ts:97-103) emits `"0 findings, but absence over killed/timed-out lanes is NOT a clean signal. This run is NOT counted..."`, while the hand-crafted helper used by the dampener tests emits `"— this run is NOT counted..."`. Both contain `Fleet: DEGRADED` so the dampener regex matches both — but only by coincidence of the shared substring, not because a test ever ran `renderQuietSection` → `checkBarrageDampener` end-to-end.
+
+If `renderQuietSection`'s degraded branch were edited to use a different marker string (e.g. `Status: DEGRADED`), every existing test would still pass: `terminal-state.test.ts` only calls `renderSection`, and `degraded-not-quiet.test.ts` uses hand-crafted input. The dampener would silently start treating degraded-clean runs as quiet, which is exactly the failure this feature exists to prevent. A one-line test calling `renderQuietSection` with `{ produced: 1, configured: 2 }` and asserting the output matches `DEGRADED_MARKER_RE` would close the gap.
+
+---
+
+### AUDIT-20260620-29 — Stale comment: "degraded+0-findings branch above already records nothing" is wrong after fix commit
+
+Finding-ID: AUDIT-20260620-29
+Status: migrated-to-backlog TASK-340
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/subcommands/audit-barrage-lift.ts` — the comment block immediately before the `renderSection` call (lines ~395-401 in the final file, added in commit 09d48928)
+
+The comment reads: `"the degraded+0-findings branch above already records nothing; this covers degraded+findings, where 0 HIGH+ from the survivors is not clean."` This was correct when commit 09d48928 landed — at that point, the degraded+0-findings path returned early with no section written. The subsequent fix commit (2692615c) changed that path to record a DEGRADED-marked quiet section rather than nothing. The comment was not updated.
+
+After the fix, the "branch above" (`if (findings.length === 0)`) now records a DEGRADED-marked section in both the healthy and degraded cases. The comment's claim that it "records nothing" is factually wrong and will mislead a future reader into thinking the zero-findings branch is still the silent early-return. A correct update would say the zero-findings branch records a DEGRADED-marked quiet section (not counted as quiet by the dampener), so the `renderSection` path below covers only the case where surviving lanes actually produced findings.
+
+---
+
+### AUDIT-20260620-30 — `DEGRADED_MARKER_RE` lacks a leading word boundary, allowing substring matches
+
+Finding-ID: AUDIT-20260620-30
+Status: migrated-to-backlog TASK-341
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/scope-discovery/promote-findings/check-barrage-dampener.ts:21`
+
+The pattern is `/Fleet:\s*DEGRADED\b/i`. It has `\b` after `DEGRADED` but not before `Fleet`, so it would match a preamble line containing `badFleet: DEGRADED` or `notAFleet: DEGRADED`. The `sawEntry` guard (lines 130–134) prevents finding bodies from being scanned, making this a very low-probability false positive in practice. However, for a security- and correctness-sensitive signal — the `degraded` flag blocks convergence — a precise regex (`/\bFleet:\s*DEGRADED\b/i`) costs nothing and eliminates the ambiguity entirely.
+
+## 2026-06-20 — audit-barrage lift (20260620T082345159Z-029-govern-operability-phase-2)
+
+### AUDIT-20260620-31 — Stale JSDoc on `renderQuietSection` directly contradicts new implementation
+
+Finding-ID: AUDIT-20260620-31
+Status: migrated-to-backlog TASK-342
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/audit-barrage-lift-render.ts:89-91 (the JSDoc comment above the updated function signature)
+
+The block comment retained above `renderQuietSection` in the diff reads:
+
+```
+* (Degraded clean runs are NOT recorded — FR-007: absence over killed lanes is not
+* a clean signal; that branch is gated in the lift, not here.)
+```
+
+This describes the OLD behavior — the early return that was removed in `audit-barrage-lift.ts`. The entire point of this commit is to make degraded clean runs ALWAYS record a section (carrying the `Fleet: DEGRADED` marker). The new `renderQuietSection` implementation does exactly the opposite of what the comment asserts: when `fleet.produced < fleet.configured`, it renders and returns a DEGRADED-marked section.
+
+A reader — human or agent — encountering this function will read the doc comment as the authoritative contract statement, conclude degraded runs are not recorded here, and potentially write a new call-site that skips the fleet argument for degraded cases on the assumption the function is a no-op for them. The comment is also the explanation of *why* the function exists; the wrong explanation at the top undermines every other reasoning chain that flows from it.
+
+The fix is to update the comment to describe the new contract: `renderQuietSection` now covers both the healthy-quiet path AND the degraded-quiet path; the `fleet` parameter controls which branch is rendered; both paths produce a section.
+
+---
+
+### AUDIT-20260620-32 — Stale inline comment at `renderSection` call site describes the removed early-return
+
+Finding-ID: AUDIT-20260620-32
+Status: migrated-to-backlog TASK-343
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/audit-barrage-lift.ts (the new `+` comment block immediately before the `renderSection` call at the bottom of the findings branch)
+
+The newly-added comment says:
+
+```
+// specs/029 US2 (FR-007): when this findings-section is recorded over a
+// DEGRADED fleet (a surviving lane found something while others were killed),
+// stamp the `Fleet: DEGRADED` marker so the dampener never counts this run as
+// quiet (the degraded+0-findings branch above already records nothing; this
+// covers degraded+findings...
+```
+
+The parenthetical `"the degraded+0-findings branch above already records nothing"` is factually wrong in the post-commit state. The degraded+0-findings branch above NOW records a section — the entire change from `fix(029)` commit is that it records a `Fleet: DEGRADED`-marked section instead of returning early. This comment was drafted to describe the OLD two-branch split (record-nothing vs record-findings), but it was not updated when the zero-findings branch behavior was changed in the same commit.
+
+An agent reading this comment to understand the branching logic will infer that the zero-findings/degraded case is handled by NOT recording anything. It will conclude that the `renderSection` call only needs the degraded marker when findings are non-empty, because "the other branch handles the degraded-quiet case by silence." This is the wrong mental model and could lead to a regression if the degraded-quiet path is touched later.
+
+Fix: replace the parenthetical with the accurate description — both branches now record a section; the zero-findings branch records via `renderQuietSection` with the degraded fleet argument; this call covers degraded+findings.
+
+---
+
+### AUDIT-20260620-33 — `renderQuietSection` degraded path has no unit test
+
+Finding-ID: AUDIT-20260620-33
+Status: migrated-to-backlog TASK-344
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/audit-barrage/terminal-state.test.ts (entire file); src/subcommands/audit-barrage-lift-render.ts:97-113 (new degraded branch in `renderQuietSection`)
+
+`terminal-state.test.ts` imports only `renderSection` — not `renderQuietSection`. The new conditional block inside `renderQuietSection` (lines 97–113 in the diff, the `if (fleet !== undefined && fleet.produced < fleet.configured)` branch) is exercised nowhere in the test suite. The dampener integration tests in `degraded-not-quiet.test.ts` use manually-constructed strings that look like what `renderQuietSection` would produce, but they never call the function.
+
+The risk: if `renderQuietSection`'s degraded branch produced the wrong marker string — say, `Fleet:DEGRADED` (no space), or `fleet: DEGRADED` (lowercase), or omitted the keyword entirely — the `DEGRADED_MARKER_RE = /Fleet:\s*DEGRADED\b/i` regex in the dampener would still match the hand-crafted test strings, making all dampener tests green while the production path is silently broken. The test suite would never catch the discrepancy.
+
+`renderSection`'s degraded path IS tested (three cases in `terminal-state.test.ts`). Adding parallel tests for `renderQuietSection` closes the gap: verify that `renderQuietSection(date, run, { produced: 1, configured: 2 })` matches `/Fleet:\s*DEGRADED/i` and that `renderQuietSection(date, run, { produced: 2, configured: 2 })` does NOT.
+
+---
+
+### AUDIT-20260620-34 — `completedNonConvergedAnnotation` silently drops nonzero-exit info when `reportBytes === 0`
+
+Finding-ID: AUDIT-20260620-34
+Status: migrated-to-backlog TASK-345
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/scope-discovery/audit-barrage/types.ts:347 (the `kind` ternary)
+
+The new ternary is:
+
+```typescript
+const kind = lane.reportBytes === 0 ? 'zero-byte' : `nonzero-exit (${lane.exitCode})`;
+```
+
+For a lane with `exitCode: 0 && reportBytes: 0` this is correct: the exit was clean but the output file is empty — `zero-byte` is the meaningful label. However for a lane with `exitCode: 3 && reportBytes: 0`, the function emits `DEGRADED [zero-byte] (exit 3, report bytes 0)`. The exit code IS printed in the longer string, but `kind` is labeled `zero-byte` exclusively. The `zero-byte` label suggests the process exited cleanly but produced no output; `exit 3` says otherwise.
+
+This is a diagnostic readability issue rather than a correctness bug (the full annotation string does carry the exit code), and the combined case is likely rare in practice. The exit-code information is not lost. The blast-radius is limited to human-readable output interpretation. A minor fix would be to check both conditions: `lane.reportBytes === 0 && lane.exitCode === 0 ? 'zero-byte' : lane.reportBytes === 0 ? 'zero-byte/nonzero-exit' : \`nonzero-exit (${lane.exitCode})\`` — or equivalently use a two-step label that names both facts when both apply.
+
+### AUDIT-20260620-35 — Stale comments still describe degraded clean runs as unrecorded
+
+Finding-ID: AUDIT-20260620-35
+Status: migrated-to-backlog TASK-346
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift-render.ts:81-90; src/subcommands/audit-barrage-lift.ts:383-387
+
+The implementation now records a DEGRADED-marked section for 0-finding degraded runs, but two comments still state the old contract. In `audit-barrage-lift-render.ts:89-90`, the function doc says “Degraded clean runs are NOT recorded”; in `audit-barrage-lift.ts:386`, the comment says “the degraded+0-findings branch above already records nothing.” Both contradict the new logic at `audit-barrage-lift.ts:347-378` and `renderQuietSection`’s degraded branch at `audit-barrage-lift-render.ts:104-110`.
+
+Blast radius is low because the executable behavior is correct and nearby comments also explain the new contract, so an adopter running the code is not broken. The risk is documentation drift in a governance-heavy path: a maintainer or unattended editing agent could preserve or reintroduce the old “record nothing” behavior by trusting these stale comments. A reasonable fix is to update both comments so they consistently say degraded clean runs are recorded with `Fleet: DEGRADED` and excluded by the dampener.
