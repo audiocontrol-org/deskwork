@@ -4,9 +4,10 @@ title: >-
   Promote the no-grounding claude-lane fix to the plugin shipping default
   (templates/audit-barrage-config.yaml) so adopters + fresh installs inherit the
   fast, reliable lane
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 02:12'
+updated_date: '2026-06-20 07:47'
 labels:
   - agent-found
   - 'type:bug'

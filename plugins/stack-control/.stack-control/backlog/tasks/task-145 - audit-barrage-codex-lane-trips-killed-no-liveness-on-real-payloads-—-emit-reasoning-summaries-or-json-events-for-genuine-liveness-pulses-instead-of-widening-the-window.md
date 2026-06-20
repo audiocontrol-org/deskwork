@@ -4,10 +4,10 @@ title: >-
   audit-barrage: codex lane trips killed-no-liveness on real payloads — emit
   reasoning summaries (or --json events) for genuine liveness pulses instead of
   widening the window
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-16 23:29'
-updated_date: '2026-06-17 17:31'
+updated_date: '2026-06-20 07:47'
 labels:
   - agent-found
   - 'type:bug'

@@ -28,7 +28,7 @@
 - [x] T004 [P] [US1] RED test: codex lane emits a liveness pulse within the tight window on a real payload (no false `killed-no-liveness`) — in `tests/audit-barrage/spawn-liveness.test.ts` (FR-003)
 - [x] T005 [US1] Wire codex reasoning-summary liveness handling + restore the tight liveness window in `src/scope-discovery/audit-barrage/spawn-cli.ts` (FR-003)
 - [x] T006 [US1] Calibrate opus no-grounding; if it cannot meet the timeout envelope, surface a fleet-composition decision to the operator (do NOT drop it unilaterally) — note result in `specs/029-govern-operability/research.md` (Assumptions)
-- [ ] T007 [US1] Close TASK-288, TASK-145 (`stackctl backlog done`); record the phase-1 govern checkpoint
+- [x] T007 [US1] Close TASK-288, TASK-145 (`stackctl backlog done`); record the phase-1 govern checkpoint
 
 ---
 
