@@ -2,6 +2,43 @@
 
 ---
 
+## 2026-06-20: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 16
+  - fix(029): US4 — per-phase --override must write the phase checkpoint (FR-017)
+  - feat(029): US4 — loop hygiene + override short-circuit (T020-T028)
+  - chore(029): US3 (Phase 3) graduated by override — govern checkpoint + closed TASK-146
+  - fix(029): US3 govern triage — unwrap markdown code-span surfaces (codex, phase-3)
+  - fix(029): US3 govern triage — single-run-clean uses RAW HIGH (codex-01, phase-3)
+  - fix(029): US3 govern triage — NUL byte, line-range signature, code-epoch suppression
+  - feat(029): US7 — hunk-granularity checkpoint fingerprint (T040-T042, brought forward)
+  - feat(029): US3 part 2 — dampener identity-keying + severity determinism (T016-T018)
+  - feat(029): US3 part 1 — shared finding-signature (T014-T015)
+  - chore(029): US2 (Phase 2) graduated — govern checkpoint + gap node shipped
+  - fix(029): US2 govern triage — degraded clean run must record a marked section
+  - feat(029): US2 — fleet observability: degraded is never convergence (T008-T012)
+  - chore(029): US1 (Phase 1) graduated — govern checkpoint + closed TASK-288/145
+  - fix(029): US1 govern round-2 — widen no-grounding lane liveness window, clarify override
+  - fix(029): US1 govern triage — codex bare flag, real-tool deny-list, opus calibrated
+  - feat(029): US1 — fleet reliability foundation (T001-T006)
+- Files changed: 82
+- Backlog touched: TASK-145, TASK-146, TASK-288, TASK-289, TASK-319, TASK-353, TASK-354
+
 ## 2026-06-20: govern-operability — cluster the umbrella, design + author the full spec chain (029) to runnable
 
 **Goal:** Operator: take up `multi:feature/govern-operability` and *"design an execution plan to burn down the entire thing at once — no fake yagni bullshit, no scope shirking. I just want it all fixed."* Then drive it through the lifecycle to a runnable spec.

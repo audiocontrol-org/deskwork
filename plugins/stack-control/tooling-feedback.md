@@ -96,3 +96,10 @@
 
 ## session-end 2026-06-20
 - spec-check / check-prerequisites resolve --spec and paths relative to cwd; running from the repo root instead of the installation dir (plugins/stack-control) gives a confusing 'spec dir not found' FATAL. A clearer error naming the installation-root expectation, or installation-relative --spec resolution, would remove a stumble in the define chain.
+
+## session-end 2026-06-20
+- Per-phase govern re-stale loop: US2/US3/US4 all edit check-barrage-dampener.ts + audit-barrage-lift.ts in overlapping regions, so each later phase re-stales the earlier ones' checkpoints (US7 hunk-fingerprints only help for DIFFERENT-region edits). Cost dominated the session (many re-govern cycles). TASK-353.
+- No-grounding claude/sonnet audit lane intermittently times out (>420s floor) on larger per-phase payloads (029 phase-3), producing degraded rounds that block convergence. TASK-354.
+- Implement-audit barrage plateaus into a finding-GENERATOR on the dampener/signature code (narrow defensive edges each round: line-ranges, markdown code-spans, tip.sha validation) — needed an operator-approved --override to exit the plateau (the spec-audit-diminishing-returns pattern, but for implement-mode).
+- findingSignature was authored with a LITERAL NUL byte separator (Edit-tool fumble) -> git saw the file as binary -> the auditor couldn't read it ('opaque' HIGH). A doctor/CI check for NUL bytes / binary-detected .ts source would catch this class.
+- Per-phase --override regressed FR-017 (override now runs a barrage instead of short-circuiting) after the override-checkpoint fix; the override-short-circuit unit test still passes -> test/real-path gap. Needs a test that reproduces the real bypass.
