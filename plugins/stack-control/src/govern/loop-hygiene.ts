@@ -69,6 +69,26 @@ export function collectLiftedSignatures(auditLogText: string): ReadonlySet<strin
   return out;
 }
 
+/**
+ * specs/029 US4 (AUDIT-BARRAGE-codex-01/claude-01, phase-2 re-govern): map each
+ * already-present signature to the CANONICAL `Finding-ID` of the audit-log entry
+ * that tracks it, so a re-report block can name the entry it dedups against
+ * (`Tracked-by: AUDIT-NN`) instead of a bare "already tracked" with no pointer.
+ * The FIRST entry for a signature wins — it is the canonical original; later
+ * entries for the same signature are themselves dedup artifacts. Re-report blocks
+ * carry no `Finding-ID:` (the parser skips them), so this map only ever sees the
+ * real backlog-bound entries.
+ */
+export function collectLiftedSignatureIds(auditLogText: string): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
+  for (const entry of parseAuditLogText(auditLogText)) {
+    if (entry.surface === undefined) continue;
+    const sig = findingSignature(auditLogEntryHeading(entry.heading), entry.surface);
+    if (!out.has(sig)) out.set(sig, entry.findingId);
+  }
+  return out;
+}
+
 /** The minimal finding shape the lift filter needs (a subset of ExtractedFinding). */
 export interface SignaturedFinding {
   readonly heading: string;
@@ -99,15 +119,34 @@ export interface SignaturedFinding {
  * wins): re-surfacing a fixed finding is genuine jitter on done work, not a
  * persistent open defect.
  */
+/**
+ * specs/029 US4 (AUDIT-BARRAGE-codex-01/claude-01): a dedup-suppressed-open finding
+ * paired with the canonical `AUDIT-NN` id it matched in the audit-log. The lift
+ * renders the pairing as `Tracked-by: <canonicalId>` so the re-report block is
+ * mechanically traceable to the entry that already tracks it.
+ */
+export interface DedupSuppressedFinding<T extends SignaturedFinding> {
+  readonly finding: T;
+  readonly canonicalId: string;
+}
+
 export interface PartitionedFindings<T extends SignaturedFinding> {
   /** Neither resolved nor already-present → fresh IDs + new entry. */
   readonly liftable: T[];
   /**
    * Already-present (FR-016) and NOT resolved → no new backlog entry, but the
    * dampener must still see their severity (US3 SC-001). The lift renders these
-   * as a non-pristine re-report section when `liftable` is empty.
+   * as a non-pristine re-report section when `liftable` is empty. Each pairs the
+   * finding with the canonical `AUDIT-NN` it dedups against (codex-01/claude-01).
    */
-  readonly dedupSuppressedOpen: T[];
+  readonly dedupSuppressedOpen: DedupSuppressedFinding<T>[];
+  /**
+   * Already RESOLVED (`Status: fixed-<sha>`, FR-013) → dropped from both work and
+   * dampener accounting. Surfaced here ONLY so the lift can report how many findings
+   * the FR-013 filter removed (claude-05 — without it the suppression arithmetic is
+   * unreconstructable: "why did only N of M findings reach the log?").
+   */
+  readonly resolvedSuppressed: T[];
 }
 
 /**
@@ -121,27 +160,30 @@ export function partitionLiftableFindings<T extends SignaturedFinding>(
   warn: (message: string) => void,
 ): PartitionedFindings<T> {
   const fixed = collectFixedSignatures(auditLogText);
-  const lifted = collectLiftedSignatures(auditLogText);
+  const liftedIds = collectLiftedSignatureIds(auditLogText);
   const liftable: T[] = [];
-  const dedupSuppressedOpen: T[] = [];
+  const dedupSuppressedOpen: DedupSuppressedFinding<T>[] = [];
+  const resolvedSuppressed: T[] = [];
   for (const f of findings) {
     const sig = findingSignature(f.heading, f.surface);
     if (fixed.has(sig)) {
       warn(`audit-barrage-lift: skipping ${f.heading} — already resolved (fixed-<sha>); not re-lifted (FR-013).`);
+      resolvedSuppressed.push(f);
       continue;
     }
-    if (lifted.has(sig)) {
+    const canonicalId = liftedIds.get(sig);
+    if (canonicalId !== undefined) {
       warn(
-        `audit-barrage-lift: ${f.heading} — already present in the audit-log (same signature); ` +
-          `no new entry (FR-016 cross-run dedup), but its severity is re-reported so a ` +
-          `persistent open finding keeps the dampener engaged (US3 SC-001).`,
+        `audit-barrage-lift: ${f.heading} — already present in the audit-log as ${canonicalId} ` +
+          `(same signature); no new entry (FR-016 cross-run dedup), but its severity is ` +
+          `re-reported so a persistent open finding keeps the dampener engaged (US3 SC-001).`,
       );
-      dedupSuppressedOpen.push(f);
+      dedupSuppressedOpen.push({ finding: f, canonicalId });
       continue;
     }
     liftable.push(f);
   }
-  return { liftable, dedupSuppressedOpen };
+  return { liftable, dedupSuppressedOpen, resolvedSuppressed };
 }
 
 /**

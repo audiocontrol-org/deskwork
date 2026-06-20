@@ -45,6 +45,7 @@ import {
   buildAuditLogHeader,
   renderSection,
   renderRereportEntries,
+  REREPORT_MIXED_LABEL,
 } from './audit-barrage-lift-render.js';
 import { recordNoNewFindingsSection } from './record-no-new-findings-section.js';
 import { atomicWriteFile } from '../scope-discovery/util/atomic-write-file.js';
@@ -359,11 +360,8 @@ export async function runAuditBarrageLift(
   // bug: a single-bucket filter dropped these, rendering an all-deduped re-run as
   // a PRISTINE quiet section that the single-run-clean rule graduated). The
   // selection logic + signature keying live in the shared loop-hygiene helper.
-  const { liftable: liftableFindings, dedupSuppressedOpen } = partitionLiftableFindings(
-    findings,
-    auditLogText,
-    (m) => stderr.write(`${m}\n`),
-  );
+  const { liftable: liftableFindings, dedupSuppressedOpen, resolvedSuppressed } =
+    partitionLiftableFindings(findings, auditLogText, (m) => stderr.write(`${m}\n`));
 
   // A run with no NEW liftable findings ALWAYS records a section so the convergence
   // dampener (which counts SECTIONS) sees it as the most-recent run — re-report /
@@ -400,8 +398,13 @@ export async function runAuditBarrageLift(
     tipSha,
   );
 
+  // claude-03/claude-05: report the TOTAL extracted plus the suppression breakdown
+  // so an operator correlating this line against the raw run files can reconstruct
+  // the arithmetic (new + persistent-re-surfaced + already-resolved = total).
   stderr.write(
-    `audit-barrage-lift: extracted ${liftableFindings.length} finding(s) from ${opts.runDir}; ` +
+    `audit-barrage-lift: extracted ${findings.length} finding(s) from ${opts.runDir} ` +
+      `(${liftableFindings.length} new, ${dedupSuppressedOpen.length} persistent-open re-surfaced, ` +
+      `${resolvedSuppressed.length} already-resolved suppressed); ` +
       `assigning ${assignedIds[0]}..${assignedIds[assignedIds.length - 1]}.\n`,
   );
   for (let i = 0; i < liftableFindings.length; i += 1) {
@@ -426,8 +429,13 @@ export async function runAuditBarrageLift(
   // the dampener) and a non-open `Status:` (never re-slushed into a duplicate task,
   // FR-016). Empty set → empty string → no-op.
   const rereportEntries = renderRereportEntries(dedupSuppressedOpen);
+  // claude-04: label the re-report block so the mixed section's two categories
+  // (new liftable entries vs re-surfaced already-tracked ones) are distinguishable
+  // at a glance — parity with the pure-re-report section's preamble.
   const sectionWithRereports =
-    rereportEntries.length > 0 ? `${section}\n${rereportEntries}` : section;
+    rereportEntries.length > 0
+      ? `${section}\n${REREPORT_MIXED_LABEL}\n\n${rereportEntries}`
+      : section;
   if (dedupSuppressedOpen.length > 0) {
     stderr.write(
       `audit-barrage-lift: also re-reported ${dedupSuppressedOpen.length} already-tracked ` +

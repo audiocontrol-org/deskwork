@@ -159,7 +159,30 @@ export function renderQuietSection(
  * of status, and its identity-keyed `newHighPlusCount` (used by N-consecutive-quiet)
  * folds these `(signature, severity)` pairs so a persistent HIGH keeps blocking.
  */
-function renderRereportEntry(finding: ExtractedFinding): string {
+/**
+ * specs/029 US4 (AUDIT-BARRAGE-codex-01/claude-01): a re-report entry paired with
+ * the canonical `AUDIT-NN` id it dedups against. The render layer takes the pairing
+ * structurally (no import from the govern loop-hygiene layer) so the dependency
+ * stays one-directional.
+ */
+export interface RereportInput {
+  readonly finding: ExtractedFinding;
+  readonly canonicalId: string;
+}
+
+/**
+ * specs/029 US4 (claude-04): the label a MIXED section (new liftable entries +
+ * re-surfaced already-tracked ones) prepends to its re-report block, so the two
+ * finding categories are distinguishable without reading every `Status:` field.
+ * The pure-re-report section (`renderRereportSection`) has its own preamble; this
+ * is only for the appended-to-a-findings-section case.
+ */
+export const REREPORT_MIXED_LABEL =
+  '_Re-surfaced persistent findings (already tracked; no new IDs/tasks — see each ' +
+  '`Tracked-by:`). Recorded so the convergence dampener still counts their severity (US3 SC-001)._';
+
+function renderRereportEntry(entry: RereportInput): string {
+  const { finding, canonicalId } = entry;
   const suffix = finding.crossModelAgreement
     ? ` (${finding.sourceModels.join(' + ')}; cross-model)`
     : '';
@@ -167,6 +190,10 @@ function renderRereportEntry(finding: ExtractedFinding): string {
     `### ${finding.heading}`,
     '',
     `Status:     re-reported (already tracked${suffix})`,
+    // codex-01/claude-01: a DURABLE, machine-readable pointer to the canonical
+    // entry — NOT a fresh `Finding-ID:` (that would mint a duplicate backlog task
+    // and a new dedup signature; the parser skips entries without `Finding-ID:`).
+    `Tracked-by: ${canonicalId}`,
     `Severity:   ${finding.severity}`,
     `Surface:    ${finding.surface}`,
     '',
@@ -178,16 +205,17 @@ function renderRereportEntry(finding: ExtractedFinding): string {
  * already-tracked findings — used to APPEND re-reports to a section that also
  * carries new liftable entries, so a run's full surfaced severity (new + persistent)
  * is recorded in one section. Each entry carries a `Severity:` line (counted by the
- * dampener) and a non-open `Status:` (so the slush path never migrates a duplicate
- * backlog task). Empty input → empty string (nothing to append).
+ * dampener), a non-open `Status:` (so the slush path never migrates a duplicate
+ * backlog task), and a `Tracked-by:` pointer to its canonical entry. Empty input →
+ * empty string (nothing to append).
  */
-export function renderRereportEntries(findings: readonly ExtractedFinding[]): string {
-  if (findings.length === 0) return '';
-  return findings.map(renderRereportEntry).join('\n');
+export function renderRereportEntries(entries: readonly RereportInput[]): string {
+  if (entries.length === 0) return '';
+  return entries.map(renderRereportEntry).join('\n');
 }
 
 export function renderRereportSection(
-  findings: readonly ExtractedFinding[],
+  findings: readonly RereportInput[],
   date: string,
   runDirBasename: string,
   fleet?: SectionFleetStatus,

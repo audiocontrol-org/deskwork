@@ -25,13 +25,14 @@ import {
   appendSection,
   renderQuietSection,
   renderRereportSection,
+  type RereportInput,
   type SectionFleetStatus,
 } from './audit-barrage-lift-render.js';
-import type { ExtractedFinding } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
 import type { FleetReport } from '../scope-discovery/audit-barrage/types.js';
 
 export interface RecordNoNewFindingsArgs {
-  readonly dedupSuppressedOpen: readonly ExtractedFinding[];
+  /** specs/029 US4: each re-surfaced finding paired with the canonical AUDIT-NN it dedups against. */
+  readonly dedupSuppressedOpen: readonly RereportInput[];
   readonly fleet: FleetReport | undefined;
   readonly date: string;
   readonly runDir: string;
