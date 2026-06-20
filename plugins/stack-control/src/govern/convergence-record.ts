@@ -145,10 +145,12 @@ function validate(
   }
   if (
     parsed.overrideReason !== undefined &&
-    (typeof parsed.overrideReason !== 'string' || parsed.overrideReason.length === 0)
+    (typeof parsed.overrideReason !== 'string' || parsed.overrideReason.trim().length === 0)
   ) {
+    // AUDIT-BARRAGE codex-02/claude-02: a whitespace-only reason is as meaningless as
+    // an empty one — reject both so the durable FR-018 attribution is always informative.
     throw new Error(
-      `${path}: govern-convergence record overrideReason must be a non-empty string when present`,
+      `${path}: govern-convergence record overrideReason must be a non-empty (non-whitespace) string when present`,
     );
   }
   // specs/029 US4 (FINDING 3, codex MEDIUM): the writer only ever emits the two

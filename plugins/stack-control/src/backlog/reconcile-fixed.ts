@@ -42,24 +42,30 @@ export interface ReconcileFixedResult {
 /**
  * Close every backlog task referenced by a `fixed-<sha>` audit-log finding.
  *
- * For each entry whose `Status:` is `fixed-<sha>`, look up the task carrying the
- * `audit:<slug>:<canonical-finding-id>` ref. When found AND not already `Done`,
- * close it. An absent or already-closed task is skipped (idempotent). The backend
- * list is read once; closes go through `backend.close` (fail-loud on a backend
- * error — never a fabricated success).
+ * For each entry whose `Status:` is `fixed-<sha>`, close EVERY backlog task carrying
+ * the `audit:<slug>:<canonical-finding-id>` ref — not just the first (FR-015:
+ * "ANY backlog task that referenced that finding"; older installs accumulated
+ * duplicate migrated-finding tasks before FR-016 tightened cross-run dedup). An
+ * absent or already-`Done` task is skipped (idempotent). The backend list is read
+ * once; a `closed` set makes the close idempotent across repeat canonical ids and a
+ * stale snapshot (no double-close — AUDIT-BARRAGE codex-03/claude-01). Closes go
+ * through `backend.close` (fail-loud on a backend error — never a fabricated success).
  */
 export function reconcileFixedFindings(args: ReconcileFixedArgs): ReconcileFixedResult {
   const items = args.backend.list();
   const reconciled: { findingId: string; taskId: string }[] = [];
+  const closed = new Set<string>();
   for (const entry of parseAuditLogText(args.auditLogText)) {
     if (!STATUS_FIXED_RE.test(entry.status)) continue;
     const canonical = canonicalAuditId(entry.findingId);
     const ref = auditRef(args.featureSlug, canonical);
-    const task = items.find((item) => item.refs.includes(ref));
-    if (task === undefined) continue;
-    if (task.status === BACKLOG_DONE_STATUS) continue;
-    args.backend.close(task.id);
-    reconciled.push({ findingId: canonical, taskId: task.id });
+    for (const task of items.filter((item) => item.refs.includes(ref))) {
+      if (closed.has(task.id)) continue; // already closed this run (no double-close)
+      if (task.status === BACKLOG_DONE_STATUS) continue;
+      args.backend.close(task.id);
+      closed.add(task.id);
+      reconciled.push({ findingId: canonical, taskId: task.id });
+    }
   }
-  return reconciled.length > 0 ? { reconciled } : { reconciled: [] };
+  return { reconciled };
 }

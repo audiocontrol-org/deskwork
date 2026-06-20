@@ -191,6 +191,66 @@ describe('govern --override short-circuit (US4, T027, FR-017/018)', () => {
     }
   });
 
+  // specs/029 US4 (AUDIT-BARRAGE codex-02 + claude-02, phase-4 re-govern): the
+  // blank-reason guard must cover the GOVERN_OVERRIDE ENV VAR too, not only the
+  // --override flag. A whitespace-only env value must FAIL LOUD (exit 2) — never
+  // graduate with a blank attribution, never fall through to a full barrage.
+  it('FATALs (exit 2) when GOVERN_OVERRIDE is whitespace-only (env-var bypass closed)', () => {
+    const repo = makeRepo('feat');
+    const fx = mkdtempSync(join(tmpdir(), 'gov-override-stub-'));
+    const marker = join(fx, 'barrage-ran.marker');
+    const stub = writeMarkerStub(fx, marker);
+    const spec = join(repo, 'spec.md');
+    writeFileSync(spec, 'A spec under audit.\n');
+    try {
+      const r = runGovern(
+        ['--mode', 'spec', '--feature', 'feat', '--at', repo, '--spec-path', spec],
+        { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run'), GOVERN_OVERRIDE: '   ' },
+      );
+      expect(r.status).toBe(2);
+      expect(`${r.stdout}${r.stderr}`).toMatch(/FATAL/);
+      expect(`${r.stdout}${r.stderr}`).toMatch(/non-empty reason/i);
+      expect(`${r.stdout}${r.stderr}`).not.toMatch(/may graduate|governed \(overridden\)/);
+      expect(existsSync(marker)).toBe(false);
+      expect(existsSync(join(fx, 'run'))).toBe(false);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
+
+  // specs/029 US4 (AUDIT-BARRAGE codex-01 HIGH + claude-03, phase-4 re-govern): a
+  // convergence-record WRITE failure must FAIL LOUD on the override path — the CLI
+  // must NOT report a graduation the durable `governing -> shipped` gate signal does
+  // not back (the US4 Finding-2 "CLI success ⟺ gate signal" principle, extended to
+  // the write-failure case). Blocking the write: a FILE where the convergence DIR
+  // must be → mkdir/write throws ENOTDIR.
+  it('FATALs (non-zero) when the durable convergence record cannot be written', () => {
+    const repo = makeRepo('feat');
+    const govDir = join(repo, '.stack-control', 'govern');
+    mkdirSync(govDir, { recursive: true });
+    writeFileSync(join(govDir, 'convergence'), 'not a directory\n'); // blocks the record write
+    const fx = mkdtempSync(join(tmpdir(), 'gov-override-stub-'));
+    const marker = join(fx, 'barrage-ran.marker');
+    const stub = writeMarkerStub(fx, marker);
+    const spec = join(repo, 'spec.md');
+    writeFileSync(spec, 'A spec under audit.\n');
+    try {
+      const r = runGovern(
+        ['--mode', 'spec', '--feature', 'feat', '--at', repo, '--spec-path', spec,
+          '--override', 'operator accepts residual'],
+        { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run') },
+      );
+      expect(r.status).not.toBe(0);
+      expect(`${r.stdout}${r.stderr}`).toMatch(/FATAL/);
+      expect(`${r.stdout}${r.stderr}`).not.toMatch(/may graduate|governed \(overridden\)/);
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
+
   it('the override does NOT persist a marker across invocations (per-invocation only, FR-018)', () => {
     const repo = makeRepo('feat');
     const fx = mkdtempSync(join(tmpdir(), 'gov-override-stub-'));

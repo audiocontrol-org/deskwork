@@ -36,20 +36,35 @@ export interface OverrideGraduateArgs {
 }
 
 /**
- * Record an attributable override graduation and return — firing zero barrage
- * work. The "OPEN by override — reason: <reason>" line preserves the gate's
- * existing override-attribution content (a consumer keying on it sees the same
- * record whether the gate or the short-circuit produced it). The convergence
- * record makes the workflow `governing → shipped` gate mechanical even on an
- * override graduation. The caller resolves `convergenceItem` (failing loud when no
- * node resolves) BEFORE calling this, so a clean override graduation ALWAYS writes
- * the record. A subsequent record-write failure (fs error) is surfaced as a WARNING
- * (the gate stays CLOSED until the record lands) — mirroring the convergence
- * graduation's fail-safe.
+ * Record an attributable override graduation — firing zero barrage work. The DURABLE
+ * convergence record is written FIRST; a write failure PROPAGATES (this function does
+ * NOT swallow it). That is the load-bearing fix for AUDIT-BARRAGE codex-01 (HIGH) /
+ * claude-03: the CLI must NOT report a graduation the durable `governing → shipped`
+ * gate signal does not back — the US4 Finding-2 "CLI success ⟺ gate signal" principle,
+ * extended to the record-WRITE-failure case (previously this warned and let the caller
+ * exit 0). The caller maps a throw to a FATAL non-zero exit, so a green CLI always
+ * means the record landed. The caller resolves `convergenceItem` (failing loud when no
+ * node resolves) BEFORE calling this.
+ *
+ * The attributable "OPEN by override — reason: <reason>" line is emitted only AFTER the
+ * record lands (so a write-failure FATAL never prints a misleading gate-open line); it
+ * preserves the gate's existing override-attribution wording.
  */
 export function recordOverrideGraduation(args: OverrideGraduateArgs): void {
-  // Attributable in the audit trail (FR-018) — distinguishable from a convergence
-  // graduation. PRESERVE the gate's wording ("OPEN by override — reason: …").
+  // FR-018: pass the override reason so the DURABLE convergence record carries
+  // `override: true` + `overrideReason` — a downstream consumer distinguishes this
+  // short-circuit graduation from a real convergence (stderr is transient). A write
+  // failure throws THROUGH to the caller (codex-01/claude-03) — no warn-and-continue.
+  recordGovernConvergence(
+    args.installationRoot,
+    args.mode,
+    args.convergenceItem,
+    args.scopePaths,
+    args.recordedAt,
+    args.reason,
+  );
+  // Record landed → emit the attributable trail (FR-018), distinguishable from a
+  // convergence graduation. PRESERVE the gate's wording ("OPEN by override — reason: …").
   args.stderr(
     `spec-governance gate [${args.feature}]: OPEN by override — reason: ${args.reason}\n`,
   );
@@ -58,23 +73,4 @@ export function recordOverrideGraduation(args: OverrideGraduateArgs): void {
       `(FR-017: zero render/barrage/lift/slush). Per-invocation only (FR-018): no ` +
       `marker persists across invocations.\n`,
   );
-  try {
-    // FR-018: pass the override reason so the DURABLE convergence record carries
-    // `override: true` + `overrideReason` — a downstream consumer can distinguish
-    // this short-circuit graduation from a real convergence (stderr is transient).
-    recordGovernConvergence(
-      args.installationRoot,
-      args.mode,
-      args.convergenceItem,
-      args.scopePaths,
-      args.recordedAt,
-      args.reason,
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    args.stderr(
-      `govern: WARNING — could not write the govern-convergence record (${message}); ` +
-        `the governing -> shipped gate stays CLOSED until it is recorded.\n`,
-    );
-  }
 }
