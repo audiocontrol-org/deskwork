@@ -511,6 +511,7 @@ govern finding-lift has no cross-run dedup, so convergence iterations multiply n
 
 ## multi:feature/govern-operability
 - status: planned
+- design: docs/superpowers/specs/2026-06-19-govern-operability-design.md
 - part-of: multi:feature/lifecycle-industrialization
 Umbrella: make cross-model governance OPERABLE — converge reliably and stay cheap to run per phase, so per-phase govern is a deterministic gate rather than an operator-vigilance tax. Groups the governance-friction surfaced by dogfooding the workflow protocol (027, 028): convergence ringing (audit-barrage-convergence — severity non-determinism, dampener-in-loop, lift cross-run dedup, granularity switch), per-phase friction (govern-per-phase-friction-burndown — O(n^2) shared-file checkpoint staleness with no cheap refresh, out-of-window false alarms), and fleet observability/liveness (codex-liveness, timeout-observability — a SIGTERMed model silently degrades the fleet). Realizes the thesis ('industrialize execution') specifically for the governance ceremony. Children are part-of this node.
 
