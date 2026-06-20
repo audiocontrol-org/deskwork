@@ -2,21 +2,33 @@
 
 ---
 
-## 2026-06-20: <!-- session title -->
+## 2026-06-20: govern-operability (029) — execute Phases 1–4 (P1 MVP) + US7; deep per-phase-govern entanglement; FR-017 regression handoff
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up 029-govern-operability where the prior session left off (runnable spec at the `/speckit-analyze` gate) and drive `/stack-control:execute` — burn the per-phase govern of the whole govern-operability umbrella down through the lifecycle.
 
 **Accomplished:**
-- <!-- compose -->
+- **Phases 1, 2, 3 (all P1) graduated**, all committed + pushed. US1 fleet reliability (no-grounding lanes promoted to the shipped template + codex reasoning-summary liveness; opus calibrated live at 172s); US2 degraded-is-never-convergence (per-lane terminal state + the `Fleet: DEGRADED` section marker + dampener degraded-awareness); US3 determinism (the shared finding-signature + identity-keyed new-vs-seen dampener + **code-epoch-scoped** re-rate suppression honoring FR-010 "unchanged code").
+- **US7 brought forward** (operator-approved, out of order): hunk-granularity, content-presence checkpoint fingerprint — the root-fix for the O(n²) staleness that blocked Phase 3. Implemented + full-suite-green; not yet phase-governed.
+- **Phase 4 (US4, last P1) implemented + full-suite-green (2327 tests)**: `--override` short-circuit, skip-`fixed-<sha>`, cross-run signature dedup, `backlog done` auto-reconcile, + per-phase-override-writes-checkpoint. **Not yet governed.**
+- Governance earned its keep repeatedly — the cross-model barrage caught real bugs my own fixes introduced: the no-grounding-lane liveness regression (US1), the invisible degraded-clean-run bug (US2/codex-01 BLOCKING), the `findingSignature` NUL-byte-makes-git-see-binary bug (US3), line-range + markdown-code-span signature non-normalization (US3), and the too-aggressive single-run-clean rule (US3).
+- Closed TASK-145, TASK-146, TASK-288; shipped the `audit-barrage-timeout-observability` gap node; captured TASK-353/354 + ~30 slushed residuals.
 
 **Didn't Work:**
-- <!-- compose -->
+- **Per-phase-govern entanglement (the dominant cost):** US2/US3/US4 all rewrite `check-barrage-dampener.ts` + `audit-barrage-lift.ts` in OVERLAPPING regions, so each later phase re-stales the earlier phases' checkpoints. US7's hunk-fingerprint only helps for DIFFERENT-region edits (FR-026); same-region overlap is legitimate FR-027 staleness → a re-govern loop. Many barrage cycles spent re-governing Phase 2/3 to unblock the next phase.
+- **Implement-audit plateaus into a finding-GENERATOR** on the dampener/signature code — each round surfaced a narrower defensive edge (line-ranges → code-spans → tip.sha input-validation). Phase 3 needed an **operator-approved `--override`** to exit the plateau.
+- **The intermittent no-grounding-lane timeout (TASK-354)** produced degraded rounds that blocked convergence on the larger phase-3 payload.
+- **I regressed FR-017** with the override-checkpoint fix (`b756cd0b`): per-phase `--override` now runs a barrage instead of short-circuiting (the short-circuit branch at `govern.ts:797` is bypassed in the real path; the unit test still passes → a test/real-path gap). Caught at session end → handoff.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] First govern used `--item`, tripping the TASK-155 compass `governing`-transition gate; corrected to the canonical `--feature` per-phase form (the SKILL.md form; 028 precedent).
+- [PROCESS] Brought US7 forward (operator-approved) as the root-fix when Phase 3 hit the O(n²) staleness, rather than paying the re-govern grind — per "root-fix over workaround-menu."
+- [PROCESS] Operator-approved `--override` to exit the Phase-3 implement-audit plateau (defensive over-ratings on trusted git output; core sound + fully tested).
+- [COMPLEXITY] Per-phase granularity is too fine for tightly-coupled consecutive phases — the entanglement re-stale loop dominated the session.
 
 **Insights:**
-- <!-- compose -->
+- The feature is acutely experiencing the govern-operability frictions it exists to fix — the entanglement re-stale loop, the lane timeout, and the override-not-short-circuiting are all live during its own construction. That recursion is informative: per-phase govern of a feature whose phases share a small set of files is structurally O(n²), and US7 only addresses the different-region case. A co-govern / batch-graduate path for coupled phases (TASK-353) is the missing piece.
+- Implement-mode audit-barrage can plateau into a generator (like spec-mode, but the residuals are defensive over-ratings rather than under-specification); the `--override` short-circuit (US4/FR-017) is exactly the plateau-exit, and needing it mid-build validates the requirement.
+- Stop-and-handoff was the right call once I introduced a regression under heavy context — better a clean fresh-session continuation than compounding errors in deep `govern.ts` control flow.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 16

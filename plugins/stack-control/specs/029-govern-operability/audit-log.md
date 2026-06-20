@@ -1435,3 +1435,348 @@ The new `dampener-identity.test.ts` tests the dampener at layer 4 by generating 
 If `renderQuietSection` or `renderSection` silently drops `tipSha` (e.g., because of a condition mismatch on the `tipSha !== undefined && tipSha.length > 0` guard), the dampener's epoch-keying logic would silently degrade to `runDirBasename`-keyed epochs for all runs, making FR-010 jitter suppression ineffective without any test failing. The blast radius is bounded because the fallback (`runDirBasename`) is conservative (no cross-suppression), but it would mean the feature shipping in this diff never fires in production even though all unit tests pass.
 
 A minimal integration test would: call `renderSection`/`renderQuietSection` with a known `tipSha` string, parse the output with `checkBarrageDampener` (or directly with the section-counting internals), and assert that the returned `codeSha` matches the input sha.
+
+## 2026-06-20 — audit-barrage lift (20260620T131025289Z-029-govern-operability-phase-2)
+
+### AUDIT-20260620-84 — Missing test coverage for FR-010 re-rate jitter suppression and SC-001 persistent-HIGH behavior
+
+Finding-ID: AUDIT-20260620-84
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/scope-discovery/promote-findings/check-barrage-dampener.ts:291–389 (the identity-keying epoch loop added in this diff)
+
+The identity-keyed `newHighPlusCount` computation introduced in this diff implements two correctness-critical distinguishing behaviors: FR-010 (a finding seen at LOW/MEDIUM and re-rated to HIGH on the same code epoch is severity jitter — suppress it) and SC-001 (a finding already present at HIGH/blocking in a prior section of the same epoch stays blocking). These are the core reason US3 exists — without them, the dampener either over-blocks (counts jitter as new HIGH) or under-blocks (lets a persistent HIGH vanish into the "consecutive quiet" streak).
+
+The two new test files in this diff (`terminal-state.test.ts`, `degraded-not-quiet.test.ts`) cover FR-006 and FR-007/FR-008 respectively. Neither contains a scenario that exercises FR-010 or SC-001. Specifically missing:
+
+- **FR-010 scenario**: an audit-log with section A containing a finding at MEDIUM (`Surface: src/x.ts:1`), then section B containing the same signature at HIGH on the same `Code-sha:` — section B's `newHighPlusCount` must be 0 (jitter, suppress).
+- **FR-011 scenario**: same signature at HIGH on a *different* `Code-sha:` — section B's `newHighPlusCount` must be 1 (genuinely new epoch, not jitter).
+- **SC-001 scenario**: section A contains a HIGH finding; section B also contains that HIGH finding on the same epoch — section B's `newHighPlusCount` must be 1 (persistent real defect, keep blocking).
+- **Combined scenario**: A:MEDIUM → B:HIGH (suppressed per FR-010, epoch map now HIGH) → C:HIGH (SC-001 fires on C, not suppressed).
+
+The commits `dbf3bfc1` (US3 part 2, T016-T018) and `434cb5bb` (US3 part 1, T014-T015) are within the audited range and add the epoch-keyed logic. No new test file for these tasks appears in the diff, and no additions to existing test files for this surface are visible. If a regression is introduced (e.g., an off-by-one in the `priorRank >= HIGH_RANK` check or a wrong epoch key), the existing tests will not catch it.
+
+---
+
+### AUDIT-20260620-85 — FR-010/SC-001 interaction: epoch max-rank elevates jitter after first occurrence, making subsequent jitter appearances block
+
+Finding-ID: AUDIT-20260620-85
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/scope-discovery/promote-findings/check-barrage-dampener.ts:315–344 (epoch map folding after `newHigh` computation)
+
+The epoch map stores the **maximum severity rank** seen for each signature within a code epoch. After the `newHigh` count is computed for section N, ALL of that section's findings (any severity) are folded into the epoch map via `if (prior === undefined || rank > prior) epochMap.set(...)`. This means that if a finding fires at MEDIUM (run 1), then HIGH (run 2, suppressed as FR-010 jitter), the epoch map now carries that signature at `HIGH_RANK`.
+
+In run 3, if the same finding appears at HIGH again (still on unchanged code — true oscillating jitter, M→H→M→H pattern), the check is:
+
+```
+const priorRank = epochSeen?.get(finding.signature);  // HIGH_RANK (from run 2's fold)
+if (priorRank === undefined || priorRank >= HIGH_RANK) { newHigh += 1; }
+```
+
+`priorRank >= HIGH_RANK` is true → SC-001 fires → blocks. But this is the same jitter pattern FR-010 was written to suppress. FR-010 only shields the *first* HIGH occurrence after a lower-severity baseline; the fold-to-max in run 2 causes SC-001 to fire on all subsequent HIGH occurrences, even if the finding continues to oscillate. In a true M→H→M→H→M→H pattern, FR-010 suppresses only run 2; SC-001 causes runs 4 and 6 to block the dampener indefinitely.
+
+Whether this behavior is intended (a finding that appeared HIGH twice on unchanged code is "real enough" to keep blocking) or unintended (true jitter can permanently elevate the epoch map and defeat FR-010) is not clear from the inline comments or the available spec text. The absence of a test for the two-or-more-occurrence jitter scenario (noted in finding -01 above) means this subtlety has no regression anchor. The fix — if the intent is to suppress repeated same-epoch jitter — would require tracking per-run severity rather than epoch-level max, or resetting the epoch map on a confirmed-clean run.
+
+---
+
+### AUDIT-20260620-86 — `existsSync` is not injectable alongside `args.read`, leaving the `Code-sha:` lift path untestable without filesystem side effects
+
+Finding-ID: AUDIT-20260620-86
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/audit-barrage-lift.ts:307–315 (the `tipShaPath` / `existsSync` block added in this diff)
+
+The `runAuditBarrageLift` function accepts `args.read` as an injectable file-reader, allowing tests to stub file I/O without touching the real filesystem. The new `Code-sha:` reading block uses `existsSync` (real filesystem, not injectable) to gate the `args.read` call:
+
+```typescript
+if (existsSync(tipShaPath)) {
+  const raw = (await (args.read ?? ((p: string) => readFile(p, 'utf8')))(tipShaPath)).trim();
+  if (raw.length > 0) tipSha = raw;
+}
+```
+
+A test that injects `args.read` returning a fake sha cannot make `existsSync` return true without creating a real file. This breaks the injectable-IO contract the rest of the function establishes. Concretely: any test wanting to verify the `Code-sha:` marker is written into the audit-log section (and subsequently parsed by the dampener's `CODE_SHA_RE`) must create a real file in a temp directory, coupling the test to the OS. If the temp file leaks or the test runner parallelizes the suite across worktrees, the test can flake.
+
+The new test files in this diff do not exercise the lift-to-audit-log-to-dampener pipeline for the `Code-sha:` path at all — the tests drive the dampener directly against hand-crafted audit-log text containing `Code-sha:` lines. The lift-side writing is untested by this diff. The fix is to extract existence-checking into an injectable `exists?: (p: string) => boolean` parameter (matching the `args.read` pattern already in place), or to replace the `existsSync` + `args.read` split with a single `try/catch` around `args.read` catching ENOENT.
+
+---
+
+### AUDIT-20260620-87 — `completedNonConvergedAnnotation`: combined `reportBytes === 0` + nonzero exit code annotated only as `zero-byte`, discarding the nonzero-exit signal in the kind label
+
+Finding-ID: AUDIT-20260620-87
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/scope-discovery/audit-barrage/types.ts:347 (the `kind` ternary added in this diff)
+
+```typescript
+const kind = lane.reportBytes === 0 ? 'zero-byte' : `nonzero-exit (${lane.exitCode})`;
+return ` — completed but DEGRADED [${kind}] (exit ${lane.exitCode}, ...)`
+```
+
+When a lane completes with `exitCode !== 0` AND `reportBytes === 0`, the `kind` label is `'zero-byte'`. The full annotation does still include `exit ${lane.exitCode}`, so the exit code is not silently dropped — but it is demoted to the parenthetical while the bracket label (`[zero-byte]`) becomes the primary classification. A human triaging fleet health from this annotation may conclude the lane "exited cleanly but produced nothing" (the natural reading of `zero-byte`) rather than "crashed (exitCode=3) and also produced nothing." The test in `terminal-state.test.ts:71–79` validates the `nonzero-exit` path only for `reportBytes: 100`; there is no test for the combined `reportBytes === 0 && exitCode !== 0` case. A fix: `const kind = lane.reportBytes === 0 && lane.exitCode !== 0 ? 'zero-byte+nonzero-exit' : lane.reportBytes === 0 ? 'zero-byte' : 'nonzero-exit (${lane.exitCode})'`.
+
+---
+
+### AUDIT-20260620-88 — Dead defensive undefined check on `fileOrderedCounts[idx]` in `recentRunCounts` construction
+
+Finding-ID: AUDIT-20260620-88
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/scope-discovery/promote-findings/check-barrage-dampener.ts (the `recentRunCounts` construction loop, ~lines 333–338 in the diff)
+
+```typescript
+const lastIndex = fileOrderedCounts.length - 1;
+for (let k = 0; k < threshold && k <= lastIndex; k += 1) {
+  const idx = lastIndex - k;
+  const base = fileOrderedCounts[idx];
+  if (base === undefined) continue;   // <-- dead
+  recentRunCounts.push({ ...base, newHighPlusCount: newHighCounts[idx] ?? 0 });
+}
+```
+
+`fileOrderedCounts` is produced by `sections.map(...)` (no holes), `lastIndex = fileOrderedCounts.length - 1`, and `k` is bounded by `k <= lastIndex`, so `idx` is always in `[0, lastIndex]` — a valid index. `base` can never be `undefined`. The check is dead code. It creates a false impression of a possible sparse-array path that doesn't exist, and the `?? 0` fallback on `newHighCounts[idx]` has the same character (also dead, since the two arrays are constructed in lock-step). No functional consequence; the signal is misleading for a future reader trying to understand when `base` could be absent.
+
+### AUDIT-20260620-89 — Duplicate-only HIGH runs are converted into pristine quiet sections
+
+Finding-ID: AUDIT-20260620-89
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/audit-barrage-lift.ts:354-386
+
+`runAuditBarrageLift` now filters extracted findings through `selectLiftableFindings` and then treats `liftableFindings.length === 0` as a zero-finding run. That conflates “the barrage surfaced nothing” with “the barrage surfaced only findings already present or fixed in the audit-log.” On a healthy fleet where the model re-surfaces an already-present open HIGH, `selectLiftableFindings` drops it as a duplicate, line 368 enters the zero-finding branch, and lines 386-393 render a quiet section with no `Severity:` lines.
+
+The downstream blast radius is high because `checkBarrageDampener` uses the most recent section’s raw severity lines to decide convergence. This path can make a run that visibly re-surfaced a persistent HIGH look like a pristine single-run-clean section, allowing the dampener to engage even though SC-001 says a persistent HIGH keeps blocking. A reasonable fix is to reserve `renderQuietSection` for `findings.length === 0`; when `findings.length > 0` but `liftableFindings.length === 0`, record a non-quiet hygiene/duplicate signal that preserves raw surfaced severity for the dampener, or otherwise prevent that run from satisfying single-run-clean.
+
+### AUDIT-20260620-90 — `renderQuietSection` documentation now states the opposite of the implemented degraded behavior
+
+Finding-ID: AUDIT-20260620-90
+Status:     open
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift-render.ts:85-90
+
+The JSDoc for `renderQuietSection` still says “Degraded clean runs are NOT recorded,” but the implementation immediately below accepts `fleet` and intentionally records a `Fleet: DEGRADED` section when `produced < configured` at lines 111-117. The call site in `audit-barrage-lift.ts` also depends on that new behavior.
+
+The blast radius is low because runtime behavior is clear and covered by the code path, but this is a contract comment on an exported renderer and it now directs maintainers toward the pre-029 behavior that caused stale quiet sections to be treated as most recent. Update the comment to say degraded zero-liftable runs are recorded with a degraded marker and excluded by the dampener.
+
+## 2026-06-20 — audit-barrage lift (20260620T131826637Z-029-govern-operability-phase-2)
+
+### AUDIT-20260620-91 — TOCTOU race in `tip.sha` read — `existsSync` not injectable via test harness
+
+Finding-ID: AUDIT-20260620-91
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/audit-barrage-lift.ts:307-316 (approximate, diff context)
+
+`tip.sha` is probed with the synchronous `existsSync(tipShaPath)` and then read with the injectable `args.read ?? readFile`. These are two separate I/O operations with no atomicity guarantee. If `tip.sha` is deleted between the check and the read (rare in practice but possible in a concurrent CI environment where a prior lift run is cleaning up the run-dir), the read throws an unhandled `ENOENT` that propagates out of `runAuditBarrageLift` as a rejection — not caught anywhere visible in this diff.
+
+More load-bearing: `existsSync` is NOT injectable through `args.read`. The test harness injects `args.read` to mock file content, but the existence check is always performed against the real filesystem. A unit test that wants to exercise the "tipSha present" branch must physically create a file, which is heavier than the rest of the injection-based test contract in this file. If the `tip.sha` reading is ever tested inline (without a real fixture file), the existence check silently short-circuits and `tipSha` is always `undefined` — silently giving wrong epoch isolation without test failure.
+
+The idiomatic fix: drop `existsSync`, wrap the read in `try/catch { if (e.code !== 'ENOENT') throw e; }`, and make the missing-file case `tipSha = undefined`. This collapses the two I/O calls into one, removes the TOCTOU, and makes the function fully testable via the existing `args.read` injection point.
+
+---
+
+### AUDIT-20260620-92 — "NEW-or-persistent" terminology in single-run-clean reason message is misleading
+
+Finding-ID: AUDIT-20260620-92
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/scope-discovery/promote-findings/check-barrage-dampener.ts (reason-building block for `singleRunCleanEngages`)
+
+The dampener's human-readable output when `singleRunCleanEngages` fires reads:
+
+```
+the most recent run (…) surfaced 0 NEW-or-persistent HIGH+ AND 0 MEDIUM findings (single-run rule)
+```
+
+But the actual check for `singleRunCleanEngages` is `mostRecent.rawHighPlusCount === 0 && mostRecent.rawMediumCount === 0` — raw counts, no identity-keying whatsoever. The code comment in the new diff is explicit that this is intentional: "jitter tolerance (newHighPlusCount) belongs to the safer 2-run N-quiet streak (Rule 1), not to the one-run fast-path." The message borrows Rule 1's "NEW-or-persistent" vocabulary for a rule that doesn't apply it.
+
+For the case where `singleRunCleanEngages` actually fires (`rawHighPlusCount === 0`), `newHighPlusCount` is also 0 (you can't have new-or-persistent HIGH without raw HIGH), so the message is technically accurate. However, an operator reading the diagnostic output or a future developer auditing this path will incorrectly infer that jitter tolerance was applied to the single-run-clean gate. If they are trying to understand why a run that had visible `Severity: high` entries (that were same-epoch jitter) didn't dampen, the message leads them to wrong analysis — they'll look for the identity-keying path when none was taken.
+
+The message for the `singleRunCleanEngages` branch should read "0 RAW HIGH+ AND 0 MEDIUM" to match the check and the documented rationale.
+
+---
+
+### AUDIT-20260620-93 — Redundant `args.read ?? readFile` expression at `tip.sha` read site
+
+Finding-ID: AUDIT-20260620-93
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift.ts (tipSha block and subsequent reader definition)
+
+The `tip.sha` read constructs the reader expression inline:
+
+```typescript
+const raw = (await (args.read ?? ((p: string) => readFile(p, 'utf8')))(tipShaPath)).trim();
+```
+
+The `reader` constant that gives the same expression is defined **below** the `tipSha` block in the same function. Because `reader` isn't in scope yet, the `tipSha` read duplicates the expression. This creates a maintenance point: if the `reader` construction changes (e.g., adding encoding options or error wrapping), the `tipSha` inline version will silently diverge. The fix is to hoist the `reader` definition to before the `tipSha` block so it can be reused. As written the two constructions are logically identical but are not the same code path, which will confuse a future editor.
+
+---
+
+### AUDIT-20260620-94 — No round-trip test: `renderQuietSection` (degraded) → `checkBarrageDampener`
+
+Finding-ID: AUDIT-20260620-94
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/ (absence of a round-trip test)
+
+The test suite in this diff exercises the dampener against hardcoded audit-log strings (`degraded-not-quiet.test.ts`) and exercises the renderer in isolation (`terminal-state.test.ts`). There is no test that calls `renderQuietSection(date, basename, fleet, tipSha)` (the degraded-fleet branch) and feeds its output directly into `checkBarrageDampener`, then asserts `degraded === true` and `codeSha` is correctly extracted.
+
+If `renderQuietSection` were to emit `Fleet: DEGRADED` in a subtly different format — for example with extra whitespace, a different casing, or the marker placed after a blank line the dampener's preamble scan doesn't reach — the unit tests would all pass while the end-to-end convergence behavior would silently regress. The same gap exists for the `Code-sha:` epoch marker: no test round-trips `renderSection(…, undefined, tipSha)` → dampener assertion on `codeSha`. Given that the FR-007 / codex-01 behavior is load-bearing for the convergence dampener, a round-trip test is the appropriate closure.
+
+---
+
+### AUDIT-20260620-95 — `selectLiftableFindings` (loop-hygiene.js) is a new critical dependency absent from this diff
+
+Finding-ID: AUDIT-20260620-95
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/subcommands/audit-barrage-lift.ts (selectLiftableFindings call site); src/govern/loop-hygiene.ts (not in diff)
+
+The diff introduces `import { selectLiftableFindings } from '../govern/loop-hygiene.js'` and gates the entire lift path — including the zero-findings branch — on its output. The function is responsible for filtering already-resolved (`fixed-<sha>`) and already-present (cross-run dedup) findings before ID assignment and section writing. The correctness of FR-013/FR-016 loop-hygiene depends entirely on this function's behavior.
+
+`loop-hygiene.ts/js` is not included in this diff, so its implementation, edge cases (empty findings list, malformed audit-log text, duplicate signatures, the `fixed-<sha>` sha-extraction), and tests cannot be reviewed here. If `selectLiftableFindings` under-filters (passes duplicate findings through), the audit log accumulates duplicates that pollute the identity-keying epoch map. If it over-filters (drops legitimate new findings), real defects are silently swallowed and the convergence dampener sees a quieter picture than reality. This is noted so the operator can confirm the dependency is separately audited.
+
+### AUDIT-20260620-96 — Filtered HIGH findings can be recorded as a pristine run
+
+Finding-ID: AUDIT-20260620-96
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/audit-barrage-lift.ts:350-368, src/scope-discovery/promote-findings/check-barrage-dampener.ts:373-387
+
+`runAuditBarrageLift` filters extracted findings through `selectLiftableFindings` before deciding whether to render a zero-finding quiet section. If a fresh barrage surfaces only findings that are already present in the audit log, including HIGH findings, `liftableFindings.length === 0` and the lift writes a quiet section with no `Severity:` lines. The dampener then treats that most recent section as pristine because `singleRunCleanEngages` checks only the rendered section’s raw HIGH/MEDIUM counts.
+
+That breaks the stated raw-signal contract in `check-barrage-dampener.ts:373-381`: “a run that VISIBLY surfaced `Severity: high` must NOT trigger immediate single-run graduation.” Downstream blast radius is high because an adopter can get an immediate dampened/skip decision after a run that did surface HIGH, as long as hygiene dedup removed the entries before rendering. A reasonable fix would keep loop-hygiene dedup from appending duplicate entries while still recording run-level raw extracted severity counts, or render a non-pristine marker section when extracted findings were present but all were filtered.
+
+## 2026-06-20 — audit-barrage lift (20260620T132747277Z-029-govern-operability-phase-2)
+
+### AUDIT-20260620-97 — Missing Code-sha round-trip test — epoch-keying for FR-010 jitter suppression is untested
+
+Finding-ID: AUDIT-20260620-97
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/scope-discovery/promote-findings/check-barrage-dampener.ts:38–56 (CODE_SHA_RE + codeSha field), src/subcommands/audit-barrage-lift-render.ts:93–96 and 136–139 (Code-sha: write), tests/promote-findings/degraded-not-quiet.test.ts (test fixtures)
+
+The `Code-sha:` → `codeSha` → per-epoch `seenMaxRankByEpoch` keying is the load-bearing mechanism for FR-010/codex-01: a finding re-rated to HIGH on a DIFFERENT sha from its prior low/medium sighting must COUNT (different epoch, genuinely new), while the same finding re-rated on the SAME sha must be SUPPRESSED (jitter). The implementation correctly plumbs this — `CODE_SHA_RE = /^Code-sha:\s*(\S+)/i` parses the marker written by `renderSection`/`renderQuietSection`, and the epoch map uses `count.codeSha ?? count.runDirBasename` as the key.
+
+However, none of the new test fixtures in this diff emit a `Code-sha:` line. All helper functions in `degraded-not-quiet.test.ts` — `degradedSection`, `healthyQuietSection`, `highSection` — produce sections without a `Code-sha:` marker. Every test therefore runs in the `codeSha === undefined` path, where the epoch key is the unique `runDirBasename` (one epoch per section, no cross-section suppression at all). The critical boundary — same sha, two sections, medium → HIGH = jitter; different sha, medium → HIGH = real new finding — has no test.
+
+A regex drift between the written format (`Code-sha: ${tipSha}\n`) and `CODE_SHA_RE` (e.g., if `renderSection` ever writes `code-sha:` lowercase without the `i` flag catching it, or if the marker line gains leading whitespace), or a bug in the `codeSha?.[1]` capture, would silently fall back to per-`runDirBasename` isolation — which is conservative in the direction of over-counting new findings, not under-counting. That direction is safe for security but would defeat the entire purpose of FR-010 jitter suppression: the streak would never engage because every re-rate-up at the same sha would count as new. The audit-log test commits (T016-T018 in `dbf3bfc1`) likely cover identity-keying by signature, but the `Code-sha:` epoch isolation dimension is a distinct axis that those tests almost certainly don't exercise either (the referenced test IDs predate the codex-01 refinement).
+
+A minimal fix: add a test that builds two audit-log sections sharing `Code-sha: abc123` where a finding escalates medium → HIGH, verifying `newHighPlusCount === 0` for the second section (jitter suppressed), and a parallel test where the second section carries `Code-sha: def456` and the same finding escalating HIGH is counted (`newHighPlusCount === 1`).
+
+---
+
+### AUDIT-20260620-98 — Stale comment claims "degraded+0-findings branch records nothing" after behavior was inverted
+
+Finding-ID: AUDIT-20260620-98
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/audit-barrage-lift.ts (the comment block immediately above the `renderSection` call for the non-zero-liftable-findings path)
+
+The comment block above the `renderSection` call reads (rendered from the diff at approximately the `// specs/029 US2 (FR-007): when this findings-section is recorded over a DEGRADED fleet...` block):
+
+> `(the degraded+0-findings branch above already records nothing; this covers degraded+findings, where 0 HIGH+ from the survivors is not clean).`
+
+This description matches the **removed** behavior — the old early-return block (`if (findings.length === 0 && fleet !== undefined && fleet.produced < fleet.configured) { ... return 0; }`) that explicitly recorded nothing for a zero-finding degraded run.
+
+The new behavior is the opposite: the `if (liftableFindings.length === 0)` branch records a **DEGRADED-marked section** (not nothing) precisely so the dampener sees the degraded run as its most-recent entry and blocks convergence. The whole point of the US2 redesign was to make the stale-prior-clean-section bug impossible — and the comment documenting the resulting calling convention now describes the pre-fix world.
+
+A future maintainer reading "the branch above records nothing" while staring at a DEGRADED-marked quiet section in the audit-log would be confused about the invariant and might reintroduce the old nothing-recording behavior thinking it's a regression. The fix is to update the comment to read something like: "the degraded+0-findings branch above records a DEGRADED-marked quiet section; this branch handles degraded+findings, where 0 HIGH+ from surviving lanes is equally not a clean signal."
+
+---
+
+### AUDIT-20260620-99 — `tip.sha` content is not validated as a hex sha before use as epoch key
+
+Finding-ID: AUDIT-20260620-99
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift.ts (tipShaPath read block, roughly the `if (existsSync(tipShaPath))` block)
+
+```typescript
+const raw = (await (args.read ?? ((p: string) => readFile(p, 'utf8')))(tipShaPath)).trim();
+if (raw.length > 0) tipSha = raw;
+```
+
+The comment says "`tip.sha` — a single 40-hex line the barrage writes." The read accepts any non-empty string. If the barrage write fails partially and leaves an error message, a newline-only file that trims to empty is handled correctly, but a file containing e.g. `fatal: ...` or a relative path would be accepted as a sha and recorded as the `Code-sha:` marker.
+
+The epoch key in the dampener is then `count.codeSha ?? count.runDirBasename`. Two sections with the same garbage sha value would share an epoch — potentially suppressing HIGH findings across sections that should be isolated. Two sections with different garbage values would each get a unique epoch (the per-`runDirBasename` fallback behavior), which is the conservative direction. The blast radius is limited: the worst case is insufficient jitter suppression (treated as different epochs, so re-rate-up jitter would block when it shouldn't). It does not enable false convergence.
+
+A one-line guard like `if (/^[0-9a-f]{40}$/i.test(raw)) tipSha = raw;` (or a stderr warning when the content doesn't match) would make the epoch boundary predictable regardless of upstream barrage write quality.
+
+---
+
+### AUDIT-20260620-100 — `completedNonConvergedAnnotation` redundantly shows "exit 0" for zero-byte lanes
+
+Finding-ID: AUDIT-20260620-100
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/scope-discovery/audit-barrage/types.ts:347–357
+
+For the zero-byte sub-state (`exitCode === 0, reportBytes === 0`), the output is:
+
+```
+" — completed but DEGRADED [zero-byte] (exit 0, report bytes 0)"
+```
+
+The `[zero-byte]` label already names the sub-state. The `(exit 0, ...)` that follows is both redundant (zero-byte by definition exits 0) and visually ambiguous: `exit 0` conventionally reads as success, which conflicts with the `DEGRADED` label appearing in the same string. A reader skimming the fleet report could interpret `exit 0` as indicating the lane completed normally before noticing the DEGRADED context. For the `nonzero-exit` sub-state the exit code is non-redundant and useful; for `zero-byte` it adds noise.
+
+The fix is minimal: omit the exit code from the zero-byte branch, e.g.:
+
+```typescript
+const kind = lane.reportBytes === 0
+  ? 'zero-byte'
+  : `nonzero-exit (${lane.exitCode})`;
+const suffix = lane.reportBytes === 0
+  ? `report bytes ${lane.reportBytes}`
+  : `exit ${lane.exitCode}, report bytes ${lane.reportBytes}`;
+return ` — completed but DEGRADED [${kind}] (${suffix}); not counted as produced`;
+```
+
+### AUDIT-20260620-101 — Deduped repeat HIGHs are rendered as quiet runs, so persistent defects can dampen
+
+Finding-ID: AUDIT-20260620-101
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/audit-barrage-lift.ts:347-383; src/scope-discovery/promote-findings/check-barrage-dampener.ts:291-354
+
+`runAuditBarrageLift` now filters extracted findings through `selectLiftableFindings(...)` before deciding whether to append a quiet section. If every extracted finding is “already-present” cross-run dedup, `liftableFindings.length === 0` records a quiet section with no `Severity:` lines. The dampener can only infer persistence from findings that appear in sections, so repeated HIGHs removed by loop hygiene disappear from the recent window instead of counting as persistent HIGHs.
+
+This contradicts the new dampener contract in `check-barrage-dampener.ts`, which explicitly treats a signature “already seen at HIGH/blocking and stays HIGH+” as blocking. A realistic sequence is: run 1 records HIGH, run 2 surfaces same HIGH but lift dedups it and writes quiet, run 3 does the same, then the two most recent sections look clean and convergence engages while the auditor is still reporting the defect. Blast radius is high because this can falsely open the governance gate on an unresolved, repeatedly surfaced HIGH. A reasonable fix is to keep loop hygiene from appending duplicate full entries while still recording a per-run occurrence signal the dampener can count, or make the dampener consult deduped extracted findings before quiet-section rendering.
