@@ -489,7 +489,7 @@ Burn down the per-phase governance friction surfaced while implementing 027 — 
 CUSTOMER-BLOCKING (offing-team adopter friction, GitHub #487, imported as TASK-295). govern's advisory clone-detection step hardcodes --format typescript,tsx, so on a non-TypeScript adopter repo jscpd matches zero files, writes no report, and the resulting throw ABORTS govern before the (language-agnostic) cross-model barrage ever runs — making per-phase governance and therefore /stack-control:execute unusable on any non-TS adopter codebase (found running execute on offing's Bash/PHP/WordPress change-runbook feature, zero .ts files). Fix: the clone step must be language-aware (detect/extend formats) OR non-fatal when it finds no matching files (skip the advisory clone step, do not abort the language-agnostic barrage). Pulled out of multi:gap/govern-per-phase-friction-burndown as its own item because it is a live adopter blocker, not burndown-queue hygiene.
 
 ## multi:feature/front-door-completeness
-- status: in-flight
+- status: shipped
 - spec: specs/028-front-door-completeness
 - design: docs/superpowers/specs/2026-06-19-front-door-completeness-design.md
 - design-approved: 2026-06-19
