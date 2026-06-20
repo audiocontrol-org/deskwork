@@ -140,26 +140,6 @@ export function renderQuietSection(
 }
 
 /**
- * specs/029 US4 (graduation-safety fix): a section that records ONLY findings the
- * FR-016 cross-run dedup suppressed (already present in the audit-log at an OPEN
- * status; NOT `fixed-<sha>`). These re-reported findings get NO fresh `AUDIT-NN`
- * id and NO new backlog task (FR-016: ≤1 task per signature) — but the section
- * MUST carry their `Severity:` lines so the convergence dampener still counts the
- * run's surfaced severity. Without this, an all-deduped re-run rendered a PRISTINE
- * quiet section (zero `Severity:` lines) and the single-run-clean rule graduated a
- * feature with a real, still-open, still-unfixed HIGH (US3 SC-001 defeated).
- *
- * The entries deliberately do NOT use `Status:     open` — the slush path picks
- * ONLY open entries to migrate to the backlog, so an open re-report would
- * manufacture the duplicate task FR-016 exists to prevent. They carry
- * `Status:     re-reported` (a non-open, dampener-irrelevant status — the dampener
- * RAW count ignores `Status:` entirely) plus a pointer back to the canonical entry
- * that already tracks this finding. The dampener's RAW count (`rawHighPlusCount` /
- * `rawMediumCount`, used by single-run-clean) sees the `Severity:` line regardless
- * of status, and its identity-keyed `newHighPlusCount` (used by N-consecutive-quiet)
- * folds these `(signature, severity)` pairs so a persistent HIGH keeps blocking.
- */
-/**
  * specs/029 US4 (AUDIT-BARRAGE-codex-01/claude-01): a re-report entry paired with
  * the canonical `AUDIT-NN` id it dedups against. The render layer takes the pairing
  * structurally (no import from the govern loop-hygiene layer) so the dependency
@@ -181,6 +161,26 @@ export const REREPORT_MIXED_LABEL =
   '_Re-surfaced persistent findings (already tracked; no new IDs/tasks — see each ' +
   '`Tracked-by:`). Recorded so the convergence dampener still counts their severity (US3 SC-001)._';
 
+/**
+ * specs/029 US4 (graduation-safety fix): render ONE re-report entry for a finding the
+ * FR-016 cross-run dedup suppressed (already present in the audit-log at an OPEN
+ * status; NOT `fixed-<sha>`). A re-report entry gets NO fresh `AUDIT-NN` id and NO new
+ * backlog task (FR-016: ≤1 task per signature) — but it MUST carry a `Severity:` line
+ * so the convergence dampener still counts the run's surfaced severity. Without this,
+ * an all-deduped re-run rendered a PRISTINE quiet section (zero `Severity:` lines) and
+ * the single-run-clean rule graduated a feature with a real, still-open, still-unfixed
+ * HIGH (US3 SC-001 defeated).
+ *
+ * The entry deliberately does NOT use `Status:     open` — the slush path picks ONLY
+ * open entries to migrate to the backlog, so an open re-report would manufacture the
+ * duplicate task FR-016 exists to prevent. It carries `Status:     re-reported` (a
+ * non-open, dampener-irrelevant status — the dampener RAW count ignores `Status:`
+ * entirely) plus a `Tracked-by:` pointer to the canonical entry that already tracks
+ * it (codex-01/claude-01). The dampener's RAW count (`rawHighPlusCount` /
+ * `rawMediumCount`, used by single-run-clean) sees the `Severity:` line regardless of
+ * status, and its identity-keyed `newHighPlusCount` (used by N-consecutive-quiet)
+ * folds these `(signature, severity)` pairs so a persistent HIGH keeps blocking.
+ */
 function renderRereportEntry(entry: RereportInput): string {
   const { finding, canonicalId } = entry;
   const suffix = finding.crossModelAgreement
@@ -221,6 +221,18 @@ export function renderRereportSection(
   fleet?: SectionFleetStatus,
   tipSha?: string,
 ): string {
+  // claude (phase-2 re-govern): the preamble asserts "every finding this run
+  // surfaced is already tracked" — vacuously FALSE for an empty set. The caller
+  // (recordNoNewFindingsSection) only reaches this branch when dedupSuppressedOpen
+  // is non-empty; a zero-finding call is a contract violation, so fail loud rather
+  // than render a factually-wrong section (the quiet/degraded sections cover the
+  // genuinely-zero cases).
+  if (findings.length === 0) {
+    throw new Error(
+      'renderRereportSection: called with zero re-surfaced findings — a re-report section ' +
+        'requires ≥1 finding (the caller must route a genuinely-empty run to renderQuietSection).',
+    );
+  }
   const isoDateStr = isoDate(date);
   const degradedMarker =
     fleet !== undefined && fleet.produced < fleet.configured

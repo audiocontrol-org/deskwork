@@ -428,15 +428,15 @@ export async function runAuditBarrageLift(
   // some new findings. The re-report entries carry a `Severity:` line (counted by
   // the dampener) and a non-open `Status:` (never re-slushed into a duplicate task,
   // FR-016). Empty set → empty string → no-op.
-  const rereportEntries = renderRereportEntries(dedupSuppressedOpen);
   // claude-04: label the re-report block so the mixed section's two categories
   // (new liftable entries vs re-surfaced already-tracked ones) are distinguishable
-  // at a glance — parity with the pure-re-report section's preamble.
-  const sectionWithRereports =
-    rereportEntries.length > 0
-      ? `${section}\n${REREPORT_MIXED_LABEL}\n\n${rereportEntries}`
-      : section;
-  if (dedupSuppressedOpen.length > 0) {
+  // at a glance — parity with the pure-re-report section's preamble. One predicate
+  // (`dedupSuppressedOpen.length`) gates both the composition and the stderr note.
+  const hasRereports = dedupSuppressedOpen.length > 0;
+  const sectionWithRereports = hasRereports
+    ? `${section}\n${REREPORT_MIXED_LABEL}\n\n${renderRereportEntries(dedupSuppressedOpen)}`
+    : section;
+  if (hasRereports) {
     stderr.write(
       `audit-barrage-lift: also re-reported ${dedupSuppressedOpen.length} already-tracked ` +
         `finding(s) in this section (no new IDs/tasks; dampener still counts their severity — US3 SC-001).\n`,
