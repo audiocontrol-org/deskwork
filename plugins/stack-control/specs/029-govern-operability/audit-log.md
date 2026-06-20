@@ -1780,3 +1780,883 @@ Surface:    src/subcommands/audit-barrage-lift.ts:347-383; src/scope-discovery/p
 `runAuditBarrageLift` now filters extracted findings through `selectLiftableFindings(...)` before deciding whether to append a quiet section. If every extracted finding is “already-present” cross-run dedup, `liftableFindings.length === 0` records a quiet section with no `Severity:` lines. The dampener can only infer persistence from findings that appear in sections, so repeated HIGHs removed by loop hygiene disappear from the recent window instead of counting as persistent HIGHs.
 
 This contradicts the new dampener contract in `check-barrage-dampener.ts`, which explicitly treats a signature “already seen at HIGH/blocking and stays HIGH+” as blocking. A realistic sequence is: run 1 records HIGH, run 2 surfaces same HIGH but lift dedups it and writes quiet, run 3 does the same, then the two most recent sections look clean and convergence engages while the auditor is still reporting the defect. Blast radius is high because this can falsely open the governance gate on an unresolved, repeatedly surfaced HIGH. A reasonable fix is to keep loop hygiene from appending duplicate full entries while still recording a per-run occurrence signal the dampener can count, or make the dampener consult deduped extracted findings before quiet-section rendering.
+
+## 2026-06-20 — audit-barrage lift (20260620T161013243Z-029-govern-operability-phase-2)
+
+Code-sha: 21f8547bc0e929f5e8844d116a1ba650a06dcfd6
+### AUDIT-20260620-102 — `renderRereportEntry` omits the canonical pointer promised by its JSDoc
+
+Finding-ID: AUDIT-20260620-102
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/audit-barrage-lift-render.ts:161-173 (the `renderRereportEntry` private function)
+
+The JSDoc block directly above `renderRereportEntry` (added in this diff) explicitly states that re-report entries carry "a pointer back to the canonical entry that already tracks this finding." The implementation renders only four fields — the `### heading`, `Status: re-reported (already tracked)`, `Severity:`, and `Surface:` — and no canonical-entry pointer:
+
+```typescript
+return [
+  `### ${finding.heading}`,
+  '',
+  `Status:     re-reported (already tracked${suffix})`,
+  `Severity:   ${finding.severity}`,
+  `Surface:    ${finding.surface}`,
+  '',
+].join('\n');
+```
+
+An operator reviewing the audit log would see a re-reported entry and know only that *some* canonical entry tracks the finding, not which one. They would have to search the log by heading text or surface to locate the tracking entry. This is a traceability gap: if the heading was edited between rounds, or if the log is long, correlation becomes manual. A `Canonical: AUDIT-NN` line — populated from whatever field `ExtractedFinding` carries about its original assignment — would close it. The contract is documented but unimplemented, so a downstream consumer reading the docstring and the rendered output will encounter a silent discrepancy.
+
+---
+
+### AUDIT-20260620-103 — Stderr reports "extracted N finding(s)" after dedup partition, but N is the post-dedup count
+
+Finding-ID: AUDIT-20260620-103
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift.ts:401-404 (the `stderr.write` call after `renderSection`)
+
+Before this diff, the log line read "extracted N finding(s)" where N came from `findings` — the raw extraction from the run directory. After this diff, the same phrasing is used but N now comes from `liftableFindings` — the post-partition count with dedup-suppressed and resolved findings removed:
+
+```typescript
+stderr.write(
+  `audit-barrage-lift: extracted ${liftableFindings.length} finding(s) from ${opts.runDir}; ` +
+    `assigning ${assignedIds[0]}..${assignedIds[assignedIds.length - 1]}.\n`,
+);
+```
+
+If `partitionLiftableFindings` (which does log its own dedup decisions through the callback) suppressed three findings from a five-finding extraction, the operator reads "extracted 2 finding(s)" — ambiguous about whether the run produced two total or five-with-three-suppressed. The word "extracted" now means "liftable after partition". The semantic mismatch is especially notable because the `dedupSuppressedOpen.length > 0` branch below explicitly logs re-reports — so the operator does eventually see the right picture, but the "extracted" line understates the run at the first glance. Changing the phrasing to "liftable" or "assigning IDs to N of M finding(s)" would match what the code actually does.
+
+---
+
+### AUDIT-20260620-104 — `record-no-new-findings-section.ts` is imported but absent from the diff
+
+Finding-ID: AUDIT-20260620-104
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/subcommands/audit-barrage-lift.ts:42 (the import line)
+
+The refactored `liftableFindings.length === 0` branch delegates entirely to `recordNoNewFindingsSection`, imported from `'./record-no-new-findings-section.js'`. This module handles three sub-cases that the old inline code handled: re-report-only runs, degraded-fleet runs, and genuine quiet runs. It is not present in the diff. Its return type must match the `Promise<number>` that `runAuditBarrageLift` expects (since it is `return`ed directly); its handling of the `dedupSuppressedOpen` array is the correctness-critical path for the graduation-safety fix (US3 SC-001). Similarly, `partitionLiftableFindings` from `'../govern/loop-hygiene.js'` is the partition primitive whose two-bucket semantics underpin the entire fix — also absent from the diff. These are the surfaces where the audited behavior lives; this audit covers only the caller site.
+
+---
+
+### AUDIT-20260620-105 — `appendSection` produces a leading newline on a fresh (empty) audit log
+
+Finding-ID: AUDIT-20260620-105
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift-render.ts:23-28 (`appendSection`)
+
+When `existing` is the empty string (brand-new audit log, no prior content), `trimmed` is `''`, `trimmed.length > 0` is `false`, `separator` is `'\n'`, and the composed result is `'' + '\n' + section`. The written file therefore begins with a blank line before the first `## ` heading. The old inline logic in `audit-barrage-lift.ts` had identical behaviour (the same `'\n'` separator path), so this is preserved rather than introduced by the diff. The remark exists because the docstring describes this as "a single newline when the log was empty" — which is accurate — but the effect is a leading blank line rather than the section starting at column 0 of line 1. This is cosmetic for human readers and benign for the dampener's line-oriented parsing, but any downstream parser that assumes the first non-whitespace character of a fresh log is `#` would need to tolerate the leading newline.
+
+## 2026-06-20 — audit-barrage lift (20260620T161307671Z-029-govern-operability-phase-2)
+
+Code-sha: 21f8547bc0e929f5e8844d116a1ba650a06dcfd6
+### AUDIT-20260620-106 — Re-report entries carry no canonical AUDIT-NN cross-reference
+
+Finding-ID: AUDIT-20260620-106 (claude-01 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=high, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/subcommands/audit-barrage-lift-render.ts:167–177 (`renderRereportEntry`)
+
+`renderRereportEntry` emits `Status: re-reported (already tracked...)` but never names the canonical `AUDIT-NN` entry the finding was matched against. An operator reading the audit log sees a finding heading resurface with "already tracked" but has no machine-readable or even human-readable pointer to the original entry. Cross-referencing requires manually scanning the full audit log for matching heading text — which is fragile (headings can drift between runs due to model phrasing variation) and operationally expensive for a large log.
+
+The deeper issue is a type-system gap: `partitionLiftableFindings` must perform the signature-to-canonical-ID match internally (that is how it classifies `dedupSuppressedOpen`), but the return type delivers `ExtractedFinding` objects that carry no `canonicalId` field. The match result is discarded after classification. The fix is to widen the `dedupSuppressedOpen` element type to `{ finding: ExtractedFinding; canonicalId: string }` and thread the canonical ID through to `renderRereportEntry`, producing `Status: re-reported (see AUDIT-042)`. Without this, the re-report section is navigable only by human inspection — which defeats the stated goal of making the dampener's dampening decisions auditable.
+
+---
+
+### AUDIT-20260620-107 — Load-bearing modules absent from the diff — critical paths unauditable
+
+Finding-ID: AUDIT-20260620-107
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/audit-barrage-lift.ts (import lines ~39–51); src/govern/loop-hygiene.ts (absent); src/subcommands/record-no-new-findings-section.ts (absent)
+
+Two modules that carry the core US4 invariant are imported by the audited code but not present in the diff:
+
+1. `partitionLiftableFindings` from `../govern/loop-hygiene.js` — this function is the gate that distinguishes FR-016 dedup-suppressed-open findings from FR-013 fixed/resolved findings and from genuinely new liftable ones. The entire correctness of the partition (the reason a deduped run cannot become a false-pristine run) lives here. The diff shows the call site and the destructuring `{ liftable: liftableFindings, dedupSuppressedOpen }`, but provides no surface to verify that the partition is keyed correctly, that `fixed-<sha>` findings are excluded from both output buckets, or that the signature comparison is the same one the dampener's identity-keyed counter uses.
+
+2. `recordNoNewFindingsSection` from `./record-no-new-findings-section.js` — this function owns the three-sub-case branch (re-report-only / degraded / pure-quiet) that US4's stated graduation-safety goal depends on. The commit subject `c29ab734 feat(029): US4 — loop hygiene + override short-circuit (T020-T028)` places both files in scope of the audited range. Their absence means the most critical logic of the feature — the code that decides whether a zero-new-liftable run records a dampener-counted section — cannot be audited from the provided diff.
+
+Blast radius: if `partitionLiftableFindings` mis-classifies a still-open HIGH as resolved, or if `recordNoNewFindingsSection` omits `Severity:` lines from re-report sections, the false-pristine run that US3 SC-001 was designed to block slips through undetected and the graduation gate passes a broken feature. That is the exact failure mode US4 exists to close.
+
+---
+
+### AUDIT-20260620-108 — "extracted N finding(s)" log message reports NET-NEW count, not total barrage findings
+
+Finding-ID: AUDIT-20260620-108
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/audit-barrage-lift.ts:401 (stderr write after `renderSection`)
+
+```typescript
+`audit-barrage-lift: extracted ${liftableFindings.length} finding(s) from ${opts.runDir}; ` +
+  `assigning ${assignedIds[0]}..${assignedIds[assignedIds.length - 1]}.\n`
+```
+
+`liftableFindings.length` is the count of findings that survived FR-013 and FR-016 suppression — the net-new set. The original message used `findings.length`, which was the total count extracted from the run directory. An operator correlating this log line against the raw barrage run files (which list all findings the models emitted) will observe a discrepancy and be unable to distinguish "findings suppressed because already fixed" from "findings suppressed because open and re-surfaced" from "findings that are genuinely net-new." A subsequent message logs the re-surfaced count, but the first line sets a false expectation. A clearer shape: `"extracted ${findings.length} finding(s) from ${opts.runDir} (${liftableFindings.length} new, ${dedupSuppressedOpen.length} persistent-open re-surfaced); assigning..."` makes the suppression accounting visible at a glance.
+
+---
+
+### AUDIT-20260620-109 — Mixed-section re-reports appended without explanatory preamble
+
+Finding-ID: AUDIT-20260620-109
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/audit-barrage-lift.ts:418–430 (re-report inline append); src/subcommands/audit-barrage-lift-render.ts:195–219 (`renderRereportSection`)
+
+When a run produces both new findings and re-surfaced already-tracked ones, re-report entries are appended to the new-findings section via:
+
+```typescript
+const sectionWithRereports =
+  rereportEntries.length > 0 ? `${section}\n${rereportEntries}` : section;
+```
+
+The pure-re-report path (`renderRereportSection`, used when `liftableFindings.length === 0`) wraps its entries in an explicit preamble:
+> *"No NEW findings — every finding this run surfaced is already tracked in the audit-log (FR-016 cross-run dedup). Re-reported here, WITHOUT new IDs or backlog tasks, so the convergence dampener still sees their severity..."*
+
+The mixed path has no equivalent. Re-report entries appear after new entries with only `Status: re-reported` as their signal. A section containing, say, four `Status: open` new entries followed by two `Status: re-reported` entries gives no structural hint that the entries represent different categories. Operators scanning the log quickly (the normal mode during triage) must read each `Status:` field individually to distinguish them. Adding even a single-line label — e.g. `_Re-surfaced persistent findings (already tracked; no new IDs assigned):_` — before the re-report block in the mixed-section case would bring the two paths to parity and make sections machine-scannable without full status-field parsing.
+
+---
+
+### AUDIT-20260620-110 — Fixed/resolved finding suppression produces no stderr accounting
+
+Finding-ID: AUDIT-20260620-110
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift.ts:349–364 (partition call site and stderr logging); src/govern/loop-hygiene.ts (absent)
+
+The diff comment at lines ~352-360 describes a three-way partition: `liftable` (new), `dedupSuppressedOpen` (FR-016 dedup), and implicitly a third category — findings that matched `fixed-<sha>` log entries and were silently dropped (FR-013). The destructuring `{ liftable: liftableFindings, dedupSuppressedOpen }` captures only two buckets. No stderr message accounts for how many findings were suppressed because they were already resolved. An operator debugging "why did only 3 of the 10 barrage findings reach the log" has no signal for the FR-013-suppressed category; they see `liftableFindings.length = 3` and `dedupSuppressedOpen.length = 4` but cannot reconstruct the arithmetic to reach 10. Adding a `resolvedSuppressed` field to the partition result (even if only logged to stderr and never written to the audit log) would close this observability gap. The fix is low-cost: widen the return type, add one log line.
+
+## 2026-06-20 — audit-barrage lift (20260620T162649539Z-029-govern-operability-phase-2)
+
+Code-sha: e9f1d15e1c6677f6f31bac0668d1833ce80ec27e
+### AUDIT-20260620-111 — Critical path delegated to `recordNoNewFindingsSection` — not in the diff
+
+Finding-ID: AUDIT-20260620-111
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/audit-barrage-lift.ts:370–382 (the `liftableFindings.length === 0` return branch)
+
+The `liftableFindings.length === 0` branch — the load-bearing path for the graduation-safety fix this whole US4 series targets — was previously ~30 lines of explicit, auditable logic directly in `runAuditBarrageLift`. It has been replaced entirely by a delegation to `recordNoNewFindingsSection`, which is imported from `./record-no-new-findings-section.js` but is **not present anywhere in this diff**. That function receives all decision inputs (`dedupSuppressedOpen`, `fleet`, `apply`, `write`, `stderr`, etc.) and is responsible for the three-way branch (re-report section / degraded-quiet section / clean-quiet section) plus the dry-run gate. None of those behaviors are auditable here.
+
+Specifically unverifiable: (1) whether the three cases are dispatched in the documented priority order (re-report > degraded > quiet); (2) whether `apply: opts.apply` is actually honored — i.e., whether dry-run mode is preserved; (3) whether the function correctly returns `0` on success and a non-zero code on write failure; (4) whether `renderRereportSection` is called with the correct arguments when `dedupSuppressedOpen.length > 0`. The prior implementation had all of these visible and checkable. The new one hides them behind a module boundary the diff does not cross.
+
+Blast-radius: if `recordNoNewFindingsSection` has a bug in any of these cases — most critically around the re-report path — a real still-open HIGH finding can be silently omitted from the recorded section, exactly the US3 SC-001 defeat the feature was written to prevent. The fact that the function is new (it's a new import) rather than an existing utility means there is no prior test coverage it can rely on.
+
+---
+
+### AUDIT-20260620-112 — Two detached JSDoc blocks on `RereportInput` — only the second attaches
+
+Finding-ID: AUDIT-20260620-112
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/audit-barrage-lift-render.ts (the two `/** */` blocks immediately before `export interface RereportInput`)
+
+The diff adds two consecutive `/** ... */` comment blocks, then `export interface RereportInput`. TypeScript JSDoc binding attaches only the **immediately preceding** block to the declaration; the first block is syntactically floating — it is a comment on nothing, and no editor hover or `tsdoc` extraction will surface it on the interface.
+
+The first block (the longer "graduation-safety fix" explanation) describes the *section* semantics and why re-reports carry no `Finding-ID:`. The second block describes the render-layer contract for the pairing. The first block's content is architecturally important but will be invisible to any tooling that reads JSDoc from the interface declaration. A developer reading `RereportInput` in an IDE hover will see only the shorter second comment. The longer explanation should either be converted to a non-JSDoc `//` block comment (if it is intended as module-level narrative), or merged into the single JSDoc block that precedes the interface.
+
+---
+
+### AUDIT-20260620-113 — `sectionWithRereports` appends to `section` without normalizing trailing whitespace
+
+Finding-ID: AUDIT-20260620-113
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift.ts — the `sectionWithRereports` composition (~line 435–440)
+
+```typescript
+const sectionWithRereports =
+    rereportEntries.length > 0
+      ? `${section}\n${REREPORT_MIXED_LABEL}\n\n${rereportEntries}`
+      : section;
+```
+
+`section` is the return value of `renderSection`, whose trailing whitespace is not visible in this diff. If `renderSection` returns content ending with `\n\n` (a common render-function convention that ensures a blank line at end), the composition produces `\n\n\n` before `REREPORT_MIXED_LABEL` — three newlines, i.e. two blank lines in rendered markdown. This is cosmetically inconsistent with every other section boundary in the log, which uses a single blank line (two newlines).
+
+By contrast, `appendSection` was introduced specifically to normalize this: it trims trailing whitespace from `existing` before inserting the separator. The `sectionWithRereports` composition bypasses that normalization for the `section → REREPORT_MIXED_LABEL` join while correctly using `appendSection` for the `auditLogText → sectionWithRereports` join. A simple `section.replace(/\s+$/, '')` before the template literal, or routing through a local `appendSection(section, REREPORT_MIXED_LABEL + '\n\n' + rereportEntries)` call, would make the two joins consistent.
+
+---
+
+### AUDIT-20260620-114 — `appendSection` inserts a leading newline for an empty `existing` argument
+
+Finding-ID: AUDIT-20260620-114
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift-render.ts — `appendSection`, line `const separator = trimmed.length > 0 ? '\n\n' : '\n';`
+
+When `existing` is an empty string, `trimmed` is also empty, so `separator = '\n'`. The composed result is `'\n' + section` — the output file starts with a blank line before any content. The docstring acknowledges this as "a single newline when the log was empty," but the natural expectation for a new file is no leading blank line; the section header should be the first character.
+
+In the current call sites this edge case does not arise: `buildAuditLogHeader` populates `auditLogText` for new logs before any `appendSection` call, so `existing` is always non-empty in practice. The risk is that a future caller of `appendSection` (it is now exported) passes an empty string and gets a file with a leading blank line without understanding why. A guard `const separator = trimmed.length > 0 ? '\n\n' : '';` would eliminate the edge case and is consistent with the intent.
+
+---
+
+### AUDIT-20260620-115 — `renderRereportSection` has no guard against empty `findings`
+
+Finding-ID: AUDIT-20260620-115
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift-render.ts — `renderRereportSection` function signature and body
+
+`renderRereportSection` accepts `findings: readonly RereportInput[]` with no early-return for `findings.length === 0`. If called with an empty array, it produces a section that includes the preamble ("No NEW findings — every finding this run surfaced is already tracked…") followed by zero entries — a section whose preamble claims to list re-surfaced findings but contains none. This is misleading output.
+
+The call site in `recordNoNewFindingsSection` (not visible in this diff) is responsible for guarding against this; but the function itself provides no contract enforcement. A one-line guard — `if (findings.length === 0) throw new Error('renderRereportSection: findings must be non-empty')` or a documented precondition — would make the contract explicit and catch miscalled sites at development time.
+
+---
+
+### AUDIT-20260620-116 — `partitionLiftableFindings` — the categorization driver — is not visible in this diff
+
+Finding-ID: AUDIT-20260620-116
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/subcommands/audit-barrage-lift.ts — `import { partitionLiftableFindings } from '../govern/loop-hygiene.js'`
+
+The new `partitionLiftableFindings` function drives the entire three-way partition (`liftable`, `dedupSuppressedOpen`, `resolvedSuppressed`) that all of the US4 logic builds on. The correctness of the re-report section, the dampener severity counting, and the FR-016 dedup guarantee all depend on this function correctly categorizing every finding in the extracted set. Its implementation is not in this diff.
+
+I am noting this as informational rather than high because the commits reference T020-T028 loop-hygiene work that presumably covers this function, and the diff's logic reads consistently against the stated contract (`dedupSuppressedOpen` = already-present-open, `resolvedSuppressed` = already-present-fixed). But any reader auditing the graduation-safety correctness end-to-end should trace through `partitionLiftableFindings` and its signature matching of findings against audit-log content, since a keying error there would silently misclassify findings and bypass the re-report path.
+
+## 2026-06-20 — audit-barrage lift (20260620T163052556Z-029-govern-operability-phase-2)
+
+Code-sha: e9f1d15e1c6677f6f31bac0668d1833ce80ec27e
+### AUDIT-20260620-117 — `record-no-new-findings-section.ts` is entirely absent from the diff
+
+Finding-ID: AUDIT-20260620-117
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/audit-barrage-lift.ts (the import at line ~52 and the `liftableFindings.length === 0` branch at ~365)
+
+The prior inline `if (findings.length === 0)` block (~30 lines of code) has been removed and replaced with a call to `recordNoNewFindingsSection`, imported from `./record-no-new-findings-section.js`. That module does not appear anywhere in the diff. This is the exclusive handler for the three most operationally sensitive sub-cases: (a) pure quiet run over a healthy fleet, (b) pure quiet run over a degraded fleet, and (c) the pure-re-report case (all findings already tracked). The correctness of the graduation-safety fix rests heavily on case (c): an all-deduped re-run must produce a re-report section—not a pristine quiet section—so the dampener's single-run-clean rule cannot falsely graduate a feature with open HIGH findings. Without the module in the diff, none of those three branches can be audited for correctness, for consistent use of `appendSection`, for proper error handling, or for correct routing between the quiet/re-report paths. Blast-radius: if the module misroutes any case (e.g. produces a quiet section when it should produce a re-report section), US3 SC-001 is silently defeated—the exact failure this feature was shipped to fix.
+
+---
+
+### AUDIT-20260620-118 — `renderRereportSection` produces a factually incorrect preamble when called with empty `findings`
+
+Finding-ID: AUDIT-20260620-118
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/audit-barrage-lift-render.ts:193–240 (`renderRereportSection`)
+
+`renderRereportSection` accepts `findings: readonly RereportInput[]` and unconditionally emits:
+
+```
+_No NEW findings — every finding this run surfaced is already tracked in the audit-log
+(FR-016 cross-run dedup). Re-reported here…_
+```
+
+followed by `renderRereportEntries(findings)`. When `findings` is empty, `renderRereportEntries` returns `''`, so the output is a section heading plus the preamble but zero entries. The preamble's claim—"every finding this run surfaced is already tracked"—is then literally false: no findings were surfaced at all. This is distinct from a quiet run. The function has no guard (no early-return, no assertion, no caller-visible contract) preventing the empty-input call. Whether the actual caller in `record-no-new-findings-section.ts` enforces this precondition is unknowable from this diff (see AUDIT-BARRAGE-claude-01). Blast-radius: if the caller passes an empty slice, the produced section has a misleading preamble that an operator reading the audit-log might mistake for a quiet-run record or a stale entry, which could confuse manual triage of graduation eligibility.
+
+A minimal fix is an early-return `if (findings.length === 0) return '';` at the top of `renderRereportSection`, or a thrown error, so the confusion cannot be emitted silently. The function's design contract ("I was given deduped-open re-surfaces; I render them with a preamble") should be enforced at the boundary.
+
+---
+
+### AUDIT-20260620-119 — Two inconsistent predicates guard the same logical condition in the mixed-section path
+
+Finding-ID: AUDIT-20260620-119
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift.ts:421–440 (mixed-section composition block)
+
+The mixed-section block checks `rereportEntries.length > 0` (a string-length test) to decide whether to append the re-report label and entries, then separately checks `dedupSuppressedOpen.length > 0` (an array-length test) to decide whether to emit the stderr accounting message:
+
+```typescript
+const rereportEntries = renderRereportEntries(dedupSuppressedOpen);
+const sectionWithRereports =
+  rereportEntries.length > 0
+    ? `${section}\n${REREPORT_MIXED_LABEL}\n\n${rereportEntries}`
+    : section;
+if (dedupSuppressedOpen.length > 0) {
+  stderr.write(`…`);
+}
+```
+
+These are logically equivalent today because `renderRereportEntries` returns `''` iff its input is empty. However, using two different predicates for the same decision increases the surface area for divergence if `renderRereportEntries`'s contract ever changes (for example, if it emits a sentinel string for empty input). Preferring a single predicate—`dedupSuppressedOpen.length > 0`—in both branches removes the implicit coupling to `renderRereportEntries`'s empty-return contract.
+
+---
+
+### AUDIT-20260620-120 — Orphaned leading JSDoc block before `RereportInput` will not be associated with any declaration
+
+Finding-ID: AUDIT-20260620-120
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift-render.ts:141–174 (two consecutive `/** */` blocks before `export interface RereportInput`)
+
+TypeScript/TSDoc associates a doc-comment with the immediately following declaration. Two consecutive `/** */` blocks appear before `export interface RereportInput`: a large design-rationale block (~25 lines) followed by a shorter attribution block. TSDoc attaches only the second (shorter) block to `RereportInput`; the first block is a floating orphan—any documentation tooling will silently discard it. The large block reads as if it is intended to document the `renderRereportSection` concept that follows, but it is placed before the interface declaration that comes first. A reasonable fix is to move the large block immediately above `renderRereportSection` (its natural home), leaving the short attribution comment as the sole TSDoc for `RereportInput`. Alternatively, collapse both into one `/** */` block. As-is, a future reader looking for the design rationale in generated docs will not find it.
+
+## 2026-06-20 — audit-barrage lift (20260620T170746034Z-029-govern-operability-phase-4)
+
+Code-sha: 3f64cc86acf1b643ee521d85f43b6bea7f971d46
+### AUDIT-20260620-121 — Override graduation swallows convergence-record write failure → CLI-success/gate-signal divergence
+
+Finding-ID: AUDIT-20260620-121 (claude-01 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    src/govern/override-graduate.ts:52-69
+
+`recordOverrideGraduation` wraps `recordGovernConvergence` in a try-catch that catches the error, emits a `WARNING` to stderr, and **returns normally** (`void`). The caller in `govern.ts` (line ~850-860) then unconditionally executes `emitTerminalOutcome('graduated')` and `process.exit(0)`. If the convergence record write fails at runtime (disk full, permission denied, parent directory missing), the CLI reports success and the govern workflow advances, but the durable gate file—the only artifact the `governing → shipped` gate reads—is never written. The gate remains CLOSED while the CLI says OPEN.
+
+This directly undermines the invariant that FINDING 2 (codex HIGH, prior audit) was intended to fix: "CLI success must not diverge from the gate signal." The prior fix correctly ensures a roadmap node is resolved before any write is attempted, eliminating the pre-029 case where the node failed and no record was written. But it left the write-itself-fails case in the same divergent state.
+
+The inconsistency with the normal convergence path amplifies this. For a normal (non-override) graduation, `recordGovernConvergence` is called without a try-catch; a write failure propagates to the outer catch in `govern.ts` (`govern: FATAL — …`, exit 1). So the normal path fails loud; the override path emits a WARNING and exits 0. The comment in `override-graduate.ts` claims this "mirrors the convergence graduation's fail-safe," but the normal path has no such fail-safe—it throws. The comment is incorrect, and the behavioral divergence is real.
+
+Fix: remove the try-catch in `recordOverrideGraduation` and let `recordGovernConvergence` throw, or return a `{ ok: false; message: string }` discriminated union that the caller checks and converts to a FATAL + exit 2 before `emitTerminalOutcome('graduated')` is reached.
+
+---
+
+### AUDIT-20260620-122 — `GOVERN_OVERRIDE` env-var whitespace-only reason bypasses the empty-reason guard
+
+Finding-ID: AUDIT-20260620-122 (claude-02 + codex-02; cross-model)
+Status: migrated-to-backlog TASK-358
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/subcommands/govern.ts:781-800 (override-reason resolution block)
+
+The explicit-blank guard applies only to the CLI flag:
+
+```typescript
+if (flags.override !== undefined && flags.override.trim().length === 0) {
+  // FATAL
+}
+const overrideReason = pick(flags.override, process.env.GOVERN_OVERRIDE);
+if (overrideReason !== undefined && overrideReason.length > 0) {
+  // override fires
+```
+
+`pick(undefined, process.env.GOVERN_OVERRIDE)` returns the env var when the flag is absent. If `GOVERN_OVERRIDE` is `"   "` (whitespace), `overrideReason.length > 0` is true (length 3), and the override block fires with a whitespace-only reason. The convergence-record validator in `convergence-record.ts:155-162` checks `overrideReason.length === 0`, which is false for whitespace, so the record is written with `overrideReason: "   "`. The comment at the guard site states: "an empty or whitespace-only reason is rejected so a blank flag cannot silently short-circuit into — or fall through to — a full barrage." That invariant holds for the CLI flag path but not for the env-var path.
+
+The blast radius is bounded—`GOVERN_OVERRIDE` is an internal env var unlikely to be set to whitespace in practice—but the stated security property ("whitespace is rejected") is incomplete. Any CI or scripted use that reads the reason from an env var could silently accept a blank override. Fix: apply `.trim().length === 0` to `overrideReason` (after `pick`) rather than only to `flags.override`, mirroring the trim-check logic already in the CLI-flag guard.
+
+---
+
+### AUDIT-20260620-123 — `slush-findings` dry-run silently skips `reconcileFixedFindings`, giving incomplete preview
+
+Finding-ID: AUDIT-20260620-123
+Status: migrated-to-backlog TASK-359
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/slush-findings.ts:149-188 (reconcile block)
+
+`reconcileFixedFindings` is gated entirely on `opts.apply`:
+
+```typescript
+if (opts.apply) {
+  const rec = reconcileFixedFindings({...});
+  ...
+}
+```
+
+When run without `--apply` (dry-run mode), the reconcile is completely skipped—no output, no preview of which fixed-finding tasks would be auto-closed. An operator running without `--apply` to preview the slush operation sees the migration dry-run output but nothing about backlog closures. If several tasks would be auto-closed (findings flipped to `fixed-<sha>` since the last slush), the operator has no warning before the `--apply` run closes them.
+
+This is an ergonomics/trust issue: the dry-run contract is "show me what `--apply` would do." The current behavior delivers an incomplete preview. Fix: unconditionally compute the would-be reconciliations (read-only: find fixed findings whose tasks are non-Done) and emit a "would close N task(s)" line on stdout, then guard only the `backend.close()` calls on `opts.apply`.
+
+---
+
+### AUDIT-20260620-124 — `writeResolvedPhaseCheckpoint` declares `string` return type that both callers ignore
+
+Finding-ID: AUDIT-20260620-124
+Status: migrated-to-backlog TASK-360
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts:462-490 (`writeResolvedPhaseCheckpoint` definition and call sites)
+
+`writeResolvedPhaseCheckpoint` is typed to return `string` (it passes through the return of `writePhaseCheckpoint`). Both callers—the normal graduation path (~line 1042) and the per-phase override path (~line 827)—invoke it as a statement and discard the return value. The return type on the function creates a false contract: a reader implementing a new caller might believe the path is meaningful. If `writePhaseCheckpoint` uses the returned value as a confirmation path for logging and that value is important, both call sites silently drop it.
+
+The fix is either to change the return type to `void` (if the checkpoint path is intentionally unused by callers) or to consume the return value in at least one call site, e.g., to emit a `stderr` line confirming the checkpoint file written—which would also close the gap where a silent no-op (phaseStatus not found) is indistinguishable from a successful write.
+
+## 2026-06-20 — audit-barrage lift (20260620T171228743Z-029-govern-operability-phase-4)
+
+Code-sha: 3f64cc86acf1b643ee521d85f43b6bea7f971d46
+### AUDIT-20260620-125 — `reconcileFixedFindings` uses a stale `list()` snapshot — potential double-close on repeat finding IDs
+
+Finding-ID: AUDIT-20260620-125
+Status: migrated-to-backlog TASK-361
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/backlog/reconcile-fixed.ts:54-64
+
+`args.backend.list()` is called once at the top of the function and stored in `items`. The `task.status === BACKLOG_DONE_STATUS` guard on line 60 checks against this initial snapshot — it is never refreshed after `args.backend.close(task.id)` mutates the backend on line 61. If the audit log contains two entries with different `findingId` strings that both produce the same `canonicalAuditId` (e.g., `AUDIT-20260619-01-revision` and `AUDIT-20260619-01-follow-up` both extract `AUDIT-20260619-01`), or if the audit log is corrupted with a duplicate `Finding-ID`, both iterations find the same backlog task, the stale-snapshot guard passes for the second iteration (status still shows non-Done), and `backend.close(task.id)` is called twice. If `backend.close` is not idempotent on an already-Done task (i.e., it throws), the caller in `slush-findings.ts` catches it and exits 1 with FATAL — a surprising hard failure on an operation the JSDoc describes as "idempotent." The fix is either to reload the task after each close, to track closed IDs in a local Set, or to confirm and document that `backend.close` is idempotent on already-Done tasks and update the guard to match.
+
+---
+
+### AUDIT-20260620-126 — `GOVERN_OVERRIDE` env var with whitespace-only value bypasses the explicit-flag guard and produces a blank attribution reason
+
+Finding-ID: AUDIT-20260620-126 (claude-02 + codex-02; cross-model)
+Status: migrated-to-backlog TASK-362
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    src/subcommands/govern.ts (override block, lines ~789-800)
+
+The explicit-flag guard fires only when `flags.override !== undefined && flags.override.trim().length === 0` — i.e., it protects the `--override ""` / `--override "   "` CLI flag case. The comment deliberately notes this guard does NOT apply to the `pick` result (which also reads `GOVERN_OVERRIDE`). Consequently, `GOVERN_OVERRIDE="   "` (whitespace-only) causes `overrideReason = pick(undefined, "   ") = "   "`, and `overrideReason.length > 0` is true (length 3) — the override fires with a whitespace-only attribution reason. In `convergence-record.ts` the `overrideReason` validator checks `parsed.overrideReason.length === 0`, which passes for whitespace strings; the record is written with `overrideReason: "   "`. A downstream consumer reading the durable record sees a non-empty, non-informative attribution. The fix is to apply `.trim().length === 0` consistently in both the flag guard and the `overrideReason` guard in `convergence-record.ts`'s `validate` function.
+
+---
+
+### AUDIT-20260620-127 — `recordOverrideGraduation` catch-and-continue exits 0 while the durable gate signal stays closed
+
+Finding-ID: AUDIT-20260620-127 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=low, codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/govern/override-graduate.ts:57-67
+
+When `recordGovernConvergence` throws (filesystem error), the catch block emits a WARNING and returns normally. The caller in `govern.ts` then calls `emitTerminalOutcome('graduated')` and `process.exit(0)`. The CLI exits with a "graduated" signal, but no durable convergence record was written — so the `governing → shipped` gate remains CLOSED. This is the CLI-success-diverges-from-gate-signal pattern that feature 029 US4 (Finding 2) was explicitly designed to eliminate. The comment says "mirroring the convergence graduation's fail-safe," implying the normal graduation path has the same behavior on FS failure. If both paths share this divergence, the risk is bounded to FS-failure scenarios (which are rare), but it contradicts the stated "CLI success ↔ gate signal" design principle. The lowest-risk fix is to convert the catch into a re-throw (exit non-zero) so the operator is forced to address the FS issue before the CLI reports graduation; if the warn-and-continue behavior is intentional policy, it should be documented in the spec as an accepted trade-off.
+
+---
+
+### AUDIT-20260620-128 — `built.checkpoint === phaseUnit.auditLogSection` invariant for phase units enforced only by code comment
+
+Finding-ID: AUDIT-20260620-128
+Status: migrated-to-backlog TASK-363
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts:470-476 (writeResolvedPhaseCheckpoint comment)
+
+The shared helper `writeResolvedPhaseCheckpoint` is the key mechanism keeping the normal-graduation path and the `--override` short-circuit path in sync for per-phase checkpoints. The normal path threads `built.checkpoint`; the override path threads `phaseUnit.auditLogSection`. The comment documents the invariant: "For a phase unit `built.checkpoint` equals `phaseUnit.auditLogSection` (`buildImplementVars` is passed the section as its checkpoint flag)." This invariant is load-bearing — if `buildImplementVars` ever computes `checkpoint` differently for a phase unit (e.g., by appending a run identifier), the two paths silently write different `checkpoint` values in the nominally-shared helper, defeating the "shared so the two paths can never drift" design intent. The invariant is not asserted at runtime (no `===` check or `throw`). A lightweight fix is to add a `console.assert` or a throw at the call site in govern.ts's normal graduation path, or to restructure `writeResolvedPhaseCheckpoint` so it derives `checkpoint` from `phaseUnit.auditLogSection` internally and neither caller supplies it.
+
+---
+
+### AUDIT-20260620-129 — `recordNoNewFindingsSection` not visible in the diff — re-report/degraded/quiet branching unverifiable
+
+Finding-ID: AUDIT-20260620-129
+Status: migrated-to-backlog TASK-364
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/subcommands/audit-barrage-lift.ts:363 (import of `recordNoNewFindingsSection`)
+
+The zero-new-liftable-findings path (`liftableFindings.length === 0`) previously contained its logic inline in `audit-barrage-lift.ts`; it has been extracted to `./record-no-new-findings-section.js`. That module is NOT present in this diff. The comment names three sub-cases ("re-report / degraded / quiet, in that priority order") and the prior inline code for those branches has been removed. Without the extracted module, the branching logic — including the FR-007 DEGRADED-fleet marker, the quiet-section separator, and the re-report priority — cannot be cross-verified against the prior behavior in this audit. The lift-dedup tests in `tests/promote-findings/lift-dedup.test.ts` exercise the end-to-end paths and would catch regressions; the gap is that the extracted module's internal structure (e.g., precedence of re-report over degraded when both apply) is opaque from this diff alone.
+
+### AUDIT-20260620-130 — Auto-reconcile closes only the first backlog task matching a fixed finding
+
+Finding-ID: AUDIT-20260620-130
+Status: migrated-to-backlog TASK-365
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/backlog/reconcile-fixed.ts:51-62
+
+`reconcileFixedFindings` uses `items.find((item) => item.refs.includes(ref))`, so only one task is closed for a fixed finding. The file header and FR-015 wording say “any backlog task that referenced that finding” must be reconciled. This matters for upgraded installations or older runs that already accumulated duplicate migrated-finding tasks before FR-016 tightened deduplication.
+
+Blast radius is medium because existing duplicate backlog records can remain open even after the audit-log source of truth says the finding is fixed, leaving burn-down state stale. Iterate all matching non-Done items for each fixed ref, or build a ref-to-items map and close every open task carrying that ref.
+
+## 2026-06-20 — audit-barrage lift (20260620T181916746Z-029-govern-operability-phase-4)
+
+Code-sha: 7c064bc321f3b0d2a792e197ce23bd8e537903e5
+### AUDIT-20260620-131 — Normal-graduation record-write FATAL has no test
+
+Finding-ID: AUDIT-20260620-131
+Status: migrated-to-backlog TASK-366
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/govern.ts (the convergence-record write block, lines ~1110–1145 of the post-diff file)
+
+The diff promotes the normal convergence graduation's record-write failure from WARNING+exit-0 to FATAL+exit-1. This is the correct direction (US4 Finding-2: CLI success ⟺ gate signal), and the analogous path in the override short-circuit has a test (`FATALs (non-zero) when the durable convergence record cannot be written`). However, **no test covers the normal-graduation write-FATAL**. The old split was: resolve-node failure → WARNING (unchanged); write-record failure → WARNING → now FATAL. Any regression that re-introduces the swallow (e.g., a future refactor wrapping the throw) would be invisible to the suite.
+
+The blast-radius: adopters scripting around exit codes now get exit-1 where they previously got exit-0-with-a-warning. Without a test pinning this, the behavior can silently regress to the old shape. Minimum fix: add a test that blocks the convergence write path (place a FILE where the directory must be created, as done in the override test) and asserts exit-1 + FATAL message + no "spec may graduate" message.
+
+---
+
+### AUDIT-20260620-132 — Exit codes are inconsistent across FATAL scenarios
+
+Finding-ID: AUDIT-20260620-132
+Status: migrated-to-backlog TASK-367
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts (override short-circuit block)
+
+Three distinct FATAL scenarios in the override short-circuit exit with different codes:
+- Blank/whitespace reason (`--override ''` or `GOVERN_OVERRIDE='   '`) → `process.exit(2)`
+- No roadmap node resolves (throws or returns undefined) → `process.exit(2)`
+- Convergence record write failure → `process.exit(1)`
+
+The two tests that assert a specific exit code both check `exit(2)`. The write-failure test only asserts `expect(r.status).not.toBe(0)`, deliberately leaving the exit code unconstrained. There is no documented distinction between exit-1 and exit-2 in the govern CLI contract.
+
+If an adopter's CI or workflow script distinguishes "bad input" (exit-2) from "operational failure" (exit-1), the write-failure case will be mis-classified. If the intent is to use 2 for usage-class errors and 1 for I/O errors, that distinction should be documented and pinned by the test (`toBe(1)` rather than `not.toBe(0)`). If there is no intended distinction, all override FATALs should use the same exit code for consistency.
+
+---
+
+### AUDIT-20260620-133 — Mixed-section path (new liftable + persistent re-reported in the same run) has no test
+
+Finding-ID: AUDIT-20260620-133
+Status: migrated-to-backlog TASK-368
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/audit-barrage-lift.ts (lines ~421–450 post-diff, `sectionWithRereports` composition)
+
+The new `sectionWithRereports` logic runs only when `liftableFindings.length > 0 && dedupSuppressedOpen.length > 0` — i.e., a run that introduces at least one NEW finding while ALSO re-surfacing an already-tracked open finding. The test suite in `lift-dedup.test.ts` covers:
+- Pure new finding (run 1 only) → `liftable > 0, dedupSuppressedOpen = 0`
+- Pure re-report (run 2, same finding) → `liftable = 0, dedupSuppressedOpen > 0` (dispatched to `recordNoNewFindingsSection`)
+
+But the third case — a run that contains a brand-new finding AND re-surfaces a persistent open finding in the same extraction — is never exercised. In that case `hasRereports = true` and the code appends `\n${REREPORT_MIXED_LABEL}\n\n${renderRereportEntries(dedupSuppressedOpen)}` to the rendered section. A bug in `REREPORT_MIXED_LABEL` formatting, in `renderRereportEntries` (e.g., producing entries that the dampener miscounts), or in the `appendSection` boundary placement when the section already has trailing content, would be invisible to the suite.
+
+Blast-radius: the dampener's `rawHighPlusCount` for the most-recent section is the load-bearing graduation gate. If re-report entries in a mixed section are malformed, a persistent HIGH could appear zero to the dampener in the presence of new liftable findings, triggering a false graduation (US3 SC-001).
+
+---
+
+### AUDIT-20260620-134 — Phase-checkpoint write in override path is unwrapped; an I/O failure produces an opaque uncaught error
+
+Finding-ID: AUDIT-20260620-134 (claude-04 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=low, codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/subcommands/govern.ts (per-phase override block, `writeResolvedPhaseCheckpoint` call site ~line 855)
+
+The per-phase override path writes the checkpoint before calling `recordOverrideGraduation`:
+
+```typescript
+if (phaseUnit?.granularity === 'phase' && phaseUnit.phaseId !== undefined && ...) {
+  const phaseStatus = phaseCheckpointStatuses.find((status) => status.phaseId === phaseId);
+  if (phaseStatus !== undefined) {
+    writeResolvedPhaseCheckpoint({ ... }); // ← no try/catch
+  }
+}
+try {
+  recordOverrideGraduation({ ... }); // ← correctly wrapped
+} catch (err) {
+  process.stderr.write(`govern: FATAL — override graduation could not write the durable convergence record...`);
+  process.exit(1);
+}
+```
+
+If `writePhaseCheckpoint` throws (disk full, permission error), the exception propagates past the `recordOverrideGraduation` try/catch and is caught by the outer protocol-error catch (or becomes an unhandled rejection), producing an error message that bears no relation to "the checkpoint write failed." The operator sees a confusing stack trace instead of a actionable `govern: FATAL —` message.
+
+The state after a checkpoint-write failure is also partially confusing: the convergence record has NOT been written (the throw interrupts before `recordOverrideGraduation`), so the gate stays closed. On retry the operator hits the same checkpoint failure again without a clear diagnostic. Minimum fix: wrap `writeResolvedPhaseCheckpoint` in the same try/catch pattern as `recordOverrideGraduation`, with a descriptive FATAL message and exit-1.
+
+### AUDIT-20260620-135 — Diff adds an explicit deferred-work marker in the govern path
+
+Finding-ID: AUDIT-20260620-135
+Status: migrated-to-backlog TASK-369
+Severity:   low
+Per-lane:   codex=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts:1092-1100
+
+The added comment reintroduces an operator-discipline trap: it documents a known misleading exit-code behavior and ends by saying the distinction is “deferred to T041” at line 1100. The audit instructions explicitly reject deferral phrases in the audited work product because they normalize shipping a known bug shape without an enforceable guard.
+
+The behavioral blast radius is low for this finding as phrased because it is a comment, not executable logic. It still matters because this file is a governance control surface and the comment sits directly above code that warns but exits 0 when no convergence item resolves. A reasonable fix is to remove the deferral wording and either encode the accepted behavior as an intentional standalone-mode rule, or make the unresolved workflow-node case fail loud where the code can distinguish it.
+
+## 2026-06-20 — audit-barrage lift (20260620T182340587Z-029-govern-operability-phase-4)
+
+Code-sha: 7c064bc321f3b0d2a792e197ce23bd8e537903e5
+### AUDIT-20260620-136 — Phase checkpoint may be written without a convergence record on override path
+
+Finding-ID: AUDIT-20260620-136 (claude-01 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-370
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    src/subcommands/govern.ts — override short-circuit block (~line 830–875 in the diff)
+
+In the per-phase `--override` path inside `runGovern`, `writeResolvedPhaseCheckpoint` is called **before** `recordOverrideGraduation`. The phase-checkpoint write has no enclosing try/catch, while the convergence-record write is wrapped in its own try/catch that exits 2 on failure. If the phase-checkpoint write succeeds and the convergence-record write subsequently fails (e.g., ENOSPC, ENOTDIR), the implementation exits FATAL — but the phase-N checkpoint file has already landed on disk. The adjacent comment reads:
+
+> "Runs ONLY after the node resolved above, so a FATAL leaves nothing half-written."
+
+This claim is false for write-level failures. The "nothing half-written" guarantee only holds for the node-resolution FATAL (before either write). Once both writes begin, a failure mid-way leaves the phase-N checkpoint current while the convergence record is absent.
+
+The practical consequence: after the FATAL the operator could run `govern --phase N+1`. The prior-phase staleness gate checks whether phase N's checkpoint is current — it is (step A succeeded) — so phase N+1 governance proceeds. Phase N+1 eventually writes the feature-level convergence record, superseding the incomplete phase-N override. The audit trail for the phase-N override intent (FR-018 attribution) is permanently absent from the convergence record; there is no `override: true / overrideReason` from phase N, and there is no AUDIT log entry recording it (FR-017 fires zero lift). The "CLI success ⟺ gate signal" invariant the diff explicitly targets (Finding-2, codex HIGH) is partially achieved — the FATAL prevents a successful CLI exit — but the half-written phase checkpoint enables a semantic path around the failed override without any record it occurred.
+
+A minimal fix is to reverse the write order: write the convergence record first (inside its try/catch), and only write the phase checkpoint after the convergence record lands. An alternative is to wrap `writeResolvedPhaseCheckpoint` in its own try/catch and FATAL on failure before the convergence record is attempted. Either ordering removes the half-write window. The misleading comment should also be updated to reflect the actual guarantee boundary.
+
+---
+
+### AUDIT-20260620-137 — `overrideReason.length > 0` guard is dead code after the blank-reason FATAL
+
+Finding-ID: AUDIT-20260620-137
+Status: migrated-to-backlog TASK-371
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts — override short-circuit block
+
+After the blank-reason FATAL guard:
+```typescript
+if (overrideReasonRaw !== undefined && overrideReasonRaw.trim().length === 0) {
+  process.exit(2);
+}
+const overrideReason = overrideReasonRaw?.trim();
+if (overrideReason !== undefined && overrideReason.length > 0) {   // ← dead code
+```
+
+At the point the second condition is evaluated, `overrideReason` can only be `undefined` (no override supplied — the `length > 0` arm is unreachable) or a non-empty, non-whitespace string (the FATAL guard eliminated every empty/whitespace case). The `.length > 0` sub-test therefore always evaluates to `true` when `overrideReason !== undefined` and adds no information. The condition reads as if a non-empty, non-null override could somehow exist and still be the zero-length string — which the first guard makes impossible. The dead sub-expression should be removed to avoid misleading future readers.
+
+---
+
+### AUDIT-20260620-138 — Silent skip when `phaseStatus` resolves to `undefined` — should be fail-loud
+
+Finding-ID: AUDIT-20260620-138
+Status: migrated-to-backlog TASK-372
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts — override path (~line 830) and normal graduation path (~line 1047)
+
+In both the override and the normal convergence-graduation paths, the phase-checkpoint write is guarded by:
+```typescript
+const phaseStatus = phaseCheckpointStatuses.find((status) => status.phaseId === phaseId);
+if (phaseStatus !== undefined) {
+  writeResolvedPhaseCheckpoint({...});
+}
+```
+
+If `find` returns `undefined` — meaning the resolved `phaseId` has no corresponding status in `phaseCheckpointStatuses` — the checkpoint write is silently skipped. Downstream gates that check whether all phases' checkpoints are current would then fail, but with no indication at the time of governance why the checkpoint is absent. At this point in the control flow, the phase unit was already successfully resolved and prior-phase staleness was already validated; a missing status for the resolved phase is not a normal operating condition — it indicates a programmer-contract violation (the phase ID resolved in one place does not appear in the status list derived from the same phase data). A silent skip is harder to diagnose than a `GovernProtocolError`. The fix is to replace the silent-skip branch with a loud assertion: if the phase was resolved and prior-phase gates passed, its status MUST be present in the list.
+
+---
+
+### AUDIT-20260620-139 — `slush-findings` dry-run does not report what `reconcileFixedFindings` would close
+
+Finding-ID: AUDIT-20260620-139
+Status: migrated-to-backlog TASK-373
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/slush-findings.ts (~line 153)
+
+`reconcileFixedFindings` is gated on `opts.apply`. On a dry-run invocation (`--dry-run` / no `--apply`), the reconcile path is entirely skipped: no message indicates how many tasks would be closed. The slush migration's dry-run output (what would be migrated) is thus incomplete — an operator running without `--apply` to preview the effects of slush sees the migration candidate list but no reconcile candidate list. Given that FR-015 auto-reconciliation is a new behavior introduced in this diff, operators are likely to probe dry-run output to understand what will happen before committing. The fix is to run `reconcileFixedFindings` in read-only mode on the dry-run path and emit a `[dry-run] would close N task(s): …` line, mirroring the existing dry-run gate further down in the function.
+
+## 2026-06-20 — audit-barrage lift (20260620T183658900Z-029-govern-operability-phase-4)
+
+Code-sha: 898493961b7df1e13142410e94f01e9e23694e2e
+### AUDIT-20260620-140 — Override catch block emits incorrect gate-state message when record write succeeds but checkpoint write fails
+
+Finding-ID: AUDIT-20260620-140 (claude-01 + claude-02 + claude-04 + claude-05 + codex-01 + codex-02 + codex-03; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    src/subcommands/govern.ts — the try/catch wrapping `recordOverrideGraduation` + `writeResolvedPhaseCheckpoint` in the `--override` short-circuit block
+
+The `try` block in the override path calls `recordOverrideGraduation` first (which writes the convergence record with `converged: true, override: true`), then calls `writeResolvedPhaseCheckpoint`. Both live inside a single `catch`. If `recordOverrideGraduation` succeeds — persisting a `converged: true` convergence record — and `writeResolvedPhaseCheckpoint` then throws, the catch block emits:
+
+> `"the convergence record or per-phase checkpoint write failed, so the governing -> shipped gate stays CLOSED and this override does NOT graduate."`
+
+That message is materially wrong. The convergence record **was** written. If the gate evaluates the record (it reads `converged: true`), it will treat the feature as graduated — not closed. The operator, reading "gate stays CLOSED," will believe they need to fix an ungradated state. Depending on the gate's evaluation logic, the actual gate state could be OPEN with a missing phase checkpoint, which is a different (and potentially more serious) problem: later phases would be blocked by the prior-phase staleness check, not by a closed `governing → shipped` gate, but the operator's diagnostic path would be entirely wrong.
+
+The companion test covers the inverse scenario (record write fails → no checkpoint written) but there is no test for `recordOverrideGraduation` succeeding followed by `writeResolvedPhaseCheckpoint` throwing, so this branch has no coverage and the incorrect message has never been exercised.
+
+Fix: either (a) separate the two operations into independent try/catch blocks, emitting distinct messages for "record write failed" vs. "checkpoint write failed" — including an accurate "record IS written; gate may already be OPEN; retry to write the checkpoint" message for the latter; or (b) use a pre-check atomic ordering (write record to a temp path, write checkpoint, rename record into place) so both artifacts land together or neither does.
+
+---
+
+### AUDIT-20260620-141 — Override path calls `resolveGovernFeatureRoot` redundantly when `featureRoot` is already in scope
+
+Finding-ID: AUDIT-20260620-141
+Status: migrated-to-backlog TASK-374
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/govern.ts — the `if (overrideReason !== undefined)` block and the `featureRoot` reference visible in the convergence-record write section further below
+
+The `runGovern` function resolves the feature root earlier in its body (the variable is named `featureRoot` and is in scope at the non-override convergence-record write: `resolveConvergenceItem(installation, featureRoot, slug)`). The override short-circuit block, inserted before the barrage/fleet path, makes an independent `await resolveGovernFeatureRoot(repoRoot, slug)` call, naming the result `overrideRoot`. These two lookups should produce the same value because `slug` and `repoRoot` are identical, but:
+
+1. Two async filesystem reads are performed where one suffices — wasted I/O on the critical-path override call.
+2. If any state changes between the two calls (concurrent write to the feature directory, a rename, a transient FS error), `overrideRoot` and `featureRoot` diverge. The `scopeFingerprint` in the convergence record depends on `scopePaths`, so an override graduation could write a different fingerprint than a normal graduation for the same feature, making the two records non-comparable.
+3. The second `resolveGovernFeatureRoot` can throw independently; that error would surface as a different message than if the first call had failed, making diagnostics inconsistent.
+
+Fix: hoist `featureRoot` (or its resolve call) to before the override check and pass it into the override block rather than resolving it a second time. Since the override short-circuit already requires the phase unit to be resolved (it runs after the phase block), `featureRoot` is necessarily available.
+
+---
+
+## 2026-06-20 — audit-barrage lift (20260620T184508456Z-029-govern-operability-phase-4)
+
+Code-sha: 898493961b7df1e13142410e94f01e9e23694e2e
+### AUDIT-20260620-142 — Checkpoint-write FATAL message misrepresents gate state when record succeeds but checkpoint fails
+
+Finding-ID: AUDIT-20260620-142 (claude-01 + claude-05 + codex-01 + codex-02 + codex-03; cross-model)
+Status: migrated-to-backlog TASK-375
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    src/subcommands/govern.ts:851-860 (override catch block)
+
+In the `--phase --override` path, `recordOverrideGraduation` is called first (writing the convergence record with `override: true, converged: true` to `.stack-control/govern/convergence/`), then `writeResolvedPhaseCheckpoint` is called second. If the checkpoint write throws, execution falls into the catch block which emits:
+
+> `the governing -> shipped gate stays CLOSED and this override does NOT graduate`
+
+This claim is only accurate when `recordOverrideGraduation` itself threw — i.e., the convergence record was never written. But when `recordOverrideGraduation` succeeds and `writeResolvedPhaseCheckpoint` throws, the convergence record **is already on disk** with `converged: true, override: true`. If the `governing → shipped` workflow gate reads the convergence record independently of the phase checkpoint, it would see the feature as graduated at the convergence-record layer, contradicting the FATAL message. A subsequent phase's gate might then proceed against a feature that the FATAL told the operator "did not graduate."
+
+The intent (per the inline comment) is: "a checkpoint failure FATALs without printing a graduation-success line." That's true — the success line isn't printed — but the companion claim about gate state is inaccurate for the checkpoint-failure sub-case. The blast radius: an operator who takes the FATAL at face value might re-run, find the convergence record already present, and be confused about why subsequent-phase gates behave inconsistently. A reasonable fix is to distinguish the sub-cases in the error message: when the FATAL is due to the checkpoint write (after a successful record write), say "the convergence record was written but the per-phase checkpoint was not; re-run to write the checkpoint — the convergence-record gate may already see this feature as governed."
+
+---
+
+### AUDIT-20260620-143 — `resolveGovernFeatureRoot` called twice in override path — `overrideRoot` duplicates already-resolved `featureRoot`
+
+Finding-ID: AUDIT-20260620-143
+Status: migrated-to-backlog TASK-376
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/govern.ts — override block (`const { root: overrideRoot } = await resolveGovernFeatureRoot(repoRoot, slug)`)
+
+The override path introduces a fresh `resolveGovernFeatureRoot(repoRoot, slug)` call that produces `overrideRoot`, which is then passed as `scopePaths: overrideRoot !== undefined ? [overrideRoot] : []` to `recordOverrideGraduation`. However, `featureRoot` — the same feature root — was already resolved earlier in the same function invocation (it is used in the normal convergence path at the `recordGovernConvergence` call). The two resolutions should produce identical values, but they are independent filesystem calls separated by the phase-unit resolution block.
+
+The risk is not correctness in the common case, but **scope-fingerprint divergence on an unlikely race**: if the feature directory is renamed or an in-flight write changes the result of `resolveGovernFeatureRoot` between the two calls, the convergence record written by the override path would carry a different `scopeFingerprint` than the normal path would produce for the same invocation state. More concretely, the normal convergence path uses `featureRoot` for `[featureRoot]`; the override path uses `overrideRoot` for `[overrideRoot]`. If for any reason these differ, the record's `scopeFingerprint` field diverges — and the gate, which reads the fingerprint to detect stale records, may produce different verdicts.
+
+A straightforward fix is to reuse the already-resolved `featureRoot` rather than re-resolving it. If `featureRoot` is not in scope at the override-path call site, thread it through from the earlier resolution rather than calling `resolveGovernFeatureRoot` a second time.
+
+---
+
+### AUDIT-20260620-144 — `GovernConvergenceRecord.override?: boolean` allows `false` but validator silently drops it
+
+Finding-ID: AUDIT-20260620-144
+Status: migrated-to-backlog TASK-377
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/workflow/workflow-types.ts:186-191 + src/govern/convergence-record.ts:178-183
+
+`GovernConvergenceRecord` declares `readonly override?: boolean`. This permits `false` as a valid value. The validator in `convergence-record.ts` accepts `override: false` (it only rejects non-booleans and the impossible `override: true` without a reason), but the return spread only propagates `override` when `parsed.override === true`:
+
+```typescript
+...(parsed.override === true ? { override: true } : {}),
+```
+
+A hand-edited JSON with `"override": false` would pass validation silently and be returned as a record with no `override` field — the `false` is discarded. This creates a type/runtime mismatch: the type says `false` is valid, but the runtime treats it as equivalent to absent. Additionally, any downstream consumer that writes `override: false` (intending to explicitly mark a non-override) would have its value silently dropped on the next read.
+
+The type should be narrowed to `readonly override?: true` (a boolean literal), matching the intent and the writer behaviour. Alternatively, the validator and spread should explicitly handle `override: false` by rejecting it (since the writer never produces it, a `false` in the JSON is a corrupt or externally-edited record, which should fail loud rather than silently coerce).
+
+---
+
+### AUDIT-20260620-145 — Test resource leak: `tmpBacklog()` dirs never cleaned up in `done.test.ts`
+
+Finding-ID: AUDIT-20260620-145
+Status: migrated-to-backlog TASK-378
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/backlog/done.test.ts (all five `it` blocks)
+
+Each test case calls `tmpBacklog()` (which calls `mkdtempSync`) but none of the test cases clean up the created temporary directory via `rmSync` in a `finally` block or `afterEach` hook. Contrast with `tests/govern/override-short-circuit.test.ts`, where every `it` block that creates temp directories uses `try/finally { rmSync(repo, { recursive: true, force: true }) }`. In a CI environment running many test iterations, these leaked directories accumulate on the runner's `/tmp` (or equivalent). This is a hygiene gap, not a correctness defect, but it diverges from the cleanup discipline already established in the same PR's other test files.
+
+---
+
+## 2026-06-20 — audit-barrage lift (20260620T190155328Z-029-govern-operability-phase-4)
+
+Code-sha: 21c1fe276b839feb8991d6ca6ecb74739d436274
+### AUDIT-20260620-146 — Normal-path "record-first" invariant fails when convergenceItem is undefined — phase checkpoint written without a convergence record
+
+Finding-ID: AUDIT-20260620-146 (claude-01 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-379
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    src/subcommands/govern.ts (normal-convergence graduation block — new code after the `non-converged` branch)
+
+The diff adds this comment to the normal graduation path:
+
+```
+// AUDIT-BARRAGE codex-02 (HIGH): record-FIRST ordering — the convergence record is
+// written BEFORE the per-phase checkpoint (the override path does the same), so a
+// record-write failure FATALs before any checkpoint is touched (no orphan checkpoint
+// that would let a later phase advance without the feature-level record).
+```
+
+The comment claims a hard invariant — no orphan checkpoint without a feature-level record. The code only upholds this invariant when `convergenceItem !== undefined`. When `resolveConvergenceItem` throws or returns `undefined` (the T041 WARNING branch), the code emits the warning and falls through to the phase-checkpoint write unconditionally:
+
+```typescript
+let convergenceItem: string | undefined;
+try {
+  convergenceItem = resolveConvergenceItem(installation, featureRoot, slug);
+} catch (err) {
+  process.stderr.write(`govern: WARNING ...`); // no exit
+}
+if (convergenceItem !== undefined) {
+  try { recordGovernConvergence(...); }
+  catch (err) { ...; process.exit(1); }
+}
+// ← convergenceItem === undefined arrives HERE
+if (phaseUnit?.granularity === 'phase' && phaseUnit.phaseId !== undefined && phaseCheckpointStatuses !== undefined) {
+  writePhaseCheckpointAfterRecordOrFatal({...}); // ← checkpoint written; no convergence record
+}
+```
+
+So a phased feature on an orphan/standalone installation (no roadmap node) will have its `phase-<id>` checkpoint written — making the phase appear "current" to the `all-phase-checkpoints-current` gate — while the `governing → shipped` convergence record is absent. A later phase's prior-phase freshness check passes; the overall graduation gate does not open (record absent), but the state is internally inconsistent.
+
+The override path correctly handles this by exiting non-zero when `convergenceItem === undefined`. The normal path's WARNING-and-continue is acknowledged in T041, but the comment's flat claim that the ordering is "the same as the override path" is factually wrong for this case. The comment should either be scoped ("when convergenceItem resolves") or the phase-checkpoint write should be gated on `convergenceItem !== undefined` to match the stated invariant.
+
+---
+
+### AUDIT-20260620-147 — "spec-governance gate" attribution label hardcoded in override-graduate.ts regardless of mode
+
+Finding-ID: AUDIT-20260620-147
+Status: migrated-to-backlog TASK-380
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/govern/override-graduate.ts:52–54
+
+```typescript
+args.stderr(
+  `spec-governance gate [${args.feature}]: OPEN by override — reason: ${args.reason}\n`,
+);
+```
+
+`recordOverrideGraduation` receives `args.mode` ('spec' | 'impl') but the attribution line unconditionally says `spec-governance gate`. An `--mode implement --override` invocation emits "spec-governance gate" in its audit trail, which is misleading for an operator correlating `govern.ts` output against the convergence record. The record itself carries `mode: 'impl'` (set by the caller), so the record and the stderr attribution disagree. A one-line fix: `${args.mode === 'spec' ? 'spec' : 'impl'}-governance gate`. The existing test for impl mode only checks that "override" appears somewhere in stdout+stderr; it would not catch this mislabeling.
+
+---
+
+### AUDIT-20260620-148 — Graduation-safety critical path (partitionLiftableFindings, recordNoNewFindingsSection) absent from diff
+
+Finding-ID: AUDIT-20260620-148
+Status: migrated-to-backlog TASK-381
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/govern/loop-hygiene.ts (partitionLiftableFindings); src/subcommands/record-no-new-findings-section.ts (new file)
+
+The diff's central graduation-safety claim is that a run whose findings are all cross-run deduped (all in `dedupSuppressedOpen`) must NOT render as a pristine quiet section to the dampener — persistent OPEN HIGHs must keep blocking (US3 SC-001). This invariant depends entirely on two modules that are not included in this diff:
+
+1. `partitionLiftableFindings` in `src/govern/loop-hygiene.ts` — the function that classifies extracted findings into `liftable` / `dedupSuppressedOpen` / `resolvedSuppressed`. The diff imports it but does not show it.
+2. `recordNoNewFindingsSection` in `src/subcommands/record-no-new-findings-section.ts` — the new file that handles the `liftableFindings.length === 0` branch. This is the code that must emit `Severity:` lines for re-surfaced open findings (so the dampener's `rawHighPlusCount` stays ≥ 1). If this function instead writes a quiet section (no Severity lines), the dampener clears and an all-dedup run graduates incorrectly.
+
+Similarly, `appendSection` and `renderRereportEntries` — imported from `audit-barrage-lift-render.ts`, which is also absent — are load-bearing for the mixed-section (new findings + re-reports) path.
+
+The end-to-end tests in `tests/promote-findings/lift-dedup.test.ts` do exercise these code paths and would catch the quiet-section failure if they run. This is not a defect claim — it is an audit surface limitation. The reviewer cannot independently verify the implementation of the graduation-safety logic from this diff alone and must rely on the test suite as the sole signal.

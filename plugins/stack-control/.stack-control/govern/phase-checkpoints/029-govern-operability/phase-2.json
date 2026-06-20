@@ -4,8 +4,8 @@
   "phaseId": "2",
   "checkpoint": "phase-2",
   "auditLogSection": "phase-2",
-  "scopeFingerprint": "8ae39811e829ed3c70430496e0dab22ead9cefeb65ecaafe4ad79b3e332da386",
-  "passedAt": "2026-06-20T13:34:06.817Z",
+  "scopeFingerprint": "469bc125f5c8040e390c7cedf4534e36cd6717ae4b9b7413f6f2fb2494c66718",
+  "passedAt": "2026-06-20T17:06:03.374Z",
   "governedPaths": [
     "tests/audit-barrage/terminal-state.test.ts",
     "src/scope-discovery/audit-barrage/run-artifacts.ts",
@@ -16,11 +16,7 @@
     "src/scope-discovery/promote-findings/check-barrage-dampener.ts"
   ],
   "auditedFiles": [
-    "plugins/stack-control/src/scope-discovery/audit-barrage/types.ts",
-    "plugins/stack-control/src/scope-discovery/promote-findings/check-barrage-dampener.ts",
     "plugins/stack-control/src/subcommands/audit-barrage-lift-render.ts",
-    "plugins/stack-control/src/subcommands/audit-barrage-lift.ts",
-    "plugins/stack-control/tests/audit-barrage/terminal-state.test.ts",
-    "plugins/stack-control/tests/promote-findings/degraded-not-quiet.test.ts"
+    "plugins/stack-control/src/subcommands/audit-barrage-lift.ts"
   ]
 }

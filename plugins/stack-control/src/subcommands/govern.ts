@@ -450,11 +450,14 @@ function writeResolvedPhaseCheckpoint(args: {
   readonly phaseStatus: PhaseCheckpointStatus;
   readonly phaseCheckpointKey: string | undefined;
   readonly slug: string;
-}): string {
+}): void {
+  // AUDIT-20260620-124 (task-360): both call sites (now via
+  // writePhaseCheckpointAfterRecordOrFatal) ignore the written path — return void
+  // rather than declaring a `string` no caller consumes.
   const { repoRoot, phaseUnit, phaseStatus, phaseCheckpointKey, slug } = args;
   const auditedFiles = resolveAuditedFiles(repoRoot, phaseUnit.diffScope.base, phaseStatus.files);
   const hunkBlocks = computePhaseHunkBlocks(repoRoot, auditedFiles, phaseUnit.diffScope.base);
-  return writePhaseCheckpoint(repoRoot, {
+  writePhaseCheckpoint(repoRoot, {
     version: 1,
     // Canonical key (AUDIT codex-01/claude-02) — what the US1 gate reads under.
     featureSlug: phaseCheckpointKey ?? featureCheckpointKey(slug),

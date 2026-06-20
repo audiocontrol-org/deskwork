@@ -4,8 +4,8 @@
   "phaseId": "3",
   "checkpoint": "phase-3",
   "auditLogSection": "phase-3",
-  "scopeFingerprint": "aa42dec6616e84c0e1646e94eaf6f127030b2c4101c1e97268a9ffef4f781466",
-  "passedAt": "2026-06-20T12:26:43.796Z",
+  "scopeFingerprint": "c10f4c82dd5e1760595f1b0741075dc0f3f4e0c8d3bae64edf5d81b42788ee03",
+  "passedAt": "2026-06-20T17:06:21.988Z",
   "governedPaths": [
     "tests/promote-findings/finding-signature.test.ts",
     "src/scope-discovery/promote-findings/extract-barrage-findings.ts",
@@ -15,11 +15,7 @@
     "src/subcommands/audit-barrage-lift-render.ts"
   ],
   "auditedFiles": [
-    "plugins/stack-control/src/scope-discovery/promote-findings/check-barrage-dampener.ts",
-    "plugins/stack-control/src/scope-discovery/promote-findings/extract-barrage-findings.ts",
     "plugins/stack-control/src/subcommands/audit-barrage-lift-render.ts",
-    "plugins/stack-control/src/subcommands/audit-barrage-lift.ts",
-    "plugins/stack-control/tests/promote-findings/dampener-identity.test.ts",
-    "plugins/stack-control/tests/promote-findings/finding-signature.test.ts"
+    "plugins/stack-control/src/subcommands/audit-barrage-lift.ts"
   ]
 }
