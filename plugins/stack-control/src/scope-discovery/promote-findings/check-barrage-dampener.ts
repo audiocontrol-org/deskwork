@@ -29,6 +29,13 @@ const BARRAGE_HEADER_RE = /^##\s+\d{4}-\d{2}-\d{2}\s+—\s+audit-barrage\s+lift\
 // rule, regardless of the (possibly 0) HIGH+ count it surfaced. The marker may
 // be wrapped in markdown emphasis (`_…_`); match it anywhere on a line.
 const DEGRADED_MARKER_RE = /Fleet:\s*DEGRADED\b/i;
+// specs/029 US3 (AUDIT-BARRAGE-codex-01): the audited code epoch, recorded by the
+// lift in the section PREAMBLE (before the first `### AUDIT-…` entry). When
+// present, FR-010 re-rate suppression is scoped to this epoch — a finding
+// re-rated UP to HIGH only across UNCHANGED code (same sha) is jitter; a HIGH on
+// CHANGED code (a different sha → a different epoch) is NOT suppressed. Same
+// preamble-only scan discipline as the degraded marker.
+const CODE_SHA_RE = /^Code-sha:\s*(\S+)/i;
 const SEVERITY_LINE_RE = /^Severity:\s*(blocking|high|medium|low|informational)\b/i;
 const STATUS_LINE_RE = /^Status:\s*(\S+)/i;
 const SURFACE_LINE_RE = /^Surface:\s*(.+?)\s*$/i;
@@ -81,6 +88,15 @@ export interface BarrageSectionCount {
    * signal when other lanes produced nothing.
    */
   readonly degraded: boolean;
+  /**
+   * specs/029 US3 (AUDIT-BARRAGE-codex-01): the audited code epoch — the run's
+   * `tip.sha` when the lift recorded a `Code-sha:` marker in the preamble, else
+   * `undefined` (an outage run with no captured sha). The dampener uses
+   * `codeSha ?? runDirBasename` as the epoch key, so a no-sha section shares an
+   * epoch with NOTHING (each `runDirBasename` is unique) → it is conservatively
+   * isolated and never cross-suppresses a HIGH.
+   */
+  readonly codeSha?: string;
   /**
    * specs/029 US3 (FR-009/010/SC-001): EVERY finding in this section as a
    * `(signature, severity)` pair, at ANY severity — RAW. The dampener folds these
@@ -183,6 +199,7 @@ function countHighPlusInSection(
   let mediumRaw = 0;
   let total = 0;
   let degraded = false;
+  let codeSha: string | undefined;
   const allFindings: { signature: string; severity: NormalizedSeverity }[] = [];
   // AUDIT-BARRAGE-claude-02: the `Fleet: DEGRADED` marker lives in the section
   // PREAMBLE (between the `## … lift (…)` header and the first `### AUDIT-…`
@@ -194,6 +211,11 @@ function countHighPlusInSection(
     const line = lines[i] ?? '';
     if (!ENTRY_HEADER_RE.test(line)) {
       if (!sawEntry && DEGRADED_MARKER_RE.test(line)) degraded = true;
+      if (!sawEntry && codeSha === undefined) {
+        const shaMatch = CODE_SHA_RE.exec(line);
+        const shaToken = shaMatch?.[1];
+        if (shaToken !== undefined) codeSha = shaToken;
+      }
       i += 1;
       continue;
     }
@@ -258,6 +280,7 @@ function countHighPlusInSection(
     rawMediumCount: mediumRaw,
     totalFindings: total,
     degraded,
+    ...(codeSha !== undefined ? { codeSha } : {}),
     allFindings,
   };
 }
@@ -269,36 +292,56 @@ export function checkBarrageDampener(
   const lines = args.auditLogText.split(/\r?\n/);
   const sections = findBarrageSections(lines);
 
-  // specs/029 US3 (FR-009/010/011 + SC-001): count NEW-or-PERSISTENT HIGH+ per
-  // section by identity-key. Walk ALL sections oldest→newest (file order),
-  // accumulating a per-signature MAX-SEVERITY-RANK map. For each section, BEFORE
-  // folding it in, a HIGH+ finding counts when EITHER:
-  //   (a) its signature is absent from the map → genuinely new (FR-011), OR
-  //   (b) its signature is present at rank >= HIGH → persistent real defect that
-  //       was already HIGH/blocking and stays HIGH+ (SC-001: a same-HIGH-every-
-  //       round blocker must NOT converge while it persists).
-  // A HIGH+ finding whose signature is present only at rank < HIGH is the
-  // re-rate-UP jitter case (FR-010, e.g. MEDIUM→HIGH on unchanged code) → NOT
-  // counted. After counting, fold EVERY finding of the section into the map at
-  // the max of its existing and current rank.
+  // specs/029 US3 (FR-009/010/011 + SC-001 + AUDIT-BARRAGE-codex-01): count
+  // NEW-or-PERSISTENT HIGH+ per section by identity-key, SCOPED TO A CODE EPOCH.
+  // Walk ALL sections oldest→newest (file order), accumulating a per-EPOCH,
+  // per-signature MAX-SEVERITY-RANK map. The epoch is the section's `codeSha`
+  // (audited tip.sha) when present, else its unique `runDirBasename` (so a no-sha
+  // section shares an epoch with NOTHING → never cross-suppresses).
+  //
+  // FR-010 is "re-rated to HIGH on UNCHANGED code" — so the re-rate jitter
+  // suppression is keyed to the SAME epoch. For each section, BEFORE folding it
+  // in, a HIGH+ finding counts when EITHER:
+  //   (a) its signature is absent from THIS EPOCH's map → genuinely new for this
+  //       epoch (FR-011; also the cross-code-change case — a HIGH on a different
+  //       sha than an earlier low/medium sighting is a different epoch → new →
+  //       counts → blocks; codex-01), OR
+  //   (b) its signature is present in THIS EPOCH at rank >= HIGH → persistent real
+  //       defect that was already HIGH/blocking and stays HIGH+ (SC-001).
+  // A HIGH+ finding whose signature is present in THIS EPOCH only at rank < HIGH
+  // is the re-rate-UP-on-unchanged-code jitter case (FR-010) → NOT counted.
+  //
+  // MEDIUM (intra-section overcounting fix): a NEW/persistent signature is counted
+  // AT MOST ONCE per section — a `Set` of the section's already-counted signatures
+  // (folding into the epoch map is naturally idempotent via max-rank).
   const HIGH_RANK = SEVERITY_RANK.high;
   const fileOrderedCounts = sections.map((s) => countHighPlusInSection(lines, s));
-  const seenMaxRank = new Map<string, number>();
+  const seenMaxRankByEpoch = new Map<string, Map<string, number>>();
   const newHighCounts: number[] = [];
   for (const count of fileOrderedCounts) {
+    const epoch = count.codeSha ?? count.runDirBasename;
+    const epochSeen = seenMaxRankByEpoch.get(epoch);
     let newHigh = 0;
+    const countedThisSection = new Set<string>();
     for (const finding of count.allFindings) {
       if (SEVERITY_RANK[finding.severity] < HIGH_RANK) continue;
-      const priorRank = seenMaxRank.get(finding.signature);
-      if (priorRank === undefined || priorRank >= HIGH_RANK) newHigh += 1;
+      if (countedThisSection.has(finding.signature)) continue;
+      const priorRank = epochSeen?.get(finding.signature);
+      if (priorRank === undefined || priorRank >= HIGH_RANK) {
+        newHigh += 1;
+        countedThisSection.add(finding.signature);
+      }
     }
     newHighCounts.push(newHigh);
-    // Fold ALL of this section's findings (any severity) into the max-rank map.
+    // Fold ALL of this section's findings (any severity) into THIS EPOCH's
+    // max-rank map.
+    const epochMap = epochSeen ?? new Map<string, number>();
     for (const finding of count.allFindings) {
       const rank = SEVERITY_RANK[finding.severity];
-      const prior = seenMaxRank.get(finding.signature);
-      if (prior === undefined || rank > prior) seenMaxRank.set(finding.signature, rank);
+      const prior = epochMap.get(finding.signature);
+      if (prior === undefined || rank > prior) epochMap.set(finding.signature, rank);
     }
+    if (epochSeen === undefined) seenMaxRankByEpoch.set(epoch, epochMap);
   }
 
   // Most-recent-first. Sections are append-only in the audit-log

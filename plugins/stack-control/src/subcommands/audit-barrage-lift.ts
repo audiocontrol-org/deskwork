@@ -306,6 +306,18 @@ export async function runAuditBarrageLift(
       stderr.write(`${renderFleetReportLines(fleet).join('\n')}\n`);
     }
   }
+  // specs/029 US3 (AUDIT-BARRAGE-codex-01): read the audited code epoch from the
+  // run-dir's `tip.sha` (a single 40-hex line the barrage writes when the tip was
+  // resolvable). An outage run omits the file; a missing/empty tip.sha is NOT an
+  // error — it is plumbed as `undefined` and the section omits the `Code-sha:`
+  // marker, isolating the run's epoch in the dampener (never cross-suppressing).
+  const tipShaPath = join(opts.runDir, 'tip.sha');
+  let tipSha: string | undefined;
+  if (existsSync(tipShaPath)) {
+    const raw = (await (args.read ?? ((p: string) => readFile(p, 'utf8')))(tipShaPath)).trim();
+    if (raw.length > 0) tipSha = raw;
+  }
+
   const auditLogPath = join(feature.root, 'audit-log.md');
   // Spec 013 US2: a brand-new feature's first barrage has no audit-log
   // yet. Instead of aborting (the old `return 2`), scaffold the
@@ -368,6 +380,7 @@ export async function runAuditBarrageLift(
       degradedFleet !== undefined
         ? { produced: degradedFleet.produced, configured: degradedFleet.configured }
         : undefined,
+      tipSha,
     );
     const quietContent = `${trimmedExisting}${separator}${quiet}`;
     await writer(auditLogPath, quietContent.endsWith('\n') ? quietContent : `${quietContent}\n`);
@@ -391,6 +404,7 @@ export async function runAuditBarrageLift(
     startingNn,
     basename(opts.runDir.replace(/\/$/, '')),
     fleet !== undefined ? { produced: fleet.produced, configured: fleet.configured } : undefined,
+    tipSha,
   );
 
   stderr.write(

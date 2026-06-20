@@ -54,8 +54,8 @@
 - [x] T014 [P] [US3] RED test: finding-signature `(normalized-heading, primary-file-path)` equality (reuses cluster-merge normalization) — in `tests/promote-findings/finding-signature.test.ts` (FR-019)
 - [x] T015 [US3] Implement the shared finding-signature in `src/scope-discovery/promote-findings/extract-barrage-findings.ts` (single normalizer, no second one) (FR-019)
 - [x] T016 [P] [US3] RED test: a re-rated already-seen finding on unchanged code does not reset the quiet streak; a new previously-unseen HIGH does — in `tests/promote-findings/dampener-identity.test.ts` (FR-009/010/011)
-- [x] T017 [US3] Key the dampener on finding-identity (count new vs seen) in `src/scope-discovery/promote-findings/check-barrage-dampener.ts` (FR-009/010/011)
-- [x] T018 [US3] Add cross-round severity hysteresis (default window = the 2-consecutive-quiet threshold) in `src/scope-discovery/promote-findings/cluster-severity.ts` + `adjudicate-findings.ts` (FR-012)
+- [x] T017 [US3] Key the dampener on finding-identity (count new vs seen) in `src/scope-discovery/promote-findings/check-barrage-dampener.ts`; scope re-rate suppression to the audited code epoch (per-section `Code-sha:` from `tip.sha`, emitted by `src/subcommands/audit-barrage-lift.ts` + `src/subcommands/audit-barrage-lift-render.ts`) so FR-010 "unchanged code" is honored (AUDIT-BARRAGE-codex-01); strip line ranges in `primaryFilePath` (codex-02) (FR-009/010/011/019)
+- [x] T018 [US3] Cross-round severity stabilization IS the identity + max-rank mechanism (a literal 2-run-persistence hysteresis would contradict FR-011's reset-on-new-HIGH); implemented in `src/scope-discovery/promote-findings/check-barrage-dampener.ts` (the only surface with cross-run history), not the per-run `cluster-severity.ts`/`adjudicate-findings.ts` (FR-012)
 - [ ] T019 [US3] Close TASK-146; record the phase-3 govern checkpoint
 
 ---

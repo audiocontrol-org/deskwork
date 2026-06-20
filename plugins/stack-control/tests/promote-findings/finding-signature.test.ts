@@ -27,6 +27,20 @@ describe('finding-signature (US3, FR-019)', () => {
     expect(primaryFilePath('src/no-line.ts')).toBe('src/no-line.ts');
   });
 
+  it('primaryFilePath strips line RANGES, not just single lines (codex-02)', () => {
+    // The audit-barrage prompt has models emit ranges like path:89-91; all
+    // locator shapes for the same file must reduce to the same path so the
+    // signature is stable across the line range a model happens to report.
+    expect(primaryFilePath('src/x.ts:89-91')).toBe('src/x.ts');
+    expect(primaryFilePath('src/x.ts:89-91:3')).toBe('src/x.ts');
+    expect(primaryFilePath('src/a.ts:89-91; src/b.ts:1')).toBe('src/a.ts');
+    // The same finding on the same file gets ONE signature whether reported as a
+    // single line or a range.
+    expect(findingSignature('a race in the path', 'src/x.ts:89')).toBe(
+      findingSignature('a race in the path', 'src/x.ts:89-91'),
+    );
+  });
+
   it('equal normalized-heading + equal primary file → equal signature', () => {
     const a = findingSignature('Race in the watchdog kill path', 'src/spawn-cli.ts:42');
     const b = findingSignature('race in the WATCHDOG kill path!', 'src/spawn-cli.ts:99:1');

@@ -93,8 +93,15 @@ export function renderQuietSection(
   date: string,
   runDirBasename: string,
   fleet?: SectionFleetStatus,
+  tipSha?: string,
 ): string {
-  const header = `## ${isoDate(date)} — audit-barrage lift (${runDirBasename})\n\n`;
+  // specs/029 US3 (AUDIT-BARRAGE-codex-01): record the audited code epoch so the
+  // dampener can scope FR-010 re-rate suppression to UNCHANGED code. The
+  // `Code-sha:` marker lives in the section preamble (before the first `### `
+  // entry); a run with no captured tip.sha (outage) omits it and is treated as a
+  // unique epoch by the dampener (never cross-suppressing).
+  const codeShaLine = tipSha !== undefined && tipSha.length > 0 ? `Code-sha: ${tipSha}\n` : '';
+  const header = `## ${isoDate(date)} — audit-barrage lift (${runDirBasename})\n\n${codeShaLine}`;
   // specs/029 US2 (FR-007 / AUDIT-BARRAGE-codex-01): a 0-finding run over a
   // DEGRADED fleet must STILL record a section — carrying the `Fleet: DEGRADED`
   // marker — so it is the dampener's most-recent run and BLOCKS convergence.
@@ -135,6 +142,7 @@ export function renderSection(
   startingNn: number,
   runDirBasename: string,
   fleet?: SectionFleetStatus,
+  tipSha?: string,
 ): { section: string; assignedIds: readonly string[] } {
   const isoDateStr = isoDate(date);
   const degradedMarker =
@@ -143,7 +151,11 @@ export function renderSection(
         `this run is NOT counted as a quiet run by the convergence dampener; 0 HIGH+ over ` +
         `killed/timed-out lanes is not a clean signal (FR-007)._\n\n`
       : '';
-  const heading = `## ${isoDateStr} — audit-barrage lift (${runDirBasename})\n\n${degradedMarker}`;
+  // specs/029 US3 (AUDIT-BARRAGE-codex-01): the audited code epoch. Lives in the
+  // preamble alongside the (optional) degraded marker; both can coexist. Omitted
+  // for an outage run with no captured tip.sha → the dampener isolates the epoch.
+  const codeShaLine = tipSha !== undefined && tipSha.length > 0 ? `Code-sha: ${tipSha}\n` : '';
+  const heading = `## ${isoDateStr} — audit-barrage lift (${runDirBasename})\n\n${codeShaLine}${degradedMarker}`;
   const assignedIds: string[] = [];
   const entries: string[] = [];
   for (let i = 0; i < findings.length; i += 1) {
