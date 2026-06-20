@@ -2998,3 +2998,358 @@ Surface:    src/capability/fronted-operations.ts:224-240
 `skillDeclarationEntries` creates one entry per capability and sets `requiredSkill` from only `cap.interface[0]`. That misses additional sanctioned front-door skills on the same capability. The existing registry has `spec-definition` with both `stack-control:define` and `stack-control:extend`, so `check-front-door` will verify `define` exists but will not verify `extend` exists.
 
 The blast radius is a false-green enforcement gate: deleting or renaming `skills/extend/SKILL.md` would not produce the promised C2a gap, even though `extend` is a sanctioned front door for a mediated capability. A reasonable fix is to emit one `skill-declaration` entry per interface skill, or otherwise have C2a iterate all `cap.interface` entries instead of only the first.
+
+## 2026-06-20 — audit-barrage lift (20260620T002231072Z-028-front-door-completeness-phase-3)
+
+### AUDIT-20260620-06 — "Fix the surface first" is ambiguous direction that could trigger unintended auto-repair
+
+Finding-ID: AUDIT-20260620-06
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    skills/extend/SKILL.md (added lines, the gate section body)
+
+The gate body instructs: "print the named gaps and fix the surface first; never weaken the check to proceed." In a skill body, instructions are directed at the executing agent. The phrase "fix the surface first" is therefore an instruction to the agent — but `extend` is a spec-extension skill, not a front-door repair tool. An AI agent executing `extend` unattended that hits a non-zero `check-front-door` exit could reasonably interpret "fix the surface first" as "I should attempt to repair the broken skill or verb before proceeding," and then try to auto-repair the front door (recreate a deleted skill, patch the fronted-operations registry, etc.) outside the sanctioned scope of `extend`. The guard "never weaken the check" prevents the agent from lowering the bar but does not prevent it from mutating unrelated surfaces in an attempt to raise the surface.
+
+The `define` skill presumably carries the same gate language, so this ambiguity is systemic. The blast radius in an unattended barrage context (batch spec work) is real: an agent that interprets "fix the surface first" as permission to act outside its assignment could leave the repository in a partially-repaired state that is harder to reason about than a clean refusal. The safer direction would separate responsibilities: "STOP, print the named gaps, and do not proceed. The operator or a dedicated repair task must resolve the gaps before spec work resumes." That phrasing is unambiguous to an automated consumer and matches the "refuse when RED" intent without opening an auto-repair path.
+
+---
+
+### AUDIT-20260620-07 — Feature-phase artifact "028 US4" embedded in the permanent section heading
+
+Finding-ID: AUDIT-20260620-07
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    skills/extend/SKILL.md:19 (`## Front-door completeness gate (028 US4 — refuse when RED)`)
+
+The heading encodes `028 US4` — the internal feature number and user-story reference that introduced this gate. Once feature 028 is closed and its spec directory is archived, "028 US4" in the heading becomes opaque to any maintainer or adopter reading the skill cold. The phrase communicates development provenance, not operational meaning. The relevant operational meaning is already fully expressed in the section body (what `check-front-door` does, when to stop, why). The heading with the artifact reads as "this heading was written mid-development and the author forgot to clean it up."
+
+Blast radius is low: the behavior of the gate is unaffected. The documentation degrades over time as the context evaporates — a maintainer extending the skill two features from now will not know what "028 US4" means and may wonder if it encodes some behavioral nuance. Preferred heading: `## Front-door completeness gate (refuse when RED)` — retains the signal while dropping the ephemeral provenance.
+
+---
+
+### AUDIT-20260620-08 — Commit subject claims "verify ALL interface skills" but the diff is one SKILL.md file
+
+Finding-ID: AUDIT-20260620-08
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    (cross-file — the `check-front-door` implementation and the fronted-operations registry, not visible in this diff)
+
+The commit subject is `fix(028): US4 govern round 3 — verify ALL interface skills + gate extend`. The diff provided contains exactly one changed file: `skills/extend/SKILL.md`. The "gate extend" half is fully visible. The "verify ALL interface skills" half is not.
+
+For the gate in `extend/SKILL.md` to be part of a complete protection ring, `check-front-door` must include `extend` in its fronted-operations list — otherwise a regression to `extend` itself (deletion, rename, `--help` breakage) would not be caught by any other skill's gate. If "verify ALL interface skills" reflects work done in a prior commit (rounds 1–2), the omission from this diff is expected. If it reflects work that was intended for this commit but not included, the fronted-operations list may not yet cover `extend`, and the "ALL" claim in the subject is inaccurate. This audit cannot confirm which case holds without access to the `check-front-door` implementation. Recommended verification: confirm that `extend` appears in the fronted-operations registry and that a probe simulating a deleted `extend` skill causes `check-front-door` to exit non-zero from another skill's gate.
+
+## 2026-06-20 — audit-barrage lift (20260620T002558882Z-028-front-door-completeness-phase-6)
+
+### AUDIT-20260620-09 — Missing `skills/extend/SKILL.md` gate despite commit "gate extend"
+
+Finding-ID: AUDIT-20260620-09
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=yes; no down-calibration signal — high retained.
+Surface:    skills/extend/SKILL.md (absent from diff)
+
+The most recent commit in the audited range (`96c5802e`) carries the subject `fix(028): US4 govern round 3 — verify ALL interface skills + gate extend`. Per `enforcement-lives-in-skills.md`, enforcement gates live exclusively in skill bodies — the gate for `check-front-door` must appear as a `stackctl check-front-door` block (refuse-on-non-zero) inside the `skills/extend/SKILL.md` body, the same pattern applied to `skills/define/SKILL.md` and `skills/execute/SKILL.md` in this diff. `skills/extend/SKILL.md` does not appear anywhere in the diff. The `stack-control:extend` skill exists (listed in the session's available-skills index), so the omission cannot be explained by the skill not existing yet.
+
+An operator running `/stack-control:extend` after this commit has no front-door gate. A silently-regressed front door (deleted skill, broken --help, unfronted mutating verb, parity break) will not be caught before an extend run proceeds. The `check-front-door` SKILL.md explicitly lists "`execute` / review" as gate surfaces but doesn't mention `extend`; the commit message is the only evidence of intent. This is a real behavioral gap regardless of whether the commit message is accurate or aspirational.
+
+Reasonable fix: add the same `### Front-door completeness gate` block to `skills/extend/SKILL.md` that was added to `define` and `execute` in this diff (commits `96c5802e` / `4946fcba`).
+
+---
+
+### AUDIT-20260620-10 — `runCheckFrontDoorCli` does not catch exceptions thrown by `liveDeps()`
+
+Finding-ID: AUDIT-20260620-10
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/check-front-door.ts:384-438
+
+`runCheckFrontDoorCli` is `async` and calls `checkFrontDoor(liveDeps())` with no try/catch. `liveDeps()` can throw in at least two ways before any result object is produced:
+
+1. `resolveTsx()` (`check-front-door.ts:295-305`) throws `Error("check-front-door: could not locate node_modules/.bin/tsx …")` when tsx is not on the expected ancestor path — which is the case on a fresh clone before `npm install`.
+2. `buildFrontedOperationsRegistry()` (via `commandTreeEntries`) throws if a single-action verb on the live command surface has `mediationClass === null` — a `Decision 4` invariant violation that manifests as an unhandled exception rather than a reported gap.
+
+Both exceptions propagate as unhandled promise rejections through the CLI dispatcher, giving the operator a raw stack trace instead of an actionable error message. When `check-front-door` is the gate in `execute` or the advisory in `session-start`, a tsx-resolution failure on a fresh install silently breaks those skill bodies with a JS stack trace rather than a named gap.
+
+The `runLiveCheckFrontDoor()` export used by the doctor rule has the same exposure. A throwing `liveDeps()` inside the doctor rule crashes the whole `scope-doctor` run.
+
+Reasonable fix: wrap the `liveDeps()` + `checkFrontDoor()` call in a try/catch in both `runCheckFrontDoorCli` and `runLiveCheckFrontDoor`, and emit a clear error message (or a single synthetic gap entry for the doctor rule) rather than re-throwing.
+
+---
+
+### AUDIT-20260620-11 — `smoke-interceptor-loaded.sh` assertion 4 grep is JSON-format-sensitive
+
+Finding-ID: AUDIT-20260620-11
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    scripts/smoke-interceptor-loaded.sh:68-73
+
+Assertion 4 checks for a deny verdict by grepping the raw stdout string:
+
+```bash
+printf '%s' "$DENY_OUT" | grep -q '"permissionDecision":"deny"'
+```
+
+This matches only compact JSON (`"permissionDecision":"deny"` — no space after the colon). If `bin/intercept` formats its output with `JSON.stringify(x, null, 2)` or any other pretty-printer, the emitted string is `"permissionDecision": "deny"` (space after colon), and `grep -q` silently fails to match — producing a false-negative "FAIL" even when the interceptor is working correctly.
+
+The Vitest counterpart (`interceptor-loaded.test.ts:82-86`) correctly parses the JSON first (`JSON.parse(stdout)`) and then accesses the property, so it is format-independent. The smoke script and the test are asymmetric on assertion 4.
+
+Assertion 5 uses a still-looser substring check (`grep -q '"deny"'`) which would also fail to match if "deny" appears only in the value of a deeply-nested key with surrounding whitespace — though the more common false-negative concern there is the complementary one: if ANY key or value anywhere in a non-deny response happens to contain the substring `"deny"`, the assertion would false-positive. Both the asymmetry and the format sensitivity are live bugs if `bin/intercept` ever outputs non-compact JSON.
+
+Reasonable fix: use `node -e 'const o=JSON.parse(require("fs").readFileSync("/dev/stdin","utf8")); if(o.hookSpecificOutput?.permissionDecision!=="deny") process.exit(1)'` or equivalent for assertion 4, matching the test's parse-then-access pattern.
+
+---
+
+### AUDIT-20260620-12 — `interceptor-loaded.test.ts` produces a cryptic error when `bin/intercept` is missing
+
+Finding-ID: AUDIT-20260620-12
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/__tests__/capability/interceptor-loaded.test.ts:67-76
+
+`runIntercept` calls `spawnSync(INTERCEPT, …)`. If `bin/intercept` does not exist (fresh clone before a build step that creates it, or the file is removed as part of a refactor), `spawnSync` sets `r.error` to an `ENOENT` and returns `{status: null, stdout: ''}`. The helper then returns `{status: null, stdout: ''}`.
+
+The firing tests then call `JSON.parse('')` which throws `SyntaxError: Unexpected end of JSON input` — completely obscuring the real problem. The first-registration test (`existsSync(INTERCEPT)`) would report clearly, but the firing tests run after and fail with a confusing parse error before any useful assertion.
+
+On a CI run or a fresh-worktree session where `bin/intercept` is not present but no skip condition guards the test, the failure looks like a JSON parsing bug rather than a missing binary. There is no `beforeAll` existence check or `describe.skipIf(!existsSync(INTERCEPT))` guard.
+
+Reasonable fix: add a `beforeAll(() => { if (!existsSync(INTERCEPT)) throw new Error('bin/intercept not found — cannot run firing assertions') })` or a `describe.skipIf(!existsSync(INTERCEPT))(…)` around the firing sub-suite. The binary-existence check already exists as the first `it` inside the registration suite; the firing suite should mirror this or rely on a shared guard.
+
+---
+
+### AUDIT-20260620-13 — `INTERNAL_VERBS` comment names "scope-\* internals" as examples but they are fronted verbs
+
+Finding-ID: AUDIT-20260620-13
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/capability/fronted-operations.ts:155-178
+
+The JSDoc for `INTERNAL_VERBS` reads (lines ~155-165):
+
+> they have NO `/stack-control:*` front-door skill BY DESIGN (`version`, `govern`, `mediate-check`, `intercept`, `audit-barrage*`, **`scope-*` internals**, release/spec tooling, etc.)
+
+In reality, the `scope-*` verbs (`scope-doctor`, `scope-export`, `scope-inventory`, `scope-summary`, `scope-widen`, `install-scope-discovery`, `validate-scope-discovery`) all have corresponding `stack-control:*` skills and are NOT present in the `INTERNAL_VERBS` set. They are fronted verbs by convention: they require a skill (verb → `skills/<verb>/SKILL.md`) and that skill exists. A developer reading the comment would reasonably assume `scope-discovery` or `scope-widen` should be added to `INTERNAL_VERBS` when they add a new scope-adjacent verb — the exact opposite of the correct behavior.
+
+The set itself is correct; only the exemplar list in the comment is wrong.
+
+Reasonable fix: remove "scope-* internals" from the parenthetical. If there are scope-adjacent verbs that ARE internal (operator tooling without a skill), name them specifically. Otherwise, the scope-* examples do not belong in this list.
+
+---
+
+### AUDIT-20260620-14 — `check-front-door` SKILL.md documents a "review" gate surface that does not exist as a stack-control skill
+
+Finding-ID: AUDIT-20260620-14 (claude-06 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=low, codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    skills/check-front-door/SKILL.md:14-16
+
+The "When to use" section states:
+
+> **`execute` / review** run it as a gate (refuse to proceed when RED).
+
+There is no `stack-control:review` skill in the repository (the available-skills index shows `dw-lifecycle:review` and `code-review:code-review` but no `stack-control:review`). An agent following this skill documentation to decide whether to gate `review` has no resolvable `stack-control:review` skill to insert the gate into. The documentation implies a gate surface that doesn't exist, and no commit in the audited range creates it.
+
+This has two concrete blast-radius paths: (1) an agent scanning the SKILL.md to enumerate where the gate fires will believe `review` is a protected surface when it isn't, and (2) an operator validating "is the front-door gate wired everywhere it should be?" will read this and find the gate only in `execute` and `define`, not in any `review` surface.
+
+Reasonable fix: either remove the `/ review` reference until a `stack-control:review` skill is created and gated, or replace it with the actual review surface that does exist (e.g., reference the `code-review` skill or whatever PR-readiness surface the project uses).
+
+---
+
+### AUDIT-20260620-15 — No test exercises `mediationRegisteredAgainst` for class-3 (skill-declaration) operations
+
+Finding-ID: AUDIT-20260620-15
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/check-front-door.ts:310-335, src/__tests__/subcommands/check-front-door-mediation.test.ts
+
+The `mediationRegisteredAgainst` function handles three classes of operations. Classes 1 and 2 (fronted-backend and first-class-verb command-tree ops) are well-covered by the mediation tests. Class 3 (skill-declaration entries, operationId = capability id like `spec-execution`) is exercised only by the live registry path inside `fronted-operations-registry.test.ts`, but that test only asserts `mediationClass === 'mutating'` on skill-declaration entries — it does not call `mediationRegisteredAgainst` and verify the predicate returns the expected boolean for a skill-declaration op.
+
+The production path for class 3 (`cap.backendIdentities.skills.length + cap.backendIdentities.cliArgv0.length > 0`) would be vacuously true for every valid capability if `validateRegistry` enforces non-empty backend identities. A test that constructs a skill-declaration op against a capability whose `backendIdentities` is empty would confirm the predicate is real and not tautological. Without such a test, a future refactor that accidentally makes class 3 always return `true` regardless of registry state would go undetected.
+
+Reasonable fix: add a test case to `check-front-door-mediation.test.ts` that calls `mediationRegisteredAgainst` against a fixture `CapabilityRegistry` with a capability whose `backendIdentities` is `{skills: [], cliArgv0: []}` and verifies it returns `false` for a corresponding skill-declaration op.
+
+### AUDIT-20260620-16 — New CLI verb is not shown as mounted in the command surface
+
+Finding-ID: AUDIT-20260620-16
+Status:     open
+Severity:   blocking
+Per-lane:   codex=blocking
+Decision:   single-model (gate-counted blocking)
+Surface:    missing surface: `src/cli-help/command-surface.ts`; related additions in `src/cli.ts:146-149` and `skills/check-front-door/SKILL.md:1-47`
+
+The diff adds the executable subcommand in `src/cli.ts`, plus a public `/stack-control:check-front-door` skill, but it does not show any corresponding command-surface descriptor. The new checker derives its registry and help probes from `buildCommandSurface()`, so a verb missing from that surface is invisible to the very completeness mechanism that is supposed to guarantee public front-door coverage.
+
+Blast radius is blocking for the feature goal: `check-front-door` can silently omit the newly added `check-front-door` operation from its own fronted-operation registry, and the skill documents `stackctl check-front-door` in multiple places. Add a `check-front-door` descriptor to the command surface with `mediationClass: 'read-only'` and usage/help metadata, then ensure `stackctl check-front-door --help` passes C2b.
+
+## 2026-06-20 — audit-barrage lift (20260620T003413932Z-028-front-door-completeness-phase-6)
+
+### AUDIT-20260620-17 — Type error: three `check-front-door-mediation.test.ts` fixtures missing required `isFrontedBackend` field
+
+Finding-ID: AUDIT-20260620-17
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    `src/__tests__/subcommands/check-front-door-mediation.test.ts` lines ~43-50, ~59-68, ~74-83
+
+`FrontedOperation` (defined in `src/capability/fronted-operations.ts`) declares `readonly isFrontedBackend: boolean` as a required field. Three object literals in the `regWith()` calls at the top of `check-front-door-mediation.test.ts` omit this field entirely:
+
+```typescript
+registry: regWith({
+  operationId: 'backlog/list',
+  requiredSkill: 'backlog',
+  mediationClass: 'read-only',
+  hasHelp: true,
+  source: 'command-tree',
+  // isFrontedBackend missing
+}),
+```
+
+`regWith` is typed `(op: CheckRegistry['operations'][number])`, which resolves to `FrontedOperation`. TypeScript strict mode (required by project guidelines: "No `any`, no `as Type`, no `@ts-ignore`") will reject these as "Property 'isFrontedBackend' is missing in type '...' but required in type 'FrontedOperation'". The same file does include a correct `ctOp()` helper in its second `describe` block — but the first three `it` blocks use bare object literals that do not go through that helper.
+
+Blast-radius: the test suite fails to compile under strict TypeScript. This is the `check-front-door` C2c test file, which is the single file verifying the non-vacuous mediation predicate — the most critical correctness guarantee delivered in this govern round. A compile failure in this file leaves the mediation check untested.
+
+Fix: add `isFrontedBackend: false` to each of the three fixture objects (they all model first-class-verb or read-only ops, so `false` is the correct value), or route them through a `ctOp()`-style builder that defaults the field.
+
+---
+
+### AUDIT-20260620-18 — Commit 96c5802e claims "gate extend" but `skills/extend/SKILL.md` is absent from the diff
+
+Finding-ID: AUDIT-20260620-18
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `skills/extend/SKILL.md` (absent from diff); commit 96c5802e subject; `skills/check-front-door/SKILL.md` "When to use" section
+
+The top commit in this range is titled "fix(028): US4 govern round 3 — verify ALL interface skills + gate extend". The diff adds the front-door completeness gate to both `skills/define/SKILL.md` and `skills/execute/SKILL.md`, and the `check-front-door/SKILL.md` "When to use" section lists `execute / review` as gating surfaces. Neither `skills/extend/SKILL.md` nor any reference to `extend` as a gate surface appears in the diff.
+
+The stack-control `extend` skill (reachable as `/stack-control:extend`) is a sanctioned feature-extension entry point. If `define` warrants a gate (because it opens the spec-authoring loop) then `extend` — which appends new phases to an in-flight spec — warrants the same gate for the same reason (a deleted skill or a parity break could be introduced mid-extension). The commit message implies this was intended and not delivered.
+
+Blast-radius: agents using `/stack-control:extend` to extend a feature skip the front-door gate that the equivalent `/stack-control:define` now enforces. A front-door regression introduced during an extension is not caught until `execute` or a pre-PR smoke, creating an inconsistent enforcement surface.
+
+Fix: add the same "Front-door completeness gate (028 US4 — refuse when RED)" block to `skills/extend/SKILL.md` that was added to `define` and `execute`; update `check-front-door/SKILL.md` "When to use" to list `define / extend / execute / review`.
+
+---
+
+### AUDIT-20260620-19 — `smoke-interceptor-loaded.sh` constructs JSON payload via unescaped `$PLUGIN_ROOT` interpolation
+
+Finding-ID: AUDIT-20260620-19 (claude-03 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    `scripts/smoke-interceptor-loaded.sh` lines 67 and 73
+
+The firing assertions construct their JSON payload through shell string concatenation:
+
+```bash
+DENY_OUT="$(printf '%s' \
+  '{"tool_name":"Bash","tool_input":{"command":"backlog capture \"x\" --type bug"},...,"cwd":"'"$PLUGIN_ROOT"'"}' \
+  | "$INTERCEPT")"
+```
+
+`$PLUGIN_ROOT` is interpolated directly into the JSON value position with no JSON-escaping step. If `PLUGIN_ROOT` contains characters that are meaningful in JSON — backslashes (`\`), double-quotes (`"`), or control characters — the payload becomes invalid JSON and `bin/intercept` will fail to parse it, causing the smoke to exit non-zero with a confusing error message rather than a meaningful FAIL message.
+
+A path of the form `/Users/some/work/dev/stack-control` is safe; `/Users/orion/work "test"/stack-control` (a contrived but plausible path on a machine using quote-in-dir names) breaks the payload. The more realistic concern is backslashes on Windows-style paths if the smoke is ever ported.
+
+The `grep -q '"permissionDecision":"deny"'` assertion that follows will silently swallow the parse error if `$INTERCEPT` exits 0 with empty stdout (interceptors are expected to always exit 0), making this a silent false-pass rather than an obvious failure.
+
+Fix: either use `jq` to build the payload (`jq -n --arg cwd "$PLUGIN_ROOT" '{tool_name:"Bash",...,cwd:$cwd}'`) or write the payload via a Node.js one-liner that JSON-serializes the cwd before constructing the final object.
+
+---
+
+### AUDIT-20260620-20 — `liveHelpProbe` spawns N synchronous subprocesses per `check-front-door` invocation, blocking session-start
+
+Finding-ID: AUDIT-20260620-20 (claude-04 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    `src/subcommands/check-front-door.ts` `liveHelpProbe` function and `session-start/SKILL.md`
+
+`liveHelpProbe` uses `spawnSync` in a tight loop — one subprocess per command-tree operation in the fronted registry:
+
+```typescript
+function liveHelpProbe(tsx: string): (op: FrontedOperation) => boolean {
+  return (op: FrontedOperation): boolean => {
+    if (op.source !== 'command-tree') return true;
+    const parts = op.operationId.split('/');
+    const r = spawnSync(tsx, args, { encoding: 'utf8' });
+    return r.status === 0 && /^usage:/im.test(r.stdout ?? '');
+  };
+}
+```
+
+Each `spawnSync` cold-starts a new `tsx` process that imports the full CLI module. With a registry of 20–40 command-tree operations, this is 20–40 synchronous `tsx` spawns in the main thread. Each spawn incurs tsx's module-resolution and TypeScript compilation overhead. The session-start skill runs `check-front-door --json` as a non-blocking advisory, but "non-blocking" means "does not refuse" — the check still runs synchronously and blocks before returning the gap count. A 40-operation registry at even 500ms/spawn is 20 seconds of wall-clock blocking at the start of every session.
+
+No caching or parallelism is present. The result set is not memoised between invocations.
+
+Blast-radius: session-start becomes unacceptably slow as the command surface grows. More subtly: `execute` uses `check-front-door` as a hard gate before driving any execution — a 20+ second gate before every `execute` invocation is a friction multiplier on the feature the whole feature set is designed to accelerate.
+
+Fix (two options, not mutually exclusive): (1) batch the help probe — spawn a single subprocess that runs all verbs and collects results, or spawn them in parallel using `child_process.spawn` with Promise.all; (2) cache the result set (hash of the command surface) to skip the probe when the surface hasn't changed. Option 1 is the simpler correctness fix; option 2 is the performance ceiling removal.
+
+---
+
+### AUDIT-20260620-21 — `front-door-completeness` doctor rule ignores `repoRoot` from `DoctorRuleOptions`
+
+Finding-ID: AUDIT-20260620-21
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/scope-discovery/doctor-rules/front-door-completeness.ts` lines 37-41; `src/subcommands/check-front-door.ts` `PLUGIN_ROOT` constant
+
+The doctor rule `check` implementation delegates to `runFrontDoorCompleteness`, which calls `runLiveCheckFrontDoor()`. The live check derives its `PLUGIN_ROOT` from `import.meta.url` at module load time — a constant pointing at this plugin's own installation. The `DoctorRuleOptions.repoRoot` passed by the scope-doctor runner is received but unused:
+
+```typescript
+export const check: DoctorRuleCheck = async (
+  opts: DoctorRuleOptions,
+): Promise<readonly ScopeDoctorFinding[]> => runFrontDoorCompleteness(opts);
+```
+
+`runFrontDoorCompleteness` only reads `opts.runCheck` (the injectable seam) and `opts.repoRoot` is structurally present but never wired into `runLiveCheckFrontDoor`. If `scope-doctor` is ever run with `--at <dir>` pointing at a different installation's root (a legitimate use case once the scope-doctor CLI gains that flag), the doctor rule will still diagnose the plugin that contains this code rather than the installation being examined.
+
+Blast-radius: low for the current workflow where scope-doctor is always run from within the same installation. Becomes a correctness bug if multi-installation auditing is added. The inconsistency between the rule's contract (receives `repoRoot`) and its behavior (ignores it) is also a documentation hazard for contributors extending the rule.
+
+Fix: thread `opts.repoRoot` into a `deps`-parameterized variant of the check (or document explicitly in the function body that `repoRoot` is intentionally unused because the check is always relative to the compiled plugin root, and mark the parameter `_opts` or add a comment citing the design decision).
+
+---
+
+### AUDIT-20260620-22 — `check-front-door/SKILL.md` "When to use" omits `define` despite the diff gating it
+
+Finding-ID: AUDIT-20260620-22
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `skills/check-front-door/SKILL.md` "When to use" section; `skills/define/SKILL.md` (updated in diff)
+
+The `check-front-door/SKILL.md` "When to use" section lists:
+
+> - **`session-start`** runs it as a non-blocking advisory
+> - **`execute` / review** run it as a gate
+
+But `skills/define/SKILL.md` was updated in this same diff to add a hard gate identical in shape to the one in `execute`. An agent reading `check-front-door/SKILL.md` to understand its enforcement surface would learn that `define` is not a gate — and could reach for `define` to author a spec without first knowing the front-door gate fires there.
+
+Blast-radius: low — the gate is actually present in `define/SKILL.md` and will fire. The issue is that the canonical reference (`check-front-door/SKILL.md`) is incomplete, which erodes the document's value as the single source of truth for "where does this gate fire."
+
+Fix: update the "When to use" bullet to read `**`define` / `execute` / review**` run it as a gate — and if finding 02 is resolved (gate extend added), include `extend` as well.

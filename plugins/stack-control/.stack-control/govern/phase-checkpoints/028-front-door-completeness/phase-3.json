@@ -4,8 +4,8 @@
   "phaseId": "3",
   "checkpoint": "phase-3",
   "auditLogSection": "phase-3",
-  "scopeFingerprint": "afdc0388de401d0bcae3c1d153afe4d3bc6c55ab882a3148a1fa5dfd5fd227bb",
-  "passedAt": "2026-06-19T23:20:48.593Z",
+  "scopeFingerprint": "0bce3671364392918c779c8f5221d0309917294f184b6c307c53e8e42fa3693f",
+  "passedAt": "2026-06-20T00:25:56.394Z",
   "governedPaths": [
     "src/__tests__/cli-help/help-roadmap-govern.test.ts",
     "src/subcommands/roadmap-command.ts",
@@ -53,10 +53,6 @@
     "skills/<name>/SKILL.md"
   ],
   "auditedFiles": [
-    "plugins/stack-control/skills/backlog/SKILL.md",
-    "plugins/stack-control/skills/execute/SKILL.md",
-    "plugins/stack-control/skills/roadmap/SKILL.md",
-    "plugins/stack-control/src/__tests__/cli-help/help-capability.test.ts",
-    "plugins/stack-control/src/cli.ts"
+    "plugins/stack-control/skills/extend/SKILL.md"
   ]
 }
