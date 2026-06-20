@@ -4,8 +4,8 @@
   "phaseId": "2",
   "checkpoint": "phase-2",
   "auditLogSection": "phase-2",
-  "scopeFingerprint": "fa11f2daf496a960ab7ce15362443594de98de7076659d948be3cf5a8f4fe4cc",
-  "passedAt": "2026-06-20T08:28:01.260Z",
+  "scopeFingerprint": "73a3145ab13b20f2159424758eb9044acbeecdae5c2e31ae400bf71c6979c7a9",
+  "passedAt": "2026-06-20T10:45:42.911Z",
   "governedPaths": [
     "tests/audit-barrage/terminal-state.test.ts",
     "src/scope-discovery/audit-barrage/run-artifacts.ts",

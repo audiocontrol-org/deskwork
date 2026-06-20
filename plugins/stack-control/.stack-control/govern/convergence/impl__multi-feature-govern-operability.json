@@ -2,8 +2,8 @@
   "version": 1,
   "mode": "impl",
   "item": "multi:feature/govern-operability",
-  "scopeFingerprint": "e37a3728357ccbdb171402fcfe4dacaf11858e10d183a5fa408594cb26412ac1",
+  "scopeFingerprint": "494af1c5e5327393b066a1ea3c79cf37cc3c0b38f663eb01f1389f3438ec486e",
   "converged": true,
-  "recordedAt": "2026-06-20T08:28:01.286Z",
+  "recordedAt": "2026-06-20T12:26:43.822Z",
   "anchorRoot": "/Users/orion/work/deskwork-work/stack-control/plugins/stack-control"
 }

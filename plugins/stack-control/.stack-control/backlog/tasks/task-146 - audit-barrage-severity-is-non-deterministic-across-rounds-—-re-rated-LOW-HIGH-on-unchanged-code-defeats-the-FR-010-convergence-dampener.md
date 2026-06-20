@@ -3,10 +3,10 @@ id: TASK-146
 title: >-
   audit-barrage severity is non-deterministic across rounds — re-rated LOW->HIGH
   on unchanged code defeats the FR-010 convergence dampener
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-16 23:37'
-updated_date: '2026-06-17 17:31'
+updated_date: '2026-06-20 12:27'
 labels:
   - 'type:imported-issue'
   - bug

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "featureSlug": "029-govern-operability",
+  "phaseId": "3",
+  "checkpoint": "phase-3",
+  "auditLogSection": "phase-3",
+  "scopeFingerprint": "aa42dec6616e84c0e1646e94eaf6f127030b2c4101c1e97268a9ffef4f781466",
+  "passedAt": "2026-06-20T12:26:43.796Z",
+  "governedPaths": [
+    "tests/promote-findings/finding-signature.test.ts",
+    "src/scope-discovery/promote-findings/extract-barrage-findings.ts",
+    "tests/promote-findings/dampener-identity.test.ts",
+    "src/scope-discovery/promote-findings/check-barrage-dampener.ts",
+    "src/subcommands/audit-barrage-lift.ts",
+    "src/subcommands/audit-barrage-lift-render.ts"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/src/scope-discovery/promote-findings/check-barrage-dampener.ts",
+    "plugins/stack-control/src/scope-discovery/promote-findings/extract-barrage-findings.ts",
+    "plugins/stack-control/src/subcommands/audit-barrage-lift-render.ts",
+    "plugins/stack-control/src/subcommands/audit-barrage-lift.ts",
+    "plugins/stack-control/tests/promote-findings/dampener-identity.test.ts",
+    "plugins/stack-control/tests/promote-findings/finding-signature.test.ts"
+  ]
+}
