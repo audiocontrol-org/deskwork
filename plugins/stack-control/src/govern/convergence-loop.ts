@@ -17,12 +17,13 @@
  * auto-edits the work under audit. The state machine is in
  * data-model.md § "State Machine: convergence loop driver".
  *
- * An operator `--override` is NOT a driver concern (AUDIT-20260612-05): govern
- * routes it through the gate so an overridden run still produces a barrage record
- * (the gate records the reason in the audit trail and returns OPEN → the driver
- * sees `converged`). The driver therefore has exactly two terminals — converged
- * and non-converged — and does not carry the audit unit (findings are recorded by
- * the lift, not the loop; the driver only sequences passes).
+ * An operator `--override` is NOT a driver concern: specs/029 US4 (FR-017) makes
+ * govern short-circuit the override ENTIRELY before the driver runs — it records
+ * the attributable override graduation + the convergence record and returns,
+ * firing zero render/barrage/lift/slush. So the driver only ever sequences a real,
+ * unoverridden convergence attempt; it has exactly two terminals — converged and
+ * non-converged — and does not carry the audit unit (findings are recorded by the
+ * lift, not the loop; the driver only sequences passes).
  */
 
 import type { ConvergenceOutcome } from './convergence-types.js';

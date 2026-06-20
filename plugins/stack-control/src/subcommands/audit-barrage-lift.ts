@@ -39,6 +39,7 @@ import { basename, dirname, join } from 'node:path';
 import { resolveCodebaseBoundary } from '../scope-discovery/codebase-boundary.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import { extractBarrageFindings } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
+import { selectLiftableFindings } from '../govern/loop-hygiene.js';
 import {
   buildAuditLogHeader,
   renderSection,
@@ -346,6 +347,14 @@ export async function runAuditBarrageLift(
     ? buildAuditLogHeader(opts.featureSlug, deriveTargetVersion(feature))
     : await reader(auditLogPath);
 
+  // specs/029 US4 (FR-013/FR-016): keep the loop hygienic — drop already-resolved
+  // (`fixed-<sha>`) and already-present (cross-run dedup) findings BEFORE assigning
+  // IDs / appending a section. The selection logic + signature keying live in the
+  // shared loop-hygiene helper.
+  const liftableFindings = selectLiftableFindings(findings, auditLogText, (m) =>
+    stderr.write(`${m}\n`),
+  );
+
   // A 0-finding run ALWAYS records a lift section so the convergence dampener
   // (which counts SECTIONS) sees it as the most-recent run:
   //   - HEALTHY fleet → a QUIET section (0 Severity lines) the dampener counts
@@ -356,7 +365,7 @@ export async function runAuditBarrageLift(
   //     behavior) left a STALE prior clean section as "most recent", letting
   //     single-run-clean dampen on it — exactly "degraded is convergence", the
   //     failure this feature exists to remove.
-  if (findings.length === 0) {
+  if (liftableFindings.length === 0) {
     const degradedFleet =
       fleet !== undefined && fleet.produced < fleet.configured ? fleet : undefined;
     stderr.write(
@@ -399,7 +408,7 @@ export async function runAuditBarrageLift(
   // quiet (the degraded+0-findings branch above already records nothing; this
   // covers degraded+findings, where 0 HIGH+ from the survivors is not clean).
   const { section, assignedIds } = renderSection(
-    findings,
+    liftableFindings,
     opts.date,
     startingNn,
     basename(opts.runDir.replace(/\/$/, '')),
@@ -408,11 +417,11 @@ export async function runAuditBarrageLift(
   );
 
   stderr.write(
-    `audit-barrage-lift: extracted ${findings.length} finding(s) from ${opts.runDir}; ` +
+    `audit-barrage-lift: extracted ${liftableFindings.length} finding(s) from ${opts.runDir}; ` +
       `assigning ${assignedIds[0]}..${assignedIds[assignedIds.length - 1]}.\n`,
   );
-  for (let i = 0; i < findings.length; i += 1) {
-    const f = findings[i]!;
+  for (let i = 0; i < liftableFindings.length; i += 1) {
+    const f = liftableFindings[i]!;
     const id = assignedIds[i]!;
     const cm = f.crossModelAgreement
       ? ` (cross-model: ${f.sourceModels.join(' + ')})`
@@ -430,7 +439,7 @@ export async function runAuditBarrageLift(
   const newContent = `${trimmedExisting}${separator}${section}`;
   await writer(auditLogPath, newContent.endsWith('\n') ? newContent : `${newContent}\n`);
   stderr.write(
-    `audit-barrage-lift: wrote ${findings.length} new entry(ies) to ${auditLogPath}.\n`,
+    `audit-barrage-lift: wrote ${liftableFindings.length} new entry(ies) to ${auditLogPath}.\n`,
   );
   return 0;
 }

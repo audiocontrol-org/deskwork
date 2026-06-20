@@ -469,39 +469,15 @@ export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult
       );
     }
 
-    // --- slush ALL remaining MED/LOW (real stackctl), per-checkpoint
-    // (AUDIT-20260607-03 scoping + AUDIT-20260607-47 all-remaining). At
-    // convergence the slush must bin EVERY still-open MED/LOW across this
-    // checkpoint's runs — not just the most-recent — so an EARLIER 0-HIGH run's
-    // residual MEDIUM (never slushed when it fired, the dampener not yet engaged
-    // then) does not linger open at graduation. `--scope all` + the
-    // checkpoint-confined flip makes "no open MEDIUM at graduation" literally
-    // true (SC-007 clean absolute). Slush only ever runs when the dampener is
-    // engaged (it is a no-op otherwise), so slushing 'all' here is never
-    // premature. HIGH/BLOCKING are NEVER slushed. ---
-    if (!args.noSlush) {
-      const slush = spawnText(args.stackctl, [
-        'slush-findings',
-        '--feature',
-        args.slug,
-        '--at',
-        args.installationRoot,
-        '--checkpoint',
-        args.checkpoint,
-        '--scope',
-        'all',
-        '--apply',
-      ]);
-      // Mirror the bash `|| true`: slush is best-effort (no-op until the
-      // dampener engages); a non-zero here must not abort the gate.
-      if (slush.status !== 0) {
-        args.stderr(`govern: slush-findings non-fatal exit ${slush.status}: ${slush.stderr.trim()}\n`);
-      }
-    }
-
     // --- convergence gate (real stackctl), scoped to this checkpoint ---
     // The gate owns the FR-010 policy and returns a single boolean on stdout
     // (#432). We OBEY it — never re-derive. Exit 2 = could-not-evaluate (fatal).
+    // specs/029 US4 (FR-014): the gate is evaluated FIRST so the slush below can
+    // be gated on the loop reaching a TERMINAL state (gate OPEN = converged OR
+    // overridden). MEDIUM-residual migration is deferred to terminal so a residual
+    // fixed in a LATER round is never migrated. (FR-013's `fixed-<sha>` skip is the
+    // companion guard — a within-loop-fixed finding is excluded from the flip set
+    // regardless.)
     const gateArgs = [
       'spec-governance-gate',
       '--feature',
@@ -525,6 +501,42 @@ export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult
     }
 
     const gateOpen = gate.stdout.trim() === 'true';
+
+    // --- slush ALL remaining MED/LOW (real stackctl), per-checkpoint
+    // (AUDIT-20260607-03 scoping + AUDIT-20260607-47 all-remaining). At
+    // convergence the slush must bin EVERY still-open MED/LOW across this
+    // checkpoint's runs — not just the most-recent — so an EARLIER 0-HIGH run's
+    // residual MEDIUM (never slushed when it fired) does not linger open at
+    // graduation. `--scope all` + the checkpoint-confined flip makes "no open
+    // MEDIUM at graduation" literally true (SC-007 clean absolute). HIGH/BLOCKING
+    // are NEVER slushed.
+    //
+    // specs/029 US4 (FR-014): migration fires ONLY when the gate is OPEN — the
+    // loop's terminal (converged or overridden). A BLOCKED (non-terminal) round
+    // never migrates, so a MEDIUM still in play across iterations is not parked
+    // prematurely (and a residual fixed before terminal is gone from the open set
+    // by then). The dampener-engaged precondition still holds at OPEN, so slushing
+    // 'all' here is never premature.
+    if (!args.noSlush && gateOpen) {
+      const slush = spawnText(args.stackctl, [
+        'slush-findings',
+        '--feature',
+        args.slug,
+        '--at',
+        args.installationRoot,
+        '--checkpoint',
+        args.checkpoint,
+        '--scope',
+        'all',
+        '--apply',
+      ]);
+      // Mirror the bash `|| true`: slush is best-effort (no-op until the
+      // dampener engages); a non-zero here must not abort graduation.
+      if (slush.status !== 0) {
+        args.stderr(`govern: slush-findings non-fatal exit ${slush.status}: ${slush.stderr.trim()}\n`);
+      }
+    }
+
     return { runDir, gateOpen };
   } finally {
     rmSync(work, { recursive: true, force: true });

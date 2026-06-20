@@ -65,15 +65,15 @@
 **Goal**: the loop stops manufacturing work that defeats its purpose. Closes TASK-149, TASK-317, TASK-318.
 **Independent test**: a fixed-in-loop finding yields 0 tasks; `--override` graduates with 0 barrage runs.
 
-- [ ] T020 [P] [US4] RED test: lift/slush skip a `fixed-<sha>` finding (in-loop or prior-commit) → 0 tasks — in `tests/promote-findings/never-lift-fixed.test.ts` (FR-013)
-- [ ] T021 [US4] Skip already-`fixed-<sha>` findings before task creation in `src/subcommands/slush-findings.ts` + `src/subcommands/audit-barrage-lift.ts` (FR-013)
-- [ ] T022 [US4] Defer MEDIUM-residual migration to the loop terminal in `src/subcommands/slush-findings.ts` (+ `src/govern/convergence-loop.ts` terminal signal) (FR-014)
-- [ ] T023 [P] [US4] RED test: cross-run signature dedup → ≤1 task per signature across N runs — in `tests/promote-findings/lift-dedup.test.ts` (FR-016)
-- [ ] T024 [US4] Implement finding-signature dedup across runs in `src/subcommands/audit-barrage-lift.ts` (FR-016)
-- [ ] T025 [P] [US4] RED test: `backlog done <id>` closes a task; a finding flip to `fixed-<sha>` auto-reconciles its task — in `tests/backlog/done.test.ts` (FR-015)
-- [ ] T026 [US4] Add the `backlog done`/close verb in `src/backlog/` + auto-reconcile on `fixed-<sha>` (FR-015)
-- [ ] T027 [P] [US4] RED test: `govern --override "<reason>"` fires 0 barrage runs and records an attributable override graduation — in `tests/govern/override-short-circuit.test.ts` (FR-017/018)
-- [ ] T028 [US4] Short-circuit the barrage on `--override` (record reason + graduate, NO render/barrage/lift/slush) in `src/subcommands/govern.ts` + `src/govern/convergence-loop.ts` + `src/govern/convergence-types.ts` (FR-017/018)
+- [x] T020 [P] [US4] RED test: lift/slush skip a `fixed-<sha>` finding (in-loop or prior-commit) → 0 tasks — in `tests/promote-findings/never-lift-fixed.test.ts` (FR-013)
+- [x] T021 [US4] Skip already-`fixed-<sha>` findings before task creation in `src/subcommands/slush-findings.ts` + `src/subcommands/audit-barrage-lift.ts` (FR-013)
+- [x] T022 [US4] Defer MEDIUM-residual migration to the loop terminal in `src/subcommands/slush-findings.ts` (+ `src/govern/convergence-loop.ts` terminal signal) (FR-014)
+- [x] T023 [P] [US4] RED test: cross-run signature dedup → ≤1 task per signature across N runs — in `tests/promote-findings/lift-dedup.test.ts` (FR-016)
+- [x] T024 [US4] Implement finding-signature dedup across runs in `src/subcommands/audit-barrage-lift.ts` (FR-016)
+- [x] T025 [P] [US4] RED test: `backlog done <id>` closes a task; a finding flip to `fixed-<sha>` auto-reconciles its task — in `tests/backlog/done.test.ts` (FR-015)
+- [x] T026 [US4] Add the `backlog done`/close verb in `src/backlog/` + auto-reconcile on `fixed-<sha>` (FR-015)
+- [x] T027 [P] [US4] RED test: `govern --override "<reason>"` fires 0 barrage runs and records an attributable override graduation — in `tests/govern/override-short-circuit.test.ts` (FR-017/018)
+- [x] T028 [US4] Short-circuit the barrage on `--override` (record reason + graduate, NO render/barrage/lift/slush) in `src/subcommands/govern.ts` + `src/govern/convergence-loop.ts` + `src/govern/convergence-types.ts` (FR-017/018)
 - [ ] T029 [US4] Close TASK-149, TASK-317, TASK-318; record the phase-4 govern checkpoint
 
 ---

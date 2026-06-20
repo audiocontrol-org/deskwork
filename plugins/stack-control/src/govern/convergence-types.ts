@@ -29,9 +29,12 @@ export interface NonConvergedOutcome {
  *   - `non-converged` — the ceiling was reached without OPEN (bounded
  *                       termination, FR-014); never an unbounded grind.
  *
- * There is no `overridden` driver terminal (AUDIT-20260612-05): an operator
- * `--override` is routed through the gate (it records the reason in the audit
- * trail and returns OPEN), so an overridden run graduates as `converged` with a
- * barrage record — the driver never needs a separate override short-circuit.
+ * There is no `overridden` driver terminal: specs/029 US4 (FR-017) short-circuits
+ * an operator `--override` ENTIRELY before the driver runs (govern records the
+ * attributable override graduation + the convergence record and returns, firing
+ * zero render/barrage/lift/slush). So the driver only ever runs a real,
+ * unoverridden convergence attempt and needs exactly two terminals — converged and
+ * non-converged. (Pre-029 the override was routed through the gate as `converged`
+ * with a barrage record; that pass is no longer fired.)
  */
 export type ConvergenceOutcome = ConvergedOutcome | NonConvergedOutcome;

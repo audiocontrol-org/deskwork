@@ -31,6 +31,7 @@
 import { existsSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { recordGovernConvergence } from '../govern/convergence-record.js';
+import { recordOverrideGraduation } from '../govern/override-graduate.js';
 import { fileURLToPath } from 'node:url';
 import {
   GovernProtocolError,
@@ -646,6 +647,49 @@ export async function runGovern(args: string[]): Promise<void> {
       featureRootExists: (s) => existingSlugs.has(s),
     });
 
+    // specs/029 US4 (FR-017/018): the `--override` SHORT-CIRCUIT. When an override
+    // reason is supplied, govern graduates THIS invocation with ZERO
+    // render/barrage/lift/slush — it records the attributable override graduation
+    // (the "OPEN by override" line + the convergence record) and returns. Detected
+    // HERE, before the barrage bin / fleet preflight / payload / loop, so none of
+    // that work fires. Per-invocation only: no fingerprint-keyed marker persists.
+    const overrideReason = pick(flags.override, process.env.GOVERN_OVERRIDE);
+    if (overrideReason !== undefined && overrideReason.length > 0) {
+      const { root: overrideRoot } = await resolveGovernFeatureRoot(repoRoot, slug);
+      // The convergence record is keyed by the canonical roadmap node id. When no
+      // node resolves (orphan/legacy/standalone fixture) the record is skipped with
+      // a WARNING — the `governing -> shipped` gate stays CLOSED until it is
+      // recorded, exactly as the convergence-graduation path treats a record-write
+      // failure (fail-safe; never a FATAL that blocks the deliberate override).
+      let convergenceItem: string | undefined;
+      try {
+        convergenceItem = resolveConvergenceItem(installation, overrideRoot, slug);
+      } catch (err) {
+        process.stderr.write(
+          `govern: WARNING — override graduation could not resolve a roadmap node ` +
+            `(${errorMessage(err)}); no convergence record written (the governing -> ` +
+            `shipped gate stays CLOSED until it is recorded).\n`,
+        );
+      }
+      recordOverrideGraduation({
+        installationRoot: repoRoot,
+        mode: flags.mode === 'spec' ? 'spec' : 'impl',
+        ...(convergenceItem !== undefined ? { convergenceItem } : {}),
+        scopePaths: overrideRoot !== undefined ? [overrideRoot] : [],
+        feature: slug,
+        reason: overrideReason,
+        recordedAt: new Date().toISOString(),
+        stderr: (s) => process.stderr.write(s),
+      });
+      process.stderr.write(
+        flags.mode === 'spec'
+          ? 'govern: spec may graduate (overridden).\n'
+          : 'govern: implementation governed (overridden).\n',
+      );
+      emitTerminalOutcome('graduated');
+      process.exit(0);
+    }
+
     const barrageBin = resolveBarrageBin();
     assertBarrageBinPresent(barrageBin);
     const stackctl = join(PLUGIN_ROOT, 'bin', 'stackctl');
@@ -850,9 +894,10 @@ export async function runGovern(args: string[]): Promise<void> {
     // agent's only in-loop action — never an auto-edit), and the ceiling — then
     // the driver owns the iterate/stop decision and the bound. A runProtocol
     // rejection (e.g. barrage OUTAGE) propagates loud through the driver to the
-    // catch below (no silent stop). The `--override` path stays routed through
-    // the gate (it records the override in the audit trail and returns gateOpen),
-    // so an overridden run still produces a barrage record.
+    // catch below (no silent stop). specs/029 US4 (FR-017): the `--override` path
+    // NO LONGER reaches the driver — it short-circuits the whole pass above
+    // (recordOverrideGraduation), so a driver run here is always a real,
+    // unoverridden convergence attempt.
     const ceiling = resolveCeiling(pick(flags.ceiling, process.env.GOVERN_CEILING));
     const outcome: ConvergenceOutcome = await runConvergenceLoop({
       ceiling,
@@ -866,10 +911,9 @@ export async function runGovern(args: string[]): Promise<void> {
     });
 
     // Map the recorded terminal to govern's exit: `converged` may graduate
-    // (exit 0) — an operator `--override` reaches here as `converged` because it
-    // is routed through the gate (records the reason, returns OPEN with a barrage
-    // record), not a driver terminal; `non-converged` is a bounded refusal
-    // (exit 1). The agent never held the iterate/stop decision (SC-004).
+    // (exit 0); `non-converged` is a bounded refusal (exit 1). An operator
+    // `--override` never reaches here — it short-circuits above (FR-017). The
+    // agent never held the iterate/stop decision (SC-004).
     if (outcome.kind === 'non-converged') {
       process.stderr.write(
         (flags.mode === 'spec'
