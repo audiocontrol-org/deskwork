@@ -38,6 +38,7 @@ import {
   renderRoadmapHelp,
   renderRoadmapUsage,
   renderSubactionHelp,
+  summaryFor,
 } from '../cli-help/roadmap-help.js';
 import {
   executeRoadmapSubaction,
@@ -61,7 +62,15 @@ function flagsFromCommand(command: Command, positionals: readonly string[]): Fla
   const raw = rawOpts(command);
   const values = new Map<string, string>();
   for (const name of Object.keys(raw)) {
-    if (name === 'doc' || name === 'apply' || name === 'clear' || name === 'chain') continue;
+    if (
+      name === 'doc' ||
+      name === 'apply' ||
+      name === 'clear' ||
+      name === 'chain' ||
+      name === 'analyzeClean'
+    ) {
+      continue;
+    }
     const value = optionalStringOption(raw[name], name);
     if (value !== undefined) values.set(name, value);
   }
@@ -71,6 +80,7 @@ function flagsFromCommand(command: Command, positionals: readonly string[]): Fla
     apply: booleanOption(raw.apply, 'apply'),
     clear: booleanOption(raw.clear, 'clear'),
     chain: booleanOption(raw.chain, 'chain'),
+    analyzeClean: booleanOption(raw.analyzeClean, 'analyzeClean'),
     positionals,
     values,
   };
@@ -102,7 +112,11 @@ function registerSubaction(parent: Command, name: string): void {
   if (grammar === undefined) {
     throw new Error(`roadmap-command: no grammar for subaction '${name}' (registry drift)`);
   }
-  const sub = parent.command(name).helpOption(false).allowExcessArguments(false);
+  const sub = parent
+    .command(name)
+    .description(summaryFor(name))
+    .helpOption(false)
+    .allowExcessArguments(false);
   // Positional arity: each subaction that takes a positional consumes exactly one
   // `<identifier>`; declare it optional so a missing positional flows to the
   // existing `requireId`/`addInputFrom` exit-2 message rather than commander's.
@@ -111,6 +125,9 @@ function registerSubaction(parent: Command, name: string): void {
   if (grammar.apply) sub.option('--apply', 'write the change (default: dry-run)');
   if (grammar.clear === true) sub.option('--clear', 'clear the condition');
   if (grammar.chain === true) sub.option('--chain', 'wire a depends-on chain over the children');
+  if (grammar.analyzeClean === true) {
+    sub.option('--analyze-clean', 'record the symmetric analyze-clean marker');
+  }
   sub.action(async function (this: Command) {
     // Flags were already validated by `preflightRoadmapFlags` in
     // `runRoadmapCommand` (BEFORE commander parse, so usage errors keep the
@@ -124,6 +141,9 @@ function registerSubaction(parent: Command, name: string): void {
 /** Build the `roadmap` commander Command (exported for T003's mount assertions). */
 export function buildRoadmapCommand(): Command {
   const program = new Command('roadmap');
+  program.description(
+    'Governed-roadmap mutation and query verbs (next/blocked/order/graph + add/advance/decompose/defer/cluster).',
+  );
   program.exitOverride();
   program.helpOption(false);
   // `--doc` is universal: declared on the parent so it is accepted on every

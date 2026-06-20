@@ -86,6 +86,18 @@ For local development against this workspace, the repo-local Codex manifest
 still exists at [`plugins/stack-control/.codex-plugin/plugin.json`](./.codex-plugin/plugin.json),
 but that is the maintainer path, not the adopter distribution story.
 
+> **Confirm against the Codex CLI's own docs.** The exact `codex plugin
+> marketplace` / `codex plugin add` syntax tracks the Codex CLI's current plugin
+> surface; quote it from `codex plugin --help` (or the Codex CLI docs) before
+> running, rather than from memory. The release-tag, `--sparse` path, and plugin
+> name above are the stable parts; the verb spelling is the part to verify.
+
+Once installed on either host, the front-door skills appear under the
+`/stack-control:` namespace and the `stackctl` CLI is on `PATH` — invoke it as
+bare `stackctl <verb>` (never as a source-repo path like
+`plugins/stack-control/bin/stackctl`, which only resolves inside this monorepo,
+not in an adopter's host install).
+
 ## Front-door skills
 
 Three skills under the `/stack-control:` namespace, invoked in-session. They are the agent-facing touch points; each calls the deterministic `stackctl` CLI as its primitive and lets the in-session agent do the agent-work (skills-over-CLI, mirroring `dw-lifecycle`).
@@ -254,6 +266,23 @@ fleet report that the lift verb and the govern loop repeat.
 ## Governance extension
 
 `stack-control` ships the **deskwork Governance** Spec Kit extension at [`spec-kit/deskwork-governance/`](./spec-kit/deskwork-governance/) (rehomed from `dw-lifecycle`). Installed into a project's `.specify/extensions/`, it registers an `after_implement` hook that automatically gathers the implemented diff, fires deskwork's cross-model `audit-barrage`, and lifts findings into the feature's `audit-log.md` — branching only on the diff, never on provider identity. If a dependency (`dw-lifecycle`, `jq`) is absent it fails loudly; it never silently skips. See its [README](./spec-kit/deskwork-governance/README.md).
+
+## Reporting tool defects and friction
+
+When you hit a stack-control bug, a confusing verb, or any tooling friction,
+**file a GitHub issue on the deskwork repository** — the
+[issue tracker](https://github.com/audiocontrol-org/deskwork/issues) is the
+portable, cross-project, reviewable record everyone can see and act on. A
+GitHub issue is the disposition; a one-line note in a local file is not.
+
+- **Do not** record tool defects only in a local file (e.g. a project-local
+  `tooling-feedback.md`). A local note is invisible to maintainers and to other
+  adopters — it rots in place and the defect never gets fixed.
+- The installation's `tooling_feedback` log (see [Project setup](#project-setup))
+  is for the maintainer's own scope-discovery ship-gate signal **inside this
+  monorepo**, not the adopter reporting channel. As an adopter, open an issue.
+- One reproduction per issue: what you ran, what you expected, what happened
+  (verbatim error / exit code). That is enough for a maintainer to act.
 
 ## Conventions
 

@@ -8,6 +8,8 @@
 //   - --help/-h/help → usage to stdout, exit 0
 //   - no flag silently ignored (each subcommand validates its own flags)
 
+import { buildCommandSurface } from './cli-help/command-surface.js';
+import { renderSubActionHelp, renderVerbHelp } from './cli-help/render-help.js';
 import { setInstallationNoticeVerb } from './config/installation.js';
 import { runVersion } from './subcommands/version.js';
 import { runExecuteCheck } from './subcommands/execute-check.js';
@@ -60,6 +62,7 @@ import { runFrontDoor } from './subcommands/front-door.js';
 import { runIntercept } from './subcommands/intercept.js';
 import { runCapabilityCli } from './subcommands/capability.js';
 import { runReconcileCli } from './subcommands/capability-reconcile.js';
+import { runCheckFrontDoorCli } from './subcommands/check-front-door.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -143,11 +146,47 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // (capability.ts) stays list-only (its phase scope is not disturbed by US3).
   capability: async (args: string[]): Promise<void> =>
     args[0] === 'reconcile' ? runReconcileCli(args.slice(1)) : runCapabilityCli(args),
+  // Front-door regression guard (028 US4): the four-assertion check over the
+  // fronted-operations registry. Self-documenting (mounted on the command surface).
+  'check-front-door': runCheckFrontDoorCli,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
   stream.write('Usage: stackctl <verb> [flags...]\n');
   stream.write(`Verbs: ${Object.keys(SUBCOMMANDS).join(', ')}\n`);
+}
+
+/** Verbs whose own handler renders a richer `--help` (e.g. roadmap's status
+ * vocabulary). cli.ts does NOT intercept their help; their handler owns it. */
+const SELF_HELP_VERBS: ReadonlySet<string> = new Set(['roadmap']);
+
+/** Route `<verb> [sub] --help` to the descriptor renderer (028 US1 T037; FR-001/
+ * 002/003). Returns true (caller exits 0) when help was rendered; false when the
+ * verb is self-handling, un-mounted, or no help flag is present — then the flat
+ * handler runs unchanged (non-regression for not-yet-migrated verbs). */
+function tryRenderVerbHelp(verb: string, args: readonly string[]): boolean {
+  if (SELF_HELP_VERBS.has(verb)) return false;
+  if (!args.some((a) => a === '--help' || a === '-h')) return false;
+  const descriptor = buildCommandSurface().find((d) => d.verb === verb);
+  if (descriptor === undefined) return false;
+  // The sub-action, if any, is the LEADING token — every skill usage puts it
+  // first (`verb <sub> [flags]`). We do NOT scan past flags for a sub-action:
+  // that would pick a flag VALUE (e.g. the path in `inbox --doc /p list --help`)
+  // as the sub-action (AUDIT-BARRAGE-claude-01). A leading flag → verb-level help.
+  const lead = args[0];
+  if (descriptor.subActions.length > 0 && lead !== undefined && !lead.startsWith('-')) {
+    // An UNKNOWN leading token on a multi-action verb is a typo, not a request
+    // for parent help — fall through to the flat handler so it emits its
+    // unknown-subaction usage error (exit 2), never a false-positive exit-0
+    // "help" (AUDIT-BARRAGE-codex-01).
+    if (!descriptor.subActions.some((s) => s.name === lead)) return false;
+    const subBody = renderSubActionHelp(descriptor, lead);
+    process.stdout.write(subBody.endsWith('\n') ? subBody : `${subBody}\n`);
+    return true;
+  }
+  const body = renderVerbHelp(descriptor);
+  process.stdout.write(body.endsWith('\n') ? body : `${body}\n`);
+  return true;
 }
 
 async function main(): Promise<void> {
@@ -168,6 +207,13 @@ async function main(): Promise<void> {
     process.stderr.write(`stackctl: unknown verb '${verb}'\n`);
     printUsage(process.stderr);
     process.exit(2);
+  }
+
+  // `<verb> [sub] --help` renders from the command-surface descriptor before
+  // dispatch (028 US1 T037). Self-handling verbs (roadmap) and not-yet-mounted
+  // verbs fall through to their flat handler unchanged.
+  if (tryRenderVerbHelp(verb, args)) {
+    process.exit(0);
   }
 
   // The shared resolver's legacy half-installation notice carries the

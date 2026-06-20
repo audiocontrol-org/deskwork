@@ -21,7 +21,7 @@ It also reports a **coherence NOTICE** if the provenance ledger and the archive 
 1. **Dry-run first (always).** Report findings; write nothing:
 
    ```bash
-   plugins/stack-control/bin/stackctl curate --doc <path>
+   stackctl curate --doc <path>
    ```
 
    Read the findings to the operator. "clean" → nothing to do; stop.
@@ -31,7 +31,7 @@ It also reports a **coherence NOTICE** if the provenance ledger and the archive 
 3. **Apply.**
 
    ```bash
-   plugins/stack-control/bin/stackctl curate --doc <path> --apply
+   stackctl curate --doc <path> --apply
    ```
 
    It reorders first, then archives terminal-status Units (composing `archive`).

@@ -2,6 +2,103 @@
 
 ---
 
+## 2026-06-19: front-door-completeness — formal re-close (no-op; post-authoring Q&A only)
+
+**Goal:** Second `/stack-control:session-end` of the day. The substantive work — the front-door-completeness audit + the full 028 spec chain to runnable — was captured and pushed in the prior entry (commit `7d03ff69`). This is a formal re-close: nothing changed the worktree since (0 commits in range), so this entry is an honest no-op (run-as-asked; empty beats missed).
+
+**Accomplished:**
+- Nothing buildable — post-authoring Q&A only: (a) confirmed **no MCP component** exists or is planned (no `mcp` key in `plugin.json`, no MCP server); MCP appears in 028 only as a named *future consumer* of the FR-052 descriptor artifact. (b) Stated the **descriptor artifact format**: oclif-manifest-style JSON (`{ id, commands: { <verb>: { description, mediationClass, flags, subActions } } }`), generated from the command tree, round-trip tested — NOT OpenAPI.
+
+**Didn't Work:**
+- N/A — no changes attempted.
+
+**Course Corrections:**
+- [PROCESS] Operator's MCP question was *"i was just asking"* — answered, captured nothing, made no scope change (a question is not an instruction to act).
+
+**Insights:**
+- The substantive close already happened at `7d03ff69`; this duplicate-shaped sparse entry is the expected output of running the capture ceremony on a no-op tail. Bounded with `--since 7d03ff69` to avoid the long-lived-branch boundary sweep (TASK-39/59).
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 0
+  - (no commits this session)
+- Files changed: 0
+- Backlog touched: (none)
+
+## 2026-06-19: front-door-completeness — audit the 026-teeth front-door gaps, register umbrella, author the full spec chain (028) to runnable
+
+**Goal:** Operator framing: now that 026 capability-mediation put teeth in the front door (agents can't reach *around* the `/stack-control:*` skills), the many front-door gaps that preclude basic operations + discovery have become hard walls. Look through the in-flight roadmap + backlog for reported front-door-as-built issues and come up with a systematic plan to make the intended operations possible and discoverable. Then (operator: *"do it"*) drive it into the lifecycle.
+
+**Accomplished:**
+- **Audit (3 parallel Explore passes + direct probes):** backlog front-door-gap census, roadmap-coverage map, and a first-principles surface inventory — ground truth: **34 skills, 46 verbs, only 2 self-documenting (`govern`/`roadmap`); 37 have no `--help`.** Corrected two stale reports: `roadmap advance` and roadmap-family `--help` already shipped in 027 (do not re-plan).
+- **Captured the comprehensive plan** to `docs/front-door-completeness/plan.md` (anti-scope-cut artifact) — four workstreams: discoverability parity, the missing operation set, teeth recovery, and a governed `check-front-door` guardrail.
+- **Registered the umbrella** `multi:feature/front-door-completeness` and folded the 4 overlapping planned items under it as `part-of` (via `roadmap cluster`).
+- **Drove the full lifecycle (orchestrator session):** `/stack-control:design` (design record + 3 alternatives; operator approved) → `/stack-control:define` → the **complete speckit chain bracketed by the 026 front-door marker**: specify → clarify → plan → checklist → tasks → analyze.
+- **Artifacts (`specs/028-front-door-completeness/`):** spec.md (35 FRs, US1–4, SC-001..007), plan.md, research.md, data-model.md, 6 CLI contracts, quickstart.md, coverage checklist, **tasks.md (122 tasks, 7 phases, RED-first)**. Analyze: **0 critical / 0 high, 100% buildable-FR coverage.** Node now at **`implementing`** phase (design-approved + analyze-clean recorded), ready for `/stack-control:execute` in a separate impl session.
+- **Architecture decision (settled the operator's "would OpenAPI help?" steer):** the commander **command tree is the single source of truth**; `--help`, the verb reference, the generated descriptor artifact, the fronted-operations registry, and `check-front-door` all DERIVE from it. OpenAPI-as-source rejected (HTTP impedance mismatch); the artifact is a generated downstream output (operator: include in v1).
+
+**Didn't Work:**
+- **No sanctioned verb writes the `design-approved` / `analyze-clean` roadmap markers** — recording approval + analyze-clean required the governed-doc direct-edit-then-`roadmap order` path (sanctioned by the ROADMAP header, but no verb). Hit it **twice** live. Captured as **TASK-298** — and it is itself exactly the class of front-door gap THIS feature fixes (recursion).
+- **`backlog capture` ENAMETOOLONG** — the on-disk filename is derived from the full untruncated title; a long capture title crashed the write. Captured as **TASK-299**; worked around with a short title.
+
+**Course Corrections:**
+- [PROCESS] Operator, hard: *"STOP TRYING TO CUT SCOPE. DO THE WHOLE GODDAMNED THING."* — my "which workstream leads first?" question was itself a scope-cut frame (the pathology that created these gaps). Dropped tiering; the whole front door is one feature, no deferral.
+- [PROCESS] FR-052 (ship the generated descriptor artifact?) — I recommended *defer*; operator chose **include in v1**. Encoded.
+- [PROCESS] *"why did you stop?"* (×2) — once at the legitimate `design-approved` operator-judgment gate (correct to pause), once perceived mid-tool-sequence. Lesson: when pausing at a real gate, say so explicitly up front so it doesn't read as stalling.
+
+**Insights:**
+- **Dogfooding the front door while authoring a feature ABOUT the front door is a finding-generator** — two real bugs (TASK-298/299) surfaced just from driving the marker + backlog ceremony. The agent building it is the most demanding adopter, exactly as the dogfood rule predicts.
+- The **086 marker bracket is heavy for the speckit chain** — six `enter`/`exit` cycles for one authoring chain (specify/clarify/plan/checklist/tasks/analyze). Worked correctly (no leaks), but the per-step ceremony is friction worth noting against the cold-start/UX goals already in 028's scope.
+- Passing **`--since <sha>` to session-end** sidesteps the long-lived-branch boundary bug (TASK-39/59) — the auto-derivation was correct this session (9 commits) where prior sessions reported 0.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 9
+  - roadmap(028): link spec + record analyze-clean (specifying complete)
+  - tasks(028): 122-task dependency-ordered plan across the four workstreams
+  - checklist(028): coverage/completeness requirements-quality checklist
+  - plan(028): impl plan + research/data-model/contracts/quickstart
+  - spec(028): clarify — resolve FR-050/051/052 + terminal vocab
+  - spec(028-front-door-completeness): author spec from approved design record
+  - roadmap(front-door-completeness): record design-approved, advance to in-flight; capture TASK-298/299
+  - design(front-door-completeness): open designing phase + design record
+  - roadmap: register front-door-completeness umbrella + capture comprehensive plan
+- Files changed: 21
+- Backlog touched: TASK-148, TASK-201, TASK-209, TASK-298, TASK-299
+
+## 2026-06-19: TASK-295 customer blocker — govern clone-step non-fatal on non-TS repos; fixed, shipped 0.51.3, validated live, closed out
+
+**Goal:** Take up the next-session flag — the **CUSTOMER-BLOCKING** `impl:fix/govern-clone-step-language-agnostic` (TASK-295 / GH #487): govern's advisory clone step aborted on any non-TypeScript adopter repo (offing's Bash/PHP/WordPress runbook), making `/stack-control:execute` unusable there. Fix it, ship it, validate on a real install, close it out.
+
+**Accomplished:**
+- **Root-caused by reproduction:** `runJscpd` hardcoded `--format typescript,tsx`; on a non-TS tree jscpd finds zero files, **exits 0, writes no report**, and the "did not write jscpd-report.json" throw propagated through the clone step and **aborted govern before the language-agnostic barrage**. Probed jscpd to establish the discriminator: clean exit (0) + no report = zero qualifying files (benign); non-zero exit + no report = genuine engine error.
+- **Fixed (operator-scoped: non-fatal only):** `runJscpd` returns `null` on clean-exit-with-no-report → `detectClonesViaJscpd` maps to zero clones; non-zero exit still throws (preserves the "missing scan root throws" contract). Clone **detection stays TS/TSX → no adopter baseline churn**. RED-first: a runner unit test + a govern-clone-step regression, both failing with the customer's exact throw pre-fix. Full suite **1968 green**.
+- **Shipped + verified live:** merged via **PR #489** (CI green); released **v0.51.3**. Validated on the **installed** plugins, same non-TS install: **0.51.2 → exit 2** (the abort) vs **0.51.3 → exit 0** ("No clone groups detected"). Posted the before/after evidence on #487.
+- **Closed out:** roadmap node advanced **planned → shipped** (sanctioned `roadmap advance`); #487 already closed (evidence comment added).
+- **Scope discipline:** asked the operator the one genuine fork (non-fatal-only vs multilingual detection) → non-fatal only; **captured TASK-296** (deferred multilingual clone detection) so it doesn't vanish with the shipped node.
+- **Rule refinement:** added a scope carve-out to `.claude/rules/agent-discipline.md` — the full spec-kit chain + per-phase governance is for spec-driven feature execution; **point fixes/targeted bugfixes skip govern** (operator decision).
+
+**Didn't Work:**
+- **session-end auto-derived "Commits: 0"** again — the long-lived-branch boundary bug (TASK-39 / TASK-59). Re-derived by hand below (AUDIT-04). Likewise "backlog progressed (0)" despite commits referencing TASK-295/296/297.
+- **Could not close TASK-295 in the backlog through the sanctioned interface:** `stackctl backlog` has no Done/close/status verb, and the Backlog.md backend is (correctly) mediated by the 026 interceptor — so there was no sanctioned path to mark the completed item Done. The roadmap node carried the closure; captured the gap as **TASK-297**.
+
+**Course Corrections:**
+- [PROCESS] Operator: *"I don't care about governance for point solutions and targeted bug fixes"* — confirmed this fix didn't need the govern/barrage ceremony; recorded as a rule carve-out so future sessions don't reflexively govern a one-file bugfix.
+- [PROCESS] Operator: after validating, *"close out the roadmap item if valid"* — drove the live install verification → roadmap shipped, rather than stopping at the in-tree commit.
+
+**Insights:**
+- The advisory clone step should have been **non-fatal from the start** — an advisory that can abort the thing it advises is a latent blocker for every non-TS adopter. The cross-model barrage (the real governance teeth) is already language-agnostic.
+- The **backlog has no closure operation** through its own interface (TASK-297). Mediation is working as designed (it blocked the backend CLI), but it exposed that "close a backlog item" isn't a sanctioned verb at all — a basic gap.
+
+**Quantitative (re-derived from git; session boundary = prior session-end d7716997):**
+- Commits: 5 (+ PR #489 merged to main; auto-derivation reported 0 — boundary bug TASK-39/59)
+  - e59bec58 fix(govern): clone-step non-fatal on zero matching files (TASK-295 / #487)
+  - 870bc6f2 docs(rules): scope the workflow protocol — point fixes skip govern
+  - e0cb641c chore(backlog): TASK-296 — deferred multilingual clone-detection enhancement
+  - 83f777cd roadmap: close out impl:fix/govern-clone-step-language-agnostic (shipped, validated 0.51.3)
+  - 001bd1a4 docs(session): session-end record
+- Files changed: 9
+- Backlog touched: TASK-295 (fixed + roadmap-closed), TASK-296 (captured), TASK-297 (captured) — auto-derivation reported none (boundary bug)
+- Tests: 1966 → 1968 (+2: the TASK-295 RED runner-unit + govern-clone-step regression)
+
 ## 2026-06-19: 027 roadmap edge-mutation + cluster — implemented, governed (2 overrides), shipped 0.51.2; govern-tooling friction surfaced + captured
 
 > **⏭️ NEXT SESSION — START HERE:** take up the **CUSTOMER-BLOCKING** item

@@ -12,9 +12,10 @@
 // confirms.)
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { LoadOptions } from '../document-model/document.js';
 import { DocumentModelError } from '../document-model/types.js';
+import { add, type MutationResult } from './mutations.js';
 import { loadRoadmap } from './roadmap-model.js';
 
 export interface StatusDrift {
@@ -124,4 +125,65 @@ export function reconcile(
       : discoverSpecDirs(baseDir, globParentDir).filter((dir) => !referenced.has(normalize(dir)));
 
   return { statusDrift, orphans, unresolved };
+}
+
+/**
+ * Derive a roadmap node identifier from an orphan spec dir's basename. A spec dir
+ * `specs/099-emergent-feature` → slug `099-emergent-feature` → `impl:feature/<slug>`.
+ * The slug is sanitized to the grammar's `[^\s/:]+` slug shape (drop disallowed
+ * chars); fail loud if nothing usable remains.
+ */
+/** Default node-type prefix for an unorphaned node when `--type` is not given. */
+export const DEFAULT_UNORPHAN_TYPE = 'impl:feature';
+
+export function nodeIdForOrphan(specRel: string, typePrefix: string = DEFAULT_UNORPHAN_TYPE): string {
+  const slug = basename(normalize(specRel)).replace(/[\s/:]+/g, '-');
+  if (slug.length === 0) {
+    throw new DocumentModelError(
+      `reconcile --unorphan: cannot derive a node slug from spec dir '${specRel}'`,
+    );
+  }
+  // The type prefix (`<phase>:<kind>`, e.g. impl:feature / design:gap) is
+  // operator-supplied via --type — an orphan spec is not necessarily an
+  // impl:feature; defaulting every orphan to impl:feature would mistype a design
+  // or multi spec (AUDIT-BARRAGE-claude-06, Phase 4).
+  if (!/^[^\s/:]+:[^\s/:]+$/.test(typePrefix)) {
+    throw new DocumentModelError(
+      `reconcile --unorphan: --type '${typePrefix}' must be a '<phase>:<kind>' prefix ` +
+        `(e.g. impl:feature, design:gap, multi:feature)`,
+    );
+  }
+  return `${typePrefix}/${slug}`;
+}
+
+/**
+ * Resolve a reported orphan spec dir into a roadmap node + a `spec:` edge
+ * (FR-015; TASK-133) — the sanctioned `--unorphan` assist that closes the orphan
+ * WITHOUT a forbidden ROADMAP.md hand-edit (it reuses the `add` node/edge
+ * mutation). A `<spec>` that is NOT actually an orphan (already referenced, or not
+ * a discoverable orphan under the glob parent) fails loud (exit-2 class) — never
+ * reconcile against a wrong/non-orphan base. The candidate is re-validated by the
+ * underlying mutation; dry-run unless `apply`.
+ */
+export function reconcileUnorphan(
+  docPath: string,
+  spec: string,
+  opts: LoadOptions,
+  baseDir: string,
+  apply: boolean,
+  typePrefix?: string,
+): MutationResult {
+  const report = reconcile(docPath, opts, baseDir);
+  const target = normalize(spec);
+  if (!report.orphans.map(normalize).includes(target)) {
+    throw new DocumentModelError(
+      `reconcile --unorphan: '${spec}' is not a reported orphan spec dir ` +
+        `(orphans: ${report.orphans.length === 0 ? 'none' : report.orphans.join(', ')}) — ` +
+        `refusing to reconcile against a non-orphan`,
+    );
+  }
+  // `spec:` records the spec DIRECTORY (the project convention, e.g.
+  // `specs/005-document-primitives`), NOT a path to `spec.md` — reconcile
+  // resolves `<spec>/spec.md` itself.
+  return add(docPath, { identifier: nodeIdForOrphan(target, typePrefix), spec: target }, opts, apply);
 }

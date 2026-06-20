@@ -75,6 +75,19 @@ function nextStep(present: ReadonlySet<SpecKitArtifact>): SpecKitStep {
   return 'clarify';
 }
 
+/**
+ * Whether a tasks.md is fully implemented: it has at least one task checkbox AND
+ * none remain unchecked (`- [ ]`). A tasks.md with zero checkboxes is degenerate
+ * (not "complete"); a single unchecked box means work remains (TASK-130).
+ */
+function isFullyImplemented(tasksAbs: string): boolean {
+  if (!existsSync(tasksAbs)) return false;
+  const body = readFileSync(tasksAbs, 'utf8');
+  const checkboxes = body.match(/^\s*-\s*\[[ xX]\]/gm);
+  if (checkboxes === null || checkboxes.length === 0) return false;
+  return !/^\s*-\s*\[ \]/m.test(body);
+}
+
 export function inferChainPosition(repoRoot: string): ChainPosition | null {
   const featureDir = readFeatureDir(repoRoot);
   if (featureDir === null) return null;
@@ -85,6 +98,12 @@ export function inferChainPosition(repoRoot: string): ChainPosition | null {
   const present = new Set<SpecKitArtifact>();
   for (const [artifact, rel] of ARTIFACT_PATHS) {
     if (existsSync(join(featureAbs, rel))) present.add(artifact);
+  }
+
+  // A fully-implemented spec is NOT "active work" — reporting it as active with a
+  // next /speckit-* step is the TASK-130 bug. Treat it as no-active-spec (FR-006).
+  if (present.has('tasks') && isFullyImplemented(join(featureAbs, 'tasks.md'))) {
+    return null;
   }
 
   return {

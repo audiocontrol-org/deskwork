@@ -50,6 +50,14 @@ export interface MarkerOptions {
   readonly now?: number;
 }
 
+/** Read options for the tolerant `listMarker` recovery read. `readFile` is an injectable
+ *  seam (like `now`) so a test can deterministically reproduce the unlocked-read TOCTOU
+ *  race — a concurrent delete landing between existsSync and the read raises ENOENT —
+ *  without mocking the filesystem module (claude-05). Production defaults to readFileSync. */
+export interface ListMarkerOptions extends MarkerOptions {
+  readonly readFile?: (path: string) => string;
+}
+
 /** Session ids become marker filenames, so they must be filename-safe — a `/` or `..`
  *  would let `--session` read/write/remove files OUTSIDE the state dir (codex-01). Guard
  *  at the marker boundary (covers every exported primitive), not just the CLI. */
@@ -73,10 +81,23 @@ function markerPath(installRoot: string, session: string): string {
   return join(installRoot, STATE_REL, `${session}.json`);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 function isActiveEntry(value: unknown): value is ActiveEntry {
-  if (typeof value !== 'object' || value === null) return false;
-  const e = value as Record<string, unknown>;
-  return typeof e.capability === 'string' && typeof e.token === 'string' && typeof e.writtenAt === 'string';
+  if (!isRecord(value)) return false;
+  return typeof value.capability === 'string' && typeof value.token === 'string' && typeof value.writtenAt === 'string';
+}
+
+/** A fully-validated marker, or null when `value` is not a well-formed marker for `session`
+ *  (tolerant — returns null instead of throwing; callers decide loud-vs-tolerant). */
+function asValidMarker(value: unknown, session: string): FrontDoorMarker | null {
+  if (!isRecord(value)) return null;
+  const { sessionId, active } = value;
+  if (typeof sessionId !== 'string' || !Array.isArray(active) || !active.every(isActiveEntry)) return null;
+  if (sessionId !== session) return null;
+  return { sessionId, active };
 }
 
 /** Read + validate the marker for a session, or null when absent. Fail loud on a
@@ -90,19 +111,14 @@ function readMarker(installRoot: string, session: string): FrontDoorMarker | nul
   } catch (err) {
     throw new Error(`front-door marker ${path} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
   }
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error(`front-door marker ${path} is malformed (expected an object)`);
+  // Validate + bind to the requested session: the file is session-keyed by path, so a
+  // shape mismatch OR a `sessionId` mismatch is corruption/tampering — fail LOUD here on
+  // the permit path (Principle V), never silently treat corruption as "no marker".
+  const marker = asValidMarker(parsed, session);
+  if (marker === null) {
+    throw new Error(`front-door marker ${path} is malformed (bad shape, or sessionId does not match '${session}')`);
   }
-  const obj = parsed as Record<string, unknown>;
-  if (typeof obj.sessionId !== 'string' || !Array.isArray(obj.active) || !obj.active.every(isActiveEntry)) {
-    throw new Error(`front-door marker ${path} is malformed (bad sessionId/active shape)`);
-  }
-  // Bind contents to the requested session (codex): the file is session-keyed by path, so
-  // its internal sessionId must match — a mismatch is corruption/tampering, fail loud.
-  if (obj.sessionId !== session) {
-    throw new Error(`front-door marker ${path} sessionId '${obj.sessionId}' does not match requested '${session}'`);
-  }
-  return { sessionId: obj.sessionId, active: obj.active };
+  return marker;
 }
 
 function isFresh(entry: ActiveEntry, now: number): boolean {
@@ -218,4 +234,74 @@ export function activeCapabilities(
   const marker = readMarker(installRoot, session);
   if (marker === null) return new Set();
   return new Set(marker.active.filter((e) => isFresh(e, now)).map((e) => e.capability));
+}
+
+// ── 028 US3 recovery primitives (FR-021/022/023) ────────────────────────────
+// `listMarker` (tolerant read) + `clearMarker` (delete-by-path) back the
+// `front-door mediate-list` / `mediate-recover` recovery verbs. The recovery surface
+// must inspect AND clear a CORRUPT marker without the strict-read path's fail-loud
+// throwing — so a session is NEVER unrecoverable through the interface (FR-021). These
+// deliberately diverge from `readMarker`'s loud-on-corruption contract: that is the
+// behavior the operator-facing recovery surface needs (inspect, then clear), not a
+// fallback that silently masks corruption on the permit path (the permit path still
+// fails loud via `readMarker`).
+
+/** One listed entry: the active entry plus whether it is within the staleness bound. */
+export interface ListedEntry extends ActiveEntry {
+  readonly fresh: boolean;
+}
+
+/** The tolerant listing of a session's marker. `corrupt` is true when the file exists
+ *  but is unparseable/malformed (reported, NOT thrown). `entries` is empty for an absent
+ *  or corrupt file. */
+export interface MarkerListing {
+  readonly corrupt: boolean;
+  readonly entries: readonly ListedEntry[];
+}
+
+/**
+ * TOLERANT read of a session's marker for the recovery surface: never throws on
+ * corruption (reports `corrupt: true`), and tags each entry with a `fresh` flag rather
+ * than dropping stale entries (the operator wants to SEE a leaked/stale marker before
+ * recovering it). Honors `assertSafeSession`.
+ */
+export function listMarker(installRoot: string, session: string, opts: ListMarkerOptions = {}): MarkerListing {
+  const now = opts.now ?? Date.now();
+  const readFile = opts.readFile ?? ((p: string) => readFileSync(p, 'utf8'));
+  const path = markerPath(installRoot, session); // asserts session safety
+  if (!existsSync(path)) return { corrupt: false, entries: [] };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFile(path));
+  } catch (err) {
+    // TOCTOU (claude-05): listMarker reads WITHOUT the marker lock, so a concurrent
+    // clearMarker (which holds the lock) can delete the file between existsSync and
+    // readFileSync. An ENOENT from that race means "the marker is gone" — classify it as
+    // no-marker (corrupt:false), NOT corrupt. Any OTHER read/parse failure is genuine
+    // corruption (corrupt:true), the recovery surface's loud-but-tolerant signal.
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { corrupt: false, entries: [] };
+    return { corrupt: true, entries: [] };
+  }
+  const marker = asValidMarker(parsed, session);
+  if (marker === null) return { corrupt: true, entries: [] };
+  return {
+    corrupt: false,
+    entries: marker.active.map((e) => ({ ...e, fresh: isFresh(e, now) })),
+  };
+}
+
+/**
+ * Clear a session's marker by DELETING THE FILE BY PATH — WITHOUT parsing it — so a
+ * corrupt file the strict read path rejects is still recoverable in one command (FR-021).
+ * Returns true when a file was removed, false when there was nothing to clear (a safe
+ * no-op). Honors `assertSafeSession`. Lock-serialized so a concurrent enter/exit cannot
+ * lose-update against the delete.
+ */
+export function clearMarker(installRoot: string, session: string): boolean {
+  const path = markerPath(installRoot, session); // asserts session safety
+  return withMarkerLock(installRoot, session, () => {
+    if (!existsSync(path)) return false;
+    rmSync(path, { force: true });
+    return true;
+  });
 }

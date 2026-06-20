@@ -25,7 +25,7 @@ does the exploration; this skill owns the *opinion injection*, the *pointer*, th
 **Before doing ANY of this skill's work**, consult the compass for the roadmap item this invocation operates on, declaring this skill as the intent:
 
 ```bash
-plugins/stack-control/bin/stackctl workflow compass <item> --intent design
+stackctl workflow compass <item> --intent design
 ```
 
 A **non-zero exit is a hard refusal**: print the compass's reason (it names the violated invariant and, for an `ahead` verdict, the skipped step) and **STOP — perform none of this skill's work**. Proceed only on exit 0 (`on-course` / `behind`). If no item resolves (a spec dir with no roadmap node is `off-rail`), refuse loud and direct the operator to capture it first. The lifecycle rules live in one place (the compass + the governed `WORKFLOW.md`), not re-encoded here; per `.claude/rules/enforcement-lives-in-skills.md` the gate lives in this skill body + the `stackctl workflow compass` verb, never a git hook.
@@ -58,7 +58,7 @@ overrides on top.
    from this moment (it keys on the pointer, not on the file existing, D3):
 
    ```bash
-   plugins/stack-control/bin/stackctl workflow link-design <item> docs/superpowers/specs/<date>-<slug>-design.md --apply
+   stackctl workflow link-design <item> docs/superpowers/specs/<date>-<slug>-design.md --apply
    ```
 
 2. **Inject the house rules, then drive the backend in-session.** Open the design
@@ -87,7 +87,7 @@ overrides on top.
    judgment. The operator sets the `design-approved:` marker on the node:
 
    ```bash
-   plugins/stack-control/bin/stackctl roadmap advance <item> --to in-flight --apply   # if not already
+   stackctl roadmap advance <item> --to in-flight --apply   # if not already
    # operator records approval (e.g. via roadmap add/edit) — the design-approved: node marker
    ```
 
@@ -97,7 +97,7 @@ overrides on top.
    not advance on an unmet gate:
 
    ```bash
-   plugins/stack-control/bin/stackctl workflow status <item>   # designing exit criteria: M of N met
+   stackctl workflow status <item>   # designing exit criteria: M of N met
    ```
 
    When the gate is met, hand off to **`/stack-control:define`** to author the

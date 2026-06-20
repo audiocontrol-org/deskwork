@@ -36,7 +36,7 @@ interface Flags {
 
 // `--doc` is universal (allowed everywhere) and handled separately from `values`.
 // Per-subaction grammar is the shared `SubactionGrammar` (document-verb-shared).
-const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
+export const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   capture: { valueFlags: ['idea', 'surfaced', 'context', 'home'], apply: true, positionals: 1 },
   promote: { valueFlags: ['to'], apply: true, positionals: 1 },
   drop: { valueFlags: ['reason'], apply: true, positionals: 1 },

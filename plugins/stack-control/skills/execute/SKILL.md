@@ -31,6 +31,22 @@ A **non-zero exit is a hard refusal**: print the compass's reason (it names the 
   by design; FR-006).
 - The GitHub Spec Kit framework (`.specify/`) is present and the `deskwork-governance` extension is installed and enabled (`specify extension list`).
 
+### Front-door completeness gate (028 US4 — refuse when RED)
+
+**Before driving any execution**, run the front-door regression guard as a **hard gate**
+(per `enforcement-lives-in-skills`, the gate lives in this skill body + the `stackctl
+check-front-door` verb — never a git hook):
+
+```bash
+stackctl check-front-door
+```
+
+- **Exit 0** → the front door is complete and discoverable; proceed.
+- **Non-zero** → **STOP. Refuse to execute.** A gap (a deleted/renamed skill, a broken
+  `--help`, an unfronted mutating verb, or a skill↔verb parity break) means an operation
+  this run may touch is not fronted/discoverable/mediated. Print the named gaps and fix
+  the surface first — never weaken the check to proceed.
+
 ## Steps
 
 1. **Resolve the target spec dir.** Use the spec dir passed as the argument. If none is given, resolve the active feature's spec dir from the `<!-- SPECKIT START -->…<!-- SPECKIT END -->` marker in `CLAUDE.md` (it names the active `specs/<feature>/plan.md`). State which spec dir you resolved before proceeding. **If neither an argument nor the marker resolves a spec dir** (marker absent/empty, or it points at a `plan.md` that no longer exists), **STOP and report that no spec dir could be resolved — do not guess a directory** (AUDIT-20260605-07). Guessing risks running native execution against the wrong spec or fabricating a runnable verdict; this mirrors the fail-loud STOP in step 2.

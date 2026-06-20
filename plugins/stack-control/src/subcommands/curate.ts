@@ -3,9 +3,44 @@
 // recognize (never run) the up-to-date seam; report the ledger↔archive
 // coherence NOTICE. Dry-run by default (FR-009).
 
+import { loadDocument } from '../document-model/document.js';
 import { runCurate } from '../document-model/curate-engine.js';
 import { type CurateFinding, DocumentModelError } from '../document-model/types.js';
 import { failUsage, grammarDirs, requireFlagValue } from './document-verb-shared.js';
+
+/**
+ * Edge-aware archival precheck (028 FR-017; contract RM4). Curate archives
+ * terminal-status Units; archiving a terminal Unit that is still the TARGET of a
+ * unit-reference edge (`depends-on` / `part-of` on the roadmap) would dangle that
+ * edge. Consult the typed edges BEFORE curate runs and refuse loud (exit 2)
+ * naming the dangling edge, rather than letting the archive move proceed.
+ */
+function assertNoDanglingTerminalEdge(docPath: string): void {
+  const opts = grammarDirs();
+  const { doc } = loadDocument(docPath, opts);
+  const unitRefFields = new Set(
+    // `?? []` — a grammar that omits edgeFields (non-roadmap doc, older grammar)
+    // has no unit-ref edges to dangle; guard rather than TypeError (claude-03).
+    (doc.grammar.edgeFields ?? []).filter((f) => f.references === 'unit').map((f) => f.name),
+  );
+  if (unitRefFields.size === 0) return; // no unit-ref edges in this grammar — nothing to dangle
+  const terminal = new Set(doc.grammar.terminalStatuses);
+  for (const unit of doc.units) {
+    if (!terminal.has(unit.status)) continue;
+    for (const other of doc.units) {
+      if (other.identifier === unit.identifier) continue;
+      for (const edge of other.edges) {
+        if (!unitRefFields.has(edge.field)) continue;
+        if (edge.targets.includes(unit.identifier)) {
+          throw new DocumentModelError(
+            `cannot archive terminal item '${unit.identifier}' — '${other.identifier}' still references it ` +
+              `via '${edge.field}' (re-point or remove that edge first; refusing to dangle the reference)`,
+          );
+        }
+      }
+    }
+  }
+}
 
 // AUDIT-20260608-31: a finding is ACTIONABLE only when applying curate would
 // change the live document. `disorder` and `unarchived-terminal` are the two
@@ -43,6 +78,10 @@ function parseArgs(args: string[]): { doc: string; apply: boolean } {
 export async function runCurateCli(args: string[]): Promise<void> {
   const { doc, apply } = parseArgs(args);
   try {
+    // Edge-aware archival (FR-017): refuse BEFORE curate would archive a terminal
+    // item still referenced by a unit-ref edge — applies to both dry-run and
+    // --apply so the operator sees the refusal without writing.
+    assertNoDanglingTerminalEdge(doc);
     const report = runCurate(doc, { apply, ...grammarDirs() });
 
     if (report.applied) {

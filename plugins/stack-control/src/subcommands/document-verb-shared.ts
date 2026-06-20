@@ -134,6 +134,8 @@ export interface SubactionGrammar {
   readonly clear?: boolean;
   /** Whether `--chain` is meaningful (roadmap `cluster`); absent → not allowed. */
   readonly chain?: boolean;
+  /** Whether `--analyze-clean` is meaningful (roadmap `approve-design`); absent → not allowed. */
+  readonly analyzeClean?: boolean;
   /** Max positionals consumed beyond the subaction token. */
   readonly positionals: number;
   /** When true, `positionals` is a floor, not a cap — the subaction accepts an
@@ -157,6 +159,7 @@ export function validateSubactionFlags(
     readonly apply: boolean;
     readonly clear?: boolean;
     readonly chain?: boolean;
+    readonly analyzeClean?: boolean;
     readonly positionals: readonly string[];
     readonly values: ReadonlyMap<string, string>;
   },
@@ -172,6 +175,9 @@ export function validateSubactionFlags(
   }
   if (flags.chain === true && grammar.chain !== true) {
     failUsage(verb, `--chain is not valid for '${subaction}'`);
+  }
+  if (flags.analyzeClean === true && grammar.analyzeClean !== true) {
+    failUsage(verb, `--analyze-clean is not valid for '${subaction}'`);
   }
   if (grammar.unboundedPositionals !== true && flags.positionals.length > grammar.positionals) {
     failUsage(verb, `unexpected positional '${flags.positionals[grammar.positionals]!}' for '${subaction}'`);

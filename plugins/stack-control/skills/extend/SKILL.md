@@ -16,12 +16,29 @@ Refine an **existing** Spec Kit spec through the stack-control front door (Featu
   current portability targets; no headless/batch CLI dependency; FR-006/007).
 - The spec dir already exists (this is `extend`, not `define`).
 
+## Front-door completeness gate (028 US4 — refuse when RED)
+
+`extend` is the other sanctioned `spec-definition` front door (with `define`) and drives
+the same `/speckit-*` backend family, so it carries the same hard gate. Before resolving
+or iterating the spec, run the front-door regression guard (per
+`enforcement-lives-in-skills`, the gate lives in this skill body + the `stackctl
+check-front-door` verb — never a git hook):
+
+```bash
+stackctl check-front-door
+```
+
+- **Exit 0** → the front door is complete; proceed.
+- **Non-zero** → **STOP. Refuse to proceed.** A gap (deleted/renamed skill, broken
+  `--help`, unfronted mutating verb, or skill↔verb parity break) is a real regression —
+  print the named gaps and fix the surface first; never weaken the check to proceed.
+
 ## Steps
 
 1. **Resolve and report current state.** Resolve the target spec dir (arg, or the active feature's dir from the `<!-- SPECKIT START -->…<!-- SPECKIT END -->` marker in `CLAUDE.md` — the program uses one long-lived branch with numbered spec dirs, so the marker resolves the dir, not the branch name; TF-09). State which spec dir you resolved, then run:
 
    ```bash
-   plugins/stack-control/bin/stackctl spec-check --spec <spec-dir>
+   stackctl spec-check --spec <spec-dir>
    ```
 
    It prints a machine-readable presence line (`spec=yes plan=yes tasks=no`). This tells you what already exists and therefore what the loop needs to advance. Read it — do not assume the spec's state.
@@ -52,7 +69,7 @@ Together with `define` (author new) and `execute` (run), `extend` is sufficient 
 ## Front-door marker (026 — capability mediation)
 
 This skill is the sanctioned interface for the **spec-definition** capability. The plugin's
-PreToolUse interceptor refuses a RAW backend call (a direct the `/speckit-*` clarify / re-plan / re-tasks chain); a call this skill
+PreToolUse interceptor refuses a RAW backend call (a direct `/speckit-*` clarify / re-plan / re-tasks chain); a call this skill
 makes is permitted because the skill sets the front-door marker first. **Bracket the
 backend drive:**
 

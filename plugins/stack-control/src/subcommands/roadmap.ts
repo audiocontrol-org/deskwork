@@ -7,8 +7,6 @@
 // Exit codes: 0 success; 2 usage/parse/validation (ungovernable doc, parse
 // failure, referential-integrity/acyclicity violation, missing arg).
 
-import { existsSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
 import type { LoadOptions } from '../document-model/document.js';
 import { DocumentModelError } from '../document-model/types.js';
 import { InstallationError } from '../config/errors.js';
@@ -22,8 +20,16 @@ import {
   type AddInput,
   type MutationResult,
 } from '../roadmap/mutations.js';
+import {
+  emitAddEdge,
+  emitApproveDesign,
+  emitMoveEdge,
+  emitRemoveEdge,
+  emitRemoveNode,
+  emitRename,
+} from './roadmap-edge-emit.js';
+import { emitReconcile } from './roadmap-reconcile-emit.js';
 import { cluster, type ClusterInput } from '../roadmap/cluster.js';
-import { globParent, reconcile } from '../roadmap/reconcile.js';
 import { loadRoadmap, type RoadmapModel } from '../roadmap/roadmap-model.js';
 import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
 import { backlogRoot } from '../backlog/root.js';
@@ -49,6 +55,7 @@ export interface Flags {
   readonly apply: boolean;
   readonly clear: boolean;
   readonly chain: boolean;
+  readonly analyzeClean: boolean;
   readonly positionals: readonly string[];
   readonly values: ReadonlyMap<string, string>;
 }
@@ -61,7 +68,9 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   blocks: { valueFlags: [], apply: false, clear: false, positionals: 1 },
   order: { valueFlags: [], apply: false, clear: false, positionals: 0 },
   graph: { valueFlags: [], apply: false, clear: false, positionals: 0 },
-  reconcile: { valueFlags: [], apply: false, clear: false, positionals: 0 },
+  // `reconcile` is report-only by default (read-only); `--unorphan <spec>` is the
+  // single mutating assist (resolves an orphan into a node + spec: edge).
+  reconcile: { valueFlags: ['unorphan', 'type'], apply: true, clear: false, positionals: 0 },
   add: {
     valueFlags: ['status', 'scope', 'depends-on', 'part-of', 'deferred-until', 'spec', 'ref'],
     apply: true,
@@ -88,6 +97,19 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
     positionals: 1,
   },
   'close-related': { valueFlags: [], apply: true, clear: false, positionals: 1 },
+  // 028 US2 edge-mutation + marker verbs (FR-014/016/017; contract RM1/RM3).
+  'add-edge': { valueFlags: ['field', 'to'], apply: true, clear: false, positionals: 1 },
+  'remove-edge': { valueFlags: ['field', 'to'], apply: true, clear: false, positionals: 1 },
+  'move-edge': { valueFlags: ['field', 'from', 'to'], apply: true, clear: false, positionals: 1 },
+  rename: { valueFlags: ['to'], apply: true, clear: false, positionals: 1 },
+  'remove-node': { valueFlags: [], apply: true, clear: false, positionals: 1 },
+  'approve-design': {
+    valueFlags: [],
+    apply: true,
+    clear: true,
+    analyzeClean: true,
+    positionals: 1,
+  },
 };
 
 /** The union of every subaction's value-flag names, so the scanner can reject a
@@ -101,16 +123,23 @@ const ALL_VALUE_FLAGS: readonly string[] = [
  * (`roadmap-command.ts`) emit the byte-identical message (FR-006; AUDIT-BARRAGE-
  * codex-01). The order is the discovery order operators have learned, kept stable. */
 export const KNOWN_SUBACTIONS =
-  'next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, cluster, group, reconcile, close-related';
+  'next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, cluster, group, reconcile, close-related, add-edge, remove-edge, move-edge, rename, remove-node, approve-design';
 
-/** Scan flags via the shared subaction-verb scanner; `--apply`/`--clear`/`--chain` booleans. */
+/** Scan flags via the shared subaction-verb scanner; the boolean switches. */
 export function scanFlags(args: readonly string[]): Flags {
-  const s = scanVerbFlags('roadmap', args, NO_DOC, ['apply', 'clear', 'chain'], ALL_VALUE_FLAGS);
+  const s = scanVerbFlags(
+    'roadmap',
+    args,
+    NO_DOC,
+    ['apply', 'clear', 'chain', 'analyze-clean'],
+    ALL_VALUE_FLAGS,
+  );
   return {
     doc: s.doc,
     apply: s.booleans.has('apply'),
     clear: s.booleans.has('clear'),
     chain: s.booleans.has('chain'),
+    analyzeClean: s.booleans.has('analyze-clean'),
     positionals: s.positionals,
     values: s.values,
   };
@@ -232,52 +261,6 @@ function emitCluster(flags: Flags, opts: LoadOptions, verb: string): void {
       ? `roadmap ${verb}: grouped ${input.children.join(', ')} under ${input.parentId}${chainNote}\n`
       : `roadmap ${verb}: dry-run — would group ${input.children.join(', ')} under ${input.parentId}${chainNote} (use --apply to write)\n`,
   );
-}
-
-/**
- * Walk UP from the doc's directory to the nearest ancestor that contains
- * `<globParent>` as a subdirectory, and return that ancestor. The roadmap's
- * `spec:` paths (and the reconciliation glob) are relative to wherever the
- * glob-parent dir lives — NOT to the invocation cwd (AUDIT-20260608-15). Failing
- * to locate it is fail-loud (a wrong base must never silently report
- * all-unresolved). Returns the doc's own directory when the grammar declares no
- * glob hook (nothing to anchor to).
- */
-function reconcileBaseDir(docPath: string, globParentDir: string | null): string {
-  const start = dirname(resolve(docPath));
-  if (globParentDir === null) return start;
-  let cur = start;
-  for (;;) {
-    const candidate = join(cur, globParentDir);
-    if (existsSync(candidate) && statSync(candidate).isDirectory()) return cur;
-    const parent = dirname(cur);
-    if (parent === cur) break;
-    cur = parent;
-  }
-  throw new DocumentModelError(
-    `reconcile: no ancestor of '${start}' contains the reconciliation glob-parent '${globParentDir}/' ` +
-      `(spec correspondences cannot be resolved; refusing to report all-unresolved against a wrong base)`,
-  );
-}
-
-function emitReconcile(flags: Flags, opts: LoadOptions): void {
-  // Spec paths resolve relative to wherever the glob-parent dir (e.g. `specs/`)
-  // lives, derived from the DOC's location — not the invocation cwd. This makes
-  // `roadmap reconcile` correct from any working directory (AUDIT-20260608-15).
-  const model = loadRoadmap(flags.doc, opts);
-  const hook = model.doc.grammar.reconciliationHook;
-  const globParentDir = hook !== null && hook.kind === 'glob' ? globParent(hook.source) : null;
-  const baseDir = reconcileBaseDir(flags.doc, globParentDir);
-  const report = reconcile(flags.doc, opts, baseDir);
-  process.stdout.write(`roadmap reconcile (report-only — proposes, never mutates):\n`);
-  process.stdout.write(`  status drift: ${report.statusDrift.length}\n`);
-  for (const d of report.statusDrift) {
-    process.stdout.write(`    - ${d.identifier}: ${d.recorded} → ${d.onDisk} (${d.proposal})\n`);
-  }
-  process.stdout.write(`  orphan spec dirs: ${report.orphans.length}\n`);
-  for (const o of report.orphans) process.stdout.write(`    - ${o}\n`);
-  process.stdout.write(`  unresolved correspondences: ${report.unresolved.length}\n`);
-  for (const u of report.unresolved) process.stdout.write(`    - ${u}\n`);
 }
 
 /**
@@ -414,6 +397,24 @@ export async function executeRoadmapSubaction(subaction: string, scanned: Flags)
         return;
       case 'close-related':
         emitCloseRelated(loadRoadmap(flags.doc, opts), flags);
+        return;
+      case 'add-edge':
+        emitAddEdge(flags, opts);
+        return;
+      case 'remove-edge':
+        emitRemoveEdge(flags, opts);
+        return;
+      case 'move-edge':
+        emitMoveEdge(flags, opts);
+        return;
+      case 'rename':
+        emitRename(flags, opts);
+        return;
+      case 'remove-node':
+        emitRemoveNode(flags, opts);
+        return;
+      case 'approve-design':
+        emitApproveDesign(flags, opts);
         return;
     }
     // Exhaustiveness backstop (AUDIT-20260610-09): the pre-dispatch guard only

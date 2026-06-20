@@ -14,8 +14,11 @@ stackctl speckit-guard <skill-name>
   (`specify`/`plan`/`tasks`) → `/stack-control:define` or `/stack-control:extend`;
   `implement` → `/stack-control:execute`. Use that front door instead — it drives the
   backend in order, holds the gates, and runs per-phase governance.
-- Exit `0` → reached via its front door (the `STACKCTL_FRONT_DOOR` marker is set) or not a
-  wrapped skill — permitted.
+- Exit `0` → reached via its front door (a session-keyed front-door marker is active for the
+  wrapping capability — established by `stackctl front-door enter --capability <id> --session
+  <id>`, the same file marker the 026 interceptor reads), OR not a wrapped skill, OR no
+  enclosing installation — permitted. (The legacy `STACKCTL_FRONT_DOOR` env var is retired —
+  setting it has no effect; the file marker is the only signal.)
 
 Invoke the CLI as bare `stackctl` (on `PATH` in a plugin install), never the source-repo
 `plugins/stack-control/bin/stackctl` form (GitHub #480).

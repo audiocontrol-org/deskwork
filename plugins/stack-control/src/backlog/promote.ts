@@ -66,6 +66,83 @@ export class PromotePartialWriteError extends Error {
   }
 }
 
+/** An item targeted for unpromote carries NO promotion linkage → there is
+ * nothing to remove (028 FR-012, contract B3). The verb maps this to a usage
+ * error (exit 2): asking to unpromote a never-promoted item is a no-op the
+ * operator should know about, not a silent success. */
+export class UnpromoteNotPromotedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnpromoteNotPromotedError';
+  }
+}
+
+export interface UnpromoteRequest {
+  readonly id: string;
+  /** Absent ⇒ dry-run (report only, zero write). */
+  readonly apply: boolean;
+  readonly backend: BacklogBackend;
+}
+
+export interface UnpromoteResult {
+  readonly id: string;
+  readonly applied: boolean;
+}
+
+/** The greppable token of the promotion-linkage notes line (mirrors
+ * promotedToLine's bold bullet). Used to strip exactly that line on unpromote. */
+const PROMOTED_TO_TOKEN = '**Promoted-to:**';
+
+/** Strip every promotion-linkage line from a notes block, returning the
+ * remaining notes (trimmed). */
+function stripPromotedToLines(notes: string): string {
+  return notes
+    .split('\n')
+    .filter((line) => !line.includes(PROMOTED_TO_TOKEN))
+    .join('\n')
+    .trim();
+}
+
+/**
+ * Remove the promotion linkage `promote` recorded — the exact inverse (028
+ * FR-012). Validates the item exists (missing → PromoteItemMissingError, exit 1)
+ * and actually carries a promotion linkage (the `promoted` label OR a
+ * `Promoted-to:` notes line); a never-promoted item throws
+ * UnpromoteNotPromotedError (exit 2) with zero write. On `apply`, removes the
+ * `promoted` label AND strips the `Promoted-to:` line(s) from the notes,
+ * preserving every other label and notes line (FR-013). Reads labels/notes via
+ * the backend's file-frontmatter projection (as promote does — `list --plain`
+ * exposes neither, D6).
+ */
+export function unpromote(req: UnpromoteRequest): UnpromoteResult {
+  const item = req.backend.list().find((i) => i.id === req.id);
+  if (item === undefined) {
+    throw new PromoteItemMissingError(
+      `backlog item '${req.id}' does not exist — unpromote removes the linkage from an existing item`,
+    );
+  }
+  const notes = req.backend.readNotes(req.id);
+  const hasLabel = item.labels.includes(PROMOTED_LABEL);
+  const hasLine = notes.includes(PROMOTED_TO_TOKEN);
+  if (!hasLabel && !hasLine) {
+    throw new UnpromoteNotPromotedError(
+      `backlog item '${req.id}' carries no promotion linkage — nothing to unpromote`,
+    );
+  }
+
+  if (req.apply) {
+    // Only rewrite notes when a Promoted-to: line is actually present — passing
+    // setNotes for a label-only item would write `--notes ''` and could erase any
+    // other notes the item carries (data loss; AUDIT-BARRAGE-claude-01, Phase 4).
+    req.backend.edit(req.id, {
+      ...(hasLabel ? { removeLabel: PROMOTED_LABEL } : {}),
+      ...(hasLine ? { setNotes: stripPromotedToLines(notes) } : {}),
+    });
+  }
+
+  return { id: req.id, applied: req.apply };
+}
+
 export interface PromoteRequest {
   /** One id (single) or N ids (batch — caller already enforced batch is tasks:-only). */
   readonly ids: readonly string[];

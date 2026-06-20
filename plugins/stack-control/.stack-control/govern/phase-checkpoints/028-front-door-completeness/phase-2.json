@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "featureSlug": "028-front-door-completeness",
+  "phaseId": "2",
+  "checkpoint": "phase-2",
+  "auditLogSection": "phase-2",
+  "scopeFingerprint": "22910ec0704880e8952a5484dc7f391ee57c84295f3afa795ac4db944ec9616b",
+  "passedAt": "2026-06-19T19:33:44.869Z",
+  "governedPaths": [
+    "src/cli-help/command-adapter.ts",
+    "src/cli-help/command-surface.ts",
+    "src/__tests__/cli-help/command-surface.test.ts",
+    "src/cli-help/render-help.ts"
+  ],
+  "auditedFiles": []
+}

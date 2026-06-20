@@ -1,6 +1,6 @@
 ---
 name: roadmap
-description: "Reason over and curate the stack-control roadmap — a governed heading-keyed DAG of work items with first-class depends-on / part-of / deferred-until edges. Answer next-ready / why-blocked / what-this-blocks, derive order, render a mermaid graph, reconcile against on-disk spec progress (report-only), and mutate (add / advance / decompose / reclassify / defer). Dry-run first, then apply. Wraps `stackctl roadmap`."
+description: "Reason over and curate the stack-control roadmap — a governed heading-keyed DAG of work items with first-class depends-on / part-of / deferred-until edges. Answer next-ready / why-blocked / what-this-blocks, derive order, render a mermaid graph, reconcile against on-disk spec progress (report-only), and mutate (add / advance / decompose / reclassify / defer / cluster / group / close-related). Dry-run first, then apply. Wraps `stackctl roadmap`."
 ---
 
 # /stack-control:roadmap
@@ -44,12 +44,12 @@ never persisted.
 ## Query / report (read-only — never writes)
 
 ```bash
-plugins/stack-control/bin/stackctl roadmap next      [--doc <path>]   # ready-list
-plugins/stack-control/bin/stackctl roadmap blocked   [--doc <path>]   # each blocked item + blockers
-plugins/stack-control/bin/stackctl roadmap blocks <id> [--doc <path>] # what depends on <id>
-plugins/stack-control/bin/stackctl roadmap order     [--doc <path>]   # derived topological order
-plugins/stack-control/bin/stackctl roadmap graph     [--doc <path>]   # mermaid flowchart
-plugins/stack-control/bin/stackctl roadmap reconcile [--doc <path>]   # report-only status-drift proposals
+stackctl roadmap next      [--doc <path>]   # ready-list
+stackctl roadmap blocked   [--doc <path>]   # each blocked item + blockers
+stackctl roadmap blocks <id> [--doc <path>] # what depends on <id>
+stackctl roadmap order     [--doc <path>]   # derived topological order
+stackctl roadmap graph     [--doc <path>]   # mermaid flowchart
+stackctl roadmap reconcile [--doc <path>]   # report-only status-drift proposals
 ```
 
 - **Start a fresh session here.** `roadmap next` answers "what can I pick up?";
@@ -69,6 +69,17 @@ plugins/stack-control/bin/stackctl roadmap reconcile [--doc <path>]   # report-o
 ... roadmap decompose <id>   --into x,y,z            [--apply]   # split one → N; parts inherit status + depends-on + part-of + deferred-until; repoint dependents
 ... roadmap reclassify <id>  --to <new-identifier>   [--apply]   # rename + rewrite all referencing edges
 ... roadmap defer <id>       --until "…" | --clear   [--apply]   # set/clear the prose deferred-until
+... roadmap cluster <parent> --children a,b,c [--summary "…"] [--chain] [--apply]   # group items under a created-or-reused parent
+... roadmap group   <parent> --children a,b,c [--summary "…"] [--chain] [--apply]   # alias of cluster
+... roadmap close-related <id>                       [--apply]   # close the backlog ids the terminal item <id> resolves
+
+# Edge mutation + node lifecycle (028 US2) — all dry-run by default, --apply to write:
+... roadmap add-edge <from> <to> --type depends-on|part-of [--apply]   # add one typed edge
+... roadmap remove-edge <from> <to> --type depends-on|part-of [--apply] # remove one typed edge
+... roadmap move-edge <child> --from <oldParent> --to <newParent> [--apply] # reparent (remove+add in one validated move)
+... roadmap rename <id> --to <new-identifier>        [--apply]   # rename a node, repointing every dependent edge
+... roadmap remove-node <id>                         [--apply]   # edge-aware node removal (repoints/refuses rather than dangling)
+... roadmap approve-design <id> [--analyze-clean] [--clear] [--apply] # write/clear the design-approved / analyze-clean marker
 ```
 
 Every mutation **re-validates the whole graph before any write** and is
@@ -76,6 +87,30 @@ Every mutation **re-validates the whole graph before any write** and is
 leaves the document byte-for-byte unchanged). The kind + phase ride in the
 identifier — there is no separate `--kind` flag; `reclassify` is how you change
 them (it rewrites every referencing edge atomically).
+
+### Cluster / group — grouping under a parent
+
+`cluster` (and its alias `group`, same grammar + same handler) gathers a set of
+existing items under a parent via the non-blocking `part-of` edge. The parent is
+**created if it does not exist, reused if it does**. The flags:
+
+- `--children a,b,c` — the comma-separated item ids to place under `<parent>`
+  (each gets a `part-of: <parent>` edge). Required.
+- `--summary "…"` — optional one-line scope text for a newly-created parent.
+- `--chain` — additionally wire a **`depends-on` chain** over the children in the
+  listed order (each child depends-on the prior), turning a flat grouping into a
+  sequenced one. Optional.
+
+Because `part-of` is non-blocking, clustering never changes readiness on its own;
+adding `--chain` does (it introduces hard `depends-on` edges). The whole graph
+re-validates before any write — a cycle or dangling child id refuses with zero
+writes.
+
+### close-related — close the backlog a terminal item resolves
+
+`close-related <id>` closes the backlog item ids that a now-terminal roadmap item
+(`shipped`/`cancelled`/`retired`) resolves — the cleanup half of promotion. Dry-run
+by default; `--apply` to write.
 
 > **Where a roadmap node can originate.** Roadmap work is not only authored fresh
 > here — a node can **graduate up from the backlog**. When a found-work item in
@@ -101,7 +136,8 @@ them (it rewrites every referencing edge atomically).
    progress, but you apply the proposal — reconcile never mutates.
 5. **Re-decompose freely.** As understanding sharpens, `decompose` an item into
    peers (former dependents are repointed onto the parts) or `reclassify` its
-   phase/kind — the graph re-validates each time.
+   phase/kind, or `cluster`/`group` peers under a parent — the graph re-validates
+   each time.
 
 ## Anti-patterns to refuse
 

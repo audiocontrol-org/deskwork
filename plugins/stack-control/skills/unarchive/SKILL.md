@@ -20,7 +20,7 @@ Bring one archived item back into its live governed document — the symmetric r
 1. **Dry-run first (always).** Report the planned restore; write nothing:
 
    ```bash
-   plugins/stack-control/bin/stackctl unarchive --doc <path> --id "<identifier>"
+   stackctl unarchive --doc <path> --id "<identifier>"
    ```
 
    It reports the item and its recorded status. Read it back to the operator.
@@ -30,7 +30,7 @@ Bring one archived item back into its live governed document — the symmetric r
 3. **Apply.**
 
    ```bash
-   plugins/stack-control/bin/stackctl unarchive --doc <path> --id "<identifier>" --apply
+   stackctl unarchive --doc <path> --id "<identifier>" --apply
    ```
 
    The item is reinserted into the live document at its declared-order position and removed from the archive (its ledger entry too). An archive→unarchive round-trip returns the item with its body and identity intact (content-equivalent, not byte-identical).

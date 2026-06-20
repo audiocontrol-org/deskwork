@@ -19,7 +19,7 @@ Move the **settled** items out of a live governed document into its sibling arch
 1. **Dry-run first (always).** Report what *would* move; write nothing:
 
    ```bash
-   plugins/stack-control/bin/stackctl archive --doc <path>
+   stackctl archive --doc <path>
    ```
 
    It lists each terminal-status Unit (identifier, status, line span) and the archive target. Read the list to the operator. Zero terminal-status Units → there is nothing to do; stop.
@@ -29,7 +29,7 @@ Move the **settled** items out of a live governed document into its sibling arch
 3. **Apply.**
 
    ```bash
-   plugins/stack-control/bin/stackctl archive --doc <path> --apply
+   stackctl archive --doc <path> --apply
    ```
 
    The moved Units are cut from the live document and appended to `<doc>-archive.md` (created if absent), each ledger entry keyed by identifier. The live document keeps zero bookkeeping.

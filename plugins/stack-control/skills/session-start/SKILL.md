@@ -25,7 +25,7 @@ directing you to `stackctl setup` (no bundled-copy fallback).
 ## What it reports
 
 ```bash
-plugins/stack-control/bin/stackctl session-start [--at <dir>] [--json]
+stackctl session-start [--at <dir>] [--json]
 ```
 
 1. **Roadmap** — the ready/next frontier and the blocked items (the 006 reasoner
@@ -42,6 +42,22 @@ plugins/stack-control/bin/stackctl session-start [--at <dir>] [--json]
 5. **Branch-staleness advisory** — whether the branch is behind its base
    (upstream, else the repo default branch). Advisory only; **never blocks**.
    Undeterminable (detached HEAD / no base) → a clean skip note.
+
+### Front-door completeness advisory (028 US4 — non-blocking)
+
+After the orientation report, run the front-door regression guard as a **non-blocking
+advisory snapshot** — report the gap count, then continue; session-start **never
+refuses** (per `enforcement-lives-in-skills`, the advisory lives in this skill body, not
+a git hook):
+
+```bash
+stackctl check-front-door --json   # read the gap count; do NOT block on it
+```
+
+- Exit 0 → note "front door complete (N operations)".
+- Non-zero → surface the gap count + each named gap so the operator sees a regression
+  early, then **continue** (session-start is read-only orientation, not a gate). The
+  blocking gate fires later in `execute` / review, not here.
 
 - `--at <dir>` orients on the installation enclosing `<dir>` instead of the cwd.
 - `--json` emits the machine-readable `OrientationReport` (for non-Claude-Code

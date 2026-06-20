@@ -42,14 +42,21 @@ export interface CaptureSpec {
   readonly priority?: 'high' | 'medium' | 'low';
 }
 
-/** Additive, field-preserving mutations for `edit` (012, D6). Both are append /
- * add operations — no read-modify-write, so concurrent edits are never clobbered
- * (FR-013). */
+/** Additive, field-preserving mutations for `edit` (012, D6). The add/append
+ * operations are pure additions — no read-modify-write, so concurrent edits are
+ * never clobbered (FR-013). The remove/set operations (028 unpromote, FR-012)
+ * are the inverse: `removeLabel` strips a single label additively; `setNotes`
+ * REPLACES the implementation notes wholesale (the caller has already computed
+ * the new notes text — used to strip one linkage line). */
 export interface EditSpec {
   /** Add a label additively (existing labels preserved). */
   readonly addLabel?: string;
   /** Append a line to the task's implementation notes (existing body preserved). */
   readonly appendNotes?: string;
+  /** Remove a single label (other labels preserved). Inverse of `addLabel`. */
+  readonly removeLabel?: string;
+  /** Replace the implementation notes wholesale (028 unpromote linkage strip). */
+  readonly setNotes?: string;
 }
 
 export interface BacklogBackend {
@@ -66,10 +73,57 @@ export interface BacklogBackend {
    * Shells the real binary; a non-zero exit (e.g. unknown id) throws BacklogError —
    * never a silent no-op, never a fabricated success. */
   close(id: string): void;
+  /**
+   * Relocate an item OUT of the live store while PRESERVING it (028 FR-011 —
+   * "content databases preserve, they don't delete"). Shells the real binary's
+   * `task archive`, which moves the file to `backlog/archive/tasks/` (still
+   * readable). The backend.md `task archive` exits 0 even for an unknown id
+   * (a silent no-op), so this verifies the relocation actually happened and
+   * throws BacklogError otherwise — never a fabricated archive.
+   */
+  archive(id: string): void;
+  /**
+   * The raw implementation-notes text of an item (028 unpromote, FR-012),
+   * read from the task-file body (`list --plain` exposes no notes, D6). The
+   * empty string when the item has no notes section. Throws BacklogError on an
+   * unknown id (never a fabricated empty read).
+   */
+  readNotes(id: string): string;
 }
 
 /** The terminal backlog status an item is moved to on closure. */
 export const BACKLOG_DONE_STATUS = 'Done';
+
+/**
+ * Max bytes the captured title may contribute to the derived on-disk filename
+ * (028 FR-013, TASK-299). backlog.md names a task file `task-<n> - <title>.md`
+ * and does NOT truncate, so a long title raises ENAMETOOLONG (the common ext4 /
+ * APFS limit is 255 bytes). We pass a truncated title to the binary (keeping the
+ * filename safe) and preserve the FULL title in the body. The budget leaves
+ * generous headroom for the `task-<bignum> - ` prefix + `.md` suffix.
+ */
+export const TITLE_FILENAME_BUDGET = 180;
+
+/** Truncate `title` to TITLE_FILENAME_BUDGET *bytes* on a UTF-8 boundary so the
+ * derived filename never exceeds the OS limit. Returns the title unchanged when
+ * it already fits. */
+function truncateTitleForFilename(title: string): string {
+  if (Buffer.byteLength(title, 'utf8') <= TITLE_FILENAME_BUDGET) return title;
+  let end = title.length;
+  while (end > 0 && Buffer.byteLength(title.slice(0, end), 'utf8') > TITLE_FILENAME_BUDGET) {
+    end -= 1;
+  }
+  return title.slice(0, end).trimEnd();
+}
+
+/** The `## Implementation Notes` body between the SECTION:NOTES fences, or '' if
+ * absent. backlog.md wraps notes in `<!-- SECTION:NOTES:BEGIN -->` … `:END -->`. */
+function extractNotes(fileText: string): string {
+  const begin = fileText.indexOf('<!-- SECTION:NOTES:BEGIN -->');
+  const end = fileText.indexOf('<!-- SECTION:NOTES:END -->');
+  if (begin < 0 || end < 0 || end < begin) return '';
+  return fileText.slice(begin + '<!-- SECTION:NOTES:BEGIN -->'.length, end).trim();
+}
 
 export interface BacklogBackendOptions {
   /** Working dir whose `backlog/` tree the binary operates on. */
@@ -219,9 +273,24 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
     return items;
   }
 
+  /** Absolute path to the task file for `id`, or undefined when absent. The file
+   * is named `task-<n> - <slug>.md`; the id is `TASK-<n>`. */
+  function taskFilePath(id: string): string | undefined {
+    if (!existsSync(tasksDir)) return undefined;
+    const n = id.replace(/^TASK-/i, '');
+    const file = readdirSync(tasksDir).find((f) => f.startsWith(`task-${n} -`));
+    return file === undefined ? undefined : join(tasksDir, file);
+  }
+
   return {
     create(spec: CaptureSpec): string {
-      const args = ['task', 'create', spec.title];
+      // Filename safety (028 FR-013, TASK-299): backlog.md derives the on-disk
+      // filename from the title without truncating. Pass a truncated title so
+      // the filename stays within the OS limit; restore the FULL title via a
+      // follow-up `edit --title` (which updates frontmatter WITHOUT renaming the
+      // file — the slug is fixed at create time).
+      const safeTitle = truncateTitleForFilename(spec.title);
+      const args = ['task', 'create', safeTitle];
       if (spec.labels.length > 0) args.push('-l', spec.labels.join(','));
       if (spec.priority !== undefined) args.push('--priority', spec.priority);
       for (const ref of spec.refs ?? []) args.push('--ref', ref);
@@ -234,7 +303,24 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
           `could not parse the created item id from the ${BACKEND_LABEL} output:\n${stdout}`,
         );
       }
-      return m[1]!;
+      const id = m[1]!;
+      if (safeTitle !== spec.title) {
+        // The item is already created with the filename-safe (truncated) title;
+        // restoring the full title is a second step. If it fails, the item is
+        // NOT silently stranded with a wrong title — surface a loud error naming
+        // the created id + truncated title so the operator can recover it
+        // (no invisible corruption; AUDIT-BARRAGE-claude-04, Phase 4).
+        try {
+          run(['task', 'edit', id, '-t', spec.title, '--plain']);
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err);
+          throw new BacklogError(
+            `created ${id} but failed to restore its full title (it currently reads the ` +
+              `truncated "${safeTitle}"): ${detail}. Fix with: backlog task edit ${id} -t "<full title>".`,
+          );
+        }
+      }
+      return id;
     },
 
     list: listItems,
@@ -266,7 +352,9 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
     edit(id: string, spec: EditSpec): void {
       const args = ['task', 'edit', id];
       if (spec.addLabel !== undefined) args.push('--add-label', spec.addLabel);
+      if (spec.removeLabel !== undefined) args.push('--remove-label', spec.removeLabel);
       if (spec.appendNotes !== undefined) args.push('--append-notes', spec.appendNotes);
+      if (spec.setNotes !== undefined) args.push('--notes', spec.setNotes);
       args.push('--plain');
       run(args); // non-zero (e.g. unknown id) → BacklogError, never a silent no-op
     },
@@ -276,6 +364,30 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
       // (unknown id, backend error) throws BacklogError — the caller never reports
       // a close it did not perform (023 FR-006/FR-007).
       run(['task', 'edit', id, '-s', BACKLOG_DONE_STATUS, '--plain']);
+    },
+
+    readNotes(id: string): string {
+      const path = taskFilePath(id);
+      if (path === undefined) {
+        throw new BacklogError(`backlog item '${id}' not found — cannot read its notes`);
+      }
+      return extractNotes(readFileSync(path, 'utf8'));
+    },
+
+    archive(id: string): void {
+      // Preserve-not-delete (028 FR-011): backlog.md's `task archive` RELOCATES
+      // the file to backlog/archive/tasks/ (still readable) — never deletes.
+      // But it exits 0 even for an unknown id (a silent no-op), so verify the
+      // live file is actually gone afterward and fail loud otherwise — the caller
+      // never reports an archive it did not perform.
+      const before = taskFilePath(id);
+      if (before === undefined) {
+        throw new BacklogError(`backlog item '${id}' not found — cannot archive`);
+      }
+      run(['task', 'archive', id, '--plain']);
+      if (taskFilePath(id) !== undefined) {
+        throw new BacklogError(`${BACKEND_LABEL} did not relocate '${id}' out of the live store`);
+      }
     },
   };
 }

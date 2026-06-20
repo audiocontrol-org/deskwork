@@ -5,7 +5,7 @@
 // wires the real marker + installation resolver against a fixture.
 
 import { describe, expect, it } from 'vitest';
-import { activeCapabilities, enterFrontDoor, exitFrontDoor } from '../../capability/marker.js';
+import { activeCapabilities, clearMarker, enterFrontDoor, exitFrontDoor, listMarker } from '../../capability/marker.js';
 import { findInstallation } from '../../config/installation.js';
 import { frontDoor, type FrontDoorDeps } from '../../subcommands/front-door.js';
 import { makeCapabilityFixture } from '../fixtures/capability-fixtures.js';
@@ -14,6 +14,8 @@ const stub = (root: string | null): FrontDoorDeps => ({
   resolveRoot: () => root,
   enter: () => 'TOKEN',
   exit: () => {},
+  list: () => ({ corrupt: false, entries: [] }),
+  clear: () => false,
 });
 
 describe('front-door verb (026 T013)', () => {
@@ -42,6 +44,8 @@ describe('front-door verb (026 T013)', () => {
       exit: () => {
         throw new Error('exit dep must not be called when there is no installation');
       },
+      list: () => ({ corrupt: false, entries: [] }),
+      clear: () => false,
     });
     expect(r.code).toBe(0);
   });
@@ -79,6 +83,8 @@ describe('front-door verb (026 T013)', () => {
         resolveRoot: (at) => findInstallation(at)?.root ?? null,
         enter: enterFrontDoor,
         exit: exitFrontDoor,
+        list: listMarker,
+        clear: clearMarker,
       };
       const entered = frontDoor(['enter', '--capability', 'backlog', '--session', 's', '--at', fx.root], deps);
       expect(entered.code).toBe(0);
