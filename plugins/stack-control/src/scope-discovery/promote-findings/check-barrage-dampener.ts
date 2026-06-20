@@ -18,6 +18,13 @@
  */
 
 const BARRAGE_HEADER_RE = /^##\s+\d{4}-\d{2}-\d{2}\s+—\s+audit-barrage\s+lift\s+\(([^)]+)\)/i;
+// specs/029 US2 (FR-007): a lift section over a degraded fleet (produced <
+// configured) carries this marker. A degraded run is NEVER a quiet run — its
+// surviving lanes' absence-of-HIGH is not a clean signal, so the dampener must
+// exclude it from both the consecutive-quiet streak and the single-run-clean
+// rule, regardless of the (possibly 0) HIGH+ count it surfaced. The marker may
+// be wrapped in markdown emphasis (`_…_`); match it anywhere on a line.
+const DEGRADED_MARKER_RE = /Fleet:\s*DEGRADED\b/i;
 const SEVERITY_LINE_RE = /^Severity:\s*(blocking|high|medium|low|informational)\b/i;
 const STATUS_LINE_RE = /^Status:\s*(\S+)/i;
 const ENTRY_HEADER_RE = /^###\s+/;
@@ -40,6 +47,14 @@ export interface BarrageSectionCount {
   /** RAW-surfaced findings with severity === medium (ignores `Status:`; #432). */
   readonly rawMediumCount: number;
   readonly totalFindings: number;
+  /**
+   * specs/029 US2 (FR-007): true when this section was recorded over a DEGRADED
+   * fleet (produced < configured — at least one lane timed-out / killed /
+   * zero-byte). A degraded section is never counted as a quiet run, regardless
+   * of its HIGH+ count: absence of HIGH from the surviving lanes is not a clean
+   * signal when other lanes produced nothing.
+   */
+  readonly degraded: boolean;
 }
 
 export interface BarrageDampenerCheckArgs {
@@ -112,9 +127,11 @@ function countHighPlusInSection(
   let highPlusRaw = 0;
   let mediumRaw = 0;
   let total = 0;
+  let degraded = false;
   let i = section.headerIndex + 1;
   while (i < section.endIndex) {
     const line = lines[i] ?? '';
+    if (DEGRADED_MARKER_RE.test(line)) degraded = true;
     if (!ENTRY_HEADER_RE.test(line)) {
       i += 1;
       continue;
@@ -152,6 +169,7 @@ function countHighPlusInSection(
     rawHighPlusCount: highPlusRaw,
     rawMediumCount: mediumRaw,
     totalFindings: total,
+    degraded,
   };
 }
 
@@ -173,9 +191,11 @@ export function checkBarrageDampener(
   // HIGH+. RAW counts (#432 / AUDIT-20260608-01): a run that surfaced a HIGH
   // then had it fixed between runs is NOT a 0-HIGH run — so two genuinely-clean
   // consecutive barrages are required, not "one clean run after the last fix."
+  // specs/029 US2 (FR-007): a degraded run is NEVER quiet — exclude it from the
+  // streak even when it surfaced 0 HIGH+.
   const consecutiveQuietEngages =
     recentRunCounts.length >= threshold &&
-    recentRunCounts.every((r) => r.rawHighPlusCount === 0);
+    recentRunCounts.every((r) => r.rawHighPlusCount === 0 && !r.degraded);
 
   // Rule 2 — single-run-clean (operator directive 2026-05-31): the MOST RECENT
   // run SURFACED 0 HIGH+ AND 0 MEDIUM. RAW counts (#432): a run whose MEDIUMs
@@ -184,6 +204,7 @@ export function checkBarrageDampener(
   const mostRecent = recentRunCounts[0];
   const singleRunCleanEngages =
     mostRecent !== undefined &&
+    !mostRecent.degraded &&
     mostRecent.rawHighPlusCount === 0 &&
     mostRecent.rawMediumCount === 0;
 
@@ -216,6 +237,16 @@ export function checkBarrageDampener(
         `Not dampened: ${notQuiet.length} of the last ${recentRunCounts.length} ` +
         `runs surfaced HIGH+ findings (most recent non-quiet run: ` +
         `${notQuiet[0]!.runDirBasename} → ${notQuiet[0]!.rawHighPlusCount} HIGH+).`
+      );
+    }
+    // specs/029 US2 (FR-007): a degraded run blocks dampening even at 0 HIGH+.
+    const degradedRuns = recentRunCounts.filter((r) => r.degraded);
+    if (degradedRuns.length > 0) {
+      return (
+        `Not dampened: ${degradedRuns.length} of the last ${recentRunCounts.length} ` +
+        `runs ran over a DEGRADED fleet (most recent: ${degradedRuns[0]!.runDirBasename}) — ` +
+        `0 HIGH+ over killed/timed-out lanes is not a clean signal (FR-007). Re-run with a ` +
+        `healthy fleet to converge.`
       );
     }
     if (mostRecent !== undefined && mostRecent.rawMediumCount > 0) {

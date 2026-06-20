@@ -162,11 +162,11 @@ describe('INDEX fleet report block (T017 / FR-007)', () => {
     const text = renderFleetReportLines(computeFleetReport(results)).join('\n');
     expect(text).toContain('- configured: 2, produced: 1  ⚠ DEGRADED');
     expect(text).toContain(
-      '- codex: completed [enforced, monitored] — completed but non-converged (exit 1, report bytes 28); not counted as produced',
+      '- codex: completed [enforced, monitored] — completed but DEGRADED [nonzero-exit (1)] (exit 1, report bytes 28); not counted as produced',
     );
     // The converged lane keeps its bare line shape.
     expect(text).toContain('- claude: completed [enforced, monitored]');
-    expect(text).not.toMatch(/claude: completed \[enforced, monitored\] — completed but non-converged/);
+    expect(text).not.toMatch(/claude: completed \[enforced, monitored\] — completed but DEGRADED/);
   });
 
   it('renders the fleet block with the quorum line for a healthy single-lane run (AUDIT-20260611-15)', () => {

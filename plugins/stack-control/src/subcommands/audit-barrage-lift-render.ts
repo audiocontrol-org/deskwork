@@ -99,14 +99,32 @@ export function renderQuietSection(date: string, runDirBasename: string): string
   );
 }
 
+/**
+ * specs/029 US2 (FR-007): a fleet snapshot for a section. When `produced <
+ * configured` the section is recorded over a DEGRADED fleet and `renderSection`
+ * stamps a `Fleet: DEGRADED …` marker the convergence dampener reads back to
+ * exclude the run from the quiet streak (a degraded run's 0-HIGH is not clean).
+ */
+export interface SectionFleetStatus {
+  readonly produced: number;
+  readonly configured: number;
+}
+
 export function renderSection(
   findings: readonly ExtractedFinding[],
   date: string,
   startingNn: number,
   runDirBasename: string,
+  fleet?: SectionFleetStatus,
 ): { section: string; assignedIds: readonly string[] } {
   const isoDateStr = isoDate(date);
-  const heading = `## ${isoDateStr} — audit-barrage lift (${runDirBasename})\n\n`;
+  const degradedMarker =
+    fleet !== undefined && fleet.produced < fleet.configured
+      ? `_Fleet: DEGRADED (produced ${fleet.produced} of ${fleet.configured} configured) — ` +
+        `this run is NOT counted as a quiet run by the convergence dampener; 0 HIGH+ over ` +
+        `killed/timed-out lanes is not a clean signal (FR-007)._\n\n`
+      : '';
+  const heading = `## ${isoDateStr} — audit-barrage lift (${runDirBasename})\n\n${degradedMarker}`;
   const assignedIds: string[] = [];
   const entries: string[] = [];
   for (let i = 0; i < findings.length; i += 1) {

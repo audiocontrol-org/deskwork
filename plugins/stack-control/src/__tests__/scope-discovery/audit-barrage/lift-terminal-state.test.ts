@@ -261,12 +261,12 @@ describe('fleet report repeated when degraded (FR-007 / SC-003)', () => {
     // to the fleet's exclusion — a bare "completed" next to "produced: 1
     // of 2" leaves the operator with nothing linking the two.
     expect(err).toMatch(
-      /codex — completed \[enforced, monitored\] — completed but non-converged \(exit 1, report bytes 28\); not counted as produced/,
+      /codex — completed \[enforced, monitored\] — completed but DEGRADED \[nonzero-exit \(1\)\] \(exit 1, report bytes 28\); not counted as produced/,
     );
     // AUDIT-20260611-11: the fleet report block repeats the same annotation
     // on its per-lane line — one vocabulary across all four surfaces.
     expect(err).toContain(
-      '- codex: completed [enforced, monitored] — completed but non-converged (exit 1, report bytes 28); not counted as produced',
+      '- codex: completed [enforced, monitored] — completed but DEGRADED [nonzero-exit (1)] (exit 1, report bytes 28); not counted as produced',
     );
   });
 });
