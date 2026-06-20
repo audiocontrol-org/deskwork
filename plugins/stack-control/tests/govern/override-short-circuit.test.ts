@@ -420,4 +420,48 @@ describe('govern --phase --override writes the per-phase checkpoint (029 US4+US7
       rmSync(fx, { recursive: true, force: true });
     }
   });
+
+  // specs/029 US4 (AUDIT-BARRAGE codex-01 HIGH + claude-01, phase-4 re-govern round 2):
+  // record-first ordering — when the convergence-record write FATALs on a --phase
+  // override, NO phase checkpoint may be left on disk (the half-write that let a later
+  // phase proceed without the FR-018 attribution). The convergence record is written
+  // BEFORE the checkpoint, so a record failure FATALs before the checkpoint is touched.
+  it('a record-write failure on a --phase override leaves NO phase checkpoint (no half-write)', () => {
+    const slug = 'feat';
+    const repo = makePhaseRepo(slug);
+    // Block the convergence-record write: a FILE where the convergence DIR must be.
+    const govDir = join(repo, '.stack-control', 'govern');
+    mkdirSync(govDir, { recursive: true });
+    writeFileSync(join(govDir, 'convergence'), 'not a directory\n');
+    const fx = mkdtempSync(join(tmpdir(), 'gov-override-phase-stub-'));
+    const marker = join(fx, 'barrage-ran.marker');
+    const stub = writeMarkerStub(fx, marker);
+    // phase-1 current so the prior-phase gate doesn't pre-empt the phase-2 override.
+    writePhaseCheckpoint(repo, {
+      version: 1,
+      featureSlug: slug,
+      phaseId: '1',
+      checkpoint: 'phase-1',
+      auditLogSection: 'phase-1',
+      scopeFingerprint: computeScopeFingerprint(repo, ['src/a.ts']),
+      passedAt: '2026-06-13T00:00:00.000Z',
+      governedPaths: ['src/a.ts'],
+    });
+    try {
+      const r = runGovern(
+        ['--mode', 'implement', '--feature', slug, '--at', repo, '--diff-base', 'HEAD~1',
+          '--phase', '2', '--require-models', '1', '--override', 'operator accepts residual'],
+        { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run') },
+      );
+      expect(r.status).not.toBe(0);
+      expect(`${r.stdout}${r.stderr}`).toMatch(/FATAL/);
+      expect(`${r.stdout}${r.stderr}`).not.toMatch(/governed \(overridden\)/);
+      // The crux: NO phase-2 checkpoint was written (record-first ordering).
+      expect(existsSync(checkpointPath(repo, slug, '2'))).toBe(false);
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
 });

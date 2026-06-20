@@ -162,25 +162,28 @@ export async function runSlushFindings(args: string[]): Promise<void> {
   // follows it. Idempotent (already-Done / no-task → no-op), so running it on
   // --apply (the protocol invokes slush only at the loop terminal, FR-014) is
   // safe. A backend close error is fail-loud (exit 1).
-  if (opts.apply) {
-    try {
-      const reconcileBackend = createBacklogBackend({ cwd: backlogRoot(repoRoot) });
-      const rec = reconcileFixedFindings({
-        auditLogText: text,
-        backend: reconcileBackend,
-        featureSlug: opts.feature,
-      });
-      if (rec.reconciled.length > 0) {
-        process.stdout.write(
-          `slush-findings: reconciled ${rec.reconciled.length} fixed finding(s) — closed ${rec.reconciled
-            .map((r) => `${r.taskId} (${r.findingId})`)
-            .join(', ')}\n`,
-        );
-      }
-    } catch (err) {
-      process.stderr.write(`slush-findings: FATAL — auto-reconcile failed: ${errorMessage(err)}\n`);
-      process.exit(1);
+  // AUDIT-BARRAGE claude-04: run reconcile on BOTH paths. On --apply it closes; on a
+  // dry-run it PREVIEWS the would-close set (no mutation) so the dry-run output is
+  // complete — an operator previewing slush sees the reconcile candidates too.
+  try {
+    const reconcileBackend = createBacklogBackend({ cwd: backlogRoot(repoRoot) });
+    const rec = reconcileFixedFindings({
+      auditLogText: text,
+      backend: reconcileBackend,
+      featureSlug: opts.feature,
+      dryRun: !opts.apply,
+    });
+    if (rec.reconciled.length > 0) {
+      const detail = rec.reconciled.map((r) => `${r.taskId} (${r.findingId})`).join(', ');
+      process.stdout.write(
+        opts.apply
+          ? `slush-findings: reconciled ${rec.reconciled.length} fixed finding(s) — closed ${detail}\n`
+          : `slush-findings: [dry-run] would close ${rec.reconciled.length} reconciled task(s) — ${detail}\n`,
+      );
     }
+  } catch (err) {
+    process.stderr.write(`slush-findings: FATAL — auto-reconcile failed: ${errorMessage(err)}\n`);
+    process.exit(1);
   }
 
   const decisionAuditLogText =

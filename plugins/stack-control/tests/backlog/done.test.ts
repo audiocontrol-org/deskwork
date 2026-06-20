@@ -111,6 +111,42 @@ describe('a finding flipping to fixed-<sha> auto-reconciles its task (US4, T025b
     expect(after.find((i) => i.id === id2)?.status).toBe(BACKLOG_DONE_STATUS);
   });
 
+  // specs/029 US4 (AUDIT-BARRAGE claude-04): dryRun computes the would-close set
+  // WITHOUT mutating the backend — the slush dry-run preview path uses it.
+  it('dryRun reports what WOULD close without closing it', () => {
+    const dir = tmpBacklog();
+    const backend = createBacklogBackend({ cwd: dir });
+    const findingId = 'AUDIT-20260619-03';
+    const ref = auditRef('feat', findingId);
+    const id = backend.create({
+      title: 'a parked medium',
+      labels: ['type:migrated-finding', 'feature:feat', `finding:${findingId}`],
+      refs: [ref],
+    });
+    const auditLogText = [
+      '# Audit Log — feat',
+      '',
+      '## 2026-06-19 — audit-barrage lift (run-1-after_clarify)',
+      '',
+      `### ${findingId} — the bug`,
+      '',
+      `Finding-ID: ${findingId}`,
+      'Status:     fixed-abc1234',
+      'Severity:   medium',
+      'Surface:    src/x.ts:1',
+      '',
+      'body',
+      '',
+    ].join('\n');
+
+    const res = reconcileFixedFindings({ auditLogText, backend, featureSlug: 'feat', dryRun: true });
+    // Reports the candidate…
+    expect(res.reconciled.map((r) => r.taskId)).toContain(id);
+    // …but did NOT close it (still open after a dry-run).
+    const item = createBacklogBackend({ cwd: dir }).list().find((i) => i.id === id);
+    expect(item?.status).not.toBe(BACKLOG_DONE_STATUS);
+  });
+
   it('an already-Done or absent task is a no-op (idempotent)', () => {
     const dir = tmpBacklog();
     const backend = createBacklogBackend({ cwd: dir });

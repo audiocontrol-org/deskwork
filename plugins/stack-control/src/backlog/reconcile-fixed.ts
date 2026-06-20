@@ -32,6 +32,13 @@ export interface ReconcileFixedArgs {
   readonly auditLogText: string;
   readonly backend: BacklogBackend;
   readonly featureSlug: string;
+  /**
+   * specs/029 US4 (AUDIT-BARRAGE claude-04): when true, COMPUTE the would-close set
+   * WITHOUT mutating the backend — the dry-run preview path lists what a `--apply`
+   * run would close, so an operator probing dry-run output sees the reconcile
+   * candidates alongside the migration candidates.
+   */
+  readonly dryRun?: boolean;
 }
 
 export interface ReconcileFixedResult {
@@ -60,9 +67,9 @@ export function reconcileFixedFindings(args: ReconcileFixedArgs): ReconcileFixed
     const canonical = canonicalAuditId(entry.findingId);
     const ref = auditRef(args.featureSlug, canonical);
     for (const task of items.filter((item) => item.refs.includes(ref))) {
-      if (closed.has(task.id)) continue; // already closed this run (no double-close)
+      if (closed.has(task.id)) continue; // already counted this run (no double-close)
       if (task.status === BACKLOG_DONE_STATUS) continue;
-      args.backend.close(task.id);
+      if (args.dryRun !== true) args.backend.close(task.id); // preview: compute, don't mutate
       closed.add(task.id);
       reconciled.push({ findingId: canonical, taskId: task.id });
     }
