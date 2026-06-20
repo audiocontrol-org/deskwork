@@ -511,6 +511,7 @@ govern finding-lift has no cross-run dedup, so convergence iterations multiply n
 
 ## multi:feature/govern-operability
 - status: planned
+- analyze-clean: yes
 - spec: specs/029-govern-operability
 - design-approved: yes
 - design: docs/superpowers/specs/2026-06-19-govern-operability-design.md
