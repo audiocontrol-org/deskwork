@@ -35,11 +35,17 @@ across the 027 and 028 dogfoods, each forcing manual overrides or hand-reconcili
    "produced nothing because killed" from "clean, no findings" (timeout-observability), so a
    degraded fleet can be mistaken for convergence.
 
-3. **The loop manufactures backlog noise.** The dampener migrates MEDIUM residuals to the
-   backlog *while those same findings are being fixed in the same loop* (TASK-149/gh-471:
-   TASK-30…35 migrated minutes before being fixed). Each barrage run lifts findings with no
-   cross-run dedup, so convergence iterations multiply near-duplicate tasks (TASK-317/gh-490:
-   028 slushed TASK-303…312, several duplicating in-loop fixes). The two compound.
+3. **The loop manufactures backlog noise — and worse, lifts work that is already done.**
+   The dampener migrates MEDIUM residuals to the backlog *while those same findings are being
+   fixed in the same loop* (TASK-149/gh-471: TASK-30…35 migrated minutes before being fixed).
+   Each barrage run lifts findings with no cross-run dedup, so convergence iterations multiply
+   near-duplicate tasks (TASK-317/gh-490: 028 slushed TASK-303…312, several duplicating in-loop
+   fixes). The two compound. **The sharper invariant the operator named (2026-06-19): an
+   ALREADY-FIXED finding must never be lifted at all** — not in-loop-fixed, not prior-commit
+   fixed, not deduped-after-the-fact. A backlog task created for a finding that is already
+   resolved is pure noise; the lift/slush must consult finding status and skip anything already
+   `fixed-<sha>` before it ever creates a task. Dedup (TASK-317) is the safety net; not-lifting
+   the fixed in the first place is the fix.
 
 4. **Per-phase scoping raises false HIGHs from harness input, not code.** Per-phase diff
    scoping fed only part of a phase's changed files (TASK-263: only the test file, not the
@@ -50,7 +56,18 @@ across the 027 and 028 dogfoods, each forcing manual overrides or hand-reconcili
    normalize import, the extend gate — all present, all flagged absent, each forcing an
    override).
 
-5. **Shared-file features pay O(n²) to govern.** The per-phase checkpoint fingerprints
+5. **The override — the sanctioned escape from ringing — itself fires another audit round.**
+   When the barrage is ringing at diminishing returns (problem 1) the operator records a
+   `--override` to *stop* auditing and graduate. But `convergence-loop.ts:20-25` documents the
+   current design verbatim: govern "routes it through the gate so an overridden run **still
+   produces a barrage record** … the gate records the reason … and returns OPEN → the driver
+   sees converged." So the override runs a **full render→barrage→lift→slush pass first**, then
+   graduates. That is the exact opposite of the operator's intent: an override exists precisely
+   to *not* run another round, yet the override path always runs one (TASK-318, operator
+   2026-06-19). It also re-triggers problem 3 — that final spurious pass lifts findings nobody
+   will act on.
+
+6. **Shared-file features pay O(n²) to govern.** The per-phase checkpoint fingerprints
    whole-file content, so a later phase editing an earlier phase's file re-stales the earlier
    checkpoint; the all-earlier-checkpoints-current gate then forces re-governing 1..N−1 at
    each new phase (TASK-289: 027 phases 2/3/4 all edit roadmap.ts/roadmap-command.ts). The
@@ -120,16 +137,26 @@ Per-axis design alternatives (the levers each phase chooses among — decisions 
   a govern ordering/mode that tolerates later-phase edits; (c) document govern-at-end for
   shared-file features. Chosen: (a) as the structural fix (keeps per-phase O(n)); (c) is
   partially delivered by P6's full-audit opt-in.
-- **Dampener-in-loop (P4).** (a) defer MEDIUM migration to loop terminal; (b) auto-reconcile a
-  backlog task when its finding flips `fixed-<sha>`; (c) add a `backlog done` verb. Chosen: all
-  three — they are the same surface and together close the noise loop.
+- **Lift hygiene — never lift the already-done (P4).** (a) skip any finding already
+  `fixed-<sha>` before creating a task (the operator's invariant); (b) defer MEDIUM migration to
+  loop terminal; (c) auto-reconcile a backlog task when its finding flips `fixed-<sha>`; (d) add
+  a `backlog done` verb; (e) cross-run signature dedup as the safety net. Chosen: all five —
+  same surface; (a) is the primary fix, the rest catch the residue.
+- **Override is terminal — it must not run another round (P4).** (a) short-circuit: when
+  `--override` is supplied, govern records the reason and graduates, firing NO
+  render→barrage→lift→slush pass at all; (b) status quo (route through the gate, which runs a
+  full pass then returns OPEN); (c) persistent override marker keyed to the audited fingerprint
+  so *every* later invocation on unchanged code graduates without re-auditing, invalidated only
+  when the code changes. Chosen: (a) as the load-bearing fix (it directly removes the spurious
+  round); (c) considered as a stronger follow-on (open question). (b) is the current defect and
+  is rejected.
 
 ## Decisions
 
 1. **One feature, nine phases, sharpen-the-saw order** (shape A). Phase order: P1 fleet
-   reliability → P2 observability → P3 determinism → P4 dampener-in-loop + lift dedup → P5
-   payload-scoping correctness → P6 granularity switch → P7 hunk-fingerprint → P8 process
-   discipline → P9 027 hygiene.
+   reliability → P2 observability → P3 determinism → P4 loop hygiene (never-lift-fixed +
+   dampener-in-loop + dedup + override-is-terminal) → P5 payload-scoping correctness → P6
+   granularity switch → P7 hunk-fingerprint → P8 process discipline → P9 027 hygiene.
 2. **Granularity: either-of graduate gate, default stays per-phase** (operator decision
    2026-06-19). The gate graduates on `all-phase-checkpoints-current` **OR** whole-feature
    `record-converged`; full-audit-at-end becomes the opt-in escape hatch. Because per-phase
@@ -148,17 +175,29 @@ Per-axis design alternatives (the levers each phase chooses among — decisions 
    flag as an open question, do not silently drop opus.
 6. **Out-of-window false alarms = widen payload to referenced deps + teach the prompt**
    (combine levers).
-7. **Dampener-in-loop = defer-to-terminal + auto-reconcile-on-fixed + `backlog done` verb**;
-   **lift dedup = finding-signature dedup across prior runs and in-loop fixes** (TASK-317).
-   Define the finding signature once and share it between the dampener identity-key (P3) and
-   the lift dedup (P4).
-8. **Degraded fleet is never convergence** (P2): a SIGTERMed/timed-out/zero-byte lane is
+7. **Lift hygiene (P4) — operator friction (a), 2026-06-19.** Primary invariant: **never lift a
+   finding that is already `fixed-<sha>`** (in-loop or prior-commit) — the lift/slush consults
+   finding status and skips the done before it creates any task. Supporting: defer MEDIUM
+   migration to loop terminal (TASK-149); auto-reconcile a backlog task when its finding flips
+   `fixed-<sha>`; add a `backlog done` verb; cross-run finding-signature dedup as the safety net
+   (TASK-317). Define the finding signature once and share it between the dampener identity-key
+   (P3) and the lift dedup (P4).
+8. **Override is terminal (P4) — operator friction (b), 2026-06-19 (TASK-318).** When
+   `--override` is supplied, govern **short-circuits the barrage entirely**: record the override
+   reason in the audit trail and graduate, firing NO render→barrage→lift→slush pass. The current
+   "route through the gate, run a full pass, then return OPEN" behavior
+   (`convergence-loop.ts:20-25`) is the defect and is removed. The override is the sanctioned
+   diminishing-returns escape (`.claude/rules/spec-audit-diminishing-returns.md`); it must
+   actually escape, not buy one more round. Whether the override also *persists* (fingerprint-
+   keyed, so later invocations on unchanged code also skip the barrage) is an open question;
+   the short-circuit is the load-bearing fix regardless.
+9. **Degraded fleet is never convergence** (P2): a SIGTERMed/timed-out/zero-byte lane is
    surfaced at synthesis and lift, and a run with a degraded lane does not count as a quiet
    run for the dampener.
-9. **027 hygiene is in scope** (P9), bundled last because it is independent and low-stakes;
-   tooling-feedback guidance (TASK-294) is corrected to route adopter friction to GitHub issues
-   against `audiocontrol-org/deskwork`.
-10. **TDD-first, governed per phase** at each `tasks.md` phase boundary; commit + push per
+10. **027 hygiene is in scope** (P9), bundled last because it is independent and low-stakes;
+    tooling-feedback guidance (TASK-294) is corrected to route adopter friction to GitHub issues
+    against `audiocontrol-org/deskwork`.
+11. **TDD-first, governed per phase** at each `tasks.md` phase boundary; commit + push per
     boundary; no protocol shortcuts. The granularity opt-in (P6) does not change *this*
     feature's governance cadence (per-phase as we build).
 
@@ -174,8 +213,11 @@ turn each into RED-first tasks:
   count.
 - **P3** `scope-discovery/promote-findings/check-barrage-dampener.ts`, `cluster-severity.ts`,
   `adjudicate-findings.ts`, `extract-barrage-findings.ts` (finding signature/identity).
-- **P4** `subcommands/slush-findings.ts`, `govern/convergence-loop.ts`,
-  `subcommands/audit-barrage-lift.ts`, `backlog/` (new `done` verb).
+- **P4** `subcommands/slush-findings.ts` (skip already-`fixed-<sha>`; defer-to-terminal),
+  `subcommands/audit-barrage-lift.ts` (lift status check + signature dedup), `backlog/` (new
+  `done` verb + auto-reconcile-on-fixed), `govern/convergence-loop.ts` + `convergence-types.ts`
+  + `govern.ts` override path (short-circuit the barrage when `--override` is supplied — today
+  `convergence-loop.ts:20-25` runs a full pass then returns OPEN).
 - **P5** `govern/incremental-audit.ts`, `subcommands/govern.ts` (diff-base / union of phase
   commits), `payload-implement.ts`, the audit prompt template.
 - **P6** `templates/WORKFLOW.md` gate semantics, `workflow/gate-eval.ts`
@@ -207,7 +249,13 @@ Resolved during `/speckit-clarify` / `/speckit-plan`, not blocking design approv
    gate-count, and how it interacts with the existing 2-consecutive-quiet threshold.
 5. **`--json` codex extractor (P1).** Deferred; reconsider only if `model_reasoning_summary`
    pulses prove insufficient on real payloads.
-6. **Phase boundary sizing for P5/P7.** These edit shared govern internals; sequence their
+6. **Override persistence (P4).** Decision 8 mandates the short-circuit (an override never runs
+   a barrage round). Should it also *persist* — a fingerprint-keyed override marker so every
+   later govern invocation on unchanged code graduates without re-auditing, invalidated when the
+   code changes? The short-circuit alone fixes the named friction; persistence is a stronger
+   property to weigh in `/speckit-clarify` (it interacts with the P7 hunk-fingerprint and the
+   P6 either-of gate).
+7. **Phase boundary sizing for P5/P7.** These edit shared govern internals; sequence their
    tasks so the feature's own per-phase checkpoints don't thrash before P7's fix lands (eat our
    own dogfood deliberately, document it).
 
@@ -224,7 +272,12 @@ Resolved during `/speckit-clarify` / `/speckit-plan`, not blocking design approv
   (commit a366533f).
 - **Backlog tasks (the defect census, 2026-06-19):** TASK-60 (gh-453), TASK-145, TASK-146
   (gh-482), TASK-149 (gh-471), TASK-154, TASK-263, TASK-288, TASK-289, TASK-290, TASK-291,
-  TASK-292, TASK-293, TASK-294 (gh-488), TASK-316, TASK-317 (gh-490).
+  TASK-292, TASK-293, TASK-294 (gh-488), TASK-316, TASK-317 (gh-490), TASK-318
+  (operator-override-triggers-another-round; filed 2026-06-19).
+- **Operator friction follow-ups (2026-06-19):** (a) already-fixed audit items must never be
+  lifted into the backlog — sharpened into P4 decision 7 (the never-lift-fixed invariant atop
+  TASK-149 + TASK-317); (b) an operator override must not cause another audit round — captured
+  as P4 decision 8 + TASK-318 (short-circuit the barrage on `--override`).
 - **Shipped prior art (do not re-plan):** specs/015-audit-protocol-convergence (35/35 done —
   severity agreement, code loop driver, payload drop, per-phase units, sonnet re-admit, raw
   guard); specs/021-audit-protocol-friction-burndown (32/32 done — checkpoint enforcement,
