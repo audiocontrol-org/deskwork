@@ -233,6 +233,15 @@ export function recordGovernConvergence(
   // artifact — FR-017 fires zero barrage).
   overrideReason?: string,
 ): string {
+  // AUDIT-BARRAGE claude-02: the write boundary is self-enforcing — reject a blank
+  // overrideReason HERE so the function can never persist a record the read-side
+  // `validate` would reject (a write-what-you-can't-read corruption window). Callers
+  // already guard, but the public signature must not depend on every caller doing so.
+  if (overrideReason !== undefined && overrideReason.trim().length === 0) {
+    throw new Error(
+      'recordGovernConvergence: overrideReason must be a non-empty (non-whitespace) string when present',
+    );
+  }
   return writeGovernConvergenceRecord(installationRoot, {
     version: 1,
     mode,

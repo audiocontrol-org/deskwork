@@ -165,6 +165,13 @@ export async function runSlushFindings(args: string[]): Promise<void> {
   // AUDIT-BARRAGE claude-04: run reconcile on BOTH paths. On --apply it closes; on a
   // dry-run it PREVIEWS the would-close set (no mutation) so the dry-run output is
   // complete — an operator previewing slush sees the reconcile candidates too.
+  // AUDIT-BARRAGE claude-05: reconcile is DELIBERATELY holistic — it reads the FULL
+  // audit log (`text`), NOT the `--checkpoint`-scoped slice the slush pass uses. A
+  // `fixed-<sha>` finding's burn-down task must close whenever reconcile runs,
+  // regardless of which checkpoint a slush pass targets (FR-015: "ANY backlog task
+  // that referenced that finding"); scoping it would leave a fixed finding's task open
+  // just because the slush ran against a different checkpoint. The stderr line below
+  // names every task closed, so the holistic effect is visible.
   try {
     const reconcileBackend = createBacklogBackend({ cwd: backlogRoot(repoRoot) });
     const rec = reconcileFixedFindings({
