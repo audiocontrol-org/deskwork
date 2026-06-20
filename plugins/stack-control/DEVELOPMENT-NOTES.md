@@ -2,21 +2,30 @@
 
 ---
 
-## 2026-06-20: <!-- session title -->
+## 2026-06-20: govern-operability (029) — P1 MVP (US1–US4) graduated, reconciled, shipped to main (PR #493); phase-4 override/two-write entanglement resolved
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Continue 029 from session 1's handoff (the "FR-017 regression" + ungoverned Phase 4): drive Phase 4 (US4) governance to completion, graduate the P1 MVP, and ship.
 
 **Accomplished:**
-- <!-- compose -->
+- The session-1 "FR-017 regression" was a **mirage**: `stackctl` resolved to the INSTALLED 0.52.0 cache, not my source — the source override short-circuit was correct all along. Switched to `./bin/stackctl` (source engine) for the rest of the burndown (operator decision).
+- **Phase 4 (US4) graduated** through a **4-round cross-model audit-barrage** that surfaced — and I fixed RED-first — a deep chain of real defects on the override/graduation paths: re-report `Tracked-by:` canonical pointers (FR-016 traceability), dedup-persistent-HIGH false-pristine (FR-016), durable override attribution (FR-018), empty/no-node override FATAL + impossible-record-state validator, **record-write-failure FATAL (CLI ⟺ durable gate signal)**, env-var override guard, reconcile-close-all + double-close-safe, and **record-first two-write ordering** with accurate per-write FATAL messages.
+- **Phases 2/3 override-refreshed** (substantive FR-018, operator-authorized) past a cross-phase scope artifact — the delegated phase-4 modules (`loop-hygiene`, `record-no-new-findings`) absent from the narrow phase-2/3 `--phase` diff; the codex lane confirmed the own-phase work clean both rounds.
+- **Dogfooded the US4 loop-hygiene mechanism**: marked the 17 already-fixed lifted findings `fixed-<sha>` → `slush-findings --apply` reconcile auto-closed their 14 backlog tasks (the claude-04 dry-run preview confirmed them first). Full suite 2344 passing.
+- **Opened PR #493** (feature/stack-control → main) and **merged it green** (CI `test` pass, mergeStateStatus CLEAN) — the P1 MVP is on `main`.
 
 **Didn't Work:**
-- <!-- compose -->
+- **Two-write atomicity (convergence record + phase checkpoint) was a diminishing-returns plateau**: every ordering fix exposed the *inverse* half-write under a new finding ID (round 2 → round 3). Detected the plateau per the `spec-audit-diminishing-returns` rule and stopped at the convergent structural fix (record-first + accurate messaging + non-advancing failure), NOT a true 2-file transactional commit (mechanism beyond US4's promise).
+- The **bash safety-classifier was intermittently unavailable** for a stretch (blocked every shell command); worked around by batching Edits (no classifier needed) and retrying — surfaced as two "are you stalled?" operator pings.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Refused to override-refresh phases 2/3 until I'd confirmed it was the codex-clean scope artifact (not real unaudited work); surfaced the override decision to the operator rather than stamping it — per "no offroading / don't lower the gate to keep moving."
+- [PROCESS] At the ~24-lifted-MEDIUM/LOW-findings volume, surfaced the (reconcile-fixed / burn-all / defer) fork to the operator rather than blindly chasing the MEDIUM/LOW generator (diminishing-returns). Operator chose reconcile-fixed-then-US5.
+- [PROCESS] Set the session-end boundary explicitly (`--since 3c0aeee7`) because the PR merge made `feature/stack-control` an ancestor of `main` (the default merge-base boundary would compute empty).
 
 **Insights:**
-- <!-- compose -->
+- The two-write durable-state problem has **no clean ordering** — every order leaves a half-write window on one side. The resolution is not transactional 2-file atomicity (the generator) but ordering so the failure is *non-advancing* + an *accurate* message: record-first keeps the `governing → shipped` gate fail-closed via `all-phase-checkpoints-current`. Same "promises before mechanism" lesson the spec-audit rule names, applied to code.
+- **Cross-model DISagreement is as informative as agreement**: the persistent phase-2/3 HIGH was the claude lane unable to see a delegated phase-4 module from the narrow diff while the codex lane (walking the same consumers) was clean — a diff-visibility scope artifact, not a defect. **US5 payload-scoping is the engineered fix for exactly this** (and the friction recurred enough to validate US5's priority).
+- The feature kept **dogfooding itself**: the override short-circuit, the loop-hygiene reconcile, and the dry-run reconcile preview were each exercised live to close out their own feature's findings.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 10
