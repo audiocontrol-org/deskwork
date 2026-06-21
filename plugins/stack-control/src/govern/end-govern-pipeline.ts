@@ -109,12 +109,14 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
   let auditIds = partition.chunks.map((c) => c.id);
   let openFindings: readonly Finding[] = [];
   const fixCommits: string[] = [];
+  const raisedById = new Map<string, Finding>(); // every finding raised in any round (R9 close-before-lift)
   let terminal: WholeFeatureConvergenceRecord['outcome'] | null = null;
 
   for (;;) {
     const toAudit = partition.chunks.filter((c) => auditIds.includes(c.id));
     const audited = await Promise.all(toAudit.map(async (chunk) => ({ chunk, result: await auditOne(chunk) })));
     openFindings = audited.flatMap((a) => [...a.result.findings]);
+    for (const f of openFindings) raisedById.set(f.id, f);
 
     if (openFindings.length === 0) break; // clean / dampened → proceed to SEAM
     if (deps.applyFixes === undefined) {
@@ -161,7 +163,13 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
     fileDiffs: scope.fileDiffs,
   });
 
-  // RECONCILE (once) — single whole-feature record. close-in-loop-before-lift (US6) refines lifted/closed.
+  // RECONCILE (once) — partition findings (R9, FR-016): findings raised earlier but
+  // ABSENT from the final state were fixed in-loop ⇒ CLOSED (not lifted); findings
+  // still open at graduation ⇒ LIFTED. The two sets are disjoint by construction.
+  const stillOpenIds = new Set(openFindings.map((f) => f.id));
+  const liftedFindings = [...new Map(openFindings.map((f) => [f.id, f])).values()];
+  const closedInLoopFindings = [...raisedById.values()].filter((f) => stillOpenIds.has(f.id) === false);
+
   const outcome: WholeFeatureConvergenceRecord['outcome'] =
     terminal !== null ? terminal : openFindings.length === 0 && seamResult.findings.length === 0 ? 'converged' : 'override-eligible';
 
@@ -173,8 +181,8 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
     headSha: input.head,
     chunkIds: partition.chunkIds,
     rounds: round,
-    liftedFindings: [...openFindings],
-    closedInLoopFindings: [],
+    liftedFindings,
+    closedInLoopFindings,
     seamResult,
     splitClusterRefs: partition.splitClusterMarkers.map((m) => m.clusterId),
     outcome,

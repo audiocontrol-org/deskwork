@@ -193,13 +193,13 @@ description: "Task list for Chunked whole-feature end-govern"
 
 ### Tests for User Story 6 (RED first) ⚠️
 
-- [ ] T055 [P] [US6] RED: `src/govern/__tests__/reconcile-once.test.ts` — assert exactly ONE `WholeFeatureConvergenceRecord` per feature is written at reconcile, with `closedInLoopFindings` and `liftedFindings` disjoint (FR-015, US6 Scenario 3, data-model validation); FAIL.
-- [ ] T056 [P] [US6] RED: `src/govern/__tests__/close-in-loop-before-lift.test.ts` — assert a finding fixed within the re-audit loop is closed BEFORE lift and NOT lifted as open, while a still-open finding IS lifted (FR-016, SC-005, US6 Scenarios 1-2); FAIL.
+- [x] T055 [P] [US6] RED: `src/govern/__tests__/reconcile-once.test.ts` — assert exactly ONE `WholeFeatureConvergenceRecord` per feature is written at reconcile, with `closedInLoopFindings` and `liftedFindings` disjoint (FR-015, US6 Scenario 3, data-model validation); FAIL.
+- [x] T056 [P] [US6] RED: `src/govern/__tests__/close-in-loop-before-lift.test.ts` — assert a finding fixed within the re-audit loop is closed BEFORE lift and NOT lifted as open, while a still-open finding IS lifted (FR-016, SC-005, US6 Scenarios 1-2); FAIL.
 
 ### Implementation for User Story 6
 
-- [ ] T057 [US6] Change `src/govern/audit-barrage-lift.ts` / `src/govern/loop-hygiene.ts` so in-loop-fixed findings (absent from the clean/dampened final round) are closed before `partitionLiftableFindings` runs — absorbs `govern-lift-auto-close-in-loop-fixes` (R9); make T056 pass.
-- [ ] T058 [US6] Change `src/govern/convergence-record.ts` to write the single whole-feature record (fields per data-model: `governedShaBase`, `headSha`, `chunkIds`, `rounds`, `liftedFindings`, `closedInLoopFindings`, `seamResultRef`, `splitClusterRefs`, `outcome`); wire the single RECONCILE call in `end-govern-pipeline.ts`; make T055 pass.
+- [x] T057 [US6] Change `src/govern/audit-barrage-lift.ts` / `src/govern/loop-hygiene.ts` so in-loop-fixed findings (absent from the clean/dampened final round) are closed before `partitionLiftableFindings` runs — absorbs `govern-lift-auto-close-in-loop-fixes` (R9); make T056 pass.
+- [x] T058 [US6] Change `src/govern/convergence-record.ts` to write the single whole-feature record (fields per data-model: `governedShaBase`, `headSha`, `chunkIds`, `rounds`, `liftedFindings`, `closedInLoopFindings`, `seamResultRef`, `splitClusterRefs`, `outcome`); wire the single RECONCILE call in `end-govern-pipeline.ts`; make T055 pass.
 
 **Checkpoint**: Single record per feature; the in-loop lift balloon is eliminated for end-govern.
 

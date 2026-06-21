@@ -7,6 +7,11 @@
 //
 // Entities trace to specs/030-chunked-end-govern/data-model.md.
 
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { convergenceRecordPath } from './convergence-record.js';
+
 /** A single audited finding (minimal shape; reconciled with the lift surface in US6). */
 export interface Finding {
   readonly id: string;
@@ -219,6 +224,38 @@ export function validateSeamResult(value: unknown): SeamResult {
     };
   });
   return { boundaryPairs, findings, suppressedCompatible: reqNumber(r, 'suppressedCompatible', 'SeamResult') };
+}
+
+// --- whole-feature convergence record IO (FR-015: exactly one per feature) ---
+
+/**
+ * Write the single whole-feature convergence record for a feature, atomically
+ * (temp + rename), installation-anchored under the existing `mode__item.json`
+ * path scheme (data-model § WholeFeatureConvergenceRecord). The path scheme is
+ * one-per-(mode,item), so a re-reconcile OVERWRITES — never appends (FR-015).
+ */
+export function writeWholeFeatureConvergenceRecord(
+  installationRoot: string,
+  record: WholeFeatureConvergenceRecord,
+): string {
+  const path = convergenceRecordPath(installationRoot, 'impl', record.item);
+  mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.${randomUUID()}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`);
+  renameSync(tmp, path);
+  return path;
+}
+
+/** Read + validate the whole-feature convergence record for a feature; throws if absent/malformed. */
+export function readWholeFeatureConvergenceRecord(
+  installationRoot: string,
+  item: string,
+): WholeFeatureConvergenceRecord {
+  const path = convergenceRecordPath(installationRoot, 'impl', item);
+  if (existsSync(path) === false) {
+    throw new Error(`govern: no whole-feature convergence record at ${path} (item '${item}')`);
+  }
+  return validateWholeFeatureConvergenceRecord(JSON.parse(readFileSync(path, 'utf8')));
 }
 
 /** Validate a WholeFeatureConvergenceRecord, throwing on a missing/invalid field. */
