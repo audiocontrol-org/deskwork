@@ -49,12 +49,12 @@ description: "Task list for Chunked whole-feature end-govern"
 
 **⚠️ CRITICAL**: No user-story work begins until this phase is complete.
 
-- [ ] T004 RED: write `src/govern/__tests__/chunk-artifacts.schema.test.ts` asserting the typed schemas for Chunk, ChunkManifest, SplitClusterMarker, TouchedSet, SeamResult, WholeFeatureConvergenceRecord (per data-model.md) reject missing-required-field and accept a valid fixture; watch it FAIL (schemas absent).
-- [ ] T005 Implement the entity type definitions + schema validators in `src/govern/chunk-artifacts.ts` (read/write/schema for chunk-set, split-cluster, touched-set, seam, convergence record; installation-anchored under `.stack-control/`, atomic temp+rename matching `convergence-record.ts:35`); make T004 pass.
-- [ ] T006 RED: write `src/govern/cluster-payload/__tests__/chunk-id.test.ts` asserting chunk id = stable hash of the sorted file-path set and is identical across two runs over the same `governedSha`..HEAD endpoints (FR-004, R3); watch it FAIL.
-- [ ] T007 Implement `src/govern/cluster-payload/chunk-id.ts` (deterministic stable hash pinned to `governedSha`..HEAD); make T006 pass.
-- [ ] T008 RED: write `src/govern/cluster-payload/__tests__/envelope-measure.test.ts` asserting the rendered-payload byte-measurement primitive (the envelope currency from `phase-boundary-sizing.ts`) is callable WITHOUT a `phaseId` and returns rendered bytes for a chunk/seam id (research Tension 2 — keep the measurement primitive; rekey off `phaseId`); watch it FAIL.
-- [ ] T009 Rekey the envelope-measurement primitive in `src/govern/phase-boundary-sizing.ts` so it measures rendered bytes for a chunk/seam id (not a `phaseId`), preserving the measurement while decoupling it from the deleted per-phase concept (research Tension 1 + 2); make T008 pass.
+- [x] T004 RED: write `src/govern/__tests__/chunk-artifacts.schema.test.ts` asserting the typed schemas for Chunk, ChunkManifest, SplitClusterMarker, TouchedSet, SeamResult, WholeFeatureConvergenceRecord (per data-model.md) reject missing-required-field and accept a valid fixture; watch it FAIL (schemas absent).
+- [x] T005 Implement the entity type definitions + schema validators in `src/govern/chunk-artifacts.ts` (read/write/schema for chunk-set, split-cluster, touched-set, seam, convergence record; installation-anchored under `.stack-control/`, atomic temp+rename matching `convergence-record.ts:35`); make T004 pass.
+- [x] T006 RED: write `src/govern/cluster-payload/__tests__/chunk-id.test.ts` asserting chunk id = stable hash of the sorted file-path set and is identical across two runs over the same `governedSha`..HEAD endpoints (FR-004, R3); watch it FAIL.
+- [x] T007 Implement `src/govern/cluster-payload/chunk-id.ts` (deterministic stable hash pinned to `governedSha`..HEAD); make T006 pass.
+- [x] T008 RED: write `src/govern/cluster-payload/__tests__/envelope-measure.test.ts` asserting the rendered-payload byte-measurement primitive (the envelope currency from `phase-boundary-sizing.ts`) is callable WITHOUT a `phaseId` and returns rendered bytes for a chunk/seam id (research Tension 2 — keep the measurement primitive; rekey off `phaseId`); watch it FAIL.
+- [x] T009 Rekey the envelope-measurement primitive in `src/govern/phase-boundary-sizing.ts` so it measures rendered bytes for a chunk/seam id (not a `phaseId`), preserving the measurement while decoupling it from the deleted per-phase concept (research Tension 1 + 2); make T008 pass.
 
 **Checkpoint**: Schemas, deterministic id, and the rekeyed envelope-measurement primitive exist — partitioner + pipeline + gate work can begin.
 

@@ -21,7 +21,7 @@ describe('actual payload fit against the fleet envelope (T013/T014)', () => {
     const m = measureBoundaryFit('2', 50, 100);
     expect(m).toEqual({
       version: 1,
-      phaseId: '2',
+      id: '2',
       measuredPromptBytes: 50,
       activeFleetEnvelopeBytes: 100,
       disposition: 'fits',
@@ -44,7 +44,7 @@ describe('actual payload fit against the fleet envelope (T013/T014)', () => {
       err = e;
     }
     expect(err).toBeInstanceOf(BoundaryTooLargeError);
-    expect((err as BoundaryTooLargeError).phaseId).toBe('phase-3');
+    expect((err as BoundaryTooLargeError).id).toBe('phase-3');
     expect((err as BoundaryTooLargeError).measuredPromptBytes).toBe(4096);
     expect((err as BoundaryTooLargeError).activeFleetEnvelopeBytes).toBe(1024);
     expect((err as Error).message).toMatch(/exceeding the active fleet envelope 1024/);
