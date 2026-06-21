@@ -51,16 +51,10 @@ function ctxFor(f: UnskippableFixture, implRecordConverged: boolean): GateContex
   };
 }
 
-describe('US6 either-of graduate gate (FR-023/024)', () => {
-  it('graduates via the DEFAULT per-phase path (all checkpoints current, no whole-feature record)', () => {
-    const f = threePhase();
-    f.checkpointPhase('1');
-    f.checkpointPhase('2');
-    f.checkpointPhase('3');
-    expect(evaluateCriterion(GRADUATE, ctxFor(f, false))).toBe(true);
-  });
-
-  it('graduates via the OPT-IN whole-feature record path (no per-phase checkpoints)', () => {
+describe('030 US2 — graduate gate is the single whole-feature record criterion (FR-018)', () => {
+  // 030 US2: the per-phase "default path" is DELETED — per-phase checkpoints no longer
+  // graduate. The gate is solely the converged whole-feature convergence record.
+  it('graduates via the whole-feature record (no per-phase checkpoints)', () => {
     const f = threePhase();
     // No per-phase checkpoints; a converged whole-feature record is the opt-in escape.
     expect(evaluateCriterion(GRADUATE, ctxFor(f, true))).toBe(true);

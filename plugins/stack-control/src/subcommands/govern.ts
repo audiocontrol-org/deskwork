@@ -157,7 +157,6 @@ interface GovernFlags {
   specPath?: string;
   planPath?: string;
   checkpoint?: string;
-  phase?: string;
   help: boolean;
 }
 
@@ -173,7 +172,6 @@ const VALUED = new Set([
   '--spec-path',
   '--plan-path',
   '--checkpoint',
-  '--phase',
 ]);
 
 function parseFlags(argv: readonly string[]): { ok: true; flags: GovernFlags } | { ok: false; error: string } {
@@ -207,7 +205,6 @@ function parseFlags(argv: readonly string[]): { ok: true; flags: GovernFlags } |
       else if (tok === '--spec-path') flags.specPath = value;
       else if (tok === '--plan-path') flags.planPath = value;
       else if (tok === '--checkpoint') flags.checkpoint = value;
-      else if (tok === '--phase') flags.phase = value;
       continue;
     }
     return { ok: false, error: `unknown flag: ${tok}` };
@@ -789,105 +786,27 @@ export async function runGovern(args: string[]): Promise<void> {
     // loop — so a per-phase override can write the SAME `phase-<id>` checkpoint a
     // normal graduation would, while still firing ZERO render/barrage/lift/slush. It
     // does NO barrage work (it resolves the unit + the prior-phase staleness gate).
+    // 030 US2 (FR-018/FR-023, clean break): implement-mode governs the WHOLE committed
+    // feature diff (governedSha..HEAD) as ONE end-of-feature audit unit — no per-phase
+    // invocation, no per-phase checkpoints, no exclusion-based composition carry. The
+    // `--phase` arm and the carried-phase composition arm are DELETED; the chunking that
+    // keeps the whole-feature payload within the fleet envelope lives in the end-govern
+    // pipeline (src/govern/end-govern-pipeline.ts).
     let phaseUnit: AuditUnit | undefined;
     let payloadPathScope: readonly string[] | undefined;
-    let phaseCheckpointStatuses: readonly PhaseCheckpointStatus[] | undefined;
-    // The canonical checkpoint namespace key (AUDIT codex-01/claude-02): derived from the
-    // resolved feature ROOT via featureCheckpointKey — the SAME spec-anchored key the US1
-    // gate reads under, NOT the (possibly branch/explicit) `slug`. Set where `root` resolves.
-    let phaseCheckpointKey: string | undefined;
-    // US1 true-composition (operator decision 2026-06-14): whole-feature govern
-    // EXCLUDES the files of converged-and-unchanged phases from the payload (it
-    // carries them) — absolute paths threaded into the assembler's excludePaths.
-    let compositionExcludePaths: readonly string[] = [];
-    if (flags.mode === 'implement' && flags.phase !== undefined) {
+    const compositionExcludePaths: readonly string[] = [];
+    if (flags.mode === 'implement') {
       const { root } = await resolveGovernFeatureRoot(repoRoot, slug);
-      if (root === undefined) {
-        throw new GovernProtocolError(
-          `govern: FATAL — --phase given but feature '${slug}' root not found (cannot resolve tasks.md).`,
-        );
-      }
-      const tasksPath = join(root, 'tasks.md');
-      if (!existsSync(tasksPath)) {
-        throw new GovernProtocolError(
-          `govern: FATAL — --phase given but tasks.md not found at ${tasksPath}.`,
-        );
-      }
-      const explicitBase = flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE);
-      phaseCheckpointKey = featureCheckpointKey(root);
-      phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, phaseCheckpointKey, tasksPath);
-      assertPriorPhaseCheckpointsCurrent(phaseCheckpointStatuses, flags.phase);
-      // 029 US5 (FR-020): resolve the diff-base to the PRE-PHASE commit — the
-      // governed HEAD of the latest prior phase — so the payload audits the UNION
-      // of this phase's changed files across ALL its commits, not just the HEAD~1
-      // delta (the TASK-263 "diff omits the fix" under-scope). An explicit
-      // --diff-base / GOVERN_DIFF_BASE WINS over the auto anchor (operator intent +
-      // the escape when a prior governedSha is unreliable); HEAD~1 is the last resort
-      // (phase 1, or a pre-US5 prior checkpoint with no governedSha).
-      const diffBase = resolvePrePhaseDiffBase({
-        phaseId: flags.phase,
-        orderedPhaseIds: phaseCheckpointStatuses.map((status) => status.phaseId),
-        governedShaByPhase: new Map(
-          phaseCheckpointStatuses.map((status) => [status.phaseId, status.governedSha]),
-        ),
-        ...(explicitBase !== undefined ? { explicitBase } : {}),
-        // AUDIT-20260621-08: verify a recorded governedSha still resolves before
-        // handing it to git diff — a stale anchor degrades to an empty payload.
-        isResolvable: (ref) => gitRefResolves(repoRoot, ref),
-        fallbackBase: 'HEAD~1',
-      });
-      phaseUnit = resolvePhaseUnit({ tasksPath, phaseId: flags.phase, diffBase });
-      payloadPathScope = normalizeGovernedPaths(repoRoot, phaseUnit.diffScope.files);
-      if (payloadPathScope.length === 0) {
-        throw new GovernProtocolError(
-          `govern: FATAL — phase '${flags.phase}' resolved to an empty path scope; refine tasks.md boundaries before governing this phase.`,
-        );
-      }
-    } else if (flags.mode === 'implement') {
-      const { root } = await resolveGovernFeatureRoot(repoRoot, slug);
-      if (root !== undefined) {
-        const tasksPath = join(root, 'tasks.md');
-        if (existsSync(tasksPath)) {
-          const diffBase =
-            flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
-          phaseCheckpointKey = featureCheckpointKey(root);
-          phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, phaseCheckpointKey, tasksPath);
-          // TRUE COMPOSITION (operator decision 2026-06-14, US1 — TASK-120/121):
-          // whole-feature govern does NOT gate on missing/stale checkpoints. It
-          // CARRIES converged-and-unchanged phases (excludes their files) and
-          // re-audits everything else — changed / missing / stale phases AND
-          // cross-cutting code owned by no phase. EXCLUSION (not inclusion) is what
-          // makes the cross-cutting remainder visible, so all-carried audits ONLY
-          // the cross-cutting diff (the whole diff minus every phase's files),
-          // never the whole feature.
-          // The after_implement unit is the whole-feature payload (exclusion-based
-          // scope, below) under the `after_implement` checkpoint label. Construct
-          // it explicitly — the scope it audits is "the diff minus carried files",
-          // expressed via compositionExcludePaths, not an inclusion file list.
-          phaseUnit = {
-            granularity: 'feature',
-            diffScope: { base: diffBase, files: [] },
-            auditLogSection: 'after_implement',
-          };
-          // Carry only the files current phases ACTUALLY audited (their recorded
-          // auditedFiles), never their declared DIRECTORY scope — so a cross-cutting
-          // change under a current phase's directory is re-audited, not hidden
-          // (TASK-129). A file shared with a missing/stale phase is still dropped
-          // (021 phase-7 AUDIT-BARRAGE-codex-01; phase ownership is not disjoint —
-          // govern.ts belongs to several phases). A current phase with no recorded
-          // auditedFiles (pre-TASK-129 checkpoint) carries nothing — re-audited.
-          const carriedFiles = carriedFilesForComposition(
-            phaseCheckpointStatuses.map((status) => ({
-              state: status.state,
-              declaredFiles: status.files,
-              auditedFiles: status.auditedFiles,
-            })),
-          );
-          compositionExcludePaths = carriedFiles.map((rel) => join(repoRoot, rel));
-          // Whole-feature payload (undefined scope) MINUS the carried phase files
-          // (compositionExcludePaths, merged into excludePaths below).
-          payloadPathScope = undefined;
-        }
+      if (root !== undefined && existsSync(join(root, 'tasks.md'))) {
+        phaseUnit = {
+          granularity: 'feature',
+          diffScope: {
+            base: flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1',
+            files: [],
+          },
+          auditLogSection: 'after_implement',
+        };
+        payloadPathScope = undefined; // the whole committed diff
       }
     }
 
@@ -990,32 +909,8 @@ export async function runGovern(args: string[]): Promise<void> {
         emitTerminalOutcome('fatal');
         process.exit(1);
       }
-      // Per-phase override: refresh the `phase-<id>` checkpoint AFTER the record landed.
-      // The whole-feature override branch (granularity !== 'phase') writes no checkpoint.
-      if (phaseUnit?.granularity === 'phase' && phaseUnit.phaseId !== undefined) {
-        const phaseId = phaseUnit.phaseId;
-        // AUDIT-BARRAGE claude-03: a resolved phase with no status is a contract
-        // violation (phase resolved + prior-phase gate passed), not a normal skip —
-        // fail loud (propagates to the main handler) rather than silently omit it.
-        const phaseStatus = phaseCheckpointStatuses?.find((status) => status.phaseId === phaseId);
-        if (phaseStatus === undefined) {
-          throw new GovernProtocolError(
-            `govern: FATAL — phase '${phaseId}' resolved for --override but has no ` +
-              `checkpoint status; cannot record the per-phase checkpoint.`,
-          );
-        }
-        writePhaseCheckpointAfterRecordOrFatal({
-          repoRoot,
-          phaseUnit: { ...phaseUnit, phaseId },
-          phaseStatus,
-          phaseCheckpointKey,
-          slug,
-          // Override path (029 US5/FR-020, AUDIT-20260621-11/02): PRESERVE the existing
-          // governedSha — an override may run at an unrelated HEAD, so it must neither
-          // record a poisoning sha NOR clear a valid anchor a prior graduation set.
-          governedSha: phaseStatus.governedSha,
-        });
-      }
+      // 030 US2 (clean break): no per-phase checkpoint is written — the override
+      // graduates on the whole-feature convergence record alone (written above).
       process.stderr.write(
         flags.mode === 'spec'
           ? 'govern: spec may graduate (overridden).\n'
@@ -1216,42 +1111,8 @@ export async function runGovern(args: string[]): Promise<void> {
         process.exit(1);
       }
     }
-    // Phase checkpoint AFTER the record (record-first — codex-02), via the shared helper
-    // so a checkpoint-write failure carries the accurate "the record IS written" message
-    // and never wrongly advances the lifecycle. claude-03: a resolved phase with no
-    // status fails loud (contract violation). claude-04: the invariant assert guards a
-    // future buildImplementVars change that would break checkpoint === auditLogSection.
-    if (
-      phaseUnit?.granularity === 'phase' &&
-      phaseUnit.phaseId !== undefined &&
-      phaseCheckpointStatuses !== undefined
-    ) {
-      const phaseId = phaseUnit.phaseId;
-      const phaseStatus = phaseCheckpointStatuses.find((status) => status.phaseId === phaseId);
-      if (phaseStatus === undefined) {
-        throw new GovernProtocolError(
-          `govern: FATAL — phase '${phaseId}' resolved for graduation but has no ` +
-            `checkpoint status; cannot record the per-phase checkpoint.`,
-        );
-      }
-      if (built.checkpoint !== phaseUnit.auditLogSection) {
-        throw new GovernProtocolError(
-          `govern: FATAL — phase-checkpoint invariant broken: built.checkpoint ` +
-            `'${built.checkpoint}' != phaseUnit.auditLogSection '${phaseUnit.auditLogSection}' ` +
-            `(buildImplementVars must thread the audit-log section as the checkpoint flag).`,
-        );
-      }
-      writePhaseCheckpointAfterRecordOrFatal({
-        repoRoot,
-        phaseUnit: { ...phaseUnit, phaseId },
-        phaseStatus,
-        phaseCheckpointKey,
-        slug,
-        // Normal graduation path: HEAD is the phase's real committed tip — record it
-        // as the FR-020 pre-phase anchor for the next phase.
-        governedSha: currentHeadSha(repoRoot),
-      });
-    }
+    // 030 US2 (clean break): no per-phase checkpoint is written — graduation rests
+    // solely on the whole-feature convergence record written above (FR-018).
     // AUDIT-BARRAGE claude-04: the override path short-circuits earlier (FR-017), so an
     // override never reaches here — the success message names only convergence.
     process.stderr.write(
