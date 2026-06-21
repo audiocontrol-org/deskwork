@@ -42,7 +42,7 @@ export function detectFrontmatter(lines: readonly string[]): LineRange | null {
  * null. We keep this deliberately simple: a fence delimiter sits alone on its
  * line (modulo an info-string) — the common case the grammar-example docs use.
  */
-function fenceDelimiterChar(line: string): '`' | '~' | null {
+export function fenceDelimiterChar(line: string): '`' | '~' | null {
   const t = line.trimStart();
   if (t.startsWith('```')) return '`';
   if (t.startsWith('~~~')) return '~';

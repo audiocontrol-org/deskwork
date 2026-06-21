@@ -155,6 +155,24 @@ function requireValue(flags: Flags, name: string): string {
   return requireMapValue('roadmap', flags.values, name);
 }
 
+/**
+ * Parse a comma-separated list flag UNIFORMLY across `--depends-on`, `--part-of`,
+ * `--children`, and `--into` (027 FR-032). A present-but-empty value or any
+ * stray/leading/trailing comma yields an empty id — a malformed grouping flag,
+ * NOT "no value": fail loud (exit 2) rather than silently dropping the id (which
+ * `--into` used to do via a `.filter`) or passing a `''` through to model
+ * validation (which `--depends-on` used to do). `verb`/`flag` shape the message.
+ * Returns the trimmed, non-empty id list (always length ≥ 1 on success — an
+ * absent flag is the caller's concern, handled before calling this).
+ */
+function parseListFlag(raw: string, verb: string, flag: string): string[] {
+  const ids = raw.split(',').map((s) => s.trim());
+  if (ids.some((s) => s.length === 0)) {
+    failUsage('roadmap', `${verb}: ${flag} has an empty id (a stray, leading, or trailing comma)`);
+  }
+  return ids;
+}
+
 function reportMutation(result: MutationResult, verb: string, id: string): void {
   process.stdout.write(
     result.applied
@@ -180,22 +198,17 @@ function addInputFrom(flags: Flags): AddInput {
   const identifier = flags.positionals[0];
   if (identifier === undefined) failUsage('roadmap', 'add requires an <identifier> positional');
   const v = flags.values;
-  const dependsOn = v.get('depends-on');
+  const dependsOnRaw = v.get('depends-on');
   const partOfRaw = v.get('part-of');
-  const partOf = partOfRaw === undefined ? undefined : partOfRaw.split(',').map((s) => s.trim());
-  // A present-but-empty `--part-of` or a stray/trailing comma (`--part-of ,` or
-  // `a,,b`) is a malformed grouping flag, NOT "no parent": fail loud rather than
-  // silently dropping the edge and reporting a successful, ungrouped add
-  // (AUDIT-BARRAGE-codex-01; consistent with the `--children` empty-id guard).
-  if (partOf !== undefined && (partOf.length === 0 || partOf.some((s) => s.length === 0))) {
-    failUsage('roadmap', 'add: --part-of has an empty id (a stray or trailing comma)');
-  }
+  // Both grouping lists go through the SHARED parse-or-fail guard (027 FR-032):
+  // a present-but-empty value or a stray/leading/trailing comma is a malformed
+  // flag → exit 2, never a silently-kept empty id or a fabricated edge.
   return {
     identifier,
     status: v.get('status'),
     scope: v.get('scope'),
-    dependsOn: dependsOn === undefined ? undefined : dependsOn.split(',').map((s) => s.trim()),
-    partOf,
+    dependsOn: dependsOnRaw === undefined ? undefined : parseListFlag(dependsOnRaw, 'add', '--depends-on'),
+    partOf: partOfRaw === undefined ? undefined : parseListFlag(partOfRaw, 'add', '--part-of'),
     deferredUntil: v.get('deferred-until'),
     spec: v.get('spec'),
     ref: v.get('ref'),
@@ -220,10 +233,9 @@ function emitAdvance(flags: Flags, opts: LoadOptions): void {
 
 function emitDecompose(flags: Flags, opts: LoadOptions): void {
   const id = requireId(flags, 'decompose');
-  const into = requireValue(flags, 'into')
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  // Uniform with the other list-flags (027 FR-032): a stray/empty id is exit 2,
+  // never silently dropped (the old `.filter(length>0)` masked a malformed flag).
+  const into = parseListFlag(requireValue(flags, 'into'), 'decompose', '--into');
   reportMutation(decompose(flags.doc, id, into, opts, flags.apply), 'decompose', id);
 }
 
@@ -242,12 +254,9 @@ function emitDefer(flags: Flags, opts: LoadOptions): void {
 /** Build the `cluster` input from the parsed flags (positional parent + --children). */
 function clusterInputFrom(flags: Flags, verb: string): ClusterInput {
   const parentId = requireId(flags, verb);
-  const children = requireValue(flags, 'children').split(',').map((s) => s.trim());
-  // A stray/trailing comma yields an empty id; fail loud rather than silently
-  // dropping it (consistent with the empty `--part-of` guard; AUDIT-BARRAGE-codex-01).
-  if (children.some((s) => s.length === 0)) {
-    failUsage('roadmap', `${verb}: --children has an empty id (a stray or trailing comma)`);
-  }
+  // Shared with the other roadmap list-flags (027 FR-032): a stray/empty id is a
+  // malformed grouping flag → exit 2, never silently dropped.
+  const children = parseListFlag(requireValue(flags, 'children'), verb, '--children');
   return { parentId, children, chain: flags.chain, summary: flags.values.get('summary') };
 }
 

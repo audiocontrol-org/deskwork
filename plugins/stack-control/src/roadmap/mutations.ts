@@ -22,6 +22,7 @@ import {
   type GovernableDocument,
   type Unit,
 } from '../document-model/types.js';
+import { fenceDelimiterChar } from '../document-model/chrome.js';
 import { loadRoadmap } from './roadmap-model.js';
 
 // Re-export the shared result type so callers (subcommands/roadmap.ts) keep
@@ -48,21 +49,38 @@ export function edgeTargets(unit: Unit, field: string): string[] {
   return [...(unit.edges.find((e) => e.field === field)?.targets ?? [])];
 }
 
-/** Rewrite a unit-ref edge line in a body, mapping its target list through `transform`. */
+/**
+ * Rewrite a unit-ref edge line in a body, mapping its target list through
+ * `transform`. FENCE-AWARE (027 FR-033): a line that LOOKS like an edge bullet but
+ * sits inside a fenced code block (``` … ``` / ~~~ … ~~~) is a documented EXAMPLE,
+ * not a real edge — it is left byte-for-byte untouched, consistent with the
+ * document engine's own edge extractor (which ignores fenced field-bullets).
+ * Without this, decompose/rename/edge-mutations would silently corrupt prose that
+ * documents the edge syntax.
+ */
 export function rewriteEdgeLine(
   bodyLines: readonly string[],
   field: string,
   transform: (targets: readonly string[]) => readonly string[],
 ): string[] {
   const re = new RegExp(`^(\\s*[-*]\\s+${field}\\s*:\\s*)(.*)$`, 'i');
+  // Fence char of the currently-open fenced code block, or null when outside one.
+  let openFence: '`' | '~' | null = null;
   return bodyLines.map((line) => {
+    const fenceChar = fenceDelimiterChar(line);
+    if (fenceChar !== null) {
+      if (openFence === null) openFence = fenceChar; // opening delimiter
+      else if (fenceChar === openFence) openFence = null; // matching close
+      return line; // a fence delimiter line is never itself an edge line
+    }
+    if (openFence !== null) return line; // inside a fence → documented example, leave untouched
     const m = re.exec(line);
     if (m === null) return line;
-    const targets = m[2]!
+    const targets = (m[2] ?? '')
       .split(',')
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
-    return `${m[1]}${transform(targets).join(', ')}`;
+    return `${m[1] ?? ''}${transform(targets).join(', ')}`;
   });
 }
 

@@ -132,14 +132,14 @@
 **Goal**: clear the deferred 027 residuals. Closes TASK-290, 291, 292, 293, 294.
 **Independent test**: each residual has a targeted presence/absence check.
 
-- [ ] T047 [P] [US9] RED test: `tests/roadmap/cluster.test.ts` contains no non-null `!` assertions — in `tests/roadmap/cluster-no-nonnull.test.ts` (FR-030)
-- [ ] T048 [US9] Replace `!` with the get-or-throw `item()` helper in `tests/roadmap/cluster.test.ts` (TASK-290, FR-030)
-- [ ] T049 [US9] Document the `cluster`/`group` verb in the roadmap `SKILL.md` (TASK-291, FR-031)
-- [ ] T050 [P] [US9] RED test: uniform empty/stray-comma guard across `--depends-on` / `--into` / `--children` / `--part-of`; dead `--part-of` branch removed — in `tests/roadmap/list-flag-guard.test.ts` (FR-032)
-- [ ] T051 [US9] Unify the list-flag guard + remove the dead `--part-of` zero-length branch in `src/subcommands/roadmap.ts` (TASK-292, FR-032)
-- [ ] T052 [P] [US9] RED test: decompose `rewriteEdgeLine` does not rewrite a fenced edge example — in `tests/roadmap/rewrite-fence-aware.test.ts` (FR-033)
-- [ ] T053 [US9] Make `rewriteEdgeLine` fence-aware in the decompose surface (TASK-293, FR-033)
-- [ ] T054 [US9] Update the tooling-feedback guidance to route adopter friction to GitHub issues against `audiocontrol-org/deskwork` (TASK-294/gh-488, FR-034)
+- [x] T047 [P] [US9] RED test: `tests/roadmap/cluster.test.ts` contains no non-null `!` assertions — in `tests/roadmap/cluster-no-nonnull.test.ts` (FR-030)
+- [x] T048 [US9] Replace `!` with the get-or-throw `item()` helper in `tests/roadmap/cluster.test.ts` (TASK-290, FR-030)
+- [x] T049 [US9] Document the `cluster`/`group` verb in the roadmap `SKILL.md` (TASK-291, FR-031)
+- [x] T050 [P] [US9] RED test: uniform empty/stray-comma guard across `--depends-on` / `--into` / `--children` / `--part-of`; dead `--part-of` branch removed — in `tests/roadmap/list-flag-guard.test.ts` (FR-032)
+- [x] T051 [US9] Unify the list-flag guard + remove the dead `--part-of` zero-length branch in `src/subcommands/roadmap.ts` (TASK-292, FR-032)
+- [x] T052 [P] [US9] RED test: decompose `rewriteEdgeLine` does not rewrite a fenced edge example — in `tests/roadmap/rewrite-fence-aware.test.ts` (FR-033)
+- [x] T053 [US9] Make `rewriteEdgeLine` fence-aware in the decompose surface (TASK-293, FR-033)
+- [x] T054 [US9] Update the tooling-feedback guidance to route adopter friction to GitHub issues against `audiocontrol-org/deskwork` (TASK-294/gh-488, FR-034)
 - [ ] T055 [US9] Close TASK-290, 291, 292, 293, 294; record the phase-9 govern checkpoint
 
 ---
