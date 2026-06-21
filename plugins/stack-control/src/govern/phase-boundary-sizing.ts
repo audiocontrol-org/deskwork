@@ -25,19 +25,6 @@ export interface ActualPayloadMeasurement {
   readonly disposition: 'fits' | 'boundary-too-large';
 }
 
-export class BoundaryTooLargeError extends Error {
-  constructor(
-    readonly id: string,
-    readonly measuredPromptBytes: number,
-    readonly activeFleetEnvelopeBytes: number,
-  ) {
-    super(
-      `unit '${id}' rendered ${measuredPromptBytes} prompt bytes, exceeding the active fleet envelope ${activeFleetEnvelopeBytes}`,
-    );
-    this.name = 'BoundaryTooLargeError';
-  }
-}
-
 export function estimateBoundary(
   id: string,
   paths: readonly string[],
@@ -73,26 +60,6 @@ export function measureBoundaryFit(
     disposition:
       measuredPromptBytes <= activeFleetEnvelopeBytes ? 'fits' : 'boundary-too-large',
   };
-}
-
-export function assertBoundaryFits(
-  id: string,
-  measuredPromptBytes: number,
-  activeFleetEnvelopeBytes: number,
-): ActualPayloadMeasurement {
-  const measurement = measureBoundaryFit(
-    id,
-    measuredPromptBytes,
-    activeFleetEnvelopeBytes,
-  );
-  if (measurement.disposition === 'boundary-too-large') {
-    throw new BoundaryTooLargeError(
-      id,
-      measuredPromptBytes,
-      activeFleetEnvelopeBytes,
-    );
-  }
-  return measurement;
 }
 
 function assertNonEmptyId(id: string): void {

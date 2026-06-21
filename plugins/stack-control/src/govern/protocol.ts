@@ -36,7 +36,6 @@ import {
 import { completedNonConvergedAnnotation } from '../scope-discovery/audit-barrage/types.js';
 import { loadLaneCapabilities, type LaneCapabilityProfile } from './lane-capabilities.js';
 import { negotiateFleet } from './fleet-negotiation.js';
-import { assertBoundaryFits, BoundaryTooLargeError } from './phase-boundary-sizing.js';
 
 /** Thrown for any fail-loud protocol condition; carries a process exit code. */
 /**
@@ -64,7 +63,6 @@ import { assertBoundaryFits, BoundaryTooLargeError } from './phase-boundary-sizi
 export type GovernTerminalKind =
   | 'graduated'
   | 'blocked'
-  | 'boundary-too-large'
   | 'negotiation-failed'
   | 'fleet-floor-shortfall'
   | 'barrage-outage'
@@ -385,23 +383,12 @@ export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult
         'negotiation-failed',
       );
     }
-    const activeEnvelope = Math.min(
-      ...laneCapabilities
-        .filter((lane) => negotiatedFleet.acceptedFleet.includes(lane.name))
-        .map((lane) => lane.envelope.maxPromptBytes),
-    );
-    try {
-      assertBoundaryFits(args.checkpoint, renderedPromptBytes, activeEnvelope);
-    } catch (err) {
-      if (err instanceof BoundaryTooLargeError) {
-        throw new GovernProtocolError(
-          `govern: FATAL — boundary-too-large: ${err.message}`,
-          2,
-          'boundary-too-large',
-        );
-      }
-      throw err;
-    }
+    // 030 US2 (FR-002, clean break): the `boundary-too-large` FATAL terminal is
+    // DELETED. The chunked end-govern bin-packer sizes every chunk ≤ the active
+    // envelope, so there is no whole-feature size at which govern refuses — the
+    // packer AVOIDS the condition rather than asserting against it. `renderedPromptBytes`
+    // is retained only for the run-dir log line below.
+    void renderedPromptBytes;
 
     // --- barrage (barrage bin); tag the run-dir label with the checkpoint so
     // the gate can scope per-checkpoint (AUDIT-20260607-05). The lift + slush +
