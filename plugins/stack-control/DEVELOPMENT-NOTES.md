@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-06-21: govern-operability (029) — US5→US9 + US10 graduated; feature complete; TASK-357 root-fix broke the entanglement loop
+
+### Feature: 029-govern-operability
+### Worktree: stack-control (feature/stack-control)
+
+**Goal:** Pick up where session-2 left off (P1 MVP US1–US4 shipped) and, on operator instruction ("dealer's choice… complete everything"), finish the entire remaining 029 burndown: US5, US6, US7-T043, US8, US9, US10 — plus the root-cause fix that makes per-phase govern actually converge.
+
+**Accomplished:**
+- **US5 (payload-scoping correctness) graduated.** FR-020 union payload via a pre-phase `governedSha` anchor (explicit `--diff-base` wins; verified-to-resolve; override preserves not clears); FR-021/022 out-of-window dep-fold (best-effort) + auditor framing that covers out-of-window AND in-window-unchanged refs. Both first-round HIGHs (governedSha-not-verified, override-clears-anchor) fixed RED-first; graduated via plateau-exit override.
+- **US6 (either-of graduate gate) graduated clean (dampener, no override).** New `graduate-impl` criterion = all-phase-checkpoints-current OR whole-feature record; WORKFLOW.md graduate gates updated; 025 "compose, reject augment" clarify record amended (augment-as-requirement still rejected; whole-feature re-admitted as opt-in).
+- **US7-T043 graduated clean** (hunk-fingerprint code already shipped; recorded the checkpoint, closed TASK-289).
+- **US8 (five process drivers) graduated** (codified in barrage prompt + execute skill; RED presence test). Real findings fixed: `__dirname`→`import.meta.url` ESM (codex HIGH), reviewer-audience phrasing, heading over-scope. Graduated via plateau-exit override (non-deterministic prose HIGHs).
+- **US9 (027 residual hygiene) graduated clean** (dampener). Subagent implemented the 4 fixes RED-first; I reviewed + fixed the 4 govern findings (4-backtick fence run-length, scopeOf/rewriteEdgeLine fence-model unification, `--into` self-decompose test, no-bang string strip).
+- **US10 (feature completion):** all 17 backlog tasks Done; quickstart SC-001..009 results recorded (live-executed vs test-covered distinguished); feature node `multi:feature/govern-operability` at `shipped` with all 9 per-phase checkpoints current. Full suite **2401 passing**; plugin validates; `check-front-door` 62 ops OK.
+- **TASK-357 (the session's highest-leverage fix):** `resolveAuditedFiles` now passes `--relative`, so US7's hunk-fingerprint engages in-monorepo (git-root ≠ installation-root). Before this every checkpoint had `hunkBlocks: 0` → whole-file freshness → the O(n²) re-stale entanglement. After it, phases re-checkpointed with real hunk blocks (16/27/8) and US6–US9 governed without cross-staling.
+
+**Didn't Work / cost:**
+- **Ran the stale installed `stackctl` 0.52.0 cache for the first half of the session** instead of `./bin/stackctl` (source 0.52.1). The cache lacks the FR-017 override short-circuit and the TASK-357 hunk fix, so every override ran a full barrage and every shared-file edit re-staled prior phases — a large amount of wasted compute + a confusing entanglement loop that looked like a real bug. Switching to the source engine made overrides instant (0 barrage) and per-phase govern converge. Captured as a durable rule (`.claude/rules/source-engine-for-stack-control-dev.md`) — this trap also hit session-2.
+- The implement-audit barrage **plateaus into a prose-nit generator** on P3 doc/guidance phases (US8): each re-run non-deterministically surfaces a new prose "HIGH". Exited via override per the diminishing-returns rule once the one real HIGH (`__dirname`) was fixed.
+
+**Course Corrections:**
+- [PROCESS] Switched from bare `stackctl` to `./bin/stackctl` mid-session once the engine mismatch was diagnosed (operator-aligned with session-2's decision).
+- [PROCESS] Applied plateau-exit overrides myself (US5, US8) under the operator's "dealer's choice / complete everything" delegation, per the spec-audit-diminishing-returns rule.
+- [COMPLEXITY] Root-fixed TASK-357 first as the enabler rather than paying override churn 5× over.
+
+**Insights:**
+- The per-phase entanglement friction this feature exists to reduce was, in this session, **almost entirely an artifact of running the wrong engine**. With the source engine + TASK-357, per-phase govern converged cleanly (US6/US7/US9 graduated with zero overrides). That is strong evidence US5/US7/TASK-357 actually deliver.
+- US6's either-of opt-in + US7's hunk-fingerprint are the designed escape for exactly the shared-file O(n²) pain — and dogfooding them on 029's own remaining phases is what proved them.
+
+**Quantitative (verify from git):**
+- Commits this session: ~30 (feature/stack-control, 2ae7604d..HEAD).
+- Backlog tasks closed: 17 (TASK-60/145/146/149/154/263/288/289/290/291/292/293/294/316/317/318) + TASK-357.
+- Tests: 2344 (session start) → 2401 (completion), +57 net new RED-first test blocks across US5–US9.
+- New durable rule: `.claude/rules/source-engine-for-stack-control-dev.md`.
+
 ## 2026-06-20: govern-operability (029) — P1 MVP (US1–US4) graduated, reconciled, shipped to main (PR #493); phase-4 override/two-write entanglement resolved
 
 **Goal:** Continue 029 from session 1's handoff (the "FR-017 regression" + ungoverned Phase 4): drive Phase 4 (US4) governance to completion, graduate the P1 MVP, and ship.
