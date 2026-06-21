@@ -13,9 +13,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const PLUGIN_ROOT = join(__dirname, '..', '..');
+const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PROMPT = readFileSync(join(PLUGIN_ROOT, 'templates', 'audit-barrage-prompt.md'), 'utf8').toLowerCase();
 const EXECUTE = readFileSync(join(PLUGIN_ROOT, 'skills', 'execute', 'SKILL.md'), 'utf8').toLowerCase();
 
