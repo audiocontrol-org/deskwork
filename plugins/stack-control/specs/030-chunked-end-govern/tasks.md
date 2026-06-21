@@ -68,19 +68,19 @@ description: "Task list for Chunked whole-feature end-govern"
 
 ### Tests for User Story 1 (RED first — watch each FAIL for the stated reason) ⚠️
 
-- [ ] T010 [P] [US1] RED: `src/govern/cluster-payload/__tests__/coupling-graph.test.ts` — assert directory-adjacency + diff cross-reference edges are built (universal baseline) and a TS import edge is added when the import graph is present, never required (FR-003, R1); FAIL (no impl).
-- [ ] T011 [P] [US1] RED: `src/govern/cluster-payload/__tests__/clustering.test.ts` — assert coupled files group into clusters, every changed file in exactly one cluster, clusters disjoint (data-model Cluster validation); FAIL.
-- [ ] T012 [P] [US1] RED: `src/govern/cluster-payload/__tests__/non-audit-trim.test.ts` — assert the pre-pass drops lockfile/generated/vendored/whitespace/fixture bytes and records each `trimApplied` category+bytes (FR-006, R2); FAIL.
-- [ ] T013 [P] [US1] RED: `src/govern/cluster-payload/__tests__/envelope-binpack.test.ts` — assert first-fit-decreasing packs clusters into chunks each ≤ envelope, and an oversized single cluster (after trim) sub-splits into ≥2 sub-chunks with a `SplitClusterMarker` (non-empty coverage caveat) and NEVER throws boundary-too-large (FR-002/FR-006, R2); FAIL.
+- [x] T010 [P] [US1] RED: `src/govern/cluster-payload/__tests__/coupling-graph.test.ts` — assert directory-adjacency + diff cross-reference edges are built (universal baseline) and a TS import edge is added when the import graph is present, never required (FR-003, R1); FAIL (no impl).
+- [x] T011 [P] [US1] RED: `src/govern/cluster-payload/__tests__/clustering.test.ts` — assert coupled files group into clusters, every changed file in exactly one cluster, clusters disjoint (data-model Cluster validation); FAIL.
+- [x] T012 [P] [US1] RED: `src/govern/cluster-payload/__tests__/non-audit-trim.test.ts` — assert the pre-pass drops lockfile/generated/vendored/whitespace/fixture bytes and records each `trimApplied` category+bytes (FR-006, R2); FAIL.
+- [x] T013 [P] [US1] RED: `src/govern/cluster-payload/__tests__/envelope-binpack.test.ts` — assert first-fit-decreasing packs clusters into chunks each ≤ envelope, and an oversized single cluster (after trim) sub-splits into ≥2 sub-chunks with a `SplitClusterMarker` (non-empty coverage caveat) and NEVER throws boundary-too-large (FR-002/FR-006, R2); FAIL.
 - [ ] T014 [P] [US1] RED: `src/govern/cluster-payload/__tests__/determinism.test.ts` — assert running the partitioner twice over identical `base..HEAD` endpoints yields byte-identical chunks/chunkIds/manifests/splitClusterMarkers (FR-004, US1 Scenario 3); FAIL.
 - [ ] T015 [P] [US1] RED: `src/govern/__tests__/end-govern-pipeline.size.test.ts` — assert end-govern on a fixture diff exceeding the smallest lane envelope reaches a graduation decision (converged/override-eligible), emits ⋃chunks.files == changed-file set, and produces 0 `boundary-too-large` outcomes (SC-001, US1 Scenarios 1-2); FAIL.
 
 ### Implementation for User Story 1
 
-- [ ] T016 [P] [US1] Implement `src/govern/cluster-payload/coupling-graph.ts` (dir-adjacency + diff cross-ref baseline; capability-gated TS import layer); make T010 pass.
-- [ ] T017 [P] [US1] Implement `src/govern/cluster-payload/clustering.ts` (group coupled files into disjoint clusters from the coupling graph); make T011 pass.
-- [ ] T018 [P] [US1] Implement `src/govern/cluster-payload/non-audit-trim.ts` (cheap pre-pass dropping non-audit bytes, recording categories); make T012 pass.
-- [ ] T019 [US1] Implement `src/govern/cluster-payload/envelope-binpack.ts` (first-fit-decreasing pack ≤ envelope using the rekeyed measurement primitive; oversized-cluster sub-split + `split-cluster` marker; never FATAL) (depends on T009, T016-T018); make T013 pass.
+- [x] T016 [P] [US1] Implement `src/govern/cluster-payload/coupling-graph.ts` (dir-adjacency + diff cross-ref baseline; capability-gated TS import layer); make T010 pass.
+- [x] T017 [P] [US1] Implement `src/govern/cluster-payload/clustering.ts` (group coupled files into disjoint clusters from the coupling graph); make T011 pass.
+- [x] T018 [P] [US1] Implement `src/govern/cluster-payload/non-audit-trim.ts` (cheap pre-pass dropping non-audit bytes, recording categories); make T012 pass.
+- [x] T019 [US1] Implement `src/govern/cluster-payload/envelope-binpack.ts` (first-fit-decreasing pack ≤ envelope using the rekeyed measurement primitive; oversized-cluster sub-split + `split-cluster` marker; never FATAL) (depends on T009, T016-T018); make T013 pass.
 - [ ] T020 [US1] Implement the `cluster-payload` aggregate entry (couple→cluster→trim→binpack→manifest, deterministic, per contracts/cluster-payload.md) wiring T016-T019 + chunk-id (T007); make T014 pass.
 - [ ] T021 [US1] Implement `src/govern/payload-diff-scope.ts` — committed-diff (`base..HEAD`) + untracked-fold scoping, inclusion-based (the FR-023 successor to the exclusion plumbing); RED test `src/govern/__tests__/payload-diff-scope.test.ts` first (assert non-empty `diffScope.files` for a committed-diff fixture; watch FAIL), then implement.
 - [ ] T022 [US1] Implement `src/govern/payload-chunk.ts` — render ONE chunk's audit payload (diff + plan/spec/contracts + manifest); RED test `src/govern/__tests__/payload-chunk.test.ts` first (assert a chunk payload includes its diff and stays ≤ envelope; watch FAIL), then implement.
