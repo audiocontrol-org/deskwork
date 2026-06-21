@@ -75,8 +75,8 @@ export function rewriteEdgeLine(
         openFence = fence; // opening delimiter
         return line;
       }
-      if (fence.char === openFence.char && fence.length >= openFence.length) {
-        openFence = null; // CommonMark close: same char, run length >= opener
+      if (fence.char === openFence.char && fence.length >= openFence.length && fence.closeable) {
+        openFence = null; // CommonMark close: same char, run >= opener, no info string
         return line;
       }
       // A shorter / different-char delimiter inside an open fence is CONTENT (e.g. an

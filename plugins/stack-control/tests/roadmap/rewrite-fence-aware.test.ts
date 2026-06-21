@@ -65,6 +65,24 @@ describe('027 FR-033 — rewriteEdgeLine is fence-aware', () => {
     expect(out[9]).toContain('impl:feature/new');
   });
 
+  it('an info-string fence line (```ts) inside an open fence does NOT close it (AUDIT-20260621-55)', () => {
+    const body = [
+      '## impl:feature/x',
+      '```',
+      'an inner opener with an info string (NOT a valid closer):',
+      '```typescript',
+      '- depends-on: impl:feature/old',
+      '```',
+      '- depends-on: impl:feature/old',
+    ];
+    const out = rewriteEdgeLine(body, 'depends-on', repoint);
+    // CommonMark: a closing fence carries no info string, so `\`\`\`typescript` cannot
+    // close the outer fence — the edge-looking line under it stays example prose.
+    expect(out[4]).toBe('- depends-on: impl:feature/old');
+    // Only the bare ``` at index 5 closes; the real edge after it (index 6) is rewritten.
+    expect(out[6]).toContain('impl:feature/new');
+  });
+
   it('rewrites edge lines that come AFTER a closed fence (fence state resets)', () => {
     const body = [
       '```',

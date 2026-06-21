@@ -93,4 +93,17 @@ describe('US6 either-of graduate gate (FR-023/024)', () => {
     f.checkpointPhase('3');
     expect(evaluateCriterion(GRADUATE, ctxFor(f, true))).toBe(true);
   });
+
+  it('the canonical opt-in: a STALE per-phase set is rescued by the whole-feature record (AUDIT-20260621-31)', () => {
+    const f = threePhase();
+    f.checkpointPhase('1');
+    f.checkpointPhase('2');
+    f.checkpointPhase('3');
+    // The motivating O(n^2) scenario: a later edit re-stales an earlier phase's checkpoint.
+    f.editPhaseFile('src/feat/b.ts', 'export const b = 222;\n');
+    // Per-phase path is now false (phase 2 stale)...
+    expect(evaluateCriterion(GRADUATE, ctxFor(f, false))).toBe(false);
+    // ...but the opt-in whole-feature record rescues graduation (the central US6 use case).
+    expect(evaluateCriterion(GRADUATE, ctxFor(f, true))).toBe(true);
+  });
 });

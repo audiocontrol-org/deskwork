@@ -47,21 +47,25 @@ export function fenceDelimiterChar(line: string): '`' | '~' | null {
 }
 
 /**
- * A fenced-code-block delimiter's character AND run length (027 FR-033 / AUDIT-20260621-54).
- * CommonMark: a closing fence must use the SAME character with a run length AT LEAST as
- * long as the opener — so an inner ``` example nested inside an outer ```` fence does NOT
- * close the outer fence. Callers tracking fence state must compare both fields, not just
- * the character, or a four-backtick outer fence is silently corrupted.
+ * A fenced-code-block delimiter's character, run length, and closeability (027 FR-033 /
+ * AUDIT-20260621-54/55). CommonMark: a CLOSING fence must use the SAME character with a run
+ * length AT LEAST as long as the opener AND carry NO info string (only trailing spaces) —
+ * so neither an inner ``` nested in an outer ```` (length) NOR an info-string line like
+ * ```` ```typescript ```` (closeable=false) closes the outer fence. Callers tracking fence
+ * state must require `char` + `length` + `closeable` for a close, or a fenced example is
+ * silently corrupted.
  */
 export function fenceDelimiter(
   line: string,
-): { readonly char: '`' | '~'; readonly length: number } | null {
-  const t = line.trimStart();
-  const backticks = /^(`{3,})/.exec(t);
-  if (backticks !== null) return { char: '`', length: backticks[1]!.length };
-  const tildes = /^(~{3,})/.exec(t);
-  if (tildes !== null) return { char: '~', length: tildes[1]!.length };
-  return null;
+): { readonly char: '`' | '~'; readonly length: number; readonly closeable: boolean } | null {
+  const run = /^(`{3,}|~{3,})/.exec(line.trimStart());
+  if (run === null) return null;
+  const delim = run[0];
+  // delim[0] is the fence character; the whole match is a homogeneous run, so its length
+  // is the run length. The remainder after the run is the info string (if any).
+  const char = delim.charAt(0) === '`' ? '`' : '~';
+  const closeable = line.trimStart().slice(delim.length).trim().length === 0;
+  return { char, length: delim.length, closeable };
 }
 
 /**
