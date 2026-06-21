@@ -561,6 +561,7 @@ No cheap checkpoint refresh for a sibling-change false-stale; --override is the 
 
 ## multi:feature/govern-whole-feature-chunked-payload
 - status: planned
+- analyze-clean: yes
 - spec: specs/030-chunked-end-govern
 - design-approved: yes
 - design: docs/superpowers/specs/2026-06-21-govern-whole-feature-chunked-payload-design.md
