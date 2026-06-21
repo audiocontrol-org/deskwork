@@ -20,6 +20,15 @@
 
 The actors are the **operator** (runs `govern` / `execute` and owns graduation) and the **driving agent** (executes the pipeline unattended). "User value" here is operator/agent outcome: a feature of any size governs to a graduation decision without manual payload-shaping, and the per-phase friction class is gone.
 
+## Clarifications
+
+### Session 2026-06-21
+
+- Q: When the chunked audit finds issues, does govern apply+commit fixes itself or propose them? → A: **Autonomous apply + commit** — fix-fanout applies fixes in worktrees, commits to the feature branch, and re-audits unattended; only fix-subagent failures and unresolvable merges surface to the operator.
+- Q: How is the feature-base anchor for the `governedSha`..HEAD diff determined? → A: **Reuse the 029 US5 `governedSha` anchor** resolved at feature start; an explicit `--diff-base` overrides.
+- Q: What backstops termination if a coupling cycle keeps the touched set from shrinking? → A: **Hard max-round cap as a backstop** — the shrinking touched-set + dampener is the norm; on hitting the cap, STOP and surface for operator override (never loop forever).
+- Q: What does the seam pass count as a substantive contract break (vs a compatible change it must not flag)? → A: **Cross-boundary breakage only** — removed/renamed exported symbol, changed arity, or changed required shape consumed across a chunk boundary; ignore compatible additions and internal-only changes.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Whole-feature audit never FATALs on size (Priority: P1)
@@ -169,7 +178,7 @@ Building the chunking mechanism decomposes `payload-implement.ts` (over the 300�
 
 **Pipeline & partitioning**
 
-- **FR-001**: Govern MUST audit the whole committed feature diff resolved from the feature base `governedSha` to HEAD as a single end-of-feature run (no per-phase invocation).
+- **FR-001**: Govern MUST audit the whole committed feature diff resolved from the feature base `governedSha` to HEAD as a single end-of-feature run (no per-phase invocation). The base anchor MUST reuse the existing 029 US5 `governedSha` anchor resolved at feature start; an explicit `--diff-base <ref>` MUST override it.
 - **FR-002**: Govern MUST partition the diff into chunks each within the active fleet envelope (the minimum `maxPromptBytes` across negotiated lanes), and MUST NOT terminate with `boundary-too-large` for a feature of any size.
 - **FR-003**: Partitioning MUST group files by code coupling, using a universal baseline of directory-adjacency + diff cross-references (language-agnostic), with the TypeScript import graph as an additional precision signal where available.
 - **FR-004**: Partitioning MUST be deterministic — the same committed diff over the same `governedSha`..HEAD endpoints MUST yield the same chunk set with stable chunk ids.
@@ -180,12 +189,12 @@ Building the chunking mechanism decomposes `payload-implement.ts` (over the 300�
 **Audit, fix, convergence**
 
 - **FR-008**: Govern MUST audit chunks in parallel (chunks × lanes) under a concurrency cap bounded by fleet negotiation.
-- **FR-009**: Govern MUST fix findings grouped by chunk via worktree-isolated fix-subagents running in parallel under a configurable concurrency cap, then merge results to the feature branch.
+- **FR-009**: Govern MUST fix findings grouped by chunk via worktree-isolated fix-subagents running in parallel under a configurable concurrency cap, then merge results to the feature branch. Fixing is **autonomous**: govern applies AND commits the fixes unattended (no propose-only / operator-applies step); only fix-subagent failures (FR-011) and unresolvable merges (FR-010) surface to the operator.
 - **FR-010**: When two chunks' fixes touch a shared file, govern MUST serialize the conflicting pair rather than merge blindly; an unresolvable merge MUST be surfaced to the operator (Constitution Principle V — fail loud, no fabricated resolution).
 - **FR-011**: A fix-subagent failure MUST isolate its chunk, allow other chunks to continue, and be surfaced at reconcile.
 - **FR-012**: After fixes, govern MUST re-audit only the chunks whose files a fix touched (the touched set), and the touched set MUST be coupling-correct (a fix to a file coupled into another chunk includes that chunk).
-- **FR-013**: The re-audit loop MUST terminate — the touched set MUST shrink toward empty and graduation occurs when the dampener clears the touched set.
-- **FR-014**: Govern MUST run a final interface-level seam pass over cross-chunk and split-cluster boundaries (signatures + changed-function headers) gated to substantive contract breaks; the seam payload MUST fit the envelope.
+- **FR-013**: The re-audit loop MUST terminate — the touched set MUST shrink toward empty and graduation occurs when the dampener clears the touched set. As a backstop against a coupling cycle that prevents the set from shrinking, govern MUST enforce a hard maximum-round cap; on hitting the cap it MUST STOP and surface the stall for operator override (it MUST NOT loop forever and MUST NOT silently auto-graduate unresolved churn).
+- **FR-014**: Govern MUST run a final interface-level seam pass over cross-chunk and split-cluster boundaries (signatures + changed-function headers) gated to substantive contract breaks; the seam payload MUST fit the envelope. A **substantive contract break** is observable cross-boundary breakage — a removed/renamed exported symbol, a changed arity, or a changed required shape consumed across a chunk boundary; the seam pass MUST NOT flag compatible additions or internal-only changes (SC-003 false-positive target).
 - **FR-015**: Govern MUST reconcile exactly once into a single whole-feature convergence record per feature.
 - **FR-016**: Findings fixed within the bounded re-audit loop MUST be closed before the lift step and MUST NOT be lifted to the backlog as open tasks; findings still open at graduation MUST be lifted.
 
@@ -237,5 +246,5 @@ Captured explicitly (house rule: open questions are marked, never silently cut).
 
 - **OQ-1 — Non-TS coupling precision**: directory + diff cross-reference is the universal baseline; on a large flat directory this signal is coarse. *Recommendation*: ship the baseline; expose a per-adopter coupling-resolver seam (kin to the customize seam) as a follow-on if coarseness bites. (Capture, do not cut.)
 - **OQ-2 — Concurrency-cap defaults**: the exact default worktree-fix concurrency cap and whether it is adopter-configurable. *Recommendation*: a small default (e.g. 4) bounded by fleet negotiation for audit; configurable. Tuning-level.
-- **OQ-3 — Seam-pass false-positive rubric**: the exact rubric for "substantive contract break" vs compatible signature change. *Recommendation*: gate on observable contract breakage (removed/renamed export, changed arity/required-shape) consumed across the boundary; refine against fixtures.
-- **OQ-4 — Coupling-graph determinism under churn**: pinning to `governedSha`..HEAD endpoints fixes determinism for identical endpoints; behavior when the base legitimately moves between runs is by-design different (different feature scope). *Recommendation*: document that a moved base is a different audit scope, not a determinism violation.
+- **OQ-3 — Seam-pass false-positive rubric**: RESOLVED (Session 2026-06-21, → FR-014) — substantive break = cross-boundary breakage (removed/renamed export, changed arity, changed required shape consumed across a boundary); compatible/internal-only changes are not flagged. Fixture-level refinement of the detector remains a planning detail.
+- **OQ-4 — Coupling-graph determinism under churn**: RESOLVED (Session 2026-06-21, → FR-001) — chunking is pinned to the 029 `governedSha`..HEAD endpoints (explicit `--diff-base` overrides); a legitimately moved base is a different audit scope by design, not a determinism violation.
