@@ -3513,3 +3513,195 @@ Decision:   single-model (gate-counted informational)
 Surface:    tests/skills/process-drivers.test.ts:28-48
 
 The test suite checks that each driver's keyword regex matches somewhere in the lowercased file content. This is correct for the stated goal (ensuring a future edit that drops a driver fails). However, the assertions do not verify that all five drivers are co-located in a single section, that the section carries an appropriate heading, or that the section appears at the expected position relative to `{{audit_lens}}` in the prompt template. A future edit that moves the drivers into a comment block, a non-rendered section, or disperses them across unrelated headings would still pass every test in this file. This is not a defect in the tests as written — presence assertions for prose content in markdown files are common and appropriate — but it is worth noting as a coverage gap if the "co-located process drivers section" structural invariant is ever considered load-bearing.
+
+## 2026-06-21 — audit-barrage lift (20260621T024529166Z-029-govern-operability-phase-9)
+
+Code-sha: fa70b25f3320e057f61416bcc7f5321459db5796
+### AUDIT-20260621-51 — `--into` clean-success test decomposes an item into itself — likely exits non-zero
+
+Finding-ID: AUDIT-20260621-51
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/roadmap/list-flag-guard.test.ts:73-78
+
+The "clean single id succeeds" loop at lines 73–78 iterates uniformly over all four `LIST_FLAGS`, invoking `argsFor(flag, 'impl:feature/a', docWithItems())` for each. For `'--into'`, `argsFor` builds:
+
+```
+['roadmap', 'decompose', 'impl:feature/a', '--into', 'impl:feature/a', '--doc', docPath, '--apply']
+```
+
+The document created by `docWithItems()` already contains `## impl:feature/a`. Asking `decompose` to decompose `impl:feature/a` into a child also named `impl:feature/a` is self-referential. One of two failure modes is almost certain at the model layer: (a) the `decompose` mutation tries to create a new unit with identifier `impl:feature/a`, which already exists → duplicate-identifier error, non-zero exit; or (b) it adds a `depends-on: impl:feature/a` edge on itself → the acyclicity check (roadmap grammar declares `depends-on` as `acyclic: true`) rejects it, non-zero exit. Either way, `expect(r.status).toBe(0)` fails.
+
+The blast-radius: this is a concrete test-suite failure. Any CI run that exercises this file will report a red test on the `--into` variant of the clean-success case, while the three stray-comma variants (which call `parseListFlag` and exit 2 before the model is ever touched) remain green. The repair is to use a fresh identifier not already in the document — e.g., `'impl:feature/new'` for the `--into` case, or to add a branch to `argsFor` that supplies a non-self child. Reusing `'impl:feature/a'` uniformly works for `--depends-on` (adding a depends-on edge from `impl:feature/new` to an existing item) and `--part-of` (same shape), and happens to work for `--children` (clustering an existing item under a newly-created parent), but `decompose` requires the `--into` ids to be children of the target, not the target itself.
+
+---
+
+### AUDIT-20260621-52 — `rewriteEdgeLine` (type-aware fence) diverges from `scopeOf` (type-agnostic toggle) for mixed-delimiter documents
+
+Finding-ID: AUDIT-20260621-52
+Status: migrated-to-backlog TASK-399
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/mutations.ts:52-85 and src/roadmap/roadmap-model.ts (out of window, SCOPE_FENCE block)
+
+The new fence-aware `rewriteEdgeLine` correctly uses type-matched close detection (a backtick fence opened by `` ``` `` is only closed by a subsequent `` ``` `` line; a tilde line inside it is treated as ordinary content and does not toggle state). This is the right CommonMark behavior.
+
+The pre-existing `scopeOf` function in `roadmap-model.ts` (shown in the referenced dependency block) uses a simple toggle:
+
+```typescript
+if (SCOPE_FENCE.test(line)) {
+  inFence = !inFence;  // toggles on ANY delimiter line, regardless of type
+  return true;
+}
+```
+
+For a document body containing a tilde line inside an open backtick fence:
+
+```
+```
+~~~           ← scopeOf: toggles inFence → false (wrong)
+content       ← scopeOf: sees this as OUTSIDE the fence, drops it if it's a bullet
+~~~           ← scopeOf: toggles inFence → true (wrong)
+```           ← scopeOf: toggles inFence → false
+```
+
+`rewriteEdgeLine` would (correctly) treat `~~~` as non-closing, keep `content` inside the fence, and close only on the final `` ``` ``. The two functions therefore disagree on which lines are "inside a fence" for any document that mixes fence delimiter types. An operator who writes a roadmap unit with a backtick-fenced block containing a tilde line (a nested language example, for instance) would see `scopeOf` strip field bullets from it as if they were outside a fence, while `rewriteEdgeLine` correctly leaves them alone.
+
+The inconsistency is introduced by this diff (which adds the type-aware logic to `rewriteEdgeLine` without updating `scopeOf` to match). The fix is either: (a) update `scopeOf` to share `fenceDelimiterChar` and the same type-aware state machine, or (b) leave `scopeOf` as-is and document that the two functions intentionally use different fence models. Neither is done here.
+
+---
+
+### AUDIT-20260621-53 — `cluster-no-nonnull.test.ts` regex matches `!` in string literals, not only postfix type assertions
+
+Finding-ID: AUDIT-20260621-53
+Status: migrated-to-backlog TASK-400
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/cluster-no-nonnull.test.ts:20
+
+The pattern used to detect non-null assertions is:
+
+```typescript
+const NON_NULL_ASSERTION = /[\w$)\]]!(?!=)/g;
+```
+
+The comment-stripping filter removes lines whose trimmed form starts with `//` or `*`. Non-comment code lines that contain a string or template literal with `!` after an identifier character (e.g., `'not found!'`, `` `item ${x} done!` ``) would pass through the filter and match the regex, producing a false positive. The test would then fail spuriously.
+
+In the current `cluster.test.ts`, the string literals used in assertions (`'impl:feature/b'`, `'multi:feature/grp'`, `'in-flight'`, `'planned'`) contain no trailing `!` after identifier characters, so the false positive does not trigger today. The risk is that a future test added to `cluster.test.ts` with a description string or expect message like `'item not found!'` silently causes this meta-test to fail, and the diagnosis is non-obvious. The fix is to either (a) scope the regex more narrowly to known non-null assertion contexts (e.g., only at end of an expression token before `.` or `;`), or (b) document the known limitation and note that the test is a heuristic guard, not a parse-accurate check.
+
+### AUDIT-20260621-54 — Four-backtick fences can still be corrupted
+
+Finding-ID: AUDIT-20260621-54
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/document-model/chrome.ts:45-48; src/roadmap/mutations.ts:70-76
+
+`fenceDelimiterChar` tracks only the fence character, not the delimiter length. `rewriteEdgeLine` then closes an open fence on any later line that starts with three of the same character. That mishandles a common Markdown composition case: an outer ```` fence used to document an inner ``` fenced example. The inner ``` line will be treated as the close of the outer fence, so a later example line like `- depends-on: impl:feature/old` inside the outer fence becomes “outside” and gets rewritten.
+
+This matters because the stated goal of FR-033 is to prevent silent prose corruption in documented edge examples. A downstream operator with nested Markdown examples in a roadmap item can still have `decompose` / `reclassify` rewrite example text while reporting a successful mutation. A reasonable fix is to have the delimiter helper return both character and run length, then close only on the same character with a run length at least as long as the opener; add a fixture with an outer four-backtick fence containing an inner triple-backtick example and an edge-looking bullet.
+
+## 2026-06-21 — audit-barrage lift (20260621T030027921Z-029-govern-operability-phase-9)
+
+Code-sha: 57d730c31f48d3162b8dda832be0cfaec9ff654b
+### AUDIT-20260621-55 — `fenceDelimiter` does not distinguish opening from closing fences — info-string lines can prematurely close an open fence
+
+Finding-ID: AUDIT-20260621-55 (claude-01 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-401
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/document-model/chrome.ts:59-66 and src/roadmap/mutations.ts:63-80 (rewriteEdgeLine)
+
+`fenceDelimiter` returns a non-null result for any line whose trimmed form begins with three or more backticks or tildes, including lines that carry an info string (e.g., ` ```typescript` or ` ```yaml`). Per CommonMark §4.5, a *closing* fence "must be followed optionally by spaces only" — an info string on a potential closing-fence line disqualifies it as a closer. `fenceDelimiter` does not check for trailing non-whitespace, so a line like ` ```typescript` produces `{ char: '`', length: 3 }` regardless of whether it appears in an opening or closing position.
+
+In `rewriteEdgeLine` (`mutations.ts:63-80`), when `openFence` is `{char: '`', length: 3}` and the algorithm encounters ` ```typescript`, the condition `fence.char === openFence.char && fence.length >= openFence.length` (3 ≥ 3) evaluates to `true`, which sets `openFence = null` — incorrectly closing the fence. Any line below that point (still inside the outer fence according to CommonMark) is now treated as real edge content and may be rewritten if it matches the edge regex. The same `fenceDelimiter` call with the same pattern appears in `scopeOf` (`roadmap-model.ts`, referenced dependency), where it causes the analogous early-close: field-bullet lines that are part of a fenced example would be incorrectly stripped from scope prose.
+
+The missing test case that would expose this: a body with an outer ` ``` ` fence (length 3) whose first interior line is ` ```typescript` (also length 3, with info string). The existing test in `rewrite-fence-aware.test.ts` covers the *different-length* inner fence case (4-backtick outer / 3-backtick inner), but not the *same-length-with-info-string* case. A reasonable fix is to resolve the ambiguity at the call site — when `openFence !== null`, additionally verify the remainder of the trimmed line after the fence run is empty or only spaces before treating it as a closer (i.e., `line.trimStart().slice(fence.length).trim().length === 0`). Alternatively, `fenceDelimiter` could expose `hasInfoString` and callers check it before accepting a close.
+
+---
+
+### AUDIT-20260621-56 — `cluster-no-nonnull.test.ts` comment-stripping does not cover `/* */` block comments
+
+Finding-ID: AUDIT-20260621-56
+Status: migrated-to-backlog TASK-402
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/cluster-no-nonnull.test.ts:28-33
+
+The stripping pass before the non-null assertion scan filters lines whose trimmed form starts with `//` or `*`, which covers `//` line comments and interior lines of `/** ... */` JSDoc blocks (the ` * ` lines). It does not cover a `/* ... */` block comment on a single line, e.g. `/* fallback x! */`. After `.filter(line => !line.trimStart().startsWith('//') && !line.trimStart().startsWith('*'))`, such a line survives into the code-only string. If `cluster.test.ts` ever acquires a single-line block comment containing `!` (e.g., as part of an error-message description or a test label), the scan would report a false positive and the CI gate would fail spuriously. In the current codebase `cluster.test.ts` uses only `//` comments, making this a dormant risk rather than an active defect. Extending the filter to also reject lines whose trimmed form starts with `/*` (or stripping `/* ... */` spans as part of the replace chain) would harden the meta-test against future comment style drift.
+
+## 2026-06-21 — audit-barrage lift (20260621T030759551Z-029-govern-operability-phase-9)
+
+Code-sha: 57d730c31f48d3162b8dda832be0cfaec9ff654b
+### AUDIT-20260621-57 — `!` non-null assertions introduced in production source while the phase simultaneously codifies the no-`!` rule
+
+Finding-ID: AUDIT-20260621-57
+Status: migrated-to-backlog TASK-403
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/document-model/chrome.ts:57–58 (added lines in diff)
+
+The newly-added `fenceDelimiter` function contains two non-null assertion operators (`!`) in production source code:
+
+```typescript
+if (backticks !== null) return { char: '`', length: backticks[1]!.length };
+...
+if (tildes !== null) return { char: '~', length: tildes[1]!.length };
+```
+
+These are semantically safe: both regex patterns have a capturing group that is always populated when the overall match succeeds, so `[1]` will never be `undefined` at runtime. The correctness risk is low. The blast-radius concern is different: the same phase that introduces these `!` expressions also ships `cluster-no-nonnull.test.ts`, whose inline comment explicitly cites the project's prohibition — "The project bans `!` (no non-null assertions — .claude/CLAUDE.md 'Never bypass typing')". An unattended agent reading `chrome.ts` sees `!` in production code that was committed this phase; it sees a guard in `cluster-no-nonnull.test.ts` scoped only to `cluster.test.ts`. The agent's natural inference is: "`!` is allowed in source files, disallowed only in that one test file." That reading will propagate the pattern. Pre-existing `!` in `roadmap-model.ts` (`targets[0]!`, `m[2]!`) compounds the signal.
+
+The appropriate fix is to eliminate the capturing group and restructure the match: capture the full leading-fence string separately, derive its length from the string itself rather than an index into the match array.
+
+---
+
+### AUDIT-20260621-58 — `cluster-no-nonnull.test.ts` guard does not strip regex literals; regex-internal `!` would be a false positive
+
+Finding-ID: AUDIT-20260621-58
+Status: migrated-to-backlog TASK-404
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/cluster-no-nonnull.test.ts:23–34
+
+The file-scan logic strips single-quoted strings, double-quoted strings, and template literals, then applies the `NON_NULL_ASSERTION` regex `/[\w$)\]]!(?!=)/g`. It does not strip regex literals (e.g., `/pattern!/`). If `cluster.test.ts` ever contains a regex literal whose body contains `!` following a word character, the test would report a false positive. More subtly, the multi-line join-then-replace approach means that a regex literal which spans multiple lines (rare but possible with the `x` flag or by having the closing `/` on a later line) would not be cleanly erased; and any line inside a multi-line template literal that happens to start with `//` or `*` would be filtered out before the template-literal erasure regex runs, potentially breaking the template literal match and leaving raw literal content (including any `!`) in `codeOnly`.
+
+In the current state of `cluster.test.ts` none of these conditions apply, so the test functions correctly. The risk manifests only if the test file evolves. The appropriate fix is to add regex-literal stripping (e.g., `/regex-literal pattern/flags`) to the erasure chain, or to use a TypeScript AST-level scan (ts-morph / TypeScript compiler API) rather than regex-on-text — the latter being more robust but heavier.
+
+---
+
+### AUDIT-20260621-59 — `session-end/SKILL.md` hardcodes `audiocontrol-org/deskwork` as the upstream GH repo; no configuration hook for external adopters
+
+Finding-ID: AUDIT-20260621-59
+Status: migrated-to-backlog TASK-405
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    skills/session-end/SKILL.md (added lines, approx. lines 65–75 in post-diff view)
+
+The new tooling-friction routing guidance says:
+
+> file a GitHub issue against [`audiocontrol-org/deskwork`](https://github.com/audiocontrol-org/deskwork/issues) (`gh issue create --repo audiocontrol-org/deskwork`)
+
+For the current deployment this is accurate — `stackctl` and the stack-control plugin are maintained in that repository. However, if stack-control is published as a standalone distributable and adopted by an organization whose `stackctl` friction should route to a different tracker, the hardcoded repo becomes wrong. The skill offers no interpolation hook (e.g., a `stackctl_upstream_repo` config key). Adopters following this guidance verbatim would file issues against the wrong repository. Whether this matters depends on the project's distributable-plugin roadmap; it is surfaced here as an artifact worth tracking, not as a current correctness defect.
+
+---
+
+### AUDIT-20260621-60 — `fenceDelimiter` uses `trimStart()` (unlimited indentation) rather than CommonMark's 0–3 space limit; acknowledged simplification but opens a latent divergence
+
+Finding-ID: AUDIT-20260621-60 (claude-04 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-406
+Severity:   medium
+Per-lane:   claude=informational, codex=medium
+Decision:   adjudicated (gate-counted medium) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — medium retained.
+Surface:    src/document-model/chrome.ts (fenceDelimiter body, added lines)
+
+CommonMark §4.5 specifies that a fenced code block's opening delimiter may be indented by at most 3 spaces before the backtick/tilde run. `fenceDelimiter` calls `line.trimStart()`, which strips any amount of leading whitespace before checking for the run. This means a line indented by 4+ spaces that happens to start with ```` ``` ```` will be identified as a fence delimiter, even though CommonMark would not treat it as one. The inverse — a line indented by 1–3 spaces — is correctly handled. The original comment ("We keep this deliberately simple") acknowledges this class of simplification. The concern here is a channel-enumeration note: the `fenceDelimiter` function is now exported and used in two places (`mutations.ts`, `roadmap-model.ts`). If either of those call sites ever needs to handle deeply-indented content (e.g., items nested inside blockquotes or list items, which roadmap bodies can contain), the unlimited-trim will silently produce wrong fence detection. Since the scope is intentionally narrow (edge-mutation documents with field bullets), this is informational rather than actionable.

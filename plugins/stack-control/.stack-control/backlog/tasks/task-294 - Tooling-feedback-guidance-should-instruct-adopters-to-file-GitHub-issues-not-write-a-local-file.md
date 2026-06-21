@@ -3,9 +3,10 @@ id: TASK-294
 title: >-
   Tooling-feedback guidance should instruct adopters to file GitHub issues, not
   write a local file
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 05:05'
+updated_date: '2026-06-21 03:14'
 labels:
   - 'type:imported-issue'
   - documentation

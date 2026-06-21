@@ -3,9 +3,10 @@ id: TASK-290
 title: >-
   cluster.test.ts uses non-null (!) assertions (model.byId.get(id)!) — banned by
   the strict-typing rule
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 03:13'
+updated_date: '2026-06-21 03:14'
 labels:
   - agent-found
   - 'type:bug'

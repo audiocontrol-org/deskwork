@@ -1,9 +1,10 @@
 ---
 id: TASK-292
 title: Uniform list-flag stray-comma handling + dead --part-of branch in roadmap.ts
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 04:26'
+updated_date: '2026-06-21 03:14'
 labels:
   - agent-found
   - 'type:gap'
