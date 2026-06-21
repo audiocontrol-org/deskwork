@@ -72,8 +72,8 @@ description: "Task list for Chunked whole-feature end-govern"
 - [x] T011 [P] [US1] RED: `src/govern/cluster-payload/__tests__/clustering.test.ts` — assert coupled files group into clusters, every changed file in exactly one cluster, clusters disjoint (data-model Cluster validation); FAIL.
 - [x] T012 [P] [US1] RED: `src/govern/cluster-payload/__tests__/non-audit-trim.test.ts` — assert the pre-pass drops lockfile/generated/vendored/whitespace/fixture bytes and records each `trimApplied` category+bytes (FR-006, R2); FAIL.
 - [x] T013 [P] [US1] RED: `src/govern/cluster-payload/__tests__/envelope-binpack.test.ts` — assert first-fit-decreasing packs clusters into chunks each ≤ envelope, and an oversized single cluster (after trim) sub-splits into ≥2 sub-chunks with a `SplitClusterMarker` (non-empty coverage caveat) and NEVER throws boundary-too-large (FR-002/FR-006, R2); FAIL.
-- [ ] T014 [P] [US1] RED: `src/govern/cluster-payload/__tests__/determinism.test.ts` — assert running the partitioner twice over identical `base..HEAD` endpoints yields byte-identical chunks/chunkIds/manifests/splitClusterMarkers (FR-004, US1 Scenario 3); FAIL.
-- [ ] T015 [P] [US1] RED: `src/govern/__tests__/end-govern-pipeline.size.test.ts` — assert end-govern on a fixture diff exceeding the smallest lane envelope reaches a graduation decision (converged/override-eligible), emits ⋃chunks.files == changed-file set, and produces 0 `boundary-too-large` outcomes (SC-001, US1 Scenarios 1-2); FAIL.
+- [x] T014 [P] [US1] RED: `src/govern/cluster-payload/__tests__/determinism.test.ts` — assert running the partitioner twice over identical `base..HEAD` endpoints yields byte-identical chunks/chunkIds/manifests/splitClusterMarkers (FR-004, US1 Scenario 3); FAIL.
+- [x] T015 [P] [US1] RED: `src/govern/__tests__/end-govern-pipeline.size.test.ts` — assert end-govern on a fixture diff exceeding the smallest lane envelope reaches a graduation decision (converged/override-eligible), emits ⋃chunks.files == changed-file set, and produces 0 `boundary-too-large` outcomes (SC-001, US1 Scenarios 1-2); FAIL.
 
 ### Implementation for User Story 1
 
@@ -81,10 +81,10 @@ description: "Task list for Chunked whole-feature end-govern"
 - [x] T017 [P] [US1] Implement `src/govern/cluster-payload/clustering.ts` (group coupled files into disjoint clusters from the coupling graph); make T011 pass.
 - [x] T018 [P] [US1] Implement `src/govern/cluster-payload/non-audit-trim.ts` (cheap pre-pass dropping non-audit bytes, recording categories); make T012 pass.
 - [x] T019 [US1] Implement `src/govern/cluster-payload/envelope-binpack.ts` (first-fit-decreasing pack ≤ envelope using the rekeyed measurement primitive; oversized-cluster sub-split + `split-cluster` marker; never FATAL) (depends on T009, T016-T018); make T013 pass.
-- [ ] T020 [US1] Implement the `cluster-payload` aggregate entry (couple→cluster→trim→binpack→manifest, deterministic, per contracts/cluster-payload.md) wiring T016-T019 + chunk-id (T007); make T014 pass.
-- [ ] T021 [US1] Implement `src/govern/payload-diff-scope.ts` — committed-diff (`base..HEAD`) + untracked-fold scoping, inclusion-based (the FR-023 successor to the exclusion plumbing); RED test `src/govern/__tests__/payload-diff-scope.test.ts` first (assert non-empty `diffScope.files` for a committed-diff fixture; watch FAIL), then implement.
-- [ ] T022 [US1] Implement `src/govern/payload-chunk.ts` — render ONE chunk's audit payload (diff + plan/spec/contracts + manifest); RED test `src/govern/__tests__/payload-chunk.test.ts` first (assert a chunk payload includes its diff and stays ≤ envelope; watch FAIL), then implement.
-- [ ] T023 [US1] Implement `src/govern/end-govern-pipeline.ts` CLUSTER→AUDIT→RECONCILE skeleton over committed `governedSha`..HEAD (FR-001; parallel per-chunk barrage fire/render under a fleet-bounded concurrency cap, reusing the existing audit-barrage machinery — FR-008; single reconcile stub) (depends on T020-T022); make T015 pass.
+- [x] T020 [US1] Implement the `cluster-payload` aggregate entry (couple→cluster→trim→binpack→manifest, deterministic, per contracts/cluster-payload.md) wiring T016-T019 + chunk-id (T007); make T014 pass.
+- [x] T021 [US1] Implement `src/govern/payload-diff-scope.ts` — committed-diff (`base..HEAD`) + untracked-fold scoping, inclusion-based (the FR-023 successor to the exclusion plumbing); RED test `src/govern/__tests__/payload-diff-scope.test.ts` first (assert non-empty `diffScope.files` for a committed-diff fixture; watch FAIL), then implement.
+- [x] T022 [US1] Implement `src/govern/payload-chunk.ts` — render ONE chunk's audit payload (diff + plan/spec/contracts + manifest); RED test `src/govern/__tests__/payload-chunk.test.ts` first (assert a chunk payload includes its diff and stays ≤ envelope; watch FAIL), then implement.
+- [x] T023 [US1] Implement `src/govern/end-govern-pipeline.ts` CLUSTER→AUDIT→RECONCILE skeleton over committed `governedSha`..HEAD (FR-001; parallel per-chunk barrage fire/render under a fleet-bounded concurrency cap, reusing the existing audit-barrage machinery — FR-008; single reconcile stub) (depends on T020-T022); make T015 pass.
 
 **Checkpoint**: A >envelope fixture feature governs to a decision with zero `boundary-too-large` — MVP partition+audit path works.
 
@@ -127,13 +127,13 @@ description: "Task list for Chunked whole-feature end-govern"
 
 ### Tests for User Story 3 (RED first) ⚠️
 
-- [ ] T037 [P] [US3] RED: `src/govern/__tests__/chunk-manifest.test.ts` — assert each chunk's manifest lists exactly the other chunks' file lists (complete, no self-entry, file-lists-only, no diff bodies) (FR-005, R8, US3 Scenario 2); FAIL.
+- [x] T037 [P] [US3] RED: `src/govern/__tests__/chunk-manifest.test.ts` — assert each chunk's manifest lists exactly the other chunks' file lists (complete, no self-entry, file-lists-only, no diff bodies) (FR-005, R8, US3 Scenario 2); FAIL.
 - [ ] T038 [P] [US3] RED: `src/govern/__tests__/seam-pass.substantive.test.ts` — assert the seam pass flags a removed/renamed export, changed arity, or changed required shape CONSUMED across a chunk boundary, and does NOT flag a compatible addition or internal-only change (`consumedAcross=true` on every finding) (FR-014, R7, SC-003, US3 Scenarios 3-4); FAIL.
 - [ ] T039 [P] [US3] RED: `src/govern/__tests__/seam-payload-envelope.test.ts` — assert the seam payload (signatures + changed-function headers only) is measured ≤ envelope via the rekeyed primitive, keyed on a seam id not a phase id (FR-014, research Tension 1); FAIL.
 
 ### Implementation for User Story 3
 
-- [ ] T040 [US3] Implement `src/govern/chunk-manifest.ts` (render per-chunk other-chunks file lists; file-lists only) and wire it into `payload-chunk.ts` rendering; make T037 pass.
+- [x] T040 [US3] Implement `src/govern/chunk-manifest.ts` (render per-chunk other-chunks file lists; file-lists only) and wire it into `payload-chunk.ts` rendering; make T037 pass.
 - [ ] T041 [US3] Implement `src/govern/seam-pass.ts` (interface-level cross-chunk + split-cluster boundary audit; substantive-break gate = cross-boundary breakage only; emits `SeamResult` with `suppressedCompatible` count) using the rekeyed envelope measurement; make T038 + T039 pass.
 - [ ] T042 [US3] Insert the SEAM step into `src/govern/end-govern-pipeline.ts` (after re-audit converges, before reconcile), consulting split-cluster markers to recover cross-sub-chunk coverage (R7).
 
