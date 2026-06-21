@@ -51,12 +51,17 @@ function head(repo: string): string {
 }
 
 describe('US5 FR-021 — the per-phase artifact framing teaches out-of-window = not-this-phase-scope', () => {
-  it('CODE_ARTIFACT_FRAMING_PER_PHASE instructs the auditor not to flag out-of-window references as absent', () => {
+  it('CODE_ARTIFACT_FRAMING_PER_PHASE instructs the auditor not to flag unshown references as absent', () => {
     const lower = CODE_ARTIFACT_FRAMING_PER_PHASE.toLowerCase();
     expect(lower).toContain('out of');
     expect(lower).toContain('window');
     // It must explicitly steer away from the "absent / not imported" false HIGH.
     expect(lower).toMatch(/absent|not imported|not-imported/);
+    // AUDIT-20260621-19: the guarantee must cover IN-scope-but-unchanged refs too
+    // (not only out-of-window) — the diff shows only changed files, so any unshown
+    // referenced file must be treated as present, and the fold is best-effort.
+    expect(lower).toContain('unchanged');
+    expect(lower).toContain('best-effort');
   });
 
   it('the generic CODE_ARTIFACT_FRAMING does NOT assert a per-phase window (AUDIT-20260621-06)', () => {
