@@ -231,8 +231,8 @@ description: "Task list for Chunked whole-feature end-govern"
 
 ### Tests for User Story 8 (RED first) ⚠️
 
-- [ ] T061 [P] [US8] RED: `src/govern/__tests__/composition-bugs-gone.test.ts` — assert the four prior repros are gone: non-empty `diffScope.files` for a committed-diff fixture, commit subjects scoped to the chunk, no checkpoint-env code path, no dead re-audit branch (FR-023, US8 Scenario 2); FAIL until the old arm is fully removed/superseded.
-- [ ] T062 [P] [US8] RED: `src/govern/__tests__/file-line-cap.test.ts` — assert every source file touched by this feature is ≤500 lines, including the `payload-implement.ts` successors and every new chunking module (SC-007, FR-022, Principle VI); FAIL if any over-cap.
+- [x] T061 [P] [US8] RED: `src/govern/__tests__/composition-bugs-gone.test.ts` — assert the four prior repros are gone: non-empty `diffScope.files` for a committed-diff fixture, commit subjects scoped to the chunk, no checkpoint-env code path, no dead re-audit branch (FR-023, US8 Scenario 2); FAIL until the old arm is fully removed/superseded.
+- [x] T062 [P] [US8] RED: `src/govern/__tests__/file-line-cap.test.ts` — assert every source file touched by this feature is ≤500 lines, including the `payload-implement.ts` successors and every new chunking module (SC-007, FR-022, Principle VI); FAIL if any over-cap.
 
 ### Implementation for User Story 8
 
@@ -247,10 +247,10 @@ description: "Task list for Chunked whole-feature end-govern"
 
 **Purpose**: Settle the carried open questions, run the quickstart validation, and final cross-story hygiene.
 
-- [ ] T065 [P] Settle **OQ-1 (non-TS coupling precision)** — decide ship-now vs follow-on for the per-adopter coupling-resolver seam; record the decision in `src/govern/cluster-payload/coupling-graph.ts` doc-comment + the spec Open Questions, or carry it forward as an explicitly-marked open item (capture-over-cut). Do NOT silently drop.
-- [ ] T066 [P] Settle **OQ-2 (concurrency-cap default)** — fix the default worktree-fix concurrency cap (recommendation ≈4) and whether it is adopter-configurable; record in `src/govern/fix-fanout/worktree-dispatch.ts` config + the spec Open Questions. Do NOT silently drop.
-- [ ] T067 Run the `specs/030-chunked-end-govern/quickstart.md` validation scenarios end-to-end against the fixture features (map SC-001..SC-007); record evidence.
-- [ ] T068 [P] Final per-file line-count + per-phase-surface-count sweep (re-run T027 + T062 assertions) confirming SC-002 (0 per-phase surfaces) and SC-007 (no >500-line file) across the whole feature diff.
+- [x] T065 [P] Settle **OQ-1 (non-TS coupling precision)** — decide ship-now vs follow-on for the per-adopter coupling-resolver seam; record the decision in `src/govern/cluster-payload/coupling-graph.ts` doc-comment + the spec Open Questions, or carry it forward as an explicitly-marked open item (capture-over-cut). Do NOT silently drop.
+- [x] T066 [P] Settle **OQ-2 (concurrency-cap default)** — fix the default worktree-fix concurrency cap (recommendation ≈4) and whether it is adopter-configurable; record in `src/govern/fix-fanout/worktree-dispatch.ts` config + the spec Open Questions. Do NOT silently drop.
+- [x] T067 Run the `specs/030-chunked-end-govern/quickstart.md` validation scenarios end-to-end against the fixture features (map SC-001..SC-007); record evidence.
+- [x] T068 [P] Final per-file line-count + per-phase-surface-count sweep (re-run T027 + T062 assertions) confirming SC-002 (0 per-phase surfaces) and SC-007 (no >500-line file) across the whole feature diff.
 
 ---
 
