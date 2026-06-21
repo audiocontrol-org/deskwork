@@ -213,11 +213,11 @@ description: "Task list for Chunked whole-feature end-govern"
 
 ### Tests for User Story 7 (RED first) ⚠️
 
-- [ ] T059 [P] [US7] RED: `src/doctor/__tests__/chunked-govern-artifacts.test.ts` — assert the doctor rule flags a malformed whole-feature convergence record, a missing required field on each new artifact, and a `split-cluster` marker referencing a non-existent chunk (dangling ref) with actionable messages (FR-021, SC-006, US7 Scenarios 1-2); FAIL.
+- [x] T059 [P] [US7] RED: `src/doctor/__tests__/chunked-govern-artifacts.test.ts` — assert the doctor rule flags a malformed whole-feature convergence record, a missing required field on each new artifact, and a `split-cluster` marker referencing a non-existent chunk (dangling ref) with actionable messages (FR-021, SC-006, US7 Scenarios 1-2); FAIL.
 
 ### Implementation for User Story 7
 
-- [ ] T060 [US7] Implement the doctor rule `src/doctor/chunked-govern-artifacts.ts` validating chunk-set, split-cluster markers, touched-set rounds, seam result, and whole-feature convergence record against the schemas in `chunk-artifacts.ts`; make T059 pass.
+- [x] T060 [US7] Implement the doctor rule `src/doctor/chunked-govern-artifacts.ts` validating chunk-set, split-cluster markers, touched-set rounds, seam result, and whole-feature convergence record against the schemas in `chunk-artifacts.ts`; make T059 pass.
 
 **Checkpoint**: Malformed new artifacts are caught, not silently trusted.
 
