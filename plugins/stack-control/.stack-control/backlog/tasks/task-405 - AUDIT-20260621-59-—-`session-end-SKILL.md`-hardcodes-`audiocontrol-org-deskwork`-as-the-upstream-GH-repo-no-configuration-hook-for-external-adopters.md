@@ -4,9 +4,10 @@ title: >-
   AUDIT-20260621-59 — `session-end/SKILL.md` hardcodes
   `audiocontrol-org/deskwork` as the upstream GH repo; no configuration hook for
   external adopters
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-21 03:14'
+updated_date: '2026-06-21 05:40'
 labels:
   - 'type:migrated-finding'
   - 'feature:029-govern-operability'

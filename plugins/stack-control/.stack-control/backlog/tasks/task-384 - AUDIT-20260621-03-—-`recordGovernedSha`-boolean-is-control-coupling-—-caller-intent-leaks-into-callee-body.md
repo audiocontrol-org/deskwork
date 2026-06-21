@@ -3,9 +3,10 @@ id: TASK-384
 title: >-
   AUDIT-20260621-03 — `recordGovernedSha` boolean is control-coupling — caller
   intent leaks into callee body
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-21 00:24'
+updated_date: '2026-06-21 05:40'
 labels:
   - 'type:migrated-finding'
   - 'feature:029-govern-operability'

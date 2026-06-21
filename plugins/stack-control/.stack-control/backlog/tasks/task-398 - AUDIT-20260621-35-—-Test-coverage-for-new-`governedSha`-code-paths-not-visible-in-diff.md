@@ -3,9 +3,10 @@ id: TASK-398
 title: >-
   AUDIT-20260621-35 — Test coverage for new `governedSha` code paths not visible
   in diff
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-21 02:10'
+updated_date: '2026-06-21 05:40'
 labels:
   - 'type:migrated-finding'
   - 'feature:029-govern-operability'
