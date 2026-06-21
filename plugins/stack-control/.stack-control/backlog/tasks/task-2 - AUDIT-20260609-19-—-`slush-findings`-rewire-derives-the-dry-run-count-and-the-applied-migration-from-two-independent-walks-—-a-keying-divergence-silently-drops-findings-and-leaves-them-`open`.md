@@ -4,10 +4,10 @@ title: >-
   AUDIT-20260609-19 — `slush-findings` rewire derives the dry-run count and the
   applied migration from two independent walks — a keying divergence silently
   drops findings and leaves them `open`
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-09 19:37'
-updated_date: '2026-06-11 02:29'
+updated_date: '2026-06-21 06:45'
 labels:
   - 'type:migrated-finding'
   - 'feature:pluggable-lifecycle-providers'
