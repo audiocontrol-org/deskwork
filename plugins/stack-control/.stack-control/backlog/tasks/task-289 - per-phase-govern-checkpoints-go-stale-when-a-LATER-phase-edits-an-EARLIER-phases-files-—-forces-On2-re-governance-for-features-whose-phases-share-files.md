@@ -4,9 +4,10 @@ title: >-
   per-phase govern checkpoints go stale when a LATER phase edits an EARLIER
   phase's files — forces O(n^2) re-governance for features whose phases share
   files
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 02:44'
+updated_date: '2026-06-21 02:10'
 labels:
   - agent-found
   - 'type:bug'

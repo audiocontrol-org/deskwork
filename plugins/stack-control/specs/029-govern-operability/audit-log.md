@@ -3235,3 +3235,46 @@ Decision:   single-model (gate-counted informational)
 Surface:    templates/WORKFLOW.md:89,98,143 (template); any instantiated WORKFLOW.md in the repo
 
 The template is updated from `all-phase-checkpoints-current impl` → `graduate-impl impl` in three positions (phase:governing exit, phase:shipped entrance, transition:graduate exit-gate). This is correct for new features. Existing features whose WORKFLOW.md was instantiated from the old template still carry `all-phase-checkpoints-current impl`. They continue to work — the old criterion is still valid — but they cannot use the opt-in path B (a converged whole-feature record) without manual edits. There is no doctor rule, migration utility, or guidance note explaining this. Operators who want to use path B on an in-flight feature must discover and apply the change themselves. Blast-radius: no feature silently breaks; the gap is exclusively that opt-in functionality is inaccessible without operator awareness. A doc note in `specs/029-govern-operability/` or a targeted doctor rule checking for `all-phase-checkpoints-current impl` in the graduate position would close the discoverability gap.
+
+## 2026-06-21 — audit-barrage lift (20260621T020821857Z-029-govern-operability-phase-7)
+
+Code-sha: 00a64d2e6d1ae6aa5d7259ecd778d227001f5d02
+### AUDIT-20260621-34 — SHA-format gap: `governedSha` is validated only as a non-empty string, not as a plausible git ref
+
+Finding-ID: AUDIT-20260621-34
+Status: migrated-to-backlog TASK-397
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/govern/checkpoint-state.ts:427–437
+
+The validation added in `validateCheckpointRecord` checks that `governedSha` is a non-empty string when present, but accepts any non-empty string:
+
+```typescript
+if (typeof parsed.governedSha !== 'string' || parsed.governedSha.length === 0) {
+  throw new Error(`…governedSha must be a non-empty string when present`);
+}
+```
+
+A checkpoint file with a plausible-looking but invalid value — `"not-a-sha"`, `"abc"` (too short), a whitespace-only string containing invisible characters — passes this gate cleanly. The error surface then shifts downstream to wherever `governedSha` is fed to `git diff` or `git rev-parse`, where the error message will be a raw git exit-code rather than a clear checkpoint-parse diagnostic.
+
+The code already applies the "fail loud" principle at the empty-string case; adding a basic hex-and-length check (e.g. `/^[0-9a-f]{7,40}$/i`) gives the same loud failure at parse time. Blast-radius reasoning: this is a checkpoint file written by the tooling itself, so a malformed SHA in the wild is unlikely — but an operator who hand-edits or cherry-picks a checkpoint across repos would hit a cryptic downstream error. Severity is low because the failure is ultimately surfaced (just at the wrong layer) and the common case is unaffected.
+
+---
+
+### AUDIT-20260621-35 — Test coverage for new `governedSha` code paths not visible in diff
+
+Finding-ID: AUDIT-20260621-35
+Status: migrated-to-backlog TASK-398
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/govern/checkpoint-state.ts (validation throw-path, ~line 433); src/govern/phase-checkpoint-status.ts (propagation paths, lines ~93 and ~102)
+
+The diff adds three new code branches that should have corresponding test cases:
+
+1. `validateCheckpointRecord`: the throw path when `governedSha` is present but not a non-empty string (the new `if`-branch at ~line 433).
+2. `resolvePhaseCheckpointStatuses`: the 'missing' path now explicitly sets `governedSha: undefined` (line ~93).
+3. `resolvePhaseCheckpointStatuses`: the record path propagates `record.governedSha` (line ~102), covering both the `undefined` (pre-US5 record) and `string` (US5+ record) cases.
+
+Commit `ce7c1db6` is titled "address phase-6 govern findings (AUDIT-20260621-27..30: record-converged criterion vs field clarity + **test gaps**)" — it explicitly claims to close test gaps. Yet neither a test file for `checkpoint-state` nor for `phase-checkpoint-status` appears in this diff. Per the phase-window instructions, those test additions may live in an earlier commit in the range or in an out-of-window file. This is flagged as informational: confirm that the test suites for these two modules exercise the new `governedSha` paths (valid present, invalid-throws, undefined-from-missing-record, and string-from-US5-record). If they do not, the throw path in `validateCheckpointRecord` is the highest-priority gap — an untested error branch is a common source of silent regressions.

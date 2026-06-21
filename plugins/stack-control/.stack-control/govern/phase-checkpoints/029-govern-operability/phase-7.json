@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "featureSlug": "029-govern-operability",
+  "phaseId": "7",
+  "checkpoint": "phase-7",
+  "auditLogSection": "phase-7",
+  "scopeFingerprint": "0acd3175dcf20a24e93bb45eafc8a3fbb7de9162d1ccc0dc35e578e2ebcce0d6",
+  "passedAt": "2026-06-21T02:10:06.995Z",
+  "governedPaths": [
+    "tests/govern/hunk-fingerprint.test.ts",
+    "src/govern/checkpoint-state.ts",
+    "src/govern/phase-checkpoint-status.ts"
+  ],
+  "auditedFiles": [
+    "src/govern/checkpoint-state.ts",
+    "src/govern/phase-checkpoint-status.ts"
+  ],
+  "governedSha": "00a64d2e6d1ae6aa5d7259ecd778d227001f5d02",
+  "hunkBlocks": [
+    {
+      "file": "src/govern/checkpoint-state.ts",
+      "hash": "00bddcfaebf0305241b7e62b928a4deb94827e08a6382be27de0fefb79939395",
+      "lines": 10
+    },
+    {
+      "file": "src/govern/checkpoint-state.ts",
+      "hash": "5ed11f516f588aaf67f273926340b00331c2f5e12501e7c8898232545b3a56ec",
+      "lines": 1
+    },
+    {
+      "file": "src/govern/checkpoint-state.ts",
+      "hash": "8d8b562306bdd82b4b93624add09f9eb8834070225b38bb7816185c8f677e3b3",
+      "lines": 1
+    },
+    {
+      "file": "src/govern/checkpoint-state.ts",
+      "hash": "e8fe081c23212fec9049c02ac0bc74ac4c98eff45136403820584ea470555c25",
+      "lines": 10
+    },
+    {
+      "file": "src/govern/phase-checkpoint-status.ts",
+      "hash": "32d29947d66cf2a453f46a238f238cd474518173a1091f1e133e4ea9d6300658",
+      "lines": 1
+    },
+    {
+      "file": "src/govern/phase-checkpoint-status.ts",
+      "hash": "4c56e38fa3d81b41bac8920798c42c97249180f6ac787d66edb2d16af2c31c9b",
+      "lines": 4
+    },
+    {
+      "file": "src/govern/phase-checkpoint-status.ts",
+      "hash": "d4ec8337a7819d822211b6a4a49414fea5c206b1e0495ec5a4f43e1a54345a0a",
+      "lines": 1
+    }
+  ]
+}
