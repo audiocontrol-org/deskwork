@@ -35,9 +35,9 @@ description: "Task list for Chunked whole-feature end-govern"
 
 **Purpose**: Create the new module skeleton and confirm the test harness so RED tests can be authored against real (empty) module surfaces.
 
-- [ ] T001 Create the `src/govern/cluster-payload/` and `src/govern/fix-fanout/` directories with empty placeholder modules (`coupling-graph.ts`, `clustering.ts`, `envelope-binpack.ts`, `non-audit-trim.ts`, `chunk-id.ts`, `worktree-dispatch.ts`, `merge-serialize.ts`) each exporting a typed stub so imports resolve; co-locate empty `__tests__/` dirs.
-- [ ] T002 Create empty placeholder modules `src/govern/chunk-manifest.ts`, `src/govern/touched-set.ts`, `src/govern/seam-pass.ts`, `src/govern/end-govern-pipeline.ts`, `src/govern/payload-chunk.ts`, `src/govern/payload-diff-scope.ts`, `src/govern/chunk-artifacts.ts`, each exporting a typed stub.
-- [ ] T003 [P] Confirm vitest runs the new `src/govern/cluster-payload/__tests__/` and `src/govern/fix-fanout/__tests__/` paths (add a trivial passing spec in each new test dir, then delete) — establishes the on-disk fixture-tree convention per `.claude/rules/testing.md`.
+- [x] T001 Create the `src/govern/cluster-payload/` and `src/govern/fix-fanout/` directories with empty placeholder modules (`coupling-graph.ts`, `clustering.ts`, `envelope-binpack.ts`, `non-audit-trim.ts`, `chunk-id.ts`, `worktree-dispatch.ts`, `merge-serialize.ts`) each exporting a typed stub so imports resolve; co-locate empty `__tests__/` dirs.
+- [x] T002 Create empty placeholder modules `src/govern/chunk-manifest.ts`, `src/govern/touched-set.ts`, `src/govern/seam-pass.ts`, `src/govern/end-govern-pipeline.ts`, `src/govern/payload-chunk.ts`, `src/govern/payload-diff-scope.ts`, `src/govern/chunk-artifacts.ts`, each exporting a typed stub.
+- [x] T003 [P] Confirm vitest runs the new tests. NOTE: the project's vitest config collects `src/__tests__/**` and `tests/**` only (NOT co-located `src/govern/**/__tests__/`); the project has zero co-located test dirs. Adapted per existing convention — 030 tests live in `src/__tests__/govern/` (alongside `phase-boundary-sizing.test.ts`), already collected; source modules keep the tasks.md paths. Govern suite green (32 files / 190 tests).
 
 **Checkpoint**: Module skeleton resolves; test harness picks up new co-located dirs.
 
