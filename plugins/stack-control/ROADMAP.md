@@ -407,32 +407,32 @@ Make the stack-control workflow protocol mechanically un-skippable for adopting 
 The stack-control agent-facing capability API: capability interfaces (backlog-like, spec-definition, spec-execution operations) that COMPLETELY MEDIATE between an adopting agent and the swappable backends that implement them, with point-of-invocation interception as the enforcement that makes mediation complete (the agent cannot reach past the API to the backend). Generalizes 025 US4 speckit-guard (operator decision 2026-06-17): refuse ALL fronted-backend calls (front door is the only sanctioned path); mechanism = a cross-vendor PreToolUse interceptor calling the stackctl guard (primary) + the make-bypass-harmless gate (backstop). Cross-vendor (logic in stackctl, never vendor identity); the backend skills/CLIs are the adopter's own (no hardcoded .claude/skills). Umbrella node: design:feature/backlog-backend-port + impl:feature/execution-engine re-relate as concrete capability adapters (part-of edges pending the TASK-137 reparent verb). Ruling in the design record: a plugin-shipped Claude Code hook is a permitted enforcement surface (travels with claude plugin install, unlike a git hook). See docs/superpowers/specs/2026-06-17-capability-interface-mediation-design.md + specs/025 US4.
 
 ## multi:feature/audit-barrage-convergence
-- status: planned
+- status: shipped
 - part-of: multi:feature/govern-operability
 - ref: TASK-60
 Make cross-model audit-barrage governance converge cleanly instead of ringing. Problem (TASK-60): myopic convergence — many rounds where few were needed, fix-induced surface growth, serial single-fleet discovery. Confirmed live in the 025 dogfood: auditors get ever nit-pickier each round. Children address the levers (granularity, severity determinism, dampener-in-loop).
 
 ## design:gap/audit-granularity-switch
-- status: planned
+- status: shipped
 - part-of: multi:feature/audit-barrage-convergence
 - ref: TASK-154
 Re-admit full-audit-at-end as a graduate path (gate honors per-phase checkpoints OR a whole-feature record-converged impl); per-phase opt-in for small-model payload-sizing, not mandatory. Reverses the 025 'compose, reject augment' clarify. Per-phase multiplied audit surface + oscillation rather than reducing it. Detail: TASK-154.
 
 ## multi:gap/audit-barrage-severity-determinism
-- status: planned
+- status: shipped
 - part-of: multi:feature/audit-barrage-convergence
 - ref: TASK-146
 Severity must be stable across rounds on unchanged code; re-rating LOW->HIGH defeats the FR-010 convergence dampener and drives the ringing. Detail: TASK-146 (gh-482).
 
 ## multi:gap/govern-dampener-in-loop
-- status: planned
+- status: shipped
 - part-of: multi:feature/audit-barrage-convergence
 - ref: TASK-149
 govern dampener migrates findings to the backlog while they are being fixed in the same loop. Detail: TASK-149 (gh-471).
 
 ## multi:gap/audit-barrage-codex-liveness
 - part-of: multi:feature/govern-operability
-- status: planned
+- status: shipped
 - ref: TASK-145
 codex lane trips killed-no-liveness on real payloads; emit reasoning summaries (or --json events) for genuine stderr liveness pulses so the window can stay tight, instead of widening it blindly. Update installation + template config. Detail: TASK-145.
 
@@ -478,7 +478,7 @@ Edge-mutation verbs on EXISTING roadmap nodes: add-edge / remove-edge / move-edg
 Verb-surface consolidation rollout: migrate the remaining ~50 flat stackctl verbs onto the commander parser surface (as roadmap was in 027) — ~50 flat verbs to ~12-15 nouns, machine-adapter verbs marked internal, backwards-compat aliases for the old names, every verb adopting the self-documenting parser. DEFERRED sibling of specs/027-roadmap-edge-mutation-and-cluster (027 migrated only the roadmap verb as the proof). FR-017.
 
 ## multi:gap/govern-per-phase-friction-burndown
-- status: planned
+- status: shipped
 - part-of: multi:feature/govern-operability
 - ref: TASK-289
 Burn down the per-phase governance friction surfaced while implementing 027 — the dominant cost was govern tooling, not the feature code. Headline defects: TASK-289 (O(n^2) shared-file checkpoint staleness — a later phase editing an earlier phase's file re-stales its checkpoint, forcing repeated re-governance and ad-hoc overrides; the structural fix is fingerprinting per-phase HUNKS not whole files, or a govern-at-end mode for shared-file features); the audit-barrage severity NON-DETERMINISM (HIGH oscillated 2->0->2 and LOW->HIGH on identical code, defeating the convergence dampener and forcing overrides on phases 4+6); TASK-263 (per-phase scoping derives the payload from tasks.md backtick paths, so a file split out during implementation — e.g. cluster.ts — is excluded from its own audit, and the no-grounding claude lane then raises FALSE HIGHs it cannot disconfirm). Also fold in the 027 code residuals: TASK-288 (promote the no-grounding claude-lane fix to the shipped default), TASK-290 (test ! hygiene), TASK-291 (roadmap SKILL.md cluster doc), TASK-292 (uniform list-flag stray-comma handling + dead branch), TASK-293 (rewriteEdgeLine fence-awareness). OFFING-TEAM ADOPTER FRICTION: TASK-294 (tooling-feedback guidance should route adopter friction to GitHub issues against audiocontrol-org/deskwork, not a local tooling-feedback.md the maintainers never see — overlaps TASK-16; imported from GitHub #488, now closed). NOTE: the CUSTOMER-BLOCKING govern clone-step non-TS blocker (#487 / TASK-295) was PULLED OUT into its own dedicated item `impl:fix/govern-clone-step-language-agnostic` — it is a live adopter blocker, not burndown-queue hygiene, and is not tracked here. Promoted from the 027 govern dogfood + the offing adopter dogfood.
@@ -498,19 +498,19 @@ CUSTOMER-BLOCKING (offing-team adopter friction, GitHub #487, imported as TASK-2
 Umbrella: make the entire stack-control front door complete, discoverable, and governed now that 026 teeth forbid reaching around it. Every backend op reachable pre-026 gets a sanctioned skill+verb, --help parity, mediation/recovery, and a check-front-door guardrail. See docs/front-door-completeness/plan.md.
 
 ## multi:gap/audit-payload-out-of-window-false-alarms
-- status: planned
+- status: shipped
 - part-of: multi:gap/govern-per-phase-friction-burndown
 - ref: TASK-316
 Per-phase barrage flags referenced-but-out-of-window files as absent/not-imported and raises FALSE HIGHs it cannot disconfirm. Recurred 3x in 028 US3/US4 (runIntercept resolveInstalled, the normalize import, the extend gate — all present, all flagged absent because outside the per-phase payload window), each forcing an override. Sibling of TASK-263 (in-window exclusion). Fix: widen payload to referenced-out-of-window deps, OR give the auditor context to disconfirm 'absent', OR teach it out-of-window = not-this-phase-scope. Detail: TASK-316.
 
 ## multi:gap/govern-lift-cross-run-dedup
-- status: planned
+- status: shipped
 - part-of: multi:feature/audit-barrage-convergence
 - ref: TASK-317
 govern finding-lift has no cross-run dedup, so convergence iterations multiply near-duplicate backlog tasks. 028: the dampener slushed TASK-303..312, several duplicating findings fixed in the same loop (compounds govern-dampener-in-loop). Fix: dedup lifted findings by signature against prior runs + in-loop fixes before creating tasks. Detail: TASK-317, gh-490.
 
 ## multi:feature/govern-operability
-- status: planned
+- status: shipped
 - analyze-clean: yes
 - spec: specs/029-govern-operability
 - design-approved: yes
