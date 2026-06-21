@@ -171,15 +171,15 @@ description: "Task list for Chunked whole-feature end-govern"
 
 ### Tests for User Story 5 (RED first) ⚠️
 
-- [ ] T049 [P] [US5] RED: `src/govern/fix-fanout/__tests__/worktree-dispatch.test.ts` — assert N disjoint-file chunks dispatch N concurrent fix-subagents (capped) in isolated worktrees via the capability port, autonomous apply+commit, with ZERO branches on vendor identity and run-to-completion on a single backend (FR-009, Principle IX, US5 Scenario 1); FAIL.
-- [ ] T050 [P] [US5] RED: `src/govern/fix-fanout/__tests__/merge-serialize.test.ts` — assert a shared-file pair serializes (not blind-merge), an unresolvable merge is surfaced (no fabricated resolution → `unresolvable-merge-surfaced`), worktree exhaustion queues excess (FR-010, US5 Scenarios 2-3); FAIL.
-- [ ] T051 [P] [US5] RED: `src/govern/fix-fanout/__tests__/fix-failure-isolation.test.ts` — assert a fix-subagent failure isolates its chunk, others continue, and the failure surfaces at reconcile as `fix-failure-surfaced` (FR-011, US5 Scenario 4); FAIL.
+- [x] T049 [P] [US5] RED: `src/govern/fix-fanout/__tests__/worktree-dispatch.test.ts` — assert N disjoint-file chunks dispatch N concurrent fix-subagents (capped) in isolated worktrees via the capability port, autonomous apply+commit, with ZERO branches on vendor identity and run-to-completion on a single backend (FR-009, Principle IX, US5 Scenario 1); FAIL.
+- [x] T050 [P] [US5] RED: `src/govern/fix-fanout/__tests__/merge-serialize.test.ts` — assert a shared-file pair serializes (not blind-merge), an unresolvable merge is surfaced (no fabricated resolution → `unresolvable-merge-surfaced`), worktree exhaustion queues excess (FR-010, US5 Scenarios 2-3); FAIL.
+- [x] T051 [P] [US5] RED: `src/govern/fix-fanout/__tests__/fix-failure-isolation.test.ts` — assert a fix-subagent failure isolates its chunk, others continue, and the failure surfaces at reconcile as `fix-failure-surfaced` (FR-011, US5 Scenario 4); FAIL.
 
 ### Implementation for User Story 5
 
-- [ ] T052 [US5] Implement `src/govern/fix-fanout/worktree-dispatch.ts` (per-chunk fix-subagent dispatch via the capability port; concurrency cap with queueing; autonomous apply+commit; capability-not-vendor selection; fail-loud when no backend declares the capability); make T049 pass.
-- [ ] T053 [US5] Implement `src/govern/fix-fanout/merge-serialize.ts` (merge fix worktrees back; serialize a conflicting pair; surface unresolvable merge; lane-outage degrades per existing fleet behavior); make T050 pass.
-- [ ] T054 [US5] Wire the FIX step into `src/govern/end-govern-pipeline.ts` (group findings by chunk → fix-fanout → collect `fixCommits`/`failedChunks`/`unresolvableMerges`; failures + unresolvable merges flow to reconcile surface); make T051 pass.
+- [x] T052 [US5] Implement `src/govern/fix-fanout/worktree-dispatch.ts` (per-chunk fix-subagent dispatch via the capability port; concurrency cap with queueing; autonomous apply+commit; capability-not-vendor selection; fail-loud when no backend declares the capability); make T049 pass.
+- [x] T053 [US5] Implement `src/govern/fix-fanout/merge-serialize.ts` (merge fix worktrees back; serialize a conflicting pair; surface unresolvable merge; lane-outage degrades per existing fleet behavior); make T050 pass.
+- [x] T054 [US5] Wire the FIX step into `src/govern/end-govern-pipeline.ts` (group findings by chunk → fix-fanout → collect `fixCommits`/`failedChunks`/`unresolvableMerges`; failures + unresolvable merges flow to reconcile surface); make T051 pass.
 
 **Checkpoint**: Parallel worktree fix runs unattended; conflicts and failures surface rather than fabricate.
 

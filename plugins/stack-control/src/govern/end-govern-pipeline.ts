@@ -17,6 +17,8 @@ import { partitionDiff } from './cluster-payload/partition.js';
 import { renderChunkPayload } from './payload-chunk.js';
 import { runSeamPass } from './seam-pass.js';
 import { computeTouchedSet } from './touched-set.js';
+import { dispatchFixSubagents, type FixRunner } from './fix-fanout/worktree-dispatch.js';
+import { mergeFixWorktrees, type MergeAttempt } from './fix-fanout/merge-serialize.js';
 
 /** The default hard round-cap backstop against a non-shrinking coupling cycle (FR-013). */
 export const DEFAULT_MAX_ROUNDS = 10;
@@ -35,11 +37,24 @@ export interface ChunkAuditResult {
   readonly degraded: boolean;
 }
 
-/** The outcome of one FIX round: the files the fixes touched + the fix commits. */
+/** The findings a round's audit raised, grouped by the chunk they were found in. */
+export interface ChunkFindings {
+  readonly chunk: Chunk;
+  readonly findings: readonly Finding[];
+}
+
+/** The outcome of one FIX round: touched files + fix commits, plus any surfaced failures. */
 export interface FixRoundResult {
   readonly changedFiles: readonly string[];
   readonly fixCommits: readonly string[];
+  /** Chunks whose fix-subagent failed (FR-011) — surfaced at reconcile. */
+  readonly failedChunks?: readonly string[];
+  /** Chunks whose merge was unresolvable (FR-010) — surfaced at reconcile. */
+  readonly unresolvableMerges?: readonly string[];
 }
+
+/** The injected FIX step: fix a round's per-chunk findings autonomously, returning the round result. */
+export type ApplyFixes = (chunkFindings: readonly ChunkFindings[], round: number) => Promise<FixRoundResult>;
 
 /** Injected collaborators — stubbed in tests, real machinery at the CLI. */
 export interface EndGovernDeps {
@@ -47,10 +62,26 @@ export interface EndGovernDeps {
   readonly resolveEnvelope: () => number;
   readonly auditChunk: (payload: string, chunkId: string) => Promise<ChunkAuditResult>;
   readonly planContext: () => string;
-  /** Apply fixes for a round's findings, returning the touched files (US5 worktree dispatch). Absent ⇒ no autonomous fix. */
-  readonly applyFixes?: (findings: readonly Finding[], round: number) => Promise<FixRoundResult>;
+  /** Apply fixes for a round's findings (US5 worktree-fanout). Absent ⇒ no autonomous fix. */
+  readonly applyFixes?: ApplyFixes;
   /** Hard round-cap backstop; defaults to DEFAULT_MAX_ROUNDS. */
   readonly maxRounds?: number;
+}
+
+/** Build the autonomous FIX step from the fix-fanout capability port: dispatch per chunk → merge back. */
+export function makeFixFanout(opts: { concurrency: number; runFix: FixRunner; canMerge: MergeAttempt }): ApplyFixes {
+  return async (chunkFindings) => {
+    const jobs = chunkFindings.map((cf) => ({ chunk: cf.chunk, findings: cf.findings }));
+    const outcomes = await dispatchFixSubagents(jobs, opts.concurrency, opts.runFix);
+    const merge = mergeFixWorktrees(outcomes, opts.canMerge);
+    const ok = outcomes.filter((o) => o.failed === false);
+    return {
+      changedFiles: ok.flatMap((o) => [...o.changedFiles]),
+      fixCommits: ok.flatMap((o) => [...o.fixCommits]),
+      failedChunks: outcomes.filter((o) => o.failed).map((o) => o.chunkId),
+      unresolvableMerges: merge.unresolvableMerges,
+    };
+  };
 }
 
 /** The pipeline result: the single reconcile record + the chunk set it governed. */
@@ -82,8 +113,8 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
 
   for (;;) {
     const toAudit = partition.chunks.filter((c) => auditIds.includes(c.id));
-    const audits = await Promise.all(toAudit.map(auditOne));
-    openFindings = audits.flatMap((a) => [...a.findings]);
+    const audited = await Promise.all(toAudit.map(async (chunk) => ({ chunk, result: await auditOne(chunk) })));
+    openFindings = audited.flatMap((a) => [...a.result.findings]);
 
     if (openFindings.length === 0) break; // clean / dampened → proceed to SEAM
     if (deps.applyFixes === undefined) {
@@ -95,8 +126,19 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
       break;
     }
 
-    const fix = await deps.applyFixes(openFindings, round);
+    const chunkFindings = audited
+      .filter((a) => a.result.findings.length > 0)
+      .map((a) => ({ chunk: a.chunk, findings: a.result.findings }));
+    const fix = await deps.applyFixes(chunkFindings, round);
     fixCommits.push(...fix.fixCommits);
+    if ((fix.unresolvableMerges ?? []).length > 0) {
+      terminal = 'unresolvable-merge-surfaced'; // FR-010 — surfaced, no fabricated resolution
+      break;
+    }
+    if ((fix.failedChunks ?? []).length > 0) {
+      terminal = 'fix-failure-surfaced'; // FR-011 — failure isolated + surfaced at reconcile
+      break;
+    }
     const touched = computeTouchedSet({
       round: round + 1,
       chunks: partition.chunks,
