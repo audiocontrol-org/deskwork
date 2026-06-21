@@ -69,4 +69,59 @@ describe('030 T021 — payload-diff-scope (FR-023)', () => {
       rmSync(repo, { recursive: true, force: true });
     }
   });
+
+  // Regression: the installation root is a SUBDIR of the git root (the monorepo
+  // layout — `.stack-control` lives at plugins/stack-control while the git root is
+  // the repo above). `git diff --name-only` emits git-root-relative paths; running
+  // the per-file `git diff -- <path>` from the installation subdir resolves the
+  // pathspec relative to the subdir and matches NOTHING, yielding empty per-file
+  // diffs (~0 bytes) — which silently defeats the chunk partitioner (it measures
+  // ~0 bytes, never chunks, and fires a whole over-envelope payload as one barrage).
+  it('resolves real per-file diffs when the installation root is a SUBDIR of the git root', () => {
+    const repo = setup(); // git root
+    const install = join(repo, 'plugins', 'sc'); // installation root (a subdir)
+    mkdirSync(join(install, 'src'), { recursive: true });
+    const base = head(repo);
+    writeFileSync(join(install, 'src/app.ts'), 'export const sub = 1;\n');
+    commitAll(repo, 'feat: add app under subdir installation');
+    const h = head(repo);
+    try {
+      const scope = scopeCommittedDiff(install, base, h);
+      // The changed file is present and its per-file diff is NON-EMPTY (the bug
+      // returned ~0 bytes here). Path base is installation-relative (`--relative`),
+      // byte-identical to the render's committed-diff arm.
+      const total = [...scope.fileDiffs.values()].reduce((n, d) => n + d.length, 0);
+      expect(total).toBeGreaterThan(0);
+      const appEntry = [...scope.fileDiffs.entries()].find(([f]) => f.endsWith('src/app.ts'));
+      expect(appEntry, 'the committed app.ts must be in scope').toBeDefined();
+      expect(appEntry?.[1] ?? '').toMatch(/export const sub = 1/);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  // Regression: a committed file whose name contains a non-ASCII character (e.g. the
+  // em-dash in backlog task filenames). git's default `core.quotePath=true` C-quotes
+  // such paths in `--name-only` output ("...\342\200\224...md"); that quoted string
+  // does NOT resolve as a pathspec, so the per-file `git diff -- <quoted>` matches
+  // nothing and the file lands in scope with an EMPTY diff. 160/255 files in this very
+  // repo hit this — silently starving the partition of most of the diff's bytes.
+  it('resolves a real per-file diff for a committed file with a non-ASCII (em-dash) name', () => {
+    const repo = setup();
+    const base = head(repo);
+    const name = 'src/task — em-dash.md'; // U+2014 EM DASH in the filename
+    writeFileSync(join(repo, name), 'body line one\n');
+    commitAll(repo, 'docs: add em-dash named file');
+    const h = head(repo);
+    try {
+      const scope = scopeCommittedDiff(repo, base, h);
+      const entry = [...scope.fileDiffs.entries()].find(([f]) => f.includes('em-dash'));
+      expect(entry, 'the em-dash file must be in scope').toBeDefined();
+      // Path is the literal UTF-8 name, NOT a git-C-quoted string.
+      expect(entry?.[0] ?? '').not.toMatch(/\\\d{3}/); // no octal \342 etc.
+      expect(entry?.[1] ?? '').toMatch(/body line one/); // per-file diff is non-empty
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
 });
