@@ -6,7 +6,7 @@
 
 import type { Chunk, ChunkManifest, SplitClusterMarker } from '../chunk-artifacts.js';
 import { buildChunkManifests } from '../chunk-manifest.js';
-import { buildCouplingGraph, type CouplingEdge } from './coupling-graph.js';
+import { buildCouplingGraph, type CouplingEdge, type CouplingGraph } from './coupling-graph.js';
 import { clusterFiles } from './clustering.js';
 import { binpackClusters } from './envelope-binpack.js';
 
@@ -24,6 +24,8 @@ export interface PartitionResult {
   readonly chunkIds: readonly string[];
   readonly manifests: readonly ChunkManifest[];
   readonly splitClusterMarkers: readonly SplitClusterMarker[];
+  /** The coupling graph the partition was derived from — reused by the bounded re-audit touched-set. */
+  readonly coupling: CouplingGraph;
 }
 
 /** Partition the committed diff into a deterministic envelope-sized chunk set. */
@@ -36,5 +38,5 @@ export function partitionDiff(input: PartitionInput, envelopeBytes: number): Par
   const clusters = clusterFiles(graph);
   const { chunks, splitClusterMarkers } = binpackClusters(clusters, input.fileDiffs, envelopeBytes);
   const manifests = buildChunkManifests(chunks);
-  return { chunks, chunkIds: chunks.map((c) => c.id), manifests, splitClusterMarkers };
+  return { chunks, chunkIds: chunks.map((c) => c.id), manifests, splitClusterMarkers, coupling: graph };
 }

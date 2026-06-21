@@ -149,15 +149,15 @@ description: "Task list for Chunked whole-feature end-govern"
 
 ### Tests for User Story 4 (RED first) ⚠️
 
-- [ ] T043 [P] [US4] RED: `src/govern/__tests__/touched-set.test.ts` — assert touched set = fixed files' own chunks PLUS any chunk a fixed file is coupled into (coupling-correct), a fix-created new file is assigned to a chunk by coupling (FR-007/FR-012, US4 Scenarios 1+3); FAIL.
-- [ ] T044 [P] [US4] RED: `src/govern/__tests__/touched-set.shrink.test.ts` — assert across rounds the touched set is strictly smaller than the full chunk set whenever ≥1 chunk is untouched, and the loop reaches a graduation decision in bounded rounds (SC-004, US4 Scenario 2); FAIL.
-- [ ] T045 [P] [US4] RED: `src/govern/__tests__/round-cap-backstop.test.ts` — assert a coupling-cycle fixture that prevents shrink hits the hard round cap and yields outcome `round-cap-surfaced` (STOP, surfaced for override; never loops; never auto-graduates) (FR-013, R5/R6); FAIL.
+- [x] T043 [P] [US4] RED: `src/govern/__tests__/touched-set.test.ts` — assert touched set = fixed files' own chunks PLUS any chunk a fixed file is coupled into (coupling-correct), a fix-created new file is assigned to a chunk by coupling (FR-007/FR-012, US4 Scenarios 1+3); FAIL.
+- [x] T044 [P] [US4] RED: `src/govern/__tests__/touched-set.shrink.test.ts` — assert across rounds the touched set is strictly smaller than the full chunk set whenever ≥1 chunk is untouched, and the loop reaches a graduation decision in bounded rounds (SC-004, US4 Scenario 2); FAIL.
+- [x] T045 [P] [US4] RED: `src/govern/__tests__/round-cap-backstop.test.ts` — assert a coupling-cycle fixture that prevents shrink hits the hard round cap and yields outcome `round-cap-surfaced` (STOP, surfaced for override; never loops; never auto-graduates) (FR-013, R5/R6); FAIL.
 
 ### Implementation for User Story 4
 
-- [ ] T046 [US4] Implement `src/govern/touched-set.ts` (derive touched chunks from fix commits, coupling-correct; assign new files to a chunk by coupling); make T043 pass.
-- [ ] T047 [US4] Wire the bounded re-audit loop into `src/govern/end-govern-pipeline.ts` (re-audit only the touched set; carry untouched; dampener clears → graduate) using the existing `check-barrage-dampener.ts`; make T044 pass.
-- [ ] T048 [US4] Implement the hard max-round-cap backstop in `src/govern/end-govern-pipeline.ts` (on cap-hit STOP + emit `round-cap-surfaced` to the operator surface; never auto-graduate); make T045 pass.
+- [x] T046 [US4] Implement `src/govern/touched-set.ts` (derive touched chunks from fix commits, coupling-correct; assign new files to a chunk by coupling); make T043 pass.
+- [x] T047 [US4] Wire the bounded re-audit loop into `src/govern/end-govern-pipeline.ts` (re-audit only the touched set; carry untouched; dampener clears → graduate) using the existing `check-barrage-dampener.ts`; make T044 pass.
+- [x] T048 [US4] Implement the hard max-round-cap backstop in `src/govern/end-govern-pipeline.ts` (on cap-hit STOP + emit `round-cap-surfaced` to the operator surface; never auto-graduate); make T045 pass.
 
 **Checkpoint**: Re-audit is bounded and coupling-correct; the loop always terminates.
 
