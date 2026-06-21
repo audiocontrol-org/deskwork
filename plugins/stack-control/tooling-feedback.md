@@ -106,3 +106,7 @@
 
 ## session-end 2026-06-20
 - Per-phase govern of 029's own US4 (Phase 4) hit a 4-round cross-model entanglement: govern.ts + audit-barrage-lift files are shared across phases, so each fix re-staled earlier per-phase checkpoints (override-refresh of phases 2/3 was the workaround), and the override/graduation TWO-WRITE atomicity (convergence record + phase checkpoint) surfaced as a diminishing-returns plateau resurfacing under new finding IDs each round. The convergent structural fix was record-first ordering + accurate per-write FATAL messages (the half-write is non-advancing; shipped gate fail-closed via all-phase-checkpoints-current); true 2-file transactional commit is mechanism beyond US4's promise. US5 payload-scoping (pre-phase diff-base union) + US7 hunk-fingerprinting are the root fixes for the shared-file re-stale friction.
+
+## session-end 2026-06-21
+- Driving the full speckit authoring chain through the define front door required 6 separate front-door enter/exit brackets (one per /speckit-* step: specify, clarify, plan, checklist, tasks, analyze). A chain-level bracket for one define authoring session would cut the ceremony.
+- Setting the spec pointer on an EXISTING roadmap node is non-obvious: roadmap add --spec errors on the uniqueness invariant; the working verb is workflow link-spec (parallel to link-design). The define skill's node-exists branch does not instruct setting the spec pointer, so a node can stay spec-pointerless (TASK-244 class).

@@ -2,6 +2,45 @@
 
 ---
 
+## 2026-06-21: govern-whole-feature-chunked-payload — design (approved) + full define chain authored to implement-ready
+
+### Feature: multi:feature/govern-whole-feature-chunked-payload (spec `030-chunked-end-govern`)
+### Worktree: stack-control (feature/stack-control)
+
+**Goal:** Pick up where the prior session's govern-at-end reshape left off by taking the load-bearing enabler `multi:feature/govern-whole-feature-chunked-payload` through the front-door lifecycle: **design** it (operator-approved), then author its Spec Kit spec end-to-end (`specify → clarify → plan → checklist → tasks → analyze`) to an implement-ready state. No implementation this session — authoring only.
+
+**Accomplished:**
+- **Design phase, approved.** Drove `/stack-control:design` → `superpowers:brainstorming` under the injected house rules; settled **5 architecture forks** with the operator (dependency-aware clusters + per-chunk manifest; bounded touched-set re-audit; worktree-isolated parallel fix; **replace-per-phase clean break**; oversized-cluster sub-split + interface-level seam pass). Wrote the installation-anchored design record; operator recorded `design-approved` (exit gate 7/7).
+- **Full define chain authored for `030-chunked-end-govern`.** `specify` (8 prioritized stories, 23 FRs) → `clarify` (4 high-impact ambiguities resolved: autonomous apply+commit fixes; reuse the 029 `governedSha` anchor; hard round-cap backstop → operator surface; cross-boundary-only seam break) → `plan` (research + 2 implementer tensions, 7-entity data-model, 4 contracts, quickstart, **Constitution Check all-9 PASS**) → `checklist` (33 items) → `tasks` (**68 test-first tasks**, MVP = US1+US2) → `analyze` (0 critical/high, 100% FR + SC coverage). `spec-check` → `spec=yes plan=yes tasks=yes`.
+- **Roadmap linkage.** `design:` + `spec:` pointers set (`workflow link-design` / `link-spec`); `design-approved` marker recorded via `roadmap approve-design`.
+- **Durable rule added.** Operator directive ("back compat is ALWAYS a honey pot … MUST be a clean break") → `.claude/rules/agent-discipline.md` § *Zero backwards compatibility — a clean break, never a deprecation surface*.
+- **Delegation.** Plan + tasks artifacts authored by `backend-typescript-architect` subagents from the on-disk design/spec/constitution, **reviewed before commit** (plan deletion inventory + Constitution Check verified; tasks format + US2 clean-break ordering verified).
+
+**Didn't Work / cost:**
+- The capability front-door requires a **separate enter/exit bracket per `/speckit-*` step** — 6 brackets across the authoring chain. Captured as friction (a chain-level bracket for one define authoring session would cut the ceremony).
+- Setting the `spec:` pointer on an **existing** roadmap node is non-obvious: `roadmap add --spec` errors on the uniqueness invariant; `workflow link-spec` is the verb, but `define`'s node-exists branch doesn't instruct it (TASK-244 class). Captured as friction.
+
+**Course Corrections:**
+- [PROCESS] Operator **hardened the clean-break decision mid-design** — upgrading my hedged "default-at-completion; per-phase opt-in" recommendation to **replace-per-phase-entirely** (delete the either-of gate, no grandfather). Captured as a durable rule so it binds future sessions, not just this design.
+
+**Insights:**
+- The clean break collapses the deferred per-phase gap nodes (`hunkblocks-uncommitted-empty`, `cheap-checkpoint-refresh`, `split-file-audit-exclusion`) from "deferred, re-weigh" to **moot/superseded** — deleting the per-phase path deletes the code that carries those bugs. Recorded in the design record's roadmap-consequences for the next reconcile.
+- Chunking's hard tension is **cross-file blindness**; the three-layer defense (coupling-grouped clusters + per-chunk manifest + interface-level seam pass) is what buys scale without losing cross-boundary bugs — and it composes with the bounded-re-audit termination guarantee because coupling-grouping keeps the touched set small.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 9
+  - tasks(030-chunked-end-govern): tag FR-001/FR-008/FR-019 for full traceability (analyze C1-C3)
+  - tasks(030-chunked-end-govern): 68-task test-first breakdown by user story
+  - checklist(030-chunked-end-govern): clean-break + cross-file-correctness/fail-loud requirements checklist (33 items)
+  - plan(030-chunked-end-govern): Phase 0/1 artifacts — plan, research, data-model, contracts, quickstart
+  - spec(030-chunked-end-govern): integrate clarify answers (fix authority, anchor, termination, seam rubric)
+  - spec(030-chunked-end-govern): author spec.md from approved design
+  - design(govern-whole-feature-chunked-payload): record operator design-approved marker
+  - rule(agent-discipline): zero backwards compatibility — clean break, never a deprecation surface
+  - design(govern-whole-feature-chunked-payload): record chunked end-govern design
+- Files changed: 17
+- Backlog touched: (none)
+
 ## 2026-06-21 (continuation): post-029-merge cleanup + offing friction capture + govern-at-end roadmap reshape
 
 ### Feature: 029-govern-operability (closeout) → govern-operability umbrella forward-planning
