@@ -1,9 +1,10 @@
 ---
 id: TASK-105
 title: AUDIT-20260614-73 — Checkpoint writes can leave orphan temp files on failure
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 18:32'
+updated_date: '2026-06-21 06:19'
 labels:
   - 'type:migrated-finding'
   - 'feature:audit-protocol-friction-burndown'
