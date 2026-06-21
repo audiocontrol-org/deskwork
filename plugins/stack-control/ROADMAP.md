@@ -518,3 +518,15 @@ govern finding-lift has no cross-run dedup, so convergence iterations multiply n
 - part-of: multi:feature/lifecycle-industrialization
 Umbrella: make cross-model governance OPERABLE — converge reliably and stay cheap to run per phase, so per-phase govern is a deterministic gate rather than an operator-vigilance tax. Groups the governance-friction surfaced by dogfooding the workflow protocol (027, 028): convergence ringing (audit-barrage-convergence — severity non-determinism, dampener-in-loop, lift cross-run dedup, granularity switch), per-phase friction (govern-per-phase-friction-burndown — O(n^2) shared-file checkpoint staleness with no cheap refresh, out-of-window false alarms), and fleet observability/liveness (codex-liveness, timeout-observability — a SIGTERMed model silently degrades the fleet). Realizes the thesis ('industrialize execution') specifically for the governance ceremony. Children are part-of this node.
 
+## multi:gap/govern-lift-auto-close-in-loop-fixes
+- status: planned
+- part-of: multi:feature/govern-operability
+- ref: gh-490 / offing-ff761162
+Lift must auto-close findings fixed in-loop. 0.52.2's FR-016 cross-run signature dedup does NOT tame the backlog balloon when the audited artifact changes each round (distinct signature per round): the offing adopter's 9-round doc phase still lifted 42 To-Do tasks (TASK-132..173) for findings it fixed in-loop, forcing a hand-written bulk-close script. Fix: on a graduating (dampened/converged) govern, auto-close the feature's OPEN migrated-finding tasks whose signature is absent from the converged round (the in-loop fix landed -> resolved). Bounded+safe: fires only on graduation, closes only findings absent from the clean final round. Source: offing 0.52.2 dogfood ff761162 (2026-06-21); agent root-cause 'gh-490-not-fully-fixed: no auto-close of in-loop fixes'.
+
+## multi:gap/govern-doc-aware-audit-lens
+- status: planned
+- part-of: multi:feature/govern-operability
+- ref: offing-ff761162
+Documentation phases ring far longer than code. A 2-task doc phase (a README + ~40 lines of seam-contract comments) took 9 cross-model rounds to converge: the auditors kept finding wording corners on forward-looking contract prose ('near-infinite phrase-more-precisely surface'), amplified by out-of-window false-HIGHs and fix-induced channel growth. The shipped severity-determinism/dampener does not stop prose nitpicking. Fix, two levers: (a) a doc/prose-aware audit lens that, when the payload is predominantly markdown prose, flags only SUBSTANTIVE doc defects (factually wrong, contradicts code, missing required content, broken example/link) and suppresses wording/phrasing/style nits; (b) implement-mode diminishing-returns plateau auto-detect that surfaces an 'override recommended' verdict (findings shifting to wording altitude / fix-induced growth / oscillation) instead of grinding. Source: offing 0.52.2 dogfood ff761162 (2026-06-21).
+
