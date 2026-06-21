@@ -4,9 +4,10 @@ title: >-
   Audit payload out-of-window false alarms: per-phase barrage flags
   referenced-but-out-of-window files as absent/not-imported and raises false
   HIGHs
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 03:53'
+updated_date: '2026-06-21 01:26'
 labels:
   - agent-found
   - 'type:gap'

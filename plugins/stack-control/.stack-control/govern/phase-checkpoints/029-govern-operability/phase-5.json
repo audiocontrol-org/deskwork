@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "featureSlug": "029-govern-operability",
+  "phaseId": "5",
+  "checkpoint": "phase-5",
+  "auditLogSection": "phase-5",
+  "scopeFingerprint": "bfc605cd3442f9ea0880cf2921737a2d47ca094368549254da31cb4f21052837",
+  "passedAt": "2026-06-21T01:25:02.182Z",
+  "governedPaths": [
+    "tests/govern/payload-union.test.ts",
+    "src/govern/incremental-audit.ts",
+    "src/subcommands/govern.ts",
+    "src/govern/checkpoint-state.ts",
+    "src/govern/phase-checkpoint-status.ts",
+    "tests/govern/out-of-window.test.ts",
+    "src/govern/payload-implement.ts"
+  ],
+  "auditedFiles": [
+    "plugins/stack-control/src/govern/checkpoint-state.ts",
+    "plugins/stack-control/src/govern/incremental-audit.ts",
+    "plugins/stack-control/src/govern/payload-implement.ts",
+    "plugins/stack-control/src/govern/phase-checkpoint-status.ts",
+    "plugins/stack-control/src/subcommands/govern.ts",
+    "plugins/stack-control/tests/govern/out-of-window.test.ts",
+    "plugins/stack-control/tests/govern/payload-union.test.ts"
+  ]
+}

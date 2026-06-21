@@ -2660,3 +2660,467 @@ The diff's central graduation-safety claim is that a run whose findings are all 
 Similarly, `appendSection` and `renderRereportEntries` — imported from `audit-barrage-lift-render.ts`, which is also absent — are load-bearing for the mixed-section (new findings + re-reports) path.
 
 The end-to-end tests in `tests/promote-findings/lift-dedup.test.ts` do exercise these code paths and would catch the quiet-section failure if they run. This is not a defect claim — it is an audit surface limitation. The reviewer cannot independently verify the implementation of the graduation-safety logic from this diff alone and must rely on the test suite as the sole signal.
+
+## 2026-06-21 — audit-barrage lift (20260621T002128759Z-029-govern-operability-phase-4)
+
+### AUDIT-20260621-01 — `resolvePrePhaseDiffBase` priority-order logic is off-screen — the fix's core behavior is unverifiable from this diff
+
+Finding-ID: AUDIT-20260621-01
+Status: migrated-to-backlog TASK-382
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/govern.ts:786–810 (call site)
+
+The stated fix is "explicit `--diff-base` wins" over the auto-resolved `governedSha`. The call site correctly separates `explicitBase` from `fallbackBase: 'HEAD~1'` (lines ~795–810), but the function that implements the priority resolution — `resolvePrePhaseDiffBase` — is entirely absent from this diff.
+
+In the **before** state, the explicit value was encoded as part of `fallbackBase` and presumably fell *below* `governedSha` in priority (hence the bug: the auto-resolved sha was shadowing an explicit operator flag). In the **after** state, `explicitBase` is passed as a separate field and must be consulted *before* `governedSha` for the fix to take effect. That priority logic lives exclusively in `resolvePrePhaseDiffBase`.
+
+TypeScript would catch an undeclared property name (`explicitBase`) at the call site if the function's parameter type never included it, so the function's signature was presumably updated in a prior commit. However, TypeScript cannot catch a well-typed field that the function body reads at the wrong priority — i.e., `explicitBase` could be in the type and still be dead code or consulted only as a tertiary fallback. The entire behavioral regression being fixed (`explicit > governedSha > HEAD~1`) is implemented in off-screen code, so this audit cannot confirm the fix is complete. A reviewer reading only this diff would have to locate `resolvePrePhaseDiffBase` and verify its priority order manually.
+
+---
+
+### AUDIT-20260621-02 — Override-after-graduation silently clears a valid `governedSha`
+
+Finding-ID: AUDIT-20260621-02
+Status: migrated-to-backlog TASK-383
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/govern.ts:482–495 (`writeResolvedPhaseCheckpoint`), ~969–984 (override call site)
+
+When `recordGovernedSha` is `false`, `governedSha` is set to `undefined` (line ~484) and passed into `writePhaseCheckpoint`. JSON serialization silently drops `undefined` properties, so the written checkpoint carries no `governedSha` field.
+
+The comments justify this for the case where the override "may run at an UNRELATED HEAD" — correct reasoning for a fresh override invocation. But the comments do not address the **override-after-graduation** scenario:
+
+1. Phase N graduates normally → checkpoint written with `governedSha = sha_at_graduation`  
+2. Later, operator re-runs phase N with `--override` for any reason  
+3. `writePhaseCheckpoint` replaces the checkpoint file entirely (standard checkpoint semantics), erasing `sha_at_graduation`  
+4. Phase N+1 calls `resolvePrePhaseDiffBase` → no `governedSha` for phase N → falls back to `HEAD~1`
+
+If `HEAD~1` at the time phase N+1 runs happens to be inside phase N+1's own work rather than before phase N, the diff scope silently regresses. An operator who runs `--override` as a "force-accept" after a valid graduation would not expect the next phase's diff base to change. The code doesn't block this pattern, doesn't log a warning that `governedSha` is being cleared, and the existing comments do not describe the behavior.
+
+A minimal fix is a log line on the override path noting that no `governedSha` will be recorded and downstream phases will fall back to `HEAD~1`.
+
+---
+
+### AUDIT-20260621-03 — `recordGovernedSha` boolean is control-coupling — caller intent leaks into callee body
+
+Finding-ID: AUDIT-20260621-03
+Status: migrated-to-backlog TASK-384
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts:466–497 (`writeResolvedPhaseCheckpoint`), 519–535 (`writePhaseCheckpointAfterRecordOrFatal`)
+
+`recordGovernedSha: boolean` is a control flag threaded through two layers (`writePhaseCheckpointAfterRecordOrFatal` → `writeResolvedPhaseCheckpoint`) to gate a single expression: `args.recordGovernedSha ? currentHeadSha(repoRoot) : undefined`. This is classic boolean-parameter control coupling: the caller encodes a branching decision as data that the callee then switches on.
+
+A cleaner shape would compute `governedSha` at each call site — `currentHeadSha(repoRoot)` for graduation, `undefined` for override — and pass it as `governedSha?: string` into the write function. The function then serializes whatever it receives, with no conditional branching and no hidden dependency on a caller intent flag. This removes the need for `recordGovernedSha` entirely and makes the two call sites self-documenting. With only two call sites the current shape is manageable, but it creates a maintenance trap if a third call site is added: the caller must know to set the flag correctly rather than seeing "pass a sha or omit it."
+
+---
+
+### AUDIT-20260621-04 — No test coverage visible in this diff for FR-020 priority-resolution or `recordGovernedSha` semantics
+
+Finding-ID: AUDIT-20260621-04
+Status: migrated-to-backlog TASK-385
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    (no test files in the diff)
+
+The diff modifies two correctness-critical behaviors:
+
+1. **`recordGovernedSha` toggle**: override path writes a checkpoint without `governedSha`; normal graduation writes one with `governedSha`. No test asserts either outcome.
+2. **`explicitBase > governedSha > HEAD~1` priority**: the behavioral regression the commit fixes (explicit `--diff-base` was shadowed by auto-resolved sha). No test exercises the three-level priority stack.
+
+The second case is the higher-risk gap: the priority logic lives in `resolvePrePhaseDiffBase` (off-screen), and a priority-order bug there would not surface in the call-site change visible here. A regression test that sets `--diff-base`, has a prior `governedSha` recorded, and asserts the explicit base wins would catch a priority-order defect that this diff cannot rule out. The absence of such a test means the only verification is manual.
+
+## 2026-06-21 — audit-barrage lift (20260621T002539218Z-029-govern-operability-phase-5)
+
+### AUDIT-20260621-05 — `readFileSync` catch in `foldReferencedOutOfWindowDeps` is silent — violates the "every inclusion/skip warned" contract
+
+Finding-ID: AUDIT-20260621-05
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/govern/payload-implement.ts` — `foldReferencedOutOfWindowDeps`, the `readFileSync` catch block (diff line approximately +589–594 in the function body)
+
+The JSDoc contract on `foldReferencedOutOfWindowDeps` states "every inclusion/skip warned (no silent change)." The function correctly emits a `warn` call for every other skip path: binary/empty files, budget overruns. But the `readFileSync` catch block does not call `warn` — it simply `continue`s:
+
+```typescript
+try {
+  content = readFileSync(abs, 'utf8');
+} catch {
+  continue;          // ← no warn(); contradicts the stated contract
+}
+```
+
+`statSync` has already confirmed the file exists (it ran inside `resolveRelativeSpecifier` and returned `isFile()`). A subsequent `readFileSync` failure represents a TOCTOU race (file deleted or permission-revoked between stat and read) or an unexpected I/O error. Neither case should be silent, because the consuming operator has no way to know an OOW dep was resolved and then dropped without warning. The contract says they can diagnose skips from the warn stream; this one disappears.
+
+Blast radius: an operator diagnosing a false HIGH (the auditor flagged an import as missing) will inspect the `warn` stream, find no skip entry for the file in question, and incorrectly conclude the file was successfully folded in. The actual cause — a TOCTOU drop — is invisible. Fix is one `warn` call inside the catch before `continue`.
+
+---
+
+### AUDIT-20260621-06 — `CODE_ARTIFACT_FRAMING` now unconditionally asserts "this is a PER-PHASE diff" — misleading when the constant is used for whole-feature audit prompts
+
+Finding-ID: AUDIT-20260621-06
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/govern/payload-implement.ts` lines ~63–65 (`CODE_ARTIFACT_FRAMING` constant modification)
+
+The diff appends a per-phase-specific note to the shared `CODE_ARTIFACT_FRAMING` constant:
+
+> `NOTE — out-of-window scope (029 US5/FR-021): this is a PER-PHASE diff. A file the diff REFERENCES but does not itself change … is OUT OF THIS PHASE'S WINDOW … Do NOT raise a finding that such a referenced file is absent / not-imported / missing merely because its definition is not in this diff … Out-of-window deps that ARE present in the repo are folded in below under a "referenced dependency (out of phase window)" header for context only.`
+
+`CODE_ARTIFACT_FRAMING` is an exported module-level constant — not a computed per-call value — so every consumer receives this text unconditionally. The whole-feature (`after_implement`) audit path calls `assembleImplementPayload` without `pathScope` (`hasPathScope = false`), which means: (1) no OOW deps are folded in (the `if (hasPathScope)` guard suppresses that code), and (2) the diff is a multi-phase union, not a per-phase window.
+
+When an auditor model receives `CODE_ARTIFACT_FRAMING` for a whole-feature audit, it reads "this is a PER-PHASE diff" (false), "out-of-window deps are folded in below under a header" (false — none are), and is instructed to assume referenced files exist and are correct (the wrong posture for a whole-feature audit where a genuinely-missing implementation SHOULD surface). The note was designed to suppress false HIGHs in per-phase context; in whole-feature context it could suppress real HIGHs. This is an auditor-facing prompt that controls model behaviour — a wrong instruction at this layer has direct downstream impact on finding quality.
+
+The fix: either (a) make the note conditional by building the framing string inside `assembleImplementPayload` based on `hasPathScope`, or (b) introduce a separate `CODE_ARTIFACT_FRAMING_PER_PHASE` constant used only on the per-phase path, keeping `CODE_ARTIFACT_FRAMING` as the generic form shared across audit modes. The test in `out-of-window.test.ts` imports and asserts on `CODE_ARTIFACT_FRAMING` directly — it would need updating to test the appropriate per-phase variant.
+
+---
+
+### AUDIT-20260621-07 — `resolvePrePhaseDiffBase` silently treats an unknown `phaseId` as "first phase" — configuration error is indistinguishable from legitimate fallback
+
+Finding-ID: AUDIT-20260621-07
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/govern/incremental-audit.ts`, `resolvePrePhaseDiffBase` function (~lines 163–176 in the diff)
+
+```typescript
+const idx = args.orderedPhaseIds.indexOf(args.phaseId);
+if (idx > 0) {
+  for (let i = idx - 1; i >= 0; i -= 1) { … }
+}
+return args.fallbackBase;
+```
+
+When `args.phaseId` is absent from `args.orderedPhaseIds`, `indexOf` returns `-1`. The condition `idx > 0` is false, so the loop is skipped and `fallbackBase` is returned. This outcome is identical to the legitimate "phase 1 has no prior phases" path (`idx === 0` also skips the loop). A caller that passes a mis-typed or stale `phaseId` gets `fallbackBase` silently — no error, no warning — and the governed diff is computed from `HEAD~1` instead of the correct pre-phase anchor. The caller in `govern.ts` is guarded upstream by `assertPriorPhaseCheckpointsCurrent`, which should reject an unknown phase before this function is reached. But `resolvePrePhaseDiffBase` is exported (it's imported in the test file), and as a standalone exported function it carries no internal defense: a test or a future caller could supply mismatched inputs without being warned.
+
+Blast radius: the misconfigured call silently falls back to `HEAD~1`, producing the TASK-263 under-scope bug that this very feature was designed to fix — the false HIGH resurfaces invisibly, with no diagnostic signal. A simple guard (`if (idx === -1) throw new Error(...)` or at minimum a `warn`) would surface the misconfiguration immediately. The `idx === 0` (first phase) path should be left alone since that is legitimate; only `idx === -1` needs the guard.
+
+### AUDIT-20260621-08 — Stored governedSha is trusted without verifying it still resolves
+
+Finding-ID: AUDIT-20260621-08
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/incremental-audit.ts:164-170; src/subcommands/govern.ts:800-807; src/govern/checkpoint-state.ts:430-438
+
+The new resolver returns the first non-empty prior `governedSha` directly, and `runGovern` threads checkpoint values into that resolver without checking whether the object still exists in the current repo. The checkpoint validator only enforces “non-empty string”, not “valid reachable commit”. If a branch was rebased, history was pruned, or the checkpoint file was edited/corrupted, the auto-selected base can be an invalid git revision.
+
+The blast radius is high because `assembleImplementPayload`’s git wrapper degrades failed git commands to an empty string, and `runGovern` explicitly treats empty diffs as plan-context-only governance. A downstream phase audit can therefore silently stop auditing the phase payload after selecting a stale stored SHA. A reasonable fix is to verify the resolved checkpoint SHA with git before using it as a diff base, and fail loud with an actionable message when a stored governed anchor is invalid.
+
+### AUDIT-20260621-09 — Re-export dependencies are not folded as out-of-window context
+
+Finding-ID: AUDIT-20260621-09
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/payload-implement.ts:472-473; src/govern/payload-implement.ts:564-569
+
+The out-of-window dependency scanner only recognizes `from` imports, dynamic imports, `require(...)`, and bare imports. It does not recognize TypeScript/ESM re-export references such as `export { foo } from "./dep.js"` or `export * from "./dep.js"`, even though those are dependency references with the same false-absence risk the feature is trying to eliminate.
+
+The blast radius is medium: projects using barrel modules or re-export based phase surfaces can still produce per-phase payloads that reference an out-of-window file without folding the present target, leaving auditors to report the same “missing/absent dependency” class this change intends to suppress. The scanner should include export-from syntax, ideally via a small parser or at least an expanded tested pattern for `export ... from "relative"`.
+
+### AUDIT-20260621-10 — Failed reads of resolved out-of-window deps are silently dropped
+
+Finding-ID: AUDIT-20260621-10
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/payload-implement.ts:588-592
+
+After resolving and sizing an out-of-window dependency, the code catches `readFileSync` failures and simply continues. That contradicts the new contract in the same helper that “every inclusion/skip is warned”; it also creates a governance blind spot when a permission error or race makes a resolved dependency unreadable.
+
+The blast radius is medium because the operator gets no warning that a referenced dependency was selected but omitted from the payload, so an audit can still see an unresolved reference with no clue that context was dropped. A reasonable fix is to emit a warning for the read failure, or fail loud if an already-resolved dependency cannot be read.
+
+## 2026-06-21 — audit-barrage lift (20260621T003919044Z-029-govern-operability-phase-5)
+
+### AUDIT-20260621-11 — Override-after-graduation silently clears a valid `governedSha`
+
+Finding-ID: AUDIT-20260621-11
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/subcommands/govern.ts:480-499, src/subcommands/govern.ts:978-984
+
+The `writeResolvedPhaseCheckpoint` function computes `governedSha` conditionally based on `recordGovernedSha`:
+
+```typescript
+const governedSha = args.recordGovernedSha ? currentHeadSha(repoRoot) : undefined;
+writePhaseCheckpoint(repoRoot, {
+  ...
+  ...(governedSha !== undefined ? { governedSha } : {}),
+  ...
+});
+```
+
+The override path passes `recordGovernedSha: false`, so `governedSha` is `undefined`, and the spread omits the field entirely. `writePhaseCheckpoint` takes a complete `PhaseCheckpointRecord` and writes it as a full replacement — a field absent from the object will be absent from the JSON on disk. If a phase was previously graduated normally (acquiring a `governedSha`), a subsequent `govern --override --phase N` call (e.g., to re-disposition a finding, to re-run with override after a stale checkpoint) fires the override path, replaces the checkpoint file, and silently discards the previously-recorded sha. The next phase's `resolvePrePhaseDiffBase` then walks past this phase (its status now returns `governedSha: undefined`), finds the nearest earlier ancestor, and audits against a wider-than-intended diff-base — or falls all the way back to `HEAD~1`. This narrowing/widening of the audit scope happens silently, with no warning.
+
+The blast-radius: the per-phase union-payload guarantee (the fix for TASK-263) is silently violated for all phases governed after an override-on-graduated-phase. A fix would preserve any previously-recorded `governedSha` through an override write — either by reading the existing checkpoint before writing and carrying the field forward, or by splitting `writeResolvedPhaseCheckpoint` into a path that only sets `governedSha` once (on first graduation) and does not overwrite it thereafter.
+
+---
+
+### AUDIT-20260621-12 — `foldReferencedOutOfWindowDeps` silently skips on `readFileSync` failure
+
+Finding-ID: AUDIT-20260621-12 (claude-02 + codex-01; cross-model)
+Status:     open
+Severity:   low
+Per-lane:   claude=low, codex=low
+Decision:   agreement (gate-counted low)
+Surface:    src/govern/payload-implement.ts:564-569 (approximately, in the `foldReferencedOutOfWindowDeps` function body)
+
+The function's stated invariant (from the JSDoc: "every inclusion/skip warned (no silent change)") is broken for the `readFileSync` branch:
+
+```typescript
+try {
+  content = readFileSync(abs, 'utf8');
+} catch {
+  continue;   // no warn() call — silent skip
+}
+```
+
+The `isBinaryOrEmpty` and budget-exceeded paths both call `warn(...)` before skipping. A permission-denied, mid-write race, or any other I/O failure silently drops a dep the auditor would have expected to see. The fix is a `warn(...)` call in the catch block before the `continue`, consistent with the other skip cases above it.
+
+---
+
+### AUDIT-20260621-13 — `recordGovernedSha` boolean is caller-intent control coupling
+
+Finding-ID: AUDIT-20260621-13
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/govern.ts:466-499 (`writeResolvedPhaseCheckpoint`)
+
+The `recordGovernedSha: boolean` parameter encodes caller context ("am I on the override path or the graduation path?") inside the callee body. This is a textbook control-coupling anti-pattern: the callee's behaviour changes based on the caller's identity rather than on its own data. The current two call sites are correctly annotated, but a future third call site (e.g., a `--dry-run` path, a `--re-govern` path, an override-of-an-override path) must know to set this flag correctly or it silently mis-records the sha. The flag also makes the interaction between the override path and the `governedSha` field non-local — the connection between "this is an override" and "therefore do not record sha" is a runtime truth that only lives in the boolean; a reader of `writeResolvedPhaseCheckpoint` cannot derive the intent from the callee alone.
+
+A cleaner shape: pass the sha explicitly (or `undefined`) as a typed argument — `governedSha: string | undefined` — computed at the call site. The callee then becomes a pure writer. The decision of whether to call `currentHeadSha` belongs at the call site, adjacent to the `if (isOverride)` branch where the context is explicit, not hidden inside the callee via a flag.
+
+---
+
+### AUDIT-20260621-14 — `resolvePrePhaseDiffBase` has no test for `phaseId` absent from `orderedPhaseIds`
+
+Finding-ID: AUDIT-20260621-14
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/govern/incremental-audit.ts:158-170 (`resolvePrePhaseDiffBase`), tests/govern/payload-union.test.ts
+
+When `phaseId` is not present in `orderedPhaseIds`, `indexOf` returns `-1`. The condition `idx > 0` is `false`, so the function falls through directly to `return args.fallbackBase`. This is the correct defensive behaviour (unknown phase → safe fallback), but the path is untested. The test suite covers the first-phase case (`idx === 0`, which also satisfies `idx > 0 === false`), but not the degenerate `idx === -1` case. If `orderedPhaseIds` and `governedShaByPhase` are built from different sources (e.g., a tasks.md parse vs. a checkpoint scan), a phase-id mismatch could silently fall back without any diagnostic. A test and/or a `warn(...)` call when `idx === -1` would make the fallback visible.
+
+## 2026-06-21 — audit-barrage lift (20260621T005644765Z-029-govern-operability-phase-4)
+
+### AUDIT-20260621-15 — `gitRefResolves` does not check `r.error` — silent mis-classification on git-not-found
+
+Finding-ID: AUDIT-20260621-15
+Status: migrated-to-backlog TASK-386
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts:458-469 (new `gitRefResolves` function)
+
+`spawnSync` sets `r.error` (a Node.js `Error` object) when the child process cannot be spawned at all — e.g., `git` is not on `PATH`, the OS returns `ENOENT`, or the process was killed by a signal that left `r.status === null`. The function returns `r.status === 0`, which evaluates `null === 0 → false` in these cases, so the safe-fallback direction is correct: an unresolvable-git environment causes `isResolvable` to return `false` and govern falls back to `HEAD~1` rather than crashing.
+
+The blast-radius is therefore bounded, but the silent false-negative has a diagnostic cost: if `git` is misconfigured in a CI environment, every governed phase silently degrades to the `HEAD~1` fallback with no stderr message indicating *why*. An operator would see subtly under-scoped diffs and no error to act on. A one-liner guard (`if (r.error) throw new Error(...)` or at minimum `process.stderr.write(...)`) would surface the root cause immediately. The existing `gitRefResolves` surface area is small and self-contained, so the fix is cheap.
+
+---
+
+### AUDIT-20260621-16 — Stale-anchor fallback path (`isResolvable → false`) has no test coverage
+
+Finding-ID: AUDIT-20260621-16
+Status: migrated-to-backlog TASK-387
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/govern/override-short-circuit.test.ts (new test block, lines 424–476); src/subcommands/govern.ts:824-829 (`isResolvable` wiring)
+
+AUDIT-20260621-08 introduced the `isResolvable` callback so that a recorded `governedSha` that no longer resolves in the repo (post-rebase, pruned reflog, shallow clone) degrades gracefully to `HEAD~1` instead of handing a dead SHA to `git diff`. The test added in this diff exercises the *opposite* case: the SHA is valid, the override is run, the SHA is preserved. That path passes through `isResolvable` returning **true**.
+
+There is no test in this diff (or in the existing suite as far as the diff shows) for the case where `isResolvable` returns **false** — i.e., the SHA recorded in the checkpoint no longer resolves. The contract of `resolvePrePhaseDiffBase` when `isResolvable(ref) === false` is therefore unverified: does it fall back to `HEAD~1`? Does it throw? Does it silently use the stale ref anyway? If the callback result is accidentally ignored inside `resolvePrePhaseDiffBase`, this diff's primary safety net for AUDIT-20260621-08 would be a no-op and nothing in the test suite would catch it.
+
+This is not a hypothetical path: any team doing interactive rebases, force-pushes, or shallow fetches between governance passes would hit it in practice. A minimal test would: (1) write a checkpoint with a `governedSha` that is fabricated / not present in the repo's object store, (2) run govern, (3) assert the diff is computed from `HEAD~1` (or whatever the declared fallback is) and govern exits cleanly.
+
+---
+
+### AUDIT-20260621-17 — `pathScope` as proxy for per-phase framing could silently suppress findings on a phase with an empty file scope
+
+Finding-ID: AUDIT-20260621-17
+Status: migrated-to-backlog TASK-388
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts:362-370 (`artifact_framing` selection in `buildImplementVars`)
+
+The framing selection is:
+
+```typescript
+artifact_framing:
+  pathScope !== undefined && pathScope.length > 0
+    ? CODE_ARTIFACT_FRAMING_PER_PHASE
+    : CODE_ARTIFACT_FRAMING,
+```
+
+The comment explains the intent correctly: `CODE_ARTIFACT_FRAMING_PER_PHASE` includes a note telling the audit model that out-of-window dependencies are intentionally folded out, which is only true for a per-phase call with an explicit path scope. For a whole-feature call, that note would falsely suppress cross-feature missing-impl findings.
+
+The condition is sound for the common cases. The edge it doesn't cover: a phase-granularity call where the resolved `pathScope` ends up empty (e.g., the phase's `diffScope` resolves to zero files — a phase touching only deleted files, or a brand-new phase with no committed files yet). In that case `pathScope.length === 0`, the generic framing is used, and the audit model is *not* told that out-of-window deps are intentionally folded. For a zero-file phase that genuinely has nothing to audit, this is harmless. But if the zero-scope is itself a symptom of an incorrectly resolved diff-base (the very category AUDIT-20260621-08 addresses), the generic framing would allow the model to flag missing implementations in the out-of-window area — false positives rather than false negatives.
+
+Blast-radius is limited: the worst outcome is noisy audit findings on an empty-scope phase, not missed correctness bugs. Low severity, but worth a comment on the assumption ("pathScope non-empty iff per-phase context") or a more direct signal (e.g., an explicit `isPerPhase` flag from the call site).
+
+---
+
+## 2026-06-21 — audit-barrage lift (20260621T005921085Z-029-govern-operability-phase-5)
+
+### AUDIT-20260621-18 — `gitRefResolves` returns `false` on spawn failure — git-unavailable misattributed as corrupt checkpoint
+
+Finding-ID: AUDIT-20260621-18
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/govern.ts` — `gitRefResolves` function (lines visible in diff, after `currentHeadSha`)
+
+When `git` is not on `PATH` (container without git, broken `PATH` in CI), `spawnSync` sets `r.error` and `r.status = null`. The function evaluates `null === 0` → `false` and returns "does not resolve." `resolvePrePhaseDiffBase` then throws: "no longer resolves to a git object (branch rebased / history pruned / corrupt checkpoint)". The operator is sent on a false recovery path — checking for rebase history — when the real issue is git unavailability. The adjacent `currentHeadSha` correctly guards with `r.status !== 0 || typeof r.stdout !== 'string'`; `gitRefResolves` should mirror that defensive shape by checking `r.error !== undefined || r.status === null` first and either returning `false` with a distinct diagnostic path, or surfacing the spawn error directly. The blast radius is a misleading diagnostic in an already-abnormal failure scenario; it doesn't corrupt data, but it burns operator time chasing the wrong cause.
+
+---
+
+### AUDIT-20260621-19 — In-scope-but-unchanged files are excluded from out-of-window folding — auditor still cannot see their content
+
+Finding-ID: AUDIT-20260621-19 (claude-02 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    `src/govern/payload-implement.ts` — `foldReferencedOutOfWindowDeps`, the `inPathScope` skip at lines
+
+```typescript
+if (inDiff.has(dep)) continue;      // already in payload
+if (inPathScope(dep, pathScope)) continue;  // in-window — ← this is the gap
+resolved.add(dep);
+```
+
+A file `dep` that is (a) listed in `pathScope` (this phase's designated scope) AND (b) unchanged since the phase base is excluded by the `inPathScope` check. It therefore does NOT appear in the diff and is NOT folded in as an out-of-window dep. The auditor sees a `+line` importing `dep` but has no definition for it in the payload. Because `dep` is in `pathScope`, it is not covered by the "out-of-window deps are folded in below" sentence in `CODE_ARTIFACT_FRAMING_PER_PHASE`; an AI auditor might reasonably infer "if it were present in-repo and in-scope it would be in the diff, so it must be missing" — reintroducing the false HIGH the folding logic was built to eliminate.
+
+The concrete scenario: phase 5 designates `src/feature.ts` and `src/helper.ts` in pathScope; only `feature.ts` is modified; `feature.ts` imports from `./helper.js`; `helper.ts` was committed before the phase base and is unchanged. `inPathScope('src/helper.ts', pathScope)` returns `true` → skipped. The auditor sees `feature.ts` referencing `helper.ts` but gets no context about `helper.ts`.
+
+The fix depends on intent: (a) replace the `inPathScope` skip with `inDiff.has(dep)` only — fold in any file that exists on disk and isn't already in the diff, regardless of pathScope membership; or (b) extend `CODE_ARTIFACT_FRAMING_PER_PHASE` to explicitly state that in-scope files absent from the diff are unchanged (not missing), not just that out-of-window files are folded in. Option (b) alone is weaker because it relies on the AI auditor applying the framing correctly to a category the framing does not name.
+
+---
+
+### AUDIT-20260621-20 — Budget-exhaustion branch in `foldReferencedOutOfWindowDeps` has no test coverage
+
+Finding-ID: AUDIT-20260621-20
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/govern/payload-implement.ts` — `foldReferencedOutOfWindowDeps` budget check; `tests/govern/out-of-window.test.ts`
+
+The branch:
+```typescript
+if (foldedBytes + sz > budgetBytes) {
+  warn(`govern: out-of-window dep ${dep} (${sz} bytes) would exceed...`);
+  continue;  // NOT break — smaller later deps can still be included
+}
+```
+
+The `continue` (not `break`) is a load-bearing semantic choice: alphabetically later deps that are small enough still get folded even after the budget is hit by a large dep. No test in `out-of-window.test.ts` exercises this path. A test should assert: given two deps where dep A exhausts the budget and dep B (alphabetically later, smaller) fits, dep B is included and dep A is not, and the warn is emitted for A. Without this test, the `continue` semantics are undocumented by the test suite, making a future refactor that changes it to `break` undetectable until a real audit payload silently loses small deps.
+
+### AUDIT-20260621-21 — Per-phase govern resolves the pre-phase base, then discards it
+
+Finding-ID: AUDIT-20260621-21
+Status:     open
+Severity:   blocking
+Per-lane:   codex=blocking
+Decision:   single-model (gate-counted blocking)
+Surface:    src/subcommands/govern.ts:820-832, src/subcommands/govern.ts:1082-1087, src/subcommands/govern.ts:319
+
+The phase path correctly computes `diffBase` with `resolvePrePhaseDiffBase(...)` and passes it into `resolvePhaseUnit` at lines 820-832, but the actual payload is built later with `buildImplementVars(..., flags.diffBase, ..., payloadPathScope, ...)` at lines 1082-1087. Inside `buildImplementVars`, line 319 re-resolves the base from `diffBaseFlag ?? GOVERN_DIFF_BASE ?? 'HEAD~1'`, so an auto-resolved prior `governedSha` is not used unless the operator explicitly passed the same value as `--diff-base`.
+
+That breaks FR-020’s core goal: a normal per-phase run without explicit `--diff-base` still audits `HEAD~1`, not the union from the pre-phase commit. The blast radius is blocking because the feature’s stated fix for TASK-263 does not actually affect the governed payload in the default path. A reasonable fix is to pass `phaseUnit.diffScope.base` into `buildImplementVars` for implement mode when a phase unit was resolved, or change `buildImplementVars` to accept the already-resolved audit unit/base rather than independently recomputing it.
+
+## 2026-06-21 — audit-barrage lift (20260621T011659497Z-029-govern-operability-phase-5)
+
+### AUDIT-20260621-22 — `gitRefResolves` misclassifies git-binary-absent as sha-unresolvable
+
+Finding-ID: AUDIT-20260621-22
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/govern.ts` — `gitRefResolves` function (added in this diff)
+
+When the git binary is not on PATH, `spawnSync` sets `r.error` (ENOENT) and `r.status` to `null`. The check `return r.status === 0` evaluates `null === 0 → false`, so the function returns `false`. `resolvePrePhaseDiffBase` then treats this as a confirmed sha-resolution failure and throws: *"which no longer resolves to a git object (branch rebased / history pruned / corrupt checkpoint)"* — a message that is factually wrong when the real failure is git unavailability.
+
+Compare with `currentHeadSha` in the same diff, which explicitly guards `if (r.status !== 0 || typeof r.stdout !== 'string') return undefined;` — `null !== 0` is `true`, so it handles the git-absent case gracefully. `gitRefResolves` has no parallel check for `r.error` or `r.status !== null`. An operator on a machine without git (CI image, restricted environment) would receive a "branch rebased / corrupt checkpoint" error directing them to investigate phantom history problems, rather than a clear "git not available" signal.
+
+The fix is minimal: `if (r.error !== undefined || r.status === null) return false;` with a stderr warning, or—better—throw a distinct error distinguishing the two failure modes (git-not-found vs. sha-not-found), so the operator gets an actionable message. Note: this finding was filed previously as AUDIT-20260621-15 (visible as untracked `task-386` in the working tree); the current diff does not address it.
+
+---
+
+### AUDIT-20260621-23 — `orderedPhaseIds` ordering assumption is not asserted at the `resolvePrePhaseDiffBase` call site
+
+Finding-ID: AUDIT-20260621-23
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/govern.ts` lines ~830–845 (the `resolvePrePhaseDiffBase` call)
+
+`resolvePrePhaseDiffBase` requires `orderedPhaseIds` to be in `tasks.md` parse order for its "latest prior phase" semantics to be correct: it iterates backward from `idx - 1` and returns the first non-empty `governedSha` it finds. In `govern.ts`, the argument is sourced from `phaseCheckpointStatuses.map((status) => status.phaseId)`. If `resolvePhaseCheckpointStatuses` (not in this diff) returns statuses in any order other than `tasks.md` order — filesystem order of checkpoint JSON files, lexicographic sort of `phaseId` strings, etc. — the wrong `governedSha` would be selected as the diff-base, silently under-scoping or over-scoping the audit payload. Phase IDs that are multi-part strings or numbers > 9 are especially vulnerable to string-sort vs. numeric-sort divergence.
+
+The call site has no assertion that the returned array is in `tasks.md` order. The function's JSDoc says "parsePhases order" but that contract is only enforceable if `resolvePhaseCheckpointStatuses` is verified to return in that order. There is no test that exercises the production `govern.ts` call path with a multi-phase fixture to confirm the ordering. Confirmed as previously filed AUDIT-20260621-01 (untracked `task-382`); not addressed in this diff.
+
+---
+
+### AUDIT-20260621-24 — `foldReferencedOutOfWindowDeps` budget selection is alphabetical, not priority-based
+
+Finding-ID: AUDIT-20260621-24
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/govern/payload-implement.ts` — `foldReferencedOutOfWindowDeps`, budget-skip loop (~line 590–610 of added code)
+
+When a resolved dep exceeds the remaining fold budget, the code skips it and continues: `"skipping it but continuing with smaller deps (not silently)"`. The iteration is over `Array.from(resolved).sort()` — strict alphabetical order. This means a large, semantically load-bearing dep (e.g., `a-contract.ts`) may be skipped while a small, peripheral dep (e.g., `z-utils.ts`) is included. In the exact scenario this feature is solving — where an auditor raises a false HIGH because it cannot see the definition of a referenced file — the referenced file is by definition the high-priority dep. If that file is large and appears early alphabetically, it may be the first to be skipped when the budget is tight.
+
+The warn message accurately documents the skip behavior, and the framing instruction says the fold is best-effort, so the operator is not misled. However, the operator has no mechanism to influence inclusion priority short of using `--diff-base` to bypass the whole mechanism. A priority-based selection (e.g., prefer deps referenced by more import sites, or prefer deps referenced in added lines over context lines) would be more resilient, but is a design enhancement beyond a bug fix.
+
+---
+
+### AUDIT-20260621-25 — Second-order out-of-window deps are not folded; no test pins this boundary
+
+Finding-ID: AUDIT-20260621-25 (claude-04 + codex-02; cross-model)
+Status:     open
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    `src/govern/payload-implement.ts` — `foldReferencedOutOfWindowDeps`; `tests/govern/out-of-window.test.ts`
+
+When a dep is folded as out-of-window context, its own imports are not scanned. A second-order dep — a file imported by the folded dep, itself outside the phase window — is not included in the payload. An LLM auditor examining the folded dep's content might flag those second-order imports as missing implementations. The framing instruction (`CODE_ARTIFACT_FRAMING_PER_PHASE`) says "assume it exists and is correct unless the diff itself shows a genuinely-missing implementation," which is intended to cover this case, but that instruction is framed around the *phase diff*, not around the *folded context blocks*. An auditor reading a folded dep's code that references an unshown file has less contextual guidance that this is also not-missing.
+
+The test suite in `out-of-window.test.ts` covers: (a) a present dep is folded, (b) a re-export dep is folded, (c) a genuinely-missing dep is not fabricated. None of these tests assert the second-order case — that a dep-of-dep is neither folded nor fabricated. The omission is by design (unbounded recursive folding would explode the payload), but without a pinning test the boundary could silently regress if the fold logic is later extended. A test asserting that `dep → sub-dep` where `sub-dep` is out-of-window does NOT appear in the fold would make the design contract explicit.
+
+### AUDIT-20260621-26 — Legacy intermediate checkpoints can make the next phase diff start too early
+
+Finding-ID: AUDIT-20260621-26
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/incremental-audit.ts:183-198
+
+`resolvePrePhaseDiffBase` walks backward until it finds any prior `governedSha`, skipping prior phases that are current but legacy/no-sha. If phase 5 follows a current phase 4 checkpoint with no `governedSha`, but phase 3 has one, this returns the phase 3 commit as phase 5's base. That is not the pre-phase commit for phase 5; it predates phase 4.
+
+The blast radius is upgraded features with mixed checkpoint formats, especially where phases share files. The resulting per-phase payload can include already-governed phase 4 hunks in a phase 5 audit, contradicting the new per-phase framing that says the diff shows only files this phase changed. A reasonable fix is to treat a sha-less intervening current phase as an unresolved boundary and require an explicit `--diff-base`, rather than skipping past it to an older anchor.
