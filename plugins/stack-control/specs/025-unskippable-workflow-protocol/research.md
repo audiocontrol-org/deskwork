@@ -32,7 +32,14 @@ discretion. Each decision below is grounded in an in-tree primitive.
   `graduate-impl impl` = `all-phase-checkpoints-current` **OR** a converged whole-feature
   `record-converged impl`. The default path is unchanged (per-phase, composed); a
   shared-file feature for which per-phase is O(n²)-painful may opt into a single
-  whole-feature govern and graduate on its record instead. This does **not** reintroduce
+  whole-feature govern and graduate on its record instead. **Precision (AUDIT-20260621-28):**
+  the OR branch in `gate-eval.ts` is the **`ctx.implRecordConverged` GateContext field**
+  (true iff a converged whole-feature convergence record exists — `isModeConverged('impl')`),
+  NOT the `record-converged impl` *criterion* composed from per-phase checkpoints. Implementing
+  `graduate-impl` as `all-phase-checkpoints-current OR record-converged impl`-the-criterion
+  would be vacuous (the composed criterion is only true when the per-phase branch already is).
+  The whole-feature escape is load-bearing precisely because it reads the standalone record field.
+  This does **not** reintroduce
   the oversized-run-by-default this feature killed (the whole-feature run is opt-in, and
   029 US5/US7 right-size + hunk-scope the payload). See `specs/029-govern-operability`
   (US6) for the either-of gate and `gate-eval.ts` `graduate-impl`.

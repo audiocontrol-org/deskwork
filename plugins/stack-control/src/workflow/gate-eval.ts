@@ -186,6 +186,16 @@ export function evaluateCriterion(c: Criterion, ctx: GateContext): boolean {
       if (c.target !== 'impl') {
         throw new WorkflowError(`criterion 'graduate-impl' has unknown target '${c.target}' (expected impl)`);
       }
+      // The OR branch is the `ctx.implRecordConverged` FIELD (a converged whole-feature
+      // convergence record exists — isModeConverged('impl')), NOT the `record-converged
+      // impl` criterion composed from per-phase checkpoints (which would be vacuous — only
+      // true when the per-phase branch already is). AUDIT-20260621-28.
+      //
+      // AUDIT-20260621-27: `phase:shipped`'s `derive: record-converged impl` stays as-is.
+      // For the OPT-IN path B (whole-feature record) it is consistent (implRecordConverged
+      // true → derive true). For the DEFAULT path A (per-phase) the authoritative shipped
+      // STATUS comes from the `transition:graduate` `roadmap-advance to=shipped` effect, not
+      // the derive — a relationship that predates US6 and is unchanged by the either-of gate.
       return allPhaseCheckpointsCurrent(ctx) || ctx.implRecordConverged;
     }
     case 'approval-marker':

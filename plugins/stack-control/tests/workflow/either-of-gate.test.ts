@@ -77,4 +77,20 @@ describe('US6 either-of graduate gate (FR-023/024)', () => {
     f.checkpointPhase('2');
     expect(evaluateCriterion(GRADUATE, ctxFor(f, false))).toBe(false);
   });
+
+  it('graduates on the whole-feature record even when no spec dir resolves (AUDIT-20260621-29)', () => {
+    const f = threePhase();
+    // specDirPath = null → the per-phase branch is structurally false; the opt-in
+    // whole-feature record alone must still graduate.
+    const ctx = { ...ctxFor(f, true), specDirPath: null, specPointer: null };
+    expect(evaluateCriterion(GRADUATE, ctx)).toBe(true);
+  });
+
+  it('graduates when BOTH paths are satisfied simultaneously (AUDIT-20260621-30)', () => {
+    const f = threePhase();
+    f.checkpointPhase('1');
+    f.checkpointPhase('2');
+    f.checkpointPhase('3');
+    expect(evaluateCriterion(GRADUATE, ctxFor(f, true))).toBe(true);
+  });
 });
