@@ -128,14 +128,14 @@ description: "Task list for Chunked whole-feature end-govern"
 ### Tests for User Story 3 (RED first) ⚠️
 
 - [x] T037 [P] [US3] RED: `src/govern/__tests__/chunk-manifest.test.ts` — assert each chunk's manifest lists exactly the other chunks' file lists (complete, no self-entry, file-lists-only, no diff bodies) (FR-005, R8, US3 Scenario 2); FAIL.
-- [ ] T038 [P] [US3] RED: `src/govern/__tests__/seam-pass.substantive.test.ts` — assert the seam pass flags a removed/renamed export, changed arity, or changed required shape CONSUMED across a chunk boundary, and does NOT flag a compatible addition or internal-only change (`consumedAcross=true` on every finding) (FR-014, R7, SC-003, US3 Scenarios 3-4); FAIL.
-- [ ] T039 [P] [US3] RED: `src/govern/__tests__/seam-payload-envelope.test.ts` — assert the seam payload (signatures + changed-function headers only) is measured ≤ envelope via the rekeyed primitive, keyed on a seam id not a phase id (FR-014, research Tension 1); FAIL.
+- [x] T038 [P] [US3] RED: `src/govern/__tests__/seam-pass.substantive.test.ts` — assert the seam pass flags a removed/renamed export, changed arity, or changed required shape CONSUMED across a chunk boundary, and does NOT flag a compatible addition or internal-only change (`consumedAcross=true` on every finding) (FR-014, R7, SC-003, US3 Scenarios 3-4); FAIL.
+- [x] T039 [P] [US3] RED: `src/govern/__tests__/seam-payload-envelope.test.ts` — assert the seam payload (signatures + changed-function headers only) is measured ≤ envelope via the rekeyed primitive, keyed on a seam id not a phase id (FR-014, research Tension 1); FAIL.
 
 ### Implementation for User Story 3
 
 - [x] T040 [US3] Implement `src/govern/chunk-manifest.ts` (render per-chunk other-chunks file lists; file-lists only) and wire it into `payload-chunk.ts` rendering; make T037 pass.
-- [ ] T041 [US3] Implement `src/govern/seam-pass.ts` (interface-level cross-chunk + split-cluster boundary audit; substantive-break gate = cross-boundary breakage only; emits `SeamResult` with `suppressedCompatible` count) using the rekeyed envelope measurement; make T038 + T039 pass.
-- [ ] T042 [US3] Insert the SEAM step into `src/govern/end-govern-pipeline.ts` (after re-audit converges, before reconcile), consulting split-cluster markers to recover cross-sub-chunk coverage (R7).
+- [x] T041 [US3] Implement `src/govern/seam-pass.ts` (interface-level cross-chunk + split-cluster boundary audit; substantive-break gate = cross-boundary breakage only; emits `SeamResult` with `suppressedCompatible` count) using the rekeyed envelope measurement; make T038 + T039 pass.
+- [x] T042 [US3] Insert the SEAM step into `src/govern/end-govern-pipeline.ts` (after re-audit converges, before reconcile), consulting split-cluster markers to recover cross-sub-chunk coverage (R7).
 
 **Checkpoint**: Cross-chunk contract breaks are caught; compatible changes don't false-positive.
 

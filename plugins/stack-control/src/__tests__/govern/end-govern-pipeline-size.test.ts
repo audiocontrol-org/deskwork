@@ -52,4 +52,25 @@ describe('030 T015 — end-govern never FATALs on size (SC-001)', () => {
     );
     expect(dirty.record.outcome).toBe('override-eligible');
   });
+
+  it('runs the seam pass and surfaces a cross-boundary break (T042)', async () => {
+    // Pad so each file fills most of the envelope ⇒ they land in SEPARATE chunks
+    // (a cross-chunk boundary), not packed together.
+    const pad = '\n-// pad'.repeat(100);
+    const seamScope: DiffScope = {
+      base: 'b',
+      head: 'h',
+      files: ['x/a.ts', 'y/b.ts'], // distinct dirs ⇒ two clusters
+      fileDiffs: new Map<string, string>([
+        ['x/a.ts', `-export function foo(z: number): void {}${pad}`],
+        ['y/b.ts', `+foo(1);${pad}`],
+      ]),
+    };
+    const result = await runEndGovern(
+      { installationRoot: '/x', item: 'i', base: 'b', head: 'h' },
+      deps({ scopeDiff: () => seamScope, resolveEnvelope: () => 1000 }),
+    );
+    expect(result.record.seamResult.findings.some((f) => f.symbol === 'foo')).toBe(true);
+    expect(result.record.outcome).toBe('override-eligible');
+  });
 });

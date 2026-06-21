@@ -14,6 +14,7 @@ import type { Chunk, Finding, WholeFeatureConvergenceRecord } from './chunk-arti
 import type { DiffScope } from './payload-diff-scope.js';
 import { partitionDiff } from './cluster-payload/partition.js';
 import { renderChunkPayload } from './payload-chunk.js';
+import { runSeamPass } from './seam-pass.js';
 
 /** Inputs to an end-govern run over a feature's committed work. */
 export interface EndGovernInput {
@@ -60,11 +61,20 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
     }),
   );
 
+  // SEAM — interface-level cross-chunk/split-cluster pass (after the re-audit loop
+  // converges, before reconcile; the FIX→RE-AUDIT loop inserts ahead of this in US4/US5),
+  // consulting split-cluster markers to recover cross-sub-chunk coverage (R7).
+  const seamResult = runSeamPass({
+    chunks: partition.chunks,
+    splitClusterMarkers: partition.splitClusterMarkers,
+    fileDiffs: scope.fileDiffs,
+  });
+
   // RECONCILE (once) — skeleton: collect findings into a single whole-feature record.
-  // FIX/RE-AUDIT bounds the loop (US4/US5); SEAM backstops cross-chunk breaks (US3);
-  // close-in-loop-before-lift partitions findings (US6) — wired in later phases.
+  // close-in-loop-before-lift partitions findings (US6) — wired in a later phase.
   const openFindings = audits.flatMap((a) => [...a.findings]);
-  const outcome: WholeFeatureConvergenceRecord['outcome'] = openFindings.length === 0 ? 'converged' : 'override-eligible';
+  const converged = openFindings.length === 0 && seamResult.findings.length === 0;
+  const outcome: WholeFeatureConvergenceRecord['outcome'] = converged ? 'converged' : 'override-eligible';
 
   const record: WholeFeatureConvergenceRecord = {
     version: 1,
@@ -76,7 +86,7 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
     rounds: 1,
     liftedFindings: openFindings,
     closedInLoopFindings: [],
-    seamResult: { boundaryPairs: [], findings: [], suppressedCompatible: 0 },
+    seamResult,
     splitClusterRefs: partition.splitClusterMarkers.map((m) => m.clusterId),
     outcome,
     anchorRoot: input.installationRoot,
