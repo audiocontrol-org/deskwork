@@ -561,6 +561,7 @@ No cheap checkpoint refresh for a sibling-change false-stale; --override is the 
 
 ## multi:feature/govern-whole-feature-chunked-payload
 - status: planned
+- design: docs/superpowers/specs/2026-06-21-govern-whole-feature-chunked-payload-design.md
 - part-of: multi:feature/govern-operability
 - ref: offing-ff761162
 Make govern-at-end the DEFAULT govern direction and make it scale. Chunk the whole-feature audit into bite-sized sub-payloads, parallelize audit and fix across the model fleet, and reconcile once at the end. US6's either-of graduate gate already sanctions whole-feature graduation; this delivers the payload mechanism that makes it the default rather than the opt-in escape. Solves boundary-too-large for whole-feature governance (the reason per-phase existed) by streaming sub-payloads under the fleet envelope. Load-bearing enabler: once govern runs at end over committed work, the per-phase staleness treadmill (hunkblocks-uncommitted-empty, cheap-checkpoint-refresh), the untracked-split exclusion, and the in-loop lift balloon (lift-auto-close) all shrink or vanish, so those gaps defer behind this. Source: offing 0.52.2 dogfood ff761162 (2026-06-21); operator direction govern-at-end.
