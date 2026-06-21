@@ -98,22 +98,22 @@ description: "Task list for Chunked whole-feature end-govern"
 
 ### Tests for User Story 2 (absence/regression RED first — watch each FAIL) ⚠️
 
-- [ ] T024 [P] [US2] RED: `src/subcommands/__tests__/govern-phase-removed.test.ts` — assert invoking `govern --phase <id>` errors as an unknown flag and setting `GOVERN_CHECKPOINT` is rejected (no legacy accept) (FR-017, US2 Scenario 1); FAIL (arm still present).
-- [ ] T025 [P] [US2] RED: `src/govern/__tests__/no-phase-checkpoints-written.test.ts` — run end-govern on a fixture and assert no `phase-checkpoints/*.json` exists under the installation anchor afterward (US2 Scenario 3); FAIL.
-- [ ] T026 [P] [US2] RED: `src/workflow/__tests__/graduate-impl-single-criterion.test.ts` — assert `graduate-impl` PASSES on a converged whole-feature record alone and REFUSES with no converged record and on every `*-surfaced` outcome (FR-018, graduate-gate contract); FAIL (either-of arm present).
-- [ ] T027 [P] [US2] RED: `src/__tests__/per-phase-surfaces-absent.test.ts` — grep-style assertions that `allPhaseCheckpointsCurrent`, `all-phase-checkpoints-current`, `resolvePhaseCheckpointStatuses`, `assertPriorPhaseCheckpointsCurrent`, `featureCheckpointKey`, `carriedFilesForComposition`, `compositionExcludePaths`, and `BoundaryTooLargeError` yield ZERO source hits (SC-002 = 0 per-phase surfaces); FAIL.
-- [ ] T028 [P] [US2] RED: `src/govern/__tests__/boundary-too-large-terminal-removed.test.ts` — assert `protocol.ts` exposes no `boundary-too-large` FATAL terminal and the envelope-measurement primitive still measures (research Tension 2 distinction); FAIL.
+- [x] T024 [P] [US2] RED: `src/subcommands/__tests__/govern-phase-removed.test.ts` — assert invoking `govern --phase <id>` errors as an unknown flag and setting `GOVERN_CHECKPOINT` is rejected (no legacy accept) (FR-017, US2 Scenario 1); FAIL (arm still present).
+- [x] T025 [P] [US2] RED: `src/govern/__tests__/no-phase-checkpoints-written.test.ts` — run end-govern on a fixture and assert no `phase-checkpoints/*.json` exists under the installation anchor afterward (US2 Scenario 3); FAIL.
+- [x] T026 [P] [US2] RED: `src/workflow/__tests__/graduate-impl-single-criterion.test.ts` — assert `graduate-impl` PASSES on a converged whole-feature record alone and REFUSES with no converged record and on every `*-surfaced` outcome (FR-018, graduate-gate contract); FAIL (either-of arm present).
+- [x] T027 [P] [US2] RED: `src/__tests__/per-phase-surfaces-absent.test.ts` — grep-style assertions that `allPhaseCheckpointsCurrent`, `all-phase-checkpoints-current`, `resolvePhaseCheckpointStatuses`, `assertPriorPhaseCheckpointsCurrent`, `featureCheckpointKey`, `carriedFilesForComposition`, `compositionExcludePaths`, and `BoundaryTooLargeError` yield ZERO source hits (SC-002 = 0 per-phase surfaces); FAIL.
+- [x] T028 [P] [US2] RED: `src/govern/__tests__/boundary-too-large-terminal-removed.test.ts` — assert `protocol.ts` exposes no `boundary-too-large` FATAL terminal and the envelope-measurement primitive still measures (research Tension 2 distinction); FAIL.
 
 ### Implementation for User Story 2 (each deletion its own task + commit)
 
-- [ ] T029 [US2] Delete the `--phase` invocation arm (`govern.ts:810–845`) and `--checkpoint`/`GOVERN_CHECKPOINT` handling (TASK-125) from `src/subcommands/govern.ts`; passing them becomes an unknown-flag/var error; make T024 pass.
-- [ ] T030 [US2] Delete the exclusion-based whole-feature composition arm (`govern.ts:846–891`) from `src/subcommands/govern.ts`, leaving the single inclusion-based end-govern path; partial toward T025.
+- [x] T029 [US2] Delete the `--phase` invocation arm (`govern.ts:810–845`) and `--checkpoint`/`GOVERN_CHECKPOINT` handling (TASK-125) from `src/subcommands/govern.ts`; passing them becomes an unknown-flag/var error; make T024 pass.
+- [x] T030 [US2] Delete the exclusion-based whole-feature composition arm (`govern.ts:846–891`) from `src/subcommands/govern.ts`, leaving the single inclusion-based end-govern path; partial toward T025.
 - [ ] T031 [US2] Delete the per-phase checkpoint writer + `phase-checkpoints/*.json` artifact + its doctor/schema rule (FR-017); make T025 pass.
-- [ ] T032 [US2] Collapse `graduate-impl` in `src/workflow/gate-eval.ts` to the single `ctx.implRecordConverged` criterion; delete `allPhaseCheckpointsCurrent` + the `all-phase-checkpoints-current` criterion (`gate-eval.ts:162–199`) + all callers; make T026 pass.
+- [x] T032 [US2] Collapse `graduate-impl` in `src/workflow/gate-eval.ts` to the single `ctx.implRecordConverged` criterion; delete `allPhaseCheckpointsCurrent` + the `all-phase-checkpoints-current` criterion (`gate-eval.ts:162–199`) + all callers; make T026 pass.
 - [ ] T033 [US2] Delete the per-phase compass/workflow transition arms (FR-019; TASK-152/155) from the workflow transition modules; partial toward T027.
 - [ ] T034 [US2] Delete `resolvePhaseCheckpointStatuses`, `assertPriorPhaseCheckpointsCurrent`, `featureCheckpointKey`, `carriedFilesForComposition`, `compositionExcludePaths`, and the `phaseUnit` exclusion plumbing once no caller remains; make T027 pass.
-- [ ] T035 [US2] Delete the `boundary-too-large` FATAL terminal (`protocol.ts:393–404`) and remove `BoundaryTooLargeError` once the bin-packer (its sole would-be consumer) no longer throws it — the bin-packer AVOIDS the condition (research Tension 2); make T028 pass.
-- [ ] T036 [US2] Wire `src/subcommands/govern.ts` to the single end-govern pipeline path matching the govern-cli contract (kept flags: `--mode implement`, `--diff-base`, `--at`, `--override`); confirm T024-T028 all green. WONTFIX migration/grandfather (FR-020) — no legacy-accept code written.
+- [x] T035 [US2] Delete the `boundary-too-large` FATAL terminal (`protocol.ts:393–404`) and remove `BoundaryTooLargeError` once the bin-packer (its sole would-be consumer) no longer throws it — the bin-packer AVOIDS the condition (research Tension 2); make T028 pass.
+- [x] T036 [US2] Wire `src/subcommands/govern.ts` to the single end-govern pipeline path matching the govern-cli contract (kept flags: `--mode implement`, `--diff-base`, `--at`, `--override`); confirm T024-T028 all green. WONTFIX migration/grandfather (FR-020) — no legacy-accept code written.
 
 **Checkpoint**: One govern path, one graduate criterion, zero per-phase surfaces — US1+US2 together are the P1 foundation the P2/P3 stories build on.
 
