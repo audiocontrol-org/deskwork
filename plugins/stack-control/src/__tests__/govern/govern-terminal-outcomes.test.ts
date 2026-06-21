@@ -145,6 +145,29 @@ describe('US5 — machine-readable govern terminal outcomes (T027/T028)', () => 
     }
   });
 
+  it('chunks a >envelope committed diff into envelope-sized chunks (030 FR-002, SC-001)', () => {
+    const repo = makeRepo({ enforced: true, maxPromptBytes: 400 });
+    const fx = mkdtempSync(join(tmpdir(), 'gov-chunk-fx-'));
+    const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
+    try {
+      const seed = git(['rev-parse', 'HEAD']).stdout.trim();
+      // Two files in DISTINCT dirs ⇒ two coupling clusters; each renders < the 400-byte
+      // envelope but together > it ⇒ the partitioner yields >1 chunk.
+      mkdirSync(join(repo, 'a'), { recursive: true });
+      mkdirSync(join(repo, 'b'), { recursive: true });
+      writeFileSync(join(repo, 'a', 'x.ts'), `${Array.from({ length: 8 }, (_, i) => `export const ax${i} = ${i};`).join('\n')}\n`, 'utf8');
+      writeFileSync(join(repo, 'b', 'y.ts'), `${Array.from({ length: 8 }, (_, i) => `export const by${i} = ${i};`).join('\n')}\n`, 'utf8');
+      git(['add', '-A']);
+      git(['commit', '-q', '-m', 'feature work across two dirs']);
+      const r = runGovern(repo, fx, ['--require-models', '1', '--diff-base', seed], 'low');
+      // The observable proof of chunking (printed before the per-chunk barrage loop).
+      expect(`${r.stdout}${r.stderr}`).toMatch(/chunked the whole committed feature diff into [2-9]/);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
+
   // 030 US2 (T028/T035): the `boundary-too-large` terminal is DELETED — an oversized
   // rendered payload no longer FATALs; the chunked bin-packer sizes every chunk ≤ the
   // active envelope so the condition is avoided, not asserted against.

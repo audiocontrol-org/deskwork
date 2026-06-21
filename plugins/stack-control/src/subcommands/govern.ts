@@ -63,6 +63,8 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
+import { scopeCommittedDiff } from '../govern/payload-diff-scope.js';
+import { partitionDiff } from '../govern/cluster-payload/partition.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
@@ -800,49 +802,44 @@ export async function runGovern(args: string[]): Promise<void> {
       flags.mode === 'implement' && featureRoot !== undefined
         ? resolveGovernExcludePaths(installation)
         : undefined;
-    // specs/015 + 014 merge: buildImplementVars threads BOTH the per-phase
-    // pathScope (015 US4 — phaseUnit's files, and its `phase-<id>` checkpoint when
-    // present) AND the 014 US5 exclusion inputs (featureRoot/excludeRoots/excludePaths).
-    const built =
-      flags.mode === 'spec'
-        ? buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint, auditLogExcerpt)
-        : buildImplementVars(
-            repoRoot,
-            slug,
-            flags.diffBase,
-            phaseUnit !== undefined ? phaseUnit.auditLogSection : flags.checkpoint,
-            payloadPathScope,
-            featureRoot,
-            excludeRoots,
-            excludePaths,
+    // 030 US1/US2 (FR-002): partition the whole committed feature diff into
+    // envelope-sized chunks so a large feature never overruns the fleet envelope and
+    // never FATALs on size. Default is a SINGLE whole-diff payload (a small feature is
+    // one chunk — identical to the pre-030 behavior); chunking engages only when the
+    // committed diff partitions into >1 envelope-sized chunk. Each chunk reuses the
+    // existing render→barrage→lift→slush→gate; the gate opens iff EVERY chunk is clean.
+    let chunkScopes: readonly (readonly string[] | undefined)[] = [payloadPathScope];
+    if (flags.mode === 'implement' && laneCapabilities !== undefined) {
+      try {
+        const base = flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
+        const scope = scopeCommittedDiff(repoRoot, base, 'HEAD');
+        const envelope = Math.min(...laneCapabilities.map((lane) => lane.envelope.maxPromptBytes));
+        const partition = partitionDiff({ changedFiles: scope.files, fileDiffs: scope.fileDiffs }, envelope);
+        if (partition.chunks.length > 1) {
+          chunkScopes = partition.chunks.map((c) => [...c.files]);
+          process.stderr.write(
+            `govern: chunked the whole committed feature diff into ${partition.chunks.length} ` +
+              `envelope-sized chunks (FR-002 — never boundary-too-large).\n`,
           );
+        }
+      } catch (err) {
+        process.stderr.write(
+          `govern: diff chunking unavailable (${errorMessage(err)}); auditing the whole committed diff as one payload.\n`,
+        );
+      }
+    }
 
-    // US7 (FR-032): implement-mode governance runs the per-codebase clone step,
-    // surfacing NEW intra-codebase duplication alongside the gate verdict
-    // (advisory — does not override the convergence gate, #432).
+    // US7 (FR-032): implement-mode governance runs the per-codebase clone step once.
     if (flags.mode === 'implement') {
       await runCloneDetectionStep({ repoRoot, write: (s) => process.stderr.write(s) });
     }
 
-    // claude-20260612-03: surface the audit-unit's path-scope exclusions as ONE
-    // consolidated, greppable summary at the verdict surface — not only as the
-    // interleaved per-file warns. A `--phase` run that silently dropped an untracked
-    // sibling (the intentional per-phase contract) is now auditable in a single line
-    // instead of buried mid-stream. (claude-20260612-r3-01: the line is built by the
-    // pure `formatScopeExclusionSummary` so it is unit-tested without the protocol.)
-    const exclusionSummary = formatScopeExclusionSummary(built.skippedOutOfScope);
-    if (exclusionSummary !== undefined) {
-      process.stderr.write(`${exclusionSummary}\n`);
-    }
-
     const noSlush = flags.noSlush || process.env.GOVERN_NO_SLUSH === '1';
-    const protocolArgs = {
+    const protocolBase = {
       stackctl,
       barrageBin,
       installationRoot: repoRoot,
       slug,
-      checkpoint: built.checkpoint,
-      vars: built.vars,
       laneCapabilities,
       models: requestedModels,
       requireModels,
@@ -854,20 +851,38 @@ export async function runGovern(args: string[]): Promise<void> {
       stderr: (s: string) => process.stderr.write(s),
     };
 
-    // specs/015 US2 (FR-004/005 / D4): delegate the convergence loop to the code
-    // driver. govern builds the three behavioral inputs — runPass (the existing
-    // protocol pass, unchanged), dispatchFix (surface the BLOCKED findings; the
-    // agent's only in-loop action — never an auto-edit), and the ceiling — then
-    // the driver owns the iterate/stop decision and the bound. A runProtocol
-    // rejection (e.g. barrage OUTAGE) propagates loud through the driver to the
-    // catch below (no silent stop). specs/029 US4 (FR-017): the `--override` path
-    // NO LONGER reaches the driver — it short-circuits the whole pass above
-    // (recordOverrideGraduation), so a driver run here is always a real,
-    // unoverridden convergence attempt.
+    // Build + audit ONE chunk's payload via the existing protocol pass.
+    const auditChunkPass = async (chunkScope: readonly string[] | undefined): Promise<boolean> => {
+      const built =
+        flags.mode === 'spec'
+          ? buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint, auditLogExcerpt)
+          : buildImplementVars(
+              repoRoot,
+              slug,
+              flags.diffBase,
+              phaseUnit !== undefined ? phaseUnit.auditLogSection : flags.checkpoint,
+              chunkScope,
+              featureRoot,
+              excludeRoots,
+              excludePaths,
+            );
+      const exclusionSummary = formatScopeExclusionSummary(built.skippedOutOfScope);
+      if (exclusionSummary !== undefined) process.stderr.write(`${exclusionSummary}\n`);
+      return (await runProtocol({ ...protocolBase, checkpoint: built.checkpoint, vars: built.vars })).gateOpen;
+    };
+
+    // specs/015 US2 (FR-004/005): delegate the convergence loop to the code driver.
+    // Each round audits EVERY chunk; the gate opens only when all chunks are clean.
     const ceiling = resolveCeiling(pick(flags.ceiling, process.env.GOVERN_CEILING));
     const outcome: ConvergenceOutcome = await runConvergenceLoop({
       ceiling,
-      runPass: async () => ({ gateOpen: (await runProtocol(protocolArgs)).gateOpen }),
+      runPass: async () => {
+        let allOpen = true;
+        for (const chunkScope of chunkScopes) {
+          if ((await auditChunkPass(chunkScope)) === false) allOpen = false;
+        }
+        return { gateOpen: allOpen };
+      },
       dispatchFix: async () => {
         process.stderr.write(
           'govern: convergence gate BLOCKED — fix the surfaced findings; the loop ' +
