@@ -3,9 +3,10 @@ id: TASK-278
 title: >-
   AUDIT-20260619-17 — `tmpChain()` creates temp directories without cleanup,
   accumulating across test runs
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 01:35'
+updated_date: '2026-06-21 06:32'
 labels:
   - 'type:migrated-finding'
   - 'feature:027-roadmap-edge-mutation-and-cluster'

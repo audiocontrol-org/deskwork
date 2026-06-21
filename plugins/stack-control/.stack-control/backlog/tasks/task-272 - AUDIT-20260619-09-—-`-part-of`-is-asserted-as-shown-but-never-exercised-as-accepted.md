@@ -3,9 +3,10 @@ id: TASK-272
 title: >-
   AUDIT-20260619-09 — `--part-of` is asserted as shown but never exercised as
   accepted
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 01:35'
+updated_date: '2026-06-21 06:32'
 labels:
   - 'type:migrated-finding'
   - 'feature:027-roadmap-edge-mutation-and-cluster'
