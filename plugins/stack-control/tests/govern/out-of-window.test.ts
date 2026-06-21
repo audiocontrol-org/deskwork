@@ -23,6 +23,7 @@ import { join } from 'node:path';
 import {
   assembleImplementPayload,
   CODE_ARTIFACT_FRAMING,
+  CODE_ARTIFACT_FRAMING_PER_PHASE,
 } from '../../src/govern/payload-implement.js';
 
 function git(repo: string, ...args: string[]): { status: number; stdout: string } {
@@ -49,13 +50,20 @@ function head(repo: string): string {
   return git(repo, 'rev-parse', 'HEAD').stdout;
 }
 
-describe('US5 FR-021 — the artifact framing teaches out-of-window = not-this-phase-scope', () => {
-  it('CODE_ARTIFACT_FRAMING instructs the auditor not to flag out-of-window references as absent', () => {
-    const lower = CODE_ARTIFACT_FRAMING.toLowerCase();
+describe('US5 FR-021 — the per-phase artifact framing teaches out-of-window = not-this-phase-scope', () => {
+  it('CODE_ARTIFACT_FRAMING_PER_PHASE instructs the auditor not to flag out-of-window references as absent', () => {
+    const lower = CODE_ARTIFACT_FRAMING_PER_PHASE.toLowerCase();
     expect(lower).toContain('out of');
     expect(lower).toContain('window');
     // It must explicitly steer away from the "absent / not imported" false HIGH.
     expect(lower).toMatch(/absent|not imported|not-imported/);
+  });
+
+  it('the generic CODE_ARTIFACT_FRAMING does NOT assert a per-phase window (AUDIT-20260621-06)', () => {
+    // The whole-feature audit path uses the generic framing — it must not claim
+    // "this is a PER-PHASE diff" (which would suppress real missing-impl HIGHs there).
+    expect(CODE_ARTIFACT_FRAMING.toLowerCase()).not.toContain('per-phase');
+    expect(CODE_ARTIFACT_FRAMING.toLowerCase()).not.toContain('out of this phase');
   });
 });
 
@@ -90,6 +98,33 @@ describe('US5 FR-021/022 — the per-phase payload widens to present out-of-wind
       // it exists (no false "absent/not-imported" HIGH).
       expect(payload.diff).toContain('src/dep.ts');
       expect(payload.diff).toContain('DEP_PRESENT_MARKER');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('folds a dep referenced via a re-export (export … from) too (AUDIT-20260621-09)', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'oow-reexport-'));
+    try {
+      git(repo, 'init', '-q');
+      mkdirSync(join(repo, 'src'), { recursive: true });
+      writeFileSync(join(repo, 'src/dep.ts'), 'export const dep = "REEXPORT_DEP_MARKER";\n');
+      writeFileSync(join(repo, 'README.md'), 'seed\n');
+      commitAll(repo, 'chore: seed dep (pre-phase, out of window)');
+      const base = head(repo);
+
+      // A barrel/re-export surface referencing the out-of-window dep.
+      writeFileSync(join(repo, 'src/barrel.ts'), 'export { dep } from "./dep.js";\nexport * from "./dep.js";\n');
+      commitAll(repo, 'feat: phase 5 barrel re-exporting the out-of-window dep');
+
+      const payload = assembleImplementPayload({
+        installationRoot: repo,
+        base,
+        pathScope: ['src/barrel.ts'],
+      });
+
+      expect(payload.diff).toContain('src/dep.ts');
+      expect(payload.diff).toContain('REEXPORT_DEP_MARKER');
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }

@@ -53,6 +53,7 @@ import {
   assembleImplementPayload,
   CODE_AUDIT_LENS,
   CODE_ARTIFACT_FRAMING,
+  CODE_ARTIFACT_FRAMING_PER_PHASE,
 } from '../govern/payload-implement.js';
 import {
   assembleSpecPayload,
@@ -359,7 +360,14 @@ export function buildImplementVars(
     audit_log_excerpt: '',
     commit_subjects: payload.commitSubjects,
     audit_lens: CODE_AUDIT_LENS,
-    artifact_framing: CODE_ARTIFACT_FRAMING,
+    // 029 US5/FR-021 (AUDIT-20260621-06): the per-phase out-of-window framing applies
+    // ONLY when a path scope is set (a per-phase unit where out-of-window deps are
+    // folded). A whole-feature audit keeps the generic framing — the per-phase note
+    // would be false there and could suppress a real missing-impl HIGH.
+    artifact_framing:
+      pathScope !== undefined && pathScope.length > 0
+        ? CODE_ARTIFACT_FRAMING_PER_PHASE
+        : CODE_ARTIFACT_FRAMING,
   };
   const checkpoint =
     checkpointFlag ?? pick(undefined, process.env.GOVERN_CHECKPOINT) ?? 'after_clarify';
@@ -448,6 +456,20 @@ function currentHeadSha(repoRoot: string): string | undefined {
 }
 
 /**
+ * True when `ref` resolves to a commit in `repoRoot` (029 US5/FR-020, AUDIT-20260621-08).
+ * Used to verify a recorded prior-phase governedSha still exists before it becomes a
+ * diff-base — a rebased/pruned/corrupt anchor must fail loud, not silently under-scope.
+ */
+function gitRefResolves(repoRoot: string, ref: string): boolean {
+  const r = spawnSync(
+    'git',
+    ['-C', repoRoot, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`],
+    { encoding: 'utf8' },
+  );
+  return r.status === 0;
+}
+
+/**
  * Write (or refresh) the per-phase checkpoint for a resolved `phase`-granularity
  * unit at the CURRENT tree state — the single home shared by the normal
  * convergence-graduation path AND the per-phase `--override` short-circuit
@@ -467,24 +489,22 @@ function writeResolvedPhaseCheckpoint(args: {
   readonly phaseCheckpointKey: string | undefined;
   readonly slug: string;
   /**
-   * Record the current HEAD as `governedSha` (029 US5/FR-020 pre-phase anchor for a
-   * LATER phase). TRUE on the normal convergence-graduation path (HEAD is the phase's
-   * real committed tip). FALSE on the `--override` short-circuit: an override is a
-   * per-invocation escape (data-model US4) that may run at an UNRELATED HEAD, so its
-   * sha must NOT poison a later phase's diff-base resolution.
+   * The `governedSha` to record (029 US5/FR-020 pre-phase anchor for a LATER phase).
+   * The CALLER decides — no boolean control-coupling (AUDIT-20260621-03):
+   *   - normal graduation passes the current HEAD (the phase's real committed tip);
+   *   - the `--override` path passes the EXISTING checkpoint's sha (preserve it —
+   *     an override at an unrelated HEAD must neither poison NOR clear a valid anchor;
+   *     AUDIT-20260621-11/02).
+   * `undefined` writes no `governedSha` field.
    */
-  readonly recordGovernedSha: boolean;
+  readonly governedSha: string | undefined;
 }): void {
   // AUDIT-20260620-124 (task-360): both call sites (now via
   // writePhaseCheckpointAfterRecordOrFatal) ignore the written path — return void
   // rather than declaring a `string` no caller consumes.
-  const { repoRoot, phaseUnit, phaseStatus, phaseCheckpointKey, slug } = args;
+  const { repoRoot, phaseUnit, phaseStatus, phaseCheckpointKey, slug, governedSha } = args;
   const auditedFiles = resolveAuditedFiles(repoRoot, phaseUnit.diffScope.base, phaseStatus.files);
   const hunkBlocks = computePhaseHunkBlocks(repoRoot, auditedFiles, phaseUnit.diffScope.base);
-  // 029 US5 (FR-020): record the governed HEAD so a LATER phase resolves its
-  // diff-base to this phase's pre-phase commit (the union-payload anchor) — but ONLY
-  // on the normal graduation path (NOT an override at an unrelated HEAD).
-  const governedSha = args.recordGovernedSha ? currentHeadSha(repoRoot) : undefined;
   writePhaseCheckpoint(repoRoot, {
     version: 1,
     // Canonical key (AUDIT codex-01/claude-02) — what the US1 gate reads under.
@@ -519,7 +539,7 @@ function writePhaseCheckpointAfterRecordOrFatal(args: {
   readonly phaseStatus: PhaseCheckpointStatus;
   readonly phaseCheckpointKey: string | undefined;
   readonly slug: string;
-  readonly recordGovernedSha: boolean;
+  readonly governedSha: string | undefined;
 }): void {
   try {
     writeResolvedPhaseCheckpoint(args);
@@ -804,6 +824,9 @@ export async function runGovern(args: string[]): Promise<void> {
           phaseCheckpointStatuses.map((status) => [status.phaseId, status.governedSha]),
         ),
         ...(explicitBase !== undefined ? { explicitBase } : {}),
+        // AUDIT-20260621-08: verify a recorded governedSha still resolves before
+        // handing it to git diff — a stale anchor degrades to an empty payload.
+        isResolvable: (ref) => gitRefResolves(repoRoot, ref),
         fallbackBase: 'HEAD~1',
       });
       phaseUnit = resolvePhaseUnit({ tasksPath, phaseId: flags.phase, diffBase });
@@ -980,9 +1003,10 @@ export async function runGovern(args: string[]): Promise<void> {
           phaseStatus,
           phaseCheckpointKey,
           slug,
-          // Override path (029 US5/FR-020): do NOT record governedSha — an override
-          // may run at an unrelated HEAD and must not poison a later phase's base.
-          recordGovernedSha: false,
+          // Override path (029 US5/FR-020, AUDIT-20260621-11/02): PRESERVE the existing
+          // governedSha — an override may run at an unrelated HEAD, so it must neither
+          // record a poisoning sha NOR clear a valid anchor a prior graduation set.
+          governedSha: phaseStatus.governedSha,
         });
       }
       process.stderr.write(
@@ -1218,7 +1242,7 @@ export async function runGovern(args: string[]): Promise<void> {
         slug,
         // Normal graduation path: HEAD is the phase's real committed tip — record it
         // as the FR-020 pre-phase anchor for the next phase.
-        recordGovernedSha: true,
+        governedSha: currentHeadSha(repoRoot),
       });
     }
     // AUDIT-BARRAGE claude-04: the override path short-circuits earlier (FR-017), so an

@@ -63,7 +63,17 @@ export const CODE_AUDIT_LENS = [
  * descriptive paragraph.
  */
 export const CODE_ARTIFACT_FRAMING =
-  'The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn\'t). ' +
+  'The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn\'t).';
+
+/**
+ * Per-phase implement framing (029 US5/FR-021). Used ONLY on the per-phase audit path
+ * (a path scope is set + out-of-window deps are folded). The whole-feature
+ * (`after_implement`) path keeps the generic CODE_ARTIFACT_FRAMING — asserting
+ * "this is a PER-PHASE diff" or "out-of-window deps are folded below" would be FALSE
+ * there and could suppress a real missing-implementation HIGH (AUDIT-20260621-06).
+ */
+export const CODE_ARTIFACT_FRAMING_PER_PHASE =
+  `${CODE_ARTIFACT_FRAMING} ` +
   'NOTE — out-of-window scope (029 US5/FR-021): this is a PER-PHASE diff. A file the diff REFERENCES but does not itself change (an import target, a dependency, a sibling module) is OUT OF THIS PHASE\'S WINDOW — it belongs to an earlier phase or is pre-existing. Do NOT raise a finding that such a referenced file is absent / not-imported / missing merely because its definition is not in this diff; assume it exists and is correct unless the diff itself shows a genuinely-missing implementation. Out-of-window deps that ARE present in the repo are folded in below under a "referenced dependency (out of phase window)" header for context only — review them as evidence the reference resolves, not as in-scope work to critique.';
 
 export interface ImplementPayloadArgs {
@@ -588,7 +598,14 @@ function foldReferencedOutOfWindowDeps(args: {
     let content: string;
     try {
       content = readFileSync(abs, 'utf8');
-    } catch {
+    } catch (err) {
+      // AUDIT-20260621-05/10: a resolved dep that then fails to read (TOCTOU race,
+      // permission revoked) must NOT be dropped silently — the "every inclusion/skip
+      // warned" contract lets an operator diagnosing a false HIGH see it was dropped.
+      warn(
+        `govern: skipping out-of-window dep ${dep} — resolved but unreadable ` +
+          `(${err instanceof Error ? err.message : String(err)}); not folded.`,
+      );
       continue;
     }
     warn(`govern: folding referenced out-of-window dep ${dep} as read-only context (FR-021).`);

@@ -141,6 +141,14 @@ export interface ResolvePrePhaseDiffBaseArgs {
    * an override write at an unrelated HEAD).
    */
   readonly explicitBase?: string;
+  /**
+   * Verifies a candidate governedSha still resolves to a git object (AUDIT-20260621-08).
+   * When provided and the SELECTED prior governedSha does NOT resolve (branch rebased /
+   * history pruned / corrupt checkpoint), the resolver FAILS LOUD rather than handing a
+   * stale ref to a git diff that would degrade to an empty payload (silent under-scope).
+   * Omitted → no verification (pure callers / tests that don't need it).
+   */
+  readonly isResolvable?: (ref: string) => boolean;
   /** Used when neither an explicit base nor a prior governedSha resolves (phase 1 /
    * pre-US5 checkpoints). */
   readonly fallbackBase: string;
@@ -164,11 +172,28 @@ export interface ResolvePrePhaseDiffBaseArgs {
 export function resolvePrePhaseDiffBase(args: ResolvePrePhaseDiffBaseArgs): string {
   if (args.explicitBase !== undefined && args.explicitBase.length > 0) return args.explicitBase;
   const idx = args.orderedPhaseIds.indexOf(args.phaseId);
-  if (idx > 0) {
-    for (let i = idx - 1; i >= 0; i -= 1) {
-      const sha = args.governedShaByPhase.get(args.orderedPhaseIds[i]!);
-      if (sha !== undefined && sha.length > 0) return sha;
+  if (idx === -1) {
+    // A mis-typed/stale phaseId must NOT silently fall back to HEAD~1 — that
+    // reintroduces the TASK-263 under-scope this feature fixes (AUDIT-20260621-07).
+    throw new Error(
+      `resolvePrePhaseDiffBase: phase '${args.phaseId}' is not in the tasks.md phase ` +
+        `order (${args.orderedPhaseIds.join(', ') || 'none'}); cannot resolve a pre-phase diff-base.`,
+    );
+  }
+  for (let i = idx - 1; i >= 0; i -= 1) {
+    const sha = args.governedShaByPhase.get(args.orderedPhaseIds[i]!);
+    if (sha === undefined || sha.length === 0) continue;
+    // AUDIT-20260621-08: a present-but-unresolvable anchor is a corruption signal —
+    // fail loud (do NOT skip to an older base, which would under-scope, nor fall back
+    // silently to HEAD~1). The operator recovers with an explicit --diff-base.
+    if (args.isResolvable !== undefined && !args.isResolvable(sha)) {
+      throw new Error(
+        `resolvePrePhaseDiffBase: phase '${args.orderedPhaseIds[i]}' recorded governedSha ` +
+          `'${sha}' which no longer resolves to a git object (branch rebased / history ` +
+          `pruned / corrupt checkpoint). Pass an explicit --diff-base to recover.`,
+      );
     }
+    return sha;
   }
   return args.fallbackBase;
 }

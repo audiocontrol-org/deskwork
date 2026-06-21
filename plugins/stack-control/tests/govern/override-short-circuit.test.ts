@@ -421,6 +421,56 @@ describe('govern --phase --override writes the per-phase checkpoint (029 US4+US7
     }
   });
 
+  // 029 US5 (AUDIT-20260621-11/02): a --phase override must PRESERVE an existing
+  // governedSha — never clear the valid pre-phase anchor a prior normal graduation set
+  // (clearing it would silently regress the NEXT phase's diff-base to HEAD~1).
+  it('preserves an existing governedSha across a --phase override (does not clear it)', () => {
+    const slug = 'feat';
+    const repo = makePhaseRepo(slug);
+    const fx = mkdtempSync(join(tmpdir(), 'gov-override-preserve-'));
+    const marker = join(fx, 'barrage-ran.marker');
+    const stub = writeMarkerStub(fx, marker);
+    const priorSha = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' })
+      .stdout.trim();
+    writePhaseCheckpoint(repo, {
+      version: 1,
+      featureSlug: slug,
+      phaseId: '1',
+      checkpoint: 'phase-1',
+      auditLogSection: 'phase-1',
+      scopeFingerprint: computeScopeFingerprint(repo, ['src/a.ts']),
+      passedAt: '2026-06-13T00:00:00.000Z',
+      governedPaths: ['src/a.ts'],
+    });
+    // Phase-2 was previously NORMALLY graduated, recording a valid governedSha anchor.
+    writePhaseCheckpoint(repo, {
+      version: 1,
+      featureSlug: slug,
+      phaseId: '2',
+      checkpoint: 'phase-2',
+      auditLogSection: 'phase-2',
+      scopeFingerprint: computeScopeFingerprint(repo, ['src/b.ts']),
+      passedAt: '2026-06-13T00:00:00.000Z',
+      governedPaths: ['src/b.ts'],
+      governedSha: priorSha,
+    });
+    try {
+      const r = runGovern(
+        ['--mode', 'implement', '--feature', slug, '--at', repo, '--diff-base', 'HEAD~1',
+          '--phase', '2', '--require-models', '1', '--override', 'operator accepts residual'],
+        { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run') },
+      );
+      expect(r.status).toBe(0);
+      const record = readPhaseCheckpoint(repo, slug, '2');
+      expect(record).not.toBeNull();
+      // The anchor survives the override — neither cleared nor poisoned.
+      expect(record?.governedSha).toBe(priorSha);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
+
   // specs/029 US4 (AUDIT-BARRAGE codex-01 HIGH + claude-01, phase-4 re-govern round 2):
   // record-first ordering — when the convergence-record write FATALs on a --phase
   // override, NO phase checkpoint may be left on disk (the half-write that let a later

@@ -137,6 +137,40 @@ describe('US5 FR-020 — per-phase payload unions all the phase\'s commits', () 
     expect(base).toBe('cafebabecafebabecafebabecafebabecafebabe');
   });
 
+  it('throws when phaseId is not in the tasks.md phase order (AUDIT-20260621-07)', () => {
+    expect(() =>
+      resolvePrePhaseDiffBase({
+        phaseId: '99',
+        orderedPhaseIds: ['1', '2', '3'],
+        governedShaByPhase: new Map<string, string | undefined>(),
+        fallbackBase: 'HEAD~1',
+      }),
+    ).toThrow(/not in the tasks\.md phase order/);
+  });
+
+  it('fails loud when the selected prior governedSha no longer resolves (AUDIT-20260621-08)', () => {
+    expect(() =>
+      resolvePrePhaseDiffBase({
+        phaseId: '5',
+        orderedPhaseIds: ['1', '2', '3', '4', '5'],
+        governedShaByPhase: new Map<string, string | undefined>([['4', 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef']]),
+        isResolvable: () => false,
+        fallbackBase: 'HEAD~1',
+      }),
+    ).toThrow(/no longer resolves/);
+  });
+
+  it('uses the prior governedSha when it resolves (AUDIT-20260621-08)', () => {
+    const base = resolvePrePhaseDiffBase({
+      phaseId: '5',
+      orderedPhaseIds: ['1', '2', '3', '4', '5'],
+      governedShaByPhase: new Map<string, string | undefined>([['4', 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef']]),
+      isResolvable: () => true,
+      fallbackBase: 'HEAD~1',
+    });
+    expect(base).toBe('deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
+  });
+
   it('persists and round-trips governedSha on the phase checkpoint record', () => {
     const repo = setupRepo();
     try {
