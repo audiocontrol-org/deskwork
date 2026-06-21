@@ -63,17 +63,6 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
-import {
-  carriedFilesForComposition,
-  resolvePhaseUnit,
-  resolvePrePhaseDiffBase,
-} from '../govern/incremental-audit.js';
-import {
-  featureCheckpointKey,
-  normalizeGovernedPaths,
-  resolvePhaseCheckpointStatuses,
-  type PhaseCheckpointStatus,
-} from '../govern/phase-checkpoint-status.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
@@ -87,7 +76,6 @@ import type { Installation } from '../config/types.js';
 import { checkLifecyclePrecondition } from '../lifecycle-precondition.js';
 import { errorMessage } from '../scope-discovery/util/typeguards.js';
 import { deriveDistinctGitToplevel } from '../scope-discovery/util/git-toplevel.js';
-import { computePhaseHunkBlocks, writePhaseCheckpoint } from '../govern/checkpoint-state.js';
 import { type LaneCapabilityProfile } from '../govern/lane-capabilities.js';
 import { negotiateFleet } from '../govern/fleet-negotiation.js';
 import { selectRequestedLaneCapabilities } from '../govern/protocol.js';
@@ -131,9 +119,7 @@ const USAGE = [
   '                            is what protocol runs exist for; specs/014 US1).',
   '  --no-slush                Disable the slush step (address every finding).',
   '  --json                    Emit the gate verdict JSON only.',
-  '  implement: --diff-base <ref>   Diff base (default HEAD~1).',
-  '             --phase <id>        Audit ONE tasks.md phase (per-phase unit, FR-007);',
-  '                                 scopes the payload to the phase files + checkpoint phase-<id>.',
+  '  implement: --diff-base <ref>   Diff base for the whole committed feature diff (default HEAD~1).',
   '  spec:      --spec-path <p>      Spec under audit (else CLAUDE.md SPECKIT marker).',
   '             --plan-path <p>      Fold the plan (the after_plan checkpoint).',
   '             --checkpoint <name>  Override the checkpoint label.',
@@ -366,8 +352,7 @@ export function buildImplementVars(
         ? CODE_ARTIFACT_FRAMING_PER_PHASE
         : CODE_ARTIFACT_FRAMING,
   };
-  const checkpoint =
-    checkpointFlag ?? pick(undefined, process.env.GOVERN_CHECKPOINT) ?? 'after_clarify';
+  const checkpoint = checkpointFlag ?? 'after_clarify';
   // claude-20260612-03: return the structured path-scope exclusions so they reach
   // the govern verdict surface as a consolidated, machine-greppable summary — not
   // only as the interleaved per-file stderr warns assembleImplementPayload emits.
@@ -405,177 +390,7 @@ function resolveGovernExcludePaths(installation: Installation): readonly string[
   return excludes;
 }
 
-// PhaseCheckpointStatus, normalizeGovernedPaths, and resolvePhaseCheckpointStatuses
-// were extracted to ../govern/phase-checkpoint-status.js (025 US1) so the per-phase
-// graduate gate reuses the SAME currency logic this command writes (no clone).
 
-/**
- * The files a phase's audit ACTUALLY covered: `git diff --name-only <base> --
- * <declaredScope>`. Recorded in the checkpoint so whole-feature composition carries
- * these exact files instead of the declared (possibly directory) scope — closing
- * the TASK-129 cross-cutting blind spot. Fails loud on a git error (the audit it
- * follows already ran git successfully, so a failure here is a real anomaly, not a
- * fallback case).
- */
-export function resolveAuditedFiles(
-  repoRoot: string,
-  base: string,
-  declaredScope: readonly string[],
-): readonly string[] {
-  // `--relative` (TASK-357): emit paths relative to the installation cwd, NOT the git
-  // toplevel. In a monorepo (git-root != installation-root) the un-relative output was
-  // git-root-prefixed (e.g. `plugins/stack-control/src/...`), which (a) made
-  // computePhaseHunkBlocks' `git diff -- <file>` (cwd=installationRoot) match nothing →
-  // empty hunkBlocks → US7 hunk-freshness never engaged → whole-file fallback re-staled
-  // shared-file phases (the entanglement loop), and (b) misaligned with the
-  // installation-relative declaredFiles the composition carry-logic compares against.
-  const r = spawnSync('git', ['-C', repoRoot, 'diff', '--name-only', '--relative', base, '--', ...declaredScope], {
-    encoding: 'utf8',
-  });
-  if (r.status !== 0 || typeof r.stdout !== 'string') {
-    throw new GovernProtocolError(
-      `govern: FATAL — could not resolve audited files via 'git diff --name-only ${base}' ` +
-        `(exit ${r.status ?? 'null'}): ${(r.stderr ?? '').toString().trim()}`,
-    );
-  }
-  return r.stdout
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-}
-
-/**
- * The current git HEAD sha at `repoRoot`, recorded on the phase checkpoint so a
- * LATER phase can resolve its diff-base to THIS phase's governed commit (029 US5,
- * FR-020). Returns undefined when git is unavailable / HEAD is unresolvable
- * (detached pre-first-commit, no git) — the checkpoint is then written WITHOUT a
- * governedSha and the next phase's resolver falls back to --diff-base/HEAD~1
- * (graceful, mirroring computePhaseHunkBlocks).
- */
-function currentHeadSha(repoRoot: string): string | undefined {
-  const r = spawnSync('git', ['-C', repoRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
-  if (r.status !== 0 || typeof r.stdout !== 'string') return undefined;
-  const sha = r.stdout.trim();
-  return sha.length > 0 ? sha : undefined;
-}
-
-/**
- * True when `ref` resolves to a commit in `repoRoot` (029 US5/FR-020, AUDIT-20260621-08).
- * Used to verify a recorded prior-phase governedSha still exists before it becomes a
- * diff-base — a rebased/pruned/corrupt anchor must fail loud, not silently under-scope.
- */
-function gitRefResolves(repoRoot: string, ref: string): boolean {
-  const r = spawnSync(
-    'git',
-    ['-C', repoRoot, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`],
-    { encoding: 'utf8' },
-  );
-  return r.status === 0;
-}
-
-/**
- * Write (or refresh) the per-phase checkpoint for a resolved `phase`-granularity
- * unit at the CURRENT tree state — the single home shared by the normal
- * convergence-graduation path AND the per-phase `--override` short-circuit
- * (specs/029 US4 + US7). A per-phase override graduates THIS phase's findings, so
- * its checkpoint must still be written/refreshed — otherwise the phase has no
- * current checkpoint and the `all-phase-checkpoints-current` gate refuses to let
- * LATER phases advance. The `checkpoint` field is derived INTERNALLY from
- * `phaseUnit.auditLogSection` (AUDIT-BARRAGE claude-04) — neither caller supplies it,
- * so the normal-graduation and `--override` paths can never write divergent values. If
- * git is unavailable, `computePhaseHunkBlocks` returns [] and we write WITHOUT
- * hunkBlocks (graceful). No-op when the phase has no resolved status.
- */
-function writeResolvedPhaseCheckpoint(args: {
-  readonly repoRoot: string;
-  readonly phaseUnit: AuditUnit & { readonly phaseId: string };
-  readonly phaseStatus: PhaseCheckpointStatus;
-  readonly phaseCheckpointKey: string | undefined;
-  readonly slug: string;
-  /**
-   * The `governedSha` to record (029 US5/FR-020 pre-phase anchor for a LATER phase).
-   * The CALLER decides — no boolean control-coupling (AUDIT-20260621-03):
-   *   - normal graduation passes the current HEAD (the phase's real committed tip);
-   *   - the `--override` path passes the EXISTING checkpoint's sha (preserve it —
-   *     an override at an unrelated HEAD must neither poison NOR clear a valid anchor;
-   *     AUDIT-20260621-11/02).
-   * `undefined` writes no `governedSha` field.
-   */
-  readonly governedSha: string | undefined;
-}): void {
-  // AUDIT-20260620-124 (task-360): both call sites (now via
-  // writePhaseCheckpointAfterRecordOrFatal) ignore the written path — return void
-  // rather than declaring a `string` no caller consumes.
-  const { repoRoot, phaseUnit, phaseStatus, phaseCheckpointKey, slug, governedSha } = args;
-  const auditedFiles = resolveAuditedFiles(repoRoot, phaseUnit.diffScope.base, phaseStatus.files);
-  const hunkBlocks = computePhaseHunkBlocks(repoRoot, auditedFiles, phaseUnit.diffScope.base);
-  writePhaseCheckpoint(repoRoot, {
-    version: 1,
-    // Canonical key (AUDIT codex-01/claude-02) — what the US1 gate reads under.
-    featureSlug: phaseCheckpointKey ?? featureCheckpointKey(slug),
-    phaseId: phaseUnit.phaseId,
-    // AUDIT-BARRAGE claude-04: derive `checkpoint` from the SINGLE source
-    // (`phaseUnit.auditLogSection`) inside the shared helper, so the normal-graduation
-    // and `--override` paths can NEVER write divergent checkpoint values through it.
-    checkpoint: phaseUnit.auditLogSection,
-    auditLogSection: phaseUnit.auditLogSection,
-    scopeFingerprint: phaseStatus.scopeFingerprint,
-    passedAt: new Date().toISOString(),
-    governedPaths: phaseStatus.files,
-    auditedFiles,
-    ...(governedSha !== undefined ? { governedSha } : {}),
-    ...(hunkBlocks.length > 0 ? { hunkBlocks } : {}),
-  });
-}
-
-/**
- * Write the per-phase checkpoint AFTER the convergence record has landed (record-first
- * ordering — AUDIT-BARRAGE codex-01/codex-02/claude-01). A checkpoint-write failure here
- * is FATAL with an ACCURATE message: the convergence record IS already written, so the
- * failure does NOT wrongly advance the lifecycle — the `governing → shipped` gate stays
- * CLOSED because `all-phase-checkpoints-current` is unmet until the checkpoint lands.
- * Re-running writes it. A `GovernProtocolError` from the caller's contract checks is NOT
- * caught here (it propagates to the main handler).
- */
-function writePhaseCheckpointAfterRecordOrFatal(args: {
-  readonly repoRoot: string;
-  readonly phaseUnit: AuditUnit & { readonly phaseId: string };
-  readonly phaseStatus: PhaseCheckpointStatus;
-  readonly phaseCheckpointKey: string | undefined;
-  readonly slug: string;
-  readonly governedSha: string | undefined;
-}): void {
-  try {
-    writeResolvedPhaseCheckpoint(args);
-  } catch (err) {
-    process.stderr.write(
-      `govern: FATAL — the convergence record IS written, but the per-phase checkpoint ` +
-        `write failed (${errorMessage(err)}); the governing -> shipped gate stays CLOSED ` +
-        `(all-phase-checkpoints-current is unmet) until the checkpoint lands — no wrong ` +
-        `advance. Re-run to write the checkpoint.\n`,
-    );
-    emitTerminalOutcome('fatal');
-    process.exit(1);
-  }
-}
-
-function renderCheckpointRequirements(statuses: readonly PhaseCheckpointStatus[]): string {
-  return statuses.map((status) => `${status.state} phase-${status.phaseId}`).join(', ');
-}
-
-function assertPriorPhaseCheckpointsCurrent(
-  statuses: readonly PhaseCheckpointStatus[],
-  phaseId: string,
-): void {
-  const phaseIndex = statuses.findIndex((status) => status.phaseId === phaseId);
-  if (phaseIndex < 0) return;
-  const unmet = statuses.slice(0, phaseIndex).filter((status) => status.state !== 'current');
-  if (unmet.length > 0) {
-    throw new GovernProtocolError(
-      `govern: FATAL — phase '${phaseId}' cannot advance until earlier required checkpoints are current: ${renderCheckpointRequirements(unmet)}.`,
-    );
-  }
-}
 
 function preflightNegotiatedFleet(
   laneCapabilities: readonly LaneCapabilityProfile[],
@@ -617,7 +432,7 @@ export function buildSpecVars(
 ): { vars: BarrageVars; checkpoint: string; skippedOutOfScope: readonly string[] } {
   const specPath = resolveSpecPath(repoRoot, specPathFlag);
   const planPath = pick(planPathFlag, process.env.GOVERN_PLAN_PATH);
-  const checkpoint = pick(checkpointFlag, process.env.GOVERN_CHECKPOINT);
+  const checkpoint = checkpointFlag;
   const budgetEnv = process.env.GOVERN_PAYLOAD_BUDGET;
   const payload = assembleSpecPayload({
     specPath,
@@ -700,6 +515,17 @@ export async function runGovern(args: string[]): Promise<void> {
     process.stderr.write(
       'govern: FATAL — GOVERN_REPO_ROOT is retired (specs/installation-isolation R2); ' +
         'use --at <dir> to name the installation enclosing <dir> explicitly.\n',
+    );
+    emitTerminalOutcome('fatal');
+    process.exit(2);
+  }
+
+  // 030 US2 (FR-017, clean break): GOVERN_CHECKPOINT is retired with the per-phase
+  // path — there is no per-phase checkpoint to select. Reject it loud, like --phase.
+  if (process.env.GOVERN_CHECKPOINT !== undefined && process.env.GOVERN_CHECKPOINT.length > 0) {
+    process.stderr.write(
+      'govern: FATAL — GOVERN_CHECKPOINT is retired (030 clean break: per-phase governance ' +
+        'is gone; govern audits the whole committed feature diff at end). Unset it.\n',
     );
     emitTerminalOutcome('fatal');
     process.exit(2);
@@ -794,7 +620,6 @@ export async function runGovern(args: string[]): Promise<void> {
     // pipeline (src/govern/end-govern-pipeline.ts).
     let phaseUnit: AuditUnit | undefined;
     let payloadPathScope: readonly string[] | undefined;
-    const compositionExcludePaths: readonly string[] = [];
     if (flags.mode === 'implement') {
       const { root } = await resolveGovernFeatureRoot(repoRoot, slug);
       if (root !== undefined && existsSync(join(root, 'tasks.md'))) {
@@ -973,7 +798,7 @@ export async function runGovern(args: string[]): Promise<void> {
     // commits/files are excluded from both payload arms.
     const excludePaths =
       flags.mode === 'implement' && featureRoot !== undefined
-        ? [...resolveGovernExcludePaths(installation), ...compositionExcludePaths]
+        ? resolveGovernExcludePaths(installation)
         : undefined;
     // specs/015 + 014 merge: buildImplementVars threads BOTH the per-phase
     // pathScope (015 US4 — phaseUnit's files, and its `phase-<id>` checkpoint when
