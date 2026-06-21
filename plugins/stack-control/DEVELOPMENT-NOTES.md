@@ -2,6 +2,45 @@
 
 ---
 
+## 2026-06-21: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 18
+  - feat(030-chunked-end-govern): US8 verification + polish — composition-bugs-gone, line caps, OQ-1/OQ-2 settled (T061/T062/T065-T068)
+  - feat(030-chunked-end-govern): US1/US2 — CLI partitions the committed diff into per-chunk barrage passes (T036 cutover)
+  - tasks(030-chunked-end-govern): mark US2 core clean-break tasks complete (T024-T036)
+  - feat(030-chunked-end-govern): US2 — strip dead per-phase code from govern.ts; reject --phase/GOVERN_CHECKPOINT (T024/T027)
+  - feat(030-chunked-end-govern): US2 — cut govern implement-mode over to whole-feature end-govern (T029/T030)
+  - feat(030-chunked-end-govern): US2 — delete the boundary-too-large terminal (T028/T035)
+  - feat(030-chunked-end-govern): US2 — collapse graduate gate to the single whole-feature criterion (T026/T032)
+  - feat(030-chunked-end-govern): Phase 9 US7 — doctor/schema surface for new artifacts (T059/T060)
+  - feat(030-chunked-end-govern): Phase 8 US6 — reconcile once, close-in-loop before lift (T055-T058)
+  - feat(030-chunked-end-govern): Phase 7 US5 — industrialized parallel fix-fanout (T049-T054)
+  - feat(030-chunked-end-govern): Phase 6 US4 — bounded re-audit loop + round cap (T043-T048)
+  - feat(030-chunked-end-govern): Phase 5 US3 — interface-level seam pass (T038/T039/T041/T042)
+  - feat(030-chunked-end-govern): Phase 3 US1 complete — partition aggregate + pipeline skeleton (T014/T015/T020-T023, T037/T040)
+  - feat(030-chunked-end-govern): Phase 3 US1 partitioner primitives (T010-T019)
+  - docs(030-chunked-end-govern): single file > envelope is fail-loud, not hunk-split (operator decision)
+  - feat(030-chunked-end-govern): Phase 2 foundational — schemas, chunk-id, envelope rekey (T004-T009)
+  - feat(030-chunked-end-govern): Phase 1 setup — typed stub modules (T001-T003)
+  - chore(030-chunked-end-govern): record analyze-clean marker; capture 4 analyze findings to backlog
+- Files changed: 68
+- Backlog touched: TASK-389, TASK-408, TASK-411, TASK-412, TASK-413
+
 ## 2026-06-21: govern-whole-feature-chunked-payload — design (approved) + full define chain authored to implement-ready
 
 ### Feature: multi:feature/govern-whole-feature-chunked-payload (spec `030-chunked-end-govern`)
