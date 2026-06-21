@@ -3,9 +3,10 @@ id: TASK-248
 title: >-
   AUDIT-20260618-03 — `stringListOption` collapses a present-but-empty value to
   `[]`, indistinguishable downstream from a real list
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-18 23:39'
+updated_date: '2026-06-21 06:37'
 labels:
   - 'type:migrated-finding'
   - 'feature:027-roadmap-edge-mutation-and-cluster'
