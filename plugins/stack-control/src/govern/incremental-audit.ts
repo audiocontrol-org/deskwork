@@ -134,7 +134,15 @@ export interface ResolvePrePhaseDiffBaseArgs {
   readonly orderedPhaseIds: readonly string[];
   /** governedSha by phase id (undefined for a phase with no recorded sha). */
   readonly governedShaByPhase: ReadonlyMap<string, string | undefined>;
-  /** Used when no prior phase recorded a sha (phase 1 / pre-US5 checkpoints). */
+  /**
+   * An operator-supplied anchor (`--diff-base` / `GOVERN_DIFF_BASE`). When set it
+   * WINS over the auto-resolved prior governedSha — operator intent beats inference,
+   * and it is the escape hatch when a prior phase's governedSha is unreliable (e.g.
+   * an override write at an unrelated HEAD).
+   */
+  readonly explicitBase?: string;
+  /** Used when neither an explicit base nor a prior governedSha resolves (phase 1 /
+   * pre-US5 checkpoints). */
   readonly fallbackBase: string;
 }
 
@@ -154,6 +162,7 @@ export interface ResolvePrePhaseDiffBaseArgs {
  * (the explicit `--diff-base`/`GOVERN_DIFF_BASE`/`HEAD~1`).
  */
 export function resolvePrePhaseDiffBase(args: ResolvePrePhaseDiffBaseArgs): string {
+  if (args.explicitBase !== undefined && args.explicitBase.length > 0) return args.explicitBase;
   const idx = args.orderedPhaseIds.indexOf(args.phaseId);
   if (idx > 0) {
     for (let i = idx - 1; i >= 0; i -= 1) {

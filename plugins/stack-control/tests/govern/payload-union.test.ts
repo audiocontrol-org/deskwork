@@ -98,6 +98,21 @@ describe('US5 FR-020 — per-phase payload unions all the phase\'s commits', () 
     }
   });
 
+  it('an explicit operator base (--diff-base) wins over an auto-resolved prior governedSha', () => {
+    const base = resolvePrePhaseDiffBase({
+      phaseId: '5',
+      orderedPhaseIds: ['1', '2', '3', '4', '5'],
+      governedShaByPhase: new Map<string, string | undefined>([
+        ['4', 'cafebabecafebabecafebabecafebabecafebabe'],
+      ]),
+      explicitBase: '2ae7604d',
+      fallbackBase: 'HEAD~1',
+    });
+    // The operator's explicit anchor wins — never the (possibly override-poisoned)
+    // prior governedSha.
+    expect(base).toBe('2ae7604d');
+  });
+
   it('falls back to fallbackBase when no prior phase recorded a governed commit (phase 1 / legacy)', () => {
     const base = resolvePrePhaseDiffBase({
       phaseId: '1',
