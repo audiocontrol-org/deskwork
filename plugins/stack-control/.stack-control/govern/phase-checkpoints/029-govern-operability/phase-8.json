@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "featureSlug": "029-govern-operability",
+  "phaseId": "8",
+  "checkpoint": "phase-8",
+  "auditLogSection": "phase-8",
+  "scopeFingerprint": "4cf0abd1cae971efcb5916b8875076d3dbd2b9aaf423ba53ad833521c6a45fa9",
+  "passedAt": "2026-06-21T02:30:21.457Z",
+  "governedPaths": [
+    "tests/skills/process-drivers.test.ts",
+    "skills/execute/SKILL.md",
+    "templates/audit-barrage-prompt.md"
+  ],
+  "auditedFiles": [
+    "skills/execute/SKILL.md",
+    "templates/audit-barrage-prompt.md",
+    "tests/skills/process-drivers.test.ts"
+  ],
+  "hunkBlocks": [
+    {
+      "file": "skills/execute/SKILL.md",
+      "hash": "fc9d0642723a5e6a58e037700a36d4915553e29c506ed3a7660008b1f7ae49bd",
+      "lines": 10
+    },
+    {
+      "file": "templates/audit-barrage-prompt.md",
+      "hash": "bd3f751a6e31a76c989f3dca66e23266ed63a1d9ba351920148f4179a2c3f137",
+      "lines": 10
+    },
+    {
+      "file": "tests/skills/process-drivers.test.ts",
+      "hash": "addedc44c16e3295d03f4313dee20f64b5cf87bdb2c518cbb47e168214e51997",
+      "lines": 45
+    }
+  ]
+}

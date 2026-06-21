@@ -122,8 +122,8 @@
 **Independent test**: the audit/implement skill bodies + barrage prompt templates contain the five drivers; a surface-adding fix triggers the channel-enumeration prompt.
 
 - [x] T044 [P] [US8] RED test: the audit/implement skill bodies + barrage prompt templates contain channel-enumeration, invariant-first boundary, round-0 self-red-team, fleet-degradation pricing, severity-rubric anchoring — in `tests/skills/process-drivers.test.ts` (presence assertions) (FR-029)
-- [x] T045 [US8] Add the five drivers to the audit/implement skill bodies + barrage prompt templates (FR-029)
-- [ ] T046 [US8] Close TASK-60; record the phase-8 govern checkpoint
+- [x] T045 [US8] Add the five drivers to the audit/implement skill body `skills/execute/SKILL.md` + the barrage prompt template `templates/audit-barrage-prompt.md` (FR-029)
+- [x] T046 [US8] Close TASK-60; record the phase-8 govern checkpoint
 
 ---
 

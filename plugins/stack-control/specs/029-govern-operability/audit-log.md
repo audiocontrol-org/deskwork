@@ -3278,3 +3278,238 @@ The diff adds three new code branches that should have corresponding test cases:
 3. `resolvePhaseCheckpointStatuses`: the record path propagates `record.governedSha` (line ~102), covering both the `undefined` (pre-US5 record) and `string` (US5+ record) cases.
 
 Commit `ce7c1db6` is titled "address phase-6 govern findings (AUDIT-20260621-27..30: record-converged criterion vs field clarity + **test gaps**)" — it explicitly claims to close test gaps. Yet neither a test file for `checkpoint-state` nor for `phase-checkpoint-status` appears in this diff. Per the phase-window instructions, those test additions may live in an earlier commit in the range or in an out-of-window file. This is flagged as informational: confirm that the test suites for these two modules exercise the new `governedSha` paths (valid present, invalid-throws, undefined-from-missing-record, and string-from-US5-record). If they do not, the throw path in `validateCheckpointRecord` is the highest-priority gap — an untested error branch is a common source of silent regressions.
+
+## 2026-06-21 — audit-barrage lift (20260621T021357125Z-029-govern-operability-phase-8)
+
+Code-sha: c3f0eef5a527c7f85e91431abd77d09de8ce15aa
+### AUDIT-20260621-36 — Round-0 self-red-team driver in audit prompt uses executor-perspective phrasing mismatched to the reviewer audience
+
+Finding-ID: AUDIT-20260621-36
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    templates/audit-barrage-prompt.md (diff +44)
+
+The **round-0 self-red-team** driver in the audit prompt reads: *"Before re-firing after a fix, do a self-red-team pass over the fix diff itself."* The phrase "before re-firing" presupposes the reader controls when the barrage re-fires — but the reviewer (the audit model reading this prompt) does not re-fire anything. The reviewer emits findings and exits; the executor re-fires. The verb "re-firing" belongs to the executor's perspective (correctly stated in `skills/execute/SKILL.md`: *"Before re-firing the barrage, do a self-red-team pass over your fix diff itself"* — where the executor is the subject).
+
+Blast-radius: this document is read by AI agents operating as audit reviewers. The phrase "before re-firing" is an imperative directed at a reviewer who has no re-fire action to take. An agent reviewer might (a) interpret "re-firing" as "before I produce findings that would trigger another round" — and correctly apply the spirit of the check, or (b) become confused about what action is being requested. In a spec designed to drive unattended agent behavior, the more natural reading the agent reaches first should be the intended one. Here, the natural reading requires the reviewer to infer a reframe. A clearer phrasing would drop "before re-firing": *"When reviewing a fix, do a self-red-team pass over the fix diff itself: what new edge did this fix open? what did it move rather than remove? Treat the fix as a fresh surface under audit."*
+
+The execute skill version is correctly scoped to the executor and requires no such inference.
+
+---
+
+### AUDIT-20260621-37 — Test file is located under `tests/skills/` but its scope covers both skills and templates surfaces
+
+Finding-ID: AUDIT-20260621-37
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:1–44
+
+The file lives at `tests/skills/process-drivers.test.ts` and is named as though it covers skills. Its first `describe` block is labelled "process drivers in the barrage prompt template" and reads `templates/audit-barrage-prompt.md` — a `templates/` surface, not a `skills/` surface. A developer navigating to `tests/skills/` to find tests for `templates/` would not look there. The `tests/skills/` prefix also means a future `tests/templates/` directory would not include this coverage, silently leaving the template surface less discoverable.
+
+Blast-radius: cosmetic, but test-location drift makes coverage gaps harder to notice. A developer auditing the `templates/` surface for test coverage would scan `tests/templates/` (or root-level tests) and might miss this file. Suggestion: move to `tests/process-drivers.test.ts` (or add a corresponding entry to `tests/templates/`) so the scope matches the path.
+
+---
+
+### AUDIT-20260621-38 — Presence-only test assertions pass if a driver is moved to a non-operative section
+
+Finding-ID: AUDIT-20260621-38 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:28–44
+
+Each test in `process-drivers.test.ts` asserts that a regex matches somewhere in the lowercased full text of the target file. If a driver were relocated to a commented-out block, a deactivated heading, an HTML comment, or a section that renders as a code block (and therefore does not participate in instruction rendering), the test would still pass. For example, if `channel-enumeration` were moved inside a fenced code block in the audit template, the regex `/channel[\s-]enumeration/` would still match — but the instruction would no longer be operative.
+
+Blast-radius: low. The tests are declared as "presence assertions" in their header comment (line 1), so this is a conscious design choice. The risk materializes only if a driver is accidentally moved somewhere non-operative — which is unlikely in practice. Worth noting for completeness: a location-sensitive assertion (e.g., verifying the keyword appears outside a code fence, or under a specific heading) would be a stronger contract, though it would also be more brittle. The current tradeoff is reasonable given the stated purpose.
+
+---
+
+### AUDIT-20260621-39 — `multiline / composition` sub-channel in channel-enumeration driver is underspecified relative to peers
+
+Finding-ID: AUDIT-20260621-39
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    templates/audit-barrage-prompt.md (diff +37); skills/execute/SKILL.md (diff +93)
+
+Both documents list three sub-channels under the **channel-enumeration** driver: **value** ("other inputs now accepted"), **state** ("new reachable states"), and **multiline / composition** ("how it composes with adjacent surfaces"). The first two sub-channels have concrete, unambiguous definitions. The third — "how it composes with adjacent surfaces" — is considerably vaguer. An agent applying this driver would have clear guidance for the value and state channels (specific things to enumerate), but no concrete cue for what "adjacent surfaces" means in the governance context, or what an opened composition channel looks like.
+
+Blast-radius: informational. An agent would likely omit composition-channel checks or interpret them narrowly (e.g., only considering the parser's caller). In practice, the omission is bounded because the other two channels and the self-red-team driver together cover most surface growth. A concrete example (e.g., "what happens when this parser branch is applied to a multiline block, or inside a fence, or inside a list item") would make the third channel as actionable as the first two.
+
+## 2026-06-21 — audit-barrage lift (20260621T021753230Z-029-govern-operability-phase-8)
+
+Code-sha: 11e61c30a429743062230b4052538dd6a9c9ac5a
+### AUDIT-20260621-40 — Test describe label names wrong skill file
+
+Finding-ID: AUDIT-20260621-40
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:39
+
+The second `describe` block (line 39) reads `'US8 FR-029 — process drivers in the implement/govern skill body'`, but the constant it exercises is `EXECUTE`, populated from `skills/execute/SKILL.md`. There is no `skills/implement/SKILL.md` or `skills/govern/SKILL.md` in the plugin. When this block's tests fail — say, because a driver heading is accidentally removed from the execute skill — a maintainer reading the Vitest output will see "implement/govern skill body" and may scan for a non-existent file before discovering the mismatch. The label should read `'… in the execute skill body (skills/execute/SKILL.md)'` to match the actual surface being asserted. Blast-radius: misleading failure messages that slow debugging. Semantically the execute skill IS the implement/govern entry-point in stack-control, so there is no behavioral defect, but the divergence between description and reality is a maintenance smell that compounds as the test suite grows.
+
+---
+
+### AUDIT-20260621-41 — Channel-enumeration driver wording diverges between the two canonical surfaces
+
+Finding-ID: AUDIT-20260621-41
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    skills/execute/SKILL.md (new lines) vs templates/audit-barrage-prompt.md (new lines)
+
+The channel-enumeration driver's parenthetical reads differently in the two files. The template version (`audit-barrage-prompt.md`) writes "a new flag, a new accepted value, a new parser branch, a new fold path" — the article "a new" qualifies each item explicitly. The execute skill version writes "a new flag, accepted value, parser branch, fold path" — "a new" qualifies only "flag", leaving the remaining items without a qualifier. In context the intended meaning is clear, but the execute skill phrasing is technically ambiguous: "accepted value" could be read as modification of an existing accepted value rather than addition of a new one. Both files are canonical sources for the same driver; divergence between them is a maintenance smell. A future editor updating one surface may not update the other, and the slight ambiguity in the skill version may seed a subtly wrong reading in an automated downstream consumer. A one-word fix (add "a new" before each item in the skill version) would align both surfaces.
+
+---
+
+### AUDIT-20260621-42 — Test comment over-promises: driver CONTENT is not verified, only driver HEADING presence
+
+Finding-ID: AUDIT-20260621-42
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    tests/skills/process-drivers.test.ts:1-13, 23-28
+
+The comment block at lines 1–13 describes what each driver is supposed to enforce ("a surface-adding fix enumerates the value / state / multiline / composition channels it opens (with fixtures) before re-firing," etc.). The actual test assertions at lines 23–28 use coarse regex patterns that match only the driver's heading token: `/channel[\s-]enumeration/`, `/invariant[\s-]first/`, etc. A future edit that retained each heading keyword while deleting or replacing the behavioral guidance under it would pass the test suite without surfacing the loss. The test is documented as a "presence assertion" regression guard, which is an honest statement of scope, but the comment's per-driver descriptions create an expectation of content-correctness that the assertions do not fulfill. No behavioral defect today; the risk is that the test is read as a completeness guarantee when it is only an existence check. If the intent is purely presence-guarding, trimming the comment to match ("presence of driver headings") would make the contract honest without requiring fuller assertions.
+
+### AUDIT-20260621-43 — New test uses CommonJS `__dirname` in an ESM package
+
+Finding-ID: AUDIT-20260621-43
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/skills/process-drivers.test.ts:18
+
+The new test computes `PLUGIN_ROOT` with bare `__dirname`, but this package is ESM (`package.json` has `"type": "module"`), and the existing test code that needs this value derives it from `fileURLToPath(import.meta.url)`. In an ESM Vitest run, bare `__dirname` is not defined, so this test file can fail before it ever asserts the FR-029 contract.
+
+Blast radius is high because downstream CI or an unattended agent running the suite will hit a test-runtime failure introduced by this phase, not a mere assertion failure about the intended behavior. A reasonable fix is to mirror the existing repo pattern: import `dirname` and `fileURLToPath`, define `__filename = fileURLToPath(import.meta.url)`, then derive `__dirname = dirname(__filename)` before building `PLUGIN_ROOT`.
+
+## 2026-06-21 — audit-barrage lift (20260621T022238079Z-029-govern-operability-phase-8)
+
+Code-sha: b313ec91eeec25e605ff13fa714181d159c30790
+### AUDIT-20260621-44 — Severity-rubric driver in execute skill references US3 rubric by citation only — text is inaccessible to an unattended executor
+
+Finding-ID: AUDIT-20260621-44
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    skills/execute/SKILL.md (new lines in the "Process drivers" section, `severity-rubric anchoring` bullet)
+
+The `severity-rubric anchoring` driver in the execute skill reads: *"Triage findings by the blast-radius rubric (US3), not by alarm — a quietly-plausible wrong reading an unattended agent would build outranks an obvious contradiction a reader would resolve."*
+
+The reference `(US3)` is a citation to a spec user story, not a link and not inline text. The actual rubric (`blocking / high / medium / low / informational` with blast-radius definitions) lives in the barrage prompt template's **Output format** section — a different file entirely. An executor working inside the govern-fix-refire loop reads the execute skill, triages a list of findings, and is told to apply the blast-radius rubric — but the rubric text is absent from the only document they are following. An unattended agent executing this skill has no path to the rubric text short of separately opening `templates/audit-barrage-prompt.md`.
+
+Blast-radius reasoning: an executor who misapplies severity (treating every finding as `high` because it feels alarming, or deprioritising a `blocking` finding that reads as cosmetic) will misroute the fix effort. The driver exists specifically to prevent that failure mode — its own inaccessibility partly defeats its purpose for the executor audience. The barrage prompt version is correct (it has the rubric inline directly below), but the execute skill version is structurally incomplete for its audience.
+
+Reasonable fix: inline a condensed version of the rubric under the `severity-rubric anchoring` bullet in the execute skill (e.g. a one-line summary table mirroring the prompt's rubric), or cross-link to the precise anchor in `audit-barrage-prompt.md` where the rubric text lives.
+
+---
+
+### AUDIT-20260621-45 — Test describe label names the wrong file — "implement/govern skill body" does not correspond to execute/SKILL.md
+
+Finding-ID: AUDIT-20260621-45
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:43
+
+Line 43: `describe('US8 FR-029 — process drivers in the implement/govern skill body', () => {`
+
+The describe block's label says **"implement/govern skill body"** but the test reads `skills/execute/SKILL.md` (line 21). The execute skill _is_ the implement/govern orchestrator in this plugin, but that mapping is not obvious from the label alone. A developer reading a failure message from this describe block would look for a file named `implement` or `govern` and find neither. The label in the corresponding `it` strings compounds this: *"the execute skill body carries the …"* — naming `execute`, not `implement/govern` — making the mismatch visible at two levels of the same suite.
+
+Blast-radius: no runtime defect; the test passes and fails correctly on the right file. The harm is navigational: a contributor triaging a red test wastes a lookup cycle reconciling the label against the actual file path. Low severity.
+
+Reasonable fix: change the describe label to `'US8 FR-029 — process drivers in skills/execute/SKILL.md'` for unambiguous traceability.
+
+---
+
+### AUDIT-20260621-46 — Presence-only test contract cannot catch audience-framing regression
+
+Finding-ID: AUDIT-20260621-46
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:24-44
+
+The test comment on line 5 explicitly acknowledges this is a "Presence assertion: a future edit that drops a driver fails here." That acknowledgement is correct but incomplete — the contract has a second gap the comment does not name: **both files are asserted with the same regex set**, so a future edit that copies the executor-phrased text verbatim into the barrage prompt (or vice versa) passes the suite even though the audience framing would be wrong.
+
+The barrage prompt's self-red-team driver is phrased for a *reviewer* audience ("When the work under audit is itself a FIX…, audit the fix diff as a fresh surface in its own right") while the execute skill's version is phrased for an *executor* audience ("Before re-firing the barrage, do a self-red-team pass over your fix diff itself"). Commit 11e61c30 was a targeted fix specifically to correct this framing difference. The tests provide no gate against that fix regressing: if the barrage prompt's driver text reverted to the executor phrasing, every test in the suite would still be green.
+
+Blast-radius: the audience-framing distinction matters — an unattended auditor reading executor-framed instructions and an unattended executor reading reviewer-framed instructions could both misapply the driver. The harm is bounded by the fact that the two framings are functionally similar, but the framing precision was specifically the point of the 11e61c30 fix.
+
+Reasonable fix: add a lightweight assertion that the two files differ on the self-red-team driver text — for example, verify that the barrage prompt contains a reviewer-audience anchor phrase (`"when the work under audit is itself a fix"` or similar) that is absent from the execute skill, and vice versa for the executor-audience phrase.
+
+---
+
+### AUDIT-20260621-47 — Channel-enumeration driver lists three channels by name but neither document states the list is exhaustive or extensible
+
+Finding-ID: AUDIT-20260621-47
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    templates/audit-barrage-prompt.md (channel-enumeration bullet); skills/execute/SKILL.md (channel-enumeration bullet)
+
+Both documents enumerate **value**, **state**, and **multiline / composition** as the channels to check when a fix adds to an allowlist or surface. Neither document states whether this is an exhaustive enumeration or an illustrative set. An unattended agent applying the channel-enumeration driver will stop after checking these three — it has no signal that other channels (e.g. a **concurrency** channel for a fix that adds a new async path, or a **error-path** channel for a fix that adds a new branch with a distinct failure mode) should also be considered.
+
+Blast-radius: informational — the three named channels cover the most common fix-induced surface growth patterns, and the text's phrasing ("a new flag, a new accepted value, a new parser branch, a new fold path") implies the list of *examples* is open. But the channel names themselves read as closed. An agent that treats the three as exhaustive will under-check a fix that opens a fourth.
+
+No immediate action required; the finding is surfaced for the operator to decide whether adding "and any other channels the fix opens" is worth the prose burden.
+
+## 2026-06-21 — audit-barrage lift (20260621T022626789Z-029-govern-operability-phase-8)
+
+Code-sha: b313ec91eeec25e605ff13fa714181d159c30790
+### AUDIT-20260621-48 — Barrage prompt section heading scopes all five drivers to fix-reviews only, but three drivers are general quality controls
+
+Finding-ID: AUDIT-20260621-48
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    templates/audit-barrage-prompt.md:35 (section heading)
+
+The section added to `audit-barrage-prompt.md` carries the heading **"apply these when reviewing a fix"**. However, only two of the five drivers are fix-specific: channel-enumeration (#1, which explicitly addresses a surface-adding fix) and round-0 self-red-team (#3, whose body says "when the work under audit is itself a FIX"). The other three — **invariant-first boundary** (#2), **fleet-degradation pricing** (#4), and **severity-rubric anchoring** (#5) — are unconditional audit quality controls that apply to every round regardless of whether the subject is a fix or original work.
+
+The blast-radius reasoning: the prompt explicitly invokes the unattended-agent scenario in its own severity rubric ("a quietly-plausible wrong reading an unattended agent would build outranks an obvious contradiction a reader would resolve"). An agent that reads the section heading as a scope gate and skips all five drivers when reviewing original feature work would (a) mis-rate findings by alarm rather than blast-radius (missing severity-rubric anchoring) and (b) over-claim convergence on degraded fleet runs (missing fleet-degradation pricing). These are exactly the systematic quality failures the drivers exist to prevent, and the heading creates a natural conditional that leads an unattended reader to the wrong path. The corresponding heading in `skills/execute/SKILL.md` is correctly scoped — "apply when fixing a govern finding before re-firing" — making the prompt heading the asymmetric entry.
+
+A fix would restructure the section into a fixed preamble for universal drivers (invariant-first boundary, fleet-degradation pricing, severity-rubric anchoring) and a conditional note for fix-specific ones, or simply change the heading to remove the conditional framing (e.g., "apply these on every audit round; the fix-specific drivers are called out below").
+
+---
+
+### AUDIT-20260621-49 — Test describe label says "implement/govern skill body" but checks `skills/execute/SKILL.md`
+
+Finding-ID: AUDIT-20260621-49
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:42-48
+
+The second `describe` block at line 42 is labelled `'US8 FR-029 — process drivers in the implement/govern skill body'` but the file it reads is `skills/execute/SKILL.md` (line 22, bound to the variable `EXECUTE`). The execute skill IS the implement/govern surface in stack-control's vocabulary, so the test exercises the correct file. The blast-radius is cosmetic: a future contributor scanning test output for a failure in "the implement/govern skill body" would need to look up which file that maps to, rather than having the path named directly. The fix is a one-word label change in the `describe` string to name the actual file path (`skills/execute/SKILL.md`) or to rename the binding variable from `EXECUTE` to `EXECUTE_SKILL` and update the label to match, whichever the project's test-labelling convention prefers.
+
+---
+
+### AUDIT-20260621-50 — Process-driver presence tests are purely syntactic — section displacement would pass undetected
+
+Finding-ID: AUDIT-20260621-50
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    tests/skills/process-drivers.test.ts:28-48
+
+The test suite checks that each driver's keyword regex matches somewhere in the lowercased file content. This is correct for the stated goal (ensuring a future edit that drops a driver fails). However, the assertions do not verify that all five drivers are co-located in a single section, that the section carries an appropriate heading, or that the section appears at the expected position relative to `{{audit_lens}}` in the prompt template. A future edit that moves the drivers into a comment block, a non-rendered section, or disperses them across unrelated headings would still pass every test in this file. This is not a defect in the tests as written — presence assertions for prose content in markdown files are common and appropriate — but it is worth noting as a coverage gap if the "co-located process drivers section" structural invariant is ever considered load-bearing.

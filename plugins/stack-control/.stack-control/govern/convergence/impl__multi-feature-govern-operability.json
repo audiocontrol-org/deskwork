@@ -2,8 +2,10 @@
   "version": 1,
   "mode": "impl",
   "item": "multi:feature/govern-operability",
-  "scopeFingerprint": "f3c09001603c4f947f99a3fdeea140c50067e744f7b7dd248c844d63b8c8a084",
+  "scopeFingerprint": "eb2fabbedc89a81fc36d24a565a95e21f63fcc18309095c27700d3170e6feeb3",
   "converged": true,
-  "recordedAt": "2026-06-21T02:10:06.936Z",
+  "recordedAt": "2026-06-21T02:30:21.411Z",
+  "override": true,
+  "overrideReason": "029 US8 P3 prose plateau-exit (dealer's-choice authorization). FR-029 five drivers codified in barrage prompt + execute skill + RED presence test (10 green). Real findings fixed: __dirname→import.meta.url ESM (AUDIT-43, codex HIGH), reviewer-audience self-red-team phrasing (AUDIT-36), heading over-scope (AUDIT-48). Residuals are non-deterministic prose-precision over-ratings on guidance text; captured in backlog.",
   "anchorRoot": "/Users/orion/work/deskwork-work/stack-control/plugins/stack-control"
 }
