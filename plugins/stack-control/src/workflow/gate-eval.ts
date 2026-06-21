@@ -11,8 +11,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { WorkflowError, type Criterion } from './workflow-types.js';
 import { designGateCriteria } from './house-rules.js';
-import { composeConvergedImpl } from '../govern/compose-convergence.js';
-import { featureCheckpointKey } from '../govern/phase-checkpoint-status.js';
 
 /**
  * The resolved, install-anchored facts the evaluator reads. Built by the query /
@@ -103,22 +101,6 @@ function tasksComplete(specDirPath: string | null): boolean {
   return total > 0 && done === total;
 }
 
-/**
- * The per-phase graduate signal (025 US1): met IFF every tasks.md phase has a current
- * per-phase checkpoint. No spec dir / no tasks.md → UNMET (not fail-loud): a feature
- * without a runnable tasks.md simply cannot have current per-phase checkpoints; the
- * dangerous masquerade (a phase with no file list) still fails loud inside
- * composeConvergedImpl (FR-004). The checkpoint namespace key is single-sourced via
- * featureCheckpointKey (the spec-dir basename — the SAME key govern writes under).
- * Shared by `all-phase-checkpoints-current` and the 029 US6 `graduate-impl` either-of.
- */
-function allPhaseCheckpointsCurrent(ctx: GateContext): boolean {
-  if (ctx.specDirPath === null) return false;
-  const tasksPath = join(ctx.specDirPath, 'tasks.md');
-  if (!existsSync(tasksPath)) return false;
-  return composeConvergedImpl(ctx.installationRoot, featureCheckpointKey(ctx.specDirPath), tasksPath);
-}
-
 /** Evaluate one criterion to a definite boolean (FR-008). */
 export function evaluateCriterion(c: Criterion, ctx: GateContext): boolean {
   switch (c.kind) {
@@ -159,44 +141,15 @@ export function evaluateCriterion(c: Criterion, ctx: GateContext): boolean {
       if (c.target === 'impl') return ctx.implRecordConverged;
       if (c.target === 'spec') return ctx.specRecordConverged;
       throw new WorkflowError(`criterion 'record-converged' has unknown target '${c.target}' (expected impl|spec)`);
-    case 'all-phase-checkpoints-current': {
-      // 025 US1 (FR-001/001a/002/003): met IFF every tasks.md phase has a current
-      // per-phase checkpoint. The composed `record-converged impl` signal is DERIVED
-      // from this union — a standalone whole-feature record never satisfies it. Reads
-      // only the per-phase checkpoints (no whole-feature payload); fails loud (FR-004)
-      // on a spec with no resolvable dir or a malformed phase set. Pure read (Principle IV).
-      //
-      // 026 US3 (FR-015): this IS the per-capability harmless-bypass backstop for
-      // spec-execution — a feature implemented by reaching around the front door (no
-      // per-phase govern checkpoints) cannot graduate here, on any host, regardless of
-      // whether the interceptor observed the raw call. `capability reconcile` surfaces the
-      // same un-governed state this gate refuses (the report-only half of the backstop).
-      if (c.target !== 'impl') {
-        throw new WorkflowError(`criterion 'all-phase-checkpoints-current' has unknown target '${c.target}' (expected impl)`);
-      }
-      return allPhaseCheckpointsCurrent(ctx);
-    }
     case 'graduate-impl': {
-      // 029 US6 (FR-023/024): EITHER-OF graduate gate. Met when the DEFAULT per-phase
-      // path is satisfied (all-phase-checkpoints-current) OR the OPT-IN whole-feature
-      // path is (a converged whole-feature convergence record). Per-phase remains the
-      // default (the standard execute flow produces it); the whole-feature record is the
-      // opt-in escape an operator produces by running whole-feature govern (FR-025
-      // re-admits it — the 025 "compose, reject augment" record is amended accordingly).
+      // 030 US2 (FR-018, clean break — zero backwards compatibility): the graduate gate
+      // evaluates SOLELY on a converged whole-feature convergence record. The per-phase
+      // either-of arm and the `all-phase-checkpoints-current` criterion are DELETED — one
+      // govern path, one graduation criterion (SC-002 = 0 per-phase surfaces).
       if (c.target !== 'impl') {
         throw new WorkflowError(`criterion 'graduate-impl' has unknown target '${c.target}' (expected impl)`);
       }
-      // The OR branch is the `ctx.implRecordConverged` FIELD (a converged whole-feature
-      // convergence record exists — isModeConverged('impl')), NOT the `record-converged
-      // impl` criterion composed from per-phase checkpoints (which would be vacuous — only
-      // true when the per-phase branch already is). AUDIT-20260621-28.
-      //
-      // AUDIT-20260621-27: `phase:shipped`'s `derive: record-converged impl` stays as-is.
-      // For the OPT-IN path B (whole-feature record) it is consistent (implRecordConverged
-      // true → derive true). For the DEFAULT path A (per-phase) the authoritative shipped
-      // STATUS comes from the `transition:graduate` `roadmap-advance to=shipped` effect, not
-      // the derive — a relationship that predates US6 and is unchanged by the either-of gate.
-      return allPhaseCheckpointsCurrent(ctx) || ctx.implRecordConverged;
+      return ctx.implRecordConverged;
     }
     case 'approval-marker':
       if (c.target === 'design-approved') return ctx.designApproved;

@@ -6,7 +6,7 @@
 // shared isolation harness.
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
@@ -73,7 +73,7 @@ export function makeWorkflowFixture(
   nodes: readonly FixtureNode[] = [],
   options: FixtureOptions = {},
 ): WorkflowFixture {
-  const root = mkdtempSync(join(tmpdir(), 'wf-fixture-'));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'wf-fixture-')));
   mkdirSync(join(root, '.stack-control'), { recursive: true });
   writeFileSync(join(root, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const roadmapPath = join(root, 'ROADMAP.md');

@@ -19,29 +19,29 @@ afterEach(() => {
   fixtures = [];
 });
 
-const hasCriterion = (criteria: readonly { kind: string; target: string }[]): boolean =>
-  criteria.some((c) => c.kind === 'all-phase-checkpoints-current' && c.target === 'impl');
 const hasKind = (criteria: readonly { kind: string; target: string }[], kind: string): boolean =>
-  criteria.some((c) => c.kind === kind && c.target === 'impl');
+  criteria.some((c) => c.kind === kind);
+function defined<T>(v: T | undefined): T {
+  if (v === undefined) throw new Error('expected a defined value');
+  return v;
+}
 
-describe('WORKFLOW.md grammar — all-phase-checkpoints-current (025 US1)', () => {
-  it('registers the criterion kind', () => {
-    expect(CRITERION_KINDS).toContain('all-phase-checkpoints-current');
-    // 029 US6: the either-of graduate criterion is also registered.
+describe('030 US2 — WORKFLOW.md grammar: single graduate criterion (FR-018, clean break)', () => {
+  it('does NOT register the deleted per-phase criterion; registers graduate-impl', () => {
+    expect(CRITERION_KINDS).not.toContain('all-phase-checkpoints-current');
     expect(CRITERION_KINDS).toContain('graduate-impl');
   });
 
-  it('the bundled graduate transition gate requires the either-of graduate-impl criterion (029 US6)', () => {
+  it('the bundled graduate transition gate requires the graduate-impl criterion', () => {
     const doc = loadWorkflowDoc(fixture().root);
-    const graduate = doc.transitions.find((t) => t.codename === 'graduate');
-    expect(graduate).toBeDefined();
-    expect(hasKind(graduate!.exitGate, 'graduate-impl')).toBe(true);
+    const graduate = defined(doc.transitions.find((t) => t.codename === 'graduate'));
+    expect(hasKind(graduate.exitGate, 'graduate-impl')).toBe(true);
   });
 
-  it('the bundled start-governing transition gate requires all-phase-checkpoints-current impl', () => {
+  it('the start-governing gate is tasks-complete only — no per-phase criterion', () => {
     const doc = loadWorkflowDoc(fixture().root);
-    const startGoverning = doc.transitions.find((t) => t.codename === 'start-governing');
-    expect(startGoverning).toBeDefined();
-    expect(hasCriterion(startGoverning!.exitGate)).toBe(true);
+    const startGoverning = defined(doc.transitions.find((t) => t.codename === 'start-governing'));
+    expect(hasKind(startGoverning.exitGate, 'tasks-complete')).toBe(true);
+    expect(hasKind(startGoverning.exitGate, 'all-phase-checkpoints-current')).toBe(false);
   });
 });

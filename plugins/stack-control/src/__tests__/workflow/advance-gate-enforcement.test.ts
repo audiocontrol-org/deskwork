@@ -23,9 +23,10 @@ function statusOf(f: UnskippableFixture): string {
 }
 
 /**
- * An item derived at `governing`: a phased tasks.md 100% complete (→ governing), with
- * per-phase checkpoints absent by default — the 025 graduate gate
- * (all-phase-checkpoints-current impl) is then unmet until checkpoints are written.
+ * An item derived at `governing`: a tasks.md 100% complete (→ governing), with NO
+ * converged whole-feature record by default — the 030 graduate gate (graduate-impl =
+ * a converged whole-feature convergence record alone, FR-018) is then unmet until the
+ * record is written.
  */
 function governingFixture(): UnskippableFixture {
   const f = makeUnskippableFixture({
@@ -40,24 +41,29 @@ function governingFixture(): UnskippableFixture {
   return f;
 }
 
-describe('025 US1 — governing → shipped refuses without current per-phase checkpoints', () => {
-  it('REFUSES to graduate when a phase has no current checkpoint, naming the criterion', () => {
-    const f = governingFixture(); // no checkpoints written → gate unmet
+describe('030 US2 — governing → shipped requires a converged whole-feature record (FR-018)', () => {
+  it('REFUSES to graduate with no converged record, naming the criterion', () => {
+    const f = governingFixture(); // no convergence record → gate unmet
     const r = runCli(['workflow', 'advance', ITEM, '--apply'], { cwd: f.root });
     expect(r.status).not.toBe(0);
     expect(r.stdout + r.stderr).toMatch(/refus/i);
-    // 029 US6: the graduate gate is the either-of `graduate-impl` criterion (per-phase
-    // checkpoints OR a whole-feature record); with neither present it still refuses.
-    expect(r.stdout + r.stderr).toMatch(/graduate-impl/);
+    expect(r.stdout + r.stderr).toMatch(/graduate-impl/); // the single graduate criterion
     expect(statusOf(f)).toBe('in-flight'); // did NOT advance to shipped
   });
 
-  it('once every per-phase checkpoint is current (gate met), graduation reaches shipped', () => {
+  it('once a converged whole-feature record exists, the item graduates to shipped', () => {
     const f = governingFixture();
-    f.checkpointPhase('1'); // the only phase now has a current checkpoint → gate met
-    f.base.commitAll('checkpoint');
-    const r = runCli(['workflow', 'advance', ITEM, '--apply'], { cwd: f.root });
-    expect(r.status).toBe(0); // gate met → graduation applies
+    f.base.writeRecord({
+      version: 1,
+      mode: 'impl',
+      item: ITEM,
+      scopeFingerprint: 'deadbeef',
+      converged: true,
+      recordedAt: '2026-06-21T00:00:00.000Z',
+    });
+    f.base.commitAll('govern: converged whole-feature record');
+    // The converged record satisfies graduate-impl AND derives phase:shipped (the same
+    // single criterion now), so the item is graduated — no per-phase checkpoints involved.
     const s = runCli(['workflow', 'status', ITEM], { cwd: f.root });
     expect(s.status).toBe(0);
     expect(s.stdout).toContain('phase: shipped');
