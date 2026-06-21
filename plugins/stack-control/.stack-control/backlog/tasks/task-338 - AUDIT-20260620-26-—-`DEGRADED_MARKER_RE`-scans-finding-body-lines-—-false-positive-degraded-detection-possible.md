@@ -3,9 +3,10 @@ id: TASK-338
 title: >-
   AUDIT-20260620-26 — `DEGRADED_MARKER_RE` scans finding body lines —
   false-positive degraded detection possible
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 08:27'
+updated_date: '2026-06-21 06:28'
 labels:
   - 'type:migrated-finding'
   - 'feature:029-govern-operability'

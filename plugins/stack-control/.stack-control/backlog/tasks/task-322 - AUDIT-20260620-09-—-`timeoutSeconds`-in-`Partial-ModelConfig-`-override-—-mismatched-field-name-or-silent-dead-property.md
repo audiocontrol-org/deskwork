@@ -3,9 +3,10 @@ id: TASK-322
 title: >-
   AUDIT-20260620-09 — `timeoutSeconds` in `Partial<ModelConfig>` override —
   mismatched field name or silent dead property
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 07:46'
+updated_date: '2026-06-21 06:28'
 labels:
   - 'type:migrated-finding'
   - 'feature:029-govern-operability'
