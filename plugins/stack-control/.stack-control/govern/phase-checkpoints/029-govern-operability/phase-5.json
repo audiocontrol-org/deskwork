@@ -4,8 +4,8 @@
   "phaseId": "5",
   "checkpoint": "phase-5",
   "auditLogSection": "phase-5",
-  "scopeFingerprint": "bfc605cd3442f9ea0880cf2921737a2d47ca094368549254da31cb4f21052837",
-  "passedAt": "2026-06-21T01:25:02.182Z",
+  "scopeFingerprint": "6d71caaea2db00889bca49ceb478e05b17d69ee6ea2fff638451024b62155c6d",
+  "passedAt": "2026-06-21T01:56:32.537Z",
   "governedPaths": [
     "tests/govern/payload-union.test.ts",
     "src/govern/incremental-audit.ts",
@@ -16,12 +16,149 @@
     "src/govern/payload-implement.ts"
   ],
   "auditedFiles": [
-    "plugins/stack-control/src/govern/checkpoint-state.ts",
-    "plugins/stack-control/src/govern/incremental-audit.ts",
-    "plugins/stack-control/src/govern/payload-implement.ts",
-    "plugins/stack-control/src/govern/phase-checkpoint-status.ts",
-    "plugins/stack-control/src/subcommands/govern.ts",
-    "plugins/stack-control/tests/govern/out-of-window.test.ts",
-    "plugins/stack-control/tests/govern/payload-union.test.ts"
+    "src/govern/checkpoint-state.ts",
+    "src/govern/incremental-audit.ts",
+    "src/govern/payload-implement.ts",
+    "src/govern/phase-checkpoint-status.ts",
+    "src/subcommands/govern.ts",
+    "tests/govern/out-of-window.test.ts",
+    "tests/govern/payload-union.test.ts"
+  ],
+  "hunkBlocks": [
+    {
+      "file": "src/govern/checkpoint-state.ts",
+      "hash": "00bddcfaebf0305241b7e62b928a4deb94827e08a6382be27de0fefb79939395",
+      "lines": 10
+    },
+    {
+      "file": "src/govern/checkpoint-state.ts",
+      "hash": "5ed11f516f588aaf67f273926340b00331c2f5e12501e7c8898232545b3a56ec",
+      "lines": 1
+    },
+    {
+      "file": "src/govern/checkpoint-state.ts",
+      "hash": "8d8b562306bdd82b4b93624add09f9eb8834070225b38bb7816185c8f677e3b3",
+      "lines": 1
+    },
+    {
+      "file": "src/govern/checkpoint-state.ts",
+      "hash": "e8fe081c23212fec9049c02ac0bc74ac4c98eff45136403820584ea470555c25",
+      "lines": 10
+    },
+    {
+      "file": "src/govern/incremental-audit.ts",
+      "hash": "0a32c9a79a3b855a33cf25ef97b249d4900dc012be6459163a4f6cb0506846e8",
+      "lines": 71
+    },
+    {
+      "file": "src/govern/payload-implement.ts",
+      "hash": "c6d2e295ff7bf49a60313d241666a7856daa77f198793f83dcbbf8752366e7f1",
+      "lines": 142
+    },
+    {
+      "file": "src/govern/payload-implement.ts",
+      "hash": "ee4aa4d0e04c77c0e08bace764c61baca64ed3059d97ff32f488e3d9bf85e489",
+      "lines": 11
+    },
+    {
+      "file": "src/govern/payload-implement.ts",
+      "hash": "f9b64eb6a93f7ec0bee2be37529191bd19e7a9f3918da882be92bd8655e0843a",
+      "lines": 22
+    },
+    {
+      "file": "src/govern/phase-checkpoint-status.ts",
+      "hash": "32d29947d66cf2a453f46a238f238cd474518173a1091f1e133e4ea9d6300658",
+      "lines": 1
+    },
+    {
+      "file": "src/govern/phase-checkpoint-status.ts",
+      "hash": "4c56e38fa3d81b41bac8920798c42c97249180f6ac787d66edb2d16af2c31c9b",
+      "lines": 4
+    },
+    {
+      "file": "src/govern/phase-checkpoint-status.ts",
+      "hash": "d4ec8337a7819d822211b6a4a49414fea5c206b1e0495ec5a4f43e1a54345a0a",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "2599eef620cbc9064b7d76f24def0ed2af67e73207466d2b697898ecfd3ed1f4",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "2ca7e7bba7349b1ac23178263e27f7424a9c2deed67c4412d8dfcf62cdf748bd",
+      "lines": 8
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "2ced3d609590c3f176fca6271dfbfc46c8fab1a5f2f351c0f0773de0b056be2b",
+      "lines": 19
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "54ef2eb552fcb1d37ab909186dc81e043fed19f656c910f7e36891a44bad3688",
+      "lines": 4
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "5bad3b7983ac3bee8649586e42a7dd5cee9f935c9909e934191bc3b3b4b697e3",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "5ed11f516f588aaf67f273926340b00331c2f5e12501e7c8898232545b3a56ec",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "6708c6c90ee40143050083a40081223163a1071c5bf5786544d9166624ee1e9d",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "8c4d1cac967cb49c77de602c052d09232031534da19c2fdd19a802aa6a409f11",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "a1c198fd83f6844c81daa2b04f9d08a3cbc200fdfe1a91f0c79fc7dc28bbd5d1",
+      "lines": 8
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "a29c35b0808fa4274bdfda4c125653757522d8f1606a903f6e7862d168d53367",
+      "lines": 10
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "bd976f67dfd0f090bc292d6531f1509e463330c86b544c6f18ee8234c2630937",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "e57bc82bdbd8b716221a99407005467b8b2f9145183f0dde95d938fef86a5497",
+      "lines": 3
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "f9d47ce1098bab32500c717d38d3662af3e83fe9d66ea255947dec07302eb9c5",
+      "lines": 29
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "fb3307a4b1937759dd161119b3d347bdd8f18c21da8224ae6182779dc10d5b2b",
+      "lines": 1
+    },
+    {
+      "file": "tests/govern/out-of-window.test.ts",
+      "hash": "e4e0ce94489f1a9d8600c84d753b8f655b1be1359532ce1d7b51c719bffeefdb",
+      "lines": 168
+    },
+    {
+      "file": "tests/govern/payload-union.test.ts",
+      "hash": "cfc536146d920227b195153d19512bcdf3b84ab980e030680b3cd65e531b6121",
+      "lines": 196
+    }
   ]
 }

@@ -3124,3 +3124,114 @@ Surface:    src/govern/incremental-audit.ts:183-198
 `resolvePrePhaseDiffBase` walks backward until it finds any prior `governedSha`, skipping prior phases that are current but legacy/no-sha. If phase 5 follows a current phase 4 checkpoint with no `governedSha`, but phase 3 has one, this returns the phase 3 commit as phase 5's base. That is not the pre-phase commit for phase 5; it predates phase 4.
 
 The blast radius is upgraded features with mixed checkpoint formats, especially where phases share files. The resulting per-phase payload can include already-governed phase 4 hunks in a phase 5 audit, contradicting the new per-phase framing that says the diff shows only files this phase changed. A reasonable fix is to treat a sha-less intervening current phase as an unresolved boundary and require an explicit `--diff-base`, rather than skipping past it to an older anchor.
+
+## 2026-06-21 — audit-barrage lift (20260621T015655993Z-029-govern-operability-phase-6)
+
+Code-sha: 52e8ff6d5c8b9fdeb656e410a8bf01aeaccf863c
+### AUDIT-20260621-27 — `shipped` phase `derive: record-converged impl` may not recognise the opt-in whole-feature graduation path
+
+Finding-ID: AUDIT-20260621-27 (claude-01 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-390
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    templates/WORKFLOW.md:95-100 + src/workflow/gate-eval.ts:174-184
+
+The `graduate-impl` criterion now admits two graduation paths: (A) all per-phase checkpoints current, or (B) `ctx.implRecordConverged` (the whole-feature record). The change correctly updates the `governing` exit, the `shipped` entrance, and the `transition:graduate` exit-gate from `all-phase-checkpoints-current impl` to `graduate-impl impl`. However, the `shipped` phase's `derive: record-converged impl` is **unchanged**.
+
+The workflow-types.ts comment states: "the composed `record-converged impl` signal is **derived from** [all-phase-checkpoints-current]." If the `record-converged impl` criterion evaluates per-phase checkpoint composition (i.e. calls `composeConvergedImpl` directly), then a feature that graduated via opt-in path B (whole-feature record, no per-phase checkpoints) would satisfy `graduate-impl impl` (entering `shipped`), but the `shipped` phase's `derive: record-converged impl` would evaluate to false — the feature entered `shipped` yet its derive criterion is unmet. Depending on how the compass engine uses the derive field, this could silently strand the feature's displayed state.
+
+The `record-converged impl` evaluator is out-of-window, so this finding is conditional: if that criterion maps to `ctx.implRecordConverged` (which path B sets to true), there is no issue. If it calls `composeConvergedImpl` independently, the `shipped` phase becomes inconsistent for opt-in users. The diff does not update `derive: record-converged impl` in the `shipped` phase and does not add a note explaining why no update is needed — that gap should either be closed (update the derive to `graduate-impl impl`) or annotated (explain why `record-converged impl` already covers both paths).
+
+---
+
+### AUDIT-20260621-28 — research.md amendment conflates the `record-converged impl` criterion with `ctx.implRecordConverged`
+
+Finding-ID: AUDIT-20260621-28
+Status: migrated-to-backlog TASK-391
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    specs/025-unskippable-workflow-protocol/research.md (new lines 27–38)
+
+The amendment reads: "the graduate gate is now `graduate-impl impl` = `all-phase-checkpoints-current` **OR** a converged whole-feature `record-converged impl`." The backtick-formatted `record-converged impl` looks like a reference to the criterion of that name. However in gate-eval.ts the OR branch is `ctx.implRecordConverged` — a pre-computed GateContext field — not the `record-converged impl` criterion.
+
+The distinction matters for a spec-reading agent. If an agent implements `graduate-impl` by ORing `all-phase-checkpoints-current` with the criterion `record-converged impl`, the opt-in escape would be semantically vacuous: `record-converged impl` (which the comment says derives from per-phase composition) would only be true when `all-phase-checkpoints-current` is also true, making the OR reduce to `all-phase-checkpoints-current` alone and silently breaking the whole-feature escape path.
+
+A minimal fix: replace `` `record-converged impl` `` in the amendment text with `ctx.implRecordConverged` (the field, not the criterion), or add a parenthetical: "*(the `implRecordConverged` GateContext field, not the `record-converged impl` criterion — the field is true when a whole-feature convergence record exists)*."
+
+---
+
+### AUDIT-20260621-29 — Test suite does not cover `specDirPath = null` + `implRecordConverged = true`
+
+Finding-ID: AUDIT-20260621-29
+Status: migrated-to-backlog TASK-392
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/workflow/either-of-gate.test.ts:42-51
+
+The `ctxFor` helper always supplies a non-null `specDirPath` (line 46: `specDirPath: join(f.root, f.specDirRel)`). The `allPhaseCheckpointsCurrent` function returns `false` when `ctx.specDirPath === null`, so for `graduate-impl` the evaluation is `false || ctx.implRecordConverged`. With `implRecordConverged = true` and a null spec dir, the gate graduates the feature — a feature with no spec dir at all can graduate via the whole-feature opt-in path.
+
+Whether this is intended is not documented. If it is intended (the whole-feature path does not require a tasks.md), a test should assert the behavior explicitly and the feature spec should acknowledge it. If it is not intended (graduation should require a spec dir regardless of path), `allPhaseCheckpointsCurrent` returning `false` is not sufficient — the `graduate-impl` case must also guard on `ctx.specDirPath !== null` before checking `ctx.implRecordConverged`.
+
+No code change is required if the behaviour is intentional, but an explicit test documents the intent and guards against a future "fix" that inadvertently breaks this case.
+
+---
+
+### AUDIT-20260621-30 — Test suite does not cover the "both conditions true simultaneously" case
+
+Finding-ID: AUDIT-20260621-30
+Status: migrated-to-backlog TASK-393
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/workflow/either-of-gate.test.ts (entire file)
+
+The four test cases cover: default-only true, opt-in-only true, neither true, partial-default-without-opt-in. The combination "all per-phase checkpoints current AND `implRecordConverged = true`" (both arms of the OR satisfied simultaneously) has no explicit test. While `A || B` with both true is trivially correct, this is the realistic state after an operator runs per-phase govern AND then also runs a whole-feature govern (e.g. to verify before shipping). An explicit test would document the expected behaviour (gate still passes) and ensure that no future change to `graduate-impl` accidentally introduces an unexpected `A && B` or `XOR` semantic.
+
+## 2026-06-21 — audit-barrage lift (20260621T020306457Z-029-govern-operability-phase-6)
+
+Code-sha: ce7c1db6924f710490325d7412276c28f4dea105
+### AUDIT-20260621-31 — Missing test for the canonical path-B use case: stale per-phase checkpoints + converged whole-feature record
+
+Finding-ID: AUDIT-20260621-31 (claude-01 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-394
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    tests/workflow/either-of-gate.test.ts:57-64
+
+The test "graduates via the OPT-IN whole-feature record path (no per-phase checkpoints)" exercises path B with `implRecordConverged = true` and zero checkpoints written — `allPhaseCheckpointsCurrent` returns false because `composeConvergedImpl` finds nothing to compare. That's a valid test, but it's not the motivating use case for the opt-in path. The documented motivation for path B is the **O(n²)-painful shared-file feature** where per-phase checkpoints were written, then source files were edited, leaving the checkpoints stale. In that scenario `allPhaseCheckpointsCurrent` still returns false (staleness detection fires), and path B's `ctx.implRecordConverged` should graduate the feature. This is the scenario `editPhaseFile` in `unskippable-fixtures.ts` was built for — it's never called in this test file. A reasonable fix: add a test that calls `f.checkpointPhase('1/2/3')`, then `f.editPhaseFile(path, newContent)` to induce staleness, and asserts that `evaluateCriterion(GRADUATE, ctxFor(f, true)) === true` (path B rescues the stale state). Without this, the central user story for the either-of gate remains undemonstrated in the test suite.
+
+---
+
+### AUDIT-20260621-32 — `graduate-impl` invalid-target error path is untested
+
+Finding-ID: AUDIT-20260621-32
+Status: migrated-to-backlog TASK-395
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/workflow/gate-eval.ts:176-178 / tests/workflow/either-of-gate.test.ts
+
+The `graduate-impl` case validates its target and throws:
+```typescript
+if (c.target !== 'impl') {
+  throw new WorkflowError(`criterion 'graduate-impl' has unknown target '${c.target}' (expected impl)`);
+}
+```
+The analogous throw in `all-phase-checkpoints-current` is likely also untested (out of this diff's window), so this is a consistent gap rather than a novel regression. Still, the new criterion's error path is unexercised. A one-line test — `expect(() => evaluateCriterion({ kind: 'graduate-impl', target: 'spec' as any }, ctx)).toThrow(WorkflowError)` — would close it. Low blast-radius since the validated field comes from the workflow template, which already hardcodes `impl` as the only target; the error path fires only on a hand-edited workflow file.
+
+---
+
+### AUDIT-20260621-33 — Existing instantiated workflow files won't automatically benefit from the either-of gate
+
+Finding-ID: AUDIT-20260621-33
+Status: migrated-to-backlog TASK-396
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    templates/WORKFLOW.md:89,98,143 (template); any instantiated WORKFLOW.md in the repo
+
+The template is updated from `all-phase-checkpoints-current impl` → `graduate-impl impl` in three positions (phase:governing exit, phase:shipped entrance, transition:graduate exit-gate). This is correct for new features. Existing features whose WORKFLOW.md was instantiated from the old template still carry `all-phase-checkpoints-current impl`. They continue to work — the old criterion is still valid — but they cannot use the opt-in path B (a converged whole-feature record) without manual edits. There is no doctor rule, migration utility, or guidance note explaining this. Operators who want to use path B on an in-flight feature must discover and apply the change themselves. Blast-radius: no feature silently breaks; the gap is exclusively that opt-in functionality is inaccessible without operator awareness. A doc note in `specs/029-govern-operability/` or a targeted doctor rule checking for `all-phase-checkpoints-current impl` in the graduate position would close the discoverability gap.

@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "featureSlug": "029-govern-operability",
+  "phaseId": "6",
+  "checkpoint": "phase-6",
+  "auditLogSection": "phase-6",
+  "scopeFingerprint": "bd760ea11e7eeb4288b6d1751a5ff5cd7b901f8a6a7748d1f99b2e3998ef4120",
+  "passedAt": "2026-06-21T02:07:00.404Z",
+  "governedPaths": [
+    "tests/workflow/either-of-gate.test.ts",
+    "src/workflow/gate-eval.ts",
+    "src/workflow/workflow-types.ts",
+    "templates/WORKFLOW.md",
+    "specs/025-unskippable-workflow-protocol"
+  ],
+  "auditedFiles": [
+    "specs/025-unskippable-workflow-protocol/research.md",
+    "src/workflow/gate-eval.ts",
+    "src/workflow/workflow-types.ts",
+    "templates/WORKFLOW.md",
+    "tests/workflow/either-of-gate.test.ts"
+  ],
+  "governedSha": "ce7c1db6924f710490325d7412276c28f4dea105",
+  "hunkBlocks": [
+    {
+      "file": "specs/025-unskippable-workflow-protocol/research.md",
+      "hash": "235eab2eca4b90c61fd8180238b594464f489995dae7282ba0fb12debf2f8bbb",
+      "lines": 19
+    },
+    {
+      "file": "src/workflow/gate-eval.ts",
+      "hash": "1f1009c3b9e7ae6cdf0fca929ac89b9be1826c54f517db12d61bd4afc598887e",
+      "lines": 16
+    },
+    {
+      "file": "src/workflow/gate-eval.ts",
+      "hash": "8d5c2d6f3aa2c2408e5ed7186a997a26747a9c151310f8285173f103c703952e",
+      "lines": 23
+    },
+    {
+      "file": "src/workflow/workflow-types.ts",
+      "hash": "83d52b0071dfd62c24e226de9340daab8fcda11043a6e16b555f8bbe0d6a5ba3",
+      "lines": 6
+    },
+    {
+      "file": "templates/WORKFLOW.md",
+      "hash": "5ccc37bfe6dbb100936e1efe9ff670912fd0afbf4395148a0ecb4853a4398ecd",
+      "lines": 1
+    },
+    {
+      "file": "templates/WORKFLOW.md",
+      "hash": "6a5481d347e95bd8d98555cb505ab09d0230ba70c0e5bfcac678db9b066a9368",
+      "lines": 1
+    },
+    {
+      "file": "templates/WORKFLOW.md",
+      "hash": "d246571b286aea1a683b918a75f05ea412520fe3442bdf750fe01ababd55b7cd",
+      "lines": 1
+    },
+    {
+      "file": "tests/workflow/either-of-gate.test.ts",
+      "hash": "1f1fea79ab238d44d27c845e1a82411863ef1332e1b04ff915659b600c0bd0e2",
+      "lines": 96
+    }
+  ]
+}

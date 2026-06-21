@@ -4,10 +4,10 @@ title: >-
   Audit-granularity switch: re-admit full-audit-at-end as a graduate path (gate
   honors per-phase checkpoints OR a whole-feature record-converged impl); make
   per-phase opt-in, not mandatory
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-17 02:32'
-updated_date: '2026-06-17 17:31'
+updated_date: '2026-06-21 02:07'
 labels:
   - agent-found
   - 'type:gap'

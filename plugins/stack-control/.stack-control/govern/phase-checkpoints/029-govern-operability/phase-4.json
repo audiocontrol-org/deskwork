@@ -4,8 +4,8 @@
   "phaseId": "4",
   "checkpoint": "phase-4",
   "auditLogSection": "phase-4",
-  "scopeFingerprint": "82022c6416762779ce3dc1fda6dfb35270138d26c36079c0961a674dfac9de29",
-  "passedAt": "2026-06-21T00:59:07.218Z",
+  "scopeFingerprint": "d1b94783dd12a3e9389d2dd4511afdd32b67ea68e7ab4d478535d349f0c41f6c",
+  "passedAt": "2026-06-21T01:56:14.346Z",
   "governedPaths": [
     "tests/promote-findings/never-lift-fixed.test.ts",
     "src/subcommands/slush-findings.ts",
@@ -22,7 +22,90 @@
     "src/workflow/workflow-types.ts"
   ],
   "auditedFiles": [
-    "plugins/stack-control/src/subcommands/govern.ts",
-    "plugins/stack-control/tests/govern/override-short-circuit.test.ts"
+    "src/subcommands/govern.ts",
+    "src/workflow/workflow-types.ts",
+    "tests/govern/override-short-circuit.test.ts"
+  ],
+  "hunkBlocks": [
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "2599eef620cbc9064b7d76f24def0ed2af67e73207466d2b697898ecfd3ed1f4",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "2ca7e7bba7349b1ac23178263e27f7424a9c2deed67c4412d8dfcf62cdf748bd",
+      "lines": 8
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "2ced3d609590c3f176fca6271dfbfc46c8fab1a5f2f351c0f0773de0b056be2b",
+      "lines": 19
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "54ef2eb552fcb1d37ab909186dc81e043fed19f656c910f7e36891a44bad3688",
+      "lines": 4
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "5bad3b7983ac3bee8649586e42a7dd5cee9f935c9909e934191bc3b3b4b697e3",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "5ed11f516f588aaf67f273926340b00331c2f5e12501e7c8898232545b3a56ec",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "6708c6c90ee40143050083a40081223163a1071c5bf5786544d9166624ee1e9d",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "8c4d1cac967cb49c77de602c052d09232031534da19c2fdd19a802aa6a409f11",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "a1c198fd83f6844c81daa2b04f9d08a3cbc200fdfe1a91f0c79fc7dc28bbd5d1",
+      "lines": 8
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "a29c35b0808fa4274bdfda4c125653757522d8f1606a903f6e7862d168d53367",
+      "lines": 10
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "bd976f67dfd0f090bc292d6531f1509e463330c86b544c6f18ee8234c2630937",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "e57bc82bdbd8b716221a99407005467b8b2f9145183f0dde95d938fef86a5497",
+      "lines": 3
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "f9d47ce1098bab32500c717d38d3662af3e83fe9d66ea255947dec07302eb9c5",
+      "lines": 29
+    },
+    {
+      "file": "src/subcommands/govern.ts",
+      "hash": "fb3307a4b1937759dd161119b3d347bdd8f18c21da8224ae6182779dc10d5b2b",
+      "lines": 1
+    },
+    {
+      "file": "src/workflow/workflow-types.ts",
+      "hash": "83d52b0071dfd62c24e226de9340daab8fcda11043a6e16b555f8bbe0d6a5ba3",
+      "lines": 6
+    },
+    {
+      "file": "tests/govern/override-short-circuit.test.ts",
+      "hash": "e212a196c0c30aee40b8d9159296ec570025d1e4fde03d6b907bac9bb98be8aa",
+      "lines": 50
+    }
   ]
 }
