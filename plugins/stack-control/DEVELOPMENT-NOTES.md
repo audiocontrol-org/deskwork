@@ -2,27 +2,38 @@
 
 ---
 
-## 2026-06-21: <!-- session title -->
+## 2026-06-21 (continuation): post-029-merge cleanup + offing friction capture + govern-at-end roadmap reshape
 
-**Goal:** <!-- compose: what we set out to do -->
+### Feature: 029-govern-operability (closeout) → govern-operability umbrella forward-planning
+### Worktree: stack-control (feature/stack-control)
+
+**Goal:** With 029 shipped (PR #494 → released 0.52.2), do the closeout the burndown deferred and plan forward: validate the released build + close resolved issues, reconcile the roadmap, clean the backlog slush pile, diagnose fresh offing audit-barrage friction, capture it on the roadmap, and reshape the govern-operability umbrella toward the operator's govern-at-end direction.
 
 **Accomplished:**
-- <!-- compose -->
+- **Released-build validation + issue closure.** Validated formally-installed 0.52.2; closed 4 GitHub issues resolved by the release (evidence posted; operator-authorized "mark closed if valid").
+- **Roadmap reconcile.** Advanced `multi:feature/govern-operability` + 8 029-subsumed nodes to `shipped` (post-029 reconcile, 7dc42a95).
+- **Backlog cleanup — 157 To-Do closed.** Tier-1 (17) + Tier-2 batches 0614/0618/0619/0620/0609/0611/0612 (25/69/15/21/10), via parallel **read-only** verification subagents that proposed dispositions for my review before any close. ~71% stale ratio (fixed/dup/moot) on the older batches; genuine-open residuals kept. Open To-Do 347 → ~191.
+- **Real residual fixes surfaced during triage, fixed RED-first:** `fenceDelimiter` closeability (an info-string line no longer closes a fence, AUDIT-55), dropped a non-null `!` (AUDIT-57), and the canonical path-B stale-rescue test (AUDIT-31) — 8b310a13.
+- **Offing 0.52.2 friction diagnosis (two transcript passes) → 6 gap nodes captured.** Pass 1: the lift balloon + doc-nitpicking (`govern-lift-auto-close-in-loop-fixes`, `govern-doc-aware-audit-lens`). Pass 2 (Phase-2 structural FATALs): `govern-hunkblocks-uncommitted-empty` (the staleness-treadmill root — hunk freshness silently no-ops on uncommitted work), `govern-boundary-too-large-normal-phase` (an 11-task phase FATALed ~4% over the fleet envelope), `govern-split-file-audit-exclusion` (a cap-driven file split goes ungoverned), `govern-cheap-checkpoint-refresh`.
+- **Govern-at-end reshape (operator direction).** Added the load-bearing enabler `multi:feature/govern-whole-feature-chunked-payload` (chunk the whole-feature audit into bite-sized sub-payloads, parallelize audit+fix, reconcile once at end); folded `boundary-too-large-normal-phase` into it (its fix is chunking); deferred the 4 now-secondary per-phase gaps behind it; kept the orthogonal `doc-aware-audit-lens` live (719fa2d8).
 
-**Didn't Work:**
-- <!-- compose -->
+**Didn't Work / cost:**
+- The offing dogfood is the friction signal, not a local failure: a 2-task **doc** phase rang **9 cross-model rounds** (prose-nit generator), and an 11-task **code** phase **FATALed at boundary-too-large** before auditing anything. Both are escapes the per-phase model can't provide — they motivated the govern-at-end reshape rather than another round of per-phase point fixes.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Operator redirected govern strategy from per-phase to **govern-at-end** after the friction diagnosis. Reshaped the umbrella to encode that (enabler #1; per-phase gaps deferred behind it) instead of continuing to file per-phase fixes.
+- [PROCESS] Backlog triage ran through read-only subagents proposing dispositions for operator/my review — no subagent closed anything directly (closure stays a reviewed call).
 
 **Insights:**
-- <!-- compose -->
+- Most per-phase friction gaps (staleness treadmill, untracked-split exclusion, cheap-refresh, in-loop lift balloon) are artifacts of governing **uncommitted** work **mid-feature**. Govern-at-end over committed work dissolves them; the one that survives — boundary-too-large — becomes the load-bearing enabler. The reshape encodes exactly that dependency.
+- The ~71% stale ratio in the backlog is the lift balloon made visible — the same complaint the offing adopter raised. The `doc-aware-lens` + `lift-auto-close` gaps target its source.
 
-**Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 0
-  - (no commits this session)
-- Files changed: 0
-- Backlog touched: (none)
+**Quantitative (re-derived from git):**
+- Commits this session: 12 (`af49917b..719fa2d8`) + the session-end record. (The verb's auto-derived "0" used a too-tight boundary; this is the count since the prior journal entry `af49917b`.)
+- Backlog closed: 157 (Tier-1 17; Tier-2 0614/25, 0620/21, 0619/15, 0618/69, 0609+0611+0612/10). Open To-Do 347 → ~191.
+- Roadmap: 8 subsumed nodes → shipped; 6 offing gap nodes captured; govern-at-end reshape (1 enabler added + 1 fold + 5 defer/condition updates).
+- GitHub issues closed: 4 (resolved by released 0.52.2).
+- Code: 3 RED-first residual fixes (AUDIT-55/57/31).
 
 ## 2026-06-21: govern-operability (029) — US5→US9 + US10 graduated; feature complete; TASK-357 root-fix broke the entanglement loop
 
