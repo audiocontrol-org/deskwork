@@ -83,11 +83,11 @@
 **Goal**: kill harness-induced false HIGHs. Closes TASK-263, TASK-316.
 **Independent test**: a multi-commit phase with a present out-of-window reference raises no false HIGH; a missing impl still raises one.
 
-- [ ] T030 [P] [US5] RED test: per-phase payload = union of the phase's changed files across all its commits (diff-base = pre-phase, not HEAD~1) — in `tests/govern/payload-union.test.ts` (FR-020)
-- [ ] T031 [US5] Resolve diff-base to the pre-phase commit + assemble the union of the phase's changed files in `src/govern/incremental-audit.ts` + `src/subcommands/govern.ts` (FR-020)
-- [ ] T032 [P] [US5] RED test: a present out-of-window referenced file raises no false "absent/not-imported" HIGH; a genuinely-missing impl still raises a HIGH — in `tests/govern/out-of-window.test.ts` (FR-021/022)
-- [ ] T033 [US5] Widen the payload to referenced-but-out-of-window deps in `src/govern/payload-implement.ts` AND teach the auditor (audit prompt template) that out-of-window = not-this-phase-scope (FR-021/022)
-- [ ] T034 [US5] Close TASK-263, TASK-316; record the phase-5 govern checkpoint
+- [x] T030 [P] [US5] RED test: per-phase payload = union of the phase's changed files across all its commits (diff-base = pre-phase, not HEAD~1) — in `tests/govern/payload-union.test.ts` (FR-020)
+- [x] T031 [US5] Resolve diff-base to the pre-phase commit + assemble the union of the phase's changed files in `src/govern/incremental-audit.ts` + `src/subcommands/govern.ts` — the pre-phase-commit anchor is the latest prior phase's recorded `governedSha`, persisted on the checkpoint via `src/govern/checkpoint-state.ts` + `src/govern/phase-checkpoint-status.ts` (FR-020)
+- [x] T032 [P] [US5] RED test: a present out-of-window referenced file raises no false "absent/not-imported" HIGH; a genuinely-missing impl still raises a HIGH — in `tests/govern/out-of-window.test.ts` (FR-021/022)
+- [x] T033 [US5] Widen the payload to referenced-but-out-of-window deps in `src/govern/payload-implement.ts` AND teach the auditor (audit prompt template) that out-of-window = not-this-phase-scope (FR-021/022)
+- [x] T034 [US5] Close TASK-263, TASK-316; record the phase-5 govern checkpoint
 
 ---
 
@@ -96,11 +96,11 @@
 **Goal**: either-of graduate gate, default per-phase. Closes TASK-154.
 **Independent test**: one feature graduates via per-phase checkpoints, another via a whole-feature record under opt-in; default requires per-phase.
 
-- [ ] T035 [P] [US6] RED test: the graduate gate graduates via `all-phase-checkpoints-current` OR whole-feature `record-converged`; default with no opt-in requires per-phase — in `tests/workflow/either-of-gate.test.ts` (FR-023/024)
-- [ ] T036 [US6] Implement the either-of gate in `src/workflow/gate-eval.ts` (+ govern default mode) (FR-023/024)
-- [ ] T037 [US6] Update `templates/WORKFLOW.md` graduate-gate semantics to the either-of condition (FR-023)
-- [ ] T038 [US6] Amend the 025 "compose, reject augment" clarify record in `specs/025-unskippable-workflow-protocol/` to document the re-admitted whole-feature path (FR-025)
-- [ ] T039 [US6] Close TASK-154; record the phase-6 govern checkpoint
+- [x] T035 [P] [US6] RED test: the graduate gate graduates via `all-phase-checkpoints-current` OR whole-feature `record-converged`; default with no opt-in requires per-phase — in `tests/workflow/either-of-gate.test.ts` (FR-023/024)
+- [x] T036 [US6] Implement the either-of gate in `src/workflow/gate-eval.ts` + the `graduate-impl` criterion kind in `src/workflow/workflow-types.ts` (+ govern default mode) (FR-023/024)
+- [x] T037 [US6] Update `templates/WORKFLOW.md` graduate-gate semantics to the either-of condition (FR-023)
+- [x] T038 [US6] Amend the 025 "compose, reject augment" clarify record in `specs/025-unskippable-workflow-protocol/` to document the re-admitted whole-feature path (FR-025)
+- [x] T039 [US6] Close TASK-154; record the phase-6 govern checkpoint
 
 ---
 
@@ -112,7 +112,7 @@
 - [x] T040 [P] [US7] RED test: a later-phase edit to a DIFFERENT hunk of a shared file does not stale an earlier checkpoint; a SAME-region edit does; total work O(n) — in `tests/govern/hunk-fingerprint.test.ts` (FR-026/027/028)
 - [x] T041 [US7] Change `computeScopeFingerprint` to hash the phase's own changed diff hunks (post-image content), not whole-file, in `src/govern/checkpoint-state.ts` (FR-026)
 - [x] T042 [US7] Update freshness evaluation in `src/govern/phase-checkpoint-status.ts` for hunk-level staleness (FR-027/028)
-- [ ] T043 [US7] Close TASK-289; record the phase-7 govern checkpoint
+- [x] T043 [US7] Close TASK-289; record the phase-7 govern checkpoint
 
 ---
 
@@ -121,9 +121,9 @@
 **Goal**: codify the TASK-60 structural drivers. Closes TASK-60.
 **Independent test**: the audit/implement skill bodies + barrage prompt templates contain the five drivers; a surface-adding fix triggers the channel-enumeration prompt.
 
-- [ ] T044 [P] [US8] RED test: the audit/implement skill bodies + barrage prompt templates contain channel-enumeration, invariant-first boundary, round-0 self-red-team, fleet-degradation pricing, severity-rubric anchoring — in `tests/skills/process-drivers.test.ts` (presence assertions) (FR-029)
-- [ ] T045 [US8] Add the five drivers to the audit/implement skill bodies + barrage prompt templates (FR-029)
-- [ ] T046 [US8] Close TASK-60; record the phase-8 govern checkpoint
+- [x] T044 [P] [US8] RED test: the audit/implement skill bodies + barrage prompt templates contain channel-enumeration, invariant-first boundary, round-0 self-red-team, fleet-degradation pricing, severity-rubric anchoring — in `tests/skills/process-drivers.test.ts` (presence assertions) (FR-029)
+- [x] T045 [US8] Add the five drivers to the audit/implement skill body `skills/execute/SKILL.md` + the barrage prompt template `templates/audit-barrage-prompt.md` (FR-029)
+- [x] T046 [US8] Close TASK-60; record the phase-8 govern checkpoint
 
 ---
 
@@ -132,23 +132,23 @@
 **Goal**: clear the deferred 027 residuals. Closes TASK-290, 291, 292, 293, 294.
 **Independent test**: each residual has a targeted presence/absence check.
 
-- [ ] T047 [P] [US9] RED test: `tests/roadmap/cluster.test.ts` contains no non-null `!` assertions — in `tests/roadmap/cluster-no-nonnull.test.ts` (FR-030)
-- [ ] T048 [US9] Replace `!` with the get-or-throw `item()` helper in `tests/roadmap/cluster.test.ts` (TASK-290, FR-030)
-- [ ] T049 [US9] Document the `cluster`/`group` verb in the roadmap `SKILL.md` (TASK-291, FR-031)
-- [ ] T050 [P] [US9] RED test: uniform empty/stray-comma guard across `--depends-on` / `--into` / `--children` / `--part-of`; dead `--part-of` branch removed — in `tests/roadmap/list-flag-guard.test.ts` (FR-032)
-- [ ] T051 [US9] Unify the list-flag guard + remove the dead `--part-of` zero-length branch in `src/subcommands/roadmap.ts` (TASK-292, FR-032)
-- [ ] T052 [P] [US9] RED test: decompose `rewriteEdgeLine` does not rewrite a fenced edge example — in `tests/roadmap/rewrite-fence-aware.test.ts` (FR-033)
-- [ ] T053 [US9] Make `rewriteEdgeLine` fence-aware in the decompose surface (TASK-293, FR-033)
-- [ ] T054 [US9] Update the tooling-feedback guidance to route adopter friction to GitHub issues against `audiocontrol-org/deskwork` (TASK-294/gh-488, FR-034)
-- [ ] T055 [US9] Close TASK-290, 291, 292, 293, 294; record the phase-9 govern checkpoint
+- [x] T047 [P] [US9] RED test: `tests/roadmap/cluster.test.ts` contains no non-null `!` assertions — in `tests/roadmap/cluster-no-nonnull.test.ts` (FR-030)
+- [x] T048 [US9] Replace `!` with the get-or-throw `item()` helper in `tests/roadmap/cluster.test.ts` (TASK-290, FR-030)
+- [x] T049 [US9] Document the `cluster`/`group` verb in `skills/roadmap/SKILL.md` (TASK-291, FR-031) — already present and verified against the live CLI
+- [x] T050 [P] [US9] RED test: uniform empty/stray-comma guard across `--depends-on` / `--into` / `--children` / `--part-of`; dead `--part-of` branch removed — in `tests/roadmap/list-flag-guard.test.ts` (FR-032)
+- [x] T051 [US9] Unify the list-flag guard + remove the dead `--part-of` zero-length branch in `src/subcommands/roadmap.ts` (TASK-292, FR-032)
+- [x] T052 [P] [US9] RED test: decompose `rewriteEdgeLine` does not rewrite a fenced edge example — in `tests/roadmap/rewrite-fence-aware.test.ts` (FR-033)
+- [x] T053 [US9] Make `rewriteEdgeLine` fence-aware in `src/roadmap/mutations.ts` (reusing `fenceDelimiterChar` exported from `src/document-model/chrome.ts`) (TASK-293, FR-033)
+- [x] T054 [US9] Update the tooling-feedback guidance in `skills/session-end/SKILL.md` to route adopter friction to GitHub issues against `audiocontrol-org/deskwork` (TASK-294/gh-488, FR-034)
+- [x] T055 [US9] Close TASK-290, 291, 292, 293, 294; record the phase-9 govern checkpoint
 
 ---
 
 ## Phase 10: Polish & feature completion
 
-- [ ] T056 Full vitest suite green; `claude plugin validate plugins/stack-control`; `stackctl check-front-door` exit 0
-- [ ] T057 Record quickstart SC-001..SC-009 validation results in `specs/029-govern-operability/quickstart.md`
-- [ ] T058 Confirm all 17 backlog tasks (TASK-60/145/146/149/154/263/288/289/290/291/292/293/294/316/317/318) + the two gap nodes are closed (SC-009); advance the roadmap node `multi:feature/govern-operability` toward shipped
+- [x] T056 Full vitest suite green; `claude plugin validate plugins/stack-control`; `stackctl check-front-door` exit 0
+- [x] T057 Record quickstart SC-001..SC-009 validation results in `specs/029-govern-operability/quickstart.md`
+- [x] T058 Confirm all 17 backlog tasks (TASK-60/145/146/149/154/263/288/289/290/291/292/293/294/316/317/318) + the two gap nodes are closed (SC-009); advance the roadmap node `multi:feature/govern-operability` toward shipped
 
 ---
 

@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "featureSlug": "029-govern-operability",
+  "phaseId": "9",
+  "checkpoint": "phase-9",
+  "auditLogSection": "phase-9",
+  "scopeFingerprint": "faf0bfdfaac948c3e09f1551bf374ce5ab2034e15dfb8a2804ee0b26a7c1b4eb",
+  "passedAt": "2026-06-21T03:14:14.012Z",
+  "governedPaths": [
+    "tests/roadmap/cluster.test.ts",
+    "tests/roadmap/cluster-no-nonnull.test.ts",
+    "skills/roadmap/SKILL.md",
+    "tests/roadmap/list-flag-guard.test.ts",
+    "src/subcommands/roadmap.ts",
+    "tests/roadmap/rewrite-fence-aware.test.ts",
+    "src/roadmap/mutations.ts",
+    "src/document-model/chrome.ts",
+    "skills/session-end/SKILL.md",
+    "audiocontrol-org/deskwork"
+  ],
+  "auditedFiles": [
+    "skills/session-end/SKILL.md",
+    "src/document-model/chrome.ts",
+    "src/roadmap/mutations.ts",
+    "src/subcommands/roadmap.ts",
+    "tests/roadmap/cluster-no-nonnull.test.ts",
+    "tests/roadmap/cluster.test.ts",
+    "tests/roadmap/list-flag-guard.test.ts",
+    "tests/roadmap/rewrite-fence-aware.test.ts"
+  ],
+  "governedSha": "57d730c31f48d3162b8dda832be0cfaec9ff654b",
+  "hunkBlocks": [
+    {
+      "file": "skills/session-end/SKILL.md",
+      "hash": "dc8d6a511d88b8a235dd303afa1da9fc98a9b1c9ae5b2ce3f185c49c2c04c403",
+      "lines": 10
+    },
+    {
+      "file": "src/document-model/chrome.ts",
+      "hash": "acef15af1bd6824c72e2d1e9ffe85fc691426112bf3b81c60a132ccd4a140f2f",
+      "lines": 4
+    },
+    {
+      "file": "src/document-model/chrome.ts",
+      "hash": "f09a46bf866af350910a242909ce6b54b567ef8dedfcda4d5d4f5f53f8208f93",
+      "lines": 14
+    },
+    {
+      "file": "src/roadmap/mutations.ts",
+      "hash": "3621c8479d2851ff02c11315b34e60d2a3b07a2f4116e810604b448b955cf0ef",
+      "lines": 4
+    },
+    {
+      "file": "src/roadmap/mutations.ts",
+      "hash": "5f851705db7069acc02c340850354abf58c807160c4d9a674ae4bff4dbbae000",
+      "lines": 1
+    },
+    {
+      "file": "src/roadmap/mutations.ts",
+      "hash": "733328870d74ced5626e70361f4cbb2268eaf0e047abe375f9758e3ac47aedad",
+      "lines": 1
+    },
+    {
+      "file": "src/roadmap/mutations.ts",
+      "hash": "882afd67c3d8021e1ca1a06481b15206cd04153d5478efa5540d9b9ba6f2186d",
+      "lines": 9
+    },
+    {
+      "file": "src/roadmap/mutations.ts",
+      "hash": "a08090f2c52a18886d3d9b9fa91ad27bfba9b8a88d1452dba2bb84813eb5ab30",
+      "lines": 15
+    },
+    {
+      "file": "src/roadmap/mutations.ts",
+      "hash": "e980bb2fa55e66c883503905bf69f184faee098e9b42ad1acc5652d08e20890c",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/roadmap.ts",
+      "hash": "003c9ec4d6ae55496b46d0619b8a0d36249365d6c82dfb1b4878d2e6bcb38eda",
+      "lines": 1
+    },
+    {
+      "file": "src/subcommands/roadmap.ts",
+      "hash": "64c7c6c27210857d720117a6c8e8a881708c2719d5a37601308cb2db281f57ca",
+      "lines": 18
+    },
+    {
+      "file": "src/subcommands/roadmap.ts",
+      "hash": "660fb0a60b99b98cb0d36941450c6f2ebc72b8cc76384fc1b94d8d76289e625e",
+      "lines": 3
+    },
+    {
+      "file": "src/subcommands/roadmap.ts",
+      "hash": "801aadc341a6d334bf5bc96a5e8c371010d870cdff2bdb4506119c05a55e6d6e",
+      "lines": 3
+    },
+    {
+      "file": "src/subcommands/roadmap.ts",
+      "hash": "d2491ceaf75f17af13da5d5053bba41339ea419dd0a318fd5df64c24f8c73db0",
+      "lines": 2
+    },
+    {
+      "file": "src/subcommands/roadmap.ts",
+      "hash": "fa18d092a11792bc57e2346dac5479f61092272350d75efb50e14f6a12ea9be7",
+      "lines": 3
+    },
+    {
+      "file": "tests/roadmap/cluster-no-nonnull.test.ts",
+      "hash": "0eb39576a56b862cc707e3422fba2b201bf37965f8c84ca2b29cfe43a95aa1f4",
+      "lines": 37
+    },
+    {
+      "file": "tests/roadmap/cluster.test.ts",
+      "hash": "3b7e203513c2eeaf0ede8d5a6e69e3f05ccca29c0ff9c1ba0d3ff2fc8c2d8a31",
+      "lines": 1
+    },
+    {
+      "file": "tests/roadmap/cluster.test.ts",
+      "hash": "a81be01c5683f932628ca007877ae979e447c8ff7e3613036f6083fb1d3493d6",
+      "lines": 3
+    },
+    {
+      "file": "tests/roadmap/cluster.test.ts",
+      "hash": "b37c9d61973750b2855174f4e46cd8fdf066b30afc7c360d62364dfa45ab4452",
+      "lines": 2
+    },
+    {
+      "file": "tests/roadmap/cluster.test.ts",
+      "hash": "d3028ce44c3a660eae50d94f00ba4426dd15f59ffaa43f2b92d5725307d2f423",
+      "lines": 1
+    },
+    {
+      "file": "tests/roadmap/cluster.test.ts",
+      "hash": "e97ba18cc3bda76e636ba0843a25cd7a8f4c137098a277b9bdc468668710f816",
+      "lines": 1
+    },
+    {
+      "file": "tests/roadmap/list-flag-guard.test.ts",
+      "hash": "5404bbaa45eae3334adeb351cd01b82f4525c2bde88efc3fbc08afd6e0880d0d",
+      "lines": 84
+    },
+    {
+      "file": "tests/roadmap/rewrite-fence-aware.test.ts",
+      "hash": "b4365d0e1cd0d2fd25186a50c54af713a7f2d7a3d4a4e1c6d656de712998eaf0",
+      "lines": 81
+    }
+  ]
+}

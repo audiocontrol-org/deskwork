@@ -5,6 +5,7 @@
 
 import { loadDocument, type LoadOptions } from '../document-model/document.js';
 import { DocumentModelError, type GovernableDocument, type Unit } from '../document-model/types.js';
+import { fenceDelimiter } from '../document-model/chrome.js';
 
 export const PHASES = ['design', 'plan', 'impl', 'multi'] as const;
 export type Phase = (typeof PHASES)[number];
@@ -90,26 +91,29 @@ function firstOrNull(targets: readonly string[]): string | null {
 const FIELD_BULLET = /^\s*[-*]\s+[A-Za-z][A-Za-z0-9-]*\s*:/;
 /** The unit's reserved level-2 `## ` heading line (NOT `### ` sub-notes). */
 const UNIT_HEADING = /^## /;
-/** A fenced-code-block delimiter (``` ``` `` / `~~~`), matching edges.ts. */
-const SCOPE_FENCE = /^\s*(```|~~~)/;
 
 /**
  * Body prose, dropping ONLY the unit's reserved `## ` heading line and the real
  * `- field:` bullet lines. `### ` sub-notes are legitimate body sub-notes per
  * grammars/roadmap.peg and MUST survive into scope; a field-looking bullet
  * inside a fenced code block is ordinary example prose (NOT a real field), so it
- * survives too — kept coherent with extractEdges (AUDIT-20260608-12).
+ * survives too — kept coherent with extractEdges (AUDIT-20260608-12). The fence
+ * model is char + run-length, type-matched (shared `fenceDelimiter`) so a mixed-
+ * delimiter or nested fence is scoped the SAME way `rewriteEdgeLine` treats it
+ * (AUDIT-20260621-52) — no divergence between the reader and the rewriter.
  */
 function scopeOf(unit: Unit): string {
-  let inFence = false;
+  let openFence: { readonly char: '`' | '~'; readonly length: number } | null = null;
   return unit.body
     .split('\n')
     .filter((line) => {
-      if (SCOPE_FENCE.test(line)) {
-        inFence = !inFence;
-        return true;
+      const fence = fenceDelimiter(line);
+      if (fence !== null) {
+        if (openFence === null) openFence = fence;
+        else if (fence.char === openFence.char && fence.length >= openFence.length) openFence = null;
+        return true; // a fence delimiter line is body prose, kept verbatim
       }
-      if (inFence) return true;
+      if (openFence !== null) return true; // inside a fence → example prose, kept
       return !UNIT_HEADING.test(line) && !FIELD_BULLET.test(line);
     })
     .join('\n')

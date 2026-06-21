@@ -55,6 +55,12 @@ export const CRITERION_KINDS = [
   // composed `record-converged impl` signal is derived from this (FR-001a) — this
   // criterion, NOT `record-converged impl`, is what the graduate gate evaluates (C1).
   'all-phase-checkpoints-current',
+  // 029 US6 (FR-023/024): the EITHER-OF graduate gate — met when
+  // all-phase-checkpoints-current (the default per-phase path) OR a whole-feature
+  // convergence record converged (the opt-in full-audit-at-end path, re-admitted by
+  // FR-025). Per-phase stays the default; whole-feature is opt-in (the operator runs
+  // whole-feature govern to produce the record).
+  'graduate-impl',
 ] as const;
 export type CriterionKind = (typeof CRITERION_KINDS)[number];
 

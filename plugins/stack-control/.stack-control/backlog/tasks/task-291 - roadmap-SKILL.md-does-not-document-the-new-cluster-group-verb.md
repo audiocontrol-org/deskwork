@@ -1,9 +1,10 @@
 ---
 id: TASK-291
 title: roadmap SKILL.md does not document the new cluster/group verb
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 03:52'
+updated_date: '2026-06-21 03:14'
 labels:
   - agent-found
   - 'type:gap'

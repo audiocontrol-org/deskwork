@@ -2,6 +2,81 @@
 
 ---
 
+## 2026-06-21: govern-operability (029) — US5→US9 + US10 graduated; feature complete; TASK-357 root-fix broke the entanglement loop
+
+### Feature: 029-govern-operability
+### Worktree: stack-control (feature/stack-control)
+
+**Goal:** Pick up where session-2 left off (P1 MVP US1–US4 shipped) and, on operator instruction ("dealer's choice… complete everything"), finish the entire remaining 029 burndown: US5, US6, US7-T043, US8, US9, US10 — plus the root-cause fix that makes per-phase govern actually converge.
+
+**Accomplished:**
+- **US5 (payload-scoping correctness) graduated.** FR-020 union payload via a pre-phase `governedSha` anchor (explicit `--diff-base` wins; verified-to-resolve; override preserves not clears); FR-021/022 out-of-window dep-fold (best-effort) + auditor framing that covers out-of-window AND in-window-unchanged refs. Both first-round HIGHs (governedSha-not-verified, override-clears-anchor) fixed RED-first; graduated via plateau-exit override.
+- **US6 (either-of graduate gate) graduated clean (dampener, no override).** New `graduate-impl` criterion = all-phase-checkpoints-current OR whole-feature record; WORKFLOW.md graduate gates updated; 025 "compose, reject augment" clarify record amended (augment-as-requirement still rejected; whole-feature re-admitted as opt-in).
+- **US7-T043 graduated clean** (hunk-fingerprint code already shipped; recorded the checkpoint, closed TASK-289).
+- **US8 (five process drivers) graduated** (codified in barrage prompt + execute skill; RED presence test). Real findings fixed: `__dirname`→`import.meta.url` ESM (codex HIGH), reviewer-audience phrasing, heading over-scope. Graduated via plateau-exit override (non-deterministic prose HIGHs).
+- **US9 (027 residual hygiene) graduated clean** (dampener). Subagent implemented the 4 fixes RED-first; I reviewed + fixed the 4 govern findings (4-backtick fence run-length, scopeOf/rewriteEdgeLine fence-model unification, `--into` self-decompose test, no-bang string strip).
+- **US10 (feature completion):** all 17 backlog tasks Done; quickstart SC-001..009 results recorded (live-executed vs test-covered distinguished); feature node `multi:feature/govern-operability` at `shipped` with all 9 per-phase checkpoints current. Full suite **2401 passing**; plugin validates; `check-front-door` 62 ops OK.
+- **TASK-357 (the session's highest-leverage fix):** `resolveAuditedFiles` now passes `--relative`, so US7's hunk-fingerprint engages in-monorepo (git-root ≠ installation-root). Before this every checkpoint had `hunkBlocks: 0` → whole-file freshness → the O(n²) re-stale entanglement. After it, phases re-checkpointed with real hunk blocks (16/27/8) and US6–US9 governed without cross-staling.
+
+**Didn't Work / cost:**
+- **Ran the stale installed `stackctl` 0.52.0 cache for the first half of the session** instead of `./bin/stackctl` (source 0.52.1). The cache lacks the FR-017 override short-circuit and the TASK-357 hunk fix, so every override ran a full barrage and every shared-file edit re-staled prior phases — a large amount of wasted compute + a confusing entanglement loop that looked like a real bug. Switching to the source engine made overrides instant (0 barrage) and per-phase govern converge. Captured as a durable rule (`.claude/rules/source-engine-for-stack-control-dev.md`) — this trap also hit session-2.
+- The implement-audit barrage **plateaus into a prose-nit generator** on P3 doc/guidance phases (US8): each re-run non-deterministically surfaces a new prose "HIGH". Exited via override per the diminishing-returns rule once the one real HIGH (`__dirname`) was fixed.
+
+**Course Corrections:**
+- [PROCESS] Switched from bare `stackctl` to `./bin/stackctl` mid-session once the engine mismatch was diagnosed (operator-aligned with session-2's decision).
+- [PROCESS] Applied plateau-exit overrides myself (US5, US8) under the operator's "dealer's choice / complete everything" delegation, per the spec-audit-diminishing-returns rule.
+- [COMPLEXITY] Root-fixed TASK-357 first as the enabler rather than paying override churn 5× over.
+
+**Insights:**
+- The per-phase entanglement friction this feature exists to reduce was, in this session, **almost entirely an artifact of running the wrong engine**. With the source engine + TASK-357, per-phase govern converged cleanly (US6/US7/US9 graduated with zero overrides). That is strong evidence US5/US7/TASK-357 actually deliver.
+- US6's either-of opt-in + US7's hunk-fingerprint are the designed escape for exactly the shared-file O(n²) pain — and dogfooding them on 029's own remaining phases is what proved them.
+
+**Quantitative (verify from git):**
+- Commits this session: ~30 (feature/stack-control, 2ae7604d..HEAD).
+- Backlog tasks closed: 17 (TASK-60/145/146/149/154/263/288/289/290/291/292/293/294/316/317/318) + TASK-357.
+- Tests: 2344 (session start) → 2401 (completion), +57 net new RED-first test blocks across US5–US9.
+- New durable rule: `.claude/rules/source-engine-for-stack-control-dev.md`.
+
+## 2026-06-20: govern-operability (029) — P1 MVP (US1–US4) graduated, reconciled, shipped to main (PR #493); phase-4 override/two-write entanglement resolved
+
+**Goal:** Continue 029 from session 1's handoff (the "FR-017 regression" + ungoverned Phase 4): drive Phase 4 (US4) governance to completion, graduate the P1 MVP, and ship.
+
+**Accomplished:**
+- The session-1 "FR-017 regression" was a **mirage**: `stackctl` resolved to the INSTALLED 0.52.0 cache, not my source — the source override short-circuit was correct all along. Switched to `./bin/stackctl` (source engine) for the rest of the burndown (operator decision).
+- **Phase 4 (US4) graduated** through a **4-round cross-model audit-barrage** that surfaced — and I fixed RED-first — a deep chain of real defects on the override/graduation paths: re-report `Tracked-by:` canonical pointers (FR-016 traceability), dedup-persistent-HIGH false-pristine (FR-016), durable override attribution (FR-018), empty/no-node override FATAL + impossible-record-state validator, **record-write-failure FATAL (CLI ⟺ durable gate signal)**, env-var override guard, reconcile-close-all + double-close-safe, and **record-first two-write ordering** with accurate per-write FATAL messages.
+- **Phases 2/3 override-refreshed** (substantive FR-018, operator-authorized) past a cross-phase scope artifact — the delegated phase-4 modules (`loop-hygiene`, `record-no-new-findings`) absent from the narrow phase-2/3 `--phase` diff; the codex lane confirmed the own-phase work clean both rounds.
+- **Dogfooded the US4 loop-hygiene mechanism**: marked the 17 already-fixed lifted findings `fixed-<sha>` → `slush-findings --apply` reconcile auto-closed their 14 backlog tasks (the claude-04 dry-run preview confirmed them first). Full suite 2344 passing.
+- **Opened PR #493** (feature/stack-control → main) and **merged it green** (CI `test` pass, mergeStateStatus CLEAN) — the P1 MVP is on `main`.
+
+**Didn't Work:**
+- **Two-write atomicity (convergence record + phase checkpoint) was a diminishing-returns plateau**: every ordering fix exposed the *inverse* half-write under a new finding ID (round 2 → round 3). Detected the plateau per the `spec-audit-diminishing-returns` rule and stopped at the convergent structural fix (record-first + accurate messaging + non-advancing failure), NOT a true 2-file transactional commit (mechanism beyond US4's promise).
+- The **bash safety-classifier was intermittently unavailable** for a stretch (blocked every shell command); worked around by batching Edits (no classifier needed) and retrying — surfaced as two "are you stalled?" operator pings.
+
+**Course Corrections:**
+- [PROCESS] Refused to override-refresh phases 2/3 until I'd confirmed it was the codex-clean scope artifact (not real unaudited work); surfaced the override decision to the operator rather than stamping it — per "no offroading / don't lower the gate to keep moving."
+- [PROCESS] At the ~24-lifted-MEDIUM/LOW-findings volume, surfaced the (reconcile-fixed / burn-all / defer) fork to the operator rather than blindly chasing the MEDIUM/LOW generator (diminishing-returns). Operator chose reconcile-fixed-then-US5.
+- [PROCESS] Set the session-end boundary explicitly (`--since 3c0aeee7`) because the PR merge made `feature/stack-control` an ancestor of `main` (the default merge-base boundary would compute empty).
+
+**Insights:**
+- The two-write durable-state problem has **no clean ordering** — every order leaves a half-write window on one side. The resolution is not transactional 2-file atomicity (the generator) but ordering so the failure is *non-advancing* + an *accurate* message: record-first keeps the `governing → shipped` gate fail-closed via `all-phase-checkpoints-current`. Same "promises before mechanism" lesson the spec-audit rule names, applied to code.
+- **Cross-model DISagreement is as informative as agreement**: the persistent phase-2/3 HIGH was the claude lane unable to see a delegated phase-4 module from the narrow diff while the codex lane (walking the same consumers) was clean — a diff-visibility scope artifact, not a defect. **US5 payload-scoping is the engineered fix for exactly this** (and the friction recurred enough to validate US5's priority).
+- The feature kept **dogfooding itself**: the override short-circuit, the loop-hygiene reconcile, and the dry-run reconcile preview were each exercised live to close out their own feature's findings.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 10
+  - chore(029): US4 — reconcile the fixed phase-4-round findings (loop-hygiene dogfood)
+  - chore(029): US4/Phase 4 graduated — phase-4 checkpoint + govern artifacts; task-360 return-type cleanup
+  - fix(029): US4 — record-first ordering on BOTH paths; accurate per-write FATAL messages; self-enforcing write guard (codex-01/02 + claude-01..05)
+  - fix(029): US4 — override writes record before checkpoint (no half-write); fail-loud phaseStatus; dead-code + dry-run reconcile preview (codex-01 + claude-01..04)
+  - fix(029): US4 — record-write failure FATALs (CLI⟺gate); env-var override guard; reconcile closes all matching tasks (codex-01/02/03 + claude-01..04)
+  - fix(029): US4 — re-attach orphaned re-report JSDoc; fail loud on empty re-report section; unify mixed-section predicate
+  - fix(029): US4 — re-report blocks name their canonical AUDIT-NN entry (Tracked-by); suppression accounting (codex-01/claude-01/03/04/05)
+  - fix(029): US4 — override short-circuit fails loud on empty/no-node; validates impossible record states (FR-017/018)
+  - fix(029): US4 — durable override attribution in the convergence record (FR-018)
+  - fix(029): US4 — deduped persistent HIGH must not become a false-pristine run (FR-016)
+- Files changed: 46
+- Backlog touched: TASK-358, TASK-364, TASK-366, TASK-367, TASK-369, TASK-377, TASK-378, TASK-379, TASK-380
+
 ## 2026-06-20: govern-operability (029) — execute Phases 1–4 (P1 MVP) + US7; deep per-phase-govern entanglement; FR-017 regression handoff
 
 **Goal:** Pick up 029-govern-operability where the prior session left off (runnable spec at the `/speckit-analyze` gate) and drive `/stack-control:execute` — burn the per-phase govern of the whole govern-operability umbrella down through the lifecycle.

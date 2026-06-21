@@ -103,6 +103,22 @@ function tasksComplete(specDirPath: string | null): boolean {
   return total > 0 && done === total;
 }
 
+/**
+ * The per-phase graduate signal (025 US1): met IFF every tasks.md phase has a current
+ * per-phase checkpoint. No spec dir / no tasks.md → UNMET (not fail-loud): a feature
+ * without a runnable tasks.md simply cannot have current per-phase checkpoints; the
+ * dangerous masquerade (a phase with no file list) still fails loud inside
+ * composeConvergedImpl (FR-004). The checkpoint namespace key is single-sourced via
+ * featureCheckpointKey (the spec-dir basename — the SAME key govern writes under).
+ * Shared by `all-phase-checkpoints-current` and the 029 US6 `graduate-impl` either-of.
+ */
+function allPhaseCheckpointsCurrent(ctx: GateContext): boolean {
+  if (ctx.specDirPath === null) return false;
+  const tasksPath = join(ctx.specDirPath, 'tasks.md');
+  if (!existsSync(tasksPath)) return false;
+  return composeConvergedImpl(ctx.installationRoot, featureCheckpointKey(ctx.specDirPath), tasksPath);
+}
+
 /** Evaluate one criterion to a definite boolean (FR-008). */
 export function evaluateCriterion(c: Criterion, ctx: GateContext): boolean {
   switch (c.kind) {
@@ -158,19 +174,29 @@ export function evaluateCriterion(c: Criterion, ctx: GateContext): boolean {
       if (c.target !== 'impl') {
         throw new WorkflowError(`criterion 'all-phase-checkpoints-current' has unknown target '${c.target}' (expected impl)`);
       }
-      // No spec dir / no tasks.md → no per-phase governance has been done → the gate is
-      // UNMET (not a fail-loud): a feature without a runnable tasks.md simply cannot have
-      // current per-phase checkpoints. Returning false (vs throwing) keeps the read-only
-      // compass robust; the dangerous masquerade case (a phase with no file list) still
-      // fails loud inside composeConvergedImpl (FR-004).
-      if (ctx.specDirPath === null) return false;
-      const tasksPath = join(ctx.specDirPath, 'tasks.md');
-      if (!existsSync(tasksPath)) return false;
-      // The checkpoint namespace key is single-sourced via featureCheckpointKey (AUDIT
-      // codex-01/claude-02): the spec-dir basename, the SAME canonical key govern writes
-      // under — so write-key and read-key cannot drift (a branch/explicit slug never
-      // re-routes the gate to a different checkpoint dir).
-      return composeConvergedImpl(ctx.installationRoot, featureCheckpointKey(ctx.specDirPath), tasksPath);
+      return allPhaseCheckpointsCurrent(ctx);
+    }
+    case 'graduate-impl': {
+      // 029 US6 (FR-023/024): EITHER-OF graduate gate. Met when the DEFAULT per-phase
+      // path is satisfied (all-phase-checkpoints-current) OR the OPT-IN whole-feature
+      // path is (a converged whole-feature convergence record). Per-phase remains the
+      // default (the standard execute flow produces it); the whole-feature record is the
+      // opt-in escape an operator produces by running whole-feature govern (FR-025
+      // re-admits it — the 025 "compose, reject augment" record is amended accordingly).
+      if (c.target !== 'impl') {
+        throw new WorkflowError(`criterion 'graduate-impl' has unknown target '${c.target}' (expected impl)`);
+      }
+      // The OR branch is the `ctx.implRecordConverged` FIELD (a converged whole-feature
+      // convergence record exists — isModeConverged('impl')), NOT the `record-converged
+      // impl` criterion composed from per-phase checkpoints (which would be vacuous — only
+      // true when the per-phase branch already is). AUDIT-20260621-28.
+      //
+      // AUDIT-20260621-27: `phase:shipped`'s `derive: record-converged impl` stays as-is.
+      // For the OPT-IN path B (whole-feature record) it is consistent (implRecordConverged
+      // true → derive true). For the DEFAULT path A (per-phase) the authoritative shipped
+      // STATUS comes from the `transition:graduate` `roadmap-advance to=shipped` effect, not
+      // the derive — a relationship that predates US6 and is unchanged by the either-of gate.
+      return allPhaseCheckpointsCurrent(ctx) || ctx.implRecordConverged;
     }
     case 'approval-marker':
       if (c.target === 'design-approved') return ctx.designApproved;

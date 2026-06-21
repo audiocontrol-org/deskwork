@@ -78,9 +78,9 @@ describe('027 T010 — roadmap cluster', () => {
     expect(r.status).toBe(0);
     const model = loadRoadmap(docPath, ROADMAP_OPTS);
     // b is first → no chain dep; c depends on b; d depends on c.
-    expect(model.byId.get('impl:feature/b')!.dependsOn).not.toContain('impl:feature/c');
-    expect(model.byId.get('impl:feature/c')!.dependsOn).toContain('impl:feature/b');
-    expect(model.byId.get('impl:feature/d')!.dependsOn).toContain('impl:feature/c');
+    expect(item(model, 'impl:feature/b').dependsOn).not.toContain('impl:feature/c');
+    expect(item(model, 'impl:feature/c').dependsOn).toContain('impl:feature/b');
+    expect(item(model, 'impl:feature/d').dependsOn).toContain('impl:feature/c');
   });
 
   it('reuse EXISTING parent: no duplicate parent is created; children grouped under it', () => {
@@ -102,11 +102,11 @@ describe('027 T010 — roadmap cluster', () => {
     expect(r.status).toBe(0);
     const model = loadRoadmap(docPath, ROADMAP_OPTS);
     // The reused parent keeps its existing status (not reset to planned).
-    expect(model.byId.get('multi:feature/grp')!.status).toBe('in-flight');
+    expect(item(model, 'multi:feature/grp').status).toBe('in-flight');
     // Exactly one parent with that id (no duplicate heading).
     expect(model.items.filter((i) => i.identifier === 'multi:feature/grp').length).toBe(1);
-    expect(model.byId.get('impl:feature/b')!.partOf).toContain('multi:feature/grp');
-    expect(model.byId.get('impl:feature/c')!.partOf).toContain('multi:feature/grp');
+    expect(item(model, 'impl:feature/b').partOf).toContain('multi:feature/grp');
+    expect(item(model, 'impl:feature/c').partOf).toContain('multi:feature/grp');
   });
 
   it('multi-parent: a child already part-of a different parent gains the new edge ALONGSIDE', () => {
@@ -127,7 +127,7 @@ describe('027 T010 — roadmap cluster', () => {
       '--doc', docPath, '--apply',
     ]);
     expect(r.status).toBe(0);
-    const child = loadRoadmap(docPath, ROADMAP_OPTS).byId.get('impl:feature/b')!;
+    const child = item(loadRoadmap(docPath, ROADMAP_OPTS), 'impl:feature/b');
     // Both parents are present — the original is not replaced.
     expect(child.partOf).toContain('multi:feature/p1');
     expect(child.partOf).toContain('multi:feature/p2');
@@ -246,6 +246,6 @@ describe('027 T010 — roadmap cluster', () => {
     expect(r.status).toBe(0);
     const model = loadRoadmap(docPath, ROADMAP_OPTS);
     expect(model.byId.get('multi:feature/grp')).toBeDefined();
-    expect(model.byId.get('impl:feature/b')!.partOf).toContain('multi:feature/grp');
+    expect(item(model, 'impl:feature/b').partOf).toContain('multi:feature/grp');
   });
 });

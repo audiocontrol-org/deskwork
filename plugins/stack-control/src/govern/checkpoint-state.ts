@@ -40,6 +40,16 @@ export interface PhaseCheckpointRecord {
    */
   readonly auditedFiles?: readonly string[];
   /**
+   * The git commit HEAD pointed at when this phase was governed (029 US5, FR-020).
+   * A LATER phase resolves its diff-base to the latest prior phase's `governedSha` —
+   * the pre-phase commit at which the later phase's work began (each phase boundary
+   * commits before the next phase starts), so the per-phase payload audits the UNION
+   * of the phase's changed files across ALL its commits rather than only the HEAD~1
+   * delta (TASK-263). Optional for back-compat: a pre-US5 checkpoint omits it and the
+   * resolver falls back to the explicit `--diff-base`/`HEAD~1`.
+   */
+  readonly governedSha?: string;
+  /**
    * The phase's OWN changed line-blocks (post-image content-hash + line-count), captured
    * at govern-write time from its diff-base (029 US7, FR-026/027/028, TASK-289). Freshness
    * checks each block still appears as consecutive lines in the current governed file —
@@ -61,6 +71,7 @@ interface ParsedCheckpointRecord {
   readonly passedAt?: unknown;
   readonly governedPaths?: unknown;
   readonly auditedFiles?: unknown;
+  readonly governedSha?: unknown;
   readonly hunkBlocks?: unknown;
 }
 
@@ -416,6 +427,16 @@ function validateCheckpointRecord(
     }
     auditedFiles = parsed.auditedFiles;
   }
+  // governedSha is optional (back-compat — pre-US5 checkpoints omit it). When present it
+  // must be a non-empty string; a malformed value fails loud rather than silently dropping
+  // the pre-phase-base anchor the FR-020 diff-base resolver depends on.
+  let governedSha: string | undefined;
+  if (parsed.governedSha !== undefined) {
+    if (typeof parsed.governedSha !== 'string' || parsed.governedSha.length === 0) {
+      throw new Error(`${path}: phase checkpoint governedSha must be a non-empty string when present`);
+    }
+    governedSha = parsed.governedSha;
+  }
   // hunkBlocks is optional (back-compat — pre-US7 checkpoints omit it). When present it
   // must be an array of {file:string, hash:string, lines:positive-int}; a malformed value
   // fails loud rather than being silently dropped (no fallbacks outside test code).
@@ -430,6 +451,7 @@ function validateCheckpointRecord(
     passedAt: parsed.passedAt,
     governedPaths: parsed.governedPaths,
     ...(auditedFiles !== undefined ? { auditedFiles } : {}),
+    ...(governedSha !== undefined ? { governedSha } : {}),
     ...(hunkBlocks !== undefined ? { hunkBlocks } : {}),
   };
 }

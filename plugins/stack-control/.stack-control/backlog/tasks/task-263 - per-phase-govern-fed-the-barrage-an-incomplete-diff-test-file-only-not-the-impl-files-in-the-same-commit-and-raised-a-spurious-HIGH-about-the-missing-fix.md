@@ -4,9 +4,10 @@ title: >-
   per-phase govern fed the barrage an incomplete diff (test file only, not the
   impl files in the same commit) and raised a spurious HIGH about the missing
   fix
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 00:16'
+updated_date: '2026-06-21 01:26'
 labels:
   - agent-found
   - 'type:bug'

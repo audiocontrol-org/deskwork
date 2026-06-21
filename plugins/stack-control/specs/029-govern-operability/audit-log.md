@@ -2660,3 +2660,1048 @@ The diff's central graduation-safety claim is that a run whose findings are all 
 Similarly, `appendSection` and `renderRereportEntries` — imported from `audit-barrage-lift-render.ts`, which is also absent — are load-bearing for the mixed-section (new findings + re-reports) path.
 
 The end-to-end tests in `tests/promote-findings/lift-dedup.test.ts` do exercise these code paths and would catch the quiet-section failure if they run. This is not a defect claim — it is an audit surface limitation. The reviewer cannot independently verify the implementation of the graduation-safety logic from this diff alone and must rely on the test suite as the sole signal.
+
+## 2026-06-21 — audit-barrage lift (20260621T002128759Z-029-govern-operability-phase-4)
+
+### AUDIT-20260621-01 — `resolvePrePhaseDiffBase` priority-order logic is off-screen — the fix's core behavior is unverifiable from this diff
+
+Finding-ID: AUDIT-20260621-01
+Status: migrated-to-backlog TASK-382
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/govern.ts:786–810 (call site)
+
+The stated fix is "explicit `--diff-base` wins" over the auto-resolved `governedSha`. The call site correctly separates `explicitBase` from `fallbackBase: 'HEAD~1'` (lines ~795–810), but the function that implements the priority resolution — `resolvePrePhaseDiffBase` — is entirely absent from this diff.
+
+In the **before** state, the explicit value was encoded as part of `fallbackBase` and presumably fell *below* `governedSha` in priority (hence the bug: the auto-resolved sha was shadowing an explicit operator flag). In the **after** state, `explicitBase` is passed as a separate field and must be consulted *before* `governedSha` for the fix to take effect. That priority logic lives exclusively in `resolvePrePhaseDiffBase`.
+
+TypeScript would catch an undeclared property name (`explicitBase`) at the call site if the function's parameter type never included it, so the function's signature was presumably updated in a prior commit. However, TypeScript cannot catch a well-typed field that the function body reads at the wrong priority — i.e., `explicitBase` could be in the type and still be dead code or consulted only as a tertiary fallback. The entire behavioral regression being fixed (`explicit > governedSha > HEAD~1`) is implemented in off-screen code, so this audit cannot confirm the fix is complete. A reviewer reading only this diff would have to locate `resolvePrePhaseDiffBase` and verify its priority order manually.
+
+---
+
+### AUDIT-20260621-02 — Override-after-graduation silently clears a valid `governedSha`
+
+Finding-ID: AUDIT-20260621-02
+Status: migrated-to-backlog TASK-383
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/govern.ts:482–495 (`writeResolvedPhaseCheckpoint`), ~969–984 (override call site)
+
+When `recordGovernedSha` is `false`, `governedSha` is set to `undefined` (line ~484) and passed into `writePhaseCheckpoint`. JSON serialization silently drops `undefined` properties, so the written checkpoint carries no `governedSha` field.
+
+The comments justify this for the case where the override "may run at an UNRELATED HEAD" — correct reasoning for a fresh override invocation. But the comments do not address the **override-after-graduation** scenario:
+
+1. Phase N graduates normally → checkpoint written with `governedSha = sha_at_graduation`  
+2. Later, operator re-runs phase N with `--override` for any reason  
+3. `writePhaseCheckpoint` replaces the checkpoint file entirely (standard checkpoint semantics), erasing `sha_at_graduation`  
+4. Phase N+1 calls `resolvePrePhaseDiffBase` → no `governedSha` for phase N → falls back to `HEAD~1`
+
+If `HEAD~1` at the time phase N+1 runs happens to be inside phase N+1's own work rather than before phase N, the diff scope silently regresses. An operator who runs `--override` as a "force-accept" after a valid graduation would not expect the next phase's diff base to change. The code doesn't block this pattern, doesn't log a warning that `governedSha` is being cleared, and the existing comments do not describe the behavior.
+
+A minimal fix is a log line on the override path noting that no `governedSha` will be recorded and downstream phases will fall back to `HEAD~1`.
+
+---
+
+### AUDIT-20260621-03 — `recordGovernedSha` boolean is control-coupling — caller intent leaks into callee body
+
+Finding-ID: AUDIT-20260621-03
+Status: migrated-to-backlog TASK-384
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts:466–497 (`writeResolvedPhaseCheckpoint`), 519–535 (`writePhaseCheckpointAfterRecordOrFatal`)
+
+`recordGovernedSha: boolean` is a control flag threaded through two layers (`writePhaseCheckpointAfterRecordOrFatal` → `writeResolvedPhaseCheckpoint`) to gate a single expression: `args.recordGovernedSha ? currentHeadSha(repoRoot) : undefined`. This is classic boolean-parameter control coupling: the caller encodes a branching decision as data that the callee then switches on.
+
+A cleaner shape would compute `governedSha` at each call site — `currentHeadSha(repoRoot)` for graduation, `undefined` for override — and pass it as `governedSha?: string` into the write function. The function then serializes whatever it receives, with no conditional branching and no hidden dependency on a caller intent flag. This removes the need for `recordGovernedSha` entirely and makes the two call sites self-documenting. With only two call sites the current shape is manageable, but it creates a maintenance trap if a third call site is added: the caller must know to set the flag correctly rather than seeing "pass a sha or omit it."
+
+---
+
+### AUDIT-20260621-04 — No test coverage visible in this diff for FR-020 priority-resolution or `recordGovernedSha` semantics
+
+Finding-ID: AUDIT-20260621-04
+Status: migrated-to-backlog TASK-385
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    (no test files in the diff)
+
+The diff modifies two correctness-critical behaviors:
+
+1. **`recordGovernedSha` toggle**: override path writes a checkpoint without `governedSha`; normal graduation writes one with `governedSha`. No test asserts either outcome.
+2. **`explicitBase > governedSha > HEAD~1` priority**: the behavioral regression the commit fixes (explicit `--diff-base` was shadowed by auto-resolved sha). No test exercises the three-level priority stack.
+
+The second case is the higher-risk gap: the priority logic lives in `resolvePrePhaseDiffBase` (off-screen), and a priority-order bug there would not surface in the call-site change visible here. A regression test that sets `--diff-base`, has a prior `governedSha` recorded, and asserts the explicit base wins would catch a priority-order defect that this diff cannot rule out. The absence of such a test means the only verification is manual.
+
+## 2026-06-21 — audit-barrage lift (20260621T002539218Z-029-govern-operability-phase-5)
+
+### AUDIT-20260621-05 — `readFileSync` catch in `foldReferencedOutOfWindowDeps` is silent — violates the "every inclusion/skip warned" contract
+
+Finding-ID: AUDIT-20260621-05
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/govern/payload-implement.ts` — `foldReferencedOutOfWindowDeps`, the `readFileSync` catch block (diff line approximately +589–594 in the function body)
+
+The JSDoc contract on `foldReferencedOutOfWindowDeps` states "every inclusion/skip warned (no silent change)." The function correctly emits a `warn` call for every other skip path: binary/empty files, budget overruns. But the `readFileSync` catch block does not call `warn` — it simply `continue`s:
+
+```typescript
+try {
+  content = readFileSync(abs, 'utf8');
+} catch {
+  continue;          // ← no warn(); contradicts the stated contract
+}
+```
+
+`statSync` has already confirmed the file exists (it ran inside `resolveRelativeSpecifier` and returned `isFile()`). A subsequent `readFileSync` failure represents a TOCTOU race (file deleted or permission-revoked between stat and read) or an unexpected I/O error. Neither case should be silent, because the consuming operator has no way to know an OOW dep was resolved and then dropped without warning. The contract says they can diagnose skips from the warn stream; this one disappears.
+
+Blast radius: an operator diagnosing a false HIGH (the auditor flagged an import as missing) will inspect the `warn` stream, find no skip entry for the file in question, and incorrectly conclude the file was successfully folded in. The actual cause — a TOCTOU drop — is invisible. Fix is one `warn` call inside the catch before `continue`.
+
+---
+
+### AUDIT-20260621-06 — `CODE_ARTIFACT_FRAMING` now unconditionally asserts "this is a PER-PHASE diff" — misleading when the constant is used for whole-feature audit prompts
+
+Finding-ID: AUDIT-20260621-06
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/govern/payload-implement.ts` lines ~63–65 (`CODE_ARTIFACT_FRAMING` constant modification)
+
+The diff appends a per-phase-specific note to the shared `CODE_ARTIFACT_FRAMING` constant:
+
+> `NOTE — out-of-window scope (029 US5/FR-021): this is a PER-PHASE diff. A file the diff REFERENCES but does not itself change … is OUT OF THIS PHASE'S WINDOW … Do NOT raise a finding that such a referenced file is absent / not-imported / missing merely because its definition is not in this diff … Out-of-window deps that ARE present in the repo are folded in below under a "referenced dependency (out of phase window)" header for context only.`
+
+`CODE_ARTIFACT_FRAMING` is an exported module-level constant — not a computed per-call value — so every consumer receives this text unconditionally. The whole-feature (`after_implement`) audit path calls `assembleImplementPayload` without `pathScope` (`hasPathScope = false`), which means: (1) no OOW deps are folded in (the `if (hasPathScope)` guard suppresses that code), and (2) the diff is a multi-phase union, not a per-phase window.
+
+When an auditor model receives `CODE_ARTIFACT_FRAMING` for a whole-feature audit, it reads "this is a PER-PHASE diff" (false), "out-of-window deps are folded in below under a header" (false — none are), and is instructed to assume referenced files exist and are correct (the wrong posture for a whole-feature audit where a genuinely-missing implementation SHOULD surface). The note was designed to suppress false HIGHs in per-phase context; in whole-feature context it could suppress real HIGHs. This is an auditor-facing prompt that controls model behaviour — a wrong instruction at this layer has direct downstream impact on finding quality.
+
+The fix: either (a) make the note conditional by building the framing string inside `assembleImplementPayload` based on `hasPathScope`, or (b) introduce a separate `CODE_ARTIFACT_FRAMING_PER_PHASE` constant used only on the per-phase path, keeping `CODE_ARTIFACT_FRAMING` as the generic form shared across audit modes. The test in `out-of-window.test.ts` imports and asserts on `CODE_ARTIFACT_FRAMING` directly — it would need updating to test the appropriate per-phase variant.
+
+---
+
+### AUDIT-20260621-07 — `resolvePrePhaseDiffBase` silently treats an unknown `phaseId` as "first phase" — configuration error is indistinguishable from legitimate fallback
+
+Finding-ID: AUDIT-20260621-07
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/govern/incremental-audit.ts`, `resolvePrePhaseDiffBase` function (~lines 163–176 in the diff)
+
+```typescript
+const idx = args.orderedPhaseIds.indexOf(args.phaseId);
+if (idx > 0) {
+  for (let i = idx - 1; i >= 0; i -= 1) { … }
+}
+return args.fallbackBase;
+```
+
+When `args.phaseId` is absent from `args.orderedPhaseIds`, `indexOf` returns `-1`. The condition `idx > 0` is false, so the loop is skipped and `fallbackBase` is returned. This outcome is identical to the legitimate "phase 1 has no prior phases" path (`idx === 0` also skips the loop). A caller that passes a mis-typed or stale `phaseId` gets `fallbackBase` silently — no error, no warning — and the governed diff is computed from `HEAD~1` instead of the correct pre-phase anchor. The caller in `govern.ts` is guarded upstream by `assertPriorPhaseCheckpointsCurrent`, which should reject an unknown phase before this function is reached. But `resolvePrePhaseDiffBase` is exported (it's imported in the test file), and as a standalone exported function it carries no internal defense: a test or a future caller could supply mismatched inputs without being warned.
+
+Blast radius: the misconfigured call silently falls back to `HEAD~1`, producing the TASK-263 under-scope bug that this very feature was designed to fix — the false HIGH resurfaces invisibly, with no diagnostic signal. A simple guard (`if (idx === -1) throw new Error(...)` or at minimum a `warn`) would surface the misconfiguration immediately. The `idx === 0` (first phase) path should be left alone since that is legitimate; only `idx === -1` needs the guard.
+
+### AUDIT-20260621-08 — Stored governedSha is trusted without verifying it still resolves
+
+Finding-ID: AUDIT-20260621-08
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/incremental-audit.ts:164-170; src/subcommands/govern.ts:800-807; src/govern/checkpoint-state.ts:430-438
+
+The new resolver returns the first non-empty prior `governedSha` directly, and `runGovern` threads checkpoint values into that resolver without checking whether the object still exists in the current repo. The checkpoint validator only enforces “non-empty string”, not “valid reachable commit”. If a branch was rebased, history was pruned, or the checkpoint file was edited/corrupted, the auto-selected base can be an invalid git revision.
+
+The blast radius is high because `assembleImplementPayload`’s git wrapper degrades failed git commands to an empty string, and `runGovern` explicitly treats empty diffs as plan-context-only governance. A downstream phase audit can therefore silently stop auditing the phase payload after selecting a stale stored SHA. A reasonable fix is to verify the resolved checkpoint SHA with git before using it as a diff base, and fail loud with an actionable message when a stored governed anchor is invalid.
+
+### AUDIT-20260621-09 — Re-export dependencies are not folded as out-of-window context
+
+Finding-ID: AUDIT-20260621-09
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/payload-implement.ts:472-473; src/govern/payload-implement.ts:564-569
+
+The out-of-window dependency scanner only recognizes `from` imports, dynamic imports, `require(...)`, and bare imports. It does not recognize TypeScript/ESM re-export references such as `export { foo } from "./dep.js"` or `export * from "./dep.js"`, even though those are dependency references with the same false-absence risk the feature is trying to eliminate.
+
+The blast radius is medium: projects using barrel modules or re-export based phase surfaces can still produce per-phase payloads that reference an out-of-window file without folding the present target, leaving auditors to report the same “missing/absent dependency” class this change intends to suppress. The scanner should include export-from syntax, ideally via a small parser or at least an expanded tested pattern for `export ... from "relative"`.
+
+### AUDIT-20260621-10 — Failed reads of resolved out-of-window deps are silently dropped
+
+Finding-ID: AUDIT-20260621-10
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/payload-implement.ts:588-592
+
+After resolving and sizing an out-of-window dependency, the code catches `readFileSync` failures and simply continues. That contradicts the new contract in the same helper that “every inclusion/skip is warned”; it also creates a governance blind spot when a permission error or race makes a resolved dependency unreadable.
+
+The blast radius is medium because the operator gets no warning that a referenced dependency was selected but omitted from the payload, so an audit can still see an unresolved reference with no clue that context was dropped. A reasonable fix is to emit a warning for the read failure, or fail loud if an already-resolved dependency cannot be read.
+
+## 2026-06-21 — audit-barrage lift (20260621T003919044Z-029-govern-operability-phase-5)
+
+### AUDIT-20260621-11 — Override-after-graduation silently clears a valid `governedSha`
+
+Finding-ID: AUDIT-20260621-11
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/subcommands/govern.ts:480-499, src/subcommands/govern.ts:978-984
+
+The `writeResolvedPhaseCheckpoint` function computes `governedSha` conditionally based on `recordGovernedSha`:
+
+```typescript
+const governedSha = args.recordGovernedSha ? currentHeadSha(repoRoot) : undefined;
+writePhaseCheckpoint(repoRoot, {
+  ...
+  ...(governedSha !== undefined ? { governedSha } : {}),
+  ...
+});
+```
+
+The override path passes `recordGovernedSha: false`, so `governedSha` is `undefined`, and the spread omits the field entirely. `writePhaseCheckpoint` takes a complete `PhaseCheckpointRecord` and writes it as a full replacement — a field absent from the object will be absent from the JSON on disk. If a phase was previously graduated normally (acquiring a `governedSha`), a subsequent `govern --override --phase N` call (e.g., to re-disposition a finding, to re-run with override after a stale checkpoint) fires the override path, replaces the checkpoint file, and silently discards the previously-recorded sha. The next phase's `resolvePrePhaseDiffBase` then walks past this phase (its status now returns `governedSha: undefined`), finds the nearest earlier ancestor, and audits against a wider-than-intended diff-base — or falls all the way back to `HEAD~1`. This narrowing/widening of the audit scope happens silently, with no warning.
+
+The blast-radius: the per-phase union-payload guarantee (the fix for TASK-263) is silently violated for all phases governed after an override-on-graduated-phase. A fix would preserve any previously-recorded `governedSha` through an override write — either by reading the existing checkpoint before writing and carrying the field forward, or by splitting `writeResolvedPhaseCheckpoint` into a path that only sets `governedSha` once (on first graduation) and does not overwrite it thereafter.
+
+---
+
+### AUDIT-20260621-12 — `foldReferencedOutOfWindowDeps` silently skips on `readFileSync` failure
+
+Finding-ID: AUDIT-20260621-12 (claude-02 + codex-01; cross-model)
+Status:     open
+Severity:   low
+Per-lane:   claude=low, codex=low
+Decision:   agreement (gate-counted low)
+Surface:    src/govern/payload-implement.ts:564-569 (approximately, in the `foldReferencedOutOfWindowDeps` function body)
+
+The function's stated invariant (from the JSDoc: "every inclusion/skip warned (no silent change)") is broken for the `readFileSync` branch:
+
+```typescript
+try {
+  content = readFileSync(abs, 'utf8');
+} catch {
+  continue;   // no warn() call — silent skip
+}
+```
+
+The `isBinaryOrEmpty` and budget-exceeded paths both call `warn(...)` before skipping. A permission-denied, mid-write race, or any other I/O failure silently drops a dep the auditor would have expected to see. The fix is a `warn(...)` call in the catch block before the `continue`, consistent with the other skip cases above it.
+
+---
+
+### AUDIT-20260621-13 — `recordGovernedSha` boolean is caller-intent control coupling
+
+Finding-ID: AUDIT-20260621-13
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/subcommands/govern.ts:466-499 (`writeResolvedPhaseCheckpoint`)
+
+The `recordGovernedSha: boolean` parameter encodes caller context ("am I on the override path or the graduation path?") inside the callee body. This is a textbook control-coupling anti-pattern: the callee's behaviour changes based on the caller's identity rather than on its own data. The current two call sites are correctly annotated, but a future third call site (e.g., a `--dry-run` path, a `--re-govern` path, an override-of-an-override path) must know to set this flag correctly or it silently mis-records the sha. The flag also makes the interaction between the override path and the `governedSha` field non-local — the connection between "this is an override" and "therefore do not record sha" is a runtime truth that only lives in the boolean; a reader of `writeResolvedPhaseCheckpoint` cannot derive the intent from the callee alone.
+
+A cleaner shape: pass the sha explicitly (or `undefined`) as a typed argument — `governedSha: string | undefined` — computed at the call site. The callee then becomes a pure writer. The decision of whether to call `currentHeadSha` belongs at the call site, adjacent to the `if (isOverride)` branch where the context is explicit, not hidden inside the callee via a flag.
+
+---
+
+### AUDIT-20260621-14 — `resolvePrePhaseDiffBase` has no test for `phaseId` absent from `orderedPhaseIds`
+
+Finding-ID: AUDIT-20260621-14
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/govern/incremental-audit.ts:158-170 (`resolvePrePhaseDiffBase`), tests/govern/payload-union.test.ts
+
+When `phaseId` is not present in `orderedPhaseIds`, `indexOf` returns `-1`. The condition `idx > 0` is `false`, so the function falls through directly to `return args.fallbackBase`. This is the correct defensive behaviour (unknown phase → safe fallback), but the path is untested. The test suite covers the first-phase case (`idx === 0`, which also satisfies `idx > 0 === false`), but not the degenerate `idx === -1` case. If `orderedPhaseIds` and `governedShaByPhase` are built from different sources (e.g., a tasks.md parse vs. a checkpoint scan), a phase-id mismatch could silently fall back without any diagnostic. A test and/or a `warn(...)` call when `idx === -1` would make the fallback visible.
+
+## 2026-06-21 — audit-barrage lift (20260621T005644765Z-029-govern-operability-phase-4)
+
+### AUDIT-20260621-15 — `gitRefResolves` does not check `r.error` — silent mis-classification on git-not-found
+
+Finding-ID: AUDIT-20260621-15
+Status: migrated-to-backlog TASK-386
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts:458-469 (new `gitRefResolves` function)
+
+`spawnSync` sets `r.error` (a Node.js `Error` object) when the child process cannot be spawned at all — e.g., `git` is not on `PATH`, the OS returns `ENOENT`, or the process was killed by a signal that left `r.status === null`. The function returns `r.status === 0`, which evaluates `null === 0 → false` in these cases, so the safe-fallback direction is correct: an unresolvable-git environment causes `isResolvable` to return `false` and govern falls back to `HEAD~1` rather than crashing.
+
+The blast-radius is therefore bounded, but the silent false-negative has a diagnostic cost: if `git` is misconfigured in a CI environment, every governed phase silently degrades to the `HEAD~1` fallback with no stderr message indicating *why*. An operator would see subtly under-scoped diffs and no error to act on. A one-liner guard (`if (r.error) throw new Error(...)` or at minimum `process.stderr.write(...)`) would surface the root cause immediately. The existing `gitRefResolves` surface area is small and self-contained, so the fix is cheap.
+
+---
+
+### AUDIT-20260621-16 — Stale-anchor fallback path (`isResolvable → false`) has no test coverage
+
+Finding-ID: AUDIT-20260621-16
+Status: migrated-to-backlog TASK-387
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    tests/govern/override-short-circuit.test.ts (new test block, lines 424–476); src/subcommands/govern.ts:824-829 (`isResolvable` wiring)
+
+AUDIT-20260621-08 introduced the `isResolvable` callback so that a recorded `governedSha` that no longer resolves in the repo (post-rebase, pruned reflog, shallow clone) degrades gracefully to `HEAD~1` instead of handing a dead SHA to `git diff`. The test added in this diff exercises the *opposite* case: the SHA is valid, the override is run, the SHA is preserved. That path passes through `isResolvable` returning **true**.
+
+There is no test in this diff (or in the existing suite as far as the diff shows) for the case where `isResolvable` returns **false** — i.e., the SHA recorded in the checkpoint no longer resolves. The contract of `resolvePrePhaseDiffBase` when `isResolvable(ref) === false` is therefore unverified: does it fall back to `HEAD~1`? Does it throw? Does it silently use the stale ref anyway? If the callback result is accidentally ignored inside `resolvePrePhaseDiffBase`, this diff's primary safety net for AUDIT-20260621-08 would be a no-op and nothing in the test suite would catch it.
+
+This is not a hypothetical path: any team doing interactive rebases, force-pushes, or shallow fetches between governance passes would hit it in practice. A minimal test would: (1) write a checkpoint with a `governedSha` that is fabricated / not present in the repo's object store, (2) run govern, (3) assert the diff is computed from `HEAD~1` (or whatever the declared fallback is) and govern exits cleanly.
+
+---
+
+### AUDIT-20260621-17 — `pathScope` as proxy for per-phase framing could silently suppress findings on a phase with an empty file scope
+
+Finding-ID: AUDIT-20260621-17
+Status: migrated-to-backlog TASK-388
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/subcommands/govern.ts:362-370 (`artifact_framing` selection in `buildImplementVars`)
+
+The framing selection is:
+
+```typescript
+artifact_framing:
+  pathScope !== undefined && pathScope.length > 0
+    ? CODE_ARTIFACT_FRAMING_PER_PHASE
+    : CODE_ARTIFACT_FRAMING,
+```
+
+The comment explains the intent correctly: `CODE_ARTIFACT_FRAMING_PER_PHASE` includes a note telling the audit model that out-of-window dependencies are intentionally folded out, which is only true for a per-phase call with an explicit path scope. For a whole-feature call, that note would falsely suppress cross-feature missing-impl findings.
+
+The condition is sound for the common cases. The edge it doesn't cover: a phase-granularity call where the resolved `pathScope` ends up empty (e.g., the phase's `diffScope` resolves to zero files — a phase touching only deleted files, or a brand-new phase with no committed files yet). In that case `pathScope.length === 0`, the generic framing is used, and the audit model is *not* told that out-of-window deps are intentionally folded. For a zero-file phase that genuinely has nothing to audit, this is harmless. But if the zero-scope is itself a symptom of an incorrectly resolved diff-base (the very category AUDIT-20260621-08 addresses), the generic framing would allow the model to flag missing implementations in the out-of-window area — false positives rather than false negatives.
+
+Blast-radius is limited: the worst outcome is noisy audit findings on an empty-scope phase, not missed correctness bugs. Low severity, but worth a comment on the assumption ("pathScope non-empty iff per-phase context") or a more direct signal (e.g., an explicit `isPerPhase` flag from the call site).
+
+---
+
+## 2026-06-21 — audit-barrage lift (20260621T005921085Z-029-govern-operability-phase-5)
+
+### AUDIT-20260621-18 — `gitRefResolves` returns `false` on spawn failure — git-unavailable misattributed as corrupt checkpoint
+
+Finding-ID: AUDIT-20260621-18
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/govern.ts` — `gitRefResolves` function (lines visible in diff, after `currentHeadSha`)
+
+When `git` is not on `PATH` (container without git, broken `PATH` in CI), `spawnSync` sets `r.error` and `r.status = null`. The function evaluates `null === 0` → `false` and returns "does not resolve." `resolvePrePhaseDiffBase` then throws: "no longer resolves to a git object (branch rebased / history pruned / corrupt checkpoint)". The operator is sent on a false recovery path — checking for rebase history — when the real issue is git unavailability. The adjacent `currentHeadSha` correctly guards with `r.status !== 0 || typeof r.stdout !== 'string'`; `gitRefResolves` should mirror that defensive shape by checking `r.error !== undefined || r.status === null` first and either returning `false` with a distinct diagnostic path, or surfacing the spawn error directly. The blast radius is a misleading diagnostic in an already-abnormal failure scenario; it doesn't corrupt data, but it burns operator time chasing the wrong cause.
+
+---
+
+### AUDIT-20260621-19 — In-scope-but-unchanged files are excluded from out-of-window folding — auditor still cannot see their content
+
+Finding-ID: AUDIT-20260621-19 (claude-02 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    `src/govern/payload-implement.ts` — `foldReferencedOutOfWindowDeps`, the `inPathScope` skip at lines
+
+```typescript
+if (inDiff.has(dep)) continue;      // already in payload
+if (inPathScope(dep, pathScope)) continue;  // in-window — ← this is the gap
+resolved.add(dep);
+```
+
+A file `dep` that is (a) listed in `pathScope` (this phase's designated scope) AND (b) unchanged since the phase base is excluded by the `inPathScope` check. It therefore does NOT appear in the diff and is NOT folded in as an out-of-window dep. The auditor sees a `+line` importing `dep` but has no definition for it in the payload. Because `dep` is in `pathScope`, it is not covered by the "out-of-window deps are folded in below" sentence in `CODE_ARTIFACT_FRAMING_PER_PHASE`; an AI auditor might reasonably infer "if it were present in-repo and in-scope it would be in the diff, so it must be missing" — reintroducing the false HIGH the folding logic was built to eliminate.
+
+The concrete scenario: phase 5 designates `src/feature.ts` and `src/helper.ts` in pathScope; only `feature.ts` is modified; `feature.ts` imports from `./helper.js`; `helper.ts` was committed before the phase base and is unchanged. `inPathScope('src/helper.ts', pathScope)` returns `true` → skipped. The auditor sees `feature.ts` referencing `helper.ts` but gets no context about `helper.ts`.
+
+The fix depends on intent: (a) replace the `inPathScope` skip with `inDiff.has(dep)` only — fold in any file that exists on disk and isn't already in the diff, regardless of pathScope membership; or (b) extend `CODE_ARTIFACT_FRAMING_PER_PHASE` to explicitly state that in-scope files absent from the diff are unchanged (not missing), not just that out-of-window files are folded in. Option (b) alone is weaker because it relies on the AI auditor applying the framing correctly to a category the framing does not name.
+
+---
+
+### AUDIT-20260621-20 — Budget-exhaustion branch in `foldReferencedOutOfWindowDeps` has no test coverage
+
+Finding-ID: AUDIT-20260621-20
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/govern/payload-implement.ts` — `foldReferencedOutOfWindowDeps` budget check; `tests/govern/out-of-window.test.ts`
+
+The branch:
+```typescript
+if (foldedBytes + sz > budgetBytes) {
+  warn(`govern: out-of-window dep ${dep} (${sz} bytes) would exceed...`);
+  continue;  // NOT break — smaller later deps can still be included
+}
+```
+
+The `continue` (not `break`) is a load-bearing semantic choice: alphabetically later deps that are small enough still get folded even after the budget is hit by a large dep. No test in `out-of-window.test.ts` exercises this path. A test should assert: given two deps where dep A exhausts the budget and dep B (alphabetically later, smaller) fits, dep B is included and dep A is not, and the warn is emitted for A. Without this test, the `continue` semantics are undocumented by the test suite, making a future refactor that changes it to `break` undetectable until a real audit payload silently loses small deps.
+
+### AUDIT-20260621-21 — Per-phase govern resolves the pre-phase base, then discards it
+
+Finding-ID: AUDIT-20260621-21
+Status:     open
+Severity:   blocking
+Per-lane:   codex=blocking
+Decision:   single-model (gate-counted blocking)
+Surface:    src/subcommands/govern.ts:820-832, src/subcommands/govern.ts:1082-1087, src/subcommands/govern.ts:319
+
+The phase path correctly computes `diffBase` with `resolvePrePhaseDiffBase(...)` and passes it into `resolvePhaseUnit` at lines 820-832, but the actual payload is built later with `buildImplementVars(..., flags.diffBase, ..., payloadPathScope, ...)` at lines 1082-1087. Inside `buildImplementVars`, line 319 re-resolves the base from `diffBaseFlag ?? GOVERN_DIFF_BASE ?? 'HEAD~1'`, so an auto-resolved prior `governedSha` is not used unless the operator explicitly passed the same value as `--diff-base`.
+
+That breaks FR-020’s core goal: a normal per-phase run without explicit `--diff-base` still audits `HEAD~1`, not the union from the pre-phase commit. The blast radius is blocking because the feature’s stated fix for TASK-263 does not actually affect the governed payload in the default path. A reasonable fix is to pass `phaseUnit.diffScope.base` into `buildImplementVars` for implement mode when a phase unit was resolved, or change `buildImplementVars` to accept the already-resolved audit unit/base rather than independently recomputing it.
+
+## 2026-06-21 — audit-barrage lift (20260621T011659497Z-029-govern-operability-phase-5)
+
+### AUDIT-20260621-22 — `gitRefResolves` misclassifies git-binary-absent as sha-unresolvable
+
+Finding-ID: AUDIT-20260621-22
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/govern.ts` — `gitRefResolves` function (added in this diff)
+
+When the git binary is not on PATH, `spawnSync` sets `r.error` (ENOENT) and `r.status` to `null`. The check `return r.status === 0` evaluates `null === 0 → false`, so the function returns `false`. `resolvePrePhaseDiffBase` then treats this as a confirmed sha-resolution failure and throws: *"which no longer resolves to a git object (branch rebased / history pruned / corrupt checkpoint)"* — a message that is factually wrong when the real failure is git unavailability.
+
+Compare with `currentHeadSha` in the same diff, which explicitly guards `if (r.status !== 0 || typeof r.stdout !== 'string') return undefined;` — `null !== 0` is `true`, so it handles the git-absent case gracefully. `gitRefResolves` has no parallel check for `r.error` or `r.status !== null`. An operator on a machine without git (CI image, restricted environment) would receive a "branch rebased / corrupt checkpoint" error directing them to investigate phantom history problems, rather than a clear "git not available" signal.
+
+The fix is minimal: `if (r.error !== undefined || r.status === null) return false;` with a stderr warning, or—better—throw a distinct error distinguishing the two failure modes (git-not-found vs. sha-not-found), so the operator gets an actionable message. Note: this finding was filed previously as AUDIT-20260621-15 (visible as untracked `task-386` in the working tree); the current diff does not address it.
+
+---
+
+### AUDIT-20260621-23 — `orderedPhaseIds` ordering assumption is not asserted at the `resolvePrePhaseDiffBase` call site
+
+Finding-ID: AUDIT-20260621-23
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `src/subcommands/govern.ts` lines ~830–845 (the `resolvePrePhaseDiffBase` call)
+
+`resolvePrePhaseDiffBase` requires `orderedPhaseIds` to be in `tasks.md` parse order for its "latest prior phase" semantics to be correct: it iterates backward from `idx - 1` and returns the first non-empty `governedSha` it finds. In `govern.ts`, the argument is sourced from `phaseCheckpointStatuses.map((status) => status.phaseId)`. If `resolvePhaseCheckpointStatuses` (not in this diff) returns statuses in any order other than `tasks.md` order — filesystem order of checkpoint JSON files, lexicographic sort of `phaseId` strings, etc. — the wrong `governedSha` would be selected as the diff-base, silently under-scoping or over-scoping the audit payload. Phase IDs that are multi-part strings or numbers > 9 are especially vulnerable to string-sort vs. numeric-sort divergence.
+
+The call site has no assertion that the returned array is in `tasks.md` order. The function's JSDoc says "parsePhases order" but that contract is only enforceable if `resolvePhaseCheckpointStatuses` is verified to return in that order. There is no test that exercises the production `govern.ts` call path with a multi-phase fixture to confirm the ordering. Confirmed as previously filed AUDIT-20260621-01 (untracked `task-382`); not addressed in this diff.
+
+---
+
+### AUDIT-20260621-24 — `foldReferencedOutOfWindowDeps` budget selection is alphabetical, not priority-based
+
+Finding-ID: AUDIT-20260621-24
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    `src/govern/payload-implement.ts` — `foldReferencedOutOfWindowDeps`, budget-skip loop (~line 590–610 of added code)
+
+When a resolved dep exceeds the remaining fold budget, the code skips it and continues: `"skipping it but continuing with smaller deps (not silently)"`. The iteration is over `Array.from(resolved).sort()` — strict alphabetical order. This means a large, semantically load-bearing dep (e.g., `a-contract.ts`) may be skipped while a small, peripheral dep (e.g., `z-utils.ts`) is included. In the exact scenario this feature is solving — where an auditor raises a false HIGH because it cannot see the definition of a referenced file — the referenced file is by definition the high-priority dep. If that file is large and appears early alphabetically, it may be the first to be skipped when the budget is tight.
+
+The warn message accurately documents the skip behavior, and the framing instruction says the fold is best-effort, so the operator is not misled. However, the operator has no mechanism to influence inclusion priority short of using `--diff-base` to bypass the whole mechanism. A priority-based selection (e.g., prefer deps referenced by more import sites, or prefer deps referenced in added lines over context lines) would be more resilient, but is a design enhancement beyond a bug fix.
+
+---
+
+### AUDIT-20260621-25 — Second-order out-of-window deps are not folded; no test pins this boundary
+
+Finding-ID: AUDIT-20260621-25 (claude-04 + codex-02; cross-model)
+Status:     open
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    `src/govern/payload-implement.ts` — `foldReferencedOutOfWindowDeps`; `tests/govern/out-of-window.test.ts`
+
+When a dep is folded as out-of-window context, its own imports are not scanned. A second-order dep — a file imported by the folded dep, itself outside the phase window — is not included in the payload. An LLM auditor examining the folded dep's content might flag those second-order imports as missing implementations. The framing instruction (`CODE_ARTIFACT_FRAMING_PER_PHASE`) says "assume it exists and is correct unless the diff itself shows a genuinely-missing implementation," which is intended to cover this case, but that instruction is framed around the *phase diff*, not around the *folded context blocks*. An auditor reading a folded dep's code that references an unshown file has less contextual guidance that this is also not-missing.
+
+The test suite in `out-of-window.test.ts` covers: (a) a present dep is folded, (b) a re-export dep is folded, (c) a genuinely-missing dep is not fabricated. None of these tests assert the second-order case — that a dep-of-dep is neither folded nor fabricated. The omission is by design (unbounded recursive folding would explode the payload), but without a pinning test the boundary could silently regress if the fold logic is later extended. A test asserting that `dep → sub-dep` where `sub-dep` is out-of-window does NOT appear in the fold would make the design contract explicit.
+
+### AUDIT-20260621-26 — Legacy intermediate checkpoints can make the next phase diff start too early
+
+Finding-ID: AUDIT-20260621-26
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/govern/incremental-audit.ts:183-198
+
+`resolvePrePhaseDiffBase` walks backward until it finds any prior `governedSha`, skipping prior phases that are current but legacy/no-sha. If phase 5 follows a current phase 4 checkpoint with no `governedSha`, but phase 3 has one, this returns the phase 3 commit as phase 5's base. That is not the pre-phase commit for phase 5; it predates phase 4.
+
+The blast radius is upgraded features with mixed checkpoint formats, especially where phases share files. The resulting per-phase payload can include already-governed phase 4 hunks in a phase 5 audit, contradicting the new per-phase framing that says the diff shows only files this phase changed. A reasonable fix is to treat a sha-less intervening current phase as an unresolved boundary and require an explicit `--diff-base`, rather than skipping past it to an older anchor.
+
+## 2026-06-21 — audit-barrage lift (20260621T015655993Z-029-govern-operability-phase-6)
+
+Code-sha: 52e8ff6d5c8b9fdeb656e410a8bf01aeaccf863c
+### AUDIT-20260621-27 — `shipped` phase `derive: record-converged impl` may not recognise the opt-in whole-feature graduation path
+
+Finding-ID: AUDIT-20260621-27 (claude-01 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-390
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    templates/WORKFLOW.md:95-100 + src/workflow/gate-eval.ts:174-184
+
+The `graduate-impl` criterion now admits two graduation paths: (A) all per-phase checkpoints current, or (B) `ctx.implRecordConverged` (the whole-feature record). The change correctly updates the `governing` exit, the `shipped` entrance, and the `transition:graduate` exit-gate from `all-phase-checkpoints-current impl` to `graduate-impl impl`. However, the `shipped` phase's `derive: record-converged impl` is **unchanged**.
+
+The workflow-types.ts comment states: "the composed `record-converged impl` signal is **derived from** [all-phase-checkpoints-current]." If the `record-converged impl` criterion evaluates per-phase checkpoint composition (i.e. calls `composeConvergedImpl` directly), then a feature that graduated via opt-in path B (whole-feature record, no per-phase checkpoints) would satisfy `graduate-impl impl` (entering `shipped`), but the `shipped` phase's `derive: record-converged impl` would evaluate to false — the feature entered `shipped` yet its derive criterion is unmet. Depending on how the compass engine uses the derive field, this could silently strand the feature's displayed state.
+
+The `record-converged impl` evaluator is out-of-window, so this finding is conditional: if that criterion maps to `ctx.implRecordConverged` (which path B sets to true), there is no issue. If it calls `composeConvergedImpl` independently, the `shipped` phase becomes inconsistent for opt-in users. The diff does not update `derive: record-converged impl` in the `shipped` phase and does not add a note explaining why no update is needed — that gap should either be closed (update the derive to `graduate-impl impl`) or annotated (explain why `record-converged impl` already covers both paths).
+
+---
+
+### AUDIT-20260621-28 — research.md amendment conflates the `record-converged impl` criterion with `ctx.implRecordConverged`
+
+Finding-ID: AUDIT-20260621-28
+Status: migrated-to-backlog TASK-391
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    specs/025-unskippable-workflow-protocol/research.md (new lines 27–38)
+
+The amendment reads: "the graduate gate is now `graduate-impl impl` = `all-phase-checkpoints-current` **OR** a converged whole-feature `record-converged impl`." The backtick-formatted `record-converged impl` looks like a reference to the criterion of that name. However in gate-eval.ts the OR branch is `ctx.implRecordConverged` — a pre-computed GateContext field — not the `record-converged impl` criterion.
+
+The distinction matters for a spec-reading agent. If an agent implements `graduate-impl` by ORing `all-phase-checkpoints-current` with the criterion `record-converged impl`, the opt-in escape would be semantically vacuous: `record-converged impl` (which the comment says derives from per-phase composition) would only be true when `all-phase-checkpoints-current` is also true, making the OR reduce to `all-phase-checkpoints-current` alone and silently breaking the whole-feature escape path.
+
+A minimal fix: replace `` `record-converged impl` `` in the amendment text with `ctx.implRecordConverged` (the field, not the criterion), or add a parenthetical: "*(the `implRecordConverged` GateContext field, not the `record-converged impl` criterion — the field is true when a whole-feature convergence record exists)*."
+
+---
+
+### AUDIT-20260621-29 — Test suite does not cover `specDirPath = null` + `implRecordConverged = true`
+
+Finding-ID: AUDIT-20260621-29
+Status: migrated-to-backlog TASK-392
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/workflow/either-of-gate.test.ts:42-51
+
+The `ctxFor` helper always supplies a non-null `specDirPath` (line 46: `specDirPath: join(f.root, f.specDirRel)`). The `allPhaseCheckpointsCurrent` function returns `false` when `ctx.specDirPath === null`, so for `graduate-impl` the evaluation is `false || ctx.implRecordConverged`. With `implRecordConverged = true` and a null spec dir, the gate graduates the feature — a feature with no spec dir at all can graduate via the whole-feature opt-in path.
+
+Whether this is intended is not documented. If it is intended (the whole-feature path does not require a tasks.md), a test should assert the behavior explicitly and the feature spec should acknowledge it. If it is not intended (graduation should require a spec dir regardless of path), `allPhaseCheckpointsCurrent` returning `false` is not sufficient — the `graduate-impl` case must also guard on `ctx.specDirPath !== null` before checking `ctx.implRecordConverged`.
+
+No code change is required if the behaviour is intentional, but an explicit test documents the intent and guards against a future "fix" that inadvertently breaks this case.
+
+---
+
+### AUDIT-20260621-30 — Test suite does not cover the "both conditions true simultaneously" case
+
+Finding-ID: AUDIT-20260621-30
+Status: migrated-to-backlog TASK-393
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/workflow/either-of-gate.test.ts (entire file)
+
+The four test cases cover: default-only true, opt-in-only true, neither true, partial-default-without-opt-in. The combination "all per-phase checkpoints current AND `implRecordConverged = true`" (both arms of the OR satisfied simultaneously) has no explicit test. While `A || B` with both true is trivially correct, this is the realistic state after an operator runs per-phase govern AND then also runs a whole-feature govern (e.g. to verify before shipping). An explicit test would document the expected behaviour (gate still passes) and ensure that no future change to `graduate-impl` accidentally introduces an unexpected `A && B` or `XOR` semantic.
+
+## 2026-06-21 — audit-barrage lift (20260621T020306457Z-029-govern-operability-phase-6)
+
+Code-sha: ce7c1db6924f710490325d7412276c28f4dea105
+### AUDIT-20260621-31 — Missing test for the canonical path-B use case: stale per-phase checkpoints + converged whole-feature record
+
+Finding-ID: AUDIT-20260621-31 (claude-01 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-394
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    tests/workflow/either-of-gate.test.ts:57-64
+
+The test "graduates via the OPT-IN whole-feature record path (no per-phase checkpoints)" exercises path B with `implRecordConverged = true` and zero checkpoints written — `allPhaseCheckpointsCurrent` returns false because `composeConvergedImpl` finds nothing to compare. That's a valid test, but it's not the motivating use case for the opt-in path. The documented motivation for path B is the **O(n²)-painful shared-file feature** where per-phase checkpoints were written, then source files were edited, leaving the checkpoints stale. In that scenario `allPhaseCheckpointsCurrent` still returns false (staleness detection fires), and path B's `ctx.implRecordConverged` should graduate the feature. This is the scenario `editPhaseFile` in `unskippable-fixtures.ts` was built for — it's never called in this test file. A reasonable fix: add a test that calls `f.checkpointPhase('1/2/3')`, then `f.editPhaseFile(path, newContent)` to induce staleness, and asserts that `evaluateCriterion(GRADUATE, ctxFor(f, true)) === true` (path B rescues the stale state). Without this, the central user story for the either-of gate remains undemonstrated in the test suite.
+
+---
+
+### AUDIT-20260621-32 — `graduate-impl` invalid-target error path is untested
+
+Finding-ID: AUDIT-20260621-32
+Status: migrated-to-backlog TASK-395
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/workflow/gate-eval.ts:176-178 / tests/workflow/either-of-gate.test.ts
+
+The `graduate-impl` case validates its target and throws:
+```typescript
+if (c.target !== 'impl') {
+  throw new WorkflowError(`criterion 'graduate-impl' has unknown target '${c.target}' (expected impl)`);
+}
+```
+The analogous throw in `all-phase-checkpoints-current` is likely also untested (out of this diff's window), so this is a consistent gap rather than a novel regression. Still, the new criterion's error path is unexercised. A one-line test — `expect(() => evaluateCriterion({ kind: 'graduate-impl', target: 'spec' as any }, ctx)).toThrow(WorkflowError)` — would close it. Low blast-radius since the validated field comes from the workflow template, which already hardcodes `impl` as the only target; the error path fires only on a hand-edited workflow file.
+
+---
+
+### AUDIT-20260621-33 — Existing instantiated workflow files won't automatically benefit from the either-of gate
+
+Finding-ID: AUDIT-20260621-33
+Status: migrated-to-backlog TASK-396
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    templates/WORKFLOW.md:89,98,143 (template); any instantiated WORKFLOW.md in the repo
+
+The template is updated from `all-phase-checkpoints-current impl` → `graduate-impl impl` in three positions (phase:governing exit, phase:shipped entrance, transition:graduate exit-gate). This is correct for new features. Existing features whose WORKFLOW.md was instantiated from the old template still carry `all-phase-checkpoints-current impl`. They continue to work — the old criterion is still valid — but they cannot use the opt-in path B (a converged whole-feature record) without manual edits. There is no doctor rule, migration utility, or guidance note explaining this. Operators who want to use path B on an in-flight feature must discover and apply the change themselves. Blast-radius: no feature silently breaks; the gap is exclusively that opt-in functionality is inaccessible without operator awareness. A doc note in `specs/029-govern-operability/` or a targeted doctor rule checking for `all-phase-checkpoints-current impl` in the graduate position would close the discoverability gap.
+
+## 2026-06-21 — audit-barrage lift (20260621T020821857Z-029-govern-operability-phase-7)
+
+Code-sha: 00a64d2e6d1ae6aa5d7259ecd778d227001f5d02
+### AUDIT-20260621-34 — SHA-format gap: `governedSha` is validated only as a non-empty string, not as a plausible git ref
+
+Finding-ID: AUDIT-20260621-34
+Status: migrated-to-backlog TASK-397
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    src/govern/checkpoint-state.ts:427–437
+
+The validation added in `validateCheckpointRecord` checks that `governedSha` is a non-empty string when present, but accepts any non-empty string:
+
+```typescript
+if (typeof parsed.governedSha !== 'string' || parsed.governedSha.length === 0) {
+  throw new Error(`…governedSha must be a non-empty string when present`);
+}
+```
+
+A checkpoint file with a plausible-looking but invalid value — `"not-a-sha"`, `"abc"` (too short), a whitespace-only string containing invisible characters — passes this gate cleanly. The error surface then shifts downstream to wherever `governedSha` is fed to `git diff` or `git rev-parse`, where the error message will be a raw git exit-code rather than a clear checkpoint-parse diagnostic.
+
+The code already applies the "fail loud" principle at the empty-string case; adding a basic hex-and-length check (e.g. `/^[0-9a-f]{7,40}$/i`) gives the same loud failure at parse time. Blast-radius reasoning: this is a checkpoint file written by the tooling itself, so a malformed SHA in the wild is unlikely — but an operator who hand-edits or cherry-picks a checkpoint across repos would hit a cryptic downstream error. Severity is low because the failure is ultimately surfaced (just at the wrong layer) and the common case is unaffected.
+
+---
+
+### AUDIT-20260621-35 — Test coverage for new `governedSha` code paths not visible in diff
+
+Finding-ID: AUDIT-20260621-35
+Status: migrated-to-backlog TASK-398
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    src/govern/checkpoint-state.ts (validation throw-path, ~line 433); src/govern/phase-checkpoint-status.ts (propagation paths, lines ~93 and ~102)
+
+The diff adds three new code branches that should have corresponding test cases:
+
+1. `validateCheckpointRecord`: the throw path when `governedSha` is present but not a non-empty string (the new `if`-branch at ~line 433).
+2. `resolvePhaseCheckpointStatuses`: the 'missing' path now explicitly sets `governedSha: undefined` (line ~93).
+3. `resolvePhaseCheckpointStatuses`: the record path propagates `record.governedSha` (line ~102), covering both the `undefined` (pre-US5 record) and `string` (US5+ record) cases.
+
+Commit `ce7c1db6` is titled "address phase-6 govern findings (AUDIT-20260621-27..30: record-converged criterion vs field clarity + **test gaps**)" — it explicitly claims to close test gaps. Yet neither a test file for `checkpoint-state` nor for `phase-checkpoint-status` appears in this diff. Per the phase-window instructions, those test additions may live in an earlier commit in the range or in an out-of-window file. This is flagged as informational: confirm that the test suites for these two modules exercise the new `governedSha` paths (valid present, invalid-throws, undefined-from-missing-record, and string-from-US5-record). If they do not, the throw path in `validateCheckpointRecord` is the highest-priority gap — an untested error branch is a common source of silent regressions.
+
+## 2026-06-21 — audit-barrage lift (20260621T021357125Z-029-govern-operability-phase-8)
+
+Code-sha: c3f0eef5a527c7f85e91431abd77d09de8ce15aa
+### AUDIT-20260621-36 — Round-0 self-red-team driver in audit prompt uses executor-perspective phrasing mismatched to the reviewer audience
+
+Finding-ID: AUDIT-20260621-36
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    templates/audit-barrage-prompt.md (diff +44)
+
+The **round-0 self-red-team** driver in the audit prompt reads: *"Before re-firing after a fix, do a self-red-team pass over the fix diff itself."* The phrase "before re-firing" presupposes the reader controls when the barrage re-fires — but the reviewer (the audit model reading this prompt) does not re-fire anything. The reviewer emits findings and exits; the executor re-fires. The verb "re-firing" belongs to the executor's perspective (correctly stated in `skills/execute/SKILL.md`: *"Before re-firing the barrage, do a self-red-team pass over your fix diff itself"* — where the executor is the subject).
+
+Blast-radius: this document is read by AI agents operating as audit reviewers. The phrase "before re-firing" is an imperative directed at a reviewer who has no re-fire action to take. An agent reviewer might (a) interpret "re-firing" as "before I produce findings that would trigger another round" — and correctly apply the spirit of the check, or (b) become confused about what action is being requested. In a spec designed to drive unattended agent behavior, the more natural reading the agent reaches first should be the intended one. Here, the natural reading requires the reviewer to infer a reframe. A clearer phrasing would drop "before re-firing": *"When reviewing a fix, do a self-red-team pass over the fix diff itself: what new edge did this fix open? what did it move rather than remove? Treat the fix as a fresh surface under audit."*
+
+The execute skill version is correctly scoped to the executor and requires no such inference.
+
+---
+
+### AUDIT-20260621-37 — Test file is located under `tests/skills/` but its scope covers both skills and templates surfaces
+
+Finding-ID: AUDIT-20260621-37
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:1–44
+
+The file lives at `tests/skills/process-drivers.test.ts` and is named as though it covers skills. Its first `describe` block is labelled "process drivers in the barrage prompt template" and reads `templates/audit-barrage-prompt.md` — a `templates/` surface, not a `skills/` surface. A developer navigating to `tests/skills/` to find tests for `templates/` would not look there. The `tests/skills/` prefix also means a future `tests/templates/` directory would not include this coverage, silently leaving the template surface less discoverable.
+
+Blast-radius: cosmetic, but test-location drift makes coverage gaps harder to notice. A developer auditing the `templates/` surface for test coverage would scan `tests/templates/` (or root-level tests) and might miss this file. Suggestion: move to `tests/process-drivers.test.ts` (or add a corresponding entry to `tests/templates/`) so the scope matches the path.
+
+---
+
+### AUDIT-20260621-38 — Presence-only test assertions pass if a driver is moved to a non-operative section
+
+Finding-ID: AUDIT-20260621-38 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:28–44
+
+Each test in `process-drivers.test.ts` asserts that a regex matches somewhere in the lowercased full text of the target file. If a driver were relocated to a commented-out block, a deactivated heading, an HTML comment, or a section that renders as a code block (and therefore does not participate in instruction rendering), the test would still pass. For example, if `channel-enumeration` were moved inside a fenced code block in the audit template, the regex `/channel[\s-]enumeration/` would still match — but the instruction would no longer be operative.
+
+Blast-radius: low. The tests are declared as "presence assertions" in their header comment (line 1), so this is a conscious design choice. The risk materializes only if a driver is accidentally moved somewhere non-operative — which is unlikely in practice. Worth noting for completeness: a location-sensitive assertion (e.g., verifying the keyword appears outside a code fence, or under a specific heading) would be a stronger contract, though it would also be more brittle. The current tradeoff is reasonable given the stated purpose.
+
+---
+
+### AUDIT-20260621-39 — `multiline / composition` sub-channel in channel-enumeration driver is underspecified relative to peers
+
+Finding-ID: AUDIT-20260621-39
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    templates/audit-barrage-prompt.md (diff +37); skills/execute/SKILL.md (diff +93)
+
+Both documents list three sub-channels under the **channel-enumeration** driver: **value** ("other inputs now accepted"), **state** ("new reachable states"), and **multiline / composition** ("how it composes with adjacent surfaces"). The first two sub-channels have concrete, unambiguous definitions. The third — "how it composes with adjacent surfaces" — is considerably vaguer. An agent applying this driver would have clear guidance for the value and state channels (specific things to enumerate), but no concrete cue for what "adjacent surfaces" means in the governance context, or what an opened composition channel looks like.
+
+Blast-radius: informational. An agent would likely omit composition-channel checks or interpret them narrowly (e.g., only considering the parser's caller). In practice, the omission is bounded because the other two channels and the self-red-team driver together cover most surface growth. A concrete example (e.g., "what happens when this parser branch is applied to a multiline block, or inside a fence, or inside a list item") would make the third channel as actionable as the first two.
+
+## 2026-06-21 — audit-barrage lift (20260621T021753230Z-029-govern-operability-phase-8)
+
+Code-sha: 11e61c30a429743062230b4052538dd6a9c9ac5a
+### AUDIT-20260621-40 — Test describe label names wrong skill file
+
+Finding-ID: AUDIT-20260621-40
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:39
+
+The second `describe` block (line 39) reads `'US8 FR-029 — process drivers in the implement/govern skill body'`, but the constant it exercises is `EXECUTE`, populated from `skills/execute/SKILL.md`. There is no `skills/implement/SKILL.md` or `skills/govern/SKILL.md` in the plugin. When this block's tests fail — say, because a driver heading is accidentally removed from the execute skill — a maintainer reading the Vitest output will see "implement/govern skill body" and may scan for a non-existent file before discovering the mismatch. The label should read `'… in the execute skill body (skills/execute/SKILL.md)'` to match the actual surface being asserted. Blast-radius: misleading failure messages that slow debugging. Semantically the execute skill IS the implement/govern entry-point in stack-control, so there is no behavioral defect, but the divergence between description and reality is a maintenance smell that compounds as the test suite grows.
+
+---
+
+### AUDIT-20260621-41 — Channel-enumeration driver wording diverges between the two canonical surfaces
+
+Finding-ID: AUDIT-20260621-41
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    skills/execute/SKILL.md (new lines) vs templates/audit-barrage-prompt.md (new lines)
+
+The channel-enumeration driver's parenthetical reads differently in the two files. The template version (`audit-barrage-prompt.md`) writes "a new flag, a new accepted value, a new parser branch, a new fold path" — the article "a new" qualifies each item explicitly. The execute skill version writes "a new flag, accepted value, parser branch, fold path" — "a new" qualifies only "flag", leaving the remaining items without a qualifier. In context the intended meaning is clear, but the execute skill phrasing is technically ambiguous: "accepted value" could be read as modification of an existing accepted value rather than addition of a new one. Both files are canonical sources for the same driver; divergence between them is a maintenance smell. A future editor updating one surface may not update the other, and the slight ambiguity in the skill version may seed a subtly wrong reading in an automated downstream consumer. A one-word fix (add "a new" before each item in the skill version) would align both surfaces.
+
+---
+
+### AUDIT-20260621-42 — Test comment over-promises: driver CONTENT is not verified, only driver HEADING presence
+
+Finding-ID: AUDIT-20260621-42
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    tests/skills/process-drivers.test.ts:1-13, 23-28
+
+The comment block at lines 1–13 describes what each driver is supposed to enforce ("a surface-adding fix enumerates the value / state / multiline / composition channels it opens (with fixtures) before re-firing," etc.). The actual test assertions at lines 23–28 use coarse regex patterns that match only the driver's heading token: `/channel[\s-]enumeration/`, `/invariant[\s-]first/`, etc. A future edit that retained each heading keyword while deleting or replacing the behavioral guidance under it would pass the test suite without surfacing the loss. The test is documented as a "presence assertion" regression guard, which is an honest statement of scope, but the comment's per-driver descriptions create an expectation of content-correctness that the assertions do not fulfill. No behavioral defect today; the risk is that the test is read as a completeness guarantee when it is only an existence check. If the intent is purely presence-guarding, trimming the comment to match ("presence of driver headings") would make the contract honest without requiring fuller assertions.
+
+### AUDIT-20260621-43 — New test uses CommonJS `__dirname` in an ESM package
+
+Finding-ID: AUDIT-20260621-43
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/skills/process-drivers.test.ts:18
+
+The new test computes `PLUGIN_ROOT` with bare `__dirname`, but this package is ESM (`package.json` has `"type": "module"`), and the existing test code that needs this value derives it from `fileURLToPath(import.meta.url)`. In an ESM Vitest run, bare `__dirname` is not defined, so this test file can fail before it ever asserts the FR-029 contract.
+
+Blast radius is high because downstream CI or an unattended agent running the suite will hit a test-runtime failure introduced by this phase, not a mere assertion failure about the intended behavior. A reasonable fix is to mirror the existing repo pattern: import `dirname` and `fileURLToPath`, define `__filename = fileURLToPath(import.meta.url)`, then derive `__dirname = dirname(__filename)` before building `PLUGIN_ROOT`.
+
+## 2026-06-21 — audit-barrage lift (20260621T022238079Z-029-govern-operability-phase-8)
+
+Code-sha: b313ec91eeec25e605ff13fa714181d159c30790
+### AUDIT-20260621-44 — Severity-rubric driver in execute skill references US3 rubric by citation only — text is inaccessible to an unattended executor
+
+Finding-ID: AUDIT-20260621-44
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    skills/execute/SKILL.md (new lines in the "Process drivers" section, `severity-rubric anchoring` bullet)
+
+The `severity-rubric anchoring` driver in the execute skill reads: *"Triage findings by the blast-radius rubric (US3), not by alarm — a quietly-plausible wrong reading an unattended agent would build outranks an obvious contradiction a reader would resolve."*
+
+The reference `(US3)` is a citation to a spec user story, not a link and not inline text. The actual rubric (`blocking / high / medium / low / informational` with blast-radius definitions) lives in the barrage prompt template's **Output format** section — a different file entirely. An executor working inside the govern-fix-refire loop reads the execute skill, triages a list of findings, and is told to apply the blast-radius rubric — but the rubric text is absent from the only document they are following. An unattended agent executing this skill has no path to the rubric text short of separately opening `templates/audit-barrage-prompt.md`.
+
+Blast-radius reasoning: an executor who misapplies severity (treating every finding as `high` because it feels alarming, or deprioritising a `blocking` finding that reads as cosmetic) will misroute the fix effort. The driver exists specifically to prevent that failure mode — its own inaccessibility partly defeats its purpose for the executor audience. The barrage prompt version is correct (it has the rubric inline directly below), but the execute skill version is structurally incomplete for its audience.
+
+Reasonable fix: inline a condensed version of the rubric under the `severity-rubric anchoring` bullet in the execute skill (e.g. a one-line summary table mirroring the prompt's rubric), or cross-link to the precise anchor in `audit-barrage-prompt.md` where the rubric text lives.
+
+---
+
+### AUDIT-20260621-45 — Test describe label names the wrong file — "implement/govern skill body" does not correspond to execute/SKILL.md
+
+Finding-ID: AUDIT-20260621-45
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:43
+
+Line 43: `describe('US8 FR-029 — process drivers in the implement/govern skill body', () => {`
+
+The describe block's label says **"implement/govern skill body"** but the test reads `skills/execute/SKILL.md` (line 21). The execute skill _is_ the implement/govern orchestrator in this plugin, but that mapping is not obvious from the label alone. A developer reading a failure message from this describe block would look for a file named `implement` or `govern` and find neither. The label in the corresponding `it` strings compounds this: *"the execute skill body carries the …"* — naming `execute`, not `implement/govern` — making the mismatch visible at two levels of the same suite.
+
+Blast-radius: no runtime defect; the test passes and fails correctly on the right file. The harm is navigational: a contributor triaging a red test wastes a lookup cycle reconciling the label against the actual file path. Low severity.
+
+Reasonable fix: change the describe label to `'US8 FR-029 — process drivers in skills/execute/SKILL.md'` for unambiguous traceability.
+
+---
+
+### AUDIT-20260621-46 — Presence-only test contract cannot catch audience-framing regression
+
+Finding-ID: AUDIT-20260621-46
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:24-44
+
+The test comment on line 5 explicitly acknowledges this is a "Presence assertion: a future edit that drops a driver fails here." That acknowledgement is correct but incomplete — the contract has a second gap the comment does not name: **both files are asserted with the same regex set**, so a future edit that copies the executor-phrased text verbatim into the barrage prompt (or vice versa) passes the suite even though the audience framing would be wrong.
+
+The barrage prompt's self-red-team driver is phrased for a *reviewer* audience ("When the work under audit is itself a FIX…, audit the fix diff as a fresh surface in its own right") while the execute skill's version is phrased for an *executor* audience ("Before re-firing the barrage, do a self-red-team pass over your fix diff itself"). Commit 11e61c30 was a targeted fix specifically to correct this framing difference. The tests provide no gate against that fix regressing: if the barrage prompt's driver text reverted to the executor phrasing, every test in the suite would still be green.
+
+Blast-radius: the audience-framing distinction matters — an unattended auditor reading executor-framed instructions and an unattended executor reading reviewer-framed instructions could both misapply the driver. The harm is bounded by the fact that the two framings are functionally similar, but the framing precision was specifically the point of the 11e61c30 fix.
+
+Reasonable fix: add a lightweight assertion that the two files differ on the self-red-team driver text — for example, verify that the barrage prompt contains a reviewer-audience anchor phrase (`"when the work under audit is itself a fix"` or similar) that is absent from the execute skill, and vice versa for the executor-audience phrase.
+
+---
+
+### AUDIT-20260621-47 — Channel-enumeration driver lists three channels by name but neither document states the list is exhaustive or extensible
+
+Finding-ID: AUDIT-20260621-47
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    templates/audit-barrage-prompt.md (channel-enumeration bullet); skills/execute/SKILL.md (channel-enumeration bullet)
+
+Both documents enumerate **value**, **state**, and **multiline / composition** as the channels to check when a fix adds to an allowlist or surface. Neither document states whether this is an exhaustive enumeration or an illustrative set. An unattended agent applying the channel-enumeration driver will stop after checking these three — it has no signal that other channels (e.g. a **concurrency** channel for a fix that adds a new async path, or a **error-path** channel for a fix that adds a new branch with a distinct failure mode) should also be considered.
+
+Blast-radius: informational — the three named channels cover the most common fix-induced surface growth patterns, and the text's phrasing ("a new flag, a new accepted value, a new parser branch, a new fold path") implies the list of *examples* is open. But the channel names themselves read as closed. An agent that treats the three as exhaustive will under-check a fix that opens a fourth.
+
+No immediate action required; the finding is surfaced for the operator to decide whether adding "and any other channels the fix opens" is worth the prose burden.
+
+## 2026-06-21 — audit-barrage lift (20260621T022626789Z-029-govern-operability-phase-8)
+
+Code-sha: b313ec91eeec25e605ff13fa714181d159c30790
+### AUDIT-20260621-48 — Barrage prompt section heading scopes all five drivers to fix-reviews only, but three drivers are general quality controls
+
+Finding-ID: AUDIT-20260621-48
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    templates/audit-barrage-prompt.md:35 (section heading)
+
+The section added to `audit-barrage-prompt.md` carries the heading **"apply these when reviewing a fix"**. However, only two of the five drivers are fix-specific: channel-enumeration (#1, which explicitly addresses a surface-adding fix) and round-0 self-red-team (#3, whose body says "when the work under audit is itself a FIX"). The other three — **invariant-first boundary** (#2), **fleet-degradation pricing** (#4), and **severity-rubric anchoring** (#5) — are unconditional audit quality controls that apply to every round regardless of whether the subject is a fix or original work.
+
+The blast-radius reasoning: the prompt explicitly invokes the unattended-agent scenario in its own severity rubric ("a quietly-plausible wrong reading an unattended agent would build outranks an obvious contradiction a reader would resolve"). An agent that reads the section heading as a scope gate and skips all five drivers when reviewing original feature work would (a) mis-rate findings by alarm rather than blast-radius (missing severity-rubric anchoring) and (b) over-claim convergence on degraded fleet runs (missing fleet-degradation pricing). These are exactly the systematic quality failures the drivers exist to prevent, and the heading creates a natural conditional that leads an unattended reader to the wrong path. The corresponding heading in `skills/execute/SKILL.md` is correctly scoped — "apply when fixing a govern finding before re-firing" — making the prompt heading the asymmetric entry.
+
+A fix would restructure the section into a fixed preamble for universal drivers (invariant-first boundary, fleet-degradation pricing, severity-rubric anchoring) and a conditional note for fix-specific ones, or simply change the heading to remove the conditional framing (e.g., "apply these on every audit round; the fix-specific drivers are called out below").
+
+---
+
+### AUDIT-20260621-49 — Test describe label says "implement/govern skill body" but checks `skills/execute/SKILL.md`
+
+Finding-ID: AUDIT-20260621-49
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/skills/process-drivers.test.ts:42-48
+
+The second `describe` block at line 42 is labelled `'US8 FR-029 — process drivers in the implement/govern skill body'` but the file it reads is `skills/execute/SKILL.md` (line 22, bound to the variable `EXECUTE`). The execute skill IS the implement/govern surface in stack-control's vocabulary, so the test exercises the correct file. The blast-radius is cosmetic: a future contributor scanning test output for a failure in "the implement/govern skill body" would need to look up which file that maps to, rather than having the path named directly. The fix is a one-word label change in the `describe` string to name the actual file path (`skills/execute/SKILL.md`) or to rename the binding variable from `EXECUTE` to `EXECUTE_SKILL` and update the label to match, whichever the project's test-labelling convention prefers.
+
+---
+
+### AUDIT-20260621-50 — Process-driver presence tests are purely syntactic — section displacement would pass undetected
+
+Finding-ID: AUDIT-20260621-50
+Status:     open
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    tests/skills/process-drivers.test.ts:28-48
+
+The test suite checks that each driver's keyword regex matches somewhere in the lowercased file content. This is correct for the stated goal (ensuring a future edit that drops a driver fails). However, the assertions do not verify that all five drivers are co-located in a single section, that the section carries an appropriate heading, or that the section appears at the expected position relative to `{{audit_lens}}` in the prompt template. A future edit that moves the drivers into a comment block, a non-rendered section, or disperses them across unrelated headings would still pass every test in this file. This is not a defect in the tests as written — presence assertions for prose content in markdown files are common and appropriate — but it is worth noting as a coverage gap if the "co-located process drivers section" structural invariant is ever considered load-bearing.
+
+## 2026-06-21 — audit-barrage lift (20260621T024529166Z-029-govern-operability-phase-9)
+
+Code-sha: fa70b25f3320e057f61416bcc7f5321459db5796
+### AUDIT-20260621-51 — `--into` clean-success test decomposes an item into itself — likely exits non-zero
+
+Finding-ID: AUDIT-20260621-51
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/roadmap/list-flag-guard.test.ts:73-78
+
+The "clean single id succeeds" loop at lines 73–78 iterates uniformly over all four `LIST_FLAGS`, invoking `argsFor(flag, 'impl:feature/a', docWithItems())` for each. For `'--into'`, `argsFor` builds:
+
+```
+['roadmap', 'decompose', 'impl:feature/a', '--into', 'impl:feature/a', '--doc', docPath, '--apply']
+```
+
+The document created by `docWithItems()` already contains `## impl:feature/a`. Asking `decompose` to decompose `impl:feature/a` into a child also named `impl:feature/a` is self-referential. One of two failure modes is almost certain at the model layer: (a) the `decompose` mutation tries to create a new unit with identifier `impl:feature/a`, which already exists → duplicate-identifier error, non-zero exit; or (b) it adds a `depends-on: impl:feature/a` edge on itself → the acyclicity check (roadmap grammar declares `depends-on` as `acyclic: true`) rejects it, non-zero exit. Either way, `expect(r.status).toBe(0)` fails.
+
+The blast-radius: this is a concrete test-suite failure. Any CI run that exercises this file will report a red test on the `--into` variant of the clean-success case, while the three stray-comma variants (which call `parseListFlag` and exit 2 before the model is ever touched) remain green. The repair is to use a fresh identifier not already in the document — e.g., `'impl:feature/new'` for the `--into` case, or to add a branch to `argsFor` that supplies a non-self child. Reusing `'impl:feature/a'` uniformly works for `--depends-on` (adding a depends-on edge from `impl:feature/new` to an existing item) and `--part-of` (same shape), and happens to work for `--children` (clustering an existing item under a newly-created parent), but `decompose` requires the `--into` ids to be children of the target, not the target itself.
+
+---
+
+### AUDIT-20260621-52 — `rewriteEdgeLine` (type-aware fence) diverges from `scopeOf` (type-agnostic toggle) for mixed-delimiter documents
+
+Finding-ID: AUDIT-20260621-52
+Status: migrated-to-backlog TASK-399
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/roadmap/mutations.ts:52-85 and src/roadmap/roadmap-model.ts (out of window, SCOPE_FENCE block)
+
+The new fence-aware `rewriteEdgeLine` correctly uses type-matched close detection (a backtick fence opened by `` ``` `` is only closed by a subsequent `` ``` `` line; a tilde line inside it is treated as ordinary content and does not toggle state). This is the right CommonMark behavior.
+
+The pre-existing `scopeOf` function in `roadmap-model.ts` (shown in the referenced dependency block) uses a simple toggle:
+
+```typescript
+if (SCOPE_FENCE.test(line)) {
+  inFence = !inFence;  // toggles on ANY delimiter line, regardless of type
+  return true;
+}
+```
+
+For a document body containing a tilde line inside an open backtick fence:
+
+```
+```
+~~~           ← scopeOf: toggles inFence → false (wrong)
+content       ← scopeOf: sees this as OUTSIDE the fence, drops it if it's a bullet
+~~~           ← scopeOf: toggles inFence → true (wrong)
+```           ← scopeOf: toggles inFence → false
+```
+
+`rewriteEdgeLine` would (correctly) treat `~~~` as non-closing, keep `content` inside the fence, and close only on the final `` ``` ``. The two functions therefore disagree on which lines are "inside a fence" for any document that mixes fence delimiter types. An operator who writes a roadmap unit with a backtick-fenced block containing a tilde line (a nested language example, for instance) would see `scopeOf` strip field bullets from it as if they were outside a fence, while `rewriteEdgeLine` correctly leaves them alone.
+
+The inconsistency is introduced by this diff (which adds the type-aware logic to `rewriteEdgeLine` without updating `scopeOf` to match). The fix is either: (a) update `scopeOf` to share `fenceDelimiterChar` and the same type-aware state machine, or (b) leave `scopeOf` as-is and document that the two functions intentionally use different fence models. Neither is done here.
+
+---
+
+### AUDIT-20260621-53 — `cluster-no-nonnull.test.ts` regex matches `!` in string literals, not only postfix type assertions
+
+Finding-ID: AUDIT-20260621-53
+Status: migrated-to-backlog TASK-400
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/cluster-no-nonnull.test.ts:20
+
+The pattern used to detect non-null assertions is:
+
+```typescript
+const NON_NULL_ASSERTION = /[\w$)\]]!(?!=)/g;
+```
+
+The comment-stripping filter removes lines whose trimmed form starts with `//` or `*`. Non-comment code lines that contain a string or template literal with `!` after an identifier character (e.g., `'not found!'`, `` `item ${x} done!` ``) would pass through the filter and match the regex, producing a false positive. The test would then fail spuriously.
+
+In the current `cluster.test.ts`, the string literals used in assertions (`'impl:feature/b'`, `'multi:feature/grp'`, `'in-flight'`, `'planned'`) contain no trailing `!` after identifier characters, so the false positive does not trigger today. The risk is that a future test added to `cluster.test.ts` with a description string or expect message like `'item not found!'` silently causes this meta-test to fail, and the diagnosis is non-obvious. The fix is to either (a) scope the regex more narrowly to known non-null assertion contexts (e.g., only at end of an expression token before `.` or `;`), or (b) document the known limitation and note that the test is a heuristic guard, not a parse-accurate check.
+
+### AUDIT-20260621-54 — Four-backtick fences can still be corrupted
+
+Finding-ID: AUDIT-20260621-54
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/document-model/chrome.ts:45-48; src/roadmap/mutations.ts:70-76
+
+`fenceDelimiterChar` tracks only the fence character, not the delimiter length. `rewriteEdgeLine` then closes an open fence on any later line that starts with three of the same character. That mishandles a common Markdown composition case: an outer ```` fence used to document an inner ``` fenced example. The inner ``` line will be treated as the close of the outer fence, so a later example line like `- depends-on: impl:feature/old` inside the outer fence becomes “outside” and gets rewritten.
+
+This matters because the stated goal of FR-033 is to prevent silent prose corruption in documented edge examples. A downstream operator with nested Markdown examples in a roadmap item can still have `decompose` / `reclassify` rewrite example text while reporting a successful mutation. A reasonable fix is to have the delimiter helper return both character and run length, then close only on the same character with a run length at least as long as the opener; add a fixture with an outer four-backtick fence containing an inner triple-backtick example and an edge-looking bullet.
+
+## 2026-06-21 — audit-barrage lift (20260621T030027921Z-029-govern-operability-phase-9)
+
+Code-sha: 57d730c31f48d3162b8dda832be0cfaec9ff654b
+### AUDIT-20260621-55 — `fenceDelimiter` does not distinguish opening from closing fences — info-string lines can prematurely close an open fence
+
+Finding-ID: AUDIT-20260621-55 (claude-01 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-401
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    src/document-model/chrome.ts:59-66 and src/roadmap/mutations.ts:63-80 (rewriteEdgeLine)
+
+`fenceDelimiter` returns a non-null result for any line whose trimmed form begins with three or more backticks or tildes, including lines that carry an info string (e.g., ` ```typescript` or ` ```yaml`). Per CommonMark §4.5, a *closing* fence "must be followed optionally by spaces only" — an info string on a potential closing-fence line disqualifies it as a closer. `fenceDelimiter` does not check for trailing non-whitespace, so a line like ` ```typescript` produces `{ char: '`', length: 3 }` regardless of whether it appears in an opening or closing position.
+
+In `rewriteEdgeLine` (`mutations.ts:63-80`), when `openFence` is `{char: '`', length: 3}` and the algorithm encounters ` ```typescript`, the condition `fence.char === openFence.char && fence.length >= openFence.length` (3 ≥ 3) evaluates to `true`, which sets `openFence = null` — incorrectly closing the fence. Any line below that point (still inside the outer fence according to CommonMark) is now treated as real edge content and may be rewritten if it matches the edge regex. The same `fenceDelimiter` call with the same pattern appears in `scopeOf` (`roadmap-model.ts`, referenced dependency), where it causes the analogous early-close: field-bullet lines that are part of a fenced example would be incorrectly stripped from scope prose.
+
+The missing test case that would expose this: a body with an outer ` ``` ` fence (length 3) whose first interior line is ` ```typescript` (also length 3, with info string). The existing test in `rewrite-fence-aware.test.ts` covers the *different-length* inner fence case (4-backtick outer / 3-backtick inner), but not the *same-length-with-info-string* case. A reasonable fix is to resolve the ambiguity at the call site — when `openFence !== null`, additionally verify the remainder of the trimmed line after the fence run is empty or only spaces before treating it as a closer (i.e., `line.trimStart().slice(fence.length).trim().length === 0`). Alternatively, `fenceDelimiter` could expose `hasInfoString` and callers check it before accepting a close.
+
+---
+
+### AUDIT-20260621-56 — `cluster-no-nonnull.test.ts` comment-stripping does not cover `/* */` block comments
+
+Finding-ID: AUDIT-20260621-56
+Status: migrated-to-backlog TASK-402
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/cluster-no-nonnull.test.ts:28-33
+
+The stripping pass before the non-null assertion scan filters lines whose trimmed form starts with `//` or `*`, which covers `//` line comments and interior lines of `/** ... */` JSDoc blocks (the ` * ` lines). It does not cover a `/* ... */` block comment on a single line, e.g. `/* fallback x! */`. After `.filter(line => !line.trimStart().startsWith('//') && !line.trimStart().startsWith('*'))`, such a line survives into the code-only string. If `cluster.test.ts` ever acquires a single-line block comment containing `!` (e.g., as part of an error-message description or a test label), the scan would report a false positive and the CI gate would fail spuriously. In the current codebase `cluster.test.ts` uses only `//` comments, making this a dormant risk rather than an active defect. Extending the filter to also reject lines whose trimmed form starts with `/*` (or stripping `/* ... */` spans as part of the replace chain) would harden the meta-test against future comment style drift.
+
+## 2026-06-21 — audit-barrage lift (20260621T030759551Z-029-govern-operability-phase-9)
+
+Code-sha: 57d730c31f48d3162b8dda832be0cfaec9ff654b
+### AUDIT-20260621-57 — `!` non-null assertions introduced in production source while the phase simultaneously codifies the no-`!` rule
+
+Finding-ID: AUDIT-20260621-57
+Status: migrated-to-backlog TASK-403
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    src/document-model/chrome.ts:57–58 (added lines in diff)
+
+The newly-added `fenceDelimiter` function contains two non-null assertion operators (`!`) in production source code:
+
+```typescript
+if (backticks !== null) return { char: '`', length: backticks[1]!.length };
+...
+if (tildes !== null) return { char: '~', length: tildes[1]!.length };
+```
+
+These are semantically safe: both regex patterns have a capturing group that is always populated when the overall match succeeds, so `[1]` will never be `undefined` at runtime. The correctness risk is low. The blast-radius concern is different: the same phase that introduces these `!` expressions also ships `cluster-no-nonnull.test.ts`, whose inline comment explicitly cites the project's prohibition — "The project bans `!` (no non-null assertions — .claude/CLAUDE.md 'Never bypass typing')". An unattended agent reading `chrome.ts` sees `!` in production code that was committed this phase; it sees a guard in `cluster-no-nonnull.test.ts` scoped only to `cluster.test.ts`. The agent's natural inference is: "`!` is allowed in source files, disallowed only in that one test file." That reading will propagate the pattern. Pre-existing `!` in `roadmap-model.ts` (`targets[0]!`, `m[2]!`) compounds the signal.
+
+The appropriate fix is to eliminate the capturing group and restructure the match: capture the full leading-fence string separately, derive its length from the string itself rather than an index into the match array.
+
+---
+
+### AUDIT-20260621-58 — `cluster-no-nonnull.test.ts` guard does not strip regex literals; regex-internal `!` would be a false positive
+
+Finding-ID: AUDIT-20260621-58
+Status: migrated-to-backlog TASK-404
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    tests/roadmap/cluster-no-nonnull.test.ts:23–34
+
+The file-scan logic strips single-quoted strings, double-quoted strings, and template literals, then applies the `NON_NULL_ASSERTION` regex `/[\w$)\]]!(?!=)/g`. It does not strip regex literals (e.g., `/pattern!/`). If `cluster.test.ts` ever contains a regex literal whose body contains `!` following a word character, the test would report a false positive. More subtly, the multi-line join-then-replace approach means that a regex literal which spans multiple lines (rare but possible with the `x` flag or by having the closing `/` on a later line) would not be cleanly erased; and any line inside a multi-line template literal that happens to start with `//` or `*` would be filtered out before the template-literal erasure regex runs, potentially breaking the template literal match and leaving raw literal content (including any `!`) in `codeOnly`.
+
+In the current state of `cluster.test.ts` none of these conditions apply, so the test functions correctly. The risk manifests only if the test file evolves. The appropriate fix is to add regex-literal stripping (e.g., `/regex-literal pattern/flags`) to the erasure chain, or to use a TypeScript AST-level scan (ts-morph / TypeScript compiler API) rather than regex-on-text — the latter being more robust but heavier.
+
+---
+
+### AUDIT-20260621-59 — `session-end/SKILL.md` hardcodes `audiocontrol-org/deskwork` as the upstream GH repo; no configuration hook for external adopters
+
+Finding-ID: AUDIT-20260621-59
+Status: migrated-to-backlog TASK-405
+Severity:   informational
+Per-lane:   claude=informational
+Decision:   single-model (gate-counted informational)
+Surface:    skills/session-end/SKILL.md (added lines, approx. lines 65–75 in post-diff view)
+
+The new tooling-friction routing guidance says:
+
+> file a GitHub issue against [`audiocontrol-org/deskwork`](https://github.com/audiocontrol-org/deskwork/issues) (`gh issue create --repo audiocontrol-org/deskwork`)
+
+For the current deployment this is accurate — `stackctl` and the stack-control plugin are maintained in that repository. However, if stack-control is published as a standalone distributable and adopted by an organization whose `stackctl` friction should route to a different tracker, the hardcoded repo becomes wrong. The skill offers no interpolation hook (e.g., a `stackctl_upstream_repo` config key). Adopters following this guidance verbatim would file issues against the wrong repository. Whether this matters depends on the project's distributable-plugin roadmap; it is surfaced here as an artifact worth tracking, not as a current correctness defect.
+
+---
+
+### AUDIT-20260621-60 — `fenceDelimiter` uses `trimStart()` (unlimited indentation) rather than CommonMark's 0–3 space limit; acknowledged simplification but opens a latent divergence
+
+Finding-ID: AUDIT-20260621-60 (claude-04 + codex-01; cross-model)
+Status: migrated-to-backlog TASK-406
+Severity:   medium
+Per-lane:   claude=informational, codex=medium
+Decision:   adjudicated (gate-counted medium) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — medium retained.
+Surface:    src/document-model/chrome.ts (fenceDelimiter body, added lines)
+
+CommonMark §4.5 specifies that a fenced code block's opening delimiter may be indented by at most 3 spaces before the backtick/tilde run. `fenceDelimiter` calls `line.trimStart()`, which strips any amount of leading whitespace before checking for the run. This means a line indented by 4+ spaces that happens to start with ```` ``` ```` will be identified as a fence delimiter, even though CommonMark would not treat it as one. The inverse — a line indented by 1–3 spaces — is correctly handled. The original comment ("We keep this deliberately simple") acknowledges this class of simplification. The concern here is a channel-enumeration note: the `fenceDelimiter` function is now exported and used in two places (`mutations.ts`, `roadmap-model.ts`). If either of those call sites ever needs to handle deeply-indented content (e.g., items nested inside blockquotes or list items, which roadmap bodies can contain), the unlimited-trim will silently produce wrong fence detection. Since the scope is intentionally narrow (edge-mutation documents with field bullets), this is informational rather than actionable.

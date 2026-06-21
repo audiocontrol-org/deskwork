@@ -86,6 +86,16 @@ stackctl check-front-door
 
    If a per-phase govern failed (e.g. the model fleet floor was not met), surface the descriptive error — governance is **not** optional, and a missing capability fails loud. Do not lower `--require-models` or `--override` to "keep moving" (that is the prohibited offroad).
 
+## Process drivers (029 US8 / FR-029 — apply when fixing a govern finding before re-firing)
+
+These codify the structural drivers of myopic convergence (TASK-60), so the loop converges in fewer rounds with less fix-induced surface growth. When you fix a finding and re-govern, apply all five:
+
+- **Channel-enumeration.** A fix that ADDS to an allowlist/surface (a new flag, accepted value, parser branch, fold path) is not done on the one example it fixes — enumerate the channels it opens: **value** (other inputs now accepted), **state** (new reachable states), **multiline / composition** (how it composes with adjacent surfaces) — and add a fixture per opened channel before re-firing.
+- **Invariant-first boundary.** When you disposition a finding as a scope boundary, state the **mechanism's invariant + an in-scope exception**, never the exclusion of the counterexample ("we exclude X" is the smell; "the invariant is I, X is the in-scope exception because…" is the disposition).
+- **Round-0 self-red-team.** Before re-firing the barrage, do a **self-red-team pass over your fix diff itself**: what new edge did it open? what did it move rather than remove? Treat your fix as a fresh surface under audit.
+- **Fleet-degradation pricing.** Price a "0 HIGH" round by the fleet that produced it. A **degraded** fleet (a timed-out / killed / zero-byte lane — US2 observability) makes cross-model agreement weaker; do not treat a degraded-fleet quiet round as full convergence.
+- **Severity-rubric anchoring.** Triage findings by the blast-radius rubric (US3), not by alarm — a quietly-plausible wrong reading an unattended agent would build outranks an obvious contradiction a reader would resolve.
+
 ## Commit and push (025 US3 — mechanical, at each phase boundary)
 
 After each phase's govern (step 3.3), the boundary runs — in order, non-discretionary:

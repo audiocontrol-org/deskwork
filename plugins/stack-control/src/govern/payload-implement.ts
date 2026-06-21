@@ -65,6 +65,17 @@ export const CODE_AUDIT_LENS = [
 export const CODE_ARTIFACT_FRAMING =
   'The actual code under review. Read it carefully. The findings you emit must be anchored to specific files + line ranges in this diff (or call out a missing surface that should be in the diff but isn\'t).';
 
+/**
+ * Per-phase implement framing (029 US5/FR-021). Used ONLY on the per-phase audit path
+ * (a path scope is set + out-of-window deps are folded). The whole-feature
+ * (`after_implement`) path keeps the generic CODE_ARTIFACT_FRAMING — asserting
+ * "this is a PER-PHASE diff" or "out-of-window deps are folded below" would be FALSE
+ * there and could suppress a real missing-implementation HIGH (AUDIT-20260621-06).
+ */
+export const CODE_ARTIFACT_FRAMING_PER_PHASE =
+  `${CODE_ARTIFACT_FRAMING} ` +
+  'NOTE — out-of-window / unshown scope (029 US5/FR-021): this is a PER-PHASE diff that shows only the files this phase CHANGED. A file the diff REFERENCES but whose full content is NOT shown here — whether it is OUT OF THIS PHASE\'S WINDOW (an earlier phase or pre-existing) OR in this phase\'s scope but UNCHANGED this round — is NOT missing. Do NOT raise a finding that such a referenced file is absent / not-imported / missing merely because its definition is not in this diff; assume it exists and is correct unless the diff itself shows a genuinely-missing implementation. Referenced out-of-window deps that ARE present in the repo are folded in below under a "referenced dependency (out of phase window)" header for context — but this fold is BEST-EFFORT: the absence of a fold block is NOT evidence the file is missing. Review any folded dep as evidence the reference resolves, not as in-scope work to critique.';
+
 export interface ImplementPayloadArgs {
   /**
    * The verb-entry-resolved installation root (specs/installation-isolation
@@ -378,6 +389,28 @@ export function assembleImplementPayload(
     }
   }
 
+  // specs/029 US5 (FR-021/022): in PER-PHASE mode (a path scope is set), widen the
+  // payload to the referenced-but-OUT-OF-WINDOW deps that ARE present — folded in as
+  // labeled read-only context so the auditor sees a referenced file exists and stops
+  // raising the false "absent/not-imported" HIGH (TASK-316). A genuinely-missing
+  // target resolves to nothing and is NOT fabricated, so a real missing-impl finding
+  // still surfaces (FR-022). Bounded by the SAME soft byte budget as the untracked
+  // fold; binary/empty skipped; every inclusion/skip warned (no silent change).
+  if (hasPathScope) {
+    const oow = foldReferencedOutOfWindowDeps({
+      installationRoot,
+      diff,
+      pathScope: args.pathScope!,
+      budgetBytes: budget,
+      foldedBytes,
+      warn,
+    });
+    if (oow.appended.length > 0) {
+      diff = `${diff}\n${oow.appended}`;
+    }
+    foldedBytes = oow.foldedBytes;
+  }
+
   // specs/installation-isolation R3/R4: when the resolved feature root
   // lies outside the installation subtree (transitional layout), fold it
   // in as an explicit, LABELED second diff arm anchored at the derived
@@ -438,6 +471,148 @@ export function assembleImplementPayload(
     skippedOutOfScope,
     skippedOtherFeature,
   };
+}
+
+/**
+ * Relative import/require specifiers in a TS/JS source line (029 US5/FR-021): the
+ * path inside `from '…'`, `import('…')`, `require('…')`, or a bare `import '…'`.
+ * Only RELATIVE specifiers (`./`, `../`) are captured — a bare package specifier is
+ * never an in-repo out-of-window dep.
+ */
+const RELATIVE_IMPORT_RE =
+  /(?:\bfrom\s*|\brequire\s*\(\s*|\bimport\s*\(\s*|\bimport\s+)['"](\.[^'"]+)['"]/g;
+
+/** Source extensions tried when a specifier omits its extension or `.js`-maps to a source. */
+const SOURCE_EXT_CANDIDATES = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
+
+/** POSIX-normalize `p`, collapsing `.`/`..`; return undefined if it escapes the root. */
+function normalizePosixWithinRoot(p: string): string | undefined {
+  const parts: string[] = [];
+  for (const seg of p.split('/')) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') {
+      if (parts.length === 0) return undefined;
+      parts.pop();
+      continue;
+    }
+    parts.push(seg);
+  }
+  return parts.length === 0 ? undefined : parts.join('/');
+}
+
+/**
+ * Resolve a relative import `specifier` (from `importerRel`) to the repo-relative
+ * path of the EXISTING source file it names, or undefined when nothing resolves (a
+ * genuinely-missing target — never fabricated, FR-022). A `.js`/`.jsx`/`.mjs`/`.cjs`
+ * specifier in a TS project maps to its `.ts`/`.tsx`/`.mts`/`.cts` source; an
+ * extensionless or directory specifier tries the source extensions + `/index.*`.
+ */
+function resolveRelativeSpecifier(
+  installationRoot: string,
+  importerRel: string,
+  specifier: string,
+): string | undefined {
+  const importerDir = importerRel.includes('/') ? importerRel.replace(/\/[^/]*$/, '') : '';
+  const joined = normalizePosixWithinRoot(
+    importerDir.length > 0 ? `${importerDir}/${specifier}` : specifier,
+  );
+  if (joined === undefined) return undefined;
+  const candidates: string[] = [joined];
+  const tsMapped = joined
+    .replace(/\.js$/, '.ts')
+    .replace(/\.jsx$/, '.tsx')
+    .replace(/\.mjs$/, '.mts')
+    .replace(/\.cjs$/, '.cts');
+  if (tsMapped !== joined) candidates.push(tsMapped);
+  for (const ext of SOURCE_EXT_CANDIDATES) {
+    candidates.push(`${joined}${ext}`);
+    candidates.push(`${joined}/index${ext}`);
+  }
+  for (const cand of candidates) {
+    try {
+      if (statSync(join(installationRoot, cand)).isFile()) return cand;
+    } catch {
+      // not present — try the next candidate
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Fold the referenced-but-OUT-OF-WINDOW present deps of a per-phase diff into the
+ * payload as labeled read-only context (029 US5/FR-021/022). Scans the diff's
+ * added/context lines for relative imports, resolves each to an existing source
+ * file, and folds in the ones that are NEITHER already in the diff NOR in the
+ * phase's path scope (in-window). A genuinely-missing target resolves to nothing
+ * and is never fabricated (FR-022). Bounded by the shared soft byte budget;
+ * binary/empty skipped; every inclusion/skip is warned (no silent change).
+ */
+function foldReferencedOutOfWindowDeps(args: {
+  readonly installationRoot: string;
+  readonly diff: string;
+  readonly pathScope: readonly string[];
+  readonly budgetBytes: number;
+  readonly foldedBytes: number;
+  readonly warn: (message: string) => void;
+}): { readonly appended: string; readonly foldedBytes: number } {
+  const { installationRoot, diff, pathScope, budgetBytes, warn } = args;
+  let foldedBytes = args.foldedBytes;
+  const inDiff = new Set<string>();
+  for (const m of diff.matchAll(/^\+\+\+ b\/(.+)$/gm)) inDiff.add(m[1]!.trim());
+  const resolved = new Set<string>();
+  let currentImporter: string | undefined;
+  for (const line of diff.split('\n')) {
+    const hdr = /^\+\+\+ b\/(.+)$/.exec(line);
+    if (hdr !== null) {
+      currentImporter = hdr[1]!.trim();
+      continue;
+    }
+    if (currentImporter === undefined) continue;
+    // Removed lines are gone from the post-image — only added/context lines carry
+    // the phase's current source references.
+    if (line.startsWith('-')) continue;
+    for (const m of line.matchAll(RELATIVE_IMPORT_RE)) {
+      const dep = resolveRelativeSpecifier(installationRoot, currentImporter, m[1]!);
+      if (dep === undefined) continue;
+      if (inDiff.has(dep)) continue; // already in the payload
+      if (inPathScope(dep, pathScope)) continue; // in-window (this phase's own scope)
+      resolved.add(dep);
+    }
+  }
+  if (resolved.size === 0) return { appended: '', foldedBytes };
+  const blocks: string[] = [];
+  for (const dep of Array.from(resolved).sort()) {
+    const abs = join(installationRoot, dep);
+    if (isBinaryOrEmpty(abs)) {
+      warn(`govern: skipping out-of-window dep ${dep} (binary/empty; not folded).`);
+      continue;
+    }
+    const sz = fileSize(abs);
+    if (foldedBytes + sz > budgetBytes) {
+      warn(
+        `govern: out-of-window dep ${dep} (${sz} bytes) would exceed the fold budget ` +
+          `(${budgetBytes} bytes); skipping it but continuing with smaller deps (not silently).`,
+      );
+      continue;
+    }
+    let content: string;
+    try {
+      content = readFileSync(abs, 'utf8');
+    } catch (err) {
+      // AUDIT-20260621-05/10: a resolved dep that then fails to read (TOCTOU race,
+      // permission revoked) must NOT be dropped silently — the "every inclusion/skip
+      // warned" contract lets an operator diagnosing a false HIGH see it was dropped.
+      warn(
+        `govern: skipping out-of-window dep ${dep} — resolved but unreadable ` +
+          `(${err instanceof Error ? err.message : String(err)}); not folded.`,
+      );
+      continue;
+    }
+    warn(`govern: folding referenced out-of-window dep ${dep} as read-only context (FR-021).`);
+    blocks.push(`### referenced dependency (out of phase window): ${dep} ###\n${content}`);
+    foldedBytes += sz;
+  }
+  return { appended: blocks.join('\n'), foldedBytes };
 }
 
 /**

@@ -4,10 +4,10 @@ title: >-
   stack-control: audit-barrage convergence loops are myopic — 20 rounds where
   ~6-10 were structurally necessary (fix-induced surface growth, boundary
   patching, serial single-fleet discovery)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-12 06:26'
-updated_date: '2026-06-14 01:54'
+updated_date: '2026-06-21 02:30'
 labels:
   - 'type:imported-issue'
   - promoted

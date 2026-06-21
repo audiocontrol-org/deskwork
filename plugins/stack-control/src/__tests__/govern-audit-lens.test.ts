@@ -26,6 +26,7 @@ import { renderAuditBarragePrompt } from '../scope-discovery/audit-barrage/promp
 import {
   CODE_AUDIT_LENS,
   CODE_ARTIFACT_FRAMING,
+  CODE_ARTIFACT_FRAMING_PER_PHASE,
 } from '../govern/payload-implement.js';
 import {
   SPEC_AUDIT_LENS,
@@ -141,5 +142,15 @@ describe('implement-mode audit lens (regression — unchanged behavior)', () => 
 
   it('CODE_AUDIT_LENS DOES carry "Operator interrupt mid-operation" (code lens unchanged)', () => {
     expect(CODE_AUDIT_LENS).toContain('Operator interrupt mid-operation');
+  });
+
+  it('per-phase implement (pathScope set) uses CODE_ARTIFACT_FRAMING_PER_PHASE (029 US5/FR-021, AUDIT-20260621-06)', () => {
+    const repo = tmpRepo();
+    try {
+      const built = buildImplementVars(repo, 'demo', 'HEAD', undefined, ['src/feature.ts']);
+      expect(built.vars.artifact_framing).toBe(CODE_ARTIFACT_FRAMING_PER_PHASE);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });

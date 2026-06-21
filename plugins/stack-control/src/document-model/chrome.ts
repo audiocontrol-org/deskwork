@@ -42,10 +42,25 @@ export function detectFrontmatter(lines: readonly string[]): LineRange | null {
  * null. We keep this deliberately simple: a fence delimiter sits alone on its
  * line (modulo an info-string) — the common case the grammar-example docs use.
  */
-function fenceDelimiterChar(line: string): '`' | '~' | null {
+export function fenceDelimiterChar(line: string): '`' | '~' | null {
+  return fenceDelimiter(line)?.char ?? null;
+}
+
+/**
+ * A fenced-code-block delimiter's character AND run length (027 FR-033 / AUDIT-20260621-54).
+ * CommonMark: a closing fence must use the SAME character with a run length AT LEAST as
+ * long as the opener — so an inner ``` example nested inside an outer ```` fence does NOT
+ * close the outer fence. Callers tracking fence state must compare both fields, not just
+ * the character, or a four-backtick outer fence is silently corrupted.
+ */
+export function fenceDelimiter(
+  line: string,
+): { readonly char: '`' | '~'; readonly length: number } | null {
   const t = line.trimStart();
-  if (t.startsWith('```')) return '`';
-  if (t.startsWith('~~~')) return '~';
+  const backticks = /^(`{3,})/.exec(t);
+  if (backticks !== null) return { char: '`', length: backticks[1]!.length };
+  const tildes = /^(~{3,})/.exec(t);
+  if (tildes !== null) return { char: '~', length: tildes[1]!.length };
   return null;
 }
 

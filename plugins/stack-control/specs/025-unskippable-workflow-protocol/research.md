@@ -24,6 +24,25 @@ discretion. Each decision below is grounded in an in-tree primitive.
 - **Open implementation detail (→ data-model/contracts)**: the new criterion kind
   (`all-phase-checkpoints-current`) and how the composed-record reader keys phases off
   `tasks.md` headers. Staleness reuses 021 fingerprints unchanged.
+- **AMENDMENT (029 US6, FR-023/024/025 — operator decision 2026-06-19)**: alternative
+  (a) *augment* was rejected here as a *requirement* (per-phase AND whole-feature), and
+  that rejection stands — per-phase remains the **default and is never mandatory-AND'd
+  with** a whole-feature run. What 029 US6 **re-admits** is the whole-feature record as
+  an **EITHER-OF opt-in escape**, not an augment: the graduate gate is now
+  `graduate-impl impl` = `all-phase-checkpoints-current` **OR** a converged whole-feature
+  `record-converged impl`. The default path is unchanged (per-phase, composed); a
+  shared-file feature for which per-phase is O(n²)-painful may opt into a single
+  whole-feature govern and graduate on its record instead. **Precision (AUDIT-20260621-28):**
+  the OR branch in `gate-eval.ts` is the **`ctx.implRecordConverged` GateContext field**
+  (true iff a converged whole-feature convergence record exists — `isModeConverged('impl')`),
+  NOT the `record-converged impl` *criterion* composed from per-phase checkpoints. Implementing
+  `graduate-impl` as `all-phase-checkpoints-current OR record-converged impl`-the-criterion
+  would be vacuous (the composed criterion is only true when the per-phase branch already is).
+  The whole-feature escape is load-bearing precisely because it reads the standalone record field.
+  This does **not** reintroduce
+  the oversized-run-by-default this feature killed (the whole-feature run is opt-in, and
+  029 US5/US7 right-size + hunk-scope the payload). See `specs/029-govern-operability`
+  (US6) for the either-of gate and `gate-eval.ts` `graduate-impl`.
 
 ## Decision 2 — Phase set derives from `tasks.md` headers; fail loud on missing file lists (US1, FR-004)
 

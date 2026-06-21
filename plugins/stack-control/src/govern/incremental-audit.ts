@@ -127,6 +127,77 @@ export function resolvePhaseUnit(args: ResolvePhaseUnitArgs): AuditUnit {
   };
 }
 
+export interface ResolvePrePhaseDiffBaseArgs {
+  /** The phase whose diff-base is being resolved. */
+  readonly phaseId: string;
+  /** Every phase id in tasks.md order (parsePhases order). */
+  readonly orderedPhaseIds: readonly string[];
+  /** governedSha by phase id (undefined for a phase with no recorded sha). */
+  readonly governedShaByPhase: ReadonlyMap<string, string | undefined>;
+  /**
+   * An operator-supplied anchor (`--diff-base` / `GOVERN_DIFF_BASE`). When set it
+   * WINS over the auto-resolved prior governedSha — operator intent beats inference,
+   * and it is the escape hatch when a prior phase's governedSha is unreliable (e.g.
+   * an override write at an unrelated HEAD).
+   */
+  readonly explicitBase?: string;
+  /**
+   * Verifies a candidate governedSha still resolves to a git object (AUDIT-20260621-08).
+   * When provided and the SELECTED prior governedSha does NOT resolve (branch rebased /
+   * history pruned / corrupt checkpoint), the resolver FAILS LOUD rather than handing a
+   * stale ref to a git diff that would degrade to an empty payload (silent under-scope).
+   * Omitted → no verification (pure callers / tests that don't need it).
+   */
+  readonly isResolvable?: (ref: string) => boolean;
+  /** Used when neither an explicit base nor a prior governedSha resolves (phase 1 /
+   * pre-US5 checkpoints). */
+  readonly fallbackBase: string;
+}
+
+/**
+ * FR-020: resolve a phase's diff-base to the PRE-PHASE commit so the per-phase
+ * payload audits the UNION of the phase's changed files across ALL its commits —
+ * not just the `HEAD~1` delta (the under-scope that produced the TASK-263 "the
+ * diff omits the fix" false HIGH when a phase's impl and test landed in separate
+ * commits).
+ *
+ * The pre-phase commit is the governed HEAD of the LATEST prior phase (in tasks.md
+ * order) that recorded one: each phase boundary commits + governs before the next
+ * phase's work starts, so that prior phase's `governedSha` is exactly the tree
+ * state at which THIS phase's work began. A prior phase with no recorded sha (a
+ * pre-US5 legacy checkpoint, or one never governed) is skipped; when none qualifies
+ * (phase 1, or every prior checkpoint is legacy) it falls back to `fallbackBase`
+ * (the explicit `--diff-base`/`GOVERN_DIFF_BASE`/`HEAD~1`).
+ */
+export function resolvePrePhaseDiffBase(args: ResolvePrePhaseDiffBaseArgs): string {
+  if (args.explicitBase !== undefined && args.explicitBase.length > 0) return args.explicitBase;
+  const idx = args.orderedPhaseIds.indexOf(args.phaseId);
+  if (idx === -1) {
+    // A mis-typed/stale phaseId must NOT silently fall back to HEAD~1 — that
+    // reintroduces the TASK-263 under-scope this feature fixes (AUDIT-20260621-07).
+    throw new Error(
+      `resolvePrePhaseDiffBase: phase '${args.phaseId}' is not in the tasks.md phase ` +
+        `order (${args.orderedPhaseIds.join(', ') || 'none'}); cannot resolve a pre-phase diff-base.`,
+    );
+  }
+  for (let i = idx - 1; i >= 0; i -= 1) {
+    const sha = args.governedShaByPhase.get(args.orderedPhaseIds[i]!);
+    if (sha === undefined || sha.length === 0) continue;
+    // AUDIT-20260621-08: a present-but-unresolvable anchor is a corruption signal —
+    // fail loud (do NOT skip to an older base, which would under-scope, nor fall back
+    // silently to HEAD~1). The operator recovers with an explicit --diff-base.
+    if (args.isResolvable !== undefined && !args.isResolvable(sha)) {
+      throw new Error(
+        `resolvePrePhaseDiffBase: phase '${args.orderedPhaseIds[i]}' recorded governedSha ` +
+          `'${sha}' which no longer resolves to a git object (branch rebased / history ` +
+          `pruned / corrupt checkpoint). Pass an explicit --diff-base to recover.`,
+      );
+    }
+    return sha;
+  }
+  return args.fallbackBase;
+}
+
 // NOTE: the whole-feature `after_implement` unit is composed EXCLUSION-side by the
 // govern command itself (specs/021 US1 true-composition): it carries converged +
 // unchanged phases by adding their files to the payload `excludePaths`, so the

@@ -3,9 +3,10 @@ id: TASK-293
 title: >-
   decompose rewriteEdgeLine is not fence-aware — can rewrite a fenced edge
   example
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 04:26'
+updated_date: '2026-06-21 03:14'
 labels:
   - agent-found
   - 'type:bug'

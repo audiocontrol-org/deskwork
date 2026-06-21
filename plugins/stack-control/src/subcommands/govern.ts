@@ -53,6 +53,7 @@ import {
   assembleImplementPayload,
   CODE_AUDIT_LENS,
   CODE_ARTIFACT_FRAMING,
+  CODE_ARTIFACT_FRAMING_PER_PHASE,
 } from '../govern/payload-implement.js';
 import {
   assembleSpecPayload,
@@ -65,6 +66,7 @@ import { runConvergenceLoop } from '../govern/convergence-loop.js';
 import {
   carriedFilesForComposition,
   resolvePhaseUnit,
+  resolvePrePhaseDiffBase,
 } from '../govern/incremental-audit.js';
 import {
   featureCheckpointKey,
@@ -358,7 +360,14 @@ export function buildImplementVars(
     audit_log_excerpt: '',
     commit_subjects: payload.commitSubjects,
     audit_lens: CODE_AUDIT_LENS,
-    artifact_framing: CODE_ARTIFACT_FRAMING,
+    // 029 US5/FR-021 (AUDIT-20260621-06): the per-phase out-of-window framing applies
+    // ONLY when a path scope is set (a per-phase unit where out-of-window deps are
+    // folded). A whole-feature audit keeps the generic framing — the per-phase note
+    // would be false there and could suppress a real missing-impl HIGH.
+    artifact_framing:
+      pathScope !== undefined && pathScope.length > 0
+        ? CODE_ARTIFACT_FRAMING_PER_PHASE
+        : CODE_ARTIFACT_FRAMING,
   };
   const checkpoint =
     checkpointFlag ?? pick(undefined, process.env.GOVERN_CHECKPOINT) ?? 'after_clarify';
@@ -411,12 +420,19 @@ function resolveGovernExcludePaths(installation: Installation): readonly string[
  * follows already ran git successfully, so a failure here is a real anomaly, not a
  * fallback case).
  */
-function resolveAuditedFiles(
+export function resolveAuditedFiles(
   repoRoot: string,
   base: string,
   declaredScope: readonly string[],
 ): readonly string[] {
-  const r = spawnSync('git', ['-C', repoRoot, 'diff', '--name-only', base, '--', ...declaredScope], {
+  // `--relative` (TASK-357): emit paths relative to the installation cwd, NOT the git
+  // toplevel. In a monorepo (git-root != installation-root) the un-relative output was
+  // git-root-prefixed (e.g. `plugins/stack-control/src/...`), which (a) made
+  // computePhaseHunkBlocks' `git diff -- <file>` (cwd=installationRoot) match nothing →
+  // empty hunkBlocks → US7 hunk-freshness never engaged → whole-file fallback re-staled
+  // shared-file phases (the entanglement loop), and (b) misaligned with the
+  // installation-relative declaredFiles the composition carry-logic compares against.
+  const r = spawnSync('git', ['-C', repoRoot, 'diff', '--name-only', '--relative', base, '--', ...declaredScope], {
     encoding: 'utf8',
   });
   if (r.status !== 0 || typeof r.stdout !== 'string') {
@@ -429,6 +445,35 @@ function resolveAuditedFiles(
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
+}
+
+/**
+ * The current git HEAD sha at `repoRoot`, recorded on the phase checkpoint so a
+ * LATER phase can resolve its diff-base to THIS phase's governed commit (029 US5,
+ * FR-020). Returns undefined when git is unavailable / HEAD is unresolvable
+ * (detached pre-first-commit, no git) — the checkpoint is then written WITHOUT a
+ * governedSha and the next phase's resolver falls back to --diff-base/HEAD~1
+ * (graceful, mirroring computePhaseHunkBlocks).
+ */
+function currentHeadSha(repoRoot: string): string | undefined {
+  const r = spawnSync('git', ['-C', repoRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
+  if (r.status !== 0 || typeof r.stdout !== 'string') return undefined;
+  const sha = r.stdout.trim();
+  return sha.length > 0 ? sha : undefined;
+}
+
+/**
+ * True when `ref` resolves to a commit in `repoRoot` (029 US5/FR-020, AUDIT-20260621-08).
+ * Used to verify a recorded prior-phase governedSha still exists before it becomes a
+ * diff-base — a rebased/pruned/corrupt anchor must fail loud, not silently under-scope.
+ */
+function gitRefResolves(repoRoot: string, ref: string): boolean {
+  const r = spawnSync(
+    'git',
+    ['-C', repoRoot, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`],
+    { encoding: 'utf8' },
+  );
+  return r.status === 0;
 }
 
 /**
@@ -450,11 +495,21 @@ function writeResolvedPhaseCheckpoint(args: {
   readonly phaseStatus: PhaseCheckpointStatus;
   readonly phaseCheckpointKey: string | undefined;
   readonly slug: string;
+  /**
+   * The `governedSha` to record (029 US5/FR-020 pre-phase anchor for a LATER phase).
+   * The CALLER decides — no boolean control-coupling (AUDIT-20260621-03):
+   *   - normal graduation passes the current HEAD (the phase's real committed tip);
+   *   - the `--override` path passes the EXISTING checkpoint's sha (preserve it —
+   *     an override at an unrelated HEAD must neither poison NOR clear a valid anchor;
+   *     AUDIT-20260621-11/02).
+   * `undefined` writes no `governedSha` field.
+   */
+  readonly governedSha: string | undefined;
 }): void {
   // AUDIT-20260620-124 (task-360): both call sites (now via
   // writePhaseCheckpointAfterRecordOrFatal) ignore the written path — return void
   // rather than declaring a `string` no caller consumes.
-  const { repoRoot, phaseUnit, phaseStatus, phaseCheckpointKey, slug } = args;
+  const { repoRoot, phaseUnit, phaseStatus, phaseCheckpointKey, slug, governedSha } = args;
   const auditedFiles = resolveAuditedFiles(repoRoot, phaseUnit.diffScope.base, phaseStatus.files);
   const hunkBlocks = computePhaseHunkBlocks(repoRoot, auditedFiles, phaseUnit.diffScope.base);
   writePhaseCheckpoint(repoRoot, {
@@ -471,6 +526,7 @@ function writeResolvedPhaseCheckpoint(args: {
     passedAt: new Date().toISOString(),
     governedPaths: phaseStatus.files,
     auditedFiles,
+    ...(governedSha !== undefined ? { governedSha } : {}),
     ...(hunkBlocks.length > 0 ? { hunkBlocks } : {}),
   });
 }
@@ -490,6 +546,7 @@ function writePhaseCheckpointAfterRecordOrFatal(args: {
   readonly phaseStatus: PhaseCheckpointStatus;
   readonly phaseCheckpointKey: string | undefined;
   readonly slug: string;
+  readonly governedSha: string | undefined;
 }): void {
   try {
     writeResolvedPhaseCheckpoint(args);
@@ -756,11 +813,29 @@ export async function runGovern(args: string[]): Promise<void> {
           `govern: FATAL — --phase given but tasks.md not found at ${tasksPath}.`,
         );
       }
-      const diffBase =
-        flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
+      const explicitBase = flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE);
       phaseCheckpointKey = featureCheckpointKey(root);
       phaseCheckpointStatuses = resolvePhaseCheckpointStatuses(repoRoot, phaseCheckpointKey, tasksPath);
       assertPriorPhaseCheckpointsCurrent(phaseCheckpointStatuses, flags.phase);
+      // 029 US5 (FR-020): resolve the diff-base to the PRE-PHASE commit — the
+      // governed HEAD of the latest prior phase — so the payload audits the UNION
+      // of this phase's changed files across ALL its commits, not just the HEAD~1
+      // delta (the TASK-263 "diff omits the fix" under-scope). An explicit
+      // --diff-base / GOVERN_DIFF_BASE WINS over the auto anchor (operator intent +
+      // the escape when a prior governedSha is unreliable); HEAD~1 is the last resort
+      // (phase 1, or a pre-US5 prior checkpoint with no governedSha).
+      const diffBase = resolvePrePhaseDiffBase({
+        phaseId: flags.phase,
+        orderedPhaseIds: phaseCheckpointStatuses.map((status) => status.phaseId),
+        governedShaByPhase: new Map(
+          phaseCheckpointStatuses.map((status) => [status.phaseId, status.governedSha]),
+        ),
+        ...(explicitBase !== undefined ? { explicitBase } : {}),
+        // AUDIT-20260621-08: verify a recorded governedSha still resolves before
+        // handing it to git diff — a stale anchor degrades to an empty payload.
+        isResolvable: (ref) => gitRefResolves(repoRoot, ref),
+        fallbackBase: 'HEAD~1',
+      });
       phaseUnit = resolvePhaseUnit({ tasksPath, phaseId: flags.phase, diffBase });
       payloadPathScope = normalizeGovernedPaths(repoRoot, phaseUnit.diffScope.files);
       if (payloadPathScope.length === 0) {
@@ -935,6 +1010,10 @@ export async function runGovern(args: string[]): Promise<void> {
           phaseStatus,
           phaseCheckpointKey,
           slug,
+          // Override path (029 US5/FR-020, AUDIT-20260621-11/02): PRESERVE the existing
+          // governedSha — an override may run at an unrelated HEAD, so it must neither
+          // record a poisoning sha NOR clear a valid anchor a prior graduation set.
+          governedSha: phaseStatus.governedSha,
         });
       }
       process.stderr.write(
@@ -1168,6 +1247,9 @@ export async function runGovern(args: string[]): Promise<void> {
         phaseStatus,
         phaseCheckpointKey,
         slug,
+        // Normal graduation path: HEAD is the phase's real committed tip — record it
+        // as the FR-020 pre-phase anchor for the next phase.
+        governedSha: currentHeadSha(repoRoot),
       });
     }
     // AUDIT-BARRAGE claude-04: the override path short-circuits earlier (FR-017), so an

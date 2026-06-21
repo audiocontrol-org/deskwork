@@ -62,6 +62,16 @@ stackctl session-end \
    documented default.
 2. **Tooling friction.** Each `--friction "<note>"` is appended (append-only) to
    the configured `tooling_feedback` path. None surfaced → skipped cleanly.
+   **Route upstream-tool defects to GitHub, not only the local file.** When the
+   friction is a defect in `stackctl` / the stack-control plugin itself (a crash,
+   a wrong result, a missing capability) — as opposed to a note about *this
+   project's* work — **file a GitHub issue against
+   [`audiocontrol-org/deskwork`](https://github.com/audiocontrol-org/deskwork/issues)**
+   (`gh issue create --repo audiocontrol-org/deskwork`) with one reproduction per
+   issue. The local `tooling_feedback` file is a session-local breadcrumb; the
+   GitHub issue is the durable, cross-project record that actually gets triaged.
+   A local-file-only capture of an upstream-tool defect is lost to the tool's
+   maintainers — GitHub is the portable channel that reaches them.
 3. **Advisory clone-snapshot.** Runs over the configured `clone_scope` and surfaces
    new duplication. Advisory — **never blocks**; skips with a note when the scope
    is unconfigured or the snapshot tool is absent.

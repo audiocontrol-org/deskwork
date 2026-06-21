@@ -10,10 +10,10 @@ title: >-
   never engages in-monorepo; the hunk-fingerprint test passed only because its
   fixture had git-root==installation-root. Fix: pass installation-relative files
   (strip the git --show-prefix) to computePhaseHunkBlocks.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 14:55'
-updated_date: '2026-06-20 14:55'
+updated_date: '2026-06-21 01:42'
 labels:
   - agent-found
   - 'type:bug'
