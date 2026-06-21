@@ -84,7 +84,7 @@ description: "Task list for Chunked whole-feature end-govern"
 - [ ] T020 [US1] Implement the `cluster-payload` aggregate entry (couple→cluster→trim→binpack→manifest, deterministic, per contracts/cluster-payload.md) wiring T016-T019 + chunk-id (T007); make T014 pass.
 - [ ] T021 [US1] Implement `src/govern/payload-diff-scope.ts` — committed-diff (`base..HEAD`) + untracked-fold scoping, inclusion-based (the FR-023 successor to the exclusion plumbing); RED test `src/govern/__tests__/payload-diff-scope.test.ts` first (assert non-empty `diffScope.files` for a committed-diff fixture; watch FAIL), then implement.
 - [ ] T022 [US1] Implement `src/govern/payload-chunk.ts` — render ONE chunk's audit payload (diff + plan/spec/contracts + manifest); RED test `src/govern/__tests__/payload-chunk.test.ts` first (assert a chunk payload includes its diff and stays ≤ envelope; watch FAIL), then implement.
-- [ ] T023 [US1] Implement `src/govern/end-govern-pipeline.ts` CLUSTER→AUDIT→RECONCILE skeleton over committed `governedSha`..HEAD (parallel per-chunk barrage fire/render reusing the existing audit-barrage machinery; single reconcile stub) (depends on T020-T022); make T015 pass.
+- [ ] T023 [US1] Implement `src/govern/end-govern-pipeline.ts` CLUSTER→AUDIT→RECONCILE skeleton over committed `governedSha`..HEAD (FR-001; parallel per-chunk barrage fire/render under a fleet-bounded concurrency cap, reusing the existing audit-barrage machinery — FR-008; single reconcile stub) (depends on T020-T022); make T015 pass.
 
 **Checkpoint**: A >envelope fixture feature governs to a decision with zero `boundary-too-large` — MVP partition+audit path works.
 
@@ -110,7 +110,7 @@ description: "Task list for Chunked whole-feature end-govern"
 - [ ] T030 [US2] Delete the exclusion-based whole-feature composition arm (`govern.ts:846–891`) from `src/subcommands/govern.ts`, leaving the single inclusion-based end-govern path; partial toward T025.
 - [ ] T031 [US2] Delete the per-phase checkpoint writer + `phase-checkpoints/*.json` artifact + its doctor/schema rule (FR-017); make T025 pass.
 - [ ] T032 [US2] Collapse `graduate-impl` in `src/workflow/gate-eval.ts` to the single `ctx.implRecordConverged` criterion; delete `allPhaseCheckpointsCurrent` + the `all-phase-checkpoints-current` criterion (`gate-eval.ts:162–199`) + all callers; make T026 pass.
-- [ ] T033 [US2] Delete the per-phase compass/workflow transition arms (TASK-152/155) from the workflow transition modules; partial toward T027.
+- [ ] T033 [US2] Delete the per-phase compass/workflow transition arms (FR-019; TASK-152/155) from the workflow transition modules; partial toward T027.
 - [ ] T034 [US2] Delete `resolvePhaseCheckpointStatuses`, `assertPriorPhaseCheckpointsCurrent`, `featureCheckpointKey`, `carriedFilesForComposition`, `compositionExcludePaths`, and the `phaseUnit` exclusion plumbing once no caller remains; make T027 pass.
 - [ ] T035 [US2] Delete the `boundary-too-large` FATAL terminal (`protocol.ts:393–404`) and remove `BoundaryTooLargeError` once the bin-packer (its sole would-be consumer) no longer throws it — the bin-packer AVOIDS the condition (research Tension 2); make T028 pass.
 - [ ] T036 [US2] Wire `src/subcommands/govern.ts` to the single end-govern pipeline path matching the govern-cli contract (kept flags: `--mode implement`, `--diff-base`, `--at`, `--override`); confirm T024-T028 all green. WONTFIX migration/grandfather (FR-020) — no legacy-accept code written.
