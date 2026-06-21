@@ -420,12 +420,19 @@ function resolveGovernExcludePaths(installation: Installation): readonly string[
  * follows already ran git successfully, so a failure here is a real anomaly, not a
  * fallback case).
  */
-function resolveAuditedFiles(
+export function resolveAuditedFiles(
   repoRoot: string,
   base: string,
   declaredScope: readonly string[],
 ): readonly string[] {
-  const r = spawnSync('git', ['-C', repoRoot, 'diff', '--name-only', base, '--', ...declaredScope], {
+  // `--relative` (TASK-357): emit paths relative to the installation cwd, NOT the git
+  // toplevel. In a monorepo (git-root != installation-root) the un-relative output was
+  // git-root-prefixed (e.g. `plugins/stack-control/src/...`), which (a) made
+  // computePhaseHunkBlocks' `git diff -- <file>` (cwd=installationRoot) match nothing →
+  // empty hunkBlocks → US7 hunk-freshness never engaged → whole-file fallback re-staled
+  // shared-file phases (the entanglement loop), and (b) misaligned with the
+  // installation-relative declaredFiles the composition carry-logic compares against.
+  const r = spawnSync('git', ['-C', repoRoot, 'diff', '--name-only', '--relative', base, '--', ...declaredScope], {
     encoding: 'utf8',
   });
   if (r.status !== 0 || typeof r.stdout !== 'string') {
