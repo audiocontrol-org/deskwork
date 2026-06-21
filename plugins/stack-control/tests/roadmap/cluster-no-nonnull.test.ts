@@ -21,12 +21,16 @@ const NON_NULL_ASSERTION = /[\w$)\]]!(?!=)/g;
 describe('027 FR-030 — cluster.test.ts is free of non-null `!` assertions', () => {
   it('contains no postfix non-null `!` assertions', () => {
     const src = readFileSync(join(here, 'cluster.test.ts'), 'utf8');
-    // Strip the one comment line that legitimately mentions `!` in prose so the
-    // scanner asserts on CODE, not on the doc-comment describing this very ban.
+    // Strip comment lines AND string/template literals before scanning so the
+    // assertion fires on CODE only — a `!` inside a string (an error message, a
+    // regex) is not a non-null assertion (AUDIT-20260621-53).
     const codeOnly = src
       .split('\n')
       .filter((line) => !line.trimStart().startsWith('//') && !line.trimStart().startsWith('*'))
-      .join('\n');
+      .join('\n')
+      .replace(/'(?:[^'\\]|\\.)*'/g, "''")
+      .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+      .replace(/`(?:[^`\\]|\\.)*`/g, '``');
     const matches = codeOnly.match(NON_NULL_ASSERTION) ?? [];
     expect(matches).toEqual([]);
   });

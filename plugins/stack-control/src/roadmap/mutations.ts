@@ -22,7 +22,7 @@ import {
   type GovernableDocument,
   type Unit,
 } from '../document-model/types.js';
-import { fenceDelimiterChar } from '../document-model/chrome.js';
+import { fenceDelimiter } from '../document-model/chrome.js';
 import { loadRoadmap } from './roadmap-model.js';
 
 // Re-export the shared result type so callers (subcommands/roadmap.ts) keep
@@ -64,14 +64,24 @@ export function rewriteEdgeLine(
   transform: (targets: readonly string[]) => readonly string[],
 ): string[] {
   const re = new RegExp(`^(\\s*[-*]\\s+${field}\\s*:\\s*)(.*)$`, 'i');
-  // Fence char of the currently-open fenced code block, or null when outside one.
-  let openFence: '`' | '~' | null = null;
+  // Char + run length of the currently-open fenced code block, or null when outside one
+  // (AUDIT-20260621-54): a closing fence needs the SAME char with a run length >= the
+  // opener, so an inner ``` example does NOT close an outer ```` fence.
+  let openFence: { readonly char: '`' | '~'; readonly length: number } | null = null;
   return bodyLines.map((line) => {
-    const fenceChar = fenceDelimiterChar(line);
-    if (fenceChar !== null) {
-      if (openFence === null) openFence = fenceChar; // opening delimiter
-      else if (fenceChar === openFence) openFence = null; // matching close
-      return line; // a fence delimiter line is never itself an edge line
+    const fence = fenceDelimiter(line);
+    if (fence !== null) {
+      if (openFence === null) {
+        openFence = fence; // opening delimiter
+        return line;
+      }
+      if (fence.char === openFence.char && fence.length >= openFence.length) {
+        openFence = null; // CommonMark close: same char, run length >= opener
+        return line;
+      }
+      // A shorter / different-char delimiter inside an open fence is CONTENT (e.g. an
+      // inner ``` example nested in an outer ```` fence) — stay inside, leave untouched.
+      return line;
     }
     if (openFence !== null) return line; // inside a fence → documented example, leave untouched
     const m = re.exec(line);

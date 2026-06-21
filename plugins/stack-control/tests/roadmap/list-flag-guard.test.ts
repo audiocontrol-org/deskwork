@@ -71,9 +71,13 @@ describe('027 FR-032 — uniform empty/stray-comma guard across roadmap list-fla
   }
 
   // A clean single id (no stray commas) must still succeed for every flag.
+  // AUDIT-20260621-51: `--into` (decompose) creates the child id, so it must be a
+  // NEW id, not the target `impl:feature/a` itself (a self-decompose duplicate /
+  // self-cycle would exit non-zero). The other flags reference an EXISTING id.
   for (const flag of LIST_FLAGS) {
     it(`${flag} with a clean id succeeds (exit 0)`, () => {
-      const r = runCli(argsFor(flag, 'impl:feature/a', docWithItems()));
+      const cleanValue = flag === '--into' ? 'impl:feature/child' : 'impl:feature/a';
+      const r = runCli(argsFor(flag, cleanValue, docWithItems()));
       expect(r.status).toBe(0);
     });
   }

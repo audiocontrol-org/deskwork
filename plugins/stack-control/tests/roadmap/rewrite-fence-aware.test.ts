@@ -43,6 +43,28 @@ describe('027 FR-033 — rewriteEdgeLine is fence-aware', () => {
     expect(out[2]).toBe('- depends-on: impl:feature/old');
   });
 
+  it('does NOT close an outer four-backtick fence on an inner ``` example (AUDIT-20260621-54)', () => {
+    const body = [
+      '## impl:feature/x',
+      'Documenting nested fences:',
+      '````',
+      'an inner triple-backtick example:',
+      '```',
+      '- depends-on: impl:feature/old',
+      '```',
+      '- depends-on: impl:feature/old',
+      '````',
+      '- depends-on: impl:feature/old',
+    ];
+    const out = rewriteEdgeLine(body, 'depends-on', repoint);
+    // Everything between the OUTER ```` fences is example prose — the inner ``` does
+    // NOT close the outer fence (CommonMark: close run length >= open).
+    expect(out[5]).toBe('- depends-on: impl:feature/old'); // inside inner example
+    expect(out[7]).toBe('- depends-on: impl:feature/old'); // inside outer, after inner closes
+    // Only the REAL edge AFTER the outer fence closes (line 9) is rewritten.
+    expect(out[9]).toContain('impl:feature/new');
+  });
+
   it('rewrites edge lines that come AFTER a closed fence (fence state resets)', () => {
     const body = [
       '```',
