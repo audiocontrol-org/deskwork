@@ -3,9 +3,10 @@ id: TASK-318
 title: >-
   Operator override triggers another audit round — override should short-circuit
   the barrage, not run a pass then graduate
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 05:26'
+updated_date: '2026-06-21 03:16'
 labels:
   - agent-found
   - 'type:gap'

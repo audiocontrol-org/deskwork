@@ -42,3 +42,24 @@ Per-phase govern a phase whose impl + test landed in separate commits and whose 
 ## SC-009 — umbrella closed
 
 Confirm all 17 referenced backlog tasks (TASK-60, 145, 146, 149, 154, 263, 288, 289, 290, 291, 292, 293, 294, 316, 317, 318) and the two gap nodes are closed by this feature's completion.
+
+---
+
+## Validation results (2026-06-21 — all 9 user stories graduated)
+
+Recorded at feature completion. Each line distinguishes what was **executed live** this
+session from what is **test-covered** (RED-first per phase) and exercised during the
+phase's real per-phase govern barrage. The source engine (`./bin/stackctl`, 0.52.1) was
+used for all govern runs (the 0.52.0 cache predates these fixes).
+
+- **SC-001** (determinism, US3): test-covered (`tests/promote-findings/dampener-identity.test.ts`, `finding-signature.test.ts`); phase-3 graduated through a live barrage.
+- **SC-002** (override 0 barrage, US4b): **executed live** — phase-4/5/8 `--override` each graduated in ~0.5s printing "short-circuiting the convergence pass (FR-017: zero render/barrage/lift/slush)", **zero** new run-dirs; `tests/govern/override-short-circuit.test.ts` green.
+- **SC-003** (fixed→0 tasks, ≤1/signature, US4a): test-covered (`never-lift-fixed.test.ts`, `lift-dedup.test.ts`, `backlog/done.test.ts`); phase-4 graduated.
+- **SC-004** (degraded never clean, US1/US2): test-covered (`tests/promote-findings/degraded-not-quiet.test.ts`); phase-2 graduated.
+- **SC-005** (O(n) shared-file, US7): **executed live** — after the TASK-357 fix, phases 4/5 re-checkpointed with real hunk blocks (16/27); phases 6–9 then governed per-phase **without cross-staling** earlier phases (the O(n²) re-stale loop that plagued the 0.52.0 runs disappeared). Test-covered: `tests/govern/hunk-fingerprint.test.ts`, `audited-files-monorepo.test.ts`.
+- **SC-006** (fresh-install config, US1): **executed live** — phase 6/7/9 barrages ran read-only on the shipped `templates/audit-barrage-config.yaml` (codex + claude lanes both produced output, no grounding loop, within the timeout floor); test-covered (`config-default.test.ts`, `spawn-liveness.test.ts`).
+- **SC-007** (either-of gate, US6): test-covered (`tests/workflow/either-of-gate.test.ts` — default per-phase path, opt-in whole-feature path, neither, both); phase-6 graduated clean (dampener).
+- **SC-008** (no payload-scoping false HIGHs, US5): test-covered (`tests/govern/payload-union.test.ts`, `out-of-window.test.ts`); phase-5 graduated.
+- **SC-009** (umbrella closed): **verified** — all 17 backlog tasks (TASK-60/145/146/149/154/263/288/289/290/291/292/293/294/316/317/318) are status Done; the `audit-barrage-timeout-observability` gap node was closed in US2; the feature node `multi:feature/govern-operability` is at `shipped` with all 9 per-phase checkpoints current.
+
+Full suite at completion: **2401 passing**. `claude plugin validate` passes; `stackctl check-front-door` exit 0 (62 fronted operations).

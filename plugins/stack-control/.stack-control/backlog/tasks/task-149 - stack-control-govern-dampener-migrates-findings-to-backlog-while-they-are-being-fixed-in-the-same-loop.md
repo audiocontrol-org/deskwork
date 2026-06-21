@@ -3,10 +3,10 @@ id: TASK-149
 title: >-
   stack-control: govern dampener migrates findings to backlog while they are
   being fixed in the same loop
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-16 23:37'
-updated_date: '2026-06-17 17:31'
+updated_date: '2026-06-21 03:16'
 labels:
   - 'type:imported-issue'
   - promoted

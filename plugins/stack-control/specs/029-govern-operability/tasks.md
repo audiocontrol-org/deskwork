@@ -146,9 +146,9 @@
 
 ## Phase 10: Polish & feature completion
 
-- [ ] T056 Full vitest suite green; `claude plugin validate plugins/stack-control`; `stackctl check-front-door` exit 0
-- [ ] T057 Record quickstart SC-001..SC-009 validation results in `specs/029-govern-operability/quickstart.md`
-- [ ] T058 Confirm all 17 backlog tasks (TASK-60/145/146/149/154/263/288/289/290/291/292/293/294/316/317/318) + the two gap nodes are closed (SC-009); advance the roadmap node `multi:feature/govern-operability` toward shipped
+- [x] T056 Full vitest suite green; `claude plugin validate plugins/stack-control`; `stackctl check-front-door` exit 0
+- [x] T057 Record quickstart SC-001..SC-009 validation results in `specs/029-govern-operability/quickstart.md`
+- [x] T058 Confirm all 17 backlog tasks (TASK-60/145/146/149/154/263/288/289/290/291/292/293/294/316/317/318) + the two gap nodes are closed (SC-009); advance the roadmap node `multi:feature/govern-operability` toward shipped
 
 ---
 

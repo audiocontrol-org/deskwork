@@ -3,9 +3,10 @@ id: TASK-317
 title: >-
   govern finding-lift has no cross-run dedup — convergence iterations multiply
   near-duplicate backlog tasks (gh-490)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 03:53'
+updated_date: '2026-06-21 03:16'
 labels:
   - agent-found
   - 'type:gap'
