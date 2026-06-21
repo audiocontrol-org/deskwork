@@ -32,6 +32,16 @@ Use this to avoid re-reporting findings that have already been triaged. If a fin
 
 {{audit_lens}}
 
+## Process drivers (029 US8 / FR-029 — apply these when reviewing a fix)
+
+These codify the structural drivers of myopic convergence (TASK-60). Apply them so the loop converges in fewer rounds with less fix-induced surface growth:
+
+- **Channel-enumeration.** When a fix ADDS to an allowlist/surface (a new flag, a new accepted value, a new parser branch, a new fold path), do not accept it on the one example it fixes — enumerate the channels it opens: the **value** channel (other inputs now accepted), the **state** channel (new reachable states), the **multiline / composition** channel (how it composes with adjacent surfaces). Flag any opened channel that lacks a fixture.
+- **Invariant-first boundary.** When a finding is dispositioned as a scope boundary, state the boundary as the **mechanism's invariant plus an in-scope exception**, NOT as the exclusion of the one counterexample. "We exclude X" is a smell; "the invariant is I, and X is the in-scope exception because…" is the disposition.
+- **Round-0 self-red-team.** Before re-firing after a fix, do a **self-red-team pass over the fix diff itself**: what new edge did this fix open? what did it move rather than remove? Treat the fix as a fresh surface under audit.
+- **Fleet-degradation pricing.** A convergence claim is only as strong as the fleet that produced it. When the fleet is **degraded** (a timed-out / killed / zero-byte lane — US2 observability), price the round's "0 HIGH" accordingly: it is computed over fewer models, so cross-model agreement is weaker. Do not treat a degraded-fleet quiet round as full convergence.
+- **Severity-rubric anchoring.** Rate every finding by the blast-radius rubric below (US3), not by how alarming it feels — a quietly-plausible wrong reading an unattended agent would build outranks an obvious contradiction a reader would resolve.
+
 ## Output format
 
 For each finding you surface, emit ONE markdown block in this exact shape:
