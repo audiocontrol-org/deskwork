@@ -46,7 +46,9 @@ describe('025 US1 — governing → shipped refuses without current per-phase ch
     const r = runCli(['workflow', 'advance', ITEM, '--apply'], { cwd: f.root });
     expect(r.status).not.toBe(0);
     expect(r.stdout + r.stderr).toMatch(/refus/i);
-    expect(r.stdout + r.stderr).toMatch(/all-phase-checkpoints-current/);
+    // 029 US6: the graduate gate is the either-of `graduate-impl` criterion (per-phase
+    // checkpoints OR a whole-feature record); with neither present it still refuses.
+    expect(r.stdout + r.stderr).toMatch(/graduate-impl/);
     expect(statusOf(f)).toBe('in-flight'); // did NOT advance to shipped
   });
 

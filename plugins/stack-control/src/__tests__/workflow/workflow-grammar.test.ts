@@ -21,17 +21,21 @@ afterEach(() => {
 
 const hasCriterion = (criteria: readonly { kind: string; target: string }[]): boolean =>
   criteria.some((c) => c.kind === 'all-phase-checkpoints-current' && c.target === 'impl');
+const hasKind = (criteria: readonly { kind: string; target: string }[], kind: string): boolean =>
+  criteria.some((c) => c.kind === kind && c.target === 'impl');
 
 describe('WORKFLOW.md grammar — all-phase-checkpoints-current (025 US1)', () => {
   it('registers the criterion kind', () => {
     expect(CRITERION_KINDS).toContain('all-phase-checkpoints-current');
+    // 029 US6: the either-of graduate criterion is also registered.
+    expect(CRITERION_KINDS).toContain('graduate-impl');
   });
 
-  it('the bundled graduate transition gate requires all-phase-checkpoints-current impl', () => {
+  it('the bundled graduate transition gate requires the either-of graduate-impl criterion (029 US6)', () => {
     const doc = loadWorkflowDoc(fixture().root);
     const graduate = doc.transitions.find((t) => t.codename === 'graduate');
     expect(graduate).toBeDefined();
-    expect(hasCriterion(graduate!.exitGate)).toBe(true);
+    expect(hasKind(graduate!.exitGate, 'graduate-impl')).toBe(true);
   });
 
   it('the bundled start-governing transition gate requires all-phase-checkpoints-current impl', () => {

@@ -96,10 +96,10 @@
 **Goal**: either-of graduate gate, default per-phase. Closes TASK-154.
 **Independent test**: one feature graduates via per-phase checkpoints, another via a whole-feature record under opt-in; default requires per-phase.
 
-- [ ] T035 [P] [US6] RED test: the graduate gate graduates via `all-phase-checkpoints-current` OR whole-feature `record-converged`; default with no opt-in requires per-phase — in `tests/workflow/either-of-gate.test.ts` (FR-023/024)
-- [ ] T036 [US6] Implement the either-of gate in `src/workflow/gate-eval.ts` (+ govern default mode) (FR-023/024)
-- [ ] T037 [US6] Update `templates/WORKFLOW.md` graduate-gate semantics to the either-of condition (FR-023)
-- [ ] T038 [US6] Amend the 025 "compose, reject augment" clarify record in `specs/025-unskippable-workflow-protocol/` to document the re-admitted whole-feature path (FR-025)
+- [x] T035 [P] [US6] RED test: the graduate gate graduates via `all-phase-checkpoints-current` OR whole-feature `record-converged`; default with no opt-in requires per-phase — in `tests/workflow/either-of-gate.test.ts` (FR-023/024)
+- [x] T036 [US6] Implement the either-of gate in `src/workflow/gate-eval.ts` (+ govern default mode) (FR-023/024)
+- [x] T037 [US6] Update `templates/WORKFLOW.md` graduate-gate semantics to the either-of condition (FR-023)
+- [x] T038 [US6] Amend the 025 "compose, reject augment" clarify record in `specs/025-unskippable-workflow-protocol/` to document the re-admitted whole-feature path (FR-025)
 - [ ] T039 [US6] Close TASK-154; record the phase-6 govern checkpoint
 
 ---

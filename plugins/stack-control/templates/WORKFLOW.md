@@ -86,7 +86,7 @@ complete without inventing an item-specific path the bundled default cannot know
 - derive: tasks-complete
 - work: stack-control:execute
 - entrance: tasks-complete spec
-- exit: all-phase-checkpoints-current impl
+- exit: graduate-impl impl
 - next: shipped
 
 ## phase:shipped
@@ -95,7 +95,7 @@ complete without inventing an item-specific path the bundled default cannot know
 - kind: phase
 - derive: record-converged impl
 - work: (none)
-- entrance: all-phase-checkpoints-current impl
+- entrance: graduate-impl impl
 - exit: (none)
 - next: (none)
 
@@ -141,7 +141,7 @@ complete without inventing an item-specific path the bundled default cannot know
 - kind: transition
 - from: governing
 - to: shipped
-- exit-gate: all-phase-checkpoints-current impl
+- exit-gate: graduate-impl impl
 - effects: roadmap-advance to=shipped; roadmap-reconcile; journal-append message={message}; commit message={message}
 
 ## transition:redesign
