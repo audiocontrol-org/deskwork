@@ -526,6 +526,7 @@ Lift must auto-close findings fixed in-loop. 0.52.2's FR-016 cross-run signature
 
 ## multi:gap/govern-doc-aware-audit-lens
 - status: planned
+- deferred-until: multi:gap/govern-lift-auto-close-in-loop-fixes lands; then weigh against execution-engine / release-resolution-cycle / lifecycle-industrialization
 - part-of: multi:feature/govern-operability
 - ref: offing-ff761162
 Documentation phases ring far longer than code. A 2-task doc phase (a README + ~40 lines of seam-contract comments) took 9 cross-model rounds to converge: the auditors kept finding wording corners on forward-looking contract prose ('near-infinite phrase-more-precisely surface'), amplified by out-of-window false-HIGHs and fix-induced channel growth. The shipped severity-determinism/dampener does not stop prose nitpicking. Fix, two levers: (a) a doc/prose-aware audit lens that, when the payload is predominantly markdown prose, flags only SUBSTANTIVE doc defects (factually wrong, contradicts code, missing required content, broken example/link) and suppresses wording/phrasing/style nits; (b) implement-mode diminishing-returns plateau auto-detect that surfaces an 'override recommended' verdict (findings shifting to wording altitude / fix-induced growth / oscillation) instead of grinding. Source: offing 0.52.2 dogfood ff761162 (2026-06-21).
