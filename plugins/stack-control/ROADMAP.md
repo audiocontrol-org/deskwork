@@ -560,11 +560,11 @@ Size-cap-driven file splits are silently excluded from their own audit. To honor
 No cheap checkpoint refresh for a sibling-change false-stale; --override is the only tool and it is semantically wrong + non-persistent. When a later phase changes a sibling file in a shared governed directory and re-stales an earlier phase whose OWN audited content is unchanged, the only way to re-current it is a full 'govern --phase N --override <reason>'. But override is per-invocation (FR-018, no persisted marker) and means 'graduate past findings' — not 're-baseline unchanged-audited-content'. Fix: a 'govern --refresh-checkpoint <phase>' (or similar) that re-stamps the phase checkpoint fingerprint at the current tree with zero barrage and NO override marker, distinct from override. NOTE: largely OBVIATED by govern-hunkblocks-uncommitted-empty — if hunk-freshness actually engages, sibling-file changes stop staling prior phases and this is rarely needed; keep as the fallback. Source: offing ff761162 Phase 2 (2026-06-21).
 
 ## design:feature/opencode-support
-- status: in-flight
-- analyze-clean: yes
+- status: shipped
 - spec: specs/031-opencode-support
 - design: docs/superpowers/specs/2026-06-22-opencode-support-design.md
 - design-approved: true
+- analyze-clean: yes
 - part-of: multi:feature/portability
 Add first-class support for opencode as a coding agent host. The stack-control plugin follows opencode's plugin structure and event system, making all stack-control skills available through opencode's interface.
 
