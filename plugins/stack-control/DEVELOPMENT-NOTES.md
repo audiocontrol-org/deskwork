@@ -2,24 +2,30 @@
 
 ---
 
-## 2026-06-22: <!-- session title -->
+## 2026-06-22 (evening): bookkeeping-hardening umbrella — 6 fixed + 7 verified-resolved, governed, shipped (PR #496)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Take up the `multi:feature/bookkeeping-hardening` umbrella (the 13 small gaps/bugs in stack-control's own bookkeeping tooling the prior session grouped). Per operator selection, work each as a **point fix** (RED-first TDD → commit → push, no spec/govern), all 13 by category. It expanded into: govern the session diff (operator request), close all 13, open + merge a PR, run session-end.
 
 **Accomplished:**
-- <!-- compose -->
+- **6 items genuinely fixed, RED-first:** TASK-297 (`backlog done` persists `--reason` to durable task notes), TASK-378 (done-test tmp-dir leak), TASK-39 (session-end journal window anchors at the previous session-end — robust to a pushed-up upstream that collapsed the merge-base to HEAD), TASK-407 (`/stack-control:define` node-exists branch wires `workflow link-spec`), TASK-16 (tooling-friction routing docs), TASK-425 (new `stackctl audit-runs list|prune` retention verb + skill — the barrage run dirs had grown to 295 dirs / 115 MB with no GC).
+- **7 items verified already-resolved** by the shipped 027/028 features (confirmed in source + passing tests, then closed): TASK-23/38/299 (028 backlog verbs), TASK-244 (node now has `spec:`), TASK-298 (`approve-design` marker verb), TASK-442 (uniform `--help`), TASK-21 (edge-aware archival, FR-017/T077).
+- **Governed the session diff** (operator request): fired the cross-model audit-barrage over `8602a319..HEAD` (claude + codex, 2/2 emitted). 5 findings; fixed 4 (incl. a real HIGH — a stale 1-arg `close` mock in `promote.test.ts` that tsc couldn't see because `tests/` is outside the tsc include), dismissed 1 false positive (the "empty closure note" can't occur — `backlog done` requires a non-empty `--reason`).
+- **Closed all 13 umbrella items** in the backlog with evidence reasons; **captured TASK-443** (govern is spec-coupled → barraging a non-spec diff needed hand-assembled payload).
+- **Shipped:** full suite 2472/2472, `check-front-door` 64 ops, tsc clean → opened PR #496 (brought the branch current with `main` first to avoid a v0.53.0 → 0.52.2 version regression) → merged to `main` after CI green (11m17s).
 
 **Didn't Work:**
-- <!-- compose -->
+- **`govern --mode implement` cannot run on a non-spec session diff.** It is structurally coupled to a spec feature (resolves a feature root + writes to that feature's `audit-log.md`); a multi-subsystem bookkeeping diff with no spec and no `spec:` on its umbrella node has nothing to anchor to. Realizing "govern the session diff" meant hand-assembling the audit-barrage payload (diff → 7-key vars.json → `audit-barrage-render` → `audit-barrage --prompt-file`). Captured as TASK-443.
 
 **Course Corrections:**
-- <!-- compose -->
+- **Zero rework.** The operator's turns were scope/direction decisions, not corrections: "point fixes" (framing), "did you run governance?" (a *check* — I answered honestly that I had not, per the point-fix scoping rule, and did NOT reflexively run it; the operator then chose "govern the whole session diff"), "close all 13", "capture the friction", "open a PR", "merge when green". [PROCESS] One mild note: I surfaced the closure question before the operator's governance preference was known — sequencing, not a wrong approach.
 
 **Insights:**
-- <!-- compose -->
+- **The umbrella was mostly already-resolved-but-not-closed.** 7 of 13 were implemented by the 027/028 features which never closed the backlog items they were seeded from — the exact node↔spec-linkage / closure-isn't-structural gap the umbrella names, demonstrated by the umbrella itself. The real engineering was 6 items; the rest was verify-and-close.
+- **session-end's own fix verified itself live.** Running `session-end` to record THIS session exercised the TASK-39 journal-anchor fix: it surfaced 9 progressed backlog items instead of the "0 commits / no backlog touched" the bug produced. The close ceremony that records the session is the one this session fixed.
+- **`govern` has a missing front door.** There's no first-class "audit an arbitrary/non-spec diff" entry — the cross-model barrage is only reachable through the spec-coupled `govern`. Surfaced precisely when trying to audit a bookkeeping diff that isn't a spec feature (TASK-443).
 
 **Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 10
+- Commits: 10 — but only **8 are this session** (7 work commits + the `git merge origin/main`); the other 2 (`chore: release v0.53.0`, `Merge pull request #495`) entered the `8602a319..HEAD` window via that merge (done to bring the long-lived branch current with `main`), not session work.
   - Merge remote-tracking branch 'origin/main' into feature/stack-control
   - chore(backlog): close the 13 bookkeeping-hardening items; capture govern-diff friction
   - fix(bookkeeping): address audit-barrage findings on the session diff
