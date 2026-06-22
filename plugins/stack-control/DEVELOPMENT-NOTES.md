@@ -2,6 +2,37 @@
 
 ---
 
+## 2026-06-22: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 10
+  - Merge remote-tracking branch 'origin/main' into feature/stack-control
+  - chore(backlog): close the 13 bookkeeping-hardening items; capture govern-diff friction
+  - fix(bookkeeping): address audit-barrage findings on the session diff
+  - feat(audit-runs): add `stackctl audit-runs list|prune` retention verb (TASK-425)
+  - docs(backlog): document tooling-friction routing — upstream defects go outward (TASK-16)
+  - docs(define): wire link-spec into the node-exists branch (TASK-407)
+  - fix(session-end): anchor the journal window at the previous session-end (TASK-39)
+  - fix(backlog): persist closure reason to task notes; clean up done-test tmp dirs
+  - chore: release v0.53.0
+  - Merge pull request #495 from audiocontrol-org/feature/stack-control
+- Files changed: 56
+- Backlog touched: TASK-16, TASK-23, TASK-244, TASK-297, TASK-378, TASK-39, TASK-407, TASK-425, TASK-443
+
 ## 2026-06-22 (pm): Backlog cleanup applied — 46 closed, 9 re-scoped, 6 uncertains resolved, bookkeeping umbrella created
 
 **Goal:** Act on the backlog-cleanup-review-2026-06-22.md work-list produced by the prior session (orientation menu pick #2): apply the dispositions (close the resolved/moot, re-scope the partials), then drive out the remaining uncertainty rather than leaving it parked. No code; this is records hygiene on the slush store + the roadmap DAG.
