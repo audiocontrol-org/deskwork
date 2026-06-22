@@ -28,7 +28,7 @@ Opencode users want to use stack-control's governance and lifecycle capabilities
 
 ### User Story 2 - Install stack-control plugin in opencode (Priority: P1)
 
-Opencode users need a straightforward way to install the stack-control plugin. They should be able to copy or symlink the plugin file to their opencode plugins directory.
+Opencode users need a straightforward way to install the stack-control plugin. They should be able to copy the plugin file to their opencode plugins directory.
 
 **Why this priority**: Without installation, the feature doesn't exist. This is the entry point for all opencode users.
 
@@ -36,7 +36,7 @@ Opencode users need a straightforward way to install the stack-control plugin. T
 
 **Acceptance Scenarios**:
 
-1. **Given** user has the stack-control plugin file, **When** they copy it to `.opencode/plugins/`, **Then** opencode loads the plugin on next start
+1. **Given** user has the stack-control plugin file, **When** they copy it to `.opencode/plugins/stack-control.ts`, **Then** opencode loads the plugin on next start
 2. **Given** opencode loads the stack-control plugin, **When** the plugin initializes, **Then** it exports the plugin function following opencode's plugin API
 3. **Given** plugin is loaded, **When** user types any stack-control skill, **Then** the skill is available in the command menu
 
@@ -110,7 +110,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - **FR-006**: The plugin MUST handle CLI errors (non-zero exit codes) and report them to opencode
 - **FR-007**: The plugin MUST provide a clear error message when `stackctl` CLI is not found
 - **FR-008**: The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill
-- **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts` or `.opencode/plugins/stack-control/index.ts`
+- **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts`
 - **FR-010**: The plugin MUST support both local installation (copy plugin file) and npm installation
 - **FR-011**: The plugin MUST report its version when queried
 - **FR-012**: The plugin MUST warn users when plugin version doesn't match CLI version
@@ -132,6 +132,12 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - **SC-004**: Plugin works with opencode versions 1.0 and later
 - **SC-005**: Plugin loads successfully in opencode without requiring additional configuration
 
+## Clarifications
+
+### Session 2026-06-22
+
+- Q: How should the opencode plugin be structured? → A: Single file (`opencode-plugin.ts`)
+
 ## Assumptions
 
 - Users have `stackctl` CLI installed and available in their PATH (or opencode has access to it via shell)
@@ -141,3 +147,4 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - The plugin is installed per-project (not globally for all opencode sessions)
 - Opencode's shell API (`$`) provides sufficient functionality for CLI invocation
 - Users have appropriate file system permissions to install the plugin in `.opencode/plugins/`
+- The plugin will be a single file (`opencode-plugin.ts`) rather than a module directory
