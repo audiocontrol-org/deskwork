@@ -2,21 +2,29 @@
 
 ---
 
-## 2026-06-22: <!-- session title -->
+## 2026-06-22: US9 audit-system implementation — 9 RED tests + 7 GREEN tasks (T078–T084a); FR-009 autonomous fix deferred
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up where the prior session left off — implement US9 (wire the end-govern pipeline as the CLI's single path), the unbuilt core that 030 was extended to capture. Drive it through the sanctioned execute protocol.
 
 **Accomplished:**
-- <!-- compose -->
+- Ran the full sanctioned `execute` chain: compass gate (verdict `behind` — re-entry, allowed), front-door completeness gate (62 ops, 0 gaps), `execute-check` (runnable), front-door marker `enter`/`exit`, then drove native `/speckit-implement` for Phase 12 (US9). Governed with the SOURCE engine (`./bin/stackctl`, 0.52.1) per the dev rule — the installed cache is a parallel 0.52.2 release lacking this branch's work.
+- Satisfied the `clean-break-safety` spec checklist **33/33** (adversarially evaluated by a subagent) BEFORE implementing — it confirmed the spec captured the two classic implementer traps (CHK007/008: keep the envelope-measurement primitive while deleting the boundary FATAL; rekey the `phaseId`-keyed sizing interface).
+- Wrote all **9 US9 RED tests** (T069–T077), each verified failing for its stated *behavioral* reason (not a compile error). Parallel subagents authored 3 module-local tests; I wrote the integration/structural ones (T069 cli-drives-pipeline, T070 gate-reads-record, T073 fix-newfile-reaudit) myself.
+- Landed **7 GREEN**: T078 render-aware chunk sizing (no chunk renders over-envelope, via a render-fit post-pass + coverage-only files), T079 coverage-preserving non-audit trim, T080 untracked-fold renders standard `git diff --no-index`, T081 seam-pass balanced-paren arity, T082 checkpoint selector mode-scoped to implement, T083 impl gate reads the whole-feature `WholeFeatureConvergenceRecord` (clean break of the old impl read path; fixture-migration ripple across 7 test files handled via a mode-aware `writeRecord`), T084a pipeline re-audits fix-created new files (FR-007 / TASK-415).
+- Suite: **2509 pass, 0 regressions; only T069×3 + T077×3 remain RED** (impls T084b/T086).
+- 6 commits, pushed early and often.
 
 **Didn't Work:**
-- <!-- compose -->
+- **T084b is far larger than "wiring."** Investigation showed its `auditChunk` needs a barrage-WITHOUT-lift decomposition (render→barrage→runDir→`extractBarrageFindings`) plus a render-layer reconciliation (the pipeline's `renderChunkPayload` output vs the `audit-barrage-render` prompt the barrage actually audits), and a lift-ONCE step. Stopped short rather than rush this delicate integration low on budget — the exact "wired-but-broken core" failure this feature exists to prevent.
+- **FR-009's autonomous fix backend is entirely unbuilt.** `worktree-dispatch.ts` (55 lines) and `merge-serialize.ts` (44 lines) are only orchestration over INJECTED deps — the real `FixRunner` (headless fix-subagent dispatch + git worktree lifecycle) and `MergeAttempt` (conflict-aware merge) exist nowhere in source, only stubbed in tests.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] **Scoped T084b down by operator decision.** Operator: *"can we use the audit system without building the full autonomous fix capability?"* → wire the chunked AUDIT system with agent-in-the-loop fix (`govern` audits → surfaces `override-eligible` → driving agent fixes → re-govern; `applyFixes` undefined), and DEFER FR-009. Captured the deferral as TASK-424 rather than silently dropping it (per "Just for now is bullshit" — file it, don't comment it).
 
 **Insights:**
-- <!-- compose -->
+- **The "unwired core" was deeper than the prior session framed it.** Not just the pipeline being unreferenced — the autonomous-fix EXECUTION backend (FR-009) was never built, only its injected-dep interface. A green unit suite over stubbed deps hid that the real fix backend doesn't exist. The integration seam (CLI→pipeline→fix-execution) is where the gaps live; unit tests over stubs cannot see them.
+- **A "unit tests for the English" spec checklist is a cheap, high-value pre-implementation gate** for a dangerous clean break. The 33-item `clean-break-safety` check (adversarially evaluated) de-risked the T085 deletion before a line of it was written.
+- **Structural ship-gate tests can be the honest catch** when a hermetic behavioral test is impractical: T069 asserts `govern.ts` calls `runEndGovern` + writes the whole-feature record + has no `chunkScopes` loop — directly encoding "is the core wired," the exact regression that shipped — while `reconcile-once` + T070 + T073 cover the runtime contract.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 5
