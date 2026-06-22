@@ -3,10 +3,10 @@ id: TASK-74
 title: >-
   Per-phase govern must have mechanical teeth so adopting agents cannot silently
   skip it
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 02:14'
-updated_date: '2026-06-14 02:14'
+updated_date: '2026-06-22 17:33'
 labels:
   - agent-found
   - 'type:gap'
