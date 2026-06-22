@@ -4,10 +4,10 @@ title: >-
   025 upgrade path: pre-025 / in-flight features with no per-phase checkpoints
   become un-graduatable when the all-phase-checkpoints-current gate lands — no
   backfill / grandfather / migration
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-17 01:48'
-updated_date: '2026-06-17 17:31'
+updated_date: '2026-06-22 16:11'
 labels:
   - agent-found
   - 'type:gap'

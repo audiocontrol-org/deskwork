@@ -4,9 +4,10 @@ title: >-
   US1 whole-feature govern: strict checkpoint gate contradicts the
   compose-from-checkpoints contract (resolveComposingFeatureUnit unreachable at
   CLI)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 20:24'
+updated_date: '2026-06-22 16:11'
 labels:
   - agent-found
   - 'type:bug'

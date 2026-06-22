@@ -4,9 +4,10 @@ title: >-
   Whole-feature composition stashes real scope in compositionExcludePaths; the
   AuditUnit it builds has diffScope.files=[] which the type contract reads as
   'whole diff'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 20:52'
+updated_date: '2026-06-22 16:11'
 labels:
   - agent-found
   - 'type:bug'

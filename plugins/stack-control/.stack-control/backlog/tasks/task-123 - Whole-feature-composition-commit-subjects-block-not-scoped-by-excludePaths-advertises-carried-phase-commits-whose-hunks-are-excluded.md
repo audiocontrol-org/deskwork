@@ -3,9 +3,10 @@ id: TASK-123
 title: >-
   Whole-feature composition: commit-subjects block not scoped by excludePaths
   (advertises carried-phase commits whose hunks are excluded)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-15 00:32'
+updated_date: '2026-06-22 16:11'
 labels:
   - agent-found
   - 'type:bug'

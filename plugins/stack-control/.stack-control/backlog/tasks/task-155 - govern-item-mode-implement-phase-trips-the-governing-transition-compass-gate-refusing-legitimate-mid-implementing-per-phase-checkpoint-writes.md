@@ -3,9 +3,10 @@ id: TASK-155
 title: >-
   govern --item + --mode implement --phase trips the governing-transition
   compass gate, refusing legitimate mid-implementing per-phase checkpoint writes
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-18 01:08'
+updated_date: '2026-06-22 16:11'
 labels:
   - agent-found
   - 'type:bug'
