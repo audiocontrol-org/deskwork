@@ -561,6 +561,7 @@ No cheap checkpoint refresh for a sibling-change false-stale; --override is the 
 
 ## design:feature/opencode-support
 - status: in-flight
+- analyze-clean: yes
 - spec: specs/031-opencode-support
 - design: docs/superpowers/specs/2026-06-22-opencode-support-design.md
 - design-approved: true
