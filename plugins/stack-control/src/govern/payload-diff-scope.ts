@@ -184,6 +184,27 @@ function lines(out: string): string[] {
   return out.split('\n').map((s) => s.trim()).filter((s) => s.length > 0);
 }
 
+/**
+ * Per-file byte budget for the untracked-fold. An untracked working-tree file is a
+ * convenience-fold, not the committed govern target; a file whose `--no-index` diff
+ * exceeds this is almost certainly generated/scratch, not hand-written source the
+ * operator wants audited inline. Bytes over the budget are withheld (TASK-436).
+ */
+const UNTRACKED_FOLD_MAX_BYTES = 1024 * 1024; // 1 MiB
+
+/**
+ * The bounded, VISIBLE placeholder substituted for a binary or oversized untracked
+ * file's diff body — the FR-027 "path preserved, bytes withheld" contract: the file
+ * stays listed in scope (never silently dropped) but its body never bloats the audit
+ * payload. Carries no `+/-export` lines, so the seam pass raises no false break on it.
+ */
+function untrackedWithheldNote(file: string, binary: boolean, bytes: number): string {
+  const reason = binary
+    ? 'binary (no auditable source)'
+    : `${bytes} bytes exceeds the ${UNTRACKED_FOLD_MAX_BYTES}-byte untracked-fold budget`;
+  return `[untracked file ${file}: diff body withheld — ${reason}. Path preserved in scope; bytes withheld from the audit payload.]\n`;
+}
+
 /** Scope the committed base..HEAD diff (plus untracked-fold) into an inclusion-based DiffScope. */
 export function scopeCommittedDiff(installationRoot: string, base: string, head: string): DiffScope {
   const fileDiffs = new Map<string, string>();
@@ -215,7 +236,13 @@ export function scopeCommittedDiff(installationRoot: string, base: string, head:
   // non-ASCII names stay literal UTF-8.
   for (const f of lines(git(installationRoot, ['ls-files', '--others', '--exclude-standard']))) {
     if (fileDiffs.has(f)) continue;
-    fileDiffs.set(f, gitDiffNoIndex(installationRoot, ['--', '/dev/null', f]));
+    const d = gitDiffNoIndex(installationRoot, ['--', '/dev/null', f]);
+    // Guard the convenience-fold against payload bloat (TASK-436): a binary file (no
+    // auditable source) or one whose diff exceeds the per-file budget keeps its PATH in
+    // scope but withholds its BODY — the FR-027 path-preserved/bytes-withheld contract.
+    const binary = /^Binary files /m.test(d);
+    const oversized = Buffer.byteLength(d) > UNTRACKED_FOLD_MAX_BYTES;
+    fileDiffs.set(f, binary || oversized ? untrackedWithheldNote(f, binary, Buffer.byteLength(d)) : d);
     files.push(f);
   }
 

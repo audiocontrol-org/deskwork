@@ -100,6 +100,52 @@ describe('030 T021 — payload-diff-scope (FR-023)', () => {
     }
   });
 
+  // TASK-436 — the untracked-fold is a convenience-fold (not the committed govern
+  // target). A LARGE untracked file must keep its PATH in scope (FR-027 "path
+  // preserved, bytes withheld") but must NOT carry its full body into the audit
+  // payload, else a generated/scratch file bloats every barrage lane.
+  it('TASK-436 withholds the body of an OVERSIZED untracked file but preserves its path', () => {
+    const repo = setup();
+    const base = head(repo);
+    writeFileSync(join(repo, 'src/committed.ts'), 'a\n');
+    commitAll(repo, 'feat: committed');
+    const h = head(repo);
+    const huge = `${'a'.repeat(2 * 1024 * 1024)}\n`; // ~2 MiB, safely over any per-file budget
+    writeFileSync(join(repo, 'src/huge.generated.ts'), huge);
+    try {
+      const scope = scopeCommittedDiff(repo, base, h);
+      expect(scope.files, 'path preserved in scope').toContain('src/huge.generated.ts');
+      const body = scope.fileDiffs.get('src/huge.generated.ts') ?? '';
+      expect(Buffer.byteLength(body), 'oversized body must be withheld, not folded whole').toBeLessThan(
+        4096,
+      );
+      expect(body, 'withheld note explains why').toMatch(/withheld/i);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  // TASK-436 — a BINARY untracked file carries no auditable source. Its path is
+  // preserved in scope but its body is withheld (never the raw bytes / full blob).
+  it('TASK-436 withholds the body of a BINARY untracked file but preserves its path', () => {
+    const repo = setup();
+    const base = head(repo);
+    writeFileSync(join(repo, 'src/committed.ts'), 'a\n');
+    commitAll(repo, 'feat: committed');
+    const h = head(repo);
+    // A buffer with NUL bytes — git detects this as binary in `git diff --no-index`.
+    writeFileSync(join(repo, 'asset.bin'), Buffer.from([0, 1, 2, 0, 255, 0, 42, 0]));
+    try {
+      const scope = scopeCommittedDiff(repo, base, h);
+      expect(scope.files, 'path preserved in scope').toContain('asset.bin');
+      const body = scope.fileDiffs.get('asset.bin') ?? '';
+      expect(body, 'binary body withheld with a note').toMatch(/withheld/i);
+      expect(body, 'note names the binary reason').toMatch(/binary/i);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   // Regression: the installation root is a SUBDIR of the git root (the monorepo
   // layout — `.stack-control` lives at plugins/stack-control while the git root is
   // the repo above). `git diff --name-only` emits git-root-relative paths; running
