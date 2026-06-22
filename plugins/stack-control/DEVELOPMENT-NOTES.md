@@ -2,27 +2,40 @@
 
 ---
 
-## 2026-06-22: <!-- session title -->
+## 2026-06-22: 030 US2/US8 clean-break completion — dead per-phase modules deleted, execute skill → govern-at-end (govern parked for next session)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up last session's parked handoff — run the whole-feature govern-at-end over the 030 diff. It turned out to be blocked, so the real work became finishing 030's US2/US8 remainder to unblock it; the govern itself was then parked per the operator.
 
 **Accomplished:**
-- <!-- compose -->
+- **Diagnosed the block.** The parked whole-feature govern refused at the `tasks-complete spec` compass gate — 5 tasks (T031/T033/T034/T063/T064) were unchecked. Investigation: 4 were pure bookkeeping drift (T085 completed them last session but never ticked the boxes — `payload-implement.ts` already gone, `file-line-cap` green, WORKFLOW.md already clean govern-at-end), and T034 had a genuine remainder.
+- **T034 genuine remainder (RED-first).** T085 deleted the per-phase call sites but left **3 orphaned dead modules** the absence test (scoped to `govern.ts`) didn't catch: `incremental-audit.ts`, `phase-enumeration.ts`, `audit-unit-types.ts`. The govern-at-end chunking path (clustering/binpack/partition) is phase-parsing-free, so nothing live called them. Extended `clean-break-absence.test.ts` to assert the modules + per-phase symbols are absent across non-test source → watched it FAIL → deleted the modules + their 3 dedicated tests; surgically updated the mixed consumers (`govern-resolution` kept live feature-resolution, dropped the dead `extractScopedPaths` block; `dw-lifecycle-isolation` dropped the deleted module names; fixture + `convergence-types` comments de-referenced the deleted code).
+- **Fixed the stale front door (operator-scoped).** Rewrote the execute SKILL.md from the deleted per-phase `govern --phase` model to govern-at-end (steps 3–5 + postcondition + does-NOT-do + honest-boundary/front-door-marker). WORKFLOW.md already encoded the clean model — no template change.
+- **Unblocked + verified.** Checked off all 5 tasks → 030 `tasks.md` is tasks-complete; compass now green (`governing` / `behind`, exit 0). Full suite green (371 files / 2442 tests), tsc clean (modulo pre-existing `portable.ts`, TASK-389). 2 substantive commits, pushed.
+- **Launched then parked the govern.** Started `./bin/stackctl govern --mode implement --item multi:feature/govern-whole-feature-chunked-payload`; operator parked it — killed in the clone-step preamble (no barrage fired, no convergence record written). Governance is next session's first step.
 
 **Didn't Work:**
-- <!-- compose -->
+- **The journal's stated next-step was wrong.** Last session's handoff ("run the whole-feature govern") assumed 030 was complete, but US2/US8 deletion tasks were unchecked — "US9 done" ≠ "feature done." Cost: a multi-step investigation to reconcile.
+- **session-end auto-derived "Commits: 0" again** (TASK-39/-59 boundary-resolution bug on this long-lived branch). Re-derived by hand from `git log 9ac15e3b..HEAD`.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Surfaced the protocol conflict (the execute skill — the sanctioned front door — documents a command 030 deletes) to the operator *before* rewriting it; operator chose "cleanup + fix the stale skill" over backlogging it.
+- [PROCESS] Governance deferred to next session by operator decision after I launched it — a sequencing call, not an offroad.
 
 **Insights:**
-- <!-- compose -->
+- **Task→reality drift is a govern-at-end hazard.** The `tasks-complete spec` gate reads literal checkboxes, so completed-but-unticked work silently blocks the next phase. A "which unchecked tasks already have green gate-tests" preflight would collapse this investigation to seconds (captured as friction).
+- **A scoped absence test is a honey-pot.** `clean-break-absence` passed while 3 whole dead modules survived — because it grepped a hand-listed file set, not the tree. A clean-break assertion must walk the whole non-test source tree.
+- **check-front-door is structural, not semantic.** It validates verb/skill parity + `--help`, NOT whether skill *prose* references a removed command — so the front door read green (62 ops) while advertising the deleted `govern --phase` (captured as friction).
 
-**Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 0
-  - (no commits this session)
-- Files changed: 0
-- Backlog touched: (none)
+**Quantitative (TASK-39/-59 boundary bug auto-derived 0; corrected by hand):**
+- Commits: 3
+  - refactor(030-chunked-end-govern): T034 — delete dead per-phase modules; complete US2/US8 checkoffs (6cb701c4)
+  - docs(030-chunked-end-govern): rewrite execute skill to the govern-at-end model (a1e14bf3)
+  - docs(session): session-end record (ebc0bab6)
+- Files changed: 13 substantive (+93 / −781 — deletion-heavy clean break)
+- Tests: 2466 → 2442 (−24: deleted 3 per-phase test files + the dead FR-012 `extractScopedPaths` block; behavior-preserving — gate tests T025/T027/T061/T062 all green)
+- Backlog touched: none (TASK-130/-39/-59 referenced as known-bug context only; no status transition)
+
+**Next session:** run the parked whole-feature govern-at-end — `./bin/stackctl govern --mode implement --item multi:feature/govern-whole-feature-chunked-payload` (source engine; 030 is now tasks-complete + compass-green, so it proceeds to the chunked barrage — the ultimate dogfood of 030's own pipeline). Note: the untracked Jun-21 convergence record (`override-eligible`, 4 stale HIGH at base `908ccf76`) predates this session and will be recomputed by the fresh run; the untracked `specs/018-repo-release-surface/` is unrelated and still needs provenance triage.
 
 ## 2026-06-22: T086 COMPLETE — govern.ts split under the 500-line cap (T077 green; US9 impl done)
 
