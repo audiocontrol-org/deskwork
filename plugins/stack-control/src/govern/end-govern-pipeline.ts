@@ -168,6 +168,15 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
       terminal = 'fix-failure-surfaced'; // FR-011 — failure isolated + surfaced at reconcile
       break;
     }
+    // TASK-439: a fix that reports SUCCESS but changed nothing (changedFiles:[]) is a
+    // no-op — the open findings it was meant to address are still open. Without this
+    // guard the empty touched-set below sets openFindings=[] and the run reconciles to
+    // `converged`, marking the unfixed findings closed-in-loop. Surface fix-failure
+    // instead — a no-op fix never graduates. (We reach here only with open findings.)
+    if (fix.changedFiles.length === 0) {
+      terminal = 'fix-failure-surfaced';
+      break;
+    }
     const touched = computeTouchedSet({
       round: round + 1,
       chunks: partition.chunks,
