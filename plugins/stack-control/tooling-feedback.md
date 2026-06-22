@@ -118,3 +118,6 @@
 ## session-end 2026-06-22
 - Completed-work task-checkoff drift blocked the next protocol step: last session's T085 completed T031/T033/T034/T063/T064 but never ticked their tasks.md boxes, so the whole-feature govern refused on the 'tasks-complete spec' compass gate this session. The govern-at-end gate reads literal checkbox state; nothing reconciles 'work done' vs 'box ticked'. A graduate/govern preflight that reports which unchecked tasks have green gate-tests (candidates for checkoff) would have surfaced this in seconds instead of a multi-step investigation.
 - 030 clean break left the execute SKILL.md (front door) documenting the deleted per-phase 'govern --phase' model; no 030 task covered updating the skill/WORKFLOW to govern-at-end. check-front-door passed (62 ops) because it validates verb/skill parity + help, not whether skill PROSE references a removed command. A skill-body anti-pattern lint (skill mentions a flag/verb the engine rejects) would catch front-door prose drift.
+
+## session-end 2026-06-22
+- backlog capture dedups by --ref: filing multiple distinct findings that share one audit-log path collapses to a single TASK (returns 'already captured for ref ...'). Workaround: give each a unique #anchor ref (e.g. audit-log.md#AUDIT-...-08). Consider keying dedup on title+ref, or warning instead of silently returning the existing id.

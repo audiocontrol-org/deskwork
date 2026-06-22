@@ -2,6 +2,44 @@
 
 ---
 
+## 2026-06-22: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 17
+  - docs(backlog): cleanup review for a future session — flagged candidates from 214 open
+  - roadmap(govern-030-hardening): umbrella for all 030 follow-up work, marked next (in-flight)
+  - chore(roadmap): clean up post-030-shipped govern nodes
+  - chore(030): close out shipped feature + moot backlog
+  - Merge remote-tracking branch 'origin/main' into feature/stack-control
+  - chore(030-chunked-end-govern): record override graduation for multi:feature/govern-whole-feature-chunked-payload (phase: shipped)
+  - chore(030-chunked-end-govern): disposition round-3 findings (24-35); -25 resolved (specs/018 out of scope), -33 fixed, rest backlogged TASK-433..441
+  - fix(030-chunked-end-govern): accumulate fleet degradation across rounds (-33)
+  - chore(030-chunked-end-govern): disposition round-2 findings 18/19/22/23 (fixed/backlogged)
+  - fix(030-chunked-end-govern): impl override opens the gate (-18) + empty scope fails loud (-23)
+  - chore(030-chunked-end-govern): disposition round-2 findings 17/20/21 (fixed/false-premise)
+  - docs(030-chunked-end-govern): clear round-2 fix-debt from the degraded-fleet outcome (-17/-21)
+  - chore(030-chunked-end-govern): disposition the 12 whole-feature govern findings
+  - docs(030-chunked-end-govern): fix quickstart contradictions/gaps (-05/-06) + scrub stale RED comments
+  - fix(030-chunked-end-govern): resolve 3 dogfood govern findings (-10/-11/-16) TDD-first
+  - chore: release v0.52.2
+  - Merge pull request #494 from audiocontrol-org/feature/stack-control
+- Files changed: 70
+- Backlog touched: TASK-104, TASK-109, TASK-128, TASK-295, TASK-357, TASK-426, TASK-427, TASK-428, TASK-429, TASK-430, TASK-433
+
 ## 2026-06-22: 030 US2/US8 clean-break completion — dead per-phase modules deleted, execute skill → govern-at-end (govern parked for next session)
 
 **Goal:** Pick up last session's parked handoff — run the whole-feature govern-at-end over the 030 diff. It turned out to be blocked, so the real work became finishing 030's US2/US8 remainder to unblock it; the govern itself was then parked per the operator.
