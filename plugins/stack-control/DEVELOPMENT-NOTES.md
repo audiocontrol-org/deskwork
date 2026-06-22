@@ -2,21 +2,36 @@
 
 ---
 
-## 2026-06-22: <!-- session title -->
+## 2026-06-22: 030 whole-feature govern — dogfooded to graduation, shipped to main, roadmap+backlog cleanup
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up the parked whole-feature govern-at-end for `multi:feature/govern-whole-feature-chunked-payload` (the journal's explicit handoff). It expanded into the full close-out: run the govern, triage every finding, fix criticals, graduate, ship to main, validate in the installed release, then clean up the roadmap + backlog.
 
 **Accomplished:**
-- <!-- compose -->
+- **Dogfooded 030's chunked govern-at-end against its own diff across 3 govern rounds** (findings 12 → 7 → 12). The core mechanism held — every fix survived re-govern; full suite green throughout (2442 → 2456, +14 across 5 new test blocks).
+- **Fixed 6 real correctness bugs TDD-first (RED→GREEN):** -10 degraded-fleet → `converged` gate hole (new `degraded-fleet-surfaced` outcome) + -33 its cross-round laundering edge; -11 render-fit over-envelope (manifest made elastic context + byte-accurate UTF-8 truncation — caught a latent multibyte over-envelope leak); -16 fence-closeability in `findGrammarComments`; -18 impl `--override` wrote the retired record shape so the gate stayed closed (THE graduation blocker); -23 empty scope graduated with zero audit.
+- **Graduated via attributable override** at the diminishing-returns plateau → convergence record `override: true` → `workflow status` reads `phase: shipped` (verified end-to-end through the released engine).
+- **Shipped to main:** PR #495 merged (merged `main` in first to resolve the version delta). **Validated 030 in the formally-installed release 0.53.0** (installed engine reads the override graduation as `phase: shipped`).
+- **Closed out:** roadmap node → `shipped`; closed 11 backlog items mooted by the US2/US8 clean break (source-verified); cleaned the roadmap (3 govern gap nodes cancelled as moot, 1 shipped, 2 un-deferred); created the `multi:feature/govern-030-hardening` umbrella (in-flight) gathering all follow-ups.
+- **Backlog cleanup review** (`docs/backlog-cleanup-review-2026-06-22.md`): context pass + 5-agent deep cross-check of all 214 open items → ~41 close / ~9 re-scope / ~7 uncertain candidates flagged for a future session (report-only).
 
 **Didn't Work:**
-- <!-- compose -->
+- **Govern plateaued (12 → 7 → 12 oscillation) — a generator, not convergence.** Each round's fixes added code the next barrage re-audited, plus backlogged items re-surfaced under new IDs and doc prose is inexhaustibly auditable. The right exit was override-and-graduate, not another fix round.
+- **The -18 override bug silently blocked graduation.** The plan was "override to graduate since residuals are backlogged," but the override path wrote the retired `GovernConvergenceRecord` while US9's gate reads `WholeFeatureConvergenceRecord` → `phase: shipped` would never have engaged. Had to fix -18 before any override could work.
+- **session-end auto-derive counted 17 commits; 2 are merged-in from main** (`release v0.52.2`, `Merge #494`). This session = **15 commits**; the boundary range includes main's commits pulled in by the mid-session merge.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Operator scoped each govern round explicitly (criticals-now / backlog-rest), then chose override-and-graduate at the plateau — I surfaced the diminishing-returns analysis and let the operator own the (A)-fix-more vs (B)-graduate call each time rather than grinding autonomously.
+- [PROCESS] The 5-agent backlog deep pass **overruled my context-only reads** — most notably TASK-295 (I'd said "keep / still-valid"; it is resolved + closed-upstream gh-487) and TASK-416 (I'd said "dup"; independently fixed). Cross-checking against source beat recall.
+- [FABRICATION-guard] Verified all three "committed failing test" barrage findings (-09/-12/-13) by running the tests before triaging — all passed; they were false positives from the chunker splitting a RED-first test from its implementing source.
+
+**Quantitative reporting (AUDIT-03/-04):**
+- **030 audit-log: 0 open findings** — BUT this is honest only with context: of 24 findings (AUDIT-20260622-05..35) across 3 rounds, 9 were *fixed*, 4 *false-premise/dismissed*, 1 *resolved-out-of-scope*, and **16 are backlogged real deferred defects** (TASK-426..441, folded into the `govern-030-hardening` umbrella) — the headline "0 open" means dispositioned, not resolved.
+- **Tests: 2442 → 2456 (+14):** +4 degraded-fleet-not-converged, +3 render-fit-over-envelope, +3 grammar-comments-fence-aware, +2 empty-scope-fails-loud, +2 impl-override-opens-gate. Re-derived from `npx vitest run` (376 files / 2456 tests green).
 
 **Insights:**
-- <!-- compose -->
+- **Chunked govern-at-end is a finding generator at the plateau.** Code-audit convergence isn't crisp here because each fix adds auditable surface and the chunker re-examines it; detect the oscillation (12→7→12) and switch to override-and-graduate rather than chasing it. The `spec-audit-diminishing-returns` discipline applies to impl mode too.
+- **The chunker splitting a test from its implementing source is a real false-finding source** (TASK-430): a model auditing the test-only chunk reads stale RED-era comments ("FAILS today") and reports a failing test, blind to the fix in a sibling chunk. Coupling should keep a test with its source.
+- **A backlog deep-cross-check earns its cost.** Five parallel agents grepping each open item against current source caught resolved-but-open items my session context missed and self-corrected their own over-eager calls (402/404 in `tests/` not `src/`; 389 live tsc errors).
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 17
