@@ -284,6 +284,25 @@ export function readWholeFeatureConvergenceRecord(
   return validateWholeFeatureConvergenceRecord(JSON.parse(readFileSync(path, 'utf8')));
 }
 
+/**
+ * The impl graduate-gate signal (030 US9 / FR-025): a feature is impl-converged iff its
+ * single whole-feature convergence record exists AND its outcome is `converged`. This is
+ * the ONE record the governing→shipped gate reads for impl — the implement-mode
+ * GovernConvergenceRecord read path is retired (clean break, FR-018). An absent,
+ * unreadable, or foreign-shaped record at the impl path yields `false` (fail-SAFE: the
+ * gate stays CLOSED and a re-govern re-establishes the record — never a fabricated
+ * graduation), mirroring the 024 FR-013 read-side fail-safe.
+ */
+export function isImplFeatureConverged(installationRoot: string, item: string): boolean {
+  const path = convergenceRecordPath(installationRoot, 'impl', item);
+  if (existsSync(path) === false) return false;
+  try {
+    return validateWholeFeatureConvergenceRecord(JSON.parse(readFileSync(path, 'utf8'))).outcome === 'converged';
+  } catch {
+    return false;
+  }
+}
+
 /** Validate a WholeFeatureConvergenceRecord, throwing on a missing/invalid field. */
 export function validateWholeFeatureConvergenceRecord(value: unknown): WholeFeatureConvergenceRecord {
   const r = ensureRecord(value, 'WholeFeatureConvergenceRecord');

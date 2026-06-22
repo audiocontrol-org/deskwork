@@ -6,6 +6,7 @@
 // CLI dispatch so the query/advance verbs stay thin.
 
 import { isModeConverged } from '../govern/convergence-record.js';
+import { isImplFeatureConverged } from '../govern/chunk-artifacts.js';
 import type { WorkItem } from '../roadmap/roadmap-model.js';
 import { anchorWithin } from './anchor.js';
 import { convergenceKeyFor } from './identity.js';
@@ -40,7 +41,10 @@ export function buildItemContext(
   // whose spec dirs share a basename. govern's write side resolves the same node
   // id via `resolveIdentityFromSpecDir`, so read and write agree.
   const convergenceKey = convergenceKeyFor(item);
-  const implRecordConverged = isModeConverged(installationRoot, 'impl', convergenceKey);
+  // 030 US9 (FR-025, clean break): the impl gate reads the SINGLE whole-feature
+  // convergence record (outcome === 'converged'); the implement-mode
+  // GovernConvergenceRecord read path is retired. Spec mode keeps its record.
+  const implRecordConverged = isImplFeatureConverged(installationRoot, convergenceKey);
   const specRecordConverged = isModeConverged(installationRoot, 'spec', convergenceKey);
 
   const gate: GateContext = {
