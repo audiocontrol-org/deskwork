@@ -38,6 +38,7 @@ import {
   extractBarrageFindings,
   type ExtractedFinding,
 } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
+import { SEVERITY_RANK } from '../scope-discovery/promote-findings/cluster-severity.js';
 import { scopeCommittedDiff } from './payload-diff-scope.js';
 
 /** Configuration for one chunked end-govern run's barrage-backed runtime. */
@@ -198,7 +199,15 @@ export function makeEndGovernRuntime(cfg: EndGovernRuntimeConfig): EndGovernRunt
         runDir,
         warn: (m) => cfg.stderr(`${m}\n`),
       });
-      const findings: Finding[] = rich.map((f) => {
+      // 030 (spec data-model § convergence: `converged` requires a clean/DAMPENED
+      // touched set): the convergence gate counts only HIGH+ (high|blocking)
+      // findings — LOW/MEDIUM are dampened, mirroring the retired gate's slush
+      // behavior — so a low-severity nit never blocks graduation. Only the
+      // gate-blocking findings flow to the pipeline (and to the post-reconcile
+      // lift via `liftedRich`); non-blocking findings remain in the run-dir for
+      // the operator (a LOW/MED slush completeness pass is a follow-on).
+      const blocking = rich.filter((f) => SEVERITY_RANK[f.severity] >= SEVERITY_RANK.high);
+      const findings: Finding[] = blocking.map((f) => {
         const id = findingKey(chunkId, f);
         richByFindingId.set(id, f);
         return { id, title: f.heading, severity: f.severity };

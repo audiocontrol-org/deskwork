@@ -63,8 +63,11 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
-import { resolveImplementDiffBase, scopeCommittedDiff } from '../govern/payload-diff-scope.js';
-import { partitionDiff } from '../govern/cluster-payload/partition.js';
+import { resolveImplementDiffBase } from '../govern/payload-diff-scope.js';
+import { runEndGovern } from '../govern/end-govern-pipeline.js';
+import { makeEndGovernRuntime } from '../govern/end-govern-runtime.js';
+import { writeWholeFeatureConvergenceRecord } from '../govern/chunk-artifacts.js';
+import { liftEndGovernFindingsOnce } from '../govern/lift-once.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
@@ -822,43 +825,126 @@ export async function runGovern(args: string[]): Promise<void> {
       flags.mode === 'implement' && featureRoot !== undefined
         ? resolveGovernExcludePaths(installation)
         : undefined;
-    // 030 US1/US2 (FR-002): partition the whole committed feature diff into
-    // envelope-sized chunks so a large feature never overruns the fleet envelope and
-    // never FATALs on size. Default is a SINGLE whole-diff payload (a small feature is
-    // one chunk — identical to the pre-030 behavior); chunking engages only when the
-    // committed diff partitions into >1 envelope-sized chunk. Each chunk reuses the
-    // existing render→barrage→lift→slush→gate; the gate opens iff EVERY chunk is clean.
-    let chunkScopes: readonly (readonly string[] | undefined)[] = [payloadPathScope];
-    if (flags.mode === 'implement' && laneCapabilities !== undefined) {
+    // 030 US9 (FR-024/026, SC-008): implement mode drives the end-govern pipeline
+    // (runEndGovern) as its SINGLE execution path — cluster → audit → (fix) →
+    // re-audit → seam → reconcile-ONCE → one WholeFeatureConvergenceRecord. The
+    // pipeline partitions the committed diff internally and audits each chunk via
+    // the barrage-backed runtime WITHOUT a per-chunk lift; this CLI lifts ONCE
+    // (FR-026). The reused per-chunk runProtocol loop is GONE (FR-024 clean break).
+    // applyFixes is absent (FR-009 autonomous fix deferred, TASK-424), so a feature
+    // with open findings reconciles to `override-eligible` and the agent fixes +
+    // re-governs. spec mode keeps the runProtocol convergence loop below.
+    if (flags.mode === 'implement') {
+      if (laneCapabilities === undefined) {
+        throw new GovernProtocolError(
+          'govern: FATAL — implement-mode fleet capabilities did not resolve (internal invariant).',
+        );
+      }
+      // US7 (FR-032): the per-codebase clone step runs once (advisory).
+      await runCloneDetectionStep({ repoRoot, write: (s) => process.stderr.write(s) });
+
+      // The graduation signal is keyed by the canonical roadmap node id; resolve it
+      // FIRST and fail loud — a record we cannot key is a record the gate cannot
+      // read (mirrors the override path's record-first ordering).
+      let convergenceItem: string;
       try {
-        const base = flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
-        const scope = scopeCommittedDiff(repoRoot, base, 'HEAD');
-        const envelope = Math.min(...laneCapabilities.map((lane) => lane.envelope.maxPromptBytes));
-        const partition = partitionDiff({ changedFiles: scope.files, fileDiffs: scope.fileDiffs }, envelope);
-        if (partition.chunks.length > 1) {
-          chunkScopes = partition.chunks.map((c) => [...c.files]);
-          process.stderr.write(
-            `govern: chunked the whole committed feature diff into ${partition.chunks.length} ` +
-              `envelope-sized chunks (FR-002 — never boundary-too-large).\n`,
-          );
+        const resolved = resolveConvergenceItem(installation, featureRoot, slug);
+        if (resolved === undefined) {
+          throw new Error(`no roadmap node resolves feature '${slug}'`);
         }
+        convergenceItem = resolved;
       } catch (err) {
-        // 030 dogfood (fail-loud): a partition error must NOT silently degrade to a
-        // whole over-envelope payload — that is the boundary-too-large / lane-choke
-        // pathology 030 exists to remove. The single-file-over-envelope case throws an
-        // actionable FATAL (the file is a-priori broken — fix/remove it; govern does not
-        // hunk-split); any other partition/git failure is equally fatal. Surface the
-        // cause and exit 2 — never swallow it.
-        const msg = errorMessage(err);
-        process.stderr.write(msg.includes('FATAL') ? `${msg}\n` : `govern: FATAL — diff partition failed: ${msg}\n`);
+        process.stderr.write(
+          `govern: FATAL — could not resolve a roadmap node for the whole-feature convergence ` +
+            `record (${errorMessage(err)}); the governing -> shipped gate cannot be keyed, so this ` +
+            `run does NOT graduate. Capture the feature on the roadmap (a node whose spec: pointer ` +
+            `names the feature dir) and re-run.\n`,
+        );
         emitTerminalOutcome('fatal');
         process.exit(2);
       }
-    }
 
-    // US7 (FR-032): implement-mode governance runs the per-codebase clone step once.
-    if (flags.mode === 'implement') {
-      await runCloneDetectionStep({ repoRoot, write: (s) => process.stderr.write(s) });
+      const base = flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
+      const envelope = Math.min(...laneCapabilities.map((lane) => lane.envelope.maxPromptBytes));
+      // Reuse buildImplementVars for the audit lens / framing / commit-subjects /
+      // workplan summary; the assembled whole `diff` is DISCARDED — the pipeline
+      // re-scopes per chunk (scopeCommittedDiff + partitionDiff), rendering the
+      // FR-027-sized payload the barrage actually audits.
+      const { vars } = buildImplementVars(
+        repoRoot,
+        slug,
+        flags.diffBase,
+        flags.checkpoint,
+        undefined,
+        featureRoot,
+        excludeRoots,
+        excludePaths,
+      );
+      const { diff: _discardedWholeDiff, workplan_summary: planContext, ...varsBase } = vars;
+      void _discardedWholeDiff;
+
+      const runtime = makeEndGovernRuntime({
+        barrageBin,
+        installationRoot: repoRoot,
+        slug,
+        checkpoint: flags.checkpoint ?? 'after_implement',
+        varsBase,
+        laneCapabilities,
+        models: requestedModels,
+        requireModels,
+        envelope,
+        planContext,
+        base,
+        head: 'HEAD',
+        stderr: (s) => process.stderr.write(s),
+      });
+
+      const { record } = await runEndGovern(
+        { installationRoot: repoRoot, item: convergenceItem, base, head: 'HEAD' },
+        runtime.deps,
+      );
+
+      // Persist the ONE whole-feature record the impl graduate gate reads (FR-025).
+      // A record-write failure is FATAL — never report graduation the durable gate
+      // signal does not back (mirrors the override path's record-first FATAL).
+      try {
+        writeWholeFeatureConvergenceRecord(repoRoot, record);
+      } catch (err) {
+        process.stderr.write(
+          `govern: FATAL — could not write the whole-feature convergence record ` +
+            `(${errorMessage(err)}); the governing -> shipped gate stays CLOSED and this run does ` +
+            `NOT graduate. Fix the write error and re-run.\n`,
+        );
+        emitTerminalOutcome('fatal');
+        process.exit(1);
+      }
+
+      // Lift ONCE (FR-026): the reconciled lifted findings become a single audit-log
+      // section, counting as one dampener run — never one section per chunk.
+      const liftDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      await liftEndGovernFindingsOnce({
+        installationRoot: repoRoot,
+        slug,
+        findings: runtime.liftedRich(record.liftedFindings.map((f) => f.id)),
+        date: liftDate,
+        runLabel: `end-govern-${flags.checkpoint ?? 'after_implement'}`,
+        stderr: (s) => process.stderr.write(s),
+      });
+
+      if (record.outcome !== 'converged') {
+        process.stderr.write(
+          `govern: implementation NOT done — end-govern reconciled to '${record.outcome}' ` +
+            `(${record.liftedFindings.length} open finding(s) over ${record.chunkIds.length} chunk(s), ` +
+            `${record.rounds} round(s)). Fix the surfaced findings & re-govern, or record --override.\n`,
+        );
+        emitTerminalOutcome('blocked');
+        process.exit(1);
+      }
+      process.stderr.write(
+        `govern: implementation governed (end-govern converged over ${record.chunkIds.length} chunk(s)).\n`,
+      );
+      emitTerminalOutcome('graduated');
+      process.exit(0);
     }
 
     const noSlush = flags.noSlush || process.env.GOVERN_NO_SLUSH === '1';
@@ -899,17 +985,13 @@ export async function runGovern(args: string[]): Promise<void> {
     };
 
     // specs/015 US2 (FR-004/005): delegate the convergence loop to the code driver.
-    // Each round audits EVERY chunk; the gate opens only when all chunks are clean.
+    // 030 (FR-024): implement mode drove the end-govern pipeline above and exited;
+    // only spec mode reaches this loop, auditing a single whole payload scope (the
+    // chunk partition lives entirely inside the implement-mode pipeline now).
     const ceiling = resolveCeiling(pick(flags.ceiling, process.env.GOVERN_CEILING));
     const outcome: ConvergenceOutcome = await runConvergenceLoop({
       ceiling,
-      runPass: async () => {
-        let allOpen = true;
-        for (const chunkScope of chunkScopes) {
-          if ((await auditChunkPass(chunkScope)) === false) allOpen = false;
-        }
-        return { gateOpen: allOpen };
-      },
+      runPass: async () => ({ gateOpen: await auditChunkPass(payloadPathScope) }),
       dispatchFix: async () => {
         process.stderr.write(
           'govern: convergence gate BLOCKED — fix the surfaced findings; the loop ' +

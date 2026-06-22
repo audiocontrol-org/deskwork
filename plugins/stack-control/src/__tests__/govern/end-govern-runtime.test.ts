@@ -43,7 +43,7 @@ function writeStubBarrage(dir: string, runDir: string, verbLog: string): string 
     '    mkdir -p "$rd"',
     '    {',
     '      printf "### Possible null deref in foo\\n"',
-    '      printf "Finding-ID: claude-01\\nStatus: open\\nSeverity: high\\nSurface: src/foo.ts:42\\n\\n"',
+    '      printf "Finding-ID: claude-01\\nStatus: open\\nSeverity: ${STUB_SEVERITY:-high}\\nSurface: src/foo.ts:42\\n\\n"',
     '      printf "The value can be null when the cache misses.\\n"',
     '    } > "$rd/model-claude.md"',
     '    printf "%s\\n" "$rd"',
@@ -112,6 +112,19 @@ describe('030 T084 — end-govern runtime audits a chunk without per-chunk lift 
     expect(result.findings[0]!.severity).toBe('high');
     expect(result.findings[0]!.title).toMatch(/null deref/i);
     expect(result.degraded).toBe(false);
+  });
+
+  it('dampens LOW/MEDIUM — only HIGH+ findings block convergence (spec: clean/dampened)', async () => {
+    const prev = process.env.STUB_SEVERITY;
+    process.env.STUB_SEVERITY = 'low';
+    try {
+      const { runtime } = makeRuntime();
+      const result = await runtime.deps.auditChunk('the chunk payload bytes', 'c1');
+      expect(result.findings, 'a LOW finding must not block convergence').toHaveLength(0);
+    } finally {
+      if (prev === undefined) delete process.env.STUB_SEVERITY;
+      else process.env.STUB_SEVERITY = prev;
+    }
   });
 
   it('does NOT call audit-barrage-lift per chunk (FR-026: lift is once, post-reconcile)', async () => {
