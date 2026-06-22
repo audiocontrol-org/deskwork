@@ -63,7 +63,7 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
-import { scopeCommittedDiff } from '../govern/payload-diff-scope.js';
+import { resolveImplementDiffBase, scopeCommittedDiff } from '../govern/payload-diff-scope.js';
 import { partitionDiff } from '../govern/cluster-payload/partition.js';
 import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
@@ -121,7 +121,7 @@ const USAGE = [
   '                            is what protocol runs exist for; specs/014 US1).',
   '  --no-slush                Disable the slush step (address every finding).',
   '  --json                    Emit the gate verdict JSON only.',
-  '  implement: --diff-base <ref>   Diff base for the whole committed feature diff (default HEAD~1).',
+  '  implement: --diff-base <ref>   Diff base for the whole committed feature diff (default: merge-base with the repo default branch; HEAD~1 if none).',
   '  spec:      --spec-path <p>      Spec under audit (else CLAUDE.md SPECKIT marker).',
   '             --plan-path <p>      Fold the plan (the after_plan checkpoint).',
   '             --checkpoint <name>  Override the checkpoint label.',
@@ -548,6 +548,17 @@ export async function runGovern(args: string[]): Promise<void> {
 
   try {
     const repoRoot = installation.root;
+    // 030 dogfood fix: implement-mode's whole-feature diff base defaults to the FEATURE
+    // FORK POINT (merge-base with the repo default branch), not HEAD~1 (which audited
+    // only the last commit). An explicit --diff-base / GOVERN_DIFF_BASE still wins; the
+    // resolved base is threaded back into flags so every downstream site (the chunk
+    // partitioner, the phase-unit scope, the per-chunk payload) shares one base.
+    if (flags.mode === 'implement') {
+      flags.diffBase = resolveImplementDiffBase(
+        repoRoot,
+        flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE),
+      );
+    }
     // 024 FR-011: resolve the feature from an existing feature root — explicit,
     // then the branch slug (when it resolves), then the Spec Kit active-feature
     // marker — so govern runs on the session-pinned branch (where the branch slug

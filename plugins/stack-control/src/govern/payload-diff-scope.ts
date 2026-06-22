@@ -30,6 +30,45 @@ function git(root: string, args: readonly string[]): string {
   return typeof r.stdout === 'string' ? r.stdout : '';
 }
 
+/** Non-throwing git: returns trimmed stdout on success, undefined on any non-zero/spawn error. */
+function gitTry(root: string, args: readonly string[]): string | undefined {
+  const r = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  if (r.status !== 0) return undefined;
+  const out = typeof r.stdout === 'string' ? r.stdout.trim() : '';
+  return out.length > 0 ? out : undefined;
+}
+
+/** The repo's default branch ref, best-effort: origin/HEAD → `main` → `master` → undefined. */
+function resolveDefaultBranch(gitRoot: string): string | undefined {
+  const sym = gitTry(gitRoot, ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD']);
+  if (sym !== undefined) return sym.replace(/^refs\/remotes\//, ''); // e.g. origin/main
+  for (const candidate of ['main', 'master']) {
+    if (gitTry(gitRoot, ['rev-parse', '--verify', '--quiet', candidate]) !== undefined) return candidate;
+  }
+  return undefined;
+}
+
+/**
+ * Resolve implement-mode's whole-feature diff base. An explicit base (the `--diff-base`
+ * flag or `GOVERN_DIFF_BASE`, threaded by the caller) wins. Otherwise default to the
+ * FEATURE FORK POINT — the merge-base with the repo default branch — so a bare
+ * `stackctl govern --mode implement` audits the WHOLE feature, not just the last commit.
+ * HEAD~1 was the prior default and silently scoped one commit (dogfood finding). The
+ * documented fallback to HEAD~1 covers the degenerate cases (on the default branch, a
+ * detached HEAD, or an unresolvable default branch) where there is no feature span.
+ */
+export function resolveImplementDiffBase(installationRoot: string, explicit: string | undefined): string {
+  if (explicit !== undefined && explicit.trim() !== '') return explicit;
+  const gitRoot = gitTry(installationRoot, ['rev-parse', '--show-toplevel']) ?? installationRoot;
+  const def = resolveDefaultBranch(gitRoot);
+  if (def !== undefined) {
+    const mergeBase = gitTry(gitRoot, ['merge-base', 'HEAD', def]);
+    const head = gitTry(gitRoot, ['rev-parse', 'HEAD']);
+    if (mergeBase !== undefined && mergeBase !== head) return mergeBase;
+  }
+  return 'HEAD~1';
+}
+
 function lines(out: string): string[] {
   return out.split('\n').map((s) => s.trim()).filter((s) => s.length > 0);
 }
