@@ -19,7 +19,7 @@ End-govern resolves the feature base anchor, audits the whole committed diff in 
 | `--at <dir>` | KEPT | the installation anchor (FR-010 invariant; default = nearest-enclosing). |
 | `--override <reason>` | KEPT | the 029 US4 short-circuit graduation with an attributable reason (a blank reason fails loud). |
 | `--phase <id>` | **REMOVED** | passing it is an **unknown-flag usage error** — clean break, no legacy accept (FR-017, US2 Scenario 1). |
-| `--checkpoint` / `GOVERN_CHECKPOINT` | **REMOVED** | unknown flag / ignored-then-error var — no per-phase checkpoint path exists (FR-017, TASK-125). |
+| `--checkpoint` / `GOVERN_CHECKPOINT` | **REMOVED (implement mode)** | rejected loud (FATAL) in implement mode — no per-phase checkpoint path exists (FR-017, TASK-125). SPEC mode retains the `--checkpoint` label as a legitimate spec-governance input (FR-029), so the tokens still appear in `src/`. |
 
 ## Base anchor resolution (FR-001)
 
@@ -44,7 +44,7 @@ The run **never** terminates with `boundary-too-large` (FR-002 — that terminal
 
 ## Invariants (testable)
 
-- Invoking `--phase` or setting `GOVERN_CHECKPOINT` is a clean usage error (no silent accept) — US2 Scenario 1.
+- In implement mode, invoking `--phase` or setting `GOVERN_CHECKPOINT` / `--checkpoint` is a clean usage error (no silent accept) — US2 Scenario 1. (Spec mode keeps `--checkpoint`, FR-029.)
 - No `phase-checkpoints/*.json` is written by any path — US2 Scenario 3.
 - A feature of any committed-diff size reaches a graduation decision (never `boundary-too-large`) — US1 / SC-001.
 - The graduate gate consults only the whole-feature convergence record — US2 Scenario 2.

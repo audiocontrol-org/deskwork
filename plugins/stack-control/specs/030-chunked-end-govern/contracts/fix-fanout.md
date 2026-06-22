@@ -1,5 +1,7 @@
 # Contract: fix-fanout (parallel worktree-isolated fix dispatch)
 
+> **STATUS — DEFERRED (TASK-424).** The autonomous worktree fix-fanout (FR-009) is **not wired**: the end-govern runtime omits `applyFixes` (operator decision 2026-06-22), so the pipeline surfaces `override-eligible` and the **agent-in-the-loop** fixes the findings and re-governs. This contract is the captured design for the deferred backend; the `makeFixFanout` builder + `dispatchFixSubagents`/`mergeFixWorktrees` primitives exist and are tested, but no runtime path injects them yet. Wiring is tracked as **TASK-424**.
+
 Applies findings grouped by chunk via worktree-isolated fix-subagents in parallel, merges back to the feature branch, and surfaces what it cannot resolve. Autonomous (apply + commit), capability-not-vendor (Principle IX), fail-loud (Principle V).
 
 ## Input

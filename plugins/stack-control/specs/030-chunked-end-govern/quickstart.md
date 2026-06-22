@@ -52,14 +52,14 @@ stackctl govern --mode implement --at <fixture-installation>
 **Run / grep.**
 ```
 stackctl govern --mode implement --phase 2 --at <fixture>      # expect: unknown-flag usage error
-GOVERN_CHECKPOINT=x stackctl govern --mode implement --at <fixture>   # expect: unknown var (no silent accept)
-grep -rn "allPhaseCheckpointsCurrent\|all-phase-checkpoints-current\|phase-checkpoints\|GOVERN_CHECKPOINT\|--checkpoint" src/   # expect: zero hits
+GOVERN_CHECKPOINT=x stackctl govern --mode implement --at <fixture>   # expect: implement-mode FATAL (no silent accept)
+grep -rn "allPhaseCheckpointsCurrent" src/ | grep -v __tests__   # expect: zero hits (deleted; clean-break-absence.test.ts asserts it stays gone)
 ```
 
 **Expect.**
-- `--phase` / `GOVERN_CHECKPOINT` are clean usage errors, not legacy-accepted (FR-017, [govern-cli.md](./contracts/govern-cli.md)).
-- The grep returns **zero** per-phase-surface hits (SC-002 = 0 remaining surfaces).
-- No `phase-checkpoints/*.json` is written by any govern run (US2 Scenario 3).
+- In **implement mode**, `--phase` and `GOVERN_CHECKPOINT` / `--checkpoint` are clean usage errors, not legacy-accepted (FR-017, [govern-cli.md](./contracts/govern-cli.md)).
+- The live per-phase checkpoint criterion (`allPhaseCheckpointsCurrent`) is gone — the grep returns **zero** hits (SC-002 = 0 remaining live per-phase criterion). NOTE: `--checkpoint` / `GOVERN_CHECKPOINT` / `phase-checkpoints` themselves are **not** zero in `src/` and must not be — SPEC mode retains the `--checkpoint` label (FR-029), implement mode rejects them with a loud FATAL, and `phase-checkpoints` survives only as a payload-exclusion path string. Grepping those tokens for zero hits is the drift TASK-433 corrected.
+- No `phase-checkpoints/*.json` is **written** by any govern run (US2 Scenario 3).
 - The graduate gate passes on the whole-feature record alone ([graduate-gate.md](./contracts/graduate-gate.md), US2 Scenario 2).
 
 ---

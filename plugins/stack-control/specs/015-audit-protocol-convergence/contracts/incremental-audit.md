@@ -1,5 +1,11 @@
 # Contract: Incremental per-phase audit unit + payload exclusion (threads 3/4; FR-006/007/008/009)
 
+> **STATUS — SUPERSEDED (specs/030 clean break; TASK-128).** This contract describes the **per-phase** audit model. It no longer matches the code:
+> - **021** removed the inclusion-based `resolveComposingFeatureUnit` (the FR-008 composing-unit primitive) — whole-feature composition moved to exclusion-based scoping in `subcommands/govern.ts` (`resolveImplementExclusion` + `filterDiffScope`).
+> - **030** then **retired the per-phase audit model entirely**: `incremental-audit.ts`, `payload-implement.ts`, `resolvePhaseUnit`, and `resolveComposingFeatureUnit` are deleted. Implement-mode govern audits the **whole committed `governedSha`..HEAD diff**, chunked by coupling into envelope-sized chunks (specs/030 `end-govern-pipeline.ts`), and rejects `--phase` / `--checkpoint` (no per-phase path exists). The `## Phase N:` colon-only header grammar described below was also superseded by the 021 digit-led colon/dash/em-dash/bare grammar before the per-phase model itself was retired.
+>
+> Retained as the historical 015/021 design record. For the current model see [specs/030-chunked-end-govern/spec.md](../../030-chunked-end-govern/spec.md) and [contracts/govern-cli.md](../../030-chunked-end-govern/contracts/govern-cli.md).
+
 Shrinks the audit unit from whole-feature to a completed tasks.md phase, and removes the self-referential generator from the rendered payload.
 
 ## `incremental-audit.ts` — unit resolution (D6; FR-007)

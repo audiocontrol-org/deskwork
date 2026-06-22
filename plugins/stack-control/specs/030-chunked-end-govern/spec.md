@@ -24,7 +24,7 @@ The actors are the **operator** (runs `govern` / `execute` and owns graduation) 
 
 ### Session 2026-06-21
 
-- Q: When the chunked audit finds issues, does govern apply+commit fixes itself or propose them? → A: **Autonomous apply + commit** — fix-fanout applies fixes in worktrees, commits to the feature branch, and re-audits unattended; only fix-subagent failures and unresolvable merges surface to the operator.
+- Q: When the chunked audit finds issues, does govern apply+commit fixes itself or propose them? → A: **Autonomous apply + commit** — fix-fanout applies fixes in worktrees, commits to the feature branch, and re-audits unattended; only fix-subagent failures and unresolvable merges surface to the operator. *(Superseded 2026-06-22: the autonomous fix-fanout is DEFERRED — `applyFixes` is unwired, the pipeline surfaces `override-eligible` and the agent-in-the-loop fixes + re-governs. Wiring tracked as TASK-424; US5 is the captured design.)*
 - Q: How is the feature-base anchor for the `governedSha`..HEAD diff determined? → A: **Reuse the 029 US5 `governedSha` anchor** resolved at feature start; an explicit `--diff-base` overrides.
 - Q: What backstops termination if a coupling cycle keeps the touched set from shrinking? → A: **Hard max-round cap as a backstop** — the shrinking touched-set + dampener is the norm; on hitting the cap, STOP and surface for operator override (never loop forever).
 - Q: What does the seam pass count as a substantive contract break (vs a compatible change it must not flag)? → A: **Cross-boundary breakage only** — removed/renamed exported symbol, changed arity, or changed required shape consumed across a chunk boundary; ignore compatible additions and internal-only changes.
@@ -106,7 +106,9 @@ After the chunked audit produces findings and they are fixed, only the chunks wh
 
 ---
 
-### User Story 5 - Industrialized parallel fix (Priority: P2)
+### User Story 5 - Industrialized parallel fix (Priority: P2) — DEFERRED (TASK-424)
+
+> **DEFERRED.** The autonomous worktree fix-fanout is not wired: the end-govern runtime omits `applyFixes` (operator decision 2026-06-22), so the pipeline surfaces `override-eligible` and the agent-in-the-loop fixes + re-governs. The `makeFixFanout` builder and its primitives exist and are tested; no runtime path injects them yet. Wiring is tracked as TASK-424. The story below is the captured design.
 
 Findings are grouped by chunk and fixed by worktree-isolated fix-subagents running in parallel under a concurrency cap; results merge back to the feature branch. A conflicting pair serializes; an unresolvable merge surfaces to the operator. A fix-subagent failure isolates that chunk and the run continues, surfacing the failure at reconcile. A lane outage degrades that round per existing behavior.
 
@@ -216,7 +218,7 @@ The implement-mode `govern` CLI **drives `end-govern-pipeline.runEndGovern`** as
 **Audit, fix, convergence**
 
 - **FR-008**: Govern MUST audit chunks in parallel (chunks × lanes) under a concurrency cap bounded by fleet negotiation.
-- **FR-009**: Govern MUST fix findings grouped by chunk via worktree-isolated fix-subagents running in parallel under a configurable concurrency cap, then merge results to the feature branch. Fixing is **autonomous**: govern applies AND commits the fixes unattended (no propose-only / operator-applies step); only fix-subagent failures (FR-011) and unresolvable merges (FR-010) surface to the operator.
+- **FR-009** *(DEFERRED — TASK-424)*: Govern fixes findings grouped by chunk via worktree-isolated fix-subagents running in parallel under a configurable concurrency cap, then merges results to the feature branch. Fixing is **autonomous**: govern applies AND commits the fixes unattended (no propose-only / operator-applies step); only fix-subagent failures (FR-011) and unresolvable merges (FR-010) surface to the operator. **Status:** the autonomous backend is **not wired** — `applyFixes` is omitted from the runtime (operator decision 2026-06-22), so the pipeline surfaces `override-eligible` and the agent-in-the-loop fixes + re-governs; the `makeFixFanout` builder + primitives (FR-010/FR-011 behavior) exist and are tested. Wiring is TASK-424.
 - **FR-010**: When two chunks' fixes touch a shared file, govern MUST serialize the conflicting pair rather than merge blindly; an unresolvable merge MUST be surfaced to the operator (Constitution Principle V — fail loud, no fabricated resolution).
 - **FR-011**: A fix-subagent failure MUST isolate its chunk, allow other chunks to continue, and be surfaced at reconcile.
 - **FR-012**: After fixes, govern MUST re-audit only the chunks whose files a fix touched (the touched set), and the touched set MUST be coupling-correct (a fix to a file coupled into another chunk includes that chunk).
