@@ -5,7 +5,10 @@
 // feature-size case — the packer AVOIDS the condition. A single FILE whose own
 // diff exceeds the envelope is a-priori-broken (operator decision 2026-06-21):
 // govern FAILS LOUD naming it rather than hunk-splitting. Implemented in Phase 3
-// (T019).
+// (T019). T079 (FR-028): a non-audit-trimmed file is RETAINED in exactly one
+// chunk's `files` for coverage (its bytes excluded from measure/render via
+// `coverageOnlyFiles`), never dropped from the chunk set; an all-non-audit
+// oversized cluster never emits a dangling (< 2 sub-chunk) marker.
 
 import type { Chunk, SplitClusterMarker } from '../chunk-artifacts.js';
 import { computeChunkId } from './chunk-id.js';
@@ -33,17 +36,56 @@ function makeChunk(bin: Bin, splitCluster: boolean): Chunk {
   return { id: computeChunkId(bin.files), files: [...bin.files].sort(), splitCluster, renderedBytes: bin.bytes };
 }
 
-/** Sub-split an oversized cluster (after trim) into envelope-sized sub-chunks; fail loud on a single oversized file. */
+/**
+ * Build one chunk whose `files` carries BOTH the audit-kept files and the
+ * coverage-only (trimmed) files, so the union stays complete (FR-028); only the
+ * kept bytes count toward the measure and only kept files render. The chunk id +
+ * the coverage-only set are computed over the full `files` so coverage is stable.
+ */
+function makeCoverageChunk(
+  keptFiles: readonly string[],
+  coverageOnlyFiles: readonly string[],
+  keptBytes: number,
+  splitCluster: boolean,
+): Chunk {
+  const allFiles = [...keptFiles, ...coverageOnlyFiles].sort();
+  const base: Chunk = {
+    id: computeChunkId(allFiles),
+    files: allFiles,
+    splitCluster,
+    renderedBytes: keptBytes,
+  };
+  if (coverageOnlyFiles.length === 0) return base;
+  return { ...base, coverageOnlyFiles: [...coverageOnlyFiles].sort() };
+}
+
+/**
+ * Sub-split an oversized cluster (after trim) into envelope-sized sub-chunks; fail
+ * loud on a single oversized AUDIT file. The trimmed (non-audit) files are never
+ * dropped — they are retained as coverage-only paths on the first sub-chunk
+ * (FR-028). A marker is emitted ONLY when ≥ 2 real audit sub-chunks result; an
+ * all-non-audit cluster (no audit bytes after trim) becomes a single coverage-only
+ * chunk with NO marker (never a dangling/empty marker).
+ */
 function subSplitOversized(
   cluster: Cluster,
   fileDiffs: ReadonlyMap<string, string>,
   envelopeBytes: number,
-): { chunks: Chunk[]; marker: SplitClusterMarker } {
+): { chunks: Chunk[]; marker: SplitClusterMarker | null } {
   const clusterId = computeChunkId(cluster.memberFiles);
   const list: FileDiff[] = cluster.memberFiles.map((f) => ({ path: f, diffText: fileDiffs.get(f) ?? '' }));
   const trimmed = trimNonAuditBytes(list);
+  const keptPaths = new Set(trimmed.kept.map((fd) => fd.path));
+  const coverageOnlyFiles = cluster.memberFiles.filter((f) => keptPaths.has(f) === false);
 
-  const subChunks: Chunk[] = [];
+  // All-non-audit cluster: nothing to audit after the trim. Retain every file as
+  // coverage-only in a single chunk — no audit bytes, full coverage, NO marker.
+  if (trimmed.kept.length === 0) {
+    const chunk = makeCoverageChunk([], cluster.memberFiles, 0, false);
+    return { chunks: [chunk], marker: null };
+  }
+
+  const subBins: Bin[] = [];
   let current: Bin = { files: [], bytes: 0 };
   for (const fd of trimmed.kept) {
     const fb = fd.diffText.length;
@@ -56,13 +98,26 @@ function subSplitOversized(
       );
     }
     if (current.bytes + fb > envelopeBytes && current.files.length > 0) {
-      subChunks.push(makeChunk(current, true));
+      subBins.push(current);
       current = { files: [], bytes: 0 };
     }
     current.files.push(fd.path);
     current.bytes += fb;
   }
-  if (current.files.length > 0) subChunks.push(makeChunk(current, true));
+  if (current.files.length > 0) subBins.push(current);
+
+  // Attach the coverage-only (trimmed) paths to the first sub-chunk so the union
+  // stays complete; their bytes never count toward any sub-chunk's measure.
+  const subChunks = subBins.map((bin, i) =>
+    i === 0
+      ? makeCoverageChunk(bin.files, coverageOnlyFiles, bin.bytes, true)
+      : makeChunk(bin, true),
+  );
+
+  // A marker is meaningful only for a genuine ≥2-sub-chunk split. A single audit
+  // sub-chunk (the kept bytes fit whole) needs no marker — and a dangling/empty
+  // marker is forbidden (FR-028).
+  if (subChunks.length < 2) return { chunks: subChunks, marker: null };
 
   const marker: SplitClusterMarker = {
     clusterId,
@@ -91,17 +146,22 @@ export function binpackClusters(
       fitting.push({ cluster, bytes });
       continue;
     }
-    // Oversized: try the trim pre-pass; if it now fits, one chunk, else sub-split + marker.
+    // Oversized: try the trim pre-pass. If the kept (audit) bytes now fit, emit ONE
+    // chunk that RETAINS the trimmed files as coverage-only paths (FR-028) — never
+    // drop them from the chunk set. Otherwise sub-split (+ marker iff ≥2 sub-chunks).
     const list: FileDiff[] = cluster.memberFiles.map((f) => ({ path: f, diffText: fileDiffs.get(f) ?? '' }));
-    const keptBytes = trimNonAuditBytes(list).kept.reduce((s, fd) => s + fd.diffText.length, 0);
+    const trimmed = trimNonAuditBytes(list);
+    const keptFiles = trimmed.kept.map((fd) => fd.path);
+    const keptBytes = trimmed.kept.reduce((s, fd) => s + fd.diffText.length, 0);
+    const keptPaths = new Set(keptFiles);
+    const coverageOnlyFiles = cluster.memberFiles.filter((f) => keptPaths.has(f) === false);
     if (keptBytes <= envelopeBytes && keptBytes > 0) {
-      const keptFiles = trimNonAuditBytes(list).kept.map((fd) => fd.path);
-      chunks.push(makeChunk({ files: keptFiles, bytes: keptBytes }, false));
+      chunks.push(makeCoverageChunk(keptFiles, coverageOnlyFiles, keptBytes, false));
       continue;
     }
     const split = subSplitOversized(cluster, fileDiffs, envelopeBytes);
     chunks.push(...split.chunks);
-    splitClusterMarkers.push(split.marker);
+    if (split.marker !== null) splitClusterMarkers.push(split.marker);
   }
 
   // First-fit-decreasing over the fitting clusters (size desc; tiebreak by stable cluster id).

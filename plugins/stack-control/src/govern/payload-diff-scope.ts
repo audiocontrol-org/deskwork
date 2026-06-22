@@ -5,8 +5,6 @@
 // committed-diff feature. Implemented in Phase 3 (T021).
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 /** The scoped diff: the changed file set + per-file diff text over governedSha..HEAD. */
 export interface DiffScope {
@@ -26,6 +24,28 @@ function git(root: string, args: readonly string[]): string {
   if (r.status !== 0) {
     const detail = typeof r.stderr === 'string' ? r.stderr.trim() : (r.error?.message ?? 'unknown error');
     throw new Error(`govern: git ${args.join(' ')} failed in ${root}: ${detail}`);
+  }
+  return typeof r.stdout === 'string' ? r.stdout : '';
+}
+
+/**
+ * `git diff --no-index <a> <b>` for the untracked-fold. This form exits with status
+ * 1 when the two inputs differ (the expected case here — an untracked file vs the
+ * empty `/dev/null`) and status 0 only when identical; a spawn error or status >1 is
+ * a real failure. We mirror the same `-c core.quotePath=false` + `--relative`
+ * conventions the tracked-diff arm uses so non-ASCII and subdir-relative paths stay
+ * byte-identical to the committed-diff arm.
+ */
+function gitDiffNoIndex(root: string, args: readonly string[]): string {
+  const r = spawnSync(
+    'git',
+    ['-C', root, '-c', 'core.quotePath=false', 'diff', '--no-index', '--relative', ...args],
+    { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
+  );
+  // 0 = identical (no diff text), 1 = differ (unified diff on stdout); both are success.
+  if (r.status !== 0 && r.status !== 1) {
+    const detail = typeof r.stderr === 'string' ? r.stderr.trim() : (r.error?.message ?? 'unknown error');
+    throw new Error(`govern: git diff --no-index ${args.join(' ')} failed in ${root}: ${detail}`);
   }
   return typeof r.stdout === 'string' ? r.stdout : '';
 }
@@ -94,12 +114,17 @@ export function scopeCommittedDiff(installationRoot: string, base: string, head:
     files.push(f);
   }
 
-  // Untracked-fold: working-tree files not yet committed are rendered as added-line diffs.
-  // `git ls-files` from the installation subdir already lists installation-relative paths.
+  // Untracked-fold: working-tree files not yet committed are rendered as STANDARD
+  // `git diff --no-index` unified diffs (diff --git / --- / +++ / @@ hunk headers),
+  // so the partitioner/barrage treats them uniformly with the committed-diff arm —
+  // NOT a hand-synthesized `+`-line-only blob (FR-030, T080). `git ls-files` from the
+  // installation subdir already lists installation-relative paths; diffing against
+  // /dev/null yields a full added-file unified diff. `--relative` + `core.quotePath`
+  // mirror the tracked arm above so the path base stays installation-relative and
+  // non-ASCII names stay literal UTF-8.
   for (const f of lines(git(installationRoot, ['ls-files', '--others', '--exclude-standard']))) {
     if (fileDiffs.has(f)) continue;
-    const content = readFileSync(join(installationRoot, f), 'utf8');
-    fileDiffs.set(f, content.split('\n').map((l) => `+${l}`).join('\n'));
+    fileDiffs.set(f, gitDiffNoIndex(installationRoot, ['--', '/dev/null', f]));
     files.push(f);
   }
 

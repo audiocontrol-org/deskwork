@@ -522,15 +522,24 @@ export async function runGovern(args: string[]): Promise<void> {
     process.exit(2);
   }
 
-  // 030 US2 (FR-017, clean break): GOVERN_CHECKPOINT is retired with the per-phase
-  // path — there is no per-phase checkpoint to select. Reject it loud, like --phase.
-  if (process.env.GOVERN_CHECKPOINT !== undefined && process.env.GOVERN_CHECKPOINT.length > 0) {
-    process.stderr.write(
-      'govern: FATAL — GOVERN_CHECKPOINT is retired (030 clean break: per-phase governance ' +
-        'is gone; govern audits the whole committed feature diff at end). Unset it.\n',
-    );
-    emitTerminalOutcome('fatal');
-    process.exit(2);
+  // 030 US9 (FR-029, clean break): the checkpoint selector is MODE-SCOPED. IMPLEMENT
+  // mode has no per-phase checkpoint to select — the per-phase path is gone; it audits
+  // the whole committed feature diff at end — so GOVERN_CHECKPOINT / --checkpoint are
+  // rejected loud, like --phase. SPEC mode KEEPS its checkpoint label (a legitimate
+  // spec-governance input), so the rejection never fires there.
+  if (flags.mode === 'implement') {
+    const checkpointEnv = process.env.GOVERN_CHECKPOINT;
+    const checkpointSelected =
+      (checkpointEnv !== undefined && checkpointEnv.length > 0) || flags.checkpoint !== undefined;
+    if (checkpointSelected) {
+      process.stderr.write(
+        'govern: FATAL — GOVERN_CHECKPOINT is retired in implement mode (030 clean break: ' +
+          'per-phase governance is gone; govern audits the whole committed feature diff at end). ' +
+          'Unset it. Spec mode keeps its checkpoint label.\n',
+      );
+      emitTerminalOutcome('fatal');
+      process.exit(2);
+    }
   }
 
   // specs/installation-isolation US3 (R1): resolve the installation ONCE

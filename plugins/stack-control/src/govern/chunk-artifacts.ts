@@ -34,6 +34,22 @@ export interface Chunk {
   readonly files: readonly string[];
   readonly splitCluster: boolean;
   readonly renderedBytes: number;
+  /**
+   * Subset of `files` RETAINED for coverage (so ⋃ chunk.files === changed set —
+   * FR-028) but whose diff BYTES are excluded from the rendered audit payload and
+   * the envelope measurement (the non-audit trim, FR-006). A trimmed non-audit
+   * file is never dropped from the chunk set — only its bytes are withheld. Absent
+   * ⇒ no coverage-only files (every file in `files` is rendered).
+   */
+  readonly coverageOnlyFiles?: readonly string[];
+  /**
+   * The active fleet envelope this chunk must render within (FR-027). When set by
+   * the partition, `renderChunkPayload` truncates the elastic shared preamble so
+   * the WHOLE rendered payload stays within this budget; the partition guarantees
+   * the non-preamble body (framing + manifest + audited diffs) already fits.
+   * Absent ⇒ no budgeting (a hand-constructed chunk renders its full preamble).
+   */
+  readonly renderBudgetBytes?: number;
 }
 
 /** Per-chunk context listing the OTHER chunks' file lists — "what this chunk cannot see". */
@@ -162,12 +178,22 @@ function reqFinding(value: unknown, entity: string): Finding {
 /** Validate a parsed object against the Chunk schema, throwing on a missing/invalid field. */
 export function validateChunk(value: unknown): Chunk {
   const r = ensureRecord(value, 'Chunk');
-  return {
+  const base: Chunk = {
     id: reqString(r, 'id', 'Chunk'),
     files: reqStringArray(r, 'files', 'Chunk'),
     splitCluster: reqBoolean(r, 'splitCluster', 'Chunk'),
     renderedBytes: reqNumber(r, 'renderedBytes', 'Chunk'),
   };
+  // coverageOnlyFiles + renderBudgetBytes are optional (FR-028/FR-027) — only carry
+  // each through when present so a chunk without them round-trips byte-identically.
+  let out: Chunk = base;
+  if (r['coverageOnlyFiles'] !== undefined) {
+    out = { ...out, coverageOnlyFiles: reqStringArray(r, 'coverageOnlyFiles', 'Chunk') };
+  }
+  if (r['renderBudgetBytes'] !== undefined) {
+    out = { ...out, renderBudgetBytes: reqNumber(r, 'renderBudgetBytes', 'Chunk') };
+  }
+  return out;
 }
 
 /** Validate a ChunkManifest, throwing on a missing/invalid field. */

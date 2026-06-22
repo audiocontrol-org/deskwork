@@ -15,13 +15,96 @@ export interface SeamPassInput {
   readonly fileDiffs: ReadonlyMap<string, string>;
 }
 
-const FN = /^export\s+(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(([^)]*)\)/;
+// Match the exported-function header up to (and including) the opening `(` of its
+// parameter list; the param list itself is scanned with balanced-delimiter awareness
+// (below) so inner parens — a function-typed param like `cb: (e: number) => void` —
+// don't truncate the scan the way a `([^)]*)` capture would.
+const FN_HEAD = /^export\s+(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/;
 const DECL = /^export\s+(?:const|let|var|class|interface|type|enum)\s+([A-Za-z0-9_$]+)/;
+
+/**
+ * Extract the parameter-list text of a function signature, starting at the index of
+ * its opening `(`, by scanning to the MATCHING `)`. Tracks nesting depth across
+ * `()`, `<>` (generics), `{}` and `[]` (inline object/tuple types) so a `)` that
+ * closes an inner group (e.g. a callback param's own parens) does not end the scan.
+ * Returns the inner text (without the outer parens), or null if unbalanced.
+ */
+function extractParamList(body: string, openParenIdx: number): string | null {
+  let depthParen = 0;
+  let depthAngle = 0;
+  let depthBrace = 0;
+  let depthBracket = 0;
+  let start = -1;
+  for (let i = openParenIdx; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === '(') {
+      if (depthParen === 0 && start === -1) start = i + 1;
+      depthParen++;
+    } else if (ch === ')') {
+      depthParen--;
+      if (depthParen === 0 && depthAngle === 0 && depthBrace === 0 && depthBracket === 0) {
+        return start === -1 ? '' : body.slice(start, i);
+      }
+    } else if (ch === '<') depthAngle++;
+    else if (ch === '>') {
+      if (depthAngle > 0) depthAngle--;
+    } else if (ch === '{') depthBrace++;
+    else if (ch === '}') {
+      if (depthBrace > 0) depthBrace--;
+    } else if (ch === '[') depthBracket++;
+    else if (ch === ']') {
+      if (depthBracket > 0) depthBracket--;
+    }
+  }
+  return null; // unbalanced — header truncated mid-signature
+}
+
+/**
+ * Split a parameter list on TOP-LEVEL commas only — commas nested inside
+ * `()`/`<>`/`{}`/`[]` (function-typed, generic, object, or tuple param types) are
+ * NOT separators.
+ */
+function splitTopLevelParams(paramList: string): string[] {
+  const params: string[] = [];
+  let depthParen = 0;
+  let depthAngle = 0;
+  let depthBrace = 0;
+  let depthBracket = 0;
+  let current = '';
+  for (const ch of paramList) {
+    if (
+      ch === ',' &&
+      depthParen === 0 &&
+      depthAngle === 0 &&
+      depthBrace === 0 &&
+      depthBracket === 0
+    ) {
+      params.push(current);
+      current = '';
+      continue;
+    }
+    if (ch === '(') depthParen++;
+    else if (ch === ')') {
+      if (depthParen > 0) depthParen--;
+    } else if (ch === '<') depthAngle++;
+    else if (ch === '>') {
+      if (depthAngle > 0) depthAngle--;
+    } else if (ch === '{') depthBrace++;
+    else if (ch === '}') {
+      if (depthBrace > 0) depthBrace--;
+    } else if (ch === '[') depthBracket++;
+    else if (ch === ']') {
+      if (depthBracket > 0) depthBracket--;
+    }
+    current += ch;
+  }
+  params.push(current);
+  return params;
+}
 
 /** Count required params (not optional `?`, not defaulted `=`). */
 function countRequired(paramList: string): number {
-  return paramList
-    .split(',')
+  return splitTopLevelParams(paramList)
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
     .filter((p) => !p.includes('=') && !p.split(':')[0]?.trim().endsWith('?')).length;
@@ -33,10 +116,14 @@ function parseExports(diffText: string, sign: '+' | '-'): Map<string, number | n
   for (const line of diffText.split('\n')) {
     if (!line.startsWith(sign)) continue;
     const body = line.slice(1).trim();
-    const fn = FN.exec(body);
-    if (fn && fn[1] !== undefined && fn[2] !== undefined) {
-      map.set(fn[1], countRequired(fn[2]));
-      continue;
+    const fn = FN_HEAD.exec(body);
+    if (fn && fn[1] !== undefined) {
+      const openParenIdx = (fn.index ?? 0) + fn[0].length - 1; // index of the `(`
+      const paramList = extractParamList(body, openParenIdx);
+      if (paramList !== null) {
+        map.set(fn[1], countRequired(paramList));
+        continue;
+      }
     }
     const decl = DECL.exec(body);
     if (decl && decl[1] !== undefined) map.set(decl[1], null);
@@ -71,6 +158,11 @@ function boundaryPairs(chunks: readonly Chunk[]): { a: string; b: string }[] {
 
 /** Run the interface-level seam pass; emit substantive cross-boundary breaks only. */
 export function runSeamPass(input: SeamPassInput): SeamResult {
+  // The seam pass is the signatures-only backstop (`renderSeamPayload` is "small
+  // by construction"), so it scans ALL of a chunk's files — INCLUDING any
+  // coverage-only file whose full diff was withheld from the audit payload to fit
+  // the envelope (FR-027). A withheld file's cross-boundary interface break must
+  // still be caught here even though its diff body never rendered into a chunk.
   const chunkText = new Map<string, string>();
   for (const c of input.chunks) chunkText.set(c.id, c.files.map((f) => input.fileDiffs.get(f) ?? '').join('\n'));
 

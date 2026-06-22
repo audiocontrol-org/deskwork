@@ -70,6 +70,33 @@ describe('030 T021 — payload-diff-scope (FR-023)', () => {
     }
   });
 
+  // 030 T075 (FR-030, US9) — the untracked-fold must render a STANDARD unified
+  // diff (the `git diff --no-index` format the rest of the render arm produces),
+  // NOT a hand-synthesized `+`-line-only blob. Today the fold prefixes every
+  // content line with `+` and emits NO `diff --git`/`---`/`+++`/`@@` hunk headers,
+  // so the folded untracked diff is not a real diff the partitioner/barrage can
+  // treat uniformly with the committed-diff arm. This asserts the standard-diff
+  // shape (a `@@` hunk header and a `+++ ` file header), which FAILS today.
+  it('T075 (FR-030) renders an untracked file as a STANDARD git-diff --no-index unified diff, not a synthetic +-line blob', () => {
+    const repo = setup();
+    const base = head(repo);
+    writeFileSync(join(repo, 'src/committed.ts'), 'a\n');
+    commitAll(repo, 'feat: committed');
+    const h = head(repo);
+    writeFileSync(join(repo, 'src/untracked.ts'), 'line one\nline two\n'); // not committed
+    try {
+      const scope = scopeCommittedDiff(repo, base, h);
+      const folded = scope.fileDiffs.get('src/untracked.ts') ?? '';
+      // The folded untracked diff is a standard unified diff: it carries an `@@`
+      // hunk header and a `+++ ` file header (as `git diff --no-index` produces),
+      // NOT merely every content line prefixed with `+` and no hunk structure.
+      expect(folded, 'untracked fold must contain a @@ hunk header').toMatch(/^@@ .* @@/m);
+      expect(folded, 'untracked fold must contain a +++ file header').toMatch(/^\+\+\+ /m);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   // Regression: the installation root is a SUBDIR of the git root (the monorepo
   // layout — `.stack-control` lives at plugins/stack-control while the git root is
   // the repo above). `git diff --name-only` emits git-root-relative paths; running

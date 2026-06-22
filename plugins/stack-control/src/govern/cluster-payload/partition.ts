@@ -9,6 +9,7 @@ import { buildChunkManifests } from '../chunk-manifest.js';
 import { buildCouplingGraph, type CouplingEdge, type CouplingGraph } from './coupling-graph.js';
 import { clusterFiles } from './clustering.js';
 import { binpackClusters } from './envelope-binpack.js';
+import { fitRenderedChunks } from './render-fit.js';
 
 /** Inputs to partitioning the whole committed diff into an envelope-sized chunk set. */
 export interface PartitionInput {
@@ -36,7 +37,12 @@ export function partitionDiff(input: PartitionInput, envelopeBytes: number): Par
     tsImportEdges: input.tsImportEdges,
   });
   const clusters = clusterFiles(graph);
-  const { chunks, splitClusterMarkers } = binpackClusters(clusters, input.fileDiffs, envelopeBytes);
-  const manifests = buildChunkManifests(chunks);
+  const { chunks: packed, splitClusterMarkers } = binpackClusters(clusters, input.fileDiffs, envelopeBytes);
+  // Manifests depend only on chunk ids + `files` (stable through the render-fit
+  // pass, which only adjusts `coverageOnlyFiles`/`renderBudgetBytes`).
+  const manifests = buildChunkManifests(packed);
+  // FR-027: render-aware verification — guarantee every chunk's rendered payload
+  // fits the envelope, not just its raw diff bytes (T078).
+  const chunks = fitRenderedChunks(packed, manifests, input.fileDiffs, envelopeBytes);
   return { chunks, chunkIds: chunks.map((c) => c.id), manifests, splitClusterMarkers, coupling: graph };
 }
