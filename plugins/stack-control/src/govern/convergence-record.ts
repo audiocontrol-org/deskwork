@@ -16,7 +16,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import type { GovernConvergenceRecord } from '../workflow/workflow-types.js';
-import { computeScopeFingerprint } from './checkpoint-state.js';
+import { computeScopeFingerprint } from './scope-fingerprint.js';
 
 export type GovernMode = GovernConvergenceRecord['mode'];
 

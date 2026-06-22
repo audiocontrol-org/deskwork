@@ -3,9 +3,10 @@ id: TASK-118
 title: >-
   AUDIT-20260614-91 — `--help` exits without the promised terminal outcome
   marker
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 20:20'
+updated_date: '2026-06-21 06:19'
 labels:
   - 'type:migrated-finding'
   - 'feature:audit-protocol-friction-burndown'

@@ -1,55 +1,16 @@
-// 024 US4 / FR-011 + FR-012 — govern is runnable on the session-pinned branch.
-// FR-012 (TASK-83): a `/stack-control:*` backtick skill-reference span is NOT a
-// governed filesystem path, so it must not crash payload assembly. FR-011: govern
-// resolves the feature from the SPECKIT marker / spec pointer, not the branch slug.
-// RED first (T006/T007).
+// 024 US4 / FR-011 — govern is runnable on the session-pinned branch. FR-011:
+// govern resolves the feature from the SPECKIT marker / spec pointer, not the
+// branch slug. RED first (T006/T007).
+//
+// (030: the FR-012/TASK-83 backtick-skill-reference-span tests were removed with
+// `extractScopedPaths` — govern-at-end chunks by diff/cluster, not by parsing
+// tasks.md phase bodies, so the phase-path-extraction grammar is dead.)
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCli } from '../_run-helpers.js';
-import { extractScopedPaths } from '../../govern/incremental-audit.js';
 import { readActiveFeatureSlug, resolveConvergenceItem, resolveFeatureFromItem, resolveFeatureSlug } from '../../govern/feature-resolution.js';
 import { resolveInstallation } from '../../config/installation.js';
 import { makeWorkflowFixture, type WorkflowFixture } from '../fixtures/workflow/workflow-fixtures.js';
-
-describe('024 FR-012 — backtick skill-reference span is not a governed path (TASK-83)', () => {
-  it('skips a /stack-control:<verb> skill reference span', () => {
-    const body = 'Run the `/stack-control:define` skill before authoring.';
-    expect(extractScopedPaths(body)).toEqual([]);
-  });
-
-  it('skips a plugin-namespaced skill reference but keeps a real path span', () => {
-    const body = [
-      'See `/stack-control:execute` and `/dw-lifecycle:implement`.',
-      'The fix lives in `src/govern/protocol.ts` and `templates/WORKFLOW.md`.',
-    ].join('\n');
-    expect(extractScopedPaths(body)).toEqual(['src/govern/protocol.ts', 'templates/WORKFLOW.md']);
-  });
-
-  it('still extracts a genuine nested path span', () => {
-    expect(extractScopedPaths('edit `src/workflow/compass.ts` now')).toEqual([
-      'src/workflow/compass.ts',
-    ]);
-  });
-
-  it('keeps a file:line span, stripping the trailing line[:col] suffix (claude-01)', () => {
-    // The blunt includes(':') guard silently dropped these; a real governed path with a
-    // line number must survive (it appears verbatim in this feature's own contract docs).
-    expect(extractScopedPaths('see `src/govern/protocol.ts:141`')).toEqual(['src/govern/protocol.ts']);
-    expect(extractScopedPaths('at `src/workflow/compass.ts:88:7`')).toEqual(['src/workflow/compass.ts']);
-  });
-
-  it('still excludes a /<plugin>:<verb> skill ref even with no line number', () => {
-    expect(extractScopedPaths('`/stack-control:define` and `src/x.ts:3`')).toEqual(['src/x.ts']);
-  });
-
-  it('excludes a BARE leading-slash slash-command / absolute ref (no colon) — round-4 FATAL fix', () => {
-    // `/release`, `/code-review` etc. have `/` and no `:`, so the prior filter kept them →
-    // absolute → "escapes the installation root" FATAL. A leading-`/` token is never an
-    // installation-relative governed path.
-    expect(extractScopedPaths('`/release` is operator-gated; `/code-review` too')).toEqual([]);
-    expect(extractScopedPaths('run `/release`, then edit `src/x.ts`')).toEqual(['src/x.ts']);
-  });
-});
 
 describe('024 FR-011 — feature slug resolves from the marker, not only the branch', () => {
   it('prefers an explicit slug', () => {

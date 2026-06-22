@@ -3,9 +3,10 @@ id: TASK-199
 title: >-
   AUDIT-20260618-79 — False-positive payloads can still fail closed after
   reading a malformed marker
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-18 05:53'
+updated_date: '2026-06-21 06:37'
 labels:
   - 'type:migrated-finding'
   - 'feature:026-capability-interface-mediation'

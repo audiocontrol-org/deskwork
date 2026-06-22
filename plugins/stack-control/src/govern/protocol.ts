@@ -36,52 +36,14 @@ import {
 import { completedNonConvergedAnnotation } from '../scope-discovery/audit-barrage/types.js';
 import { loadLaneCapabilities, type LaneCapabilityProfile } from './lane-capabilities.js';
 import { negotiateFleet } from './fleet-negotiation.js';
-import { assertBoundaryFits, BoundaryTooLargeError } from './phase-boundary-sizing.js';
 
-/** Thrown for any fail-loud protocol condition; carries a process exit code. */
-/**
- * Machine-distinguishable terminal outcomes (specs/021 US5 / T028). Every govern
- * EXECUTION exit — an invocation that resolves flags and attempts governance —
- * emits exactly one `govern: terminal-outcome=<kind>` line so a consumer can tell
- * the degraded states apart without fragile message-substring matching: a fleet
- * that could not be negotiated, a phase whose payload exceeds the active
- * envelope, a barrage that produced no covering family (outage), and a barrage
- * that produced coverage but missed the cross-model floor are different failures
- * with different recoveries. The `--help` / usage-info early return is NOT a
- * governed run and deliberately emits no terminal-outcome (it does no work and
- * has no outcome to report); that boundary is locked by a test.
- *
- * `boundary-too-large` (US2/FR-006) and `negotiation-failed` (US3/FR-008) live on
- * two distinct axes and are both reachable (TASK-117 root-fix): `negotiateFleet`
- * selects lanes on lane-health alone (availability / read-only enforcement /
- * liveness / required-models floor), and `assertBoundaryFits` separately checks
- * the rendered payload against the active fleet envelope. So a viable fleet whose
- * envelope is overflowed by the actual rendered payload surfaces as
- * `boundary-too-large`, while a fleet that cannot meet the health floor surfaces
- * as `negotiation-failed` — the two terminals stay machine-distinguishable
- * (SC-005).
- */
-export type GovernTerminalKind =
-  | 'graduated'
-  | 'blocked'
-  | 'boundary-too-large'
-  | 'negotiation-failed'
-  | 'fleet-floor-shortfall'
-  | 'barrage-outage'
-  | 'payload-error'
-  | 'usage'
-  | 'fatal';
-
-export class GovernProtocolError extends Error {
-  readonly exitCode: number;
-  readonly terminalKind: GovernTerminalKind;
-  constructor(message: string, exitCode = 2, terminalKind: GovernTerminalKind = 'fatal') {
-    super(message);
-    this.name = 'GovernProtocolError';
-    this.exitCode = exitCode;
-    this.terminalKind = terminalKind;
-  }
-}
+// GovernTerminalKind, GovernProtocolError, and BarrageVars live in govern-protocol-types.ts
+// (030 T086 — so helper modules share them without a circular import); imported for internal
+// use and re-exported here as protocol.ts's public API.
+import { GovernProtocolError } from './govern-protocol-types.js';
+import type { GovernTerminalKind, BarrageVars } from './govern-protocol-types.js';
+export { GovernProtocolError };
+export type { GovernTerminalKind, BarrageVars };
 
 /**
  * Load lane capabilities, routing fleet-knowledge read + binary-probe failures
@@ -174,27 +136,6 @@ export function assertBarrageBinPresent(barrageBin: string): void {
       `govern: FATAL — barrage entrypoint '${barrageBin}' not found; cannot govern (no silent skip; FR-005).`,
     );
   }
-}
-
-export interface BarrageVars {
-  readonly feature_slug: string;
-  readonly workplan_summary: string;
-  readonly diff: string;
-  readonly audit_log_excerpt: string;
-  readonly commit_subjects: string;
-  /**
-   * Mode-aware lens for the prompt's "What to look for" section. Implement mode
-   * supplies CODE_AUDIT_LENS (code-quality / edge-case checklist); spec mode
-   * supplies SPEC_AUDIT_LENS (promise / decision / contradiction / ambiguity
-   * altitude). Keeping the lens as data keeps the render mode-agnostic.
-   */
-  readonly audit_lens: string;
-  /**
-   * Mode-aware framing for the prompt's "Under audit" section — how to read the
-   * folded artifact (code-with-line-anchors vs. spec-as-promises). CODE_* for
-   * implement, SPEC_* for spec.
-   */
-  readonly artifact_framing: string;
 }
 
 /**
@@ -385,23 +326,12 @@ export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult
         'negotiation-failed',
       );
     }
-    const activeEnvelope = Math.min(
-      ...laneCapabilities
-        .filter((lane) => negotiatedFleet.acceptedFleet.includes(lane.name))
-        .map((lane) => lane.envelope.maxPromptBytes),
-    );
-    try {
-      assertBoundaryFits(args.checkpoint, renderedPromptBytes, activeEnvelope);
-    } catch (err) {
-      if (err instanceof BoundaryTooLargeError) {
-        throw new GovernProtocolError(
-          `govern: FATAL — boundary-too-large: ${err.message}`,
-          2,
-          'boundary-too-large',
-        );
-      }
-      throw err;
-    }
+    // 030 US2 (FR-002, clean break): the `boundary-too-large` FATAL terminal is
+    // DELETED. The chunked end-govern bin-packer sizes every chunk ≤ the active
+    // envelope, so there is no whole-feature size at which govern refuses — the
+    // packer AVOIDS the condition rather than asserting against it. `renderedPromptBytes`
+    // is retained only for the run-dir log line below.
+    void renderedPromptBytes;
 
     // --- barrage (barrage bin); tag the run-dir label with the checkpoint so
     // the gate can scope per-checkpoint (AUDIT-20260607-05). The lift + slush +

@@ -60,31 +60,29 @@ stackctl check-front-door
    - Exit `0` (`runnable`) → continue to step 3.
    - Exit non-zero → **STOP.** Surface the `stackctl` stderr **verbatim** (it names the missing artifact, e.g. `tasks.md missing; spec not runnable (run /speckit-tasks first)`). Do not start native execution, do not fabricate a run, do not paper over the gap (FR-008, Principle V). The recovery is to author the spec to runnable via `/stack-control:extend` (or `/speckit-tasks`), then re-run execute.
 
-3. **Drive native `/speckit-implement` PHASE BY PHASE, governing at each boundary (025 US2 — non-discretionary).** Walk the `tasks.md` phases **in order**. For each phase:
+3. **Drive native `/speckit-implement` over the spec, in-session (030 — govern-at-end).** Walk the `tasks.md` tasks **in order** via native `/speckit-implement`, in this session, with this agent. **Do NOT shell out to a headless/batch CLI** to invoke the agent (FR-006; the durability motivation behind Principle IX). Native execution does the work; stack-control does not walk the tasks itself. **Governance does NOT fire per phase** — the per-phase `--phase` checkpoint apparatus is retired (030); govern runs once at the end of `implementing`, in step 4, over the committed whole-feature diff.
 
-   1. **Refuse to start a phase until every prior phase is governed.** A phase may begin only when all earlier `tasks.md` phases have a *current* per-phase checkpoint (FR-007). `stackctl` enforces this at govern time; do not start phase N+1's work while phase N is missing/stale.
-   2. **Drive that phase's tasks** via native `/speckit-implement`, in this session, with this agent. **Do NOT shell out to a headless/batch CLI** to invoke the agent (FR-006; the durability motivation behind Principle IX). Native execution does the work; stack-control does not walk the tasks itself.
-   3. **At the phase boundary, run per-phase governance** — a skill-body post-condition, **not** an agent choice (FR-006):
-
-      ```bash
-      stackctl govern --mode implement --phase <id>
-      ```
-
-      This scopes the cross-model `audit-barrage` to the phase's files (a right-sized payload) and writes the phase checkpoint. Governance runs **per phase, here — never batched into one whole-feature pass at the end** (a whole-feature barrage exceeds the model-fleet envelope → `boundary-too-large`; FR-006a, and the `.claude/rules/agent-discipline.md` "No offroading" rule this feature mechanizes).
-      - If a **single phase** still exceeds the fleet envelope, `stackctl` fails loud with **`boundary-too-large`** pointing at right-sizing guidance (TASK-75). **Do NOT auto-split the phase and do NOT silently scope it down** (FR-008). The recovery is to re-shape the phase's `tasks.md` boundary, then re-run — never to bypass govern.
-   4. **Commit, then push — at this boundary, mechanically (025 US3).** After the phase's govern, **commit the phase's work** (it lands locally first, so completed work is never lost — FR-009), then **push** to the branch's remote (FR-010). This is automatic boundary behavior, not something the operator has to ask for. If the **push fails** (offline / auth / pre-push hook), surface the failure loud — the local commit is intact and pushes on retry; **never** continue silently and **never** use `--no-verify` (fix the hook, don't bypass it; FR-011/SC-007).
+   At each implementation boundary, **commit, then push — mechanically (025 US3):** **commit the work** (it lands locally first, so completed work is never lost — FR-009), then **push** to the branch's remote (FR-010). This is automatic boundary behavior, not something the operator has to ask for. If the **push fails** (offline / auth / pre-push hook), surface the failure loud — the local commit is intact and pushes on retry; **never** continue silently and **never** use `--no-verify` (fix the hook, don't bypass it; FR-011/SC-007).
 
    There is **no skip/defer/shortcut branch** anywhere in this loop (US5). A heavy step is *done*, not offered for deferral.
 
-4. **Governance is the per-phase pass — the `governing` phase composes, it does not re-barrage (FR-006a).** Because every phase was governed in step 3 during `implementing`, the per-phase checkpoints already exist when the feature reaches `governing`. The whole-feature `record-converged impl` signal the graduate gate reads is **composed** from the union of those per-phase checkpoints (it carries converged-and-unchanged phases and re-audits only cross-cutting remainder) — there is **no new whole-feature barrage**. This skill never runs `audit-barrage` directly (SC-002); `stackctl govern --phase` owns it.
+4. **Govern once, at the end, over the whole committed feature (030 — chunked govern-at-end; non-discretionary).** When every `tasks.md` task is complete and committed (the workflow's `start-governing` gate is `tasks-complete spec`), run the single whole-feature governance pass — a skill-body post-condition, **not** an agent choice (FR-006):
+
+   ```bash
+   stackctl govern --mode implement          # feature derived from the SPECKIT marker / branch
+   # or, when driven by a roadmap item:
+   stackctl govern --mode implement --item <id>
+   ```
+
+   This scopes the cross-model `audit-barrage` to the **whole-feature committed diff**, **chunking it into bite-sized sub-payloads** that each fit under the model-fleet envelope, parallelizing audit + fix across the fleet, and reconciling **once** at the end. Because the payload is chunked, a large feature **never FATALs on size** — 030 retires the per-phase `boundary-too-large` regime that the old per-phase split existed to avoid. This skill never runs `audit-barrage` directly (SC-002); `stackctl govern` owns it.
 
 5. **Confirm and report.** Report:
    - the spec dir that was executed,
-   - the per-phase govern run-dirs (under `.stack-control/audit-runs/`) and the phase checkpoints written (`.stack-control/govern/phase-checkpoints/<feature>/`),
+   - the whole-feature govern run-dirs (under `.stack-control/audit-runs/`) and the convergence record written (`.stack-control/govern/convergence/<item>.json`),
    - where findings landed (`audit-log.md`),
-   - how many model lanes produced output per phase.
+   - how many model lanes produced output, and the per-chunk round count.
 
-   If a per-phase govern failed (e.g. the model fleet floor was not met), surface the descriptive error — governance is **not** optional, and a missing capability fails loud. Do not lower `--require-models` or `--override` to "keep moving" (that is the prohibited offroad).
+   If govern failed (e.g. the model fleet floor was not met), surface the descriptive error — governance is **not** optional, and a missing capability fails loud. Do not lower `--require-models` or `--override` to "keep moving" (that is the prohibited offroad).
 
 ## Process drivers (029 US8 / FR-029 — apply when fixing a govern finding before re-firing)
 
@@ -96,11 +94,12 @@ These codify the structural drivers of myopic convergence (TASK-60), so the loop
 - **Fleet-degradation pricing.** Price a "0 HIGH" round by the fleet that produced it. A **degraded** fleet (a timed-out / killed / zero-byte lane — US2 observability) makes cross-model agreement weaker; do not treat a degraded-fleet quiet round as full convergence.
 - **Severity-rubric anchoring.** Triage findings by the blast-radius rubric (US3), not by alarm — a quietly-plausible wrong reading an unattended agent would build outranks an obvious contradiction a reader would resolve.
 
-## Commit and push (025 US3 — mechanical, at each phase boundary)
+## Commit and push (025 US3 — mechanical, at each implementation boundary)
 
-After each phase's govern (step 3.3), the boundary runs — in order, non-discretionary:
+At each implementation boundary during step 3 (before the end-of-feature govern), the
+boundary runs — in order, non-discretionary:
 
-1. **Commit, local-first.** `git add -A` then `git commit` the phase's work. The commit
+1. **Commit, local-first.** `git add -A` then `git commit` the work. The commit
    lands locally before the push so completed work is never lost (FR-009). One logical
    change per commit (Principle VII).
 2. **Push.** `git push` the branch to its remote (FR-010).
@@ -115,15 +114,20 @@ cross that boundary.
 
 ## Postcondition
 
-Native execution ran over the spec **phase by phase**, with `stackctl govern --phase` governing each boundary (never one batched whole-feature run); per-phase checkpoints exist for every phase; the graduate gate's signal is composed from them. On any blocked path, you surfaced a descriptive error naming the missing piece (runnable spec / oversized boundary → TASK-75 / governance capability) — never a faked or partial run (SC-006).
+Native execution ran over the spec, and once every task was complete and committed,
+`stackctl govern --mode implement` governed the **whole committed feature in one chunked
+pass** (the payload streamed across the fleet under the envelope, so size never FATALs); the
+graduate gate reads the converged whole-feature record that pass wrote. On any blocked path,
+you surfaced a descriptive error naming the missing piece (runnable spec / governance
+capability) — never a faked or partial run (SC-006).
 
 ## Honest boundary (FR-017)
 
 This mechanism binds an agent **following the skills**. It does NOT claim to prevent a
 deliberate human bypass via raw `git` / `gh` / the vendored `speckit` scripts — a person
-running those directly is outside the skill surface. What IS guaranteed: the **US1 per-phase
-graduate gate** narrows the worst hole — a feature implemented raw (without per-phase govern
-checkpoints) **cannot graduate to `shipped`**, on any host (the defense-in-depth, FR-014).
+running those directly is outside the skill surface. What IS guaranteed: the **graduate
+gate** narrows the worst hole — a feature implemented raw (without a converged whole-feature
+govern record) **cannot graduate to `shipped`**, on any host (the defense-in-depth, FR-014).
 The cross-vendor point-of-invocation interception of a raw backend call is a filed follow-on
 (`design:gap/speckit-bypass-point-of-invocation-refusal`), not claimed here.
 
@@ -131,14 +135,14 @@ The cross-vendor point-of-invocation interception of a raw backend call is a fil
 
 - It does not author or repair the spec (use `/stack-control:define` / `/stack-control:extend`).
 - It does not reimplement `/speckit-implement`.
-- It does not run a single batched whole-feature `audit-barrage` — governance is per-phase (`stackctl govern --phase`); the `governing` phase composes from the checkpoints (FR-006a).
+- It does not run `audit-barrage` directly — `stackctl govern --mode implement` owns the one whole-feature chunked govern-at-end pass (SC-002).
 - It does not offer to skip/defer/shortcut any step (US5), and it does not lower the fleet floor or `--override` to bypass a failed govern.
 - It does not branch on which tool authored the spec (Principle III — capability, not provider identity).
 
 ## Front-door marker (026 — capability mediation)
 
 This skill is the sanctioned interface for the **spec-execution** capability. The plugin's
-PreToolUse interceptor refuses a RAW backend call (a direct native `/speckit-implement`, per phase); a call this skill
+PreToolUse interceptor refuses a RAW backend call (a direct native `/speckit-implement`); a call this skill
 makes is permitted because the skill sets the front-door marker first. **Bracket the
 backend drive:**
 
@@ -154,7 +158,7 @@ backend drive:**
    calls**, so a `$TOKEN` shell variable will NOT survive between them — carry the LITERAL
    token value yourself.
 
-2. Drive the backend (native `/speckit-implement`, per phase).
+2. Drive the backend (native `/speckit-implement`), then govern the whole feature at the end.
 
 3. **ALWAYS `exit` — on success AND on a failed/aborted drive** — passing the LITERAL token
    value from step 1 (not a shell variable, which is gone by now; `exit` rejects an empty

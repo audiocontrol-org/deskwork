@@ -1,9 +1,10 @@
 ---
 id: TASK-326
 title: AUDIT-20260620-13 — Research note keeps a prohibited future-work marker
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 07:46'
+updated_date: '2026-06-21 06:28'
 labels:
   - 'type:migrated-finding'
   - 'feature:029-govern-operability'

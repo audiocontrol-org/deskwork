@@ -1,9 +1,9 @@
-// T035 (RED-first, 029 Phase 6 US6) — the graduate gate becomes EITHER-OF:
-// it graduates when all per-phase checkpoints are current (the default path) OR
-// when a whole-feature convergence record exists (the opt-in full-audit-at-end
-// path, re-admitted per FR-025). With NEITHER, it does not graduate. FR-023/024.
+// 030 US2 (FR-018) — the graduate gate is the SINGLE whole-feature record criterion.
+// The 029 either-of arm (per-phase checkpoints OR whole-feature record) is COLLAPSED:
+// per-phase checkpoints no longer graduate anything; `governing → shipped` is met IFF a
+// converged whole-feature convergence record exists (read via implRecordConverged).
 //
-// On-disk fixtures via makeUnskippableFixture (real checkpoints + records), per testing.md.
+// On-disk fixtures via makeUnskippableFixture (multi-phase scaffold), per testing.md.
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
@@ -51,46 +51,22 @@ function ctxFor(f: UnskippableFixture, implRecordConverged: boolean): GateContex
   };
 }
 
-describe('US6 either-of graduate gate (FR-023/024)', () => {
-  it('graduates via the DEFAULT per-phase path (all checkpoints current, no whole-feature record)', () => {
+describe('030 US2 — graduate gate is the single whole-feature record criterion (FR-018)', () => {
+  it('graduates via a converged whole-feature record', () => {
     const f = threePhase();
-    f.checkpointPhase('1');
-    f.checkpointPhase('2');
-    f.checkpointPhase('3');
-    expect(evaluateCriterion(GRADUATE, ctxFor(f, false))).toBe(true);
-  });
-
-  it('graduates via the OPT-IN whole-feature record path (no per-phase checkpoints)', () => {
-    const f = threePhase();
-    // No per-phase checkpoints; a converged whole-feature record is the opt-in escape.
     expect(evaluateCriterion(GRADUATE, ctxFor(f, true))).toBe(true);
   });
 
-  it('does NOT graduate with neither per-phase checkpoints nor a whole-feature record', () => {
+  it('does NOT graduate without a converged whole-feature record', () => {
     const f = threePhase();
-    expect(evaluateCriterion(GRADUATE, ctxFor(f, false))).toBe(false);
-  });
-
-  it('a partial per-phase set without a whole-feature record does not graduate', () => {
-    const f = threePhase();
-    f.checkpointPhase('1');
-    f.checkpointPhase('2');
     expect(evaluateCriterion(GRADUATE, ctxFor(f, false))).toBe(false);
   });
 
   it('graduates on the whole-feature record even when no spec dir resolves (AUDIT-20260621-29)', () => {
     const f = threePhase();
-    // specDirPath = null → the per-phase branch is structurally false; the opt-in
-    // whole-feature record alone must still graduate.
+    // specDirPath = null → there is no per-phase structure to consult; the whole-feature
+    // record alone graduates.
     const ctx = { ...ctxFor(f, true), specDirPath: null, specPointer: null };
     expect(evaluateCriterion(GRADUATE, ctx)).toBe(true);
-  });
-
-  it('graduates when BOTH paths are satisfied simultaneously (AUDIT-20260621-30)', () => {
-    const f = threePhase();
-    f.checkpointPhase('1');
-    f.checkpointPhase('2');
-    f.checkpointPhase('3');
-    expect(evaluateCriterion(GRADUATE, ctxFor(f, true))).toBe(true);
   });
 });

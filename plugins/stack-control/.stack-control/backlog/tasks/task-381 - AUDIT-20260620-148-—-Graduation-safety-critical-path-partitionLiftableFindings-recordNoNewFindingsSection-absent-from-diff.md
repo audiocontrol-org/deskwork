@@ -3,9 +3,10 @@ id: TASK-381
 title: >-
   AUDIT-20260620-148 — Graduation-safety critical path
   (partitionLiftableFindings, recordNoNewFindingsSection) absent from diff
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 19:08'
+updated_date: '2026-06-21 06:28'
 labels:
   - 'type:migrated-finding'
   - 'feature:029-govern-operability'

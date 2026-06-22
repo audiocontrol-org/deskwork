@@ -3,10 +3,10 @@ id: TASK-5
 title: >-
   AUDIT-20260609-22 — A single malformed task file makes `list`/`exists`/imports
   throw an uncaught error (exit 1, not the graceful BacklogError → exit 2)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-09 19:37'
-updated_date: '2026-06-11 02:29'
+updated_date: '2026-06-21 06:45'
 labels:
   - 'type:migrated-finding'
   - 'feature:pluggable-lifecycle-providers'

@@ -110,7 +110,7 @@ function scopeOf(unit: Unit): string {
       const fence = fenceDelimiter(line);
       if (fence !== null) {
         if (openFence === null) openFence = fence;
-        else if (fence.char === openFence.char && fence.length >= openFence.length) openFence = null;
+        else if (fence.char === openFence.char && fence.length >= openFence.length && fence.closeable) openFence = null;
         return true; // a fence delimiter line is body prose, kept verbatim
       }
       if (openFence !== null) return true; // inside a fence → example prose, kept

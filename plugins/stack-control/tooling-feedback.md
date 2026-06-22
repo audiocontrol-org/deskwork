@@ -106,3 +106,15 @@
 
 ## session-end 2026-06-20
 - Per-phase govern of 029's own US4 (Phase 4) hit a 4-round cross-model entanglement: govern.ts + audit-barrage-lift files are shared across phases, so each fix re-staled earlier per-phase checkpoints (override-refresh of phases 2/3 was the workaround), and the override/graduation TWO-WRITE atomicity (convergence record + phase checkpoint) surfaced as a diminishing-returns plateau resurfacing under new finding IDs each round. The convergent structural fix was record-first ordering + accurate per-write FATAL messages (the half-write is non-advancing; shipped gate fail-closed via all-phase-checkpoints-current); true 2-file transactional commit is mechanism beyond US4's promise. US5 payload-scoping (pre-phase diff-base union) + US7 hunk-fingerprinting are the root fixes for the shared-file re-stale friction.
+
+## session-end 2026-06-21
+- Driving the full speckit authoring chain through the define front door required 6 separate front-door enter/exit brackets (one per /speckit-* step: specify, clarify, plan, checklist, tasks, analyze). A chain-level bracket for one define authoring session would cut the ceremony.
+- Setting the spec pointer on an EXISTING roadmap node is non-obvious: roadmap add --spec errors on the uniqueness invariant; the working verb is workflow link-spec (parallel to link-design). The define skill's node-exists branch does not instruct setting the spec pointer, so a node can stay spec-pointerless (TASK-244 class).
+
+## session-end 2026-06-22
+- 030 dogfood: the unit suite (2460 green) + a passing govern both masked that the feature's CORE (end-govern-pipeline) was never wired into the CLI — tests exercised the pipeline in isolation, never the CLI→pipeline seam, so 'victory' was declarable on an unbuilt mechanism. Need a CLI-drives-pipeline integration test as a ship gate.
+- Dev-time skill/engine skew: the cached /stack-control:execute + :extend skills (0.52.2) drive the OLD per-phase govern (govern --phase), which the post-030 source engine rejects — so the sanctioned execute front door cannot govern the very branch that deletes per-phase. Surfaced again this session.
+
+## session-end 2026-06-22
+- Completed-work task-checkoff drift blocked the next protocol step: last session's T085 completed T031/T033/T034/T063/T064 but never ticked their tasks.md boxes, so the whole-feature govern refused on the 'tasks-complete spec' compass gate this session. The govern-at-end gate reads literal checkbox state; nothing reconciles 'work done' vs 'box ticked'. A graduate/govern preflight that reports which unchecked tasks have green gate-tests (candidates for checkoff) would have surfaced this in seconds instead of a multi-step investigation.
+- 030 clean break left the execute SKILL.md (front door) documenting the deleted per-phase 'govern --phase' model; no 030 task covered updating the skill/WORKFLOW to govern-at-end. check-front-door passed (62 ops) because it validates verb/skill parity + help, not whether skill PROSE references a removed command. A skill-body anti-pattern lint (skill mentions a flag/verb the engine rejects) would catch front-door prose drift.

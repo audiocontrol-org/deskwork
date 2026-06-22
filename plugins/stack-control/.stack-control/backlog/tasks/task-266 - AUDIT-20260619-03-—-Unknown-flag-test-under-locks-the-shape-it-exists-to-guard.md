@@ -1,9 +1,10 @@
 ---
 id: TASK-266
 title: AUDIT-20260619-03 — Unknown-flag test under-locks the shape it exists to guard
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 00:27'
+updated_date: '2026-06-21 06:32'
 labels:
   - 'type:migrated-finding'
   - 'feature:027-roadmap-edge-mutation-and-cluster'

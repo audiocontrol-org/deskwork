@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { resolveAuditLogExcerpt } from '../subcommands/govern.js';
+import { resolveAuditLogExcerpt } from '../govern/govern-vars.js';
 
 describe('resolveAuditLogExcerpt — layout-aware audit-log excerpt (spec 013 / TASK-25)', () => {
   it('finds the audit-log of a specs/NNN-<slug> feature (the case the hardcoded docs/ path missed)', async () => {

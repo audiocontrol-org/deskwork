@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  assertBoundaryFits,
-  estimateBoundary,
-  measureBoundaryFit,
-} from '../../govern/phase-boundary-sizing.js';
+import { estimateBoundary, measureBoundaryFit } from '../../govern/phase-boundary-sizing.js';
 
 describe('phase boundary sizing records', () => {
   it('records a prospective estimate against the active fleet envelope', () => {
@@ -18,10 +14,10 @@ describe('phase boundary sizing records', () => {
     expect(measurement.disposition).toBe('boundary-too-large');
   });
 
-  it('fails loud on invalid byte counts and empty phase ids', () => {
-    expect(() => estimateBoundary('', ['src/a.ts'], 2048, 8192)).toThrow(/phaseId must be a non-empty string/);
+  it('fails loud on invalid byte counts and empty ids', () => {
+    expect(() => estimateBoundary('', ['src/a.ts'], 2048, 8192)).toThrow(/boundary id must be a non-empty string/);
     expect(() => estimateBoundary('2', ['src/a.ts'], -1, 8192)).toThrow(/averageBytesPerPath must be a positive integer/);
     expect(() => measureBoundaryFit('2', Number.NaN, 8192)).toThrow(/measuredPromptBytes must be a positive integer/);
-    expect(() => assertBoundaryFits('2', 4096, 0)).toThrow(/activeFleetEnvelopeBytes must be a positive integer/);
+    expect(() => measureBoundaryFit('2', 4096, 0)).toThrow(/activeFleetEnvelopeBytes must be a positive integer/);
   });
 });

@@ -15,7 +15,7 @@ import {
   frontDoorsFor,
   evaluateRefusal,
 } from '../../speckit-wrapper/refusal.js';
-import { composeConvergedImpl } from '../../govern/compose-convergence.js';
+import { isImplFeatureConverged } from '../../govern/chunk-artifacts.js';
 import {
   makeUnskippableFixture,
   type UnskippableFixture,
@@ -78,20 +78,19 @@ describe('speckit wrapper refusal map (026 T017 — now registry-derived, single
   });
 });
 
-describe('US4 defense-in-depth: an evaded raw implement cannot graduate (FR-014, T023)', () => {
-  it('a feature implemented raw (no per-phase checkpoints) fails the US1 composed gate', () => {
+describe('US4 defense-in-depth: an evaded raw implement cannot graduate (FR-014, T023; 030 FR-018)', () => {
+  it('a feature implemented raw (no whole-feature governance record) fails the graduate gate', () => {
     const f = makeUnskippableFixture({
       slug: '025-evaded',
+      node: { identifier: 'multi:feature/evaded', status: 'in-flight', spec: 'specs/025-evaded' },
       phases: [
         { id: '1', files: [{ path: 'src/e/a.ts', content: 'export const a = 1;\n' }] },
         { id: '2', files: [{ path: 'src/e/b.ts', content: 'export const b = 2;\n' }] },
       ],
     });
     fixtures.push(f);
-    // No checkpointPhase() calls — the raw path skipped per-phase govern.
-    expect(composeConvergedImpl(f.root, f.slug, f.tasksPath)).toBe(false);
-    // Even after the FIRST phase, the second is missing → still cannot graduate.
-    f.checkpointPhase('1');
-    expect(composeConvergedImpl(f.root, f.slug, f.tasksPath)).toBe(false);
+    // No govern ran — no whole-feature WholeFeatureConvergenceRecord was written, so the
+    // governing→shipped gate's impl signal stays false (the raw path can't graduate).
+    expect(isImplFeatureConverged(f.root, 'multi:feature/evaded')).toBe(false);
   });
 });

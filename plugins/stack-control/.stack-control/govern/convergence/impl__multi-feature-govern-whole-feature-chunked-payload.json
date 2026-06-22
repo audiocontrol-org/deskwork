@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "mode": "impl",
+  "item": "multi:feature/govern-whole-feature-chunked-payload",
+  "governedShaBase": "override-short-circuit",
+  "headSha": "override-short-circuit",
+  "chunkIds": [],
+  "rounds": 0,
+  "liftedFindings": [],
+  "closedInLoopFindings": [],
+  "seamResult": {
+    "boundaryPairs": [],
+    "findings": [],
+    "suppressedCompatible": 0
+  },
+  "splitClusterRefs": [],
+  "outcome": "override-eligible",
+  "anchorRoot": "/Users/orion/work/deskwork-work/stack-control/plugins/stack-control",
+  "override": true,
+  "overrideReason": "Plateau reached (findings oscillated 12 to 7 to 12 across three govern rounds = generator, not convergence). Core 030 chunked govern-at-end mechanism is sound: all round-1/2 fixes held across re-govern and the full suite is green (2456 tests). Every residual finding is dispositioned in specs/030-chunked-end-govern/audit-log.md: fixed (-10/-11/-16/-17/-18/-21/-23/-33), false-premise (-09/-12/-13/-20), resolved-out-of-scope (-25 specs-018 moved to _holding), or backlogged TASK-426..441 (seam-pass cluster, unreachable-deferred-TASK-424 paths, diff-base/untracked-fold edges, doc reconciliations, test-coverage gaps). None is a core-mechanism blocker. Operator-approved override 2026-06-22."
+}

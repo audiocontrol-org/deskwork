@@ -51,15 +51,9 @@ export const CRITERION_KINDS = [
   'record-converged',
   'approval-marker',
   'node-marker',
-  // 025 US1: every tasks.md phase has a CURRENT per-phase govern checkpoint. The
-  // composed `record-converged impl` signal is derived from this (FR-001a) — this
-  // criterion, NOT `record-converged impl`, is what the graduate gate evaluates (C1).
-  'all-phase-checkpoints-current',
-  // 029 US6 (FR-023/024): the EITHER-OF graduate gate — met when
-  // all-phase-checkpoints-current (the default per-phase path) OR a whole-feature
-  // convergence record converged (the opt-in full-audit-at-end path, re-admitted by
-  // FR-025). Per-phase stays the default; whole-feature is opt-in (the operator runs
-  // whole-feature govern to produce the record).
+  // 030 US2 (FR-018, clean break): the graduate gate evaluates SOLELY on a converged
+  // whole-feature convergence record. The per-phase `all-phase-checkpoints-current`
+  // criterion is DELETED (one govern path, one graduation criterion).
   'graduate-impl',
 ] as const;
 export type CriterionKind = (typeof CRITERION_KINDS)[number];

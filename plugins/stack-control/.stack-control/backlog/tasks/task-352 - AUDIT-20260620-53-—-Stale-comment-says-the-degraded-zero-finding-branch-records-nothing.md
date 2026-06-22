@@ -3,9 +3,10 @@ id: TASK-352
 title: >-
   AUDIT-20260620-53 — Stale comment says the degraded zero-finding branch
   records nothing
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 10:12'
+updated_date: '2026-06-21 06:28'
 labels:
   - 'type:migrated-finding'
   - 'feature:029-govern-operability'

@@ -132,7 +132,7 @@ complete without inventing an item-specific path the bundled default cannot know
 - kind: transition
 - from: implementing
 - to: governing
-- exit-gate: tasks-complete spec; all-phase-checkpoints-current impl
+- exit-gate: tasks-complete spec
 - effects: journal-append message={message}; commit message={message}
 
 ## transition:graduate

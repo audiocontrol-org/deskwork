@@ -3,9 +3,10 @@ id: TASK-86
 title: >-
   AUDIT-20260614-37 — Scope fingerprinting allows governed paths to escape the
   installation root
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 18:32'
+updated_date: '2026-06-21 06:19'
 labels:
   - 'type:migrated-finding'
   - 'feature:audit-protocol-friction-burndown'

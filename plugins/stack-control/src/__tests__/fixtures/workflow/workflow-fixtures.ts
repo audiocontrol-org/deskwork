@@ -6,12 +6,16 @@
 // shared isolation harness.
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
   writeGovernConvergenceRecord,
 } from '../../../govern/convergence-record.js';
+import {
+  writeWholeFeatureConvergenceRecord,
+  type WholeFeatureConvergenceRecord,
+} from '../../../govern/chunk-artifacts.js';
 import type { GovernConvergenceRecord } from '../../../workflow/workflow-types.js';
 import { BUILTIN_GRAMMAR_DIR } from '../../../subcommands/document-verb-shared.js';
 import type { LoadOptions } from '../../../document-model/document.js';
@@ -68,12 +72,34 @@ export function roadmapMarkdown(nodes: readonly FixtureNode[]): string {
   );
 }
 
+/** Map a record-shaped fixture input onto a whole-feature convergence record (impl gate). */
+function implRecordFrom(
+  rec: Omit<GovernConvergenceRecord, 'anchorRoot'>,
+  root: string,
+): WholeFeatureConvergenceRecord {
+  return {
+    version: 1,
+    mode: 'impl',
+    item: rec.item,
+    governedShaBase: 'fixture-base',
+    headSha: 'fixture-head',
+    chunkIds: ['fixture-chunk'],
+    rounds: 1,
+    liftedFindings: [],
+    closedInLoopFindings: [],
+    seamResult: { boundaryPairs: [], findings: [], suppressedCompatible: 0 },
+    splitClusterRefs: [],
+    outcome: rec.converged ? 'converged' : 'override-eligible',
+    anchorRoot: root,
+  };
+}
+
 /** A flat installation fixture (a tmp dir owning `.stack-control/config.yaml`). */
 export function makeWorkflowFixture(
   nodes: readonly FixtureNode[] = [],
   options: FixtureOptions = {},
 ): WorkflowFixture {
-  const root = mkdtempSync(join(tmpdir(), 'wf-fixture-'));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'wf-fixture-')));
   mkdirSync(join(root, '.stack-control'), { recursive: true });
   writeFileSync(join(root, '.stack-control', 'config.yaml'), 'version: 1\n', 'utf8');
   const roadmapPath = join(root, 'ROADMAP.md');
@@ -124,7 +150,13 @@ export function makeWorkflowFixture(
       ].join('\n');
       return write(join(specDirRel, 'tasks.md'), body);
     },
-    writeRecord: (rec) => writeGovernConvergenceRecord(root, rec),
+    // 030 US9 (FR-025, clean break): impl convergence is the whole-feature record;
+    // spec convergence keeps the GovernConvergenceRecord. The fixture maps the
+    // record-shaped input so existing call sites stay unchanged.
+    writeRecord: (rec) =>
+      rec.mode === 'impl'
+        ? writeWholeFeatureConvergenceRecord(root, implRecordFrom(rec, root))
+        : writeGovernConvergenceRecord(root, rec),
     write,
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };

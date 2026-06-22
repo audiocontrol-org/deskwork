@@ -21,6 +21,7 @@ import { check as catalogEntryMissingStatus } from './catalog-entry-missing-stat
 import { check as provenanceOrphanedEntries } from './provenance-orphaned-entries.js';
 import { check as legacyEditorSymmetryFieldRename } from './legacy-editor-symmetry-field-rename.js';
 import { check as frontDoorCompleteness } from './front-door-completeness.js';
+import { check as chunkedGovernArtifacts } from './chunked-govern-artifacts.js';
 import type { DoctorRuleCheck } from './types.js';
 
 export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
@@ -34,6 +35,7 @@ export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
   provenanceOrphanedEntries,
   legacyEditorSymmetryFieldRename,
   frontDoorCompleteness,
+  chunkedGovernArtifacts,
 ];
 
 export type { DoctorRuleCheck, DoctorRuleOptions, ScopeDoctorFinding } from './types.js';

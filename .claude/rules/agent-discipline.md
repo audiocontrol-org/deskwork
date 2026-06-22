@@ -110,6 +110,22 @@ These are not project-management entries. They are **debt that compounds invisib
 
 **The hard test:** when in doubt, ask — *"if a release shipped today with this code as-is, would I be embarrassed in front of the operator?"* If yes, the deferral is bullshit. Fix it now or file the issue now. If you're tempted to argue *"but the release is weeks away,"* re-read the convention-canon trap above. The release is always closer than the deferral expects.
 
+## Zero backwards compatibility — a clean break, never a deprecation surface
+
+**When replacing a path, primitive, schema, flag, or behavior, DELETE the old one. Do not leave a back-compat shim, a deprecation alias, a read-side fallback, an "old + new both work" branch, or a grandfather clause.** The default is a clean break. Operator directive, verbatim (2026-06-21): *"I want zero backwards compatibility. That is ALWAYS a honey pot for agents who don't know the backward compatibility is a deprecation. It MUST be a clean break."*
+
+**Why it's a honey pot (internalize this):** a back-compat surface is indistinguishable, to a fresh agent six months later, from load-bearing code. The next session finds the old path still wired in, treats it as a live contract instead of a deprecation slated for removal, *builds on it*, and the dead path calcifies into canon — exactly the convention-canon trap from the "Just for now" rule, one altitude up. The deprecation comment that says "remove after X" rots in place the same way the IOU comment does; nobody removes it; it becomes permanent. The only way an agent can't mistake a deprecation for a contract is for the deprecation to **not exist**.
+
+**How to apply:**
+
+- **Replacing a path → delete the old path in the same change.** Not "default to new, keep old as `--legacy`." Not "new gate arm OR old gate arm." Collapse the either-of to the single new criterion and delete the old arm + all its callers (e.g. this is exactly why `multi:feature/govern-whole-feature-chunked-payload` deletes the per-phase checkpoint apparatus and collapses `graduate-impl` to a single criterion rather than keeping a checkpoint-arm grandfather).
+- **No migration/grandfather by reflex.** "But in-flight consumers need the old behavior" is a *scope question for the operator* (per § Operator owns scope decisions), not a license to keep the old path alive. Default to WONTFIX on migration unless the operator explicitly scopes one in. Most "we need a migration" instincts evaporate once you check the actual blast radius (often zero).
+- **Renames/aliases are deprecation surfaces too.** A `check-old-name` alias "for one release cycle" is the same honey pot. If you must keep a name for an already-documented frozen adopter contract (the marketplace-clone-script sub-rule under § Issue closure), that's a deliberate, named exception with a written contract — not the default, and not something you reach for to soften an internal refactor.
+- **Audit your own diff for the shim vocabulary:** `legacy`, `deprecated`, `back-compat`, `backwards compat`, `for compatibility`, `fallback to old`, `grandfather`, `--legacy`, `v1-compat`, `keep for now`, "remove after". Any hit on an internal (non-frozen-contract) surface is a flag to delete the old path instead.
+- **The narrow, deliberate exceptions** (already named elsewhere): a documented **frozen adopter contract** (a published CLI subcommand / clone-script path — § Issue closure), and a **read-side migration doctor rule** whose entire job is to *clean legacy data off disk* and then stop existing (e.g. the `legacy-top-level-id-migration` / `reviewState` read-side artifacts). These are bounded, named, and have a removal mechanism that actually fires — not an open-ended "both work."
+
+**The hard test:** *"If a fresh agent reads this code next month, can it tell the old path is dead and slated for deletion — or will it look exactly like a contract to build on?"* If the latter, you didn't break cleanly; you planted a honey pot. Delete it.
+
 ## Packaging is UX — never paper over install bugs
 
 When evaluating on a real install, treat the install state as ground truth — never copy missing files into the cache or reconstruct the *"intended"* surface to make the evaluation pass. Install-level defects (404s, missing bundles, dead UI) are top-priority blockers; fix the public path (file the packaging issue, fix source, push, re-release), don't paper over. Operator: *"Packaging IS UX."*

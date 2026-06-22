@@ -80,6 +80,28 @@ function makeRepo(slug: string): string {
   mkdirSync(dir, { recursive: true });
   // Seed an audit-log so lift/slush/gate can resolve it.
   writeFileSync(join(dir, 'audit-log.md'), `# Audit Log — ${slug}\n`, 'utf8');
+  // 030 US9: implement mode keys its whole-feature convergence record by a roadmap
+  // node whose `spec:` names the feature dir (resolveConvergenceItem FATALs without
+  // one). Inert for the spec-mode tests, which never resolve a convergence item.
+  writeFileSync(
+    join(repo, 'ROADMAP.md'),
+    [
+      '---',
+      'doc-grammar: roadmap',
+      '---',
+      '',
+      '# Roadmap',
+      '',
+      `## impl:feature/${slug}`,
+      '',
+      '- status: in-flight',
+      `- spec: docs/1.0/001-IN-PROGRESS/${slug}`,
+      '',
+      `${slug} scope prose.`,
+      '',
+    ].join('\n'),
+    'utf8',
+  );
   return repo;
 }
 
@@ -123,20 +145,28 @@ describe('stackctl govern — full orchestration with stubbed barrage', () => {
     // source files: the fixture is an installation now (marker above), so
     // the implement-mode clone step actually runs jscpd here, and jscpd v4
     // only writes its JSON report when it analyzed at least one real file.
+    const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
+    git(['init', '-q']);
+    git(['config', 'user.email', 't@e.com']);
+    git(['config', 'user.name', 'T']);
+    // Commit the installation scaffold as the diff BASE (no src yet), then add the
+    // source in a second commit so `base..HEAD` is a NON-empty diff the pipeline can
+    // chunk. (AUDIT-20260622-23: an empty base..HEAD now fails loud — a govern over a
+    // zero-file scope is a defect, not a silent clean pass — so the base must precede
+    // the source.)
+    git(['add', '-A']);
+    git(['commit', '-q', '-m', 'seed']);
+    const base = git(['rev-parse', 'HEAD']).stdout.trim();
     mkdirSync(join(repo, 'src'), { recursive: true });
     for (const n of [0, 1]) {
       const lines = Array.from({ length: 30 }, (_, i) => `export const v${n}_${i} = ${i} * ${n + 2};`);
       writeFileSync(join(repo, 'src', `f${n}.ts`), `${lines.join('\n')}\n`, 'utf8');
     }
-    const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
-    git(['init', '-q']);
-    git(['config', 'user.email', 't@e.com']);
-    git(['config', 'user.name', 'T']);
     git(['add', '-A']);
-    git(['commit', '-q', '-m', 'seed']);
+    git(['commit', '-q', '-m', 'add source']);
     try {
       const r = runGovern(
-        ['--mode', 'implement', '--feature', 'feat', '--at', repo, '--diff-base', 'HEAD'],
+        ['--mode', 'implement', '--feature', 'feat', '--at', repo, '--diff-base', base],
         { GOVERN_BARRAGE_BIN: stub, STUB_RUN_DIR: join(fx, 'run-b') },
       );
       expect(`${r.stdout}${r.stderr}`).toMatch(/governed|OPEN/);

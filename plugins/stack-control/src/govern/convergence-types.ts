@@ -3,7 +3,7 @@
  *
  * specs/015-audit-protocol-convergence — Phase 2 (T005).
  *
- * The terminal result of one convergence-loop attempt over an `AuditUnit` (D4).
+ * The terminal result of one convergence-loop attempt over a bounded audit payload (D4).
  * Discriminated union — every loop attempt ends in exactly one variant; the loop
  * NEVER returns control without one (data-model § ConvergenceOutcome invariant /
  * SC-004, deterministic termination).
