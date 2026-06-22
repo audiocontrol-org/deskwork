@@ -32,8 +32,14 @@ const NEW_030_FILES = [
 ];
 
 describe('030 US8 — composition bugs gone (T061)', () => {
-  it('the exclusion-based composition surface is deleted from govern.ts (FR-023)', () => {
-    const govern = readFileSync(join(SRC, 'subcommands/govern.ts'), 'utf8');
+  it('the exclusion-based composition surface is deleted from the govern command (FR-023)', () => {
+    // 030 T086 (FR-022): the govern command was decomposed under the 500-line cap —
+    // the implement arm moved from subcommands/govern.ts into govern/govern-arms.ts.
+    // Read the combined command surface so the assertion follows the code, not the file.
+    const govern =
+      readFileSync(join(SRC, 'subcommands/govern.ts'), 'utf8') +
+      '\n' +
+      readFileSync(join(SRC, 'govern/govern-arms.ts'), 'utf8');
     expect(govern).not.toContain('compositionExcludePaths');
     expect(govern).not.toContain('carriedFilesForComposition');
     // The inclusion-based committed-diff scoping replaces it.

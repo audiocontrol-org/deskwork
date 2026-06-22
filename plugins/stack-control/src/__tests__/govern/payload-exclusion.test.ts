@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import {
   buildImplementVars,
   formatScopeExclusionSummary,
-} from '../../subcommands/govern.js';
+} from '../../govern/govern-vars.js';
 
 const dirs: string[] = [];
 afterEach(() => {

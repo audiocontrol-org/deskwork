@@ -28,7 +28,7 @@ import {
   SPEC_AUDIT_LENS,
   SPEC_ARTIFACT_FRAMING,
 } from '../govern/payload-spec.js';
-import { buildImplementVars, buildSpecVars } from '../subcommands/govern.js';
+import { buildImplementVars, buildSpecVars } from '../govern/govern-vars.js';
 
 function tmpRepo(): string {
   return mkdtempSync(join(tmpdir(), 'gov-lens-'));

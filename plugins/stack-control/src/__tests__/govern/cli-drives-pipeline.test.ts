@@ -30,7 +30,10 @@ function source(rel: string): string {
 }
 
 describe('030 T069 — the implement-mode CLI drives the end-govern pipeline (FR-024/026, SC-008)', () => {
-  const govern = source('subcommands/govern.ts');
+  // 030 T086 (FR-022): the govern command was decomposed under the 500-line cap —
+  // the implement-arm drive moved from subcommands/govern.ts into govern/govern-arms.ts.
+  // The CLI→pipeline wiring assertions read the combined command surface.
+  const govern = `${source('subcommands/govern.ts')}\n${source('govern/govern-arms.ts')}`;
 
   it('drives the pipeline via runEndGovern (the single whole-feature audit path)', () => {
     expect(govern, 'govern.ts must call runEndGovern — the CLI drives the pipeline').toMatch(/runEndGovern\s*\(/);
