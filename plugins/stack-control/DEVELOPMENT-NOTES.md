@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-06-22: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 1
+  - roadmap(bookkeeping-hardening): advance umbrella to shipped — verified in v0.53.1
+- Files changed: 1
+- Backlog touched: (none)
+
 ## 2026-06-22 (evening): bookkeeping-hardening umbrella — 6 fixed + 7 verified-resolved, governed, shipped (PR #496)
 
 **Goal:** Take up the `multi:feature/bookkeeping-hardening` umbrella (the 13 small gaps/bugs in stack-control's own bookkeeping tooling the prior session grouped). Per operator selection, work each as a **point fix** (RED-first TDD → commit → push, no spec/govern), all 13 by category. It expanded into: govern the session diff (operator request), close all 13, open + merge a PR, run session-end.
