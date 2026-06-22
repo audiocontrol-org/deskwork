@@ -66,7 +66,35 @@ export const check: DoctorRuleCheck = async (opts: DoctorRuleOptions): Promise<r
       findings.push({ rule: RULE_ID, severity: 'error', message: `chunk-set artifact ${f} is not an object` });
       continue;
     }
-    const rawChunks = Array.isArray(raw['chunks']) ? raw['chunks'] : [];
+    // A persisted chunk-set MUST list the chunks it governed. end-govern FATALs on an
+    // empty scope BEFORE writing a record (end-govern-pipeline AUDIT-20260622-23), so a
+    // missing / empty / non-array `chunks` field is corrupt — not "valid, zero chunks"
+    // (TASK-437). Previously both fields silently defaulted to [] and passed doctor.
+    if (!Array.isArray(raw['chunks'])) {
+      findings.push({
+        rule: RULE_ID,
+        severity: 'error',
+        message: `chunk-set artifact ${f} is missing a valid 'chunks' array — a persisted chunk-set must list the chunks it governed.`,
+      });
+      continue;
+    }
+    if (raw['chunks'].length === 0) {
+      findings.push({
+        rule: RULE_ID,
+        severity: 'error',
+        message: `chunk-set artifact ${f} has an EMPTY 'chunks' array — end-govern FATALs on a zero-chunk scope, so a persisted empty chunk-set is corrupt; re-run end-govern to regenerate it.`,
+      });
+      continue;
+    }
+    if (raw['splitClusterMarkers'] !== undefined && !Array.isArray(raw['splitClusterMarkers'])) {
+      findings.push({
+        rule: RULE_ID,
+        severity: 'error',
+        message: `chunk-set artifact ${f} has a non-array 'splitClusterMarkers' field — it must be an array of markers (or absent).`,
+      });
+      continue;
+    }
+    const rawChunks = raw['chunks'];
     const rawMarkers = Array.isArray(raw['splitClusterMarkers']) ? raw['splitClusterMarkers'] : [];
     const chunkIds = new Set<string>();
     let shapeOk = true;
