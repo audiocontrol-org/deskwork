@@ -870,10 +870,15 @@ export async function runGovern(args: string[]): Promise<void> {
       // workplan summary; the assembled whole `diff` is DISCARDED — the pipeline
       // re-scopes per chunk (scopeCommittedDiff + partitionDiff), rendering the
       // FR-027-sized payload the barrage actually audits.
+      // AUDIT-20260622-04: pass the SAME resolved `base` the pipeline scopes over —
+      // not `flags.diffBase` — so the audit metadata (commit_subjects / workplan
+      // summary) can never describe a different range than the chunks audited.
+      // (flags.diffBase is already resolved to `base` at the top of runGovern via
+      // resolveImplementDiffBase, so this is also the single base-resolution site.)
       const { vars } = buildImplementVars(
         repoRoot,
         slug,
-        flags.diffBase,
+        base,
         flags.checkpoint,
         undefined,
         featureRoot,
@@ -931,15 +936,31 @@ export async function runGovern(args: string[]): Promise<void> {
 
       // Lift ONCE (FR-026): the reconciled lifted findings become a single audit-log
       // section, counting as one dampener run — never one section per chunk.
+      // AUDIT-20260622-03: lift runs AFTER the convergence record is persisted, so a
+      // lift failure leaves an inconsistent state (the durable gate signal is on disk
+      // but the surfaced findings were never recorded). Surface that explicitly —
+      // name BOTH halves so the operator knows the record was written and to re-run —
+      // rather than letting a bare fs error propagate to the generic outer catch.
       const liftDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      await liftEndGovernFindingsOnce({
-        installationRoot: repoRoot,
-        slug,
-        findings: runtime.liftedRich(record.liftedFindings.map((f) => f.id)),
-        date: liftDate,
-        runLabel: `end-govern-${flags.checkpoint ?? 'after_implement'}`,
-        stderr: (s) => process.stderr.write(s),
-      });
+      try {
+        await liftEndGovernFindingsOnce({
+          installationRoot: repoRoot,
+          slug,
+          findings: runtime.liftedRich(record.liftedFindings.map((f) => f.id)),
+          date: liftDate,
+          runLabel: `end-govern-${flags.checkpoint ?? 'after_implement'}`,
+          stderr: (s) => process.stderr.write(s),
+        });
+      } catch (err) {
+        process.stderr.write(
+          `govern: FATAL — the whole-feature convergence record was written, but recording the ` +
+            `surfaced findings (lift) failed (${errorMessage(err)}). The audit-log section was NOT ` +
+            `appended; the gate reads the record, so re-run govern after fixing the write error to ` +
+            `record the findings.\n`,
+        );
+        emitTerminalOutcome('fatal');
+        process.exit(1);
+      }
 
       if (record.outcome !== 'converged') {
         process.stderr.write(

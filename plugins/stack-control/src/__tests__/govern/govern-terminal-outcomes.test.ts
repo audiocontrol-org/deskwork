@@ -295,6 +295,39 @@ describe('US5 — machine-readable govern terminal outcomes (T027/T028)', () => 
     }
   });
 
+  // AUDIT-20260622-03: lift runs AFTER the convergence record is written. If lift
+  // throws (here: a read-only feature dir makes the atomic audit-log write fail),
+  // the failure must surface as a SPECIFIC, diagnosable FATAL that names the
+  // record-written-but-lift-failed state (mirroring the record-write FATAL) — never
+  // a bare propagated fs error that hides what state govern left behind.
+  it('a lift failure after the record write FATALs with a record-vs-lift diagnostic', () => {
+    const repo = makeRepo({ enforced: true, maxPromptBytes: 65536 });
+    const fx = mkdtempSync(join(tmpdir(), 'gov-lift-fail-fx-'));
+    const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
+    const featureDir = join(repo, 'docs', '1.0', '001-IN-PROGRESS', 'feat');
+    try {
+      const seed = git(['rev-parse', 'HEAD']).stdout.trim();
+      writeFileSync(join(repo, 'src', 'feature.ts'), 'export const feature = 1;\n', 'utf8');
+      git(['add', '-A']);
+      git(['commit', '-q', '-m', 'feat: feature work']);
+      // HIGH finding ⇒ override-eligible ⇒ lift-once attempts an audit-log write.
+      // Read-only feature dir ⇒ the sibling-temp atomic write fails ⇒ lift throws
+      // AFTER the convergence record is already persisted.
+      chmodSync(featureDir, 0o555);
+      const r = runGovern(repo, fx, ['--require-models', '1', '--ceiling', '1', '--diff-base', seed], 'high');
+      const out = `${r.stdout}${r.stderr}`;
+      expect(r.status, `stderr:\n${r.stderr}`).not.toBe(0);
+      expect(out).toContain('govern: terminal-outcome=fatal');
+      // The diagnostic names BOTH halves of the inconsistent state.
+      expect(out).toMatch(/record/i);
+      expect(out).toMatch(/lift/i);
+    } finally {
+      chmodSync(featureDir, 0o755);
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
+
   // AUDIT-BARRAGE-codex-01 (021 phase-2 round 2): the contract is scoped to
   // EXECUTION exits. `--help` does no governance work, so it deliberately emits
   // NO terminal-outcome — locking the boundary so the contract is precise (not
