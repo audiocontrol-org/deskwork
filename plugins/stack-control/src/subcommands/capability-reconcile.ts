@@ -1,26 +1,29 @@
 // 026 T023 — `stackctl capability reconcile` (US3 backstop, contracts/cli-verbs.md). The
 // harmless-bypass reconciler: it flags backend state present WITHOUT a corresponding
-// governance record — i.e. spec-execution work (a feature's tasks.md phases) that lacks a
-// current per-phase checkpoint, the residue of a bypassed front door. REPORT-ONLY (exit 0,
-// never mutates) — it surfaces what the graduate gate would refuse, for operator attention.
-// Reuses the per-phase checkpoint status primitive (no new gate). In a separate module so
+// governance record — i.e. spec-execution work (a feature's tasks.md) that has no CONVERGED
+// whole-feature governance record, the residue of a bypassed front door. REPORT-ONLY (exit
+// 0, never mutates) — it surfaces what the governing→shipped graduate gate would refuse,
+// for operator attention. 030 (FR-018/025) collapsed governance to the single whole-feature
+// `WholeFeatureConvergenceRecord`; this backstop reads exactly the signal the gate reads
+// (`isImplFeatureConverged`), keyed by the feature's roadmap node. In a separate module so
 // the Phase-4 capability.ts (capability list) is not edited by this phase.
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { InstallationError } from '../config/errors.js';
 import { findInstallation } from '../config/installation.js';
-import { featureCheckpointKey, resolvePhaseCheckpointStatuses } from '../govern/phase-checkpoint-status.js';
+import type { Installation } from '../config/types.js';
+import { resolveConvergenceItem } from '../govern/feature-resolution.js';
+import { isImplFeatureConverged } from '../govern/chunk-artifacts.js';
 
 /** One un-governed-state finding (data-model § UngovernedState). */
 export interface ReconcileFinding {
   readonly capability: string;
   /** The feature whose spec-execution state is un-governed. */
   readonly evidence: string;
-  /** The non-current phases (missing/stale checkpoints); empty for a whole-feature reason. */
-  readonly phases: { readonly phaseId: string; readonly state: 'missing' | 'stale' }[];
-  /** A whole-feature reason when there are no per-phase rows to cite (no phases / malformed). */
-  readonly reason?: string;
+  /** Why it is un-governed: no converged whole-feature record, or the feature dir does not
+   *  resolve to a roadmap node (orphan/legacy — the gate cannot key it). */
+  readonly reason: string;
 }
 
 /** Is `path` a directory? Returns false (rather than throwing) on a broken symlink or a
@@ -35,39 +38,37 @@ function isDirectorySafe(path: string): boolean {
 
 /**
  * Scan the installation's spec features and flag any whose spec-execution state is
- * un-governed — i.e. exactly what the all-phase-checkpoints-current graduate gate would
- * refuse (the report-only half of the US3 backstop must agree with the gate): a phase
- * with a missing/stale checkpoint, a tasks.md with NO governable phases (the gate refuses
- * it too — claude-01/codex-01), or a malformed phase set. Pure read; no mutation. A single
- * unreadable feature is reported, NOT fatal to the whole scan (claude-02).
+ * un-governed — i.e. exactly what the governing→shipped graduate gate would refuse (the
+ * report-only half of the US3 backstop must agree with the gate): a feature with a tasks.md
+ * but no CONVERGED `WholeFeatureConvergenceRecord` (`isImplFeatureConverged` false), or a
+ * feature dir that does not resolve to a roadmap node (orphan/legacy — the gate cannot key
+ * the record by canonical identity). Pure read; no mutation. A single unresolvable feature
+ * is reported, NOT fatal to the whole scan (claude-02).
  */
-export function reconcileCapabilities(installRoot: string): ReconcileFinding[] {
-  const specsDir = join(installRoot, 'specs');
+export function reconcileCapabilities(installation: Installation): ReconcileFinding[] {
+  const specsDir = join(installation.root, 'specs');
   if (!existsSync(specsDir)) return [];
   const findings: ReconcileFinding[] = [];
   for (const entry of readdirSync(specsDir).sort()) {
     const featureDir = join(specsDir, entry);
     const tasksPath = join(featureDir, 'tasks.md');
     if (!isDirectorySafe(featureDir) || !existsSync(tasksPath)) continue;
-    const slug = featureCheckpointKey(featureDir);
     try {
-      const statuses = resolvePhaseCheckpointStatuses(installRoot, slug, tasksPath);
-      if (statuses.length === 0) {
-        // No governable phases — the graduate gate refuses this too; flag it so the
-        // report-only half does not falsely read clean (claude-01/codex-01).
-        findings.push({ capability: 'spec-execution', evidence: entry, phases: [], reason: 'no governable phases' });
-        continue;
-      }
-      const nonCurrent = statuses
-        .filter((s): s is typeof s & { state: 'missing' | 'stale' } => s.state !== 'current')
-        .map((s) => ({ phaseId: s.phaseId, state: s.state }));
-      if (nonCurrent.length > 0) {
-        findings.push({ capability: 'spec-execution', evidence: entry, phases: nonCurrent });
+      // Resolve the feature dir to the roadmap node id the gate keys the record by — the
+      // SAME `resolveConvergenceItem` govern wrote with (an orphan throws; reported below).
+      const item = resolveConvergenceItem(installation, featureDir, entry);
+      if (!isImplFeatureConverged(installation.root, item)) {
+        findings.push({
+          capability: 'spec-execution',
+          evidence: entry,
+          reason: 'no converged whole-feature governance record',
+        });
       }
     } catch (err) {
-      // A malformed phase set in ONE feature is reported, not fatal to the scan (claude-02).
+      // An orphan/legacy feature (no roadmap node) is reported, not fatal to the scan
+      // (claude-02). The gate would refuse it too — it cannot key a record by identity.
       const detail = err instanceof Error ? err.message : String(err); // no `as` (project rule)
-      findings.push({ capability: 'spec-execution', evidence: entry, phases: [], reason: `unreadable: ${detail}` });
+      findings.push({ capability: 'spec-execution', evidence: entry, reason: `unresolvable: ${detail}` });
     }
   }
   return findings;
@@ -86,8 +87,7 @@ export function renderReconcile(findings: readonly ReconcileFinding[], json: boo
   }
   const lines = ['capability reconcile: un-governed backend state (would not graduate):', ''];
   for (const f of findings) {
-    const detail = f.phases.length > 0 ? f.phases.map((p) => `${p.state} phase-${p.phaseId}`).join(', ') : (f.reason ?? 'un-governed');
-    lines.push(`  ● ${f.capability} — ${f.evidence}: ${detail}`);
+    lines.push(`  ● ${f.capability} — ${f.evidence}: ${f.reason}`);
   }
   return { code: 0, stdout: `${lines.join('\n')}\n` };
 }
@@ -120,16 +120,16 @@ export function reconcileVerb(args: readonly string[]): ReconcileVerbResult {
     }
   }
 
-  let installRoot: string | null;
+  let installation: Installation | null;
   try {
-    installRoot = findInstallation(at ?? process.cwd())?.root ?? null; // null on not-found
+    installation = findInstallation(at ?? process.cwd()); // null on not-found
   } catch (err) {
     if (err instanceof InstallationError) {
       return { code: 2, stdout: '', stderr: `capability reconcile: ${err.message}\n` };
     }
     throw err;
   }
-  const findings = installRoot === null ? [] : reconcileCapabilities(installRoot);
+  const findings = installation === null ? [] : reconcileCapabilities(installation);
   return { ...renderReconcile(findings, json), stderr: '' };
 }
 
