@@ -43,6 +43,13 @@ describe('030 AUDIT-20260622-11 — render-fit cannot return an over-envelope ch
       })),
     };
     const [fitted] = fitRenderedChunks([chunk], [bigManifest], diffs, envelope);
+    // fitChunk does NOT mutate or return manifests — `bigManifest` is unchanged. The
+    // manifest truncation is RENDER-TIME: fitRenderedChunks marks the chunk with a
+    // `renderBudgetBytes`, and renderChunkPayload then truncates the elastic context
+    // (preamble + this manifest) to that budget. Pass the ORIGINAL bigManifest on
+    // purpose — the render path is what must keep it within the envelope (AUDIT-20260622-21).
+    expect(bigManifest.otherChunks.length).toBe(20); // not mutated by fitRenderedChunks
+    expect(fitted.renderBudgetBytes).toBe(envelope); // the chunk carries the render budget
     const rendered = renderedByteLength({ chunk: fitted, manifest: bigManifest, fileDiffs: diffs, planContext: '' });
     expect(rendered).toBeLessThanOrEqual(envelope);
   });

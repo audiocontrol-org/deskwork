@@ -34,7 +34,7 @@ ctx.implRecordConverged
 |---|---|
 | converged whole-feature record present (`outcome='converged'`) | **PASS** (US2 Scenario 2) |
 | no converged record | refuse (graduation blocked) |
-| `outcome` ∈ {`round-cap-surfaced`, `fix-failure-surfaced`, `unresolvable-merge-surfaced`} | refuse — the run STOPPED for operator decision; not auto-graduated (FR-013 / Principle V) |
+| `outcome` ∈ {`round-cap-surfaced`, `fix-failure-surfaced`, `unresolvable-merge-surfaced`, `degraded-fleet-surfaced`} | refuse — the run STOPPED for operator decision; not auto-graduated (FR-013 / Principle V; `degraded-fleet-surfaced` per AUDIT-20260622-10) |
 | `outcome='override-eligible'` + operator `--override <reason>` | the 029 US4 attributable override graduation (separate path) |
 
 ## Invariants (testable)

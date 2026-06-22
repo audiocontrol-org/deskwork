@@ -123,10 +123,10 @@ The single per-feature record the graduate gate evaluates (FR-015, FR-018). **Pe
 | `closedInLoopFindings` | `Finding[]` | findings fixed within the loop, closed BEFORE lift (NOT lifted — FR-016) |
 | `seamResultRef` | `SeamResult` ref | the seam pass outcome |
 | `splitClusterRefs` | `string[]` | any `SplitClusterMarker` cluster ids (degradation provenance) |
-| `outcome` | `'converged' \| 'override-eligible' \| 'round-cap-surfaced' \| 'fix-failure-surfaced' \| 'unresolvable-merge-surfaced'` | terminal disposition |
+| `outcome` | `'converged' \| 'override-eligible' \| 'round-cap-surfaced' \| 'fix-failure-surfaced' \| 'unresolvable-merge-surfaced' \| 'degraded-fleet-surfaced'` | terminal disposition (`degraded-fleet-surfaced`: the convergence-determining audit round ran on a degraded fleet — a quiet round from fewer lanes is not full cross-model convergence, so it never reconciles to `converged`; AUDIT-20260622-10) |
 | `anchorRoot` | `string` | the installation root the record lives under (existing convention) |
 
-**Validation.** Exactly **one** record per feature (FR-015; a second is a doctor finding — US7 Scenario 1 covers malformed; uniqueness is enforced by the `mode__item.json` path scheme at `convergence-record.ts:40`). `closedInLoopFindings` and `liftedFindings` MUST be disjoint (a finding is either fixed-in-loop or still-open, never both — FR-016). `outcome='converged'` requires a clean/dampened final touched set; the four `*-surfaced` outcomes require the corresponding surfaced condition (Principle V).
+**Validation.** Exactly **one** record per feature (FR-015; a second is a doctor finding — US7 Scenario 1 covers malformed; uniqueness is enforced by the `mode__item.json` path scheme at `convergence-record.ts:40`). `closedInLoopFindings` and `liftedFindings` MUST be disjoint (a finding is either fixed-in-loop or still-open, never both — FR-016). `outcome='converged'` requires a clean/dampened final touched set AND a non-degraded convergence-determining round; the five `*-surfaced` outcomes require the corresponding surfaced condition (Principle V) — `degraded-fleet-surfaced` when the final clean round ran on a degraded fleet (AUDIT-20260622-10).
 
 **Lifecycle.** Written once at RECONCILE. `outcome='converged'` ⇒ the `graduate-impl` gate passes on this record alone (FR-018). The `*-surfaced` outcomes STOP the run for operator decision (no auto-graduate of unresolved churn — FR-013).
 

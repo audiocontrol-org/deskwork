@@ -38,6 +38,7 @@ The run **never** terminates with `boundary-too-large` (FR-002 — that terminal
 | `round-cap-surfaced` | a coupling cycle hit the hard max-round cap; the stall is surfaced for operator override — NOT auto-graduated (FR-013). | STOP, surfaced (Principle V) |
 | `fix-failure-surfaced` | a fix-subagent failed; its chunk was isolated, others continued, and the failure is surfaced at reconcile (FR-011). | STOP/partial, surfaced |
 | `unresolvable-merge-surfaced` | two chunks' fixes could not be merged/serialized; surfaced rather than fabricating a resolution (FR-010). | STOP, surfaced |
+| `degraded-fleet-surfaced` | the convergence-determining (final clean) audit round ran on a degraded fleet — a quiet round from fewer lanes is not full cross-model convergence, so it does NOT reconcile to `converged`. Ensure every configured model CLI is reachable & re-govern, or `--override` to accept the weakened audit (AUDIT-20260622-10). | STOP, surfaced |
 
 **No `boundary-too-large` terminal exists** under any of these — SC-001 asserts 0 occurrences across the test matrix.
 
