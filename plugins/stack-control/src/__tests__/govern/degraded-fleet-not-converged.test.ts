@@ -59,4 +59,29 @@ describe('030 AUDIT-20260622-10 — a degraded fleet cannot converge', () => {
     );
     expect(result.record.outcome).toBe('degraded-fleet-surfaced');
   });
+
+  it('a later touched-set re-audit cannot LAUNDER an earlier degraded round (AUDIT-20260622-33)', async () => {
+    // Round 1: adir has a finding (full fleet), bdir is clean-but-DEGRADED. A fix
+    // touches adir only → round 2 re-audits adir alone (clean, full fleet). The
+    // earlier bdir degradation must NOT be laundered by the non-degraded round 2.
+    const seen = new Set<string>();
+    const result = await runEndGovern(
+      { installationRoot: '/x', item: 'i', base: 'b', head: 'h' },
+      baseDeps({
+        auditChunk: async (payload, chunkId) => {
+          if (payload.includes('adir/a.ts')) {
+            if (!seen.has(chunkId)) {
+              seen.add(chunkId);
+              return { findings: [{ id: 'F', title: 'fix-me', severity: 'HIGH' }], degraded: false };
+            }
+            return { findings: [], degraded: false }; // round-2 re-audit: clean, full fleet
+          }
+          return { findings: [], degraded: true }; // bdir: clean but degraded in round 1
+        },
+        applyFixes: async () => ({ changedFiles: ['adir/a.ts'], fixCommits: ['fix'] }),
+      }),
+    );
+    expect(result.record.outcome).toBe('degraded-fleet-surfaced');
+    expect(result.record.outcome).not.toBe('converged');
+  });
 });

@@ -135,7 +135,13 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
   for (;;) {
     const toAudit = partition.chunks.filter((c) => auditIds.includes(c.id));
     const audited = await Promise.all(toAudit.map(async (chunk) => ({ chunk, result: await auditOne(chunk) })));
-    lastAuditDegraded = audited.some((a) => a.result.degraded);
+    // AUDIT-20260622-33: ACCUMULATE degradation across rounds (never overwrite). A
+    // later round re-audits only the fix-touched chunks (FR-012); if those come back
+    // clean+full-fleet while an EARLIER round had a clean-but-degraded chunk that was
+    // never re-audited, overwriting would LAUNDER that degradation into a `converged`
+    // record. Once any audited round was degraded, the run stays degraded (conservative
+    // = fail-safe for a graduation gate) — a re-govern on a healthy fleet clears it.
+    lastAuditDegraded = lastAuditDegraded || audited.some((a) => a.result.degraded);
     openFindings = audited.flatMap((a) => [...a.result.findings]);
     for (const f of openFindings) raisedById.set(f.id, f);
 
