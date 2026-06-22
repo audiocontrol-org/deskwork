@@ -10,7 +10,7 @@ targetVersion: ""
 ### AUDIT-20260622-01 — No validation that `runDir` is non-empty on zero-exit barrage
 
 Finding-ID: AUDIT-20260622-01
-Status:     open
+Status:     fixed-d61e282d
 Severity:   high
 Per-lane:   claude=high
 Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
@@ -35,7 +35,7 @@ The blast radius is that a misconfigured or mismatched barrage binary produces a
 ### AUDIT-20260622-02 — `scopeDiff` in the pipeline runtime drops all payload exclude paths
 
 Finding-ID: AUDIT-20260622-02
-Status:     open
+Status:     fixed-d61e282d
 Severity:   high
 Per-lane:   claude=high
 Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
@@ -68,7 +68,7 @@ The fix is to thread an exclude-paths argument through `EndGovernRuntimeConfig` 
 ### AUDIT-20260622-03 — `liftEndGovernFindingsOnce` throw is uncaught — process crashes after graduation record is committed
 
 Finding-ID: AUDIT-20260622-03
-Status:     open
+Status:     fixed-96bc421f
 Severity:   high
 Per-lane:   claude=high
 Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
@@ -97,7 +97,7 @@ The fix mirrors the convergence-record write pattern: wrap `liftEndGovernFinding
 ### AUDIT-20260622-04 — Audit metadata can describe a different diff than the chunks actually audited
 
 Finding-ID: AUDIT-20260622-04
-Status:     open
+Status:     fixed-96bc421f
 Severity:   high
 Per-lane:   codex=high
 Decision:   single-model (gate-counted high)
