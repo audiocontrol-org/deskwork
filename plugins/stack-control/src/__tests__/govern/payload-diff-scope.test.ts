@@ -238,6 +238,61 @@ describe('030 — rename-aware committed-diff scoping (TASK-429 / TASK-47)', () 
   });
 });
 
+// TASK-441 (restores the outer-tree payload-leak invariant deleted with the
+// installation-anchor integration test in T085) — govern anchors at the INSTALLATION.
+// When the installation is a SUBDIR of the git root, a committed or untracked file in
+// the OUTER tree (outside the installation subtree) must NEVER enter the audited scope
+// — `--relative` keeps both the committed arm and the untracked fold installation-scoped.
+describe('030 — scope is installation-anchored; the outer tree never leaks (TASK-441)', () => {
+  it('excludes a committed OUTER-tree file and keeps paths installation-relative', () => {
+    const repo = setup(); // git root
+    const install = join(repo, 'plugins', 'sc'); // installation = a subdir
+    mkdirSync(join(install, 'src'), { recursive: true });
+    const base = head(repo);
+    // ONE commit touching BOTH trees.
+    writeFileSync(join(repo, 'outer-change.txt'), 'outer changed\n');
+    writeFileSync(join(install, 'src/inner.ts'), 'export const inner = 1;\n');
+    commitAll(repo, 'feat: change both trees');
+    const h = head(repo);
+    try {
+      const scope = scopeCommittedDiff(install, base, h);
+      expect(scope.files.some((f) => f.endsWith('src/inner.ts')), 'inner file is in scope').toBe(true);
+      expect(scope.files, 'outer-tree file must NOT leak into scope').not.toContain('outer-change.txt');
+      expect(
+        [...scope.files].some((f) => f.includes('outer-change')),
+        'no outer-tree path under any spelling',
+      ).toBe(false);
+      // Path is installation-relative (NOT prefixed by the installation subdir).
+      expect(scope.files).toContain('src/inner.ts');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('untracked fold enumerates only the installation subtree (no outer leak)', () => {
+    const repo = setup();
+    const install = join(repo, 'plugins', 'sc');
+    mkdirSync(join(install, 'src'), { recursive: true });
+    const base = head(repo);
+    writeFileSync(join(install, 'src/committed.ts'), 'x\n');
+    commitAll(repo, 'feat: committed inner');
+    const h = head(repo);
+    // Untracked files in BOTH trees.
+    writeFileSync(join(repo, 'u-outer.ts'), 'export const leak = 1;\n');
+    writeFileSync(join(install, 'u-inner.ts'), 'export const folded = 1;\n');
+    try {
+      const scope = scopeCommittedDiff(install, base, h);
+      expect(scope.files, 'inner untracked file is folded').toContain('u-inner.ts');
+      expect(scope.files, 'outer untracked file must NOT leak').not.toContain('u-outer.ts');
+      expect([...scope.files].some((f) => f.includes('u-outer')), 'no outer untracked under any spelling').toBe(
+        false,
+      );
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
 // AUDIT-20260622-02 — the end-govern pipeline's scopeDiff dropped ALL payload
 // exclude paths: it called scopeCommittedDiff (no exclusion args) so spec docs,
 // contracts, and the feature's own audit-log flowed into the audited surface.
