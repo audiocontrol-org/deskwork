@@ -111,4 +111,43 @@ describe('sessionBoundary', () => {
     expect(boundary).not.toBe(head);
     expect(git(dir, 'rev-list', '--count', `${boundary}..HEAD`)).toBe('1');
   });
+
+  // TASK-39: on a long-lived feature branch whose upstream is pushed up to HEAD
+  // ("push early and often"), merge-base(upstream, HEAD) collapses to HEAD, so the
+  // session window is empty and the journal reports "0 commits". The journal-anchored
+  // boundary must instead start at the previous session-end (the last commit that
+  // touched the journal), capturing this session's commits regardless of push state.
+  it('anchors the boundary at the last journal-touching commit (TASK-39)', () => {
+    dir = initRepo();
+    commit(dir, 'a.txt', 'a'); // older history, before the previous session-end
+    // Previous session-end commits the journal — this is the session boundary.
+    const prevSessionEnd = commit(dir, 'DEVELOPMENT-NOTES.md', 'session-end record');
+    // This session: 3 code commits, none touching the journal.
+    commit(dir, 'c.txt', 'c');
+    commit(dir, 'd.txt', 'd');
+    commit(dir, 'e.txt', 'e');
+    // Reproduce the collapse: a fully-pushed upstream tracking HEAD.
+    const remote = mkdtempSync(join(tmpdir(), 'sc-bare-'));
+    git(remote, 'init', '-q', '--bare', '-b', 'main');
+    git(dir, 'remote', 'add', 'origin', remote);
+    git(dir, 'push', '-q', '-u', 'origin', 'main');
+
+    const boundary = sessionBoundary(dir, { journalPath: join(dir, 'DEVELOPMENT-NOTES.md') });
+    expect(boundary).toBe(prevSessionEnd);
+    // The window now captures exactly this session's 3 commits.
+    expect(git(dir, 'rev-list', '--count', `${boundary}..HEAD`)).toBe('3');
+    rmSync(remote, { recursive: true, force: true });
+  });
+
+  it('falls back to the base/HEAD~N heuristic when the journal has no commit history', () => {
+    dir = initRepo();
+    commit(dir, 'a.txt', 'a');
+    commit(dir, 'b.txt', 'b');
+    // journalPath points at a file never committed → no anchor → heuristic fallback.
+    const boundary = sessionBoundary(dir, {
+      journalPath: join(dir, 'DEVELOPMENT-NOTES.md'),
+      fallbackN: 1,
+    });
+    expect(git(dir, 'rev-list', '--count', `${boundary}..HEAD`)).toBe('1');
+  });
 });

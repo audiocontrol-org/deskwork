@@ -204,7 +204,15 @@ export async function runSessionEndCli(args: string[]): Promise<void> {
 
   const cwd = installation.root;
   const date = new Date().toISOString().slice(0, 10);
-  const boundary = sessionBoundary(cwd, flags.since !== null ? { since: flags.since } : {});
+  // Anchor the session window at the previous session-end (the last commit that
+  // touched the journal) so a pushed-up feature branch still derives a correct
+  // commit/backlog window (TASK-39). Explicit --since still wins.
+  const boundary = sessionBoundary(
+    cwd,
+    flags.since !== null
+      ? { since: flags.since }
+      : { journalPath: installation.resolved.journal },
+  );
 
   const progressed = progressedBacklog({ cwd, boundary, items: openBacklog(installation) });
   const template = readJournalTemplate(cwd) ?? undefined;
