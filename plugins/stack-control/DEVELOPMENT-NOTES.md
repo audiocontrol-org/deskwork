@@ -2,6 +2,33 @@
 
 ---
 
+## 2026-06-22: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 6
+  - chore(backlog): capture TASK-425 — audit-runs accumulate with no prune verb
+  - test(030-chunked-end-govern): US9 migrate remaining govern integration tests (orchestration + installation-anchor)
+  - docs(030-chunked-end-govern): mark dogfood findings -01..-04 fixed
+  - fix(030-chunked-end-govern): US9 dogfood findings -03/-04 (lift-failure diagnostic + base single-source)
+  - test(030-chunked-end-govern): US9 migrate govern integration tests to the pipeline harness
+  - fix(030-chunked-end-govern): US9 dogfood findings -01/-02 (runtime scope + run-dir guard)
+- Files changed: 12
+- Backlog touched: TASK-425
+
 ## 2026-06-22: T084 — wired the end-govern pipeline into the CLI, then dogfooded it live
 
 **Goal:** Pick up where the prior session stopped — T084, the "delicate integration" it deliberately didn't rush (wire `govern.ts`'s implement arm to drive `runEndGovern` as the single path). Drive it through the sanctioned `/stack-control:execute` gates, then try the audit protocol for real.
