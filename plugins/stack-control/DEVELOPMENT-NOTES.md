@@ -2314,3 +2314,4 @@ workflow-mechanization centerpiece) and capture it durably as a design record.
 - Spec 012 authoring commits on branch (unmerged): **6** (`930c440c`..`0016bb7d` + the session-end skeleton `6cc10fff`).
 - Backlog: 11 → **21 items** (10 imported); spec 012 authored + runnable.
 - Tooling friction captured this session: **3** in `tooling-feedback.md` (import-all, TF-09 prereq, filename length) + the session-end boundary bug noted above.
+workflow(open-design): design:feature/opencode-support planned -> designing
