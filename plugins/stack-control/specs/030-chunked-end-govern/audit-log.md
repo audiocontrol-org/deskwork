@@ -298,7 +298,7 @@ The spec also says under US5: "a lane outage degrades that round per existing fl
 ### AUDIT-20260622-18 — Implement override writes the retired record shape, so a green override does not open the impl gate
 
 Finding-ID: AUDIT-20260622-18
-Status:     open
+Status:     fixed-3ddb66cc
 Severity:   high
 Per-lane:   codex=high
 Decision:   single-model (gate-counted high)
@@ -311,7 +311,7 @@ Blast radius: an operator can run `stackctl govern --mode implement --override .
 ### AUDIT-20260622-19 — Seam pass declares required-shape detection but never implements it
 
 Finding-ID: AUDIT-20260622-19
-Status:     open
+Status:     migrated-to-backlog TASK-431
 Severity:   high
 Per-lane:   codex=high
 Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
@@ -350,7 +350,7 @@ The test calls `fitRenderedChunks([chunk], [bigManifest], diffs, envelope)` and 
 ### AUDIT-20260622-22 — CLI pipeline wiring test can pass on imports instead of actual wiring
 
 Finding-ID: AUDIT-20260622-22
-Status:     open
+Status:     migrated-to-backlog TASK-432
 Severity:   high
 Per-lane:   codex=high
 Decision:   single-model (gate-counted high)
@@ -363,7 +363,7 @@ Blast radius is high because this is the core US9 integration gate. A downstream
 ### AUDIT-20260622-23 — Empty chunk set can graduate without any audit
 
 Finding-ID: AUDIT-20260622-23
-Status:     open
+Status:     fixed-3ddb66cc
 Severity:   high
 Per-lane:   codex=high
 Decision:   single-model (gate-counted high)
