@@ -143,11 +143,17 @@ function gitTry(root: string, args: readonly string[]): string | undefined {
   return out.length > 0 ? out : undefined;
 }
 
-/** The repo's default branch ref, best-effort: origin/HEAD → `main` → `master` → undefined. */
+/**
+ * The repo's default branch ref, best-effort: origin/HEAD → local `main`/`master` →
+ * remote-tracking `origin/main`/`origin/master` → undefined. The remote-tracking
+ * candidates cover the worktree / fresh-clone shape where origin/HEAD is unset and no
+ * LOCAL default branch exists — there `origin/main` is the only ref to the fork point,
+ * and missing it silently scoped the diff to HEAD~1 (TASK-435).
+ */
 function resolveDefaultBranch(gitRoot: string): string | undefined {
   const sym = gitTry(gitRoot, ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD']);
   if (sym !== undefined) return sym.replace(/^refs\/remotes\//, ''); // e.g. origin/main
-  for (const candidate of ['main', 'master']) {
+  for (const candidate of ['main', 'master', 'origin/main', 'origin/master']) {
     if (gitTry(gitRoot, ['rev-parse', '--verify', '--quiet', candidate]) !== undefined) return candidate;
   }
   return undefined;
