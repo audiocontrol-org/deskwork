@@ -2,6 +2,34 @@
 
 ---
 
+## 2026-06-22: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 7
+  - docs(030-chunked-end-govern): T086 protocol.ts done; scope the remaining govern.ts split
+  - refactor(030-chunked-end-govern): T086 — decompose protocol.ts under the 500-line cap
+  - chore(030-chunked-end-govern): mark T085 done; scope the remaining T086 decomposition
+  - refactor(030-chunked-end-govern): T085 — delete payload-implement.ts (clean break complete)
+  - refactor(030-chunked-end-govern): T085 — delete the per-phase modules + migrate their tests
+  - refactor(030-chunked-end-govern): T085 — rewire per-phase importers to the whole-feature model
+  - refactor(030-chunked-end-govern): T085 prep — extract scope-fingerprint + audit-constants from per-phase modules
+- Files changed: 37
+- Backlog touched: TASK-47
+
 ## 2026-06-22: US9 finish — fixed the 4 dogfood findings + migrated all 6 govern integration tests
 
 **Goal:** Pick up the remaining US9 work the prior session parked: fix the 4 open HIGH dogfood findings (AUDIT-20260622-01..04) RED-first, migrate the integration tests the chunked-end-govern wiring broke, and leave the suite green except the deliberately-RED T086 decomposition tests. Re-govern + T085/T086 explicitly deferred to a focused session (operator call).
