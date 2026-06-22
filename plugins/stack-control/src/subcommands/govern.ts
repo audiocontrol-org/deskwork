@@ -63,7 +63,6 @@ import { runEndGovern } from '../govern/end-govern-pipeline.js';
 import { makeEndGovernRuntime } from '../govern/end-govern-runtime.js';
 import { writeWholeFeatureConvergenceRecord } from '../govern/chunk-artifacts.js';
 import { liftEndGovernFindingsOnce } from '../govern/lift-once.js';
-import type { AuditUnit } from '../govern/audit-unit-types.js';
 import type { ConvergenceOutcome } from '../govern/convergence-types.js';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
