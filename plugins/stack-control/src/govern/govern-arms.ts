@@ -31,6 +31,7 @@ import { runEndGovern } from './end-govern-pipeline.js';
 import { makeEndGovernRuntime } from './end-govern-runtime.js';
 import { writeWholeFeatureConvergenceRecord } from './chunk-artifacts.js';
 import { liftEndGovernFindingsOnce } from './lift-once.js';
+import { renderEndGovernNotDoneMessage } from './end-govern-message.js';
 import type { ConvergenceOutcome } from './convergence-types.js';
 import type { LaneCapabilityProfile } from './lane-capabilities.js';
 import type { Installation } from '../config/types.js';
@@ -330,20 +331,11 @@ export async function runImplementArm(ctx: GovernRunContext): Promise<void> {
   }
 
   if (record.outcome !== 'converged') {
-    // AUDIT-20260622-10: a degraded-fleet outcome is not a findings problem — the
-    // run was quiet because fewer lanes than the configured fleet produced it, so
-    // "fix the findings" advice would mislead. Point at fleet reachability instead.
-    const advice =
-      record.outcome === 'degraded-fleet-surfaced'
-        ? `the audit fleet was degraded for the convergence-determining round (a quiet round from ` +
-          `fewer lanes is not full cross-model convergence). Ensure every configured model CLI is ` +
-          `installed/reachable & re-govern, or record --override to accept the weakened audit.`
-        : `Fix the surfaced findings & re-govern, or record --override.`;
-    process.stderr.write(
-      `govern: implementation NOT done — end-govern reconciled to '${record.outcome}' ` +
-        `(${record.liftedFindings.length} open finding(s) over ${record.chunkIds.length} chunk(s), ` +
-        `${record.rounds} round(s)). ${advice}\n`,
-    );
+    // TASK-440: surface the cross-chunk SEAM breaks too — they can drive an
+    // override-eligible outcome while liftedFindings is empty, so without them the
+    // operator saw "0 open finding(s)" and could not see what blocked. AUDIT-20260622-10:
+    // a degraded-fleet outcome points at fleet reachability, not "fix the findings".
+    process.stderr.write(renderEndGovernNotDoneMessage(record));
     emitTerminalOutcome('blocked');
     process.exit(1);
   }
