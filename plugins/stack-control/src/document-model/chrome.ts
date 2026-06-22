@@ -35,18 +35,6 @@ export function detectFrontmatter(lines: readonly string[]): LineRange | null {
 }
 
 /**
- * Detect a fenced-code-block delimiter line. A fence opens (and closes) on a
- * line whose trimmed content STARTS with a run of 3+ backticks or 3+ tildes
- * (the common CommonMark case; an info-string like ```markdown may follow).
- * Returns the fence character (`` ` `` or `~`) for a candidate delimiter, else
- * null. We keep this deliberately simple: a fence delimiter sits alone on its
- * line (modulo an info-string) — the common case the grammar-example docs use.
- */
-export function fenceDelimiterChar(line: string): '`' | '~' | null {
-  return fenceDelimiter(line)?.char ?? null;
-}
-
-/**
  * A fenced-code-block delimiter's character, run length, and closeability (027 FR-033 /
  * AUDIT-20260621-54/55). CommonMark: a CLOSING fence must use the SAME character with a run
  * length AT LEAST as long as the opener AND carry NO info string (only trailing spaces) —
@@ -87,18 +75,25 @@ export function fenceDelimiter(
  */
 export function findGrammarComments(lines: readonly string[]): GrammarComment[] {
   const found: GrammarComment[] = [];
-  // Fence char of the currently-open fenced code block, or null when outside a
-  // fence. A fence closes on a later delimiter line using the same fence char.
-  let openFence: '`' | '~' | null = null;
+  // The currently-open fenced code block's char + run length, or null when outside
+  // a fence. AUDIT-20260622-16: a fence closes ONLY on a later delimiter using the
+  // SAME char, a run length AT LEAST the opener's, and NO info string (CommonMark) —
+  // the same contract `rewriteEdgeLine` enforces. Tracking only the char (the old
+  // `fenceDelimiterChar`) let an inner ``` example nested in an outer ```` fence, or
+  // an info-string line like ```typescript, wrongly close the fence and expose a
+  // documented `<!-- doc-grammar: … -->` EXAMPLE as a real declaration.
+  let openFence: { readonly char: '`' | '~'; readonly length: number } | null = null;
   for (let i = 0; i < lines.length; i++) {
-    const fenceChar = fenceDelimiterChar(lines[i]!);
-    if (fenceChar !== null) {
+    const fence = fenceDelimiter(lines[i]!);
+    if (fence !== null) {
       if (openFence === null) {
-        openFence = fenceChar; // opening delimiter
-      } else if (fenceChar === openFence) {
-        openFence = null; // matching closing delimiter
+        openFence = fence; // opening delimiter
+      } else if (fence.char === openFence.char && fence.length >= openFence.length && fence.closeable) {
+        openFence = null; // CommonMark close: same char, run >= opener, no info string
       }
-      // A fence delimiter line is never itself a grammar-comment opener.
+      // A shorter / different-char / info-string delimiter inside an open fence is
+      // CONTENT (a documented nested example) — stay inside. A fence delimiter line
+      // is never itself a grammar-comment opener either way.
       continue;
     }
     // Inside a fenced code block: any `<!--` here is a documented example, not a

@@ -330,10 +330,19 @@ export async function runImplementArm(ctx: GovernRunContext): Promise<void> {
   }
 
   if (record.outcome !== 'converged') {
+    // AUDIT-20260622-10: a degraded-fleet outcome is not a findings problem — the
+    // run was quiet because fewer lanes than the configured fleet produced it, so
+    // "fix the findings" advice would mislead. Point at fleet reachability instead.
+    const advice =
+      record.outcome === 'degraded-fleet-surfaced'
+        ? `the audit fleet was degraded for the convergence-determining round (a quiet round from ` +
+          `fewer lanes is not full cross-model convergence). Ensure every configured model CLI is ` +
+          `installed/reachable & re-govern, or record --override to accept the weakened audit.`
+        : `Fix the surfaced findings & re-govern, or record --override.`;
     process.stderr.write(
       `govern: implementation NOT done — end-govern reconciled to '${record.outcome}' ` +
         `(${record.liftedFindings.length} open finding(s) over ${record.chunkIds.length} chunk(s), ` +
-        `${record.rounds} round(s)). Fix the surfaced findings & re-govern, or record --override.\n`,
+        `${record.rounds} round(s)). ${advice}\n`,
     );
     emitTerminalOutcome('blocked');
     process.exit(1);

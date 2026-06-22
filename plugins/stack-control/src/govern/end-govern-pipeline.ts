@@ -113,10 +113,16 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
   const fixCommits: string[] = [];
   const raisedById = new Map<string, Finding>(); // every finding raised in any round (R9 close-before-lift)
   let terminal: WholeFeatureConvergenceRecord['outcome'] | null = null;
+  // AUDIT-20260622-10: a degraded chunk barrage (fewer lanes than the configured
+  // fleet) that returns a quiet round is NOT equivalent to full cross-model
+  // convergence. Track whether the convergence-determining (final) audit round ran
+  // on a degraded fleet so a weakened audit cannot reconcile to `converged`.
+  let lastAuditDegraded = false;
 
   for (;;) {
     const toAudit = partition.chunks.filter((c) => auditIds.includes(c.id));
     const audited = await Promise.all(toAudit.map(async (chunk) => ({ chunk, result: await auditOne(chunk) })));
+    lastAuditDegraded = audited.some((a) => a.result.degraded);
     openFindings = audited.flatMap((a) => [...a.result.findings]);
     for (const f of openFindings) raisedById.set(f.id, f);
 
@@ -184,8 +190,18 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
   const liftedFindings = [...new Map(openFindings.map((f) => [f.id, f])).values()];
   const closedInLoopFindings = [...raisedById.values()].filter((f) => stillOpenIds.has(f.id) === false);
 
+  // AUDIT-20260622-10: a clean final state reached on a degraded fleet reconciles
+  // to `degraded-fleet-surfaced` (a non-converged terminal), never `converged` —
+  // the durable record is the graduation gate, so a weakened audit must not pass it.
+  const cleanFinalState = openFindings.length === 0 && seamResult.findings.length === 0;
   const outcome: WholeFeatureConvergenceRecord['outcome'] =
-    terminal !== null ? terminal : openFindings.length === 0 && seamResult.findings.length === 0 ? 'converged' : 'override-eligible';
+    terminal !== null
+      ? terminal
+      : cleanFinalState
+        ? lastAuditDegraded
+          ? 'degraded-fleet-surfaced'
+          : 'converged'
+        : 'override-eligible';
 
   const record: WholeFeatureConvergenceRecord = {
     version: 1,

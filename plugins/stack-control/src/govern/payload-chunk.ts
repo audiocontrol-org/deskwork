@@ -19,24 +19,19 @@ export interface ChunkPayloadInput {
   readonly planContext: string;
 }
 
-/** Marker appended when the shared preamble is truncated to fit the chunk's render budget (FR-027). */
-const PREAMBLE_TRUNCATION_MARKER = '\n…[plan/spec/contracts context truncated to fit the fleet envelope]';
+/** Marker appended when the elastic context is truncated to fit the chunk's render budget (FR-027). */
+const CONTEXT_TRUNCATION_MARKER = '\n…[shared context truncated to fit the fleet envelope]';
 
 /**
- * Render the chunk's non-preamble body: the chunk header, the manifest of the
- * OTHER chunks' file lists, and the AUDITED diffs (coverage-only files keep their
- * path in the header but contribute no diff bytes — FR-028 / FR-006).
+ * Render the chunk's LOAD-BEARING framing: the chunk header (id + the full
+ * files-in-scope list) and the AUDITED diffs (coverage-only files keep their path
+ * in the header but contribute no diff bytes — FR-028 / FR-006). This is the part
+ * render-fit controls by withholding diffs to coverage-only; the header is its
+ * irreducible floor. It is NEVER truncated by the budget — if it cannot fit even
+ * after withholding every diff, render-fit fails loud (AUDIT-20260622-11).
  */
-function renderBody(input: ChunkPayloadInput): string {
+function renderFraming(input: ChunkPayloadInput): string {
   const parts: string[] = [`\n## Chunk ${input.chunk.id}\nFiles in scope: ${[...input.chunk.files].join(', ')}`];
-
-  if (input.manifest.otherChunks.length > 0) {
-    parts.push('\n## Other chunks (file lists only — context for cross-file dependencies this chunk cannot see):');
-    for (const o of input.manifest.otherChunks) {
-      parts.push(`- ${o.id}: ${[...o.files].join(', ')}`);
-    }
-  }
-
   // FR-028 / FR-006: a coverage-only (non-audit-trimmed or un-auditable-within-
   // envelope) file keeps its PATH in `chunk.files` (union completeness) but its
   // diff BYTES are excluded from the rendered payload — coverage never dropped.
@@ -46,35 +41,73 @@ function renderBody(input: ChunkPayloadInput): string {
     if (coverageOnly.has(f)) continue;
     parts.push(`\n### ${f}\n${input.fileDiffs.get(f) ?? ''}`);
   }
-
   return parts.join('\n');
 }
 
 /**
- * Truncate the shared preamble so `preamble + "\n" + body` fits `budgetBytes`.
- * The body (framing + manifest + audited diffs) is the partition-guaranteed
- * envelope-fitting part and is NEVER truncated; only the elastic preamble is.
+ * Render the manifest of the OTHER chunks' file lists (FR-005) — cross-file
+ * dependency CONTEXT this chunk cannot otherwise see. AUDIT-20260622-11: this is
+ * elastic context (like the plan/spec preamble), NOT load-bearing, and grows with
+ * the chunk count; it is truncated to fit the envelope rather than forcing an
+ * over-envelope payload. Empty when there are no other chunks.
  */
-function fitPreamble(planContext: string, body: string, budgetBytes: number): string {
-  const joinByte = 1; // the '\n' between preamble and body
-  const available = budgetBytes - Buffer.byteLength(body) - joinByte;
-  if (Buffer.byteLength(planContext) <= available) return planContext;
-  if (available <= Buffer.byteLength(PREAMBLE_TRUNCATION_MARKER)) {
-    // No room for any preamble content beyond the marker (or none at all): drop it.
-    return available <= 0 ? '' : PREAMBLE_TRUNCATION_MARKER.slice(0, available);
-  }
-  const keep = available - Buffer.byteLength(PREAMBLE_TRUNCATION_MARKER);
-  return `${planContext.slice(0, keep)}${PREAMBLE_TRUNCATION_MARKER}`;
+function renderManifest(manifest: ChunkManifest): string {
+  if (manifest.otherChunks.length === 0) return '';
+  const parts: string[] = ['## Other chunks (file lists only — context for cross-file dependencies this chunk cannot see):'];
+  for (const o of manifest.otherChunks) parts.push(`- ${o.id}: ${[...o.files].join(', ')}`);
+  return parts.join('\n');
 }
 
-/** Render one chunk's audit payload (diff + plan/spec/contracts + manifest). */
+/**
+ * Largest prefix of `s` whose UTF-8 byte length is ≤ `maxBytes`, never splitting a
+ * multibyte character. Character-based `slice` is byte-inaccurate for multibyte
+ * content (e.g. the manifest header's em-dash is 3 bytes / 1 char), which would
+ * overshoot the envelope by up to 2 bytes per multibyte char in the cut region —
+ * exactly the over-envelope leak this truncation exists to prevent.
+ */
+function sliceToBytes(s: string, maxBytes: number): string {
+  if (maxBytes <= 0) return '';
+  if (Buffer.byteLength(s) <= maxBytes) return s;
+  let lo = 0;
+  let hi = s.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (Buffer.byteLength(s.slice(0, mid)) <= maxBytes) lo = mid;
+    else hi = mid - 1;
+  }
+  return s.slice(0, lo);
+}
+
+/**
+ * Truncate the elastic context (plan/spec/contracts preamble + the other-chunks
+ * manifest) so `context + "\n" + framing` fits `budgetBytes`. The framing (header
+ * + audited diffs) is the load-bearing part render-fit guarantees fits and is
+ * NEVER truncated here; only the elastic context is. Truncation is byte-accurate
+ * (UTF-8 safe) so the result never overshoots the envelope.
+ */
+function fitContext(context: string, framing: string, budgetBytes: number): string {
+  const joinByte = 1; // the '\n' between context and framing
+  const available = budgetBytes - Buffer.byteLength(framing) - joinByte;
+  if (Buffer.byteLength(context) <= available) return context;
+  const markerBytes = Buffer.byteLength(CONTEXT_TRUNCATION_MARKER);
+  if (available <= markerBytes) {
+    // No room for any context beyond the marker (or none at all): drop it.
+    return sliceToBytes(CONTEXT_TRUNCATION_MARKER, available);
+  }
+  return `${sliceToBytes(context, available - markerBytes)}${CONTEXT_TRUNCATION_MARKER}`;
+}
+
+/** Render one chunk's audit payload (load-bearing framing + elastic plan/manifest context). */
 export function renderChunkPayload(input: ChunkPayloadInput): string {
-  const body = renderBody(input);
-  // No render budget set (e.g. a hand-constructed chunk) ⇒ full preamble, no
-  // truncation — preserves the FR-005 "include the full context" default.
+  const framing = renderFraming(input);
+  const manifest = renderManifest(input.manifest);
+  // Elastic, low-density context shared/duplicated across chunks: the plan/spec/
+  // contracts preamble + the other-chunks manifest. Both truncate to fit (FR-005
+  // default keeps them whole when no budget is set, e.g. a hand-constructed chunk).
+  const context = manifest === '' ? input.planContext : `${input.planContext}\n${manifest}`;
   const budget = input.chunk.renderBudgetBytes;
-  const preamble = budget === undefined ? input.planContext : fitPreamble(input.planContext, body, budget);
-  return `${preamble}\n${body}`;
+  const fitted = budget === undefined ? context : fitContext(context, framing, budget);
+  return `${fitted}\n${framing}`;
 }
 
 /**

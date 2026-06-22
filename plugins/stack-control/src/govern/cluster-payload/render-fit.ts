@@ -52,6 +52,23 @@ function fitChunk(
   }
 
   const fittedBytes = bodyBytes(current, manifest, fileDiffs);
+  // AUDIT-20260622-11: postcondition (FR-027/SC-009) — NO chunk renders
+  // over-envelope. The elastic context (preamble + other-chunks manifest) already
+  // truncates to fit; withholding every audited diff to coverage-only removes the
+  // remaining elastic body. So if the chunk STILL renders over-envelope here, its
+  // IRREDUCIBLE framing — the chunk header + the files-in-scope list itself —
+  // exceeds the envelope: a genuinely unfittable chunk (too many files / too-long
+  // paths in one chunk). Returning it anyway would mark a false "fitted" record
+  // and run the barrage on an oversized payload. Fail loud naming the chunk.
+  if (fittedBytes > envelopeBytes) {
+    throw new Error(
+      `govern: FATAL — chunk '${chunk.id}' renders ${fittedBytes} bytes after truncating all elastic ` +
+        `context and withholding every audited diff to coverage-only, still exceeding the fleet envelope ` +
+        `${envelopeBytes}. The irreducible framing (chunk header + the ${chunk.files.length}-file in-scope ` +
+        `list) does not fit. The cluster must sub-split into fewer files per chunk, or the envelope is too ` +
+        `small — govern does not run the barrage on an over-envelope payload (FR-027/SC-009).`,
+    );
+  }
   return { ...current, renderedBytes: fittedBytes };
 }
 

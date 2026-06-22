@@ -107,7 +107,8 @@ export interface WholeFeatureConvergenceRecord {
     | 'override-eligible'
     | 'round-cap-surfaced'
     | 'fix-failure-surfaced'
-    | 'unresolvable-merge-surfaced';
+    | 'unresolvable-merge-surfaced'
+    | 'degraded-fleet-surfaced';
   readonly anchorRoot: string;
 }
 
@@ -121,6 +122,7 @@ const OUTCOMES: readonly WholeFeatureConvergenceRecord['outcome'][] = [
   'round-cap-surfaced',
   'fix-failure-surfaced',
   'unresolvable-merge-surfaced',
+  'degraded-fleet-surfaced',
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
