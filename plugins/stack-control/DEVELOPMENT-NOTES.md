@@ -2,6 +2,40 @@
 
 ---
 
+## 2026-06-22: T084 — wired the end-govern pipeline into the CLI, then dogfooded it live
+
+**Goal:** Pick up where the prior session stopped — T084, the "delicate integration" it deliberately didn't rush (wire `govern.ts`'s implement arm to drive `runEndGovern` as the single path). Drive it through the sanctioned `/stack-control:execute` gates, then try the audit protocol for real.
+
+**Accomplished:**
+- Ran the `execute` gates clean (compass `behind`/re-entry, front-door 62 ops, spec runnable), then built T084 in committed increments:
+  - **`end-govern-runtime.ts`** — the `auditChunk` the prior session flagged as the crux: renders each chunk's FR-027-sized payload as the barrage `{{diff}}` var (audited bytes == sized bytes), fires the barrage, **extracts findings WITHOUT a per-chunk lift** (the FR-026 balloon), stashes rich findings for lift-once. Hermetic test proves no per-chunk lift.
+  - **`lift-once.ts`** — one audit-log section per invocation (FR-026), reusing the lift render/append/partition primitives.
+  - **`govern.ts` rewired** — implement arm drives `runEndGovern` + `writeWholeFeatureConvergenceRecord`, per-chunk loop deleted; spec mode keeps `runProtocol`. **T069 green.**
+- **Dogfooded it LIVE end-to-end** (`./bin/stackctl govern --mode implement`, real codex+claude, scoped to this session's 4-file diff): 1 chunk, **fleet produced 2/2**, reconciled once → **`override-eligible`** (4 open HIGH, 1 round) → `terminal-outcome=blocked` exit 1, **record written (FR-025)**, **one lift section of 4 findings (FR-026)** — all verified on real output. The agent-in-the-loop terminal behavior works exactly as the spec describes.
+
+**Didn't Work:**
+- **The wiring breaks 6 impl-mode integration tests** (govern-terminal-outcomes ×4, govern-orchestration ×1, govern-anchor-unification ×1) — they encode the RETIRED per-chunk `runProtocol` path the FR-024 clean break deletes. They need migration to the new pipeline harness (ROADMAP fixture for the record key + model-`.md` stub for `extractBarrageFindings`). Scoped as task #4; the migration needs the roadmap-identity grammar, non-trivial. Workflow/gate suite stayed fully green (138).
+- **The first wiring would have over-blocked.** The pipeline converges on `openFindings.length === 0`, but the spec data-model requires a *dampened* set — a LOW nit would have wrongly blocked. Caught + fixed mid-wiring: `auditChunk` now returns only HIGH+ (the retired gate's slush behavior).
+
+**Course Corrections:**
+- [PROCESS] Stopped before rushing the remaining US9 (test migration + T085 + T086 + the surfaced findings) low on budget — the same discipline the prior session applied to T084 itself. Operator: *"let's take it up in the next session."*
+
+**Insights:**
+- **The live dogfood earned its keep — it caught a real regression unit tests missed.** Cross-model agreement (claude + codex) surfaced 4 HIGH findings in the just-written wiring, the load-bearing one being **`scopeDiff` drops `excludeRoots`/`excludePaths`** (the pipeline audits a broader scope than the old path). This is the "integration seam is where the gaps live" lesson, demonstrated on real output: the structural T069 + unit tests were green while the runtime had a real scope bug.
+- **The protocol now runs.** After two sessions of "authored but unwired," `govern --mode implement` drives the chunked end-govern pipeline on real models to a real graduation decision. The wiring is real, not just unit-green.
+
+**Open findings at session end: 4 (all HIGH, all in the new T084 wiring; 0 slush-pile)** — AUDIT-20260622-01 (runDir not validated non-empty), -02 (`scopeDiff` drops exclude paths — load-bearing), -03 (`liftEndGovernFindingsOnce` failure handling post-record), -04 (audit metadata vs audited chunks mismatch). Recorded in `specs/030-chunked-end-govern/audit-log.md`; to fix + re-govern next session.
+
+**Remaining US9 (next session):** fix the 4 findings & re-govern to `converged`; migrate the 6 integration tests (task #4); T085 (delete per-phase apparatus + override-record fix); T086 (decompose under the 500-line cap → T077 green).
+
+**Quantitative (auto-derived from git; verified):**
+- Commits: 3 feature commits this session (+ this session-end record)
+  - feat(030-chunked-end-govern): T084 (part 2) — drive runEndGovern from the CLI
+  - feat(030-chunked-end-govern): T084 (part 1) — end-govern runtime adapter
+  - (part 2 commit folded the dampener fix + lift-once)
+- Files changed: 4 (end-govern-runtime.ts, lift-once.ts, govern.ts, end-govern-runtime.test.ts)
+- Backlog touched: TASK-424 (referenced; no status change)
+
 ## 2026-06-22: US9 audit-system implementation — 9 RED tests + 7 GREEN tasks (T078–T084a); FR-009 autonomous fix deferred
 
 **Goal:** Pick up where the prior session left off — implement US9 (wire the end-govern pipeline as the CLI's single path), the unbuilt core that 030 was extended to capture. Drive it through the sanctioned execute protocol.
