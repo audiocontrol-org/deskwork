@@ -372,3 +372,207 @@ Surface:    src/govern/end-govern-pipeline.ts:98-129, src/govern/end-govern-pipe
 `runEndGovern` partitions the scoped diff, but it never rejects an empty `scope.files` / empty `partition.chunks` result. When there are no chunks, `auditIds` is empty, `toAudit` is empty, `openFindings` stays empty, and the loop breaks as clean. The final outcome logic then treats `openFindings.length === 0 && seamResult.findings.length === 0` as `converged`.
 
 That means a bad diff base, an exclusion filter that removes the whole surface, or a feature with no scoped files can write a converged whole-feature record without firing any barrage at all. Blast radius is high because the workflow gate now trusts this record as the single implementation graduation signal. A reasonable fix is to fail loud before the audit loop when the scoped diff or partitioned chunk set is empty, with an error naming the base/head and any exclusions applied.
+
+## 2026-06-22 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260622-24 — `GOVERN_CHECKPOINT` / `--checkpoint` contradiction: contract says removed globally, FR-029 says spec mode retains it, quickstart grep expects zero hits
+
+Finding-ID: AUDIT-20260622-24 (claude-01 + codex-02 + codex-03; cross-model)
+Status:     migrated-to-backlog TASK-433
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    specs/030-chunked-end-govern/contracts/govern-cli.md (flags table, `--checkpoint`/`GOVERN_CHECKPOINT` row) + specs/030-chunked-end-govern/spec.md (FR-029) + specs/030-chunked-end-govern/quickstart.md (Scenario 4 grep command)
+
+Three documents in this diff disagree about whether `GOVERN_CHECKPOINT`/`--checkpoint` survive in spec mode.
+
+**`contracts/govern-cli.md` flags table:**
+> `--checkpoint` / `GOVERN_CHECKPOINT` | **REMOVED** | unknown flag / ignored-then-error var — no per-phase checkpoint path exists (FR-017, TASK-125).
+
+No mode qualifier. An agent reading this table understands both flags/vars are gone globally.
+
+**`spec.md` FR-029:**
+> `GOVERN_CHECKPOINT` / `--checkpoint` rejection MUST be implement-mode-scoped — spec mode retains its checkpoint-label selection; only implement mode rejects them.
+
+Explicitly says spec mode keeps it.
+
+**`quickstart.md` Scenario 4 grep:**
+```
+grep -rn "GOVERN_CHECKPOINT\|--checkpoint" src/   # expect: zero hits
+```
+Expects zero hits globally across `src/`, which contradicts FR-029 (if spec mode retains the variable, there would be hits in spec-mode paths).
+
+The contract's `Synopsis` shows `--mode implement` and says spec mode is "separate/parked," so the contract may intend to cover implement mode only — but the flags table does not say so. An agent reading just the contract removes `GOVERN_CHECKPOINT` globally; an agent reading FR-029 keeps it for spec mode; an agent writing the quickstart test verifies zero global hits (validating the contract interpretation, not FR-029). Any one of the three is a plausible authoritative source. The most dangerous reading is the contract's, because it would cause spec-mode checkpoint-label selection to silently break and there is no test that would catch it (Scenario 4's grep passes, but spec-mode behavior is unreachable by that grep). A reasonable fix: either add a "scope: implement mode only" note to the govern-cli.md flags table and update the quickstart grep to exclude spec-mode paths, or update FR-029 to state that `GOVERN_CHECKPOINT` is removed from both modes.
+
+---
+
+### AUDIT-20260622-25 — Spec 018 artifacts committed into the 030 govern scope with all tasks unchecked
+
+Finding-ID: AUDIT-20260622-25
+Status:     acknowledged-resolved-20260622 (specs/018-repo-release-surface moved to _holding, out of the govern untracked-fold; provenance triage tracked separately)
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    specs/018-repo-release-surface/ (entire new directory — 9 files added in this diff)
+
+Nine new files for a separate, unrelated feature (`018-repo-release-surface` — "repo-owned maintainer release surface") appear in this diff. The development notes for the session explicitly acknowledge this:
+
+> the untracked `specs/018-repo-release-surface/` is unrelated and still needs provenance triage.
+
+All 28 tasks in `specs/018-repo-release-surface/tasks.md` are unchecked (`[ ]`). No implementation commits for this feature appear in the commit subjects in scope.
+
+The concrete problem: when the 030 whole-feature govern-at-end barrage fires over `governedSha..HEAD`, the committed diff includes these 018 spec files. Auditors receive a partial release-surface spec alongside governance-pipeline code. They may:
+1. Flag incomplete implementation (all 018 tasks unchecked, no code changes matching them)
+2. Surface "release authority" findings that are irrelevant to the chunked-govern feature
+3. Block 030's graduation on HIGH findings that belong to 018
+
+The 030 govern barrage is supposed to be the "ultimate dogfood of 030's own chunked end-govern pipeline" per the dev notes. Polluting its audit scope with an unrelated, unimplemented spec artificially inflates findings, undermines the scope-correctness guarantee FR-004 depends on (deterministic scope), and risks a blocked outcome for the wrong reasons. A reasonable fix: exclude `specs/018-repo-release-surface/` via `--exclude-paths` when running the govern barrage, or move/defer these files out of the committed diff before governing 030.
+
+---
+
+### AUDIT-20260622-26 — Autonomous fix-fanout is still promised after being explicitly scoped out
+
+Finding-ID: AUDIT-20260622-26
+Status:     migrated-to-backlog TASK-434
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    specs/030-chunked-end-govern/spec.md:27, specs/030-chunked-end-govern/spec.md:111-119, specs/030-chunked-end-govern/spec.md:218-219, specs/030-chunked-end-govern/contracts/fix-fanout.md:3-25, DEVELOPMENT-NOTES.md:193-196
+
+The spec and contract still define autonomous fix execution as delivered behavior: govern “applies fixes in worktrees, commits to the feature branch, and re-audits unattended” and FR-009 says govern “MUST fix findings” via worktree-isolated subagents. The fix-fanout contract likewise says it applies findings, allocates worktrees, dispatches fix-subagents, and merges the results. But the same audited range’s journal records the opposite: “FR-009’s autonomous fix backend is entirely unbuilt” and the operator-scoped outcome was “agent-in-the-loop fix (`govern` audits → surfaces `override-eligible` → driving agent fixes → re-govern; `applyFixes` undefined), and DEFER FR-009.”
+
+Blast radius is high because a downstream agent or maintainer acting on the current spec/contract will believe `stackctl govern --mode implement` can mutate worktrees and commit fixes unattended. If the implementation is actually audit-only / agent-in-the-loop, that consumer will design tests, recovery flows, and operator expectations around a capability that does not exist. A reasonable fix is to make the docs honest in one direction: either restore/build the autonomous backend to satisfy FR-009, or change the spec/contract/execute prose to state the current agent-in-the-loop contract and remove the autonomous apply+commit requirements from this feature.
+
+### AUDIT-20260622-27 — Default diff base falls back to `HEAD~1` when only `origin/main` exists
+
+Finding-ID: AUDIT-20260622-27
+Status:     migrated-to-backlog TASK-435
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/payload-diff-scope.ts:146-174
+
+`resolveDefaultBranch` tries `origin/HEAD`, then local `main`, then local `master`, but never checks `origin/main` or `origin/master` directly. In a common CI/worktree shape where `origin/HEAD` is not configured and the feature branch is checked out without a local `main`, `resolveImplementDiffBase` falls through to `HEAD~1` at lines 173-174. That reopens the exact under-scope failure this feature is meant to close: bare implement govern audits only the last commit instead of the whole feature span.
+
+Blast radius is high because an unattended consumer running the documented default can get a green or blocked result over the wrong diff range. Fix by resolving remote default refs explicitly, or fail loud when no feature fork point can be established instead of silently using `HEAD~1`.
+
+### AUDIT-20260622-28 — Untracked fold lost the binary and byte-budget safeguards
+
+Finding-ID: AUDIT-20260622-28
+Status:     migrated-to-backlog TASK-436
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/payload-diff-scope.ts:210-213
+
+The new `scopeCommittedDiff` folds every untracked, non-ignored file with `git diff --no-index` and no binary check, file-size check, or aggregate budget. The deleted assembler had explicit binary/empty skipping and a soft byte budget; this replacement now allows a large generated text file or accidental local artifact to enter the audit payload unbounded.
+
+Blast radius is high because implement govern can ship unexpectedly huge local content into the model fleet, or blow the envelope before chunking decisions are meaningful. Fix by restoring the prior fold constraints in this new scoping primitive: skip binary/empty files, enforce a total folded-byte budget, and surface every skip in the runtime diagnostics.
+
+### AUDIT-20260622-29 — Doctor accepts empty or missing chunk-set fields as valid
+
+Finding-ID: AUDIT-20260622-29
+Status:     migrated-to-backlog TASK-437
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/scope-discovery/doctor-rules/chunked-govern-artifacts.ts:65-70
+
+The doctor rule claims to catch malformed or missing-field chunk artifacts, but it defaults absent `chunks` and `splitClusterMarkers` to `[]`. A chunk-set JSON object like `{}` passes with no finding because both arrays become empty and no validator is called. That contradicts the rule’s stated purpose at lines 4-8 and lets a structurally incomplete chunk-set be trusted as clean.
+
+Blast radius is high because the new gate depends on these artifacts being trustworthy; doctor can report clean while the persisted chunk-set has no usable chunk inventory. Fix by validating the top-level chunk-set shape before iterating, and emit an error when required arrays are absent or not arrays.
+
+### AUDIT-20260622-30 — Seam arity check treats required function-typed params as optional
+
+Finding-ID: AUDIT-20260622-30
+Status:     migrated-to-backlog TASK-438
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/govern/seam-pass.ts:105-110
+
+`countRequired` classifies a parameter as non-required whenever the raw parameter text contains `=`, but TypeScript function types contain `=>`. A newly added required callback parameter like `cb: () => void` includes `=`, so the seam pass does not count it as required. That means a cross-chunk export can gain a required callback and avoid the `changed-arity` finding even when another chunk consumes it.
+
+Blast radius is high because the seam pass is the backstop for cross-chunk interface breakage after chunked audits split the diff. Fix by detecting default assignment only at top-level parameter syntax, not by searching for `=` anywhere inside the parameter type.
+
+### AUDIT-20260622-31 — Fix-succeeds-but-changes-nothing path silently converges with open findings
+
+Finding-ID: AUDIT-20260622-31
+Status:     migrated-to-backlog TASK-439
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unreachable, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/govern/end-govern-pipeline.ts:190-200
+
+In `runEndGovern`, after `applyFixes` completes, `computeTouchedSet` maps `fix.changedFiles` to chunk IDs. When that touched set is empty — most concretely when the fix backend returns a successful (non-failing) `FixRoundResult` with `changedFiles: []` — `nextAuditIds` is empty and the code sets `openFindings = []` and breaks:
+
+```ts
+if (nextAuditIds.length === 0) {
+  openFindings = []; // fixes touched nothing re-auditable → loop is complete
+  break;
+}
+```
+
+After the break, reconciliation treats everything in `raisedById` as closed-in-loop (`stillOpenIds` is the empty set), and the outcome computes to `converged` (assuming no seam findings and no degraded fleet). A finding that was never fixed becomes `closedInLoopFindings` and the pipeline writes a converged `WholeFeatureConvergenceRecord` to disk, opening the graduate gate.
+
+The autonomous fix backend (`applyFixes`) is intentionally absent in the current build (TASK-424 deferred), so this code path is unreachable today. But it is not guarded, and the contract of `FixRoundResult` does not prohibit a succeeding outcome with empty `changedFiles`. When a real fix agent says "done" but touches no files — a plausible condition when findings are disputed, already addressed in a prior commit, or when a merge serialization race wins — the pipeline silently graduates with unresolved findings. The graduate gate, the audit-log lift section, and the operator are all misled.
+
+A concrete fix: distinguish `nextAuditIds.length === 0` when `fix.changedFiles` is empty (a no-op fix that should surface as a failure or at least keep `openFindings` at its pre-break state) from the case where a fix created genuinely no re-auditable surface. The latter should be rare and probably also deserves an explicit `fix-failure-surfaced` outcome, not silent convergence.
+
+---
+
+### AUDIT-20260622-32 — Seam findings block the run but are never lifted
+
+Finding-ID: AUDIT-20260622-32
+Status:     migrated-to-backlog TASK-440
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/govern/end-govern-pipeline.ts:193-217, src/govern/govern-arms.ts:312-345
+
+`runEndGovern` computes `seamResult` after the audit loop and correctly uses `seamResult.findings.length` to prevent convergence. But `liftedFindings` is built only from `openFindings`, which are chunk-audit findings, not seam findings. The CLI then lifts only `runtime.liftedRich(record.liftedFindings.map(...))` and reports `record.liftedFindings.length` as the open finding count.
+
+So a seam-only break produces `override-eligible` with zero lifted findings, no audit-log entry to act on, and a misleading “0 open finding(s)” message. Blast radius is high: a real cross-chunk contract break blocks graduation but is not surfaced through the operator’s normal remediation channel. A reasonable fix is to reconcile seam findings into a liftable finding stream, or provide an equivalent persisted/lifted seam finding section that the CLI count and audit-log recording include.
+
+### AUDIT-20260622-33 — Degraded clean chunks can be laundered by a later touched-set re-audit
+
+Finding-ID: AUDIT-20260622-33
+Status:     fixed-9b01a661
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=yes; no down-calibration signal — high retained.
+Surface:    src/govern/end-govern-pipeline.ts:135-217
+
+`lastAuditDegraded` is overwritten on every round from only the chunks audited in that round. In a multi-round run, round 1 may audit all chunks and get a clean-but-degraded result for chunk B, then a finding in chunk A triggers a fix. Round 2 audits only touched chunk A; if A is clean and non-degraded, `lastAuditDegraded` becomes false and the final `cleanFinalState` can reconcile to `converged`.
+
+That violates the fleet-degradation pricing control for carried clean chunks: chunk B’s only evidence was degraded, but the final record treats it as full convergence because B was not re-audited. Blast radius is high because this can open the graduate gate on a whole-feature record whose clean state depends on weakened audit evidence. Track degradation per chunk across the currently accepted final evidence, or force any degraded clean chunk to be re-audited before convergence.
+
+### AUDIT-20260622-34 — Outer-tree payload leak invariant not explicitly tested in the new suite
+
+Finding-ID: AUDIT-20260622-34
+Status:     migrated-to-backlog TASK-441
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/__tests__/govern-installation-anchor.test.ts (deleted), src/__tests__/govern/payload-diff-scope.test.ts
+
+The deleted `govern-installation-anchor.test.ts` contained the most direct assertion that outer-tree content cannot leak into the barrage payload. Specifically, it committed `OUTER-LEAK-CANARY.txt` in the outer git root (outside the installation subtree), ran a full `stackctl govern` end-to-end with `STUB_VARS_COPY` capturing the rendered vars, and asserted `expect(vars).not.toContain('OUTER-LEAK-CANARY')`. This is a READ-side invariant: outer-tree diff content must not flow into what gets sent to AI models.
+
+The updated `govern-anchor-unification-021.test.ts` checks the WRITE side — "outer tree byte-identical after the full run" — which proves nothing wrote to the outer tree, but says nothing about whether outer-tree content was read into the payload. The new `payload-diff-scope.test.ts` tests that a subdir installation resolves per-file diffs correctly but never adds an outer-tree changed file and asserts its absence from the `DiffScope.files` / `DiffScope.fileDiffs`. No test in this chunk reproduces the original READ-side leak assertion.
+
+Blast-radius: if `scopeCommittedDiff(installationRoot, base, head)` is not correctly scoped to the installation subtree, committed or untracked files from the outer git repo (potentially containing sensitive unrelated content) would be sent to every AI model in the fleet on every govern run. A reasonable fix: add one test to `payload-diff-scope.test.ts` that commits a file in the outer repo (not under the installation subdir), runs `scopeCommittedDiff(installationRoot, base, head)`, and asserts the outer-tree file does not appear in `scope.files`.
+
+---
+
+### AUDIT-20260622-35 — Other-feature scaffolds are no longer excluded from implement audits
+
+Finding-ID: AUDIT-20260622-35
+Status:     migrated-to-backlog TASK-428 (duplicate of AUDIT-20260622-14)
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/__tests__/govern/payload-diff-scope.test.ts:202-214
+
+The replacement exclusion test only asserts that `specs/029-other/audit-log.md` is excluded. That locks in a narrower invariant than the retired self-reference tests: unrelated feature roots themselves are no longer kept out of the implement payload, only their audit logs are. In the implementation this corresponds to `otherFeatureRels.map((root) => \`${root}/audit-log.md\`)`, so `specs/029-other/spec.md`, contracts, notes, or untracked scaffolding can still enter the chunked audit.
+
+Blast radius is high because an adopter with multiple in-progress features can have the current feature’s govern run audit and report findings against a different feature’s parked docs/code. An unattended agent could then “fix” unrelated surfaces or block the wrong feature. The repair is to restore a tested invariant for other feature roots: either exclude the whole other-feature root from the scoped diff, or explicitly prove why only audit logs are safe with a fixture containing a non-audit file under another feature.
