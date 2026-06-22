@@ -3,10 +3,10 @@ id: TASK-12
 title: >-
   stack-control: audit-barrage-lift merges distinct-mechanism findings under one
   ID, documents only one (systematic)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-11 02:29'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:bug'

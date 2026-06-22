@@ -3,9 +3,10 @@ id: TASK-130
 title: >-
   session-start nominates a fully-implemented spec as 'active' with a bogus next
   /speckit-* step
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-15 16:52'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:bug'

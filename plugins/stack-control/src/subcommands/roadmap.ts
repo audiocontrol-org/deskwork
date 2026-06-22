@@ -320,7 +320,9 @@ function emitCloseRelated(model: RoadmapModel, flags: Flags): void {
       process.stdout.write(`  - ${t}: already closed (no-op)\n`);
       continue;
     }
-    backend.close(t); // non-zero → BacklogError, never a fabricated success
+    // non-zero → BacklogError, never a fabricated success. The reason records
+    // the roadmap provenance (028 TASK-297 — close persists WHY).
+    backend.close(t, `resolved by roadmap item ${id} (close-related)`);
     process.stdout.write(`  - ${t}: closed -> ${BACKLOG_DONE_STATUS}\n`);
   }
 }

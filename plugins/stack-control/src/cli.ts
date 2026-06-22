@@ -21,6 +21,7 @@ import { runSlushFindings } from './subcommands/slush-findings.js';
 import { auditBarrage } from './subcommands/audit-barrage.js';
 import { auditBarrageRender } from './subcommands/audit-barrage-render.js';
 import { auditBarrageLiftCli } from './subcommands/audit-barrage-lift.js';
+import { runAuditRunsCli } from './subcommands/audit-runs.js';
 import { runGovern } from './subcommands/govern.js';
 import { runArchiveCli } from './subcommands/archive.js';
 import { runUnarchiveCli } from './subcommands/unarchive.js';
@@ -81,6 +82,8 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   'audit-barrage-render': auditBarrageRender,
   'audit-barrage': auditBarrage,
   'audit-barrage-lift': auditBarrageLiftCli,
+  // Bounded retention for the audit-barrage run dirs (TASK-425).
+  'audit-runs': runAuditRunsCli,
   // Single-sourced audit-protocol orchestration (govern consolidation):
   // replaces the two divergent bash scripts; the shims exec this verb.
   govern: runGovern,

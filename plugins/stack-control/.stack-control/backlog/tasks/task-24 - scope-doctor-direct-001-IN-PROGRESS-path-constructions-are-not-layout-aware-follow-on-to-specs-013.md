@@ -3,10 +3,10 @@ id: TASK-24
 title: >-
   scope-* + doctor direct 001-IN-PROGRESS path constructions are not
   layout-aware (follow-on to specs/013)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-10 21:59'
-updated_date: '2026-06-11 02:29'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

@@ -3,10 +3,10 @@ id: TASK-15
 title: >-
   stack-control docs: backlog → per-feature tasks.md promotion seam is
   undocumented (the two tiers never reference each other)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 20:04'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

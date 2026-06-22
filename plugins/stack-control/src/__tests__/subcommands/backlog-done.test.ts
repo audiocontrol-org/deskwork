@@ -49,6 +49,18 @@ describe('028 B1 — backlog done --apply', () => {
     const item = createBacklogBackend({ cwd: root }).list().find((i) => i.id === id)!;
     expect(item.status).toBe(BACKLOG_DONE_STATUS);
   });
+
+  it('persists the closure reason to the task notes on disk (TASK-297)', () => {
+    const { root, id } = fresh();
+    const r = runCli(['backlog', 'done', id, '--reason', 'resolved by TASK-42', '--apply'], {
+      env: { STACKCTL_BACKLOG_DIR: root },
+    });
+    expect(r.status).toBe(0);
+    // The rationale is not just printed — it lands in the durable task file so a
+    // future reader sees WHY the item was closed (TASK-297 regression guard).
+    const notes = createBacklogBackend({ cwd: root }).readNotes(id);
+    expect(notes).toContain('resolved by TASK-42');
+  });
 });
 
 describe('028 B1 — backlog done usage + runtime exit codes', () => {

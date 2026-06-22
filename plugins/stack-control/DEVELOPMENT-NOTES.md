@@ -2,6 +2,89 @@
 
 ---
 
+## 2026-06-22 (pm): Backlog cleanup applied — 46 closed, 9 re-scoped, 6 uncertains resolved, bookkeeping umbrella created
+
+**Goal:** Act on the backlog-cleanup-review-2026-06-22.md work-list produced by the prior session (orientation menu pick #2): apply the dispositions (close the resolved/moot, re-scope the partials), then drive out the remaining uncertainty rather than leaving it parked. No code; this is records hygiene on the slush store + the roadmap DAG.
+
+**Accomplished:**
+- **Applied the cleanup review: 214 → 168 open backlog items (−46).** First pass closed 42 (17 moot-by-030 per-phase deletion, 3 closed-upstream gh-455/458/487, 19 likely-resolved with promoted-spec-shipped + fix-SHA evidence, 2 operator-decision wontfix, 1 wontfix-per-governed-markdown-rule) and re-scoped 9 (re-aimed each at its surviving remnant: fleet-knowledge schema, torn-temp on writeWholeFeatureConvergenceRecord, scope-fingerprint non-regular-FS, etc.).
+- **Fixed the TASK-26 ID collision** — two distinct task files shared id `task-26`. Closed the watchdog item as TASK-26 (resolved via shipped 014); renamed the inconsistent-`--help` item to TASK-442 (still open, still valid).
+- **Resolved all 6 uncertain items via parallel source investigation** (6 Explore agents, one per item): closed 3 with file:line evidence (183 clean-case test exists; 386 gitRefResolves gone + r.error handled; 141 embedded-`..` mitigated by resolveScopedPath); re-scoped 297 (closure verb exists but `--reason` is dropped); confirmed 2 still-valid and annotated the evidence into their bodies (395 invalid-target untested; 143 node-less govern silently exits 0). Operator confirmed TASK-74 (030 graduate gate satisfies the mechanical-teeth intent) → closed.
+- **Created the bookkeeping umbrella** `multi:feature/bookkeeping-hardening` (planned, part-of lifecycle-industrialization) grouping the 13 small gaps/bugs in stack-control's own bookkeeping tooling (backlog verbs, session-end derivation, roadmap curation + node↔spec linkage, audit-run retention, tooling-friction routing). Mirrors the govern-030-hardening pattern: members live in the backlog, the node is the work-breakdown. `roadmap reconcile` clean (0 drift/orphan/unresolved) after the edit.
+
+**Didn't Work:**
+- **The backlog `done` verb does not persist `--reason` to disk** (this IS finding TASK-297, confirmed empirically mid-session). Every one of the 46 closures recorded `status: Done` but dropped its carefully-written rationale — the reason is validated and printed, never written (backlog.ts:171 calls `backend.close(id)` without it; backend.ts:75 has no reason param). The closure rationale survives only in docs/backlog-cleanup-review-2026-06-22.md + the commit messages, not the task files. Records intact, just not co-located.
+
+**Course Corrections:**
+- None. The operator's turns ("2", "74 yes", "see if you can remove the uncertainty", "create/reuse an umbrella") were direction + scope decisions, not corrections of a wrong approach. Zero rework.
+
+**Insights:**
+- **A flag-and-propose review doc earns its cost at apply-time.** The prior session's 5-agent deep-pass report made this session almost purely mechanical — each tier already carried verdict + evidence + recommended-reason, so applying it was a scripted batch, not a re-derivation. The one place it needed more was the ~7 uncertains, and those resolved cleanly with one targeted agent each.
+- **"Remove the uncertainty" is a closeable instruction, not an open-ended one.** Six items flagged "needs a human read" each reduced to a single concrete source question (does test X exist? is symbol Y gone? does guard Z catch the bypass?); parallel Explore agents answered all six with file:line evidence. Uncertainty in a backlog is usually just an unrun grep.
+- **The bookkeeping tooling has its own debt class.** Pulling the 13 backlog-verb / session-end / roadmap-curation defects into one umbrella made visible that they cluster — the meta-tooling that maintains the records is itself under-hardened (the `done --reason` drop being the on-the-nose example, surfaced by using the very verb it describes).
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 4
+  - roadmap(bookkeeping-hardening): umbrella grouping the 13 bookkeeping verb/skill gaps + bugs
+  - chore(backlog): resolve the 6 uncertain cleanup-review items via source investigation
+  - chore(backlog): close TASK-74 — 030 graduate gate satisfies mechanical-teeth intent (operator confirmed)
+  - chore(backlog): apply 2026-06-22 cleanup review — 42 closed, 9 re-scoped, 1 ID collision fixed
+- Files changed: 62
+- Backlog touched: TASK-16, TASK-244, TASK-26, TASK-297, TASK-324, TASK-39, TASK-425, TASK-442, TASK-74
+
+## 2026-06-22: 030 whole-feature govern — dogfooded to graduation, shipped to main, roadmap+backlog cleanup
+
+**Goal:** Pick up the parked whole-feature govern-at-end for `multi:feature/govern-whole-feature-chunked-payload` (the journal's explicit handoff). It expanded into the full close-out: run the govern, triage every finding, fix criticals, graduate, ship to main, validate in the installed release, then clean up the roadmap + backlog.
+
+**Accomplished:**
+- **Dogfooded 030's chunked govern-at-end against its own diff across 3 govern rounds** (findings 12 → 7 → 12). The core mechanism held — every fix survived re-govern; full suite green throughout (2442 → 2456, +14 across 5 new test blocks).
+- **Fixed 6 real correctness bugs TDD-first (RED→GREEN):** -10 degraded-fleet → `converged` gate hole (new `degraded-fleet-surfaced` outcome) + -33 its cross-round laundering edge; -11 render-fit over-envelope (manifest made elastic context + byte-accurate UTF-8 truncation — caught a latent multibyte over-envelope leak); -16 fence-closeability in `findGrammarComments`; -18 impl `--override` wrote the retired record shape so the gate stayed closed (THE graduation blocker); -23 empty scope graduated with zero audit.
+- **Graduated via attributable override** at the diminishing-returns plateau → convergence record `override: true` → `workflow status` reads `phase: shipped` (verified end-to-end through the released engine).
+- **Shipped to main:** PR #495 merged (merged `main` in first to resolve the version delta). **Validated 030 in the formally-installed release 0.53.0** (installed engine reads the override graduation as `phase: shipped`).
+- **Closed out:** roadmap node → `shipped`; closed 11 backlog items mooted by the US2/US8 clean break (source-verified); cleaned the roadmap (3 govern gap nodes cancelled as moot, 1 shipped, 2 un-deferred); created the `multi:feature/govern-030-hardening` umbrella (in-flight) gathering all follow-ups.
+- **Backlog cleanup review** (`docs/backlog-cleanup-review-2026-06-22.md`): context pass + 5-agent deep cross-check of all 214 open items → ~41 close / ~9 re-scope / ~7 uncertain candidates flagged for a future session (report-only).
+
+**Didn't Work:**
+- **Govern plateaued (12 → 7 → 12 oscillation) — a generator, not convergence.** Each round's fixes added code the next barrage re-audited, plus backlogged items re-surfaced under new IDs and doc prose is inexhaustibly auditable. The right exit was override-and-graduate, not another fix round.
+- **The -18 override bug silently blocked graduation.** The plan was "override to graduate since residuals are backlogged," but the override path wrote the retired `GovernConvergenceRecord` while US9's gate reads `WholeFeatureConvergenceRecord` → `phase: shipped` would never have engaged. Had to fix -18 before any override could work.
+- **session-end auto-derive counted 17 commits; 2 are merged-in from main** (`release v0.52.2`, `Merge #494`). This session = **15 commits**; the boundary range includes main's commits pulled in by the mid-session merge.
+
+**Course Corrections:**
+- [PROCESS] Operator scoped each govern round explicitly (criticals-now / backlog-rest), then chose override-and-graduate at the plateau — I surfaced the diminishing-returns analysis and let the operator own the (A)-fix-more vs (B)-graduate call each time rather than grinding autonomously.
+- [PROCESS] The 5-agent backlog deep pass **overruled my context-only reads** — most notably TASK-295 (I'd said "keep / still-valid"; it is resolved + closed-upstream gh-487) and TASK-416 (I'd said "dup"; independently fixed). Cross-checking against source beat recall.
+- [FABRICATION-guard] Verified all three "committed failing test" barrage findings (-09/-12/-13) by running the tests before triaging — all passed; they were false positives from the chunker splitting a RED-first test from its implementing source.
+
+**Quantitative reporting (AUDIT-03/-04):**
+- **030 audit-log: 0 open findings** — BUT this is honest only with context: of 24 findings (AUDIT-20260622-05..35) across 3 rounds, 9 were *fixed*, 4 *false-premise/dismissed*, 1 *resolved-out-of-scope*, and **16 are backlogged real deferred defects** (TASK-426..441, folded into the `govern-030-hardening` umbrella) — the headline "0 open" means dispositioned, not resolved.
+- **Tests: 2442 → 2456 (+14):** +4 degraded-fleet-not-converged, +3 render-fit-over-envelope, +3 grammar-comments-fence-aware, +2 empty-scope-fails-loud, +2 impl-override-opens-gate. Re-derived from `npx vitest run` (376 files / 2456 tests green).
+
+**Insights:**
+- **Chunked govern-at-end is a finding generator at the plateau.** Code-audit convergence isn't crisp here because each fix adds auditable surface and the chunker re-examines it; detect the oscillation (12→7→12) and switch to override-and-graduate rather than chasing it. The `spec-audit-diminishing-returns` discipline applies to impl mode too.
+- **The chunker splitting a test from its implementing source is a real false-finding source** (TASK-430): a model auditing the test-only chunk reads stale RED-era comments ("FAILS today") and reports a failing test, blind to the fix in a sibling chunk. Coupling should keep a test with its source.
+- **A backlog deep-cross-check earns its cost.** Five parallel agents grepping each open item against current source caught resolved-but-open items my session context missed and self-corrected their own over-eager calls (402/404 in `tests/` not `src/`; 389 live tsc errors).
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 17
+  - docs(backlog): cleanup review for a future session — flagged candidates from 214 open
+  - roadmap(govern-030-hardening): umbrella for all 030 follow-up work, marked next (in-flight)
+  - chore(roadmap): clean up post-030-shipped govern nodes
+  - chore(030): close out shipped feature + moot backlog
+  - Merge remote-tracking branch 'origin/main' into feature/stack-control
+  - chore(030-chunked-end-govern): record override graduation for multi:feature/govern-whole-feature-chunked-payload (phase: shipped)
+  - chore(030-chunked-end-govern): disposition round-3 findings (24-35); -25 resolved (specs/018 out of scope), -33 fixed, rest backlogged TASK-433..441
+  - fix(030-chunked-end-govern): accumulate fleet degradation across rounds (-33)
+  - chore(030-chunked-end-govern): disposition round-2 findings 18/19/22/23 (fixed/backlogged)
+  - fix(030-chunked-end-govern): impl override opens the gate (-18) + empty scope fails loud (-23)
+  - chore(030-chunked-end-govern): disposition round-2 findings 17/20/21 (fixed/false-premise)
+  - docs(030-chunked-end-govern): clear round-2 fix-debt from the degraded-fleet outcome (-17/-21)
+  - chore(030-chunked-end-govern): disposition the 12 whole-feature govern findings
+  - docs(030-chunked-end-govern): fix quickstart contradictions/gaps (-05/-06) + scrub stale RED comments
+  - fix(030-chunked-end-govern): resolve 3 dogfood govern findings (-10/-11/-16) TDD-first
+  - chore: release v0.52.2
+  - Merge pull request #494 from audiocontrol-org/feature/stack-control
+- Files changed: 70
+- Backlog touched: TASK-104, TASK-109, TASK-128, TASK-295, TASK-357, TASK-426, TASK-427, TASK-428, TASK-429, TASK-430, TASK-433
+
 ## 2026-06-22: 030 US2/US8 clean-break completion — dead per-phase modules deleted, execute skill → govern-at-end (govern parked for next session)
 
 **Goal:** Pick up last session's parked handoff — run the whole-feature govern-at-end over the 030 diff. It turned out to be blocked, so the real work became finishing 030's US2/US8 remainder to unblock it; the govern itself was then parked per the operator.

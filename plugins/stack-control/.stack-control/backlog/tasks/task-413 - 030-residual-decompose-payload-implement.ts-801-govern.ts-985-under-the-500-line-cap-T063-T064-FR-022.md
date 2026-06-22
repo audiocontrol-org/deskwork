@@ -18,5 +18,5 @@ ordinal: 413000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-The CLI per-chunk loop (T036) reuses the existing barrage payload assembler (buildImplementVars -> payload-implement.ts, 801 lines) rather than switching the CLI to the end-govern-pipeline module (which would need the barrage->findings auditChunk integration). So payload-implement.ts remains (FR-022 decompose not done) and govern.ts is 985 lines (down from 1284 but still over cap; pre-existing TASK-151). All NEW 030 modules are <=500 (SC-007 for new code holds). Either decompose payload-implement in place, or do the deeper CLI switch to runEndGovern (enabling its removal + using seam/fix-fanout/bounded-loop at the CLI).
+Re-scoped 2026-06-22: payload-implement.ts DELETED by 030 US8; govern.ts is now 333 lines (under the 300-500 cap). FR-022 decompose/cap intent is met. Surviving work: the CLI dispatches to runEndGovern but the pipeline object output is not yet fully wired through (overlaps TASK-417 — WholeFeatureConvergenceRecord vs GovernConvergenceRecord shape mismatch). Scope: wire CLI pipeline output to runEndGovern cleanly so the record shape gate in capability-reconcile reads the correct type.
 <!-- SECTION:DESCRIPTION:END -->

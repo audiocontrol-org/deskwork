@@ -18,3 +18,9 @@ ordinal: 110000
 ---
 
 
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Re-scoped 2026-06-22: original finding cited checkpoint-state.ts:144-158 (deleted by 030 — moot). Same defect migrated to scope-fingerprint.ts:77 digestScopedPath — only symlinks and directories are guarded; FIFO, socket, and device special files fall through to readFileSync and hash as opaque blobs. Fix: reject non-regular entries (FIFO/socket/block-device/char-device) in digestScopedPath, fail loud instead of silently hashing device bytes.
+<!-- SECTION:DESCRIPTION:END -->

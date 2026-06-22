@@ -33,7 +33,7 @@ function doneItem(): { root: string; id: string } {
   dirs.push(root);
   const backend = createBacklogBackend({ cwd: root });
   const id = backend.create({ title: 'finished work', labels: ['type:gap'] });
-  backend.close(id);
+  backend.close(id, 'finished');
   return { root, id };
 }
 

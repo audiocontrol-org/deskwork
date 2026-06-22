@@ -3,9 +3,10 @@ id: TASK-301
 title: >-
   Per-phase govern has no no-barrage checkpoint refresh, so 'govern per US, no
   earlier re-govern' is unsupported (shared-file O(n2))
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 18:11'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

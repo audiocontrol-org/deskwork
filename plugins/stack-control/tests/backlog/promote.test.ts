@@ -137,7 +137,7 @@ describe('promote writer — mid-batch write failure is fail-loud + names writte
         if (id === failId) throw new BacklogError(`simulated backend failure on ${id}`);
         real.edit(id, spec);
       },
-      close: (id: string) => real.close(id),
+      close: (id: string, reason: string) => real.close(id, reason),
       archive: (id: string) => real.archive(id),
       readNotes: (id: string) => real.readNotes(id),
     };

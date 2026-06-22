@@ -3,9 +3,10 @@ id: TASK-423
 title: >-
   non-audit trim drops files from chunk set; all-non-audit cluster yields
   dangling SplitClusterMarker
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-22 00:17'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:bug'

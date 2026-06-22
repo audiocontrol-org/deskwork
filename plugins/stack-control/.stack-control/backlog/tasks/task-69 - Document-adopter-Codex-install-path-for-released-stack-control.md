@@ -1,9 +1,10 @@
 ---
 id: TASK-69
 title: Document adopter Codex install path for released stack-control
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-12 18:01'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

@@ -4,16 +4,31 @@
 // and when a finding's audit-log entry flips to `fixed-<sha>`, any backlog task
 // REFERENCING that finding MUST be reconciled/closed automatically (part (b)).
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
+import { rmSync } from 'node:fs';
 import { runCli } from '../../src/__tests__/_run-helpers.js';
 import { createBacklogBackend, BACKLOG_DONE_STATUS } from '../../src/backlog/backend.js';
 import { reconcileFixedFindings } from '../../src/backlog/reconcile-fixed.js';
 import { auditRef } from '../../src/backlog/slush-migrate.js';
 import { tmpBacklog } from './helpers.js';
 
+// TASK-378: tmpBacklog() provisions a dir under the OS tmpdir per test; without
+// cleanup those dirs accumulate across runs. Track each and remove it afterEach
+// (mirrors src/__tests__/subcommands/backlog-done.test.ts).
+let dirs: string[] = [];
+afterEach(() => {
+  for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  dirs = [];
+});
+function fresh(): string {
+  const dir = tmpBacklog();
+  dirs.push(dir);
+  return dir;
+}
+
 describe('backlog done closes a task (US4, T025a, FR-015)', () => {
   it('backlog done <id> --apply sets the task status to Done', () => {
-    const dir = tmpBacklog();
+    const dir = fresh();
     const backend = createBacklogBackend({ cwd: dir });
     const id = backend.create({ title: 'a found bug', labels: ['agent-found', 'type:bug'] });
 
@@ -28,7 +43,7 @@ describe('backlog done closes a task (US4, T025a, FR-015)', () => {
 
 describe('a finding flipping to fixed-<sha> auto-reconciles its task (US4, T025b, FR-015)', () => {
   it('closes the backlog task whose ref matches the fixed finding', () => {
-    const dir = tmpBacklog();
+    const dir = fresh();
     const backend = createBacklogBackend({ cwd: dir });
     const findingId = 'AUDIT-20260619-01';
     const ref = auditRef('feat', findingId);
@@ -68,7 +83,7 @@ describe('a finding flipping to fixed-<sha> auto-reconciles its task (US4, T025b
   // tightened dedup; ALL of them must close when the finding is fixed. And a repeat
   // canonical id (or a stale list() snapshot) must NOT double-close a task.
   it('closes EVERY backlog task carrying the fixed finding ref, double-close-safe', () => {
-    const dir = tmpBacklog();
+    const dir = fresh();
     const backend = createBacklogBackend({ cwd: dir });
     const findingId = 'AUDIT-20260619-02';
     const ref = auditRef('feat', findingId);
@@ -114,7 +129,7 @@ describe('a finding flipping to fixed-<sha> auto-reconciles its task (US4, T025b
   // specs/029 US4 (AUDIT-BARRAGE claude-04): dryRun computes the would-close set
   // WITHOUT mutating the backend — the slush dry-run preview path uses it.
   it('dryRun reports what WOULD close without closing it', () => {
-    const dir = tmpBacklog();
+    const dir = fresh();
     const backend = createBacklogBackend({ cwd: dir });
     const findingId = 'AUDIT-20260619-03';
     const ref = auditRef('feat', findingId);
@@ -148,7 +163,7 @@ describe('a finding flipping to fixed-<sha> auto-reconciles its task (US4, T025b
   });
 
   it('an already-Done or absent task is a no-op (idempotent)', () => {
-    const dir = tmpBacklog();
+    const dir = fresh();
     const backend = createBacklogBackend({ cwd: dir });
     // No task references this finding — reconcile is a clean no-op.
     const auditLogText = [

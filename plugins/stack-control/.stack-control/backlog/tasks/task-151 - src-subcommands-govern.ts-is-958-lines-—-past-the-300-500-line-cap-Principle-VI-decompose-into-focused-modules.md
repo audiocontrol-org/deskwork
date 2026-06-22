@@ -3,9 +3,10 @@ id: TASK-151
 title: >-
   src/subcommands/govern.ts is 958 lines — past the 300-500 line cap (Principle
   VI); decompose into focused modules
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-17 01:22'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

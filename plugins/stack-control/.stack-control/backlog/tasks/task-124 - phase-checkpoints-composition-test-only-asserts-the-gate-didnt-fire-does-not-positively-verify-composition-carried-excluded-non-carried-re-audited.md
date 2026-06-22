@@ -3,9 +3,10 @@ id: TASK-124
 title: >-
   phase-checkpoints composition test only asserts the gate didn't fire; does not
   positively verify composition (carried excluded / non-carried re-audited)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-15 00:32'
+updated_date: '2026-06-22 16:11'
 labels:
   - agent-found
   - 'type:bug'

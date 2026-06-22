@@ -36,12 +36,23 @@ not *refuse*:
    ```
 
    A spec dir is never left without a node (no orphan). Do **not** refuse.
-3. **Node already exists → compass-gate.** Consult the compass and refuse loud on a non-zero
-   verdict (an `ahead`/`off-rail` action — e.g. the item is in a terminal side-state), performing
-   none of this skill's work:
+3. **Node already exists → compass-gate, then link the spec.** Consult the compass and refuse
+   loud on a non-zero verdict (an `ahead`/`off-rail` action — e.g. the item is in a terminal
+   side-state), performing none of this skill's work:
 
    ```bash
    stackctl workflow compass <id> --intent define
+   ```
+
+   Then author the spec (Steps below) and — because the node already exists — **set its
+   `spec:` pointer** once `/speckit-specify` resolves the new spec dir (TASK-407). The no-node
+   branch above gets this for free via `roadmap add --spec`; the node-exists branch must do it
+   explicitly, or the node stays spec-pointerless and `govern --item` / `reconcile` cannot
+   authoritatively resolve the feature (the TASK-244 class). `roadmap add --spec` does NOT work
+   on an existing node (it errors on identifier uniqueness) — use `workflow link-spec`:
+
+   ```bash
+   stackctl workflow link-spec <id> specs/NNN-<slug> --apply
    ```
 
 **Backstop (FR-009, mechanical):** any spec dir that still ends up with no roadmap node (e.g.

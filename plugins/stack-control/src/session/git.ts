@@ -21,6 +21,15 @@ export interface AheadBehind {
 export interface SessionBoundaryOptions {
   /** Explicit boundary ref (highest precedence). */
   readonly since?: string;
+  /**
+   * Path to the development journal (TASK-39). When set and the file has commit
+   * history, the boundary anchors at the LAST commit that touched it — i.e. the
+   * previous session-end — so the window captures exactly this session's commits.
+   * This is robust to the merge-base-with-upstream collapse: on a long-lived
+   * feature branch pushed up to HEAD, merge-base(upstream, HEAD) === HEAD and the
+   * window would otherwise be empty ("0 commits this session").
+   */
+  readonly journalPath?: string;
   /** Commits-back fallback when no base resolves (research D5). Default 1. */
   readonly fallbackN?: number;
 }
@@ -113,14 +122,24 @@ export function aheadBehind(cwd: string, base: string): AheadBehind {
 }
 
 /**
- * The session-boundary SHA (research D5): explicit `--since` (resolved to a SHA)
- * → merge-base with the resolved base branch → `HEAD~N` fallback. When even
- * HEAD~N is out of range (shallow history), bottom out at the root commit so the
+ * The session-boundary SHA: explicit `--since` (resolved to a SHA) → the last
+ * commit that touched the journal (the previous session-end, TASK-39) → merge-base
+ * with the resolved base branch (research D5) → `HEAD~N` fallback. When even HEAD~N
+ * is out of range (shallow history), bottom out at the root commit so the
  * `<boundary>..HEAD` range is always valid.
  */
 export function sessionBoundary(cwd: string, opts: SessionBoundaryOptions = {}): string {
   if (opts.since !== undefined && opts.since.length > 0) {
     return git(cwd, ['rev-parse', opts.since]);
+  }
+
+  // Journal anchor (TASK-39): the last commit that modified the journal marks the
+  // previous session-end. `<that>..HEAD` is exactly this session's window — robust
+  // to a pushed-up upstream that would collapse the merge-base to HEAD. Absent
+  // journal history (first session) falls through to the base heuristic below.
+  if (opts.journalPath !== undefined && opts.journalPath.length > 0) {
+    const lastJournalCommit = tryGit(cwd, ['log', '-1', '--format=%H', '--', opts.journalPath]);
+    if (lastJournalCommit !== null && lastJournalCommit.length > 0) return lastJournalCommit;
   }
 
   const base = resolveBase(cwd);

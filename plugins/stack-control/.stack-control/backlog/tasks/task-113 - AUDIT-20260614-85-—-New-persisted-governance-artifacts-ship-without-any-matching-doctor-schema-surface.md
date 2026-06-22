@@ -18,3 +18,9 @@ ordinal: 113000
 ---
 
 
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Re-scoped 2026-06-22: phase-checkpoints artifact cited in original finding was deleted by 030 US2 (moot). Surviving gap: fleet-knowledge.yaml ships with only light setup verification (verify.ts:44) and no full schema/doctor rule — same surviving gap as TASK-77. Confirm whether this is a dup of TASK-77; if so, close as dup. Otherwise scope to fleet-knowledge.yaml doctor rule + schema validation only.
+<!-- SECTION:DESCRIPTION:END -->

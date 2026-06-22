@@ -3,9 +3,10 @@ id: TASK-160
 title: >-
   tasks.md setup-phase that declares container directories as governed scope
   makes its per-phase checkpoint perpetually stale
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-18 01:24'
+updated_date: '2026-06-22 16:11'
 labels:
   - agent-found
   - 'type:gap'

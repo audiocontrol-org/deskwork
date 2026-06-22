@@ -3,9 +3,10 @@ id: TASK-264
 title: >-
   audit-barrage claude/opus lane times out on the 027 Phase 2 full-feature
   payload (24KB) — derived timeout 311s, killed at 311s
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 00:24'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:bug'

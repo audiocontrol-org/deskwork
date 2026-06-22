@@ -26,6 +26,7 @@ labels, provenance) and otherwise gets out of the way.
 4. **One pile, three intake sources.** Ongoing agent `capture`, a one-time GitHub-issue snapshot (`import-github`), and audit-barrage parked residuals (`import-slush` + the rewired `slush-findings`) all feed the **same** pile, which is the single burn-down queue.
 5. **Default to capturing.** If unsure whether found work is in scope, capture it and keep going — captures are durable, git-diffable, and cheap; a lost bug is not.
 6. **Promotion is record-only.** When a backlog item earns the full spec-driven treatment, `promote` records the graduation linkage — it never creates the target. Creating the spec / roadmap node / task is a separate, deliberate operator step via the existing creator. This mirrors the inbox `promote` precedent (record, don't create).
+7. **Tooling friction is NOT backlog material — route it outward.** Found a defect in a tool this project *consumes* (`stackctl` itself, Spec Kit, any upstream)? The pile only holds work **this installation can burn down**; an upstream defect is unactionable here and just pollutes the selection queue. File it as a **GitHub issue on the tool's repo** (reliably cross-project) and keep moving. If you already captured it locally before recognizing it as upstream, mark the local item `done` with a `filed-upstream` label + the issue URL in its notes — the record survives, the queue stays honest.
 
 ## Capture (one move, mid-task)
 

@@ -520,47 +520,45 @@ Umbrella: make cross-model governance OPERABLE — converge reliably and stay ch
 
 ## multi:gap/govern-lift-auto-close-in-loop-fixes
 - status: planned
-- deferred-until: govern-whole-feature-chunked-payload lands; govern-at-end's single end reconciliation shrinks the in-loop lift balloon this targets — re-weigh then
-- part-of: multi:feature/govern-operability
+- part-of: multi:feature/govern-operability, multi:feature/govern-030-hardening
 - ref: gh-490 / offing-ff761162
 Lift must auto-close findings fixed in-loop. 0.52.2's FR-016 cross-run signature dedup does NOT tame the backlog balloon when the audited artifact changes each round (distinct signature per round): the offing adopter's 9-round doc phase still lifted 42 To-Do tasks (TASK-132..173) for findings it fixed in-loop, forcing a hand-written bulk-close script. Fix: on a graduating (dampened/converged) govern, auto-close the feature's OPEN migrated-finding tasks whose signature is absent from the converged round (the in-loop fix landed -> resolved). Bounded+safe: fires only on graduation, closes only findings absent from the clean final round. Source: offing 0.52.2 dogfood ff761162 (2026-06-21); agent root-cause 'gh-490-not-fully-fixed: no auto-close of in-loop fixes'.
 
 ## multi:gap/govern-doc-aware-audit-lens
 - status: planned
-- deferred-until: weigh against govern-whole-feature-chunked-payload and other lifecycle-industrialization priorities; orthogonal to govern-at-end (prose nitpicking persists regardless of when govern runs)
-- part-of: multi:feature/govern-operability
+- part-of: multi:feature/govern-operability, multi:feature/govern-030-hardening
 - ref: offing-ff761162
 Documentation phases ring far longer than code. A 2-task doc phase (a README + ~40 lines of seam-contract comments) took 9 cross-model rounds to converge: the auditors kept finding wording corners on forward-looking contract prose ('near-infinite phrase-more-precisely surface'), amplified by out-of-window false-HIGHs and fix-induced channel growth. The shipped severity-determinism/dampener does not stop prose nitpicking. Fix, two levers: (a) a doc/prose-aware audit lens that, when the payload is predominantly markdown prose, flags only SUBSTANTIVE doc defects (factually wrong, contradicts code, missing required content, broken example/link) and suppresses wording/phrasing/style nits; (b) implement-mode diminishing-returns plateau auto-detect that surfaces an 'override recommended' verdict (findings shifting to wording altitude / fix-induced growth / oscillation) instead of grinding. Source: offing 0.52.2 dogfood ff761162 (2026-06-21).
 
 ## multi:gap/govern-hunkblocks-uncommitted-empty
-- status: planned
+- status: cancelled
 - deferred-until: govern-whole-feature-chunked-payload lands; govern-at-end audits committed work, so the per-phase staleness treadmill this targets is moot — re-weigh then
 - part-of: multi:feature/govern-operability
 - ref: offing-ff761162 / completes TASK-357
 Hunk-fingerprint freshness silently does not engage when govern audits UNCOMMITTED work. computePhaseHunkBlocks runs 'git diff <diffBase> HEAD -- <file>' (assumes the phase is committed, HEAD == tip). The natural adopter flow governs working-tree changes with --diff-base HEAD, so this becomes 'git diff HEAD HEAD' = EMPTY -> zero hunkBlocks -> the checkpoint falls back to whole-file/directory scopeFingerprint -> US7/TASK-357 hunk-freshness never engages -> every later phase that touches a sibling file in a shared governed directory re-stales ALL prior phases (the O(n^2) entanglement TASK-357 was meant to kill). Confirmed live: offing 0.52.2 (which HAS the TASK-357 path-relativity fix) phase-1 checkpoint had no hunkBlocks; Phase 2 adding files to tests/validate/ re-staled phase-1, forcing override-refresh. Fix: compute hunkBlocks against the WORKING TREE ('git diff <base> -- <file>', no HEAD) when the phase work is uncommitted, so hunkBlocks populate and freshness becomes sibling-immune. Completes TASK-357 for the uncommitted-work case. THE root of the staleness treadmill — highest-leverage. Source: offing ff761162 Phase 2 (2026-06-21).
 
 ## multi:gap/govern-boundary-too-large-normal-phase
-- status: planned
+- status: shipped
 - part-of: multi:feature/govern-whole-feature-chunked-payload
 - ref: offing-ff761162
 boundary-too-large FATALs a single NORMAL code phase before any barrage runs. offing Phase 2 (11 tasks) rendered 68360 prompt bytes vs the 65536 fleet envelope — only ~4% over — and govern FATALed with terminal-outcome=boundary-too-large, never auditing anything. The sanctioned recovery (re-shape the tasks.md phase boundary / split the phase) forces spec restructuring to satisfy the auditor's payload limit, and the escape is closed BOTH ways: per-phase blows the envelope here, and whole-feature-at-end (US6) also risks boundary-too-large (which is why per-phase exists). Fix options: chunk/stream the payload across the fleet (audit a large phase in sub-payloads), derive/raise the envelope per lane, or a deterministic payload-trim that drops non-audit-relevant bytes — so a normal-sized phase does not force tasks.md restructuring. Source: offing ff761162 Phase 2 (2026-06-21).
 
 ## multi:gap/govern-split-file-audit-exclusion
-- status: planned
+- status: cancelled
 - deferred-until: govern-whole-feature-chunked-payload lands; files are committed/tracked at end-govern, so the untracked-split exclusion vanishes — re-weigh then
 - part-of: multi:feature/govern-operability
 - ref: offing-ff761162 / TASK-263 class
 Size-cap-driven file splits are silently excluded from their own audit. To honor the 300-500-line file cap, offing's Phase 2 split validate-diff.sh -> validate-diff-ref.sh (164 lines of real pipeline logic). Because the split file is untracked AND not named in tasks.md, the per-phase payload scope (FR-006) excluded it: 'untracked file scripts/lib/validate-diff-ref.sh is outside the audit unit's path scope; excluding it from the folded payload.' So the file-size discipline and the govern-scope discipline are in DIRECT CONFLICT — splitting a file to satisfy one silently drops it from the other (it goes ungoverned). Fix: fold untracked NEW siblings of in-scope files (or new files referenced by the in-scope diff's imports/sources) into the per-phase payload, so a cap-driven split is still audited. Related to the shipped TASK-263/US5 payload-scoping but distinct (untracked-new-file case). Source: offing ff761162 Phase 2 (2026-06-21).
 
 ## multi:gap/govern-cheap-checkpoint-refresh
-- status: planned
+- status: cancelled
 - deferred-until: govern-whole-feature-chunked-payload lands; no per-phase checkpoints to refresh under govern-at-end — re-weigh then
 - part-of: multi:feature/govern-operability
 - ref: offing-ff761162
 No cheap checkpoint refresh for a sibling-change false-stale; --override is the only tool and it is semantically wrong + non-persistent. When a later phase changes a sibling file in a shared governed directory and re-stales an earlier phase whose OWN audited content is unchanged, the only way to re-current it is a full 'govern --phase N --override <reason>'. But override is per-invocation (FR-018, no persisted marker) and means 'graduate past findings' — not 're-baseline unchanged-audited-content'. Fix: a 'govern --refresh-checkpoint <phase>' (or similar) that re-stamps the phase checkpoint fingerprint at the current tree with zero barrage and NO override marker, distinct from override. NOTE: largely OBVIATED by govern-hunkblocks-uncommitted-empty — if hunk-freshness actually engages, sibling-file changes stop staling prior phases and this is rarely needed; keep as the fallback. Source: offing ff761162 Phase 2 (2026-06-21).
 
 ## multi:feature/govern-whole-feature-chunked-payload
-- status: planned
+- status: shipped
 - analyze-clean: yes
 - spec: specs/030-chunked-end-govern
 - design-approved: yes
@@ -568,4 +566,65 @@ No cheap checkpoint refresh for a sibling-change false-stale; --override is the 
 - part-of: multi:feature/govern-operability
 - ref: offing-ff761162
 Make govern-at-end the DEFAULT govern direction and make it scale. Chunk the whole-feature audit into bite-sized sub-payloads, parallelize audit and fix across the model fleet, and reconcile once at the end. US6's either-of graduate gate already sanctions whole-feature graduation; this delivers the payload mechanism that makes it the default rather than the opt-in escape. Solves boundary-too-large for whole-feature governance (the reason per-phase existed) by streaming sub-payloads under the fleet envelope. Load-bearing enabler: once govern runs at end over committed work, the per-phase staleness treadmill (hunkblocks-uncommitted-empty, cheap-checkpoint-refresh), the untracked-split exclusion, and the in-loop lift balloon (lift-auto-close) all shrink or vanish, so those gaps defer behind this. Source: offing 0.52.2 dogfood ff761162 (2026-06-21); operator direction govern-at-end.
+
+## multi:feature/govern-030-hardening
+- status: in-flight
+Umbrella for the 030 chunked-end-govern dogfood follow-ups + the deferred govern hardening folded in. 030 shipped (0.53.0, PR #495) via override at the diminishing-returns plateau; these are the dispositioned residuals, gathered here as the curated next epic. Detail lives in the backlog (slush); this node is the work-breakdown.
+
+Seam-pass hardening (the cross-chunk contract backstop — final gate before a converged whole-feature record):
+- TASK-426 (-07) multi-line exported function signatures missed
+- TASK-427 (-08) consumers unchanged in the diff missed (use the import/coupling graph, not diff text)
+- TASK-431 (-19) `changed-required-shape` declared in the schema but never implemented
+- TASK-438 (-30) required function-typed params treated as optional
+
+Govern pipeline correctness / edges:
+- TASK-435 (-27) default diff base falls back to HEAD~1 when only origin/main exists
+- TASK-436 (-28) untracked fold lost the binary + byte-budget safeguards
+- TASK-437 (-29) doctor accepts empty/missing chunk-set fields as valid
+- TASK-440 (-32) seam findings block the run but are never lifted (operator can't see what blocked)
+- TASK-439 (-31) fix-succeeds-changes-nothing converges with open findings (unreachable until TASK-424 autonomous-fix lands; unguarded)
+- TASK-428 (-14/-35) other-feature scaffolds no longer excluded from the implement payload
+- TASK-429 (-15) rename-aware committed-diff coverage deleted, not replaced
+- TASK-430 chunker splits a RED-first test from its implementing source → false "failing test" findings
+- TASK-441 (-34) outer-tree payload-leak invariant not re-pinned after the test was deleted
+
+Doc reconciliation:
+- TASK-433 (-24) `GOVERN_CHECKPOINT`/`--checkpoint` contradiction across contract / FR-029 / quickstart
+- TASK-434 (-26) autonomous fix-fanout still promised in spec/contract after the TASK-424 deferral
+- TASK-128 `contracts/incremental-audit.md` still documents the deleted `resolveComposingFeatureUnit` API
+
+Re-target:
+- TASK-109 torn-temp-file guard — re-aim from the deleted per-phase writer to `writeWholeFeatureConvergenceRecord`
+
+Folded-in roadmap gaps (now `part-of` this umbrella, defers cleared since 030 landed):
+- multi:gap/govern-lift-auto-close-in-loop-fixes — auto-close in-loop-fixed backlog tasks on graduation (US6 shrank, didn't deliver)
+- multi:gap/govern-doc-aware-audit-lens — orthogonal prose-nitpick lens
+
+## multi:feature/bookkeeping-hardening
+- status: planned
+- part-of: multi:feature/lifecycle-industrialization
+Umbrella for the small gaps + bugs in stack-control's own bookkeeping tooling — the verbs and skills that maintain the project's records (the backlog store, the roadmap DAG curation, the session-end journal derivation, the node↔spec linkage, audit-run retention). These are defects in the EXISTING bookkeeping surface, complementary to the new mechanization features under the parent lifecycle-industrialization node. Detail lives in the backlog; this node is the work-breakdown. Surfaced + grouped during the 2026-06-22 backlog cleanup (docs/backlog-cleanup-review-2026-06-22.md).
+
+Backlog store verbs:
+- TASK-297 `backlog done` drops `--reason` — closure rationale printed but never written to disk (backlog.ts:171 calls backend.close(id) without it; backend.ts:75 has no reason param)
+- TASK-378 `done.test.ts` tmpBacklog() dirs never cleaned up (pairs with 297)
+- TASK-23 `backlog promote` has no inverse (un-promote / re-home) — correcting a mis-promote needs a hand-edit
+- TASK-38 `backlog capture` does not dedupe by `--ref` — duplicate items for the same gh ref created silently
+- TASK-299 `backlog capture` ENAMETOOLONG — filename derived from the full untruncated title
+
+Session-end journal derivation:
+- TASK-39 session-end auto-derivation reported 0 commits / no backlog touched for a 10-commit session
+
+Roadmap curation + node↔spec linkage (verbs can't write certain fields → forced hand-edits):
+- TASK-244 in-flight node has no `spec:` pointer — govern --item / reconcile can't authoritatively resolve its feature
+- TASK-407 `define` skill does not set the spec pointer on an existing node (link-spec discoverability)
+- TASK-298 no sanctioned verb writes the design-approved / analyze-clean roadmap marker
+- TASK-21 roadmap archival is edge-unaware — curate --apply would archive a depended-upon shipped item and dangle its edges (FR-005)
+- TASK-442 inconsistent `--help` across verbs — most flag sets are only discoverable by reading source
+
+Audit-run retention:
+- TASK-425 audit-barrage run-dirs accumulate unboundedly under .stack-control/audit-runs with no prune/retention verb
+
+Tooling-friction routing policy:
+- TASK-16 adopt + document the tooling-friction routing policy (upstream-tool defects go to GitHub issues, never the local backlog)
 

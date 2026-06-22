@@ -69,7 +69,11 @@ export function reconcileFixedFindings(args: ReconcileFixedArgs): ReconcileFixed
     for (const task of items.filter((item) => item.refs.includes(ref))) {
       if (closed.has(task.id)) continue; // already counted this run (no double-close)
       if (task.status === BACKLOG_DONE_STATUS) continue;
-      if (args.dryRun !== true) args.backend.close(task.id); // preview: compute, don't mutate
+      // preview: compute, don't mutate. The closure reason records the audit
+      // provenance (028 TASK-297 — close persists WHY).
+      if (args.dryRun !== true) {
+        args.backend.close(task.id, `audit finding ${canonical} reconciled (${entry.status})`);
+      }
       closed.add(task.id);
       reconciled.push({ findingId: canonical, taskId: task.id });
     }

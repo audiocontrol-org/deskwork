@@ -69,10 +69,12 @@ export interface BacklogBackend {
   /** Additively edit an existing item (add a label / append notes). Shells the
    * real binary; a non-zero exit (e.g. unknown id) throws BacklogError (D6). */
   edit(id: string, spec: EditSpec): void;
-  /** Close an item by setting its status to the terminal `Done` (023 FR-007).
-   * Shells the real binary; a non-zero exit (e.g. unknown id) throws BacklogError —
-   * never a silent no-op, never a fabricated success. */
-  close(id: string): void;
+  /** Close an item by setting its status to the terminal `Done` (023 FR-007) AND
+   * appending `reason` to its implementation notes so the closure rationale is a
+   * durable on-disk record, not just a printed line (028 TASK-297). Shells the
+   * real binary; a non-zero exit (e.g. unknown id) throws BacklogError — never a
+   * silent no-op, never a fabricated success. */
+  close(id: string, reason: string): void;
   /**
    * Relocate an item OUT of the live store while PRESERVING it (028 FR-011 —
    * "content databases preserve, they don't delete"). Shells the real binary's
@@ -359,11 +361,23 @@ export function createBacklogBackend(opts: BacklogBackendOptions): BacklogBacken
       run(args); // non-zero (e.g. unknown id) → BacklogError, never a silent no-op
     },
 
-    close(id: string): void {
-      // Set status to the terminal `Done` via the real binary. A non-zero exit
+    close(id: string, reason: string): void {
+      // Set status to the terminal `Done` AND record WHY in the durable task
+      // notes (028 TASK-297 — the rationale was printed but never persisted). One
+      // `task edit` invocation sets the status + appends the closure note
+      // atomically: a single backend write, no torn partial-close. A non-zero exit
       // (unknown id, backend error) throws BacklogError — the caller never reports
       // a close it did not perform (023 FR-006/FR-007).
-      run(['task', 'edit', id, '-s', BACKLOG_DONE_STATUS, '--plain']);
+      run([
+        'task',
+        'edit',
+        id,
+        '-s',
+        BACKLOG_DONE_STATUS,
+        '--append-notes',
+        `Closed: ${reason}`,
+        '--plain',
+      ]);
     },
 
     readNotes(id: string): string {

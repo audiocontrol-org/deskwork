@@ -3,9 +3,10 @@ id: TASK-121
 title: >-
   US1 whole-feature govern: all-carried empty scope reverts to a FULL feature
   payload (defeats minimal re-audit)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 20:24'
+updated_date: '2026-06-22 16:11'
 labels:
   - agent-found
   - 'type:bug'

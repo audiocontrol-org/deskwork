@@ -4,10 +4,10 @@ title: >-
   025 FR-002: start-governing (implementing->governing) gate is authored in
   WORKFLOW.md but the 024 advance engine treats mid-pipeline transitions as
   advisory, so all-phase-checkpoints-current is reported-not-enforced there
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-17 01:48'
-updated_date: '2026-06-17 17:31'
+updated_date: '2026-06-22 16:11'
 labels:
   - agent-found
   - 'type:gap'

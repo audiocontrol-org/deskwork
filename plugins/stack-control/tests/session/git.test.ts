@@ -34,8 +34,13 @@ function initRepo(): string {
 }
 
 let dir: string;
+// Extra tmp dirs (e.g. bare remotes) tracked so a failing assertion before an
+// inline rmSync can't leak them (AUDIT-BARRAGE-claude-03).
+let extraDirs: string[] = [];
 afterEach(() => {
   if (dir) rmSync(dir, { recursive: true, force: true });
+  for (const d of extraDirs) rmSync(d, { recursive: true, force: true });
+  extraDirs = [];
 });
 
 describe('resolveBase', () => {
@@ -109,6 +114,46 @@ describe('sessionBoundary', () => {
     const boundary = sessionBoundary(dir, { fallbackN: 1 });
     // HEAD~1 of the 2-commit history is the first commit; boundary != HEAD.
     expect(boundary).not.toBe(head);
+    expect(git(dir, 'rev-list', '--count', `${boundary}..HEAD`)).toBe('1');
+  });
+
+  // TASK-39: on a long-lived feature branch whose upstream is pushed up to HEAD
+  // ("push early and often"), merge-base(upstream, HEAD) collapses to HEAD, so the
+  // session window is empty and the journal reports "0 commits". The journal-anchored
+  // boundary must instead start at the previous session-end (the last commit that
+  // touched the journal), capturing this session's commits regardless of push state.
+  it('anchors the boundary at the last journal-touching commit (TASK-39)', () => {
+    dir = initRepo();
+    commit(dir, 'a.txt', 'a'); // older history, before the previous session-end
+    // Previous session-end commits the journal — this is the session boundary.
+    const prevSessionEnd = commit(dir, 'DEVELOPMENT-NOTES.md', 'session-end record');
+    // This session: 3 code commits, none touching the journal.
+    commit(dir, 'c.txt', 'c');
+    commit(dir, 'd.txt', 'd');
+    commit(dir, 'e.txt', 'e');
+    // Reproduce the collapse: a fully-pushed upstream tracking HEAD. Tracked for
+    // cleanup so a failing assertion below can't leak the bare repo (claude-03).
+    const remote = mkdtempSync(join(tmpdir(), 'sc-bare-'));
+    extraDirs.push(remote);
+    git(remote, 'init', '-q', '--bare', '-b', 'main');
+    git(dir, 'remote', 'add', 'origin', remote);
+    git(dir, 'push', '-q', '-u', 'origin', 'main');
+
+    const boundary = sessionBoundary(dir, { journalPath: join(dir, 'DEVELOPMENT-NOTES.md') });
+    expect(boundary).toBe(prevSessionEnd);
+    // The window now captures exactly this session's 3 commits.
+    expect(git(dir, 'rev-list', '--count', `${boundary}..HEAD`)).toBe('3');
+  });
+
+  it('falls back to the base/HEAD~N heuristic when the journal has no commit history', () => {
+    dir = initRepo();
+    commit(dir, 'a.txt', 'a');
+    commit(dir, 'b.txt', 'b');
+    // journalPath points at a file never committed → no anchor → heuristic fallback.
+    const boundary = sessionBoundary(dir, {
+      journalPath: join(dir, 'DEVELOPMENT-NOTES.md'),
+      fallbackN: 1,
+    });
     expect(git(dir, 'rev-list', '--count', `${boundary}..HEAD`)).toBe('1');
   });
 });

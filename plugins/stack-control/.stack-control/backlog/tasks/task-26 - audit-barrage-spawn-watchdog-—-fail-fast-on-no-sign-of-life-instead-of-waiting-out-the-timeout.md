@@ -3,10 +3,10 @@ id: TASK-26
 title: >-
   audit-barrage: spawn watchdog — fail fast on no sign-of-life instead of
   waiting out the timeout
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-11 04:40'
-updated_date: '2026-06-11 04:51'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

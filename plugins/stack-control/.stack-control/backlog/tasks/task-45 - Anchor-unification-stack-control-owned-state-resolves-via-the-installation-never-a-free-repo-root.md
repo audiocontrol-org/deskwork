@@ -3,10 +3,10 @@ id: TASK-45
 title: >-
   Anchor unification: stack-control-owned state resolves via the installation,
   never a free --repo-root
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-11 04:15'
-updated_date: '2026-06-11 05:11'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

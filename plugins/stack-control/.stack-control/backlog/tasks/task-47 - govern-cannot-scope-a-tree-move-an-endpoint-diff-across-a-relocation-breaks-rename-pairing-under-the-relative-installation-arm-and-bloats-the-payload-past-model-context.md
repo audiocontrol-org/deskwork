@@ -19,7 +19,7 @@ ordinal: 47000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Found at the installation-isolation after_implement governance pass: the feature relocated specs/.specify into the installation (git mv, history-preserving); git diff --relative <pre-feature-base> then shows every moved file as a pure ADD (~1.8MB / 20k insertions of pre-existing spec text) because the delete side lies outside the installation subtree. govern has no end-ref or pathspec seam, and GOVERN_PAYLOAD_BUDGET bounds only the untracked fold. Workaround used: a local synthetic rename-neutralized base commit (worktree at the base + the same git mv, never pushed). Candidate fixes: rename-pair across the boundary before relativizing; a documented --diff-base recipe for relocations; or a payload-size FATAL with actionable advice instead of silent oversized shipping.
+Re-scoped 2026-06-22: 021 T026 added --find-renames for the committed/cross-tree arms (partial fix landed). Surviving residual: a rename across the installation boundary (git mv moving files in OR out of the installation subtree) still bloats the payload — the delete side is outside the relative subtree, so git diff --relative shows a full ADD. No rename-pairing across the boundary, and no payload-size FATAL with actionable advice. Candidate next step: detect cross-boundary bloat (payload > threshold) and emit a FATAL with actionable advice (e.g. use a synthetic base commit or --diff-base recipe), rather than silently shipping the oversized payload.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Implementation Notes

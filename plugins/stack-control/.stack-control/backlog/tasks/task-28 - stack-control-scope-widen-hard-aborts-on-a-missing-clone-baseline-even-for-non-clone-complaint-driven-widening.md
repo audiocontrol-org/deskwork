@@ -3,10 +3,10 @@ id: TASK-28
 title: >-
   stack-control: scope-widen hard-aborts on a missing clone baseline, even for
   non-clone (complaint-driven) widening
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-11 00:41'
-updated_date: '2026-06-11 02:29'
+updated_date: '2026-06-22 17:24'
 labels:
   - 'type:imported-issue'
   - promoted

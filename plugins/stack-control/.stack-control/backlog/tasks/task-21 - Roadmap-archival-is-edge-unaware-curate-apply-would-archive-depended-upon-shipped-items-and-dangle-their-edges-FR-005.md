@@ -3,10 +3,10 @@ id: TASK-21
 title: >-
   Roadmap archival is edge-unaware: curate --apply would archive depended-upon
   shipped items and dangle their edges (FR-005)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-11 00:55'
+updated_date: '2026-06-22 21:07'
 labels:
   - agent-found
   - 'type:bug'
@@ -36,4 +36,6 @@ Tracked as roadmap item `design:gap/roadmap-edge-aware-archival` (part-of design
 
 <!-- SECTION:NOTES:BEGIN -->
 Roadmap node design:gap/roadmap-edge-aware-archival (ref gh-436) was retired 2026-06-11 and migrated here; a duplicate capture (TASK-31) was created in that pass and archived in favor of this item.
+
+Closed: Resolved by 028 FR-017/T077 (edge-aware archival precheck in curate refuses to dangle a depends-on/part-of target); verified in edge-aware-archival.test.ts.
 <!-- SECTION:NOTES:END -->

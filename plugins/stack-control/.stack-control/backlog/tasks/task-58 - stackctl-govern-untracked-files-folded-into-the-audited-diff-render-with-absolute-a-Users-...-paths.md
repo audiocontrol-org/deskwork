@@ -3,10 +3,10 @@ id: TASK-58
 title: >-
   stackctl govern: untracked files folded into the audited diff render with
   absolute a/Users/... paths
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-12 06:26'
-updated_date: '2026-06-14 01:54'
+updated_date: '2026-06-22 17:24'
 labels:
   - 'type:imported-issue'
   - promoted

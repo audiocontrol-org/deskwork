@@ -3,9 +3,10 @@ id: TASK-148
 title: >-
   stack-control: roadmap verb has no advance/set-status (completed phases stay
   'planned'; hand-edit forbidden)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-16 23:37'
+updated_date: '2026-06-22 17:24'
 labels:
   - 'type:imported-issue'
 dependencies: []

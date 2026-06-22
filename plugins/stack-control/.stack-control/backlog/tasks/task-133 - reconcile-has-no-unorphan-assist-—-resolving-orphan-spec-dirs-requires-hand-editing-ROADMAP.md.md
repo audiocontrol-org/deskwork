@@ -3,9 +3,10 @@ id: TASK-133
 title: >-
   reconcile has no unorphan assist — resolving orphan spec dirs requires
   hand-editing ROADMAP.md
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-15 20:39'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

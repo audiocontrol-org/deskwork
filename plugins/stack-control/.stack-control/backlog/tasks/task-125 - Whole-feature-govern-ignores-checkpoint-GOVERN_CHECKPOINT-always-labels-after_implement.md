@@ -3,9 +3,10 @@ id: TASK-125
 title: >-
   Whole-feature govern ignores --checkpoint/GOVERN_CHECKPOINT (always labels
   after_implement)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-15 00:38'
+updated_date: '2026-06-22 16:11'
 labels:
   - agent-found
   - 'type:bug'
