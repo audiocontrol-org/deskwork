@@ -561,7 +561,9 @@ No cheap checkpoint refresh for a sibling-change false-stale; --override is the 
 
 ## design:feature/opencode-support
 - status: in-flight
+- spec: specs/031-opencode-support
 - design: docs/superpowers/specs/2026-06-22-opencode-support-design.md
+- design-approved: true
 - part-of: multi:feature/portability
 Add first-class support for opencode as a coding agent host. The stack-control plugin follows opencode's plugin structure and event system, making all stack-control skills available through opencode's interface.
 
