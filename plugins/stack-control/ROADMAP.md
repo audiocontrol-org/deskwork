@@ -600,3 +600,31 @@ Folded-in roadmap gaps (now `part-of` this umbrella, defers cleared since 030 la
 - multi:gap/govern-lift-auto-close-in-loop-fixes — auto-close in-loop-fixed backlog tasks on graduation (US6 shrank, didn't deliver)
 - multi:gap/govern-doc-aware-audit-lens — orthogonal prose-nitpick lens
 
+## multi:feature/bookkeeping-hardening
+- status: planned
+- part-of: multi:feature/lifecycle-industrialization
+Umbrella for the small gaps + bugs in stack-control's own bookkeeping tooling — the verbs and skills that maintain the project's records (the backlog store, the roadmap DAG curation, the session-end journal derivation, the node↔spec linkage, audit-run retention). These are defects in the EXISTING bookkeeping surface, complementary to the new mechanization features under the parent lifecycle-industrialization node. Detail lives in the backlog; this node is the work-breakdown. Surfaced + grouped during the 2026-06-22 backlog cleanup (docs/backlog-cleanup-review-2026-06-22.md).
+
+Backlog store verbs:
+- TASK-297 `backlog done` drops `--reason` — closure rationale printed but never written to disk (backlog.ts:171 calls backend.close(id) without it; backend.ts:75 has no reason param)
+- TASK-378 `done.test.ts` tmpBacklog() dirs never cleaned up (pairs with 297)
+- TASK-23 `backlog promote` has no inverse (un-promote / re-home) — correcting a mis-promote needs a hand-edit
+- TASK-38 `backlog capture` does not dedupe by `--ref` — duplicate items for the same gh ref created silently
+- TASK-299 `backlog capture` ENAMETOOLONG — filename derived from the full untruncated title
+
+Session-end journal derivation:
+- TASK-39 session-end auto-derivation reported 0 commits / no backlog touched for a 10-commit session
+
+Roadmap curation + node↔spec linkage (verbs can't write certain fields → forced hand-edits):
+- TASK-244 in-flight node has no `spec:` pointer — govern --item / reconcile can't authoritatively resolve its feature
+- TASK-407 `define` skill does not set the spec pointer on an existing node (link-spec discoverability)
+- TASK-298 no sanctioned verb writes the design-approved / analyze-clean roadmap marker
+- TASK-21 roadmap archival is edge-unaware — curate --apply would archive a depended-upon shipped item and dangle its edges (FR-005)
+- TASK-442 inconsistent `--help` across verbs — most flag sets are only discoverable by reading source
+
+Audit-run retention:
+- TASK-425 audit-barrage run-dirs accumulate unboundedly under .stack-control/audit-runs with no prune/retention verb
+
+Tooling-friction routing policy:
+- TASK-16 adopt + document the tooling-friction routing policy (upstream-tool defects go to GitHub issues, never the local backlog)
+
