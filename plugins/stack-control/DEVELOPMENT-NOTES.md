@@ -2,6 +2,36 @@
 
 ---
 
+## 2026-06-22 (pm): Backlog cleanup applied — 46 closed, 9 re-scoped, 6 uncertains resolved, bookkeeping umbrella created
+
+**Goal:** Act on the backlog-cleanup-review-2026-06-22.md work-list produced by the prior session (orientation menu pick #2): apply the dispositions (close the resolved/moot, re-scope the partials), then drive out the remaining uncertainty rather than leaving it parked. No code; this is records hygiene on the slush store + the roadmap DAG.
+
+**Accomplished:**
+- **Applied the cleanup review: 214 → 168 open backlog items (−46).** First pass closed 42 (17 moot-by-030 per-phase deletion, 3 closed-upstream gh-455/458/487, 19 likely-resolved with promoted-spec-shipped + fix-SHA evidence, 2 operator-decision wontfix, 1 wontfix-per-governed-markdown-rule) and re-scoped 9 (re-aimed each at its surviving remnant: fleet-knowledge schema, torn-temp on writeWholeFeatureConvergenceRecord, scope-fingerprint non-regular-FS, etc.).
+- **Fixed the TASK-26 ID collision** — two distinct task files shared id `task-26`. Closed the watchdog item as TASK-26 (resolved via shipped 014); renamed the inconsistent-`--help` item to TASK-442 (still open, still valid).
+- **Resolved all 6 uncertain items via parallel source investigation** (6 Explore agents, one per item): closed 3 with file:line evidence (183 clean-case test exists; 386 gitRefResolves gone + r.error handled; 141 embedded-`..` mitigated by resolveScopedPath); re-scoped 297 (closure verb exists but `--reason` is dropped); confirmed 2 still-valid and annotated the evidence into their bodies (395 invalid-target untested; 143 node-less govern silently exits 0). Operator confirmed TASK-74 (030 graduate gate satisfies the mechanical-teeth intent) → closed.
+- **Created the bookkeeping umbrella** `multi:feature/bookkeeping-hardening` (planned, part-of lifecycle-industrialization) grouping the 13 small gaps/bugs in stack-control's own bookkeeping tooling (backlog verbs, session-end derivation, roadmap curation + node↔spec linkage, audit-run retention, tooling-friction routing). Mirrors the govern-030-hardening pattern: members live in the backlog, the node is the work-breakdown. `roadmap reconcile` clean (0 drift/orphan/unresolved) after the edit.
+
+**Didn't Work:**
+- **The backlog `done` verb does not persist `--reason` to disk** (this IS finding TASK-297, confirmed empirically mid-session). Every one of the 46 closures recorded `status: Done` but dropped its carefully-written rationale — the reason is validated and printed, never written (backlog.ts:171 calls `backend.close(id)` without it; backend.ts:75 has no reason param). The closure rationale survives only in docs/backlog-cleanup-review-2026-06-22.md + the commit messages, not the task files. Records intact, just not co-located.
+
+**Course Corrections:**
+- None. The operator's turns ("2", "74 yes", "see if you can remove the uncertainty", "create/reuse an umbrella") were direction + scope decisions, not corrections of a wrong approach. Zero rework.
+
+**Insights:**
+- **A flag-and-propose review doc earns its cost at apply-time.** The prior session's 5-agent deep-pass report made this session almost purely mechanical — each tier already carried verdict + evidence + recommended-reason, so applying it was a scripted batch, not a re-derivation. The one place it needed more was the ~7 uncertains, and those resolved cleanly with one targeted agent each.
+- **"Remove the uncertainty" is a closeable instruction, not an open-ended one.** Six items flagged "needs a human read" each reduced to a single concrete source question (does test X exist? is symbol Y gone? does guard Z catch the bypass?); parallel Explore agents answered all six with file:line evidence. Uncertainty in a backlog is usually just an unrun grep.
+- **The bookkeeping tooling has its own debt class.** Pulling the 13 backlog-verb / session-end / roadmap-curation defects into one umbrella made visible that they cluster — the meta-tooling that maintains the records is itself under-hardened (the `done --reason` drop being the on-the-nose example, surfaced by using the very verb it describes).
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 4
+  - roadmap(bookkeeping-hardening): umbrella grouping the 13 bookkeeping verb/skill gaps + bugs
+  - chore(backlog): resolve the 6 uncertain cleanup-review items via source investigation
+  - chore(backlog): close TASK-74 — 030 graduate gate satisfies mechanical-teeth intent (operator confirmed)
+  - chore(backlog): apply 2026-06-22 cleanup review — 42 closed, 9 re-scoped, 1 ID collision fixed
+- Files changed: 62
+- Backlog touched: TASK-16, TASK-244, TASK-26, TASK-297, TASK-324, TASK-39, TASK-425, TASK-442, TASK-74
+
 ## 2026-06-22: 030 whole-feature govern — dogfooded to graduation, shipped to main, roadmap+backlog cleanup
 
 **Goal:** Pick up the parked whole-feature govern-at-end for `multi:feature/govern-whole-feature-chunked-payload` (the journal's explicit handoff). It expanded into the full close-out: run the govern, triage every finding, fix criticals, graduate, ship to main, validate in the installed release, then clean up the roadmap + backlog.
