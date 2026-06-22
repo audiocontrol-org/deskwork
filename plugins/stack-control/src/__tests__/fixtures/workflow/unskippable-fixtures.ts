@@ -14,10 +14,9 @@ import { makeWorkflowFixture, type FixtureNode, type WorkflowFixture } from './w
 /** One phase of a fixture feature: its id and the files its tasks name. */
 export interface FixturePhase {
   /**
-   * The phase id, as it appears after `## Phase ` in the rendered tasks.md. MUST be
-   * digit-led (`PHASE_HEADER_RE` in incremental-audit.ts selects only `[0-9][0-9A-Za-z.]*`)
-   * — a non-digit-led id renders a header the parser silently ignores, so the phase would
-   * vanish from enumeration (AUDIT-BARRAGE claude-01).
+   * The phase id, as it appears after `## Phase ` in the rendered tasks.md. Use a
+   * digit-led id (`1`, `2`, …) so the rendered header reads as a well-formed
+   * `## Phase <n>` boundary.
    */
   readonly id: string;
   /** Each file's installation-relative path + content (written to disk for scoping). */
@@ -52,7 +51,7 @@ export function makeUnskippableFixture(opts: {
   const specDirRel = join('specs', opts.slug);
 
   // Write each phase's files, then a tasks.md whose `## Phase <id>` bodies name
-  // those files in backtick spans (the grammar parsePhases / extractScopedPaths read).
+  // those files in backtick spans.
   for (const phase of opts.phases) {
     for (const file of phase.files) base.write(file.path, file.content);
   }

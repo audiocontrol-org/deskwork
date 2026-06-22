@@ -4,7 +4,8 @@
 // lived in (SC-002 — zero per-phase surfaces on the govern path + gate).
 
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +13,19 @@ import { runCli } from '../_run-helpers.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SRC = join(here, '..', '..'); // plugins/stack-control/src
+
+/** Lines under src/ (excluding the test tree) that reference any of `symbols`. */
+function nonTestSourceHits(symbols: readonly string[]): string[] {
+  const r = spawnSync(
+    'grep',
+    ['-rnE', '--include=*.ts', '--exclude-dir=__tests__', symbols.join('|'), SRC],
+    { encoding: 'utf8' },
+  );
+  // grep exit 1 = no matches (the clean state); 0 = matches found; >1 = real error.
+  if (r.status === 1) return [];
+  if (r.status !== 0) throw new Error(`grep failed: ${r.stderr}`);
+  return r.stdout.split('\n').filter((l) => l.length > 0);
+}
 
 /** Read a source file with comments stripped, so an assertion fires on CODE, not a note that mentions the symbol. */
 function source(rel: string): string {
@@ -78,5 +92,37 @@ describe('030 T027 — removed per-phase surfaces are absent from source (SC-002
     ]) {
       expect(govern, `'${sym}' must be gone from govern.ts`).not.toContain(sym);
     }
+  });
+});
+
+describe('030 T034 — the dead per-phase audit-unit + composition modules are deleted (clean break)', () => {
+  it('the per-phase audit-unit / phase-enumeration / audit-unit-types modules no longer exist', () => {
+    // govern-at-end chunks by diff/cluster, not tasks.md phases — so the per-phase
+    // audit-unit resolution, phase enumeration, and the AuditUnit type are all dead.
+    // Per the clean-break rule, the whole modules are deleted, not left half-dead.
+    for (const rel of [
+      'govern/incremental-audit.ts',
+      'workflow/phase-enumeration.ts',
+      'govern/audit-unit-types.ts',
+    ]) {
+      expect(existsSync(join(SRC, rel)), `${rel} must be deleted (dead per-phase apparatus)`).toBe(
+        false,
+      );
+    }
+  });
+
+  it('the per-phase audit-unit + phase-parsing symbols have zero non-test source hits (SC-002)', () => {
+    const hits = nonTestSourceHits([
+      'resolvePhaseUnit',
+      'resolvePrePhaseDiffBase',
+      'carriedFilesForComposition',
+      'carriedExclusivelyCurrentFiles',
+      'enumeratePhases',
+      'parsePhases',
+      'extractScopedPaths',
+    ]);
+    expect(hits, `dead per-phase symbols still referenced in source:\n${hits.join('\n')}`).toEqual(
+      [],
+    );
   });
 });

@@ -108,10 +108,10 @@ description: "Task list for Chunked whole-feature end-govern"
 
 - [x] T029 [US2] Delete the `--phase` invocation arm (`govern.ts:810–845`) and `--checkpoint`/`GOVERN_CHECKPOINT` handling (TASK-125) from `src/subcommands/govern.ts`; passing them becomes an unknown-flag/var error; make T024 pass.
 - [x] T030 [US2] Delete the exclusion-based whole-feature composition arm (`govern.ts:846–891`) from `src/subcommands/govern.ts`, leaving the single inclusion-based end-govern path; partial toward T025.
-- [ ] T031 [US2] Delete the per-phase checkpoint writer + `phase-checkpoints/*.json` artifact + its doctor/schema rule (FR-017); make T025 pass.
+- [x] T031 [US2] Delete the per-phase checkpoint writer + `phase-checkpoints/*.json` artifact + its doctor/schema rule (FR-017); make T025 pass. (Completed by T085; verified — T025 green, no `phase-checkpoints/*.json` written.)
 - [x] T032 [US2] Collapse `graduate-impl` in `src/workflow/gate-eval.ts` to the single `ctx.implRecordConverged` criterion; delete `allPhaseCheckpointsCurrent` + the `all-phase-checkpoints-current` criterion (`gate-eval.ts:162–199`) + all callers; make T026 pass.
-- [ ] T033 [US2] Delete the per-phase compass/workflow transition arms (FR-019; TASK-152/155) from the workflow transition modules; partial toward T027.
-- [ ] T034 [US2] Delete `resolvePhaseCheckpointStatuses`, `assertPriorPhaseCheckpointsCurrent`, `featureCheckpointKey`, `carriedFilesForComposition`, `compositionExcludePaths`, and the `phaseUnit` exclusion plumbing once no caller remains; make T027 pass.
+- [x] T033 [US2] Delete the per-phase compass/workflow transition arms (FR-019; TASK-152/155) from the workflow transition modules; partial toward T027. (Completed by T085; verified — `templates/WORKFLOW.md` is the clean govern-at-end model with no per-phase transition arm.)
+- [x] T034 [US2] Delete `resolvePhaseCheckpointStatuses`, `assertPriorPhaseCheckpointsCurrent`, `featureCheckpointKey`, `carriedFilesForComposition`, `compositionExcludePaths`, and the `phaseUnit` exclusion plumbing once no caller remains; make T027 pass. (T085 deleted the call sites; this session deleted the orphaned dead modules `incremental-audit.ts` + `phase-enumeration.ts` + `audit-unit-types.ts` and their tests — clean-break-absence.test.ts extended to assert zero non-test source hits.)
 - [x] T035 [US2] Delete the `boundary-too-large` FATAL terminal (`protocol.ts:393–404`) and remove `BoundaryTooLargeError` once the bin-packer (its sole would-be consumer) no longer throws it — the bin-packer AVOIDS the condition (research Tension 2); make T028 pass.
 - [x] T036 [US2] Wire `src/subcommands/govern.ts` to the single end-govern pipeline path matching the govern-cli contract (kept flags: `--mode implement`, `--diff-base`, `--at`, `--override`); confirm T024-T028 all green. WONTFIX migration/grandfather (FR-020) — no legacy-accept code written.
 
@@ -236,8 +236,8 @@ description: "Task list for Chunked whole-feature end-govern"
 
 ### Implementation for User Story 8
 
-- [ ] T063 [US8] Remove `src/govern/payload-implement.ts` (now fully superseded by `payload-diff-scope.ts` + `payload-chunk.ts` + `cluster-payload/`); repoint any remaining importers to the successors; make T061 pass.
-- [ ] T064 [US8] Audit + split any feature-touched file still >500 lines into focused successors with one-line responsibilities; make T062 pass.
+- [x] T063 [US8] Remove `src/govern/payload-implement.ts` (now fully superseded by `payload-diff-scope.ts` + `payload-chunk.ts` + `cluster-payload/`); repoint any remaining importers to the successors; make T061 pass. (Completed by T085; verified — `payload-implement.ts` absent, T061 green.)
+- [x] T064 [US8] Audit + split any feature-touched file still >500 lines into focused successors with one-line responsibilities; make T062 pass. (Verified — T062/file-line-cap green; T086 closed the last over-cap file, `govern.ts`.)
 
 **Checkpoint**: No over-cap file; the broken exclusion-based composition path is gone.
 

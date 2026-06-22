@@ -60,8 +60,6 @@ describe('dw-lifecycle isolation from the rehomed governance extension (T028 / V
       'adjudicate-findings',
       'convergence-loop',
       'convergence-types',
-      'incremental-audit',
-      'audit-unit-types',
     ].join('|');
     const r = spawnSync('grep', ['-rnE', NEW_015_MODULES, ...present], {
       cwd: repoRoot,
