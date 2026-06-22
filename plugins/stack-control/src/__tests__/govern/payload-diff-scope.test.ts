@@ -11,7 +11,11 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { scopeCommittedDiff } from '../../govern/payload-diff-scope.js';
+import {
+  scopeCommittedDiff,
+  filterDiffScope,
+  resolveImplementExclusion,
+} from '../../govern/payload-diff-scope.js';
 
 function git(repo: string, ...args: string[]): string {
   const r = spawnSync('git', ['-C', repo, ...args], { encoding: 'utf8' });
@@ -150,5 +154,64 @@ describe('030 T021 — payload-diff-scope (FR-023)', () => {
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
+  });
+});
+
+// AUDIT-20260622-02 — the end-govern pipeline's scopeDiff dropped ALL payload
+// exclude paths: it called scopeCommittedDiff (no exclusion args) so spec docs,
+// contracts, and the feature's own audit-log flowed into the audited surface.
+// filterDiffScope + resolveImplementExclusion are the single-source exclusion the
+// runtime applies AND buildImplementVars derives its `:(exclude)` pathspecs from.
+describe('030 — diff-scope exclusion (AUDIT-20260622-02)', () => {
+  it('filterDiffScope drops an exactly-matched excluded file but keeps the rest', () => {
+    const scope = {
+      base: 'B',
+      head: 'H',
+      files: ['src/app.ts', 'specs/030/audit-log.md'],
+      fileDiffs: new Map([
+        ['src/app.ts', 'diff a'],
+        ['specs/030/audit-log.md', 'diff b'],
+      ]),
+    };
+    const filtered = filterDiffScope(scope, ['specs/030/audit-log.md']);
+    expect(filtered.files).toEqual(['src/app.ts']);
+    expect(filtered.fileDiffs.has('specs/030/audit-log.md')).toBe(false);
+    expect(filtered.fileDiffs.get('src/app.ts')).toBe('diff a');
+  });
+
+  it('filterDiffScope drops a whole excluded subtree (dir-prefix), keeps siblings', () => {
+    const scope = {
+      base: 'B',
+      head: 'H',
+      files: ['src/app.ts', 'specs/030/spec.md', 'specs/030/contracts/x.md', 'specs/031/spec.md'],
+      fileDiffs: new Map([
+        ['src/app.ts', 'a'],
+        ['specs/030/spec.md', 'b'],
+        ['specs/030/contracts/x.md', 'c'],
+        ['specs/031/spec.md', 'd'],
+      ]),
+    };
+    const filtered = filterDiffScope(scope, ['specs/030']);
+    expect(filtered.files).toEqual(['src/app.ts', 'specs/031/spec.md']);
+  });
+
+  it('filterDiffScope with no exclusions returns the scope unchanged', () => {
+    const scope = { base: 'B', head: 'H', files: ['a.ts'], fileDiffs: new Map([['a.ts', 'x']]) };
+    expect(filterDiffScope(scope, [])).toBe(scope);
+  });
+
+  it('resolveImplementExclusion yields the own + other-feature audit-logs and caller excludePaths', () => {
+    const root = '/install';
+    const ex = resolveImplementExclusion(
+      root,
+      '/install/specs/030-feat',
+      ['/install/specs/030-feat', '/install/specs/029-other'],
+      ['/install/.stack-control/backlog'],
+    );
+    expect(ex.excludeDiffRels).toContain('specs/030-feat/audit-log.md');
+    expect(ex.excludeDiffRels).toContain('specs/029-other/audit-log.md');
+    expect(ex.excludeDiffRels).toContain('.stack-control/backlog');
+    // The feature's own root is NOT double-listed as an "other" feature.
+    expect(ex.otherFeatureRels).not.toContain('specs/030-feat');
   });
 });

@@ -39,7 +39,7 @@ import {
   type ExtractedFinding,
 } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
 import { SEVERITY_RANK } from '../scope-discovery/promote-findings/cluster-severity.js';
-import { scopeCommittedDiff } from './payload-diff-scope.js';
+import { scopeCommittedDiff, filterDiffScope } from './payload-diff-scope.js';
 
 /** Configuration for one chunked end-govern run's barrage-backed runtime. */
 export interface EndGovernRuntimeConfig {
@@ -65,6 +65,15 @@ export interface EndGovernRuntimeConfig {
   readonly envelope: number;
   /** The plan/spec/contracts context block shared across chunks (FR-005). */
   readonly planContext: string;
+  /**
+   * Installation-relative paths excluded from the audited committed diff —
+   * the feature's own audit-log, other features' audit-logs, and the governance
+   * bookkeeping store (resolveImplementExclusion().excludeDiffRels). Applied to
+   * the pipeline's `scopeDiff` so the barrage audits the SAME surface
+   * `buildImplementVars` would, never the spec/contract/audit-log prose the old
+   * path silently folded in (AUDIT-20260622-02).
+   */
+  readonly excludeDiffPaths: readonly string[];
   readonly base: string;
   readonly head: string;
   readonly stderr: (s: string) => void;
@@ -189,6 +198,20 @@ export function makeEndGovernRuntime(cfg: EndGovernRuntimeConfig): EndGovernRunt
       }
 
       const runDir = barrage.stdout.trim();
+      // AUDIT-20260622-01: a zero-exit barrage MUST print its run-dir. An empty
+      // stdout (version mismatch making `--output-run-dir` a no-op, a stdout
+      // redirect, a truncated pipe) would otherwise resolve `join('', 'INDEX.md')`
+      // to the CWD and silently report "no findings, fleet healthy" — a run that
+      // never audited anything counted as clean. Fail loud instead.
+      if (runDir.length === 0) {
+        throw new GovernProtocolError(
+          `govern: FATAL — audit-barrage exited 0 for chunk ${chunkId} but printed no run-dir ` +
+            `(expected the path from --output-run-dir on stdout). The work is NOT recorded as ` +
+            `governed (FR-005). Check the barrage binary version supports --output-run-dir.`,
+          2,
+          'barrage-outage',
+        );
+      }
       cfg.stderr(`govern: chunk ${chunkId} barrage run-dir = ${runDir}\n`);
       reportFleetStatus(runDir, cfg.stderr);
       const degraded = chunkFleetDegraded(runDir);
@@ -219,7 +242,8 @@ export function makeEndGovernRuntime(cfg: EndGovernRuntimeConfig): EndGovernRunt
   };
 
   const deps: EndGovernDeps = {
-    scopeDiff: (installationRoot, base, head) => scopeCommittedDiff(installationRoot, base, head),
+    scopeDiff: (installationRoot, base, head) =>
+      filterDiffScope(scopeCommittedDiff(installationRoot, base, head), cfg.excludeDiffPaths),
     resolveEnvelope: () => cfg.envelope,
     auditChunk,
     planContext: () => cfg.planContext,

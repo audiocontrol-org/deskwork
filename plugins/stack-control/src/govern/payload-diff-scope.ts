@@ -5,6 +5,7 @@
 // committed-diff feature. Implemented in Phase 3 (T021).
 
 import { spawnSync } from 'node:child_process';
+import { relative, sep } from 'node:path';
 
 /** The scoped diff: the changed file set + per-file diff text over governedSha..HEAD. */
 export interface DiffScope {
@@ -12,6 +13,90 @@ export interface DiffScope {
   readonly head: string;
   readonly files: readonly string[];
   readonly fileDiffs: ReadonlyMap<string, string>;
+}
+
+/**
+ * The resolved implement-mode exclusion set — the single source of truth for which
+ * installation-relative paths fall OUT of the audited committed diff. Both
+ * `buildImplementVars` (which renders them as `:(exclude)<rel>` git pathspecs) and
+ * the end-govern pipeline runtime (which filters `scopeCommittedDiff` output via
+ * `filterDiffScope`) derive from this — so the two arms can never drift
+ * (AUDIT-20260622-02). The structured fields beyond `excludeDiffRels` are the
+ * intermediates `buildImplementVars` also needs for its untracked-fold arm.
+ */
+export interface ImplementExclusion {
+  /** The feature root, installation-relative (POSIX separators), or undefined. */
+  readonly featureRel: string | undefined;
+  /** Whether the feature root lies inside the installation subtree. */
+  readonly featureInside: boolean;
+  /** The feature root when it lies OUTSIDE the installation (the cross-tree layout). */
+  readonly crossTreeFeatureRoot: string | undefined;
+  /** Other in-repo feature roots (installation-relative), excluding the feature's own. */
+  readonly otherFeatureRels: readonly string[];
+  /** Caller-threaded governance-bookkeeping paths, installation-relative + in-repo. */
+  readonly excludePathRels: readonly string[];
+  /** The installation-relative paths excluded from the committed diff. */
+  readonly excludeDiffRels: readonly string[];
+}
+
+/**
+ * Derive the implement-mode exclusion set from the feature root, the full feature-root
+ * list (`excludeRoots`), and the caller-threaded bookkeeping paths (`excludePaths`).
+ * Mirrors specs/014 US5 (FR-007, AUDIT-20260611-08): drop the feature's own audit-log
+ * (when inside the installation), every OTHER feature root's audit-log.md, and the
+ * governance-bookkeeping paths — all the surfaces a self-reference generator would
+ * quote back to the fleet.
+ */
+export function resolveImplementExclusion(
+  installationRoot: string,
+  featureRoot: string | undefined,
+  excludeRoots: readonly string[] | undefined,
+  excludePaths: readonly string[] | undefined,
+): ImplementExclusion {
+  const relify = (abs: string): string => relative(installationRoot, abs).split(sep).join('/');
+  const inRepo = (rel: string): boolean => rel.length > 0 && rel !== '..' && !rel.startsWith('../');
+  const featureRel = featureRoot !== undefined ? relify(featureRoot) : undefined;
+  const featureInside = featureRel !== undefined && inRepo(featureRel);
+  const crossTreeFeatureRoot =
+    featureRoot !== undefined && !featureInside ? featureRoot : undefined;
+  const otherFeatureRels =
+    featureRoot !== undefined
+      ? (excludeRoots ?? []).map(relify).filter((root) => inRepo(root) && root !== featureRel)
+      : [];
+  const excludePathRels =
+    featureRoot !== undefined ? (excludePaths ?? []).map(relify).filter(inRepo) : [];
+  const excludeDiffRels = [
+    ...(featureInside ? [`${featureRel}/audit-log.md`] : []),
+    ...otherFeatureRels.map((root) => `${root}/audit-log.md`),
+    ...excludePathRels,
+  ];
+  return {
+    featureRel,
+    featureInside,
+    crossTreeFeatureRoot,
+    otherFeatureRels,
+    excludePathRels,
+    excludeDiffRels,
+  };
+}
+
+/**
+ * Drop every file under one of the excluded installation-relative paths from a
+ * DiffScope (exact match OR directory-prefix), preserving per-file diffs for the
+ * survivors. The inclusion-based successor to git's `:(exclude)<rel>` pathspecs, so
+ * the pipeline audits exactly the surface `buildImplementVars` would (AUDIT-20260622-02).
+ */
+export function filterDiffScope(scope: DiffScope, excludeRels: readonly string[]): DiffScope {
+  if (excludeRels.length === 0) return scope;
+  const excluded = (f: string): boolean =>
+    excludeRels.some((rel) => f === rel || f.startsWith(`${rel}/`));
+  const files = scope.files.filter((f) => !excluded(f));
+  const fileDiffs = new Map<string, string>();
+  for (const f of files) {
+    const d = scope.fileDiffs.get(f);
+    if (d !== undefined) fileDiffs.set(f, d);
+  }
+  return { base: scope.base, head: scope.head, files, fileDiffs };
 }
 
 function git(root: string, args: readonly string[]): string {

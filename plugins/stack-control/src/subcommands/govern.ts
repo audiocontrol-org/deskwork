@@ -63,7 +63,7 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
-import { resolveImplementDiffBase } from '../govern/payload-diff-scope.js';
+import { resolveImplementDiffBase, resolveImplementExclusion } from '../govern/payload-diff-scope.js';
 import { runEndGovern } from '../govern/end-govern-pipeline.js';
 import { makeEndGovernRuntime } from '../govern/end-govern-runtime.js';
 import { writeWholeFeatureConvergenceRecord } from '../govern/chunk-artifacts.js';
@@ -882,6 +882,15 @@ export async function runGovern(args: string[]): Promise<void> {
       );
       const { diff: _discardedWholeDiff, workplan_summary: planContext, ...varsBase } = vars;
       void _discardedWholeDiff;
+      // AUDIT-20260622-02: thread the SAME resolved exclusion set buildImplementVars
+      // derives so the pipeline's per-chunk scopeDiff filters spec/contract/audit-log
+      // prose out of the audited surface (was silently auditing the whole diff).
+      const { excludeDiffRels } = resolveImplementExclusion(
+        repoRoot,
+        featureRoot,
+        excludeRoots,
+        excludePaths,
+      );
 
       const runtime = makeEndGovernRuntime({
         barrageBin,
@@ -889,6 +898,7 @@ export async function runGovern(args: string[]): Promise<void> {
         slug,
         checkpoint: flags.checkpoint ?? 'after_implement',
         varsBase,
+        excludeDiffPaths: excludeDiffRels,
         laneCapabilities,
         models: requestedModels,
         requireModels,

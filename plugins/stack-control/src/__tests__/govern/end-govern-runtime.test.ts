@@ -7,7 +7,8 @@
 // `extractBarrageFindings` into the pipeline's minimal Finding shape.
 
 import { describe, it, expect } from 'vitest';
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeEndGovernRuntime } from '../../govern/end-govern-runtime.js';
@@ -39,6 +40,7 @@ function writeStubBarrage(dir: string, runDir: string, verbLog: string): string 
     '    [ -n "$output" ] && printf "stub prompt\\n" > "$output" || true',
     '    exit 0 ;;',
     '  audit-barrage)',
+    '    if [ -n "${STUB_EMPTY_RUNDIR:-}" ]; then exit 0; fi',
     '    rd="' + runDir + '"',
     '    mkdir -p "$rd"',
     '    {',
@@ -93,6 +95,7 @@ function makeRuntime() {
       audit_lens: 'CODE_AUDIT_LENS',
       artifact_framing: 'CODE_FRAMING',
     },
+    excludeDiffPaths: [],
     laneCapabilities: [viableLane()],
     requireModels: 1,
     envelope: 100_000,
@@ -144,10 +147,78 @@ describe('030 T084 — end-govern runtime audits a chunk without per-chunk lift 
     expect(rich[0]!.heading).toMatch(/null deref/i);
   });
 
+  it('FATALs when the barrage exits 0 but prints no run-dir (AUDIT-20260622-01)', async () => {
+    const prev = process.env.STUB_EMPTY_RUNDIR;
+    process.env.STUB_EMPTY_RUNDIR = '1';
+    try {
+      const { runtime } = makeRuntime();
+      await expect(
+        runtime.deps.auditChunk('the chunk payload bytes', 'c1'),
+      ).rejects.toThrow(/run-dir/i);
+    } finally {
+      if (prev === undefined) delete process.env.STUB_EMPTY_RUNDIR;
+      else process.env.STUB_EMPTY_RUNDIR = prev;
+    }
+  });
+
   it('exposes the pipeline deps with applyFixes ABSENT (FR-009 deferred → override-eligible)', () => {
     const { runtime } = makeRuntime();
     expect(runtime.deps.applyFixes).toBeUndefined();
     expect(runtime.deps.resolveEnvelope()).toBe(100_000);
     expect(runtime.deps.planContext()).toContain('context');
+  });
+});
+
+describe('030 — runtime scopeDiff honors excludeDiffPaths (AUDIT-20260622-02)', () => {
+  function gitRepoWithCommit(): { repo: string; base: string; head: string } {
+    const repo = mkdtempSync(join(tmpdir(), 'egr-scope-'));
+    const g = (...a: string[]): void => {
+      spawnSync('git', ['-C', repo, '-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...a], { encoding: 'utf8' });
+    };
+    g('init', '-q');
+    mkdirSync(join(repo, 'src'), { recursive: true });
+    mkdirSync(join(repo, 'specs/030'), { recursive: true });
+    writeFileSync(join(repo, 'README.md'), 'seed\n');
+    g('add', '-A');
+    g('commit', '-q', '--no-gpg-sign', '-m', 'seed');
+    const base = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+    writeFileSync(join(repo, 'src/app.ts'), 'export const x = 1;\n');
+    writeFileSync(join(repo, 'specs/030/audit-log.md'), '### prior finding\n');
+    g('add', '-A');
+    g('commit', '-q', '--no-gpg-sign', '-m', 'feat + audit-log');
+    const head = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+    return { repo, base, head };
+  }
+
+  it('drops a configured exclude path from the scoped diff but keeps implementation files', () => {
+    const { repo, base, head } = gitRepoWithCommit();
+    try {
+      const runtime = makeEndGovernRuntime({
+        barrageBin: '/bin/true',
+        installationRoot: repo,
+        slug: 'feat',
+        checkpoint: 'after_implement',
+        varsBase: {
+          feature_slug: 'feat',
+          audit_log_excerpt: '',
+          commit_subjects: '',
+          audit_lens: 'L',
+          artifact_framing: 'F',
+        },
+        excludeDiffPaths: ['specs/030/audit-log.md'],
+        laneCapabilities: [viableLane()],
+        requireModels: 1,
+        envelope: 100_000,
+        planContext: 'ctx',
+        base,
+        head,
+        stderr: () => {},
+      });
+      const scope = runtime.deps.scopeDiff(repo, base, head);
+      expect(scope.files).toContain('src/app.ts');
+      expect(scope.files).not.toContain('specs/030/audit-log.md');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });

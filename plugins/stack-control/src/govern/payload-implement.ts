@@ -36,6 +36,7 @@ import { spawnSync } from 'node:child_process';
 import { realpathSync, statSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { GovernPayloadError } from './payload-spec.js';
+import { resolveImplementExclusion } from './payload-diff-scope.js';
 import { deriveGitToplevel } from '../scope-discovery/util/git-toplevel.js';
 
 /** 256 KB soft budget on transmitted untracked working-tree content. */
@@ -229,27 +230,12 @@ export function assembleImplementPayload(
   // layout): its rel-ification then escapes (`../…`) and the feature
   // folds in via the labeled cross-tree arm below instead of arm-1
   // pathspecs.
-  const relify = (abs: string): string =>
-    relative(installationRoot, abs).split(sep).join('/');
-  const inRepo = (rel: string): boolean =>
-    rel.length > 0 && rel !== '..' && !rel.startsWith('../');
-  const featureRel =
-    args.featureRoot !== undefined ? relify(args.featureRoot) : undefined;
-  const featureInside = featureRel !== undefined && inRepo(featureRel);
-  const crossTreeFeatureRoot =
-    args.featureRoot !== undefined && !featureInside
-      ? args.featureRoot
-      : undefined;
-  const otherFeatureRels =
-    args.featureRoot !== undefined
-      ? (args.excludeRoots ?? [])
-          .map(relify)
-          .filter((root) => inRepo(root) && root !== featureRel)
-      : [];
-  const excludePathRels =
-    args.featureRoot !== undefined
-      ? (args.excludePaths ?? []).map(relify).filter(inRepo)
-      : [];
+  // AUDIT-20260622-02: derive the exclusion set from the SINGLE source the
+  // end-govern pipeline runtime also consumes (resolveImplementExclusion +
+  // filterDiffScope) — so the committed-diff arm here and the pipeline's
+  // scopeDiff can never drift on which paths are audited.
+  const { featureRel, featureInside, crossTreeFeatureRoot, otherFeatureRels, excludePathRels, excludeDiffRels } =
+    resolveImplementExclusion(installationRoot, args.featureRoot, args.excludeRoots, args.excludePaths);
 
   // Committed-diff arm — COMBINES three scoping systems (the 015 × isolation merge):
   //  • specs/015 AUDIT-20260612-01 INCLUSION: scope the committed diff to the
@@ -272,14 +258,7 @@ export function assembleImplementPayload(
     : args.featureRoot !== undefined
       ? ['.']
       : [];
-  const excludeTokens =
-    args.featureRoot !== undefined
-      ? [
-          ...(featureInside ? [`:(exclude)${featureRel}/audit-log.md`] : []),
-          ...otherFeatureRels.map((root) => `:(exclude)${root}/audit-log.md`),
-          ...excludePathRels.map((rel) => `:(exclude)${rel}`),
-        ]
-      : [];
+  const excludeTokens = excludeDiffRels.map((rel) => `:(exclude)${rel}`);
   // `--find-renames` forces rename detection regardless of the operator's
   // `diff.renames` git config (specs/021 T026 / TASK-47): a tree-move pairs as a
   // rename (small payload) instead of a full delete + full add (the same content
