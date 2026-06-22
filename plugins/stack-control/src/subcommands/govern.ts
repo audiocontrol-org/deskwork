@@ -49,12 +49,8 @@ import {
   resolveFeatureFromItem,
   resolveFeatureSlug,
 } from '../govern/feature-resolution.js';
-import {
-  assembleImplementPayload,
-  CODE_AUDIT_LENS,
-  CODE_ARTIFACT_FRAMING,
-  CODE_ARTIFACT_FRAMING_PER_PHASE,
-} from '../govern/payload-implement.js';
+import { assembleImplementPayload } from '../govern/payload-implement.js';
+import { CODE_AUDIT_LENS, CODE_ARTIFACT_FRAMING } from '../govern/audit-constants.js';
 import {
   assembleSpecPayload,
   GovernPayloadError,
@@ -348,14 +344,10 @@ export function buildImplementVars(
     audit_log_excerpt: '',
     commit_subjects: payload.commitSubjects,
     audit_lens: CODE_AUDIT_LENS,
-    // 029 US5/FR-021 (AUDIT-20260621-06): the per-phase out-of-window framing applies
-    // ONLY when a path scope is set (a per-phase unit where out-of-window deps are
-    // folded). A whole-feature audit keeps the generic framing — the per-phase note
-    // would be false there and could suppress a real missing-impl HIGH.
-    artifact_framing:
-      pathScope !== undefined && pathScope.length > 0
-        ? CODE_ARTIFACT_FRAMING_PER_PHASE
-        : CODE_ARTIFACT_FRAMING,
+    // 030 (FR-017): per-phase is retired — the whole-feature audit always uses the
+    // generic framing. (The per-phase out-of-window note would be false here and
+    // could suppress a real missing-impl HIGH.)
+    artifact_framing: CODE_ARTIFACT_FRAMING,
   };
   const checkpoint = checkpointFlag ?? 'after_clarify';
   // claude-20260612-03: return the structured path-scope exclusions so they reach

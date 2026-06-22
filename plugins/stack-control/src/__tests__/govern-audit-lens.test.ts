@@ -23,11 +23,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { renderAuditBarragePrompt } from '../scope-discovery/audit-barrage/prompt-renderer.js';
-import {
-  CODE_AUDIT_LENS,
-  CODE_ARTIFACT_FRAMING,
-  CODE_ARTIFACT_FRAMING_PER_PHASE,
-} from '../govern/payload-implement.js';
+import { CODE_AUDIT_LENS, CODE_ARTIFACT_FRAMING } from '../govern/audit-constants.js';
 import {
   SPEC_AUDIT_LENS,
   SPEC_ARTIFACT_FRAMING,
@@ -144,11 +140,11 @@ describe('implement-mode audit lens (regression — unchanged behavior)', () => 
     expect(CODE_AUDIT_LENS).toContain('Operator interrupt mid-operation');
   });
 
-  it('per-phase implement (pathScope set) uses CODE_ARTIFACT_FRAMING_PER_PHASE (029 US5/FR-021, AUDIT-20260621-06)', () => {
+  it('implement framing is always the generic CODE_ARTIFACT_FRAMING (030 FR-017: per-phase retired)', () => {
     const repo = tmpRepo();
     try {
       const built = buildImplementVars(repo, 'demo', 'HEAD', undefined, ['src/feature.ts']);
-      expect(built.vars.artifact_framing).toBe(CODE_ARTIFACT_FRAMING_PER_PHASE);
+      expect(built.vars.artifact_framing).toBe(CODE_ARTIFACT_FRAMING);
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
