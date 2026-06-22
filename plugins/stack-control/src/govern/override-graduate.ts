@@ -16,6 +16,7 @@
  */
 
 import { recordGovernConvergence, type GovernMode } from './convergence-record.js';
+import { writeWholeFeatureConvergenceRecord, type WholeFeatureConvergenceRecord } from './chunk-artifacts.js';
 
 export interface OverrideGraduateArgs {
   readonly installationRoot: string;
@@ -51,18 +52,49 @@ export interface OverrideGraduateArgs {
  * preserves the gate's existing override-attribution wording.
  */
 export function recordOverrideGraduation(args: OverrideGraduateArgs): void {
-  // FR-018: pass the override reason so the DURABLE convergence record carries
-  // `override: true` + `overrideReason` — a downstream consumer distinguishes this
-  // short-circuit graduation from a real convergence (stderr is transient). A write
-  // failure throws THROUGH to the caller (codex-01/claude-03) — no warn-and-continue.
-  recordGovernConvergence(
-    args.installationRoot,
-    args.mode,
-    args.convergenceItem,
-    args.scopePaths,
-    args.recordedAt,
-    args.reason,
-  );
+  // FR-018: the DURABLE record carries `override: true` + `overrideReason` so a
+  // downstream consumer distinguishes this short-circuit graduation from a real
+  // convergence (stderr is transient). A write failure throws THROUGH to the caller
+  // (codex-01/claude-03) — no warn-and-continue.
+  //
+  // AUDIT-20260622-18: impl and spec gates read DIFFERENT record shapes (030 US9
+  // clean break). The impl `governing → shipped` gate reads `isImplFeatureConverged`
+  // (a WholeFeatureConvergenceRecord); writing the retired GovernConvergenceRecord to
+  // the impl path left the gate CLOSED despite a "graduated" CLI — the exact
+  // CLI-success/gate-signal divergence this path exists to prevent. So impl override
+  // writes a gate-readable WholeFeatureConvergenceRecord; spec override is unchanged.
+  if (args.mode === 'impl') {
+    const record: WholeFeatureConvergenceRecord = {
+      version: 1,
+      mode: 'impl',
+      item: args.convergenceItem,
+      // The override SHORT-CIRCUITS the pipeline (FR-017: zero render/barrage), so no
+      // real run backs these — empty/sentinel values mark "graduated by override, not
+      // by a run". The gate opens on `override: true`, not on these fields.
+      governedShaBase: 'override-short-circuit',
+      headSha: 'override-short-circuit',
+      chunkIds: [],
+      rounds: 0,
+      liftedFindings: [],
+      closedInLoopFindings: [],
+      seamResult: { boundaryPairs: [], findings: [], suppressedCompatible: 0 },
+      splitClusterRefs: [],
+      outcome: 'override-eligible',
+      anchorRoot: args.installationRoot,
+      override: true,
+      overrideReason: args.reason,
+    };
+    writeWholeFeatureConvergenceRecord(args.installationRoot, record);
+  } else {
+    recordGovernConvergence(
+      args.installationRoot,
+      args.mode,
+      args.convergenceItem,
+      args.scopePaths,
+      args.recordedAt,
+      args.reason,
+    );
+  }
   // Record landed → emit the attributable trail (FR-018), distinguishable from a
   // convergence graduation. PRESERVE the gate's wording ("OPEN by override — reason: …").
   args.stderr(

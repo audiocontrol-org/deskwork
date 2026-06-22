@@ -110,6 +110,14 @@ export interface WholeFeatureConvergenceRecord {
     | 'unresolvable-merge-surfaced'
     | 'degraded-fleet-surfaced';
   readonly anchorRoot: string;
+  /**
+   * AUDIT-20260622-18 — operator override attribution. When an operator graduates an
+   * override-eligible feature with `--override <reason>`, the impl gate opens on this
+   * flag (not on `outcome === 'converged'`) so a forced graduation is durable AND
+   * distinguishable from a real convergence. Absent on a normal pipeline record.
+   */
+  readonly override?: boolean;
+  readonly overrideReason?: string;
 }
 
 // --- validation helpers (no `as`, no `any`; type-predicate narrowing) ---
@@ -299,7 +307,11 @@ export function isImplFeatureConverged(installationRoot: string, item: string): 
   const path = convergenceRecordPath(installationRoot, 'impl', item);
   if (existsSync(path) === false) return false;
   try {
-    return validateWholeFeatureConvergenceRecord(JSON.parse(readFileSync(path, 'utf8'))).outcome === 'converged';
+    const record = validateWholeFeatureConvergenceRecord(JSON.parse(readFileSync(path, 'utf8')));
+    // AUDIT-20260622-18: the gate opens on a real convergence OR an attributable
+    // operator override (a forced graduation of an override-eligible run). Both are
+    // durable on the one impl record the gate reads.
+    return record.outcome === 'converged' || record.override === true;
   } catch {
     return false;
   }
@@ -312,6 +324,9 @@ export function validateWholeFeatureConvergenceRecord(value: unknown): WholeFeat
   if (version !== 1) throw new Error(`WholeFeatureConvergenceRecord: 'version' must be 1`);
   const mode = reqString(r, 'mode', 'WholeFeatureConvergenceRecord');
   if (mode !== 'impl') throw new Error(`WholeFeatureConvergenceRecord: 'mode' must be 'impl'`);
+  // AUDIT-20260622-18: optional operator-override attribution (absent on normal records).
+  const override = r['override'] !== undefined ? reqBoolean(r, 'override', 'WholeFeatureConvergenceRecord') : undefined;
+  const overrideReason = r['overrideReason'] !== undefined ? reqString(r, 'overrideReason', 'WholeFeatureConvergenceRecord') : undefined;
   return {
     version: 1,
     mode: 'impl',
@@ -326,5 +341,7 @@ export function validateWholeFeatureConvergenceRecord(value: unknown): WholeFeat
     splitClusterRefs: reqStringArray(r, 'splitClusterRefs', 'WholeFeatureConvergenceRecord'),
     outcome: reqEnum(r, 'outcome', 'WholeFeatureConvergenceRecord', OUTCOMES),
     anchorRoot: reqString(r, 'anchorRoot', 'WholeFeatureConvergenceRecord'),
+    ...(override !== undefined ? { override } : {}),
+    ...(overrideReason !== undefined ? { overrideReason } : {}),
   };
 }

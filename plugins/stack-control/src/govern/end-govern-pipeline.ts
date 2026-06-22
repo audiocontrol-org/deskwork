@@ -97,6 +97,19 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
   // re-scopes + re-partitions mid-loop so those files are assigned to a chunk for re-audit.
   let scope = deps.scopeDiff(input.installationRoot, input.base, input.head);
   let partition = partitionDiff({ changedFiles: scope.files, fileDiffs: scope.fileDiffs }, deps.resolveEnvelope());
+  // AUDIT-20260622-23: fail loud on an EMPTY scope / empty chunk set. With no
+  // chunks the audit loop would break immediately with zero findings and reconcile
+  // to `converged` — a graduation-gate record written WITHOUT firing any barrage. A
+  // bad diff base, an over-broad exclusion filter, or a feature with no scoped files
+  // is a defect to surface, never a silent clean pass.
+  if (scope.files.length === 0 || partition.chunks.length === 0) {
+    throw new Error(
+      `govern: FATAL — end-govern found an EMPTY scope for '${input.item}' over ${input.base}..${input.head} ` +
+        `(${scope.files.length} scoped file(s) → ${partition.chunks.length} chunk(s)). No barrage fired, so the ` +
+        `work is NOT governed — a converged record here would graduate on a zero-audit run. Check the diff base ` +
+        `resolves to real changes and that the exclusion filters did not remove the whole surface.`,
+    );
+  }
   const planContext = deps.planContext();
   const maxRounds = deps.maxRounds ?? DEFAULT_MAX_ROUNDS;
 
