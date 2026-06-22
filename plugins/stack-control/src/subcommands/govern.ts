@@ -834,9 +834,16 @@ export async function runGovern(args: string[]): Promise<void> {
           );
         }
       } catch (err) {
-        process.stderr.write(
-          `govern: diff chunking unavailable (${errorMessage(err)}); auditing the whole committed diff as one payload.\n`,
-        );
+        // 030 dogfood (fail-loud): a partition error must NOT silently degrade to a
+        // whole over-envelope payload — that is the boundary-too-large / lane-choke
+        // pathology 030 exists to remove. The single-file-over-envelope case throws an
+        // actionable FATAL (the file is a-priori broken — fix/remove it; govern does not
+        // hunk-split); any other partition/git failure is equally fatal. Surface the
+        // cause and exit 2 — never swallow it.
+        const msg = errorMessage(err);
+        process.stderr.write(msg.includes('FATAL') ? `${msg}\n` : `govern: FATAL — diff partition failed: ${msg}\n`);
+        emitTerminalOutcome('fatal');
+        process.exit(2);
       }
     }
 

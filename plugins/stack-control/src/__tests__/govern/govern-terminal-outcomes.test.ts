@@ -223,6 +223,40 @@ describe('US5 — machine-readable govern terminal outcomes (T027/T028)', () => 
     expect(out2.match(/govern: terminal-outcome=/g) ?? []).toHaveLength(1);
   });
 
+  // 030 dogfood (TASK-#3): a partition error must FAIL LOUD, never silently degrade
+  // to a whole over-envelope payload (the exact pathology 030 removes). A single file
+  // whose diff alone exceeds the envelope is a-priori broken (line cap) — the
+  // partitioner throws FATAL and govern must surface it as a fatal terminal (exit 2),
+  // not swallow it and audit the whole diff as one oversized barrage.
+  it('a single file over the envelope fails loud (fatal), not a silent whole-payload fallback', () => {
+    const repo = makeRepo({ enforced: true, maxPromptBytes: 200 });
+    const fx = mkdtempSync(join(tmpdir(), 'gov-oversize-fx-'));
+    const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
+    try {
+      const seed = git(['rev-parse', 'HEAD']).stdout.trim();
+      // One file in one dir whose diff alone is well over the 200-byte envelope.
+      mkdirSync(join(repo, 'big'), { recursive: true });
+      writeFileSync(
+        join(repo, 'big', 'huge.ts'),
+        `${Array.from({ length: 40 }, (_, i) => `export const huge${i} = ${i};`).join('\n')}\n`,
+        'utf8',
+      );
+      git(['add', '-A']);
+      git(['commit', '-q', '-m', 'one oversized file']);
+      const r = runGovern(repo, fx, ['--require-models', '1', '--diff-base', seed], 'low');
+      expect(r.status).toBe(2);
+      const out = `${r.stdout}${r.stderr}`;
+      expect(out).toContain('govern: terminal-outcome=fatal');
+      // The descriptive cause is surfaced, not swallowed.
+      expect(out).toMatch(/exceed|envelope|partition/i);
+      // It did NOT silently degrade.
+      expect(out).not.toMatch(/auditing the whole committed diff as one payload/);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(fx, { recursive: true, force: true });
+    }
+  });
+
   // AUDIT-BARRAGE-codex-01 (021 phase-2 round 2): the contract is scoped to
   // EXECUTION exits. `--help` does no governance work, so it deliberately emits
   // NO terminal-outcome — locking the boundary so the contract is precise (not
