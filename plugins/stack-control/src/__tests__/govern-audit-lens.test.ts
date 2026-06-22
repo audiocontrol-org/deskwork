@@ -143,7 +143,7 @@ describe('implement-mode audit lens (regression — unchanged behavior)', () => 
   it('implement framing is always the generic CODE_ARTIFACT_FRAMING (030 FR-017: per-phase retired)', () => {
     const repo = tmpRepo();
     try {
-      const built = buildImplementVars(repo, 'demo', 'HEAD', undefined, ['src/feature.ts']);
+      const built = buildImplementVars(repo, 'demo', 'HEAD', undefined);
       expect(built.vars.artifact_framing).toBe(CODE_ARTIFACT_FRAMING);
     } finally {
       rmSync(repo, { recursive: true, force: true });

@@ -215,3 +215,20 @@ export function scopeCommittedDiff(installationRoot: string, base: string, head:
 
   return { base, head, files: files.sort(), fileDiffs };
 }
+
+/**
+ * The in-range commit subjects (`git log <base>..HEAD --oneline`) scoped to the
+ * installation subtree (`-- .`) — the metadata the barrage prompt's `commit_subjects`
+ * var carries. Subtree-scoped to match `scopeCommittedDiff` (the whole-feature pipeline
+ * operates on the installation subtree; cross-tree feature anchors are out of scope here,
+ * 030 clean break). Replaces the per-commit-subjects arm of the deleted
+ * `assembleImplementPayload` (T085). Returns '' when the range is empty.
+ */
+export function implementCommitSubjects(installationRoot: string, base: string): string {
+  // Tolerant (gitTry): a missing base / empty / non-git tree degrades to '' rather than
+  // aborting — mirrors the deleted assembler's `|| true` git-read semantics.
+  const out = gitTry(installationRoot, ['log', `${base}..HEAD`, '--oneline', '--', '.']);
+  if (out === undefined) return '';
+  const subjects = lines(out);
+  return subjects.length === 0 ? '' : `${subjects.join('\n')}\n`;
+}

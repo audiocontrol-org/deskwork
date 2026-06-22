@@ -49,7 +49,6 @@ import {
   resolveFeatureFromItem,
   resolveFeatureSlug,
 } from '../govern/feature-resolution.js';
-import { assembleImplementPayload } from '../govern/payload-implement.js';
 import { CODE_AUDIT_LENS, CODE_ARTIFACT_FRAMING } from '../govern/audit-constants.js';
 import {
   assembleSpecPayload,
@@ -59,7 +58,7 @@ import {
 } from '../govern/payload-spec.js';
 import { runCloneDetectionStep } from '../govern/clone-step.js';
 import { runConvergenceLoop } from '../govern/convergence-loop.js';
-import { resolveImplementDiffBase, resolveImplementExclusion } from '../govern/payload-diff-scope.js';
+import { implementCommitSubjects, resolveImplementDiffBase, resolveImplementExclusion } from '../govern/payload-diff-scope.js';
 import { runEndGovern } from '../govern/end-govern-pipeline.js';
 import { makeEndGovernRuntime } from '../govern/end-govern-runtime.js';
 import { writeWholeFeatureConvergenceRecord } from '../govern/chunk-artifacts.js';
@@ -290,59 +289,21 @@ export function buildImplementVars(
   slug: string,
   diffBaseFlag: string | undefined,
   checkpointFlag: string | undefined,
-  // specs/015 + 014 merge: pathScope (per-phase inclusion, 015) AND
-  // featureRoot/excludeRoots/excludePaths (self-reference/cross-feature/bookkeeping
-  // exclusion, 014 US5) are threaded together into the assembler. `auditLogExcerpt`
-  // is GONE: 015 SC-005 drops the excerpt from the implement payload entirely
-  // (the body sets audit_log_excerpt: ''), so there is no excerpt to pass.
-  pathScope?: readonly string[],
-  featureRoot?: string,
-  excludeRoots?: readonly string[],
-  excludePaths?: readonly string[],
 ): { vars: BarrageVars; checkpoint: string; skippedOutOfScope: readonly string[] } {
   const base = diffBaseFlag ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
-  const budgetEnv = process.env.GOVERN_PAYLOAD_BUDGET;
-  // specs/014 US5: thread the resolved feature root so the payload is
-  // self-reference-free (audit-log excluded from both arms), plus the
-  // repo's full feature-root list (`excludeRoots`, from the async
-  // discoverFeatureRoots — this builder stays sync) so the untracked
-  // fold drops OTHER features' scaffolds while still folding the
-  // feature's own files and new source modules (AUDIT-20260611-01),
-  // plus the governance-bookkeeping store paths (`excludePaths`, from
-  // the backlog root seam — AUDIT-20260611-08: per-round backlog
-  // bookkeeping commits land in the diff range the same way lift
-  // commits do, re-feeding prior findings through a channel the
-  // feature-root pathspec misses). The labeled audit_log_excerpt block
-  // below stays the ONLY audit-log content in the payload (013/TASK-25).
-  const payload = assembleImplementPayload({
-    installationRoot: repoRoot,
-    base,
-    ...(featureRoot !== undefined ? { featureRoot } : {}),
-    ...(excludeRoots !== undefined ? { excludeRoots } : {}),
-    ...(excludePaths !== undefined ? { excludePaths } : {}),
-    ...(budgetEnv !== undefined && budgetEnv.length > 0
-      ? { budgetBytes: Number.parseInt(budgetEnv, 10) }
-      : {}),
-    // specs/015 (FR-006/D7): bound the fold to the audit unit's explicit path
-    // scope when one exists; otherwise keep the whole-feature pre-015 behavior.
-    ...(pathScope !== undefined && pathScope.length > 0 ? { pathScope } : {}),
-  });
-  if (payload.empty) {
-    process.stderr.write(
-      `govern: empty diff against ${base} — running barrage over the plan context only (edge case; no defects expected).\n`,
-    );
-  }
+  // 030 (FR-024): the implement arm drives the end-govern pipeline, which re-scopes the
+  // committed diff per CHUNK (scopeCommittedDiff + partitionDiff). The whole-feature `diff`
+  // the old assembler produced is discarded, so this builder no longer assembles it — it
+  // supplies only the audit metadata the per-chunk barrage prompt carries: the audit lens /
+  // framing, the in-range commit subjects (installation-subtree-scoped), and the static
+  // workplan summary. The audit-log excerpt is dropped from the implement payload entirely
+  // (015 SC-005); the dampener/gate read the audit-log FILE directly.
   const vars: BarrageVars = {
     feature_slug: slug,
     workplan_summary: `Governance pass over the just-implemented work for feature '${slug}', diffed against ${base}. The differentiated back half audits a plan it did not author or execute.`,
-    diff: payload.diff,
-    // specs/015 (FR-006/D7/SC-005): the implement-mode payload DROPS the feature's
-    // own prior audit-log excerpt — the self-referential generator that
-    // manufactured findings about the audit-log's own prose. The dampener/gate
-    // still read the audit-log FILE directly for findings; only the audited
-    // payload the models read excludes it.
+    diff: '',
     audit_log_excerpt: '',
-    commit_subjects: payload.commitSubjects,
+    commit_subjects: implementCommitSubjects(repoRoot, base),
     audit_lens: CODE_AUDIT_LENS,
     // 030 (FR-017): per-phase is retired — the whole-feature audit always uses the
     // generic framing. (The per-phase out-of-window note would be false here and
@@ -350,10 +311,7 @@ export function buildImplementVars(
     artifact_framing: CODE_ARTIFACT_FRAMING,
   };
   const checkpoint = checkpointFlag ?? 'after_clarify';
-  // claude-20260612-03: return the structured path-scope exclusions so they reach
-  // the govern verdict surface as a consolidated, machine-greppable summary — not
-  // only as the interleaved per-file stderr warns assembleImplementPayload emits.
-  return { vars, checkpoint, skippedOutOfScope: payload.skippedOutOfScope };
+  return { vars, checkpoint, skippedOutOfScope: [] };
 }
 
 /**
@@ -635,23 +593,6 @@ export async function runGovern(args: string[]): Promise<void> {
     // `--phase` arm and the carried-phase composition arm are DELETED; the chunking that
     // keeps the whole-feature payload within the fleet envelope lives in the end-govern
     // pipeline (src/govern/end-govern-pipeline.ts).
-    let phaseUnit: AuditUnit | undefined;
-    let payloadPathScope: readonly string[] | undefined;
-    if (flags.mode === 'implement') {
-      const { root } = await resolveGovernFeatureRoot(repoRoot, slug);
-      if (root !== undefined && existsSync(join(root, 'tasks.md'))) {
-        phaseUnit = {
-          granularity: 'feature',
-          diffScope: {
-            base: flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1',
-            files: [],
-          },
-          auditLogSection: 'after_implement',
-        };
-        payloadPathScope = undefined; // the whole committed diff
-      }
-    }
-
     // specs/029 US4 (FR-017/018): the `--override` SHORT-CIRCUIT. When an override
     // reason is supplied, govern graduates THIS invocation with ZERO
     // render/barrage/lift/slush — it records the attributable override graduation
@@ -867,16 +808,7 @@ export async function runGovern(args: string[]): Promise<void> {
       // summary) can never describe a different range than the chunks audited.
       // (flags.diffBase is already resolved to `base` at the top of runGovern via
       // resolveImplementDiffBase, so this is also the single base-resolution site.)
-      const { vars } = buildImplementVars(
-        repoRoot,
-        slug,
-        base,
-        flags.checkpoint,
-        undefined,
-        featureRoot,
-        excludeRoots,
-        excludePaths,
-      );
+      const { vars } = buildImplementVars(repoRoot, slug, base, flags.checkpoint);
       const { diff: _discardedWholeDiff, workplan_summary: planContext, ...varsBase } = vars;
       void _discardedWholeDiff;
       // AUDIT-20260622-02: thread the SAME resolved exclusion set buildImplementVars
@@ -987,21 +919,10 @@ export async function runGovern(args: string[]): Promise<void> {
       stderr: (s: string) => process.stderr.write(s),
     };
 
-    // Build + audit ONE chunk's payload via the existing protocol pass.
-    const auditChunkPass = async (chunkScope: readonly string[] | undefined): Promise<boolean> => {
-      const built =
-        flags.mode === 'spec'
-          ? buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint, auditLogExcerpt)
-          : buildImplementVars(
-              repoRoot,
-              slug,
-              flags.diffBase,
-              phaseUnit !== undefined ? phaseUnit.auditLogSection : flags.checkpoint,
-              chunkScope,
-              featureRoot,
-              excludeRoots,
-              excludePaths,
-            );
+    // Build + audit the spec payload via the protocol pass. 030 (FR-024): only spec mode
+    // reaches this loop — implement mode drove the end-govern pipeline above and exited.
+    const auditChunkPass = async (): Promise<boolean> => {
+      const built = buildSpecVars(repoRoot, slug, flags.specPath, flags.planPath, flags.checkpoint, auditLogExcerpt);
       const exclusionSummary = formatScopeExclusionSummary(built.skippedOutOfScope);
       if (exclusionSummary !== undefined) process.stderr.write(`${exclusionSummary}\n`);
       return (await runProtocol({ ...protocolBase, checkpoint: built.checkpoint, vars: built.vars })).gateOpen;
@@ -1014,7 +935,7 @@ export async function runGovern(args: string[]): Promise<void> {
     const ceiling = resolveCeiling(pick(flags.ceiling, process.env.GOVERN_CEILING));
     const outcome: ConvergenceOutcome = await runConvergenceLoop({
       ceiling,
-      runPass: async () => ({ gateOpen: await auditChunkPass(payloadPathScope) }),
+      runPass: async () => ({ gateOpen: await auditChunkPass() }),
       dispatchFix: async () => {
         process.stderr.write(
           'govern: convergence gate BLOCKED — fix the surfaced findings; the loop ' +
