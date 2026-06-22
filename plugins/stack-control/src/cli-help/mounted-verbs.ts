@@ -14,6 +14,7 @@ import { SUBACTION_SPECS as INBOX_SPECS } from '../subcommands/inbox.js';
 import type { MediationClass, MountedVerb } from './command-surface.js';
 import { buildGrammarSurfaceCommand } from './surface-builder.js';
 import { AUDIT_BARRAGE_VERBS } from './surfaces/audit-barrage.js';
+import { AUDIT_RUNS_VERBS } from './surfaces/audit-runs.js';
 import { CAPABILITY_VERBS } from './surfaces/capability.js';
 import { DOCUMENT_PRIMITIVES_VERBS } from './surfaces/document-primitives.js';
 import { SCOPE_CHECKS_VERBS } from './surfaces/scope-checks.js';
@@ -138,6 +139,7 @@ export const MOUNTED: readonly MountedVerb[] = [
   ...SCOPE_CHECKS_VERBS,
   ...SCOPE_SURFACE_VERBS,
   ...AUDIT_BARRAGE_VERBS,
+  ...AUDIT_RUNS_VERBS,
   ...SESSION_SETUP_VERBS,
   ...SPEC_MISC_VERBS,
 ];
