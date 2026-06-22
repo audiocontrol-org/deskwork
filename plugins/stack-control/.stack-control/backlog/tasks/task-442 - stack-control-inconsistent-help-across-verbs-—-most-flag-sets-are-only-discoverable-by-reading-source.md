@@ -3,9 +3,10 @@ id: TASK-442
 title: >-
   stack-control: inconsistent --help across verbs — most flag sets are only
   discoverable by reading source
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-11 00:41'
+updated_date: '2026-06-22 21:07'
 labels:
   - 'type:imported-issue'
 dependencies: []
@@ -40,3 +41,9 @@ Uniform `--help` on every verb and subaction (the audit-barrage implementation i
 
 Hit while learning roadmap add, backlog capture/import-slush, spec-check, and scope-widen interfaces during the design-control port. Filed per the tooling-friction-to-GitHub-issues policy.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closed: Resolved by 027 discoverability (uniform --help across the verb surface); verified backlog/roadmap/spec-check --help exit 0.
+<!-- SECTION:NOTES:END -->

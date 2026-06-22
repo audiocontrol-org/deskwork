@@ -3,10 +3,10 @@ id: TASK-16
 title: >-
   stack-control: adopt + document the tooling-friction routing policy —
   upstream-tool defects go to GitHub issues, never the local backlog
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-10 18:33'
-updated_date: '2026-06-10 21:20'
+updated_date: '2026-06-22 21:07'
 labels:
   - agent-found
   - 'type:gap'
@@ -48,3 +48,9 @@ Document the routing rule in README § "Backlog slush pile — intake" (it is a 
 
 Operator decision during the design-control adoption session; applied precedent in that installation's backlog (TASK-3/4/5 → #441/#440/#442) and codified in its project rules. Companion docs issue: #443.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closed: Fixed 2026-06-22 (commit a53a7bae): tooling-friction routing documented in README backlog-intake + /stack-control:backlog discipline 7 (anti-intake + filed-upstream convention).
+<!-- SECTION:NOTES:END -->

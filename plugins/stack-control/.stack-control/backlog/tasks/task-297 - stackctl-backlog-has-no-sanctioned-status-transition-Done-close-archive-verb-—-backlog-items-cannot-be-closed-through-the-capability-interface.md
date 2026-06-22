@@ -3,9 +3,10 @@ id: TASK-297
 title: >-
   stackctl backlog done drops --reason — the closure rationale is printed but
   never persisted to the task file
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 07:48'
+updated_date: '2026-06-22 21:07'
 labels:
   - agent-found
   - 'type:gap'
@@ -20,3 +21,9 @@ Re-scoped 2026-06-22: the closure VERB now exists (`backlog done <id> --reason .
 
 Fix: thread the reason through `BacklogBackend.close(id, reason?)` and write it into the task body/frontmatter (e.g. an Implementation-Notes closure line or a `closure_reason` frontmatter field), then extend done.test.ts to assert the reason is on disk. Original framing (no closure verb at all) is satisfied; this is the persistence remnant. Verified via source + empirical 2026-06-22.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closed: Fixed 2026-06-22 (commit eda7e09f, bookkeeping-hardening): backend.close(id, reason) appends the closure note to durable task notes; RED-first test + cross-model audit-barrage pass.
+<!-- SECTION:NOTES:END -->
