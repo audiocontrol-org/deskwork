@@ -93,8 +93,10 @@ export interface EndGovernResult {
 /** Run the chunked end-govern pipeline to a single whole-feature convergence record. */
 export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): Promise<EndGovernResult> {
   // CLUSTER — scope the committed diff and partition it into envelope-sized chunks.
-  const scope = deps.scopeDiff(input.installationRoot, input.base, input.head);
-  const partition = partitionDiff({ changedFiles: scope.files, fileDiffs: scope.fileDiffs }, deps.resolveEnvelope());
+  // `scope`/`partition` are reassignable because a fix that creates NEW files (FR-007)
+  // re-scopes + re-partitions mid-loop so those files are assigned to a chunk for re-audit.
+  let scope = deps.scopeDiff(input.installationRoot, input.base, input.head);
+  let partition = partitionDiff({ changedFiles: scope.files, fileDiffs: scope.fileDiffs }, deps.resolveEnvelope());
   const planContext = deps.planContext();
   const maxRounds = deps.maxRounds ?? DEFAULT_MAX_ROUNDS;
 
@@ -148,11 +150,23 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
       changedFiles: fix.changedFiles,
       fixCommits: fix.fixCommits,
     });
-    if (touched.chunkIds.length === 0) {
+    // FR-007: a fix that creates NEW file(s) not yet in any chunk must have them
+    // assigned to a chunk for re-audit — never dropped. Re-scope the committed diff
+    // (the fix commit now includes them) and re-partition so the new files land in a
+    // chunk; then re-audit those chunk(s) alongside the coupling-touched chunks.
+    if (touched.newFiles.length > 0) {
+      scope = deps.scopeDiff(input.installationRoot, input.base, input.head);
+      partition = partitionDiff({ changedFiles: scope.files, fileDiffs: scope.fileDiffs }, deps.resolveEnvelope());
+    }
+    const newFileChunkIds = partition.chunks
+      .filter((c) => c.files.some((f) => touched.newFiles.includes(f)))
+      .map((c) => c.id);
+    const nextAuditIds = [...new Set([...touched.chunkIds, ...newFileChunkIds])];
+    if (nextAuditIds.length === 0) {
       openFindings = []; // fixes touched nothing re-auditable → loop is complete
       break;
     }
-    auditIds = [...touched.chunkIds];
+    auditIds = nextAuditIds;
     round++;
   }
 
