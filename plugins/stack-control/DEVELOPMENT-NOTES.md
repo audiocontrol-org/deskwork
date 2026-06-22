@@ -2,21 +2,31 @@
 
 ---
 
-## 2026-06-22: <!-- session title -->
+## 2026-06-22: US9 finish — fixed the 4 dogfood findings + migrated all 6 govern integration tests
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up the remaining US9 work the prior session parked: fix the 4 open HIGH dogfood findings (AUDIT-20260622-01..04) RED-first, migrate the integration tests the chunked-end-govern wiring broke, and leave the suite green except the deliberately-RED T086 decomposition tests. Re-govern + T085/T086 explicitly deferred to a focused session (operator call).
 
 **Accomplished:**
-- <!-- compose -->
+- **All 4 findings fixed**, RED-first where a behavior delta existed:
+  - `-01` empty-run-dir guard (`auditChunk` FATALs instead of silently reporting "no findings, fleet healthy").
+  - `-02` `scopeDiff` dropped exclude paths — introduced `resolveImplementExclusion` + `filterDiffScope` in `payload-diff-scope.ts` as the SINGLE source both `buildImplementVars` (`:(exclude)` pathspecs) and the pipeline runtime (`excludeDiffPaths`) derive from; the two arms can no longer drift.
+  - `-03` lift-after-record failure now FATALs with a diagnostic naming BOTH halves (record written / audit-log NOT appended → re-run).
+  - `-04` pass the resolved `base` (not `flags.diffBase`) to `buildImplementVars` — single-sources the call site.
+- **All 6 govern integration tests migrated** to the whole-feature pipeline harness (ROADMAP fixtures so `resolveConvergenceItem` keys the record; model-`.md` stubs so the pipeline extracts findings; real `--diff-base` ranges so chunks actually audit). Confirmed the new `scopeDiff` still excludes the outer-tree / backlog / audit-runs canaries — no exclusion regression.
+- Marked the audit-log findings `fixed-<sha>`; captured **TASK-425** (audit-runs accumulate unboundedly — 279 dirs / 108 MB here — with no prune verb).
+- Suite: 2527 passed; the only 3 failing are `file-line-cap` (T077), which are T086's own RED targets. Typecheck clean apart from pre-existing `portable.ts` (TASK-389).
 
 **Didn't Work:**
-- <!-- compose -->
+- `-04` turned out to be a near-false-positive: `runGovern` already resolves `flags.diffBase` to `base` via `resolveImplementDiffBase` (line 569 write-back), so the metadata and audited range were already equal — the codex auditor missed the write-back. Fixed anyway as a structural single-source (no RED test possible — no observable behavior delta).
+- The integration-test migration was larger than the prior session's "non-trivial" estimate: graduated/blocked tests needed real committed work over an explicit `--diff-base` (empty `HEAD..HEAD` ranges converge vacuously with 0 chunks, making "blocked" impossible to exercise), and ROADMAP fixtures needed the `doc-grammar: roadmap` frontmatter.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Answered the operator's mid-session question (does audit-barrage clone/worktree? cleanup?) before continuing — it surfaced a real gap (the unbounded audit-runs pile), captured as TASK-425 on operator approval rather than scoped unilaterally.
+- [PROCESS] Stopped at the findings + migration boundary instead of barreling into T085 (clean-break rewiring execute-check/capability-reconcile) + T086 (decompose) + an expensive re-govern — operator chose to park them for a focused session.
 
 **Insights:**
-- <!-- compose -->
+- The migration earned its keep as a *verifier*: it proved the new pipeline's `scopeDiff` excludes the same control-plane canaries the old `buildImplementVars` did (the audit-runs/backlog/outer-tree exclusion held), turning a worried "did the clean break regress exclusion?" into a tested fact.
+- Single-sourcing is the durable fix for a "two arms can drift" finding: `-02` and `-04` both collapsed a duplicated computation to one function/call-site, which kills the finding permanently rather than patching one instance.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 6
