@@ -76,11 +76,10 @@ describe('030 T021 — payload-diff-scope (FR-023)', () => {
 
   // 030 T075 (FR-030, US9) — the untracked-fold must render a STANDARD unified
   // diff (the `git diff --no-index` format the rest of the render arm produces),
-  // NOT a hand-synthesized `+`-line-only blob. Today the fold prefixes every
-  // content line with `+` and emits NO `diff --git`/`---`/`+++`/`@@` hunk headers,
-  // so the folded untracked diff is not a real diff the partitioner/barrage can
-  // treat uniformly with the committed-diff arm. This asserts the standard-diff
-  // shape (a `@@` hunk header and a `+++ ` file header), which FAILS today.
+  // NOT a hand-synthesized `+`-line-only blob. The fold emits a real unified diff
+  // (`diff --git`/`---`/`+++`/`@@` hunk headers) so the folded untracked diff is
+  // treated uniformly with the committed-diff arm by the partitioner/barrage. This
+  // pins the standard-diff shape (a `@@` hunk header and a `+++ ` file header).
   it('T075 (FR-030) renders an untracked file as a STANDARD git-diff --no-index unified diff, not a synthetic +-line blob', () => {
     const repo = setup();
     const base = head(repo);

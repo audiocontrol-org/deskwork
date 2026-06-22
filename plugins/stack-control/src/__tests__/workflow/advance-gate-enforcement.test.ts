@@ -53,6 +53,10 @@ describe('030 US2 — governing → shipped requires a converged whole-feature r
 
   it('once a converged whole-feature record exists, the item graduates to shipped', () => {
     const f = governingFixture();
+    // NB: for `mode: 'impl'`, the fixture's writeRecord maps this record-shaped input
+    // through `implRecordFrom(...)` and persists a real `WholeFeatureConvergenceRecord`
+    // (workflow-fixtures.ts) — these are adapter INPUTS, NOT the on-disk schema. The
+    // graduate gate reads the mapped whole-feature record, not these literal fields.
     f.base.writeRecord({
       version: 1,
       mode: 'impl',

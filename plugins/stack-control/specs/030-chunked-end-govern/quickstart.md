@@ -1,6 +1,6 @@
 # Quickstart: Chunked whole-feature end-govern — validation scenarios
 
-Runnable scenarios that prove the feature. Each maps to a Success Criterion (SC-001..SC-007) and the user stories (US1..US8). Commands are illustrative of the observable surface; assertions reference [contracts/](./contracts/) and [data-model.md](./data-model.md) rather than duplicating them. No implementation/test bodies here — these are *what an operator runs and observes*.
+Runnable scenarios that prove the feature. Each maps to a Success Criterion (SC-001..SC-010) and the user stories (US1..US9). Commands are illustrative of the observable surface; assertions reference [contracts/](./contracts/) and [data-model.md](./data-model.md) rather than duplicating them. No implementation/test bodies here — these are *what an operator runs and observes*.
 
 ## Prerequisites
 
@@ -142,10 +142,48 @@ grep -rn "compositionExcludePaths\|carriedFilesForComposition" src/   # expect: 
 
 ---
 
+## Scenario 11 — The CLI drives the end-govern pipeline (the wired core) (US9 / SC-008)
+
+**Setup.** A fixture feature whose committed diff partitions into N>1 chunks.
+
+**Run.**
+```
+stackctl govern --mode implement --at <fixture-installation>
+grep -n "runProtocol" src/subcommands/govern.ts        # expect: zero per-chunk implement-mode invocations
+```
+
+**Expect.**
+- `govern.ts` contains **0** per-chunk `runProtocol` invocations and **0** implement-mode `GovernConvergenceRecord` reads (SC-008; US9 Scenario 5 — clean break).
+- The run writes exactly **1** `WholeFeatureConvergenceRecord` and exactly **1** lift section (not N) — the CLI drove `runEndGovern` once (US9 Scenarios 1–2).
+- The graduate gate evaluates `implRecordConverged` by reading that one `WholeFeatureConvergenceRecord` (one schema, one path — [graduate-gate.md](./contracts/graduate-gate.md)).
+
+---
+
+## Scenario 12 — Rendered-byte sizing: no chunk renders over-envelope (US9 Scenario 3 / SC-009)
+
+**Setup.** A chunk whose *raw* diff is ≤ envelope but whose *rendered* payload (preamble + per-file framing + the manifest of the other chunks' file lists) would exceed it.
+
+**Expect.**
+- Across the test matrix, **0** chunks render a payload exceeding the active fleet envelope — sizing is measured on **rendered** bytes, not raw diff (SC-009).
+- A chunk whose **irreducible** body (header + other-chunk manifest) cannot fit even after every audited diff is withheld to coverage-only causes govern to **fail loud** naming the chunk (AUDIT-20260622-11) — it never runs the barrage on an over-envelope payload.
+
+---
+
+## Scenario 13 — Union completeness: no file dropped, no dangling marker (US9 Scenario 4 / SC-010)
+
+**Setup.** Fixtures including non-audit-trim and oversized-cluster cases.
+
+**Expect.**
+- On every fixture, the union of all chunk files equals the changed-file set — **no file dropped** (SC-010).
+- **0** dangling `SplitClusterMarker`s are produced (a sub-split always yields ≥2 sub-chunks).
+
+---
+
 ## Edge-case probes (from spec § Edge Cases)
 
 - **Below-envelope feature** → governs as a single chunk (size-1 partition), no empty-payload error.
-- **Single file > envelope** → hunk-level sub-split with a marker; never FATALs.
+- **Lane outage mid-run** → the affected chunk's round is degraded; the run does NOT fabricate a clean result — a clean-but-degraded final round reconciles to `degraded-fleet-surfaced` (a non-converged terminal), never `converged` (AUDIT-20260622-10).
+- **Single file > envelope** → govern **fails loud** naming the file as an a-priori-broken defect to fix; there is NO `split-file`/hunk-split path (spec § Edge Cases; operator decision 2026-06-21). This is distinct from the never-FATAL feature-size case (which chunking handles) and from multi-file oversized clusters (which FR-006 sub-splits at file granularity).
 - **Fix creates a new file** → assigned to a chunk by coupling for re-audit (FR-007; the `split-file-audit-exclusion` class must not recur).
 - **All chunks clean on first pass** → reconcile once, graduate, zero fix/re-audit rounds.
 - **Lane outage mid-run** → that round degrades per existing fleet behavior; no fabricated clean result.
