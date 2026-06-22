@@ -44,13 +44,15 @@ describe('023 T002 — backend close(id) (real binary)', () => {
     const id = backend.create({ title: 'closable', labels: ['type:gap'] });
     expect(backend.list().find((i) => i.id === id)!.status).not.toBe(BACKLOG_DONE_STATUS);
 
-    backend.close(id);
+    backend.close(id, 'unit-test closure');
     expect(backend.list().find((i) => i.id === id)!.status).toBe(BACKLOG_DONE_STATUS);
+    // The rationale is persisted to the durable task notes (028 TASK-297).
+    expect(backend.readNotes(id)).toContain('unit-test closure');
 
     // Idempotent: closing an already-Done item is not an error.
-    expect(() => backend.close(id)).not.toThrow();
+    expect(() => backend.close(id, 'second close')).not.toThrow();
 
     // Unknown id fails loud — never a silent no-op.
-    expect(() => backend.close('TASK-999999')).toThrow(BacklogError);
+    expect(() => backend.close('TASK-999999', 'x')).toThrow(BacklogError);
   });
 });

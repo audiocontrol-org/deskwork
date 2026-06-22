@@ -168,7 +168,7 @@ function emitDone(flags: Flags): void {
     return;
   }
   try {
-    backend.close(id);
+    backend.close(id, reason);
   } catch (err) {
     if (err instanceof BacklogError) {
       process.stderr.write(`backlog: ${err.message}\n`);
