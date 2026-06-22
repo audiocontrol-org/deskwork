@@ -56,6 +56,28 @@ function makeRepo(opts: RepoOpts): string {
   const featureRoot = join(repo, 'docs', '1.0', '001-IN-PROGRESS', 'feat');
   mkdirSync(featureRoot, { recursive: true });
   writeFileSync(join(featureRoot, 'audit-log.md'), '# Audit Log — feat\n', 'utf8');
+  // 030 US9 (T084): the whole-feature pipeline keys its convergence record by the
+  // canonical roadmap node id, so the fixture needs a node whose `spec:` pointer
+  // names the feature dir (resolveConvergenceItem fails loud otherwise).
+  writeFileSync(
+    join(repo, 'ROADMAP.md'),
+    [
+      '---',
+      'doc-grammar: roadmap',
+      '---',
+      '',
+      '# Roadmap',
+      '',
+      '## impl:feature/feat',
+      '',
+      '- status: in-flight',
+      '- spec: docs/1.0/001-IN-PROGRESS/feat',
+      '',
+      'feat scope prose.',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
   mkdirSync(join(repo, 'src'), { recursive: true });
   // Substantive source so the implement-mode clone-step's jscpd run analyzes real
   // files (it writes no report — and the step errors — over a trivial tree).
@@ -74,7 +96,13 @@ function makeRepo(opts: RepoOpts): string {
   return repo;
 }
 
-/** Stub barrage whose lift appends a finding of `STUB_SEVERITY` every round. */
+/**
+ * Stub barrage for the 030 end-govern pipeline: the `audit-barrage` arm
+ * materializes a run-dir holding ONE model's markdown finding of `STUB_SEVERITY`,
+ * which the pipeline extracts per chunk (extractBarrageFindings) — low is dampened
+ * (converges → graduated), high blocks (override-eligible → blocked). The new path
+ * never drives `audit-barrage-lift` (lift-once renders in-process), so that arm is gone.
+ */
 function writeStub(dir: string): string {
   const stub = join(dir, 'stub-barrage.sh');
   writeFileSync(
@@ -83,11 +111,9 @@ function writeStub(dir: string): string {
       '#!/usr/bin/env bash',
       'set -euo pipefail',
       'verb="$1"; shift',
-      'repo=""; feature=""; output=""',
+      'output=""',
       'while [ "$#" -gt 0 ]; do',
       '  case "$1" in',
-      '    --at) repo="$2"; shift 2 ;;',
-      '    --feature) feature="$2"; shift 2 ;;',
       '    --output) output="$2"; shift 2 ;;',
       '    *) shift ;;',
       '  esac',
@@ -95,15 +121,12 @@ function writeStub(dir: string): string {
       'case "$verb" in',
       '  audit-barrage-render) [ -n "$output" ] && printf "stub prompt\\n" > "$output" || true; exit 0 ;;',
       '  audit-barrage)',
-      '    rd="${STUB_RUN_DIR:?}-$$-${RANDOM}"; mkdir -p "$rd"; printf "%s\\n" "$rd"; exit 0 ;;',
-      '  audit-barrage-lift)',
-      '    log="${repo}/docs/1.0/001-IN-PROGRESS/${feature}/audit-log.md"',
-      '    n=$(grep -c "audit-barrage lift" "$log" 2>/dev/null || true); n=$(( ${n:-0} + 1 ))',
+      '    rd="${STUB_RUN_DIR:?}-$$-${RANDOM}"; mkdir -p "$rd"',
       '    {',
-      '      printf "\\n## 2026-06-14 — audit-barrage lift (terminal-stub-%s-after_clarify)\\n\\n" "$n"',
-      '      printf "### Stub finding %s\\n\\nFinding-ID: AUDIT-20260614-%02d\\nStatus:     open\\nSeverity:   %s\\nSurface:    spec.md:1\\n\\nBody.\\n" "$n" "$n" "${STUB_SEVERITY:?}"',
-      '    } >> "$log"',
-      '    exit 0 ;;',
+      '      printf "### Stub finding\\n\\n"',
+      '      printf "Finding-ID: claude-01\\nStatus: open\\nSeverity: ${STUB_SEVERITY:?}\\nSurface: src/f0.ts:1\\n\\nBody.\\n"',
+      '    } > "$rd/model-stub.md"',
+      '    printf "%s\\n" "$rd"; exit 0 ;;',
       '  *) echo "stub: unknown $verb" >&2; exit 3 ;;',
       'esac',
       '',
@@ -160,8 +183,11 @@ describe('US5 — machine-readable govern terminal outcomes (T027/T028)', () => 
       git(['add', '-A']);
       git(['commit', '-q', '-m', 'feature work across two dirs']);
       const r = runGovern(repo, fx, ['--require-models', '1', '--diff-base', seed], 'low');
-      // The observable proof of chunking (printed before the per-chunk barrage loop).
-      expect(`${r.stdout}${r.stderr}`).toMatch(/chunked the whole committed feature diff into [2-9]/);
+      const out = `${r.stdout}${r.stderr}`;
+      // The whole-feature pipeline converges (low → dampened) and reports the chunk
+      // count it governed; two distinct-dir clusters over a 400-byte envelope ⇒ ≥2.
+      expect(r.status, `stderr:\n${r.stderr}`).toBe(0);
+      expect(out).toMatch(/end-govern converged over [2-9] chunk\(s\)/);
     } finally {
       rmSync(repo, { recursive: true, force: true });
       rmSync(fx, { recursive: true, force: true });
@@ -175,8 +201,15 @@ describe('US5 — machine-readable govern terminal outcomes (T027/T028)', () => 
   it('graduated: an enforced lane + a clean (low) barrage opens the gate', () => {
     const repo = makeRepo({ enforced: true, maxPromptBytes: 65536 });
     const fx = mkdtempSync(join(tmpdir(), 'gov-terminal-fx-'));
+    const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
     try {
-      const r = runGovern(repo, fx, ['--require-models', '1'], 'low');
+      // Real committed work in the audited range — the pipeline audits chunks over
+      // base..HEAD, so an empty range would converge vacuously (0 chunks audited).
+      const seed = git(['rev-parse', 'HEAD']).stdout.trim();
+      writeFileSync(join(repo, 'src', 'feature.ts'), 'export const feature = 1;\n', 'utf8');
+      git(['add', '-A']);
+      git(['commit', '-q', '-m', 'feat: feature work']);
+      const r = runGovern(repo, fx, ['--require-models', '1', '--diff-base', seed], 'low');
       expect(r.status, `stderr:\n${r.stderr}`).toBe(0);
       expect(`${r.stdout}${r.stderr}`).toContain('govern: terminal-outcome=graduated');
     } finally {
@@ -188,9 +221,14 @@ describe('US5 — machine-readable govern terminal outcomes (T027/T028)', () => 
   it('blocked: an enforced lane + an always-HIGH barrage refuses graduation', () => {
     const repo = makeRepo({ enforced: true, maxPromptBytes: 65536 });
     const fx = mkdtempSync(join(tmpdir(), 'gov-terminal-fx-'));
+    const git = (a: string[]) => spawnSync('git', ['-C', repo, ...a], { encoding: 'utf8' });
     try {
-      const r = runGovern(repo, fx, ['--require-models', '1', '--ceiling', '1'], 'high');
-      expect(r.status).toBe(1);
+      const seed = git(['rev-parse', 'HEAD']).stdout.trim();
+      writeFileSync(join(repo, 'src', 'feature.ts'), 'export const feature = 1;\n', 'utf8');
+      git(['add', '-A']);
+      git(['commit', '-q', '-m', 'feat: feature work']);
+      const r = runGovern(repo, fx, ['--require-models', '1', '--ceiling', '1', '--diff-base', seed], 'high');
+      expect(r.status, `stderr:\n${r.stderr}`).toBe(1);
       const out = `${r.stdout}${r.stderr}`;
       expect(out).toContain('govern: terminal-outcome=blocked');
       // "exactly one" part of the contract.

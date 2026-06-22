@@ -24,8 +24,10 @@ import {
 } from '../_isolation-harness.js';
 import { tmpBacklog } from '../../../tests/backlog/helpers.js';
 
-/** Stub barrage: render writes the prompt, barrage prints the run dir, lift
- * appends one LOW finding to the installation's audit-log. */
+/** Stub barrage for the 030 end-govern pipeline: render writes the prompt, barrage
+ * prints the run-dir holding one HIGH model finding (so the pipeline surfaces it as
+ * override-eligible and lift-once writes a section INTO the installation's audit-log —
+ * the anchor invariant under test). The new path never drives audit-barrage-lift. */
 function writeStub(dir: string): string {
   const stub = join(dir, 'stub-barrage.sh');
   writeFileSync(
@@ -34,12 +36,9 @@ function writeStub(dir: string): string {
       '#!/usr/bin/env bash',
       'set -euo pipefail',
       'verb="$1"; shift',
-      'repo=""; feature=""; output=""',
+      'output=""',
       'while [ "$#" -gt 0 ]; do',
       '  case "$1" in',
-      '    --at) repo="$2"; shift 2 ;;',
-      '    --repo-root) repo="$2"; shift 2 ;;',
-      '    --feature) feature="$2"; shift 2 ;;',
       '    --output) output="$2"; shift 2 ;;',
       '    *) shift ;;',
       '  esac',
@@ -49,16 +48,13 @@ function writeStub(dir: string): string {
       '    [ -n "$output" ] && printf "stub prompt\\n" > "$output" || true',
       '    exit 0 ;;',
       '  audit-barrage)',
-      '    rd="${STUB_RUN_DIR:?STUB_RUN_DIR required}"',
+      '    rd="${STUB_RUN_DIR:?STUB_RUN_DIR required}-$$-${RANDOM}"',
       '    mkdir -p "$rd"',
-      '    printf "%s\\n" "$rd"',
-      '    exit 0 ;;',
-      '  audit-barrage-lift)',
-      '    log="${repo}/docs/1.0/001-IN-PROGRESS/${feature}/audit-log.md"',
       '    {',
-      '      printf "\\n## 2026-06-14 — audit-barrage lift (anchor-unification-stub)\\n\\n"',
-      '      printf "### Clean finding\\n\\nFinding-ID: AUDIT-20260614-99\\nStatus:     open\\nSeverity:   low\\nSurface:    spec.md:1\\n\\nBody.\\n"',
-      '    } >> "$log"',
+      '      printf "### Anchor stub finding\\n\\n"',
+      '      printf "Finding-ID: claude-01\\nStatus: open\\nSeverity: high\\nSurface: src/f0.ts:1\\n\\nBody.\\n"',
+      '    } > "$rd/model-stub.md"',
+      '    printf "%s\\n" "$rd"',
       '    exit 0 ;;',
       '  *) echo "stub-barrage: unknown verb $verb" >&2; exit 3 ;;',
       'esac',
@@ -78,6 +74,27 @@ describe('US4 — govern one-anchor unification under nesting (T023/T024)', () =
       seedDefaultFleetKnowledge(fixture.installationRoot);
       const auditLogRel = 'docs/1.0/001-IN-PROGRESS/feat/audit-log.md';
       fixture.writeInstallation(auditLogRel, '# Audit Log — feat\n');
+      // 030 US9: the whole-feature pipeline keys its convergence record by the
+      // roadmap node id, so the installation needs a node whose `spec:` names the
+      // feature dir (else resolveConvergenceItem FATALs — exit 2 — before the run).
+      fixture.writeInstallation(
+        'ROADMAP.md',
+        [
+          '---',
+          'doc-grammar: roadmap',
+          '---',
+          '',
+          '# Roadmap',
+          '',
+          '## impl:feature/feat',
+          '',
+          '- status: in-flight',
+          '- spec: docs/1.0/001-IN-PROGRESS/feat',
+          '',
+          'feat scope prose.',
+          '',
+        ].join('\n'),
+      );
       // Substantive source so the clone-step's jscpd run has real files.
       for (const n of [0, 1]) {
         const lines = Array.from({ length: 30 }, (_, i) => `export const v${n}_${i} = ${i} * ${n + 2};`);
@@ -116,10 +133,11 @@ describe('US4 — govern one-anchor unification under nesting (T023/T024)', () =
       // anchor failure, so only that is disqualifying here.
       expect(r.status, `stderr was:\n${r.stderr}`).not.toBe(2);
 
-      // (1) Lift anchored to the installation: its finding landed in the
-      // installation's audit-log, not anywhere in the outer tree.
+      // (1) Lift anchored to the installation: lift-once wrote its section + a
+      // fresh AUDIT-<date> finding into the installation's audit-log, not anywhere
+      // in the outer tree (the specific id is date-derived now, not hardcoded).
       const auditLog = readFileSync(join(fixture.installationRoot, auditLogRel), 'utf8');
-      expect(auditLog).toContain('AUDIT-20260614-99');
+      expect(auditLog).toMatch(/AUDIT-\d{8}-\d+/);
 
       // (2) One-anchor: the outer tree outside the installation is byte-identical
       // after the full run — no sub-step (payload, barrage, lift, slush, gate,
