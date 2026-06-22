@@ -1,0 +1,32 @@
+{
+  "name": "@stack-control/opencode-plugin",
+  "version": "0.1.0",
+  "description": "stack-control plugin for opencode - delegates to stackctl CLI",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "@types/node": "^22.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/jest": "^29.5.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "stack-control"
+  ],
+  "license": "MIT"
+}
