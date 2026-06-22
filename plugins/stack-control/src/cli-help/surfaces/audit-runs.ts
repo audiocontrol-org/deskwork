@@ -29,7 +29,8 @@ export const AUDIT_RUNS_VERBS: readonly MountedVerb[] = [
           'keep-last': 'keep the N newest run dirs; prune the rest',
           'older-than-days': 'prune run dirs older than this many days',
         },
-        positionalName: 'unused',
+        // No positionalName: both sub-actions declare positionals: 0, so none is
+        // ever rendered (omitting avoids a confusing literal in the surface decl).
       }),
     meta: { deprecatedAliasOf: null, subActionMediation: AUDIT_RUNS_MEDIATION },
   },

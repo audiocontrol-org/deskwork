@@ -34,8 +34,13 @@ function initRepo(): string {
 }
 
 let dir: string;
+// Extra tmp dirs (e.g. bare remotes) tracked so a failing assertion before an
+// inline rmSync can't leak them (AUDIT-BARRAGE-claude-03).
+let extraDirs: string[] = [];
 afterEach(() => {
   if (dir) rmSync(dir, { recursive: true, force: true });
+  for (const d of extraDirs) rmSync(d, { recursive: true, force: true });
+  extraDirs = [];
 });
 
 describe('resolveBase', () => {
@@ -126,8 +131,10 @@ describe('sessionBoundary', () => {
     commit(dir, 'c.txt', 'c');
     commit(dir, 'd.txt', 'd');
     commit(dir, 'e.txt', 'e');
-    // Reproduce the collapse: a fully-pushed upstream tracking HEAD.
+    // Reproduce the collapse: a fully-pushed upstream tracking HEAD. Tracked for
+    // cleanup so a failing assertion below can't leak the bare repo (claude-03).
     const remote = mkdtempSync(join(tmpdir(), 'sc-bare-'));
+    extraDirs.push(remote);
     git(remote, 'init', '-q', '--bare', '-b', 'main');
     git(dir, 'remote', 'add', 'origin', remote);
     git(dir, 'push', '-q', '-u', 'origin', 'main');
@@ -136,7 +143,6 @@ describe('sessionBoundary', () => {
     expect(boundary).toBe(prevSessionEnd);
     // The window now captures exactly this session's 3 commits.
     expect(git(dir, 'rev-list', '--count', `${boundary}..HEAD`)).toBe('3');
-    rmSync(remote, { recursive: true, force: true });
   });
 
   it('falls back to the base/HEAD~N heuristic when the journal has no commit history', () => {

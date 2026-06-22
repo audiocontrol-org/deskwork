@@ -13,7 +13,7 @@ import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveInstallation } from '../config/installation.js';
 import { InstallationError } from '../config/errors.js';
-import { parseRunDirTimestamp, selectForPrune } from '../audit-runs/prune.js';
+import { parseRunDirTimestamp, selectForPrune, type PruneOptions } from '../audit-runs/prune.js';
 import {
   failUsage,
   scanVerbFlags,
@@ -118,10 +118,18 @@ function emitPrune(flags: Flags): void {
   }
   const runsDir = resolveRunsDir(flags);
   const names = readRunDirNames(runsDir);
-  const opts =
-    keepLastRaw !== undefined
-      ? { keepLast: requireCount(keepLastRaw, '--keep-last'), now: new Date() }
-      : { olderThanDays: requireCount(olderRaw!, '--older-than-days'), now: new Date() };
+  // The exactly-one guard above guarantees one of these is defined; narrow with a
+  // branch (never a `!` non-null assertion — that is in the "never bypass typing"
+  // family per the project rules). The final fail-loud is unreachable but keeps
+  // `opts` provably assigned without an assertion.
+  let opts: PruneOptions;
+  if (keepLastRaw !== undefined) {
+    opts = { keepLast: requireCount(keepLastRaw, '--keep-last'), now: new Date() };
+  } else if (olderRaw !== undefined) {
+    opts = { olderThanDays: requireCount(olderRaw, '--older-than-days'), now: new Date() };
+  } else {
+    failUsage('audit-runs', 'prune requires EXACTLY ONE of --keep-last <n> or --older-than-days <t>');
+  }
   const { prune } = selectForPrune(names, opts);
 
   if (prune.length === 0) {
