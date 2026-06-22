@@ -80,6 +80,28 @@ function makeRepo(slug: string): string {
   mkdirSync(dir, { recursive: true });
   // Seed an audit-log so lift/slush/gate can resolve it.
   writeFileSync(join(dir, 'audit-log.md'), `# Audit Log — ${slug}\n`, 'utf8');
+  // 030 US9: implement mode keys its whole-feature convergence record by a roadmap
+  // node whose `spec:` names the feature dir (resolveConvergenceItem FATALs without
+  // one). Inert for the spec-mode tests, which never resolve a convergence item.
+  writeFileSync(
+    join(repo, 'ROADMAP.md'),
+    [
+      '---',
+      'doc-grammar: roadmap',
+      '---',
+      '',
+      '# Roadmap',
+      '',
+      `## impl:feature/${slug}`,
+      '',
+      '- status: in-flight',
+      `- spec: docs/1.0/001-IN-PROGRESS/${slug}`,
+      '',
+      `${slug} scope prose.`,
+      '',
+    ].join('\n'),
+    'utf8',
+  );
   return repo;
 }
 

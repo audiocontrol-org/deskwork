@@ -298,6 +298,26 @@ describe('US3/US4 — govern end-to-end: --at anchor, no cwd leak, backlog-store
         'docs/1.0/001-IN-PROGRESS/feat/audit-log.md',
         '# Audit Log — feat\n',
       );
+      // 030 US9: the whole-feature pipeline keys its convergence record by a roadmap
+      // node whose `spec:` names the feature dir.
+      fixture.writeInstallation(
+        'ROADMAP.md',
+        [
+          '---',
+          'doc-grammar: roadmap',
+          '---',
+          '',
+          '# Roadmap',
+          '',
+          '## impl:feature/feat',
+          '',
+          '- status: in-flight',
+          '- spec: docs/1.0/001-IN-PROGRESS/feat',
+          '',
+          'feat scope prose.',
+          '',
+        ].join('\n'),
+      );
       // Substantive source so the implement-mode clone step's jscpd run
       // analyzes real files (it writes no report over a trivial tree).
       for (const n of [0, 1]) {
@@ -332,7 +352,7 @@ describe('US3/US4 — govern end-to-end: --at anchor, no cwd leak, backlog-store
       const argsFile = join(fx, 'barrage-args.txt');
       const r = spawnSync(
         resolveTsx(),
-        [CLI, 'govern', '--mode', 'implement', '--feature', 'feat', '--at', fixture.installationRoot, '--diff-base', 'HEAD'],
+        [CLI, 'govern', '--mode', 'implement', '--feature', 'feat', '--at', fixture.installationRoot, '--diff-base', 'HEAD~1'],
         {
           encoding: 'utf8',
           cwd: fixture.outerRoot,
