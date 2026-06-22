@@ -221,8 +221,30 @@ export function scopeCommittedDiff(installationRoot: string, base: string, head:
   // byte-identical to the render's committed-diff arm, so the chunk scope it produces
   // matches the render's pathScope filter exactly. (Single-rooted repo: the installation
   // and the git toplevel coincide, so `--relative` is a no-op there.)
+  // Rename detection up front (`-M`), INDEPENDENT of the operator's diff.renames
+  // config (TASK-429 / TASK-47): a pure tree-move pairs as a single rename stanza
+  // instead of a full delete + full add. Without it, an endpoint diff across a
+  // relocation ships the whole file body twice → doubled bytes → oversized chunks.
+  const renamedNewToOld = new Map<string, string>(); // new path → old path
+  const renamedOldPaths = new Set<string>();
+  for (const line of lines(git(installationRoot, ['diff', '-M', '--relative', '--name-status', base, head]))) {
+    const m = /^R\d*\t(.+)\t(.+)$/.exec(line);
+    if (m && m[1] !== undefined && m[2] !== undefined) {
+      renamedNewToOld.set(m[2], m[1]);
+      renamedOldPaths.add(m[1]);
+    }
+  }
+
   for (const f of lines(git(installationRoot, ['diff', '--relative', '--name-only', base, head]))) {
-    fileDiffs.set(f, git(installationRoot, ['diff', '--relative', base, head, '--', f]));
+    if (renamedOldPaths.has(f)) continue; // OLD side of a rename — covered by the paired stanza
+    const old = renamedNewToOld.get(f);
+    // For a renamed NEW path, diff the pair under `-M` so it renders as a rename (body
+    // only for any content delta); otherwise the standard per-file diff.
+    const d =
+      old !== undefined
+        ? git(installationRoot, ['diff', '-M', '--relative', base, head, '--', old, f])
+        : git(installationRoot, ['diff', '--relative', base, head, '--', f]);
+    fileDiffs.set(f, d);
     files.push(f);
   }
 

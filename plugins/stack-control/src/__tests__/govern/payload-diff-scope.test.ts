@@ -202,6 +202,42 @@ describe('030 T021 — payload-diff-scope (FR-023)', () => {
   });
 });
 
+// TASK-429 (restores the rename-aware coverage deleted with assembleImplementPayload
+// in T085) — a pure tree-move within scope must PAIR as a rename, not emit a full
+// delete + full add. Without forced `-M` an endpoint diff across a relocation ships
+// the whole file body TWICE (doubled → oversized chunks), the exact TASK-47 failure.
+// The scope must NOT depend on the operator's diff.renames config — it forces -M.
+describe('030 — rename-aware committed-diff scoping (TASK-429 / TASK-47)', () => {
+  it('pairs an in-scope tree-move as a rename even when diff.renames=false', () => {
+    const repo = setup();
+    // A substantial, uniquely-marked file at the original path.
+    const body = `${Array.from({ length: 40 }, (_, i) => `export const RENAME_MARKER_${i} = ${i} * 7;`).join('\n')}\n`;
+    writeFileSync(join(repo, 'src/original.ts'), body);
+    commitAll(repo, 'feat: add original');
+    const base = head(repo);
+    // Pure tree-move (100% similarity), then disable git's default rename detection.
+    git(repo, 'mv', 'src/original.ts', 'src/relocated.ts');
+    commitAll(repo, 'refactor: relocate original -> relocated');
+    git(repo, 'config', 'diff.renames', 'false');
+    const h = head(repo);
+    try {
+      const scope = scopeCommittedDiff(repo, base, h);
+      const all = [...scope.fileDiffs.values()].join('\n');
+      // Paired as a rename: the diff carries the rename headers...
+      expect(all, 'tree-move must pair as a rename').toMatch(/rename from src\/original\.ts/);
+      expect(all).toMatch(/rename to src\/relocated\.ts/);
+      // ...and NOT the file body twice (a paired rename of unchanged content ships
+      // zero +/- body hunks; without -M the marker appears as both a - and a +).
+      expect(all, 'no doubled added body').not.toMatch(/^\+export const RENAME_MARKER_/m);
+      expect(all, 'no doubled deleted body').not.toMatch(/^-export const RENAME_MARKER_/m);
+      // The OLD path is not a separate full-deletion scoped entry.
+      expect(scope.files).not.toContain('src/original.ts');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
 // AUDIT-20260622-02 — the end-govern pipeline's scopeDiff dropped ALL payload
 // exclude paths: it called scopeCommittedDiff (no exclusion args) so spec docs,
 // contracts, and the feature's own audit-log flowed into the audited surface.
