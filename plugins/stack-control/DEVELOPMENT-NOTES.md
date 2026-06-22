@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-06-22: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 5
+  - spec(030-chunked-end-govern): extend with US9 — wire the pipeline (the unbuilt core) + dogfood defects
+  - chore(030-chunked-end-govern): capture 10 dogfood findings to the backlog
+  - fix(030-chunked-end-govern): partition errors fail loud, never silent whole-payload fallback
+  - fix(030-chunked-end-govern): default implement-mode diff base to the feature fork point, not HEAD~1
+  - fix(030-chunked-end-govern): partition measures the real diff — subdir + non-ASCII path bugs
+- Files changed: 18
+- Backlog touched: TASK-412, TASK-413, TASK-414, TASK-421
+
 ## 2026-06-21: 030 chunked-end-govern — implementation: full mechanism + clean break + CLI chunking (63/68, suite green)
 
 ### Feature: multi:feature/govern-whole-feature-chunked-payload (spec `030-chunked-end-govern`)

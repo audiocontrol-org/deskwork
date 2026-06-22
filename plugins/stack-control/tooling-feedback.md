@@ -110,3 +110,7 @@
 ## session-end 2026-06-21
 - Driving the full speckit authoring chain through the define front door required 6 separate front-door enter/exit brackets (one per /speckit-* step: specify, clarify, plan, checklist, tasks, analyze). A chain-level bracket for one define authoring session would cut the ceremony.
 - Setting the spec pointer on an EXISTING roadmap node is non-obvious: roadmap add --spec errors on the uniqueness invariant; the working verb is workflow link-spec (parallel to link-design). The define skill's node-exists branch does not instruct setting the spec pointer, so a node can stay spec-pointerless (TASK-244 class).
+
+## session-end 2026-06-22
+- 030 dogfood: the unit suite (2460 green) + a passing govern both masked that the feature's CORE (end-govern-pipeline) was never wired into the CLI — tests exercised the pipeline in isolation, never the CLI→pipeline seam, so 'victory' was declarable on an unbuilt mechanism. Need a CLI-drives-pipeline integration test as a ship gate.
+- Dev-time skill/engine skew: the cached /stack-control:execute + :extend skills (0.52.2) drive the OLD per-phase govern (govern --phase), which the post-030 source engine rejects — so the sanctioned execute front door cannot govern the very branch that deletes per-phase. Surfaced again this session.
