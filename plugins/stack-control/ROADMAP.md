@@ -520,7 +520,6 @@ Umbrella: make cross-model governance OPERABLE — converge reliably and stay ch
 
 ## multi:gap/govern-lift-auto-close-in-loop-fixes
 - status: planned
-- deferred-until: govern-whole-feature-chunked-payload lands; govern-at-end's single end reconciliation shrinks the in-loop lift balloon this targets — re-weigh then
 - part-of: multi:feature/govern-operability
 - ref: gh-490 / offing-ff761162
 Lift must auto-close findings fixed in-loop. 0.52.2's FR-016 cross-run signature dedup does NOT tame the backlog balloon when the audited artifact changes each round (distinct signature per round): the offing adopter's 9-round doc phase still lifted 42 To-Do tasks (TASK-132..173) for findings it fixed in-loop, forcing a hand-written bulk-close script. Fix: on a graduating (dampened/converged) govern, auto-close the feature's OPEN migrated-finding tasks whose signature is absent from the converged round (the in-loop fix landed -> resolved). Bounded+safe: fires only on graduation, closes only findings absent from the clean final round. Source: offing 0.52.2 dogfood ff761162 (2026-06-21); agent root-cause 'gh-490-not-fully-fixed: no auto-close of in-loop fixes'.
@@ -533,27 +532,27 @@ Lift must auto-close findings fixed in-loop. 0.52.2's FR-016 cross-run signature
 Documentation phases ring far longer than code. A 2-task doc phase (a README + ~40 lines of seam-contract comments) took 9 cross-model rounds to converge: the auditors kept finding wording corners on forward-looking contract prose ('near-infinite phrase-more-precisely surface'), amplified by out-of-window false-HIGHs and fix-induced channel growth. The shipped severity-determinism/dampener does not stop prose nitpicking. Fix, two levers: (a) a doc/prose-aware audit lens that, when the payload is predominantly markdown prose, flags only SUBSTANTIVE doc defects (factually wrong, contradicts code, missing required content, broken example/link) and suppresses wording/phrasing/style nits; (b) implement-mode diminishing-returns plateau auto-detect that surfaces an 'override recommended' verdict (findings shifting to wording altitude / fix-induced growth / oscillation) instead of grinding. Source: offing 0.52.2 dogfood ff761162 (2026-06-21).
 
 ## multi:gap/govern-hunkblocks-uncommitted-empty
-- status: planned
+- status: cancelled
 - deferred-until: govern-whole-feature-chunked-payload lands; govern-at-end audits committed work, so the per-phase staleness treadmill this targets is moot — re-weigh then
 - part-of: multi:feature/govern-operability
 - ref: offing-ff761162 / completes TASK-357
 Hunk-fingerprint freshness silently does not engage when govern audits UNCOMMITTED work. computePhaseHunkBlocks runs 'git diff <diffBase> HEAD -- <file>' (assumes the phase is committed, HEAD == tip). The natural adopter flow governs working-tree changes with --diff-base HEAD, so this becomes 'git diff HEAD HEAD' = EMPTY -> zero hunkBlocks -> the checkpoint falls back to whole-file/directory scopeFingerprint -> US7/TASK-357 hunk-freshness never engages -> every later phase that touches a sibling file in a shared governed directory re-stales ALL prior phases (the O(n^2) entanglement TASK-357 was meant to kill). Confirmed live: offing 0.52.2 (which HAS the TASK-357 path-relativity fix) phase-1 checkpoint had no hunkBlocks; Phase 2 adding files to tests/validate/ re-staled phase-1, forcing override-refresh. Fix: compute hunkBlocks against the WORKING TREE ('git diff <base> -- <file>', no HEAD) when the phase work is uncommitted, so hunkBlocks populate and freshness becomes sibling-immune. Completes TASK-357 for the uncommitted-work case. THE root of the staleness treadmill — highest-leverage. Source: offing ff761162 Phase 2 (2026-06-21).
 
 ## multi:gap/govern-boundary-too-large-normal-phase
-- status: planned
+- status: shipped
 - part-of: multi:feature/govern-whole-feature-chunked-payload
 - ref: offing-ff761162
 boundary-too-large FATALs a single NORMAL code phase before any barrage runs. offing Phase 2 (11 tasks) rendered 68360 prompt bytes vs the 65536 fleet envelope — only ~4% over — and govern FATALed with terminal-outcome=boundary-too-large, never auditing anything. The sanctioned recovery (re-shape the tasks.md phase boundary / split the phase) forces spec restructuring to satisfy the auditor's payload limit, and the escape is closed BOTH ways: per-phase blows the envelope here, and whole-feature-at-end (US6) also risks boundary-too-large (which is why per-phase exists). Fix options: chunk/stream the payload across the fleet (audit a large phase in sub-payloads), derive/raise the envelope per lane, or a deterministic payload-trim that drops non-audit-relevant bytes — so a normal-sized phase does not force tasks.md restructuring. Source: offing ff761162 Phase 2 (2026-06-21).
 
 ## multi:gap/govern-split-file-audit-exclusion
-- status: planned
+- status: cancelled
 - deferred-until: govern-whole-feature-chunked-payload lands; files are committed/tracked at end-govern, so the untracked-split exclusion vanishes — re-weigh then
 - part-of: multi:feature/govern-operability
 - ref: offing-ff761162 / TASK-263 class
 Size-cap-driven file splits are silently excluded from their own audit. To honor the 300-500-line file cap, offing's Phase 2 split validate-diff.sh -> validate-diff-ref.sh (164 lines of real pipeline logic). Because the split file is untracked AND not named in tasks.md, the per-phase payload scope (FR-006) excluded it: 'untracked file scripts/lib/validate-diff-ref.sh is outside the audit unit's path scope; excluding it from the folded payload.' So the file-size discipline and the govern-scope discipline are in DIRECT CONFLICT — splitting a file to satisfy one silently drops it from the other (it goes ungoverned). Fix: fold untracked NEW siblings of in-scope files (or new files referenced by the in-scope diff's imports/sources) into the per-phase payload, so a cap-driven split is still audited. Related to the shipped TASK-263/US5 payload-scoping but distinct (untracked-new-file case). Source: offing ff761162 Phase 2 (2026-06-21).
 
 ## multi:gap/govern-cheap-checkpoint-refresh
-- status: planned
+- status: cancelled
 - deferred-until: govern-whole-feature-chunked-payload lands; no per-phase checkpoints to refresh under govern-at-end — re-weigh then
 - part-of: multi:feature/govern-operability
 - ref: offing-ff761162
