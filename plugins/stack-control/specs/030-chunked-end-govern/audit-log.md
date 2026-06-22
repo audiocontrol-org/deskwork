@@ -270,3 +270,105 @@ Surface:    `src/document-model/chrome.ts:45-46`, `src/document-model/chrome.ts:
 The blast radius is high because this is another document-model scanner, not a cosmetic helper: a documented `<!-- doc-grammar: ... -->` example after an in-fence info-string line can be misread as a real embedded grammar declaration. A downstream user can hit false ambiguity or false grammar selection while the roadmap rewrite tests pass, because the new fixture only exercises `rewriteEdgeLine`.
 
 A reasonable fix is to make `findGrammarComments` track the same `{ char, length }` open-fence state used by `rewriteEdgeLine` and only close when `fence.char === openFence.char && fence.length >= openFence.length && fence.closeable`. Add a grammar-detection fixture mirroring `tests/roadmap/rewrite-fence-aware.test.ts:68-84` so the shared contract is pinned on both consumers.
+
+## 2026-06-22 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260622-17 — `degraded-fleet-surfaced` terminal outcome appears in quickstart.md but is absent from the data model and CLI contract
+
+Finding-ID: AUDIT-20260622-17 (claude-01 + claude-04 + claude-06 + codex-01; cross-model)
+Status:     fixed-50ef7947
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    specs/030-chunked-end-govern/quickstart.md (Edge-case probes section)
+
+The quickstart's "Lane outage mid-run" edge-case probe states: "the run does NOT fabricate a clean result — a clean-but-degraded final round reconciles to `degraded-fleet-surfaced` (a non-converged terminal), never `converged` (AUDIT-20260622-10)."
+
+`degraded-fleet-surfaced` does not appear in any of the following:
+- The `WholeFeatureConvergenceRecord.outcome` discriminated union in `data-model.md`: `'converged' | 'override-eligible' | 'round-cap-surfaced' | 'fix-failure-surfaced' | 'unresolvable-merge-surfaced'`
+- The terminal outcomes table in `contracts/govern-cli.md`
+- The formal `outcome` field in `spec.md`'s Key Entities description or the FR set
+
+The blast-radius is that an implementer building `end-govern-pipeline.ts` will write a `WholeFeatureConvergenceRecord` with the five defined outcome values and will have no valid bucket for the lane-outage case. The quickstart promises a specific terminal (`degraded-fleet-surfaced`) that no schema supports. Two wrong outcomes are then possible: (a) the run is recorded as `override-eligible` (the most natural fallback), but the quickstart says it should NOT converge — and `override-eligible` still allows `--override` graduation, which the quickstart implies should not happen on a degraded fleet; (b) the implementation adds a sixth outcome type not specified in the contract, causing the doctor rule (FR-021) to reject the record.
+
+The spec also says under US5: "a lane outage degrades that round per existing fleet-degradation behavior; the run does not fabricate a clean result" — but what the terminal outcome IS in that case is never stated in the FRs or data model. This is a specification hole, not merely a quickstart typo. A reasonable fix: add `'degraded-fleet-not-converged'` (or similar) to the `WholeFeatureConvergenceRecord.outcome` union and the CLI contract terminal-outcomes table, or explicitly state that lane outage maps to `override-eligible` with a degraded-fleet notation.
+
+---
+
+### AUDIT-20260622-18 — Implement override writes the retired record shape, so a green override does not open the impl gate
+
+Finding-ID: AUDIT-20260622-18
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/override-graduate.ts:53-65; src/govern/chunk-artifacts.ts:298-305; src/workflow/workflow-context.ts:41-47
+
+`maybeOverrideGraduate` routes both spec and implement overrides through `recordOverrideGraduation`, which writes via `recordGovernConvergence` at `override-graduate.ts:58-65`. That is the retired `GovernConvergenceRecord` shape. But the clean-break impl gate now reads `isImplFeatureConverged` (`workflow-context.ts:41-47`), which validates the file as a `WholeFeatureConvergenceRecord` and returns false for foreign-shaped records (`chunk-artifacts.ts:298-305`).
+
+Blast radius: an operator can run `stackctl govern --mode implement --override ...`, see exit 0 plus `terminal-outcome=graduated`, but `governing -> shipped` remains closed because the durable record is unreadable by the new gate. That reintroduces the exact CLI-success/durable-gate divergence the override path comments say it prevents. A reasonable fix is to make implement-mode override write the new whole-feature record shape with an override/accepted outcome the gate intentionally recognizes, or reject implement overrides until that shape exists.
+
+### AUDIT-20260622-19 — Seam pass declares required-shape detection but never implements it
+
+Finding-ID: AUDIT-20260622-19
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/govern/seam-pass.ts:113-131; src/govern/seam-pass.ts:187-197; src/govern/chunk-artifacts.ts:77-83
+
+The public seam finding schema includes `changed-required-shape` (`chunk-artifacts.ts:77-83`), and the seam-pass comments/spec say changed required shapes are substantive cross-boundary breaks. The implementation only parses exported function required-arity and declaration names (`seam-pass.ts:113-131`), then only emits `removed-export` or `changed-arity` (`seam-pass.ts:187-197`). For `export interface Options` or `export type Options = ...` changing from `{ a?: string }` to `{ a: string }`, both sides are parsed as `null`; the code treats that as a compatible touched signature and suppresses it.
+
+Blast radius: a chunk can add a new required object field consumed from another chunk, and the final seam backstop can still produce no findings, allowing a `converged` whole-feature record for a cross-boundary contract break. The fix should either implement required-shape comparison for exported interfaces/types or remove that promised finding kind from the contract and schema so downstream consumers do not rely on nonexistent coverage.
+
+### AUDIT-20260622-20 — Wrong variable name in `govern-orchestration.test.ts` ROADMAP.md fixture
+
+Finding-ID: AUDIT-20260622-20
+Status:     acknowledged-false-premise-20260622 (verified: makeRepo defines `const repo = mkdtempSync(...)` at line 72 as the temp root and `dir` as the feature subdir; join(repo, ROADMAP.md) is correct — barrage misread the scoping; full suite green)
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/__tests__/govern-orchestration.test.ts (the `makeRepo` function, around the newly-added `writeFileSync(join(repo, 'ROADMAP.md'), ...)` block)
+
+Inside `makeRepo(slug: string): string`, the temp directory created by `mkdtempSync` is bound to the local name `dir` — the unchanged existing code uses `join(dir, 'audit-log.md')` consistently. The new 030 US9 ROADMAP.md write, however, references `repo` rather than `dir`. `repo` is not declared anywhere in `makeRepo`; it would resolve either to a module-level or outer-scope variable (if one happens to exist with that name), or produce a ReferenceError. Either outcome is wrong: the roadmap fixture would land in the wrong directory (outside the temp repo) or the write would throw. The symptom at test-run time would be `resolveConvergenceItem` fatalling with exit 2 — making the orchestration tests fail for the wrong reason, or silently passing because `repo` happens to point at a previously-created temp dir from another test. The correct expression is `join(dir, 'ROADMAP.md')`. The same variable mismatch does NOT appear in `govern-terminal-outcomes.test.ts` (where `makeRepo` uses `repo` for its temp dir throughout), so this is an isolated copy-paste error in the orchestration file.
+
+---
+
+### AUDIT-20260622-21 — `render-fit-over-envelope.test.ts` verifies truncation using the untruncated manifest
+
+Finding-ID: AUDIT-20260622-21
+Status:     fixed-50ef7947
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/__tests__/govern/render-fit-over-envelope.test.ts:33–43 ("truncates a large manifest (elastic context) to fit rather than failing loud")
+
+The test calls `fitRenderedChunks([chunk], [bigManifest], diffs, envelope)` and then immediately calls `renderedByteLength({ chunk: fitted, manifest: bigManifest, ... })` — passing the **original, untruncated** `bigManifest` (20 other-chunks, each with two long path strings, well over the 120-byte envelope). If `fitRenderedChunks` creates a new truncated manifest object rather than mutating `bigManifest` in place (the expected behavior for a pure function — and the only API-sound behavior given the function returns `Chunk[]` not `Chunk[] + ChunkManifest[]`), then `renderedByteLength` with the original manifest would produce a size far larger than 120, and the assertion `expect(rendered).toBeLessThanOrEqual(envelope)` would FAIL. The only way this assertion can pass is if `fitRenderedChunks` mutates `bigManifest.otherChunks` in-place as a side effect. Such mutation is a surprising contract, is not documented in the comment, and would mean callers cannot safely hold references to manifests across a `fitRenderedChunks` call. The test appears to be verifying its desired invariant through an accidental implementation side-effect rather than through the returned surface. If the implementation is later changed to return truncated manifests (the more composable design), this test would silently start measuring the wrong thing and could pass even on a broken implementation. The fix is to destructure the returned manifests (or re-query via a `getManifest(fitted.id)` helper) and pass the fitted manifest to `renderedByteLength`.
+
+---
+
+### AUDIT-20260622-22 — CLI pipeline wiring test can pass on imports instead of actual wiring
+
+Finding-ID: AUDIT-20260622-22
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/__tests__/govern/cli-drives-pipeline.test.ts:36-46
+
+The new ship-gate test claims to prove that implement-mode “drives the pipeline” and persists the whole-feature convergence record, but it only concatenates source text and searches for `runEndGovern(` / `writeWholeFeatureConvergenceRecord(`. The persistence assertion is especially weak: an import, helper, dead branch, or unrelated mode path can satisfy the regex without proving the implement CLI path writes the record after the pipeline returns.
+
+Blast radius is high because this is the core US9 integration gate. A downstream change could leave the CLI unwired or move the call outside the implement path while this test still passes. A reasonable fix is to make this behavioral: run `govern --mode implement` against a fixture and assert exactly one whole-feature convergence record is written and that the stubbed barrage path is reached through `runEndGovern`.
+
+### AUDIT-20260622-23 — Empty chunk set can graduate without any audit
+
+Finding-ID: AUDIT-20260622-23
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/govern/end-govern-pipeline.ts:98-129, src/govern/end-govern-pipeline.ts:196-204
+
+`runEndGovern` partitions the scoped diff, but it never rejects an empty `scope.files` / empty `partition.chunks` result. When there are no chunks, `auditIds` is empty, `toAudit` is empty, `openFindings` stays empty, and the loop breaks as clean. The final outcome logic then treats `openFindings.length === 0 && seamResult.findings.length === 0` as `converged`.
+
+That means a bad diff base, an exclusion filter that removes the whole surface, or a feature with no scoped files can write a converged whole-feature record without firing any barrage at all. Blast radius is high because the workflow gate now trusts this record as the single implementation graduation signal. A reasonable fix is to fail loud before the audit loop when the scoped diff or partitioned chunk set is empty, with an error naming the base/head and any exclusions applied.
