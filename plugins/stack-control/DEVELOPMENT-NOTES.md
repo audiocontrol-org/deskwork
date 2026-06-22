@@ -2,21 +2,31 @@
 
 ---
 
-## 2026-06-22: <!-- session title -->
+## 2026-06-22: US9 close — T085 clean break COMPLETE; T086 protocol.ts decomposed (govern.ts split remains)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up the parked US9 remainder via the sanctioned `/stack-control:execute` path: **T085** (the per-phase → whole-feature clean break) + **T086** (decompose `govern.ts` + `protocol.ts` under the 500-line cap → make T077 green). Re-govern deferred until after T086 (don't re-govern mid-decomposition).
 
 **Accomplished:**
-- <!-- compose -->
+- **T085 COMPLETE** — the entire clean break, in committed increments, each verified green:
+  - Deleted 5 retired modules: `compose-convergence.ts`, `phase-checkpoint-status.ts`, `checkpoint-state.ts`, `hunk-fingerprint.ts` (dead per-phase freshness — zero live importers after checkpoint-state went), `payload-implement.ts`.
+  - Relocated the survivors: `computeScopeFingerprint`→`scope-fingerprint.ts`; audit lens/framing→`audit-constants.ts`; commit-subjects→`implementCommitSubjects` in `payload-diff-scope.ts`.
+  - Rewired every per-phase importer: `execute-check` (deleted the per-phase govern cadence), `capability-reconcile` (rewired to the gate's real signal `isImplFeatureConverged` keyed by `resolveConvergenceItem`), `redesign`/`workflow` (re-design no longer stales per-phase checkpoints), `govern.ts` (dropped the dead per-chunk `auditChunkPass` branch + the `phaseUnit` block + the `assembleImplementPayload` call; `buildImplementVars` now supplies only the audit metadata + commit-subjects).
+  - Migrated/deleted ~15 test files across BOTH `src/__tests__` and `tests/`; absence tests T027/T061 stay green.
+- **T086 partial** — `protocol.ts` 555→**498** (moved `GovernTerminalKind`/`GovernProtocolError`/`BarrageVars` to `govern-protocol-types.ts`, re-exported; circular-import-safe). `subcommands/govern.ts` (~1031) is now the **single remaining T077 RED**.
+- Suite green except that one file-size cap; tsc clean (modulo pre-existing `portable.ts`/TASK-389). 7 commits, all pushed.
 
 **Didn't Work:**
-- <!-- compose -->
+- **The `tests/` directory was a blind spot.** My initial importer greps scoped only `src`, so the first module-deletion commit broke `tests/govern/hunk-fingerprint.test.ts` + `tests/govern/payload-union.test.ts` (deleted-module load errors) and `tests/workflow/either-of-gate.test.ts` (the per-phase-fixture methods I'd removed). The full-suite run AFTER that commit caught it; re-grepped both trees and migrated/deleted them.
+- **`payload-implement.ts` was NOT "fully superseded"** as T063/the spec assumed — `buildImplementVars` still needed its commit-subjects, which the successor modules didn't provide. Deletion required extracting `implementCommitSubjects` (and using the tolerant `gitTry`, not the strict `git`, to preserve the old assembler's `|| true` non-git tolerance).
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Ran the FULL suite after each module-deletion increment rather than trusting `tsc` — `tsc` does not type-check the `tests/` tree, so only the runtime suite surfaced the per-phase coverage hiding there. tsc-green ≠ suite-green when deleting a widely-used module.
+- [PROCESS] Stopped before the `govern.ts` `runGovern` split (the last cap) rather than start a ~530-line shared-state extraction this deep into the session — a half-finished split leaves the tree RED, strictly worse than the clean green-except-one-cosmetic-cap boundary. Scoped the split precisely in `tasks.md` for a focused pass.
 
 **Insights:**
-- <!-- compose -->
+- A clean-break module deletion has a wider, less-predictable test blast radius than the *source* importer graph suggests: per-phase coverage was woven through both test roots AND into functions that were only "live" via the deleted module (`resolvePrePhaseDiffBase`, `hunk-fingerprint`) — dead once their sole caller went. Grep BOTH test trees + run the full suite; tsc is not enough.
+- "Fully superseded" in a spec is a hypothesis to verify per-export, not a fact — check each deleted module's exports for an actual successor (or re-home them) before deleting.
+- Re-homing a helper must preserve its *error-tolerance contract*, not just its signature — the strict-vs-tolerant git read was the difference between green and a non-git-fixture failure.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 7
