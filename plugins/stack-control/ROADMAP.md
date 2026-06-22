@@ -601,7 +601,7 @@ Folded-in roadmap gaps (now `part-of` this umbrella, defers cleared since 030 la
 - multi:gap/govern-doc-aware-audit-lens — orthogonal prose-nitpick lens
 
 ## multi:feature/bookkeeping-hardening
-- status: planned
+- status: shipped
 - part-of: multi:feature/lifecycle-industrialization
 Umbrella for the small gaps + bugs in stack-control's own bookkeeping tooling — the verbs and skills that maintain the project's records (the backlog store, the roadmap DAG curation, the session-end journal derivation, the node↔spec linkage, audit-run retention). These are defects in the EXISTING bookkeeping surface, complementary to the new mechanization features under the parent lifecycle-industrialization node. Detail lives in the backlog; this node is the work-breakdown. Surfaced + grouped during the 2026-06-22 backlog cleanup (docs/backlog-cleanup-review-2026-06-22.md).
 
