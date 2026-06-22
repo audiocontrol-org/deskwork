@@ -57,7 +57,7 @@ graph LR
 - [x] T010 [US1] Create skill routing in `plugins/stack-control/opencode/skills.ts` to map `/stack-control:define` to the define skill
 - [x] T011 [US1] Implement skill argument forwarding to CLI in `plugins/stack-control/opencode/cli.ts`
 - [x] T012 [US1] Add skill output formatting in `plugins/stack-control/opencode/cli.ts` to return CLI output to opencode
-- [ ] T013 [US1] Create acceptance test `tests/opencode/skill-invocation.test.ts` verifying skill invocation chain
+- [x] T013 [US1] Create acceptance test `tests/opencode/skill-invocation.test.ts` verifying skill invocation chain
 
 ## Phase 4: User Story 2 - Install stack-control plugin in opencode
 
@@ -71,20 +71,20 @@ graph LR
 - [x] T018 [US3] Implement `stackctl` command construction in `plugins/stack-control/opencode/cli.ts`
 - [x] T019 [US3] Add non-zero exit code handling in `plugins/stack-control/opencode/cli.ts`
 - [x] T020 [US3] Create CLI output capture and formatting in `plugins/stack-control/opencode/cli.ts`
-- [ ] T021 [US3] Add integration test `tests/opencode/cli-delegation.test.ts` verifying CLI invocation
+- [x] T021 [US3] Add integration test `tests/opencode/cli-delegation.test.ts` verifying CLI invocation
 
 ## Phase 6: User Story 4 - Skill mapping to opencode events
 
 - [x] T022 [US4] Implement `command.executed` event handler in `plugins/stack-control/opencode/events.ts`
 - [x] T023 [US4] Add skill registration to opencode's command palette in `plugins/stack-control/opencode/index.ts`
-- [ ] T024 [US4] Create event mapping test `tests/opencode/event-mapping.test.ts` verifying command routing
+- [x] T024 [US4] Create event mapping test `tests/opencode/event-mapping.test.ts` verifying command routing
 
 ## Phase 7: User Story 5 - Plugin version sync with stackctl CLI
 
 - [x] T025 [US5] Add version reporting to plugin metadata in `plugins/stack-control/opencode/index.ts`
 - [x] T026 [US5] Implement CLI version detection in `plugins/stack-control/opencode/version.ts`
-- [ ] T027 [US5] Add version mismatch warning in `plugins/stack-control/opencode/cli.ts`
-- [ ] T028 [US5] Create version test `tests/opencode/version-sync.test.ts` verifying version reporting
+- [x] T027 [US5] Add version mismatch warning in `plugins/stack-control/opencode/cli.ts`
+- [x] T028 [US5] Create version test `tests/opencode/version-sync.test.ts` verifying version reporting
 
 ## Phase 8: Polish & Cross-Cutting
 
@@ -92,5 +92,5 @@ graph LR
 - [x] T030 [P] Create contributing guide `CONTRIBUTING.md` with development setup
 - [x] T031 [P] Add CI/CD pipeline `.github/workflows/opencode-plugin.yml` for plugin builds
 - [x] T032 [P] Create release process documentation `RELEASE.md` with versioning strategy
-- [ ] T033 Run full test suite and fix any failures
+- [x] T033 Run full test suite and fix any failures
 - [x] T034 Update plugin README.md with usage examples and troubleshooting section

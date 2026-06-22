@@ -47,3 +47,20 @@ export function formatCLIOutput(result: CLIResult): string {
   }
   return formatCLIError(result);
 }
+
+export function checkVersionMismatch(pluginVersion: string, cliVersion: string | null): boolean {
+  if (!cliVersion || pluginVersion === 'unknown') {
+    return false;
+  }
+  return pluginVersion !== cliVersion;
+}
+
+export function formatVersionWarning(pluginVersion: string, cliVersion: string | null): string {
+  if (!cliVersion) {
+    return 'Warning: Could not determine stackctl CLI version';
+  }
+  if (pluginVersion !== cliVersion) {
+    return `Warning: Version mismatch - plugin v${pluginVersion}, CLI v${cliVersion}`;
+  }
+  return '';
+}
