@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-06-22: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 0
+  - (no commits this session)
+- Files changed: 0
+- Backlog touched: (none)
+
 ## 2026-06-22: T086 COMPLETE — govern.ts split under the 500-line cap (T077 green; US9 impl done)
 
 **Goal:** Finish the parked T086 remainder from the prior session — decompose `subcommands/govern.ts` (1038 lines, the single remaining T077 RED) under the 500-line cap. Pure file-size refactor, no behavior change. Closing the last cap completes US9 / feature 030's implementation.
