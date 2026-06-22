@@ -23,12 +23,6 @@ import { readFileSync } from 'node:fs';
 import { resolveTsx, CLI } from '../../src/__tests__/_run-helpers.js';
 import { seedDefaultFleetKnowledge } from '../../src/__tests__/_isolation-harness.js';
 import { tmpBacklog } from '../backlog/helpers.js';
-import {
-  checkpointPath,
-  computeScopeFingerprint,
-  readPhaseCheckpoint,
-  writePhaseCheckpoint,
-} from '../../src/govern/checkpoint-state.js';
 import { readGovernConvergenceRecord } from '../../src/govern/convergence-record.js';
 
 // A barrage stub that TOUCHES a marker the moment ANY verb is invoked. The
