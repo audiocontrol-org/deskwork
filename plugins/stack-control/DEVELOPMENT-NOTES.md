@@ -2,27 +2,35 @@
 
 ---
 
-## 2026-06-22: <!-- session title -->
+## 2026-06-22: T086 COMPLETE — govern.ts split under the 500-line cap (T077 green; US9 impl done)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Finish the parked T086 remainder from the prior session — decompose `subcommands/govern.ts` (1038 lines, the single remaining T077 RED) under the 500-line cap. Pure file-size refactor, no behavior change. Closing the last cap completes US9 / feature 030's implementation.
 
 **Accomplished:**
-- <!-- compose -->
+- **T086 COMPLETE.** `subcommands/govern.ts` 1038 → **333**, via the exact decomposition scoped in `tasks.md`:
+  - `govern/govern-vars.ts` (**363**, new) — the flag grammar + env/flag helpers + `BarrageVars` builders (`parseFlags`/`pick`/`resolveBarrageBin`/`tail`/`resolveAuditLogExcerpt`/`resolveSpecPath`/`formatScopeExclusionSummary`/`buildImplementVars`/`buildSpecVars`/`resolveGovernExcludePaths`/`resolveGovernFeatureRoot`/`preflightNegotiatedFleet`/`resolveCeiling`/`USAGE`/`GovernFlags`/`PLUGIN_ROOT`).
+  - `govern/govern-arms.ts` (**474**, new) — `runGovern`'s three arms (`maybeOverrideGraduate`, `runImplementArm`, `runSpecArm`) + `emitTerminalOutcome` + the `GovernRunContext` shared-locals object. Each arm takes an explicit context object; bodies moved verbatim and still run inside `runGovern`'s try/catch (they throw the same `GovernProtocolError`/`GovernPayloadError`, caught by the orchestrator).
+  - `runGovern` keeps the preamble + feature-slug resolution + shared-context assembly + arm dispatch + the outer try/catch.
+- **Importers repointed:** 3 symbol tests (`govern-audit-lens`, `govern-audit-log-excerpt`, `payload-exclusion`) → `govern-vars.js`; the 2 source-introspection tests (`cli-drives-pipeline`, `composition-bugs-gone`) now read the **combined command surface** (`govern.ts` + `govern-arms.ts`) so their wiring assertions follow the code, not the file.
+- **Verified:** full suite green (374 files / **2466 tests**), T077 green (all three files ≤ 500), tsc clean modulo the pre-existing `portable.ts` (TASK-389). 1 commit (`f019cbcc`), pushed. **US9 / feature 030 implementation is now complete.**
 
 **Didn't Work:**
-- <!-- compose -->
+- **`tsc` is not the gate — the source-introspection tests are.** tsc passed immediately, but the full suite surfaced 3 failures in 2 brittle text-grep tests (`cli-drives-pipeline`, `composition-bugs-gone`) that assert the implement-arm wiring (`runEndGovern`/`writeWholeFeatureConvergenceRecord` calls, `scopeCommittedDiff`/`partitionDiff` comments) lives *in `govern.ts`* — but that arm body moved to `govern-arms.ts`. Same lesson as last session: run the full suite, never trust tsc alone.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Greped EVERY importer of the moved symbols across BOTH test trees *before* moving code (last session's blind-spot lesson applied up front) — caught the 3 symbol tests + 2 source-introspection tests in one pass; no surprise breakage after commit.
 
 **Insights:**
-- <!-- compose -->
+- A decomposition that splits a command across N files quietly breaks any test that greps a *single* file's source text for a symbol. The fix is to make the test read the **command surface** (the concat of the decomposed files), not weaken the assertion — the intent ("the govern command drives the pipeline / has no composition surface") is unchanged; only its physical location moved.
+- Extracting `process.exit`-ing arm bodies into separate functions is behavior-preserving precisely because `process.exit` returns `never`: TS still narrows correctly, the arms inherit the orchestrator's try/catch when called inside it, and the implement-arm-always-exits / spec-arm-falls-through control flow is identical to the inline version.
+
+**Next session:** the deferred whole-feature re-govern — `./bin/stackctl govern --mode implement --item multi:feature/govern-whole-feature-chunked-payload` (the `after_implement` cross-model barrage over the whole 030 diff; the ultimate dogfood of 030's own chunked end-govern pipeline). Parked deliberately this session per the operator.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 1
   - refactor(030-chunked-end-govern): T086 — split govern.ts under the 500-line cap (T077 green)
 - Files changed: 9
-- Backlog touched: TASK-389
+- Backlog touched: TASK-389 (referenced in the commit message as a pre-existing, unrelated caveat — NOT addressed this session; no status transition)
 
 ## 2026-06-22: US9 close — T085 clean break COMPLETE; T086 protocol.ts decomposed (govern.ts split remains)
 
