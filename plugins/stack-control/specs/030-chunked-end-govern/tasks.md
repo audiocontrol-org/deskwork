@@ -254,6 +254,42 @@ description: "Task list for Chunked whole-feature end-govern"
 
 ---
 
+## Phase 12: User Story 9 - Wire the end-govern pipeline as the CLI's single path (Priority: P1)
+
+**Goal**: Make the authored-but-unwired `end-govern-pipeline` the implement-mode CLI's actual execution path, delivering FR-008/009/012/015/016 at the CLI, and fix the dogfood-surfaced defects at their root (one record, one lift, rendered-byte sizing, full coverage, scoped checkpoint, standard untracked diff, seam arity). Discovered by dogfooding the 245-file feature diff on this branch (Clarifications § Session 2026-06-21 dogfood).
+
+**Independent Test**: Drive implement-mode govern over a >envelope multi-chunk fixture; assert one `WholeFeatureConvergenceRecord` + one lift section, the gate reads that record, no chunk renders over-envelope, union(chunk files)==changed set, and the per-chunk `runProtocol` loop is gone from `govern.ts`.
+
+> Note: this phase SUPERSEDES the still-open per-phase deletions (T031/T033/T034) and the decomposition tasks (T062/T063/T064) — they are completed AS PART of T085/T086 below (one clean break, not a separate pass). T062's RED test was marked done but never written; T077 writes it.
+
+### Tests for User Story 9 (RED first — watch each FAIL for the stated reason) ⚠️
+
+- [ ] T069 [P] [US9] RED: `src/__tests__/govern/cli-drives-pipeline.test.ts` — a >envelope multi-chunk implement-mode CLI run writes exactly ONE `WholeFeatureConvergenceRecord` and ONE audit-log lift section (not one-per-chunk), and `govern.ts` source contains no per-chunk `runProtocol` invocation loop (FR-024/026, SC-008); FAIL while the CLI loops `runProtocol`.
+- [ ] T070 [P] [US9] RED: `src/__tests__/workflow/gate-reads-pipeline-record.test.ts` — after a converged pipeline run, `isModeConverged`/`implRecordConverged` reads the pipeline's `WholeFeatureConvergenceRecord`; the divergent implement-mode `GovernConvergenceRecord` read path is absent (FR-025, SC-008); FAIL while the gate reads the old record.
+- [ ] T071 [P] [US9] RED: `src/govern/cluster-payload/__tests__/rendered-byte-sizing.test.ts` — a chunk whose RAW diff ≤ envelope but whose RENDERED payload (preamble+trailer+framing+folded deps) > envelope is split so no chunk renders over-envelope (FR-027, SC-009); FAIL while sizing measures raw bytes.
+- [ ] T072 [P] [US9] RED: `src/govern/cluster-payload/__tests__/coverage-through-trim.test.ts` — union(chunk files)==changed set including non-audit-trimmed files; an all-non-audit oversized cluster yields no dangling `SplitClusterMarker` (subChunkIds ≥ 2 or none) (FR-028, SC-010); FAIL while trim drops files / emits empty markers.
+- [ ] T073 [P] [US9] RED: `src/govern/__tests__/fix-newfile-reaudit.test.ts` — a fix that creates a NEW file assigns it to a chunk for re-audit through the wired pipeline, never dropped (FR-007); FAIL until wired.
+- [ ] T074 [P] [US9] RED: `src/__tests__/govern/checkpoint-mode-scope.test.ts` — `GOVERN_CHECKPOINT`/`--checkpoint` is REJECTED in implement mode and ACCEPTED in spec mode (FR-029); FAIL while rejection fires for all modes.
+- [ ] T075 [P] [US9] RED: extend `payload-diff-scope.test.ts` — the untracked-fold renders a `git diff --no-index` standard diff, not a synthetic `+`-line format (FR-030); FAIL while it synthesizes `+`-lines.
+- [ ] T076 [P] [US9] RED: `src/govern/__tests__/seam-arity.test.ts` — the seam-pass signature comparison counts arity correctly for a function-typed parameter (its inner parens do not terminate the scan) (FR-031); FAIL while the regex stops at the first `)`.
+- [ ] T077 [P] [US9] RED: `src/govern/__tests__/file-line-cap.test.ts` — the MISSING T062 test: assert every feature-touched source file (incl. `govern.ts` + the `payload-implement.ts` successors) is ≤500 lines (SC-007, FR-022); FAIL while `govern.ts` (985) / `payload-implement.ts` (801) are over-cap.
+
+### Implementation for User Story 9
+
+- [ ] T078 [US9] Render-aware sizing: measure rendered payload bytes (preamble+trailer+per-file framing+FR-021 folded deps) in the partition/bin-pack envelope check; make T071 pass. (FR-027)
+- [ ] T079 [US9] Coverage-preserving trim: a trimmed file stays covered in exactly one chunk (bytes excluded from measure/render, file retained); eliminate the empty/dangling `SplitClusterMarker`; the render honors the same trim; make T072 pass. (FR-028)
+- [ ] T080 [US9] Untracked-fold renders `git diff --no-index` (matching the render arm), not synthetic `+`-lines; make T075 pass. (FR-030)
+- [ ] T081 [US9] Seam-pass arity: skip balanced inner parens (function-typed params) when scanning a signature; make T076 pass. (FR-031)
+- [ ] T082 [US9] Scope `GOVERN_CHECKPOINT`/`--checkpoint` rejection to implement mode only (spec mode keeps its label); make T074 pass. (FR-029)
+- [ ] T083 [US9] Unify the convergence record: the pipeline's `WholeFeatureConvergenceRecord` IS what the gate reads; delete the implement-mode `GovernConvergenceRecord` read path; make T070 pass. (FR-025)
+- [ ] T084 [US9] WIRE the CLI: replace the per-chunk `runProtocol` loop in `govern.ts` with a single `runEndGovern` drive — `auditOne` → the barrage fire/render, `runFix` → fix-fanout, `canMerge` → merge-serialize — reconcile-once → ONE lift; make T069/T073 pass. (FR-024/026, FR-007)
+- [ ] T085 [US9] Clean break: delete the per-phase modules + the reused per-chunk path — `compose-convergence`, `phase-checkpoint-status`, `checkpoint-state` per-phase arms, the per-phase compass/workflow transitions, `resolvePhaseCheckpointStatuses`/`assertPriorPhaseCheckpointsCurrent`/`featureCheckpointKey`/`carriedFilesForComposition`/`compositionExcludePaths`, and `payload-implement.ts` once superseded; repoint importers; completes T031/T033/T034 + T063; keep the absence tests (T027/T061) green. (FR-017/019/023)
+- [ ] T086 [US9] Decompose `govern.ts` and the `payload-implement.ts` successors under the 500-line cap (completes T064); make T077 pass. (FR-022, SC-007)
+
+**Checkpoint**: the CLI drives the pipeline; one record / one lift / one dampener run; rendered-byte chunking; full coverage with no dangling markers; clean break complete; no over-cap file. US9 retires the unwired-core gap.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

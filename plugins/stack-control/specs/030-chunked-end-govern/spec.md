@@ -29,6 +29,15 @@ The actors are the **operator** (runs `govern` / `execute` and owns graduation) 
 - Q: What backstops termination if a coupling cycle keeps the touched set from shrinking? → A: **Hard max-round cap as a backstop** — the shrinking touched-set + dampener is the norm; on hitting the cap, STOP and surface for operator override (never loop forever).
 - Q: What does the seam pass count as a substantive contract break (vs a compatible change it must not flag)? → A: **Cross-boundary breakage only** — removed/renamed exported symbol, changed arity, or changed required shape consumed across a chunk boundary; ignore compatible additions and internal-only changes.
 
+### Session 2026-06-21 (dogfood gap discovery)
+
+Dogfooding the whole-feature end-govern on this very branch (the 245-file feature diff) proved the **core mechanism was authored but never wired**: the implement-mode CLI ships a `runProtocol`-per-chunk stand-in, while `end-govern-pipeline.ts` (cluster → audit → fix → re-audit → seam → reconcile-once → one `WholeFeatureConvergenceRecord`) sits unreferenced. Consequently FR-008 (parallel audit), FR-009 (worktree fix-fanout), FR-012 (coupling-correct touched-set re-audit), FR-015 (reconcile once), and FR-016 (close-before-lift) are **not delivered at the CLI** — they exist only inside the unwired object. This session captures the wiring + the surfaced defects as the missing scope (US9 + FR-024…FR-031, SC-008…SC-010); none is a deferred follow-up.
+
+- Q: Does the implement-mode CLI drive `end-govern-pipeline`, or the reused per-chunk `runProtocol` loop? → A: **The pipeline is the single path** — the CLI MUST drive `runEndGovern`; the per-chunk `runProtocol` loop is deleted (clean break, FR-020 discipline).
+- Q: Which convergence record does the graduate gate read after wiring? → A: **One record** — the pipeline's `WholeFeatureConvergenceRecord` IS what the gate reads; the divergent implement-mode `GovernConvergenceRecord` read path is removed (FR-015 made real, no second schema).
+- Q: Does chunk sizing measure the raw diff or the rendered payload? → A: **Rendered payload** — sizing MUST account for the context preamble/trailer, per-file framing, and FR-021 folded out-of-window deps, so no chunk renders over-envelope (raw-byte measure was the dogfood's over-envelope-single-barrage bug).
+- Q: When the non-audit trim drops a file's bytes, is the file still covered? → A: **Yes, always covered** — the trim reduces measured/rendered bytes, never coverage; the render honors the same trim so coverage doesn't re-bloat the payload; an all-non-audit cluster yields no dangling `SplitClusterMarker`.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Whole-feature audit never FATALs on size (Priority: P1)
@@ -160,6 +169,24 @@ Building the chunking mechanism decomposes `payload-implement.ts` (over the 300�
 
 ---
 
+### User Story 9 - The CLI drives the end-govern pipeline (the wired core) (Priority: P1)
+
+The implement-mode `govern` CLI **drives `end-govern-pipeline.runEndGovern`** as its single execution path — cluster → (audit → fix → re-audit)\* bounded → seam → reconcile-once → one whole-feature convergence record — instead of looping the reused per-chunk `runProtocol`. This is what makes FR-008/009/012/015/016 real at the CLI rather than dead code in an unreferenced module, and it dissolves the dogfood-surfaced defects (per-chunk lift sections, raw-byte sizing, coverage holes, divergent record schema) at their root rather than patching the reused path.
+
+**Why this priority**: P1 — this IS the feature. Without it the headline mechanism (parallel chunked audit + autonomous fix + reconcile-once) ships as an unwired object and the CLI silently audits a single over-envelope payload. Discovered only by dogfooding because the unit tests exercised the pipeline in isolation, never the CLI→pipeline seam.
+
+**Independent Test**: Drive the implement-mode CLI over a >envelope multi-chunk fixture; assert it invokes the pipeline (one `WholeFeatureConvergenceRecord` written, exactly one lift section / one dampener "run"), that the graduate gate reads that record, that no chunk's *rendered* payload exceeds the envelope, and that the per-chunk `runProtocol` loop is gone from `govern.ts`.
+
+**Acceptance Scenarios**:
+
+1. **Given** a feature diff that partitions into N>1 chunks, **When** implement-mode govern runs, **Then** the CLI drives `runEndGovern` once and writes exactly one whole-feature convergence record and one lift section (not N).
+2. **Given** that record, **When** the graduate gate evaluates `implRecordConverged`, **Then** it reads the pipeline's `WholeFeatureConvergenceRecord` (one schema, one path; the divergent `GovernConvergenceRecord` read path for implement mode is gone).
+3. **Given** a chunk whose raw diff is ≤ envelope but whose *rendered* payload (preamble + framing + folded deps) would exceed it, **When** the partition sizes it, **Then** sizing uses rendered bytes and the chunk does not render over-envelope.
+4. **Given** an oversized cluster containing non-audit (trimmed) files, **When** it is chunked, **Then** every changed file remains covered (union of chunk files == changed set), the render honors the same trim, and no dangling `SplitClusterMarker` is produced.
+5. **Given** `govern.ts` after wiring, **When** its source is inspected, **Then** the per-chunk `runProtocol` invocation loop and the implement-mode `GovernConvergenceRecord` read path are deleted (clean break).
+
+---
+
 ### Edge Cases
 
 - **Empty / below-envelope feature diff**: a small feature whose whole diff fits one chunk governs as a single chunk (chunking is a no-op partition of size 1) — no special-case FATAL, no empty-payload error.
@@ -211,6 +238,17 @@ Building the chunking mechanism decomposes `payload-implement.ts` (over the 300�
 - **FR-022**: `payload-implement.ts` and any other touched file MUST be brought within the 300–500-line cap (Constitution Principle VI) as part of building the chunking modules.
 - **FR-023**: The broken exclusion-based whole-feature composition path MUST be replaced by the inclusion-based chunked path (no empty `diffScope.files`, no unscoped commit subjects, no ignored checkpoint env, no dead re-audit branch).
 
+#### Wired pipeline + dogfood-surfaced defects (US9)
+
+- **FR-024**: The implement-mode `govern` CLI MUST drive `end-govern-pipeline.runEndGovern` as its single execution path. The reused per-chunk `runProtocol` invocation loop MUST be deleted (clean break, no fallback arm) so FR-008 (parallel audit), FR-009 (worktree fix-fanout), FR-012 (touched-set re-audit), FR-015 (reconcile once), and FR-016 (close-before-lift) are delivered by the CLI, not merely present in an unreferenced module.
+- **FR-025**: The graduate gate MUST read the SAME convergence record the pipeline writes — the `WholeFeatureConvergenceRecord` IS the record `isModeConverged`/`implRecordConverged` evaluates. The divergent implement-mode `GovernConvergenceRecord` read path MUST be removed (one schema, one path; FR-015 made real).
+- **FR-026**: A chunked govern invocation MUST reconcile once into exactly ONE lift section and count as exactly ONE dampener "run" — never one lift/run per chunk. The N-quiet / consecutive-clean streak MUST count govern invocations, not chunks.
+- **FR-027**: Chunk sizing MUST measure the RENDERED payload bytes — the context preamble/trailer, per-file framing, and the FR-021-folded out-of-window dependencies — not the raw per-file diff bytes. No chunk's rendered payload may exceed the active fleet envelope (the raw-byte measure permitted an over-envelope single barrage — the dogfood's headline defect).
+- **FR-028**: The coverage invariant (the union of all chunk files equals the `governedSha`..HEAD changed-file set) MUST hold THROUGH the non-audit trim: a trimmed file's bytes are excluded from measurement/render but the file remains covered in exactly one chunk, and the render MUST honor the same trim so re-adding the file for coverage does not re-bloat the payload. An all-non-audit oversized cluster MUST NOT produce a dangling `SplitClusterMarker` (a marker MUST reference ≥2 real sub-chunks, or no marker is written).
+- **FR-029**: `GOVERN_CHECKPOINT` / `--checkpoint` rejection MUST be implement-mode-scoped — spec mode retains its checkpoint-label selection; only implement mode rejects them (the clean break removed per-phase checkpoints from implement mode only).
+- **FR-030**: The committed-diff scope's untracked-file fold MUST render a standard git diff (`git diff --no-index`), not a synthetic per-line `+`-prefixed format, matching the render arm so the audit lane sees consistent diff syntax.
+- **FR-031**: The seam-pass signature comparison MUST count parameter arity correctly when a parameter is itself function-typed (its own parentheses MUST NOT terminate the signature scan), so higher-order signatures are not mis-rated.
+
 ### Key Entities
 
 - **Chunk**: an envelope-sized audit unit — a set of coupled files (or sub-split files) with a stable id, carrying the cross-cutting manifest.
@@ -232,6 +270,9 @@ Building the chunking mechanism decomposes `payload-implement.ts` (over the 300�
 - **SC-005**: Findings fixed within the re-audit loop appear as open backlog tasks at graduation in **0%** of cases (the lift balloon for in-loop fixes is eliminated for end-govern).
 - **SC-006**: Every new on-disk artifact is rejected by `doctor` when malformed (100% of seeded-corruption cases flagged).
 - **SC-007**: No source file touched by the feature exceeds the 500-line cap.
+- **SC-008**: After wiring, the implement-mode CLI drives the pipeline — `govern.ts` contains **0** per-chunk `runProtocol` invocations and **0** implement-mode `GovernConvergenceRecord` reads; a multi-chunk invocation writes exactly **1** `WholeFeatureConvergenceRecord` and exactly **1** lift section, and the graduate gate reads that record.
+- **SC-009**: Across the test matrix, **0** chunks render a payload exceeding the active fleet envelope (sizing measured on rendered bytes, not raw diff).
+- **SC-010**: On every fixture — including non-audit-trim and oversized-cluster cases — the union of all chunk files equals the changed-file set (no file dropped) and **0** dangling `SplitClusterMarker`s are produced.
 
 ## Assumptions
 
