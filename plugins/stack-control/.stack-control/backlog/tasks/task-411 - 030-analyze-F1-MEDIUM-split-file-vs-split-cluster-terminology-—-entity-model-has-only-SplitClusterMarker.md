@@ -3,9 +3,10 @@ id: TASK-411
 title: >-
   030 analyze F1 (MEDIUM): split-file vs split-cluster terminology — entity
   model has only SplitClusterMarker
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-21 17:57'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

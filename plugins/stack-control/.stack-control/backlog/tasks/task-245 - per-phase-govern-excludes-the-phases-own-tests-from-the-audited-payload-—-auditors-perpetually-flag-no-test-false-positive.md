@@ -3,9 +3,10 @@ id: TASK-245
 title: >-
   per-phase govern excludes the phase's own tests from the audited payload —
   auditors perpetually flag 'no test' (false positive)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-18 23:37'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:bug'

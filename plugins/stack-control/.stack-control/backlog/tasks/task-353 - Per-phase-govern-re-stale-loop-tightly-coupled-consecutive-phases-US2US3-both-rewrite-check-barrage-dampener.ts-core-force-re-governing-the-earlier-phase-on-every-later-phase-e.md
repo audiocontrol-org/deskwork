@@ -6,10 +6,10 @@ title: >-
   phase on every later-phase edit to the shared region; US7 hunk-fingerprints
   don't help (same-region = FR-027). Need a co-govern/batch-graduate path for
   coupled phases.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 10:39'
-updated_date: '2026-06-20 10:39'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

@@ -3,10 +3,10 @@ id: TASK-70
 title: >-
   stackctl per-phase govern scoping is unsound when tasks.md lacks authoritative
   file lists
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 01:39'
-updated_date: '2026-06-14 01:54'
+updated_date: '2026-06-22 17:24'
 labels:
   - 'type:imported-issue'
   - bug

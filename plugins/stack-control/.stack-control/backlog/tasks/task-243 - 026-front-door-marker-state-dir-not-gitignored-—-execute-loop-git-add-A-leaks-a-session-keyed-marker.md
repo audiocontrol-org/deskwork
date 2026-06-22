@@ -16,5 +16,5 @@ ordinal: 243000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-plugins/stack-control/.stack-control/state/front-door/ is not covered by any gitignore. The execute (027) per-phase boundary commit uses git add -A, which sweeps the session marker into the commit; a stale marker 57b16bd2-...json is already tracked from a prior session. Fixed forward in 027 Phase 1 by adding **/.stack-control/state/ to the repo-root .gitignore; the already-tracked stale marker still needs a git rm --cached cleanup (not done in the Phase 1 scope commit).
+Re-scoped 2026-06-22: gitignore half DONE (**/.stack-control/state/ at root .gitignore:168). Surviving work: git ls-files shows state/front-door/57b16bd2-...json still tracked — run git rm --cached plugins/stack-control/.stack-control/state/front-door/57b16bd2-*.json (and any other tracked marker files) to complete the cleanup.
 <!-- SECTION:DESCRIPTION:END -->

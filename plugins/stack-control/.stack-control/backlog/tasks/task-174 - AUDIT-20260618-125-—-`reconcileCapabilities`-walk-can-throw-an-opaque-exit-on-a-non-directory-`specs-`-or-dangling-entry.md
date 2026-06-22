@@ -3,9 +3,10 @@ id: TASK-174
 title: >-
   AUDIT-20260618-125 — `reconcileCapabilities` walk can throw an opaque exit on
   a non-directory `specs/` or dangling entry
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-18 05:33'
+updated_date: '2026-06-22 17:24'
 labels:
   - 'type:migrated-finding'
   - 'feature:026-capability-interface-mediation'

@@ -3,9 +3,10 @@ id: TASK-72
 title: >-
   Retire roadmap and insight capture in favor of backlog as the single system of
   record
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 01:47'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

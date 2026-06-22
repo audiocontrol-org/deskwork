@@ -1,9 +1,10 @@
 ---
 id: TASK-416
 title: GOVERN_CHECKPOINT rejection fires for all modes including spec
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-22 00:06'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:bug'

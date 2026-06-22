@@ -3,9 +3,10 @@ id: TASK-59
 title: >-
   stack-control: session-end auto-derives 'Commits: 0' on long-lived branches —
   boundary resolution fails silently, inverting the never-fabricate guarantee
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-12 06:26'
+updated_date: '2026-06-22 17:24'
 labels:
   - 'type:imported-issue'
 dependencies: []

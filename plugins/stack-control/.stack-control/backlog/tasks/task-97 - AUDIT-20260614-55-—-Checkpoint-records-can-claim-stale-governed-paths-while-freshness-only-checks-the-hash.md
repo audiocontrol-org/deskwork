@@ -3,9 +3,10 @@ id: TASK-97
 title: >-
   AUDIT-20260614-55 — Checkpoint records can claim stale governed paths while
   freshness only checks the hash
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 18:32'
+updated_date: '2026-06-22 17:24'
 labels:
   - 'type:migrated-finding'
   - 'feature:audit-protocol-friction-burndown'

@@ -3,9 +3,10 @@ id: TASK-295
 title: >-
   govern clone-step is TypeScript-only — fatally blocks per-phase governance on
   non-TS (Bash/PHP/WordPress) adopter codebases
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-19 05:05'
+updated_date: '2026-06-22 17:24'
 labels:
   - 'type:imported-issue'
   - bug

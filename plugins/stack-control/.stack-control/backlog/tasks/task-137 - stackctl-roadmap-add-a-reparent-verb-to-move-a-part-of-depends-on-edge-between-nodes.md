@@ -3,10 +3,10 @@ id: TASK-137
 title: >-
   stackctl roadmap: add a reparent verb to move a part-of / depends-on edge
   between nodes
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-15 21:45'
-updated_date: '2026-06-15 21:47'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

@@ -3,9 +3,10 @@ id: TASK-147
 title: >-
   session-start skill quotes a source-repo-only path
   (plugins/stack-control/bin/stackctl) that 404s in host installs
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-16 23:37'
+updated_date: '2026-06-22 17:24'
 labels:
   - 'type:imported-issue'
   - bug

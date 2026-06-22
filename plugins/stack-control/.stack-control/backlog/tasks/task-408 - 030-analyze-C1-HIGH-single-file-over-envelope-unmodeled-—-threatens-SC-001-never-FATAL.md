@@ -3,9 +3,10 @@ id: TASK-408
 title: >-
   030 analyze C1 (HIGH): single-file-over-envelope unmodeled — threatens SC-001
   never-FATAL
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-21 17:57'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

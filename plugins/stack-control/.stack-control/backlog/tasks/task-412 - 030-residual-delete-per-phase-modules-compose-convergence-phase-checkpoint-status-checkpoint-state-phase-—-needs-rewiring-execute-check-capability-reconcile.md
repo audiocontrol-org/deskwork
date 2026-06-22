@@ -4,9 +4,10 @@ title: >-
   030 residual: delete per-phase modules (compose-convergence,
   phase-checkpoint-status, checkpoint-state phase) — needs rewiring
   execute-check + capability-reconcile
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-21 20:45'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

@@ -1,9 +1,10 @@
 ---
 id: TASK-144
 title: Pay down 023 terminal-closure govern debt — graduate to shipped
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-16 15:51'
+updated_date: '2026-06-22 17:24'
 labels:
   - agent-found
   - 'type:gap'

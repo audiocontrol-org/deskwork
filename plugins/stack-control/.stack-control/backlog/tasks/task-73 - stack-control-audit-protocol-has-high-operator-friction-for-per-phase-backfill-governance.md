@@ -3,10 +3,10 @@ id: TASK-73
 title: >-
   stack-control audit protocol has high operator friction for per-phase backfill
   governance
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-14 02:14'
-updated_date: '2026-06-14 02:14'
+updated_date: '2026-06-22 17:24'
 labels:
   - 'type:imported-issue'
   - promoted
