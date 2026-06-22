@@ -2,21 +2,24 @@
 
 ---
 
-## 2026-06-22: <!-- session title -->
+## 2026-06-22 (late): bookkeeping-hardening verified in v0.53.1 + umbrella shipped (paperwork close-out)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Operator released v0.53.1 (containing this session's bookkeeping-hardening work) and asked to validate the installed release and close out the relevant paperwork. A short close-out tail after the main session + the first session-end.
 
 **Accomplished:**
-- <!-- compose -->
+- **Validated the 6 fixes against the formally-installed v0.53.1 release** (bare `stackctl` = cache, the adopter surface): `audit-runs list|prune` ships and works (296 dirs / 115.6 MB; prune would free 96.8 MB; mutual-exclusion guard exits 2); `backlog done` persists `Closed: <reason>` to the task notes on disk (self-demonstrating — TASK-297's own closure note is present); session-end's journal anchor surfaced 9 progressed items (the TASK-39 bug reported 0); `check-front-door` = 64 ops OK. This satisfies the issue-closure discipline (verified in a formally-installed release), so the 13 closures are now release-backed.
+- **Advanced the umbrella roadmap node** `multi:feature/bookkeeping-hardening` `planned → shipped`; `roadmap reconcile` clean (0 drift / 0 orphan / 0 unresolved).
 
 **Didn't Work:**
-- <!-- compose -->
+- Nothing this increment.
 
 **Course Corrections:**
-- <!-- compose -->
+- None. Straight validate-then-close-out, as asked.
 
 **Insights:**
-- <!-- compose -->
+- **The release closed the discipline loop the "close all 13 now" call had left open.** Closing the backlog items mid-session rested on commits + tests; v0.53.1 then made them genuinely *release-verified* — the proper bar. The paperwork (node → shipped) was honest to defer until a real install existed, then cheap to finish.
+- **Validate on the installed cache, not source.** The adopter-meaningful check is what `claude plugin install` delivers (bare `stackctl` = v0.53.1), not `./bin/stackctl` (source) — packaging is UX.
+- Noted (unrelated): `/reload-plugins` reported 1 load error; the `audit-runs` skill loaded fine, so it's not from this work — flagged for a `/doctor` look.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 1
