@@ -88,7 +88,7 @@ The new test locks this in by proving a local repo with no remote can record `st
 ### AUDIT-20260623-06 — The off-rail backstop is only wired into compass/close, not the mutating `workflow advance` path
 
 Finding-ID: AUDIT-20260623-06
-Status:     open
+Status:     fixed-f1f7f98e
 Severity:   high
 Per-lane:   codex=high
 Decision:   single-model (gate-counted high)
