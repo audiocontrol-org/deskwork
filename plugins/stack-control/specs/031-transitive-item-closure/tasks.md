@@ -79,17 +79,17 @@ C, G, H.
 **Goal**: No validation criterion on any stage; no `tasks.md`-resident validation
 task governance waits on. **Independent test**: quickstart Scenario H.
 
-- [ ] T033 [P] [US4] RED: test the install-agnostic invariant — no phase (incl. `closed`) carries a post-install/release validation entrance criterion in `src/workflow/__tests__/install-agnostic.test.ts`
-- [ ] T034 [US4] Confirm/assert (no new criterion added) the invariant holds across `WORKFLOW.md` + `gate-eval`; document the structural deadlock-absence in the contract (GREEN T033)
-- [ ] T035 [P] [US4] RED: test that an installation with no release step reaches `closed` with nothing blocking (fixture with no install config) in `src/workflow/__tests__/closed-no-install.test.ts`
+- [X] T033 [P] [US4] RED: test the install-agnostic invariant — no phase (incl. `closed`) carries a post-install/release validation entrance criterion in `src/__tests__/workflow/install-agnostic.test.ts` (landed under the collected `src/__tests__/**` root, per the prior-phase tests/** placement deviation)
+- [X] T034 [US4] Confirm/assert (no new criterion added) the invariant holds across `WORKFLOW.md` + `gate-eval`; document the structural deadlock-absence in the contract (GREEN T033) — invariant held WITHOUT changes: `closed` has empty entrance/exit, `CRITERION_KINDS`/`DERIVE_KINDS` carry no validation-of-publish kind, and the deadlock-absence is documented in the test header (cites FR-017/FR-018)
+- [X] T035 [P] [US4] RED: test that an installation with no release step reaches `closed` with nothing blocking (fixture with no install config) in `src/__tests__/workflow/closed-no-install.test.ts` (landed under the collected `src/__tests__/**` root)
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T036 [P] Add `--help` text for `close-related --cascade`, `resolves`, `advance --to closed` (uniform with sibling verbs)
-- [ ] T037 [P] Verify every new/changed file ≤ 500 lines (SC-derived; refactor if any exceeds) across the feature's source files
+- [X] T036 [P] Add `--help` text for `close-related --cascade`, `resolves`, `advance --to closed` (uniform with sibling verbs) — all three already rendered correctly (`--cascade` on close-related, `--add`/`--remove` on resolves, `closed` in advance's `--to` vocabulary, grammar-sourced/non-drift); added a focused help-surface test asserting `advance --help` names `closed`
+- [X] T037 [P] Verify every new/changed file ≤ 500 lines (SC-derived; refactor if any exceeds) across the feature's source files — every feature source + test file ≤ 500 (largest source `roadmap.ts` 499; largest test `phase-derivation-by-name.test.ts` 149); no refactor needed
 - [ ] T038 OQ-4: add the operator-facing close surface — a `/stack-control:close` skill body (or release-tail wiring) that drives `advance --to closed` with the dry-run/confirm and the self-hosting "validate the installed plugin" prompt (skill body + verb, never a git hook); update `check-front-door` if a new fronted op is added
 - [ ] T039 Run the quickstart scenarios A–H end-to-end against a fixture installation and record results (maps SC-001..SC-007)
-- [ ] T040 [P] Update `templates/WORKFLOW.md` + any `--help`/skill docs that describe the lifecycle to mention the `closed` terminal phase (no rot-prone version specifics)
+- [X] T040 [P] Update `templates/WORKFLOW.md` + any `--help`/skill docs that describe the lifecycle to mention the `closed` terminal phase (no rot-prone version specifics) — WORKFLOW.md already defines `phase:closed` (no change); the only drifted lifecycle-describing artifact was the `DEFAULT_PHASES` reference constant in `workflow-types.ts` (its doc-comment claims it mirrors the WORKFLOW.md default but it omitted `closed`) — added `closed` + a doc-comment note. No operator-facing skill/help enumerates the chain ending at `shipped`; the only full-chain enumerations are backward-looking design records under `docs/superpowers/specs/` (the 031 record already shows `shipped → closed`), which the documentation rule permits to describe history.
 
 ## Dependencies & order
 

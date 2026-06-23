@@ -11,7 +11,11 @@
  */
 export type PhaseId = string;
 
-/** The canonical bundled lifecycle phase ids (the `templates/WORKFLOW.md` default). */
+/**
+ * The canonical bundled lifecycle phase ids (the `templates/WORKFLOW.md` default).
+ * `closed` is the post-ship TERMINAL phase (031) — `shipped` is no longer the end of
+ * the lifecycle; the operator-confirmed `advance --to closed` is the final move.
+ */
 export const DEFAULT_PHASES = [
   'captured',
   'planned',
@@ -20,6 +24,7 @@ export const DEFAULT_PHASES = [
   'implementing',
   'governing',
   'shipped',
+  'closed',
 ] as const;
 
 /**

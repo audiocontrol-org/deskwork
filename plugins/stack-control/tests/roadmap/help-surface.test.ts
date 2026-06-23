@@ -66,3 +66,16 @@ describe('027 T007 — advance/add --help surface the status vocabulary (CHK014)
     }
   });
 });
+
+describe('031 T036 — advance --help surfaces the post-ship terminal `closed` target', () => {
+  it('advance --help names `closed` in the --to status vocabulary (the terminal advance)', () => {
+    // The post-ship terminal advance (`advance --to closed`) is discoverable on the
+    // same surface as every other status — uniform with sibling --to targets, sourced
+    // from the governed grammar (non-drift). A regression that dropped `closed` from
+    // the vocabulary would fail here.
+    expect(roadmapStatusVocabulary()).toContain('closed');
+    const r = runCli(['roadmap', 'advance', '--help']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('closed');
+  });
+});
