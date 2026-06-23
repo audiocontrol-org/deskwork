@@ -151,3 +151,49 @@ Surface:    src/subcommands/backlog.ts:180-193, src/subcommands/backlog.ts:381-3
 The new preflight validates that a parent-node target exists before `backlog done` or `promote` mutates the backlog, but it does not prove the later roadmap write will succeed. `emitDone` preflights, closes the backlog id, then calls `emitAutoBackLink`; `emitAutoBackLink` computes and commits the roadmap mutation afterward. If `commitCandidate` fails because the roadmap became invalid, unwritable, or concurrently changed, the task is already `Done` and exits fail-loud but unlinked. `promote --apply` has the same shape: promotion is recorded before `setParentNode`/`emitAutoBackLink` write the roadmap link.
 
 The blast radius is high because this is the exact class of state split the auto-backlink feature is meant to remove: later transitive closure only reads recorded `closes:` ids, so a Done/promoted task that failed to back-link can be omitted from the cascade. A reasonable fix should exercise and handle the commit-failure channel, not just unknown-node preflight: either make the backlink write happen with rollback semantics around the backlog mutation, or record a durable repairable pending-link state that the close cascade refuses or surfaces loudly.
+
+## 2026-06-23 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260623-10 — SKILL.md "Re-running is safe" is false when the cascade fails after the roadmap write
+
+Finding-ID: AUDIT-20260623-10
+Status:     fixed-b350d1b2
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=reachable, fix-debt=no; no down-calibration signal — high retained. FIXED 2026-06-23 (b350d1b2) — close SKILL.md Step 4 + Notes now document close-related --cascade --apply as the recovery for a partial close after the status write (re-running advance is refused by the shipped precondition).
+Surface:    skills/close/SKILL.md (Step 4, final sentence)
+
+Step 4 of the `/stack-control:close` skill says:
+
+> This runs the cascade (closes the deduped subtree ids; already-closed ids are reported as no-ops; idempotent) **and** advances the item's status to the terminal `closed`. Re-running is safe.
+
+This claim is accurate only when the entire operation succeeds or fails *before* any writes. In `emitAdvanceClosed` (`src/subcommands/roadmap-advance-closed.ts`, lines ~65–105), the roadmap status write happens first:
+
+```typescript
+advance(docPath, id, CLOSED_STATUS, opts, true);          // roadmap: shipped → closed
+process.stdout.write(`roadmap advance ${id}: advanced to ${CLOSED_STATUS}\n`);
+applyCascade(plan, backend);                               // close backlog ids
+```
+
+If `applyCascade` fails mid-cascade—a transient backlog error, a concurrent deletion, a disk fault—the item's roadmap status is already `closed` but some backlog IDs remain open. The operator follows the SKILL.md's "Re-running is safe" and retries `stackctl roadmap advance <id> --to closed --apply`. They immediately hit the precondition check:
+
+> `advance: '<id>' is 'closed', not 'shipped' — 'closed' is reachable only from 'shipped'`
+
+The correct recovery is `stackctl roadmap close-related <id> --cascade --apply` (documented in the code comment at `roadmap-advance-closed.ts:72–79` but absent from the SKILL.md). The Notes section mentions `close-related --cascade` only as a "mid-cleanup" tool, not as the recovery surface for this failure mode. An operator following the skill to the letter has no obvious path forward.
+
+Blast-radius reasoning: the partial-failure scenario is reachable via any transient I/O error or concurrent store mutation during the cascade. An operator who encounters it and trusts "Re-running is safe" will be stuck with an item in `closed` state and a set of open backlog IDs with no guidance surfaced anywhere in the operator-facing artifact. The fix is a sentence in Step 4 and the Notes section: if the command succeeds up to "advanced to closed" but then fails, use `close-related --cascade --apply` to complete the cascade; `advance --to closed --apply` cannot be re-run after the status write.
+
+---
+
+### AUDIT-20260623-11 — `promote --node` writes `closes:` before promote preflight validates the ids
+
+Finding-ID: AUDIT-20260623-11
+Status:     fixed-b2511794
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high); FIXED 2026-06-23 (b2511794) — emitPromote now runs promote(apply:false) (the all-or-nothing batch validation) BEFORE the roadmap back-link write, then promote(apply:true); a bad batch is rejected before any closes: write. RED test: promote of a missing id with --node leaves closes: clean.
+Surface:    src/subcommands/backlog.ts:385-388; src/backlog/promote.ts:180-206
+
+`emitPromote` now runs `emitAutoBackLink(backend, id, process.cwd(), node)` for every id before calling `promote(...)`. But `promote()` is where the existing all-or-nothing preflight lives: duplicate ids are rejected at lines 181-189, missing ids at 193-200, and already-promoted ids at 201-205. Because the new roadmap mutation happens first, `backlog promote MISSING --to tasks:x --node multi:feature/n --apply` can add `MISSING` to the roadmap node’s `closes:` set and only then fail when `promote()` discovers the backlog item does not exist. Duplicate or already-promoted ids have the same write-before-refusal shape.
+
+That breaks the existing promote contract documented in `src/backlog/promote.ts:167-170`: the whole batch is validated before any write. The blast radius is high because an adopter can end up with a roadmap `closes:` entry for an item that was not promoted, or does not exist at all, and the later transitive close path treats recorded ids as authoritative. A reasonable fix is to preserve promote’s validation-before-write boundary by moving the validation into a reusable preflight, calling `promote(..., apply:false)` or equivalent before any auto-back-link write, or teaching `emitAutoBackLink` to validate the backlog id exists before mutating the roadmap when invoked with an explicit `--node`.
