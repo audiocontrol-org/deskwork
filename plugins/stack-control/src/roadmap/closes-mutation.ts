@@ -21,6 +21,7 @@
 import { loadDocument, type LoadOptions } from '../document-model/document.js';
 import { findUnit } from '../document-model/mutations-core.js';
 import { DocumentModelError, type GovernableDocument, type Unit } from '../document-model/types.js';
+import { fenceDelimiter } from '../document-model/chrome.js';
 import { reassemble, rewriteEdgeLine, unitBodyLines } from './mutations.js';
 
 const STATUS_LINE = /^\s*[-*]\s+status\s*:/i;
@@ -93,10 +94,30 @@ function insertClosesLine(body: readonly string[], value: string): string[] {
   return out;
 }
 
-/** Drop the `- closes:` line entirely (used when the set becomes empty). */
+/**
+ * Drop the REAL `- closes:` field bullet (used when the set becomes empty) —
+ * FENCE-AWARE (AUDIT-20260623-05). A `- closes:` line inside a fenced code block
+ * is a documented example, NOT the field; removing it would be silent content
+ * corruption. Mirrors the fence model of `rewriteEdgeLine` / `scopeOf` (shared
+ * `fenceDelimiter`: a closing fence is the same char with a run length >= the
+ * opener), so the reader and both writers scope a node body identically.
+ */
 function dropClosesLine(body: readonly string[]): string[] {
   const lineRe = new RegExp(`^\\s*[-*]\\s+${CLOSES_FIELD}\\s*:`, 'i');
-  return body.filter((line) => !lineRe.test(line));
+  let openFence: { readonly char: '`' | '~'; readonly length: number } | null = null;
+  const out: string[] = [];
+  for (const line of body) {
+    const fence = fenceDelimiter(line);
+    if (fence !== null) {
+      if (openFence === null) openFence = fence;
+      else if (fence.char === openFence.char && fence.length >= openFence.length && fence.closeable) openFence = null;
+      out.push(line); // a fence delimiter line is kept verbatim
+      continue;
+    }
+    if (openFence === null && lineRe.test(line)) continue; // the REAL field bullet → drop
+    out.push(line); // inside a fence (documented example) OR not a closes line → keep
+  }
+  return out;
 }
 
 /**

@@ -51,6 +51,26 @@ describe('031 closes-mutation engine (T017)', () => {
     expect(result.text).not.toContain('closes:');
   });
 
+  it('dropping the last id is FENCE-AWARE — keeps a fenced `- closes:` example, drops only the real bullet (AUDIT-20260623-05)', () => {
+    const doc = writeTempRoadmap([
+      '## multi:feature/n',
+      '- status: shipped',
+      '- closes: TASK-1',
+      '',
+      'A documented example in this node body:',
+      '',
+      '```yaml',
+      '- closes: TASK-EXAMPLE',
+      '```',
+    ]);
+    const result = computeCloses(doc, 'multi:feature/n', { remove: ['TASK-1'] }, ROADMAP_OPTS);
+    expect(result.after).toEqual([]); // the real recorded set emptied
+    // The fenced example bullet MUST survive (no silent content corruption)…
+    expect(result.text).toContain('- closes: TASK-EXAMPLE');
+    // …and the real field bullet is gone.
+    expect(result.text).not.toContain('- closes: TASK-1');
+  });
+
   it('adding an already-present id is a no-op (after === before, reported not error)', () => {
     const doc = writeClosureRoadmap([{ id: 'multi:feature/n', status: 'shipped', closes: ['TASK-7'] }]);
     const result = computeCloses(doc, 'multi:feature/n', { add: ['TASK-7'] }, ROADMAP_OPTS);
