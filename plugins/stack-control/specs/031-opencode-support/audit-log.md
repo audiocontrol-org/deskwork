@@ -2678,3 +2678,91 @@ Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:77-81`, `p
 US4 says registered skills are handled by opencode’s command palette, while unregistered `/stack-control:` commands fall through to an event listener. FR-002 requires registering `define`, `extend`, `execute`, `workflow`, and `roadmap`; FR-008 also says the plugin must map `/stack-control:` prefixed commands to the appropriate skill and return an unknown-command error for unknown commands. The spec never states whether the event listener must ignore already-registered commands, whether registered command execution also flows through the same router, or which path owns errors and output formatting.
 
 The blast radius is medium because a reasonable builder would probably infer one shared router, but the written promises allow duplicate or divergent handling for the five primary commands versus fallback commands. That can produce inconsistent argument parsing, version warnings, or error formatting depending on how the command was invoked. A reasonable fix would state the user-facing invariant: registered and fallback invocations of the same `/stack-control:<verb>` command produce the same behavior, or explicitly define the split.
+
+## 2026-06-23 — audit-barrage lift (20260623T034804763Z-031-opencode-support-after_clarify)
+
+Code-sha: 18f9d8420bc6365569d0730ee4c8685502f62590
+### AUDIT-20260623-151 — Missing FR for working-directory / CWD promise
+
+Finding-ID: AUDIT-20260623-151
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US1 AS2, US3 AS1, Assumptions section, FR-003
+
+The spec makes a consistent, explicit promise that CLI invocations use "the opencode session's active project/workspace as the working directory / working context" — stated in US1 AS2, US3 AS1, and the Assumptions section. This is a load-bearing user-facing commitment: it determines which `stackctl` configuration and project context is used, and getting it wrong means governance runs against the wrong project.
+
+However, none of the Functional Requirements encode this promise. FR-003 reads: "The plugin MUST delegate skill execution to the `stackctl` CLI via the shell API, except for `/stack-control:version`." It says nothing about CWD. The remaining FRs (FR-004 through FR-012) also omit it.
+
+An unattended agent building only from the FRs — the natural authoritative surface for implementation — would implement shell delegation with no specified CWD, defaulting to whatever the runtime provides (opencode's own install directory, the user's home directory, or wherever the shell spawns). The correct behavior is specified only in the User Stories and Assumptions, neither of which is a mandatory requirement surface. The blast radius is high: wrong CWD means `stackctl` silently operates on the wrong project, with no user-visible error, and the spec provides no mechanism for the plugin to detect the mistake.
+
+A reasonable fix: add an FR of the form "The plugin MUST invoke `stackctl` with the opencode session's active project/workspace as the working directory for all CLI delegations." This lifts the promise from assumption-land into an enforceable requirement.
+
+---
+
+### AUDIT-20260623-152 — FR-008 routing rule does not account for the /stack-control:version third category
+
+Finding-ID: AUDIT-20260623-152 (claude-02 + claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=high, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-002 note, FR-008, Key Entities note, US4 AS1
+
+FR-008 establishes a binary routing rule: `/stack-control:` prefixed commands map to "the appropriate skill," and unknown commands produce an "unknown stack-control command" error. FR-002's note and the Key Entities section introduce a third category — `/stack-control:version` is "routed but not a registered skill" — but FR-008's routing rule is never updated to accommodate it.
+
+The binary as written by FR-008: either the command is registered (and reaches the command palette), or it is unknown (and errors). `/stack-control:version` is explicitly neither: it is unregistered per FR-002 and Key Entities, and it is explicitly known (it has a defined behavior under FR-011 and US5). An unattended builder following FR-008 literally confronts a fork: classify `/stack-control:version` as an unknown command (triggering "unknown stack-control command" error, breaking FR-011 and US5 entirely), or treat it as registered (contradicting FR-002 and the Key Entities note). Neither reading is correct, and the spec provides no rule to resolve the fork.
+
+US4 AS1 addresses this partially ("When the command starts with `/stack-control:` and is not registered, Then the plugin routes it to the appropriate skill"), but US4 AS1 is an acceptance scenario, not a functional requirement, and it still does not explain how the router distinguishes "unregistered but known" (`version`) from "unregistered and unknown" (a typo like `/stack-control:frobnicate`). The routing decision rule — how the event handler knows which unregistered commands are handled vs. errored — is absent from the FRs.
+
+A reasonable fix: amend FR-008 to explicitly name the three-way routing split: (1) registered commands → command palette, (2) unregistered but explicitly-handled commands (list them, at minimum `version`) → their respective handlers, (3) unknown commands → error.
+
+---
+
+### AUDIT-20260623-153 — FR-010 "loaded from" phrasing contradicts the single-load-path promise in FR-009
+
+Finding-ID: AUDIT-20260623-153
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-009, FR-010, US2 Note
+
+FR-009: "The plugin MUST load from `.opencode/plugins/stack-control.ts`." FR-010: "The plugin MUST export a default function that can be **loaded from** `node_modules/@stack-control/opencode-plugin` for npm package installation."
+
+The phrase "can be loaded from `node_modules/…`" in FR-010 reads naturally as "opencode may load the plugin directly from the npm package path," which contradicts FR-009's requirement that loading happens from `.opencode/plugins/stack-control.ts`. The US2 Note clarifies the intended design — npm installation requires the user to create `.opencode/plugins/stack-control.ts` that imports from the npm package, so FR-009's load path is always satisfied — but the Note is not a requirement, and FR-010 as written says the plugin "MUST" be loadable from the npm path. Under the literal reading, an implementer providing direct npm-path loading (bypassing FR-009's required path entirely) would satisfy FR-010 while violating FR-009.
+
+The blast radius is medium because the US2 Note does disambiguate the intended design for a careful reader, and the more natural plugin-ecosystem interpretation (one canonical file that may import from elsewhere) is available. However, an agent building from FRs alone would have two contradictory MUST-level requirements and no rule to resolve the conflict.
+
+A reasonable fix: rewrite FR-010 to reflect the actual invariant — "The plugin MUST export a default function such that `.opencode/plugins/stack-control.ts` may either contain the plugin implementation directly or import it from `node_modules/@stack-control/opencode-plugin`" — making FR-009 the load-path invariant and FR-010 the export-compatibility invariant without contradiction.
+
+---
+
+### AUDIT-20260623-154 — FR-012 does not specify warning frequency for version mismatch
+
+Finding-ID: AUDIT-20260623-154
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-012, US5 AS2
+
+FR-012: "The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked." US5 AS2: "Given CLI version differs from plugin version, When user runs a skill, Then a warning is displayed about version mismatch."
+
+Neither FR-012 nor AS2 specifies whether the warning fires on every skill invocation while a mismatch exists, or once per session, or once per opencode restart. "When a skill is invoked" taken literally means every invocation emits a warning — which would produce warning spam throughout every session where the user has not yet resolved the version gap, likely causing users to dismiss the warning without reading it. A once-per-session design is friendlier but equally valid under the current wording.
+
+The blast radius is low because both implementations satisfy the letter of the spec and both deliver the core user-facing value (the user sees the warning). The failure mode — per-invocation spam degrading the signal value of the warning — is real but not a correctness defect. A reasonable fix: add a qualifier such as "once per session" or "at most once per opencode process lifecycle" to FR-012.
+
+### AUDIT-20260623-155 — Version-sync story promises matching versions, but requirements only promise mismatch warnings
+
+Finding-ID: AUDIT-20260623-155
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:85-99,126,164
+
+User Story 5 says the plugin version “should match” the `stackctl` CLI version to avoid compatibility issues. The concrete requirements do not require matching versions; FR-012 only requires detecting a mismatch and warning users, and the assumptions say users manually resolve mismatches.
+
+The blast radius is medium because this is P3 and the requirements mostly guide a builder toward the warning behavior. Still, the user story overpromises a compatibility guarantee that the measurable behavior does not deliver. A reasonable fix would reframe the story as “version mismatch visibility” or add an explicit requirement that plugin and CLI release/package versions are kept aligned.

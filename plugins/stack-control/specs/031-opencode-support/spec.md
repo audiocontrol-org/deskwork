@@ -96,7 +96,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 2. **Given** CLI version differs from plugin version, **When** user runs a skill, **Then** a warning is displayed about version mismatch
 3. **Given** user runs `/stack-control:version` and `stackctl --version`, **When** both commands are invoked, **Then** both versions are displayed for comparison
 
-Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. CLI version detection happens silently for mismatch warnings on skill invocation. Users who need to verify alignment must compare the plugin version (from `/stack-control:version`) to the CLI version (from `stackctl --version`).
+Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. CLI version detection happens silently for mismatch warnings on skill invocation. Users who need to verify alignment must compare the plugin version (from `/stack-control:version`) to the CLI version (from `stackctl --version`). The spec does not require matching versions; it only requires mismatch visibility.
 
 ---
 
@@ -138,7 +138,7 @@ Note: `/stack-control:version` is a routed command, not a registered skill. It i
 
 ### Measurable Outcomes
 
-- **SC-001**: Users can install the stack-control plugin by copying `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts` and invoke `/stack-control:define` within 5 minutes of first opening opencode
+- **SC-001**: Users can install the stack-control plugin by copying `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts` and invoke `/stack-control:define --help` within 5 minutes of first opening opencode
 - **SC-002**: Plugin successfully delegates all five listed happy-path skill invocations to the CLI without errors (`/stack-control:define --help`, `/stack-control:extend --help`, `/stack-control:execute --help`, `/stack-control:workflow --help`, `/stack-control:roadmap --help`)
 - **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI
 - **SC-004**: Plugin works with opencode 1.0 (tested against opencode 1.0; future compatibility depends on opencode's plugin API stability)
