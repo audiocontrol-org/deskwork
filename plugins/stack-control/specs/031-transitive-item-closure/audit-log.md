@@ -89,3 +89,31 @@ Surface:    src/roadmap/closes-mutation.ts:96-110
 `dropClosesLine()` removes every body line matching `- closes:` with a raw filter. Unlike the rewrite path, it is not fence-aware, so `roadmap resolves <node> --remove <last-id> --apply` will delete fenced code examples inside that node body if they contain a `- closes:` line. The test at `tests/roadmap/closes-mutation.test.ts:82-95` only covers the add/rewrite branch, so this deletion branch is untested.
 
 Blast radius is high because this is silent content corruption in governed markdown: an adopter can lose prose examples while performing the intended `--remove` operation. The fix should make the drop path use the same fence-aware traversal as `rewriteEdgeLine`, removing only the real field bullet outside fences.
+
+## 2026-06-23 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260623-06 — `close` intent breaks custom WORKFLOW.md overrides without `closed`
+
+Finding-ID: AUDIT-20260623-06
+Status:     fixed-88366e68
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high); FIXED 2026-06-23 (88366e68) — buildIntentVocabulary registers an alias only when its target phase exists in the doc; a custom WORKFLOW.md without phase:closed no longer throws (close just becomes an unavailable intent). RED test in intent-vocabulary.test.ts.
+Surface:    src/workflow/intent-vocabulary.ts:27-35,64-67; src/workflow/workflow-grammar.ts:235-247
+
+`ALIAS_TO_PHASE` now hardcodes `['close', 'closed']`, and `buildIntentVocabulary` throws if any alias target is absent from the governed `WORKFLOW.md`. But `loadWorkflowDoc` explicitly gives `<root>/.stack-control/WORKFLOW.md` precedence over the bundled template. Any existing or customized installation override that has not added `phase:closed` now makes intent vocabulary construction fail, not just make `close` unavailable.
+
+Blast radius is high for adopter/custom installs: `resolveIntent` and `knownIntents` both call `buildIntentVocabulary`, so a missing `closed` phase can break compass intent handling broadly. A safer shape is to derive transition aliases like `close` from declared `transition:*` units, or only register the hardcoded alias when the target phase exists, with a loud diagnostic specifically for using `close` against a lifecycle that lacks that transition.
+
+### AUDIT-20260623-07 — `advance --to closed --apply` can close backlog IDs before the roadmap status write succeeds
+
+Finding-ID: AUDIT-20260623-07
+Status:     fixed-7f26be4e
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high); FIXED 2026-06-23 (7f26be4e) — advance --to closed now writes the roadmap status FIRST (local, validated, atomic temp+rename), then closes the backlog ids; a failed status write leaves the backlog untouched (no ids-closed-but-item-shipped split). RED test: unwritable roadmap dir leaves the id un-closed.
+Surface:    src/subcommands/roadmap-advance-closed.ts:84-98
+
+The apply path runs `applyCascade(plan, backend)` first, mutating every backlog item to `Done`, then calls `advance(docPath, id, 'closed', opts, true)` to validate and write the roadmap status. If the roadmap write fails after the cascade succeeds, for example due to a concurrent edit, missing status line, filesystem permission error, or candidate validation/write failure, the installation is left with contained backlog IDs closed while the root roadmap item is still `shipped`.
+
+Blast radius is high because this is the feature’s central operator-confirmed action and it spans two durable stores. The code already preflights unknown backlog IDs, but it does not preflight or stage the roadmap mutation before closing external backlog items. A reasonable fix would validate the roadmap status candidate before mutating backlog and structure the apply path so failures produce a recoverable, explicitly reported state instead of silently splitting “ids closed” from “item closed.”
