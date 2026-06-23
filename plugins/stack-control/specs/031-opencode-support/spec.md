@@ -24,7 +24,7 @@ Opencode users want to use stack-control's governance and lifecycle capabilities
 2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI with the opencode session's active project/workspace as the working directory
 3. **Given** user is in an opencode session, **When** they invoke `/stack-control:extend`, **Then** the skill executes in the stack-control installation context
 
-Note: CLI operations execute with the opencode session's active project/workspace as the working directory. Stack-control installation discovery starts from that cwd and resolves the enclosing installation.
+Note: Interactive CLI prompts are not supported. Commands that require interactive input will fail with a clear error message.
 
 ---
 
@@ -114,7 +114,7 @@ Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. C
 
 - **FR-001**: The plugin MUST export a function following opencode's plugin API signature
 - **FR-002**: The plugin MUST register the primary lifecycle skills when loaded (`define`, `extend`, `execute`, `workflow`, `roadmap`). The `/stack-control:version` command is routed but not a registered skill in opencode's command palette.
-- **FR-003**: The plugin MUST delegate skill execution to the `stackctl` CLI via the shell API, except for `/stack-control:version` which reports the plugin-local version
+- **FR-003**: The plugin MUST delegate skill execution to the `stackctl` CLI via the shell API, except for `/stack-control:version` which reports the plugin-local version. Interactive CLI prompts are not supported.
 - **FR-004**: The plugin MUST forward skill arguments to the CLI as command arguments, preserving opencode command argument token boundaries and quoting semantics (e.g., `/stack-control:define "opencode support"` passes command `define` and one argument with value `opencode support` to `stackctl`)
 - **FR-005**: The plugin MUST capture CLI output and return it to opencode
 - **FR-006**: The plugin MUST handle CLI errors (non-zero exit codes) and report them to opencode

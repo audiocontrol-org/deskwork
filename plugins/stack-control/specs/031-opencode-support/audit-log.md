@@ -2404,3 +2404,83 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:25-27,59,16
 US-1 says `/stack-control:extend` executes “in the stack-control installation context” at line 25, but the surrounding note and later requirements say CLI operations execute with the opencode session’s active project/workspace as the working context at lines 27, 59, and 169. Those are not necessarily the same location: a user may invoke opencode from a nested project directory, a sibling package, or a workspace folder inside an enclosing stack-control installation.
 
 An unattended builder could reasonably implement either “cd to the resolved stack-control installation root before running `stackctl`” or “keep opencode’s active workspace cwd and let stackctl discover upward.” Those produce different behavior for relative paths, generated files, and command output. The blast radius is high because cwd is part of every skill invocation, and choosing the wrong interpretation can make lifecycle commands operate against the wrong collection or write files in surprising locations. A reasonable fix would make one promise explicit: either the CLI cwd remains the active opencode workspace and installation discovery is internal, or the plugin changes cwd to the resolved installation root before invocation.
+
+## 2026-06-23 — audit-barrage lift (20260623T031901147Z-031-opencode-support-after_clarify)
+
+Code-sha: 5ce0f9368f8dfba2a337d8b002099ddf8a3726a5
+### AUDIT-20260623-134 — US4 Acceptance Scenario 1 contradicts FR-008 on the unknown-command routing path
+
+Finding-ID: AUDIT-20260623-134
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US4 Acceptance Scenario 1 (lines ~97-104) and FR-008 (FR section)
+
+US4 Acceptance Scenario 1 states: "Given opencode fires a `command.executed` event, When the command starts with `/stack-control:` and is not registered, Then the plugin routes it to the appropriate skill." The phrase "routes it to the appropriate skill" presupposes that every unregistered `/stack-control:X` command has an appropriate skill destination. FR-008 contradicts this: "The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill; unknown commands produce a clear 'unknown stack-control command' error." FR-008 introduces a second branch — the unknown-command error — that US4 Scenario 1 has no room for.
+
+An unattended builder reading US4 Scenario 1 in isolation will implement the event listener as: intercept all unregistered `/stack-control:X` commands → route them to the CLI as `stackctl X`. Under the delegation model (all registered skills map to `stackctl <name>`), routing `/stack-control:foobar` to the CLI is the natural consequence of following the scenario. `stackctl foobar` will then fail at the CLI level with a CLI-level error, not the plugin-level "unknown stack-control command" message FR-008 requires. The builder following Scenario 1 will never add a knowledge-gate check at the event listener because the scenario never tells them to; the scenario's "routes it" implies success without qualification.
+
+The US4 Note ("Registered skills are handled by opencode's command palette; unregistered `/stack-control:` commands fall through to the event listener") compounds the ambiguity: it says all unregistered commands fall through, without distinguishing known-but-unregistered (e.g., `/stack-control:version`) from unknown ones (e.g., `/stack-control:foobar`). A fix would rewrite US4 Scenario 1 to: "When the command starts with `/stack-control:` and is not registered **and is a known routed command**" → routes; add a second scenario: "When the command starts with `/stack-control:` and the command name is not in the plugin's known set" → produces the FR-008 error.
+
+---
+
+### AUDIT-20260623-135 — FR-012 per-invocation version detection creates a latency race with SC-003
+
+Finding-ID: AUDIT-20260623-135
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-012 and SC-003
+
+FR-012 states: "The plugin MUST detect version mismatch between plugin and CLI and warn users **when a skill is invoked**." The phrase "when a skill is invoked" has no qualifier about caching or amortization; a natural reading is per-invocation. Version detection requires running `stackctl --version` (a shell invocation that returns the CLI version), separate from the skill's own `stackctl define` invocation. SC-003 promises: "Skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI."
+
+If version detection runs `stackctl --version` synchronously before `stackctl define`, the total latency is the sum of two CLI startups plus execution time. A TypeScript CLI with `tsx` entrypoint carries typical cold-start overhead of 200–700ms per invocation on developer hardware; two sequential spawns would consume 400ms–1.4s of the 2-second budget before the actual skill runs. On slower systems or when the local CLI is a wrapper with additional module loading (common for published npm binaries), this is a live risk that the two promises cannot both hold.
+
+The spec does not permit caching explicitly, and "when a skill is invoked" suggests no amortization is assumed. The fix is to state one of: (a) version detection is performed once at plugin load time and the result is cached for the session, or (b) the SC-003 measurement excludes version detection overhead and the 2-second budget begins after any pre-checks complete. Either is a valid decision; the spec currently makes neither, leaving the builder to resolve an unacknowledged tension.
+
+---
+
+### AUDIT-20260623-136 — FR-012 "version detection failure is non-blocking" conflicts with FR-007 "CLI not found is blocking" when the CLI is absent
+
+Finding-ID: AUDIT-20260623-136
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-012 and FR-007
+
+FR-012 states: "Version detection failures are non-blocking warnings; the skill continues to execute." FR-007 states: "The plugin MUST provide a clear error message when `stackctl` CLI is not found." When `stackctl` is absent from PATH, running `stackctl --version` (the version detection step) will fail because the binary cannot be found. This is simultaneously a version detection failure (FR-012 → non-blocking warning, skill continues) and a CLI-not-found condition (FR-007 → blocking error).
+
+A builder who implements FR-012 literally will treat the `stackctl --version` failure as a non-blocking version-detection failure, emit a warning, and continue to execute the skill. The skill execution then spawns `stackctl define`, which also fails because the CLI is absent, and now FR-007's blocking error fires. The user sees two messages — a version-detection warning followed by a CLI-not-found error — for a single underlying condition (the CLI is absent). A builder who implements FR-007 first would shortcut: check CLI presence before version detection, skip the version check if the CLI is not found, and emit only the FR-007 error. Both reading chains are plausible from the spec as written.
+
+The spec does not define the ordering of version detection versus CLI presence validation, nor does it say whether "version detection failure" includes the CLI-not-found case or only covers parse/format failures on an otherwise present CLI. The fix is to add one sentence: "If `stackctl` is not found, FR-007's error fires immediately and version detection is not attempted." This also prevents the confusing two-message UX.
+
+---
+
+### AUDIT-20260623-137 — FR-010 (npm install path) has no acceptance scenario and no success criterion
+
+Finding-ID: AUDIT-20260623-137
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-010, US2 (Independent Test), SC section
+
+FR-010 states: "The plugin MUST export a default function that can be loaded from `node_modules/@stack-control/opencode-plugin` for npm package installation." The MUST makes this a hard functional requirement. However, US2's Independent Test covers only the copy-installation path ("Can be fully tested by copying `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts`"), explicitly labeling the npm path secondary. No acceptance scenario exercises the npm installation sequence (install the npm package, create `.opencode/plugins/stack-control.ts` importing from it, verify opencode loads the plugin). SC-001 measures only the copy path ("copying `opencode-plugin.ts`"). No success criterion references the npm install path.
+
+The result is that FR-010 is a MUST with no independently testable acceptance path and no measurable success condition. An unattended builder implementing FR-010 has no spec-derived way to confirm the requirement is met. The US2 Note mentions the npm path as "required to create `.opencode/plugins/stack-control.ts` that imports from the package" but this is informational prose, not a testable gate. The blast radius is that the npm install path ships untested against any spec-defined acceptance criterion; real users who follow the npm path have no guarantee the spec considered their flow beyond a parenthetical note. A fix would add one acceptance scenario to US2 (or a new US6) covering the npm install sequence, and add a corresponding SC (e.g., "SC-006: Plugin loads via npm install path without additional configuration beyond creating the adapter `.ts` file").
+
+### AUDIT-20260623-138 — Interactive CLI prompt handling is not promised
+
+Finding-ID: AUDIT-20260623-138
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:23`, `plugins/stack-control/specs/031-opencode-support/spec.md:117-120`, `plugins/stack-control/specs/031-opencode-support/spec.md:141-143`
+
+US-1 promises that invoking `/stack-control:define` makes “the spec authoring chain” begin, and SC-001/SC-002 treat `/stack-control:define` as a happy-path workflow capability. But the functional requirements only promise one-shot CLI delegation plus output/error capture; they never state whether interactive `stackctl` prompts can be surfaced to the opencode user and answered inside the session.
+
+This matters because `define`, `extend`, and likely `execute` are lifecycle skills, not simple fire-and-forget commands. An unattended builder could reasonably implement “run `stackctl define`, capture output, return when the process exits,” which satisfies FR-003 through FR-006 as written but can hang or fail as soon as `stackctl` asks a question. The blast radius is high: the feature’s P1 workflow can be built in a way that passes the spec’s delegation wording while failing the core interactive authoring use case. A reasonable fix would add an explicit user-facing decision: either these opencode commands support interactive CLI prompt/response round trips, or only non-interactive invocations are in scope and interactive commands must fail with a clear message.
