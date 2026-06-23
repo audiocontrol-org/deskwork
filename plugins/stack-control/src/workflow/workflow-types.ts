@@ -77,7 +77,10 @@ export interface Criterion {
  * `Criterion` kinds: these place an item AT a phase from the pre-existing
  * artifacts. Read FROM the doc per phase (FR-005). `node-marker`/`record-converged`
  * mirror the gate kinds; `backlog-only`/`node-present`/`release-tagged` are the
- * structural anchors of the pipeline.
+ * structural anchors of the pipeline. `never` is the by-name-only sentinel: a
+ * phase whose `derive: never` is NEVER placed by the artifact loop — it is
+ * reachable solely by the recorded-status by-name rule (031: the terminal
+ * `closed` phase, an explicit operator-confirmed action, not an artifact).
  */
 export const DERIVE_KINDS = [
   'backlog-only',
@@ -87,6 +90,7 @@ export const DERIVE_KINDS = [
   'record-converged',
   'tasks-complete',
   'release-tagged',
+  'never',
 ] as const;
 export type DeriveKind = (typeof DERIVE_KINDS)[number];
 

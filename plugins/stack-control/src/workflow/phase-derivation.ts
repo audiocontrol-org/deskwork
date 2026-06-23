@@ -57,6 +57,12 @@ function deriveHolds(pred: DerivePredicate, inputs: DerivationInputs): boolean {
       return inputs.tasksComplete;
     case 'release-tagged':
       return inputs.releaseTagged;
+    case 'never':
+      // By-name-only sentinel (031): NEVER placed by the artifact loop. A phase
+      // with `derive: never` (the terminal `closed`) is reached solely by the
+      // recorded-status by-name rule — closing is an explicit operator action,
+      // not an artifact a release tag or convergence record could stand in for.
+      return false;
     default: {
       const exhaustive: never = pred.kind;
       throw new WorkflowError(`unhandled derive kind '${String(exhaustive)}'`);

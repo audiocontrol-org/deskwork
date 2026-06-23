@@ -103,7 +103,7 @@ complete without inventing an item-specific path the bundled default cannot know
 
 - status: active
 - kind: phase
-- derive: release-tagged
+- derive: never
 - work: (none)
 - entrance: (none)
 - exit: (none)
