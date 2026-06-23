@@ -74,3 +74,18 @@ Surface:    src/subcommands/backlog.ts:180-190, src/subcommands/backlog.ts:373-3
 `backlog done --apply` closes the task first, then calls `emitAutoBackLink`; `promote --apply` similarly runs `promote(...)` before writing/validating the parent-node back-link. If the stored `**Node:**` ref is stale or misspelled, `emitAutoBackLink` exits 1 after the backlog mutation has already happened. That leaves a task in `Done` or promoted state without the promised `closes:` entry, even though the command reports failure.
 
 The blast radius is high because this violates the feature’s core “near-zero-touch closure” path: an unattended consumer can believe the failed command made no state change, retry or inspect the roadmap, and still miss that the backlog item has already transitioned. A reasonable fix is to preflight the parent-node roadmap mutation before closing/promoting, or otherwise make the backlog state and roadmap back-link commit as one recoverable operation.
+
+## 2026-06-23 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260623-05 — `closes:` removal deletes fenced examples
+
+Finding-ID: AUDIT-20260623-05
+Status:     fixed-fa4d1eb2
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained. FIXED 2026-06-23 (fa4d1eb2) — dropClosesLine is now fence-aware (shared fenceDelimiter model), removing only the real field bullet outside fences; a fenced closes-example is preserved. RED test in closes-mutation.test.ts.
+Surface:    src/roadmap/closes-mutation.ts:96-110
+
+`dropClosesLine()` removes every body line matching `- closes:` with a raw filter. Unlike the rewrite path, it is not fence-aware, so `roadmap resolves <node> --remove <last-id> --apply` will delete fenced code examples inside that node body if they contain a `- closes:` line. The test at `tests/roadmap/closes-mutation.test.ts:82-95` only covers the add/rewrite branch, so this deletion branch is untested.
+
+Blast radius is high because this is silent content corruption in governed markdown: an adopter can lose prose examples while performing the intended `--remove` operation. The fix should make the drop path use the same fence-aware traversal as `rewriteEdgeLine`, removing only the real field bullet outside fences.
