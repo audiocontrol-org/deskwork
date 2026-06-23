@@ -63,14 +63,14 @@ task auto-back-links it. **Independent test**: quickstart Scenarios E, F.
 operator-confirmed `advance --to closed`. **Independent test**: quickstart Scenarios
 C, G, H.
 
-- [ ] T025 [P] [US3] RED: test phase-derivation maps status→phase BY NAME — `shipped`→`phase:shipped`, `closed`→`phase:closed`; the `shipped→last-phase` special-case is gone in `src/workflow/__tests__/phase-derivation-by-name.test.ts`
-- [ ] T026 [US3] Rework `src/workflow/phase-derivation.ts` to status→phase by-name; DELETE the `status === 'shipped' → last-phase` special-case (clean break, no fallback) (GREEN T025)
-- [ ] T027 [P] [US3] RED: test compass — `shipped → closed` is `on-course`; `closed` from a non-`shipped` phase is refused; `closed` is terminal in `src/workflow/__tests__/compass-closed.test.ts`
-- [ ] T028 [US3] Add the `shipped → closed` legitimacy + non-`shipped` refusal to `src/workflow/compass.ts` (GREEN T027)
-- [ ] T029 [P] [US3] RED: test `advance --to closed` — dry-run shows the cascade plan and changes nothing; `--apply` runs the cascade AND sets status `closed`; never auto-fires; refuses from non-`shipped` in `src/roadmap/__tests__/advance-to-closed.test.ts`
-- [ ] T030 [US3] Add the `closed` arm to `advance` (drives `transitive-close`; dry-run/`--apply`; precondition `shipped`) in `src/roadmap/mutations.ts` + wire in `src/subcommands/roadmap.ts` (GREEN T029)
-- [ ] T031 [P] [US3] RED: test that status/session-start surface a `shipped` item as not-yet-closed with `closed` as the next move in `src/workflow/__tests__/shipped-not-terminal-surface.test.ts`
-- [ ] T032 [US3] Ensure the workflow status/next surfaces the pending `closed` for `shipped` items (consume the by-name derivation) (GREEN T031)
+- [X] T025 [P] [US3] RED: test phase-derivation maps status→phase BY NAME — `shipped`→`phase:shipped`, `closed`→`phase:closed`; the `shipped→last-phase` special-case is gone in `src/workflow/__tests__/phase-derivation-by-name.test.ts` (landed at `src/__tests__/workflow/phase-derivation-by-name.test.ts`, per the prior-phase tests/** placement deviation)
+- [X] T026 [US3] Rework `src/workflow/phase-derivation.ts` to status→phase by-name; DELETE the `status === 'shipped' → last-phase` special-case (clean break, no fallback) (GREEN T025) — generalized to a pure by-name rule scoped to work-less terminal phases (`work: (none)`), removing the hardcoded `shipped || closed` enumeration + the "partial" comment
+- [X] T027 [P] [US3] RED: test compass — `shipped → closed` is `on-course`; `closed` from a non-`shipped` phase is refused; `closed` is terminal in `src/workflow/__tests__/compass-closed.test.ts` (landed at `src/__tests__/workflow/compass-closed.test.ts`)
+- [X] T028 [US3] Add the `shipped → closed` legitimacy + non-`shipped` refusal to `src/workflow/compass.ts` (GREEN T027) — the generic `computeVerdict` already produced the right verdicts; the only change was `['close', 'closed']` in `intent-vocabulary.ts` ALIAS_TO_PHASE (compass.ts unchanged)
+- [X] T029 [P] [US3] RED: test `advance --to closed` — dry-run shows the cascade plan and changes nothing; `--apply` runs the cascade AND sets status `closed`; never auto-fires; refuses from non-`shipped` in `src/roadmap/__tests__/advance-to-closed.test.ts` (landed at `tests/roadmap/advance-to-closed.test.ts`)
+- [X] T030 [US3] Add the `closed` arm to `advance` (drives `transitive-close`; dry-run/`--apply`; precondition `shipped`) in NEW `src/subcommands/roadmap-advance-closed.ts` + thin branch in `src/subcommands/roadmap.ts` (GREEN T029) — roadmap.ts kept at 499 lines
+- [X] T031 [P] [US3] RED: test that status/session-start surface a `shipped` item as not-yet-closed with `closed` as the next move in `src/workflow/__tests__/shipped-not-terminal-surface.test.ts` (landed at `src/__tests__/workflow/shipped-not-terminal-surface.test.ts`)
+- [X] T032 [US3] Ensure the workflow status/next surfaces the pending `closed` for `shipped` items (consume the by-name derivation) (GREEN T031) — `workflow next` already surfaced it generically; added a "legitimate next move" line to `emitStatus` driven by `legitimateNextPhase`
 
 **Checkpoint**: US3 independently testable; the lifecycle surfaces + guards the close.
 

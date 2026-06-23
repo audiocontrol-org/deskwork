@@ -18,8 +18,11 @@ function shortName(work: string): string {
 /**
  * Fixed transition / verb aliases that are not a phase's own `work:` skill but name
  * an intent against a phase: `govern` (the after_implement hook), `ship`/`release`
- * (the back-half graduate target), and the `specify`/`speckit-*` skill aliases.
- * Each VALUE is a phase id that MUST exist in the governed doc (validated below).
+ * (the back-half graduate target), `close` (the post-ship terminal advance, 031
+ * FR-015), and the `specify`/`speckit-*` skill aliases. Each VALUE is a phase id
+ * that MUST exist in the governed doc (validated below). The `closed` phase carries
+ * `work: (none)`, so no intent is derived from a work skill — the `close` alias is
+ * the only name that targets it.
  */
 const ALIAS_TO_PHASE: ReadonlyArray<readonly [string, PhaseId]> = [
   ['specify', 'specifying'],
@@ -28,6 +31,7 @@ const ALIAS_TO_PHASE: ReadonlyArray<readonly [string, PhaseId]> = [
   ['govern', 'governing'],
   ['ship', 'shipped'],
   ['release', 'shipped'],
+  ['close', 'closed'],
 ];
 
 /**

@@ -96,6 +96,16 @@ function emitStatus(itemId: string): void {
   process.stdout.write(`  phase: ${phase.id}\n`);
   const p = phaseById(doc, phase.id);
   if (p === undefined) throw new WorkflowError(`derived phase '${phase.id}' is not declared in WORKFLOW.md`);
+  // 031 FR-013: name the legitimate pending next phase (generic — driven by the
+  // phase's `next` chain). A `shipped` item is NOT terminal: its pending move is
+  // `closed`, surfaced here so an operator isn't left thinking shipped is the end
+  // (the "don't forget to close" surface). A truly terminal phase (no `next`) says so.
+  const nextId = legitimateNextPhase(doc, phase.id);
+  process.stdout.write(
+    nextId !== null
+      ? `  legitimate next move: ${nextId}\n`
+      : `  no legitimate next move (terminal phase '${phase.id}')\n`,
+  );
   reportGate('exit criteria', evaluateGate(p.exit, gate));
   // v1: gates are REPORTED, never enforced as a refusal (FR-010 / analyze U1).
 }
