@@ -6,7 +6,7 @@
 
 ## Summary
 
-Make recording `status: shipped` non-optional by welding it to the merge. Add a `/stack-control:ship` skill that is the one on-rail ship step (govern-converged precondition → open PR → operator confirms CI green → merge → non-discretionarily fire `graduate`). Restructure the governed lifecycle so the post-govern span reads `governing → merging → shipped → validating → closed`, with every post-merge phase derived from the **recorded `status:` + the `validated` marker** (the same sources the close gate reads) — eliminating the TASK-445 divergence by construction. Add a **backstop compass invariant** that refuses forward lifecycle motion while a merged-but-status-in-flight item exists (detected by a portable git signal: the item's govern convergence record reachable from `origin/main` while status ≠ shipped), with session-start/session-end surfacing it as a non-blocking advisory only. Add an adopter-defined `validating` phase (default: operator-confirm `validated` marker). Delivered as ONE unit.
+Make recording `status: shipped` non-optional by welding it to the merge. Add a `/stack-control:ship` skill that is the one on-rail ship step (govern-converged precondition → open PR → operator confirms CI green → merge → non-discretionarily fire `graduate`). Restructure the governed lifecycle so the post-govern span reads `governing → merging → validating → closed` (`shipped` is the recorded STATUS, set by `graduate` at merge; `validating` is the post-merge phase derived from `status: shipped`), with every post-merge phase derived from the **recorded `status:`** (+ the `validated` marker as the close gate) — the same source the close gate reads — eliminating the TASK-445 divergence by construction. Add a **backstop compass invariant** that refuses forward lifecycle motion while a merged-but-status-in-flight item exists (detected by a portable git signal: the item's govern convergence record reachable from `origin/main` while status ≠ shipped), with session-start/session-end surfacing it as a non-blocking advisory only. Add an adopter-defined `validating` phase (default: operator-confirm `validated` marker). Delivered as ONE unit.
 
 ## Technical Context
 
@@ -65,7 +65,7 @@ specs/032-ship-stage/
 ### Source Code (installation root: `plugins/stack-control/`)
 
 ```text
-templates/WORKFLOW.md                 # add merging + validating phases; rewire transition:graduate; re-point shipped derive
+templates/WORKFLOW.md                 # add merging + validating phases; DELETE phase:shipped; rewire transition:graduate (merging→validating, records status:shipped)
 src/workflow/
 ├── workflow-types.ts                 # + CRITERION_KINDS / DERIVE_KINDS members (status-is / validated marker)
 ├── workflow-grammar.ts               # parse the new kinds

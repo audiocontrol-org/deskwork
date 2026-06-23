@@ -39,7 +39,7 @@ Across the whole governing→closed span, the phase the compass/`workflow status
 
 **Why this priority**: The coherence half is core to the feature's purpose. The divergence is the bug that let the broken state ship unnoticed; eliminating it structurally (not by patching the close gate) is the point.
 
-**Independent Test**: At each point between govern-converge and closed, compare the phase derived by the compass against what the close gate would enforce from the recorded status; confirm they agree at every step, including the post-govern-pre-merge window (now `merging`) and the post-merge window (now `shipped`/`validating`).
+**Independent Test**: At each point between govern-converge and closed, compare the phase derived by the compass against what the close gate would enforce from the recorded status; confirm they agree at every step, including the post-govern-pre-merge window (now `merging`) and the post-merge window (now `validating`; `shipped` is the recorded status).
 
 **Acceptance Scenarios**:
 
@@ -98,9 +98,9 @@ After an item is shipped (merged), it enters a `validating` phase before `closed
 
 **The phase model + coherence (US2)**
 
-- **FR-005**: The governed `WORKFLOW.md` MUST define a `merging` phase between `governing` and `shipped`, whose work is `/stack-control:ship` and which is derived from "govern-converged AND status ≠ shipped".
+- **FR-005**: The governed `WORKFLOW.md` MUST define a `merging` phase between `governing` and the post-merge `validating` phase, whose work is `/stack-control:ship` and which is derived from "govern-converged AND status ≠ shipped".
 - **FR-006**: `shipped` MUST mean merged: `transition:graduate` (which records `status: shipped`) fires at merge, not at govern-converge; govern-converge becomes ship's precondition, not the event that records shipped.
-- **FR-007**: `phase:shipped` and every post-merge phase MUST derive from the recorded `status:` (plus the `validated` marker) — the same source the close gate reads — so that for any item the derived phase equals what the recorded status implies.
+- **FR-007**: Every post-merge phase MUST derive from the recorded `status:` — the same source the close gate reads — so that for any item the derived phase equals what the recorded status implies. (`shipped` is the recorded STATUS, set by `graduate` at merge; `status: shipped` derives to the `validating` phase; there is no distinct derived `phase:shipped`. The `validated` marker is the `validating → closed` gate, not a derive discriminator — see plan §R3 / analyze F1.)
 - **FR-008**: The system MUST make the "graduated-but-status-in-flight" divergence impossible on the on-rail path: there MUST be no state in which the compass/`workflow status` report a post-merge phase that the close gate's recorded-status read contradicts (folds TASK-445).
 
 **The backstop (US3)**
@@ -113,7 +113,7 @@ After an item is shipped (merged), it enters a `validating` phase before `closed
 
 **The validating phase (US4)**
 
-- **FR-014**: The governed `WORKFLOW.md` MUST define a `validating` phase between `shipped` and `closed`; the bundled default exit MUST be an operator-confirm `validated` approval-marker, and the default end-to-end behavior MUST match 031's current pre-close operator-confirm.
+- **FR-014**: The governed `WORKFLOW.md` MUST define a `validating` phase entered at `status: shipped` (the post-merge phase) before `closed`; the bundled default exit MUST be an operator-confirm `validated` approval-marker, and the default end-to-end behavior MUST match 031's current pre-close operator-confirm.
 - **FR-015**: The engine MUST define only the `validating` phase and the `validated` marker; the *meaning* of validation MUST be adopter-defined via the `WORKFLOW.md` override (no hardcoded install/validation semantics in the engine).
 - **FR-016**: An adopter override of `validating`'s exit criteria MUST be honored by the same override-resolution mechanism used for other phases (bundled default is overridable, no engine code change required).
 
@@ -126,8 +126,8 @@ After an item is shipped (merged), it enters a `validating` phase before `closed
 ### Key Entities *(include if feature involves data)*
 
 - **`/stack-control:ship` skill**: the on-rail ship step; precondition = govern-converged; effect = merge-then-graduate (welded).
-- **`merging` phase**: governed-WORKFLOW.md phase between governing and shipped; work = ship; derived from govern-converged & status ≠ shipped.
-- **`validating` phase**: governed-WORKFLOW.md phase between shipped and closed; exit = `validated` marker (operator-confirm default; adopter-overridable meaning).
+- **`merging` phase**: governed-WORKFLOW.md phase between governing and validating; work = ship; derived from govern-converged & status ≠ shipped.
+- **`validating` phase**: the post-merge governed-WORKFLOW.md phase, entered at `status: shipped`, before closed; exit = `validated` marker (operator-confirm default; adopter-overridable meaning). (`shipped` is the recorded status, not a separate derived phase.)
 - **`validated` marker**: a node approval-marker recorded by the operator (or the adopter's process) to exit validating.
 - **`transition:graduate` (rewired)**: now fires at merge (driven by ship), records `status: shipped` + reconcile + journal + commit; gate includes "merged".
 - **Backstop invariant**: a compass-level refusal predicate keyed on "any merged-but-status-in-flight item exists".

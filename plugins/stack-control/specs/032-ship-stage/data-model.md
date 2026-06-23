@@ -7,28 +7,26 @@ The "data" is the governed lifecycle vocabulary + the recorded markers/records t
 | Phase | Kind | Derive predicate | Work | Entrance | Exit | Next |
 |---|---|---|---|---|---|---|
 | `governing` | phase | `tasks-complete` (unchanged) | execute | tasks-complete spec | graduate-impl impl | `merging` |
-| **`merging`** (NEW) | phase | `record-converged impl` AND status ≠ shipped | **`stack-control:ship`** | record-converged impl | merged (skill-driven) | `shipped` |
-| `shipped` | phase | recorded **status == shipped** (was `record-converged impl`) | (none) | graduate-impl impl (+ merged) | (none) | `validating` |
-| **`validating`** (NEW) | phase | recorded **status == shipped AND `validated` absent** | adopter-defined (default: operator-confirm) | status == shipped | `approval-marker validated` | `closed` |
+| **`merging`** (NEW) | phase | `record-converged impl` AND status ≠ shipped | **`stack-control:ship`** | record-converged impl | merged (skill-driven) | `validating` |
+| **`validating`** (NEW) | phase | recorded **status == shipped** | adopter-defined (default: operator-confirm) | status == shipped | `approval-marker validated` | `closed` |
 | `closed` | phase | `never` (by-name terminal) | (none) | `approval-marker validated` | (none) | (none) |
 
-**Ordering invariant (derive walk, most-advanced-wins):** `shipped` precedes `validating` in the ordered phase list so that, while status == shipped, the walk returns `validating` until the `validated` marker is recorded, then falls back to `shipped` (ready-to-close). All post-merge derivation keys on recorded status + the `validated` marker — the same sources the close gate reads (FR-007/FR-008).
+**`shipped` is a STATUS, not a derived phase** (F1 resolution, analyze 2026-06-23). `graduate` records `status: shipped` at merge; `status: shipped` derives to phase **`validating`** (the post-merge verify window). There is no distinct derived `phase:shipped` — collapsing it removes the deadlock where a validated item would derive `shipped` while `close` fires from `validating`. The chain is **`governing → merging → validating → closed`** (phases); statuses are `in-flight → shipped → closed`. All post-merge derivation keys on the recorded status (+ the `validated` marker for the close gate) — the same source the close gate reads (FR-007/FR-008).
 
 ## Transitions (governed `WORKFLOW.md`)
 
 | Transition | From → To | Exit-gate | Effects (commit last) | Driver |
 |---|---|---|---|---|
 | `start-merging` (NEW) | governing → merging | `graduate-impl impl` | `journal-append; commit` | execute end / compass |
-| `graduate` (REWIRED) | merging → shipped | `graduate-impl impl` (+ merged, established by the skill having merged) | `roadmap-advance to=shipped; roadmap-reconcile; journal-append; commit` | **`/stack-control:ship`** at merge |
-| `validate` (NEW) | shipped → validating | (none) | `journal-append; commit` | derived on entry to validating |
+| `graduate` (REWIRED) | merging → validating | `graduate-impl impl` (+ merged, established by the skill having merged) | `roadmap-advance to=shipped; roadmap-reconcile; journal-append; commit` | **`/stack-control:ship`** at merge |
 | `close` (REWIRED) | validating → closed | `approval-marker validated` | `roadmap-advance to=closed; journal-append; commit` | `/stack-control:close` |
 | `redesign` (unchanged) | * → designing | (none) | … | — |
 
-> Note: the exact split between a distinct `start-merging`/`validate` transition vs. deriving those boundaries is pinned RED-first; the load-bearing contract is the gate + effect set above. `graduate`'s effect ORDER is unchanged (commit last — the atomic boundary, transition-engine.ts).
+> `graduate` records `status: shipped` (the effect) but lands in phase `validating` (the `to`) — phase and status names legitimately differ here. The exact split between a distinct `start-merging` transition vs. deriving that boundary is pinned RED-first; the load-bearing contract is the gate + effect set above. `graduate`'s effect ORDER is unchanged (commit last — the atomic boundary, transition-engine.ts).
 
 ## Vocabulary additions (`workflow-types.ts`)
 
-- **DERIVE_KINDS** += a recorded-status predicate (e.g. `status-is <status>`) so `shipped`/`validating` derive from the recorded `status:` rather than `record-converged`. (Plus `validating` ANDs the `validated`-marker absence — encoding pinned RED-first; candidate: a marker-absent derive variant or a composite evaluated in `phase-derivation.ts`.)
+- **DERIVE_KINDS** += a recorded-status predicate (e.g. `status-is <status>`) so `validating` derives from the recorded `status:` (== `shipped`) rather than `record-converged`. No marker-absence in the derive — the `validated` marker is a close-GATE criterion, not a derive discriminator (F1 resolution).
 - **CRITERION_KINDS**: reuse the existing generic **`approval-marker`** with target `validated` for the `validating → closed` gate (no new kind needed for the marker). The backstop is NOT a criterion kind (see below).
 
 ## The `validated` marker
@@ -54,9 +52,9 @@ The "data" is the governed lifecycle vocabulary + the recorded markers/records t
 ```
 in-flight + tasks-complete            → phase governing
 in-flight + record-converged impl     → phase merging        (run /stack-control:ship)
-  [ship: PR → operator confirms CI green → merge → graduate]
-status:shipped + validated absent     → phase validating     (record `validated`)
-status:shipped + validated present    → phase shipped         (ready to close → /stack-control:close)
+  [ship: PR → operator confirms CI green → merge → graduate records status:shipped]
+status:shipped (validated absent)     → phase validating     (record `validated`, then close)
+status:shipped (validated present)    → phase validating     (close gate now satisfied → /stack-control:close)
 status:closed                         → phase closed
 --- off-rail residual ---
 record reachable from origin/main + status:in-flight → BACKSTOP refuses forward motion (reconcile exempt)
