@@ -139,7 +139,7 @@ The fix is to extend `isPostMergeStatus` to also return `true` for `'blocked'` a
 ### AUDIT-20260623-08 — Shared lifecycle precondition drops the new backstop signal
 
 Finding-ID: AUDIT-20260623-08
-Status:     open
+Status:     fixed-d0b7959d
 Severity:   high
 Per-lane:   codex=high
 Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
@@ -152,7 +152,7 @@ This matters because `stackctl govern --item ...` uses this helper as its lifecy
 ### AUDIT-20260623-09 — Backstop refusal suggests a generic `roadmap advance --to shipped` shortcut
 
 Finding-ID: AUDIT-20260623-09
-Status:     open
+Status:     fixed-d0b7959d
 Severity:   high
 Per-lane:   codex=high
 Decision:   single-model (gate-counted high)
