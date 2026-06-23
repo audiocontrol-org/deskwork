@@ -67,7 +67,8 @@ function flagsFromCommand(command: Command, positionals: readonly string[]): Fla
       name === 'apply' ||
       name === 'clear' ||
       name === 'chain' ||
-      name === 'analyzeClean'
+      name === 'analyzeClean' ||
+      name === 'cascade'
     ) {
       continue;
     }
@@ -81,6 +82,7 @@ function flagsFromCommand(command: Command, positionals: readonly string[]): Fla
     clear: booleanOption(raw.clear, 'clear'),
     chain: booleanOption(raw.chain, 'chain'),
     analyzeClean: booleanOption(raw.analyzeClean, 'analyzeClean'),
+    cascade: booleanOption(raw.cascade, 'cascade'),
     positionals,
     values,
   };
@@ -127,6 +129,9 @@ function registerSubaction(parent: Command, name: string): void {
   if (grammar.chain === true) sub.option('--chain', 'wire a depends-on chain over the children');
   if (grammar.analyzeClean === true) {
     sub.option('--analyze-clean', 'record the symmetric analyze-clean marker');
+  }
+  if (grammar.cascade === true) {
+    sub.option('--cascade', 'close the whole part-of subtree (transitive close)');
   }
   sub.action(async function (this: Command) {
     // Flags were already validated by `preflightRoadmapFlags` in

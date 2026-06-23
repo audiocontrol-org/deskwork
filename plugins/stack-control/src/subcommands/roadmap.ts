@@ -33,6 +33,7 @@ import { cluster, type ClusterInput } from '../roadmap/cluster.js';
 import { loadRoadmap, type RoadmapModel } from '../roadmap/roadmap-model.js';
 import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
 import { backlogRoot } from '../backlog/root.js';
+import { emitCloseRelatedCascade } from './roadmap-cascade-emit.js';
 import { blockedReport, mermaid, readyList } from '../roadmap/views.js';
 import {
   failUsage,
@@ -56,6 +57,7 @@ export interface Flags {
   readonly clear: boolean;
   readonly chain: boolean;
   readonly analyzeClean: boolean;
+  readonly cascade: boolean;
   readonly positionals: readonly string[];
   readonly values: ReadonlyMap<string, string>;
 }
@@ -96,7 +98,9 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
     chain: true,
     positionals: 1,
   },
-  'close-related': { valueFlags: [], apply: true, clear: false, positionals: 1 },
+  // `--cascade` (031 US1) walks the part-of subtree and closes every terminal
+  // member's recorded ids; without it, single-node close-related is unchanged.
+  'close-related': { valueFlags: [], apply: true, clear: false, cascade: true, positionals: 1 },
   // 028 US2 edge-mutation + marker verbs (FR-014/016/017; contract RM1/RM3).
   'add-edge': { valueFlags: ['field', 'to'], apply: true, clear: false, positionals: 1 },
   'remove-edge': { valueFlags: ['field', 'to'], apply: true, clear: false, positionals: 1 },
@@ -131,7 +135,7 @@ export function scanFlags(args: readonly string[]): Flags {
     'roadmap',
     args,
     NO_DOC,
-    ['apply', 'clear', 'chain', 'analyze-clean'],
+    ['apply', 'clear', 'chain', 'analyze-clean', 'cascade'],
     ALL_VALUE_FLAGS,
   );
   return {
@@ -140,6 +144,7 @@ export function scanFlags(args: readonly string[]): Flags {
     clear: s.booleans.has('clear'),
     chain: s.booleans.has('chain'),
     analyzeClean: s.booleans.has('analyze-clean'),
+    cascade: s.booleans.has('cascade'),
     positionals: s.positionals,
     values: s.values,
   };
@@ -277,6 +282,8 @@ function emitCluster(flags: Flags, opts: LoadOptions, verb: string): void {
  * the backlog ids recorded on the node (`closes:` ∪ `ref:`) when the item is in a
  * grammar-terminal status. Never title-matches or infers; dry-run by default;
  * fail-loud per id; idempotent (an already-`Done` item is reported, not re-closed).
+ * `--cascade` (031 US1) walks the whole `part-of` subtree via the transitive-close
+ * engine (handled by `emitCloseRelatedCascade`); without it, single-node behavior.
  */
 function emitCloseRelated(model: RoadmapModel, flags: Flags): void {
   const id = requireId(flags, 'close-related');
@@ -289,6 +296,10 @@ function emitCloseRelated(model: RoadmapModel, flags: Flags): void {
       `close-related: '${id}' is '${item.status}', not a terminal status (${terminal.join('/')}) — ` +
         `loose ends are tied only once an item reaches a terminal state`,
     );
+  }
+  if (flags.cascade) {
+    emitCloseRelatedCascade(model, id, flags.apply);
+    return;
   }
   // The resolved set is a RECORDED fact: closes: ∪ ref:. Never inferred (023 FR-003).
   const targets = [...new Set([...item.closes, ...(item.ref !== null ? [item.ref] : [])])];

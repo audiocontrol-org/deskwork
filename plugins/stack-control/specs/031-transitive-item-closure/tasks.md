@@ -31,13 +31,13 @@ All paths are under `plugins/stack-control/`.
 **Independent test**: cascade over a fixture parent+children closes the full deduped
 id set; re-run is idempotent (quickstart Scenarios A, B, D).
 
-- [ ] T010 [P] [US1] RED: test the `CascadePlan` builder — walks the `part-of` subtree, collects terminal nodes' `closes:` ids, dedups multi-parent via visited-Set in `src/roadmap/__tests__/transitive-close-walk.test.ts`
-- [ ] T011 [P] [US1] RED: test skip-and-report — a non-terminal child is listed in `skipped`, its ids excluded, the walk continues in `src/roadmap/__tests__/transitive-close-skip.test.ts`
-- [ ] T012 [P] [US1] RED: test uniform terminal handling — a `cancelled`/`retired` member's ids are collected with a status-reflecting reason; walk descends into its children in `src/roadmap/__tests__/transitive-close-uniform.test.ts`
-- [ ] T013 [P] [US1] RED: test `unknownIds` (recorded id absent from backlog) surfaces in the plan and apply refuses in `src/roadmap/__tests__/transitive-close-unknown.test.ts`
-- [ ] T014 [US1] Implement `transitive-close.ts` (CascadePlan builder + apply: walk, dedup, skip-and-report, uniform-terminal, unknownIds, idempotent close via `backend.close`) in `src/roadmap/transitive-close.ts` (GREEN T010–T013)
-- [ ] T015 [P] [US1] RED: test `close-related --cascade` dry-run lists the plan and writes nothing; `--apply` closes the deduped set; re-run reports `alreadyClosed` in `src/subcommands/__tests__/roadmap-close-cascade.test.ts`
-- [ ] T016 [US1] Add the `--cascade` flag to `emitCloseRelated` in `src/subcommands/roadmap.ts` driving `transitive-close` (GREEN T015)
+- [X] T010 [P] [US1] RED: test the `CascadePlan` builder — walks the `part-of` subtree, collects terminal nodes' `closes:` ids, dedups multi-parent via visited-Set in `tests/roadmap/transitive-close-walk.test.ts` (placed under the collected `tests/**` root)
+- [X] T011 [P] [US1] RED: test skip-and-report — a non-terminal child is listed in `skipped`, its ids excluded, the walk continues in `tests/roadmap/transitive-close-skip.test.ts`
+- [X] T012 [P] [US1] RED: test uniform terminal handling — a `cancelled`/`retired` member's ids are collected with a status-reflecting reason; walk descends into its children in `tests/roadmap/transitive-close-uniform.test.ts`
+- [X] T013 [P] [US1] RED: test `unknownIds` (recorded id absent from backlog) surfaces in the plan and apply refuses in `tests/roadmap/transitive-close-unknown.test.ts`
+- [X] T014 [US1] Implement `transitive-close.ts` (CascadePlan builder + apply: walk, dedup, skip-and-report, uniform-terminal, unknownIds, idempotent close via `backend.close`) in `src/roadmap/transitive-close.ts` (GREEN T010–T013)
+- [X] T015 [P] [US1] RED: test `close-related --cascade` dry-run lists the plan and writes nothing; `--apply` closes the deduped set; re-run reports `alreadyClosed` in `src/__tests__/terminal-closure/close-cascade.test.ts` (placed under the collected `src/__tests__/**` root)
+- [X] T016 [US1] Add the `--cascade` flag to `emitCloseRelated` in `src/subcommands/roadmap.ts` driving `transitive-close` (engine arm extracted to `src/subcommands/roadmap-cascade-emit.ts` to hold roadmap.ts under the size cap; flag wired through scanner + grammar + commander mount + help) (GREEN T015)
 
 **Checkpoint**: US1 independently testable against a hand-populated `closes:` fixture.
 
