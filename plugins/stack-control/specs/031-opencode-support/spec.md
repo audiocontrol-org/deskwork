@@ -74,11 +74,11 @@ Stack-control skills must be properly mapped to opencode's event system. Users s
 
 **Acceptance Scenarios**:
 
-1. **Given** opencode fires a `command.executed` event, **When** the command starts with `/stack-control:`, **Then** the plugin routes it to the appropriate skill
+1. **Given** opencode fires a `command.executed` event, **When** the command starts with `/stack-control:` and is not registered, **Then** the plugin routes it to the appropriate skill
 2. **Given** user types `/stack-control:define`, **When** the command is invoked, **Then** it appears in opencode's command palette and executes the skill
 3. **Given** plugin loads, **When** the plugin function is called, **Then** it registers the primary lifecycle skills with opencode
 
-Note: Registered skills appear in opencode's command palette as `/stack-control:define`, `/stack-control:extend`, etc. (full command names, not bare skill names).
+Note: Registered skills are handled by opencode's command palette; unregistered `/stack-control:` commands fall through to the event listener.
 
 ---
 
@@ -141,7 +141,7 @@ Note: `/stack-control:version` is a routed command, not a registered skill. It i
 - **SC-001**: Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode
 - **SC-002**: Plugin successfully delegates all five listed happy-path skill invocations to the CLI without errors (`/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)
 - **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI
-- **SC-004**: Plugin works with opencode 1.0 and later (tested against opencode 1.0; future compatibility depends on opencode's plugin API stability)
+- **SC-004**: Plugin works with opencode 1.0 (tested against opencode 1.0; future compatibility depends on opencode's plugin API stability)
 - **SC-005**: Plugin loads successfully in opencode without requiring additional configuration
 
 ## Clarifications
