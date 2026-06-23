@@ -5,7 +5,7 @@
 // Implemented in Phase 3 (T016).
 
 /** The provenance of a coupling edge (R1 signals). */
-export type CouplingSignal = 'dir' | 'diff-xref' | 'ts-import';
+export type CouplingSignal = 'dir' | 'diff-xref' | 'ts-import' | 'test-source';
 
 /** A directed coupling edge between two changed files, with its signal provenance. */
 export interface CouplingEdge {
@@ -37,6 +37,16 @@ function posixDirname(p: string): string {
 function posixBasename(p: string): string {
   const i = p.lastIndexOf('/');
   return i === -1 ? p : p.slice(i + 1);
+}
+
+/** The stem of a test file (`foo.test.ts` → `foo`, `bar.spec.tsx` → `bar`), or undefined if not a test. */
+function testStem(file: string): string | undefined {
+  return /^(.+)\.(?:test|spec)\.[cm]?[jt]sx?$/.exec(posixBasename(file))?.[1];
+}
+
+/** The stem of a source file (basename without its TS/JS extension): `seam-pass.ts` → `seam-pass`. */
+function sourceStem(file: string): string {
+  return posixBasename(file).replace(/\.[cm]?[jt]sx?$/, '');
 }
 
 /** Reference tokens that a diff mentioning file B might use to refer to it (path / basename / ESM .js swap). */
@@ -73,6 +83,20 @@ export function buildCouplingGraph(input: CouplingInput): CouplingGraph {
           edges.push({ from: a, to: b, signal: 'diff-xref' });
         }
       }
+    }
+  }
+
+  // Universal baseline 3 (TASK-430): pair a test file with its implementing source by
+  // NAME (`foo.test.ts` ↔ `foo.ts`), independent of directory and diff text, so the
+  // chunker keeps them in the SAME chunk. A RED-first test split from its source makes
+  // the model auditing the test-only chunk read stale "FAILS today" TDD comments and
+  // report a false failing-test finding (the 030 dogfood meta-finding).
+  for (const t of files) {
+    const stem = testStem(t);
+    if (stem === undefined) continue;
+    for (const s of files) {
+      if (s === t || testStem(s) !== undefined) continue; // source side only
+      if (sourceStem(s) === stem) edges.push({ from: t, to: s, signal: 'test-source' });
     }
   }
 

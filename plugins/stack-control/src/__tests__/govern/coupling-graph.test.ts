@@ -20,6 +20,30 @@ describe('030 T010 — coupling graph (FR-003, R1)', () => {
     expect(hasEdge(g, 'src/a/x.ts', 'src/b/z.ts', 'dir')).toBe(false);
   });
 
+  it('TASK-430 — pairs a test file with its implementing source by name, across directories, with no diffs', () => {
+    // A RED-first test under __tests__ and its source under src/govern share a stem
+    // (seam-pass). They are in DIFFERENT directories and there are NO diffs, so neither
+    // the dir-adjacency nor the diff-xref baseline pairs them — only the name-based
+    // test↔source signal keeps them in one chunk, so the model auditing the test sees
+    // the implementing source (not a stale "FAILS today" comment in isolation).
+    const g = buildCouplingGraph({
+      changedFiles: ['src/govern/seam-pass.ts', 'src/__tests__/govern/seam-pass.test.ts'],
+    });
+    expect(
+      hasEdge(g, 'src/govern/seam-pass.ts', 'src/__tests__/govern/seam-pass.test.ts', 'test-source'),
+      'a test must be coupled to its same-stem source regardless of directory',
+    ).toBe(true);
+  });
+
+  it('TASK-430 — does NOT pair a test with an unrelated-stem source', () => {
+    const g = buildCouplingGraph({
+      changedFiles: ['src/govern/other.ts', 'src/__tests__/govern/seam-pass.test.ts'],
+    });
+    expect(
+      hasEdge(g, 'src/govern/other.ts', 'src/__tests__/govern/seam-pass.test.ts', 'test-source'),
+    ).toBe(false);
+  });
+
   it('adds a diff cross-reference edge when one file diff mentions another changed file', () => {
     const fileDiffs = new Map<string, string>([
       ['src/a.ts', 'import { foo } from "./b.js";'],
