@@ -21,10 +21,10 @@ Opencode users want to use stack-control's governance and lifecycle capabilities
 **Acceptance Scenarios**:
 
 1. **Given** opencode is installed with the stack-control plugin, **When** user types `/stack-control:define`, **Then** the skill is invoked and the spec authoring chain begins
-2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI
+2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI with the opencode session's active project/workspace as the working directory
 3. **Given** user is in an opencode session, **When** they invoke `/stack-control:extend`, **Then** the skill executes in the stack-control installation context
 
-Note: CLI operations execute with the active project/workspace as the working directory. Stack-control installation discovery starts from that cwd and resolves the enclosing installation.
+Note: CLI operations execute with the opencode session's active project/workspace as the working directory. Stack-control installation discovery starts from that cwd and resolves the enclosing installation.
 
 ---
 
@@ -123,7 +123,7 @@ Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. C
 - **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts`
 - **FR-010**: The plugin MUST export a default function that can be loaded from `node_modules/@stack-control/opencode-plugin` for npm package installation
 - **FR-011**: The plugin MUST expose a `/stack-control:version` command that reports only the plugin version
-- **FR-012**: The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked
+- **FR-012**: The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked. Version detection failures are non-blocking warnings; the skill continues to execute.
 
 ### Key Entities
 

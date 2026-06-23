@@ -2307,3 +2307,100 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:25-27,103-1
 US-1 promises `/stack-control:extend` “executes in the stack-control installation context,” and the spec says CLI operations use the active project/workspace cwd. The Key Entities also define `Session` as context used for skill invocation. But the first Edge Case leaves “What happens when the opencode session ends during a long-running stack-control skill?” unanswered, while long-running skills are central to the feature’s stated workflow.
 
 This is not asking for a cancellation mechanism. The missing promise is user-facing: whether the command continues and returns output somewhere, is cancelled, or reports that the session ended. As written, an unattended builder could choose any of those behaviors and still claim the spec leaves it open, producing materially different outcomes for `define`/`execute` runs. Blast radius is medium because the happy path still works, but long-running lifecycle commands are core enough that ambiguous session-end semantics can lose user-visible command results or leave users unsure whether governance work completed.
+
+## 2026-06-23 — audit-barrage lift (20260623T031144756Z-031-opencode-support-after_clarify)
+
+Code-sha: 186ae40a0247471fc17b1b05a4c30970e31bfe87
+### AUDIT-20260623-128 — US-4 Scenario 1 "routes to the appropriate skill" contradicts FR-008's unknown-command error
+
+Finding-ID: AUDIT-20260623-128
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US-4 Scenario 1 (line ~80) vs FR-008 (line ~145)
+
+US-4 Scenario 1 states: "Given opencode fires a `command.executed` event, When the command starts with `/stack-control:` and is not registered, Then the plugin routes it to the appropriate skill." The word "routes it to the appropriate skill" covers the entire class of unregistered `/stack-control:` commands. But for an unknown command (e.g. `/stack-control:badcommand`), there is no appropriate skill — FR-008 says "unknown commands produce a clear 'unknown stack-control command' error."
+
+An unattended builder reading US-4 Scenario 1 first will implement the event listener as a pass-through: strip the `/stack-control:` prefix, forward the remainder to `stackctl`, and let the CLI produce whatever error it surfaces. This satisfies the scenario's letter ("routes it") while violating FR-008's letter (the error must say "unknown stack-control command," which is a plugin-level message, not whatever `stackctl unknowncommand` emits). The combination of US-4 Scenario 1 and FR-003 ("delegate all skill execution to the `stackctl` CLI") further reinforces the wrong reading: a builder sees "delegate everything, event listener routes everything," never flags the unknown-command case as requiring a plugin-owned error.
+
+The US-4 Note ("unregistered `/stack-control:` commands fall through to the event listener") and the Key Entities clarification on `/stack-control:version` suggest the spec intends two distinct event-listener outcomes: (a) known-but-unregistered commands (currently only `version`) are routed to their handler, and (b) truly unknown commands produce a plugin-owned error. Neither the scenario nor the note states this distinction. The fix is to split US-4 Scenario 1 into two scenarios — one for known-but-unregistered (`version`) and one for truly unknown commands — with the unknown case explicitly ending in the plugin-owned error message.
+
+---
+
+### AUDIT-20260623-129 — FR-012 "version mismatch" has no definition
+
+Finding-ID: AUDIT-20260623-129 (claude-02 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-012, US-5, Clarifications (version-mismatch section)
+
+FR-012 says "The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked." US-5 Scenario 2 says "Given CLI version differs from plugin version, When user runs a skill, Then a warning is displayed about version mismatch." The Clarifications note says "Plugin detects mismatch and warns on skill invocation; users manually resolve."
+
+None of these define what "mismatch" means. An unattended builder has multiple equally-plausible readings: (a) any version difference is a mismatch; (b) only major-version differences count; (c) a CLI newer than the plugin is acceptable but an older CLI is a mismatch; (d) a specific compatibility table governs what pairs are compatible. If the builder picks reading (a) — the natural reading of "differs" in US-5 Scenario 2 — users will receive a warning on every patch release, making the warning noisy to the point of being ignored. If the builder picks reading (b), the warning fires only on breaking-change boundaries, which may miss genuine incompatibilities at the minor level.
+
+Because FR-012 fires on every skill invocation (per "warn users when a skill is invoked"), the wrong definition compounds: an over-eager definition degrades all skill invocations with spurious warnings; an under-eager definition silently lets incompatible pairs run. The spec states the mismatch detection mechanism is intentionally left to the implementation ("silently" via CLI detection), but the definition of "mismatch" is user-facing behavior that the spec must commit to. The fix is to state, at a spec level, which version axis (major, major+minor, any semver divergence) constitutes a mismatch requiring a user-visible warning.
+
+---
+
+### AUDIT-20260623-130 — FR-010 MUST requirement (npm installation path) has no verifiable success criterion
+
+Finding-ID: AUDIT-20260623-130
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-010, SC-001 through SC-005
+
+FR-010 is a MUST: "The plugin MUST export a default function that can be loaded from `node_modules/@stack-control/opencode-plugin` for npm package installation." This is a distinct installation path from the local-copy path in FR-009. US-2 Note confirms they are separate: "npm package installation requires users to create `.opencode/plugins/stack-control.ts` that imports from the package."
+
+SC-001 through SC-005 are the spec's acceptance gates, and every one of them is anchored to the local-copy path. SC-001 explicitly says "copying `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts`." SC-002 through SC-005 describe runtime behavior but do not specify which installation path is under test. There is no success criterion that verifies FR-010's npm installation path end-to-end: that the package exports the correct function, that the import-from-package idiom in `.opencode/plugins/stack-control.ts` works with opencode's loader, or that the npm path produces the same skill registrations and CLI delegations as the local-copy path.
+
+An implementation could satisfy all five SCs with a perfect local-copy implementation while shipping a broken or absent npm package, and no spec gate would catch it. The blast radius is bounded (this only affects npm-installation users), but the US-2 Note's framing "npm package installation ... the local copy installation is the primary supported path" creates an implicit excuse to deprioritize the npm path — while FR-010's MUST language says it is required. The fix is to add a success criterion that exercises the npm installation path at least to the point of verifying the plugin loads and the five registered skills appear.
+
+---
+
+### AUDIT-20260623-131 — Edge case "returns output when complete" after session end is an unfulfillable promise
+
+Finding-ID: AUDIT-20260623-131
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — Edge Cases section (session-end edge case)
+
+The spec's Edge Cases section commits: "What happens when the opencode session ends during a long-running stack-control skill? → The skill continues and returns output when complete; the plugin does not cancel in-progress operations."
+
+The phrase "returns output when complete" is a user-facing promise. If the opencode session has ended — the user closed the application, not just switched panels — there is no active channel to return output to. The promise as written has no receiver. A builder implementing this literally (keep the subprocess alive, deliver output on completion) cannot fulfill "returns output" to a user who is no longer in a session. The spec does not distinguish between a session that is backgrounded (opencode still running) and a session that is fully terminated (opencode exited), which are the two cases where "continues" has different practical outcomes.
+
+This matters because US-1's stated core value — "invoke stack-control skills without leaving the opencode environment" — includes long-running skills like `execute`. A user starting a governance run that takes several minutes and then closing opencode would find the spec has promised output delivery that is mechanically impossible in the fully-terminated case. The spec should either narrow the promise to "the CLI subprocess continues; output is not guaranteed to reach the user if the session terminated" or bound the promise to the backgrounded-session case. The current wording sets an expectation that will be violated in the most common real-world occurrence of this edge case (user closes opencode mid-operation).
+
+---
+
+### AUDIT-20260623-132 — SC-003 "first output" measurement point is undefined
+
+Finding-ID: AUDIT-20260623-132
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-003
+
+SC-003: "Skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI." The phrase "first output" is not defined. Plausible readings include: (a) the first byte written to opencode's output channel by the plugin; (b) the first stdout byte from `stackctl define`; (c) the first user-meaningful line (a prompt, a status message, a confirmation); (d) the moment the CLI process starts, before it produces any output. These interpretations can differ by hundreds of milliseconds in practice, and readings (b) through (d) are outside the plugin's direct control if the CLI has any startup overhead.
+
+The blast radius is low: SC-003 is a performance target rather than a behavioral commitment, and the 2-second window is generous enough that most readings would agree under normal conditions. An unattended builder is unlikely to implement incorrect behavior because of this ambiguity; they would simply not write a timing test. The gap is that SC-003 cannot serve as an autonomous acceptance gate without a defined measurement procedure — the same pattern flagged in prior findings AUDIT-20260623-125 (SC-001) and AUDIT-20260623-126. The fix is to define "first output" as a specific event, e.g. "the first byte written to opencode's output channel by the plugin handler."
+
+### AUDIT-20260623-133 — Execution context is stated two ways
+
+Finding-ID: AUDIT-20260623-133
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:25-27,59,169
+
+US-1 says `/stack-control:extend` executes “in the stack-control installation context” at line 25, but the surrounding note and later requirements say CLI operations execute with the opencode session’s active project/workspace as the working context at lines 27, 59, and 169. Those are not necessarily the same location: a user may invoke opencode from a nested project directory, a sibling package, or a workspace folder inside an enclosing stack-control installation.
+
+An unattended builder could reasonably implement either “cd to the resolved stack-control installation root before running `stackctl`” or “keep opencode’s active workspace cwd and let stackctl discover upward.” Those produce different behavior for relative paths, generated files, and command output. The blast radius is high because cwd is part of every skill invocation, and choosing the wrong interpretation can make lifecycle commands operate against the wrong collection or write files in surprising locations. A reasonable fix would make one promise explicit: either the CLI cwd remains the active opencode workspace and installation discovery is internal, or the plugin changes cwd to the resolved installation root before invocation.
