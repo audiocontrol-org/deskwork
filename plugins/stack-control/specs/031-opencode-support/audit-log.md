@@ -776,3 +776,100 @@ Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:107-112,12
 SC-002 says “Plugin successfully delegates 95% of skill invocations to the CLI without errors” (line 130), while FR-006 and FR-007 explicitly require handling CLI errors and missing CLI cases (lines 110-111). The success criterion does not define the denominator for “skill invocations,” whether user/CLI failures count against the plugin, or how many invocations are needed for the percentage to be meaningful.
 
 The blast radius is medium: this will not necessarily break the plugin, but it gives builders and reviewers no stable pass/fail condition. One implementation can claim success by excluding CLI failures from the metric, while another can fail the criterion because valid CLI rejections count as errors. The spec should restate SC-002 as a measurable delegation contract, such as successful handoff for all registered valid commands in a defined test matrix, with CLI-returned failures classified separately from plugin delegation failures.
+
+## 2026-06-23 — audit-barrage lift (20260623T011827629Z-031-opencode-support-after_clarify)
+
+Code-sha: 9773f1639793a8a70bbee56851465634ca8a65f9
+### AUDIT-20260623-36 — Spec commits to `stackctl` CLI delegation for skills that may not exist as `stackctl` subcommands
+
+Finding-ID: AUDIT-20260623-36
+Status:     open
+Severity:   blocking
+Per-lane:   claude=blocking
+Decision:   single-model (gate-counted blocking)
+Surface:    spec.md — FR-003, FR-004, FR-008, Key Entities (skill list), US3 acceptance scenarios
+
+FR-003 requires the plugin to "delegate skill execution to the `stackctl` CLI via the shell API." FR-004 requires forwarding "skill arguments to the CLI as command arguments." FR-008 requires mapping `/stack-control:` prefixed commands to "the appropriate skill." The five registered skills are named as `define`, `extend`, `execute`, `workflow`, `roadmap`. These five names appear in stack-control as SKILL.md-driven agent guidance files — `/stack-control:define` loads a SKILL.md and the agent follows conversational instructions; it is not a CLI-executable entry point. The `stackctl` CLI exposes verbs like `govern`, `specify`, `clarify`, `plan`, `tasks`, `analyze`, `implement`, `roadmap`, `inbox`, and `backlog`. The spec never establishes that `stackctl define`, `stackctl extend`, `stackctl execute`, `stackctl workflow`, and `stackctl roadmap` exist as CLI subcommands.
+
+Blast-radius: if these subcommands do not exist, the entire US3 delegation model (and every acceptance scenario under it) is unbuildable as written. An unattended builder reads FR-003 + FR-004, calls `stackctl define`, gets a "command not found" error, and has no spec-level guidance for how to proceed. This is the most load-bearing unbuildable promise in the document.
+
+A minimum fix: for each registered skill, explicitly state the `stackctl` subcommand or verb sequence it maps to (e.g. "invoking `/stack-control:define` delegates to `stackctl specify --mode feature`"), OR re-specify the delegation model as "the plugin loads and presents the skill's SKILL.md to the opencode agent for execution" rather than CLI invocation.
+
+---
+
+### AUDIT-20260623-37 — FR-002 "all stack-control skills" directly contradicts Key Entities' five-skill set
+
+Finding-ID: AUDIT-20260623-37 (claude-02 + claude-03 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    spec.md — FR-002 ("all stack-control skills"), Key Entities section (five-skill set)
+
+FR-002: "The plugin MUST register all stack-control skills when loaded." Key Entities: "The set of skills registered by the plugin is: `define`, `extend`, `execute`, `workflow`, `roadmap` (the primary lifecycle skills)." These directly contradict. The stack-control plugin exposes many more skills than five: `archive`, `audit-runs`, `backlog`, `batch-dispose`, `check-adopters`, `check-anti-patterns`, `check-clones`, `check-deprecations`, `curate`, `define`, `design`, `dispatch-wrapper`, `execute`, `extend`, `inbox`, `install-drift`, `release`, `roadmap`, `scope-doctor`, `scope-export`, `scope-inventory`, `scope-summary`, `scope-widen`, `session-end`, `session-start`, `setup`, `unarchive`, `validate-scope-discovery`, `workflow`.
+
+An unattended builder following FR-002 (a MUST requirement) registers all of these. Key Entities constrains it to five, but requirements outweigh definitional prose in standard practice — an agent that notices the conflict resolves it toward the stricter MUST. The wrong building direction (registering all skills) produces a plugin that exposes governance, scope, auditing, and teardown operations to opencode users who expect only the five lifecycle skills. The fix is to align FR-002 with Key Entities: "The plugin MUST register the five primary lifecycle skills (`define`, `extend`, `execute`, `workflow`, `roadmap`) when loaded."
+
+---
+
+### AUDIT-20260623-38 — Edge cases section raises three behavioral questions with no corresponding promises
+
+Finding-ID: AUDIT-20260623-38
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — Edge Cases section
+
+The spec's Edge Cases section lists five questions. FR-006 and FR-007 address CLI errors (non-zero exit codes) and missing CLI. The remaining three questions are unaddressed by any FR, acceptance scenario, or explicit "undefined behavior" declaration:
+
+1. "What happens when the opencode session ends during a long-running stack-control skill?" — No FR. The plugin may leave orphaned `stackctl` processes.
+2. "What if the user has multiple opencode sessions running simultaneously?" — No FR. Concurrent access to shared state (roadmap files, specs) has no promise.
+3. "How does the plugin handle network timeouts or file system errors during CLI execution?" — No FR beyond the general "CLI errors" handling in FR-006, which addresses non-zero exit codes but not OS-level failures.
+
+A spec that explicitly names edge cases without either addressing them or declaring them out-of-scope leaves builders to implement as they see fit. The three items above each involve state that outlives the command invocation — orphaned processes, lock conflicts, and partial writes — and each could produce meaningfully different plugin behavior depending on how the builder resolves the gap.
+
+---
+
+### AUDIT-20260623-39 — SC-003 latency metric cannot be measured as written
+
+Finding-ID: AUDIT-20260623-39
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — SC-003
+
+SC-003: "Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI." Two undefined boundaries make this untestable: (1) "first output" — the first byte of stdout, the first newline, the first user-meaningful line, or the complete response? For `stackctl govern` or `stackctl specify`, the first stdout line is often a startup/progress log, not a result; the criterion could be satisfied by printing a progress indicator immediately while useful output arrives 30 seconds later. (2) "typing command" — when the user presses Enter in opencode's UI, when opencode fires the `command.executed` event, or when the plugin dispatches to the shell API?
+
+SC-002 (prior finding AUDIT-20260623-35) is also flagged for measurability issues but covers a different criterion (95% delegation success rate). SC-003 is independently unmeasurable. The fix is to specify the start event (e.g. "from `command.executed` event receipt") and the end event (e.g. "to first line of CLI stdout").
+
+---
+
+### AUDIT-20260623-40 — SC-004 forward compatibility promise is unmeasurable and unbounded
+
+Finding-ID: AUDIT-20260623-40
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — SC-004
+
+SC-004: "Plugin works with opencode versions 1.0 and later." "Works" is undefined: the same plugin API shape? The same event names? The same shell API? No FR addresses version compatibility, no FR pins the opencode API version relied upon, and no acceptance scenario exercises multi-version behavior. Since opencode's current version is not stated, "1.0 and later" is an open-ended forward compatibility promise with no mechanism to verify it at any point in time. If opencode v1.5 changes the plugin API signature or renames `command.executed`, the spec provides no basis for determining whether SC-004 is met or broken.
+
+The blast-radius is that this criterion will always appear satisfied in a single-version test environment (whatever opencode version the builder has), and "and later" will never be falsified until an adopter reports a regression on a future version. The fix is either to scope SC-004 to a specific tested version ("Plugin works with opencode v1.0") or to add a companion FR that pins the API surface the plugin relies on, making future-version incompatibilities detectable.
+
+---
+
+### AUDIT-20260623-41 — FR-001 compliance promise references an API signature the spec never describes or cites
+
+Finding-ID: AUDIT-20260623-41
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — FR-001, Assumptions (plugin API bullet)
+
+FR-001: "The plugin MUST export a function following opencode's plugin API signature." The spec never describes what this signature is: the function's name, its parameter types, its return type, whether it is synchronous or asynchronous, and what registration calls it is expected to make. Every subsequent FR (FR-002 through FR-012) depends on this foundation — a plugin that exports the wrong function shape fails silently at load time, and none of the functional requirements can be exercised.
+
+The Assumptions section states "The opencode plugin system supports the event hooks needed" but does not quote or cite the API. AUDIT-20260623-33 (prior, open) covers the `$` shell execution sub-API. This finding is distinct: the top-level plugin export signature itself is unspecified, not just the shell utility. A builder must look up opencode's documentation independently; if that documentation changes between the spec being written and the plugin being built, the spec provides no baseline against which to verify FR-001 compliance. At minimum, the spec should quote the expected function signature (even as pseudocode) and cite the opencode documentation version it was taken from.

@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "Add first-class support for opencode as a coding agent host. The stack-control plugin follows opencode's plugin structure and event system, making all stack-control skills available through opencode's interface."
+**Input**: User description: "Add first-class support for opencode as a coding agent host. The stack-control plugin registers the primary lifecycle skills (define, extend, execute, workflow, roadmap) and delegates to the `stackctl` CLI for all operations."
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -70,7 +70,7 @@ Stack-control skills must be properly mapped to opencode's event system. Users s
 
 1. **Given** opencode fires a `command.executed` event, **When** the command starts with `/stack-control:`, **Then** the plugin routes it to the appropriate skill
 2. **Given** user types a skill name, **When** the skill is registered, **Then** it appears in opencode's command palette
-3. **Given** plugin loads, **When** the plugin function is called, **Then** it registers all stack-control skills with opencode
+3. **Given** plugin loads, **When** the plugin function is called, **Then** it registers the primary lifecycle skills (`define`, `extend`, `execute`, `workflow`, `roadmap`) with opencode
 
 ---
 
@@ -84,9 +84,9 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 
 **Acceptance Scenarios**:
 
-1. **Given** plugin is loaded, **When** user checks version, **Then** plugin reports its version
+1. **Given** user runs `/stack-control:version`, **When** the command is invoked, **Then** plugin reports its version
 2. **Given** CLI version differs from plugin version, **When** user runs a skill, **Then** a warning is displayed about version mismatch
-3. **Given** user runs `stackctl --version`, **When** plugin version is available, **Then** both versions are displayed
+3. **Given** user runs `/stack-control:version`, **When** the command is invoked, **Then** both plugin and CLI versions are displayed
 
 ---
 
@@ -103,7 +103,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 ### Functional Requirements
 
 - **FR-001**: The plugin MUST export a function following opencode's plugin API signature
-- **FR-002**: The plugin MUST register all stack-control skills when loaded
+- **FR-002**: The plugin MUST register the primary lifecycle skills when loaded (`define`, `extend`, `execute`, `workflow`, `roadmap`)
 - **FR-003**: The plugin MUST delegate skill execution to the `stackctl` CLI via the shell API
 - **FR-004**: The plugin MUST forward skill arguments to the CLI as command arguments
 - **FR-005**: The plugin MUST capture CLI output and return it to opencode
@@ -112,7 +112,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - **FR-008**: The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill
 - **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts` (local file installation)
 - **FR-010**: The plugin MUST support npm installation by exporting a default function that opencode can load from `node_modules/@stack-control/opencode-plugin` (npm package installation)
-- **FR-011**: The plugin MUST report its version when queried
+- **FR-011**: The plugin MUST expose a `/stack-control:version` command that reports the plugin version
 - **FR-012**: The plugin MUST warn users when plugin version doesn't match CLI version
 
 ### Key Entities
