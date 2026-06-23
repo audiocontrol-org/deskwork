@@ -236,13 +236,19 @@ function emitAdvance(itemId: string, apply: boolean, values: Record<string, stri
   if (t === undefined) {
     failUsage(`'${itemId}' is in terminal phase '${p.id}'; no forward transition to advance`);
   }
-  // 024 US5 / FR-010 (phased): the back-half `governing → shipped` (terminal)
-  // transition is ENFORCED as a refusal — an unmet exit gate blocks the advance
-  // rather than only being reported (022 v1 report-only is retired HERE). Mid-
-  // pipeline transitions stay ADVISORY in this advance path during migration;
-  // mid-pipeline ORDER is still enforced by the compass embedded in the skills.
-  const terminalPhaseId = r.doc.phases[r.doc.phases.length - 1]!.id;
-  if (t.to === terminalPhaseId && t.exitGate.length > 0) {
+  // 024 US5 / FR-010 (phased): the back-half `governing → shipped` graduation is
+  // ENFORCED as a refusal — an unmet exit gate blocks the advance rather than only
+  // being reported (022 v1 report-only is retired HERE). Mid-pipeline transitions
+  // stay ADVISORY in this advance path during migration; mid-pipeline ORDER is
+  // still enforced by the compass embedded in the skills.
+  //
+  // 031 FR-014 (clean break): keyed on the `graduate-impl` exit-gate criterion (the
+  // graduation marker), NOT on the positional last phase — adding the terminal
+  // `closed` phase after `shipped` means `shipped` is no longer the array-last
+  // phase, so a positional `to === lastPhase` test would silently stop enforcing
+  // the graduation gate.
+  const isGraduation = t.exitGate.some((c) => c.kind === 'graduate-impl');
+  if (isGraduation && t.exitGate.length > 0) {
     const result = evaluateGate(t.exitGate, gate);
     if (!result.allMet) {
       process.stderr.write(

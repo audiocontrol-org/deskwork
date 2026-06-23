@@ -12,18 +12,18 @@ All paths are under `plugins/stack-control/`.
 
 ## Phase 1: Setup
 
-- [ ] T001 Add a fixture-builder helper for roadmap+backlog test trees (terminal/non-terminal nodes, `part-of` edges, `closes:` sets, backlog ids) in `src/roadmap/__tests__/fixtures/closure-fixtures.ts`
+- [X] T001 Add a fixture-builder helper for roadmap+backlog test trees (terminal/non-terminal nodes, `part-of` edges, `closes:` sets, backlog ids) in `src/roadmap/__tests__/fixtures/closure-fixtures.ts`
 
 ## Phase 2: Foundational (blocking prerequisites — MUST complete before US1/US3)
 
-- [ ] T002 [P] RED: test that `grammars/roadmap.peg` admits `closed` in `statusVocabulary` and `terminalStatuses` in `src/roadmap/__tests__/grammar-closed-status.test.ts`
-- [ ] T003 Add `closed` to `statusVocabulary` and `terminalStatuses` in `grammars/roadmap.peg` (GREEN T002)
-- [ ] T004 [P] RED: test that `roadmap-model` treats `closed` as terminal (status parse + terminal-set membership) in `src/roadmap/__tests__/roadmap-model-closed.test.ts`
-- [ ] T005 Admit `closed` into the terminal-status handling in `src/roadmap/roadmap-model.ts` (GREEN T004; derive from grammar — no hardcoded duplicate set)
-- [ ] T006 [P] RED: test `childrenOf(model, parentId)` returns items whose `partOf` includes the parent (incl. multi-parent) in `src/roadmap/__tests__/graph-children-of.test.ts`
-- [ ] T007 Add `childrenOf(model, parentId)` to `src/roadmap/graph.ts` mirroring `blocks()` (GREEN T006)
-- [ ] T008 [P] RED: test `WORKFLOW.md` defines `phase:closed` after `phase:shipped` (terminal, no `next`) + a `shipped → closed` transition in `src/workflow/__tests__/workflow-closed-phase.test.ts`
-- [ ] T009 Add `phase:closed` + the `shipped → closed` transition to `templates/WORKFLOW.md` (GREEN T008)
+- [X] T002 [P] RED: test that `grammars/roadmap.peg` admits `closed` in `statusVocabulary` and `terminalStatuses` in `src/roadmap/__tests__/grammar-closed-status.test.ts`
+- [X] T003 Add `closed` to `statusVocabulary` and `terminalStatuses` in `grammars/roadmap.peg` (GREEN T002)
+- [X] T004 [P] RED: test that `roadmap-model` treats `closed` as terminal (status parse + terminal-set membership) in `src/roadmap/__tests__/roadmap-model-closed.test.ts`
+- [X] T005 Admit `closed` into the terminal-status handling in `src/roadmap/roadmap-model.ts` (GREEN T004; derive from grammar — no hardcoded duplicate set)
+- [X] T006 [P] RED: test `childrenOf(model, parentId)` returns items whose `partOf` includes the parent (incl. multi-parent) in `src/roadmap/__tests__/graph-children-of.test.ts`
+- [X] T007 Add `childrenOf(model, parentId)` to `src/roadmap/graph.ts` mirroring `blocks()` (GREEN T006)
+- [X] T008 [P] RED: test `WORKFLOW.md` defines `phase:closed` after `phase:shipped` (terminal, no `next`) + a `shipped → closed` transition in `src/workflow/__tests__/workflow-closed-phase.test.ts`
+- [X] T009 Add `phase:closed` + the `shipped → closed` transition to `templates/WORKFLOW.md` (GREEN T008)
 
 ## Phase 3: User Story 1 — Transitive closer (Priority: P1)
 

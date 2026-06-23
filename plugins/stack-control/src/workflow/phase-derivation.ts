@@ -84,14 +84,22 @@ export function derivePhase(doc: WorkflowDoc, inputs: DerivationInputs): Derived
   const side = sideStateOf(inputs);
   if (side !== null) return side;
 
-  // A terminal roadmap status `shipped` is an operator-recorded fact that the item
-  // shipped (operator decision 2026-06-16) — derive the doc's terminal phase (its
-  // last phase) directly, rather than re-deriving from a convergence record that a
-  // pre-workflow process never wrote. This mirrors the recorded-fact discipline of
-  // `cancelled`/`retired` (handled by sideStateOf) and `analyze-clean:`/
-  // `design-approved:` markers: the operator records, derivation reads.
-  if (inputs.status?.toLowerCase() === 'shipped') {
-    return { kind: 'phase', id: doc.phases[doc.phases.length - 1]!.id };
+  // A terminal roadmap status `shipped` / `closed` is an operator-recorded fact —
+  // derive the matching phase BY NAME (operator decision 2026-06-16; 031 FR-014),
+  // rather than re-deriving from a convergence record a pre-workflow process never
+  // wrote. This mirrors the recorded-fact discipline of `cancelled`/`retired`
+  // (handled by sideStateOf) and the `analyze-clean:`/`design-approved:` markers:
+  // the operator records, derivation reads.
+  //
+  // 031 FR-014 (partial — full by-name rework is T026): map the recorded terminal
+  // status to the phase with the SAME name, NOT the doc's positional last phase.
+  // Adding the terminal `closed` phase after `shipped` makes `shipped` no longer
+  // the array-last phase, so a positional `phases[last]` would mis-derive a
+  // `shipped` item as `closed`.
+  const status = inputs.status?.toLowerCase() ?? null;
+  if (status === 'shipped' || status === 'closed') {
+    const byName = doc.phases.find((p) => p.id === status);
+    if (byName !== undefined) return { kind: 'phase', id: byName.id };
   }
 
   for (let i = doc.phases.length - 1; i >= 0; i--) {

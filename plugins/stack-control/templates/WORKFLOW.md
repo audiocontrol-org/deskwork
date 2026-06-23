@@ -97,6 +97,16 @@ complete without inventing an item-specific path the bundled default cannot know
 - work: (none)
 - entrance: graduate-impl impl
 - exit: (none)
+- next: closed
+
+## phase:closed
+
+- status: active
+- kind: phase
+- derive: release-tagged
+- work: (none)
+- entrance: (none)
+- exit: (none)
 - next: (none)
 
 ## transition:open-design
@@ -143,6 +153,15 @@ complete without inventing an item-specific path the bundled default cannot know
 - to: shipped
 - exit-gate: graduate-impl impl
 - effects: roadmap-advance to=shipped; roadmap-reconcile; journal-append message={message}; commit message={message}
+
+## transition:close
+
+- status: active
+- kind: transition
+- from: shipped
+- to: closed
+- exit-gate: (none)
+- effects: roadmap-advance to=closed; journal-append message={message}; commit message={message}
 
 ## transition:redesign
 

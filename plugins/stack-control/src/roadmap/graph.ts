@@ -79,6 +79,17 @@ export function blocks(model: RoadmapModel, identifier: string): readonly WorkIt
   return model.items.filter((item) => item.dependsOn.includes(identifier));
 }
 
+/** Items that declare `part-of: <identifier>` (the reverse grouping edge, 031
+ * FR-006) — the cascade closer's sole traversal primitive. A unit may belong to
+ * MULTIPLE parents (027 multi-parent clustering), so a shared child appears under
+ * each parent it lists. Mirrors `blocks()`: fail loud on an unknown parent id. */
+export function childrenOf(model: RoadmapModel, identifier: string): readonly WorkItem[] {
+  if (!model.byId.has(identifier)) {
+    throw new DocumentModelError(`roadmap has no item '${identifier}'`);
+  }
+  return model.items.filter((item) => item.partOf.includes(identifier));
+}
+
 /** compareUnits adapter: order by the declared phase relation, then identifier. */
 function compareItems(model: RoadmapModel, a: WorkItem, b: WorkItem): number {
   return compareUnits(
