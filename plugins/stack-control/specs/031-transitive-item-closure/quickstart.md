@@ -91,3 +91,28 @@ on disk (never mocked).
 | F | US2 | SC-002 |
 | G | US3 | SC-003, SC-004 |
 | H | US3, US4 | SC-005, SC-006 |
+
+## Validation results (T039)
+
+Each scenario is exercised end-to-end against on-disk fixtures (real CLI + real
+`backlog` binary) by a passing automated test, and the marquee terminal-stage flow
+was additionally smoke-driven live with the source engine (`./bin/stackctl`)
+against this repo's own installation. Full suite at validation: **2570 passed / 0
+failed**.
+
+| Scenario | Covering test(s) | SC | Status |
+|---|---|---|---|
+| A | `src/__tests__/terminal-closure/close-cascade.test.ts` | SC-001, SC-007 | PASS |
+| B | `tests/roadmap/transitive-close-walk.test.ts` (+ close-cascade) | SC-007 | PASS |
+| C | `tests/roadmap/transitive-close-skip.test.ts`, `tests/roadmap/advance-to-closed.test.ts` | SC-003 | PASS |
+| D | `tests/roadmap/transitive-close-uniform.test.ts` | SC-001 | PASS |
+| E | `src/__tests__/roadmap/roadmap-resolves.test.ts` | SC-002 | PASS |
+| F | `src/__tests__/backlog-autobacklink.test.ts` | SC-002 | PASS |
+| G | `src/__tests__/workflow/{shipped-not-terminal-surface,compass-closed}.test.ts`, `tests/roadmap/advance-to-closed.test.ts` | SC-003, SC-004 | PASS |
+| H | `src/__tests__/workflow/{closed-no-install,install-agnostic}.test.ts` | SC-005, SC-006 | PASS |
+
+Live source-engine smoke (read-only / dry-run, writes nothing) on a real `shipped`
+item: `workflow status` reports `legitimate next move: closed`; `workflow compass
+… --intent close` is `on-course`; `roadmap advance … --to closed` (dry-run) prints
+the cascade plan + "would advance" and leaves `ROADMAP.md` unchanged (SC-004 — no
+automatic close).
