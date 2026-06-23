@@ -75,6 +75,17 @@ journals (2026-06-22/23) describe doing both by hand. Per the thesis, an obligat
 that depends on the agent remembering is a latent failure — it should be a
 mechanical, un-skippable step in the lifecycle.
 
+### P4 — Most adopters have no "install" step (genericity constraint)
+
+stack-control governs **collections of markdown / generic projects** — a docs
+collection, an internal plan, an engineering roadmap — most of which produce **no
+installable/releasable artifact at all**. "Post-install validation" is therefore
+specific to projects that ship such an artifact (stack-control governing *itself*
+is one — that is where the offing deadlock lived). It follows that **post-install
+validation cannot be baked into the entrance criteria of any stage** — a universal
+criterion that assumes an install step is wrong for the generic adopter. Whatever
+guards terminal closure must be install-agnostic.
+
 ### Current lifecycle shape (the substrate this design changes)
 
 `templates/WORKFLOW.md` defines the phase vocabulary
@@ -90,31 +101,42 @@ transitions and refuses terminal side-states.
 
 ## solution-space
 
-### Chosen approach — a single new terminal phase `closed`, with validation as its gate and closure as its effect
+### Chosen approach — a single new terminal phase `closed`; transitive closure is the terminal step, guarded by operator confirmation
 
 Add **one** phase after `shipped`:
 
 ```
 implementing → governing → shipped → closed
-   shipped = code merged + released (publish done)
-   closed  = installed release validated  +  contained subtree closed
+   shipped = code merged + released (where a release exists)
+   closed  = contained subtree closed, after the operator confirmed
 ```
 
-- **`closed` entrance criterion:** post-install validation passed (a recorded
-  marker — see below). You cannot enter `closed` without it. This is the
-  mechanical form of "no closure until verified in a formally-installed release."
-- **`closed` entrance effect:** transitive closure fires
-  (`close-related --cascade`) — so closure is not a step the agent must remember.
+- **Entering `closed` is guarded by OPERATOR CONFIRMATION** — closure never fires
+  automatically. The agent proposes the full transitive closure as a **dry-run**;
+  the operator confirms; then `--apply` runs and the status advances to `closed`.
+  This maps directly onto the existing `close-related` dry-run/`--apply` discipline
+  and onto the project rule *"the agent posts evidence; the operator decides."*
+- **There is NO validation criterion and NO "install" concept in any stage's
+  criteria** (per P4). The operator confirmation *is* the guard. What the operator
+  checks before confirming — e.g. "validate the installed plugin" for
+  stack-control's own releases, or nothing for a docs collection — is the
+  operator's call and project-specific; it is not prescribed or enforced by the
+  workflow. *"Asking the operator is good enough for validation. It's just a guard
+  against automatic closure."*
+- **`closed` entrance effect (operator-initiated):** the advance-to-`closed` runs
+  the transitive cascade (`close-related --cascade --apply`). Because the operator
+  initiates the advance, closure is confirmed-then-applied, never auto-applied.
 - New roadmap terminal **status** `closed`, joining `shipped`/`cancelled`/`retired`
   in the terminal set.
-- **Post-install validation** is performed by the **agent** against the
-  formally-installed plugin (bare `stackctl` = the published cache, the adopter
-  surface), then recorded as a pass/fail marker — the same recorded-fact pattern
-  as `design-approved:`. "Ask the agent to validate the installed plugin" has
-  worked every time so far and is the sanctioned mechanism; no automated smoke
-  framework is built.
-- Because validation lives in the workflow stage (not `tasks.md`), **govern never
-  waits on it** — the P2 deadlock is gone by construction.
+- **"Don't forget" is satisfied mechanically without auto-closing:** the workflow
+  surfaces `shipped` as **non-terminal** — `closed` is the real end — so the
+  compass/status/session-start naturally report "this shipped item is not closed
+  yet" as the pending next move. The obligation is surfaced by the lifecycle, the
+  *act* is operator-confirmed.
+- **The offing (P2) deadlock dissolves by construction:** there is no validation
+  *task* and no validation *criterion* to deadlock on. Govern (the `governing`
+  phase) never waits on anything publish-dependent; closure is simply an
+  operator-confirmed terminal step that happens after release.
 
 **Transitive closure mechanics:**
 
@@ -154,11 +176,23 @@ implementing → governing → shipped → closed
    not in `closes:`/`ref:` is not touched). The forward task→node ref is still
    adopted as the *auto-back-link* source, but it populates `closes:` rather than
    replacing it, preserving the auditable set.
-4. **Validation: a fixed automated smoke framework and/or a per-feature smoke
-   harness.** *Rejected (operator "good enough")* — agent-driven validation of the
-   installed plugin has worked every time; an automated framework is unwarranted
-   complexity now. Captured as a possible future enhancement, not v1 scope.
-5. **`closes:` population: explicit-verb-only, or auto-back-link-only.** *Rejected*
+4. **Validation as a phase ENTRANCE CRITERION** (the original Approach-C framing:
+   `closed` requires a recorded "post-install validation passed" marker).
+   *Rejected* — it bakes an *install* assumption into a stage's criteria, which is
+   wrong for the many adopters with no install/release step (P4). A criterion that
+   is universal must not assume an artifact exists.
+5. **Generic config-gated verification criterion** — a per-installation
+   `terminal-validation:` config the `closed` criterion reads (required-when-declared,
+   not-applicable-when-absent). *Rejected* — more machinery than the problem needs;
+   the operator's standard is simply *"asking the operator is good enough … it's
+   just a guard against automatic closure."* An operator-confirmation guard
+   achieves install-agnostic safety with zero new config surface. (Re-open only if
+   a real adopter needs an *unattended* terminal close with an automated gate.)
+6. **A fixed automated smoke framework and/or per-feature smoke harness** for
+   validation. *Rejected (operator "good enough")* — operator-confirmed validation
+   has worked every time; an automated framework is unwarranted complexity now.
+   Captured as a possible future enhancement, not v1 scope.
+7. **`closes:` population: explicit-verb-only, or auto-back-link-only.** *Rejected*
    in favor of both — verb-only keeps a manual record step per node; auto-only
    cannot record an id not closed through `done`/`promote`. Both together cover
    each other's gap.
@@ -170,8 +204,11 @@ implementing → governing → shipped → closed
 - **D1.** Add a single new terminal phase `closed` after `shipped`, and a matching
   new terminal roadmap **status** `closed` (terminal set becomes
   `shipped`/`closed`/`cancelled`/`retired`).
-- **D2.** `closed` **entrance criterion** = post-install validation passed
-  (recorded marker). `closed` **entrance effect** = transitive closure fires.
+- **D2.** Entering `closed` is **operator-confirmed** (the guard against automatic
+  closure) — there is NO validation entrance criterion and NO install assumption in
+  any stage's criteria. The operator-initiated advance-to-`closed` runs the
+  transitive cascade (`close-related --cascade --apply`) as its effect; the agent
+  first presents the dry-run, the operator confirms, then it applies.
 - **D3.** Rework phase-derivation: map roadmap status → phase **by name**, retiring
   the `status === shipped → last phase` special-case (`phase-derivation.ts:87-95`)
   so `shipped` and `closed` derive to their own phases.
@@ -181,41 +218,46 @@ implementing → governing → shipped → closed
 - **D5.** `closes:` population = `roadmap resolves <node> --add/--remove TASK-…`
   **plus** auto-back-link on `backlog done`/`promote` via a new optional
   task→parent-node ref. Stays inside the `closes:` recorded-set model (auditable).
-- **D6.** Post-install validation = the **agent validates the formally-installed
-  plugin** and records a pass/fail marker; the `closed` gate reads the recorded
-  fact. No automated smoke framework in v1.
-- **D7.** Post-install validation **leaves `tasks.md`** entirely → it is a
-  terminal-stage workflow step, not an implement task. This is the P2 deadlock fix.
-- **D8.** Closure fires automatically as the `closed` entrance effect (not a
-  separately-remembered step) and is also exposed as the explicit
-  `close-related --cascade` verb.
+- **D6.** "Validation" is **operator confirmation only** — install-agnostic, not a
+  workflow criterion, no recorded validation marker, no config surface. What the
+  operator inspects before confirming (validate the installed plugin, for
+  stack-control's own releases; nothing, for a docs collection) is project-specific
+  and outside the workflow's contract.
+- **D7.** No validation step lives in `tasks.md` (there is none to place there) →
+  govern never waits on a publish-dependent task. The P2 deadlock is dissolved by
+  construction, not merely relocated.
+- **D8.** Closure is **operator-confirmed, never automatic**, and is exposed as the
+  explicit `close-related --cascade` verb (dry-run → `--apply`). "Don't forget" is
+  satisfied by the lifecycle surfacing `shipped` as non-terminal (compass/status
+  report the pending `closed`), not by auto-firing.
 
 ---
 
 ## open-questions
 
-- **OQ1 — Anti-reintroduction.** Should we *mechanically* flag/refuse a `tasks.md`
-  task that is a post-install-validation step (the thing that caused the offing
-  deadlock), per "make the failure state impossible"? Or is relocating validation
-  into the workflow enough, with the discipline carried by docs/skill bodies?
+- **OQ1 — Operator-confirm surface.** Where/how is the operator-confirmation guard
+  presented? Options: the `close-related --cascade` dry-run + an explicit `--apply`
+  the operator authorizes (the default close-related discipline); a dedicated
+  `/stack-control:close` skill that shows the dry-run and prompts; or the
+  `advance --to closed` verb refusing to apply the cascade without an explicit
+  confirm flag. Pick one so "confirm" is a concrete, auditable action — not an
+  ambient expectation.
 - **OQ2 — Partial subtree.** When the `part-of` subtree contains a child that is
   NOT terminal yet, does the cascade skip-and-report it (lean) or refuse the whole
   cascade? Dry-run must surface it either way.
 - **OQ3 — Backlog task parent-node ref.** Field name/shape; does `promote`
   set it automatically (it already moves an item into the roadmap)? Does `capture`
   accept it? Read-side: where does the auto-back-link in `done` read it from?
-- **OQ4 — `shipped` vs `closed` boundary + release wiring.** `advance --to shipped`
-  stays the publish/release milestone; `closed` is only reachable after validation.
-  Where exactly is the agent prompted to validate + advance to `closed` — a tail of
-  `/stack-control:release`, a new `/stack-control:close` skill, or an extension of
-  an existing hygiene skill? (Per `enforcement-lives-in-skills.md`, the firing
-  surface must be a skill body + CLI verb, never a git hook.)
-- **OQ5 — Validation marker shape.** Reuse the `approval-marker` criterion kind
-  (like `design-approved`) or add a dedicated `validation-marker` kind? What does
-  the marker record (version validated, date, agent note)?
+- **OQ4 — `shipped` vs `closed` boundary + close wiring.** `advance --to shipped`
+  stays the merge/release milestone; `closed` is the operator-confirmed close.
+  Which skill surfaces the close (and, for self-hosting, prompts the operator to
+  validate the installed plugin first) — a tail of `/stack-control:release`, a new
+  `/stack-control:close`, or an existing hygiene skill? (Per
+  `enforcement-lives-in-skills.md`, the firing surface must be a skill body + CLI
+  verb, never a git hook.)
 - **OQ6 — Compass.** `shipped → closed` must be a legitimate next move; the compass
-  must refuse skipping validation (entering `closed` with no validation marker) and
-  refuse `closed` from a non-`shipped` phase.
+  must refuse `closed` from a non-`shipped` phase. (No validation marker to gate on
+  — the guard is the operator-confirm at apply time, OQ1.)
 - **OQ7 — Cancelled/retired items.** `close-related` already permits terminal
   statuses including `cancelled`. Do `cancelled`/`retired` items get a closure pass
   (close their `closes:`) too, or is the post-ship tail `shipped`-only? How does
@@ -224,12 +266,13 @@ implementing → governing → shipped → closed
   idempotent — `backend.close()` re-sets status + appends a note); confirm a
   re-run of the cascade is safe and reports "already closed" rather than erroring.
 - **OQ9 — Decomposition.** This spans lifecycle-model change + 3 verb surfaces +
-  validation wiring. Confirm it is one feature spec (cohesive: the post-ship
-  terminal stage) vs. a small program; if one spec, the natural `tasks.md` phases
-  are: (1) `closed` phase/status + derivation/compass; (2) `roadmap resolves` +
+  close wiring. Confirm it is one feature spec (cohesive: the post-ship terminal
+  stage) vs. a small program; if one spec, the natural `tasks.md` phases are:
+  (1) `closed` phase/status + derivation/compass; (2) `roadmap resolves` +
   auto-back-link + task parent-node ref; (3) `close-related --cascade` + transitive
-  closer + `childrenOf`; (4) validation marker + skill/`release` wiring; (5)
-  `closed` entrance criterion+effect glue.
+  closer + `childrenOf`; (4) operator-confirm close wiring (the close skill +
+  `advance --to closed` running the cascade on confirm). NB: no validation marker,
+  no entrance-criterion glue — the guard is operator-confirm at apply time.
 
 ---
 
@@ -244,7 +287,10 @@ implementing → governing → shipped → closed
   run until the plugin is published, which is backwards"*; *"the solution to that
   problem is to have the post-install validation be part of the workflow, not an
   implementation task"*; *"what has worked every time so far is to ask the agent to
-  validate the installed plugin. That's good enough."*
+  validate the installed plugin. That's good enough"*; *"adopters may not have an
+  'install' step. So we can't bake that into the entrance criteria for any stage"*;
+  *"asking the operator is good enough for validation. It's just a guard against
+  automatic closure."*
 - **Roadmap node** `multi:gap/transitive-item-closure` (the three stacked closure
   gaps + the proposed verb shapes).
 - **Offing 0.52.2 dogfood friction** (post-install validation as a `tasks.md` task
