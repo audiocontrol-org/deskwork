@@ -2766,3 +2766,87 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:85-99,126,1
 User Story 5 says the plugin version “should match” the `stackctl` CLI version to avoid compatibility issues. The concrete requirements do not require matching versions; FR-012 only requires detecting a mismatch and warning users, and the assumptions say users manually resolve mismatches.
 
 The blast radius is medium because this is P3 and the requirements mostly guide a builder toward the warning behavior. Still, the user story overpromises a compatibility guarantee that the measurable behavior does not deliver. A reasonable fix would reframe the story as “version mismatch visibility” or add an explicit requirement that plugin and CLI release/package versions are kept aligned.
+
+## 2026-06-23 — audit-barrage lift (20260623T035534186Z-031-opencode-support-after_clarify)
+
+Code-sha: 445756e1db53f89271aeb3a7b3f4820bbdfdba0c
+### AUDIT-20260623-156 — US5 AS3 "both versions are displayed" is ambiguous and likely contradicts FR-011
+
+Finding-ID: AUDIT-20260623-156
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US5 AS3 vs FR-011
+
+US5 AS3 reads: "Given user runs `/stack-control:version` and `stackctl --version`, When both commands are invoked, Then both versions are displayed for comparison." The grammatical subject of "both versions are displayed" is ambiguous: it could mean (a) the user runs two separate commands and each displays its own version (a UX workflow, not a feature), or (b) a single invocation of `/stack-control:version` displays both versions in its output.
+
+Reading (b) directly contradicts FR-011 ("reports only the plugin version") and FR-003's /version exception ("reports the plugin-local version"). Yet reading (b) is the more natural one for an acceptance scenario, which typically describes a single testable event → outcome. An unattended agent building from AS3 alone would likely implement a `/stack-control:version` that fetches and displays both versions — a direct violation of the spec's own FR-011 and FR-003.
+
+The US5 Note that follows ("Users who need to verify alignment must compare the plugin version (from `/stack-control:version`) to the CLI version (from `stackctl --version`)") clarifies the design intent, but Notes are not normative and are easily missed when building from the acceptance scenarios. A reasonable fix: rewrite AS3 as "Given user runs `/stack-control:version`, Then the plugin version is displayed; and given user separately runs `stackctl --version`, Then the CLI version is displayed," making it explicit that this is a two-step user workflow, not a single-command output.
+
+---
+
+### AUDIT-20260623-157 — "Commands that require interactive input will fail with a clear error message" may be an unachievable promise
+
+Finding-ID: AUDIT-20260623-157 (claude-02 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US1 Note, FR-003
+
+The spec states in US1's Note: "Interactive CLI prompts are not supported. Commands that require interactive input will fail with a clear error message." FR-003 repeats: "Interactive CLI prompts are not supported."
+
+This promise is achievable only if one of the following holds: (a) the plugin can detect ahead of time which commands require interactive input and refuse them proactively, (b) `stackctl` itself detects the absence of a TTY and exits with a non-zero code and an error message, or (c) the plugin imposes an execution timeout after which it kills the process and emits an error. None of these conditions are required by any FR. If `stackctl` hangs indefinitely waiting for interactive input (as many CLI tools do when stdin is not a TTY and they haven't explicitly coded for it), the promise "will fail with a clear error message" cannot be kept — the skill will simply stall. The distinction between "hangs" and "fails with an error" is a material user-facing difference (a stalled session vs. an actionable error prompt), but the spec makes the better promise without specifying the mechanism or precondition that would allow it to be kept.
+
+The blast radius is medium: most usage in this feature is `--help`-flagged and non-interactive, so the failure mode is unlikely on the happy path. But any user who runs `/stack-control:define` without arguments (a natural invocation) will hit this. A reasonable fix: either scope the promise down to "the plugin MAY hang if `stackctl` does not exit on missing TTY" or add an assumption that `stackctl` exits cleanly when invoked without a TTY.
+
+---
+
+### AUDIT-20260623-158 — "opencode session's active project/workspace as the working directory" is never defined
+
+Finding-ID: AUDIT-20260623-158
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US1 AS2, US3 AS1, Assumptions
+
+The spec uses three interchangeable phrases across US1 AS2, US3 AS1, and the Assumptions section: "opencode session's active project/workspace as the working directory," "opencode session's active project/workspace as the working context," and "opencode session's active project/workspace as the working context." These are load-bearing: `stackctl` is a CLI that operates relative to a filesystem root (the governed project), and invoking it in the wrong directory silently breaks governance — it would either fail to find the spec/roadmap or operate on the wrong project.
+
+The spec never defines: what "active project/workspace" means as a concrete value, whether it maps to a filesystem path, how the plugin obtains that path from opencode's API, or what happens when opencode has no "active project" (e.g., user opened an empty session). The Assumptions confirm the model ("Skill invocations execute `stackctl` with the opencode session's active project/workspace as the working context") but do not define it.
+
+An unattended agent building from this spec would need to guess what opencode API surface provides the active workspace path — a concrete API decision with no spec anchor. The blast radius is medium because the feature breaks at runtime (wrong working directory → governance errors) but the failure is noisy rather than silent. A reasonable fix: add a requirement such as "The plugin MUST invoke `stackctl` with its working directory set to the path opencode exposes as the active project root (via `<opencode API surface TBD>`), and MUST fail with a clear error if no active project path is available."
+
+---
+
+### AUDIT-20260623-159 — US3 AS3 "formats and returns" implies formatting behavior not captured in FR-005
+
+Finding-ID: AUDIT-20260623-159
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US3 AS3 vs FR-005
+
+US3 AS3 states: "Given CLI command completes, When output is returned, Then the plugin formats and returns it to opencode." FR-005 states: "The plugin MUST capture CLI output and return it to opencode" — with no mention of formatting.
+
+"Formats" in US3 AS3 implies the plugin performs some transformation of the raw CLI output before presenting it to the user (e.g., stripping ANSI escape codes, wrapping in a code block, adding a header). FR-005 implies raw passthrough. An agent building from FR-005 ships passthrough; an agent building from AS3 ships a formatter. If the CLI emits ANSI-colored output that opencode doesn't handle, passthrough produces garbled output while formatting would solve it. If the intent is raw passthrough, AS3's "formats" is misleading and will generate unnecessary implementation effort or inconsistencies between implementations.
+
+The blast radius is low because the behavioral difference (passthrough vs. formatted) is unlikely to break correctness, only aesthetics. A reasonable fix: either remove "formats" from AS3 or add a requirement to FR-005 such as "MUST strip ANSI escape codes from CLI output before returning to opencode."
+
+---
+
+### AUDIT-20260623-160 — SC-003 "first output" is undefined for streaming vs. buffered execution models
+
+Finding-ID: AUDIT-20260623-160
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-003
+
+SC-003 states: "Skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI." The phrase "first output" is ambiguous: in a streaming model, "first output" means the first byte received from the CLI; in a buffered model, it means the complete response is rendered. These can differ by seconds for commands that buffer until completion. The condition "local CLI" is also undefined — does it mean the binary is on the same machine? In the same filesystem mount? With a warm process cache?
+
+The blast radius is low because the 2-second bound is generous enough that most reasonable interpretations produce the same pass/fail outcome for a well-functioning local install. However, as written the success criterion cannot be unambiguously measured: a streaming implementation and a buffered implementation could both claim to satisfy SC-003 while behaving very differently from the user's perspective. A reasonable fix: specify "first character of output appears in the opencode UI" (streaming) or "complete response is displayed" (buffered), and define "local CLI" as "CLI binary resolvable via the shell PATH without network access."
