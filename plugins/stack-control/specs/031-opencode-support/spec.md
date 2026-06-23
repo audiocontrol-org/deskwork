@@ -22,7 +22,7 @@ Opencode users want to use stack-control's governance and lifecycle capabilities
 
 1. **Given** opencode is installed with the stack-control plugin, **When** user types `/stack-control:define`, **Then** the skill is invoked and the spec authoring chain begins
 2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI
-3. **Given** user is in an opencode session, **When** they run `/speckit-*` commands through the skill, **Then** those commands execute in the installation context
+3. **Given** user is in an opencode session, **When** they invoke `/stack-control:extend`, **Then** the skill executes in the installation context
 
 ---
 
@@ -110,15 +110,15 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - **FR-006**: The plugin MUST handle CLI errors (non-zero exit codes) and report them to opencode
 - **FR-007**: The plugin MUST provide a clear error message when `stackctl` CLI is not found
 - **FR-008**: The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill
-- **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts`
-- **FR-010**: The plugin MUST support both local installation (copy plugin file) and npm installation
+- **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts` (local file installation)
+- **FR-010**: The plugin MUST support npm installation by exporting a default function that opencode can load from `node_modules/@stack-control/opencode-plugin` (npm package installation)
 - **FR-011**: The plugin MUST report its version when queried
 - **FR-012**: The plugin MUST warn users when plugin version doesn't match CLI version
 
 ### Key Entities
 
 - **Plugin**: The opencode plugin module that exports the plugin function and skill mappings
-- **Skill**: A stack-control skill (e.g., `define`, `extend`, `execute`) that is registered with opencode
+- **Skill**: A stack-control skill that is registered with opencode. The set of skills registered by the plugin is: `define`, `extend`, `execute`, `workflow`, `roadmap` (the primary lifecycle skills)
 - **CLI**: The `stackctl` command-line interface that performs actual stack-control operations
 - **Session**: An opencode session context that the plugin uses for skill invocation
 
@@ -127,7 +127,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 ### Measurable Outcomes
 
 - **SC-001**: Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode
-- **SC-002**: Plugin successfully delegates 95% of skill invocations to the CLI without errors
+- **SC-002**: Plugin successfully delegates 95% of skill invocations to the CLI without errors (measured over a defined set of happy-path skill invocations: `/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`)
 - **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI
 - **SC-004**: Plugin works with opencode versions 1.0 and later
 - **SC-005**: Plugin loads successfully in opencode without requiring additional configuration
@@ -137,6 +137,9 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 ### Session 2026-06-22
 
 - Q: How should the opencode plugin be structured? → A: Single file (`opencode-plugin.ts`)
+- Q: Which stack-control skills are registered with opencode? → A: `define`, `extend`, `execute`, `workflow`, `roadmap` (primary lifecycle skills)
+- Q: How does npm installation work? → A: Plugin exports default function; opencode loads from `node_modules/@stack-control/opencode-plugin`
+- Q: What happens with `/speckit-*` commands? → A: Not supported in this feature; only `/stack-control:` commands are routed
 
 ## Assumptions
 
