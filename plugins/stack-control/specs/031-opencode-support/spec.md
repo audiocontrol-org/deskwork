@@ -42,6 +42,8 @@ Opencode users need a straightforward way to install the stack-control plugin. T
 2. **Given** opencode loads the stack-control plugin, **When** the plugin initializes, **Then** it exports the plugin function following opencode's plugin API
 3. **Given** plugin is loaded, **When** user types any stack-control skill, **Then** the skill is available in the command palette
 
+Note: npm package installation (`@stack-control/opencode-plugin`) exports the same default function but requires users to create `.opencode/plugins/stack-control.ts` that imports from the package. The local copy installation is the primary supported path.
+
 ---
 
 ### User Story 3 - Plugin delegates to stackctl CLI (Priority: P2)
@@ -92,6 +94,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 
 1. **Given** user runs `/stack-control:version`, **When** the command is invoked, **Then** plugin reports only its version
 2. **Given** CLI version differs from plugin version, **When** user runs a skill, **Then** a warning is displayed about version mismatch
+3. **Given** user runs `/stack-control:version` and `stackctl --version`, **When** both commands are invoked, **Then** both versions are displayed for comparison
 
 Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. CLI version detection happens silently for mismatch warnings on skill invocation. Users who need to verify alignment must compare the plugin version (from `/stack-control:version`) to the CLI version (from `stackctl --version`).
 

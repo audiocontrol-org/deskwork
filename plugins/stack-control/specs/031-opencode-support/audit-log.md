@@ -2145,3 +2145,89 @@ SC-003: "Skill invocation latency (from typing command to first output) is under
 "First output" is ambiguous in a context where `stackctl define` might: (a) immediately emit a prompt ("What is the feature name?") in under 2 seconds — trivially satisfying the criterion — or (b) produce meaningful first output only after an LLM sub-agent completes its first step, which could take 5–30 seconds. Both behaviors may be consistent with the batch invocation model of FR-003–FR-005 and both are "first output."
 
 If the intent is to measure time-to-first-byte of CLI stdout, that is nearly always under 2 seconds regardless of what the operation does. If the intent is time to first meaningful result, the criterion needs to specify what counts as meaningful. Either way, the criterion as written can be satisfied trivially (any output byte counts) without validating the UX goal it presumably captures. This is low severity because the wrong reading (first byte) doesn't harm users; it just makes the criterion vacuous.
+
+## 2026-06-23 — audit-barrage lift (20260623T025009495Z-031-opencode-support-after_clarify)
+
+Code-sha: 86e5599cd07fab86b2a7397d8cc2f538a924c82b
+### AUDIT-20260623-118 — SC-004 incomplete fix — "and later" forward-compat promise still contradicts the parenthetical caveat
+
+Finding-ID: AUDIT-20260623-118
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-004
+
+The prior finding (documented in the audit-log header) identified that "Plugin works with opencode 1.0 and later" makes an open-ended forward-compatibility promise, while the parenthetical immediately qualifies it as conditional on API stability — two readings that cannot simultaneously hold. The commit titled "fix: address audit findings - clarify SC-004, FR-010 npm installation" updated the parenthetical (dropping "1.0+" → "1.0" and rewording the caveat) but left the main clause unchanged. SC-004 currently reads: "Plugin works with opencode 1.0 **and later** (tested against opencode 1.0; future compatibility depends on opencode's plugin API stability)."
+
+"And later" is still a forward-compat promise. The parenthetical still immediately contradicts it. The fix resolved the internal parenthetical wording but did not resolve the structural contradiction the prior finding named: the main clause and the caveat still cannot both hold as a coherent promise. The prior finding's suggested resolution was to drop "and later" and replace the main clause with a point-in-time claim — that change was not made.
+
+Blast-radius reasoning: an adopter reading SC-004 post-fix is still entitled to rely on "opencode 1.0 and later" as a durability guarantee. Nothing in the current text corrects that reading. An unattended agent building test suites or documentation from this spec would encode the "1.0 and later" promise as a hard compatibility contract. Medium rather than high because the parenthetical does give a careful reader grounds to question the forward promise — but the main clause remains the more salient, first-read claim.
+
+---
+
+### AUDIT-20260623-119 — FR-010 npm installation path has no acceptance scenario and the discovery mechanism is unstated
+
+Finding-ID: AUDIT-20260623-119 (claude-02 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-010, User Story 2
+
+FR-009 defines one installation model: the user copies the plugin file to `.opencode/plugins/stack-control.ts` and opencode loads it on restart. FR-010 defines a second installation model: "The plugin MUST export a default function that can be loaded from `node_modules/@stack-control/opencode-plugin` for npm package installation." These are two distinct installation paths, but the spec only provides acceptance scenarios for the file-copy path (User Story 2, scenarios 1–3). There is no acceptance scenario for the npm path.
+
+More critically, the spec never states how opencode discovers and loads the npm-installed plugin. Three interpretations are plausible: (a) opencode natively scans `node_modules/` for plugins with a specific naming convention; (b) the npm installation also creates `.opencode/plugins/stack-control.ts` (via a postinstall script or user action); (c) the user manually creates a shim in `.opencode/plugins/` that imports from `node_modules/@stack-control/opencode-plugin`. The clarifications entry ("npm package entrypoint is the same single file") confirms the file is shared but does not resolve which discovery model applies. An implementer building to FR-010 must guess the opencode-side discovery behavior and the user-facing setup steps for the npm path.
+
+Blast-radius reasoning: if an adopter installs via `npm install @stack-control/opencode-plugin` following any reasonable inference from the spec and the plugin does not appear in opencode, the npm installation path is broken by design-level omission rather than implementation error. An unattended agent building against this spec would have no spec signal to guide which of the three discovery models to implement for FR-010, making the two installation paths likely to diverge.
+
+---
+
+### AUDIT-20260623-120 — FR-005 output capture scope and delivery mode are ambiguous
+
+Finding-ID: AUDIT-20260623-120
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-005, FR-006, SC-003
+
+FR-005: "The plugin MUST capture CLI output and return it to opencode." Two ambiguities converge here.
+
+**Stdout vs. stderr scope.** "CLI output" does not distinguish stdout from stderr. Many CLI tools — including AI-orchestrated pipelines like `stackctl define` — write progress, warnings, and diagnostics to stderr on a zero exit code. FR-006 handles non-zero exit codes but says nothing about what gets returned alongside the exit code. An implementer who captures only stdout would technically satisfy FR-005's literal text while silently dropping stderr content (version-mismatch warnings from FR-012, contextual error messages on partial failures). An implementer who captures both and interleaves them would produce a different output stream shape. The spec commits to no channel scope.
+
+**Buffered vs. streaming delivery.** "Capture CLI output and return it" reads naturally as buffered: wait for the process to exit, then return the accumulated output. But SC-003 requires "first output" in under 2 seconds for `/stack-control:define`. `stackctl define` is an AI-orchestrated workflow that may run for minutes; in buffered mode no output would appear until completion, making SC-003 unmeasurable for this skill regardless of the 2-second threshold. A streaming delivery model (forwarding output incrementally as the CLI produces it) would satisfy SC-003's spirit, but "capture and return" does not describe streaming. These two requirements are not literally contradictory but the implementer resolving FR-005 toward the natural buffered reading would build something that cannot satisfy SC-003 for long-running skills.
+
+Blast-radius reasoning: an unattended agent implementing FR-005 as buffered stdout-only capture satisfies the literal text of FR-005, drops stderr, and produces no first-output during multi-minute operations. Both the channel-scope gap and the buffered/streaming gap compound silently — neither produces an obvious defect on the happy-path unit test for a fast-returning skill.
+
+---
+
+### AUDIT-20260623-121 — US-2 scenario 3 "any stack-control skill" is broader than the registered set
+
+Finding-ID: AUDIT-20260623-121
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — User Story 2, acceptance scenario 3; FR-002; Key Entities note
+
+User Story 2, acceptance scenario 3: "Given plugin is loaded, When user types any stack-control skill, Then the skill is available in the command palette."
+
+FR-002 and the Key Entities note both explicitly state that `/stack-control:version` is "a routed command, not a registered skill" and "does not appear in opencode's skill registration." A reader treating "any stack-control skill" as meaning "any command invoked with the `/stack-control:` prefix" would register the version command in the command palette, contradicting FR-002 and the Key Entities note.
+
+The intended reading ("any of the five registered lifecycle skills") is accessible to a careful reader who has read FR-002 and the Key Entities section. But US-2 scenario 3 is the most natural place for an implementer to anchor registration behavior, and its wording is more permissive than the spec's settled intent. An implementer working from acceptance scenarios alone would arrive at a different registered set than one reading FR-002.
+
+Blast-radius reasoning: the wrong reading (register everything including version) produces a minor UX inconsistency — version appearing in the command palette — that may or may not align with opencode's intended UX. Low severity because the correct reading is reachable from the full spec and multiple other sections reinforce the exclusion.
+
+### AUDIT-20260623-122 — Version alignment is promised, but only mismatch warning is specified
+
+Finding-ID: AUDIT-20260623-122
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:83-96,121-123,153-161
+
+User Story 5 says users “should be able to verify version alignment,” and its independent test is comparing plugin version to CLI version. But FR-011 requires `/stack-control:version` to report only the plugin version, while FR-012 only requires warning on skill invocation when a mismatch is detected. The note reinforces that users must manually compare `/stack-control:version` with `stackctl --version`.
+
+Those promises leave no plugin-level affirmative alignment result. If versions match, the plugin emits nothing; if a builder expands `/stack-control:version` to report both versions, it violates “reports only the plugin version.” The likely implementation is a silent mismatch check that satisfies FR-012 but cannot prove alignment through the plugin surface. Blast radius is medium because manual CLI comparison still exists, but the stated version-sync feature is weaker and less testable than the user story promises.
