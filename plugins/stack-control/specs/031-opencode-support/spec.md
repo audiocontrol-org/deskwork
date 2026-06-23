@@ -21,10 +21,10 @@ Opencode users want to use stack-control's governance and lifecycle capabilities
 **Acceptance Scenarios**:
 
 1. **Given** opencode is installed with the stack-control plugin, **When** user types `/stack-control:define`, **Then** the skill is invoked and the spec authoring chain begins
-2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI with the opencode session's active project/workspace as the working context
-3. **Given** user is in an opencode session, **When** they invoke `/stack-control:extend`, **Then** the skill executes in the installation context
+2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI with the active project/workspace as the working context
+3. **Given** user is in an opencode session, **When** they invoke `/stack-control:extend`, **Then** the skill executes in the stack-control installation context
 
-Note: `/stack-control:workflow` is a lifecycle management command that delegates to `stackctl workflow`. Its successful output is a valid workflow status report from the CLI.
+Note: CLI operations execute with the active project/workspace as the working directory. The installation context is resolved from the enclosing stack-control installation directory.
 
 ---
 
@@ -108,7 +108,7 @@ Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. C
 ### Functional Requirements
 
 - **FR-001**: The plugin MUST export a function following opencode's plugin API signature
-- **FR-002**: The plugin MUST register the primary lifecycle skills when loaded (`define`, `extend`, `execute`, `workflow`, `roadmap`)
+- **FR-002**: The plugin MUST register the primary lifecycle skills when loaded (`define`, `extend`, `execute`, `workflow`, `roadmap`). The `/stack-control:version` command is routed but not a registered skill in opencode's command palette.
 - **FR-003**: The plugin MUST delegate skill execution to the `stackctl` CLI via the shell API, except for `/stack-control:version` which reports the plugin-local version
 - **FR-004**: The plugin MUST forward skill arguments to the CLI as command arguments, preserving opencode command argument token boundaries and quoting semantics (e.g., `/stack-control:define "opencode support"` passes command `define` and one argument with value `opencode support` to `stackctl`)
 - **FR-005**: The plugin MUST capture CLI output and return it to opencode
@@ -127,6 +127,8 @@ Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. C
 - **CLI**: The `stackctl` command-line interface that performs actual stack-control operations
 - **Session**: An opencode session context that the plugin uses for skill invocation
 
+Note: `/stack-control:version` is a routed command, not a registered skill. It is plugin-local and does not appear in opencode's skill registration.
+
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
@@ -134,7 +136,7 @@ Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. C
 - **SC-001**: Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode
 - **SC-002**: Plugin successfully delegates all five listed happy-path skill invocations to the CLI without errors (`/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)
 - **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI
-- **SC-004**: Plugin works with opencode versions 1.0 and later (tested against opencode 1.0+; compatibility with future versions depends on opencode's plugin API stability)
+- **SC-004**: Plugin works with opencode 1.0 and later (tested against opencode 1.0+; compatibility with future versions depends on opencode's plugin API stability)
 - **SC-005**: Plugin loads successfully in opencode without requiring additional configuration
 
 ## Clarifications

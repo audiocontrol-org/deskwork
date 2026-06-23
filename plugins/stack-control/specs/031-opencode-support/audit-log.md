@@ -1515,3 +1515,81 @@ Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:9`, `plugi
 The spec requires registering and successfully delegating `/stack-control:workflow`: it is listed in the feature input (`line 9`), required by FR-002 (`line 110`), included in SC-002’s five happy-path invocations (`line 134`), and appears in the command registration scenario (`lines 73-75`). But no user story or acceptance scenario states what `workflow` should do, what `stackctl` command it maps to, or what successful output means.
 
 This is not a request for implementation mechanism; it is a missing behavioral promise for one of the five success-criterion commands. The blast radius is medium because an unattended builder will probably infer `stackctl workflow`, but the spec gives no way to distinguish a correct implementation from a merely registered command that calls the wrong lifecycle surface. A reasonable fix would add a one-sentence contract for `/stack-control:workflow`, parallel to the other lifecycle commands, or remove it from the required happy-path list if it is not part of this feature.
+
+## 2026-06-23 — audit-barrage lift (20260623T020148749Z-031-opencode-support-after_clarify)
+
+Code-sha: 0bd69eea962bbf0fa2d8a9f1005d457cfbf12ba6
+### AUDIT-20260623-81 — `version` skill registration inconsistent between Clarifications section and normative requirements
+
+Finding-ID: AUDIT-20260623-81
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=reachable, fix-debt=no; reachable, high blast radius — NOT calibrated down (real signal preserved, SC-003).
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (Clarifications, FR-002, FR-011, US4-SC3, Key Entities)
+
+The Clarifications section (Session 2026-06-22) records the authoritative answer as: "Which stack-control skills are registered with opencode? → A: `define`, `extend`, `execute`, `workflow`, `roadmap`, `version` (primary lifecycle skills + version command)" — six skills including `version`. Every normative artifact in the same spec contradicts this: FR-002 lists five skills (`define`, `extend`, `execute`, `workflow`, `roadmap`) with no `version`; the Key Entities block repeats the same five-skill list explicitly; US4-SC3 acceptance scenario names the same five skills; and SC-002's happy-path delegation test covers only the five CLI-delegating skills.
+
+FR-011 requires the plugin to "expose a `/stack-control:version` command," but uses "expose" while FR-002 uses "register." The spec never equates these verbs, so an unattended builder following FR-002 would implement a five-skill registration and might treat `version` as a separate, non-registered command handler — or might omit it entirely, since FR-011's "expose" does not appear in the normative skill-list. The Clarifications answer is discoverable but is not binding prose; FR-002 is the formal requirement a builder implements against.
+
+Blast-radius: high. An unattended builder reads FR-002 (the normative list), produces a plugin that registers five skills, and `/stack-control:version` either silently fails or is never reachable through the command palette. The fix is straightforward: either add `version` to FR-002's list (annotating the FR-003 CLI-delegation exception inline), or explicitly state in FR-002 that `version` is registered but handled locally per FR-003/FR-011.
+
+---
+
+### AUDIT-20260623-82 — CLI working-context (active project/workspace) requirement appears in acceptance scenarios but has no corresponding FR
+
+Finding-ID: AUDIT-20260623-82 (claude-02 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (US1-SC2, US3-SC1, FR-003)
+
+US1-SC2 promises: "the plugin delegates to the local `stackctl` CLI with **the opencode session's active project/workspace as the working context**." US3-SC1 repeats the identical constraint: "the plugin invokes `stackctl <command>` via the shell API with **the opencode session's active project/workspace as the working context**." This requirement appears in two independent acceptance scenarios, which signals it is a genuine, load-bearing behavioral promise — `stackctl` operates on the directory it is invoked from, so an incorrect working directory would cause it to govern the wrong project or fail with a "not a stack-control project" error.
+
+FR-003 says only: "The plugin MUST delegate skill execution to the `stackctl` CLI via the shell API." There is no FR that says the invocation MUST use the session's active workspace as the working directory. The Assumptions section says nothing about working directory either.
+
+Blast-radius: high. An unattended builder reads FR-003 and writes code that shells out to `stackctl define` — but in whatever directory the opencode process was started, or in the plugin's installation directory — and the plugin silently operates on the wrong project on every invocation. The feature appears to work (no error, output is returned per FR-005) but governs the wrong codebase. The fix is to add an FR specifying that CLI invocations MUST set the working directory to the opencode session's active project path, and to define how that path is obtained from the opencode session context.
+
+---
+
+### AUDIT-20260623-83 — SC-004's "versions 1.0 and later" promise is immediately revoked by its own parenthetical
+
+Finding-ID: AUDIT-20260623-83
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (SC-004)
+
+SC-004 reads: "Plugin works with opencode versions 1.0 and later (tested against opencode 1.0+; compatibility with future versions depends on opencode's plugin API stability)." The main clause makes a forward-looking promise: compatibility with all opencode releases ≥ 1.0. The parenthetical immediately conditions it: compatibility with *future* versions (i.e., anything after 1.0) depends on a third-party API staying stable — which the spec cannot guarantee.
+
+The result is that the success criterion states two mutually incompatible things: (a) the plugin works with 1.0 and all later versions, and (b) future version compatibility is contingent. An unattended builder cannot know which reading to implement against, and an auditor cannot determine whether the criterion is met after a breaking opencode API change. As written, SC-004 is also untestable against future versions: there is no oracle for "opencode's plugin API stability" and no threshold that tells a tester when the contingency fires.
+
+The fix is to pick one reading: either (a) narrow SC-004 to "Plugin is verified to work with opencode 1.0 at the time of this feature's implementation" (a measurable, historical claim), or (b) state the forward-looking compatibility as a best-effort goal with explicit acknowledgment that it is not a guarantee — separated from the measurable success criterion rather than embedded in its parenthetical.
+
+### AUDIT-20260623-84 — Version command is required but not consistently part of the registered command set
+
+Finding-ID: AUDIT-20260623-84
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:77`, `plugins/stack-control/specs/031-opencode-support/spec.md:110-126`, `plugins/stack-control/specs/031-opencode-support/spec.md:144-145`
+
+FR-011 requires exposing `/stack-control:version` (`line 120`), and the clarification says registered skills include `define`, `extend`, `execute`, `workflow`, `roadmap`, and `version` (`line 145`). But the main registration requirement only names the five primary lifecycle skills (`line 111`), US4-SC3 only requires those five to be registered with opencode (`line 77`), and the Key Entities definition of Skill excludes `version` from the registered set (`line 126`).
+
+The intended reading is probably that `version` is a command but not a lifecycle skill, yet the spec uses registration, skill availability, and command exposure interchangeably. An unattended builder could implement `/stack-control:version` as a routed fallback but omit it from opencode’s command palette, or treat it as a sixth registered skill contrary to the “primary lifecycle” set. Blast radius is medium because the core lifecycle commands still work, but the version UX and registration contract are inconsistent. A reasonable fix would explicitly say whether `version` is registered in opencode’s command palette and whether it is a skill or a plugin-local command.
+
+### AUDIT-20260623-85 — SC-004 promises open-ended future opencode compatibility while disclaiming it
+
+Finding-ID: AUDIT-20260623-85
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:137`
+
+SC-004 says “Plugin works with opencode versions 1.0 and later,” then immediately narrows that with “compatibility with future versions depends on opencode's plugin API stability” (`line 137`). The first clause is an open-ended compatibility promise over future versions; the parenthetical admits that promise cannot be guaranteed by this feature.
+
+This makes the success criterion untestable as written. A downstream builder or verifier can test against known 1.0+ versions available at build time, but cannot prove compatibility with all later versions. Blast radius is medium because the intended compatibility target is obvious, but the measurable outcome overpromises. A reasonable fix would scope SC-004 to specific tested opencode versions or to “opencode 1.0-compatible plugin API” rather than all future 1.0+ releases.
