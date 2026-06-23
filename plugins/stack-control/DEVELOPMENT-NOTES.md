@@ -2,6 +2,44 @@
 
 ---
 
+## 2026-06-23: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 17
+  - chore: release v0.53.2
+  - Merge pull request #497 from audiocontrol-org/feature/stack-control
+  - docs(govern): reframe seam-pass as redundant with the compiler; record the stochastic-layer principle
+  - fix(govern): couple a test file with its implementing source by name (TASK-430)
+  - fix(govern): exclude WHOLE other-feature roots from the implement payload (TASK-428)
+  - docs(govern): reconcile 030/015 spec drift (TASK-433/434/128)
+  - fix(govern): reap orphan torn temp files when writing the convergence record (TASK-109)
+  - test(govern): re-pin the outer-tree payload-leak invariant for scopeCommittedDiff (TASK-441)
+  - fix(govern): rename-aware committed-diff scoping, independent of diff.renames (TASK-429)
+  - fix(govern): a no-op fix surfaces fix-failure, never converges (TASK-439)
+  - fix(govern): surface cross-chunk seam breaks in the NOT-done message (TASK-440)
+  - fix(govern): doctor rejects chunk-set artifacts with missing/empty/non-array chunks (TASK-437)
+  - fix(govern): guard the untracked-fold against binary + oversized files (TASK-436)
+  - fix(govern): resolve diff base via origin/main when it is the only default-branch ref
+  - fix(govern): seam-pass detects multi-line sigs, function-typed params, required-shape
+  - chore: release v0.53.1
+  - Merge pull request #496 from audiocontrol-org/feature/stack-control
+- Files changed: 42
+- Backlog touched: TASK-109, TASK-128, TASK-424, TASK-426, TASK-428, TASK-429, TASK-430, TASK-431, TASK-433, TASK-434, TASK-435, TASK-436, TASK-437, TASK-438, TASK-439, TASK-440, TASK-441, TASK-47
+
 ## 2026-06-22 (late): bookkeeping-hardening verified in v0.53.1 + umbrella shipped (paperwork close-out)
 
 **Goal:** Operator released v0.53.1 (containing this session's bookkeeping-hardening work) and asked to validate the installed release and close out the relevant paperwork. A short close-out tail after the main session + the first session-end.
