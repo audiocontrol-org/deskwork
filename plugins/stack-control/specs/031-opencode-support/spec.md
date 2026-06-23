@@ -151,6 +151,7 @@ Note: `/stack-control:version` is a routed command, not a registered skill. It i
 - Q: What happens with unknown `/stack-control:` commands? → A: Clear "unknown stack-control command" error
 - Q: What happens with `/speckit-*` commands? → A: Not supported in this feature; only `/stack-control:` commands are routed
 - Q: How are version mismatches detected? → A: Plugin detects mismatch and warns on skill invocation; users manually resolve
+- Q: What is the CLI verb mapping for registered skills? → A: `/stack-control:define` → `stackctl define`, `/stack-control:extend` → `stackctl extend`, `/stack-control:execute` → `stackctl execute`, `/stack-control:workflow` → `stackctl workflow`, `/stack-control:roadmap` → `stackctl roadmap`
 
 ## Assumptions
 

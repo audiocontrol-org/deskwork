@@ -1977,3 +1977,85 @@ Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:57-59,102,
 SC-003 says “Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI” at line 140, while the feature also promises CLI delegation for skill execution at lines 57-59 and explicitly acknowledges long-running stack-control skills at line 102. As written, “first output” can reasonably mean first CLI output, because FR-005/US3 frame returned output as captured CLI output. The plugin cannot guarantee that timing for arbitrary local `stackctl` commands, especially if the CLI performs setup, waits on governance work, or is silent during a long-running operation.
 
 Blast radius is medium: a reasonable builder may infer the intended promise is plugin dispatch overhead and still build the right wrapper, but another unattended builder could add synthetic “starting...” output solely to satisfy SC-003, changing the user-facing output contract without a spec-level decision. A reasonable fix is to restate SC-003 as either plugin dispatch/acknowledgement latency or narrow it to a tested happy-path command whose first output is known to occur within the threshold.
+
+## 2026-06-23 — audit-barrage lift (20260623T023556636Z-031-opencode-support-after_clarify)
+
+Code-sha: ffd27a31df7ff909170fb2f6158b3ef81d5999c4
+### AUDIT-20260623-108 — FR-003 omits the working-directory requirement that user stories treat as essential
+
+Finding-ID: AUDIT-20260623-108
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-003 vs US1 note, US3 scenario 1 note
+
+FR-003 states: "The plugin MUST delegate skill execution to the `stackctl` CLI via the shell API." It says nothing about the working directory in which `stackctl` runs. Two separate user-story notes carry the missing constraint explicitly: the US1 note says "CLI operations execute with the active project/workspace as the working directory. Stack-control installation discovery starts from that cwd and resolves the enclosing installation," and the US3 scenario 1 note says the plugin invokes `stackctl` "with the opencode session's active project/workspace as the working context."
+
+`stackctl` resolves the enclosing stack-control installation by walking up from its working directory. If the shell API invokes `stackctl` in an unspecified default cwd (e.g., the opencode installation directory or the user's home directory), the CLI will fail to locate the installation and every skill invocation will break — not with a clear error about missing CLI (covered by FR-007) but with a confusing "no stack-control installation found" error or silent mis-routing to a different installation. An unattended builder implementing FR-003 faithfully will produce a plugin that delegates correctly but runs `stackctl` in the wrong context.
+
+The fix is straightforward: add a sentence to FR-003 — "The plugin MUST invoke `stackctl` with the opencode session's active project/workspace as the working directory" — and verify that FR-003's language matches the user-story notes. The user stories are clear on the requirement; the gap is that it was never lifted into the FRs.
+
+---
+
+### AUDIT-20260623-109 — FR-009 and FR-010 state incompatible MUST constraints on the plugin load path
+
+Finding-ID: AUDIT-20260623-109
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-009, FR-010
+
+FR-009: "The plugin MUST load from `.opencode/plugins/stack-control.ts`." FR-010: "The plugin MUST support npm package installation via export of a default function." These two MUSTs describe incompatible load paths. The local-copy install lands the file at `.opencode/plugins/stack-control.ts`; an npm install lands it in `node_modules/` (or wherever the registry puts it). opencode's plugin loader reads from one or the other, not both simultaneously.
+
+The clarification Q&A addresses only file content ("same single file"), not the path: "Q: How does npm installation work? → A: Plugin exports default function; npm package entrypoint is the same single file." This tells a builder that the file content is identical across install methods but leaves the loader path entirely unresolved. An unattended builder implementing FR-009 would target `.opencode/plugins/stack-control.ts` as the authoritative load path; implementing FR-010 would yield an npm package whose default load path is not `.opencode/plugins/stack-control.ts`. The two cannot simultaneously satisfy FR-009's MUST unless there is a bridging step (e.g., a post-install script that copies the npm file to the plugins directory) — a step the spec does not describe.
+
+A reasonable fix is to disambiguate: either (a) declare the two as alternative installation methods (local copy OR npm — not both MUST), and describe the npm installation path explicitly, or (b) describe the bridging step that reconciles the npm-installed location with the `.opencode/plugins/` load path. The current dual-MUST form leaves an unattended builder no path to satisfying both requirements simultaneously.
+
+---
+
+### AUDIT-20260623-110 — Version mismatch warning frequency is ambiguous — every invocation vs. once per session are equally plausible
+
+Finding-ID: AUDIT-20260623-110
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-012, US5 acceptance scenario 2
+
+FR-012: "The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked." US5 acceptance scenario 2: "Given CLI version differs from plugin version, When user runs a skill, Then a warning is displayed about version mismatch."
+
+"When a skill is invoked" has two equally plausible readings: (a) every time any skill is invoked while a mismatch persists, or (b) once — the first time a skill is invoked in a session after the mismatch is detected. The literal reading of "when a skill is invoked" most naturally yields (a) — a warning on every execution — which would produce noisy UX for users who have an intentional version delta and simply haven't upgraded yet. A thoughtful builder might implement (b) for better UX, reasoning that a once-per-session warning is sufficient. The spec does not say which is intended.
+
+This ambiguity has an observable UX consequence: two compliant implementations behave differently in exactly the scenario the user story is testing (a persistent version mismatch). The spec should specify whether the warning fires once per session, once per process lifetime, or on every skill invocation, so that SC-002's "without errors" language can be read in context and the warning behavior can be verified against the criterion.
+
+---
+
+### AUDIT-20260623-111 — Edge cases section raises open questions without explicit dispositions
+
+Finding-ID: AUDIT-20260623-111
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — Edge Cases section
+
+The Edge Cases section lists five questions: (1) session ends during long-running skill, (2) `stackctl` not in PATH, (3) multiple simultaneous opencode sessions, (4) network timeouts or file system errors during CLI execution, (5) `stackctl` installed globally but not in PATH. None are marked out of scope; none have corresponding FRs or SC entries.
+
+Two of the five are implicitly covered elsewhere: (2) and (5) are addressed by FR-007 ("clear error message when `stackctl` CLI is not found") and the assumptions section ("Users have `stackctl` CLI installed and available in their PATH"). FR-006 partially covers (4) for non-zero exit codes, but a hanging CLI process (no exit, no output) is not covered. Cases (1) and (3) have no coverage in the FRs or assumptions at all.
+
+The blast radius is low because a careful builder applying standard practices would handle session-ending gracefully (process cleanup on session close) and would not be confused by simultaneous sessions (each session forks its own CLI process). However, a spec that lists open questions without disposing of them is ambiguous about whether a builder is expected to solve them or ignore them. A reasonable fix is to add one line per edge case: either cite the FR that handles it, state an assumption that bounds it out of scope, or explicitly call it "out of scope for this release."
+
+### AUDIT-20260623-112 — Registered skill names are treated as CLI verbs without a committed command mapping
+
+Finding-ID: AUDIT-20260623-112
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:57,113-115,138-139`
+
+FR-002 registers five opencode skills (`define`, `extend`, `execute`, `workflow`, `roadmap`), while FR-003/FR-004 say skill execution delegates to `stackctl` and give `/stack-control:define "opencode support"` as passing command `define` to `stackctl`. SC-002 then treats all five bare slash commands as happy-path invocations. The spec never states whether the opencode skill name is always the literal `stackctl` verb, or whether each registered skill maps to a specific CLI verb/subcommand/argument shape.
+
+That ambiguity has high blast radius for an unattended builder: the most direct implementation is `/stack-control:<name>` → `stackctl <name> ...`, but broad surfaces like `workflow` and `roadmap` are command families, and `define`/`extend`/`execute` may not be literal CLI verbs in the same sense. The result could satisfy FR-004’s example-driven reading while failing SC-002 for several of the advertised primary skills. A reasonable fix is to add a normative mapping table for all five registered commands, including the exact CLI command/subcommand shape and whether a bare invocation is valid or must produce usage/argument guidance.
