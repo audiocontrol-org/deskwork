@@ -117,3 +117,37 @@ Surface:    src/subcommands/roadmap-advance-closed.ts:84-98
 The apply path runs `applyCascade(plan, backend)` first, mutating every backlog item to `Done`, then calls `advance(docPath, id, 'closed', opts, true)` to validate and write the roadmap status. If the roadmap write fails after the cascade succeeds, for example due to a concurrent edit, missing status line, filesystem permission error, or candidate validation/write failure, the installation is left with contained backlog IDs closed while the root roadmap item is still `shipped`.
 
 Blast radius is high because this is the feature’s central operator-confirmed action and it spans two durable stores. The code already preflights unknown backlog IDs, but it does not preflight or stage the roadmap mutation before closing external backlog items. A reasonable fix would validate the roadmap status candidate before mutating backlog and structure the apply path so failures produce a recoverable, explicitly reported state instead of silently splitting “ids closed” from “item closed.”
+
+## 2026-06-23 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260623-08 — Code comment implies `advance --to closed` can converge by re-run; it cannot
+
+Finding-ID: AUDIT-20260623-08 (claude-03 + codex-01; cross-model)
+Status:     fixed-98e7eab5
+Severity:   high
+Per-lane:   claude=low, codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained. FIXED 2026-06-23 (98e7eab5) — comment corrected: recovery from a mid-cascade failure is `close-related --cascade` (accepts the now-terminal closed item, idempotent), NOT re-running advance (whose shipped precondition refuses it).
+Surface:    src/subcommands/roadmap-advance-closed.ts — the apply-path comment block (lines approximately 75-82)
+
+The apply-path comment reads:
+
+> *"Only once the status is recorded `closed` do we close the contained backlog ids. (unknownIds were already refused above; the cascade is idempotent, so a re-run converges.)"*
+
+The parenthetical "a re-run converges" implies that a developer encountering a mid-cascade failure can re-run the same command to finish the job. They cannot: the roadmap status is already `closed`, and the command's own precondition (`item.status !== 'shipped'`) will refuse it. The recovery is via `close-related --cascade`, not via re-running this command.
+
+The comment likely means to say *"the cascade step is individually idempotent — if triggered via `close-related --cascade` as a recovery, already-closed ids are no-ops"*, but as written it reads as a claim about this specific command's re-runnability, contradicting the precondition guard four lines above it. Blast-radius: a future maintainer refactoring the precondition or adding a retry wrapper could be misled into believing there is a safe re-entrant path.
+
+---
+
+### AUDIT-20260623-09 — Auto-backlink preflight does not prevent Done/promoted-but-unlinked on roadmap write failure
+
+Finding-ID: AUDIT-20260623-09
+Status:     fixed-c44b419b
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high); FIXED 2026-06-23 (c44b419b) — done/promote now write the roadmap back-link FIRST (local, validated, atomic) then mutate the backlog; a back-link write failure leaves the backlog untouched (no Done/promoted-but-unlinked). Subsumes the node-existence preflight (removed). RED test: unwritable roadmap fails done with the task un-closed.
+Surface:    src/subcommands/backlog.ts:180-193, src/subcommands/backlog.ts:381-392, src/backlog/auto-backlink.ts:55-57
+
+The new preflight validates that a parent-node target exists before `backlog done` or `promote` mutates the backlog, but it does not prove the later roadmap write will succeed. `emitDone` preflights, closes the backlog id, then calls `emitAutoBackLink`; `emitAutoBackLink` computes and commits the roadmap mutation afterward. If `commitCandidate` fails because the roadmap became invalid, unwritable, or concurrently changed, the task is already `Done` and exits fail-loud but unlinked. `promote --apply` has the same shape: promotion is recorded before `setParentNode`/`emitAutoBackLink` write the roadmap link.
+
+The blast radius is high because this is the exact class of state split the auto-backlink feature is meant to remove: later transitive closure only reads recorded `closes:` ids, so a Done/promoted task that failed to back-link can be omitted from the cascade. A reasonable fix should exercise and handle the commit-failure channel, not just unknown-node preflight: either make the backlink write happen with rollback semantics around the backlog mutation, or record a durable repairable pending-link state that the close cascade refuses or surfaces loudly.
