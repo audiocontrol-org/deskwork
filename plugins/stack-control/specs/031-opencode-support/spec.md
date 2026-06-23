@@ -139,7 +139,7 @@ Note: `/stack-control:version` is a routed command, not a registered skill. It i
 ### Measurable Outcomes
 
 - **SC-001**: Users can install the stack-control plugin by copying `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts` and invoke `/stack-control:define` within 5 minutes of first opening opencode
-- **SC-002**: Plugin successfully delegates all five listed happy-path skill invocations to the CLI without errors (`/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)
+- **SC-002**: Plugin successfully delegates all five listed happy-path skill invocations to the CLI without errors (`/stack-control:define --help`, `/stack-control:extend --help`, `/stack-control:execute --help`, `/stack-control:workflow --help`, `/stack-control:roadmap --help`)
 - **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI
 - **SC-004**: Plugin works with opencode 1.0 (tested against opencode 1.0; future compatibility depends on opencode's plugin API stability)
 - **SC-005**: Plugin loads successfully in opencode without requiring additional configuration
