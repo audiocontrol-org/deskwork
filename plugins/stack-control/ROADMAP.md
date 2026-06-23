@@ -619,6 +619,7 @@ Tooling-friction routing policy:
 
 ## multi:gap/transitive-item-closure
 - status: in-flight
+- spec: specs/031-transitive-item-closure
 - design-approved: yes
 - design: docs/superpowers/specs/2026-06-23-transitive-item-closure-design.md
 - part-of: multi:feature/lifecycle-industrialization
