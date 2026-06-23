@@ -2,6 +2,42 @@
 
 ---
 
+## 2026-06-23: transitive-item-closure — design → full Spec Kit chain authored to runnable
+
+**Goal:** Take up `multi:gap/transitive-item-closure` (the in-flight pickup) — make "closing what a roadmap item contains" one mechanical move — and fold in two operator-added requirements: make closure part of the **terminal-state workflow stage** (so it isn't forgotten), and move **post-install validation into the workflow, not a `tasks.md` task** (the offing deadlock). Author it through the stack-control front door from design to a runnable spec. Orchestrator-session work only (implementation is a separate session).
+
+**Accomplished:**
+- **Drove the full lifecycle in-session, front-door-mediated, committed+pushed at every step:** `/stack-control:design` (brainstorming backend + house rules → operator-approved design record) → `/stack-control:define` driving the native Spec Kit chain **specify → clarify → plan → checklist → tasks → analyze**, each bracketed by the capability-mediation front-door marker (`spec-definition`).
+- **Spec `031-transitive-item-closure` is runnable:** `spec/plan/tasks` all present, `execute-check: runnable`, phase `implementing`; node carries `design:` + `spec:` pointers, `design-approved` + `analyze-clean` markers.
+- **Feature shape captured:** (1) transitive closer — `close-related --cascade` walks the `part-of` subtree, dedups multi-parent via visited-Set, **skips-and-reports** non-terminal children, **uniform terminal handling** for cancelled/retired; (2) `closes:` population — `roadmap resolves --add/--remove` + auto-back-link on `backlog done`/`promote` via a task parent-node ref; (3) a new terminal **`closed`** phase + status entered only via the operator-confirmed **`advance --to closed`** (dry-run → `--apply`), with phase-derivation mapping status→phase by-name so `shipped` is no longer terminal.
+- **`/speckit-clarify` resolved 3 forks** with operator picks (confirm surface = `advance --to closed`; partial subtree = skip-and-report; cancelled/retired = uniform terminal handling). **`/speckit-analyze`:** 100% FR/SC→task coverage, 0 critical/0 high. **`/speckit-checklist`:** 27-item closure-safety requirements checklist.
+
+**Didn't Work:**
+- **Bash classifier intermittently unavailable** at session start (`claude-opus-4-8 temporarily unavailable` for non-allowlisted commands) — blocked the `session-start` verb and other non-allowlisted commands. Worked around by assembling orientation from read-only file tools; it recovered shortly after. A harness condition, not a `stackctl` defect.
+
+**Course Corrections:**
+- **[SCOPE]** Operator expanded scope twice mid-design (terminal-stage wiring; post-install validation in the workflow) — captured each per capture-over-YAGNI rather than cutting.
+- **[DESIGN]** Operator caught that **adopters may have no "install" step**, so post-install validation can't be a universal entrance criterion — generalized to an **install-agnostic operator-confirmation guard**. Then narrowed further: *"asking the operator is good enough … it's just a guard against automatic closure"* — collapsed validation to an operator-confirm at apply time, with **no config/marker machinery**. Both reshaped the design *before* any code; design record + spec revised accordingly. No shipped-code rework — these were capture-phase shaping calls.
+
+**Insights:**
+- **The two-session boundary held.** The orchestrator session authored design→runnable and stopped at the implementation handoff; `execute` belongs to a separate worktree/session.
+- **Operator-confirm-as-guard generalized the feature cleanly:** the same move that makes closure un-forgettable (`shipped` no longer terminal → the lifecycle surfaces the pending `closed`) keeps it non-automatic, and **dissolves the offing audit/publish deadlock by construction** (no validation task or criterion left to deadlock on). Validating the design's *purpose* (install-agnostic) before specifying the mechanism avoided baking in an install assumption.
+- The full Spec Kit chain ran with **zero `stackctl` defects** — front-door capability mediation (enter/exit per backend drive) + per-step commit/push worked smoothly end to end.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 9
+  - roadmap(031-transitive-item-closure): record analyze-clean (speckit-analyze: 0 critical/high)
+  - tasks(031-transitive-item-closure): author tasks.md via speckit-tasks + set node spec pointer
+  - checklist(031-transitive-item-closure): closure-safety requirements checklist
+  - plan(031-transitive-item-closure): author plan + design artifacts via speckit-plan
+  - spec(031-transitive-item-closure): clarify — resolve the 3 scope forks
+  - spec(031-transitive-item-closure): author spec.md via speckit-specify
+  - roadmap(transitive-item-closure): record design-approved (operator approved 2026-06-23)
+  - design(transitive-item-closure): generalize — operator-confirm guard, not install criterion
+  - design(transitive-item-closure): post-ship terminal stage + transitive closer
+- Files changed: 16
+- Backlog touched: (none)
+
 ## 2026-06-23: govern-030-hardening burndown + seam-pass reframing → shipped v0.53.2
 
 **Goal:** Pick up the in-flight `govern-030-hardening` umbrella and burn down its dispositioned residuals; operator chose "whole umbrella, you sequence."
