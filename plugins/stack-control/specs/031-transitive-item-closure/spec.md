@@ -12,6 +12,14 @@
 > spec records the full known surface. Scoping into phases is `tasks.md`'s job
 > after `/speckit-plan`. No YAGNI cuts are inserted here.
 
+## Clarifications
+
+### Session 2026-06-23
+
+- Q: Which surface carries the operator-confirm for closing + advancing an item to the terminal `closed` phase? → A: `advance --to closed` is the single move — it shows the full transitive cascade as a dry-run, and an explicit `--apply` runs the cascade and sets status `closed` (one operator-confirmed action; no new skill; reuses the dry-run/`--apply` discipline).
+- Q: When the `part-of` subtree contains a child that is NOT yet terminal, what should the cascade do? → A: Skip-and-report — close the terminal parts, list the skipped in-flight child(ren) in the dry-run, and let the parent still advance to `closed`. An in-flight sibling does not block closing resolved work.
+- Q: Should the cascade also run a closure pass over `cancelled`/`retired` members it encounters in the subtree? → A: Yes — uniform terminal handling: descend through them and close their recorded `closes:` ids too (with a reason reflecting their terminal status), then continue to their children.
+
 ## User Scenarios & Testing *(mandatory)*
 
 The actors are the **operator** and the **agent** acting on the operator's behalf,
@@ -150,13 +158,14 @@ confirmation at close time.
 ### Edge Cases
 
 - **Partial subtree** — a `part-of` child in the subtree is NOT in a terminal
-  status yet (still in-flight). [NEEDS CLARIFICATION: does the cascade skip-and-report
-  the non-terminal child and close the rest, or refuse the whole cascade until the
-  subtree is uniformly terminal?]
-- **Cancelled/retired members of the subtree** — [NEEDS CLARIFICATION: does the
-  cascade also run a closure pass over `cancelled`/`retired` items it encounters
-  (closing their `closes:` ids), or only over `shipped`→`closed` items? How is a
-  `cancelled` child treated when walking the subtree?]
+  status yet (still in-flight). Resolved (2026-06-23): the cascade **skips and
+  reports** the non-terminal child (listed clearly in the dry-run), closes the
+  terminal parts, and the parent still advances to `closed`. An in-flight sibling
+  does not block closing resolved work; in-flight children remain tracked.
+- **Cancelled/retired members of the subtree** — Resolved (2026-06-23): **uniform
+  terminal handling** — the cascade descends through `cancelled`/`retired` members,
+  closes their recorded `closes:` ids too (with a reason reflecting their terminal
+  status), and continues to their children.
 - **Already-closed ids** — a `closes:` id already `Done` is a no-op; the run reports
   "already closed" and still succeeds.
 - **Empty `closes:` on a node in the subtree** — a node that records no ids
@@ -194,8 +203,14 @@ confirmation at close time.
 - **FR-006**: The system MUST provide a reverse-edge `part-of`-children lookup
   (children of a given parent) that the cascade walks, consistent with the existing
   reverse-edge reasoning pattern.
-- **FR-007**: The cascade MUST advance/handle terminal children encountered in the
-  subtree per the resolution of the cancelled/retired open question (see Edge Cases).
+- **FR-007**: The cascade MUST apply **uniform terminal handling**: it descends
+  through `cancelled`/`retired` members of the subtree and closes their recorded
+  `closes:` ids (with a reason reflecting their terminal status), then continues to
+  their children.
+- **FR-007a**: When the subtree contains a non-terminal (in-flight) child, the
+  cascade MUST **skip and report** that child (surface it in the dry-run) and still
+  close the terminal parts; a non-terminal child MUST NOT block the parent's
+  closure or its advance to `closed`.
 
 **`closes:` population**
 
@@ -225,12 +240,12 @@ confirmation at close time.
 - **FR-015**: The compass MUST treat `shipped → closed` as the legitimate next move
   and MUST refuse `closed` from any phase other than `shipped`.
 - **FR-016**: Entering `closed` MUST be guarded by an explicit operator confirmation;
-  the transitive cascade MUST NOT fire automatically. The operator-initiated advance
-  to `closed` runs the cascade as its effect (dry-run presented, confirmed, then
-  applied). [NEEDS CLARIFICATION: which concrete surface carries the confirm — the
-  cascade verb's dry-run/`--apply`, a dedicated close skill, or `advance --to closed`
-  refusing to apply without a confirm flag? Firing surface must be a skill body + CLI
-  verb, never a git hook.]
+  the transitive cascade MUST NOT fire automatically. Resolved (2026-06-23): the
+  confirm surface is the **`advance --to closed` move** — it presents the full
+  transitive cascade as a dry-run and requires an explicit `--apply` to run the
+  cascade and set status `closed` (the lifecycle advance and the closure are one
+  operator-confirmed action; no new skill). Per `enforcement-lives-in-skills.md` the
+  firing surface is this CLI verb + the skill body that drives it, never a git hook.
 - **FR-017**: There MUST be NO post-install/release validation entrance criterion on
   `closed` (or any stage), and NO assumption that an install/release step exists.
   Whatever the operator inspects before confirming is project-specific and outside

@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,17 +31,14 @@
 
 ## Notes
 
-- **3 [NEEDS CLARIFICATION] markers remain by design**, to be resolved in
-  `/speckit-clarify`:
-  - Edge Cases / FR-016 — which concrete surface carries the operator-confirm
-    (cascade verb vs close skill vs `advance --to closed` confirm flag).
-  - Edge Cases — partial subtree with a non-terminal child: skip-and-report vs
-    refuse the whole cascade.
-  - Edge Cases — cancelled/retired members: do they get a closure pass, and how is a
-    cancelled child treated in the walk.
-- These are the genuine scope-affecting forks; all other open questions (OQ3/OQ4/OQ8/OQ9)
-  have documented reasonable defaults in the Assumptions section and are refined in
-  `/speckit-plan`.
+- **All 3 [NEEDS CLARIFICATION] markers resolved** in `/speckit-clarify` (Session
+  2026-06-23):
+  - FR-016 — confirm surface = the `advance --to closed` move (dry-run + explicit
+    `--apply` runs the cascade + sets status).
+  - Partial subtree — skip-and-report; parent still closes (FR-007a).
+  - Cancelled/retired members — uniform terminal handling; close their ids too (FR-007).
+- Remaining open questions (OQ3/OQ4/OQ8/OQ9) have documented reasonable defaults in
+  the Assumptions section and are refined in `/speckit-plan`.
 - The spec describes CLI/library tooling; "implementation details" is read as
   "names of languages/frameworks/internal modules" — verb-shaped capabilities are the
   feature's user-facing surface and are stated as WHAT, not HOW.
