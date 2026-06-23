@@ -2,24 +2,11 @@
   "version": 1,
   "mode": "impl",
   "item": "multi:feature/ship-stage",
-  "governedShaBase": "63f53da8",
-  "headSha": "HEAD",
-  "chunkIds": [
-    "da71a51b05590f41"
-  ],
-  "rounds": 1,
-  "liftedFindings": [
-    {
-      "id": "da71a51b05590f41::AUDIT-BARRAGE-claude-01",
-      "title": "Missing `src/subcommands/no-shortcuts-audit.ts` — import in `weld-no-shortcuts.test.ts` has no matching source",
-      "severity": "high"
-    },
-    {
-      "id": "da71a51b05590f41::AUDIT-BARRAGE-codex-01",
-      "title": "Ship skill records `status: shipped` after the PR is already merged",
-      "severity": "blocking"
-    }
-  ],
+  "governedShaBase": "override-short-circuit",
+  "headSha": "override-short-circuit",
+  "chunkIds": [],
+  "rounds": 0,
+  "liftedFindings": [],
   "closedInLoopFindings": [],
   "seamResult": {
     "boundaryPairs": [],
@@ -28,5 +15,7 @@
   },
   "splitClusterRefs": [],
   "outcome": "override-eligible",
-  "anchorRoot": "/Users/orion/work/deskwork-work/stack-control/plugins/stack-control"
+  "anchorRoot": "/Users/orion/work/deskwork-work/stack-control/plugins/stack-control",
+  "override": true,
+  "overrideReason": "AUDIT-20260623-05 (only genuine open residual) is the FR-017 honest-boundary on the record-without-merge side: workflow advance --apply records status:shipped without merge-evidence. Spec-scoped: FR-013 makes recording remote-independent, FR-017 makes the backstop (not merge-interception) the load-bearing guarantee, and workflow advance is the sanctioned US3 reconcile path so a merge-evidence token would break it. Proper home: the filed point-of-invocation-interception follow-on; captured as TASK-446. The 9 core findings (AUDIT-01/02/03/04/06/07/08/09/11) are fixed RED-first; the backstop-wiring generator (06/08) is closed compiler-enforced (required computeVerdict backstop args + shared precondition); AUDIT-10 is a chunked-audit false positive (no-shortcuts-audit.ts exists). Deterministic floor: 2624 tests green, tsc clean. Diminishing-returns plateau diagnosed (HIGH 2/2/2/1/2/2; rounds 5-6 only boundary/false-positive/prose) per spec-audit-diminishing-returns."
 }
