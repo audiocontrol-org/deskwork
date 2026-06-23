@@ -1344,3 +1344,79 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:108
 FR-004 requires preserving token boundaries and gives `/stack-control:define "opencode support"` as an example that “passes two arguments to `stackctl`.” There are two plausible readings: either `stackctl` receives `define` plus one preserved quoted argument (`["define", "opencode support"]`), or the quoted phrase is mistakenly expected to become two arguments (`["define", "opencode", "support"]`). The wording “preserving ... quoting semantics” points to the first reading, while “passes two arguments” can be read as counting the words in the quoted phrase.
 
 The blast radius is high because unattended builders often implement examples literally. If the wrong reading is built, multi-word feature names are split incorrectly, which affects the first core workflow `/stack-control:define "opencode support"`. A reasonable fix would state the exact argv shape, for example: `/stack-control:define "opencode support"` invokes `stackctl` with command `define` and one user argument whose value is `opencode support`.
+
+## 2026-06-23 — audit-barrage lift (20260623T014859835Z-031-opencode-support-after_clarify)
+
+Code-sha: 46c4fd9aeae1013885c514b657d796b14dc6ef34
+### AUDIT-20260623-70 — FR-003 and US5 scenario 3 are contradictory about what `:version` reports
+
+Finding-ID: AUDIT-20260623-70 (claude-01 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (FR-003, FR-011, US5 acceptance scenario 3)
+
+FR-003 explicitly carves `:version` out of CLI delegation: it "reports the plugin-local version" and is the named exception to the rule that all skills delegate to `stackctl`. FR-011 similarly says the command "reports the plugin version." But US5 acceptance scenario 3 states: "both plugin and CLI versions are displayed." Displaying the CLI version requires invoking `stackctl` (or at minimum `stackctl --version`) — which is exactly what FR-003 forbids for this command.
+
+An unattended builder has two contradictory authoritative surfaces. Reading FR-003 + FR-011 literally, they implement `:version` as a purely local metadata lookup that never touches the CLI. Reading US5 scenario 3 literally, they add a `stackctl --version` subprocess call. These cannot both be correct. The blast radius is user-visible: a user running `:version` either sees only the plugin version (can't verify CLI alignment) or sees both (FR-003 violated). If the intent is that `:version` calls `stackctl --version` despite FR-003's "exception" framing, FR-003 needs rewording. If `:version` is genuinely local-only, US5 scenario 3 needs to be revised to "plugin version only."
+
+---
+
+### AUDIT-20260623-71 — FR-002 and US4 scenario 3 omit `version` from the registered skill list, contradicting the Clarifications section
+
+Finding-ID: AUDIT-20260623-71
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (FR-002, US4 scenario 3, Clarifications, FR-011, US2 scenario 2)
+
+FR-002 enumerates exactly five registered skills: `define`, `extend`, `execute`, `workflow`, `roadmap`. US4 scenario 3 confirms five: "registers the primary lifecycle skills (`define`, `extend`, `execute`, `workflow`, `roadmap`)." But the Clarifications section explicitly states: "Which stack-control skills are registered with opencode? → A: `define`, `extend`, `execute`, `workflow`, `roadmap`, `version`" — six skills. FR-011 separately specifies the `:version` command but never says it is "registered" in the same sense (i.e., discoverable in the command palette per US2 scenario 2).
+
+An unattended builder reading FR-002 as the authoritative registration list would build a plugin where `:version` does not appear in opencode's command palette — it would only work if typed exactly, not discovered. A builder reading the Clarifications as authoritative would register six skills. The spec does not resolve which surface is canonical when they differ. The practical consequence is that `:version` discoverability is unspecified — a real user-experience decision left undefined.
+
+---
+
+### AUDIT-20260623-72 — SC-003 latency criterion is unmeasurable as stated for heavy skills
+
+Finding-ID: AUDIT-20260623-72
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (SC-003)
+
+SC-003 requires: "Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI." The spec registers five primary skills, one of which is `execute`. The spec itself acknowledges in the Edge Cases section "a long-running stack-control skill" as a plausible scenario — `/stack-control:execute` over a large feature can run for minutes. SC-003 does not carve out `execute` (or any other heavy skill), does not qualify the criterion to apply only to lightweight commands, and does not define "first output" (completion of the CLI call, or the first streaming byte of output).
+
+As written, an unattended builder cannot satisfy SC-003 for `execute` while also fully delegating to `stackctl execute` — these are contradictory promises. If the intent is "first streaming byte" (which would be achievable even for long operations), that must be stated. If the criterion applies only to non-execute skills, the spec must say so. A test suite written against SC-003 as written would either incorrectly fail `execute` or require the test author to make an assumption the spec doesn't license.
+
+---
+
+### AUDIT-20260623-73 — "Active project/workspace as working context" is never defined in opencode API terms
+
+Finding-ID: AUDIT-20260623-73
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (US3 scenario 1, Assumptions)
+
+US3 acceptance scenario 1 requires the plugin to invoke `stackctl <command>` "with the opencode session's active project/workspace as the working context." The Assumptions section restates this: "Skill invocations execute `stackctl` with the opencode session's active project/workspace as the working context." Neither location defines what "active project/workspace" means in opencode's plugin API, how it maps to a filesystem working directory, or how the plugin obtains it.
+
+The Assumptions list what the opencode plugin system exposes (`command.executed` events, shell API), but do not include an assumption that opencode exposes the active project path. If opencode's shell API runs subprocesses from a fixed working directory (the opencode install directory, the user's home, etc.) rather than the project's directory, `stackctl` will silently operate on the wrong project — a failure mode that produces no error, just wrong behavior. Since `stackctl`'s correctness depends critically on running in the right directory (it reads `plugins/stack-control/` relative paths, roadmap files, etc.), this missing commitment is load-bearing. A reasonable fix adds an explicit Assumption naming the opencode API surface that exposes the project path, or acknowledges that the CWD must be passed explicitly to `stackctl`.
+
+---
+
+### AUDIT-20260623-74 — FR-009 and FR-010 assume opencode handles TypeScript npm packages identically to local `.ts` files — never stated
+
+Finding-ID: AUDIT-20260623-74
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (FR-009, FR-010, Clarifications)
+
+FR-009 specifies local installation as `.opencode/plugins/stack-control.ts` — a raw TypeScript file. FR-010 requires npm package installation where "npm package entrypoint is the same single file." Publishing raw TypeScript as an npm package entrypoint is only viable if opencode's npm plugin loader handles TypeScript source the same way as locally-copied `.ts` files. If opencode compiles local plugins from TypeScript but loads npm packages as pre-compiled JavaScript (the conventional npm expectation), then "same single file" is self-contradictory: the local path is a `.ts` source file, but the npm entrypoint would need to be compiled JavaScript.
+
+The Assumptions section does not include any claim that opencode's npm plugin loading supports TypeScript source. Without this assumption, FR-010's "same single file" promise may be impossible to satisfy while also satisfying FR-009's `.ts` extension requirement. A reasonable fix either adds an Assumption that opencode's npm loader supports TypeScript source, or acknowledges that the npm package ships compiled JavaScript (making it technically a different file format from the local `.ts` copy, with the "same single file" claim requiring clarification).

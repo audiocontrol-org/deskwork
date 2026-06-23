@@ -86,9 +86,11 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 
 **Acceptance Scenarios**:
 
-1. **Given** user runs `/stack-control:version`, **When** the command is invoked, **Then** plugin reports its version
+1. **Given** user runs `/stack-control:version`, **When** the command is invoked, **Then** plugin reports only its version
 2. **Given** CLI version differs from plugin version, **When** user runs a skill, **Then** a warning is displayed about version mismatch
-3. **Given** user runs `/stack-control:version`, **When** the command is invoked, **Then** both plugin and CLI versions are displayed
+3. **Given** user runs `/stack-control:version`, **When** the command is invoked, **Then** the plugin version is displayed
+
+Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. CLI version detection happens silently for mismatch warnings on skill invocation.
 
 ---
 
@@ -114,7 +116,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - **FR-008**: The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill; unknown commands produce a clear "unknown stack-control command" error
 - **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts` (local file installation)
 - **FR-010**: The plugin MUST support npm package installation by exporting a default function that opencode loads from `node_modules/@stack-control/opencode-plugin` (npm package entrypoint is the same single file)
-- **FR-011**: The plugin MUST expose a `/stack-control:version` command that reports the plugin version
+- **FR-011**: The plugin MUST expose a `/stack-control:version` command that reports only the plugin version
 - **FR-012**: The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked
 
 ### Key Entities
