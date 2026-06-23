@@ -73,4 +73,40 @@ describe('032 US2 — compass and close gate never disagree (SC-002, folds TASK-
     expect(close.status).toBe(0);
     expect(statusOf(f)).toBe('closed');
   });
+
+  it('the CLOSE step refuses via the backstop while a dangling merged item exists, then proceeds once reconciled (SC-003 / AUDIT-20260623-01)', () => {
+    const CLOSE_TARGET = 'multi:feature/closeme';
+    const DANGLING = 'multi:feature/dangling';
+    const f = makeWorkflowFixture(
+      [
+        { identifier: CLOSE_TARGET, status: 'shipped', validated: true },
+        { identifier: DANGLING, status: 'in-flight' },
+      ],
+      { git: true },
+    );
+    fixtures.push(f);
+    f.commitAll('seed');
+    // the dangling item has a committed impl convergence record reachable from origin/main
+    f.writeRecord({
+      version: 1, mode: 'impl', item: DANGLING, scopeFingerprint: 'abc', converged: true,
+      recordedAt: '2026-06-23T00:00:00Z',
+    });
+    f.commitAll('govern: converged (dangling)');
+    f.git(['update-ref', 'refs/remotes/origin/main', f.git(['rev-parse', 'HEAD']).trim()]);
+
+    // closing the shipped+validated item is REFUSED inside emitAdvanceClosed — forward lifecycle
+    // motion is blocked while the dangling merged item exists (the backstop on the close step).
+    const refused = runCli(['roadmap', 'advance', CLOSE_TARGET, '--to', 'closed', '--apply'], { cwd: f.root });
+    expect(refused.status).not.toBe(0);
+    expect(refused.stdout + refused.stderr).toContain(DANGLING);
+    expect(refused.stdout + refused.stderr).toMatch(/merged-but-status-in-flight|reconcile/i);
+    expect(loadRoadmap(f.roadmapPath, f.opts).byId.get(CLOSE_TARGET)!.status).toBe('shipped'); // NOT closed
+
+    // reconcile the dangling item (records its status), then the close proceeds
+    const reconcile = runCli(['workflow', 'advance', DANGLING, '--apply'], { cwd: f.root });
+    expect(reconcile.status, reconcile.stderr).toBe(0);
+    const ok = runCli(['roadmap', 'advance', CLOSE_TARGET, '--to', 'closed', '--apply'], { cwd: f.root });
+    expect(ok.status, ok.stderr).toBe(0);
+    expect(loadRoadmap(f.roadmapPath, f.opts).byId.get(CLOSE_TARGET)!.status).toBe('closed');
+  });
 });

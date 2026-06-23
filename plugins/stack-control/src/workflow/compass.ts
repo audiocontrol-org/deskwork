@@ -74,15 +74,24 @@ export function computeVerdict(args: ComputeVerdictArgs): Verdict {
   const nextGateUnmet = args.nextGateUnmet ?? [];
 
   // 032 US3 backstop (FR-009/FR-010): while a merged-but-status-in-flight item exists, refuse
-  // forward lifecycle motion for ANY OTHER item — naming the dangling item + the reconcile
-  // command — UNLESS this verdict is being computed for the dangling item itself (the reconcile
-  // must never be blocked). Cross-item invariant: it overrides the per-item phase diff below.
+  // forward lifecycle motion — naming the dangling item + the reconcile command. The ONLY thing
+  // exempt is the dangling item's own RECONCILE: a phase-bearing intent ON the dangling item that
+  // is at-or-before its current phase (e.g. `ship` → its `merging` phase, which fires graduate to
+  // record shipped). A FORWARD intent on the dangling item (e.g. `release` → `validating`) is NOT
+  // exempt — it would let the off-rail item advance past merge before its status is recorded
+  // (AUDIT-20260623-02). Phase-NEUTRAL intents (session-end) are never backstop-refused
+  // (session-skills-never-block). Cross-item invariant: overrides the per-item phase diff below.
   const dangling = args.danglingMergedItem ?? null;
-  if (dangling !== null && args.intentItem !== dangling) {
-    return mk('off-rail', currentPhase, intent.phase, null, null,
-      `a merged-but-status-in-flight item exists ('${dangling}') — forward lifecycle motion is ` +
-        `blocked until it is reconciled; run \`stackctl workflow advance ${dangling} --apply\` ` +
-        `(or \`stackctl roadmap advance ${dangling} --to shipped --apply\`) to record its status, then retry`);
+  if (dangling !== null && intent.kind === 'phase') {
+    const intentOrd = ordinal(doc, intent.phase!);
+    const curOrd = currentPhase.kind === 'phase' ? ordinal(doc, currentPhase.id) : -1;
+    const isReconcileOfDangling = args.intentItem === dangling && intentOrd <= curOrd;
+    if (!isReconcileOfDangling) {
+      return mk('off-rail', currentPhase, intent.phase, null, null,
+        `a merged-but-status-in-flight item exists ('${dangling}') — forward lifecycle motion is ` +
+          `blocked until it is reconciled; run \`stackctl workflow advance ${dangling} --apply\` ` +
+          `(or \`stackctl roadmap advance ${dangling} --to shipped --apply\`) to record its status, then retry`);
+    }
   }
 
   // off-rail: orphan (no node) or a terminal side-state — refuse linear advancement.

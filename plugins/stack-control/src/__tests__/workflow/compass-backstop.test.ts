@@ -45,9 +45,9 @@ describe('032 US3 — backstop compass invariant (T018)', () => {
     expect(v.reason).toMatch(/reconcile|advance/i); // names the recovery command
   });
 
-  it('ALLOWS consulting the compass for the dangling item itself (the reconcile is never blocked)', () => {
+  it('ALLOWS the dangling item its own reconcile (ship → merging, at-or-before current)', () => {
     const d = doc();
-    // the dangling item derives merging (govern-converged, in-flight); ship is its on-course move
+    // the dangling item derives merging (govern-converged, in-flight); ship is its reconcile move
     const v = computeVerdict({
       doc: d,
       currentPhase: phase('merging'),
@@ -56,8 +56,40 @@ describe('032 US3 — backstop compass invariant (T018)', () => {
       intentItem: DANGLING,
       danglingMergedItem: DANGLING,
     });
-    expect(v.outcome).not.toBe('off-rail'); // backstop does NOT fire for the dangling item itself
-    expect(v.exitCode).toBe(0); // ship from merging is on-course/behind — allowed
+    expect(v.outcome).not.toBe('off-rail'); // backstop does NOT fire for the reconcile
+    expect(v.exitCode).toBe(0); // ship from merging is behind/on-course — allowed
+  });
+
+  it('REFUSES a FORWARD intent on the dangling item (release → validating) — only the reconcile is exempt (AUDIT-20260623-02)', () => {
+    const d = doc();
+    // release maps to validating (one phase PAST merging). Exempting it would let an off-rail
+    // merged item into the release skill before its status is recorded — the exemption must be
+    // limited to the reconcile (at-or-before-current), not any intent for the dangling item.
+    const v = computeVerdict({
+      doc: d,
+      currentPhase: phase('merging'),
+      intent: resolveIntent(d, 'release')!,
+      hasNode: true,
+      intentItem: DANGLING,
+      danglingMergedItem: DANGLING,
+    });
+    expect(v.outcome).toBe('off-rail'); // forward motion on the dangling item is still blocked
+    expect(v.exitCode).not.toBe(0);
+    expect(v.reason).toContain(DANGLING);
+  });
+
+  it('does NOT block a phase-neutral finishing intent (session-end) even with a dangling item (session-skills-never-block)', () => {
+    const d = doc();
+    const v = computeVerdict({
+      doc: d,
+      currentPhase: phase('implementing'),
+      intent: resolveIntent(d, 'session-end')!,
+      hasNode: true,
+      intentItem: OTHER,
+      danglingMergedItem: DANGLING,
+    });
+    expect(v.outcome).not.toBe('off-rail'); // session-end is never backstop-refused
+    expect(v.exitCode).toBe(0);
   });
 
   it('on-course when no item dangles (backstop dormant)', () => {

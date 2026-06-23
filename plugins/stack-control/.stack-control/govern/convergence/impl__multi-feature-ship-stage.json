@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "mode": "impl",
+  "item": "multi:feature/ship-stage",
+  "governedShaBase": "63f53da8",
+  "headSha": "HEAD",
+  "chunkIds": [
+    "a6c9fd8c3b487be0"
+  ],
+  "rounds": 1,
+  "liftedFindings": [
+    {
+      "id": "a6c9fd8c3b487be0::AUDIT-BARRAGE-claude-03+AUDIT-BARRAGE-codex-02",
+      "title": "No test exercises the backstop gate inside `emitAdvanceClosed` against a real dangling-merged-item fixture",
+      "severity": "high"
+    },
+    {
+      "id": "a6c9fd8c3b487be0::AUDIT-BARRAGE-codex-01",
+      "title": "Dangling-item exemption lets `release` pass before status is recorded",
+      "severity": "high"
+    }
+  ],
+  "closedInLoopFindings": [],
+  "seamResult": {
+    "boundaryPairs": [],
+    "findings": [],
+    "suppressedCompatible": 0
+  },
+  "splitClusterRefs": [],
+  "outcome": "override-eligible",
+  "anchorRoot": "/Users/orion/work/deskwork-work/stack-control/plugins/stack-control"
+}
