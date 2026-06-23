@@ -628,6 +628,7 @@ Closing everything CONTAINED in a roadmap item — its resolved backlog ids AND 
 
 ## multi:feature/ship-stage
 - status: planned
+- spec: specs/032-ship-stage
 - analyze-clean: yes
 - part-of: multi:feature/lifecycle-industrialization
 - depends-on: multi:feature/unskippable-workflow-protocol
