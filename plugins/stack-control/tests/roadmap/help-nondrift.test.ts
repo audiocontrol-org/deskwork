@@ -192,6 +192,12 @@ const VALID_INVOCATION: Readonly<Record<string, ValidInvocation>> = {
   'remove-node': { argv: ['impl:feature/c'], expectExit0: true },
   // approve-design: exercise the --analyze-clean marker switch on any node.
   'approve-design': { argv: ['design:feature/a', '--analyze-clean'], expectExit0: true },
+  // resolves (031 US2): exercise BOTH multi-value flags (--add / --remove). A
+  // dry-run --add of TASK-1 + --remove of an absent TASK-2 exits 0 (no write).
+  resolves: {
+    argv: ['impl:feature/c', '--add', 'TASK-1', '--remove', 'TASK-2'],
+    expectExit0: true,
+  },
 };
 
 /** The completeness guard: every registered subaction has a check (3) fixture.

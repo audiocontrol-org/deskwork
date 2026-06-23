@@ -3,8 +3,8 @@ id: roadmap
 unit:
   kind: heading
   level: 2
-statusVocabulary: [planned, in-flight, shipped, cancelled, retired]
-terminalStatuses: [shipped, cancelled, retired]
+statusVocabulary: [planned, in-flight, shipped, cancelled, retired, closed]
+terminalStatuses: [shipped, cancelled, retired, closed]
 orderKey:
   field: phase
   relation: [design, plan, impl, multi]

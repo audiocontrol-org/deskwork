@@ -96,6 +96,16 @@ function emitStatus(itemId: string): void {
   process.stdout.write(`  phase: ${phase.id}\n`);
   const p = phaseById(doc, phase.id);
   if (p === undefined) throw new WorkflowError(`derived phase '${phase.id}' is not declared in WORKFLOW.md`);
+  // 031 FR-013: name the legitimate pending next phase (generic — driven by the
+  // phase's `next` chain). A `shipped` item is NOT terminal: its pending move is
+  // `closed`, surfaced here so an operator isn't left thinking shipped is the end
+  // (the "don't forget to close" surface). A truly terminal phase (no `next`) says so.
+  const nextId = legitimateNextPhase(doc, phase.id);
+  process.stdout.write(
+    nextId !== null
+      ? `  legitimate next move: ${nextId}\n`
+      : `  no legitimate next move (terminal phase '${phase.id}')\n`,
+  );
   reportGate('exit criteria', evaluateGate(p.exit, gate));
   // v1: gates are REPORTED, never enforced as a refusal (FR-010 / analyze U1).
 }
@@ -236,13 +246,34 @@ function emitAdvance(itemId: string, apply: boolean, values: Record<string, stri
   if (t === undefined) {
     failUsage(`'${itemId}' is in terminal phase '${p.id}'; no forward transition to advance`);
   }
-  // 024 US5 / FR-010 (phased): the back-half `governing → shipped` (terminal)
-  // transition is ENFORCED as a refusal — an unmet exit gate blocks the advance
-  // rather than only being reported (022 v1 report-only is retired HERE). Mid-
-  // pipeline transitions stay ADVISORY in this advance path during migration;
-  // mid-pipeline ORDER is still enforced by the compass embedded in the skills.
-  const terminalPhaseId = r.doc.phases[r.doc.phases.length - 1]!.id;
-  if (t.to === terminalPhaseId && t.exitGate.length > 0) {
+  // 031 AUDIT-20260623-01: entering the terminal `closed` phase is NOT a generic
+  // workflow advance. Closing is the operator-confirmed TRANSITIVE CASCADE — it
+  // closes the item's whole part-of subtree's recorded backlog ids AND advances
+  // the status, as one action. The generic effect path here would run only the
+  // status-rewrite (`roadmap-advance to=closed`), silently leaving the contained
+  // ids open. Refuse and redirect to the single cascade-running close surface so
+  // there is no second, status-only path to `closed`.
+  if (t.to === 'closed') {
+    failUsage(
+      `'${itemId}': closing is the operator-confirmed transitive cascade — run ` +
+        `\`stackctl roadmap advance ${itemId} --to closed\` (or the /stack-control:close skill), ` +
+        `which closes the item's contained backlog ids AND advances it to 'closed'. ` +
+        `\`workflow advance\` will not perform a status-only close.`,
+    );
+  }
+  // 024 US5 / FR-010 (phased): the back-half `governing → shipped` graduation is
+  // ENFORCED as a refusal — an unmet exit gate blocks the advance rather than only
+  // being reported (022 v1 report-only is retired HERE). Mid-pipeline transitions
+  // stay ADVISORY in this advance path during migration; mid-pipeline ORDER is
+  // still enforced by the compass embedded in the skills.
+  //
+  // 031 FR-014 (clean break): keyed on the `graduate-impl` exit-gate criterion (the
+  // graduation marker), NOT on the positional last phase — adding the terminal
+  // `closed` phase after `shipped` means `shipped` is no longer the array-last
+  // phase, so a positional `to === lastPhase` test would silently stop enforcing
+  // the graduation gate.
+  const isGraduation = t.exitGate.some((c) => c.kind === 'graduate-impl');
+  if (isGraduation && t.exitGate.length > 0) {
     const result = evaluateGate(t.exitGate, gate);
     if (!result.allMet) {
       process.stderr.write(

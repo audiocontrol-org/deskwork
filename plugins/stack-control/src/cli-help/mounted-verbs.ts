@@ -47,6 +47,8 @@ const ROADMAP_MEDIATION: Readonly<Record<string, MediationClass>> = {
   rename: 'mutating',
   'remove-node': 'mutating',
   'approve-design': 'mutating',
+  // 031 US2 — record resolved ids onto a node's closes: set (a write).
+  resolves: 'mutating',
 };
 
 const BACKLOG_MEDIATION: Readonly<Record<string, MediationClass>> = {

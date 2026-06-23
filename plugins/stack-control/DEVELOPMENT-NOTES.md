@@ -2,6 +2,87 @@
 
 ---
 
+## 2026-06-23: transitive-item-closure — design → full Spec Kit chain authored to runnable
+
+**Goal:** Take up `multi:gap/transitive-item-closure` (the in-flight pickup) — make "closing what a roadmap item contains" one mechanical move — and fold in two operator-added requirements: make closure part of the **terminal-state workflow stage** (so it isn't forgotten), and move **post-install validation into the workflow, not a `tasks.md` task** (the offing deadlock). Author it through the stack-control front door from design to a runnable spec. Orchestrator-session work only (implementation is a separate session).
+
+**Accomplished:**
+- **Drove the full lifecycle in-session, front-door-mediated, committed+pushed at every step:** `/stack-control:design` (brainstorming backend + house rules → operator-approved design record) → `/stack-control:define` driving the native Spec Kit chain **specify → clarify → plan → checklist → tasks → analyze**, each bracketed by the capability-mediation front-door marker (`spec-definition`).
+- **Spec `031-transitive-item-closure` is runnable:** `spec/plan/tasks` all present, `execute-check: runnable`, phase `implementing`; node carries `design:` + `spec:` pointers, `design-approved` + `analyze-clean` markers.
+- **Feature shape captured:** (1) transitive closer — `close-related --cascade` walks the `part-of` subtree, dedups multi-parent via visited-Set, **skips-and-reports** non-terminal children, **uniform terminal handling** for cancelled/retired; (2) `closes:` population — `roadmap resolves --add/--remove` + auto-back-link on `backlog done`/`promote` via a task parent-node ref; (3) a new terminal **`closed`** phase + status entered only via the operator-confirmed **`advance --to closed`** (dry-run → `--apply`), with phase-derivation mapping status→phase by-name so `shipped` is no longer terminal.
+- **`/speckit-clarify` resolved 3 forks** with operator picks (confirm surface = `advance --to closed`; partial subtree = skip-and-report; cancelled/retired = uniform terminal handling). **`/speckit-analyze`:** 100% FR/SC→task coverage, 0 critical/0 high. **`/speckit-checklist`:** 27-item closure-safety requirements checklist.
+
+**Didn't Work:**
+- **Bash classifier intermittently unavailable** at session start (`claude-opus-4-8 temporarily unavailable` for non-allowlisted commands) — blocked the `session-start` verb and other non-allowlisted commands. Worked around by assembling orientation from read-only file tools; it recovered shortly after. A harness condition, not a `stackctl` defect.
+
+**Course Corrections:**
+- **[SCOPE]** Operator expanded scope twice mid-design (terminal-stage wiring; post-install validation in the workflow) — captured each per capture-over-YAGNI rather than cutting.
+- **[DESIGN]** Operator caught that **adopters may have no "install" step**, so post-install validation can't be a universal entrance criterion — generalized to an **install-agnostic operator-confirmation guard**. Then narrowed further: *"asking the operator is good enough … it's just a guard against automatic closure"* — collapsed validation to an operator-confirm at apply time, with **no config/marker machinery**. Both reshaped the design *before* any code; design record + spec revised accordingly. No shipped-code rework — these were capture-phase shaping calls.
+
+**Insights:**
+- **The two-session boundary held.** The orchestrator session authored design→runnable and stopped at the implementation handoff; `execute` belongs to a separate worktree/session.
+- **Operator-confirm-as-guard generalized the feature cleanly:** the same move that makes closure un-forgettable (`shipped` no longer terminal → the lifecycle surfaces the pending `closed`) keeps it non-automatic, and **dissolves the offing audit/publish deadlock by construction** (no validation task or criterion left to deadlock on). Validating the design's *purpose* (install-agnostic) before specifying the mechanism avoided baking in an install assumption.
+- The full Spec Kit chain ran with **zero `stackctl` defects** — front-door capability mediation (enter/exit per backend drive) + per-step commit/push worked smoothly end to end.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 9
+  - roadmap(031-transitive-item-closure): record analyze-clean (speckit-analyze: 0 critical/high)
+  - tasks(031-transitive-item-closure): author tasks.md via speckit-tasks + set node spec pointer
+  - checklist(031-transitive-item-closure): closure-safety requirements checklist
+  - plan(031-transitive-item-closure): author plan + design artifacts via speckit-plan
+  - spec(031-transitive-item-closure): clarify — resolve the 3 scope forks
+  - spec(031-transitive-item-closure): author spec.md via speckit-specify
+  - roadmap(transitive-item-closure): record design-approved (operator approved 2026-06-23)
+  - design(transitive-item-closure): generalize — operator-confirm guard, not install criterion
+  - design(transitive-item-closure): post-ship terminal stage + transitive closer
+- Files changed: 16
+- Backlog touched: (none)
+
+## 2026-06-23: govern-030-hardening burndown + seam-pass reframing → shipped v0.53.2
+
+**Goal:** Pick up the in-flight `govern-030-hardening` umbrella and burn down its dispositioned residuals; operator chose "whole umbrella, you sequence."
+
+**Accomplished:**
+- **16 residual point fixes, each RED-first (test exercises the bug → fix), one commit per task.** Seam-pass interface detection (multi-line signatures, function-typed params miscounted via the `=>` arrow, `changed-required-shape` unimplemented, seam breaks invisible in the NOT-done message); pipeline correctness (diff base via `origin/main`, untracked-fold binary/byte guards, doctor chunk-set validation, no-op-fix guard, whole other-feature-root exclusion, rename-aware scoping, test↔source coupling in the chunker, payload-leak guard); doc reconciliation (checkpoint mode-scoping, fix-fanout deferral, superseded 015 contract); torn-temp-file reap. No govern/audit-barrage — these are point fixes per the workflow-protocol scope rule.
+- **Two operator design calls** resolved and implemented: whole other-feature-root exclusion (over audit-log-only), and co-locate test with source in the coupling graph (over manifest cross-reference).
+- **PR #497 opened, CI green (382 files / 2496 tests), merged; released v0.53.2** (`chore: release v0.53.2` on top of the merge). **Validated the formally-installed 0.53.2 cache** contains every fix (markers present + clean boot + git lineage + published tag) — satisfies the issue-closure discipline.
+- **Paperwork closed out:** 16 tasks → Done (verified v0.53.2); the seam-unchanged-consumer task closed as superseded; umbrella `govern-030-hardening` → shipped; the 3 forward nodes (lift-auto-close, doc-aware-lens, retire-seam-pass) re-homed to `govern-operability` so they don't dangle under a shipped parent.
+
+**Didn't Work:**
+- **`backlog list` renders Done items inline** (`[Done]` marker), so a grep of the list read as "still open" until I checked the on-disk status — captured as friction. Tasks were correctly closed.
+- **The session-end boundary over-counted commits** (17 includes the prior v0.53.1 release tail — `chore: release v0.53.1` / Merge #496 — that rode in via the ff to main). This session's own new commits: the 13 govern-030 commits + merge #497 + release v0.53.2.
+
+**Course Corrections:**
+- **[DESIGN]** Operator reframed the seam pass: it reimplements interface-contract checking (removed/renamed export, changed arity/shape) that the **compiler** already does completely — including unchanged consumers — and the audit-barrage is **stochastic defense-in-depth**, not a deterministic interface checker. The "unchanged-consumer gap" was a layer confusion; it dissolves by construction. Recorded a roadmap node (`retire-seam-pass-interface-check`) + a rule (`audit-barrage-is-stochastic-defense-in-depth.md`). This **moots this session's own seam-pass interface hardening** — correct given the seam pass exists, dead weight once it's retired.
+- **[COMMUNICATION]** Operator: refer to items by meaningful name, not bare ID number — "names ferry meaning." Saved as a memory; promoting feature-shaped work to NAMED roadmap nodes is the structural form of this.
+- **[UX]** Two "I don't understand X" prompts — the "what's left" framing and "seam-pass unchanged-consumer gap" jargon needed plain-language, concrete-example explanations.
+
+**Insights:**
+- The sharpest lesson: **validate a mechanism's purpose before polishing it.** I hardened the seam pass through four fixes before the operator's reframing revealed the whole interface-check is redundant with the compiler. A deterministic concern had been smuggled into the stochastic layer; the fix is to lean on the compiler/test floor, not to make the heuristic smarter.
+- Point-fix discipline (RED-first, no governance) burned down 16 fixes cleanly and kept the full suite green throughout.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 17
+  - chore: release v0.53.2
+  - Merge pull request #497 from audiocontrol-org/feature/stack-control
+  - docs(govern): reframe seam-pass as redundant with the compiler; record the stochastic-layer principle
+  - fix(govern): couple a test file with its implementing source by name (TASK-430)
+  - fix(govern): exclude WHOLE other-feature roots from the implement payload (TASK-428)
+  - docs(govern): reconcile 030/015 spec drift (TASK-433/434/128)
+  - fix(govern): reap orphan torn temp files when writing the convergence record (TASK-109)
+  - test(govern): re-pin the outer-tree payload-leak invariant for scopeCommittedDiff (TASK-441)
+  - fix(govern): rename-aware committed-diff scoping, independent of diff.renames (TASK-429)
+  - fix(govern): a no-op fix surfaces fix-failure, never converges (TASK-439)
+  - fix(govern): surface cross-chunk seam breaks in the NOT-done message (TASK-440)
+  - fix(govern): doctor rejects chunk-set artifacts with missing/empty/non-array chunks (TASK-437)
+  - fix(govern): guard the untracked-fold against binary + oversized files (TASK-436)
+  - fix(govern): resolve diff base via origin/main when it is the only default-branch ref
+  - fix(govern): seam-pass detects multi-line sigs, function-typed params, required-shape
+  - chore: release v0.53.1
+  - Merge pull request #496 from audiocontrol-org/feature/stack-control
+- Files changed: 42
+- Backlog touched: TASK-109, TASK-128, TASK-424, TASK-426, TASK-428, TASK-429, TASK-430, TASK-431, TASK-433, TASK-434, TASK-435, TASK-436, TASK-437, TASK-438, TASK-439, TASK-440, TASK-441, TASK-47
+
 ## 2026-06-22 (late): bookkeeping-hardening verified in v0.53.1 + umbrella shipped (paperwork close-out)
 
 **Goal:** Operator released v0.53.1 (containing this session's bookkeeping-hardening work) and asked to validate the installed release and close out the relevant paperwork. A short close-out tail after the main session + the first session-end.

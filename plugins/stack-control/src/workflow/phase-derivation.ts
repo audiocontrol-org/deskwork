@@ -57,6 +57,12 @@ function deriveHolds(pred: DerivePredicate, inputs: DerivationInputs): boolean {
       return inputs.tasksComplete;
     case 'release-tagged':
       return inputs.releaseTagged;
+    case 'never':
+      // By-name-only sentinel (031): NEVER placed by the artifact loop. A phase
+      // with `derive: never` (the terminal `closed`) is reached solely by the
+      // recorded-status by-name rule — closing is an explicit operator action,
+      // not an artifact a release tag or convergence record could stand in for.
+      return false;
     default: {
       const exhaustive: never = pred.kind;
       throw new WorkflowError(`unhandled derive kind '${String(exhaustive)}'`);
@@ -84,14 +90,27 @@ export function derivePhase(doc: WorkflowDoc, inputs: DerivationInputs): Derived
   const side = sideStateOf(inputs);
   if (side !== null) return side;
 
-  // A terminal roadmap status `shipped` is an operator-recorded fact that the item
-  // shipped (operator decision 2026-06-16) — derive the doc's terminal phase (its
-  // last phase) directly, rather than re-deriving from a convergence record that a
-  // pre-workflow process never wrote. This mirrors the recorded-fact discipline of
-  // `cancelled`/`retired` (handled by sideStateOf) and `analyze-clean:`/
-  // `design-approved:` markers: the operator records, derivation reads.
-  if (inputs.status?.toLowerCase() === 'shipped') {
-    return { kind: 'phase', id: doc.phases[doc.phases.length - 1]!.id };
+  // A recorded roadmap status that NAMES a post-graduation, work-less phase
+  // (`work: (none)` — `shipped` / `closed` in the bundled lifecycle) is an
+  // operator-recorded terminal FACT: derive that phase BY NAME (031 FR-014, clean
+  // break), rather than re-deriving from a convergence record a pre-workflow
+  // process never wrote. This is a PURE by-name rule over the governed doc — NOT a
+  // hardcoded `shipped`/`closed` enumeration and NOT the doc's positional last
+  // phase (adding `closed` after `shipped` makes `shipped` no longer array-last, so
+  // a positional `phases[last]` would mis-derive a `shipped` item as `closed`).
+  //
+  // It mirrors the recorded-fact discipline of `cancelled`/`retired` (handled by
+  // sideStateOf) and the `analyze-clean:`/`design-approved:` markers — the operator
+  // records, derivation reads. It is scoped to WORK-LESS phases so a status that
+  // also names an ACTIVE (work-bearing) phase (e.g. `planned`) still derives
+  // through the predicate chain: a `planned` item whose artifacts have advanced is
+  // mid-pipeline, not pinned to its un-updated status.
+  const status = inputs.status?.toLowerCase() ?? null;
+  if (status !== null) {
+    const byName = doc.phases.find((p) => p.id === status);
+    if (byName !== undefined && (byName.work === '(none)' || byName.work.length === 0)) {
+      return { kind: 'phase', id: byName.id };
+    }
   }
 
   for (let i = doc.phases.length - 1; i >= 0; i--) {

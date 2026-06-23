@@ -121,3 +121,6 @@
 
 ## session-end 2026-06-22
 - backlog capture dedups by --ref: filing multiple distinct findings that share one audit-log path collapses to a single TASK (returns 'already captured for ref ...'). Workaround: give each a unique #anchor ref (e.g. audit-log.md#AUDIT-...-08). Consider keying dedup on title+ref, or warning instead of silently returning the existing id.
+
+## session-end 2026-06-23
+- backlog done writes status Done but backlog list still renders Done items inline, which can read as 'still open' to a grep — list could separate or flag closed items

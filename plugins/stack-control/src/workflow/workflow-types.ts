@@ -11,7 +11,11 @@
  */
 export type PhaseId = string;
 
-/** The canonical bundled lifecycle phase ids (the `templates/WORKFLOW.md` default). */
+/**
+ * The canonical bundled lifecycle phase ids (the `templates/WORKFLOW.md` default).
+ * `closed` is the post-ship TERMINAL phase (031) — `shipped` is no longer the end of
+ * the lifecycle; the operator-confirmed `advance --to closed` is the final move.
+ */
 export const DEFAULT_PHASES = [
   'captured',
   'planned',
@@ -20,6 +24,7 @@ export const DEFAULT_PHASES = [
   'implementing',
   'governing',
   'shipped',
+  'closed',
 ] as const;
 
 /**
@@ -72,7 +77,10 @@ export interface Criterion {
  * `Criterion` kinds: these place an item AT a phase from the pre-existing
  * artifacts. Read FROM the doc per phase (FR-005). `node-marker`/`record-converged`
  * mirror the gate kinds; `backlog-only`/`node-present`/`release-tagged` are the
- * structural anchors of the pipeline.
+ * structural anchors of the pipeline. `never` is the by-name-only sentinel: a
+ * phase whose `derive: never` is NEVER placed by the artifact loop — it is
+ * reachable solely by the recorded-status by-name rule (031: the terminal
+ * `closed` phase, an explicit operator-confirmed action, not an artifact).
  */
 export const DERIVE_KINDS = [
   'backlog-only',
@@ -82,6 +90,7 @@ export const DERIVE_KINDS = [
   'record-converged',
   'tasks-complete',
   'release-tagged',
+  'never',
 ] as const;
 export type DeriveKind = (typeof DERIVE_KINDS)[number];
 

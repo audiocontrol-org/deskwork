@@ -50,13 +50,14 @@ const SUMMARIES: Readonly<Record<string, string>> = {
   group: 'alias of cluster — group items under a created-or-reused parent (dry-run unless --apply)',
   reconcile:
     'report status drift, orphan spec dirs, unresolved correspondences (report-only; --unorphan <spec> resolves an orphan into a node)',
-  'close-related': 'close the backlog ids a terminal item resolves (dry-run unless --apply)',
+  'close-related': 'close the backlog ids a terminal item resolves; --cascade closes the whole part-of subtree (dry-run unless --apply)',
   'add-edge': 'add a typed edge (--field <f> --to <target>) and re-validate (dry-run unless --apply)',
   'remove-edge': 'remove a typed edge target (--field <f> --to <target>) (dry-run unless --apply)',
   'move-edge': 'reparent a typed edge (--field <f> --from <p> --to <p>) in one validated move (dry-run unless --apply)',
   rename: 'rename a node and repoint every dependent edge (dry-run unless --apply)',
   'remove-node': 'remove a node, refusing loud if it is still an edge target (dry-run unless --apply)',
   'approve-design': 'record the design-approved marker (--analyze-clean for the symmetric one; --clear negates) (dry-run unless --apply)',
+  resolves: 'record resolved backlog ids on a node\'s closes: set (--add/--remove one or more ids; dry-run unless --apply)',
 };
 
 /** The summary for a subaction, failing loud if a registered subaction has none
@@ -84,21 +85,30 @@ export function subactionNames(): readonly string[] {
 export function flagNamesFor(grammar: SubactionGrammar): readonly string[] {
   const names = ['--doc'];
   for (const flag of grammar.valueFlags) names.push(`--${flag}`);
+  for (const flag of grammar.multiValueFlags ?? []) names.push(`--${flag}`);
   if (grammar.apply) names.push('--apply');
   if (grammar.clear === true) names.push('--clear');
   if (grammar.chain === true) names.push('--chain');
   if (grammar.analyzeClean === true) names.push('--analyze-clean');
+  if (grammar.cascade === true) names.push('--cascade');
   return names;
 }
 
 /** The left-column token for a flag's help line (`--apply`, `--doc <path>`,
- * `--<value-flag> <value>`). The description column aligns to the widest such
- * token across the subaction's flag set. */
-function flagToken(flag: string): string {
-  if (flag === '--apply' || flag === '--clear' || flag === '--chain' || flag === '--analyze-clean') {
+ * `--<value-flag> <value>`, `--<multi-value-flag> <ids...>`). The description
+ * column aligns to the widest such token across the subaction's flag set. */
+function flagToken(flag: string, grammar: SubactionGrammar): string {
+  if (
+    flag === '--apply' ||
+    flag === '--clear' ||
+    flag === '--chain' ||
+    flag === '--analyze-clean' ||
+    flag === '--cascade'
+  ) {
     return flag;
   }
   if (flag === '--doc') return '--doc <path>';
+  if ((grammar.multiValueFlags ?? []).includes(flag.slice(2))) return `${flag} <ids...>`;
   return `${flag} <value>`;
 }
 
@@ -111,13 +121,14 @@ function flagLine(
   statusVocab: readonly string[],
   col: number,
 ): string {
-  const token = flagToken(flag);
+  const token = flagToken(flag, grammar);
   let desc: string;
   if (flag === '--doc') desc = 'roadmap document (default: resolve through the installation)';
   else if (flag === '--apply') desc = 'write the change (default: dry-run)';
   else if (flag === '--clear') desc = 'clear the condition';
   else if (flag === '--chain') desc = 'wire a depends-on chain over the children (in argument order)';
   else if (flag === '--analyze-clean') desc = 'record the symmetric analyze-clean marker';
+  else if (flag === '--cascade') desc = 'close the whole part-of subtree (transitive close)';
   else {
     const isStatusFlag =
       (flag === '--to' && grammar === SUBACTION_SPECS.advance) || flag === '--status';
@@ -166,7 +177,7 @@ export function renderSubactionHelp(subaction: string): string {
   lines.push('');
   lines.push('Flags:');
   const flags = flagNamesFor(grammar);
-  const col = Math.max(...flags.map((f) => flagToken(f).length));
+  const col = Math.max(...flags.map((f) => flagToken(f, grammar).length));
   for (const flag of flags) {
     lines.push(flagLine(flag, grammar, statusVocab, col));
   }

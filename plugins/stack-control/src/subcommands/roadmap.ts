@@ -1,8 +1,7 @@
 // `stackctl roadmap <subaction> [flags]` (006 US1/US2) — the roadmap
-// semantic-layer surface, per contracts/roadmap-cli.md. Read-only queries
-// (`next`/`blocked`) + the `add` mutation (dry-run unless `--apply`). The verb
-// stays thin: it composes roadmap-model + graph + mutations and formats. Later
-// phases add blocks/order/graph (US4) and the remaining mutations (US3) here.
+// semantic-layer surface, per contracts/roadmap-cli.md. The verb stays thin: it
+// composes roadmap-model + graph + mutations and formats (queries + mutations,
+// dry-run unless `--apply`).
 //
 // Exit codes: 0 success; 2 usage/parse/validation (ungovernable doc, parse
 // failure, referential-integrity/acyclicity violation, missing arg).
@@ -29,10 +28,13 @@ import {
   emitRename,
 } from './roadmap-edge-emit.js';
 import { emitReconcile } from './roadmap-reconcile-emit.js';
+import { emitResolves } from './roadmap-resolves-emit.js';
 import { cluster, type ClusterInput } from '../roadmap/cluster.js';
 import { loadRoadmap, type RoadmapModel } from '../roadmap/roadmap-model.js';
 import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
 import { backlogRoot } from '../backlog/root.js';
+import { emitCloseRelatedCascade } from './roadmap-cascade-emit.js';
+import { emitAdvanceClosed } from './roadmap-advance-closed.js';
 import { blockedReport, mermaid, readyList } from '../roadmap/views.js';
 import {
   failUsage,
@@ -56,8 +58,10 @@ export interface Flags {
   readonly clear: boolean;
   readonly chain: boolean;
   readonly analyzeClean: boolean;
+  readonly cascade: boolean;
   readonly positionals: readonly string[];
   readonly values: ReadonlyMap<string, string>;
+  readonly multiValues: ReadonlyMap<string, readonly string[]>;
 }
 
 // `--doc` is universal (allowed everywhere) and handled separately from `values`.
@@ -96,7 +100,9 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
     chain: true,
     positionals: 1,
   },
-  'close-related': { valueFlags: [], apply: true, clear: false, positionals: 1 },
+  // `--cascade` (031 US1) walks the part-of subtree and closes every terminal
+  // member's recorded ids; without it, single-node close-related is unchanged.
+  'close-related': { valueFlags: [], apply: true, clear: false, cascade: true, positionals: 1 },
   // 028 US2 edge-mutation + marker verbs (FR-014/016/017; contract RM1/RM3).
   'add-edge': { valueFlags: ['field', 'to'], apply: true, clear: false, positionals: 1 },
   'remove-edge': { valueFlags: ['field', 'to'], apply: true, clear: false, positionals: 1 },
@@ -110,6 +116,9 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
     analyzeClean: true,
     positionals: 1,
   },
+  // `resolves` (031 US2) records resolved ids onto a node's PROSE `closes:` set
+  // via multi-value `--add`/`--remove` (never add-edge, which refuses prose).
+  resolves: { valueFlags: [], multiValueFlags: ['add', 'remove'], apply: true, clear: false, positionals: 1 },
 };
 
 /** The union of every subaction's value-flag names, so the scanner can reject a
@@ -118,12 +127,16 @@ const ALL_VALUE_FLAGS: readonly string[] = [
   ...new Set(Object.values(SUBACTION_SPECS).flatMap((s) => s.valueFlags)),
 ];
 
+/** Union of every subaction's multi-value-flag names (the scanner's greedy set). */
+const ALL_MULTI_VALUE_FLAGS: readonly string[] = [
+  ...new Set(Object.values(SUBACTION_SPECS).flatMap((s) => s.multiValueFlags ?? [])),
+];
+
 /** The known-subaction list rendered in the unknown-subaction usage error —
- * single-sourced so the flat path (`runRoadmapCli`) and the commander mount
- * (`roadmap-command.ts`) emit the byte-identical message (FR-006; AUDIT-BARRAGE-
- * codex-01). The order is the discovery order operators have learned, kept stable. */
+ * single-sourced so the flat path and the commander mount emit the byte-identical
+ * message (FR-006; AUDIT-BARRAGE-codex-01). Order = operator discovery order. */
 export const KNOWN_SUBACTIONS =
-  'next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, cluster, group, reconcile, close-related, add-edge, remove-edge, move-edge, rename, remove-node, approve-design';
+  'next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, cluster, group, reconcile, close-related, add-edge, remove-edge, move-edge, rename, remove-node, approve-design, resolves';
 
 /** Scan flags via the shared subaction-verb scanner; the boolean switches. */
 export function scanFlags(args: readonly string[]): Flags {
@@ -131,8 +144,9 @@ export function scanFlags(args: readonly string[]): Flags {
     'roadmap',
     args,
     NO_DOC,
-    ['apply', 'clear', 'chain', 'analyze-clean'],
+    ['apply', 'clear', 'chain', 'analyze-clean', 'cascade'],
     ALL_VALUE_FLAGS,
+    ALL_MULTI_VALUE_FLAGS,
   );
   return {
     doc: s.doc,
@@ -140,8 +154,10 @@ export function scanFlags(args: readonly string[]): Flags {
     clear: s.booleans.has('clear'),
     chain: s.booleans.has('chain'),
     analyzeClean: s.booleans.has('analyze-clean'),
+    cascade: s.booleans.has('cascade'),
     positionals: s.positionals,
     values: s.values,
+    multiValues: s.multiValues,
   };
 }
 
@@ -158,12 +174,11 @@ function requireValue(flags: Flags, name: string): string {
 /**
  * Parse a comma-separated list flag UNIFORMLY across `--depends-on`, `--part-of`,
  * `--children`, and `--into` (027 FR-032). A present-but-empty value or any
- * stray/leading/trailing comma yields an empty id — a malformed grouping flag,
- * NOT "no value": fail loud (exit 2) rather than silently dropping the id (which
- * `--into` used to do via a `.filter`) or passing a `''` through to model
- * validation (which `--depends-on` used to do). `verb`/`flag` shape the message.
- * Returns the trimmed, non-empty id list (always length ≥ 1 on success — an
- * absent flag is the caller's concern, handled before calling this).
+ * stray/leading/trailing comma yields an empty id — a malformed grouping flag, NOT
+ * "no value": fail loud (exit 2) rather than silently dropping the id or passing a
+ * `''` through to model validation. `verb`/`flag` shape the message. Returns the
+ * trimmed, non-empty id list (always length ≥ 1 on success — an absent flag is the
+ * caller's concern, handled before calling this).
  */
 function parseListFlag(raw: string, verb: string, flag: string): string[] {
   const ids = raw.split(',').map((s) => s.trim());
@@ -227,8 +242,16 @@ function emitAdd(flags: Flags, opts: LoadOptions): void {
 
 function emitAdvance(flags: Flags, opts: LoadOptions): void {
   const id = requireId(flags, 'advance');
-  const result = advance(flags.doc, id, requireValue(flags, 'to'), opts, flags.apply);
-  reportMutation(result, 'advance', id);
+  const to = requireValue(flags, 'to');
+  // 031 US3 (FR-016): `--to closed` is the post-ship terminal advance — runs the
+  // transitive close cascade (operator-confirm dry-run by default) then advances
+  // the status as one action (delegated to keep this file ≤ 500). Every other
+  // `--to <status>` is the unchanged single-line status rewrite.
+  if (to === 'closed') {
+    emitAdvanceClosed(loadRoadmap(flags.doc, opts), id, flags.doc, opts, flags.apply);
+    return;
+  }
+  reportMutation(advance(flags.doc, id, to, opts, flags.apply), 'advance', id);
 }
 
 function emitDecompose(flags: Flags, opts: LoadOptions): void {
@@ -274,9 +297,10 @@ function emitCluster(flags: Flags, opts: LoadOptions, verb: string): void {
 
 /**
  * `roadmap close-related <item>` (023) — mechanical terminal closure. Closes EXACTLY
- * the backlog ids recorded on the node (`closes:` ∪ `ref:`) when the item is in a
- * grammar-terminal status. Never title-matches or infers; dry-run by default;
- * fail-loud per id; idempotent (an already-`Done` item is reported, not re-closed).
+ * the recorded backlog ids (`closes:` ∪ `ref:`) when the item is grammar-terminal.
+ * Never title-matches or infers; dry-run by default; fail-loud per id; idempotent.
+ * `--cascade` (031 US1) walks the whole `part-of` subtree via the transitive-close
+ * engine (handled by `emitCloseRelatedCascade`); without it, single-node behavior.
  */
 function emitCloseRelated(model: RoadmapModel, flags: Flags): void {
   const id = requireId(flags, 'close-related');
@@ -289,6 +313,10 @@ function emitCloseRelated(model: RoadmapModel, flags: Flags): void {
       `close-related: '${id}' is '${item.status}', not a terminal status (${terminal.join('/')}) — ` +
         `loose ends are tied only once an item reaches a terminal state`,
     );
+  }
+  if (flags.cascade) {
+    emitCloseRelatedCascade(model, id, flags.apply);
+    return;
   }
   // The resolved set is a RECORDED fact: closes: ∪ ref:. Never inferred (023 FR-003).
   const targets = [...new Set([...item.closes, ...(item.ref !== null ? [item.ref] : [])])];
@@ -336,11 +364,10 @@ export { NO_DOC, SUBACTION_SPECS };
  * The AUDIT-hardened front-end validation, single-sourced for the commander mount
  * (027 T004). Runs the shared subaction-verb scanner + per-subaction grammar
  * validation on the RAW subaction args — preserving every exit-2 guard the flat
- * path enforced, INCLUDING the forgot-value cases commander's own parser does not
- * replicate (`--<value-flag>` immediately followed by a recognized flag → exit 2,
- * AUDIT-20260608-04 / AUDIT-BARRAGE-claude-01). `subaction` MUST already be a known
- * key of SUBACTION_SPECS (the caller rejects unknowns first). Returns the validated
- * `Flags`; on any violation it `process.exit(2)`s via the shared `failUsage`.
+ * path enforced, INCLUDING the forgot-value cases commander's parser does not
+ * replicate (`--<value-flag>` followed by a recognized flag → exit 2,
+ * AUDIT-20260608-04). `subaction` MUST be a known key of SUBACTION_SPECS (the
+ * caller rejects unknowns first). On any violation it `process.exit(2)`s.
  */
 export function preflightRoadmapFlags(subaction: string, subActionArgs: readonly string[]): Flags {
   const scanned = scanFlags(subActionArgs);
@@ -351,12 +378,10 @@ export function preflightRoadmapFlags(subaction: string, subActionArgs: readonly
 /**
  * The doc-resolution + dispatch + error-mapping core, shared by BOTH the flat
  * hand-rolled path (`runRoadmapCli`) and the commander mount (roadmap-command.ts).
- * `scanned` is a fully-validated `Flags` whose `doc` is either an explicit path
- * or the `NO_DOC` sentinel. Subaction is assumed already validated as a known
- * key of SUBACTION_SPECS (the caller rejects unknowns with exit 2 first).
- *
- * Single-sourcing this here keeps the InstallationError/DocumentModelError/
- * BacklogError → exit-code mapping identical across both entry points (027 T004).
+ * `scanned` is a fully-validated `Flags` whose `doc` is either an explicit path or
+ * the `NO_DOC` sentinel; subaction is assumed already validated. Single-sourcing
+ * here keeps the InstallationError/DocumentModelError/BacklogError → exit-code
+ * mapping identical across both entry points (027 T004).
  */
 export async function executeRoadmapSubaction(subaction: string, scanned: Flags): Promise<void> {
   try {
@@ -427,13 +452,14 @@ export async function executeRoadmapSubaction(subaction: string, scanned: Flags)
       case 'approve-design':
         emitApproveDesign(flags, opts);
         return;
+      case 'resolves':
+        emitResolves(flags, opts);
+        return;
     }
-    // Exhaustiveness backstop (AUDIT-20260610-09): the pre-dispatch guard only
-    // rejects subactions ABSENT from SUBACTION_SPECS. A subaction REGISTERED in
-    // SUBACTION_SPECS but missing a `case` above would otherwise fall through and
-    // return exit 0 — a silent no-op. `subaction` is typed `string` (from args[0]),
-    // not a union, so the `never` assignment can't be a compile-time check here;
-    // the runtime fail-loud below restores the loud-failure guarantee.
+    // Exhaustiveness backstop (AUDIT-20260610-09): a subaction REGISTERED in
+    // SUBACTION_SPECS but missing a `case` above would fall through to exit 0 — a
+    // silent no-op. `subaction` is typed `string` (not a union), so no compile-time
+    // `never` check applies here; this runtime fail-loud restores the guarantee.
     failUsage('roadmap', `unhandled subaction '${subaction}' (registered in grammar but no dispatch case)`);
   } catch (err) {
     if (err instanceof InstallationError) {

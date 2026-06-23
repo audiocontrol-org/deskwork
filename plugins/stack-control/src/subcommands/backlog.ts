@@ -13,6 +13,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
 import { resolveInstallationBacklog } from '../backlog/root.js';
+import { emitAutoBackLink } from '../backlog/auto-backlink.js';
+import { setParentNode } from '../backlog/parent-node.js';
 import { InstallationError } from '../config/errors.js';
 import { scaffoldKey } from '../setup/scaffold.js';
 import { CAPTURE_TYPES, isCaptureType, typeLabelStamp } from '../backlog/mappings.js';
@@ -52,11 +54,15 @@ interface Flags {
 }
 
 export const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
-  capture: { valueFlags: ['type', 'ref', 'body'], apply: false, positionals: 1 },
+  // `--node <roadmap-id>` (031 US2, FR-010) records the optional parent-node ref
+  // at capture, so a later `done`/`promote` auto-back-links the id (FR-011).
+  capture: { valueFlags: ['type', 'ref', 'body', 'node'], apply: false, positionals: 1 },
   list: { valueFlags: [], apply: false, positionals: 0 },
   'import-github': { valueFlags: [], apply: true, positionals: 0 },
   'import-slush': { valueFlags: ['feature'], apply: true, positionals: 0 },
-  promote: { valueFlags: ['to'], apply: true, positionals: 1, unboundedPositionals: true },
+  // `--node <roadmap-id>` (031 US2) records the parent-node ref as part of the
+  // promotion linkage (a batch applies the same node to every id).
+  promote: { valueFlags: ['to', 'node'], apply: true, positionals: 1, unboundedPositionals: true },
   // 028 US2 — terminal lifecycle verbs (all mutating; BACKLOG_MEDIATION).
   done: { valueFlags: ['reason'], apply: true, positionals: 1 },
   archive: { valueFlags: [], apply: true, positionals: 1 },
@@ -138,7 +144,11 @@ function emitCapture(flags: Flags): void {
     refs: ref !== undefined ? [ref] : [],
     body: flags.values.get('body'),
   });
-  process.stdout.write(`backlog capture: ${id}\n`);
+  // Optional parent-node ref (031 US2, FR-010): record the linkage so a later
+  // done/promote auto-back-links the id into that node's closes: set (FR-011).
+  const node = flags.values.get('node');
+  if (node !== undefined) setParentNode(backend, id, node);
+  process.stdout.write(`backlog capture: ${id}${node !== undefined ? ` (node ${node})` : ''}\n`);
 }
 
 /**
@@ -167,6 +177,12 @@ function emitDone(flags: Flags): void {
     );
     return;
   }
+  // AUDIT-20260623-04/-09: write the roadmap back-link FIRST — it is the LOCAL,
+  // validated, atomic (temp+rename) mutation. Doing it before the irreversible
+  // backlog close means ANY back-link failure (unknown node, unwritable/invalid
+  // roadmap) fails loud with the task NOT closed — never Done-but-unlinked. A no-ref
+  // task is a no-op. The close runs only after the link is recorded.
+  emitAutoBackLink(backend, id, process.cwd());
   try {
     backend.close(id, reason);
   } catch (err) {
@@ -358,8 +374,28 @@ function emitPromote(flags: Flags): void {
   }
   const root = ensureBacklogProject();
   const backend = createBacklogBackend({ cwd: root });
+  const node = flags.values.get('node');
   try {
+    if (flags.apply) {
+      // AUDIT-20260623-11: validate the WHOLE promote batch (duplicate / missing /
+      // already-promoted) BEFORE any write. `promote` runs its all-or-nothing preflight
+      // in apply:false too, so a bad batch throws here — preserving promote's
+      // validation-before-write contract that the roadmap-first back-link would
+      // otherwise breach (writing closes: for an id promote is about to reject).
+      promote({ ids, target, apply: false, backend, cwd: process.cwd() });
+      // AUDIT-20260623-04/-09: write each id's roadmap back-link FIRST among the WRITES
+      // (the local, validated, atomic mutation), so any back-link failure (unwritable /
+      // invalid roadmap) fails loud with the backlog promote linkage UNWRITTEN — never
+      // promoted-but-unlinked. The effective node is `--node` (passed explicitly, since
+      // the task does not yet hold the ref) or the id's existing ref.
+      for (const id of ids) emitAutoBackLink(backend, id, process.cwd(), node);
+    }
     reportPromote(promote({ ids, target, apply: flags.apply, backend, cwd: process.cwd() }));
+    // 031 US2 (FR-010): record the optional parent-node ref on each promoted id so a
+    // FUTURE `done` auto-back-links it (the closes: link itself is already written above).
+    if (flags.apply && node !== undefined) {
+      for (const id of ids) setParentNode(backend, id, node);
+    }
   } catch (err) {
     // Usage-class refusals (preflight, zero write) → exit 2.
     if (err instanceof PromoteAlreadyPromotedError || err instanceof PromoteDuplicateIdError) {

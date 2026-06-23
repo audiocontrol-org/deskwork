@@ -18,8 +18,11 @@ function shortName(work: string): string {
 /**
  * Fixed transition / verb aliases that are not a phase's own `work:` skill but name
  * an intent against a phase: `govern` (the after_implement hook), `ship`/`release`
- * (the back-half graduate target), and the `specify`/`speckit-*` skill aliases.
- * Each VALUE is a phase id that MUST exist in the governed doc (validated below).
+ * (the back-half graduate target), `close` (the post-ship terminal advance, 031
+ * FR-015), and the `specify`/`speckit-*` skill aliases. Each VALUE is a phase id
+ * that MUST exist in the governed doc (validated below). The `closed` phase carries
+ * `work: (none)`, so no intent is derived from a work skill — the `close` alias is
+ * the only name that targets it.
  */
 const ALIAS_TO_PHASE: ReadonlyArray<readonly [string, PhaseId]> = [
   ['specify', 'specifying'],
@@ -28,6 +31,7 @@ const ALIAS_TO_PHASE: ReadonlyArray<readonly [string, PhaseId]> = [
   ['govern', 'governing'],
   ['ship', 'shipped'],
   ['release', 'shipped'],
+  ['close', 'closed'],
 ];
 
 /**
@@ -58,10 +62,14 @@ export function buildIntentVocabulary(doc: WorkflowDoc): ReadonlyMap<string, Pha
     if (!vocab.has(name)) vocab.set(name, phase.id);
   }
   for (const [alias, phase] of ALIAS_TO_PHASE) {
-    if (!phaseIds.has(phase)) {
-      throw new Error(`intent-vocabulary: alias '${alias}' targets phase '${phase}', which is not in WORKFLOW.md`);
-    }
-    vocab.set(alias, phase);
+    // Register an alias ONLY when its target phase exists in THIS doc (031
+    // AUDIT-20260623-06). A custom/adopter `.stack-control/WORKFLOW.md` override may
+    // legitimately lack a phase the bundled lifecycle has (e.g. the terminal
+    // `closed`); a missing target must make that one intent UNAVAILABLE (resolveIntent
+    // → null → the caller's loud unknown-intent exit), NOT throw and break the WHOLE
+    // vocabulary (which feeds the compass for every intent). The bundled doc declares
+    // every alias target, so this never silently drops one there.
+    if (phaseIds.has(phase)) vocab.set(alias, phase);
   }
   return vocab;
 }
