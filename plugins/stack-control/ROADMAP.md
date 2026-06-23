@@ -618,7 +618,7 @@ Tooling-friction routing policy:
 - TASK-16 adopt + document the tooling-friction routing policy (upstream-tool defects go to GitHub issues, never the local backlog)
 
 ## multi:gap/transitive-item-closure
-- status: in-flight
+- status: closed
 - analyze-clean: yes
 - spec: specs/031-transitive-item-closure
 - design-approved: yes
