@@ -9,6 +9,7 @@
 import { existsSync } from 'node:fs';
 import { convergenceRecordPath } from '../govern/convergence-record.js';
 import { isReachableFromBase, lastCommitTouching } from '../session/git.js';
+import { SIDE_STATES } from './workflow-types.js';
 import type { RoadmapModel, WorkItem } from '../roadmap/roadmap-model.js';
 
 /** A detected off-rail-merged item: merged (record reachable from base) but status in-flight. */
@@ -18,10 +19,19 @@ export interface MergedButInFlight {
   readonly recordCommit: string;
 }
 
-/** A status that is no longer in-flight w.r.t. shipping (so never a dangling signal). */
-function isPostMergeStatus(status: string): boolean {
-  const s = status.toLowerCase();
-  return s === 'shipped' || s === 'closed';
+/**
+ * Statuses for which the dangling signal NEVER fires (032 AUDIT-20260623-07): the post-merge
+ * recorded statuses (`shipped`/`closed`) AND the terminal side-states (`blocked`/`cancelled`/
+ * `retired`). A side-state item is not pending-ship and CANNOT be reconciled via `workflow
+ * advance` (side-states refuse advance), so flagging it dangling would DEADLOCK the backstop —
+ * forward motion blocked with no way to clear it. Only the active pre-ship status (`in-flight`)
+ * is a dangling candidate (the single point where a merge can be pending-record).
+ */
+const NON_DANGLING_STATUSES: ReadonlySet<string> = new Set(['shipped', 'closed', ...SIDE_STATES]);
+
+/** True when `status` can never be a merged-but-status-in-flight (dangling) item. */
+function isNonDanglingStatus(status: string): boolean {
+  return NON_DANGLING_STATUSES.has(status.toLowerCase());
 }
 
 /**
@@ -31,7 +41,7 @@ function isPostMergeStatus(status: string): boolean {
  * already shipped or closed / base undeterminable — the last is fail-open, never a refusal).
  */
 export function mergedButInFlight(item: WorkItem, installationRoot: string): MergedButInFlight | null {
-  if (isPostMergeStatus(item.status)) return null; // already recorded — not dangling
+  if (isNonDanglingStatus(item.status)) return null; // recorded, or a non-reconcilable side-state
   const recordPath = convergenceRecordPath(installationRoot, 'impl', item.identifier);
   if (!existsSync(recordPath)) return null; // no govern record → nothing was merged off-rail
   const recordCommit = lastCommitTouching(installationRoot, recordPath);

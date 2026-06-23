@@ -70,6 +70,16 @@ describe('032 US3 — mergedButInFlight (T017)', () => {
     expect(mergedButInFlight(itemOf(f), f.root)).toBeNull();
   });
 
+  it('returns null for a side-state / terminal status (cancelled, retired) — not a pending-ship item (AUDIT-20260623-07)', () => {
+    // A cancelled/retired item with a reachable convergence record must NOT be flagged dangling:
+    // it is not pending-ship, and it cannot be reconciled via `workflow advance` (side-states
+    // refuse advance) — flagging it would DEADLOCK the backstop.
+    for (const status of ['cancelled', 'retired']) {
+      const f = fixture({ identifier: ITEM, status }, { withRecord: true, baseAtRecord: true });
+      expect(mergedButInFlight(itemOf(f), f.root), status).toBeNull();
+    }
+  });
+
   it('returns null when the base is undeterminable (no remote default branch)', () => {
     const f = makeWorkflowFixture([{ identifier: ITEM, status: 'in-flight' }], { git: true });
     fixtures.push(f);

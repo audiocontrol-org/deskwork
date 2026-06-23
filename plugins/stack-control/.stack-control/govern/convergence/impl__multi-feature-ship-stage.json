@@ -5,18 +5,13 @@
   "governedShaBase": "63f53da8",
   "headSha": "HEAD",
   "chunkIds": [
-    "0ea2f057e7b497cf"
+    "19a6dd710ced9499"
   ],
   "rounds": 1,
   "liftedFindings": [
     {
-      "id": "0ea2f057e7b497cf::AUDIT-BARRAGE-codex-01",
-      "title": "`workflow advance` can record `shipped` without the merge/CI half of the weld",
-      "severity": "high"
-    },
-    {
-      "id": "0ea2f057e7b497cf::AUDIT-BARRAGE-codex-02",
-      "title": "The off-rail backstop is only wired into compass/close, not the mutating `workflow advance` path",
+      "id": "19a6dd710ced9499::AUDIT-BARRAGE-claude-01",
+      "title": "`isPostMergeStatus` only excludes `shipped`/`closed` — a `blocked` or `cancelled` item with a reachable convergence record deadlocks the backstop",
       "severity": "high"
     }
   ],

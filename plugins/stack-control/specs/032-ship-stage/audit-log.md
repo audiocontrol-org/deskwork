@@ -97,3 +97,39 @@ Surface:    src/workflow/compass-resolve.ts:56-77; src/workflow/compass.ts:84-95
 The dangling merge signal is computed in `resolveCompass` and passed into `computeVerdict` (src/workflow/compass-resolve.ts:56-77), where phase-bearing forward intents are refused while any merged-but-status-in-flight item exists (src/workflow/compass.ts:84-95). But `emitAdvance` does not call `resolveCompass`, `firstDanglingMergedItem`, or any equivalent guard before applying a forward transition (src/subcommands/workflow-advance.ts:32-104).
 
 That leaves a front-door mutating command able to advance unrelated lifecycle items while the cross-item backstop is active. The tests cover the close command’s backstop path, but not generic `workflow advance` on another item. Blast radius is high because `workflow advance` is a stackctl lifecycle surface, not raw `git`/`gh`; an adopter or unattended agent can bypass the promised “refuses forward lifecycle motion at the next workflow waypoint” behavior without leaving the stack-control CLI. The guard should be shared by the mutating advance path, with the same reconcile exemption used by compass.
+
+## 2026-06-23 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260623-07 — `isPostMergeStatus` only excludes `shipped`/`closed` — a `blocked` or `cancelled` item with a reachable convergence record deadlocks the backstop
+
+Finding-ID: AUDIT-20260623-07
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=reachable, fix-debt=no; no down-calibration signal — high retained.
+Surface:    `src/workflow/merge-signal.ts:22-25` and `src/subcommands/workflow-advance.ts:50-56`
+
+`isPostMergeStatus` in `merge-signal.ts` gates the dangling-item signal:
+
+```typescript
+function isPostMergeStatus(status: string): boolean {
+  const s = status.toLowerCase();
+  return s === 'shipped' || s === 'closed';
+}
+```
+
+It excludes only `shipped` and `closed`. Any other status — including `blocked` and `cancelled` (valid side-states surfaced throughout the codebase via `{ kind: 'side-state', id: 'blocked' }`) — is treated as "in-flight" and will trigger the backstop if the item's convergence record commit is reachable from `origin/main`.
+
+This creates an irreconcilable deadlock via a realistic sequence: an item is governed and then merged off-rail (convergence record lands on `main`); the team subsequently marks it `cancelled` in ROADMAP.md. At that point `firstDanglingMergedItem` returns it, the backstop fires and blocks all forward lifecycle motion for every other item, and the only stated reconcile path — `stackctl workflow advance <item> --apply` — immediately hits the guard in `emitAdvance`:
+
+```typescript
+if (phase.kind === 'side-state') {
+  failUsage(`'${itemId}' is in terminal side-state '${phase.id}'; induct it back before advancing`);
+}
+```
+
+There is no other automated path. The operator is stuck until they manually edit ROADMAP.md to record `status: shipped` or `closed` on the cancelled item, a non-obvious recovery that nothing in the error message names.
+
+The fix is to extend `isPostMergeStatus` to also return `true` for `'blocked'` and `'cancelled'` (or rename it `isNonDanglingStatus` and enumerate all statuses that do not need a merge-recording reconcile). Alternatively, the backstop could restrict its trigger to items whose status is specifically `'in-flight'`, matching the function name `mergedButInFlight` and the feature spec's stated threat model.
+
+---
