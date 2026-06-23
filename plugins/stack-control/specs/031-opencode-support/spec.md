@@ -105,7 +105,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - **FR-001**: The plugin MUST export a function following opencode's plugin API signature
 - **FR-002**: The plugin MUST register the primary lifecycle skills when loaded (`define`, `extend`, `execute`, `workflow`, `roadmap`)
 - **FR-003**: The plugin MUST delegate skill execution to the `stackctl` CLI via the shell API
-- **FR-004**: The plugin MUST forward skill arguments to the CLI as command arguments
+- **FR-004**: The plugin MUST forward skill arguments to the CLI as command arguments, preserving opencode command argument token boundaries and quoting semantics (e.g., `/stack-control:define "opencode support"` passes two arguments to `stackctl`)
 - **FR-005**: The plugin MUST capture CLI output and return it to opencode
 - **FR-006**: The plugin MUST handle CLI errors (non-zero exit codes) and report them to opencode
 - **FR-007**: The plugin MUST provide a clear error message when `stackctl` CLI is not found
@@ -113,7 +113,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts` (local file installation)
 - **FR-010**: The plugin MUST support npm installation by exporting a default function that opencode can load from `node_modules/@stack-control/opencode-plugin` (npm package installation)
 - **FR-011**: The plugin MUST expose a `/stack-control:version` command that reports the plugin version
-- **FR-012**: The plugin MUST warn users when plugin version doesn't match CLI version
+- **FR-012**: The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked
 
 ### Key Entities
 
@@ -127,7 +127,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 ### Measurable Outcomes
 
 - **SC-001**: Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode
-- **SC-002**: Plugin successfully delegates 95% of skill invocations to the CLI without errors (measured over a defined set of happy-path skill invocations: `/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`)
+- **SC-002**: Plugin successfully delegates 95% of skill invocations to the CLI without errors (measured over a defined set of happy-path skill invocations: `/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)
 - **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI
 - **SC-004**: Plugin works with opencode versions 1.0 and later
 - **SC-005**: Plugin loads successfully in opencode without requiring additional configuration
@@ -140,13 +140,14 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - Q: Which stack-control skills are registered with opencode? → A: `define`, `extend`, `execute`, `workflow`, `roadmap` (primary lifecycle skills)
 - Q: How does npm installation work? → A: Plugin exports default function; opencode loads from `node_modules/@stack-control/opencode-plugin`
 - Q: What happens with `/speckit-*` commands? → A: Not supported in this feature; only `/stack-control:` commands are routed
+- Q: How are version mismatches detected? → A: Plugin detects mismatch and warns on skill invocation; users manually resolve
 
 ## Assumptions
 
 - Users have `stackctl` CLI installed and available in their PATH (or opencode has access to it via shell)
 - Opencode users have basic familiarity with stack-control concepts (roadmap, workflow, phases)
 - The opencode plugin system supports the event hooks needed (command.executed, session events)
-- Users will manually ensure plugin and CLI version alignment (no automated version sync)
+- The plugin detects version mismatch and warns users; users manually resolve mismatches
 - The plugin is installed per-project (not globally for all opencode sessions)
 - Opencode's shell API (`$`) provides sufficient functionality for CLI invocation
 - Users have appropriate file system permissions to install the plugin in `.opencode/plugins/`

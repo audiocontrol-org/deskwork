@@ -873,3 +873,162 @@ Surface:    spec.md — FR-001, Assumptions (plugin API bullet)
 FR-001: "The plugin MUST export a function following opencode's plugin API signature." The spec never describes what this signature is: the function's name, its parameter types, its return type, whether it is synchronous or asynchronous, and what registration calls it is expected to make. Every subsequent FR (FR-002 through FR-012) depends on this foundation — a plugin that exports the wrong function shape fails silently at load time, and none of the functional requirements can be exercised.
 
 The Assumptions section states "The opencode plugin system supports the event hooks needed" but does not quote or cite the API. AUDIT-20260623-33 (prior, open) covers the `$` shell execution sub-API. This finding is distinct: the top-level plugin export signature itself is unspecified, not just the shell utility. A builder must look up opencode's documentation independently; if that documentation changes between the spec being written and the plugin being built, the spec provides no baseline against which to verify FR-001 compliance. At minimum, the spec should quote the expected function signature (even as pseudocode) and cite the opencode documentation version it was taken from.
+
+## 2026-06-23 — audit-barrage lift (20260623T012430527Z-031-opencode-support-after_clarify)
+
+Code-sha: 06025d3a39dcccc67fec9c7b8231e08c7a26cbaa
+### AUDIT-20260623-42 — FR-012 automated version check contradicts the "manually ensure" Assumption
+
+Finding-ID: AUDIT-20260623-42
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    spec.md — FR-012, Assumptions (version alignment bullet)
+
+FR-012 reads: "The plugin MUST warn users when plugin version doesn't match CLI version." This is an automated check — the plugin detects a mismatch and surfaces a warning without user action. The Assumptions section reads: "Users will manually ensure plugin and CLI version alignment (no automated version sync)."
+
+These two statements cannot both be true. FR-012 makes the detection semi-automatic (the plugin does the checking); the Assumption says it's manual. US5 Priority rationale reinforces the assumption side ("Users can manually ensure alignment if needed"), but FR-012 is stated as MUST. An unattended builder reading only the FRs implements the automated check; one reading only the Assumptions skips it. Since both sections carry normative weight, the builder has no clear resolution. The blast-radius is that version-mismatch warnings either ship as a required feature or are omitted, depending on which section the builder treats as authoritative — and the spec provides no tiebreaker.
+
+Fix: remove the Assumption's "no automated version sync" clause (it directly contradicts FR-012), or downgrade FR-012 to SHOULD and add an explicit note that automatic detection is optional.
+
+---
+
+### AUDIT-20260623-43 — US5 Acceptance Scenarios 1 and 3 give contradictory output for `/stack-control:version`, and FR-011 contradicts AS3
+
+Finding-ID: AUDIT-20260623-43
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    spec.md — User Story 5, AS1, AS3; FR-011
+
+User Story 5 has two acceptance scenarios for the same trigger (`/stack-control:version` is invoked):
+
+- **AS1**: "Then plugin reports its version" — plugin version only.
+- **AS3**: "Then both plugin and CLI versions are displayed" — both versions.
+
+AS1 reads as exclusive ("its version" = the plugin's version, not the CLI's). AS3 requires two values to be displayed. These cannot simultaneously be the correct behavior for the same command.
+
+FR-011 resolves in AS1's direction: "The plugin MUST expose a `/stack-control:version` command that reports the plugin version." This gives the builder three signals: AS1 (plugin only), AS3 (both), and FR-011 (plugin only). The correct behavior cannot be inferred from the spec as written — an unattended builder chooses one of the two contradictory outputs. A builder who defers to FRs over user stories implements plugin-only and fails the AS3 scenario; a builder who treats US5 as requirements-grade picks AS3 and contradicts FR-011. Neither reading is obviously wrong given the spec's structure. The blast-radius is that the version command ships with ambiguous, likely incorrect output and neither path satisfies the full spec.
+
+Fix: delete one of AS1/AS3 (keep AS3 — showing both is strictly more useful), update FR-011 to match ("reports the plugin and CLI versions"), and delete the "both" redundancy with FR-012's warning behavior.
+
+---
+
+### AUDIT-20260623-44 — FR-009 and FR-010 impose two mutually incompatible installation paths on a single-file plugin with no packaging pathway described
+
+Finding-ID: AUDIT-20260623-44
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    spec.md — FR-009, FR-010, Assumptions (single-file bullet), Clarifications
+
+FR-009: "The plugin MUST load from `.opencode/plugins/stack-control.ts` (local file installation)" — a raw TypeScript file copied to a local directory.
+
+FR-010: "The plugin MUST support npm installation by exporting a default function that opencode can load from `node_modules/@stack-control/opencode-plugin` (npm package installation)."
+
+The Assumptions section states "The plugin will be a single file (`opencode-plugin.ts`)" and the Clarifications confirm this. A bare TypeScript file can be copied locally (FR-009 path) or published as an npm package (FR-010 path). However, publishing to npm as `@stack-control/opencode-plugin` requires a `package.json`, a build or bundle step, and a registry publish workflow — none of which the spec mentions. The Assumptions section says nothing about npm publishing infrastructure.
+
+The blast-radius: an unattended builder reads both MUSTs, builds the local-copy path (straightforward), and has no information about how to satisfy FR-010 — what the package.json contains, who publishes it, whether the TypeScript source ships as-is or compiled, or whether the two installation paths are tested against the same artifact. A builder who implements only FR-009's path has satisfied FR-009 but violated FR-010; one who attempts FR-010 must invent an entire packaging and publishing mechanism from no spec guidance. The two MUSTs are structurally incompatible with a "single file, no build step" assumption.
+
+Fix: either add a packaging assumption ("a `package.json` and npm publish step exist"), or drop FR-010 to SHOULD/MAY and explicitly note it requires separate packaging infrastructure not covered by this spec.
+
+---
+
+### AUDIT-20260623-45 — FR-002's exhaustive skill list omits the `version` skill required by FR-011 and FR-012
+
+Finding-ID: AUDIT-20260623-45
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — FR-002, FR-011, FR-012
+
+FR-002: "The plugin MUST register the primary lifecycle skills when loaded (`define`, `extend`, `execute`, `workflow`, `roadmap`)." The parenthetical reads as an exhaustive enumeration.
+
+FR-011 requires the plugin to expose `/stack-control:version`, and FR-012 requires version-mismatch warnings. US4 AS3 also echoes FR-002's enumeration verbatim without mentioning `version`. Nowhere does the spec extend the registration requirement to include `version`.
+
+An unattended builder implementing FR-002 as a complete list registers five skills and may not wire up `version` as a registered command at all — satisfying FR-002 while violating FR-011. The spec provides no bridging statement like "in addition to the lifecycle skills, the plugin registers a `version` command." The blast-radius is that `/stack-control:version` is never registered with opencode's command palette and US5 is never testable.
+
+Fix: either add `version` to FR-002's enumeration, or add a new FR for version command registration separate from the lifecycle skills.
+
+---
+
+### AUDIT-20260623-46 — Three listed edge cases have no governing requirement or assumption, leaving builder behavior undefined
+
+Finding-ID: AUDIT-20260623-46
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — Edge Cases section (items 1, 3, 4)
+
+The Edge Cases section lists five open questions but resolves only two: item 2 (CLI errors) is addressed by FR-006/FR-007, and item 5 (`stackctl` not in PATH) is addressed by FR-007 and the PATH assumption. Three items have no governing FR, design decision, or assumption:
+
+- **EC1**: "What happens when the opencode session ends during a long-running stack-control skill?" — No requirement. The plugin could kill the subprocess, leave it running, emit partial output, or crash. All are equally valid readings.
+- **EC3**: "What if the user has multiple opencode sessions running simultaneously?" — No requirement. Concurrent `stackctl` invocations against the same project directory could conflict; the spec provides no isolation or ordering guarantee.
+- **EC4**: "How does the plugin handle network timeouts or file system errors during CLI execution?" — No requirement beyond FR-006's "handle CLI errors (non-zero exit codes)." Timeouts and file system errors may not produce non-zero exits; the spec provides no guidance.
+
+The blast-radius for each: an unattended builder makes an arbitrary implementation choice. Since the spec explicitly names these as concerns (listing them implies awareness), omitting any resolution signals a missing promise rather than a deliberate out-of-scope decision. If they are out of scope, the spec should state "these edge cases are out of scope for this release; behavior is undefined." As-is, the builder is uncertain whether the spec has a gap or intentionally punts.
+
+Fix: for each unresolved edge case, add either (a) a governing FR, (b) an explicit assumption bounding the behavior, or (c) an explicit "out of scope" statement. The current listing-without-resolution is the worst of all worlds.
+
+---
+
+### AUDIT-20260623-47 — SC-001 "within 5 minutes" has an undefined measurement start event
+
+Finding-ID: AUDIT-20260623-47
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — SC-001
+
+SC-001: "Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode."
+
+Two boundaries are undefined: (1) "first opening opencode" — does the five-minute clock start when opencode first launches (before the user even decides to install the plugin), when the user begins the install procedure, or when opencode is first launched after a fresh system setup? (2) "install" — the spec supports two installation paths (FR-009 local copy, FR-010 npm), which have materially different durations; which path does the 5-minute criterion apply to?
+
+The blast-radius is lower than SC-003 (already open) because the 5-minute bound is loose enough that a reasonable builder would pass it on the local-copy path regardless of the start-event interpretation. However, if a reviewer tests the npm installation path on a slow network (package not cached), the 5-minute bound becomes load-bearing, and without a defined start event, the criterion cannot be declared met or failed. This is not as urgent as AUDIT-BARRAGE-claude-01 through -03, but it makes SC-001 the third unmeasurable success criterion alongside SC-003 (open) and SC-004 (open).
+
+Fix: specify the start event ("from the moment the user copies `opencode-plugin.ts` to `.opencode/plugins/`") and which installation path the criterion targets.
+
+### AUDIT-20260623-48 — FR-004 does not define argument preservation semantics
+
+Finding-ID: AUDIT-20260623-48
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:107-108
+
+FR-004 says the plugin “MUST forward skill arguments to the CLI as command arguments,” but it never defines what counts as an argument boundary or whether user quoting must be preserved. For commands like `/stack-control:define "opencode support"` or flags with values, two plausible builds diverge: pass the raw suffix through to `stackctl`, or split it into argv tokens before invoking the shell API. An unattended builder could choose either, and the wrong choice breaks normal CLI usage for quoted strings, paths with spaces, or multi-token values.
+
+The blast radius is high because this is a core invocation contract, not an edge case. A reasonable fix would state the user-facing promise explicitly, for example that opencode command arguments are passed to `stackctl` with the same token boundaries and quoting semantics as a direct CLI invocation.
+
+### AUDIT-20260623-49 — Success criteria omit two required primary skills
+
+Finding-ID: AUDIT-20260623-49
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:105-116,129-133
+
+FR-002 requires registering five primary lifecycle skills: `define`, `extend`, `execute`, `workflow`, and `roadmap`. SC-002, however, measures delegation only over `/stack-control:define`, `/stack-control:extend`, and `/stack-control:execute`. As written, the feature can satisfy its measurable delegation success criterion while `workflow` and `roadmap` fail to execute or delegate correctly.
+
+The intended requirement is clear enough from FR-002 and the key entity definition, so this is medium rather than high. Still, it weakens the spec as an unattended build input because the testable success surface excludes two promised commands. The fix is to include all registered primary lifecycle skills in the delegation success set, or add separate success criteria for `workflow` and `roadmap`.
+
+### AUDIT-20260623-50 — Version alignment responsibility is internally split between user and plugin
+
+Finding-ID: AUDIT-20260623-50
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:77-89,115-116,149
+
+User Story 5 says users can manually ensure version alignment, and the Assumptions section says “Users will manually ensure plugin and CLI version alignment.” But FR-012 requires the plugin to warn users when the plugin version does not match the CLI version, and the acceptance scenario requires that warning when a skill runs. Those are different promises: either mismatch detection is a plugin responsibility, or it is left to the user via manual comparison.
+
+The likely intended reading is “the plugin warns but does not auto-sync,” so the contradiction is resolvable. The risk is that a builder treats the assumption as permission to skip runtime mismatch checks while still claiming FR-012 is satisfied by `/stack-control:version`. The spec should say the plugin must detect and warn on mismatch, while users remain responsible for resolving the mismatch manually.
