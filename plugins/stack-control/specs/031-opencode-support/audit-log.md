@@ -2484,3 +2484,100 @@ Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:23`, `plug
 US-1 promises that invoking `/stack-control:define` makes “the spec authoring chain” begin, and SC-001/SC-002 treat `/stack-control:define` as a happy-path workflow capability. But the functional requirements only promise one-shot CLI delegation plus output/error capture; they never state whether interactive `stackctl` prompts can be surfaced to the opencode user and answered inside the session.
 
 This matters because `define`, `extend`, and likely `execute` are lifecycle skills, not simple fire-and-forget commands. An unattended builder could reasonably implement “run `stackctl define`, capture output, return when the process exits,” which satisfies FR-003 through FR-006 as written but can hang or fail as soon as `stackctl` asks a question. The blast radius is high: the feature’s P1 workflow can be built in a way that passes the spec’s delegation wording while failing the core interactive authoring use case. A reasonable fix would add an explicit user-facing decision: either these opencode commands support interactive CLI prompt/response round trips, or only non-interactive invocations are in scope and interactive commands must fail with a clear message.
+
+## 2026-06-23 — audit-barrage lift (20260623T032621485Z-031-opencode-support-after_clarify)
+
+Code-sha: d5435934a0dae2586dde53516cafa16aa6c16727
+### AUDIT-20260623-139 — SC-002's "without errors" promise directly contradicts FR-003's interactive-CLI prohibition for the same five commands
+
+Finding-ID: AUDIT-20260623-139
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-002, FR-003, US1 Note
+
+The spec updated FR-003 and US1 to address AUDIT-20260623-138: "Interactive CLI prompts are not supported. Commands that require interactive input will fail with a clear error message." This directly introduced a new contradiction with SC-002: "Plugin successfully delegates all five listed happy-path skill invocations to the CLI **without errors** (`/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)."
+
+The five commands in SC-002 are the primary stack-control lifecycle commands. US1 AS1 describes `/stack-control:define` as initiating "the spec authoring chain" — a multi-step guided workflow. Nothing in the spec states that `stackctl define`, `stackctl execute`, or the other lifecycle commands have non-interactive modes. If any of these commands emit a CLI prompt (which lifecycle-authoring tools commonly do), they "will fail with a clear error message" per FR-003 — which directly contradicts SC-002's "without errors" promise for those exact invocations.
+
+An unattended builder reading SC-002 implements a passing happy path. An unattended builder reading FR-003 knows the plugin will refuse interactive prompts. Both are simultaneously in force for the same five commands and the same invocation scenarios. The spec never states which of the five commands can complete without any interactive prompt, nor does it assert that `stackctl` provides a non-interactive mode for these commands. The blast radius: an implementation that fully satisfies FR-003 cannot satisfy SC-002 unless `stackctl`'s CLI commands happen to be non-interactive — a load-bearing behavioral property the spec leaves unasserted.
+
+A reasonable fix: add one sentence to SC-002 scoping which of the five commands have non-interactive happy paths, or add an explicit FR asserting that the five listed commands accept all necessary arguments via command-line flags and produce output without any prompt when invoked from a non-TTY context.
+
+---
+
+### AUDIT-20260623-140 — US4 AS1's event-routing model is ambiguous about whether registered skills also fire `command.executed`, enabling double-execution
+
+Finding-ID: AUDIT-20260623-140
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US4 AS1, US4 AS2, FR-002
+
+US4 AS1: "Given opencode fires a `command.executed` event, **When the command starts with `/stack-control:` and is not registered**, Then the plugin routes it to the appropriate skill." US4 AS2: "Given user types `/stack-control:define`, When the command is invoked, Then it appears in opencode's command palette **and executes the skill**." FR-002 registers five skills through opencode's command palette.
+
+The ambiguity: does opencode fire `command.executed` for commands that ARE registered, or only for unregistered ones? The spec's intent appears to be that the event listener only catches unregistered commands (the phrase "and is not registered" in AS1), while registered commands are executed through the palette mechanism described in AS2. But the spec never states whether opencode's `command.executed` event fires for registered commands. If it does — which is the natural behavior for many event systems that fire on every command execution — then registered skills will be handled by both their palette registration (AS2) and the event listener (AS1), causing double invocation of `stackctl define`, `stackctl execute`, etc.
+
+An unattended builder implementing the event listener against AS1 may attach it to all `/stack-control:` commands unconditionally, since the "is not registered" condition describes when routing happens but does not constrain when the event fires. There is no reference to opencode's event model documentation in the spec, and the registered-vs-unregistered firing distinction is never confirmed. The blast radius: every registered skill invocation triggers the CLI twice, producing duplicate output, duplicate side-effects in the spec store, and non-idempotent damage for commands like `stackctl execute`.
+
+A reasonable fix: add one sentence explicitly stating whether `command.executed` fires for registered commands, or whether the plugin attaches the catch-all listener only to a dedicated "unregistered command" event, referencing which opencode API surface draws the line.
+
+---
+
+### AUDIT-20260623-141 — SC-001's "within 5 minutes" success criterion is unmeasurable as written
+
+Finding-ID: AUDIT-20260623-141
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-001
+
+SC-001: "Users can install the stack-control plugin by copying `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts` and invoke `/stack-control:define` within 5 minutes of first opening opencode." The 5-minute target is not anchored to any controlled conditions: it does not specify user experience level, hardware, whether documentation is pre-read, whether opencode is already installed, or what "first opening opencode" means (cold start on a fresh install vs. an existing opencode session with other plugins). As written, no test can falsify this criterion — a 6-minute installation could always be attributed to a less-experienced user or slower machine, not a spec failure.
+
+A measurable SC requires either controlled conditions ("an experienced adopter following the README on a system where opencode is already installed") or a restructured framing that removes the time target in favor of something observable (e.g., "installation requires no more than N manual steps and no configuration beyond copying the file"). The blast radius is that SC-001 cannot serve as a release gate: no one can confirm it is met or broken because the measurement conditions are undefined.
+
+---
+
+### AUDIT-20260623-142 — The working-directory promise depends on a shell API capability that the spec lists as an assumption but never confirms
+
+Finding-ID: AUDIT-20260623-142
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US1 AS2, US3 AS1, Assumptions
+
+US1 AS2: "When the skill requires CLI operations, Then the plugin delegates to the local `stackctl` CLI **with the opencode session's active project/workspace as the working directory**." US3 AS1 makes the same promise: "the plugin invokes `stackctl <command>` via the shell API with the opencode session's active project/workspace as the working context." This working-directory behavior is load-bearing — `stackctl` is a project-scoped CLI; if it runs in the wrong directory it applies changes to the wrong project.
+
+The Assumptions section states: "Opencode's shell API (`$`) provides sufficient functionality for CLI invocation." This assumption does not confirm that the shell API accepts a working directory parameter or that it inherits the session's active project context as CWD. If the shell API launches processes in a fixed directory (e.g., the plugin file's directory or opencode's install root), the working-directory promise in US1 AS2 and US3 AS1 cannot be satisfied regardless of how the plugin is implemented. The spec makes a user-visible functional promise in two acceptance scenarios but backs it only with an underspecified "sufficient functionality" assumption that does not name the specific capability required.
+
+A reasonable fix: either confirm the specific shell API property that delivers CWD control (e.g., "`$` accepts a `cwd` option") or promote this to an explicit, testable FR ("The plugin MUST invoke `stackctl` with the CWD set to the opencode session's active project path").
+
+### AUDIT-20260623-143 — `/stack-control:define` is both the P1 happy path and declared unsupported when it needs input
+
+Finding-ID: AUDIT-20260623-143
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:19-27`, `plugins/stack-control/specs/031-opencode-support/spec.md:117`, `plugins/stack-control/specs/031-opencode-support/spec.md:141-143`
+
+US1’s independent test says invoking `/stack-control:define` creates a new feature spec, and acceptance scenario 1 says the “spec authoring chain begins.” SC-001 and SC-003 also make `/stack-control:define` the measurable P1 path. But the same story and FR-003 now state that interactive CLI prompts are unsupported and commands requiring interactive input fail with a clear error.
+
+That leaves the core P1 promise internally unstable: if `stackctl define` is an authoring chain that requires prompts, the spec simultaneously promises it begins successfully and fails clearly. An unattended builder could implement the literal non-interactive delegation, satisfy FR-003, and still ship a plugin whose headline `/stack-control:define` flow fails the acceptance scenario. The blast radius is high because the feature’s primary workflow can be built to the written FRs while not delivering the written user story. A reasonable fix would state the non-interactive invocation contract for `define` explicitly, such as required arguments for a successful opencode path, or change the P1 acceptance and SCs to expect a clear unsupported-interactive error rather than spec creation.
+
+### AUDIT-20260623-144 — Ended sessions cannot reliably receive completed command output
+
+Finding-ID: AUDIT-20260623-144
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:103-109`
+
+The edge-case promise says that when an opencode session ends during a long-running stack-control skill, “the skill continues and returns output when complete.” Once the session has ended, the spec does not name any remaining user-facing destination for that output, while the normal output contract is to return output “to opencode” or to the invocation context.
+
+This is an impossible or at least ambiguous promise as written: a builder can keep the CLI process running, but cannot necessarily return output to a closed session. The likely consequence is a medium-severity design mismatch where agents either drop output silently, invent a persistence surface, or keep session resources alive beyond the stated session lifecycle. A reasonable fix would separate the two promises: whether in-progress operations are cancelled, and where completion output is delivered if the invoking session no longer exists.

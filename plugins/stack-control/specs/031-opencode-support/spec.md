@@ -16,15 +16,15 @@ Opencode users want to use stack-control's governance and lifecycle capabilities
 
 **Why this priority**: This is the core value proposition - enabling opencode users to leverage stack-control's workflow capabilities natively. Without this, opencode users must use the CLI separately, creating friction.
 
-**Independent Test**: Can be fully tested by installing the stack-control opencode plugin, opening a session, and invoking `/stack-control:define` to create a new feature spec. Delivers immediate workflow capability within opencode.
+**Independent Test**: Can be fully tested by installing the stack-control opencode plugin, opening a session, and invoking `/stack-control:define --help` to display usage. Delivers immediate workflow capability within opencode.
 
 **Acceptance Scenarios**:
 
-1. **Given** opencode is installed with the stack-control plugin, **When** user types `/stack-control:define`, **Then** the skill is invoked and the spec authoring chain begins
+1. **Given** opencode is installed with the stack-control plugin, **When** user types `/stack-control:define --help`, **Then** the skill is invoked and displays `stackctl define` usage
 2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI with the opencode session's active project/workspace as the working directory
-3. **Given** user is in an opencode session, **When** they invoke `/stack-control:extend`, **Then** the skill executes in the stack-control installation context
+3. **Given** user is in an opencode session, **When** they invoke `/stack-control:extend --help`, **Then** the skill executes in the stack-control installation context
 
-Note: Interactive CLI prompts are not supported. Commands that require interactive input will fail with a clear error message.
+Note: Interactive CLI prompts are not supported. Commands that require interactive input will fail with a clear error message. Non-interactive commands (e.g., with `--help`, `--version`, or required arguments) are supported.
 
 ---
 
@@ -102,7 +102,7 @@ Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. C
 
 ### Edge Cases
 
-- What happens when the opencode session ends during a long-running stack-control skill? → The skill continues and returns output when complete; the plugin does not cancel in-progress operations.
+- What happens when the opencode session ends during a long-running stack-control skill? → The skill continues running in the background and output is discarded once the session ends.
 - How does the plugin handle errors from the `stackctl` CLI (non-zero exit codes)? → The plugin captures stderr and returns it to opencode with a clear error message.
 - What if the user has multiple opencode sessions running simultaneously? → Each session operates independently; the plugin maintains no shared state between sessions.
 - How does the plugin handle network timeouts or file system errors during CLI execution? → The plugin reports the error to opencode and does not retry.
