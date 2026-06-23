@@ -54,6 +54,13 @@ export interface ScannedFlags {
   readonly values: ReadonlyMap<string, string>;
   /** Recognized boolean flags that were present (e.g. `apply`, `clear`). */
   readonly booleans: ReadonlySet<string>;
+  /**
+   * Multi-value flags (e.g. roadmap `resolves --add TASK-7 TASK-8`): a flag that
+   * GREEDILY consumes EVERY following non-recognized-flag token as a list. Each
+   * present multi-value flag maps to its (possibly empty) id list. Distinct from
+   * `values` (single-value) so existing single-value verbs are unaffected.
+   */
+  readonly multiValues: ReadonlyMap<string, readonly string[]>;
 }
 
 /**
@@ -75,19 +82,45 @@ export function scanVerbFlags(
   defaultDoc: string,
   booleanFlags: readonly string[],
   valueFlagNames: readonly string[],
+  multiValueFlagNames: readonly string[] = [],
 ): ScannedFlags {
   const recognizedBooleans = new Set(booleanFlags);
-  // Every flag NAME the verb recognizes: booleans ∪ value-flags ∪ the universal
-  // `doc`. A token `--<name>` whose <name> is in this set is a real flag of the
-  // verb, never legitimate free-text prose.
-  const recognizedFlagNames = new Set([...booleanFlags, ...valueFlagNames, 'doc']);
+  const recognizedMultiValues = new Set(multiValueFlagNames);
+  // Every flag NAME the verb recognizes: booleans ∪ value-flags ∪ multi-value
+  // flags ∪ the universal `doc`. A token `--<name>` whose <name> is in this set
+  // is a real flag of the verb, never legitimate free-text prose.
+  const recognizedFlagNames = new Set([
+    ...booleanFlags,
+    ...valueFlagNames,
+    ...multiValueFlagNames,
+    'doc',
+  ]);
   let doc = defaultDoc;
   const positionals: string[] = [];
   const values = new Map<string, string>();
+  const multiValues = new Map<string, string[]>();
   const booleans = new Set<string>();
   for (let i = 0; i < args.length; i++) {
     const token = args[i]!;
-    if (token.startsWith('--') && recognizedBooleans.has(token.slice(2))) {
+    if (token.startsWith('--') && recognizedMultiValues.has(token.slice(2))) {
+      // A multi-value flag GREEDILY consumes every following BARE token until the
+      // next `--`-prefixed token (a flag — recognized or not) or end of argv. The
+      // values are ids (e.g. TASK-7), never flag-shaped, so stopping at any `--`
+      // token keeps an UNRECOGNIZED following flag (e.g. a bogus `--zzz`) as a
+      // distinct token the grammar validator then rejects (instead of silently
+      // swallowing it as a value). A multi-value flag with NO values (next token
+      // is `--`-prefixed, or it ends argv) is a usage error — the operator forgot
+      // the ids (mirrors the single-value forgot-value guard).
+      const name = token.slice(2);
+      const collected: string[] = [];
+      while (i + 1 < args.length && !args[i + 1]!.startsWith('--')) {
+        collected.push(args[++i]!);
+      }
+      if (collected.length === 0) failUsage(verb, `${token} <value...> required`);
+      const existing = multiValues.get(name);
+      if (existing === undefined) multiValues.set(name, collected);
+      else existing.push(...collected);
+    } else if (token.startsWith('--') && recognizedBooleans.has(token.slice(2))) {
       booleans.add(token.slice(2));
     } else if (token === '--doc') {
       const v = args[++i];
@@ -122,12 +155,15 @@ export function scanVerbFlags(
       positionals.push(token);
     }
   }
-  return { doc, positionals, values, booleans };
+  return { doc, positionals, values, booleans, multiValues };
 }
 
 /** Per-subaction flag grammar shared by the subaction-dispatching verbs. */
 export interface SubactionGrammar {
   readonly valueFlags: readonly string[];
+  /** Multi-value flags (greedy list consumers, e.g. roadmap `resolves --add`).
+   * Absent ⇒ the subaction accepts no multi-value flags. */
+  readonly multiValueFlags?: readonly string[];
   /** Whether `--apply` is meaningful for the subaction. */
   readonly apply: boolean;
   /** Whether `--clear` is meaningful (roadmap `defer`); absent → not allowed. */
@@ -165,12 +201,17 @@ export function validateSubactionFlags(
     readonly cascade?: boolean;
     readonly positionals: readonly string[];
     readonly values: ReadonlyMap<string, string>;
+    readonly multiValues?: ReadonlyMap<string, readonly string[]>;
   },
 ): void {
   if (grammar === undefined) return;
   const allowed = new Set(grammar.valueFlags);
   for (const name of flags.values.keys()) {
     if (!allowed.has(name)) failUsage(verb, `unknown flag --${name} for '${subaction}'`);
+  }
+  const allowedMulti = new Set(grammar.multiValueFlags ?? []);
+  for (const name of flags.multiValues?.keys() ?? []) {
+    if (!allowedMulti.has(name)) failUsage(verb, `unknown flag --${name} for '${subaction}'`);
   }
   if (flags.apply && !grammar.apply) failUsage(verb, `--apply is not valid for '${subaction}'`);
   if (flags.clear === true && grammar.clear !== true) {

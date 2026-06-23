@@ -57,6 +57,7 @@ const SUMMARIES: Readonly<Record<string, string>> = {
   rename: 'rename a node and repoint every dependent edge (dry-run unless --apply)',
   'remove-node': 'remove a node, refusing loud if it is still an edge target (dry-run unless --apply)',
   'approve-design': 'record the design-approved marker (--analyze-clean for the symmetric one; --clear negates) (dry-run unless --apply)',
+  resolves: 'record resolved backlog ids on a node\'s closes: set (--add/--remove one or more ids; dry-run unless --apply)',
 };
 
 /** The summary for a subaction, failing loud if a registered subaction has none
@@ -84,6 +85,7 @@ export function subactionNames(): readonly string[] {
 export function flagNamesFor(grammar: SubactionGrammar): readonly string[] {
   const names = ['--doc'];
   for (const flag of grammar.valueFlags) names.push(`--${flag}`);
+  for (const flag of grammar.multiValueFlags ?? []) names.push(`--${flag}`);
   if (grammar.apply) names.push('--apply');
   if (grammar.clear === true) names.push('--clear');
   if (grammar.chain === true) names.push('--chain');
@@ -93,9 +95,9 @@ export function flagNamesFor(grammar: SubactionGrammar): readonly string[] {
 }
 
 /** The left-column token for a flag's help line (`--apply`, `--doc <path>`,
- * `--<value-flag> <value>`). The description column aligns to the widest such
- * token across the subaction's flag set. */
-function flagToken(flag: string): string {
+ * `--<value-flag> <value>`, `--<multi-value-flag> <ids...>`). The description
+ * column aligns to the widest such token across the subaction's flag set. */
+function flagToken(flag: string, grammar: SubactionGrammar): string {
   if (
     flag === '--apply' ||
     flag === '--clear' ||
@@ -106,6 +108,7 @@ function flagToken(flag: string): string {
     return flag;
   }
   if (flag === '--doc') return '--doc <path>';
+  if ((grammar.multiValueFlags ?? []).includes(flag.slice(2))) return `${flag} <ids...>`;
   return `${flag} <value>`;
 }
 
@@ -118,7 +121,7 @@ function flagLine(
   statusVocab: readonly string[],
   col: number,
 ): string {
-  const token = flagToken(flag);
+  const token = flagToken(flag, grammar);
   let desc: string;
   if (flag === '--doc') desc = 'roadmap document (default: resolve through the installation)';
   else if (flag === '--apply') desc = 'write the change (default: dry-run)';
@@ -174,7 +177,7 @@ export function renderSubactionHelp(subaction: string): string {
   lines.push('');
   lines.push('Flags:');
   const flags = flagNamesFor(grammar);
-  const col = Math.max(...flags.map((f) => flagToken(f).length));
+  const col = Math.max(...flags.map((f) => flagToken(f, grammar).length));
   for (const flag of flags) {
     lines.push(flagLine(flag, grammar, statusVocab, col));
   }

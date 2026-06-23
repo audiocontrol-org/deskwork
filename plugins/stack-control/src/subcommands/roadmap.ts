@@ -29,6 +29,7 @@ import {
   emitRename,
 } from './roadmap-edge-emit.js';
 import { emitReconcile } from './roadmap-reconcile-emit.js';
+import { emitResolves } from './roadmap-resolves-emit.js';
 import { cluster, type ClusterInput } from '../roadmap/cluster.js';
 import { loadRoadmap, type RoadmapModel } from '../roadmap/roadmap-model.js';
 import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
@@ -60,6 +61,7 @@ export interface Flags {
   readonly cascade: boolean;
   readonly positionals: readonly string[];
   readonly values: ReadonlyMap<string, string>;
+  readonly multiValues: ReadonlyMap<string, readonly string[]>;
 }
 
 // `--doc` is universal (allowed everywhere) and handled separately from `values`.
@@ -114,6 +116,9 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
     analyzeClean: true,
     positionals: 1,
   },
+  // `resolves` (031 US2) records resolved ids onto a node's PROSE `closes:` set
+  // via multi-value `--add`/`--remove` (never add-edge, which refuses prose).
+  resolves: { valueFlags: [], multiValueFlags: ['add', 'remove'], apply: true, clear: false, positionals: 1 },
 };
 
 /** The union of every subaction's value-flag names, so the scanner can reject a
@@ -122,12 +127,17 @@ const ALL_VALUE_FLAGS: readonly string[] = [
   ...new Set(Object.values(SUBACTION_SPECS).flatMap((s) => s.valueFlags)),
 ];
 
+/** Union of every subaction's multi-value-flag names (the scanner's greedy set). */
+const ALL_MULTI_VALUE_FLAGS: readonly string[] = [
+  ...new Set(Object.values(SUBACTION_SPECS).flatMap((s) => s.multiValueFlags ?? [])),
+];
+
 /** The known-subaction list rendered in the unknown-subaction usage error —
  * single-sourced so the flat path (`runRoadmapCli`) and the commander mount
  * (`roadmap-command.ts`) emit the byte-identical message (FR-006; AUDIT-BARRAGE-
  * codex-01). The order is the discovery order operators have learned, kept stable. */
 export const KNOWN_SUBACTIONS =
-  'next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, cluster, group, reconcile, close-related, add-edge, remove-edge, move-edge, rename, remove-node, approve-design';
+  'next, blocked, blocks, order, graph, add, advance, decompose, reclassify, defer, cluster, group, reconcile, close-related, add-edge, remove-edge, move-edge, rename, remove-node, approve-design, resolves';
 
 /** Scan flags via the shared subaction-verb scanner; the boolean switches. */
 export function scanFlags(args: readonly string[]): Flags {
@@ -137,6 +147,7 @@ export function scanFlags(args: readonly string[]): Flags {
     NO_DOC,
     ['apply', 'clear', 'chain', 'analyze-clean', 'cascade'],
     ALL_VALUE_FLAGS,
+    ALL_MULTI_VALUE_FLAGS,
   );
   return {
     doc: s.doc,
@@ -147,6 +158,7 @@ export function scanFlags(args: readonly string[]): Flags {
     cascade: s.booleans.has('cascade'),
     positionals: s.positionals,
     values: s.values,
+    multiValues: s.multiValues,
   };
 }
 
@@ -437,6 +449,9 @@ export async function executeRoadmapSubaction(subaction: string, scanned: Flags)
         return;
       case 'approve-design':
         emitApproveDesign(flags, opts);
+        return;
+      case 'resolves':
+        emitResolves(flags, opts);
         return;
     }
     // Exhaustiveness backstop (AUDIT-20260610-09): the pre-dispatch guard only

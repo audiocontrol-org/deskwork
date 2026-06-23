@@ -33,7 +33,13 @@
 // shape — zero `as`/`any`/`@ts-ignore` (Constitution Principle VI; CHK024).
 
 import { Command, CommanderError } from 'commander';
-import { booleanOption, optionalStringOption, rawOpts, stringOption } from '../cli-help/command-adapter.js';
+import {
+  booleanOption,
+  optionalStringArrayOption,
+  optionalStringOption,
+  rawOpts,
+  stringOption,
+} from '../cli-help/command-adapter.js';
 import {
   renderRoadmapHelp,
   renderRoadmapUsage,
@@ -57,10 +63,17 @@ function isHelpFlag(token: string): boolean {
 /** Build the `Flags` shape the execution core consumes from a sub-command's
  * parsed options, read through the typed adapter (no `any`). `--doc` absent maps
  * to the `NO_DOC` sentinel so installation resolution behaves identically to the
- * flat path. */
-function flagsFromCommand(command: Command, positionals: readonly string[]): Flags {
+ * flat path. `multiValueNames` are the variadic flags this subaction declares —
+ * they parse to arrays (read into `multiValues`), so the single-value loop skips
+ * them (reading an array via the scalar reader would fail loud). */
+function flagsFromCommand(
+  command: Command,
+  positionals: readonly string[],
+  multiValueNames: ReadonlySet<string>,
+): Flags {
   const raw = rawOpts(command);
   const values = new Map<string, string>();
+  const multiValues = new Map<string, readonly string[]>();
   for (const name of Object.keys(raw)) {
     if (
       name === 'doc' ||
@@ -70,6 +83,11 @@ function flagsFromCommand(command: Command, positionals: readonly string[]): Fla
       name === 'analyzeClean' ||
       name === 'cascade'
     ) {
+      continue;
+    }
+    if (multiValueNames.has(name)) {
+      const list = optionalStringArrayOption(raw[name], name);
+      if (list !== undefined) multiValues.set(name, list);
       continue;
     }
     const value = optionalStringOption(raw[name], name);
@@ -85,6 +103,7 @@ function flagsFromCommand(command: Command, positionals: readonly string[]): Fla
     cascade: booleanOption(raw.cascade, 'cascade'),
     positionals,
     values,
+    multiValues,
   };
 }
 
@@ -124,6 +143,10 @@ function registerSubaction(parent: Command, name: string): void {
   // existing `requireId`/`addInputFrom` exit-2 message rather than commander's.
   if (grammar.positionals >= 1) sub.argument('[identifier]');
   for (const flag of grammar.valueFlags) sub.option(`--${flag} <value>`);
+  // Multi-value flags are commander variadics (`--add <ids...>`): they collect
+  // one or more following tokens into an array (031 US2 `resolves --add A B`).
+  const multiValueNames = new Set(grammar.multiValueFlags ?? []);
+  for (const flag of multiValueNames) sub.option(`--${flag} <ids...>`);
   if (grammar.apply) sub.option('--apply', 'write the change (default: dry-run)');
   if (grammar.clear === true) sub.option('--clear', 'clear the condition');
   if (grammar.chain === true) sub.option('--chain', 'wire a depends-on chain over the children');
@@ -138,7 +161,7 @@ function registerSubaction(parent: Command, name: string): void {
     // `runRoadmapCommand` (BEFORE commander parse, so usage errors keep the
     // `roadmap: …` message shape). This action only reads the typed options for
     // dispatch.
-    const flags = dashedFlags(flagsFromCommand(this, this.args));
+    const flags = dashedFlags(flagsFromCommand(this, this.args, multiValueNames));
     await executeRoadmapSubaction(name, flags);
   });
 }

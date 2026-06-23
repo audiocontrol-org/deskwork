@@ -46,14 +46,14 @@ id set; re-run is idempotent (quickstart Scenarios A, B, D).
 **Goal**: Record resolved ids on a node without hand-editing; closing/promoting a
 task auto-back-links it. **Independent test**: quickstart Scenarios E, F.
 
-- [ ] T017 [P] [US2] RED: test `closes-mutation` add/remove — set-union/difference, canonical comma-list, create/remove the line in `src/roadmap/__tests__/closes-mutation.test.ts`
-- [ ] T018 [US2] Implement `closes-mutation.ts` (add/remove ids in a node's prose `closes:`; dry-run/apply) in `src/roadmap/closes-mutation.ts` (GREEN T017)
-- [ ] T019 [P] [US2] RED: test the `roadmap resolves` verb (dry-run shows before→after; `--apply` writes; `add-edge` still refuses `closes`) in `src/subcommands/__tests__/roadmap-resolves.test.ts`
-- [ ] T020 [US2] Add the `resolves` verb to `src/subcommands/roadmap.ts` (grammar entry + `emitResolves`) driving `closes-mutation` (GREEN T019)
-- [ ] T021 [P] [US2] RED: test the backlog task parent-node ref — set via `promote`/`capture --node`, read via raw-notes; absent ⇒ no-op in `src/backlog/__tests__/parent-node-ref.test.ts`
-- [ ] T022 [US2] Persist/read the optional parent-node ref (notes linkage line) in `src/backlog/backend.ts` (GREEN T021)
-- [ ] T023 [P] [US2] RED: test auto-back-link — `backlog done` of a task with a parent-node ref adds its id to that node's `closes:`; no ref ⇒ no-op, no error in `src/subcommands/__tests__/backlog-autobacklink.test.ts`
-- [ ] T024 [US2] Wire `done`/`promote` to auto-back-link via `closes-mutation` + accept `--node` on `capture`/`promote` in `src/subcommands/backlog.ts` (GREEN T023)
+- [X] T017 [P] [US2] RED: test `closes-mutation` add/remove — set-union/difference, canonical comma-list, create/remove the line (placed at `tests/roadmap/closes-mutation.test.ts` — the `src/roadmap/__tests__/` root is NOT vitest-collected)
+- [X] T018 [US2] Implement `closes-mutation.ts` (add/remove ids in a node's prose `closes:`; dry-run/apply) in `src/roadmap/closes-mutation.ts` (GREEN T017)
+- [X] T019 [P] [US2] RED: test the `roadmap resolves` verb (dry-run shows before→after; `--apply` writes; `add-edge` still refuses `closes`) at `src/__tests__/roadmap/roadmap-resolves.test.ts`
+- [X] T020 [US2] Add the `resolves` verb to `src/subcommands/roadmap.ts` (grammar entry + `emitResolves` in `roadmap-resolves-emit.ts`) driving `closes-mutation`; registered across all four surfaces + ROADMAP_MEDIATION (GREEN T019)
+- [X] T021 [P] [US2] RED: test the backlog task parent-node ref — set via `setParentNode`, read via raw-notes; absent ⇒ no-op at `tests/backlog/parent-node-ref.test.ts`
+- [X] T022 [US2] Persist/read the optional parent-node ref (notes linkage line) in `src/backlog/parent-node.ts` (reuses backend `readNotes`/`edit({appendNotes})`) (GREEN T021)
+- [X] T023 [P] [US2] RED: test auto-back-link — `backlog done` of a task with a parent-node ref adds its id to that node's `closes:`; no ref ⇒ no-op, no error at `src/__tests__/backlog-autobacklink.test.ts`
+- [X] T024 [US2] Wire `done`/`promote` to auto-back-link via `closes-mutation` (`src/backlog/auto-backlink.ts`) + accept `--node` on `capture`/`promote` in `src/subcommands/backlog.ts` (GREEN T023)
 
 **Checkpoint**: US2 independently testable; combined with US1, closure is near-zero-touch.
 

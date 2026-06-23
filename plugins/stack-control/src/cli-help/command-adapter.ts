@@ -97,3 +97,22 @@ export const booleanOption: OptionReader<boolean> = (raw, flagName) => {
 /** An optional string flag: `undefined` when unset, else a validated string. */
 export const optionalStringOption: OptionReader<string | undefined> = (raw, flagName) =>
   raw === undefined ? undefined : stringOption(raw, flagName);
+
+/**
+ * A variadic (multi-value) string flag: `undefined` when unset; else an array of
+ * validated non-empty strings (commander collects `--add A B` into `['A','B']`).
+ * A present-but-empty array, or any non-string element, fails loud (Principle V).
+ */
+export const optionalStringArrayOption: OptionReader<readonly string[] | undefined> = (
+  raw,
+  flagName,
+) => {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) {
+    throw new CommandAdapterError(`--${flagName} expects a list value (got ${describe(raw)})`);
+  }
+  if (raw.length === 0) {
+    throw new CommandAdapterError(`--${flagName} expects at least one value (got empty)`);
+  }
+  return raw.map((el, i) => stringOption(el, `${flagName}[${i}]`));
+};
