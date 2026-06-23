@@ -66,8 +66,13 @@ export function resolveImplementExclusion(
   const excludePathRels =
     featureRoot !== undefined ? (excludePaths ?? []).map(relify).filter(inRepo) : [];
   const excludeDiffRels = [
+    // The feature's OWN root: exclude only its audit-log (self-reference generator) —
+    // its code is the audit target and must stay in scope.
     ...(featureInside ? [`${featureRel}/audit-log.md`] : []),
-    ...otherFeatureRels.map((root) => `${root}/audit-log.md`),
+    // TASK-428: every OTHER in-repo feature root is excluded WHOLE (not just its
+    // audit-log.md), so an unrelated parked scaffold (e.g. specs/002/scaffold.md) can't
+    // enter the current feature's chunked payload and generate false findings.
+    ...otherFeatureRels,
     ...excludePathRels,
   ];
   return {
@@ -143,11 +148,17 @@ function gitTry(root: string, args: readonly string[]): string | undefined {
   return out.length > 0 ? out : undefined;
 }
 
-/** The repo's default branch ref, best-effort: origin/HEAD → `main` → `master` → undefined. */
+/**
+ * The repo's default branch ref, best-effort: origin/HEAD → local `main`/`master` →
+ * remote-tracking `origin/main`/`origin/master` → undefined. The remote-tracking
+ * candidates cover the worktree / fresh-clone shape where origin/HEAD is unset and no
+ * LOCAL default branch exists — there `origin/main` is the only ref to the fork point,
+ * and missing it silently scoped the diff to HEAD~1 (TASK-435).
+ */
 function resolveDefaultBranch(gitRoot: string): string | undefined {
   const sym = gitTry(gitRoot, ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD']);
   if (sym !== undefined) return sym.replace(/^refs\/remotes\//, ''); // e.g. origin/main
-  for (const candidate of ['main', 'master']) {
+  for (const candidate of ['main', 'master', 'origin/main', 'origin/master']) {
     if (gitTry(gitRoot, ['rev-parse', '--verify', '--quiet', candidate]) !== undefined) return candidate;
   }
   return undefined;
@@ -178,6 +189,27 @@ function lines(out: string): string[] {
   return out.split('\n').map((s) => s.trim()).filter((s) => s.length > 0);
 }
 
+/**
+ * Per-file byte budget for the untracked-fold. An untracked working-tree file is a
+ * convenience-fold, not the committed govern target; a file whose `--no-index` diff
+ * exceeds this is almost certainly generated/scratch, not hand-written source the
+ * operator wants audited inline. Bytes over the budget are withheld (TASK-436).
+ */
+const UNTRACKED_FOLD_MAX_BYTES = 1024 * 1024; // 1 MiB
+
+/**
+ * The bounded, VISIBLE placeholder substituted for a binary or oversized untracked
+ * file's diff body — the FR-027 "path preserved, bytes withheld" contract: the file
+ * stays listed in scope (never silently dropped) but its body never bloats the audit
+ * payload. Carries no `+/-export` lines, so the seam pass raises no false break on it.
+ */
+function untrackedWithheldNote(file: string, binary: boolean, bytes: number): string {
+  const reason = binary
+    ? 'binary (no auditable source)'
+    : `${bytes} bytes exceeds the ${UNTRACKED_FOLD_MAX_BYTES}-byte untracked-fold budget`;
+  return `[untracked file ${file}: diff body withheld — ${reason}. Path preserved in scope; bytes withheld from the audit payload.]\n`;
+}
+
 /** Scope the committed base..HEAD diff (plus untracked-fold) into an inclusion-based DiffScope. */
 export function scopeCommittedDiff(installationRoot: string, base: string, head: string): DiffScope {
   const fileDiffs = new Map<string, string>();
@@ -194,8 +226,30 @@ export function scopeCommittedDiff(installationRoot: string, base: string, head:
   // byte-identical to the render's committed-diff arm, so the chunk scope it produces
   // matches the render's pathScope filter exactly. (Single-rooted repo: the installation
   // and the git toplevel coincide, so `--relative` is a no-op there.)
+  // Rename detection up front (`-M`), INDEPENDENT of the operator's diff.renames
+  // config (TASK-429 / TASK-47): a pure tree-move pairs as a single rename stanza
+  // instead of a full delete + full add. Without it, an endpoint diff across a
+  // relocation ships the whole file body twice → doubled bytes → oversized chunks.
+  const renamedNewToOld = new Map<string, string>(); // new path → old path
+  const renamedOldPaths = new Set<string>();
+  for (const line of lines(git(installationRoot, ['diff', '-M', '--relative', '--name-status', base, head]))) {
+    const m = /^R\d*\t(.+)\t(.+)$/.exec(line);
+    if (m && m[1] !== undefined && m[2] !== undefined) {
+      renamedNewToOld.set(m[2], m[1]);
+      renamedOldPaths.add(m[1]);
+    }
+  }
+
   for (const f of lines(git(installationRoot, ['diff', '--relative', '--name-only', base, head]))) {
-    fileDiffs.set(f, git(installationRoot, ['diff', '--relative', base, head, '--', f]));
+    if (renamedOldPaths.has(f)) continue; // OLD side of a rename — covered by the paired stanza
+    const old = renamedNewToOld.get(f);
+    // For a renamed NEW path, diff the pair under `-M` so it renders as a rename (body
+    // only for any content delta); otherwise the standard per-file diff.
+    const d =
+      old !== undefined
+        ? git(installationRoot, ['diff', '-M', '--relative', base, head, '--', old, f])
+        : git(installationRoot, ['diff', '--relative', base, head, '--', f]);
+    fileDiffs.set(f, d);
     files.push(f);
   }
 
@@ -209,7 +263,13 @@ export function scopeCommittedDiff(installationRoot: string, base: string, head:
   // non-ASCII names stay literal UTF-8.
   for (const f of lines(git(installationRoot, ['ls-files', '--others', '--exclude-standard']))) {
     if (fileDiffs.has(f)) continue;
-    fileDiffs.set(f, gitDiffNoIndex(installationRoot, ['--', '/dev/null', f]));
+    const d = gitDiffNoIndex(installationRoot, ['--', '/dev/null', f]);
+    // Guard the convenience-fold against payload bloat (TASK-436): a binary file (no
+    // auditable source) or one whose diff exceeds the per-file budget keeps its PATH in
+    // scope but withholds its BODY — the FR-027 path-preserved/bytes-withheld contract.
+    const binary = /^Binary files /m.test(d);
+    const oversized = Buffer.byteLength(d) > UNTRACKED_FOLD_MAX_BYTES;
+    fileDiffs.set(f, binary || oversized ? untrackedWithheldNote(f, binary, Buffer.byteLength(d)) : d);
     files.push(f);
   }
 

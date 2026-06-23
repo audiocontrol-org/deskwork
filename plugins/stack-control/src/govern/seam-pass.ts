@@ -102,31 +102,166 @@ function splitTopLevelParams(paramList: string): string[] {
   return params;
 }
 
-/** Count required params (not optional `?`, not defaulted `=`). */
+/**
+ * Count required params (not optional `?`, not defaulted `=`). A function-typed
+ * param (`cb: (e: number) => void`) carries an `=>` arrow whose `=` must NOT be
+ * read as a default assignment — strip arrows before the default check, else a
+ * required callback param is silently dropped from the arity (TASK-438).
+ */
 function countRequired(paramList: string): number {
   return splitTopLevelParams(paramList)
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
-    .filter((p) => !p.includes('=') && !p.split(':')[0]?.trim().endsWith('?')).length;
+    .filter((p) => !p.replace(/=>/g, '').includes('=') && !p.split(':')[0]?.trim().endsWith('?')).length;
 }
 
-/** Parse exported symbols on `+` or `-` diff lines → name → required-param count (null for non-functions). */
-function parseExports(diffText: string, sign: '+' | '-'): Map<string, number | null> {
-  const map = new Map<string, number | null>();
+/**
+ * Extract the brace-delimited body of an interface/type literal, starting at the
+ * index of its opening `{`, by scanning to the MATCHING `}`. Returns the inner text
+ * (without the outer braces), or null if unbalanced (header truncated mid-body).
+ */
+function extractBraceBody(body: string, openBraceIdx: number): string | null {
+  let depth = 0;
+  let start = -1;
+  for (let i = openBraceIdx; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === '{') {
+      if (depth === 0 && start === -1) start = i + 1;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) return start === -1 ? '' : body.slice(start, i);
+    }
+  }
+  return null;
+}
+
+/** Split an interface/type body into member declarations on TOP-LEVEL `;` / `,` / newline. */
+function splitTopLevelMembers(bodyText: string): string[] {
+  const out: string[] = [];
+  let dp = 0;
+  let da = 0;
+  let db = 0;
+  let dk = 0;
+  let cur = '';
+  const flush = (): void => {
+    if (cur.trim().length > 0) out.push(cur.trim());
+    cur = '';
+  };
+  for (const ch of bodyText) {
+    if ((ch === ';' || ch === ',' || ch === '\n') && dp === 0 && da === 0 && db === 0 && dk === 0) {
+      flush();
+      continue;
+    }
+    if (ch === '(') dp++;
+    else if (ch === ')') {
+      if (dp > 0) dp--;
+    } else if (ch === '<') da++;
+    else if (ch === '>') {
+      if (da > 0) da--;
+    } else if (ch === '{') db++;
+    else if (ch === '}') {
+      if (db > 0) db--;
+    } else if (ch === '[') dk++;
+    else if (ch === ']') {
+      if (dk > 0) dk--;
+    }
+    cur += ch;
+  }
+  flush();
+  return out;
+}
+
+/**
+ * Names of the REQUIRED members of an interface/type body (skip optional `?:` members,
+ * index/call signatures, and anything not led by a plain identifier — conservative,
+ * so an unparseable member is never read as a new required field).
+ */
+function requiredFieldsOf(bodyText: string): string[] {
+  const fields: string[] = [];
+  for (const seg of splitTopLevelMembers(bodyText)) {
+    const m = /^([A-Za-z0-9_$]+)(\??)/.exec(seg);
+    if (!m || m[1] === undefined) continue;
+    if (m[2] !== '?') fields.push(m[1]);
+  }
+  return fields;
+}
+
+/** An exported symbol's seam-relevant shape: a function arity, an interface/type's required fields, or other. */
+type ExportSig =
+  | { readonly kind: 'fn'; readonly required: number }
+  | { readonly kind: 'shape'; readonly requiredFields: readonly string[] }
+  | { readonly kind: 'other' };
+
+/**
+ * Parse exported symbols on `+` or `-` diff lines → name → seam signature. Function
+ * and interface/type signatures may span MULTIPLE contiguous same-sign diff lines
+ * (TASK-426/431): accumulate continuation lines until the param list / brace body
+ * balances before measuring it.
+ */
+function parseExports(diffText: string, sign: '+' | '-'): Map<string, ExportSig> {
+  const map = new Map<string, ExportSig>();
+  const bodies: string[] = [];
   for (const line of diffText.split('\n')) {
-    if (!line.startsWith(sign)) continue;
-    const body = line.slice(1).trim();
+    if (line.startsWith(sign)) bodies.push(line.slice(1));
+  }
+  for (let i = 0; i < bodies.length; i++) {
+    const first = bodies[i];
+    if (first === undefined) continue;
+    const body = first.trim();
+
     const fn = FN_HEAD.exec(body);
     if (fn && fn[1] !== undefined) {
       const openParenIdx = (fn.index ?? 0) + fn[0].length - 1; // index of the `(`
-      const paramList = extractParamList(body, openParenIdx);
-      if (paramList !== null) {
-        map.set(fn[1], countRequired(paramList));
-        continue;
+      let joined = body;
+      let paramList = extractParamList(joined, openParenIdx);
+      let j = i;
+      while (paramList === null && j + 1 < bodies.length) {
+        const next = bodies[++j];
+        if (next === undefined) break;
+        joined += `\n${next}`;
+        paramList = extractParamList(joined, openParenIdx);
       }
+      if (paramList !== null) {
+        map.set(fn[1], { kind: 'fn', required: countRequired(paramList) });
+        i = j;
+      }
+      continue;
     }
+
     const decl = DECL.exec(body);
-    if (decl && decl[1] !== undefined) map.set(decl[1], null);
+    if (!decl || decl[1] === undefined) continue;
+    const keyword = /^export\s+(?:async\s+)?(const|let|var|class|interface|type|enum)\b/.exec(body)?.[1];
+    if (keyword === 'interface' || keyword === 'type') {
+      let joined = body;
+      let braceIdx = joined.indexOf('{');
+      let j = i;
+      while (braceIdx === -1 && j + 1 < bodies.length) {
+        const next = bodies[++j];
+        if (next === undefined) break;
+        joined += `\n${next}`;
+        braceIdx = joined.indexOf('{');
+      }
+      if (braceIdx !== -1) {
+        let shapeBody = extractBraceBody(joined, braceIdx);
+        while (shapeBody === null && j + 1 < bodies.length) {
+          const next = bodies[++j];
+          if (next === undefined) break;
+          joined += `\n${next}`;
+          shapeBody = extractBraceBody(joined, braceIdx);
+        }
+        if (shapeBody !== null) {
+          map.set(decl[1], { kind: 'shape', requiredFields: requiredFieldsOf(shapeBody) });
+          i = j;
+          continue;
+        }
+      }
+      // No brace body (union/primitive type alias) — no required-shape semantics.
+      map.set(decl[1], { kind: 'other' });
+      i = j;
+      continue;
+    }
+    map.set(decl[1], { kind: 'other' });
   }
   return map;
 }
@@ -170,8 +305,8 @@ export function runSeamPass(input: SeamPassInput): SeamResult {
   let suppressedCompatible = 0;
 
   for (const c of input.chunks) {
-    const removed = new Map<string, number | null>();
-    const added = new Map<string, number | null>();
+    const removed = new Map<string, ExportSig>();
+    const added = new Map<string, ExportSig>();
     for (const f of c.files) {
       const d = input.fileDiffs.get(f) ?? '';
       for (const [n, r] of parseExports(d, '-')) removed.set(n, r);
@@ -181,15 +316,26 @@ export function runSeamPass(input: SeamPassInput): SeamResult {
     for (const name of names) {
       const inRem = removed.has(name);
       const inAdd = added.has(name);
-      const remReq = removed.get(name) ?? null;
-      const addReq = added.get(name) ?? null;
+      const remSig = removed.get(name);
+      const addSig = added.get(name);
 
       let kind: SeamFinding['kind'] | null = null;
       let compatibleChange = false;
       if (inRem && !inAdd) kind = 'removed-export';
-      else if (inRem && inAdd) {
-        if (remReq !== null && addReq !== null && addReq > remReq) kind = 'changed-arity';
-        else compatibleChange = true; // signature touched but source-compatible
+      else if (inRem && inAdd && remSig !== undefined && addSig !== undefined) {
+        if (remSig.kind === 'fn' && addSig.kind === 'fn') {
+          if (addSig.required > remSig.required) kind = 'changed-arity';
+          else compatibleChange = true; // arity unchanged or narrowed — source-compatible
+        } else if (remSig.kind === 'shape' && addSig.kind === 'shape') {
+          // A required field present in the new shape but NOT required in the old one
+          // (brand-new, or optional→required) breaks a cross-boundary consumer.
+          const wasRequired = new Set(remSig.requiredFields);
+          if (addSig.requiredFields.some((field) => !wasRequired.has(field))) {
+            kind = 'changed-required-shape';
+          } else compatibleChange = true;
+        } else {
+          compatibleChange = true; // kind changed / not seam-relevant — stay conservative
+        }
       }
 
       const consumed = consumedInOtherChunk(name, c.id, chunkText);

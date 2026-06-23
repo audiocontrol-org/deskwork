@@ -7,8 +7,8 @@
 //
 // Entities trace to specs/030-chunked-end-govern/data-model.md.
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { convergenceRecordPath } from './convergence-record.js';
 
@@ -275,7 +275,18 @@ export function writeWholeFeatureConvergenceRecord(
   record: WholeFeatureConvergenceRecord,
 ): string {
   const path = convergenceRecordPath(installationRoot, 'impl', record.item);
-  mkdirSync(dirname(path), { recursive: true });
+  const dir = dirname(path);
+  mkdirSync(dir, { recursive: true });
+  // TASK-109: reap orphan torn temp siblings from prior crashes (a crash between the
+  // write and the rename below leaves a `<base>.<uuid>.tmp`). Reaping before we write a
+  // fresh temp bounds the litter to at most one in-flight temp per write. (Concurrent
+  // govern on the SAME (mode,item) is unsupported — the record is one-per-(mode,item).)
+  const base = basename(path);
+  const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const tmpRe = new RegExp(`^${escaped}\\.[^.]+\\.tmp$`);
+  for (const f of readdirSync(dir)) {
+    if (tmpRe.test(f)) rmSync(join(dir, f), { force: true });
+  }
   const tmp = `${path}.${randomUUID()}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`);
   renameSync(tmp, path);

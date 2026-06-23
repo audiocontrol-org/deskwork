@@ -100,6 +100,52 @@ describe('030 T021 — payload-diff-scope (FR-023)', () => {
     }
   });
 
+  // TASK-436 — the untracked-fold is a convenience-fold (not the committed govern
+  // target). A LARGE untracked file must keep its PATH in scope (FR-027 "path
+  // preserved, bytes withheld") but must NOT carry its full body into the audit
+  // payload, else a generated/scratch file bloats every barrage lane.
+  it('TASK-436 withholds the body of an OVERSIZED untracked file but preserves its path', () => {
+    const repo = setup();
+    const base = head(repo);
+    writeFileSync(join(repo, 'src/committed.ts'), 'a\n');
+    commitAll(repo, 'feat: committed');
+    const h = head(repo);
+    const huge = `${'a'.repeat(2 * 1024 * 1024)}\n`; // ~2 MiB, safely over any per-file budget
+    writeFileSync(join(repo, 'src/huge.generated.ts'), huge);
+    try {
+      const scope = scopeCommittedDiff(repo, base, h);
+      expect(scope.files, 'path preserved in scope').toContain('src/huge.generated.ts');
+      const body = scope.fileDiffs.get('src/huge.generated.ts') ?? '';
+      expect(Buffer.byteLength(body), 'oversized body must be withheld, not folded whole').toBeLessThan(
+        4096,
+      );
+      expect(body, 'withheld note explains why').toMatch(/withheld/i);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  // TASK-436 — a BINARY untracked file carries no auditable source. Its path is
+  // preserved in scope but its body is withheld (never the raw bytes / full blob).
+  it('TASK-436 withholds the body of a BINARY untracked file but preserves its path', () => {
+    const repo = setup();
+    const base = head(repo);
+    writeFileSync(join(repo, 'src/committed.ts'), 'a\n');
+    commitAll(repo, 'feat: committed');
+    const h = head(repo);
+    // A buffer with NUL bytes — git detects this as binary in `git diff --no-index`.
+    writeFileSync(join(repo, 'asset.bin'), Buffer.from([0, 1, 2, 0, 255, 0, 42, 0]));
+    try {
+      const scope = scopeCommittedDiff(repo, base, h);
+      expect(scope.files, 'path preserved in scope').toContain('asset.bin');
+      const body = scope.fileDiffs.get('asset.bin') ?? '';
+      expect(body, 'binary body withheld with a note').toMatch(/withheld/i);
+      expect(body, 'note names the binary reason').toMatch(/binary/i);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   // Regression: the installation root is a SUBDIR of the git root (the monorepo
   // layout — `.stack-control` lives at plugins/stack-control while the git root is
   // the repo above). `git diff --name-only` emits git-root-relative paths; running
@@ -156,6 +202,97 @@ describe('030 T021 — payload-diff-scope (FR-023)', () => {
   });
 });
 
+// TASK-429 (restores the rename-aware coverage deleted with assembleImplementPayload
+// in T085) — a pure tree-move within scope must PAIR as a rename, not emit a full
+// delete + full add. Without forced `-M` an endpoint diff across a relocation ships
+// the whole file body TWICE (doubled → oversized chunks), the exact TASK-47 failure.
+// The scope must NOT depend on the operator's diff.renames config — it forces -M.
+describe('030 — rename-aware committed-diff scoping (TASK-429 / TASK-47)', () => {
+  it('pairs an in-scope tree-move as a rename even when diff.renames=false', () => {
+    const repo = setup();
+    // A substantial, uniquely-marked file at the original path.
+    const body = `${Array.from({ length: 40 }, (_, i) => `export const RENAME_MARKER_${i} = ${i} * 7;`).join('\n')}\n`;
+    writeFileSync(join(repo, 'src/original.ts'), body);
+    commitAll(repo, 'feat: add original');
+    const base = head(repo);
+    // Pure tree-move (100% similarity), then disable git's default rename detection.
+    git(repo, 'mv', 'src/original.ts', 'src/relocated.ts');
+    commitAll(repo, 'refactor: relocate original -> relocated');
+    git(repo, 'config', 'diff.renames', 'false');
+    const h = head(repo);
+    try {
+      const scope = scopeCommittedDiff(repo, base, h);
+      const all = [...scope.fileDiffs.values()].join('\n');
+      // Paired as a rename: the diff carries the rename headers...
+      expect(all, 'tree-move must pair as a rename').toMatch(/rename from src\/original\.ts/);
+      expect(all).toMatch(/rename to src\/relocated\.ts/);
+      // ...and NOT the file body twice (a paired rename of unchanged content ships
+      // zero +/- body hunks; without -M the marker appears as both a - and a +).
+      expect(all, 'no doubled added body').not.toMatch(/^\+export const RENAME_MARKER_/m);
+      expect(all, 'no doubled deleted body').not.toMatch(/^-export const RENAME_MARKER_/m);
+      // The OLD path is not a separate full-deletion scoped entry.
+      expect(scope.files).not.toContain('src/original.ts');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
+// TASK-441 (restores the outer-tree payload-leak invariant deleted with the
+// installation-anchor integration test in T085) — govern anchors at the INSTALLATION.
+// When the installation is a SUBDIR of the git root, a committed or untracked file in
+// the OUTER tree (outside the installation subtree) must NEVER enter the audited scope
+// — `--relative` keeps both the committed arm and the untracked fold installation-scoped.
+describe('030 — scope is installation-anchored; the outer tree never leaks (TASK-441)', () => {
+  it('excludes a committed OUTER-tree file and keeps paths installation-relative', () => {
+    const repo = setup(); // git root
+    const install = join(repo, 'plugins', 'sc'); // installation = a subdir
+    mkdirSync(join(install, 'src'), { recursive: true });
+    const base = head(repo);
+    // ONE commit touching BOTH trees.
+    writeFileSync(join(repo, 'outer-change.txt'), 'outer changed\n');
+    writeFileSync(join(install, 'src/inner.ts'), 'export const inner = 1;\n');
+    commitAll(repo, 'feat: change both trees');
+    const h = head(repo);
+    try {
+      const scope = scopeCommittedDiff(install, base, h);
+      expect(scope.files.some((f) => f.endsWith('src/inner.ts')), 'inner file is in scope').toBe(true);
+      expect(scope.files, 'outer-tree file must NOT leak into scope').not.toContain('outer-change.txt');
+      expect(
+        [...scope.files].some((f) => f.includes('outer-change')),
+        'no outer-tree path under any spelling',
+      ).toBe(false);
+      // Path is installation-relative (NOT prefixed by the installation subdir).
+      expect(scope.files).toContain('src/inner.ts');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('untracked fold enumerates only the installation subtree (no outer leak)', () => {
+    const repo = setup();
+    const install = join(repo, 'plugins', 'sc');
+    mkdirSync(join(install, 'src'), { recursive: true });
+    const base = head(repo);
+    writeFileSync(join(install, 'src/committed.ts'), 'x\n');
+    commitAll(repo, 'feat: committed inner');
+    const h = head(repo);
+    // Untracked files in BOTH trees.
+    writeFileSync(join(repo, 'u-outer.ts'), 'export const leak = 1;\n');
+    writeFileSync(join(install, 'u-inner.ts'), 'export const folded = 1;\n');
+    try {
+      const scope = scopeCommittedDiff(install, base, h);
+      expect(scope.files, 'inner untracked file is folded').toContain('u-inner.ts');
+      expect(scope.files, 'outer untracked file must NOT leak').not.toContain('u-outer.ts');
+      expect([...scope.files].some((f) => f.includes('u-outer')), 'no outer untracked under any spelling').toBe(
+        false,
+      );
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
 // AUDIT-20260622-02 — the end-govern pipeline's scopeDiff dropped ALL payload
 // exclude paths: it called scopeCommittedDiff (no exclusion args) so spec docs,
 // contracts, and the feature's own audit-log flowed into the audited surface.
@@ -199,7 +336,7 @@ describe('030 — diff-scope exclusion (AUDIT-20260622-02)', () => {
     expect(filterDiffScope(scope, [])).toBe(scope);
   });
 
-  it('resolveImplementExclusion yields the own + other-feature audit-logs and caller excludePaths', () => {
+  it('resolveImplementExclusion excludes the OWN audit-log, WHOLE other-feature roots, and caller excludePaths (TASK-428)', () => {
     const root = '/install';
     const ex = resolveImplementExclusion(
       root,
@@ -207,10 +344,36 @@ describe('030 — diff-scope exclusion (AUDIT-20260622-02)', () => {
       ['/install/specs/030-feat', '/install/specs/029-other'],
       ['/install/.stack-control/backlog'],
     );
+    // Own feature: only its audit-log is excluded — its CODE is still audited.
     expect(ex.excludeDiffRels).toContain('specs/030-feat/audit-log.md');
-    expect(ex.excludeDiffRels).toContain('specs/029-other/audit-log.md');
+    // TASK-428: another feature's WHOLE root is excluded (not just its audit-log.md),
+    // so an unrelated parked scaffold can't enter the current feature's payload.
+    expect(ex.excludeDiffRels).toContain('specs/029-other');
+    expect(ex.excludeDiffRels).not.toContain('specs/029-other/audit-log.md');
     expect(ex.excludeDiffRels).toContain('.stack-control/backlog');
     // The feature's own root is NOT double-listed as an "other" feature.
     expect(ex.otherFeatureRels).not.toContain('specs/030-feat');
+  });
+
+  it('TASK-428 — a whole other-feature root drops its parked scaffold via filterDiffScope', () => {
+    const ex = resolveImplementExclusion(
+      '/install',
+      '/install/specs/030-feat',
+      ['/install/specs/030-feat', '/install/specs/002-unrelated'],
+      [],
+    );
+    const scope = {
+      base: 'B',
+      head: 'H',
+      files: ['specs/030-feat/src/app.ts', 'specs/002-unrelated/scaffold.md'],
+      fileDiffs: new Map([
+        ['specs/030-feat/src/app.ts', 'a'],
+        ['specs/002-unrelated/scaffold.md', 'b'],
+      ]),
+    };
+    const filtered = filterDiffScope(scope, ex.excludeDiffRels);
+    // The current feature's code stays; the unrelated feature's scaffold is dropped.
+    expect(filtered.files).toContain('specs/030-feat/src/app.ts');
+    expect(filtered.files).not.toContain('specs/002-unrelated/scaffold.md');
   });
 });

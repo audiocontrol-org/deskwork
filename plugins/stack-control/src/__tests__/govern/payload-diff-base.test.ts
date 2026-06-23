@@ -61,6 +61,32 @@ describe('030 — resolveImplementDiffBase (whole-feature default)', () => {
     }
   });
 
+  it('resolves the fork point via origin/main when it is the only default-branch ref (TASK-435)', () => {
+    // A worktree/fresh-clone shape: no local `main`/`master`, and `refs/remotes/origin/HEAD`
+    // is unset — the ONLY ref to the default branch is the remote-tracking `origin/main`.
+    // The buggy resolver returns HEAD~1 (scoping one commit); it must instead find the
+    // merge-base with origin/main (the whole feature span).
+    const repo = mkdtempSync(join(tmpdir(), 'diff-base-origin-'));
+    git(repo, 'init', '-q', '-b', 'feature/x');
+    writeFileSync(join(repo, 'README.md'), 'seed\n');
+    commitAll(repo, 'chore: seed');
+    const forkPoint = git(repo, 'rev-parse', 'HEAD');
+    // Point a remote-tracking ref at the fork point; do NOT create a local main or origin/HEAD.
+    git(repo, 'update-ref', 'refs/remotes/origin/main', forkPoint);
+    mkdirSync(join(repo, 'src'), { recursive: true });
+    writeFileSync(join(repo, 'src/a.ts'), 'export const a = 1;\n');
+    commitAll(repo, 'feat: a');
+    writeFileSync(join(repo, 'src/b.ts'), 'export const b = 2;\n');
+    commitAll(repo, 'feat: b');
+    try {
+      const base = resolveImplementDiffBase(repo, undefined);
+      expect(base).toBe(forkPoint); // the merge-base via origin/main, not HEAD~1
+      expect(base).not.toBe('HEAD~1');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   it('falls back to HEAD~1 on the default branch itself (no feature fork point)', () => {
     const repo = setupMain();
     writeFileSync(join(repo, 'src.ts'), 'x\n');

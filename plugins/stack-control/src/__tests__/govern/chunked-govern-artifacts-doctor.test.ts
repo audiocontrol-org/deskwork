@@ -50,6 +50,51 @@ describe('030 T059 — chunked-govern-artifacts doctor rule (FR-021, SC-006)', (
     }
   });
 
+  // TASK-437 — a persisted chunk-set must list the chunks it governed. end-govern
+  // FATALs on an empty scope BEFORE writing a record, so a chunk-set artifact with a
+  // missing / empty / non-array `chunks` field is corrupt, not "valid with zero chunks".
+  it('TASK-437 flags a chunk-set artifact MISSING its chunks field', async () => {
+    const root = setup();
+    try {
+      writeFileSync(
+        join(root, '.stack-control', 'govern', 'chunk-sets', 'impl__nofield.json'),
+        JSON.stringify({ splitClusterMarkers: [] }),
+      );
+      const findings = await check({ repoRoot: root });
+      expect(findings.some((f) => f.severity === 'error' && /chunks/.test(f.message))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('TASK-437 flags a chunk-set artifact with an EMPTY chunks array', async () => {
+    const root = setup();
+    try {
+      writeFileSync(
+        join(root, '.stack-control', 'govern', 'chunk-sets', 'impl__empty.json'),
+        JSON.stringify({ chunks: [], splitClusterMarkers: [] }),
+      );
+      const findings = await check({ repoRoot: root });
+      expect(findings.some((f) => f.severity === 'error' && /empty/i.test(f.message))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('TASK-437 flags a chunk-set artifact whose chunks field is not an array', async () => {
+    const root = setup();
+    try {
+      writeFileSync(
+        join(root, '.stack-control', 'govern', 'chunk-sets', 'impl__nonarray.json'),
+        JSON.stringify({ chunks: { id: 'c1' }, splitClusterMarkers: [] }),
+      );
+      const findings = await check({ repoRoot: root });
+      expect(findings.some((f) => f.severity === 'error' && /chunks/.test(f.message))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('reports nothing for a clean installation (no artifacts)', async () => {
     const root = setup();
     try {

@@ -530,6 +530,11 @@ Lift must auto-close findings fixed in-loop. 0.52.2's FR-016 cross-run signature
 - ref: offing-ff761162
 Documentation phases ring far longer than code. A 2-task doc phase (a README + ~40 lines of seam-contract comments) took 9 cross-model rounds to converge: the auditors kept finding wording corners on forward-looking contract prose ('near-infinite phrase-more-precisely surface'), amplified by out-of-window false-HIGHs and fix-induced channel growth. The shipped severity-determinism/dampener does not stop prose nitpicking. Fix, two levers: (a) a doc/prose-aware audit lens that, when the payload is predominantly markdown prose, flags only SUBSTANTIVE doc defects (factually wrong, contradicts code, missing required content, broken example/link) and suppresses wording/phrasing/style nits; (b) implement-mode diminishing-returns plateau auto-detect that surfaces an 'override recommended' verdict (findings shifting to wording altitude / fix-induced growth / oscillation) instead of grinding. Source: offing 0.52.2 dogfood ff761162 (2026-06-21).
 
+## multi:gap/retire-seam-pass-interface-check
+- status: planned
+- part-of: multi:feature/govern-030-hardening
+The cross-chunk seam pass reimplements interface-contract checking (removed/renamed export, changed arity, changed required shape) with a regex over diff lines. For a strongly-typed backend the COMPILER already answers every one of these completely — it checks the whole program, not a diff, so it also catches a break in an UNCHANGED consumer (a removed export still called by a file this change didn't touch). The seam pass is therefore redundant where a compiler exists, and strictly weaker: it produced false "failing test" findings and carries a false-negative gap (the unchanged consumer it cannot see — the former "seam-unchanged-consumer / disk-reading" idea). This is a layer confusion — interface contracts are a DETERMINISTIC concern owned by the compiler + high-coverage-test floor, NOT the STOCHASTIC audit-barrage layer (see `.claude/rules/audit-barrage-is-stochastic-defense-in-depth.md`). Reframing: make a green typecheck + test run the deterministic floor the barrage stands on, and RETIRE the seam pass's interface-checking (or scope it to compiler-less backends — untyped Python, shell, markdown). Under this reframing the unchanged-consumer "gap" vanishes by construction, and this session's seam-pass interface hardening (multi-line signatures, function-typed params, changed-required-shape, plus surfacing seam findings) is mooted — correct given the seam pass exists, dead weight once it is retired. Supersedes the seam-unchanged-consumer bullet in the umbrella breakdown. Source: operator reframing 2026-06-22.
+
 ## multi:gap/govern-hunkblocks-uncommitted-empty
 - status: cancelled
 - deferred-until: govern-whole-feature-chunked-payload lands; govern-at-end audits committed work, so the per-phase staleness treadmill this targets is moot — re-weigh then
@@ -571,11 +576,11 @@ Make govern-at-end the DEFAULT govern direction and make it scale. Chunk the who
 - status: in-flight
 Umbrella for the 030 chunked-end-govern dogfood follow-ups + the deferred govern hardening folded in. 030 shipped (0.53.0, PR #495) via override at the diminishing-returns plateau; these are the dispositioned residuals, gathered here as the curated next epic. Detail lives in the backlog (slush); this node is the work-breakdown.
 
-Seam-pass hardening (the cross-chunk contract backstop — final gate before a converged whole-feature record):
-- TASK-426 (-07) multi-line exported function signatures missed
-- TASK-427 (-08) consumers unchanged in the diff missed (use the import/coupling graph, not diff text)
-- TASK-431 (-19) `changed-required-shape` declared in the schema but never implemented
-- TASK-438 (-30) required function-typed params treated as optional
+Seam-pass hardening (shipped this session) — NOTE: the whole seam-pass interface-check is now slated for RETIREMENT as redundant with the compiler; see `multi:gap/retire-seam-pass-interface-check`. The fixes below are correct given the seam pass exists, but become moot once it is retired:
+- TASK-426 (-07) multi-line exported function signatures missed — DONE
+- seam-unchanged-consumer (was TASK-427 / -08): consumers unchanged in the diff are invisible to the seam pass → REFRAMED. The compiler already catches unchanged consumers; do NOT build disk-reading into the seam pass. Superseded by `multi:gap/retire-seam-pass-interface-check`.
+- TASK-431 (-19) `changed-required-shape` never implemented — DONE
+- TASK-438 (-30) required function-typed params treated as optional — DONE
 
 Govern pipeline correctness / edges:
 - TASK-435 (-27) default diff base falls back to HEAD~1 when only origin/main exists
@@ -601,7 +606,7 @@ Folded-in roadmap gaps (now `part-of` this umbrella, defers cleared since 030 la
 - multi:gap/govern-doc-aware-audit-lens — orthogonal prose-nitpick lens
 
 ## multi:feature/bookkeeping-hardening
-- status: planned
+- status: shipped
 - part-of: multi:feature/lifecycle-industrialization
 Umbrella for the small gaps + bugs in stack-control's own bookkeeping tooling — the verbs and skills that maintain the project's records (the backlog store, the roadmap DAG curation, the session-end journal derivation, the node↔spec linkage, audit-run retention). These are defects in the EXISTING bookkeeping surface, complementary to the new mechanization features under the parent lifecycle-industrialization node. Detail lives in the backlog; this node is the work-breakdown. Surfaced + grouped during the 2026-06-22 backlog cleanup (docs/backlog-cleanup-review-2026-06-22.md).
 
