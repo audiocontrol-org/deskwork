@@ -520,19 +520,19 @@ Umbrella: make cross-model governance OPERABLE — converge reliably and stay ch
 
 ## multi:gap/govern-lift-auto-close-in-loop-fixes
 - status: planned
-- part-of: multi:feature/govern-operability, multi:feature/govern-030-hardening
+- part-of: multi:feature/govern-operability
 - ref: gh-490 / offing-ff761162
 Lift must auto-close findings fixed in-loop. 0.52.2's FR-016 cross-run signature dedup does NOT tame the backlog balloon when the audited artifact changes each round (distinct signature per round): the offing adopter's 9-round doc phase still lifted 42 To-Do tasks (TASK-132..173) for findings it fixed in-loop, forcing a hand-written bulk-close script. Fix: on a graduating (dampened/converged) govern, auto-close the feature's OPEN migrated-finding tasks whose signature is absent from the converged round (the in-loop fix landed -> resolved). Bounded+safe: fires only on graduation, closes only findings absent from the clean final round. Source: offing 0.52.2 dogfood ff761162 (2026-06-21); agent root-cause 'gh-490-not-fully-fixed: no auto-close of in-loop fixes'.
 
 ## multi:gap/govern-doc-aware-audit-lens
 - status: planned
-- part-of: multi:feature/govern-operability, multi:feature/govern-030-hardening
+- part-of: multi:feature/govern-operability
 - ref: offing-ff761162
 Documentation phases ring far longer than code. A 2-task doc phase (a README + ~40 lines of seam-contract comments) took 9 cross-model rounds to converge: the auditors kept finding wording corners on forward-looking contract prose ('near-infinite phrase-more-precisely surface'), amplified by out-of-window false-HIGHs and fix-induced channel growth. The shipped severity-determinism/dampener does not stop prose nitpicking. Fix, two levers: (a) a doc/prose-aware audit lens that, when the payload is predominantly markdown prose, flags only SUBSTANTIVE doc defects (factually wrong, contradicts code, missing required content, broken example/link) and suppresses wording/phrasing/style nits; (b) implement-mode diminishing-returns plateau auto-detect that surfaces an 'override recommended' verdict (findings shifting to wording altitude / fix-induced growth / oscillation) instead of grinding. Source: offing 0.52.2 dogfood ff761162 (2026-06-21).
 
 ## multi:gap/retire-seam-pass-interface-check
 - status: planned
-- part-of: multi:feature/govern-030-hardening
+- part-of: multi:feature/govern-operability
 The cross-chunk seam pass reimplements interface-contract checking (removed/renamed export, changed arity, changed required shape) with a regex over diff lines. For a strongly-typed backend the COMPILER already answers every one of these completely — it checks the whole program, not a diff, so it also catches a break in an UNCHANGED consumer (a removed export still called by a file this change didn't touch). The seam pass is therefore redundant where a compiler exists, and strictly weaker: it produced false "failing test" findings and carries a false-negative gap (the unchanged consumer it cannot see — the former "seam-unchanged-consumer / disk-reading" idea). This is a layer confusion — interface contracts are a DETERMINISTIC concern owned by the compiler + high-coverage-test floor, NOT the STOCHASTIC audit-barrage layer (see `.claude/rules/audit-barrage-is-stochastic-defense-in-depth.md`). Reframing: make a green typecheck + test run the deterministic floor the barrage stands on, and RETIRE the seam pass's interface-checking (or scope it to compiler-less backends — untyped Python, shell, markdown). Under this reframing the unchanged-consumer "gap" vanishes by construction, and this session's seam-pass interface hardening (multi-line signatures, function-typed params, changed-required-shape, plus surfacing seam findings) is mooted — correct given the seam pass exists, dead weight once it is retired. Supersedes the seam-unchanged-consumer bullet in the umbrella breakdown. Source: operator reframing 2026-06-22.
 
 ## multi:gap/govern-hunkblocks-uncommitted-empty
@@ -573,37 +573,21 @@ No cheap checkpoint refresh for a sibling-change false-stale; --override is the 
 Make govern-at-end the DEFAULT govern direction and make it scale. Chunk the whole-feature audit into bite-sized sub-payloads, parallelize audit and fix across the model fleet, and reconcile once at the end. US6's either-of graduate gate already sanctions whole-feature graduation; this delivers the payload mechanism that makes it the default rather than the opt-in escape. Solves boundary-too-large for whole-feature governance (the reason per-phase existed) by streaming sub-payloads under the fleet envelope. Load-bearing enabler: once govern runs at end over committed work, the per-phase staleness treadmill (hunkblocks-uncommitted-empty, cheap-checkpoint-refresh), the untracked-split exclusion, and the in-loop lift balloon (lift-auto-close) all shrink or vanish, so those gaps defer behind this. Source: offing 0.52.2 dogfood ff761162 (2026-06-21); operator direction govern-at-end.
 
 ## multi:feature/govern-030-hardening
-- status: in-flight
-Umbrella for the 030 chunked-end-govern dogfood follow-ups + the deferred govern hardening folded in. 030 shipped (0.53.0, PR #495) via override at the diminishing-returns plateau; these are the dispositioned residuals, gathered here as the curated next epic. Detail lives in the backlog (slush); this node is the work-breakdown.
+- status: shipped
+Umbrella for the 030 chunked-end-govern dogfood follow-ups. 030 shipped (0.53.0, PR #495) via override at the diminishing-returns plateau; this node gathered the dispositioned residuals as the curated next epic. **SHIPPED in v0.53.2 (PR #497):** all 16 residual point fixes landed RED-first and are closed-verified in the installed release. Detail lived in the backlog (slush); these are now Done.
 
-Seam-pass hardening (shipped this session) — NOTE: the whole seam-pass interface-check is now slated for RETIREMENT as redundant with the compiler; see `multi:gap/retire-seam-pass-interface-check`. The fixes below are correct given the seam pass exists, but become moot once it is retired:
-- TASK-426 (-07) multi-line exported function signatures missed — DONE
-- seam-unchanged-consumer (was TASK-427 / -08): consumers unchanged in the diff are invisible to the seam pass → REFRAMED. The compiler already catches unchanged consumers; do NOT build disk-reading into the seam pass. Superseded by `multi:gap/retire-seam-pass-interface-check`.
-- TASK-431 (-19) `changed-required-shape` never implemented — DONE
-- TASK-438 (-30) required function-typed params treated as optional — DONE
+The residual burndown (all DONE, v0.53.2):
+- Seam-pass interface detection: multi-line signatures (TASK-426), function-typed params miscounted as optional (TASK-438), `changed-required-shape` never implemented (TASK-431), seam breaks invisible in the NOT-done message (TASK-440).
+- Pipeline correctness / edges: diff base via origin/main (TASK-435), untracked-fold binary/byte guards (TASK-436), doctor chunk-set validation (TASK-437), no-op-fix guard (TASK-439), whole other-feature-root exclusion (TASK-428), rename-aware scoping (TASK-429), test↔source coupling (TASK-430), payload-leak guard (TASK-441).
+- Doc reconciliation: checkpoint mode-scoping (TASK-433), fix-fanout deferral (TASK-434), superseded 015 contract (TASK-128).
+- Re-target: torn-temp-file reap on the whole-feature record writer (TASK-109).
 
-Govern pipeline correctness / edges:
-- TASK-435 (-27) default diff base falls back to HEAD~1 when only origin/main exists
-- TASK-436 (-28) untracked fold lost the binary + byte-budget safeguards
-- TASK-437 (-29) doctor accepts empty/missing chunk-set fields as valid
-- TASK-440 (-32) seam findings block the run but are never lifted (operator can't see what blocked)
-- TASK-439 (-31) fix-succeeds-changes-nothing converges with open findings (unreachable until TASK-424 autonomous-fix lands; unguarded)
-- TASK-428 (-14/-35) other-feature scaffolds no longer excluded from the implement payload
-- TASK-429 (-15) rename-aware committed-diff coverage deleted, not replaced
-- TASK-430 chunker splits a RED-first test from its implementing source → false "failing test" findings
-- TASK-441 (-34) outer-tree payload-leak invariant not re-pinned after the test was deleted
+Reframed out (NOT built): the seam-unchanged-consumer gap (was TASK-427). The seam pass reimplements interface-contract checking the COMPILER already does completely — including unchanged consumers — so the gap dissolves by construction. The seam-pass interface-check itself is now slated for retirement; that work moved OUT of this umbrella. See `multi:gap/retire-seam-pass-interface-check` and `.claude/rules/audit-barrage-is-stochastic-defense-in-depth.md`.
 
-Doc reconciliation:
-- TASK-433 (-24) `GOVERN_CHECKPOINT`/`--checkpoint` contradiction across contract / FR-029 / quickstart
-- TASK-434 (-26) autonomous fix-fanout still promised in spec/contract after the TASK-424 deferral
-- TASK-128 `contracts/incremental-audit.md` still documents the deleted `resolveComposingFeatureUnit` API
-
-Re-target:
-- TASK-109 torn-temp-file guard — re-aim from the deleted per-phase writer to `writeWholeFeatureConvergenceRecord`
-
-Folded-in roadmap gaps (now `part-of` this umbrella, defers cleared since 030 landed):
-- multi:gap/govern-lift-auto-close-in-loop-fixes — auto-close in-loop-fixed backlog tasks on graduation (US6 shrank, didn't deliver)
+Forward work that was folded in but outlived the residual burndown — re-homed to `multi:feature/govern-operability` (no longer `part-of` this shipped umbrella):
+- multi:gap/govern-lift-auto-close-in-loop-fixes — auto-close in-loop-fixed backlog tasks on graduation
 - multi:gap/govern-doc-aware-audit-lens — orthogonal prose-nitpick lens
+- multi:gap/retire-seam-pass-interface-check — retire the seam-pass interface check (redundant with the compiler/test floor)
 
 ## multi:feature/bookkeeping-hardening
 - status: shipped

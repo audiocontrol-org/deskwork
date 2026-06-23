@@ -3,9 +3,10 @@ id: TASK-435
 title: >-
   AUDIT-20260622-27 — Default diff base falls back to HEAD~1 when only
   origin/main exists
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-22 13:59'
+updated_date: '2026-06-23 06:09'
 labels:
   - agent-found
   - 'type:bug'
@@ -20,3 +21,9 @@ ordinal: 435000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 src/govern/payload-diff-scope.ts:146-174: the diff-base resolver falls back to HEAD~1 when origin/main is the only ref, which can scope the wrong range. From 030 round-3 govern (codex).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closed: verified in formally-installed release v0.53.2 (PR #497); fix present in installed cache + clean boot
+<!-- SECTION:NOTES:END -->
