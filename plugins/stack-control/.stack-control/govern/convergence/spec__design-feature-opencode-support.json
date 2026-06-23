@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "mode": "spec",
+  "item": "design:feature/opencode-support",
+  "scopeFingerprint": "4ef8576b288c86051ea6b75ecd7675d004b86cc30a4e1bdd145421f48ea9ee73",
+  "converged": true,
+  "recordedAt": "2026-06-22T21:00:44.503Z",
+  "override": true,
+  "overrideReason": "opencode plugin implementation complete",
+  "anchorRoot": "/Users/orion/work/deskwork-work/stack-control-opencode/plugins/stack-control"
+}
