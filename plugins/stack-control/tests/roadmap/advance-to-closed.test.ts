@@ -11,7 +11,8 @@
 // Fixtures on disk; never mocked.
 
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { chmodSync, readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { createBacklogBackend, BACKLOG_DONE_STATUS } from '../../src/backlog/backend.js';
 import { provisionBacklog, writeClosureRoadmap } from '../../src/__tests__/roadmap/closure-fixtures.js';
 import { runCli } from '../../src/__tests__/_run-helpers.js';
@@ -131,5 +132,26 @@ describe('031 roadmap advance --to closed', () => {
     expect(r.status).toBe(0);
     expect(roadmapStatusOf(doc, 'multi:feature/root')).toBe('in-flight');
     expect(statusOf(backlog.cwd, t1!)).not.toBe(BACKLOG_DONE_STATUS); // no cascade on a non-closed advance
+  });
+
+  it('an unwritable roadmap fails BEFORE the cascade — backlog ids are NOT closed (AUDIT-20260623-07)', () => {
+    const backlog = provisionBacklog([{ title: 'T1' }]);
+    const [t1] = backlog.ids;
+    const doc = writeClosureRoadmap([{ id: 'multi:feature/root', status: 'shipped', closes: [t1!] }]);
+    // Make the roadmap's directory unwritable so the atomic temp+rename status write
+    // fails (a file-only chmod does not — rename replaces it from the writable dir).
+    chmodSync(dirname(doc), 0o555);
+    try {
+      const r = runCli(['roadmap', 'advance', 'multi:feature/root', '--to', 'closed', '--apply', '--doc', doc], {
+        cwd: backlog.cwd,
+        env: { STACKCTL_BACKLOG_DIR: backlog.cwd },
+      });
+      expect(r.status).not.toBe(0);
+      // The roadmap status is written BEFORE the cascade, so a failed write leaves the
+      // backlog id NOT closed — no ids-closed-but-item-shipped split across the stores.
+      expect(statusOf(backlog.cwd, t1!)).not.toBe(BACKLOG_DONE_STATUS);
+    } finally {
+      chmodSync(dirname(doc), 0o755);
+    }
   });
 });

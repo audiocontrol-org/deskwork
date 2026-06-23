@@ -81,8 +81,15 @@ export function emitAdvanceClosed(
     return;
   }
 
-  // The closure + the lifecycle advance are one operator-confirmed action: close
-  // the deduped subtree ids, THEN set the root status to `closed`.
+  // The closure + the lifecycle advance are one operator-confirmed action. Write the
+  // roadmap status FIRST (AUDIT-20260623-07): the status write is the LOCAL, validated,
+  // atomic (temp+rename) mutation — if it fails (unwritable doc, invalid candidate,
+  // concurrent edit) the backlog is left UNTOUCHED, so there is no ids-closed-but-item-
+  // shipped split across the two durable stores. Only once the status is recorded
+  // `closed` do we close the contained backlog ids. (unknownIds were already refused
+  // above; the cascade is idempotent, so a re-run converges.)
+  advance(docPath, id, CLOSED_STATUS, opts, true);
+  process.stdout.write(`roadmap advance ${id}: advanced to ${CLOSED_STATUS}\n`);
   applyCascade(plan, backend);
   process.stdout.write(`roadmap advance ${id} --to ${CLOSED_STATUS}: closing resolved items\n`);
   const already = new Set(plan.alreadyClosed);
@@ -94,6 +101,4 @@ export function emitAdvanceClosed(
   for (const child of plan.skipped) {
     process.stdout.write(`  skipped ${child.id} [${child.status}] — non-terminal, not closing its ids\n`);
   }
-  advance(docPath, id, CLOSED_STATUS, opts, true);
-  process.stdout.write(`roadmap advance ${id}: advanced to ${CLOSED_STATUS}\n`);
 }
