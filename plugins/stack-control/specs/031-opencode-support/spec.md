@@ -21,16 +21,16 @@ Opencode users want to use stack-control's governance and lifecycle capabilities
 **Acceptance Scenarios**:
 
 1. **Given** opencode is installed with the stack-control plugin, **When** user types `/stack-control:define`, **Then** the skill is invoked and the spec authoring chain begins
-2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI with the active project/workspace as the working context
+2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI
 3. **Given** user is in an opencode session, **When** they invoke `/stack-control:extend`, **Then** the skill executes in the stack-control installation context
 
-Note: CLI operations execute with the active project/workspace as the working directory. The installation context is resolved from the enclosing stack-control installation directory.
+Note: CLI operations execute with the active project/workspace as the working directory. Stack-control installation discovery starts from that cwd and resolves the enclosing installation.
 
 ---
 
 ### User Story 2 - Install stack-control plugin in opencode (Priority: P1)
 
-Opencode users need a straightforward way to install the stack-control plugin. They should be able to copy the plugin file to their opencode plugins directory.
+Opencode users need a straightforward way to install the stack-control plugin. They should be able to use either local file installation or npm package installation.
 
 **Why this priority**: Without installation, the feature doesn't exist. This is the entry point for all opencode users.
 
@@ -41,6 +41,8 @@ Opencode users need a straightforward way to install the stack-control plugin. T
 1. **Given** user has the stack-control plugin file, **When** they copy it to `.opencode/plugins/stack-control.ts`, **Then** opencode loads the plugin on next start
 2. **Given** opencode loads the stack-control plugin, **When** the plugin initializes, **Then** it exports the plugin function following opencode's plugin API
 3. **Given** plugin is loaded, **When** user types any stack-control skill, **Then** the skill is available in the command menu
+
+Note: npm package installation (`@stack-control/opencode-plugin`) is supported but not tested in this feature. The local file installation is the primary supported path.
 
 ---
 

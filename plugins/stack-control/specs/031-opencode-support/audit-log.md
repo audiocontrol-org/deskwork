@@ -1593,3 +1593,108 @@ Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:137`
 SC-004 says “Plugin works with opencode versions 1.0 and later,” then immediately narrows that with “compatibility with future versions depends on opencode's plugin API stability” (`line 137`). The first clause is an open-ended compatibility promise over future versions; the parenthetical admits that promise cannot be guaranteed by this feature.
 
 This makes the success criterion untestable as written. A downstream builder or verifier can test against known 1.0+ versions available at build time, but cannot prove compatibility with all later versions. Blast radius is medium because the intended compatibility target is obvious, but the measurable outcome overpromises. A reasonable fix would scope SC-004 to specific tested opencode versions or to “opencode 1.0-compatible plugin API” rather than all future 1.0+ releases.
+
+## 2026-06-23 — audit-barrage lift (20260623T020840979Z-031-opencode-support-after_clarify)
+
+Code-sha: 7aa42dcf677a1b2b57ac91521966aba19f79420c
+### AUDIT-20260623-86 — FR-008 routing semantics contradiction: version command classified as "unknown"
+
+Finding-ID: AUDIT-20260623-86
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (FR-002, FR-008, FR-011, Key Entities)
+
+FR-008 reads: "The plugin MUST map `/stack-control:` prefixed commands to the appropriate **skill**; unknown commands produce a clear 'unknown stack-control command' error." FR-002 and the Key Entities section both explicitly establish that `/stack-control:version` is **not a registered skill**: "The `/stack-control:version` command is routed but not a registered skill in opencode's command palette" and "Note: `/stack-control:version` is a routed command, not a registered skill."
+
+An unattended builder reading FR-002 and FR-008 together reaches this decision tree: route the 5 registered skills → handle; anything that is not a skill → "unknown stack-control command" error. Under that reading, `/stack-control:version` falls squarely into the error branch — directly contradicting FR-011, which is a MUST requirement to expose it as a command returning the plugin version.
+
+The two readings (version is known-and-handled vs. version is not-a-skill-therefore-unknown) are equally plausible precisely because FR-002 and Key Entities go out of their way to emphasize version's non-skill status. FR-011 resolves the contradiction, but only if a builder reads all three requirements together and decides FR-011 carves an explicit exception out of FR-008's framing. The spec never states that exception.
+
+A reasonable fix: rewrite FR-008 to say the plugin routes **known commands** (the 5 lifecycle skills plus the plugin-local `version` command) and produces an error for **unknown commands**, removing the "skill" framing that creates the ambiguity.
+
+---
+
+### AUDIT-20260623-87 — FR-010 npm installation path is untestable — no acceptance scenario or success criterion covers it
+
+Finding-ID: AUDIT-20260623-87 (claude-02 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (FR-010, US2, SC-001, SC-005)
+
+FR-010 is a MUST requirement: "The plugin MUST support npm package installation by exporting a default function that opencode loads from `node_modules/@stack-control/opencode-plugin`." However:
+
+- US2 (the installation user story) describes only the local file copy path: "copy it to `.opencode/plugins/stack-control.ts`." All three acceptance scenarios in US2 test the copy-install path exclusively.
+- SC-001's independent test says "installing the stack-control opencode plugin, opening a session" — the independent test narrative in US2 specifies "copying `opencode-plugin.ts`."
+- SC-005 ("Plugin loads successfully in opencode without requiring additional configuration") has no acceptance scenario for the npm install path.
+
+There is no acceptance scenario, no independent test, and no success criterion against which an implementation of FR-010 can be verified. An unattended builder would implement npm support because it is a MUST, but the spec provides no way to confirm whether the implementation meets the requirement. For a spec whose success criteria are described as "mandatory," omitting test coverage for one of the two installation paths leaves FR-010 effectively unmeasurable.
+
+A reasonable fix: add an acceptance scenario to US2 (or a new US) covering "Given user runs `npm install @stack-control/opencode-plugin`, When opencode loads, Then the plugin registers its skills" and add a corresponding independent test. Alternatively, if npm installation is planned for a later feature, remove FR-010 from this spec to avoid an untestable MUST.
+
+---
+
+### AUDIT-20260623-88 — US1 Note specifies two conflicting working directory concepts for CLI invocation
+
+Finding-ID: AUDIT-20260623-88
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (US1 Note, US3 AS1, Assumptions)
+
+US1's Note reads: "CLI operations execute with the active project/workspace as the working directory. The installation context is resolved from the enclosing stack-control installation directory."
+
+US3-AS1 confirms the first sentence: "the plugin invokes `stackctl <command>` via the shell API with the opencode session's active project/workspace as the working context." But the second sentence in the US1 Note introduces a distinct concept — "the installation context" resolved from "the enclosing stack-control installation directory" — without defining what it is used for, how it differs from the working directory, or when it takes precedence.
+
+For an unattended builder implementing the CLI subprocess invocation, the question is: what `cwd` does `stackctl` run in? The spec gives two candidate answers: (1) the active project/workspace directory, and (2) the enclosing stack-control installation directory. These are almost certainly different directories — especially given the Assumption that "the plugin is installed per-project" which implies the stack-control installation root is the project root, but `stackctl govern` and similar verbs may need to run from the spec or stack-control subdirectory, not the broader workspace root.
+
+The spec never reconciles these two directory references or states which is used for the subprocess `cwd`. A builder who sets `cwd` to the opencode workspace root (reading US3-AS1) may invoke `stackctl` in a directory where it cannot locate the installation context it needs. A builder who sets `cwd` to the stack-control installation directory may break relative-path resolution for project files.
+
+A reasonable fix: define in one place (FR-003 or a new FR) the single `cwd` rule for CLI invocation, and if the "installation context" is a distinct concept (e.g., an environment variable or CLI flag passed to `stackctl`), specify it separately rather than embedding it in the working-directory sentence.
+
+---
+
+### AUDIT-20260623-89 — FR-011 and FR-012 have no corresponding success criteria — version command and mismatch warning are unmeasurable
+
+Finding-ID: AUDIT-20260623-89
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (FR-011, FR-012, SC-001 through SC-005)
+
+FR-011 is a MUST: "The plugin MUST expose a `/stack-control:version` command that reports only the plugin version." FR-012 is a MUST: "The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked." SC-001 through SC-005 are the spec's stated measurable outcomes.
+
+None of the five success criteria verify FR-011 or FR-012 behavior:
+
+- SC-002 explicitly lists only the 5 lifecycle skill invocations, omitting the version command.
+- SC-003 covers latency for local CLI, which is irrelevant to the plugin-local version command.
+- SC-004 and SC-005 cover compatibility and load behavior.
+
+The version command and mismatch warning are MUST requirements without any measurable outcome the operator can check post-implementation. The spec structure defines success criteria as "mandatory" and as "measurable outcomes" — omitting two MUST FRs from those outcomes means there is no acceptance gate for the version UX. An unattended builder implementing FR-011/FR-012 has no spec-provided criterion to build toward or verify against.
+
+A reasonable fix: add a SC-006 or expand SC-002 to cover: (a) `/stack-control:version` returns the plugin version string without invoking `stackctl`, and (b) invoking a lifecycle skill while the plugin version differs from the CLI version produces a visible warning.
+
+---
+
+### AUDIT-20260623-90 — Edge cases section lists behavioral questions with no committed answers, including one not covered by any FR
+
+Finding-ID: AUDIT-20260623-90
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (Edge Cases section)
+
+The spec explicitly lists five edge cases as open questions. Two remain without any FR-level answer:
+
+1. "What happens when the opencode session ends during a long-running stack-control skill?" — No FR addresses graceful cleanup, subprocess termination, or partial output behavior when the session context is torn down.
+2. "What if the user has multiple opencode sessions running simultaneously?" — No FR addresses shared state, filesystem contention, or ordering guarantees when two plugin instances invoke `stackctl` concurrently against the same project.
+
+FR-006 covers CLI error reporting (non-zero exit codes) and FR-007 covers the not-found case, so those two edge cases are addressed. The remaining two (session teardown and concurrent sessions) are acknowledged as open in the spec without committing to any behavior.
+
+The blast radius is lower than the above findings because the spec doesn't make a false promise — it honestly surfaces these as open questions. However, leaving them unresolved means an unattended builder will make undocumented decisions that could diverge from operator intent. A reasonable fix: either commit to a behavior for each (e.g., "on session end, the plugin makes no guarantee about in-flight subprocess completion; the subprocess continues until the OS reclaims it"), or explicitly mark them as out-of-scope for this feature with a note that they are tracked elsewhere.
