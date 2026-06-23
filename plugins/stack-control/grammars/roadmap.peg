@@ -19,6 +19,7 @@ edgeFields:
   - { name: design,          references: external, acyclic: false, blocking: false }
   - { name: design-approved, references: prose,    acyclic: false, blocking: false }
   - { name: analyze-clean,   references: prose,    acyclic: false, blocking: false }
+  - { name: validated,       references: prose,    acyclic: false, blocking: false }
   - { name: closes,          references: prose,    acyclic: false, blocking: false }
 reconciliationHook:
   kind: glob

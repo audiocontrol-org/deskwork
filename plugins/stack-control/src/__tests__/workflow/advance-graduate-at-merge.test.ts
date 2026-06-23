@@ -60,6 +60,9 @@ describe('032 US1 — graduate fires at merge (merging → validating; records s
 
   it('a govern-converged item derives merging; advance --apply fires graduate → records status:shipped → derives validating', () => {
     const f = mergingFixture();
+    // SC-006 / FR-013: recording status:shipped needs NO GitHub remote — the fixture has
+    // a local git repo with NO remote configured, and graduate records shipped anyway.
+    expect(f.git(['remote']).trim()).toBe('');
     // derives merging (govern-converged, status in-flight)
     const before = runCli(['workflow', 'status', ITEM], { cwd: f.root });
     expect(before.status).toBe(0);

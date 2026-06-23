@@ -6,16 +6,47 @@
 // Dry-run by default — the operator-confirm guard — writes nothing; `--apply`
 // closes the deduped subtree ids THEN advances the root status to `closed`.
 
+import { dirname } from 'node:path';
 import type { LoadOptions } from '../document-model/document.js';
 import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
 import { backlogRoot } from '../backlog/root.js';
 import { advance } from '../roadmap/mutations.js';
 import { applyCascade, buildCascadePlan, type CascadePlan } from '../roadmap/transitive-close.js';
-import type { RoadmapModel } from '../roadmap/roadmap-model.js';
+import type { RoadmapModel, WorkItem } from '../roadmap/roadmap-model.js';
+import { resolveInstallation } from '../config/installation.js';
+import { loadWorkflowDoc } from '../workflow/workflow-grammar.js';
+import { buildItemContext } from '../workflow/workflow-context.js';
+import { describeCriterion, evaluateGate } from '../workflow/gate-eval.js';
 
 /** The roadmap status `closed` is reachable ONLY from `shipped` (compass refuses otherwise). */
 const REQUIRED_FROM_STATUS = 'shipped';
 const CLOSED_STATUS = 'closed';
+
+/**
+ * 032 US4 (FR-014/FR-016): honor the governed `validating → closed` exit-gate
+ * (default `approval-marker validated`, adopter-overridable) — the SAME gate the
+ * compass evaluates, so the CLI close path and the compass cannot disagree (SC-002).
+ * Resolves the installation enclosing the roadmap doc, loads the (possibly
+ * overridden) WORKFLOW.md, finds the transition into `closed`, and evaluates its
+ * exit-gate against the item. Throws (fail-loud) when the gate is unmet. A custom doc
+ * with no transition into `closed` has no extra gate (status==shipped stays the only
+ * precondition).
+ */
+function assertCloseGateMet(item: WorkItem, docPath: string): void {
+  const inst = resolveInstallation(dirname(docPath));
+  const doc = loadWorkflowDoc(inst.root);
+  const closeTransition = doc.transitions.find((t) => t.to === CLOSED_STATUS && t.from !== '*');
+  if (closeTransition === undefined || closeTransition.exitGate.length === 0) return;
+  const { gate } = buildItemContext(inst.root, item);
+  const result = evaluateGate(closeTransition.exitGate, gate);
+  if (!result.allMet) {
+    const unmet = result.unmet.map(describeCriterion).join('; ');
+    throw new BacklogError(
+      `advance: '${item.identifier}' is 'shipped' but the validating → closed gate is unmet (${unmet}) — ` +
+        `record the marker (e.g. \`stackctl roadmap resolves ${item.identifier} ...\` / set \`validated:\`) before closing`,
+    );
+  }
+}
 
 /** Render the dry-run plan + the would-advance line (formatting kept out of the engine). */
 function renderClosedPlan(plan: CascadePlan): string {
@@ -63,6 +94,12 @@ export function emitAdvanceClosed(
         `'${CLOSED_STATUS}' is reachable only from '${REQUIRED_FROM_STATUS}' (the post-ship terminal advance)`,
     );
   }
+  // 032 US2/US4 (FR-014, SC-002): a shipped item is at the `validating` phase — close is
+  // gated on the governed `validating → closed` exit-gate (default `approval-marker
+  // validated`). This is the SAME gate the compass evaluates, so the CLI close path and
+  // the compass agree (no graduated-but-not-validated divergence). Evaluated on dry-run
+  // too, so the operator-confirm preview also surfaces the unmet gate.
+  assertCloseGateMet(item, docPath);
 
   const backend = createBacklogBackend({ cwd: backlogRoot() });
   const statusById = new Map(backend.list().map((it) => [it.id, it.status]));

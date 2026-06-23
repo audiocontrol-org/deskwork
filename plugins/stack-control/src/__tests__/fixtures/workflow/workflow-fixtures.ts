@@ -28,6 +28,8 @@ export interface FixtureNode {
   readonly spec?: string;
   readonly designApproved?: boolean;
   readonly analyzeClean?: boolean;
+  /** 032 FR-014: the recorded `validated:` marker — the validating → closed gate. */
+  readonly validated?: boolean;
   readonly scope?: string;
 }
 
@@ -62,6 +64,7 @@ function nodeMarkdown(node: FixtureNode): string {
   if (node.spec !== undefined) lines.push(`- spec: ${node.spec}`);
   if (node.designApproved === true) lines.push('- design-approved: 2026-06-16');
   if (node.analyzeClean === true) lines.push('- analyze-clean: 2026-06-16');
+  if (node.validated === true) lines.push('- validated: 2026-06-23');
   lines.push('', node.scope ?? `${node.identifier} scope prose.`, '');
   return lines.join('\n');
 }
