@@ -127,7 +127,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 ### Measurable Outcomes
 
 - **SC-001**: Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode
-- **SC-002**: Plugin successfully delegates 95% of skill invocations to the CLI without errors (measured over a defined set of happy-path skill invocations: `/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)
+- **SC-002**: Plugin successfully delegates all five listed happy-path skill invocations to the CLI without errors (`/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)
 - **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI
 - **SC-004**: Plugin works with opencode versions 1.0 and later
 - **SC-005**: Plugin loads successfully in opencode without requiring additional configuration
@@ -153,3 +153,4 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - Opencode's shell API (`$`) provides sufficient functionality for CLI invocation
 - Users have appropriate file system permissions to install the plugin in `.opencode/plugins/`
 - The plugin will be a single file (`opencode-plugin.ts`) rather than a module directory
+- Skill invocations execute `stackctl` with the opencode session's active project/workspace as the working context

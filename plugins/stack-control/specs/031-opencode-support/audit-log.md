@@ -1138,3 +1138,101 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:71-73,112,1
 The spec says commands starting with `/stack-control:` are routed to the appropriate skill, and clarifies that only `/stack-control:` commands are routed. It also defines the registered skill set as `define`, `extend`, `execute`, `workflow`, and `roadmap`, plus `/stack-control:version`. It never promises what happens for an in-namespace but unsupported command such as `/stack-control:foo` or `/stack-control:speckit-plan`.
 
 The likely intended behavior is a clear unsupported-command error, so this is medium rather than high. Still, the namespace contract is user-facing: an unattended builder could silently ignore unknown commands, pass them through to `stackctl`, or report an error, and all are plausible from the current prose. The spec should add a requirement for unsupported `/stack-control:` commands to produce a clear “unknown stack-control command” result and not invoke unrelated CLI operations.
+
+## 2026-06-23 — audit-barrage lift (20260623T013634159Z-031-opencode-support-after_clarify)
+
+Code-sha: 772f37f5abbaf61e0168e667ce5c48bd7d099ad8
+### AUDIT-20260623-58 — US5 acceptance scenarios 1 and 3 promise contradictory outputs for the same command
+
+Finding-ID: AUDIT-20260623-58
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:94-105 (US5 acceptance scenarios)
+
+Scenarios 1 and 3 of User Story 5 both trigger on the identical user action (`/stack-control:version`) but commit to different outputs:
+
+- Scenario 1: "Then plugin reports its version" — outputs plugin version only.
+- Scenario 3: "Then both plugin and CLI versions are displayed" — outputs both plugin and CLI versions.
+
+These cannot both be true. An unattended builder reading FR-011 ("expose a `/stack-control:version` command that reports the plugin version") alongside Scenario 1 would implement a single-version display. Reading Scenario 3 alongside the intent of US5 (version sync and mismatch detection) would build a dual-version display. Both readings are equally plausible from the spec text; the spec provides no tie-breaker. The correct behavior is almost certainly Scenario 3 (showing both versions so the user can verify alignment), but Scenario 1 and FR-011 as written point in the other direction. A reasonable fix is to delete Scenario 1 (it is strictly weaker than Scenario 3) and update FR-011 to state "reports both plugin version and CLI version."
+
+---
+
+### AUDIT-20260623-59 — FR-005 and SC-003 are contradictory on whether CLI output is buffered or streamed
+
+Finding-ID: AUDIT-20260623-59
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:118 (FR-005), 133 (SC-003)
+
+FR-005 says: "The plugin MUST capture CLI output and return it to opencode." The word "capture" followed by "return" is the language of buffer-then-emit: collect all output, then hand it back as a unit.
+
+SC-003 says: "Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI." If "first output" means the first character or line the user sees, this is a streaming requirement — anything that buffers the complete CLI response violates SC-003 for any `stackctl` operation that takes more than two seconds end-to-end (which feature-definition, execution, and roadmap commands plausibly do, given they drive multi-step spec authoring or parallel execution).
+
+These two requirements are contradictory unless the spec means something narrow by "first output" (e.g., "time until CLI process starts producing bytes" rather than "time until user sees anything"). The spec does not clarify. An unattended builder implementing FR-005 as a buffered capture-and-return will violate SC-003 for non-trivial CLI operations; a builder implementing streaming to satisfy SC-003 will need to interpret FR-005's "capture and return" differently than written. A reasonable fix is to state explicitly in FR-005 whether output is streamed incrementally or returned as a single payload, and to adjust SC-003's "first output" definition accordingly (e.g., "time from command entry to first line of CLI output appearing in the opencode interface").
+
+---
+
+### AUDIT-20260623-60 — FR-007 and FR-012 interaction is undefined when `stackctl` is absent
+
+Finding-ID: AUDIT-20260623-60 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:119-120 (FR-007, FR-012)
+
+FR-007 requires a clear error when `stackctl` is not found. FR-012 requires detecting version mismatch and warning the user on skill invocation. Version mismatch detection requires executing the CLI to read its version string. When the CLI is absent, both requirements apply to the same trigger (a skill invocation): FR-007 fires because the CLI is not found, and FR-012 would also attempt to fire but cannot retrieve the CLI version.
+
+The spec does not state that FR-007 takes precedence and that FR-012 is skipped when the CLI is not installed, nor does it define what happens if the version-check subprocess fails for reasons other than the CLI being absent (e.g., the CLI binary is present but crashes on `--version`). A reasonable builder would handle "CLI not found" as the error path and never reach the version check, but the spec leaves this implicit. A reasonable fix adds a single sentence to FR-012: "Version mismatch detection is skipped when the CLI is not found; FR-007 governs that case."
+
+---
+
+### AUDIT-20260623-61 — Skill registration set defined inconsistently across Key Entities and Clarifications
+
+Finding-ID: AUDIT-20260623-61
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:67 (Key Entities), 110 (FR-002), 143 (Clarifications)
+
+Three places define the set of skills registered by the plugin, and they disagree:
+
+- FR-002: "`define`, `extend`, `execute`, `workflow`, `roadmap`" — five skills, no `version`.
+- Key Entities: "The set of skills registered by the plugin is: `define`, `extend`, `execute`, `workflow`, `roadmap` (the primary lifecycle skills)" — same five, no `version`.
+- Clarifications: "Which stack-control skills are registered with opencode? → A: `define`, `extend`, `execute`, `workflow`, `roadmap`, `version` (primary lifecycle skills + version command)" — six items, `version` included.
+
+A builder following FR-002 and Key Entities literally would implement `version` as a special-case command handler distinct from the registered skill set — it might not appear in the opencode command palette under the skill enumeration, only via explicit routing. A builder following the Clarifications would register all six. The spec never resolves whether `version` is a "registered skill" (command-palette entry) or a "routed command" (handled by FR-008's mapping logic but not a registered skill). This distinction matters to adopters who want to discover available commands from the palette. A reasonable fix is to update FR-002 and Key Entities to include `version` explicitly, or to define `version` as a "built-in routed command, not a registered skill, and explain the difference.
+
+---
+
+### AUDIT-20260623-62 — SC-002 measurement methodology is undefined against a five-item happy-path set
+
+Finding-ID: AUDIT-20260623-62
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:131-132 (SC-002)
+
+SC-002 requires "95% of skill invocations succeed" measured against exactly five named happy-path invocations. With a five-item set, 95% success means 4.75 items must pass — a fractional result against a discrete count. A builder interpreting this as "all five must pass" is enforcing 100%; one interpreting it as "repeat each invocation N times and require 95% of runs to succeed" gets a different protocol. The spec names the five items but does not define how many times each is run, under what conditions, or what counts as a "successful delegation" (CLI exits 0? Output is non-empty? User sees a response?).
+
+The intent is clearly that happy-path invocations should reliably succeed, but the 95% figure is arithmetically incoherent against exactly 5 discrete items unless a sampling protocol is also defined. A reasonable fix replaces "95% of skill invocations" with "all five listed skill invocations" (since these are happy-path conditions where the CLI is installed and the inputs are valid), and adds "delegation is successful when the CLI exits 0 and the plugin returns non-empty output to the user."
+
+### AUDIT-20260623-63 — SC-002 uses an impossible 95% threshold over five listed invocations
+
+Finding-ID: AUDIT-20260623-63
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:129-130
+
+SC-002 says the plugin “successfully delegates 95% of skill invocations” and then defines the measured set as five happy-path commands: `define`, `extend`, `execute`, `workflow`, and `roadmap`. Over a five-case acceptance set, 95% is not a measurable pass threshold: four successes is 80%, and five successes is 100%.
+
+The likely intended outcome is that all five happy-path commands delegate successfully, so a human reader can resolve this. The blast radius is still medium because this is a success criterion for an unattended build: one builder might treat it as “all five,” another might invent repeated trials, and another might ignore a single failure as statistically acceptable. A reasonable fix would replace the percentage with “all five listed happy-path invocations” or define a real repeated-measure sample size.
