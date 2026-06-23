@@ -167,7 +167,7 @@ That means following the advertised recovery can clear the dangling signal while
 ### AUDIT-20260623-10 — Missing `src/subcommands/no-shortcuts-audit.ts` — import in `weld-no-shortcuts.test.ts` has no matching source
 
 Finding-ID: AUDIT-20260623-10
-Status:     open
+Status:     false-positive (chunked-audit artifact — src/subcommands/no-shortcuts-audit.ts exists since Jun 16, absent only from this chunk's diff; import resolves, weld-no-shortcuts 3/3, tsc + full suite green)
 Severity:   high
 Per-lane:   claude=high
 Decision:   single-model (gate-counted high)
@@ -186,7 +186,7 @@ This module (`src/subcommands/no-shortcuts-audit.ts`) does not appear in the Fil
 ### AUDIT-20260623-11 — Ship skill records `status: shipped` after the PR is already merged
 
 Finding-ID: AUDIT-20260623-11
-Status:     open
+Status:     fixed-d344800b
 Severity:   blocking
 Per-lane:   codex=blocking
 Decision:   single-model (gate-counted blocking)
