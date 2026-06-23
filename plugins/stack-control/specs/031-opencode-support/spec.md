@@ -30,7 +30,7 @@ Note: CLI operations execute with the active project/workspace as the working di
 
 ### User Story 2 - Install stack-control plugin in opencode (Priority: P1)
 
-Opencode users need a straightforward way to install the stack-control plugin. They should be able to use either local file installation or npm package installation.
+Opencode users need a straightforward way to install the stack-control plugin. They should be able to use local file installation.
 
 **Why this priority**: Without installation, the feature doesn't exist. This is the entry point for all opencode users.
 
@@ -41,8 +41,6 @@ Opencode users need a straightforward way to install the stack-control plugin. T
 1. **Given** user has the stack-control plugin file, **When** they copy it to `.opencode/plugins/stack-control.ts`, **Then** opencode loads the plugin on next start
 2. **Given** opencode loads the stack-control plugin, **When** the plugin initializes, **Then** it exports the plugin function following opencode's plugin API
 3. **Given** plugin is loaded, **When** user types any stack-control skill, **Then** the skill is available in the command menu
-
-Note: npm package installation (`@stack-control/opencode-plugin`) is supported but not tested in this feature. The local file installation is the primary supported path.
 
 ---
 
@@ -117,8 +115,8 @@ Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. C
 - **FR-006**: The plugin MUST handle CLI errors (non-zero exit codes) and report them to opencode
 - **FR-007**: The plugin MUST provide a clear error message when `stackctl` CLI is not found
 - **FR-008**: The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill; unknown commands produce a clear "unknown stack-control command" error
-- **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts` (local file installation)
-- **FR-010**: The plugin MUST support npm package installation by exporting a default function that opencode loads from `node_modules/@stack-control/opencode-plugin` (npm package entrypoint is the same single file)
+- **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts`
+- **FR-010**: The plugin MUST support npm package installation via export of a default function
 - **FR-011**: The plugin MUST expose a `/stack-control:version` command that reports only the plugin version
 - **FR-012**: The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked
 
@@ -146,7 +144,7 @@ Note: `/stack-control:version` is a routed command, not a registered skill. It i
 ### Session 2026-06-22
 
 - Q: How should the opencode plugin be structured? → A: Single file (`opencode-plugin.ts`) for both local copy and npm package entrypoint
-- Q: Which stack-control skills are registered with opencode? → A: `define`, `extend`, `execute`, `workflow`, `roadmap`, `version` (primary lifecycle skills + version command)
+- Q: Which stack-control skills are registered with opencode? → A: `define`, `extend`, `execute`, `workflow`, `roadmap` (primary lifecycle skills only)
 - Q: How does npm installation work? → A: Plugin exports default function; npm package entrypoint is the same single file
 - Q: What happens with unknown `/stack-control:` commands? → A: Clear "unknown stack-control command" error
 - Q: What happens with `/speckit-*` commands? → A: Not supported in this feature; only `/stack-control:` commands are routed

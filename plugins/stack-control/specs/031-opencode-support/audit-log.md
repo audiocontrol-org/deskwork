@@ -1698,3 +1698,87 @@ The spec explicitly lists five edge cases as open questions. Two remain without 
 FR-006 covers CLI error reporting (non-zero exit codes) and FR-007 covers the not-found case, so those two edge cases are addressed. The remaining two (session teardown and concurrent sessions) are acknowledged as open in the spec without committing to any behavior.
 
 The blast radius is lower than the above findings because the spec doesn't make a false promise — it honestly surfaces these as open questions. However, leaving them unresolved means an unattended builder will make undocumented decisions that could diverge from operator intent. A reasonable fix: either commit to a behavior for each (e.g., "on session end, the plugin makes no guarantee about in-flight subprocess completion; the subprocess continues until the OS reclaims it"), or explicitly mark them as out-of-scope for this feature with a note that they are tracked elsewhere.
+
+## 2026-06-23 — audit-barrage lift (20260623T021520377Z-031-opencode-support-after_clarify)
+
+Code-sha: 8da9efa8d6cb81cf858888b6449b2cef6526a396
+### AUDIT-20260623-91 — Clarifications section contradicts FR-002 and Key Entities: version registration status is directly inconsistent
+
+Finding-ID: AUDIT-20260623-91
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — Clarifications section vs. FR-002 vs. Key Entities Note
+
+The Clarifications section records the following resolved Q&A: *"Which stack-control skills are registered with opencode? → A: `define`, `extend`, `execute`, `workflow`, `roadmap`, `version` (primary lifecycle skills + version command)"* — explicitly listing `version` as a registered skill.
+
+FR-002 says the opposite: *"The plugin MUST register the primary lifecycle skills when loaded (`define`, `extend`, `execute`, `workflow`, `roadmap`). The `/stack-control:version` command is routed but not a registered skill in opencode's command palette."* The Key Entities note repeats this: *"Note: `/stack-control:version` is a routed command, not a registered skill. It is plugin-local and does not appear in opencode's skill registration."* US3's note and the section heading in User Story 5 both reinforce the non-registered reading.
+
+An unattended builder has a direct contradiction: one authoritative section (Clarifications) says register six skills; four other authoritative sections say register five and explicitly exclude version. The Clarifications section is typically treated as the final settled answer to disputed questions — an agent will likely build the six-skill registration, violating FR-002's explicit MUST. Whether version appears in opencode's command palette (searchable, discoverable) or only behind a slash-command invoke is a user-facing behavioral difference, not an implementation detail. Blast radius: an agent building from this spec as written will either add version to the command palette (violating FR-002) or not (violating the Clarifications answer), with no spec text that unambiguously resolves which is correct.
+
+---
+
+### AUDIT-20260623-92 — FR-008's routing model has no path for `/stack-control:version` — it would be classified as "unknown" and produce an error
+
+Finding-ID: AUDIT-20260623-92
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-008 vs. FR-011 vs. Key Entities Note
+
+FR-008 reads: *"The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill; unknown commands produce a clear 'unknown stack-control command' error."* The routing table FR-008 describes has exactly two outcomes: (a) the command maps to a skill, or (b) it is "unknown" and produces an error.
+
+The Key Entities note establishes that `/stack-control:version` is *not a skill*: *"a routed command, not a registered skill."* FR-002 also excludes it from skill registration. Under FR-008 as written, a command that starts with `/stack-control:` and does not map to a registered skill falls through to the "unknown command" error path. Yet FR-011 requires version to work. There is no spec text that establishes a third routing branch ("routed non-skill commands") or that tells an unattended builder to special-case version before consulting the skill table.
+
+An unattended builder implementing FR-008 literally — look up the command in the skills table, return error if not found — will produce a version command that returns *"unknown stack-control command"* instead of the plugin version. The spec says version is "routed" without ever specifying what routing path handles it. Blast radius: the version command is fully broken by default on any implementation that takes FR-008 at face value. This is not an edge case the builder would catch from the FRs alone.
+
+---
+
+### AUDIT-20260623-93 — FR-010 uses MUST for npm installation, but User Story 2 explicitly marks it as untested in this feature
+
+Finding-ID: AUDIT-20260623-93 (claude-03 + claude-05 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-010 vs. User Story 2 Note
+
+FR-010 states: *"The plugin MUST support npm package installation by exporting a default function that opencode loads from `node_modules/@stack-control/opencode-plugin` (npm package entrypoint is the same single file)."* MUST in this spec's vocabulary is a mandatory, testable requirement.
+
+The User Story 2 Note immediately contradicts the obligation level: *"npm package installation (`@stack-control/opencode-plugin`) is supported but not tested in this feature. The local file installation is the primary supported path."*
+
+A MUST requirement that is "not tested in this feature" is not a valid acceptance gate — either it is tested and must pass (MUST), or it is aspirational and should be SHOULD/MAY. An unattended builder sees a mandatory requirement, implements it, and expects it to be exercised by the success criteria. No SC covers npm installation. SC-005 ("Plugin loads successfully without requiring additional configuration") could be read as covering npm install, but no acceptance scenario tests it. The spec creates a MUST that has no test path and is explicitly out-of-scope for testing — this contradicts the "mandatory" framing.
+
+---
+
+### AUDIT-20260623-94 — FR-012's "when a skill is invoked" frequency is unspecified, creating a potential conflict with SC-003's latency promise
+
+Finding-ID: AUDIT-20260623-94
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-012 vs. SC-003
+
+FR-012 states: *"The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked."* US5 AC2 confirms: *"Given CLI version differs from plugin version, When user runs a skill, Then a warning is displayed about version mismatch."*
+
+Detecting the CLI version requires invoking `stackctl --version` (or equivalent). The spec does not say whether this check happens once at plugin load, once per session, or on every skill invocation. The phrase "when a skill is invoked" most naturally reads as per-invocation, which means a second CLI subprocess (`stackctl --version`) fires before the main skill CLI call on every invocation.
+
+SC-003 promises: *"Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI."* Two sequential CLI subprocess spawns (version check + skill execution) on each invocation increases the latency floor. An unattended builder implementing FR-012 literally as "check version on each invocation" may produce a compliant FR-012 implementation that violates SC-003. The spec never disambiguates the frequency, so the builder has no spec-anchored reason to choose session-level caching. Blast radius: the two promises (warn on every invocation, under 2 seconds) are potentially incompatible, and the builder has no spec-provided resolution.
+
+---
+
+### AUDIT-20260623-95 — `version` is both registered and not registered
+
+Finding-ID: AUDIT-20260623-95
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:113,132,149
+
+FR-002 says `/stack-control:version` is “routed but not a registered skill in opencode's command palette,” and the Key Entities note repeats that it “does not appear in opencode's skill registration.” The Clarifications section contradicts that by answering that the registered opencode skills are `define`, `extend`, `execute`, `workflow`, `roadmap`, `version`.
+
+This matters because an unattended builder has two plausible instructions for the command palette surface: register `version` as a skill, or route it only as a command. The blast radius is medium because either choice leaves the version command callable, but one choice violates the intended command-palette contract. A reasonable fix is to make the clarification match FR-002: registered skills are only the five lifecycle skills, while `version` is a routed non-skill command.
