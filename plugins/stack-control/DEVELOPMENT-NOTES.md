@@ -2,6 +2,54 @@
 
 ---
 
+## 2026-06-23: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 27
+  - roadmap+rule: capture multi:feature/ship-stage + session-skills-never-block invariant
+  - roadmap(031): close multi:gap/transitive-item-closure (shipped in v0.54.0)
+  - backlog(031): capture close-gate coherence wart found dogfooding v0.54.0 (TASK-445)
+  - govern(031-transitive-item-closure): graduate via operator-approved override
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-10/-11 fixed
+  - docs(031-transitive-item-closure): correct close skill recovery guidance (AUDIT-20260623-10)
+  - fix(031-transitive-item-closure): validate promote batch before the back-link write (AUDIT-20260623-11)
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-08/-09 fixed
+  - fix(031-transitive-item-closure): back-link before the backlog mutation in done/promote (AUDIT-20260623-09)
+  - fix(031-transitive-item-closure): correct advance-closed recovery comment (AUDIT-20260623-08)
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-06/-07 fixed
+  - fix(031-transitive-item-closure): write roadmap status before the cascade in advance --to closed (AUDIT-20260623-07)
+  - fix(031-transitive-item-closure): intent vocab tolerant of missing alias-target phases (AUDIT-20260623-06)
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-05 fixed (fa4d1eb2)
+  - fix(031-transitive-item-closure): fence-aware closes: line drop (AUDIT-20260623-05)
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-03/-04 fixed
+  - fix(031-transitive-item-closure): preflight auto-back-link before close/promote (AUDIT-20260623-04)
+  - fix(031-transitive-item-closure): closed is reached only by-name, never predicate-derived (AUDIT-20260623-03)
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-01/-02 fixed
+  - fix(031-transitive-item-closure): no silent status-only close via workflow advance (AUDIT-20260623-01)
+  - fix(031-transitive-item-closure): closed satisfies depends-on (AUDIT-20260623-02)
+  - feat(031-transitive-item-closure): /stack-control:close skill + quickstart validation (T038-T039)
+  - test(031-transitive-item-closure): install-agnostic invariant + polish (T033-T037, T040)
+  - feat(031-transitive-item-closure): post-ship terminal stage wiring (T025-T032)
+  - feat(031-transitive-item-closure): closes: population + auto-back-link (T017-T024)
+  - feat(031-transitive-item-closure): transitive closer + close-related --cascade (T010-T016)
+  - feat(031-transitive-item-closure): foundational closed status + childrenOf + closed phase (T001-T009)
+- Files changed: 56
+- Backlog touched: TASK-444, TASK-445, TASK-7, TASK-8
+
 ## 2026-06-23: transitive-item-closure — design → full Spec Kit chain authored to runnable
 
 **Goal:** Take up `multi:gap/transitive-item-closure` (the in-flight pickup) — make "closing what a roadmap item contains" one mechanical move — and fold in two operator-added requirements: make closure part of the **terminal-state workflow stage** (so it isn't forgotten), and move **post-install validation into the workflow, not a `tasks.md` task** (the offing deadlock). Author it through the stack-control front door from design to a runnable spec. Orchestrator-session work only (implementation is a separate session).
