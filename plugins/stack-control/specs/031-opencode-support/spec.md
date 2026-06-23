@@ -118,7 +118,7 @@ Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. C
 - **FR-007**: The plugin MUST provide a clear error message when `stackctl` CLI is not found
 - **FR-008**: The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill; unknown commands produce a clear "unknown stack-control command" error
 - **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts`
-- **FR-010**: The plugin MUST support npm package installation via export of a default function
+- **FR-010**: The plugin MUST export a default function that can be loaded from `node_modules/@stack-control/opencode-plugin` for npm package installation
 - **FR-011**: The plugin MUST expose a `/stack-control:version` command that reports only the plugin version
 - **FR-012**: The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked
 
@@ -138,7 +138,7 @@ Note: `/stack-control:version` is a routed command, not a registered skill. It i
 - **SC-001**: Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode
 - **SC-002**: Plugin successfully delegates all five listed happy-path skill invocations to the CLI without errors (`/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)
 - **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI
-- **SC-004**: Plugin works with opencode 1.0 and later (tested against opencode 1.0+; compatibility with future versions depends on opencode's plugin API stability)
+- **SC-004**: Plugin works with opencode 1.0 and later (tested against opencode 1.0; future compatibility depends on opencode's plugin API stability)
 - **SC-005**: Plugin loads successfully in opencode without requiring additional configuration
 
 ## Clarifications

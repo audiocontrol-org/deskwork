@@ -2059,3 +2059,89 @@ Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:57,113-115
 FR-002 registers five opencode skills (`define`, `extend`, `execute`, `workflow`, `roadmap`), while FR-003/FR-004 say skill execution delegates to `stackctl` and give `/stack-control:define "opencode support"` as passing command `define` to `stackctl`. SC-002 then treats all five bare slash commands as happy-path invocations. The spec never states whether the opencode skill name is always the literal `stackctl` verb, or whether each registered skill maps to a specific CLI verb/subcommand/argument shape.
 
 That ambiguity has high blast radius for an unattended builder: the most direct implementation is `/stack-control:<name>` → `stackctl <name> ...`, but broad surfaces like `workflow` and `roadmap` are command families, and `define`/`extend`/`execute` may not be literal CLI verbs in the same sense. The result could satisfy FR-004’s example-driven reading while failing SC-002 for several of the advertised primary skills. A reasonable fix is to add a normative mapping table for all five registered commands, including the exact CLI command/subcommand shape and whether a bare invocation is valid or must produce usage/argument guidance.
+
+## 2026-06-23 — audit-barrage lift (20260623T024311809Z-031-opencode-support-after_clarify)
+
+Code-sha: a08bddacf4ed0e82f79d7ea21d45ebea71c08bae
+### AUDIT-20260623-113 — Plugin CLI invocation model assumes non-interactive (batch) operation without committing to it
+
+Finding-ID: AUDIT-20260623-113
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-003, FR-004, FR-005, SC-002
+
+FR-003 requires the plugin to "delegate skill execution to the `stackctl` CLI via the shell API." FR-004 requires forwarding "skill arguments to the CLI as command arguments." FR-005 requires the plugin to "capture CLI output and return it to opencode." Together these three FRs describe a batch invocation model: `stackctl <verb> [args…]` is called, output is captured, execution returns. SC-002 then asserts all five primary skills delegate "without errors."
+
+The five registered skills — `define`, `extend`, `execute`, `workflow`, `roadmap` — are not trivial stateless operations. Within the stack-control project, `define` initiates an entire spec-authoring chain; `execute` drives a multi-phase implementation workflow. These operations in a typical agent context involve interactive back-and-forth (prompts for feature name, clarifying questions, phase-boundary confirmations). If `stackctl define` reads from stdin waiting for user input, the shell invocation described by FR-003–FR-005 will block indefinitely; SC-002's "without errors" criterion will be unachievable for these skills.
+
+The spec never commits to whether the five CLI operations are interactive (requiring stdin I/O) or batch (producing output and exiting). The Assumptions section notes "Opencode's shell API (`$`) provides sufficient functionality for CLI invocation" — this is a capability claim about the shell API, not a statement that the CLI itself operates in batch mode. An unattended builder implementing FR-003–FR-005 will build a fire-and-forget integration. If any of the five skills require interactive I/O, that integration fails silently (hang or EOF error) for exactly the operations SC-002 names as happy paths. The spec should commit to one of: (a) the five CLI verbs operate in non-interactive/batch mode when invoked from opencode, (b) opencode's shell API supports full interactive I/O streaming, or (c) the plugin wraps CLI invocation differently per skill. Until one of these is stated, SC-002's "without errors" promise is untestable.
+
+---
+
+### AUDIT-20260623-114 — FR-010 npm installation path has no acceptance scenario and is not reconciled with FR-009's install path requirement
+
+Finding-ID: AUDIT-20260623-114 (claude-02 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-009, FR-010, US2
+
+FR-009: "The plugin MUST load from `.opencode/plugins/stack-control.ts`." FR-010: "The plugin MUST support npm package installation via export of a default function." These two requirements are stated independently without describing how they relate.
+
+US2 (Install stack-control plugin in opencode) covers only the manual-copy path: copy `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts`. There is no acceptance scenario for the npm installation path — no "Given user runs `npm install`…" scenario exists. The Clarifications state "Plugin exports default function; npm package entrypoint is the same single file" — this describes the file shape, not the end-to-end npm install experience.
+
+The ambiguity for an unattended builder is: does FR-010 require that `npm install <package>` alone results in a working plugin (i.e., opencode discovers the plugin in node_modules), or does it merely require that the plugin file exports a default function so it *can* be published to npm (with the user still copying it to `.opencode/plugins/`)? These two readings result in substantially different implementations: the first requires knowledge of how opencode discovers npm-installed plugins; the second makes FR-010 almost tautological given FR-001. Since both readings are plausible and the blast radius of the first being wrong is "entire npm installation path is broken," the spec should add one acceptance scenario for the npm path and explicitly state whether `npm install` alone is sufficient or whether the user must still copy the file after npm installation.
+
+---
+
+### AUDIT-20260623-115 — SC-004 makes and immediately retracts a forward-compatibility promise
+
+Finding-ID: AUDIT-20260623-115 (claude-03 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-004
+
+SC-004 reads: "Plugin works with opencode 1.0 and later (tested against opencode 1.0+; compatibility with future versions depends on opencode's plugin API stability)."
+
+The first clause is an open-ended forward-compatibility promise: "1.0 and later" means every version from 1.0 onward. The parenthetical immediately qualifies this to mean only compatibility at ship time, because "future versions depend on API stability." These two readings are internally contradictory: "1.0 and later" cannot simultaneously mean "all future versions" and "only the API-stable future versions we can't know about."
+
+For a user reading the spec as a contract: they rely on "opencode 1.0 and later" as a durability guarantee and deploy the plugin in an environment running opencode 1.5, then find it broken after an opencode API change. The spec promised 1.5 support. For an implementation team: they treat the parenthetical as the real constraint and write no forward-compat shims. Both parties are acting on what the spec says. A clean version of SC-004 would be: "Plugin works with opencode 1.0 at the time of this release; compatibility with future opencode versions is not guaranteed and depends on opencode's plugin API stability."
+
+---
+
+### AUDIT-20260623-116 — SC-001 names a user-time metric not verifiable as plugin behavior
+
+Finding-ID: AUDIT-20260623-116
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-001
+
+SC-001: "Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode."
+
+This is a time-to-value metric covering user cognition, documentation quality, and installation steps — not plugin behavior. No automated test or acceptance scenario can measure it: you would need to time a new user reading documentation and performing installation steps. Any plugin implementation satisfies this criterion if the documentation is good enough. Any plugin implementation fails it if the documentation is confusing, regardless of what the plugin does.
+
+As a success criterion for a software feature, this belongs in a product/UX brief, not in measurable plugin requirements. A reasonable fix is to replace it with a verifiable behavioral criterion (e.g., "plugin loads without error in a fresh opencode session with no prior configuration") or remove it from the SC list and move it to a UX goal note. As written it cannot signal whether the plugin is built correctly.
+
+---
+
+### AUDIT-20260623-117 — SC-003 "first output" is ambiguous for AI-orchestrated CLI operations
+
+Finding-ID: AUDIT-20260623-117
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-003
+
+SC-003: "Skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI."
+
+"First output" is ambiguous in a context where `stackctl define` might: (a) immediately emit a prompt ("What is the feature name?") in under 2 seconds — trivially satisfying the criterion — or (b) produce meaningful first output only after an LLM sub-agent completes its first step, which could take 5–30 seconds. Both behaviors may be consistent with the batch invocation model of FR-003–FR-005 and both are "first output."
+
+If the intent is to measure time-to-first-byte of CLI stdout, that is nearly always under 2 seconds regardless of what the operation does. If the intent is time to first meaningful result, the criterion needs to specify what counts as meaningful. Either way, the criterion as written can be satisfied trivially (any output byte counts) without validating the UX goal it presumably captures. This is low severity because the wrong reading (first byte) doesn't harm users; it just makes the criterion vacuous.
