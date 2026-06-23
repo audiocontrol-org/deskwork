@@ -51,7 +51,7 @@ describe('030 US2 — governing → shipped requires a converged whole-feature r
     expect(statusOf(f)).toBe('in-flight'); // did NOT advance to shipped
   });
 
-  it('once a converged whole-feature record exists, the item graduates to shipped', () => {
+  it('once a converged whole-feature record exists, the item derives merging (ship precondition met; 032)', () => {
     const f = governingFixture();
     // NB: for `mode: 'impl'`, the fixture's writeRecord maps this record-shaped input
     // through `implRecordFrom(...)` and persists a real `WholeFeatureConvergenceRecord`
@@ -66,11 +66,11 @@ describe('030 US2 — governing → shipped requires a converged whole-feature r
       recordedAt: '2026-06-21T00:00:00.000Z',
     });
     f.base.commitAll('govern: converged whole-feature record');
-    // The converged record satisfies graduate-impl AND derives phase:shipped (the same
-    // single criterion now), so the item is graduated — no per-phase checkpoints involved.
+    // 032: the converged record satisfies graduate-impl AND derives phase:merging (the
+    // ship-the-PR phase) — `shipped` is the STATUS recorded later by `graduate` at merge.
     const s = runCli(['workflow', 'status', ITEM], { cwd: f.root });
     expect(s.status).toBe(0);
-    expect(s.stdout).toContain('phase: shipped');
+    expect(s.stdout).toContain('phase: merging');
   });
 });
 

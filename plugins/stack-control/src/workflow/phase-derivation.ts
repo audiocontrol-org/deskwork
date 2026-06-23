@@ -57,6 +57,16 @@ function deriveHolds(pred: DerivePredicate, inputs: DerivationInputs): boolean {
       return inputs.tasksComplete;
     case 'release-tagged':
       return inputs.releaseTagged;
+    case 'status-is':
+      // 032 (ship-stage) FR-007: the recorded node `status:` equals the predicate's
+      // target (e.g. `status-is shipped`). The post-merge `validating` phase derives
+      // from `status-is shipped` — the SAME recorded status the close gate reads, so
+      // the derived phase and the close gate cannot diverge. NO marker-absence here
+      // (the `validated` marker is the validating→closed gate, not a derive input; F1).
+      if (pred.target === undefined || pred.target.length === 0) {
+        throw new WorkflowError(`derive 'status-is' requires a status value (e.g. 'status-is shipped')`);
+      }
+      return (inputs.status?.toLowerCase() ?? null) === pred.target.toLowerCase();
     case 'never':
       // By-name-only sentinel (031): NEVER placed by the artifact loop. A phase
       // with `derive: never` (the terminal `closed`) is reached solely by the

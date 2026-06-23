@@ -46,8 +46,10 @@ describe('024 FR-004 — intent vocabulary single-sourced from WORKFLOW.md work 
   it('includes the fixed transition aliases', () => {
     const r = (name: string) => resolveIntent(doc(), name);
     expect(r('govern')).toEqual({ kind: 'phase', phase: 'governing' });
-    expect(r('ship')).toEqual({ kind: 'phase', phase: 'shipped' });
-    expect(r('release')).toEqual({ kind: 'phase', phase: 'shipped' });
+    // 032: ship targets the `merging` phase (ship-the-PR boundary); release targets
+    // the post-merge `validating` phase. Neither targets the removed `shipped` phase.
+    expect(r('ship')).toEqual({ kind: 'phase', phase: 'merging' });
+    expect(r('release')).toEqual({ kind: 'phase', phase: 'validating' });
     expect(r('specify')).toEqual({ kind: 'phase', phase: 'specifying' });
     expect(r('speckit-implement')).toEqual({ kind: 'phase', phase: 'implementing' });
   });
@@ -78,7 +80,7 @@ describe('024 FR-004 — intent vocabulary single-sourced from WORKFLOW.md work 
     expect(() => buildIntentVocabulary(noClosed)).not.toThrow();
     const vocab = buildIntentVocabulary(noClosed);
     expect(vocab.has('close')).toBe(false); // close unavailable (no closed phase)
-    expect(vocab.get('ship')).toBe('shipped'); // the other aliases still resolve
+    expect(vocab.get('ship')).toBe('merging'); // the other aliases still resolve (032: ship → merging)
     expect(resolveIntent(noClosed, 'close')).toBeNull(); // -> caller's loud unknown-intent exit
     expect(resolveIntent(noClosed, 'design')).toEqual({ kind: 'phase', phase: 'designing' });
   });

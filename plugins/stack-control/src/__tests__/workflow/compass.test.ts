@@ -58,32 +58,34 @@ describe('024 FR-002 — compass verdict matrix', () => {
     expect(v.skippedStep).toBe('governing');
   });
 
-  it('on-course: ship from governing reaches shipped', () => {
+  it('on-course: ship from governing reaches merging (the ship-the-PR phase)', () => {
+    // 032: ship → merging, governing's legitimate next. The graduate (record status:shipped)
+    // fires at the merging→validating boundary, driven by the ship skill.
     expect(verdict(doc(), phase('governing'), 'ship').outcome).toBe('on-course');
   });
 
-  it('T040/codex-01: release/ship from governing REFUSES when the graduation exit gate is unmet', () => {
+  it('T040/codex-01: ship from governing REFUSES when the graduation exit gate is unmet', () => {
     const d = doc();
-    const unmet = [{ kind: 'record-converged', target: 'impl' } as const];
+    const unmet = [{ kind: 'graduate-impl', target: 'impl' } as const];
     const v = computeVerdict({
       doc: d,
       currentPhase: phase('governing'),
-      intent: resolveIntent(d, 'release')!,
+      intent: resolveIntent(d, 'ship')!,
       hasNode: true,
       nextGateUnmet: unmet,
     });
-    expect(v.outcome).toBe('ahead'); // NOT on-course — the compass cannot green-light release
+    expect(v.outcome).toBe('ahead'); // NOT on-course — the compass cannot green-light ship un-governed
     expect(v.exitCode).not.toBe(0);
     expect(v.unmetGate.length).toBeGreaterThan(0);
-    expect(v.reason).toMatch(/record-converged impl|exit gate/i);
+    expect(v.reason).toMatch(/graduate-impl impl|exit gate/i);
   });
 
-  it('T040: release from governing is on-course when the graduation gate is met (empty unmet)', () => {
+  it('T040: ship from governing is on-course when the graduation gate is met (empty unmet)', () => {
     const d = doc();
     const v = computeVerdict({
       doc: d,
       currentPhase: phase('governing'),
-      intent: resolveIntent(d, 'release')!,
+      intent: resolveIntent(d, 'ship')!,
       hasNode: true,
       nextGateUnmet: [],
     });

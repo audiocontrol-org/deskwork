@@ -22,10 +22,11 @@ afterEach(() => {
 
 const ITEM = 'multi:feature/x';
 
-describe('031 T031 — a shipped item is not terminal; closed is the pending next move (FR-013)', () => {
-  it('legitimateNextPhase(shipped) === closed (the generic engine surfaces the pending close)', () => {
+describe('031 T031 / 032 — a shipped item is not terminal; closed is the pending next move (FR-013)', () => {
+  it('legitimateNextPhase(validating) === closed (the post-merge phase surfaces the pending close)', () => {
     const doc = loadWorkflowDoc(fixture([]).root);
-    expect(legitimateNextPhase(doc, 'shipped')).toBe('closed');
+    // 032: `status: shipped` derives the `validating` phase, whose next is `closed`.
+    expect(legitimateNextPhase(doc, 'validating')).toBe('closed');
     expect(legitimateNextPhase(doc, 'closed')).toBeNull(); // closed IS terminal
   });
 
@@ -33,7 +34,8 @@ describe('031 T031 — a shipped item is not terminal; closed is the pending nex
     const f = fixture([{ identifier: ITEM, status: 'shipped' }]);
     const r = runCli(['workflow', 'next', ITEM], { cwd: f.root });
     expect(r.status).toBe(0);
-    expect(r.stdout).toContain('current phase: shipped');
+    // `status: shipped` derives the `validating` phase (the verify-before-close window).
+    expect(r.stdout).toContain('current phase: validating');
     // NOT terminal: a forward transition toward closed is named.
     expect(r.stdout).not.toMatch(/no further transition/i);
     expect(r.stdout).toMatch(/next transition: close/i);
@@ -44,7 +46,7 @@ describe('031 T031 — a shipped item is not terminal; closed is the pending nex
     const f = fixture([{ identifier: ITEM, status: 'shipped' }]);
     const r = runCli(['workflow', 'status', ITEM], { cwd: f.root });
     expect(r.status).toBe(0);
-    expect(r.stdout).toContain('phase: shipped');
+    expect(r.stdout).toContain('phase: validating');
     // The pending-close surface: the status names `closed` as the legitimate next move.
     expect(r.stdout).toContain('closed');
   });

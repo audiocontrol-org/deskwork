@@ -92,11 +92,12 @@ describe('US2 phase derivation — totality + determinism', () => {
     expect(r).toEqual({ kind: 'phase', id: 'governing' });
   });
 
-  it('derives shipped only when the impl convergence record is recorded and converged', () => {
+  it('derives merging — govern-converged but status still in-flight (NOT shipped) — F1/T006', () => {
     const doc = loadWorkflowDoc(fixture().root);
     const r = derivePhase(
       doc,
       base({
+        status: 'in-flight',
         designPointer: 'd',
         specPointer: 's',
         analyzeClean: true,
@@ -104,7 +105,50 @@ describe('US2 phase derivation — totality + determinism', () => {
         implRecordConverged: true,
       }),
     );
-    expect(r).toEqual({ kind: 'phase', id: 'shipped' });
+    // The impl convergence record is the SHIP PRECONDITION, not the event that
+    // records shipped: a converged-but-unmerged item is `merging` (run ship), never
+    // `shipped`. There is no derived `phase:shipped` (F1 resolution).
+    expect(r).toEqual({ kind: 'phase', id: 'merging' });
+  });
+
+  it('derives validating from recorded status:shipped (status-is shipped) — no convergence record needed (T003)', () => {
+    const doc = loadWorkflowDoc(fixture().root);
+    const r = derivePhase(
+      doc,
+      base({
+        status: 'shipped',
+        designPointer: 'd',
+        specPointer: 's',
+        analyzeClean: true,
+        tasksComplete: true,
+        implRecordConverged: false,
+      }),
+    );
+    // `shipped` is the recorded STATUS; it derives the post-merge `validating` phase
+    // (the verify-before-close window), NOT a `phase:shipped`. The `validated` marker
+    // is the validating→closed GATE, never a derive input (F1: no marker-absence here).
+    expect(r).toEqual({ kind: 'phase', id: 'validating' });
+  });
+
+  it('the bundled lifecycle has merging + validating and NO phase:shipped (clean break, T008/T023)', () => {
+    const doc = loadWorkflowDoc(fixture().root);
+    const ids = doc.phases.map((p) => p.id);
+    expect(ids).toContain('merging');
+    expect(ids).toContain('validating');
+    expect(ids).not.toContain('shipped');
+    // ordering: governing → merging → validating → closed
+    expect(ids.indexOf('merging')).toBeGreaterThan(ids.indexOf('governing'));
+    expect(ids.indexOf('validating')).toBeGreaterThan(ids.indexOf('merging'));
+    expect(ids.indexOf('closed')).toBeGreaterThan(ids.indexOf('validating'));
+  });
+
+  it('closed stays by-name terminal even when post-merge artifacts are present', () => {
+    const doc = loadWorkflowDoc(fixture().root);
+    const r = derivePhase(
+      doc,
+      base({ status: 'closed', specPointer: 's', analyzeClean: true, tasksComplete: true, implRecordConverged: true }),
+    );
+    expect(r).toEqual({ kind: 'phase', id: 'closed' });
   });
 
   it('is total — every input shape maps to exactly one phase or side-state', () => {
@@ -156,15 +200,16 @@ describe('US2 terminal side-states (T010)', () => {
     ).toEqual({ kind: 'side-state', id: 'blocked' });
   });
 
-  it('a node whose roadmap status is shipped derives the terminal shipped phase (operator-recorded fact, no convergence record needed)', () => {
+  it('a node whose roadmap status is shipped derives validating (the post-merge phase), no convergence record needed', () => {
     const doc = loadWorkflowDoc(fixture().root);
-    // A historical feature: status shipped, spec set, tasks complete, but NO impl
-    // convergence record (it shipped under the old process). It must NOT mis-derive
-    // to 'governing' — the recorded shipped status is terminal (operator decision).
+    // A merged feature: status shipped, spec set, tasks complete, but NO impl
+    // convergence record (it merged under the old process / off-rail). It must NOT
+    // mis-derive to 'governing' — recorded `status: shipped` derives `validating`
+    // via the `status-is shipped` predicate (F1: shipped is a status, not a phase).
     const r = derivePhase(
       doc,
       base({ status: 'shipped', specPointer: 's', analyzeClean: true, tasksComplete: true, implRecordConverged: false }),
     );
-    expect(r).toEqual({ kind: 'phase', id: 'shipped' });
+    expect(r).toEqual({ kind: 'phase', id: 'validating' });
   });
 });

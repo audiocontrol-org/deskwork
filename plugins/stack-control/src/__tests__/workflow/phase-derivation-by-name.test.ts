@@ -40,15 +40,16 @@ function base(overrides: Partial<DerivationInputs> = {}): DerivationInputs {
 }
 
 describe('031 T025 — phase derivation is by name, not positional', () => {
-  it('maps status shipped → phase shipped BY NAME (not the array-last phase)', () => {
+  it('maps status shipped → phase validating BY PREDICATE (status-is), not positionally to closed (032)', () => {
     const doc = loadWorkflowDoc(fixture().root);
-    // The last phase in WORKFLOW.md is now `closed`. A positional `phases[last]`
-    // rule would mis-derive this `shipped` item to `closed`; by-name yields shipped.
+    // 032: there is no `phase:shipped`. `status: shipped` derives `validating` via the
+    // `status-is shipped` predicate. The last phase is `closed`; a positional `phases[last]`
+    // rule would mis-derive to closed — the predicate yields validating.
     const r = derivePhase(
       doc,
       base({ status: 'shipped', specPointer: 's', analyzeClean: true, tasksComplete: true, implRecordConverged: false }),
     );
-    expect(r).toEqual({ kind: 'phase', id: 'shipped' });
+    expect(r).toEqual({ kind: 'phase', id: 'validating' });
   });
 
   it('maps status closed → phase closed BY NAME', () => {
@@ -60,12 +61,12 @@ describe('031 T025 — phase derivation is by name, not positional', () => {
     expect(r).toEqual({ kind: 'phase', id: 'closed' });
   });
 
-  it('the last declared phase is closed, so the by-name rule is the only thing distinguishing shipped from closed', () => {
+  it('closed is the by-name terminal (last phase); a shipped-status item derives validating, never positionally closed', () => {
     const doc = loadWorkflowDoc(fixture().root);
     expect(doc.phases[doc.phases.length - 1]!.id).toBe('closed');
     const shipped = derivePhase(doc, base({ status: 'shipped' }));
     const closed = derivePhase(doc, base({ status: 'closed' }));
-    expect(shipped).toEqual({ kind: 'phase', id: 'shipped' });
+    expect(shipped).toEqual({ kind: 'phase', id: 'validating' });
     expect(closed).toEqual({ kind: 'phase', id: 'closed' });
     expect(shipped).not.toEqual(closed);
   });

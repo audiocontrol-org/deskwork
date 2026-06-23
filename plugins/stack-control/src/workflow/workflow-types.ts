@@ -13,8 +13,11 @@ export type PhaseId = string;
 
 /**
  * The canonical bundled lifecycle phase ids (the `templates/WORKFLOW.md` default).
- * `closed` is the post-ship TERMINAL phase (031) — `shipped` is no longer the end of
- * the lifecycle; the operator-confirmed `advance --to closed` is the final move.
+ * 032 (ship-stage): the post-govern span is `governing → merging → validating →
+ * closed`. `shipped` is the recorded STATUS (set by `graduate` at merge), NOT a
+ * phase — `phase:shipped` is removed (clean break, F1). `merging` is the
+ * ship-the-PR phase; `validating` is the post-merge verify-before-close phase;
+ * `closed` stays the operator-confirmed terminal.
  */
 export const DEFAULT_PHASES = [
   'captured',
@@ -23,7 +26,8 @@ export const DEFAULT_PHASES = [
   'specifying',
   'implementing',
   'governing',
-  'shipped',
+  'merging',
+  'validating',
   'closed',
 ] as const;
 
@@ -90,6 +94,12 @@ export const DERIVE_KINDS = [
   'record-converged',
   'tasks-complete',
   'release-tagged',
+  // 032 (ship-stage) FR-007: a predicate over the recorded node `status:` (target =
+  // a status value, e.g. `shipped`). The post-merge `validating` phase derives from
+  // `status-is shipped` — the SAME recorded status the close gate reads — so the
+  // derived phase and the close gate cannot diverge (folds TASK-445). The `validated`
+  // marker is the validating→closed GATE, NOT a derive discriminator (F1 resolution).
+  'status-is',
   'never',
 ] as const;
 export type DeriveKind = (typeof DERIVE_KINDS)[number];
@@ -97,7 +107,7 @@ export type DeriveKind = (typeof DERIVE_KINDS)[number];
 /** A phase's derive predicate — the artifact condition that places an item here. */
 export interface DerivePredicate {
   readonly kind: DeriveKind;
-  /** Pointer name (`design`/`spec`), node-marker field, or record mode; absent for backlog-only/node-present/tasks-complete/release-tagged. */
+  /** Pointer name (`design`/`spec`), node-marker field, record mode, or status value (`status-is`); absent for backlog-only/node-present/tasks-complete/release-tagged. */
   readonly target?: string;
 }
 

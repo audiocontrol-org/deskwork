@@ -87,16 +87,26 @@ complete without inventing an item-specific path the bundled default cannot know
 - work: stack-control:execute
 - entrance: tasks-complete spec
 - exit: graduate-impl impl
-- next: shipped
+- next: merging
 
-## phase:shipped
+## phase:merging
 
 - status: active
 - kind: phase
 - derive: record-converged impl
+- work: stack-control:ship
+- entrance: record-converged impl
+- exit: graduate-impl impl
+- next: validating
+
+## phase:validating
+
+- status: active
+- kind: phase
+- derive: status-is shipped
 - work: (none)
-- entrance: graduate-impl impl
-- exit: (none)
+- entrance: (none)
+- exit: approval-marker validated
 - next: closed
 
 ## phase:closed
@@ -145,12 +155,21 @@ complete without inventing an item-specific path the bundled default cannot know
 - exit-gate: tasks-complete spec
 - effects: journal-append message={message}; commit message={message}
 
-## transition:graduate
+## transition:start-merging
 
 - status: active
 - kind: transition
 - from: governing
-- to: shipped
+- to: merging
+- exit-gate: graduate-impl impl
+- effects: journal-append message={message}; commit message={message}
+
+## transition:graduate
+
+- status: active
+- kind: transition
+- from: merging
+- to: validating
 - exit-gate: graduate-impl impl
 - effects: roadmap-advance to=shipped; roadmap-reconcile; journal-append message={message}; commit message={message}
 
@@ -158,9 +177,9 @@ complete without inventing an item-specific path the bundled default cannot know
 
 - status: active
 - kind: transition
-- from: shipped
+- from: validating
 - to: closed
-- exit-gate: (none)
+- exit-gate: approval-marker validated
 - effects: roadmap-advance to=closed; journal-append message={message}; commit message={message}
 
 ## transition:redesign

@@ -23,6 +23,8 @@ export interface GateContext {
   readonly specPointer: string | null;
   readonly analyzeClean: boolean;
   readonly designApproved: boolean;
+  /** 032 FR-014: the recorded `validated:` marker — the `validating → closed` gate. */
+  readonly validated: boolean;
   /** Absolute path of the design record (resolved from `designPointer`), or null. */
   readonly designRecordPath: string | null;
   /** Absolute path of the spec dir (resolved from `specPointer`), or null. */
@@ -153,10 +155,14 @@ export function evaluateCriterion(c: Criterion, ctx: GateContext): boolean {
     }
     case 'approval-marker':
       if (c.target === 'design-approved') return ctx.designApproved;
-      throw new WorkflowError(`criterion 'approval-marker' has unknown target '${c.target}' (expected design-approved)`);
+      // 032 FR-014: the `validating → closed` gate reuses the generic approval-marker
+      // with target `validated` (operator-confirm default; adopter-overridable meaning).
+      if (c.target === 'validated') return ctx.validated;
+      throw new WorkflowError(`criterion 'approval-marker' has unknown target '${c.target}' (expected design-approved|validated)`);
     case 'node-marker':
       if (c.target === 'analyze-clean') return ctx.analyzeClean;
       if (c.target === 'design-approved') return ctx.designApproved;
+      if (c.target === 'validated') return ctx.validated;
       throw new WorkflowError(`criterion 'node-marker' has unknown target '${c.target}'`);
     default: {
       const exhaustive: never = c.kind;

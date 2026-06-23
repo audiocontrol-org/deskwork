@@ -36,6 +36,8 @@ export interface WorkItem {
   readonly designApproved: boolean;
   /** Recorded `speckit-analyze`-clean marker (022 FR-029) — the default `specifying → implementing` signal. */
   readonly analyzeClean: boolean;
+  /** Recorded `validated:` marker (032 FR-014) — the `validating → closed` gate (operator-confirm default). */
+  readonly validated: boolean;
   /** Backlog ids this item resolves; closed mechanically on terminal closure (023 FR-001). */
   readonly closes: readonly string[];
   /** The item's shape prose (body, sans the heading and the field bullets). */
@@ -138,6 +140,10 @@ function toWorkItem(unit: Unit): WorkItem {
   const design = firstOrNull(edgeTargets(unit, 'design'));
   const designApproved = firstOrNull(edgeTargets(unit, 'design-approved'));
   const analyzeClean = firstOrNull(edgeTargets(unit, 'analyze-clean'));
+  // 032 (ship-stage) FR-014: the `validated:` marker is the validating→closed gate
+  // (operator-confirm default; adopter-overridable meaning). Same shape as
+  // `design-approved:` / `analyze-clean:` — present-and-not-negated is the recorded fact.
+  const validated = firstOrNull(edgeTargets(unit, 'validated'));
   // `closes` is a prose edge (single raw value) carrying a comma-list of backlog ids.
   const closesRaw = firstOrNull(edgeTargets(unit, 'closes'));
   const closes =
@@ -157,6 +163,7 @@ function toWorkItem(unit: Unit): WorkItem {
     design: design === null ? null : unquote(design),
     designApproved: markerTrue(designApproved),
     analyzeClean: markerTrue(analyzeClean),
+    validated: markerTrue(validated),
     closes,
     scope: scopeOf(unit),
   };

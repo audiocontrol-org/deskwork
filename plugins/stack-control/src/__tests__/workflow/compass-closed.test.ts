@@ -40,9 +40,10 @@ describe('031 T027 — compass close intent + closed terminal rules (FR-015)', (
     expect(r).toEqual({ kind: 'phase', phase: 'closed' });
   });
 
-  it('shipped --intent close → on-course (the legitimate next move)', () => {
+  it('validating --intent close → on-course (the legitimate next move; 032)', () => {
     const d = doc();
-    const v = verdict(d, phase('shipped'), 'close');
+    // 032: `status: shipped` derives the `validating` phase, whose legitimate next is `closed`.
+    const v = verdict(d, phase('validating'), 'close');
     expect(v.outcome).toBe('on-course');
     expect(v.exitCode).toBe(0);
     expect(v.legitimateNext).toBe('closed');
@@ -67,11 +68,11 @@ describe('031 T027 — compass close intent + closed terminal rules (FR-015)', (
     expect(v.exitCode).toBe(0);
   });
 
-  it('pre-shipped (governing) --intent close → ahead, the shipped step is skipped', () => {
+  it('pre-merge (governing) --intent close → ahead, the merging step is skipped (032)', () => {
     const d = doc();
     const v = verdict(d, phase('governing'), 'close');
     expect(v.outcome).toBe('ahead');
     expect(v.exitCode).not.toBe(0);
-    expect(v.skippedStep).toBe('shipped'); // the immediate next phase out of governing
+    expect(v.skippedStep).toBe('merging'); // the immediate next phase out of governing (032)
   });
 });
