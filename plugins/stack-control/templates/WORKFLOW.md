@@ -86,7 +86,7 @@ complete without inventing an item-specific path the bundled default cannot know
 - derive: tasks-complete
 - work: stack-control:execute
 - entrance: tasks-complete spec
-- exit: graduate-impl impl; record-converged spec
+- exit: record-converged spec
 - next: shipped
 
 ## phase:shipped
