@@ -79,16 +79,26 @@ fails loud in the dry-run before anything is written.
    stackctl roadmap advance <id> --to closed --apply
    ```
 
-   This runs the cascade (closes the deduped subtree ids; already-closed ids are
-   reported as no-ops; idempotent) **and** advances the item's status to the
-   terminal `closed`. Re-running is safe.
+   This records the roadmap status `closed` first, then closes the deduped subtree
+   ids (already-closed ids are reported as no-ops; idempotent). Running it again on
+   a still-`shipped` item is safe and converges.
+
+   **If the command fails partway** — it printed `advanced to closed` but then a
+   backlog close errored — the item is already `closed`, so re-running
+   `advance --to closed` will be **refused** (its precondition is `shipped`). Finish
+   the contained closes with **`stackctl roadmap close-related <id> --cascade --apply`**,
+   which accepts the now-terminal `closed` item and closes the remaining ids
+   idempotently. (Symmetrically, if it failed at `advanced to closed` — before any
+   backlog change — the backlog is untouched and you can simply re-run `advance --to
+   closed`.)
 
 ## Notes
 
 - To close **only** an item's contained ids without advancing its status (e.g.
-  mid-cleanup), use `stackctl roadmap close-related <id> --cascade` (same dry-run
-  / `--apply` discipline; does not change status). `advance --to closed` is the
-  lifecycle move that does both.
+  mid-cleanup, or to finish a partially-applied close — see Step 4), use
+  `stackctl roadmap close-related <id> --cascade` (same dry-run / `--apply`
+  discipline; does not change status). `advance --to closed` is the lifecycle move
+  that does both.
 - A non-terminal child is **reported, never closed** — in-flight siblings do not
   block closing the resolved work, and they remain tracked.
 
