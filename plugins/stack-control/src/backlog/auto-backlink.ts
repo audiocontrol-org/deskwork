@@ -46,9 +46,13 @@ export function autoBackLink(
   backend: BacklogBackend,
   id: string,
   startDir: string,
+  explicitNode?: string,
 ): AutoBackLinkResult {
-  const nodeId = readParentNode(backend, id);
-  if (nodeId === null) return { nodeId: null, linked: false };
+  // `explicitNode` (the `promote --node` value) lets the back-link run BEFORE the
+  // task carries the ref in its notes (promote records the ref only afterward);
+  // `done` passes no explicitNode and reads the ref already on the task.
+  const nodeId = explicitNode ?? readParentNode(backend, id);
+  if (nodeId === null || nodeId === undefined) return { nodeId: null, linked: false };
   const inst = resolveInstallation(startDir);
   const opts: LoadOptions = grammarOptsForRoot(inst.root);
   const roadmap = inst.resolved.roadmap;
@@ -59,74 +63,25 @@ export function autoBackLink(
 }
 
 /**
- * Preflight the auto-back-link WITHOUT mutating anything (031 AUDIT-20260623-04).
- * Resolves the task's parent-node ref (or an explicit `nodeId`, for the
- * `promote --node` case where the ref is set only AFTER the promote) and validates
- * the back-link target against the installation's roadmap via the PURE
- * `computeCloses` (it loads + requires the node, throwing on an unknown one; it
- * never writes). The caller runs this BEFORE the backlog mutation (close/promote)
- * so a stale/missing ref fails loud BEFORE any state change — never leaving a task
- * `Done`/promoted but unlinked. A no-ref task is a no-op (nothing to preflight).
- */
-export function preflightAutoBackLink(
-  backend: BacklogBackend,
-  id: string,
-  startDir: string,
-  explicitNode?: string,
-): void {
-  const nodeId = explicitNode ?? readParentNode(backend, id);
-  if (nodeId === null || nodeId === undefined) return;
-  const inst = resolveInstallation(startDir);
-  const opts: LoadOptions = grammarOptsForRoot(inst.root);
-  computeCloses(inst.resolved.roadmap, nodeId, { add: [id] }, opts); // throws on unknown node; no write
-}
-
-/**
- * Verb-side preflight wrapper: validate the back-link target BEFORE the backlog
- * mutation, mapping a bad ref / unreadable roadmap / out-of-installation
- * resolution to a fail-loud exit 1 (mirrors `emitAutoBackLink`'s mapping). Because
- * this runs before `backend.close`/`promote`, a refusal here means the backlog is
- * untouched — the operator fixes the ref and retries against a clean state.
- */
-export function emitPreflightAutoBackLink(
-  backend: BacklogBackend,
-  id: string,
-  startDir: string,
-  explicitNode?: string,
-): void {
-  try {
-    preflightAutoBackLink(backend, id, startDir, explicitNode);
-  } catch (err) {
-    if (
-      err instanceof DocumentModelError ||
-      err instanceof BacklogError ||
-      err instanceof InstallationError
-    ) {
-      process.stderr.write(
-        `backlog: auto-back-link target invalid for ${id} — refusing before the backlog change: ${err.message}\n`,
-      );
-      process.exit(1);
-    }
-    throw err;
-  }
-}
-
-/**
  * The verb-side wrapper (031 US2, FR-011) the `backlog done`/`promote` handlers
- * call after a successful close/promote. Runs `autoBackLink` and reports a newly
- * recorded link; an unknown referenced node / unreadable roadmap / out-of-
- * installation resolution is fail-loud (exit 1) — the close already happened, but
- * the operator must know the back-link did NOT land (contract invariant: never
- * silently swallowed). Absence of a parent-node ref is a documented no-op.
+ * call. It runs the roadmap back-link write (the LOCAL, validated, atomic
+ * temp+rename mutation) and is invoked BEFORE the irreversible backlog mutation
+ * (close/promote) — so a failure (unknown node, unreadable/unwritable roadmap,
+ * out-of-installation, concurrent invalidation) fails loud (exit 1) with the
+ * backlog UNTOUCHED, never leaving a task `Done`/promoted but unlinked
+ * (AUDIT-20260623-04/-09). Absence of a parent-node ref is a documented no-op.
+ * `explicitNode` carries the `promote --node` value (the task does not yet hold
+ * the ref at back-link time).
  */
 export function emitAutoBackLink(
   backend: BacklogBackend,
   id: string,
   startDir: string,
+  explicitNode?: string,
   out: (line: string) => void = (line) => process.stdout.write(line),
 ): void {
   try {
-    const res = autoBackLink(backend, id, startDir);
+    const res = autoBackLink(backend, id, startDir, explicitNode);
     if (res.linked) out(`  - back-linked ${id} -> ${res.nodeId} closes:\n`);
   } catch (err) {
     if (

@@ -13,7 +13,7 @@
 // Fixtures on disk; never mock fs (.claude/rules/testing.md).
 
 import { describe, expect, it } from 'vitest';
-import { copyFileSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -118,5 +118,24 @@ describe('031 backlog done auto-back-link (T023)', () => {
     expect(r2.status, r2.stderr).toBe(0);
     const closes = closesOf(inst.roadmap, 'multi:feature/n');
     expect(closes.filter((c) => c === id).length).toBe(1);
+  });
+
+  it('an unwritable roadmap fails done BEFORE the task is closed — no Done-but-unlinked (AUDIT-20260623-09)', () => {
+    const inst = makeInstallation(['## multi:feature/n', '- status: shipped']);
+    const backend = createBacklogBackend({ cwd: inst.backlogCwd });
+    const id = backend.create({ title: 'write-fail', labels: ['agent-found', 'type:gap'] });
+    setParentNode(backend, id, 'multi:feature/n'); // node EXISTS — preflight would pass; the WRITE is what fails
+    // The roadmap lives at <root>/ROADMAP.md; making <root> unwritable blocks the
+    // atomic temp+rename closes: write while leaving the deeper backlog store writable.
+    chmodSync(inst.root, 0o555);
+    try {
+      const r = runCli(['backlog', 'done', id, '--apply', '--reason', 'fixed'], { cwd: inst.root });
+      expect(r.status).not.toBe(0);
+      // The back-link (roadmap write) happens BEFORE the close, so a write failure
+      // leaves the task NOT closed — never Done-but-unlinked.
+      expect(backend.list().find((i) => i.id === id)!.status).not.toBe(BACKLOG_DONE_STATUS);
+    } finally {
+      chmodSync(inst.root, 0o755);
+    }
   });
 });

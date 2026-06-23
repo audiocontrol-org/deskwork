@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
 import { resolveInstallationBacklog } from '../backlog/root.js';
-import { emitAutoBackLink, emitPreflightAutoBackLink } from '../backlog/auto-backlink.js';
+import { emitAutoBackLink } from '../backlog/auto-backlink.js';
 import { setParentNode } from '../backlog/parent-node.js';
 import { InstallationError } from '../config/errors.js';
 import { scaffoldKey } from '../setup/scaffold.js';
@@ -177,9 +177,12 @@ function emitDone(flags: Flags): void {
     );
     return;
   }
-  // AUDIT-20260623-04: preflight the auto-back-link BEFORE closing — a stale/missing
-  // parent-node ref must fail here, leaving the task un-closed, never Done-but-unlinked.
-  emitPreflightAutoBackLink(backend, id, process.cwd());
+  // AUDIT-20260623-04/-09: write the roadmap back-link FIRST — it is the LOCAL,
+  // validated, atomic (temp+rename) mutation. Doing it before the irreversible
+  // backlog close means ANY back-link failure (unknown node, unwritable/invalid
+  // roadmap) fails loud with the task NOT closed — never Done-but-unlinked. A no-ref
+  // task is a no-op. The close runs only after the link is recorded.
+  emitAutoBackLink(backend, id, process.cwd());
   try {
     backend.close(id, reason);
   } catch (err) {
@@ -190,7 +193,6 @@ function emitDone(flags: Flags): void {
     throw err;
   }
   process.stdout.write(`backlog done: closed ${id} (reason: ${reason})\n`);
-  emitAutoBackLink(backend, id, process.cwd());
 }
 
 /**
@@ -374,22 +376,20 @@ function emitPromote(flags: Flags): void {
   const backend = createBacklogBackend({ cwd: root });
   const node = flags.values.get('node');
   try {
-    // AUDIT-20260623-04: preflight every id's back-link target BEFORE promoting, so
-    // a bad `--node` (or a stale pre-existing ref) fails before the promote linkage
-    // is written — never promoted-but-unlinked. The effective node is `--node` (set
-    // only after the promote) or the id's existing ref.
+    // AUDIT-20260623-04/-09: write each id's roadmap back-link FIRST (the local,
+    // validated, atomic mutation), so any back-link failure (bad `--node`, stale
+    // pre-existing ref, unwritable/invalid roadmap) fails loud with the backlog
+    // promote linkage UNWRITTEN — never promoted-but-unlinked. The effective node is
+    // `--node` (passed explicitly, since the task does not yet hold the ref) or the
+    // id's existing ref.
     if (flags.apply) {
-      for (const id of ids) emitPreflightAutoBackLink(backend, id, process.cwd(), node);
+      for (const id of ids) emitAutoBackLink(backend, id, process.cwd(), node);
     }
     reportPromote(promote({ ids, target, apply: flags.apply, backend, cwd: process.cwd() }));
-    // 031 US2 (FR-010/011): on apply, record the optional parent-node ref on each
-    // promoted id then auto-back-link it into that node's closes: set. A no-node
-    // promotion still auto-back-links any PRE-EXISTING ref (capture --node path).
-    if (flags.apply) {
-      for (const id of ids) {
-        if (node !== undefined) setParentNode(backend, id, node);
-        emitAutoBackLink(backend, id, process.cwd());
-      }
+    // 031 US2 (FR-010): record the optional parent-node ref on each promoted id so a
+    // FUTURE `done` auto-back-links it (the closes: link itself is already written above).
+    if (flags.apply && node !== undefined) {
+      for (const id of ids) setParentNode(backend, id, node);
     }
   } catch (err) {
     // Usage-class refusals (preflight, zero write) → exit 2.
