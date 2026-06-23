@@ -86,8 +86,11 @@ export function emitAdvanceClosed(
   // atomic (temp+rename) mutation — if it fails (unwritable doc, invalid candidate,
   // concurrent edit) the backlog is left UNTOUCHED, so there is no ids-closed-but-item-
   // shipped split across the two durable stores. Only once the status is recorded
-  // `closed` do we close the contained backlog ids. (unknownIds were already refused
-  // above; the cascade is idempotent, so a re-run converges.)
+  // `closed` do we close the contained backlog ids (unknownIds were already refused
+  // above). If a backlog close fails mid-cascade, the item is already `closed`, so this
+  // command's `shipped` precondition refuses a re-run (AUDIT-20260623-08) — recover with
+  // `stackctl roadmap close-related <id> --cascade --apply`, which accepts the now-
+  // terminal `closed` item and closes the remaining ids idempotently.
   advance(docPath, id, CLOSED_STATUS, opts, true);
   process.stdout.write(`roadmap advance ${id}: advanced to ${CLOSED_STATUS}\n`);
   applyCascade(plan, backend);
