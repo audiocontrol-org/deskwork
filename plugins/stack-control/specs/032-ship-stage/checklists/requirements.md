@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,8 +31,7 @@
 
 ## Notes
 
-- **2 [NEEDS CLARIFICATION] markers remain by design** — deferred to `/speckit-clarify` (the next chain step), per the approved design record's open-questions:
-  1. **FR-012 / Edge Cases** — the off-rail backstop's merged-detection signal, given items share the single `feature/stack-control` branch (no per-item ancestry). Candidates: gh-API PR-merged query (needs a GitHub remote), portable "spec dir in `origin/main` + govern-converged + status ≠ shipped" heuristic, or ship-written marker + independent re-derivation.
-  2. **FR-019 / Edge Cases** — CI-green gating on the merge: poll vs operator-confirmation (CI here is brutally slow).
-- These are load-bearing scope/portability decisions with multiple reasonable interpretations — correctly left as clarifications rather than guessed.
-- All other items pass; the spec is ready for `/speckit-clarify`.
+- **Both [NEEDS CLARIFICATION] markers resolved in `/speckit-clarify` (Session 2026-06-23):**
+  1. **FR-012** — off-rail merge-detection signal → git: the item's govern convergence record reachable from `origin/main` while status ≠ shipped (portable, per-item, no gh-API).
+  2. **FR-019** — CI-green gating → operator confirmation that CI is green before merge (no long poll; operator-owned merge).
+- All checklist items pass; the spec is ready for `/speckit-plan`.

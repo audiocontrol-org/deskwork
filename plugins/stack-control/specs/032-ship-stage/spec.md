@@ -8,6 +8,13 @@
 
 **Input**: Approved design record `docs/superpowers/specs/2026-06-23-ship-stage-design.md` (operator-approved 2026-06-23); roadmap node `multi:feature/ship-stage`; folds backlog TASK-445.
 
+## Clarifications
+
+### Session 2026-06-23
+
+- Q: How should the off-rail backstop detect that a specific item is merged, given items share the single `feature/stack-control` branch (no per-item ancestry) and detection must be independent of whether ship ran? → A: Git signal — the item's per-item govern **convergence record is reachable from the default branch (`origin/main`)** while the recorded `status:` is still `in-flight`. Portable (any git remote, no gh-API), per-item, independent of the ship skill having run.
+- Q: How should `/stack-control:ship` gate the merge on CI being green, given CI here is brutally slow and the merge is operator-owned? → A: **Operator confirmation** — ship surfaces the PR/CI link and asks the operator to confirm CI is green before merging (no long poll; portable; matches operator-owned merge).
+
 ## User Scenarios & Testing *(mandatory)*
 
 The "users" are (a) the **operator** driving a feature to completion and (b) the **adopting agent** that must stay on-rail. The "system" is the stack-control lifecycle engine (governed `WORKFLOW.md` + gate-eval + compass + skills).
@@ -70,8 +77,8 @@ After an item is shipped (merged), it enters a `validating` phase before `closed
 
 ### Edge Cases
 
-- **CI never goes green / red CI**: `/stack-control:ship` must not merge a red/pending PR; the merge is gated on CI being green. [NEEDS CLARIFICATION: does ship poll CI to confirm green, or is "merge when green" an operator confirmation at the skill, given CI here is brutally slow?]
-- **Off-rail merge detection with a shared branch**: items ship on the single `feature/stack-control` branch via sequential PRs, so there is no per-item branch to test git-ancestry against. [NEEDS CLARIFICATION: what signal does the backstop use to detect that a specific item is merged, independent of the ship skill having run and without requiring a GitHub remote for the on-rail path?]
+- **CI never goes green / red CI**: `/stack-control:ship` must not merge a red/pending PR; the merge is gated on the operator confirming CI is green (FR-019). If the operator does not confirm green, ship does not merge and records nothing.
+- **Off-rail merge detection with a shared branch**: items ship on the single `feature/stack-control` branch via sequential PRs, so there is no per-item branch to test git-ancestry against. The backstop instead keys on the item's govern convergence record being reachable from `origin/main` while status ≠ shipped (FR-012) — a per-item, git-only signal that needs the default-branch ref fetched but no gh-API.
 - **Multiple dangling items**: more than one merged-but-status-in-flight item exists at once — the backstop must name all (or at least surface that >1 exists) and not deadlock once one is reconciled.
 - **Reconcile of a dangling item is itself a forward step**: the backstop must allow the reconcile transition (advance-to-shipped) even though it refuses other forward motion, or the divergence is unfixable.
 - **Item shipped but never validated**: an item that sits in `validating` indefinitely is surfaced (advisory) but not force-closed; closure stays operator-confirmed.
@@ -101,7 +108,7 @@ After an item is shipped (merged), it enters a `validating` phase before `closed
 - **FR-009**: The system MUST provide a backstop invariant that refuses forward lifecycle motion — at the close step AND at the compass precondition every workflow skill calls — while any merged-but-status-in-flight item exists, naming the dangling item and printing the reconcile command.
 - **FR-010**: The backstop MUST NOT block the reconcile transition itself (advancing the dangling item to shipped); the reconcile MUST always be runnable.
 - **FR-011**: The backstop MUST NOT live in `/stack-control:session-start` or `/stack-control:session-end`; those skills MUST never refuse on this condition and MAY only surface it as a non-blocking advisory (per `.claude/rules/session-skills-never-block.md`).
-- **FR-012**: The backstop MUST detect merged-ness INDEPENDENTLY of whether `/stack-control:ship` ran, so that an off-rail raw `gh pr merge` is still caught. [NEEDS CLARIFICATION: the detection signal, given items share the single `feature/stack-control` branch — gh-API PR-merged query (needs a GitHub remote), a portable "spec dir present in `origin/main` + govern-converged + status ≠ shipped" heuristic, or a ship-written marker plus an independent re-derivation; constraint: independent of ship having run.]
+- **FR-012**: The backstop MUST detect merged-ness INDEPENDENTLY of whether `/stack-control:ship` ran, so that an off-rail raw `gh pr merge` is still caught. The detection signal is a **git signal**: an item is merged-but-status-in-flight when its per-item govern **convergence record is reachable from the default branch (`origin/main`)** while its recorded `status:` is still `in-flight`. This is portable (any git remote; no gh-API dependency), per-item (the convergence record is item/feature-keyed), and independent of the ship skill having run.
 - **FR-013**: The on-rail ship weld (FR-002) MUST NOT require a GitHub remote to record `status: shipped`; only the off-rail backstop detection (FR-012) MAY rely on remote-derived signals where present.
 
 **The validating phase (US4)**
@@ -114,7 +121,7 @@ After an item is shipped (merged), it enters a `validating` phase before `closed
 
 - **FR-017**: The feature MUST NOT claim to prevent a deliberate raw `gh pr merge` performed outside the skill surface; the load-bearing guarantee MUST be the backstop gate (FR-009/FR-012), not interception of the merge.
 - **FR-018**: The phase-model changes (`merging` + `validating`), the `ship` skill, the graduate rewire, the backstop invariant, and the coherence fix MUST be delivered as ONE unit — no partial increments that leave the shipped↔closed surfaces in an inconsistent intermediate state.
-- **FR-019**: The CI-green precondition on the merge MUST be enforced (no merge of a red/pending PR). [NEEDS CLARIFICATION: poll vs operator-confirmation of green, given CI here is brutally slow.]
+- **FR-019**: The CI-green precondition on the merge MUST be enforced (no merge of a red/pending PR). `/stack-control:ship` MUST surface the PR/CI link and require **operator confirmation** that CI is green before merging (no long poll; the merge is operator-owned).
 
 ### Key Entities *(include if feature involves data)*
 
