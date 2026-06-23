@@ -20,6 +20,9 @@ import { sessionBoundary } from '../session/git.js';
 import { buildJournalEntry } from '../session/journal.js';
 import { progressedBacklog, type BacklogItemRef } from '../session/progressed-backlog.js';
 import { runClose, readJournalTemplate, type CloseResult } from '../session/close.js';
+import { loadRoadmap } from '../roadmap/roadmap-model.js';
+import { grammarOptsForRoot } from './document-verb-shared.js';
+import { allDanglingMergedItems } from '../workflow/merge-signal.js';
 
 interface EndFlags {
   readonly at: string | null;
@@ -163,6 +166,12 @@ interface SessionEndReport {
   readonly backlogProgressed: readonly BacklogItemRef[];
   readonly commit: { readonly sha: string; readonly pushed: boolean; readonly pushError?: string };
   readonly uncommittedNonDocWarning?: string;
+  /**
+   * 032 US3 (FR-011) — merged-but-status-in-flight item ids, surfaced as a NON-BLOCKING
+   * advisory. session-end NEVER refuses on these (capture-only posture +
+   * `session-skills-never-block`); the blocking gate lives at the workflow waypoints.
+   */
+  readonly mergedNotShippedItems: readonly string[];
 }
 
 function render(report: SessionEndReport): string {
@@ -185,7 +194,23 @@ function render(report: SessionEndReport): string {
   if (report.uncommittedNonDocWarning !== undefined) {
     lines.push(`  WARNING: ${report.uncommittedNonDocWarning}`);
   }
+  // 032 US3 (FR-011) — advisory only; session-end never refuses on it.
+  if (report.mergedNotShippedItems.length > 0) {
+    lines.push(`  merged-but-status-in-flight (advisory — ${report.mergedNotShippedItems.length}):`);
+    for (const id of report.mergedNotShippedItems) {
+      lines.push(`    - ${id} — reconcile with \`stackctl workflow advance ${id} --apply\``);
+    }
+  }
   return lines.join('\n') + '\n';
+}
+
+/** 032 US3 (FR-011) — merged-but-status-in-flight item ids over the roadmap (advisory).
+ * A missing roadmap / unavailable git yields [] (the merge signal fail-opens). */
+function gatherMergedNotShipped(installation: Installation): readonly string[] {
+  const doc = installation.resolved.roadmap;
+  if (!existsSync(doc)) return [];
+  const model = loadRoadmap(doc, grammarOptsForRoot(installation.root));
+  return allDanglingMergedItems(model, installation.root).map((s) => s.itemId);
 }
 
 export async function runSessionEndCli(args: string[]): Promise<void> {
@@ -246,6 +271,7 @@ export async function runSessionEndCli(args: string[]): Promise<void> {
     backlogProgressed: progressed,
     commit: { sha, pushed, ...(pushError !== undefined ? { pushError } : {}) },
     ...(warning !== undefined ? { uncommittedNonDocWarning: warning } : {}),
+    mergedNotShippedItems: gatherMergedNotShipped(installation),
   };
 
   process.stdout.write(flags.json ? `${JSON.stringify(report, null, 2)}\n` : render(report));

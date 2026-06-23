@@ -49,6 +49,16 @@ export interface ComputeVerdictArgs {
    * unmet. Empty (default) when the gate is met or the caller doesn't supply it.
    */
   readonly nextGateUnmet?: readonly Criterion[];
+  /**
+   * 032 US3 (FR-009/FR-012) — the id of a merged-but-status-in-flight item found over the
+   * roadmap (the off-rail residual), or null/undefined when none dangles. While one dangles,
+   * forward lifecycle motion for ANY OTHER item is refused (off-rail), naming it + the reconcile
+   * command. EXEMPTION (FR-010): when `intentItem === danglingMergedItem` the backstop is dormant
+   * — the dangling item's own reconcile (advance to shipped) must never be blocked.
+   */
+  readonly danglingMergedItem?: string | null;
+  /** 032 US3 — the id of the item this verdict is being computed FOR (the backstop exemption key). */
+  readonly intentItem?: string;
 }
 
 /**
@@ -62,6 +72,18 @@ export interface ComputeVerdictArgs {
 export function computeVerdict(args: ComputeVerdictArgs): Verdict {
   const { doc, currentPhase, intent, hasNode } = args;
   const nextGateUnmet = args.nextGateUnmet ?? [];
+
+  // 032 US3 backstop (FR-009/FR-010): while a merged-but-status-in-flight item exists, refuse
+  // forward lifecycle motion for ANY OTHER item — naming the dangling item + the reconcile
+  // command — UNLESS this verdict is being computed for the dangling item itself (the reconcile
+  // must never be blocked). Cross-item invariant: it overrides the per-item phase diff below.
+  const dangling = args.danglingMergedItem ?? null;
+  if (dangling !== null && args.intentItem !== dangling) {
+    return mk('off-rail', currentPhase, intent.phase, null, null,
+      `a merged-but-status-in-flight item exists ('${dangling}') — forward lifecycle motion is ` +
+        `blocked until it is reconciled; run \`stackctl workflow advance ${dangling} --apply\` ` +
+        `(or \`stackctl roadmap advance ${dangling} --to shipped --apply\`) to record its status, then retry`);
+  }
 
   // off-rail: orphan (no node) or a terminal side-state — refuse linear advancement.
   if (!hasNode) {

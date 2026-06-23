@@ -47,6 +47,15 @@ export function renderOrientation(report: OrientationReport): string {
   lines.push('Branch staleness:');
   lines.push(`  ${renderStaleness(report)}`);
 
+  // 032 US3 (FR-011) — merged-but-status-in-flight advisory; NON-BLOCKING (surfaced, never refuses).
+  if (report.mergedNotShippedItems.length > 0) {
+    lines.push('');
+    lines.push(`Merged-but-status-in-flight (advisory — ${report.mergedNotShippedItems.length}):`);
+    for (const id of report.mergedNotShippedItems) {
+      lines.push(`  - ${id} — record its status: \`stackctl workflow advance ${id} --apply\``);
+    }
+  }
+
   return lines.join('\n') + '\n';
 }
 

@@ -17,6 +17,7 @@ import { resolveInstallation } from '../config/installation.js';
 import { loadWorkflowDoc } from '../workflow/workflow-grammar.js';
 import { buildItemContext } from '../workflow/workflow-context.js';
 import { describeCriterion, evaluateGate } from '../workflow/gate-eval.js';
+import { firstDanglingMergedItem } from '../workflow/merge-signal.js';
 
 /** The roadmap status `closed` is reachable ONLY from `shipped` (compass refuses otherwise). */
 const REQUIRED_FROM_STATUS = 'shipped';
@@ -32,12 +33,11 @@ const CLOSED_STATUS = 'closed';
  * with no transition into `closed` has no extra gate (status==shipped stays the only
  * precondition).
  */
-function assertCloseGateMet(item: WorkItem, docPath: string): void {
-  const inst = resolveInstallation(dirname(docPath));
-  const doc = loadWorkflowDoc(inst.root);
+function assertCloseGateMet(item: WorkItem, installationRoot: string): void {
+  const doc = loadWorkflowDoc(installationRoot);
   const closeTransition = doc.transitions.find((t) => t.to === CLOSED_STATUS && t.from !== '*');
   if (closeTransition === undefined || closeTransition.exitGate.length === 0) return;
-  const { gate } = buildItemContext(inst.root, item);
+  const { gate } = buildItemContext(installationRoot, item);
   const result = evaluateGate(closeTransition.exitGate, gate);
   if (!result.allMet) {
     const unmet = result.unmet.map(describeCriterion).join('; ');
@@ -87,6 +87,20 @@ export function emitAdvanceClosed(
   if (item === undefined) {
     throw new BacklogError(`advance: no roadmap item '${id}'`);
   }
+  // 032 US3 backstop (FR-009/SC-003): close is forward lifecycle motion — refuse it
+  // while ANY merged-but-status-in-flight item dangles (the off-rail residual), naming
+  // it + the reconcile command. The dangling item itself can never reach this gate (it
+  // is in-flight, not `shipped`), so this only blocks closing OTHER items until the
+  // off-rail merge is reconciled. Fires on dry-run too (the operator sees the refusal).
+  const inst = resolveInstallation(dirname(docPath));
+  const dangling = firstDanglingMergedItem(model, inst.root);
+  if (dangling !== null) {
+    throw new BacklogError(
+      `advance: a merged-but-status-in-flight item exists ('${dangling.itemId}') — forward lifecycle ` +
+        `motion is blocked until it is reconciled; run \`stackctl workflow advance ${dangling.itemId} --apply\` ` +
+        `to record its status, then retry`,
+    );
+  }
   // Lifecycle precondition (FR-016): closed is reachable only from shipped.
   if (item.status !== REQUIRED_FROM_STATUS) {
     throw new BacklogError(
@@ -99,7 +113,7 @@ export function emitAdvanceClosed(
   // validated`). This is the SAME gate the compass evaluates, so the CLI close path and
   // the compass agree (no graduated-but-not-validated divergence). Evaluated on dry-run
   // too, so the operator-confirm preview also surfaces the unmet gate.
-  assertCloseGateMet(item, docPath);
+  assertCloseGateMet(item, inst.root);
 
   const backend = createBacklogBackend({ cwd: backlogRoot() });
   const statusById = new Map(backend.list().map((it) => [it.id, it.status]));

@@ -112,6 +112,43 @@ export function resolveBase(cwd: string): BaseResolution {
 }
 
 /**
+ * 032 US3 — the SHA of the last commit that touched `path` (the commit that wrote
+ * the govern convergence record), or null when the path has no commit history (never
+ * committed). `path` may be absolute or repo-relative.
+ */
+export function lastCommitTouching(cwd: string, path: string): string | null {
+  const sha = tryGit(cwd, ['log', '-1', '--format=%H', '--', path]);
+  return sha !== null && sha.length > 0 ? sha : null;
+}
+
+/**
+ * 032 US3 (FR-012) — is `commit` an ancestor of the resolved default-branch base
+ * (origin/main, via `resolveBase`)? The off-rail merge backstop keys on this: an
+ * item whose govern convergence-record commit is reachable from the base while its
+ * status is still in-flight has been merged off-rail. Returns `true` when reachable,
+ * `false` when not (or `commit` is unresolvable), and `null` when the base is
+ * undeterminable (detached HEAD / no remote) — fail-open for detection so a no-remote
+ * installation never yields a false refusal (the on-rail weld never depends on this).
+ */
+export function isReachableFromBase(commit: string, cwd: string): boolean | null {
+  const base = resolveBase(cwd);
+  if (base.kind !== 'resolved') return null;
+  // `git merge-base --is-ancestor <commit> <base>` exits 0 iff commit is an ancestor
+  // of base, 1 when it is not, and non-zero on any other error (e.g. an unknown
+  // commit) — all of which mean "not provably reachable" → false (never a refusal we
+  // can't justify). Base-undeterminable is the only `null` (handled above).
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', commit, base.base], {
+      cwd,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Commits HEAD is behind/ahead of `base`. `git rev-list --left-right --count
  * base...HEAD` prints "<behind>\t<ahead>" (left = base-only, right = HEAD-only).
  */
