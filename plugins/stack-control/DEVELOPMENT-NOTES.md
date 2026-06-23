@@ -2,21 +2,28 @@
 
 ---
 
-## 2026-06-23: <!-- session title -->
+## 2026-06-23: govern-030-hardening burndown + seam-pass reframing → shipped v0.53.2
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up the in-flight `govern-030-hardening` umbrella and burn down its dispositioned residuals; operator chose "whole umbrella, you sequence."
 
 **Accomplished:**
-- <!-- compose -->
+- **16 residual point fixes, each RED-first (test exercises the bug → fix), one commit per task.** Seam-pass interface detection (multi-line signatures, function-typed params miscounted via the `=>` arrow, `changed-required-shape` unimplemented, seam breaks invisible in the NOT-done message); pipeline correctness (diff base via `origin/main`, untracked-fold binary/byte guards, doctor chunk-set validation, no-op-fix guard, whole other-feature-root exclusion, rename-aware scoping, test↔source coupling in the chunker, payload-leak guard); doc reconciliation (checkpoint mode-scoping, fix-fanout deferral, superseded 015 contract); torn-temp-file reap. No govern/audit-barrage — these are point fixes per the workflow-protocol scope rule.
+- **Two operator design calls** resolved and implemented: whole other-feature-root exclusion (over audit-log-only), and co-locate test with source in the coupling graph (over manifest cross-reference).
+- **PR #497 opened, CI green (382 files / 2496 tests), merged; released v0.53.2** (`chore: release v0.53.2` on top of the merge). **Validated the formally-installed 0.53.2 cache** contains every fix (markers present + clean boot + git lineage + published tag) — satisfies the issue-closure discipline.
+- **Paperwork closed out:** 16 tasks → Done (verified v0.53.2); the seam-unchanged-consumer task closed as superseded; umbrella `govern-030-hardening` → shipped; the 3 forward nodes (lift-auto-close, doc-aware-lens, retire-seam-pass) re-homed to `govern-operability` so they don't dangle under a shipped parent.
 
 **Didn't Work:**
-- <!-- compose -->
+- **`backlog list` renders Done items inline** (`[Done]` marker), so a grep of the list read as "still open" until I checked the on-disk status — captured as friction. Tasks were correctly closed.
+- **The session-end boundary over-counted commits** (17 includes the prior v0.53.1 release tail — `chore: release v0.53.1` / Merge #496 — that rode in via the ff to main). This session's own new commits: the 13 govern-030 commits + merge #497 + release v0.53.2.
 
 **Course Corrections:**
-- <!-- compose -->
+- **[DESIGN]** Operator reframed the seam pass: it reimplements interface-contract checking (removed/renamed export, changed arity/shape) that the **compiler** already does completely — including unchanged consumers — and the audit-barrage is **stochastic defense-in-depth**, not a deterministic interface checker. The "unchanged-consumer gap" was a layer confusion; it dissolves by construction. Recorded a roadmap node (`retire-seam-pass-interface-check`) + a rule (`audit-barrage-is-stochastic-defense-in-depth.md`). This **moots this session's own seam-pass interface hardening** — correct given the seam pass exists, dead weight once it's retired.
+- **[COMMUNICATION]** Operator: refer to items by meaningful name, not bare ID number — "names ferry meaning." Saved as a memory; promoting feature-shaped work to NAMED roadmap nodes is the structural form of this.
+- **[UX]** Two "I don't understand X" prompts — the "what's left" framing and "seam-pass unchanged-consumer gap" jargon needed plain-language, concrete-example explanations.
 
 **Insights:**
-- <!-- compose -->
+- The sharpest lesson: **validate a mechanism's purpose before polishing it.** I hardened the seam pass through four fixes before the operator's reframing revealed the whole interface-check is redundant with the compiler. A deterministic concern had been smuggled into the stochastic layer; the fix is to lean on the compiler/test floor, not to make the heuristic smarter.
+- Point-fix discipline (RED-first, no governance) burned down 16 fixes cleanly and kept the full suite green throughout.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 17
