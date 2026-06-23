@@ -2850,3 +2850,72 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-003
 SC-003 states: "Skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI." The phrase "first output" is ambiguous: in a streaming model, "first output" means the first byte received from the CLI; in a buffered model, it means the complete response is rendered. These can differ by seconds for commands that buffer until completion. The condition "local CLI" is also undefined — does it mean the binary is on the same machine? In the same filesystem mount? With a warm process cache?
 
 The blast radius is low because the 2-second bound is generous enough that most reasonable interpretations produce the same pass/fail outcome for a well-functioning local install. However, as written the success criterion cannot be unambiguously measured: a streaming implementation and a buffered implementation could both claim to satisfy SC-003 while behaving very differently from the user's perspective. A reasonable fix: specify "first character of output appears in the opencode UI" (streaming) or "complete response is displayed" (buffered), and define "local CLI" as "CLI binary resolvable via the shell PATH without network access."
+
+## 2026-06-23 — audit-barrage lift (20260623T040219710Z-031-opencode-support-after_clarify)
+
+Code-sha: 5e82e01dae5c1c77180a2bf4d09398af5f036eae
+### AUDIT-20260623-161 — FR-008 "unknown commands" error path is not explicitly scoped to exclude `/stack-control:version`
+
+Finding-ID: AUDIT-20260623-161 (claude-01 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=high, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-008, FR-002 Note, FR-003, FR-011
+
+FR-008 states: "the plugin MUST map `/stack-control:` prefixed commands to the appropriate **skill**; unknown commands produce a clear 'unknown stack-control command' error." FR-002's Note says "`/stack-control:version` is routed but **not a registered skill** in opencode's command palette." The Key Entities section reinforces this: "Note: `/stack-control:version` is a routed command, not a registered skill."
+
+The word "skill" in FR-008's first clause refers to the registered-skill set (`define`, `extend`, `execute`, `workflow`, `roadmap`). Version is explicitly *not* a skill. Therefore the "map to the appropriate skill" path does not cover version — and "unknown commands produce a clear error" is the fallback. An unattended agent reading FR-008 in combination with FR-002's explicit "not a registered skill" note will build the error path for `/stack-control:version`, directly contradicting FR-011's requirement that it reports the plugin version.
+
+The information needed to resolve this *does* exist in the spec (FR-003 makes version an exception to CLI delegation, FR-011 defines its output), but FR-008's "unknown" is never defined to mean "not known to **any handler**" rather than "not a registered **skill**." The natural reading of FR-008 — especially after a reader has just absorbed FR-002's explicit skill enumeration and the "not a registered skill" note for version — resolves against FR-011. A reasonable fix: amend FR-008 to read "commands that are neither registered lifecycle skills nor the `/stack-control:version` routed command produce a clear 'unknown stack-control command' error."
+
+---
+
+### AUDIT-20260623-162 — FR-012 non-blocking guarantee is scoped only to detection failures, not to detected mismatches
+
+Finding-ID: AUDIT-20260623-162 (claude-02 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-012, US5 AS2, US5 Note
+
+FR-012 states: "The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked. **Version detection failures are non-blocking warnings; the skill continues to execute.**" The non-blocking guarantee is spelled out only for detection *failures* (i.e., `stackctl --version` cannot be run, or returns no parseable output). The spec is silent on whether a successfully *detected* mismatch is also non-blocking.
+
+A strict reading: detection failures are non-blocking (stated); detected mismatches are unaddressed. An agent could implement mismatch detection as a blocking gate — refuse to execute the skill until the user resolves the version difference — and satisfy FR-012's literal text. This is in direct tension with US5 AS2 ("Given CLI version differs from plugin version, When user runs a skill, **Then a warning is displayed**" — implying the skill still runs), and with the US5 Note ("The spec does not require matching versions; it only requires mismatch **visibility**"). The intent is clearly advisory/non-blocking, but FR-012 as written does not state it.
+
+Blast radius: an agent that builds a blocking version-mismatch gate breaks every skill invocation for users on mismatched versions. The US5 Note and AS2 provide sufficient context for a careful reader, but the discrepancy between what FR-012 says (failures are non-blocking) and what AS2 implies (mismatches are non-blocking) is a real ambiguity. A reasonable fix: amend FR-012 to add "Version mismatch warnings are also non-blocking; the skill MUST continue to execute."
+
+---
+
+### AUDIT-20260623-163 — FR-004 argument forwarding has no acceptance scenario or success criterion that verifies it
+
+Finding-ID: AUDIT-20260623-163
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-004, SC-002, US1 AS1–AS3
+
+FR-004 states: "The plugin MUST forward skill arguments to the CLI as command arguments, preserving opencode command argument token boundaries and quoting semantics (e.g., `/stack-control:define "opencode support"` passes command `define` and one argument with value `opencode support` to `stackctl`)."
+
+SC-002, the primary measurable outcome for delegation, tests only `--help` invocations for all five registered skills: "Plugin successfully delegates all five listed happy-path skill invocations to the CLI without errors (`/stack-control:define --help`, ...)." The `--help` flag requires no argument forwarding — it is a zero-argument invocation for each skill. Every acceptance scenario in US1 and US3 that exercises skill delegation also uses `--help` or `--version`. No acceptance scenario exercises the quoting case from FR-004's parenthetical (`"/stack-control:define "opencode support"`).
+
+An agent implementing the plugin can pass all acceptance scenarios and SC-002 with a delegator that simply concatenates `stackctl <verb> <raw-tokens>` without respecting quoting boundaries — the `--help` invocations will pass regardless. The quoting semantics the spec requires in FR-004 have no test harness in the spec to verify them. The blast radius is medium: features invoked with quoted multi-word arguments (the primary use case for `define`) will silently tokenize incorrectly, but the defect won't surface until a user passes a quoted argument in real use. A reasonable fix: add one acceptance scenario to US1 or US3, such as "Given user invokes `/stack-control:define "opencode support"`, When the skill executes, Then `stackctl` is called with command `define` and argument value `opencode support` (one token, not two)."
+
+---
+
+### AUDIT-20260623-164 — SC-001 "within 5 minutes of first opening opencode" conflates a precondition (copy the file) with an in-session timing guarantee
+
+Finding-ID: AUDIT-20260623-164
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-001, US2 AS1
+
+SC-001 states: "Users can install the stack-control plugin by copying `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts` and invoke `/stack-control:define --help` within 5 minutes of **first opening opencode**."
+
+US2 AS1 states: "Given user has the stack-control plugin file, When they copy it to `.opencode/plugins/stack-control.ts`, Then opencode loads the plugin on **next start**." The plugin does not load into a running session — it requires a restart. So the workflow is: (1) obtain the plugin file, (2) copy it to `.opencode/plugins/`, (3) **restart opencode**, (4) invoke the command. This means "first opening opencode" cannot be the clock start for a user who follows US2 AS1 — they must exit, copy the file, then re-open.
+
+The 5-minute window is either measured from (A) the first time the user opens opencode ever (before they have the plugin file, before they know to copy it), making the criterion dependent on download speed and file-system navigation, or (B) the first time the user opens opencode after installing the plugin, which is the natural reading but leaves the phrase "first opening opencode" ambiguous. Under reading (A), the SC is nearly untestable since it depends on external factors. Under reading (B), the SC is reasonable but the phrasing is misleading. A reasonable fix: clarify to "within 5 minutes of copying the plugin file and relaunching opencode" or "within 5 minutes of completing the installation steps in US2."
