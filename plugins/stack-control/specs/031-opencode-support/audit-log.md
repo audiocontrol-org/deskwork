@@ -521,3 +521,258 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:77-89,115-1
 US5 says users can verify plugin/CLI version alignment, FR-011 says the plugin reports its version, and FR-012 says the plugin warns when versions differ. But acceptance scenario 3 says that when the user runs `stackctl --version`, “both versions are displayed.” That assigns plugin-version reporting to the CLI command, while the surrounding requirements frame version reporting as plugin behavior. The assumptions also say users manually ensure alignment with no automated version sync.
 
 The likely intended behavior is clear enough that this is medium rather than high, but an unattended builder could implement only plugin-side warning and never alter `stackctl --version`, leaving AC3 unmet; or alter CLI version output even though the feature is scoped as an opencode plugin. The spec should choose the user-visible version surface: plugin command/query, CLI output, or both.
+
+## 2026-06-23 — audit-barrage lift (20260623T010819772Z-031-opencode-support-after_clarify)
+
+Code-sha: bc7740778f698245a85b2d376c68d73f347f969a
+### AUDIT-20260623-20 — FR-010 "npm installation" is undefined and irreconcilable with the single-file loading model
+
+Finding-ID: AUDIT-20260623-20 (claude-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    spec.md — FR-009, FR-010, Assumptions (last two bullets), Clarifications
+
+FR-009 states the plugin MUST load from `.opencode/plugins/stack-control.ts`. The Assumptions commit to a single-file design (`opencode-plugin.ts`) installed per-project. The Clarifications confirm "Single file (`opencode-plugin.ts`)". FR-010 then adds a MUST requirement that the plugin support "npm installation" alongside the local-copy path — but npm packages install into `node_modules/`, not into `.opencode/plugins/`. The spec never bridges these two facts.
+
+An unattended builder reading FR-010 faces two roughly-equally-plausible builds: (a) publish to npm, write a `postinstall` script that copies the plugin file to `.opencode/plugins/stack-control.ts` in the CWD — but this requires knowing whether `postinstall` has access to the project root, and it ties installation to `npm install` in a project's CWD; or (b) publish a module that can be `import`ed from inside `.opencode/plugins/stack-control.ts`, making the user-written plugin file a thin re-export — which is no longer a single file and contradicts the Assumptions. Both readings lead to substantively different implementations, and the wrong one is just as easy to reach as the right one.
+
+The fix is to either remove "npm installation" from FR-010 if the single-file copy model is the intended delivery, or to add a requirement that states exactly how npm installation interacts with FR-009's loading path.
+
+---
+
+### AUDIT-20260623-21 — FR-001: The opencode plugin API signature is never stated or referenced
+
+Finding-ID: AUDIT-20260623-21
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    spec.md — FR-001, US2 AC2, Assumptions ("Opencode's shell API (`$`) provides sufficient functionality")
+
+FR-001 states the plugin MUST "export a function following opencode's plugin API signature" — but the spec never states what that signature is and never references opencode's documentation as the authoritative source. US2 AC2 says the plugin "exports the plugin function following opencode's plugin API" without elaborating. The Assumptions mention the `$` shell API by name but give no citation or description of it.
+
+An unattended builder reading this spec cannot produce a compliant plugin without consulting opencode documentation that the spec never links. This is functionally the same failure mode AUDIT-20260623-17 identified for the `command.executed` event name, but at a higher level: the entire export contract (function signature, return type, registration mechanism) is unspecified. An agent building to this will either guess, produce an import for `$` that doesn't exist at that path, or export the wrong shape entirely — and nothing in the spec corrects the wrong guess. AUDIT-20260623-17 covers the event name; this finding covers the plugin API shape, which is the load-bearing contract for FR-001 through FR-005.
+
+The fix is to add a normative reference to opencode's plugin API documentation, quote the expected function signature, and confirm that `$` is the correct shell API identifier and import path — or explicitly state that the builder must derive these from the opencode docs before implementing.
+
+---
+
+### AUDIT-20260623-22 — Edge Cases section poses unanswered questions — unattended builder fills in all decisions unilaterally
+
+Finding-ID: AUDIT-20260623-22
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — Edge Cases section
+
+The Edge Cases section lists five open questions about behavior the plugin must exhibit, but commits to answers for none of them. Among these, two carry real implementation consequence:
+
+"What if the user has multiple opencode sessions running simultaneously?" — if two sessions both invoke `stackctl govern` against the same project simultaneously, there are file-system and output-ordering race conditions. The spec must state whether concurrent invocations are in scope (and if so, how the plugin isolates them) or explicitly out of scope (and what the user sees when they try).
+
+"What happens if `stackctl` CLI is installed globally but not in PATH?" — the Assumptions say "Users have `stackctl` CLI installed and available in their PATH (or opencode has access to it via shell)," which makes "not in PATH" an out-of-scope assumption violation. Yet the Edge Cases section re-opens this as a question, contradicting the Assumptions. An unattended builder reading both sections will not know whether to handle this case or reject it.
+
+The other three questions (session ends mid-skill, network/FS errors, CLI errors) have partial FR coverage (FR-006 covers non-zero exit codes) but no full decision. A spec that lists open questions without closing them hands every decision to the builder. The fix is to answer each question — even if the answer is "this is explicitly unsupported and the user receives FR-007's missing-CLI error" — so a builder has a commitment to implement against.
+
+---
+
+### AUDIT-20260623-23 — FR-002 "all stack-control skills" is undefined — no enumeration or discovery mechanism stated
+
+Finding-ID: AUDIT-20260623-23 (claude-04 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    spec.md — FR-002, US2 AC3, US4 AC3
+
+FR-002 states the plugin MUST "register all stack-control skills when loaded." US2 AC3 says "any stack-control skill" is available in the command menu. US4 AC3 says the plugin "registers all stack-control skills." But the spec never defines what "all skills" means: it doesn't enumerate them, doesn't reference the plugin's `skills/` directory, and doesn't say whether the set is static (fixed at build time) or dynamic (discovered at load time from whatever skills exist in the installation).
+
+Two divergent builds follow: (a) the builder hardcodes the list of skills known at the time of writing (currently: `define`, `execute`, `extend`, `speckit-guard`); or (b) the builder reads the skills directory at load time to discover the set dynamically. These differ in behavior whenever stack-control adds or removes a skill. If (a), a future new skill silently doesn't appear in opencode until the opencode plugin is manually updated. If (b), the loading mechanism must be specified. The spec's "all" implies (b) but describes nothing that enables it.
+
+The fix is to either enumerate the skills the plugin registers (documenting the static list) or add a requirement that the plugin discovers skills dynamically by reading the installation's `skills/` directory — and add a success criterion that a newly-added skill appears in opencode without a plugin update.
+
+---
+
+### AUDIT-20260623-24 — SC-002 "95% success rate" is unmeasurable and implies an acceptable failure mode that conflicts with FR-006
+
+Finding-ID: AUDIT-20260623-24 (claude-05 + codex-03; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    spec.md — SC-002, FR-006
+
+SC-002 states: "Plugin successfully delegates 95% of skill invocations to the CLI without errors." This is unmeasurable for two reasons. First, there is no defined population of "skill invocations" to sample over — the criterion could pass with a single successful invocation (100% ≥ 95%) and fail with two invocations where one errors (50% < 95%). Second, the threshold implies a 5% tolerated failure rate for the plugin's core delegation function. For a thin forwarding layer (plugin invokes CLI, captures output, returns it), the correct bar is 100%: the delegation either works or it doesn't, and failures are FR-006's handled error path, not a statistical tolerance.
+
+The "without errors" qualifier further conflicts with FR-006, which explicitly requires the plugin to handle CLI errors (non-zero exit codes). A CLI error is a legitimate outcome — FR-006 says the plugin MUST handle it and return it to opencode. That handling is success, not failure. SC-002 as written cannot distinguish between a delegation failure (plugin crashed, output lost) and a CLI error that FR-006 requires the plugin to surface correctly.
+
+The fix is to replace SC-002 with a binary criterion: "Plugin correctly delegates skill invocations to the CLI, captures both successful output and non-zero-exit errors per FR-006, and returns them to opencode" — testable by running a skill against a functioning CLI and against a CLI that returns non-zero, verifying both are handled.
+
+---
+
+### AUDIT-20260623-25 — SC-004 forward-compatibility promise has no corresponding requirement or mechanism
+
+Finding-ID: AUDIT-20260623-25 (claude-06 + codex-04; cross-model)
+Status:     open
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    spec.md — SC-004, FR-001
+
+SC-004 states "Plugin works with opencode versions 1.0 and later." No FR constrains which opencode APIs the plugin may use, no requirement says the plugin must declare a minimum opencode version, and no requirement says the plugin must handle API changes between opencode versions. If opencode changes its plugin API between 1.0 and 2.0 (e.g., renames the function signature shape, removes `$`, changes the event system), SC-004 becomes false but no FR would be violated.
+
+This is a commitment without a mechanism: the spec cannot verify SC-004 against its own requirements. A builder cannot know, from the FRs alone, how to ensure forward compatibility — whether that means using only a stable/documented API subset, adding feature-detection at load time, or declaring `engines: { opencode: ">=1.0" }` in a manifest. As a low-severity finding, this is a hygiene issue rather than a build-blocking ambiguity, but a tester verifying SC-004 has nothing in the FRs to test against.
+
+## 2026-06-23 — audit-barrage lift (20260623T011050650Z-031-opencode-support-after_clarify)
+
+Code-sha: bc7740778f698245a85b2d376c68d73f347f969a
+### AUDIT-20260623-26 — FR-009 and FR-010 contradict each other on the plugin load path
+
+Finding-ID: AUDIT-20260623-26
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    spec.md — FR-009, FR-010
+
+FR-009 states: "The plugin MUST load from `.opencode/plugins/stack-control.ts`." FR-010 states: "The plugin MUST support both local installation (copy plugin file) and npm installation." These two requirements cannot hold simultaneously as written. When a plugin is installed via npm, it resolves to a path inside `node_modules/`, not to `.opencode/plugins/stack-control.ts`. For both to be true, the spec would need to commit to one of: (a) npm installation is defined as "npm downloads a file and places it at the `.opencode/plugins/` path," or (b) FR-009's load path is only the canonical location for the local-copy flow, and npm installation produces a different load path. Neither interpretation is stated.
+
+An unattended builder reading FR-009 will hardcode `.opencode/plugins/stack-control.ts` as the load location and have no definition of what an npm install looks like. The builder reading FR-010 will add npm support but cannot know what path opencode will load the plugin from post-npm-install. One of these requirements will be dropped or silently violated. The spec must either eliminate one installation path from scope, or define both load paths and the conditions that select between them.
+
+---
+
+### AUDIT-20260623-27 — FR-002 promises to register "all stack-control skills" but never enumerates or bounds the set
+
+Finding-ID: AUDIT-20260623-27 (claude-02 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    spec.md — FR-002, US2 AC3
+
+FR-002: "The plugin MUST register all stack-control skills when loaded." US2 AC3: "Given plugin is loaded, When user types any stack-control skill, Then the skill is available in the command menu." Neither the requirement nor the acceptance scenario defines what the complete set of stack-control skills is. The set is open-ended: stack-control adds new skills over time. The requirement "all" is a moving target with no enumeration and no discovery mechanism specified.
+
+An unattended builder will face two equally plausible implementations: (a) hard-code the list of known skills at time of writing (which silently excludes future skills), or (b) attempt to auto-discover skills dynamically (with no discovery mechanism defined in the spec). Both readings are plausible; neither is the spec's stated intent. The spec must either enumerate the required set of skills explicitly, define how the plugin discovers the set at runtime, or scope the requirement to a named subset (e.g., the skills listed in the roadmap's current milestone).
+
+---
+
+### AUDIT-20260623-28 — FR-008 promises to route commands to "the appropriate skill" but never defines the mapping
+
+Finding-ID: AUDIT-20260623-28
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    spec.md — FR-008, US4 AC1
+
+FR-008: "The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill." "Appropriate" is undefined. The spec provides no routing table, no naming convention that would allow a builder to derive the mapping, and no canonical source-of-truth reference. US4 AC1's acceptance scenario says "the plugin routes it to the appropriate skill" using the same undefined word.
+
+An unattended builder has no way to implement or test this requirement. The most natural reading — that `/stack-control:define` maps to the `define` skill, `/stack-control:execute` maps to the `execute` skill, and so on by the suffix after the colon — may be the intent, but if that convention exists it must be stated. Any skill whose name contains a colon, a namespace, or a multi-word slug would break this naive mapping immediately. The spec must state the mapping rule explicitly (or reference the source that defines it), so the requirement is falsifiable.
+
+---
+
+### AUDIT-20260623-29 — FR-005 "capture CLI output and return it" conflicts with SC-003's first-output latency for long-running skills
+
+Finding-ID: AUDIT-20260623-29
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — FR-005, SC-003
+
+FR-005: "The plugin MUST capture CLI output and return it to opencode." "Capture and return" describes a buffered model: collect all output, then deliver it. SC-003: "Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI." "First output" implies a streaming model: the user sees partial output before the skill completes.
+
+For any stack-control skill that runs longer than two seconds end-to-end (e.g., `define` driving a multi-step spec authoring chain, `execute` driving a phased implementation), a buffered implementation of FR-005 cannot satisfy SC-003. The spec makes both promises without acknowledging the conflict. An unattended builder who implements FR-005 faithfully (capture-then-return) will fail SC-003 on any long-running skill. The spec must choose: buffer (and adjust SC-003 to measure total latency, or restrict it to skills with known short runtimes), or stream (and reword FR-005 to say "stream CLI output incrementally").
+
+---
+
+### AUDIT-20260623-30 — Edge cases section lists five open questions with no disposition
+
+Finding-ID: AUDIT-20260623-30
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — Edge Cases section
+
+The Edge Cases section lists five unresolved behavioral questions:
+1. Session ends during a long-running skill
+2. Non-zero exit codes from the CLI
+3. Multiple simultaneous opencode sessions
+4. Network timeouts or file system errors
+5. `stackctl` installed globally but not in PATH
+
+None of these has a stated disposition — no "in scope," "out of scope," "handled by FR-XXX," or "deferred with justification." An unattended builder reads this section as an open question list and must guess: are these in scope (requiring implementation), or acknowledged known unknowns (requiring nothing)? The most dangerous reading is #2 (non-zero exit codes), which is also partially addressed by FR-006 — but the edge case question is whether FR-006 fully covers it. The ambiguity invites the builder to either over-implement (inventing behavior for all five) or under-implement (treating them as implicitly out of scope). The spec must either close each edge case by pointing to the FR that covers it, or explicitly mark each as out of scope with the reason.
+
+---
+
+### AUDIT-20260623-31 — SC-001 measures a 5-minute install-to-invoke time but omits `stackctl` as a stated prerequisite
+
+Finding-ID: AUDIT-20260623-31
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — SC-001, US3 AC2, Assumptions
+
+SC-001: "Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode." Invoking any skill requires `stackctl` CLI to be installed (US3 AC2, FR-007, FR-003 all establish this dependency). The Assumptions section mentions this, but SC-001 does not state it as a precondition. The 5-minute window thus either (a) includes `stackctl` installation — which on a fresh machine with no prior install is well over 5 minutes — or (b) assumes `stackctl` is already installed, making the SC untestable from a clean state without first satisfying an unstated prerequisite.
+
+A verifier testing SC-001 against a literal reading has no way to know which interpretation is intended. If the intent is (b), the SC must say "given `stackctl` is already installed and in PATH." If the intent is (a), the 5-minute bound needs revision or a definition of the test environment.
+
+---
+
+### AUDIT-20260623-32 — SC-002 "95% of skill invocations" is unmeasurable — no test corpus or error taxonomy defined
+
+Finding-ID: AUDIT-20260623-32
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — SC-002
+
+SC-002: "Plugin successfully delegates 95% of skill invocations to the CLI without errors." This success criterion contains no: (a) definition of the reference set of invocations over which 95% is measured, (b) categorization of what counts as "without errors" vs. an expected CLI failure (e.g., a user invoking `define` with invalid arguments), or (c) measurement procedure for collecting the sample. Without these, no one can determine whether SC-002 is met.
+
+Additionally, the 5% implicit failure budget is unusual for a delegation path. A plugin that drops 1 in 20 invocations silently would be a serious defect; a plugin that correctly surfaces CLI errors on 5% of calls is working as designed. These two outcomes are indistinguishable under the current wording. The spec should either replace SC-002 with a falsifiable criterion (e.g., "zero silent failures — all CLI errors are surfaced to the user") or define the corpus and measurement method that makes 95% a testable threshold.
+
+---
+
+### AUDIT-20260623-33 — Opencode `$` shell API is assumed to exist but is named in an assumption, not verified — creating a second blocking integration dependency
+
+Finding-ID: AUDIT-20260623-33
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — Assumptions (shell API bullet), FR-003
+
+The Assumptions section states: "Opencode's shell API (`$`) provides sufficient functionality for CLI invocation." FR-003 then commits to this: "The plugin MUST delegate skill execution to the `stackctl` CLI via the shell API." The `$` tagged-template-literal shell API is named as a specific symbol — it appears in libraries like `bun:shell` and some process-execution utilities, but it is not a universal JavaScript convention. The spec treats this as a known-good integration point while explicitly labeling it as an assumption.
+
+Unlike AUDIT-20260623-17 (which covers the `command.executed` event routing assumption), this is a second, independent blocking assumption: if opencode does not expose a `$` shell API, or exposes shell execution under a different name or shape, FR-003 cannot be satisfied as written. The spec should verify the opencode shell execution API name and shape from opencode's published documentation before committing to it in FR-003, or state the verification evidence. Leaving it as an unverified assumption with "sufficient" as the adequacy criterion (also undefined) means an unattended builder may discover the API mismatch only at integration time.
+
+### AUDIT-20260623-34 — Local copy install and npm install are both required, but only one load path is promised
+
+Finding-ID: AUDIT-20260623-34
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:31-40,113-114,139-150`
+
+US2 defines installation as copying `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts` (lines 31-40), FR-009 requires loading from that exact project path (line 113), and the clarification/assumption section repeats that the plugin is a single file rather than a module directory (lines 139, 150). FR-010 then requires “both local installation (copy plugin file) and npm installation” (line 114), but the spec never states what npm installation means for an opencode plugin or whether npm install must still result in the `.opencode/plugins/stack-control.ts` file.
+
+This is medium because the likely intended behavior is local copy first, but a builder could satisfy FR-010 by publishing a package that opencode cannot load, or by creating a package-based load path that conflicts with the single-file/per-project promise. The spec should choose the user-visible npm installation contract: package provides the same copyable file, package installs/links the opencode plugin path, or npm support is out of scope for this feature.
+
+### AUDIT-20260623-35 — Delegation success metric is not testable as written
+
+Finding-ID: AUDIT-20260623-35
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:107-112,129-131`
+
+SC-002 says “Plugin successfully delegates 95% of skill invocations to the CLI without errors” (line 130), while FR-006 and FR-007 explicitly require handling CLI errors and missing CLI cases (lines 110-111). The success criterion does not define the denominator for “skill invocations,” whether user/CLI failures count against the plugin, or how many invocations are needed for the percentage to be meaningful.
+
+The blast radius is medium: this will not necessarily break the plugin, but it gives builders and reviewers no stable pass/fail condition. One implementation can claim success by excluding CLI failures from the metric, while another can fail the criterion because valid CLI rejections count as errors. The spec should restate SC-002 as a measurable delegation contract, such as successful handoff for all registered valid commands in a defined test matrix, with CLI-returned failures classified separately from plugin delegation failures.
