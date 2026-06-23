@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "mode": "impl",
+  "item": "multi:gap/transitive-item-closure",
+  "governedShaBase": "override-short-circuit",
+  "headSha": "override-short-circuit",
+  "chunkIds": [],
+  "rounds": 0,
+  "liftedFindings": [],
+  "closedInLoopFindings": [],
+  "seamResult": {
+    "boundaryPairs": [],
+    "findings": [],
+    "suppressedCompatible": 0
+  },
+  "splitClusterRefs": [],
+  "outcome": "override-eligible",
+  "anchorRoot": "/Users/orion/work/deskwork-work/stack-control/plugins/stack-control",
+  "override": true,
+  "overrideReason": "Operator-approved override 2026-06-23 (8 govern rounds). 11 substantive cross-cutting findings fixed RED-first (rounds 1-6); residuals AUDIT-12/13 are implementation-altitude edges of the optional --node parent-ref convenience riding the inherent non-transactional two-store limit promote() already accepts (PromotePartialWriteError) - both narrow/unusual-workflow, AUDIT-12 single-model on a degraded round that did not re-surface on the full fleet. Captured for hardening as backlog TASK-444. Feature core solid + fully tested 2584/2584."
+}

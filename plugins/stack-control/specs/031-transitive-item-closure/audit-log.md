@@ -197,3 +197,39 @@ Surface:    src/subcommands/backlog.ts:385-388; src/backlog/promote.ts:180-206
 `emitPromote` now runs `emitAutoBackLink(backend, id, process.cwd(), node)` for every id before calling `promote(...)`. But `promote()` is where the existing all-or-nothing preflight lives: duplicate ids are rejected at lines 181-189, missing ids at 193-200, and already-promoted ids at 201-205. Because the new roadmap mutation happens first, `backlog promote MISSING --to tasks:x --node multi:feature/n --apply` can add `MISSING` to the roadmap node’s `closes:` set and only then fail when `promote()` discovers the backlog item does not exist. Duplicate or already-promoted ids have the same write-before-refusal shape.
 
 That breaks the existing promote contract documented in `src/backlog/promote.ts:167-170`: the whole batch is validated before any write. The blast radius is high because an adopter can end up with a roadmap `closes:` entry for an item that was not promoted, or does not exist at all, and the later transitive close path treats recorded ids as authoritative. A reasonable fix is to preserve promote’s validation-before-write boundary by moving the validation into a reusable preflight, calling `promote(..., apply:false)` or equivalent before any auto-back-link write, or teaching `emitAutoBackLink` to validate the backlog id exists before mutating the roadmap when invoked with an explicit `--node`.
+
+## 2026-06-23 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260623-12 — `promote --node` can leave unpromoted ids recorded in `closes:` after a later batch back-link failure
+
+Finding-ID: AUDIT-20260623-12
+Status:     override-accepted-2026-06-23
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high); OVERRIDE-ACCEPTED 2026-06-23 (operator-approved) → backlog TASK-444. Implementation-altitude edge of the optional `--node` parent-ref convenience riding the inherent non-transactional two-store limitation that promote() already documents+accepts (PromotePartialWriteError); single-model on a DEGRADED round (claude lane killed) and did NOT re-surface on the round-8 full fleet. Captured for hardening; feature core is solid + fully tested.
+Surface:    src/subcommands/backlog.ts:379-393; src/backlog/auto-backlink.ts:56-62
+
+`emitPromote` validates the whole batch first, but then writes each roadmap back-link one at a time before the actual `promote(...)` write. `autoBackLink` reloads and commits the roadmap for a single id at a time. If id 1 back-links successfully and id 2 then fails due an unwritable roadmap, concurrent invalidation, interrupted process, or another commit failure, execution exits before the batch promotion runs at `backlog.ts:393`.
+
+That leaves `closes:` containing an id for work that was not promoted. Since the transitive closer treats recorded ids as authoritative, a later close cascade can close backlog work that never actually completed the promotion path. The earlier fix prevents “promoted but unlinked”, but this opens the opposite partial state: “linked but unpromoted”. Blast radius is high because `closes:` is the durable input to terminal closure, and a real partial failure can corrupt that input without any promoted backlink to justify it.
+
+A reasonable fix is to make the roadmap-side promote back-link a single batch mutation after preflight, or snapshot/rollback the roadmap if any later back-link in the batch fails before promotion.
+
+## 2026-06-23 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260623-13 — `promote --node` appends a second `**Node:**` ref when a task already has one from `capture --node`; `done` silently uses only the last
+
+Finding-ID: AUDIT-20260623-13 (claude-04 + codex-01; cross-model)
+Status:     override-accepted-2026-06-23
+Severity:   high
+Per-lane:   claude=low, codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained. OVERRIDE-ACCEPTED 2026-06-23 (operator-approved) → backlog TASK-444. Narrow, unusual-workflow edge (capture --node A then promote --node B) of the optional `--node` parent-ref convenience, per the finding's own limited-blast-radius note (claude=low). The fix (setParentNode replace-in-place) is captured for hardening; the feature core is solid + fully tested.
+Surface:    src/backlog/parent-node.ts (`setParentNode`, `readParentNode`) and src/subcommands/backlog.ts (the `capture` and `promote` handlers)
+
+`setParentNode` always appends a new `- **Node:** <id>` line via `appendNotes`. `readParentNode` returns the last matching line. If a task was created via `backlog capture --node A` and then batch-promoted via `backlog promote <id> --to <spec> --node B --apply`, the task's notes end up with two `**Node:**` lines: one pointing at `A` (from capture) and one at `B` (from promote, written in step 4 of `emitPromote`). Subsequent `done` will back-link the task into node `B`'s `closes:` only — silently discarding the originally-recorded node `A`.
+
+The blast-radius is limited because this combination (capture with one node, then promote with a different node) is an unusual workflow. But the behavior is invisible to the operator: the step-4 `setParentNode` call leaves no feedback that a prior ref was superseded. If the task was intentionally associated with node `A` at capture and `--node B` on promote was a mistake, the error is only discoverable by inspecting the task's raw notes.
+
+The fix is either: (a) have `setParentNode` check for an existing ref and replace it in-place (rather than append), or (b) emit a warning when `setParentNode` is called and the task already carries a different ref, making the supersession visible at the time of `promote --apply`.
+
+---
