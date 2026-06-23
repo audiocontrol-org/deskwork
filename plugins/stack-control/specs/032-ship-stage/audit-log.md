@@ -103,7 +103,7 @@ That leaves a front-door mutating command able to advance unrelated lifecycle it
 ### AUDIT-20260623-07 — `isPostMergeStatus` only excludes `shipped`/`closed` — a `blocked` or `cancelled` item with a reachable convergence record deadlocks the backstop
 
 Finding-ID: AUDIT-20260623-07
-Status:     open
+Status:     fixed-d609d031
 Severity:   high
 Per-lane:   claude=high
 Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=reachable, fix-debt=no; no down-calibration signal — high retained.
