@@ -2,24 +2,32 @@
 
 ---
 
-## 2026-06-23: <!-- session title -->
+## 2026-06-23: ship-stage — orchestrator session: design → runnable spec (4-phase, F1-corrected) via the full front-door lifecycle
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up where the last session left off — the captured `multi:feature/ship-stage` node — and drive it through the stack-control front door from design to a runnable spec. Orchestrator-session work only; implementation is a separate session per the two-session boundary.
 
 **Accomplished:**
-- <!-- compose -->
+- **Got current first:** back-merged `origin/main` so the branch is on **v0.54.0** (the engine ship-stage reconciles), not the stale 0.53.2 it was sitting on — source bin now matches the installed cache.
+- **Drove the full lifecycle in-session, front-door-mediated, committed+pushed at every step:** `/stack-control:design` (brainstorming backend + injected house rules) → operator-approved **design record** (`design-approved` marker; lineage edges `depends-on unskippable-workflow-protocol`, `part-of lifecycle-industrialization`) → `/stack-control:define` driving native **specify → clarify → plan → checklist → tasks → analyze**, bracketed by the 026 capability-mediation marker (cleanly exited, no leak).
+- **Spec `032-ship-stage` is runnable:** spec/plan/tasks present, `execute-check` green, `analyze-clean` recorded; node at phase `implementing`. 29 RED-first tasks, dependency-ordered, build-as-ONE-unit.
+- **Feature shape captured:** `/stack-control:ship` welds merge → `graduate` (can't-merge-without-recording, operator confirms CI green); phase chain **`governing → merging → validating → closed`** with every post-merge phase derived from the **recorded status** (same source as the close gate) → **TASK-445 dissolved by construction**; a **backstop compass invariant** (git merge-detection — convergence record reachable from `origin/main` + status≠shipped; reconcile-exempt; advisory-only at session-start/end); an **adopter-defined `validating`** phase (operator-confirm default == 031).
+- **Resolved 6 operator forks** (ship scope, merging phase, validating phase, git merge-detection, operator-confirm CI gating, F1).
 
 **Didn't Work:**
-- <!-- compose -->
+- **Bash cwd reset between tool calls** intermittently dropped the working dir to the repo root, making `stackctl spec-check` FATAL ("spec dir not found") until I re-`cd`'d into the installation — a harness/tool-call behavior, not a `stackctl` defect.
+- **No `stackctl` defects surfaced.** The front door ran end-to-end clean: compass gates, the per-step capability markers, `spec-check`/`execute-check`, the roadmap/workflow verbs all behaved.
 
 **Course Corrections:**
-- <!-- compose -->
+- **[DESIGN/SCOPE]** Operator added a post-merge **`validating`** stage mid-design (adopter-defined — "whatever validating a shipped/merged unit means to the adopter"). Captured per capture-over-YAGNI; reconciled 031's deliberate "no validation machinery" by generalizing the operator-confirm into a named, overridable phase whose default behavior is unchanged.
+- **[DESIGN]** `/speckit-analyze` caught **F1 (HIGH)**: modeling BOTH `phase:shipped` and `phase:validating` over the single `status:shipped` **deadlocks `closed`** (a validated item derives `shipped` while `close` fires from `validating`). Operator chose the collapse — **`shipped` is the STATUS, `validating` the post-merge phase** (chain `governing → merging → validating → closed`) — and I propagated it across spec/plan/research/data-model/contracts/tasks + a design-record amendment. The gate earned its keep *before* any code was written.
 
 **Insights:**
-- <!-- compose -->
+- **The up-front-design half of the barbell worked as designed:** the full Spec Kit chain + per-step front-door mediation ran with zero `stackctl` defects.
+- **`speckit-analyze` is a real coherence gate, not ceremony:** it surfaced a derive/transition deadlock the spec's prose hid. Resolving it before implementation (not during) is exactly the "invest up front; industrialize execution" thesis — a cheap markdown edit now vs. a tangled rework mid-`execute`.
+- **The two-session boundary held:** this session authored design→runnable and stopped at the implementation handoff; `/stack-control:execute` belongs to a separate worktree/session.
 
 **Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 12
+- Commits: 12 in `7afbd0a7..HEAD`, but **2 are not this session's work** — `chore: release v0.54.0` and `Merge pull request #498` are main's v0.54.0 release tail that rode in via the back-merge. This session authored **10**: the back-merge + 9 ship-stage authoring/roadmap commits (design record → analyze-clean), plus this session-end journal commit.
   - roadmap(032-ship-stage): record analyze-clean (speckit-analyze 0 critical/high)
   - analyze(032-ship-stage): resolve F1 coherence finding (collapse to 4-phase)
   - tasks(032-ship-stage): author tasks.md via speckit-tasks
