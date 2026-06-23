@@ -10,7 +10,7 @@ targetVersion: ""
 ### AUDIT-20260623-01 — No test exercises the backstop gate inside `emitAdvanceClosed` against a real dangling-merged-item fixture
 
 Finding-ID: AUDIT-20260623-01 (claude-03 + codex-02; cross-model)
-Status:     open
+Status:     fixed-1248aa7e
 Severity:   high
 Per-lane:   claude=low, codex=high
 Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
@@ -25,7 +25,7 @@ The session-advisory and compass-backstop tests prove the underlying `mergedButI
 ### AUDIT-20260623-02 — Dangling-item exemption lets `release` pass before status is recorded
 
 Finding-ID: AUDIT-20260623-02
-Status:     open
+Status:     fixed-1248aa7e
 Severity:   high
 Per-lane:   codex=high
 Decision:   single-model (gate-counted high)
