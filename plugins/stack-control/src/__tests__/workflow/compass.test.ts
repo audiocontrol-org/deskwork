@@ -27,7 +27,8 @@ const side = (id: 'blocked' | 'cancelled' | 'retired'): DerivedPhase => ({ kind:
 
 function verdict(d: WorkflowDoc, current: DerivedPhase, intentName: string, hasNode = true) {
   const intent = resolveIntent(d, intentName)!;
-  return computeVerdict({ doc: d, currentPhase: current, intent, hasNode });
+  // no dangling item in these scenarios → backstop dormant (the args are required, 032 AUDIT-08)
+  return computeVerdict({ doc: d, currentPhase: current, intent, hasNode, danglingMergedItem: null, intentItem: 'multi:feature/x' });
 }
 
 describe('024 FR-002 — compass verdict matrix', () => {
@@ -73,6 +74,8 @@ describe('024 FR-002 — compass verdict matrix', () => {
       intent: resolveIntent(d, 'ship')!,
       hasNode: true,
       nextGateUnmet: unmet,
+      danglingMergedItem: null,
+      intentItem: 'multi:feature/x',
     });
     expect(v.outcome).toBe('ahead'); // NOT on-course — the compass cannot green-light ship un-governed
     expect(v.exitCode).not.toBe(0);
@@ -88,6 +91,8 @@ describe('024 FR-002 — compass verdict matrix', () => {
       intent: resolveIntent(d, 'ship')!,
       hasNode: true,
       nextGateUnmet: [],
+      danglingMergedItem: null,
+      intentItem: 'multi:feature/x',
     });
     expect(v.outcome).toBe('on-course');
     expect(v.unmetGate).toEqual([]);

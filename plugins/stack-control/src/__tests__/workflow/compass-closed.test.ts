@@ -30,7 +30,7 @@ const phase = (id: string): DerivedPhase => ({ kind: 'phase', id });
 function verdict(d: WorkflowDoc, current: DerivedPhase, intentName: string) {
   const intent = resolveIntent(d, intentName);
   expect(intent).not.toBeNull(); // `close` must be a known intent (T028)
-  return computeVerdict({ doc: d, currentPhase: current, intent: intent!, hasNode: true });
+  return computeVerdict({ doc: d, currentPhase: current, intent: intent!, hasNode: true, danglingMergedItem: null, intentItem: 'multi:feature/x' });
 }
 
 describe('031 T027 — compass close intent + closed terminal rules (FR-015)', () => {

@@ -10,8 +10,13 @@
   "rounds": 1,
   "liftedFindings": [
     {
-      "id": "19a6dd710ced9499::AUDIT-BARRAGE-claude-01",
-      "title": "`isPostMergeStatus` only excludes `shipped`/`closed` — a `blocked` or `cancelled` item with a reachable convergence record deadlocks the backstop",
+      "id": "19a6dd710ced9499::AUDIT-BARRAGE-codex-01",
+      "title": "Shared lifecycle precondition drops the new backstop signal",
+      "severity": "high"
+    },
+    {
+      "id": "19a6dd710ced9499::AUDIT-BARRAGE-codex-02",
+      "title": "Backstop refusal suggests a generic `roadmap advance --to shipped` shortcut",
       "severity": "high"
     }
   ],

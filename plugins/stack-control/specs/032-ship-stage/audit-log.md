@@ -133,3 +133,31 @@ There is no other automated path. The operator is stuck until they manually edit
 The fix is to extend `isPostMergeStatus` to also return `true` for `'blocked'` and `'cancelled'` (or rename it `isNonDanglingStatus` and enumerate all statuses that do not need a merge-recording reconcile). Alternatively, the backstop could restrict its trigger to items whose status is specifically `'in-flight'`, matching the function name `mergedButInFlight` and the feature spec's stated threat model.
 
 ---
+
+## 2026-06-23 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260623-08 — Shared lifecycle precondition drops the new backstop signal
+
+Finding-ID: AUDIT-20260623-08
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/lifecycle-precondition.ts:37-46; src/subcommands/govern.ts:185-199
+
+`resolveCompass()` now computes `danglingMergedItem`, and the CLI compass path correctly passes it into `computeVerdict()` with `intentItem` at `src/subcommands/workflow.ts:141-155`. But the shared lifecycle precondition still destructures only `doc`, `hasNode`, `currentPhase`, and `nextGateUnmet`, then calls `computeVerdict()` without `danglingMergedItem` or `intentItem` at `src/lifecycle-precondition.ts:37-46`.
+
+This matters because `stackctl govern --item ...` uses this helper as its lifecycle gate before payload assembly at `src/subcommands/govern.ts:185-199`. With a merged-but-status-in-flight item dangling, a later govern run can still pass this shared precondition, even though the feature claims forward lifecycle waypoints refuse until reconciliation. Blast radius is high: an adopter or unattended agent using the govern entry point can keep moving lifecycle work through a path that the CLI compass would have refused. The fix is to thread `danglingMergedItem` from `resolveCompass()` through `checkLifecyclePrecondition()` into `computeVerdict()`, passing `intentItem: args.item`, and add a regression test for the helper or govern path.
+
+### AUDIT-20260623-09 — Backstop refusal suggests a generic `roadmap advance --to shipped` shortcut
+
+Finding-ID: AUDIT-20260623-09
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/workflow/compass.ts:90-93; src/subcommands/roadmap.ts:243-254
+
+The backstop refusal in `computeVerdict()` tells the operator to run either `stackctl workflow advance <dangling> --apply` or `stackctl roadmap advance <dangling> --to shipped --apply` at `src/workflow/compass.ts:90-93`. The second command is not equivalent to the welded reconcile path. `roadmap advance` special-cases only `--to closed`; every other status, including `shipped`, is just the old single-line status rewrite at `src/subcommands/roadmap.ts:243-254`.
+
+That means following the advertised recovery can clear the dangling signal while skipping the `graduate` transition’s required side effects: `roadmap-reconcile`, `journal-append`, and `commit` from `templates/WORKFLOW.md:177-184`. Blast radius is high because this is emitted as the machine’s own recovery instruction in a refusal path, and an unattended operator agent could reasonably execute it. The recovery text should name only `stackctl workflow advance <id> --apply`, or `roadmap advance --to shipped` must be blocked/redirected when it is being used as a ship-stage reconcile shortcut.

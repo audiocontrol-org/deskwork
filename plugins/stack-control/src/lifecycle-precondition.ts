@@ -35,13 +35,24 @@ export interface PreconditionArgs {
  * silent proceed.
  */
 export function checkLifecyclePrecondition(args: PreconditionArgs): PreconditionResult {
-  const { doc, hasNode, currentPhase, nextGateUnmet } = resolveCompass(args.cwd ?? process.cwd(), args.item);
+  // 032 US3 (AUDIT-20260623-08): this shared gate backs EVERY lifecycle skill's precondition AND
+  // `govern --item`, so it MUST thread the off-rail backstop signal `resolveCompass` computes —
+  // otherwise a merged-but-status-in-flight item would block the compass CLI but NOT the
+  // skill/govern preconditions (a backstop hole). `computeVerdict`'s now-required
+  // `danglingMergedItem` + `intentItem` make this non-droppable (the compiler enforces it).
+  const { doc, hasNode, currentPhase, nextGateUnmet, danglingMergedItem } = resolveCompass(
+    args.cwd ?? process.cwd(),
+    args.item,
+  );
   const intent = resolveIntent(doc, args.intent);
   if (intent === null) {
     throw new WorkflowError(
       `lifecycle precondition: unknown intent '${args.intent}' (known: ${knownIntents(doc).join(', ')})`,
     );
   }
-  const verdict = computeVerdict({ doc, currentPhase, intent, hasNode, nextGateUnmet });
+  const verdict = computeVerdict({
+    doc, currentPhase, intent, hasNode, nextGateUnmet,
+    danglingMergedItem, intentItem: args.item,
+  });
   return { proceed: verdict.exitCode === 0, verdict };
 }

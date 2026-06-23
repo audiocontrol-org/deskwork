@@ -51,14 +51,20 @@ export interface ComputeVerdictArgs {
   readonly nextGateUnmet?: readonly Criterion[];
   /**
    * 032 US3 (FR-009/FR-012) — the id of a merged-but-status-in-flight item found over the
-   * roadmap (the off-rail residual), or null/undefined when none dangles. While one dangles,
-   * forward lifecycle motion for ANY OTHER item is refused (off-rail), naming it + the reconcile
-   * command. EXEMPTION (FR-010): when `intentItem === danglingMergedItem` the backstop is dormant
-   * — the dangling item's own reconcile (advance to shipped) must never be blocked.
+   * roadmap (the off-rail residual), or null when none dangles. While one dangles, forward
+   * lifecycle motion for ANY OTHER item is refused (off-rail), naming it + the reconcile command.
+   * EXEMPTION (FR-010): when `intentItem === danglingMergedItem` the backstop allows the dangling
+   * item's own reconcile.
+   *
+   * REQUIRED (not optional): every verdict-gating caller MUST wire the backstop signal — the
+   * compiler enforces it, so a new caller cannot silently drop the off-rail gate (the AUDIT-06 /
+   * AUDIT-08 class). `resolveCompass()` computes it; pass `null` only when there is genuinely no
+   * dangling item (the deterministic floor owns "is the backstop wired", per the
+   * stochastic-defense-in-depth rule — not the barrage).
    */
-  readonly danglingMergedItem?: string | null;
-  /** 032 US3 — the id of the item this verdict is being computed FOR (the backstop exemption key). */
-  readonly intentItem?: string;
+  readonly danglingMergedItem: string | null;
+  /** 032 US3 — the id of the item this verdict is being computed FOR (the backstop exemption key). REQUIRED. */
+  readonly intentItem: string;
 }
 
 /**
@@ -81,16 +87,20 @@ export function computeVerdict(args: ComputeVerdictArgs): Verdict {
   // exempt — it would let the off-rail item advance past merge before its status is recorded
   // (AUDIT-20260623-02). Phase-NEUTRAL intents (session-end) are never backstop-refused
   // (session-skills-never-block). Cross-item invariant: overrides the per-item phase diff below.
-  const dangling = args.danglingMergedItem ?? null;
+  const dangling = args.danglingMergedItem ?? null; // required by the type; `?? null` is runtime defence
   if (dangling !== null && intent.kind === 'phase') {
     const intentOrd = ordinal(doc, intent.phase!);
     const curOrd = currentPhase.kind === 'phase' ? ordinal(doc, currentPhase.id) : -1;
     const isReconcileOfDangling = args.intentItem === dangling && intentOrd <= curOrd;
     if (!isReconcileOfDangling) {
+      // AUDIT-20260623-09: name ONLY the welded reconcile (`workflow advance --apply`, which fires
+      // graduate's roadmap-advance + reconcile + journal + commit). Do NOT suggest `roadmap advance
+      // --to shipped` — that is a bare status-line rewrite that SKIPS the graduate effects, clearing
+      // the dangling signal without the welded recording.
       return mk('off-rail', currentPhase, intent.phase, null, null,
         `a merged-but-status-in-flight item exists ('${dangling}') — forward lifecycle motion is ` +
           `blocked until it is reconciled; run \`stackctl workflow advance ${dangling} --apply\` ` +
-          `(or \`stackctl roadmap advance ${dangling} --to shipped --apply\`) to record its status, then retry`);
+          `to record its status (fires the welded graduate), then retry`);
     }
   }
 
