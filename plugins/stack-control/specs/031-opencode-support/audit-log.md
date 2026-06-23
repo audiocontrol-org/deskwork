@@ -2581,3 +2581,100 @@ Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:103-109`
 The edge-case promise says that when an opencode session ends during a long-running stack-control skill, “the skill continues and returns output when complete.” Once the session has ended, the spec does not name any remaining user-facing destination for that output, while the normal output contract is to return output “to opencode” or to the invocation context.
 
 This is an impossible or at least ambiguous promise as written: a builder can keep the CLI process running, but cannot necessarily return output to a closed session. The likely consequence is a medium-severity design mismatch where agents either drop output silently, invent a persistence surface, or keep session resources alive beyond the stated session lifecycle. A reasonable fix would separate the two promises: whether in-progress operations are cancelled, and where completion output is delivered if the invoking session no longer exists.
+
+## 2026-06-23 — audit-barrage lift (20260623T033330702Z-031-opencode-support-after_clarify)
+
+Code-sha: b2a2693d048c1b63c10358b084c977ee4042c8e4
+### AUDIT-20260623-145 — Interactive CLI hang — spec promises "clear error" but no timeout or detection mechanism is promised
+
+Finding-ID: AUDIT-20260623-145
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US1 Note, FR-003, FR-006
+
+US1's note states: "Commands that require interactive input will fail with a clear error message." FR-003 similarly says "Interactive CLI prompts are not supported." The spec makes a user-visible promise that such invocations fail with a clear error. However, `stackctl` invoked non-interactively with a command that requires input (e.g., `/stack-control:define` without arguments when `stackctl define` awaits stdin for a feature name) will not fail with a non-zero exit code — it will block, waiting on stdin indefinitely. FR-006 covers CLI errors via "non-zero exit codes"; a hung process produces no exit code and no stderr, so FR-006 never fires.
+
+The blast radius is high because the spec promises a clear failure path for a foreseeable user action (bare `/stack-control:define` invocation), but the implementation path implied by the spec — delegate to CLI, capture exit code, report on error — cannot deliver that promise when the CLI hangs rather than fails. An unattended builder following the spec would produce a plugin where invoking `/stack-control:define` without arguments freezes the opencode session indefinitely. The spec would need to either add an explicit timeout promise ("the plugin MUST kill the CLI process and report an error after N seconds of no output") or state that interactive-prompt detection is the CLI's responsibility (e.g., `stackctl` must detect it's running non-interactively and fail immediately). Neither mechanism is currently promised.
+
+---
+
+### AUDIT-20260623-146 — SC-001 success criterion depends on an unspecified precondition
+
+Finding-ID: AUDIT-20260623-146
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-001, US2 AS1
+
+SC-001: "Users can install the stack-control plugin by copying `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts` and invoke `/stack-control:define` within 5 minutes of first opening opencode." US2 AS1: "Given user has the stack-control plugin file, When they copy it…"
+
+The spec never states where `opencode-plugin.ts` comes from. SC-001 is the primary P1 success criterion, and it is untestable as written because the tester cannot establish the precondition ("having the plugin file") from information in the spec. The spec mentions two installation paths — local copy and npm — but does not commit to a canonical source for the local-copy path (the stack-control GitHub repository? a releases page? a directory inside an existing stack-control installation?). US2's "primary supported path" is local copy, but the adoption journey for a new user begins with "where do I get `opencode-plugin.ts`?" — a question this spec never answers.
+
+A user following only the spec and the 5-minute window would have no path to obtaining the file. The blast radius is high because SC-001 is the defined measure of success for the feature's core P1 value proposition, and it cannot be verified or replicated without the unspecified precondition. A reasonable fix: add a requirement (e.g., "The plugin file MUST be available at a documented location — either a path within the stack-control repository or a release artifact URL — and that location MUST be referenced in the plugin's README") so the acceptance path is fully walkable from the spec.
+
+---
+
+### AUDIT-20260623-147 — FR-012 and FR-007 produce double-message noise when CLI is absent
+
+Finding-ID: AUDIT-20260623-147
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-007, FR-012
+
+FR-012: "The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked. Version detection failures are non-blocking warnings; the skill continues to execute." FR-007: "The plugin MUST provide a clear error message when `stackctl` CLI is not found."
+
+When `stackctl` is not installed at all, the version detection attempt (FR-012) will fail — not with a mismatch, but with a "CLI not found" signal. Per FR-012, version detection failures are non-blocking: the skill continues to execute. The skill then immediately fails again because `stackctl` is not installed, triggering FR-007's blocking error. The result is two user-facing messages for a single root cause: first a non-blocking version-detection warning, then a blocking "CLI not found" error.
+
+The spec does not disambiguate whether a "CLI not found" condition during version detection should short-circuit directly to the FR-007 error path (suppressing the version-detection warning) or whether the double-message pattern is intended. An unattended builder reading FR-012 in isolation would implement "all version detection failures are non-blocking" without carving out the "CLI not found" sub-case — producing the double-message UX. A reasonable fix: add a clarification to FR-012 or FR-007 stating that if the CLI is not found during version detection, the plugin must skip the non-blocking warning and proceed directly to the blocking FR-007 error rather than emitting both.
+
+---
+
+### AUDIT-20260623-148 — US1 AS3 "stack-control installation context" is undefined and conflicts with the working-directory promise
+
+Finding-ID: AUDIT-20260623-148 (claude-04 + codex-01; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=high
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US1 AS2, US1 AS3, US3 AS1
+
+US1 AS2: "plugin delegates to the local `stackctl` CLI with the opencode session's active project/workspace as the working directory." US3 AS1: "the plugin invokes `stackctl <command>` via the shell API with the opencode session's active project/workspace as the working context." US1 AS3: "the skill executes in the stack-control installation context."
+
+The phrase "stack-control installation context" in AS3 is undefined. Three plausible readings: (a) the directory where `stackctl` is installed (e.g., a global npm prefix or plugin cache), (b) the root directory of the stack-control plugin within this repository, or (c) the active project/workspace — consistent with AS2 and US3 AS1. AS3 is specifically testing `--help`, so the working directory has no effect on the outcome of that particular acceptance scenario. This makes the conflict invisible in testing: a builder who tests only AS3 in isolation will never notice the phrasing diverges from AS2 and US3 AS1.
+
+The blast radius is medium because the divergence does not affect `--help` outputs. However, a careful builder reading AS3 as authoritative might implement a different CWD strategy for some code path — or simply leave AS3 as untestable dead wording that introduces future confusion. The term "installation context" should either be defined or replaced with "active project/workspace" to align with the consistent promise in AS2 and US3 AS1.
+
+---
+
+### AUDIT-20260623-149 — FR-004 leaves argument-tokenization responsibility ambiguous
+
+Finding-ID: AUDIT-20260623-149
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-004
+
+FR-004: "The plugin MUST forward skill arguments to the CLI as command arguments, preserving opencode command argument token boundaries and quoting semantics (e.g., `/stack-control:define "opencode support"` passes command `define` and one argument with value `opencode support` to `stackctl`)"
+
+The phrase "preserving opencode command argument token boundaries" imports opencode's tokenization contract by reference. The spec does not state whether the plugin receives arguments pre-tokenized as an array (opencode handles tokenization, plugin just forwards the tokens) or as a raw post-command string (the plugin must tokenize). The example covers one case (a single quoted argument containing a space) but does not address edge cases that diverge depending on who owns tokenization: `--name='foo bar'`, multiple quoted arguments, arguments containing both spaces and quotes, or arguments with shell special characters.
+
+The blast radius is low because the example is clear for the common case, and most builders would assume opencode provides pre-tokenized arguments (the more natural plugin API shape). But if opencode passes a raw string, a builder following only the example would produce a plugin that mishandles quote-within-quote or mixed-quoting arguments. A reasonable fix: explicitly state "opencode provides pre-tokenized arguments as an array; the plugin forwards them positionally" or "the plugin receives a raw argument string and is responsible for shell-safe tokenization."
+
+### AUDIT-20260623-150 — Command-palette registration and event fallback split the same commands into ambiguous execution paths
+
+Finding-ID: AUDIT-20260623-150
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:77-81`, `plugins/stack-control/specs/031-opencode-support/spec.md:116`, `plugins/stack-control/specs/031-opencode-support/spec.md:122`
+
+US4 says registered skills are handled by opencode’s command palette, while unregistered `/stack-control:` commands fall through to an event listener. FR-002 requires registering `define`, `extend`, `execute`, `workflow`, and `roadmap`; FR-008 also says the plugin must map `/stack-control:` prefixed commands to the appropriate skill and return an unknown-command error for unknown commands. The spec never states whether the event listener must ignore already-registered commands, whether registered command execution also flows through the same router, or which path owns errors and output formatting.
+
+The blast radius is medium because a reasonable builder would probably infer one shared router, but the written promises allow duplicate or divergent handling for the five primary commands versus fallback commands. That can produce inconsistent argument parsing, version warnings, or error formatting depending on how the command was invoked. A reasonable fix would state the user-facing invariant: registered and fallback invocations of the same `/stack-control:<verb>` command produce the same behavior, or explicitly define the split.

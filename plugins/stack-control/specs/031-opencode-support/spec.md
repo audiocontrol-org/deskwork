@@ -20,11 +20,11 @@ Opencode users want to use stack-control's governance and lifecycle capabilities
 
 **Acceptance Scenarios**:
 
-1. **Given** opencode is installed with the stack-control plugin, **When** user types `/stack-control:define --help`, **Then** the skill is invoked and displays `stackctl define` usage
+1. **Given** opencode is installed with the stack-control plugin, **When** user types `/stack-control:define --help`, **Then** the skill is invoked and displays `stackctl define --help` output
 2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI with the opencode session's active project/workspace as the working directory
-3. **Given** user is in an opencode session, **When** they invoke `/stack-control:extend --help`, **Then** the skill executes in the stack-control installation context
+3. **Given** user is in an opencode session, **When** they invoke `/stack-control:extend --help`, **Then** the skill executes and displays `stackctl extend --help` output
 
-Note: Interactive CLI prompts are not supported. Commands that require interactive input will fail with a clear error message. Non-interactive commands (e.g., with `--help`, `--version`, or required arguments) are supported.
+Note: Interactive CLI prompts are not supported. Commands that require interactive input will fail with a clear error message. Non-interactive commands (e.g., with `--help`, `--version`, or required arguments) are supported. All skill invocations use the opencode session's active project/workspace as the working directory.
 
 ---
 
@@ -78,7 +78,7 @@ Stack-control skills must be properly mapped to opencode's event system. Users s
 2. **Given** user types `/stack-control:define`, **When** the command is invoked, **Then** it appears in opencode's command palette and executes the skill
 3. **Given** plugin loads, **When** the plugin function is called, **Then** it registers the primary lifecycle skills with opencode
 
-Note: Registered skills are handled by opencode's command palette; unregistered `/stack-control:` commands fall through to the event listener.
+Note: Registered and unregistered `/stack-control:` commands produce identical behavior for the same verb. The command palette handles registered skills; the event listener handles unregistered commands.
 
 ---
 
