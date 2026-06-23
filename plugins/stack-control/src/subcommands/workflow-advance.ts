@@ -6,9 +6,11 @@
 import { spawnSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { loadRoadmap } from '../roadmap/roadmap-model.js';
 import { setField } from '../roadmap/mutations.js';
 import { describeCriterion, evaluateGate } from '../workflow/gate-eval.js';
 import { derivePhase } from '../workflow/phase-derivation.js';
+import { firstDanglingMergedItem } from '../workflow/merge-signal.js';
 import { buildItemContext } from '../workflow/workflow-context.js';
 import type { EffectContext } from '../workflow/effects.js';
 import { applyTransition, previewTransition } from '../workflow/transition-engine.js';
@@ -31,6 +33,20 @@ function effectContextFor(r: Resolved, transition: Transition, extra: Record<str
 
 export function emitAdvance(itemId: string, apply: boolean, values: Record<string, string>): void {
   const r = resolve(itemId);
+  // 032 US3 backstop (FR-009 / AUDIT-20260623-06): `workflow advance` is a mutating
+  // lifecycle WAYPOINT, so it shares the off-rail backstop the compass + close step enforce —
+  // not only raw git/gh is gated. While a merged-but-status-in-flight item dangles, forward
+  // motion for ANY OTHER item is refused (naming it + the reconcile command). EXEMPTION: the
+  // dangling item's OWN advance is the reconcile (records its status) and is never blocked.
+  const dangling = firstDanglingMergedItem(loadRoadmap(r.roadmapPath, r.opts), r.root);
+  if (dangling !== null && dangling.itemId !== itemId) {
+    process.stderr.write(
+      `workflow advance ${itemId}: REFUSED — a merged-but-status-in-flight item exists ` +
+        `('${dangling.itemId}'); forward lifecycle motion is blocked until it is reconciled — run ` +
+        `\`stackctl workflow advance ${dangling.itemId} --apply\` to record its status, then retry\n`,
+    );
+    process.exit(4);
+  }
   const { inputs, gate } = buildItemContext(r.root, r.item);
   const phase = derivePhase(r.doc, inputs);
   if (phase.kind === 'side-state') {

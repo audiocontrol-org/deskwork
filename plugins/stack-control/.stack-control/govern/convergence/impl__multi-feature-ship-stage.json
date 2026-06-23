@@ -10,13 +10,13 @@
   "rounds": 1,
   "liftedFindings": [
     {
-      "id": "0ea2f057e7b497cf::AUDIT-BARRAGE-claude-04+AUDIT-BARRAGE-codex-01",
-      "title": "`start-merging` transition is a refusal surface only — structurally unreachable as a firable path via `workflow advance`",
+      "id": "0ea2f057e7b497cf::AUDIT-BARRAGE-codex-01",
+      "title": "`workflow advance` can record `shipped` without the merge/CI half of the weld",
       "severity": "high"
     },
     {
       "id": "0ea2f057e7b497cf::AUDIT-BARRAGE-codex-02",
-      "title": "Feature-branch upstreams are mistaken for default-branch merges",
+      "title": "The off-rail backstop is only wired into compass/close, not the mutating `workflow advance` path",
       "severity": "high"
     }
   ],

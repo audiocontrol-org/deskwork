@@ -69,3 +69,31 @@ Surface:    src/session/git.ts:91-105, src/session/git.ts:133-141, src/workflow/
 `mergedButInFlight` treats a convergence-record commit as merged when `isReachableFromBase(recordCommit, root) === true`. But `isReachableFromBase` uses `resolveBase`, and `resolveBase` prefers `@{upstream}` before `origin/HEAD`, `origin/main`, or `origin/master`. On a normal feature branch tracking `origin/feature`, pushing the convergence record to that feature branch makes the record commit reachable from the upstream, even though it has not landed on `origin/main`.
 
 That creates a false dangling-merge signal: compass/close/session advisory will report “merged-but-status-in-flight” and block forward motion before any off-rail merge happened. The blast radius is high because it can block ordinary pre-merge feature work for any branch with an upstream. The merge signal needs a default-branch resolver that ignores the current branch upstream, plus a test where `origin/feature` contains the record commit but `origin/main` does not, and `mergedButInFlight` returns null.
+
+## 2026-06-23 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260623-05 — `workflow advance` can record `shipped` without the merge/CI half of the weld
+
+Finding-ID: AUDIT-20260623-05
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/workflow-advance.ts:32-104; skills/ship/SKILL.md:42-66; src/__tests__/workflow/advance-graduate-at-merge.test.ts:61-76
+
+`/stack-control:ship` says the invariant is “operator confirms CI green → merge → fire graduate” and that steps 3 and 4 are “one welded operation” (skills/ship/SKILL.md:42-66). But the CLI core exposes the `graduate` transition through plain `stackctl workflow advance <item> --apply`; `emitAdvance` only derives the current phase, checks the `graduate-impl` gate, and applies the transition effects (src/subcommands/workflow-advance.ts:32-104). There is no evidence input that a PR was merged or that CI was confirmed.
+
+The new test locks this in by proving a local repo with no remote can record `status: shipped` via `workflow advance --apply` (src/__tests__/workflow/advance-graduate-at-merge.test.ts:61-76). Remote-independent status recording is valid, but as implemented the “merge is the event” invariant is unenforced on the advertised CLI-first surface. Blast radius is high: an unattended agent following the CLI surface can mark an unmerged feature as shipped, moving it into `validating`/release territory without the operator-owned merge ever happening. A reasonable correction would make the merge action and status recording a single command surface, or require an explicit operator-provided merge confirmation/evidence token for the `graduate` transition rather than exposing it as generic advance.
+
+### AUDIT-20260623-06 — The off-rail backstop is only wired into compass/close, not the mutating `workflow advance` path
+
+Finding-ID: AUDIT-20260623-06
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/workflow/compass-resolve.ts:56-77; src/workflow/compass.ts:84-95; src/subcommands/workflow-advance.ts:32-104
+
+The dangling merge signal is computed in `resolveCompass` and passed into `computeVerdict` (src/workflow/compass-resolve.ts:56-77), where phase-bearing forward intents are refused while any merged-but-status-in-flight item exists (src/workflow/compass.ts:84-95). But `emitAdvance` does not call `resolveCompass`, `firstDanglingMergedItem`, or any equivalent guard before applying a forward transition (src/subcommands/workflow-advance.ts:32-104).
+
+That leaves a front-door mutating command able to advance unrelated lifecycle items while the cross-item backstop is active. The tests cover the close command’s backstop path, but not generic `workflow advance` on another item. Blast radius is high because `workflow advance` is a stackctl lifecycle surface, not raw `git`/`gh`; an adopter or unattended agent can bypass the promised “refuses forward lifecycle motion at the next workflow waypoint” behavior without leaving the stack-control CLI. The guard should be shared by the mutating advance path, with the same reconcile exemption used by compass.
