@@ -67,4 +67,19 @@ describe('024 FR-004 — intent vocabulary single-sourced from WORKFLOW.md work 
     expect(known).toContain('session-end');
     expect(known).not.toContain('frobnicate');
   });
+
+  it('a custom WORKFLOW.md without phase:closed does NOT break the vocabulary (AUDIT-20260623-06)', () => {
+    // An adopter override (.stack-control/WORKFLOW.md) may legitimately lack the
+    // `closed` phase. The hardcoded `close -> closed` alias must NOT make the whole
+    // vocabulary construction throw (which would break compass intent handling for
+    // EVERY intent) — a missing alias target just makes that one intent unavailable.
+    const full = doc();
+    const noClosed = { ...full, phases: full.phases.filter((p) => p.id !== 'closed') };
+    expect(() => buildIntentVocabulary(noClosed)).not.toThrow();
+    const vocab = buildIntentVocabulary(noClosed);
+    expect(vocab.has('close')).toBe(false); // close unavailable (no closed phase)
+    expect(vocab.get('ship')).toBe('shipped'); // the other aliases still resolve
+    expect(resolveIntent(noClosed, 'close')).toBeNull(); // -> caller's loud unknown-intent exit
+    expect(resolveIntent(noClosed, 'design')).toEqual({ kind: 'phase', phase: 'designing' });
+  });
 });
