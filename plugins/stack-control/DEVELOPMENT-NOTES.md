@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-06-23: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 12
+  - roadmap(032-ship-stage): record analyze-clean (speckit-analyze 0 critical/high)
+  - analyze(032-ship-stage): resolve F1 coherence finding (collapse to 4-phase)
+  - tasks(032-ship-stage): author tasks.md via speckit-tasks
+  - checklist(032-ship-stage): requirements-quality checklist via speckit-checklist
+  - plan(032-ship-stage): author plan + design artifacts via speckit-plan
+  - spec(032-ship-stage): clarify — resolve merge-detection + CI-gating forks
+  - spec(032-ship-stage): author spec.md via speckit-specify
+  - roadmap(ship-stage): record design-approved + lineage edges
+  - design(ship-stage): design record + designing-phase pointer
+  - Merge remote-tracking branch 'origin/main' into feature/stack-control
+  - chore: release v0.54.0
+  - Merge pull request #498 from audiocontrol-org/feature/stack-control
+- Files changed: 34
+- Backlog touched: TASK-445
+
 ## 2026-06-23: transitive-item-closure — implement → 8-round govern → graduate → merge (v0.54.0) → close + ship-stage capture
 
 **Goal:** Pick up `multi:gap/transitive-item-closure` at the implementation handoff (the prior session authored it to runnable) and drive it through the stack-control front door to graduated → merged → validated → closed — the implementation half of the two-session boundary.
