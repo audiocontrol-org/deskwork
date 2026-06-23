@@ -66,8 +66,13 @@ export function resolveImplementExclusion(
   const excludePathRels =
     featureRoot !== undefined ? (excludePaths ?? []).map(relify).filter(inRepo) : [];
   const excludeDiffRels = [
+    // The feature's OWN root: exclude only its audit-log (self-reference generator) —
+    // its code is the audit target and must stay in scope.
     ...(featureInside ? [`${featureRel}/audit-log.md`] : []),
-    ...otherFeatureRels.map((root) => `${root}/audit-log.md`),
+    // TASK-428: every OTHER in-repo feature root is excluded WHOLE (not just its
+    // audit-log.md), so an unrelated parked scaffold (e.g. specs/002/scaffold.md) can't
+    // enter the current feature's chunked payload and generate false findings.
+    ...otherFeatureRels,
     ...excludePathRels,
   ];
   return {

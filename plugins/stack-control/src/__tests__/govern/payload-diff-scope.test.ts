@@ -336,7 +336,7 @@ describe('030 — diff-scope exclusion (AUDIT-20260622-02)', () => {
     expect(filterDiffScope(scope, [])).toBe(scope);
   });
 
-  it('resolveImplementExclusion yields the own + other-feature audit-logs and caller excludePaths', () => {
+  it('resolveImplementExclusion excludes the OWN audit-log, WHOLE other-feature roots, and caller excludePaths (TASK-428)', () => {
     const root = '/install';
     const ex = resolveImplementExclusion(
       root,
@@ -344,10 +344,36 @@ describe('030 — diff-scope exclusion (AUDIT-20260622-02)', () => {
       ['/install/specs/030-feat', '/install/specs/029-other'],
       ['/install/.stack-control/backlog'],
     );
+    // Own feature: only its audit-log is excluded — its CODE is still audited.
     expect(ex.excludeDiffRels).toContain('specs/030-feat/audit-log.md');
-    expect(ex.excludeDiffRels).toContain('specs/029-other/audit-log.md');
+    // TASK-428: another feature's WHOLE root is excluded (not just its audit-log.md),
+    // so an unrelated parked scaffold can't enter the current feature's payload.
+    expect(ex.excludeDiffRels).toContain('specs/029-other');
+    expect(ex.excludeDiffRels).not.toContain('specs/029-other/audit-log.md');
     expect(ex.excludeDiffRels).toContain('.stack-control/backlog');
     // The feature's own root is NOT double-listed as an "other" feature.
     expect(ex.otherFeatureRels).not.toContain('specs/030-feat');
+  });
+
+  it('TASK-428 — a whole other-feature root drops its parked scaffold via filterDiffScope', () => {
+    const ex = resolveImplementExclusion(
+      '/install',
+      '/install/specs/030-feat',
+      ['/install/specs/030-feat', '/install/specs/002-unrelated'],
+      [],
+    );
+    const scope = {
+      base: 'B',
+      head: 'H',
+      files: ['specs/030-feat/src/app.ts', 'specs/002-unrelated/scaffold.md'],
+      fileDiffs: new Map([
+        ['specs/030-feat/src/app.ts', 'a'],
+        ['specs/002-unrelated/scaffold.md', 'b'],
+      ]),
+    };
+    const filtered = filterDiffScope(scope, ex.excludeDiffRels);
+    // The current feature's code stays; the unrelated feature's scaffold is dropped.
+    expect(filtered.files).toContain('specs/030-feat/src/app.ts');
+    expect(filtered.files).not.toContain('specs/002-unrelated/scaffold.md');
   });
 });
