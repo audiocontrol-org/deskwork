@@ -1,6 +1,6 @@
 // Roadmap graph queries (006 US1, R4). Derived views over the typed WorkItem
 // graph — never persisted. `ready` is the in-degree-zero frontier under the
-// "satisfied iff shipped" rule; `blockedBy` explains why an item is not ready.
+// "satisfied iff shipped-or-closed" rule; `blockedBy` explains why an item is not ready.
 // `part-of` is ignored for readiness (non-blocking grouping).
 
 import { topoOrder } from '../document-model/edges.js';
@@ -8,10 +8,21 @@ import { compareUnits } from '../document-model/ordering.js';
 import { DocumentModelError } from '../document-model/types.js';
 import type { RoadmapModel, WorkItem } from './roadmap-model.js';
 
-/** The single status that satisfies a `depends-on` edge (R4/FR-003). */
-const SATISFYING_STATUS = 'shipped';
+/**
+ * The statuses that satisfy a `depends-on` edge (R4/FR-003). A dependency is met
+ * once it reaches a SUCCESSFUL terminal: `shipped`, OR `closed` — the post-ship
+ * terminal (031) a shipped item advances to, which is strictly *more* done than
+ * shipped, so it must keep satisfying its dependents (AUDIT-20260623-02). NOT all
+ * terminal statuses: `cancelled`/`retired` remain permanent blockers (never met).
+ */
+const SATISFYING_STATUSES: readonly string[] = ['shipped', 'closed'];
 
-/** A non-shipped dependency that blocks an item, with its current status. */
+/** True iff `status` satisfies a `depends-on` edge (shipped, or the post-ship closed). */
+function isSatisfyingStatus(status: string): boolean {
+  return SATISFYING_STATUSES.includes(status);
+}
+
+/** An unsatisfied dependency (not shipped/closed) that blocks an item, with its current status. */
 export interface Blocker {
   readonly identifier: string;
   readonly status: string;
@@ -28,7 +39,7 @@ export function isTerminal(model: RoadmapModel, item: WorkItem): boolean {
   return model.doc.grammar.terminalStatuses.includes(item.status);
 }
 
-/** The non-shipped `depends-on` targets of an item, each with its status. */
+/** The unsatisfied `depends-on` targets of an item (not shipped/closed), each with its status. */
 function unmetDependencies(model: RoadmapModel, item: WorkItem): Blocker[] {
   const blockers: Blocker[] = [];
   for (const dep of item.dependsOn) {
@@ -40,7 +51,7 @@ function unmetDependencies(model: RoadmapModel, item: WorkItem): Blocker[] {
         `roadmap item '${item.identifier}' depends-on '${dep}', which is not in the model (referential integrity should have caught this at load)`,
       );
     }
-    if (target.status !== SATISFYING_STATUS) {
+    if (!isSatisfyingStatus(target.status)) {
       blockers.push({ identifier: target.identifier, status: target.status });
     }
   }
