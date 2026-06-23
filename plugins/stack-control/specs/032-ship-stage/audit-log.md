@@ -40,7 +40,7 @@ Blast radius: an off-rail merged item can proceed into the release skill while i
 ### AUDIT-20260623-03 — `start-merging` transition is a refusal surface only — structurally unreachable as a firable path via `workflow advance`
 
 Finding-ID: AUDIT-20260623-03 (claude-04 + codex-01; cross-model)
-Status:     open
+Status:     fixed-3b353598
 Severity:   high
 Per-lane:   claude=informational, codex=high
 Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
@@ -60,7 +60,7 @@ This is a design choice, not a defect: `start-merging` provides a meaningful ref
 ### AUDIT-20260623-04 — Feature-branch upstreams are mistaken for default-branch merges
 
 Finding-ID: AUDIT-20260623-04
-Status:     open
+Status:     fixed-3b353598
 Severity:   high
 Per-lane:   codex=high
 Decision:   single-model (gate-counted high)
