@@ -21,8 +21,10 @@ Opencode users want to use stack-control's governance and lifecycle capabilities
 **Acceptance Scenarios**:
 
 1. **Given** opencode is installed with the stack-control plugin, **When** user types `/stack-control:define`, **Then** the skill is invoked and the spec authoring chain begins
-2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI
+2. **Given** user has invoked a stack-control skill, **When** the skill requires CLI operations, **Then** the plugin delegates to the local `stackctl` CLI with the opencode session's active project/workspace as the working context
 3. **Given** user is in an opencode session, **When** they invoke `/stack-control:extend`, **Then** the skill executes in the installation context
+
+Note: `/stack-control:workflow` is a lifecycle management command that delegates to `stackctl workflow`. Its successful output is a valid workflow status report from the CLI.
 
 ---
 
@@ -88,9 +90,8 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 
 1. **Given** user runs `/stack-control:version`, **When** the command is invoked, **Then** plugin reports only its version
 2. **Given** CLI version differs from plugin version, **When** user runs a skill, **Then** a warning is displayed about version mismatch
-3. **Given** user runs `/stack-control:version`, **When** the command is invoked, **Then** the plugin version is displayed
 
-Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. CLI version detection happens silently for mismatch warnings on skill invocation.
+Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. CLI version detection happens silently for mismatch warnings on skill invocation. Users who need to verify alignment must compare the plugin version (from `/stack-control:version`) to the CLI version (from `stackctl --version`).
 
 ---
 

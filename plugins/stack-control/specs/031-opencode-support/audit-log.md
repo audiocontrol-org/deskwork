@@ -1420,3 +1420,98 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (FR-009, FR
 FR-009 specifies local installation as `.opencode/plugins/stack-control.ts` — a raw TypeScript file. FR-010 requires npm package installation where "npm package entrypoint is the same single file." Publishing raw TypeScript as an npm package entrypoint is only viable if opencode's npm plugin loader handles TypeScript source the same way as locally-copied `.ts` files. If opencode compiles local plugins from TypeScript but loads npm packages as pre-compiled JavaScript (the conventional npm expectation), then "same single file" is self-contradictory: the local path is a `.ts` source file, but the npm entrypoint would need to be compiled JavaScript.
 
 The Assumptions section does not include any claim that opencode's npm plugin loading supports TypeScript source. Without this assumption, FR-010's "same single file" promise may be impossible to satisfy while also satisfying FR-009's `.ts` extension requirement. A reasonable fix either adds an Assumption that opencode's npm loader supports TypeScript source, or acknowledges that the npm package ships compiled JavaScript (making it technically a different file format from the local `.ts` copy, with the "same single file" claim requiring clarification).
+
+## 2026-06-23 — audit-barrage lift (20260623T015519382Z-031-opencode-support-after_clarify)
+
+Code-sha: a76efbf06ca400cb92b0cae4284fd625fae409a1
+### AUDIT-20260623-75 — `version` is registered in Clarifications (6 skills) but not in FR-002, Key Entities, or US4-SC3 (5 skills) — creating an unresolvable routing gap at FR-008
+
+Finding-ID: AUDIT-20260623-75
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (FR-002, Key Entities, US4-SC3, Clarifications, FR-008, FR-011)
+
+Three sections of the spec give an enumeration of registered skills that excludes `version`: FR-002 ("register the primary lifecycle skills when loaded (`define`, `extend`, `execute`, `workflow`, `roadmap`)"), Key Entities ("The set of skills registered by the plugin is: `define`, `extend`, `execute`, `workflow`, `roadmap`"), and US4-SC3 ("it registers the primary lifecycle skills (`define`, `extend`, `execute`, `workflow`, `roadmap`) with opencode"). The Clarifications section contradicts all three: "Which stack-control skills are registered with opencode? → A: `define`, `extend`, `execute`, `workflow`, `roadmap`, `version` (primary lifecycle skills + version command)." The spec has four sections that address this exact question and produces two different authoritative answers.
+
+This contradiction directly cascades into FR-008's routing behavior. FR-008 says: "The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill; unknown commands produce a clear 'unknown stack-control command' error." FR-011 separately says: "The plugin MUST expose a `/stack-control:version` command that reports only the plugin version." The spec never says whether FR-011's `version` command is: (a) an entry in FR-002's registered-skill list (which would make Clarifications authoritative and FR-002's enumeration wrong), or (b) a special-case command handled before FR-008's routing fires (which would make FR-002 authoritative but require an explicit exemption clause in FR-008). An unattended builder implementing FR-008's routing table from FR-002's 5-skill list would route `/stack-control:version` to the "unknown command" error handler — making FR-011 impossible to satisfy without adding an undocumented special case. The spec never acknowledges this gap, let alone resolves it. Blast-radius: high — an agent building FR-008 first from the formal requirements would build exactly this wrong behavior, and the spec offers no correction.
+
+A reasonable fix: add `version` to FR-002's enumeration with a note that it is handled plugin-locally per FR-003/FR-011 (not delegated to the CLI), and update Key Entities and US4-SC3 to match. Alternatively, add a sentence to FR-008 stating that `version` is exempted from its unknown-command routing.
+
+---
+
+### AUDIT-20260623-76 — FR-012's "version mismatch" trigger is undefined — any version difference or only breaking-level differences?
+
+Finding-ID: AUDIT-20260623-76
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (FR-012, US5-SC2)
+
+FR-012: "The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked." US5-SC2: "Given CLI version differs from plugin version, When user runs a skill, Then a warning is displayed about version mismatch." US5-SC2 says "differs" without qualification, which a literal reading maps to: any version difference at all triggers a warning. Under this reading, a plugin at 1.0.1 paired with a CLI at 1.0.0 produces a warning on every skill invocation — a plausible but probably unintended UX.
+
+The spec never defines version compatibility semantics: is the threshold major-version change? any semver incompatible change? any version difference? Without this definition, FR-012 is an unmeasurable requirement — there is no test that can definitively confirm whether the plugin "correctly detected a mismatch" because the spec has not defined what detection threshold is correct. Blast-radius: medium — an unattended builder will make a reasonable-seeming choice (likely "any difference") that may be wrong, producing either warning fatigue or silent incompatibility, neither of which the spec catches because it never states the intended threshold.
+
+A reasonable fix: add one sentence to FR-012 defining the threshold (e.g., "version mismatch is defined as a difference in major version component" or "any version string inequality") so the requirement is testable.
+
+---
+
+### AUDIT-20260623-77 — SC-004 commits to "1.0 and later" then immediately hedges future compatibility away — the criterion is self-contradictory and untestable
+
+Finding-ID: AUDIT-20260623-77
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (SC-004)
+
+SC-004: "Plugin works with opencode versions 1.0 and later (tested against opencode 1.0+; compatibility with future versions depends on opencode's plugin API stability)."
+
+The bare criterion "works with opencode versions 1.0 and later" is a forward-looking compatibility commitment: it says the plugin works with all current and future 1.x releases. The parenthetical immediately conditions this away: "compatibility with future versions depends on opencode's plugin API stability." These claims cannot both be true simultaneously — "1.0 and later" is unconditional; "depends on API stability" is conditional. If the intent is "we tested against 1.0 and make no forward commitment," that is a different, weaker claim than what the opening clause states.
+
+Beyond the internal contradiction, the criterion as written is not testable: testing "1.0 and later" requires testing against unreleased future versions; the parenthetical hedge licenses treating any future incompatibility as "not our problem." An unattended builder cannot write a definitive test against SC-004 because the spec never resolves which half of the criterion is authoritative — must tests cover all released 1.x versions? only 1.0? whatever is available? Blast-radius: the spec's quality is the issue rather than the implementation, but a downstream QA agent would likely write a test against 1.0 only and declare SC-004 satisfied, leaving the broader compatibility claim unverified.
+
+A reasonable fix: split into a testable "tested against" claim and a separate design note about expected API stability, e.g.: "Plugin is tested against opencode 1.0. The plugin API surface used (`command.executed` events, shell API) is expected to remain stable across opencode 1.x releases, but compatibility with future versions is not guaranteed."
+
+---
+
+### AUDIT-20260623-78 — US3-SC3 says the plugin "formats and returns" CLI output, but no FR defines any formatting behavior
+
+Finding-ID: AUDIT-20260623-78
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (US3-SC3, FR-005)
+
+US3 Acceptance Scenario 3: "Given CLI command completes, When output is returned, Then the plugin formats and returns it to opencode." FR-005: "The plugin MUST capture CLI output and return it to opencode." FR-005 omits the word "formats" and imposes no transformation requirements on the output. The acceptance scenario implies a defined formatting step; the corresponding functional requirement does not.
+
+If "formats" is meaningful — stripping ANSI codes, wrapping in a structured response, applying markdown, or any other transformation — the behavior is missing from the formal requirements and an unattended builder would miss it. If "formats" is just informal phrasing for "returns," the acceptance scenario language is misleading and should be replaced with language matching FR-005. Blast-radius: low — an unattended builder would return raw stdout and this is likely exactly right; the gap only matters if a specific formatting behavior was intended.
+
+### AUDIT-20260623-79 — `/stack-control:version` cannot verify version alignment as promised
+
+Finding-ID: AUDIT-20260623-79
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:79-93`, `plugins/stack-control/specs/031-opencode-support/spec.md:119-120`
+
+US5 promises “Users should be able to verify version alignment” and its independent test says the feature “can be fully tested by comparing plugin version to CLI version” (`lines 81-85`). But the accepted behavior for `/stack-control:version` is explicitly plugin-only: it “reports only its version” (`line 89`), FR-011 repeats that it reports “only the plugin version” (`line 119`), and the note says CLI version detection happens silently only for mismatch warnings on skill invocation (`line 93`).
+
+As written, a user can detect a mismatch only indirectly after running a skill, and cannot verify alignment when there is no mismatch warning. The blast radius is medium because a builder would likely implement the stated plugin-only version command correctly, but the delivered UX would fail US5’s stated verification promise. A reasonable fix would either remove the “verify alignment” promise/test, or add a distinct user-facing behavior that reports both plugin and CLI versions without contradicting `/stack-control:version`’s plugin-only contract.
+
+### AUDIT-20260623-80 — `workflow` is required as a happy-path skill but has no user-facing contract
+
+Finding-ID: AUDIT-20260623-80
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:9`, `plugins/stack-control/specs/031-opencode-support/spec.md:73-75`, `plugins/stack-control/specs/031-opencode-support/spec.md:109-120`, `plugins/stack-control/specs/031-opencode-support/spec.md:133-135`
+
+The spec requires registering and successfully delegating `/stack-control:workflow`: it is listed in the feature input (`line 9`), required by FR-002 (`line 110`), included in SC-002’s five happy-path invocations (`line 134`), and appears in the command registration scenario (`lines 73-75`). But no user story or acceptance scenario states what `workflow` should do, what `stackctl` command it maps to, or what successful output means.
+
+This is not a request for implementation mechanism; it is a missing behavioral promise for one of the five success-criterion commands. The blast radius is medium because an unattended builder will probably infer `stackctl workflow`, but the spec gives no way to distinguish a correct implementation from a merely registered command that calls the wrong lifecycle surface. A reasonable fix would add a one-sentence contract for `/stack-control:workflow`, parallel to the other lifecycle commands, or remove it from the required happy-path list if it is not part of this feature.
