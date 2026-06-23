@@ -246,6 +246,21 @@ function emitAdvance(itemId: string, apply: boolean, values: Record<string, stri
   if (t === undefined) {
     failUsage(`'${itemId}' is in terminal phase '${p.id}'; no forward transition to advance`);
   }
+  // 031 AUDIT-20260623-01: entering the terminal `closed` phase is NOT a generic
+  // workflow advance. Closing is the operator-confirmed TRANSITIVE CASCADE — it
+  // closes the item's whole part-of subtree's recorded backlog ids AND advances
+  // the status, as one action. The generic effect path here would run only the
+  // status-rewrite (`roadmap-advance to=closed`), silently leaving the contained
+  // ids open. Refuse and redirect to the single cascade-running close surface so
+  // there is no second, status-only path to `closed`.
+  if (t.to === 'closed') {
+    failUsage(
+      `'${itemId}': closing is the operator-confirmed transitive cascade — run ` +
+        `\`stackctl roadmap advance ${itemId} --to closed\` (or the /stack-control:close skill), ` +
+        `which closes the item's contained backlog ids AND advances it to 'closed'. ` +
+        `\`workflow advance\` will not perform a status-only close.`,
+    );
+  }
   // 024 US5 / FR-010 (phased): the back-half `governing → shipped` graduation is
   // ENFORCED as a refusal — an unmet exit gate blocks the advance rather than only
   // being reported (022 v1 report-only is retired HERE). Mid-pipeline transitions
