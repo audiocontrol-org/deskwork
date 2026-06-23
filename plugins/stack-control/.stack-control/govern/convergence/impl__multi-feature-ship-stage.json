@@ -5,19 +5,19 @@
   "governedShaBase": "63f53da8",
   "headSha": "HEAD",
   "chunkIds": [
-    "19a6dd710ced9499"
+    "da71a51b05590f41"
   ],
   "rounds": 1,
   "liftedFindings": [
     {
-      "id": "19a6dd710ced9499::AUDIT-BARRAGE-codex-01",
-      "title": "Shared lifecycle precondition drops the new backstop signal",
+      "id": "da71a51b05590f41::AUDIT-BARRAGE-claude-01",
+      "title": "Missing `src/subcommands/no-shortcuts-audit.ts` — import in `weld-no-shortcuts.test.ts` has no matching source",
       "severity": "high"
     },
     {
-      "id": "19a6dd710ced9499::AUDIT-BARRAGE-codex-02",
-      "title": "Backstop refusal suggests a generic `roadmap advance --to shipped` shortcut",
-      "severity": "high"
+      "id": "da71a51b05590f41::AUDIT-BARRAGE-codex-01",
+      "title": "Ship skill records `status: shipped` after the PR is already merged",
+      "severity": "blocking"
     }
   ],
   "closedInLoopFindings": [],

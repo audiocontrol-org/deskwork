@@ -161,3 +161,37 @@ Surface:    src/workflow/compass.ts:90-93; src/subcommands/roadmap.ts:243-254
 The backstop refusal in `computeVerdict()` tells the operator to run either `stackctl workflow advance <dangling> --apply` or `stackctl roadmap advance <dangling> --to shipped --apply` at `src/workflow/compass.ts:90-93`. The second command is not equivalent to the welded reconcile path. `roadmap advance` special-cases only `--to closed`; every other status, including `shipped`, is just the old single-line status rewrite at `src/subcommands/roadmap.ts:243-254`.
 
 That means following the advertised recovery can clear the dangling signal while skipping the `graduate` transition’s required side effects: `roadmap-reconcile`, `journal-append`, and `commit` from `templates/WORKFLOW.md:177-184`. Blast radius is high because this is emitted as the machine’s own recovery instruction in a refusal path, and an unattended operator agent could reasonably execute it. The recovery text should name only `stackctl workflow advance <id> --apply`, or `roadmap advance --to shipped` must be blocked/redirected when it is being used as a ship-stage reconcile shortcut.
+
+## 2026-06-23 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260623-10 — Missing `src/subcommands/no-shortcuts-audit.ts` — import in `weld-no-shortcuts.test.ts` has no matching source
+
+Finding-ID: AUDIT-20260623-10
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/__tests__/workflow/weld-no-shortcuts.test.ts:10
+
+`weld-no-shortcuts.test.ts` (a new file in this diff, T012) imports `scanShortcutAffordances` from `../../subcommands/no-shortcuts-audit.js`:
+
+```typescript
+import { scanShortcutAffordances } from '../../subcommands/no-shortcuts-audit.js';
+```
+
+This module (`src/subcommands/no-shortcuts-audit.ts`) does not appear in the Files in scope list for this chunk, nor does any diff hunk show it being added. The file list includes `src/subcommands/workflow-advance.ts` and `src/subcommands/workflow-shared.ts` (both newly created), but `no-shortcuts-audit.ts` is absent. If the file doesn't exist in the current HEAD, the entire test module fails at import time — none of the three tests in `weld-no-shortcuts.test.ts` can run, including the assertion that the ship SKILL.md has no `--defer`/`--skip` affordance (the primary T012 contract). This is a chunked audit, so the file may exist in another chunk; but as written here, the dependency is unresolved.
+
+---
+
+### AUDIT-20260623-11 — Ship skill records `status: shipped` after the PR is already merged
+
+Finding-ID: AUDIT-20260623-11
+Status:     open
+Severity:   blocking
+Per-lane:   codex=blocking
+Decision:   single-model (gate-counted blocking)
+Surface:    skills/ship/SKILL.md:53-72
+
+The ship skill tells the agent to merge the PR first, then run `stackctl workflow advance <item> --apply`, then `git push` “the branch”. In the normal PR workflow, after `gh pr merge` the default branch has already consumed the PR head as it existed at merge time. The subsequent `workflow advance` commit is created after the merge, on the local branch the agent is sitting on, so pushing that branch does not put the `status: shipped` roadmap change onto the default branch that just received the feature.
+
+That breaks the core weld guarantee: an unattended agent can follow `/stack-control:ship` exactly as written and still land implementation on trunk while the shipped-status commit is not part of the merged PR. The blast radius is blocking because this is the single sanctioned on-rail path, and acting on the skill as written reproduces the feature’s motivating defect. A reasonable fix is to make the git ordering produce one mergeable unit: either record the welded `graduate` commit on the PR branch before the final merge/push, or after the merge explicitly update the default branch and commit/push the status there. The skill should name the required branch/ref behavior, not just “push the branch.”

@@ -53,8 +53,8 @@ remote (FR-013) — only the merge does.
 3. **Merge** the PR (operator-owned merge): `gh pr merge …` (or the operator merges
    in the GitHub UI and tells you it is merged).
 
-4. **Fire `graduate` — non-discretionarily.** Immediately run the `merging →
-   validating` transition, which records `status: shipped`:
+4. **Fire `graduate` — non-discretionarily, ON THE LIFECYCLE BRANCH.** Immediately run
+   the `merging → validating` transition, which records `status: shipped`:
 
    ```bash
    stackctl workflow advance <item> --apply
@@ -65,12 +65,30 @@ remote (FR-013) — only the merge does.
    Steps 3 and 4 are **one welded operation**: there is no branch that merges without
    the recording following, and the skill offers **no** "defer recording" option.
 
-5. **Push** the branch (commit/push early-and-often — the `commit` effect already
-   committed locally; push it):
+   **Git ordering (AUDIT-20260623-11) — the `graduate` commit must land where the
+   roadmap is read.** The `commit` effect writes the `status: shipped` change to the
+   ROADMAP the engine reads — so run `workflow advance` on the **branch that tracks the
+   roadmap** (the long-lived lifecycle branch, or the default branch), NOT on a
+   feature/PR branch that step 3 just merged-and-closed. The merge in step 3 consumed
+   the PR head *as it was before* this commit, so a post-merge `graduate` commit left
+   only on a discarded PR branch would never reach the trunk the merge updated — the
+   roadmap on the lifecycle branch would say `shipped` while the trunk still reads
+   `in-flight`, the exact split this feature exists to prevent. **If your workflow uses
+   a per-feature branch, switch to the lifecycle/default branch before this step** (the
+   roadmap status is a trunk-level fact, not feature-branch-local).
+
+5. **Push the lifecycle branch to its remote** (commit/push early-and-often — the
+   `commit` effect already committed locally):
 
    ```bash
    git push
    ```
+
+   The push must put the `status: shipped` commit on the remote the next reader (the
+   backstop, the next `workflow status`/compass, the next merge to trunk) consults. On
+   the single-long-lived-branch model this is the dev branch itself (it syncs to trunk
+   on the next merge); on a per-feature workflow, push the default branch you recorded on
+   in step 4 — **not** a merged-and-closed feature branch.
 
 ## Postcondition
 
