@@ -59,6 +59,59 @@ export function autoBackLink(
 }
 
 /**
+ * Preflight the auto-back-link WITHOUT mutating anything (031 AUDIT-20260623-04).
+ * Resolves the task's parent-node ref (or an explicit `nodeId`, for the
+ * `promote --node` case where the ref is set only AFTER the promote) and validates
+ * the back-link target against the installation's roadmap via the PURE
+ * `computeCloses` (it loads + requires the node, throwing on an unknown one; it
+ * never writes). The caller runs this BEFORE the backlog mutation (close/promote)
+ * so a stale/missing ref fails loud BEFORE any state change — never leaving a task
+ * `Done`/promoted but unlinked. A no-ref task is a no-op (nothing to preflight).
+ */
+export function preflightAutoBackLink(
+  backend: BacklogBackend,
+  id: string,
+  startDir: string,
+  explicitNode?: string,
+): void {
+  const nodeId = explicitNode ?? readParentNode(backend, id);
+  if (nodeId === null || nodeId === undefined) return;
+  const inst = resolveInstallation(startDir);
+  const opts: LoadOptions = grammarOptsForRoot(inst.root);
+  computeCloses(inst.resolved.roadmap, nodeId, { add: [id] }, opts); // throws on unknown node; no write
+}
+
+/**
+ * Verb-side preflight wrapper: validate the back-link target BEFORE the backlog
+ * mutation, mapping a bad ref / unreadable roadmap / out-of-installation
+ * resolution to a fail-loud exit 1 (mirrors `emitAutoBackLink`'s mapping). Because
+ * this runs before `backend.close`/`promote`, a refusal here means the backlog is
+ * untouched — the operator fixes the ref and retries against a clean state.
+ */
+export function emitPreflightAutoBackLink(
+  backend: BacklogBackend,
+  id: string,
+  startDir: string,
+  explicitNode?: string,
+): void {
+  try {
+    preflightAutoBackLink(backend, id, startDir, explicitNode);
+  } catch (err) {
+    if (
+      err instanceof DocumentModelError ||
+      err instanceof BacklogError ||
+      err instanceof InstallationError
+    ) {
+      process.stderr.write(
+        `backlog: auto-back-link target invalid for ${id} — refusing before the backlog change: ${err.message}\n`,
+      );
+      process.exit(1);
+    }
+    throw err;
+  }
+}
+
+/**
  * The verb-side wrapper (031 US2, FR-011) the `backlog done`/`promote` handlers
  * call after a successful close/promote. Runs `autoBackLink` and reports a newly
  * recorded link; an unknown referenced node / unreadable roadmap / out-of-

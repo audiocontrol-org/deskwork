@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
 import { resolveInstallationBacklog } from '../backlog/root.js';
-import { emitAutoBackLink } from '../backlog/auto-backlink.js';
+import { emitAutoBackLink, emitPreflightAutoBackLink } from '../backlog/auto-backlink.js';
 import { setParentNode } from '../backlog/parent-node.js';
 import { InstallationError } from '../config/errors.js';
 import { scaffoldKey } from '../setup/scaffold.js';
@@ -177,6 +177,9 @@ function emitDone(flags: Flags): void {
     );
     return;
   }
+  // AUDIT-20260623-04: preflight the auto-back-link BEFORE closing — a stale/missing
+  // parent-node ref must fail here, leaving the task un-closed, never Done-but-unlinked.
+  emitPreflightAutoBackLink(backend, id, process.cwd());
   try {
     backend.close(id, reason);
   } catch (err) {
@@ -371,6 +374,13 @@ function emitPromote(flags: Flags): void {
   const backend = createBacklogBackend({ cwd: root });
   const node = flags.values.get('node');
   try {
+    // AUDIT-20260623-04: preflight every id's back-link target BEFORE promoting, so
+    // a bad `--node` (or a stale pre-existing ref) fails before the promote linkage
+    // is written — never promoted-but-unlinked. The effective node is `--node` (set
+    // only after the promote) or the id's existing ref.
+    if (flags.apply) {
+      for (const id of ids) emitPreflightAutoBackLink(backend, id, process.cwd(), node);
+    }
     reportPromote(promote({ ids, target, apply: flags.apply, backend, cwd: process.cwd() }));
     // 031 US2 (FR-010/011): on apply, record the optional parent-node ref on each
     // promoted id then auto-back-link it into that node's closes: set. A no-node

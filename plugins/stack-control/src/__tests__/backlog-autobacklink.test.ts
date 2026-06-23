@@ -89,6 +89,20 @@ describe('031 backlog done auto-back-link (T023)', () => {
     expect(r.status).not.toBe(0);
   });
 
+  it('a bad parent-node ref fails BEFORE closing the task — no Done-but-unlinked (AUDIT-20260623-04)', () => {
+    const inst = makeInstallation(['## multi:feature/n', '- status: shipped']);
+    const backend = createBacklogBackend({ cwd: inst.backlogCwd });
+    const id = backend.create({ title: 'atomic close', labels: ['agent-found', 'type:gap'] });
+    setParentNode(backend, id, 'multi:feature/does-not-exist');
+
+    const r = runCli(['backlog', 'done', id, '--apply', '--reason', 'fixed'], { cwd: inst.root });
+    expect(r.status).not.toBe(0);
+    // The back-link is preflighted BEFORE the backlog mutation, so a failure leaves
+    // the task un-closed (NOT 'Done' with a missing link) — the operator fixes the
+    // ref and retries against a clean state.
+    expect(backend.list().find((i) => i.id === id)!.status).not.toBe(BACKLOG_DONE_STATUS);
+  });
+
   it('auto-back-link is idempotent (an already-present id is a no-op, exit 0)', () => {
     const inst = makeInstallation(['## multi:feature/n', '- status: shipped', '- closes: PLACEHOLDER']);
     const backend = createBacklogBackend({ cwd: inst.backlogCwd });
