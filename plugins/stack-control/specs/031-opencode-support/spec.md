@@ -73,8 +73,10 @@ Stack-control skills must be properly mapped to opencode's event system. Users s
 **Acceptance Scenarios**:
 
 1. **Given** opencode fires a `command.executed` event, **When** the command starts with `/stack-control:`, **Then** the plugin routes it to the appropriate skill
-2. **Given** user types a skill name, **When** the skill is registered, **Then** it appears in opencode's command palette
-3. **Given** plugin loads, **When** the plugin function is called, **Then** it registers the primary lifecycle skills (`define`, `extend`, `execute`, `workflow`, `roadmap`) with opencode
+2. **Given** user types `/stack-control:define`, **When** the command is invoked, **Then** it appears in opencode's command palette and executes the skill
+3. **Given** plugin loads, **When** the plugin function is called, **Then** it registers the primary lifecycle skills with opencode
+
+Note: Registered skills appear in opencode's command palette as `/stack-control:define`, `/stack-control:extend`, etc. (full command names, not bare skill names).
 
 ---
 
@@ -152,7 +154,7 @@ Note: `/stack-control:version` is a routed command, not a registered skill. It i
 
 ## Assumptions
 
-- Users have `stackctl` CLI installed and available in their PATH (or opencode has access to it via shell)
+- Users have `stackctl` CLI installed and available in their PATH (or opencode has access to it via shell) for normal operation. The plugin MUST report a clear error when `stackctl` is not found.
 - Opencode users have basic familiarity with stack-control concepts (roadmap, workflow, phases)
 - The opencode plugin system supports the event hooks needed (command.executed, session events)
 - The plugin detects version mismatch and warns users; users manually resolve mismatches

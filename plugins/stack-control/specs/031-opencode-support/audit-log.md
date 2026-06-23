@@ -1782,3 +1782,82 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:113,132,149
 FR-002 says `/stack-control:version` is “routed but not a registered skill in opencode's command palette,” and the Key Entities note repeats that it “does not appear in opencode's skill registration.” The Clarifications section contradicts that by answering that the registered opencode skills are `define`, `extend`, `execute`, `workflow`, `roadmap`, `version`.
 
 This matters because an unattended builder has two plausible instructions for the command palette surface: register `version` as a skill, or route it only as a command. The blast radius is medium because either choice leaves the version command callable, but one choice violates the intended command-palette contract. A reasonable fix is to make the clarification match FR-002: registered skills are only the five lifecycle skills, while `version` is a routed non-skill command.
+
+## 2026-06-23 — audit-barrage lift (20260623T022145097Z-031-opencode-support-after_clarify)
+
+Code-sha: c145406bd94cecf3a9ceba6847a7c14fd7b392f8
+### AUDIT-20260623-96 — Working directory context is mentioned only in Notes and Assumptions, never elevated to a Functional Requirement
+
+Finding-ID: AUDIT-20260623-96
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US1 Note, US3 Note, US3 AC1, Assumptions vs. FR-003 through FR-008
+
+Every FR governing plugin-to-CLI delegation (FR-003 through FR-008) specifies *what* the plugin must do (delegate, forward arguments, capture output, handle errors) but none specifies *with what working directory*. The working directory is the mechanism by which `stackctl` discovers which stack-control installation is in scope; without it pointing at the opencode session's active project/workspace, `stackctl` runs in the wrong context (possibly the plugin directory, or the process root) and either discovers no installation at all or resolves the wrong one.
+
+The promise *is* made — but only in non-normative surfaces: US1 Note ("CLI operations execute with the active project/workspace as the working directory"), US3 Note (same), US3 AC1 ("with the opencode session's active project/workspace as the working context"), and Assumptions ("Stack-control installation discovery starts from that cwd and resolves the enclosing installation"). Notes and Assumptions have no testable contract weight. An unattended builder reading the twelve FRs and mapping them to code sees no requirement to set a CWD on the subprocess. FR-003 says "via the shell API" but does not say which shell API parameter carries the cwd. A builder could implement FR-003 fully — delegate to `stackctl`, capture output, forward errors — with the wrong working directory, produce a clean FR-003 test pass, and ship a plugin that always fails against real projects.
+
+This is load-bearing. The Assumptions section itself confirms that CWD is the *only* discovery signal ("starts from that cwd"). A reasonable fix is a new FR: "The plugin MUST invoke `stackctl` with the opencode session's active project/workspace directory as the working directory for CLI subprocess execution."
+
+---
+
+### AUDIT-20260623-97 — SC-001's "within 5 minutes" threshold has no acceptance test procedure
+
+Finding-ID: AUDIT-20260623-97 (claude-02 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-001
+
+SC-001 states: "Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode." A success criterion must be falsifiable through a defined test procedure before the feature can be accepted. The 5-minute threshold is not defined in any acceptance scenario; US2's Independent Test ("copy `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts` and verify the plugin loads") tests installation success but does not specify a time budget or a reference user profile (experienced stack-control user? first-time opencode user?). The outcome of the 5-minute promise depends entirely on documentation quality, user familiarity, and opencode's onboarding UX — none of which this spec controls.
+
+The blast radius: an unattended agent building against this spec can mark SC-001 as "satisfied" as soon as the plugin technically loads and the command technically fires. The 5-minute promise then rests on the word "Users" with no test path to challenge it. Either state a test procedure ("a user following the README from a clean machine achieves first invocation in ≤5 minutes, as timed against a defined test fixture") or restate SC-001 as a technical sub-goal whose measurable expression is SC-002/SC-005 (which are already testable). The "5 minutes" either maps to the User Story 2 Independent Test (and should reference it explicitly) or it is aspirational prose that should not occupy a success-criterion slot.
+
+---
+
+### AUDIT-20260623-98 — FR-006's "report them to opencode" framing leaves the error-presentation contract undefined
+
+Finding-ID: AUDIT-20260623-98
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-006 vs. FR-007
+
+FR-007 uses a concrete formulation: "provide a clear error message when `stackctl` CLI is not found." FR-006 uses a different and less specific formulation for the adjacent case (non-zero exit code): "handle CLI errors (non-zero exit codes) and report them to opencode." "Report them to opencode" has at least three plausible implementations in an opencode plugin context: (a) throw/reject the plugin's promise so opencode surfaces a system error, (b) return a structured error result from the skill handler for opencode to render, (c) return a human-readable string containing the CLI's stderr for opencode to display as normal output. Options (a), (b), and (c) produce different user-visible behavior — option (a) typically shows an unhandled-rejection stack trace, option (b) depends on opencode's error-result rendering, option (c) looks like skill output to the user.
+
+The blast radius: an unattended builder has no spec-anchored reason to prefer one over the other. FR-007 sets a precedent of "user-visible clear error message," which implies (c) or (b), but FR-006 doesn't cite FR-007's framing. The discrepancy between FR-006 and FR-007's formulations also leaves open whether the non-zero-exit-code case and the not-found case are handled through the same path (consistent UX) or different paths. A reasonable fix is to align FR-006 with FR-007's language: "The plugin MUST handle CLI errors (non-zero exit codes) and surface a clear error message to the user containing the CLI's exit code and stderr output."
+
+---
+
+### AUDIT-20260623-99 — Edge cases 1 and 3 are explicitly listed but neither addressed by any FR nor declared out-of-scope
+
+Finding-ID: AUDIT-20260623-99
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — Edge Cases section vs. Functional Requirements
+
+The Edge Cases section lists five questions. Three of them are addressed (partially or fully) by FRs: non-zero exit codes → FR-006; `stackctl` not in PATH → FR-007; network timeouts/filesystem errors → implied by FR-006's "CLI errors" scope. Two are left completely unaddressed by any FR or explicit scope exclusion:
+
+- "What happens when the opencode session ends during a long-running stack-control skill?" — `stackctl` may be writing spec files, governance records, or running a barrage at the time. The subprocess fate on session teardown (killed? orphaned? completes and writes to disk with no consumer?) is unspecified.
+- "What if the user has multiple opencode sessions running simultaneously?" — if both invoke skills against the same stack-control installation, concurrent writes to the same `tasks.md`, `spec.md`, or governance records are possible. No FR serializes or isolates concurrent access.
+
+Listing an edge case in a spec and providing no answer — not even "out of scope for this feature" — leaves an unattended builder with two plausible interpretations: the case is handled (somehow) because it's listed, or the case is out of scope because no FR covers it. A spec that acknowledges an edge case should say explicitly which applies. The fix is either a two-line decision per case ("session teardown kills the subprocess; partial writes are the CLI's responsibility" or "simultaneous sessions are out of scope for this feature") or removal from the Edge Cases section to signal deliberate non-coverage.
+
+### AUDIT-20260623-100 — Command palette command names are ambiguous between bare skills and `/stack-control:` commands
+
+Finding-ID: AUDIT-20260623-100
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:73-78,110-118,136-138
+
+User Story 4 says “Given user types a skill name, When the skill is registered, Then it appears in opencode's command palette” and says the plugin registers lifecycle skills `define`, `extend`, `execute`, `workflow`, `roadmap`. FR-008 and the success criteria, however, consistently describe invocation as `/stack-control:<skill>`. The spec never states whether the command palette entries are registered as bare names (`define`) or namespaced commands (`/stack-control:define` / `stack-control:define`).
+
+Blast radius is high because an unattended builder could reasonably register bare `define`/`execute` commands in the palette while separately routing `/stack-control:` events. That creates a different user-facing command surface than the acceptance scenarios and may collide with other opencode commands. A reasonable fix would make the registered palette command IDs explicit and align them with the slash-command acceptance surface.
