@@ -1032,3 +1032,109 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:77-89,115-1
 User Story 5 says users can manually ensure version alignment, and the Assumptions section says “Users will manually ensure plugin and CLI version alignment.” But FR-012 requires the plugin to warn users when the plugin version does not match the CLI version, and the acceptance scenario requires that warning when a skill runs. Those are different promises: either mismatch detection is a plugin responsibility, or it is left to the user via manual comparison.
 
 The likely intended reading is “the plugin warns but does not auto-sync,” so the contradiction is resolvable. The risk is that a builder treats the assumption as permission to skip runtime mismatch checks while still claiming FR-012 is satisfied by `/stack-control:version`. The spec should say the plugin must detect and warn on mismatch, while users remain responsible for resolving the mismatch manually.
+
+## 2026-06-23 — audit-barrage lift (20260623T013031899Z-031-opencode-support-after_clarify)
+
+Code-sha: ea815cc5d91f46f9feeef81c2164bb5120866767
+### AUDIT-20260623-51 — US5 P3 priority directly contradicts FR-012 MUST-level requirement
+
+Finding-ID: AUDIT-20260623-51
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:77-89 (US5), 115-116 (FR-012)
+
+User Story 5 carries Priority P3, with an explicit rationale saying the feature "is important for maintainability but not critical for first release. Users can manually ensure alignment if needed." This framing signals to a builder that the version-mismatch capability can be deferred to a future release.
+
+FR-012, however, uses MUST: "The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked." MUST is a binding obligation in RFC 2119 usage and has no deferral escape. The Clarifications section also confirms the behavior is intended: "Plugin detects mismatch and warns on skill invocation."
+
+An unattended builder following priority-first development would treat US5 as out-of-scope for v1 and skip implementing FR-012. An unattended builder treating all MUST clauses as mandatory would implement it. Both readings are equally supported by the document. The blast radius is a user-visible feature — the mismatch warning — either being absent or present depending on which part of the spec the builder weighted. One of these must be wrong: either downgrade FR-012 to SHOULD/MAY (consistent with P3 "not critical"), or promote US5 to P1/P2 (consistent with MUST).
+
+---
+
+### AUDIT-20260623-52 — SC-002 95% delegation threshold is unmeasurable against a 5-item test set
+
+Finding-ID: AUDIT-20260623-52
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:129-133
+
+SC-002 states: "Plugin successfully delegates 95% of skill invocations to the CLI without errors (measured over a defined set of happy-path skill invocations: `/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)."
+
+The "defined set" enumerates exactly 5 invocations — one per skill. With a set of 5, the achievable percentages are 0%, 20%, 40%, 60%, 80%, and 100%. There is no outcome that yields 95%. A builder implementing the acceptance test cannot construct a test suite that distinguishes "passes SC-002" from "fails SC-002" for the 80% case (4 of 5 pass) versus the 100% case. If the intent is "all five skills must delegate successfully," the criterion should state exactly that. If the 5% failure tolerance is genuine (one failure per 20 invocations), the test set must be sized to 20 or more invocations across varied inputs. As written, the criterion cannot be evaluated.
+
+---
+
+### AUDIT-20260623-53 — FR-007 conflates "CLI not installed" with "CLI not in PATH" while Edge Cases explicitly distinguishes them
+
+Finding-ID: AUDIT-20260623-53
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:112 (FR-007), Edge Cases section
+
+FR-007 requires "a clear error message when `stackctl` CLI is not found." The Edge Cases section separately calls out: "What happens if `stackctl` CLI is installed globally but not in PATH?" — raising this as a distinct, unresolved question. These are different failure modes with different recovery instructions for the user ("install `stackctl`" vs. "add `stackctl` to your PATH"), yet FR-007 collapses them under the single phrase "not found."
+
+An unattended builder implementing FR-007 would write a single error path — most likely relying on the shell API's failure to locate the binary — which handles PATH absence but is indistinguishable from non-installation. Users who have `stackctl` installed at a non-PATH location (common with language-version managers, local `./bin/` installations, or shell wrapper scripts) would receive a "CLI not found" error that doesn't explain how to fix their situation. The spec itself identified this as an open question but did not resolve it in a requirement. A minimal fix is to state the promise explicitly: either FR-007 applies to any failure to invoke the binary (regardless of reason), or the spec adds a second requirement that distinguishes the two and requires differentiated messaging.
+
+---
+
+### AUDIT-20260623-54 — FR-005 does not specify which output streams the plugin captures
+
+Finding-ID: AUDIT-20260623-54
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:109 (FR-005), 110 (FR-006)
+
+FR-005 says "The plugin MUST capture CLI output and return it to opencode." FR-006 separately covers "CLI errors (non-zero exit codes)." The spec never states whether "CLI output" in FR-005 means stdout only, stderr only, or both streams combined.
+
+This creates a build-time ambiguity with real user-facing consequences. Stackctl commands (like governance runs) commonly emit progress information on stderr and results on stdout. If the plugin captures stdout-only, users lose visibility into progress or warning messages during normal execution. If it captures stderr-only, result data is discarded. If it merges both, error markers in the output stream become indistinguishable from result content. The case where FR-006 fires (non-zero exit) makes this more acute: the CLI may write an actionable error description to stderr, but a stdout-only FR-005 implementation would return empty output alongside an error code, leaving users with no diagnostic information.
+
+A reasonable fix states the stream promise explicitly: for example, "the plugin MUST capture stdout and present it as output; on non-zero exit, MUST also surface stderr content as the error detail."
+
+---
+
+### AUDIT-20260623-55 — SC-004 open-ended forward-compatibility promise is unverifiable as a success criterion
+
+Finding-ID: AUDIT-20260623-55
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:134
+
+SC-004 states: "Plugin works with opencode versions 1.0 and later." The "and later" clause makes this a forward-looking guarantee covering versions that do not yet exist and whose API changes are unknown. No test written at implementation time can verify "versions not yet released will remain compatible." This is a promise the spec cannot keep as a verifiable success criterion.
+
+This is common in product specs and a reader would understand it as "track opencode API changes," but as a measurable outcome it only covers opencode 1.0 specifically. A minimal fix replaces "versions 1.0 and later" with "opencode version 1.0" as the verifiable floor, and separately notes that compatibility with future versions is tracked as an ongoing commitment rather than a ship-gate criterion.
+
+### AUDIT-20260623-56 — npm installation conflicts with the single-file/per-project installation decision
+
+Finding-ID: AUDIT-20260623-56
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:113-114,147-154
+
+FR-009 requires the plugin to load from `.opencode/plugins/stack-control.ts`, while FR-010 also requires npm installation from `node_modules/@stack-control/opencode-plugin`. The assumptions then say the plugin is installed per-project and “will be a single file (`opencode-plugin.ts`) rather than a module directory.” Those promises can be reconciled by a careful reader, but they are not the same product contract: local file copying and npm package loading have different install surfaces, update behavior, and file layout expectations.
+
+The blast radius is high for unattended build input because a builder could satisfy only the local-file story, treating the npm line as an export-shape detail, or could build a package layout that violates the single-file/per-project assumption. A reasonable fix would state the two supported installation modes explicitly and define whether “single file” means the source artifact only, the local install artifact only, or also the npm package entrypoint.
+
+### AUDIT-20260623-57 — Unknown `/stack-control:` commands have no promised user-facing behavior
+
+Finding-ID: AUDIT-20260623-57
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:71-73,112,142
+
+The spec says commands starting with `/stack-control:` are routed to the appropriate skill, and clarifies that only `/stack-control:` commands are routed. It also defines the registered skill set as `define`, `extend`, `execute`, `workflow`, and `roadmap`, plus `/stack-control:version`. It never promises what happens for an in-namespace but unsupported command such as `/stack-control:foo` or `/stack-control:speckit-plan`.
+
+The likely intended behavior is a clear unsupported-command error, so this is medium rather than high. Still, the namespace contract is user-facing: an unattended builder could silently ignore unknown commands, pass them through to `stackctl`, or report an error, and all are plausible from the current prose. The spec should add a requirement for unsupported `/stack-control:` commands to produce a clear “unknown stack-control command” result and not invoke unrelated CLI operations.

@@ -109,9 +109,9 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - **FR-005**: The plugin MUST capture CLI output and return it to opencode
 - **FR-006**: The plugin MUST handle CLI errors (non-zero exit codes) and report them to opencode
 - **FR-007**: The plugin MUST provide a clear error message when `stackctl` CLI is not found
-- **FR-008**: The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill
+- **FR-008**: The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill; unknown commands produce a clear "unknown stack-control command" error
 - **FR-009**: The plugin MUST load from `.opencode/plugins/stack-control.ts` (local file installation)
-- **FR-010**: The plugin MUST support npm installation by exporting a default function that opencode can load from `node_modules/@stack-control/opencode-plugin` (npm package installation)
+- **FR-010**: The plugin MUST support npm package installation by exporting a default function that opencode loads from `node_modules/@stack-control/opencode-plugin` (npm package entrypoint is the same single file)
 - **FR-011**: The plugin MUST expose a `/stack-control:version` command that reports the plugin version
 - **FR-012**: The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked
 
@@ -136,9 +136,10 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 
 ### Session 2026-06-22
 
-- Q: How should the opencode plugin be structured? → A: Single file (`opencode-plugin.ts`)
-- Q: Which stack-control skills are registered with opencode? → A: `define`, `extend`, `execute`, `workflow`, `roadmap` (primary lifecycle skills)
-- Q: How does npm installation work? → A: Plugin exports default function; opencode loads from `node_modules/@stack-control/opencode-plugin`
+- Q: How should the opencode plugin be structured? → A: Single file (`opencode-plugin.ts`) for both local copy and npm package entrypoint
+- Q: Which stack-control skills are registered with opencode? → A: `define`, `extend`, `execute`, `workflow`, `roadmap`, `version` (primary lifecycle skills + version command)
+- Q: How does npm installation work? → A: Plugin exports default function; npm package entrypoint is the same single file
+- Q: What happens with unknown `/stack-control:` commands? → A: Clear "unknown stack-control command" error
 - Q: What happens with `/speckit-*` commands? → A: Not supported in this feature; only `/stack-control:` commands are routed
 - Q: How are version mismatches detected? → A: Plugin detects mismatch and warns on skill invocation; users manually resolve
 
