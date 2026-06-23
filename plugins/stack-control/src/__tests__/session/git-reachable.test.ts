@@ -59,7 +59,22 @@ describe('032 US3 — isReachableFromBase (T016)', () => {
   it('returns null when the base is undeterminable (no remote default branch)', () => {
     const root = makeRepo();
     const a = commit(root, 'a.txt', 'A');
-    // no origin/main, no upstream → resolveBase undeterminable
+    // no origin/main, no upstream → resolveDefaultBase undeterminable
     expect(isReachableFromBase(a, root)).toBeNull();
+  });
+
+  it('does NOT count a feature-branch upstream as merged — resolves origin/main, not @{upstream} (AUDIT-20260623-04)', () => {
+    const root = makeRepo();
+    const base = commit(root, 'base.txt', 'BASE');
+    git(root, 'update-ref', 'refs/remotes/origin/main', base); // origin/main is BEHIND the record
+    // the record commit lands on a FEATURE branch whose upstream is origin/feature (NOT main)
+    git(root, 'checkout', '-q', '-b', 'feature');
+    const record = commit(root, 'record.txt', 'RECORD');
+    git(root, 'update-ref', 'refs/remotes/origin/feature', record);
+    git(root, 'config', 'branch.feature.remote', 'origin');
+    git(root, 'config', 'branch.feature.merge', 'refs/heads/feature'); // @{upstream} = origin/feature
+    // @{upstream} (origin/feature) CONTAINS the record, but origin/main does not. The merge
+    // signal must key on origin/main → NOT reachable → false (no false "merged" signal).
+    expect(isReachableFromBase(record, root)).toBe(false);
   });
 });

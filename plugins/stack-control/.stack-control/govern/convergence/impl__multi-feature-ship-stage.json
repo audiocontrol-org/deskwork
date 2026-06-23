@@ -5,18 +5,18 @@
   "governedShaBase": "63f53da8",
   "headSha": "HEAD",
   "chunkIds": [
-    "a6c9fd8c3b487be0"
+    "0ea2f057e7b497cf"
   ],
   "rounds": 1,
   "liftedFindings": [
     {
-      "id": "a6c9fd8c3b487be0::AUDIT-BARRAGE-claude-03+AUDIT-BARRAGE-codex-02",
-      "title": "No test exercises the backstop gate inside `emitAdvanceClosed` against a real dangling-merged-item fixture",
+      "id": "0ea2f057e7b497cf::AUDIT-BARRAGE-claude-04+AUDIT-BARRAGE-codex-01",
+      "title": "`start-merging` transition is a refusal surface only — structurally unreachable as a firable path via `workflow advance`",
       "severity": "high"
     },
     {
-      "id": "a6c9fd8c3b487be0::AUDIT-BARRAGE-codex-01",
-      "title": "Dangling-item exemption lets `release` pass before status is recorded",
+      "id": "0ea2f057e7b497cf::AUDIT-BARRAGE-codex-02",
+      "title": "Feature-branch upstreams are mistaken for default-branch merges",
       "severity": "high"
     }
   ],

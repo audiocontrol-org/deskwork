@@ -84,31 +84,41 @@ export function filesChangedSince(cwd: string, boundary: string): number {
 }
 
 /**
- * Resolve the staleness base (research D3): the configured upstream if set, else
- * the repository default branch (origin/HEAD → origin/main → origin/master), else
- * undeterminable (no remote, or a detached HEAD with neither).
+ * Resolve the repository DEFAULT branch (origin/HEAD → origin/main → origin/master),
+ * IGNORING the current branch's `@{upstream}`. This is the base for "has this landed
+ * on the trunk?" questions — the off-rail merge signal (032 AUDIT-20260623-04). It must
+ * NOT prefer `@{upstream}`: on a feature branch tracking `origin/<feature>`, pushing a
+ * convergence record to that feature branch makes the record reachable from the upstream
+ * even though it has NOT merged to `main` — which would be a false "merged" signal.
+ */
+export function resolveDefaultBase(cwd: string): BaseResolution {
+  const originHead = tryGit(cwd, ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD']);
+  if (originHead !== null && originHead.startsWith('refs/remotes/')) {
+    return { kind: 'resolved', base: originHead.slice('refs/remotes/'.length) };
+  }
+  for (const candidate of ['origin/main', 'origin/master']) {
+    if (tryGit(cwd, ['rev-parse', '--verify', '--quiet', candidate]) !== null) {
+      return { kind: 'resolved', base: candidate };
+    }
+  }
+  return {
+    kind: 'undeterminable',
+    reason: 'no remote default branch (origin/HEAD, origin/main, origin/master)',
+  };
+}
+
+/**
+ * Resolve the staleness base (research D3): the configured upstream if set, else the
+ * repository default branch (origin/HEAD → origin/main → origin/master), else
+ * undeterminable. The `@{upstream}` preference is correct for STALENESS ("am I behind my
+ * own upstream?") — but NOT for the merge signal (use `resolveDefaultBase` for that).
  */
 export function resolveBase(cwd: string): BaseResolution {
   const upstream = tryGit(cwd, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
   if (upstream !== null && upstream.length > 0) {
     return { kind: 'resolved', base: upstream };
   }
-
-  const originHead = tryGit(cwd, ['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD']);
-  if (originHead !== null && originHead.startsWith('refs/remotes/')) {
-    return { kind: 'resolved', base: originHead.slice('refs/remotes/'.length) };
-  }
-
-  for (const candidate of ['origin/main', 'origin/master']) {
-    if (tryGit(cwd, ['rev-parse', '--verify', '--quiet', candidate]) !== null) {
-      return { kind: 'resolved', base: candidate };
-    }
-  }
-
-  return {
-    kind: 'undeterminable',
-    reason: 'no upstream set and no remote default branch (origin/HEAD, origin/main, origin/master)',
-  };
+  return resolveDefaultBase(cwd);
 }
 
 /**
@@ -131,7 +141,10 @@ export function lastCommitTouching(cwd: string, path: string): string | null {
  * installation never yields a false refusal (the on-rail weld never depends on this).
  */
 export function isReachableFromBase(commit: string, cwd: string): boolean | null {
-  const base = resolveBase(cwd);
+  // 032 AUDIT-20260623-04: the merge signal asks "has this landed on the TRUNK?", so it
+  // resolves the DEFAULT branch (origin/main), NOT the current branch's `@{upstream}` — a
+  // feature-branch upstream containing the record commit is NOT a merge to main.
+  const base = resolveDefaultBase(cwd);
   if (base.kind !== 'resolved') return null;
   // `git merge-base --is-ancestor <commit> <base>` exits 0 iff commit is an ancestor
   // of base, 1 when it is not, and non-zero on any other error (e.g. an unknown

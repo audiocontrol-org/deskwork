@@ -29,6 +29,16 @@ README status-table update on `graduate`). Listing it keeps the vocabulary
 complete without inventing an item-specific path the bundled default cannot know
 (Analyze O1).
 
+Note on `transition:start-merging` (032 AUDIT-20260623-03): the `governing → merging`
+edge is a REFUSAL surface, not an applied transition. Once the `impl` convergence
+record exists, an item DERIVES `merging` directly (the `phase:merging`
+`derive: record-converged impl` predicate) — so `start-merging` never fires via
+`workflow advance`. Its `exit-gate: graduate-impl impl` is therefore the gate an
+operator hits when they run `workflow advance` on a `governing` item *before*
+govern-converge: it produces the actionable "complete govern first" refusal rather
+than a bare "terminal phase" message. The transition exists for that error path +
+doc completeness, by design.
+
 ## phase:captured
 
 - status: active

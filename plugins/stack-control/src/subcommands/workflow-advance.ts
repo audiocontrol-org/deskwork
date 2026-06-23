@@ -68,6 +68,12 @@ export function emitAdvance(itemId: string, apply: boolean, values: Record<strin
   // `closed` phase after `shipped` means `shipped` is no longer the array-last
   // phase, so a positional `to === lastPhase` test would silently stop enforcing
   // the graduation gate.
+  // 032 AUDIT-20260623-03: for a `governing` item the forward transition is
+  // `start-merging` (gate `graduate-impl impl`). This is a REFUSAL surface, not an
+  // applied path: once the convergence record exists the item DERIVES `merging`
+  // directly (so it would never be at `governing` here), so the only time this fires is
+  // a premature `workflow advance` on a not-yet-govern-converged item — where the
+  // graduation-gate check below produces the actionable "complete govern first" refusal.
   const isGraduation = t.exitGate.some((c) => c.kind === 'graduate-impl');
   if (isGraduation && t.exitGate.length > 0) {
     const result = evaluateGate(t.exitGate, gate);
