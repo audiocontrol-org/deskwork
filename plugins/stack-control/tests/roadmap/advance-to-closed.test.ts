@@ -41,7 +41,7 @@ describe('031 roadmap advance --to closed', () => {
     const backlog = provisionBacklog([{ title: 'T1' }, { title: 'T2' }, { title: 'T3' }]);
     const [t1, t2, t3] = backlog.ids;
     const doc = writeClosureRoadmap([
-      { id: 'multi:feature/root', status: 'shipped', closes: [t1!, t2!] },
+      { id: 'multi:feature/root', status: 'shipped', validated: true, closes: [t1!, t2!] },
       { id: 'impl:feature/child', status: 'shipped', partOf: ['multi:feature/root'], closes: [t3!] },
     ]);
 
@@ -65,7 +65,7 @@ describe('031 roadmap advance --to closed', () => {
     const backlog = provisionBacklog([{ title: 'T1' }, { title: 'T2' }, { title: 'T3' }]);
     const [t1, t2, t3] = backlog.ids;
     const doc = writeClosureRoadmap([
-      { id: 'multi:feature/root', status: 'shipped', closes: [t1!, t2!] },
+      { id: 'multi:feature/root', status: 'shipped', validated: true, closes: [t1!, t2!] },
       { id: 'impl:feature/child', status: 'shipped', partOf: ['multi:feature/root'], closes: [t3!] },
     ]);
 
@@ -102,7 +102,7 @@ describe('031 roadmap advance --to closed', () => {
     const backlog = provisionBacklog([{ title: 'T1' }, { title: 'TCHILD' }]);
     const [t1, tchild] = backlog.ids;
     const doc = writeClosureRoadmap([
-      { id: 'multi:feature/root', status: 'shipped', closes: [t1!] },
+      { id: 'multi:feature/root', status: 'shipped', validated: true, closes: [t1!] },
       // a non-terminal (in-flight) child: skip-and-report — its id is NOT closed.
       { id: 'impl:feature/wip', status: 'in-flight', partOf: ['multi:feature/root'], closes: [tchild!] },
     ]);
@@ -137,7 +137,7 @@ describe('031 roadmap advance --to closed', () => {
   it('an unwritable roadmap fails BEFORE the cascade — backlog ids are NOT closed (AUDIT-20260623-07)', () => {
     const backlog = provisionBacklog([{ title: 'T1' }]);
     const [t1] = backlog.ids;
-    const doc = writeClosureRoadmap([{ id: 'multi:feature/root', status: 'shipped', closes: [t1!] }]);
+    const doc = writeClosureRoadmap([{ id: 'multi:feature/root', status: 'shipped', validated: true, closes: [t1!] }]);
     // Make the roadmap's directory unwritable so the atomic temp+rename status write
     // fails (a file-only chmod does not — rename replaces it from the writable dir).
     chmodSync(dirname(doc), 0o555);

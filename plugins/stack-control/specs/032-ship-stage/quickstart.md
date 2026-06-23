@@ -11,7 +11,7 @@ Runnable scenarios that prove the feature works end-to-end. Run from a stack-con
 
 ```bash
 # item is govern-converged (impl convergence record present)
-stackctl workflow status <item>          # expect phase: merging, next: shipped
+stackctl workflow status <item>          # expect phase: merging; legitimate next move: validating
 # run /stack-control:ship (operator confirms CI green, merges) — then:
 stackctl workflow status <item>          # expect status: shipped recorded; phase: validating
 grep -A2 "## <item>" ROADMAP.md          # expect `status: shipped`
