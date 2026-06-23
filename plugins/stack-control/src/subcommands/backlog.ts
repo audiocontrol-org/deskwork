@@ -376,13 +376,18 @@ function emitPromote(flags: Flags): void {
   const backend = createBacklogBackend({ cwd: root });
   const node = flags.values.get('node');
   try {
-    // AUDIT-20260623-04/-09: write each id's roadmap back-link FIRST (the local,
-    // validated, atomic mutation), so any back-link failure (bad `--node`, stale
-    // pre-existing ref, unwritable/invalid roadmap) fails loud with the backlog
-    // promote linkage UNWRITTEN — never promoted-but-unlinked. The effective node is
-    // `--node` (passed explicitly, since the task does not yet hold the ref) or the
-    // id's existing ref.
     if (flags.apply) {
+      // AUDIT-20260623-11: validate the WHOLE promote batch (duplicate / missing /
+      // already-promoted) BEFORE any write. `promote` runs its all-or-nothing preflight
+      // in apply:false too, so a bad batch throws here — preserving promote's
+      // validation-before-write contract that the roadmap-first back-link would
+      // otherwise breach (writing closes: for an id promote is about to reject).
+      promote({ ids, target, apply: false, backend, cwd: process.cwd() });
+      // AUDIT-20260623-04/-09: write each id's roadmap back-link FIRST among the WRITES
+      // (the local, validated, atomic mutation), so any back-link failure (unwritable /
+      // invalid roadmap) fails loud with the backlog promote linkage UNWRITTEN — never
+      // promoted-but-unlinked. The effective node is `--node` (passed explicitly, since
+      // the task does not yet hold the ref) or the id's existing ref.
       for (const id of ids) emitAutoBackLink(backend, id, process.cwd(), node);
     }
     reportPromote(promote({ ids, target, apply: flags.apply, backend, cwd: process.cwd() }));

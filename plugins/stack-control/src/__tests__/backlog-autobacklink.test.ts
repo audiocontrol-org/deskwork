@@ -120,6 +120,19 @@ describe('031 backlog done auto-back-link (T023)', () => {
     expect(closes.filter((c) => c === id).length).toBe(1);
   });
 
+  it('promote of a MISSING id with --node does NOT write closes: before promote validates (AUDIT-20260623-11)', () => {
+    const inst = makeInstallation(['## multi:feature/n', '- status: shipped']);
+    // No backlog item created — TASK-999 is missing, so promote's all-or-nothing
+    // preflight must reject the batch BEFORE the roadmap back-link writes anything.
+    const r = runCli(
+      ['backlog', 'promote', 'TASK-999', '--to', 'spec:specs/012-x', '--node', 'multi:feature/n', '--apply'],
+      { cwd: inst.root },
+    );
+    expect(r.status).not.toBe(0); // missing id rejected
+    // The roadmap node's closes: must NOT contain the un-promoted, non-existent id.
+    expect(closesOf(inst.roadmap, 'multi:feature/n')).not.toContain('TASK-999');
+  });
+
   it('an unwritable roadmap fails done BEFORE the task is closed — no Done-but-unlinked (AUDIT-20260623-09)', () => {
     const inst = makeInstallation(['## multi:feature/n', '- status: shipped']);
     const backend = createBacklogBackend({ cwd: inst.backlogCwd });
