@@ -2,21 +2,32 @@
 
 ---
 
-## 2026-06-23: <!-- session title -->
+## 2026-06-23: transitive-item-closure — implement → 8-round govern → graduate → merge (v0.54.0) → close + ship-stage capture
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up `multi:gap/transitive-item-closure` at the implementation handoff (the prior session authored it to runnable) and drive it through the stack-control front door to graduated → merged → validated → closed — the implementation half of the two-session boundary.
 
 **Accomplished:**
-- <!-- compose -->
+- **Drove `/stack-control:execute` end to end** (front-door-mediated): 40 tasks RED-first across 7 phases via `typescript-pro` subagents reviewed + committed per phase. Full suite **2584/2584**, tsc clean, every feature file ≤500 lines, `check-front-door` 65 ops.
+- **Shipped the feature:** transitive `part-of` cascade closer (`close-related --cascade`), `closes:` population (`roadmap resolves` + auto-back-link), the post-ship terminal `closed` stage (`advance --to closed` + the `/stack-control:close` skill), and the install-agnostic deadlock-absence invariant.
+- **Whole-feature govern-at-end: 8 rounds.** 11 substantive cross-cutting findings fixed RED-first; 2 implementation-altitude `--node` residuals overridden (operator-approved) → backlog **TASK-444**; `terminal-outcome=graduated`.
+- **Refreshed + merged PR #498** (merge commit; CI confirmed green for the exact merged head); released as **v0.54.0**.
+- **Validated the installed v0.54.0** (dogfood): 031 surfaces live + correct; then closed the feature's own roadmap item `in-flight → shipped → closed` (empty cascade — it is a leaf).
+- **Captured follow-ups:** TASK-445 (close-gate coherence wart), roadmap node `multi:feature/ship-stage` (ship-as-one-unit), and the `.claude/rules/session-skills-never-block.md` rule.
 
 **Didn't Work:**
-- <!-- compose -->
+- **Bash classifier intermittently unavailable** again (`claude-opus-4-8 temporarily unavailable` for non-allowlisted commands) — required retries; a harness condition, not a `stackctl` defect.
+- **Govern round 7 fired on a DEGRADED fleet** (claude lane `killed-no-liveness`) → AUDIT-12 was single-model and did NOT re-surface on the round-8 full fleet (a degraded-round artifact, not a real defect).
+- **Validating v0.54.0 surfaced the dw-lifecycle retirement frontmatter breakage** (~34 skills with unparseable frontmatter → the reload "1 error during load") — pre-existing (0.53.2 had it too), retired plugin, unrelated to 031.
 
 **Course Corrections:**
-- <!-- compose -->
+- **[PROCESS]** After govern graduated, I went straight to the manual close and never ran `transition:graduate` (the step that records `status: shipped`), so the recorded status lagged at `in-flight` while the derived phase said `shipped`. Operator asked why → root cause: graduate is a separate, skippable step and PR merge is off-rail raw `gh`. Captured `multi:feature/ship-stage` (make firing graduate non-optional) + TASK-445 (the coherence divergence).
+- **[DESIGN]** Operator: `session-start`/`session-end` are orthogonal to the workflow — always available, never blocked. Corrected my proposal to put the ship backstop gate at session boot/close; recorded the `session-skills-never-block` rule.
+- **[SCOPE]** Operator: the ship feature MUST be designed and implemented as ONE unit (no partial increments → incoherent goo) — baked into the ship-stage node scope.
 
 **Insights:**
-- <!-- compose -->
+- **The cross-model barrage earned its keep.** 13 distinct real cross-cutting defects across 8 rounds that the compiler + 2584 tests structurally could not catch (depends-on satisfaction of `closed`, a silent second close path via `workflow advance`, a release-tag predicate-derivation regression, fence-aware `closes:` corruption, two-store ordering across advance/done/promote, intent-vocab robustness) — plus the barrage self-red-teaming its own fixes (AUDIT-08→13). Stochastic defense-in-depth as designed.
+- **The two-store-ordering class recurred until the invariant was stated once and applied everywhere:** write the governed-markdown record (status / `closes:`) FIRST, then the external backlog mutation — advance, done, and promote all converged on it.
+- **Dogfooding the release on its own roadmap item is the highest-signal validation:** closing 031 with the shipped close path is exactly what exposed the status-vs-phase divergence and the missing non-optional ship binding.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 27
