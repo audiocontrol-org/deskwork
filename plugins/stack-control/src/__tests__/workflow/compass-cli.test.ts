@@ -40,10 +40,10 @@ function snapshot(root: string): Map<string, string> {
 const ITEM = 'multi:feature/x';
 const planned = () => fixture([{ identifier: ITEM, status: 'planned' }]);
 
-describe('024 T040 / 025 US1 — compass refuses release when the graduation gate is unmet (end-to-end)', () => {
-  it('compass --intent release on a governing item with NO per-phase checkpoints exits non-zero, naming the gate', () => {
-    // phased tasks.md complete (→ governing), but no per-phase checkpoints → the 025
-    // graduate gate (all-phase-checkpoints-current impl) is unmet → release is ahead.
+describe('024 T040 / 025 US1 / 032 — compass refuses ship when the graduation gate is unmet (end-to-end)', () => {
+  it('compass --intent ship on a governing item with NO converged record exits non-zero, naming the gate', () => {
+    // tasks.md complete (→ governing), but no converged whole-feature record → the
+    // graduate gate (graduate-impl impl) is unmet → ship (→ merging, the legitimate next) is ahead.
     const f = makeUnskippableFixture({
       slug: 'x',
       node: { identifier: ITEM, status: 'in-flight', design: 'd', spec: 'specs/x', analyzeClean: true },
@@ -51,10 +51,10 @@ describe('024 T040 / 025 US1 — compass refuses release when the graduation gat
       tasksComplete: true,
     });
     fixtures.push(f.base);
-    const r = runCli(['workflow', 'compass', ITEM, '--intent', 'release'], { cwd: f.root });
-    expect(r.status).not.toBe(0); // the compass does NOT green-light release without checkpoints
+    const r = runCli(['workflow', 'compass', ITEM, '--intent', 'ship'], { cwd: f.root });
+    expect(r.status).not.toBe(0); // the compass does NOT green-light ship without a converged record
     expect(r.stdout).toContain('verdict: ahead');
-    expect(r.stdout + r.stderr).toMatch(/all-phase-checkpoints-current|exit gate/i);
+    expect(r.stdout + r.stderr).toMatch(/graduate-impl impl|exit gate/i);
   });
 });
 

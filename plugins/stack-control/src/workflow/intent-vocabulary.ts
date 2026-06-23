@@ -17,20 +17,26 @@ function shortName(work: string): string {
 
 /**
  * Fixed transition / verb aliases that are not a phase's own `work:` skill but name
- * an intent against a phase: `govern` (the after_implement hook), `ship`/`release`
- * (the back-half graduate target), `close` (the post-ship terminal advance, 031
+ * an intent against a phase: `govern` (the after_implement hook), `ship` (the
+ * `merging` phase's ship-the-PR work — also auto-derived from `merging.work`, kept
+ * explicit for robustness), `release` (the post-merge `validating` work — cut the
+ * version + verify before close, 032), `close` (the post-ship terminal advance, 031
  * FR-015), and the `specify`/`speckit-*` skill aliases. Each VALUE is a phase id
- * that MUST exist in the governed doc (validated below). The `closed` phase carries
- * `work: (none)`, so no intent is derived from a work skill — the `close` alias is
- * the only name that targets it.
+ * that MUST exist in the governed doc (validated below). The `validating`/`closed`
+ * phases carry `work: (none)`, so no intent is derived from a work skill — the
+ * `release`/`close` aliases are the only names that target them.
+ *
+ * 032 (ship-stage): `phase:shipped` is removed. `ship` targets `merging` (the
+ * ship-the-PR boundary that fires `graduate`); `release` targets `validating` (the
+ * post-merge verify window). Neither targets a non-existent `shipped` phase.
  */
 const ALIAS_TO_PHASE: ReadonlyArray<readonly [string, PhaseId]> = [
   ['specify', 'specifying'],
   ['speckit-specify', 'specifying'],
   ['speckit-implement', 'implementing'],
   ['govern', 'governing'],
-  ['ship', 'shipped'],
-  ['release', 'shipped'],
+  ['ship', 'merging'],
+  ['release', 'validating'],
   ['close', 'closed'],
 ];
 

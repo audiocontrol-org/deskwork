@@ -63,3 +63,43 @@ describe('024 US2 — checkLifecyclePrecondition', () => {
     expect(() => check(f.root, ITEM, 'frobnicate')).toThrow(WorkflowError);
   });
 });
+
+describe('032 US3 — the shared precondition threads the off-rail backstop (AUDIT-20260623-08)', () => {
+  const TARGET = 'multi:feature/target';
+  const DANGLING = 'multi:feature/dangling';
+  /** A git fixture with an advanceable TARGET + a dangling merged item (record reachable from base). */
+  function danglingFixture(): WorkflowFixture {
+    const f = makeWorkflowFixture(
+      [
+        { identifier: TARGET, status: 'planned' },
+        { identifier: DANGLING, status: 'in-flight' },
+      ],
+      { git: true },
+    );
+    fixtures.push(f);
+    f.commitAll('seed');
+    f.writeRecord({
+      version: 1, mode: 'impl', item: DANGLING, scopeFingerprint: 'abc', converged: true,
+      recordedAt: '2026-06-23T00:00:00Z',
+    });
+    f.commitAll('govern: converged (dangling)');
+    f.git(['update-ref', 'refs/remotes/origin/main', f.git(['rev-parse', 'HEAD']).trim()]);
+    return f;
+  }
+
+  it('REFUSES a lifecycle precondition for an UNRELATED item while a dangling merged item exists', () => {
+    // This is the gate `govern --item` + every lifecycle skill consults — it must enforce the
+    // backstop, not only the `workflow compass` CLI path.
+    const f = danglingFixture();
+    const r = check(f.root, TARGET, 'design');
+    expect(r.proceed).toBe(false);
+    expect(r.verdict.outcome).toBe('off-rail');
+    expect(r.verdict.reason).toContain(DANGLING);
+  });
+
+  it('ALLOWS the dangling item its own reconcile precondition (ship)', () => {
+    const f = danglingFixture();
+    const r = check(f.root, DANGLING, 'ship'); // ship → merging; the dangling item derives merging
+    expect(r.proceed).toBe(true);
+  });
+});

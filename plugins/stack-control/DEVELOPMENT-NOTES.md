@@ -2,6 +2,106 @@
 
 ---
 
+## 2026-06-23: ship-stage — orchestrator session: design → runnable spec (4-phase, F1-corrected) via the full front-door lifecycle
+
+**Goal:** Pick up where the last session left off — the captured `multi:feature/ship-stage` node — and drive it through the stack-control front door from design to a runnable spec. Orchestrator-session work only; implementation is a separate session per the two-session boundary.
+
+**Accomplished:**
+- **Got current first:** back-merged `origin/main` so the branch is on **v0.54.0** (the engine ship-stage reconciles), not the stale 0.53.2 it was sitting on — source bin now matches the installed cache.
+- **Drove the full lifecycle in-session, front-door-mediated, committed+pushed at every step:** `/stack-control:design` (brainstorming backend + injected house rules) → operator-approved **design record** (`design-approved` marker; lineage edges `depends-on unskippable-workflow-protocol`, `part-of lifecycle-industrialization`) → `/stack-control:define` driving native **specify → clarify → plan → checklist → tasks → analyze**, bracketed by the 026 capability-mediation marker (cleanly exited, no leak).
+- **Spec `032-ship-stage` is runnable:** spec/plan/tasks present, `execute-check` green, `analyze-clean` recorded; node at phase `implementing`. 29 RED-first tasks, dependency-ordered, build-as-ONE-unit.
+- **Feature shape captured:** `/stack-control:ship` welds merge → `graduate` (can't-merge-without-recording, operator confirms CI green); phase chain **`governing → merging → validating → closed`** with every post-merge phase derived from the **recorded status** (same source as the close gate) → **TASK-445 dissolved by construction**; a **backstop compass invariant** (git merge-detection — convergence record reachable from `origin/main` + status≠shipped; reconcile-exempt; advisory-only at session-start/end); an **adopter-defined `validating`** phase (operator-confirm default == 031).
+- **Resolved 6 operator forks** (ship scope, merging phase, validating phase, git merge-detection, operator-confirm CI gating, F1).
+
+**Didn't Work:**
+- **Bash cwd reset between tool calls** intermittently dropped the working dir to the repo root, making `stackctl spec-check` FATAL ("spec dir not found") until I re-`cd`'d into the installation — a harness/tool-call behavior, not a `stackctl` defect.
+- **No `stackctl` defects surfaced.** The front door ran end-to-end clean: compass gates, the per-step capability markers, `spec-check`/`execute-check`, the roadmap/workflow verbs all behaved.
+
+**Course Corrections:**
+- **[DESIGN/SCOPE]** Operator added a post-merge **`validating`** stage mid-design (adopter-defined — "whatever validating a shipped/merged unit means to the adopter"). Captured per capture-over-YAGNI; reconciled 031's deliberate "no validation machinery" by generalizing the operator-confirm into a named, overridable phase whose default behavior is unchanged.
+- **[DESIGN]** `/speckit-analyze` caught **F1 (HIGH)**: modeling BOTH `phase:shipped` and `phase:validating` over the single `status:shipped` **deadlocks `closed`** (a validated item derives `shipped` while `close` fires from `validating`). Operator chose the collapse — **`shipped` is the STATUS, `validating` the post-merge phase** (chain `governing → merging → validating → closed`) — and I propagated it across spec/plan/research/data-model/contracts/tasks + a design-record amendment. The gate earned its keep *before* any code was written.
+
+**Insights:**
+- **The up-front-design half of the barbell worked as designed:** the full Spec Kit chain + per-step front-door mediation ran with zero `stackctl` defects.
+- **`speckit-analyze` is a real coherence gate, not ceremony:** it surfaced a derive/transition deadlock the spec's prose hid. Resolving it before implementation (not during) is exactly the "invest up front; industrialize execution" thesis — a cheap markdown edit now vs. a tangled rework mid-`execute`.
+- **The two-session boundary held:** this session authored design→runnable and stopped at the implementation handoff; `/stack-control:execute` belongs to a separate worktree/session.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 12 in `7afbd0a7..HEAD`, but **2 are not this session's work** — `chore: release v0.54.0` and `Merge pull request #498` are main's v0.54.0 release tail that rode in via the back-merge. This session authored **10**: the back-merge + 9 ship-stage authoring/roadmap commits (design record → analyze-clean), plus this session-end journal commit.
+  - roadmap(032-ship-stage): record analyze-clean (speckit-analyze 0 critical/high)
+  - analyze(032-ship-stage): resolve F1 coherence finding (collapse to 4-phase)
+  - tasks(032-ship-stage): author tasks.md via speckit-tasks
+  - checklist(032-ship-stage): requirements-quality checklist via speckit-checklist
+  - plan(032-ship-stage): author plan + design artifacts via speckit-plan
+  - spec(032-ship-stage): clarify — resolve merge-detection + CI-gating forks
+  - spec(032-ship-stage): author spec.md via speckit-specify
+  - roadmap(ship-stage): record design-approved + lineage edges
+  - design(ship-stage): design record + designing-phase pointer
+  - Merge remote-tracking branch 'origin/main' into feature/stack-control
+  - chore: release v0.54.0
+  - Merge pull request #498 from audiocontrol-org/feature/stack-control
+- Files changed: 34
+- Backlog touched: TASK-445
+
+## 2026-06-23: transitive-item-closure — implement → 8-round govern → graduate → merge (v0.54.0) → close + ship-stage capture
+
+**Goal:** Pick up `multi:gap/transitive-item-closure` at the implementation handoff (the prior session authored it to runnable) and drive it through the stack-control front door to graduated → merged → validated → closed — the implementation half of the two-session boundary.
+
+**Accomplished:**
+- **Drove `/stack-control:execute` end to end** (front-door-mediated): 40 tasks RED-first across 7 phases via `typescript-pro` subagents reviewed + committed per phase. Full suite **2584/2584**, tsc clean, every feature file ≤500 lines, `check-front-door` 65 ops.
+- **Shipped the feature:** transitive `part-of` cascade closer (`close-related --cascade`), `closes:` population (`roadmap resolves` + auto-back-link), the post-ship terminal `closed` stage (`advance --to closed` + the `/stack-control:close` skill), and the install-agnostic deadlock-absence invariant.
+- **Whole-feature govern-at-end: 8 rounds.** 11 substantive cross-cutting findings fixed RED-first; 2 implementation-altitude `--node` residuals overridden (operator-approved) → backlog **TASK-444**; `terminal-outcome=graduated`.
+- **Refreshed + merged PR #498** (merge commit; CI confirmed green for the exact merged head); released as **v0.54.0**.
+- **Validated the installed v0.54.0** (dogfood): 031 surfaces live + correct; then closed the feature's own roadmap item `in-flight → shipped → closed` (empty cascade — it is a leaf).
+- **Captured follow-ups:** TASK-445 (close-gate coherence wart), roadmap node `multi:feature/ship-stage` (ship-as-one-unit), and the `.claude/rules/session-skills-never-block.md` rule.
+
+**Didn't Work:**
+- **Bash classifier intermittently unavailable** again (`claude-opus-4-8 temporarily unavailable` for non-allowlisted commands) — required retries; a harness condition, not a `stackctl` defect.
+- **Govern round 7 fired on a DEGRADED fleet** (claude lane `killed-no-liveness`) → AUDIT-12 was single-model and did NOT re-surface on the round-8 full fleet (a degraded-round artifact, not a real defect).
+- **Validating v0.54.0 surfaced the dw-lifecycle retirement frontmatter breakage** (~34 skills with unparseable frontmatter → the reload "1 error during load") — pre-existing (0.53.2 had it too), retired plugin, unrelated to 031.
+
+**Course Corrections:**
+- **[PROCESS]** After govern graduated, I went straight to the manual close and never ran `transition:graduate` (the step that records `status: shipped`), so the recorded status lagged at `in-flight` while the derived phase said `shipped`. Operator asked why → root cause: graduate is a separate, skippable step and PR merge is off-rail raw `gh`. Captured `multi:feature/ship-stage` (make firing graduate non-optional) + TASK-445 (the coherence divergence).
+- **[DESIGN]** Operator: `session-start`/`session-end` are orthogonal to the workflow — always available, never blocked. Corrected my proposal to put the ship backstop gate at session boot/close; recorded the `session-skills-never-block` rule.
+- **[SCOPE]** Operator: the ship feature MUST be designed and implemented as ONE unit (no partial increments → incoherent goo) — baked into the ship-stage node scope.
+
+**Insights:**
+- **The cross-model barrage earned its keep.** 13 distinct real cross-cutting defects across 8 rounds that the compiler + 2584 tests structurally could not catch (depends-on satisfaction of `closed`, a silent second close path via `workflow advance`, a release-tag predicate-derivation regression, fence-aware `closes:` corruption, two-store ordering across advance/done/promote, intent-vocab robustness) — plus the barrage self-red-teaming its own fixes (AUDIT-08→13). Stochastic defense-in-depth as designed.
+- **The two-store-ordering class recurred until the invariant was stated once and applied everywhere:** write the governed-markdown record (status / `closes:`) FIRST, then the external backlog mutation — advance, done, and promote all converged on it.
+- **Dogfooding the release on its own roadmap item is the highest-signal validation:** closing 031 with the shipped close path is exactly what exposed the status-vs-phase divergence and the missing non-optional ship binding.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 27
+  - roadmap+rule: capture multi:feature/ship-stage + session-skills-never-block invariant
+  - roadmap(031): close multi:gap/transitive-item-closure (shipped in v0.54.0)
+  - backlog(031): capture close-gate coherence wart found dogfooding v0.54.0 (TASK-445)
+  - govern(031-transitive-item-closure): graduate via operator-approved override
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-10/-11 fixed
+  - docs(031-transitive-item-closure): correct close skill recovery guidance (AUDIT-20260623-10)
+  - fix(031-transitive-item-closure): validate promote batch before the back-link write (AUDIT-20260623-11)
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-08/-09 fixed
+  - fix(031-transitive-item-closure): back-link before the backlog mutation in done/promote (AUDIT-20260623-09)
+  - fix(031-transitive-item-closure): correct advance-closed recovery comment (AUDIT-20260623-08)
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-06/-07 fixed
+  - fix(031-transitive-item-closure): write roadmap status before the cascade in advance --to closed (AUDIT-20260623-07)
+  - fix(031-transitive-item-closure): intent vocab tolerant of missing alias-target phases (AUDIT-20260623-06)
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-05 fixed (fa4d1eb2)
+  - fix(031-transitive-item-closure): fence-aware closes: line drop (AUDIT-20260623-05)
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-03/-04 fixed
+  - fix(031-transitive-item-closure): preflight auto-back-link before close/promote (AUDIT-20260623-04)
+  - fix(031-transitive-item-closure): closed is reached only by-name, never predicate-derived (AUDIT-20260623-03)
+  - audit(031-transitive-item-closure): mark AUDIT-20260623-01/-02 fixed
+  - fix(031-transitive-item-closure): no silent status-only close via workflow advance (AUDIT-20260623-01)
+  - fix(031-transitive-item-closure): closed satisfies depends-on (AUDIT-20260623-02)
+  - feat(031-transitive-item-closure): /stack-control:close skill + quickstart validation (T038-T039)
+  - test(031-transitive-item-closure): install-agnostic invariant + polish (T033-T037, T040)
+  - feat(031-transitive-item-closure): post-ship terminal stage wiring (T025-T032)
+  - feat(031-transitive-item-closure): closes: population + auto-back-link (T017-T024)
+  - feat(031-transitive-item-closure): transitive closer + close-related --cascade (T010-T016)
+  - feat(031-transitive-item-closure): foundational closed status + childrenOf + closed phase (T001-T009)
+- Files changed: 56
+- Backlog touched: TASK-444, TASK-445, TASK-7, TASK-8
+
 ## 2026-06-23: transitive-item-closure — design → full Spec Kit chain authored to runnable
 
 **Goal:** Take up `multi:gap/transitive-item-closure` (the in-flight pickup) — make "closing what a roadmap item contains" one mechanical move — and fold in two operator-added requirements: make closure part of the **terminal-state workflow stage** (so it isn't forgotten), and move **post-install validation into the workflow, not a `tasks.md` task** (the offing deadlock). Author it through the stack-control front door from design to a runnable spec. Orchestrator-session work only (implementation is a separate session).

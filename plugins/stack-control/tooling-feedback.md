@@ -124,3 +124,6 @@
 
 ## session-end 2026-06-23
 - backlog done writes status Done but backlog list still renders Done items inline, which can read as 'still open' to a grep — list could separate or flag closed items
+
+## session-end 2026-06-23
+- Validating the installed v0.54.0 surfaced that the dw-lifecycle retirement left ~34 skills with unparseable YAML frontmatter (dangling --- opener + a > **RETIRED** notice, no closing fence) → they load with empty metadata and trip the reload "1 error during load". Pre-existing (0.53.2 cache had 34 too); retired plugin; clean fix = give retired skills minimal valid frontmatter or drop the dangling opener.

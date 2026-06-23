@@ -54,6 +54,7 @@ export function buildItemContext(
     specPointer: item.spec,
     analyzeClean: item.analyzeClean,
     designApproved: item.designApproved,
+    validated: item.validated,
     designRecordPath,
     specDirPath,
     implRecordConverged,

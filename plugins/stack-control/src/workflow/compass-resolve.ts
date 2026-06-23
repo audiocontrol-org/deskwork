@@ -11,6 +11,7 @@ import { loadWorkflowDoc } from './workflow-grammar.js';
 import { buildItemContext } from './workflow-context.js';
 import { derivePhase } from './phase-derivation.js';
 import { evaluateGate, type GateContext } from './gate-eval.js';
+import { firstDanglingMergedItem } from './merge-signal.js';
 import type { Criterion, DerivedPhase, WorkflowDoc } from './workflow-types.js';
 
 export interface ResolvedCompass {
@@ -28,6 +29,12 @@ export interface ResolvedCompass {
    * Empty when there is no node / side-state / terminal phase / the gate is met.
    */
   readonly nextGateUnmet: readonly Criterion[];
+  /**
+   * 032 US3 — the id of the FIRST merged-but-status-in-flight item over the roadmap (the
+   * off-rail backstop signal), or null when none dangles. Fed to `computeVerdict` to refuse
+   * forward motion for any OTHER item until it is reconciled.
+   */
+  readonly danglingMergedItem: string | null;
 }
 
 /** Unmet exit-gate criteria of the forward transition out of `currentPhase` (empty when none/met). */
@@ -50,11 +57,15 @@ export function resolveCompass(cwd: string, itemId: string): ResolvedCompass {
   const inst = resolveInstallation(cwd);
   const doc = loadWorkflowDoc(inst.root);
   const model = loadRoadmap(inst.resolved.roadmap, grammarOptsForRoot(inst.root));
+  // 032 US3: scan the whole roadmap for a merged-but-status-in-flight item (the off-rail
+  // backstop signal) — cross-item, so it is computed regardless of whether `itemId` resolves.
+  const dangling = firstDanglingMergedItem(model, inst.root)?.itemId ?? null;
   const item = model.byId.get(itemId) ?? null;
   if (item === null) {
     return {
       root: inst.root, doc, item: null, hasNode: false,
       currentPhase: { kind: 'phase', id: doc.phases[0]!.id }, gate: null, nextGateUnmet: [],
+      danglingMergedItem: dangling,
     };
   }
   const { inputs, gate } = buildItemContext(inst.root, item);
@@ -62,5 +73,6 @@ export function resolveCompass(cwd: string, itemId: string): ResolvedCompass {
   return {
     root: inst.root, doc, item, hasNode: true, currentPhase, gate,
     nextGateUnmet: nextTransitionExitGateUnmet(doc, currentPhase, gate),
+    danglingMergedItem: dangling,
   };
 }

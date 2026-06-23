@@ -18,13 +18,14 @@ afterEach(() => {
   fixtures = [];
 });
 
-describe('WORKFLOW.md `closed` terminal phase (T008, FR-012)', () => {
-  it('defines phase:closed after phase:shipped', () => {
+describe('WORKFLOW.md `closed` terminal phase (T008, FR-012; 032 ship-stage)', () => {
+  it('defines phase:closed after phase:validating (032: shipped is a status, not a phase)', () => {
     const doc = loadWorkflowDoc(fixture().root);
     const ids = doc.phases.map((p) => p.id);
     expect(ids).toContain('closed');
-    expect(ids).toContain('shipped');
-    expect(ids.indexOf('closed')).toBeGreaterThan(ids.indexOf('shipped'));
+    expect(ids).toContain('validating');
+    expect(ids).not.toContain('shipped');
+    expect(ids.indexOf('closed')).toBeGreaterThan(ids.indexOf('validating'));
   });
 
   it('closed is terminal (no outgoing next)', () => {
@@ -34,16 +35,16 @@ describe('WORKFLOW.md `closed` terminal phase (T008, FR-012)', () => {
     expect(closed!.next).toBeNull();
   });
 
-  it('shipped is no longer terminal — its next is closed', () => {
+  it('validating is no longer terminal — its next is closed', () => {
     const doc = loadWorkflowDoc(fixture().root);
-    const shipped = doc.phases.find((p) => p.id === 'shipped');
-    expect(shipped).toBeDefined();
-    expect(shipped!.next).toBe('closed');
+    const validating = doc.phases.find((p) => p.id === 'validating');
+    expect(validating).toBeDefined();
+    expect(validating!.next).toBe('closed');
   });
 
-  it('a shipped → closed transition exists', () => {
+  it('a validating → closed transition exists (the close gate)', () => {
     const doc = loadWorkflowDoc(fixture().root);
-    const t = doc.transitions.find((x) => x.from === 'shipped' && x.to === 'closed');
+    const t = doc.transitions.find((x) => x.from === 'validating' && x.to === 'closed');
     expect(t).toBeDefined();
   });
 });

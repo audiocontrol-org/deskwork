@@ -44,13 +44,13 @@ function deriveFor(f: WorkflowFixture) {
   return derivePhase(loadWorkflowDoc(f.root), inputs);
 }
 
-describe('US6 — the impl record gates governing → shipped (required, mechanical)', () => {
+describe('US6 / 032 — the impl record gates governing → merging (ship precondition)', () => {
   it('tasks 100% but NO impl convergence record → governing (graduation blocked)', () => {
     const f = fixture();
     expect(deriveFor(f)).toEqual({ kind: 'phase', id: 'governing' });
   });
 
-  it('a recorded ∧ converged impl record → shipped', () => {
+  it('a recorded ∧ converged impl record (status still in-flight) → merging (run ship; NOT shipped)', () => {
     const f = fixture();
     f.writeRecord({
       version: 1,
@@ -60,7 +60,9 @@ describe('US6 — the impl record gates governing → shipped (required, mechani
       converged: true,
       recordedAt: '2026-06-16T00:00:00Z',
     });
-    expect(deriveFor(f)).toEqual({ kind: 'phase', id: 'shipped' });
+    // 032: the converged record is the SHIP PRECONDITION — it derives `merging`, not
+    // `shipped`. `shipped` is the STATUS recorded by `graduate` at merge (run /stack-control:ship).
+    expect(deriveFor(f)).toEqual({ kind: 'phase', id: 'merging' });
   });
 
   it('a recorded-but-NOT-converged impl record does not graduate', () => {

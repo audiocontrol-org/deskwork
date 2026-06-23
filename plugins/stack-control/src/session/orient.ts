@@ -14,6 +14,7 @@ import { isReady, isTerminal, ready } from '../roadmap/graph.js';
 import { grammarOptsForRoot } from '../subcommands/document-verb-shared.js';
 import { inferChainPosition, type ChainPosition } from './chain-position.js';
 import { checkStaleness, type StalenessSignal } from './staleness.js';
+import { allDanglingMergedItems } from '../workflow/merge-signal.js';
 
 /** A roadmap item projected for the report (the 006 WorkItem, narrowed). */
 export interface RoadmapItemRef {
@@ -42,6 +43,13 @@ export interface OrientationReport {
   readonly openBacklog: readonly BacklogItemRef[];
   /** Branch-staleness advisory (US4); never blocks (FR-016/FR-017). */
   readonly staleness: StalenessSignal;
+  /**
+   * 032 US3 (FR-011) — merged-but-status-in-flight items (the off-rail residual), as a
+   * NON-BLOCKING advisory. session-start surfaces these so the operator sees an off-rail
+   * merge early, but NEVER refuses on them (per `session-skills-never-block`). The
+   * blocking gate lives at the workflow waypoints (compass + close), not here.
+   */
+  readonly mergedNotShippedItems: readonly string[];
 }
 
 export interface OrientInput {
@@ -58,7 +66,18 @@ export function orient(input: OrientInput): OrientationReport {
     latestJournalEntry: gatherLatestJournalEntry(installation.resolved.journal),
     openBacklog: gatherOpenBacklog(installation.resolved.backlog),
     staleness: checkStaleness(installation.root),
+    mergedNotShippedItems: gatherMergedNotShipped(installation),
   };
+}
+
+/** 032 US3 (FR-011) — merged-but-status-in-flight item ids over the roadmap, as a
+ * non-blocking advisory. A missing roadmap / unavailable git yields [] (read-only;
+ * the merge signal fail-opens to null → no advisory, never a crash). */
+function gatherMergedNotShipped(installation: Installation): readonly string[] {
+  const doc = installation.resolved.roadmap;
+  if (!existsSync(doc)) return [];
+  const model = loadRoadmap(doc, grammarOptsForRoot(installation.root));
+  return allDanglingMergedItems(model, installation.root).map((s) => s.itemId);
 }
 
 /** ready frontier + blocked (non-terminal, not-ready) from the 006 reasoner. A

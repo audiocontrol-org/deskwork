@@ -54,9 +54,12 @@ function roadmapStatusOf(doc: string, id: string): string | null {
   return null;
 }
 
-describe('031 closed reachable with NO install/release step (T035, SC-005)', () => {
-  it('a shipped item advances to closed with nothing blocking — exit 0, status closed', () => {
-    const inst = makeInstallationNoRelease(['## multi:feature/done', '- status: shipped']);
+describe('031 closed reachable with NO install/release step (T035, SC-005; 032 validated marker)', () => {
+  it('a shipped+validated item advances to closed with no install/release machinery — exit 0, status closed', () => {
+    // 032 FR-014: close is gated on the operator-confirm `validated:` marker — a BARE
+    // confirm, NOT an install/release step. The no-install-MACHINERY invariant holds:
+    // no release config, no publish-dependent task — just the recorded confirm marker.
+    const inst = makeInstallationNoRelease(['## multi:feature/done', '- status: shipped', '- validated: 2026-06-23']);
     // Sanity: this installation has a backlog store but no release config.
     expect(createBacklogBackend({ cwd: inst.backlogCwd }).list()).toEqual([]);
 
@@ -75,6 +78,7 @@ describe('031 closed reachable with NO install/release step (T035, SC-005)', () 
     const inst = makeInstallationNoRelease([
       '## multi:feature/withids',
       '- status: shipped',
+      '- validated: 2026-06-23',
       '- closes: PLACEHOLDER',
     ]);
     const backend = createBacklogBackend({ cwd: inst.backlogCwd });

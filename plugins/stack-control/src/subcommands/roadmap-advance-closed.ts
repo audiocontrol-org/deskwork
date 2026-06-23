@@ -6,16 +6,63 @@
 // Dry-run by default — the operator-confirm guard — writes nothing; `--apply`
 // closes the deduped subtree ids THEN advances the root status to `closed`.
 
+import { dirname } from 'node:path';
 import type { LoadOptions } from '../document-model/document.js';
 import { createBacklogBackend, BacklogError, BACKLOG_DONE_STATUS } from '../backlog/backend.js';
 import { backlogRoot } from '../backlog/root.js';
 import { advance } from '../roadmap/mutations.js';
 import { applyCascade, buildCascadePlan, type CascadePlan } from '../roadmap/transitive-close.js';
-import type { RoadmapModel } from '../roadmap/roadmap-model.js';
+import type { RoadmapModel, WorkItem } from '../roadmap/roadmap-model.js';
+import { resolveInstallation } from '../config/installation.js';
+import { loadWorkflowDoc } from '../workflow/workflow-grammar.js';
+import { buildItemContext } from '../workflow/workflow-context.js';
+import { describeCriterion, evaluateGate } from '../workflow/gate-eval.js';
+import { firstDanglingMergedItem } from '../workflow/merge-signal.js';
 
 /** The roadmap status `closed` is reachable ONLY from `shipped` (compass refuses otherwise). */
 const REQUIRED_FROM_STATUS = 'shipped';
 const CLOSED_STATUS = 'closed';
+
+/**
+ * The installation root for the governed-doc + git reads (the validated gate +
+ * backstop). The enclosing installation of the roadmap doc when one exists; else the
+ * doc's own directory (a bare `--doc <path>` outside any installation — the bundled
+ * WORKFLOW.md still applies, and the git/record reads simply find nothing → no gate
+ * surprise, no crash). This keeps the close path working for the bare-doc usage the
+ * pre-032 close tests rely on while honoring an installation override where present.
+ */
+function resolveRoot(docPath: string): string {
+  try {
+    return resolveInstallation(dirname(docPath)).root;
+  } catch {
+    return dirname(docPath);
+  }
+}
+
+/**
+ * 032 US4 (FR-014/FR-016): honor the governed `validating → closed` exit-gate
+ * (default `approval-marker validated`, adopter-overridable) — the SAME gate the
+ * compass evaluates, so the CLI close path and the compass cannot disagree (SC-002).
+ * Resolves the installation enclosing the roadmap doc, loads the (possibly
+ * overridden) WORKFLOW.md, finds the transition into `closed`, and evaluates its
+ * exit-gate against the item. Throws (fail-loud) when the gate is unmet. A custom doc
+ * with no transition into `closed` has no extra gate (status==shipped stays the only
+ * precondition).
+ */
+function assertCloseGateMet(item: WorkItem, installationRoot: string): void {
+  const doc = loadWorkflowDoc(installationRoot);
+  const closeTransition = doc.transitions.find((t) => t.to === CLOSED_STATUS && t.from !== '*');
+  if (closeTransition === undefined || closeTransition.exitGate.length === 0) return;
+  const { gate } = buildItemContext(installationRoot, item);
+  const result = evaluateGate(closeTransition.exitGate, gate);
+  if (!result.allMet) {
+    const unmet = result.unmet.map(describeCriterion).join('; ');
+    throw new BacklogError(
+      `advance: '${item.identifier}' is 'shipped' but the validating → closed gate is unmet (${unmet}) — ` +
+        `record the marker (e.g. \`stackctl roadmap resolves ${item.identifier} ...\` / set \`validated:\`) before closing`,
+    );
+  }
+}
 
 /** Render the dry-run plan + the would-advance line (formatting kept out of the engine). */
 function renderClosedPlan(plan: CascadePlan): string {
@@ -56,6 +103,20 @@ export function emitAdvanceClosed(
   if (item === undefined) {
     throw new BacklogError(`advance: no roadmap item '${id}'`);
   }
+  // 032 US3 backstop (FR-009/SC-003): close is forward lifecycle motion — refuse it
+  // while ANY merged-but-status-in-flight item dangles (the off-rail residual), naming
+  // it + the reconcile command. The dangling item itself can never reach this gate (it
+  // is in-flight, not `shipped`), so this only blocks closing OTHER items until the
+  // off-rail merge is reconciled. Fires on dry-run too (the operator sees the refusal).
+  const root = resolveRoot(docPath);
+  const dangling = firstDanglingMergedItem(model, root);
+  if (dangling !== null) {
+    throw new BacklogError(
+      `advance: a merged-but-status-in-flight item exists ('${dangling.itemId}') — forward lifecycle ` +
+        `motion is blocked until it is reconciled; run \`stackctl workflow advance ${dangling.itemId} --apply\` ` +
+        `to record its status, then retry`,
+    );
+  }
   // Lifecycle precondition (FR-016): closed is reachable only from shipped.
   if (item.status !== REQUIRED_FROM_STATUS) {
     throw new BacklogError(
@@ -63,6 +124,12 @@ export function emitAdvanceClosed(
         `'${CLOSED_STATUS}' is reachable only from '${REQUIRED_FROM_STATUS}' (the post-ship terminal advance)`,
     );
   }
+  // 032 US2/US4 (FR-014, SC-002): a shipped item is at the `validating` phase — close is
+  // gated on the governed `validating → closed` exit-gate (default `approval-marker
+  // validated`). This is the SAME gate the compass evaluates, so the CLI close path and
+  // the compass agree (no graduated-but-not-validated divergence). Evaluated on dry-run
+  // too, so the operator-confirm preview also surfaces the unmet gate.
+  assertCloseGateMet(item, root);
 
   const backend = createBacklogBackend({ cwd: backlogRoot() });
   const statusById = new Map(backend.list().map((it) => [it.id, it.status]));

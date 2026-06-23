@@ -1,80 +1,25 @@
 // `stackctl workflow <subaction> [flags]` (022) — the parseable lifecycle
-// workflow surface (contracts/workflow-cli.md). Phase 4 (US1) ships the read-only
-// query verbs `status` / `can-enter` / `next`; Phase 6 (US4) adds `advance` /
-// `link-design` / `link-spec`. The verb stays thin: it resolves the installation,
-// loads the governed WORKFLOW.md + the roadmap item, builds the derivation/gate
-// context, and formats. Query verbs write nothing and are deterministic (FR-014).
+// workflow surface (contracts/workflow-cli.md). This file holds the read-only
+// query verbs `status` / `can-enter` / `next` / `compass` + the dispatcher; the
+// mutating advance / link-design / link-spec / redesign verbs live in
+// workflow-advance.ts and the shared resolution in workflow-shared.ts (032 R7 /
+// T001 split). Query verbs write nothing and are deterministic (FR-014).
 //
 // Exit codes: 0 success (including a REPORTED unmet gate — v1 gates never refuse,
 // FR-010); 2 usage/parse/validation (unknown subaction, missing arg, ungovernable
-// doc, unknown item).
+// doc, unknown item); a compass verdict's own non-zero exit (3 ahead / 4 off-rail).
 
-import { spawnSync } from 'node:child_process';
-import { appendFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { InstallationError } from '../config/errors.js';
-import { resolveInstallation } from '../config/installation.js';
 import { DocumentModelError } from '../document-model/types.js';
-import { loadRoadmap, type WorkItem } from '../roadmap/roadmap-model.js';
-import { setField } from '../roadmap/mutations.js';
-import { grammarOptsForRoot } from './document-verb-shared.js';
 import { describeCriterion, evaluateGate, type GateContext } from '../workflow/gate-eval.js';
 import { derivePhase } from '../workflow/phase-derivation.js';
-import { loadWorkflowDoc } from '../workflow/workflow-grammar.js';
 import { buildItemContext } from '../workflow/workflow-context.js';
 import { computeVerdict, legitimateNextPhase } from '../workflow/compass.js';
 import { resolveCompass } from '../workflow/compass-resolve.js';
 import { knownIntents, resolveIntent } from '../workflow/intent-vocabulary.js';
-import type { DerivedPhase } from '../workflow/workflow-types.js';
-import type { EffectContext } from '../workflow/effects.js';
-import { applyTransition, previewTransition } from '../workflow/transition-engine.js';
-import { reenterDesign } from '../workflow/redesign.js';
-import { WorkflowError, type Phase, type Transition, type WorkflowDoc } from '../workflow/workflow-types.js';
-import type { LoadOptions } from '../document-model/document.js';
-
-function failUsage(message: string): never {
-  process.stderr.write(`workflow: ${message}\n`);
-  process.exit(2);
-}
-
-interface Resolved {
-  readonly root: string;
-  readonly doc: WorkflowDoc;
-  readonly item: WorkItem;
-  readonly roadmapPath: string;
-  readonly journalPath: string;
-  readonly opts: LoadOptions;
-}
-
-/** Resolve the installation, governed doc, and the named roadmap item. */
-function resolve(itemId: string): Resolved {
-  const inst = resolveInstallation(process.cwd());
-  const doc = loadWorkflowDoc(inst.root);
-  const opts = grammarOptsForRoot(inst.root);
-  const model = loadRoadmap(inst.resolved.roadmap, opts);
-  const item = model.byId.get(itemId);
-  if (item === undefined) {
-    failUsage(`no roadmap item '${itemId}' (known: ${[...model.byId.keys()].join(', ') || '(none)'})`);
-  }
-  return {
-    root: inst.root,
-    doc,
-    item,
-    roadmapPath: inst.resolved.roadmap,
-    journalPath: inst.resolved.journal,
-    opts,
-  };
-}
-
-function phaseById(doc: WorkflowDoc, id: string): Phase | undefined {
-  return doc.phases.find((p) => p.id === id);
-}
-
-/** The forward transition out of `phase` (from → next), when one exists. */
-function forwardTransition(doc: WorkflowDoc, phase: Phase): Transition | undefined {
-  if (phase.next === null) return undefined;
-  return doc.transitions.find((t) => t.from === phase.id && t.to === phase.next);
-}
+import { WorkflowError, type DerivedPhase, type WorkflowDoc } from '../workflow/workflow-types.js';
+import { failUsage, forwardTransition, phaseById, resolve } from './workflow-shared.js';
+import { emitAdvance, emitLink, emitRedesign } from './workflow-advance.js';
 
 function reportGate(label: string, criteria: ReturnType<typeof evaluateGate>): void {
   const total = criteria.met.length + criteria.unmet.length;
@@ -97,9 +42,9 @@ function emitStatus(itemId: string): void {
   const p = phaseById(doc, phase.id);
   if (p === undefined) throw new WorkflowError(`derived phase '${phase.id}' is not declared in WORKFLOW.md`);
   // 031 FR-013: name the legitimate pending next phase (generic — driven by the
-  // phase's `next` chain). A `shipped` item is NOT terminal: its pending move is
-  // `closed`, surfaced here so an operator isn't left thinking shipped is the end
-  // (the "don't forget to close" surface). A truly terminal phase (no `next`) says so.
+  // phase's `next` chain). A post-merge item is NOT terminal: its pending move is
+  // surfaced here so an operator isn't left thinking merge is the end (the "don't
+  // forget to close" surface). A truly terminal phase (no `next`) says so.
   const nextId = legitimateNextPhase(doc, phase.id);
   process.stdout.write(
     nextId !== null
@@ -193,7 +138,7 @@ function emitCompassOrientation(
 
 /** `workflow compass <item> [--intent <action>] [--json]` (024 US1) — orient + diff; the verdict is the exit code. */
 function emitCompass(itemId: string, intentName: string | undefined, json: boolean): void {
-  const { doc, hasNode, currentPhase, gate, nextGateUnmet } = resolveCompass(process.cwd(), itemId);
+  const { doc, hasNode, currentPhase, gate, nextGateUnmet, danglingMergedItem } = resolveCompass(process.cwd(), itemId);
 
   if (intentName === undefined) {
     emitCompassOrientation(doc, itemId, currentPhase, hasNode, gate);
@@ -204,7 +149,10 @@ function emitCompass(itemId: string, intentName: string | undefined, json: boole
   if (resolved === null) {
     failUsage(`unknown intent '${intentName}' (known: ${knownIntents(doc).join(', ')})`);
   }
-  const verdict = computeVerdict({ doc, currentPhase, intent: resolved, hasNode, nextGateUnmet });
+  const verdict = computeVerdict({
+    doc, currentPhase, intent: resolved, hasNode, nextGateUnmet,
+    danglingMergedItem, intentItem: itemId,
+  });
   if (json) {
     process.stdout.write(`${JSON.stringify(verdict, null, 2)}\n`);
   } else {
@@ -218,133 +166,6 @@ function emitCompass(itemId: string, intentName: string | undefined, json: boole
     process.stdout.write(`  → ${verdict.reason}\n`);
   }
   if (verdict.exitCode !== 0) process.exit(verdict.exitCode);
-}
-
-/** Build the effect context for a forward transition out of the current phase. */
-function effectContextFor(r: Resolved, transition: Transition, extra: Record<string, string>): EffectContext {
-  const message = `workflow(${transition.codename}): ${r.item.identifier} ${transition.from} -> ${transition.to}`;
-  return {
-    installationRoot: r.root,
-    roadmapPath: r.roadmapPath,
-    journalPath: r.journalPath,
-    grammarOpts: r.opts,
-    item: r.item.identifier,
-    bindings: { message, ...extra },
-  };
-}
-
-function emitAdvance(itemId: string, apply: boolean, values: Record<string, string>): void {
-  const r = resolve(itemId);
-  const { inputs, gate } = buildItemContext(r.root, r.item);
-  const phase = derivePhase(r.doc, inputs);
-  if (phase.kind === 'side-state') {
-    failUsage(`'${itemId}' is in terminal side-state '${phase.id}'; induct it back before advancing`);
-  }
-  const p = phaseById(r.doc, phase.id);
-  if (p === undefined) throw new WorkflowError(`derived phase '${phase.id}' is not declared in WORKFLOW.md`);
-  const t = forwardTransition(r.doc, p);
-  if (t === undefined) {
-    failUsage(`'${itemId}' is in terminal phase '${p.id}'; no forward transition to advance`);
-  }
-  // 031 AUDIT-20260623-01: entering the terminal `closed` phase is NOT a generic
-  // workflow advance. Closing is the operator-confirmed TRANSITIVE CASCADE — it
-  // closes the item's whole part-of subtree's recorded backlog ids AND advances
-  // the status, as one action. The generic effect path here would run only the
-  // status-rewrite (`roadmap-advance to=closed`), silently leaving the contained
-  // ids open. Refuse and redirect to the single cascade-running close surface so
-  // there is no second, status-only path to `closed`.
-  if (t.to === 'closed') {
-    failUsage(
-      `'${itemId}': closing is the operator-confirmed transitive cascade — run ` +
-        `\`stackctl roadmap advance ${itemId} --to closed\` (or the /stack-control:close skill), ` +
-        `which closes the item's contained backlog ids AND advances it to 'closed'. ` +
-        `\`workflow advance\` will not perform a status-only close.`,
-    );
-  }
-  // 024 US5 / FR-010 (phased): the back-half `governing → shipped` graduation is
-  // ENFORCED as a refusal — an unmet exit gate blocks the advance rather than only
-  // being reported (022 v1 report-only is retired HERE). Mid-pipeline transitions
-  // stay ADVISORY in this advance path during migration; mid-pipeline ORDER is
-  // still enforced by the compass embedded in the skills.
-  //
-  // 031 FR-014 (clean break): keyed on the `graduate-impl` exit-gate criterion (the
-  // graduation marker), NOT on the positional last phase — adding the terminal
-  // `closed` phase after `shipped` means `shipped` is no longer the array-last
-  // phase, so a positional `to === lastPhase` test would silently stop enforcing
-  // the graduation gate.
-  const isGraduation = t.exitGate.some((c) => c.kind === 'graduate-impl');
-  if (isGraduation && t.exitGate.length > 0) {
-    const result = evaluateGate(t.exitGate, gate);
-    if (!result.allMet) {
-      process.stderr.write(
-        `workflow advance ${itemId}: REFUSED — '${t.codename}' (${t.from} -> ${t.to}) exit gate unmet:\n`,
-      );
-      for (const c of result.unmet) process.stderr.write(`    [ ] ${describeCriterion(c)}\n`);
-      process.exit(1);
-    }
-  }
-  const ctx = effectContextFor(r, t, values);
-  if (!apply) {
-    const preview = previewTransition(t, ctx);
-    process.stdout.write(`workflow advance ${itemId} (dry-run — writes nothing; use --apply)\n`);
-    process.stdout.write(`  transition: ${t.codename} (${t.from} -> ${t.to})\n`);
-    process.stdout.write(`  effects (in order):\n`);
-    preview.effects.forEach((e, i) => process.stdout.write(`    ${i + 1}. ${e.verb}\n`));
-    return;
-  }
-  const outcome = applyTransition(t, ctx);
-  process.stdout.write(`workflow advance ${itemId}: applied ${t.codename} (${t.from} -> ${t.to})\n`);
-  process.stdout.write(
-    outcome.committed
-      ? `  committed: "${outcome.message}"\n`
-      : `  applied (no commit effect in this transition)\n`,
-  );
-}
-
-function emitLink(itemId: string, field: 'design' | 'spec', value: string, apply: boolean): void {
-  const r = resolve(itemId);
-  const result = setField(r.roadmapPath, r.item.identifier, field, value, r.opts, apply);
-  const verb = field === 'design' ? 'link-design' : 'link-spec';
-  process.stdout.write(
-    result.applied
-      ? `workflow ${verb}: set ${field}=${value} on ${itemId}\n`
-      : `workflow ${verb}: dry-run — would set ${field}=${value} on ${itemId} (use --apply)\n`,
-  );
-}
-
-function emitRedesign(itemId: string, designDoc: string, apply: boolean): void {
-  const r = resolve(itemId);
-  if (!apply) {
-    process.stdout.write(`workflow redesign ${itemId} (dry-run — writes nothing; use --apply)\n`);
-    process.stdout.write(`  * -> designing re-entry: open a new design-record revision (append-only)\n`);
-    process.stdout.write(`  preserve the spec dir\n`);
-    return;
-  }
-  const result = reenterDesign({
-    installationRoot: r.root,
-    roadmapPath: r.roadmapPath,
-    item: itemId,
-    designDoc,
-    hasSpec: r.item.spec !== null,
-    opts: r.opts,
-    at: new Date().toISOString(),
-  });
-  appendFileSync(r.journalPath, `workflow(redesign): ${itemId} re-entered designing (revision ${result.revision})\n`, 'utf8');
-  // F2 (governance HIGH, cross-model): stage ONLY the redesign-touched paths (never
-  // `git add -A`, which sweeps unrelated working-tree changes) and fail loud on a
-  // commit error (a non-zero git exit must NOT be reported as success).
-  const touched = [r.roadmapPath, join(r.root, designDoc), r.journalPath];
-  const add = spawnSync('git', ['-C', r.root, 'add', '--', ...touched], { encoding: 'utf8' });
-  if (add.status !== 0) failUsage(`redesign: git add failed — ${add.stderr ?? ''}`);
-  const commit = spawnSync(
-    'git',
-    ['-C', r.root, 'commit', '-m', `workflow(redesign): ${itemId} re-entered designing`, '--', ...touched],
-    { encoding: 'utf8' },
-  );
-  if (commit.status !== 0) failUsage(`redesign: git commit failed — ${commit.stderr ?? ''}`);
-  process.stdout.write(`workflow redesign ${itemId}: re-entered designing\n`);
-  process.stdout.write(`  design record revision: ${result.revision}\n`);
-  process.stdout.write(`  spec dir preserved: ${result.specPreserved}\n`);
 }
 
 export async function runWorkflowCli(args: string[]): Promise<void> {

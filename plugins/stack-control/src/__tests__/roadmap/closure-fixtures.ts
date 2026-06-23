@@ -34,6 +34,8 @@ export interface ClosureNodeSpec {
   readonly closes?: readonly string[];
   /** `depends-on` target identifiers. */
   readonly dependsOn?: readonly string[];
+  /** 032 FR-014: the `validated:` marker — the validating → closed gate (operator-confirm). */
+  readonly validated?: boolean;
 }
 
 /** Render one node's heading + field bullets (writeTempRoadmap body-line shape). */
@@ -47,6 +49,9 @@ function nodeLines(node: ClosureNodeSpec): string[] {
   }
   if (node.dependsOn !== undefined && node.dependsOn.length > 0) {
     lines.push(`- depends-on: ${node.dependsOn.join(', ')}`);
+  }
+  if (node.validated === true) {
+    lines.push('- validated: 2026-06-23');
   }
   return lines;
 }

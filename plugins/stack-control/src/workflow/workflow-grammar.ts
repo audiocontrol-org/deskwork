@@ -114,7 +114,8 @@ function parseDerive(value: string, ctx: string): DerivePredicate {
     );
   }
   const target = parts[1];
-  const needsTarget = kind === 'pointer-set' || kind === 'node-marker' || kind === 'record-converged';
+  const needsTarget =
+    kind === 'pointer-set' || kind === 'node-marker' || kind === 'record-converged' || kind === 'status-is';
   if (needsTarget && (target === undefined || target.length === 0)) {
     throw new WorkflowError(`WORKFLOW.md ${ctx}: derive '${kind}' requires a target`);
   }

@@ -58,7 +58,9 @@ describe('closed is not predicate-derived (AUDIT-20260623-03)', () => {
       }),
     );
     expect(r.id).not.toBe('closed');
-    expect(r).toEqual({ kind: 'phase', id: 'shipped' }); // its real artifact phase
+    // 032: govern-converged + status in-flight derives `merging` (the ship-the-PR phase),
+    // its real artifact phase — NOT predicate-derived `closed`, and not `shipped` (a status).
+    expect(r).toEqual({ kind: 'phase', id: 'merging' });
   });
 
   it('a release-tagged item with NO convergence record still does not derive closed', () => {
