@@ -1236,3 +1236,111 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:129-130
 SC-002 says the plugin “successfully delegates 95% of skill invocations” and then defines the measured set as five happy-path commands: `define`, `extend`, `execute`, `workflow`, and `roadmap`. Over a five-case acceptance set, 95% is not a measurable pass threshold: four successes is 80%, and five successes is 100%.
 
 The likely intended outcome is that all five happy-path commands delegate successfully, so a human reader can resolve this. The blast radius is still medium because this is a success criterion for an unattended build: one builder might treat it as “all five,” another might invent repeated trials, and another might ignore a single failure as statistically acceptable. A reasonable fix would replace the percentage with “all five listed happy-path invocations” or define a real repeated-measure sample size.
+
+## 2026-06-23 — audit-barrage lift (20260623T014243894Z-031-opencode-support-after_clarify)
+
+Code-sha: 666121a45e9ecaf116c00284b27259e40f19b526
+### AUDIT-20260623-64 — US5 acceptance scenarios 1 and 3 make contradictory promises about `/stack-control:version` output
+
+Finding-ID: AUDIT-20260623-64 (claude-01 + claude-03 + codex-03; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=high, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (User Story 5 — acceptance scenarios 1 and 3)
+
+Both scenarios share the same trigger condition — "Given user runs `/stack-control:version`, When the command is invoked" — but promise different outputs:
+
+- Scenario 1: "Then plugin reports **its version**" (plugin version only)
+- Scenario 3: "Then **both plugin and CLI versions are displayed**"
+
+These cannot both be true. An unattended builder reads the acceptance criteria as the testable contract. Scenario 1 is satisfied by reporting only the plugin version; scenario 3 requires both. A builder implementing scenario 1 will fail scenario 3, and vice versa. There is no disambiguating priority signal in the spec, no "scenario 3 supersedes scenario 1," and no "both together describe a single behavior." The wrong reading gets built by default.
+
+Blast radius: this is a user-facing output difference visible to every adopter who runs `/stack-control:version`. The two-version display (scenario 3) is the more useful behavior and aligns with FR-012's version-mismatch detection theme, but nothing in the spec establishes that precedence. A reasonable fix is to delete scenario 1 or collapse it into scenario 3: "Then both plugin and CLI versions are displayed."
+
+---
+
+### AUDIT-20260623-65 — FR-012 "version mismatch" is undefined — no specification of what constitutes a mismatch
+
+Finding-ID: AUDIT-20260623-65
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:143 (FR-012), Assumptions
+
+FR-012 requires the plugin to "detect version mismatch between plugin and CLI and warn users when a skill is invoked." The Assumptions section repeats the behavior: "The plugin detects version mismatch and warns users; users manually resolve mismatches." Neither defines what "version mismatch" means operationally.
+
+Three equally plausible interpretations exist: (a) any difference in the full version string is a mismatch; (b) a semver major-version difference is a mismatch, but minor/patch differences are tolerated; (c) any version string difference beyond an exact match is a mismatch. Each produces different warning frequency — exact-match strict would warn on every patch release; major-only would suppress warnings until a breaking change. An unattended builder picks whichever interpretation feels natural, producing a user-facing behavior that may differ significantly from what the operator intended.
+
+Blast radius: the mismatch warning fires on every skill invocation per FR-012, so a too-strict interpretation creates alert fatigue for every patch upgrade; a too-loose interpretation silently ignores incompatibilities. A reasonable fix adds one sentence to FR-012: "A mismatch is defined as a difference in the major semver component between plugin and CLI versions" (or whatever the intended policy is).
+
+---
+
+### AUDIT-20260623-66 — FR-008 routing creates an irreconcilable gap when combined with the unresolved `version` skill enumeration (new consequence of AUDIT-20260623-61)
+
+Finding-ID: AUDIT-20260623-66
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:126 (FR-008), 110 (FR-002), 147 (FR-011)
+
+This finding surfaces a concrete implementability consequence of the still-open AUDIT-20260623-61 rather than re-reporting the enumeration inconsistency itself.
+
+FR-008 states: "The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill; **unknown commands produce a clear 'unknown stack-control command' error**." FR-002 defines the registered skill set as `define`, `extend`, `execute`, `workflow`, `roadmap` — no `version`. FR-011 independently requires the plugin to expose `/stack-control:version`.
+
+When these three requirements are read together as written: `version` is not in the FR-002 registered set; FR-008 routes all unrecognized commands to an error; therefore `/stack-control:version` — being unrecognized per FR-002 — hits the FR-008 error path. This makes FR-008 and FR-011 directly irreconcilable without first resolving the FR-002 vs. Clarifications inconsistency. An unattended builder following FR-002 + FR-008 literally will produce "unknown stack-control command" for the required `/stack-control:version` command, violating FR-011.
+
+Blast radius: the consequence is a required command throwing an error at runtime, a regression visible to every user who runs `/stack-control:version`. AUDIT-20260623-61's fix (add `version` to FR-002's enumeration) would resolve this gap; until then, these three requirements cannot all be satisfied simultaneously. Flagging here because the existing finding was about enumeration inconsistency — the implementability break via FR-008 is a distinct and concrete consequence that merits its own signal.
+
+---
+
+### AUDIT-20260623-67 — Listed edge cases are questions without committed answers — three behaviors are entirely undefined
+
+Finding-ID: AUDIT-20260623-67
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md (Edge Cases section)
+
+The spec lists five edge cases and frames them as open questions. Two are addressed by FRs: non-zero exit codes by FR-006, and `stackctl` not found by FR-007. Three have no committed behavior anywhere in the spec:
+
+1. "What happens when the opencode session ends during a long-running stack-control skill?" — no FR, no acceptance scenario, no assumption.
+2. "What if the user has multiple opencode sessions running simultaneously?" — no FR, no acceptance scenario, no assumption.
+3. "How does the plugin handle network timeouts or file system errors during CLI execution?" — no FR, no acceptance scenario, no assumption.
+
+Listing an edge case as an open question signals the spec authors were aware of the scenario. Leaving it answered by nothing commits the behavior to "undefined" — an unattended builder will either ignore the scenario or implement whatever feels natural, and neither is auditable against the spec.
+
+Blast radius: session-termination during a long-running skill (e.g., `/stack-control:execute` over a large feature) is plausibly common; without a committed behavior (abort cleanly? leave CLI running? warn on next open?), users experience whatever the implementation chose. A reasonable fix adds explicit Assumptions or FRs for these three: even "behavior is undefined and left to the CLI's own termination handling" is a committed answer that guides implementation.
+
+---
+
+### AUDIT-20260623-68 — SC-004 "opencode versions 1.0 and later" is untestable without a minimum API compatibility contract
+
+Finding-ID: AUDIT-20260623-68 (claude-06 + codex-01; cross-model)
+Status:     open
+Severity:   low
+Per-lane:   claude=low, codex=medium
+Decision:   agreement (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:137 (SC-004)
+
+SC-004 states: "Plugin works with opencode versions 1.0 and later." There is no mechanism in the spec or its assumptions for verifying this. Opencode's plugin API versioning, what API surface the plugin depends on, or what constitutes a breaking opencode API change are all unspecified. If opencode 2.0 changes its plugin event model, this criterion's "and later" clause becomes retroactively false for a shipped plugin, with no way for the builder to have guarded against it at implementation time.
+
+Additionally, the spec's Assumptions name "The opencode plugin system supports the event hooks needed (command.executed, session events)" — a conditional dependency on specific opencode API surface — but SC-004 offers no way to verify that dependency holds across "versions 1.0 and later." A builder cannot write a test for "works with all future opencode versions."
+
+A reasonable fix replaces "versions 1.0 and later" with the specific API surface the plugin depends on (e.g., "Plugin works with any opencode version that implements the `command.executed` hook and shell API as used at the time of authoring"), or adds an Assumption that constrains the API surface being relied upon so the criterion becomes falsifiable.
+
+### AUDIT-20260623-69 — FR-004’s argument-count example is ambiguous about what gets passed to `stackctl`
+
+Finding-ID: AUDIT-20260623-69
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:108
+
+FR-004 requires preserving token boundaries and gives `/stack-control:define "opencode support"` as an example that “passes two arguments to `stackctl`.” There are two plausible readings: either `stackctl` receives `define` plus one preserved quoted argument (`["define", "opencode support"]`), or the quoted phrase is mistakenly expected to become two arguments (`["define", "opencode", "support"]`). The wording “preserving ... quoting semantics” points to the first reading, while “passes two arguments” can be read as counting the words in the quoted phrase.
+
+The blast radius is high because unattended builders often implement examples literally. If the wrong reading is built, multi-word feature names are split incorrectly, which affects the first core workflow `/stack-control:define "opencode support"`. A reasonable fix would state the exact argv shape, for example: `/stack-control:define "opencode support"` invokes `stackctl` with command `define` and one user argument whose value is `opencode support`.

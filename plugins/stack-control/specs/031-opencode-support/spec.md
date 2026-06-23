@@ -52,9 +52,11 @@ The opencode plugin should delegate all stack-control operations to the `stackct
 
 **Acceptance Scenarios**:
 
-1. **Given** plugin receives a skill invocation, **When** the skill requires execution, **Then** the plugin invokes `stackctl <command>` via the shell API
+1. **Given** plugin receives a skill invocation, **When** the skill requires execution, **Then** the plugin invokes `stackctl <command>` via the shell API with the opencode session's active project/workspace as the working context
 2. **Given** `stackctl` is not installed, **When** plugin tries to execute a command, **Then** the plugin reports a clear error about missing CLI
 3. **Given** CLI command completes, **When** output is returned, **Then** the plugin formats and returns it to opencode
+
+Note: `/stack-control:version` is an exception that reports plugin-local metadata, not a CLI operation.
 
 ---
 
@@ -104,8 +106,8 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 
 - **FR-001**: The plugin MUST export a function following opencode's plugin API signature
 - **FR-002**: The plugin MUST register the primary lifecycle skills when loaded (`define`, `extend`, `execute`, `workflow`, `roadmap`)
-- **FR-003**: The plugin MUST delegate skill execution to the `stackctl` CLI via the shell API
-- **FR-004**: The plugin MUST forward skill arguments to the CLI as command arguments, preserving opencode command argument token boundaries and quoting semantics (e.g., `/stack-control:define "opencode support"` passes two arguments to `stackctl`)
+- **FR-003**: The plugin MUST delegate skill execution to the `stackctl` CLI via the shell API, except for `/stack-control:version` which reports the plugin-local version
+- **FR-004**: The plugin MUST forward skill arguments to the CLI as command arguments, preserving opencode command argument token boundaries and quoting semantics (e.g., `/stack-control:define "opencode support"` passes command `define` and one argument with value `opencode support` to `stackctl`)
 - **FR-005**: The plugin MUST capture CLI output and return it to opencode
 - **FR-006**: The plugin MUST handle CLI errors (non-zero exit codes) and report them to opencode
 - **FR-007**: The plugin MUST provide a clear error message when `stackctl` CLI is not found
@@ -129,7 +131,7 @@ The plugin version should match the `stackctl` CLI version to avoid compatibilit
 - **SC-001**: Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode
 - **SC-002**: Plugin successfully delegates all five listed happy-path skill invocations to the CLI without errors (`/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)
 - **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI
-- **SC-004**: Plugin works with opencode versions 1.0 and later
+- **SC-004**: Plugin works with opencode versions 1.0 and later (tested against opencode 1.0+; compatibility with future versions depends on opencode's plugin API stability)
 - **SC-005**: Plugin loads successfully in opencode without requiring additional configuration
 
 ## Clarifications
