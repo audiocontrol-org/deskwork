@@ -254,3 +254,270 @@ Surface:    plugins/stack-control/specs/030-chunked-end-govern/spec.md:95-105,22
 US4 says the re-audit set shrinks each round, the independent test asserts it “monotonically shrinks across rounds,” and FR-013 says the touched set “MUST shrink toward empty.” The same FR then admits coupling cycles can prevent shrinkage and requires a hard max-round cap; FR-012 also requires coupling-correct expansion when a fix touches a file coupled into another chunk.
 
 That makes the strict monotonic-shrink promise too strong. The intended behavior seems to be bounded convergence with a cap, not mathematically guaranteed shrinkage every round. As written, tests could enforce an impossible invariant and reject a correct cap-stop path. Reword the promise to require “not full-set unless coupling requires it, carries untouched chunks, terminates by empty/dampener/cap,” and reserve monotonic shrinkage for fixtures intentionally constructed to have no coupling expansion.
+
+## 2026-06-23 — audit-barrage lift (20260623T002310145Z-031-opencode-support-after_clarify)
+
+Code-sha: bde66b2f7ce4115c37d94fd37704685112c8eaf1
+### AUDIT-20260623-01 — FR-010 contradicts FR-009 — npm installation path is incompatible with the mandatory load path
+
+Finding-ID: AUDIT-20260623-01 (claude-01 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=high, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    spec.md — FR-009; FR-010; US2 AC1
+
+FR-009 states: "The plugin MUST load from `.opencode/plugins/stack-control.ts`." FR-010 states: "The plugin MUST support both local installation (copy plugin file) and npm installation." For a single `.ts` file plugin, there is no canonical npm installation behavior that satisfies FR-009's specific path requirement without an unspecified post-install step (e.g., a postinstall script that copies the file into `.opencode/plugins/`). The spec neither describes what the npm package contains nor how npm installation results in the file appearing at the FR-009 path.
+
+An unattended builder has two roughly equally plausible readings: (a) the npm package uses a postinstall hook to place the file at the FR-009 path, or (b) npm installation places the file in `node_modules/` and the plugin path differs from FR-009. Under reading (b), FR-009 and FR-010 cannot both be satisfied. US2 AC1 — the primary acceptance scenario for installation — only describes the copy-file path, not npm installation, so the AC provides no disambiguation. The spec must either describe what "npm installation" means for a `.ts` single-file plugin (what is published, what lands where) or drop one of the two requirements.
+
+---
+
+### AUDIT-20260623-02 — "All stack-control skills" is undefined — builder must fabricate the skill set boundary
+
+Finding-ID: AUDIT-20260623-02
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    spec.md — FR-002; US4 AC3
+
+FR-002 states: "The plugin MUST register all stack-control skills when loaded." US4 AC3 repeats this: "it registers all stack-control skills with opencode." Neither the FR nor the US defines what "all stack-control skills" means: is it the set of skills present at the time this plugin ships (a hardcoded list that silently rots as skills are added or renamed), or skills discovered dynamically at load time from some registry (an API or mechanism never mentioned in the spec)?
+
+US1 AC1 names only `/stack-control:define` as an example — it is not an enumeration. The Key Entities section defines "Skill" as "a stack-control skill (e.g., `define`, `extend`, `execute`)" — also an open-ended example, not a complete list. An unattended builder must invent a boundary: hardcode a list (which breaks on future skill additions with no spec violation to catch it) or implement dynamic discovery (which requires an API surface never specified). The spec should either enumerate the skill set to register, commit to the discovery mechanism, or at minimum state whether new skills added after this feature ships are automatically included.
+
+---
+
+### AUDIT-20260623-03 — FR-004 — "skill arguments" is undefined; the argument surface is never specified
+
+Finding-ID: AUDIT-20260623-03
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    spec.md — FR-004; US1 AC2; US3 AC1
+
+FR-004 states: "The plugin MUST forward skill arguments to the CLI as command arguments." This promise depends on a definition of "skill arguments" — what the user supplies when invoking a skill in opencode — that the spec never provides. The spec does not describe how arguments are passed in opencode's command system: are they typed inline after the slash command (`/stack-control:define my-feature-name`)? Are they prompted interactively via a series of opencode dialog turns? Are they structured data from the event payload?
+
+US1 AC2 ("When the skill requires CLI operations, Then the plugin delegates to the local `stackctl` CLI") and US3 AC1 ("Then the plugin invokes `stackctl <command>` via the shell API") do not close the gap. The mapping from opencode's command invocation surface to `stackctl`'s argument interface is the core of FR-004, and it is completely absent. An unattended builder must fabricate this mapping, and fabrication here directly determines the user-visible invocation UX of every skill.
+
+---
+
+### AUDIT-20260623-04 — US5 AC3 contradicts the "no automated version sync" assumption
+
+Finding-ID: AUDIT-20260623-04
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — US5 AC3; Assumptions (version alignment)
+
+US5 AC3 states: "Given user runs `stackctl --version`, When plugin version is available, Then both versions are displayed." The Assumptions section states: "Users will manually ensure plugin and CLI version alignment (no automated version sync)." `stackctl --version` is a CLI binary invocation — for it to display the plugin's version, the `stackctl` binary must have a channel to query the installed opencode plugin's version. That requires coordination the "no automated version sync" assumption appears to rule out.
+
+The most natural reading of "user runs `stackctl --version`" is a direct terminal invocation of the CLI binary, not a stack-control skill routed through opencode. Under that reading, the `stackctl` binary would need to locate and read the plugin version — a mechanism with no spec basis. An alternative reading — that the AC means "when user invokes a version-reporting skill inside opencode" — is plausible but contradicted by the literal text. The spec should either clarify what surface US5 AC3 describes (CLI binary? opencode skill?) or remove the premise that both versions appear in a single CLI command output.
+
+---
+
+### AUDIT-20260623-05 — SC-002 "95%" success rate is unmeasurable — denominator and test protocol undefined
+
+Finding-ID: AUDIT-20260623-05
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — SC-002; Edge Cases
+
+SC-002 states: "Plugin successfully delegates 95% of skill invocations to the CLI without errors." No measurement protocol is defined: no test harness, no reference workload, no definition of what counts as a "delegation error" versus a CLI-originated error versus a user/environment error (e.g., missing `stackctl`, bad arguments). The 95% floor implies a denominator — 95% of what? — that is never stated.
+
+The Edge Cases section lists several failure scenarios (missing CLI, network timeouts, concurrent sessions, stackctl not in PATH) without specifying which count against the 5% tolerance and which are categorically excluded from the denominator. An unattended builder cannot verify SC-002 or know when an implementation satisfies it. The SC must either define the measurement protocol (workload, what counts as the denominator, what counts as a delegation failure) or be reworded as a qualitative goal rather than a measured threshold.
+
+---
+
+### AUDIT-20260623-06 — SC-004 "opencode versions 1.0 and later" is an unverifiable compatibility promise
+
+Finding-ID: AUDIT-20260623-06
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — SC-004; Assumptions (opencode plugin system)
+
+SC-004 states: "Plugin works with opencode versions 1.0 and later." The spec never enumerates the opencode API surface the plugin depends on — the event system (`command.executed`), the session context, and the shell API (`$`) appear only in the Assumptions section as assumed-stable surfaces. Without specifying which opencode API contracts are the load-bearing dependencies, "versions 1.0 and later" cannot be verified: any future opencode version could change the event schema or shell API, silently breaking the plugin while SC-004 claims compatibility.
+
+This matters especially because US4 AC1 references `command.executed` as a specific event name and schema. If opencode renames or restructures that event in a point release, the plugin breaks but the spec never identified the dependency as load-bearing. The spec should either enumerate the specific API contracts the plugin relies on (and assert they are stable across 1.x), or scope SC-004 to "opencode version X.Y.Z as of this feature's implementation" rather than making an open-ended forward-compatibility claim.
+
+---
+
+### AUDIT-20260623-07 — Edge case "stackctl installed but not in PATH" is listed but has no FR or acceptance scenario
+
+Finding-ID: AUDIT-20260623-07
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — Edge Cases; FR-007; US3 AC2
+
+The Edge Cases section explicitly raises: "What if `stackctl` CLI is installed globally but not in PATH?" This is a distinct failure mode from `stackctl` not being installed at all. FR-007 covers "not found" with a clear error message. US3 AC2 states "Given `stackctl` is not installed, When plugin tries to execute a command, Then the plugin reports a clear error." Neither clause commits to what happens in the "installed but not in PATH" case — a situation where the binary exists on disk, can be located if you know where to look, but is not reachable via standard `PATH` resolution.
+
+A user in this situation would receive a generic "not found" error (if FR-007's message is unhelpful) when the real fix is a `PATH` configuration step. The spec either needs a separate FR covering this case with a diagnostic-quality error message (e.g., "stackctl is not in your PATH — ensure the directory containing stackctl is exported"), or must explicitly state it is subsumed under FR-007 and the "clear error" there is defined to cover path-resolution advice.
+
+---
+
+### AUDIT-20260623-08 — "Shell API" in FR-003 is not defined in Key Entities — ambiguous execution primitive
+
+Finding-ID: AUDIT-20260623-08
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    spec.md — FR-003; Key Entities; Assumptions
+
+FR-003 requires CLI delegation "via the shell API." The Assumptions section parenthetically notes `($)` as the shell API symbol, but "Shell API" does not appear in Key Entities alongside Plugin, Skill, CLI, and Session. If opencode exposes multiple subprocess execution mechanisms (e.g., a streaming shell API vs. a synchronous one, or different privilege contexts), the choice between them affects how FR-005 (capture CLI output) and FR-006 (handle non-zero exit codes) are satisfied.
+
+This is hygiene-level as an unattended builder can likely find the correct API from opencode's documentation. However, the Key Entities section defines the spec's vocabulary, and leaving the execution primitive undefined there while referencing it in a functional requirement is an internal inconsistency. Adding "Shell API: opencode's subprocess execution interface (`$`)" to Key Entities would close the gap at no cost.
+
+### AUDIT-20260623-09 — Command surface for `/speckit-*` is promised but not registered
+
+Finding-ID: AUDIT-20260623-09
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:23-25`, `plugins/stack-control/specs/031-opencode-support/spec.md:71-73`, `plugins/stack-control/specs/031-opencode-support/spec.md:112`
+
+US1 promises that users can run `/speckit-*` commands through the skill and those commands execute in the installation context, but US4 and FR-008 only require routing commands that start with `/stack-control:`. Those are two different command namespaces. An unattended builder following FR-008 could implement only `/stack-control:*` dispatch and still believe the requirements are satisfied, while US1’s spec-authoring flow fails when it reaches `/speckit-*`.
+
+The blast radius is high because this affects the core P1 workflow: `/stack-control:define` begins a chain that explicitly depends on `/speckit-*` commands. The spec should state whether `/speckit-*` is a first-class registered opencode command namespace, an internal delegation target hidden behind `/stack-control:*`, or out of scope.
+
+### AUDIT-20260623-10 — Version reporting assigns plugin behavior to `stackctl --version`
+
+Finding-ID: AUDIT-20260623-10
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:87-89`, `plugins/stack-control/specs/031-opencode-support/spec.md:115-116`, `plugins/stack-control/specs/031-opencode-support/spec.md:146`
+
+US5 AC3 says that when the user runs `stackctl --version`, both CLI and plugin versions are displayed. But the feature scope is an opencode plugin delegating to `stackctl`, while FR-011/FR-012 only require the plugin to report its own version and warn on mismatch. The assumptions also say users manually ensure version alignment, with no automated version sync.
+
+As written, this can be read as requiring a change to the `stackctl` CLI version command, or as requiring the plugin to display both versions inside opencode. Those are materially different promises. The blast radius is medium: version checks are P3, but an unattended builder could modify the wrong surface or omit the AC3 behavior entirely.
+
+## 2026-06-23 — audit-barrage lift (20260623T002534664Z-031-opencode-support-after_clarify)
+
+Code-sha: bde66b2f7ce4115c37d94fd37704685112c8eaf1
+### AUDIT-20260623-11 — FR-009 and FR-010 state mutually exclusive installation paths
+
+Finding-ID: AUDIT-20260623-11 (claude-01 + claude-08 + codex-03; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=high, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    spec.md — FR-009; FR-010
+
+FR-009 states: "The plugin MUST load from `.opencode/plugins/stack-control.ts`." FR-010 states: "The plugin MUST support both local installation (copy plugin file) and npm installation." These requirements cannot both be true simultaneously. npm installation places a module in `node_modules/` (or a global npm prefix), not in `.opencode/plugins/stack-control.ts`. An unattended agent building to both requirements faces an irreconcilable contradiction: it cannot place the plugin at a fixed path in `.opencode/plugins/` and also load it from wherever npm puts it. The two readings are roughly equally plausible — a builder might interpret FR-009 as "this is where users put it manually" and FR-010 as "npm also works somehow" — but the spec gives no guidance on how opencode discovers npm-installed plugins versus file-based plugins, nor how these two paths relate. Either FR-009 needs to be scoped to the "local copy" path only (and npm installation needs its own load-path description), or FR-010's "npm installation" needs to explain how the module ends up at the FR-009 path. As written, an agent implementing both FRs will fabricate a resolution that may contradict the intended architecture.
+
+---
+
+### AUDIT-20260623-12 — "All stack-control skills" in FR-002 is undefined — no canonical list
+
+Finding-ID: AUDIT-20260623-12 (claude-02 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    spec.md — FR-002; US4 AC3
+
+FR-002 states: "The plugin MUST register all stack-control skills when loaded." US4 AC3 echoes this: "it registers all stack-control skills with opencode." Neither the spec nor any referenced artifact defines the canonical set of skills. An unattended agent building to this requirement has three equally plausible resolutions: (1) hardcode a list it infers from the skill names mentioned in the spec (e.g., `define`, `extend`, `execute`, `plan`); (2) dynamically introspect the local stack-control installation for available skills; (3) query the `stackctl` CLI for its skill manifest. All three produce different runtime behavior. The spec does not commit to which approach is intended or what the list comprises. If a new skill is added to stack-control after the plugin ships, reading (1) silently misses it; readings (2) and (3) require mechanisms the spec never promises. A wrong implementation of "all" is invisible until a user invokes a skill that isn't registered. The spec should either enumerate the skill set explicitly or state the discovery mechanism as a promise.
+
+---
+
+### AUDIT-20260623-13 — US5 AC3 describes behavior architecturally impossible for the CLI
+
+Finding-ID: AUDIT-20260623-13
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    spec.md — US5 AC3; FR-011; FR-012
+
+US5 AC3 states: "Given user runs `stackctl --version`, When plugin version is available, Then both versions are displayed." This acceptance scenario requires the `stackctl` CLI to display the opencode plugin's version. The CLI has no architectural visibility into which opencode plugin file the user has installed, where it is, or what version it carries. The plugin is a file in `.opencode/plugins/` (per FR-009); the CLI is an independent binary. There is no plausible mechanism by which `stackctl --version` would report a plugin version without either (a) the CLI querying a registry of installed plugins (no such registry is defined in the spec), or (b) the plugin intercepting the CLI invocation (no such interception mechanism is promised). An agent building to this acceptance scenario will either fabricate a mechanism that doesn't exist or silently skip it. FR-011 ("the plugin MUST report its version when queried") and FR-012 ("warn when plugin version doesn't match CLI version") describe a sensible version-awareness model in the opposite direction (the plugin knows the CLI version), making AC3's inversion a plausible spec confusion. The scenario should be corrected to describe the plugin reporting its own version, with the CLI version obtained by running `stackctl --version` separately.
+
+---
+
+### AUDIT-20260623-14 — US1 AC3 introduces `/speckit-*` command routing with no backing FR
+
+Finding-ID: AUDIT-20260623-14
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    spec.md — US1 AC3; FR-008
+
+US1 AC3 states: "Given user is in an opencode session, When they run `/speckit-*` commands through the skill, Then those commands execute in the installation context." FR-008, the only routing requirement, states: "The plugin MUST map `/stack-control:` prefixed commands to the appropriate skill." FR-008 has no analogous requirement for `/speckit-*` prefixed commands. An agent building to the FR set would implement `/stack-control:` routing and consider the routing requirement satisfied. US1 AC3 would then fail: `/speckit-*` commands would not be routed by the plugin. The spec never explains what a `/speckit-*` command is, whether it maps to the same CLI delegation model as `/stack-control:` commands, or how the plugin would discover which `/speckit-*` commands exist. This is a silent gap between the acceptance scenario and the requirements: the scenario promises a capability the requirements do not require. A builder working from the FRs alone will ship a plugin that passes all FR-level tests and fails US1 AC3 at system test.
+
+---
+
+### AUDIT-20260623-15 — SC-005 directly contradicts the CLI prerequisite
+
+Finding-ID: AUDIT-20260623-15
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — SC-005; FR-007; US3 AC2; Assumptions
+
+SC-005 states: "Plugin loads successfully in opencode without requiring additional configuration." The Assumptions section states: "Users have `stackctl` CLI installed and available in their PATH." FR-007 and US3 AC2 describe the error path when `stackctl` is not found — implying that `stackctl` must be pre-installed for the plugin to function. Installing `stackctl` is additional configuration. A user who copies the plugin file (per US2 AC1) and restarts opencode (SC-005's implied baseline) has not yet installed `stackctl`; the plugin loads but fails immediately on first skill invocation with the FR-007 error. The spec cannot simultaneously promise "no additional configuration" (SC-005) and require a separate CLI installation (Assumptions). A reasonable consumer would resolve this as SC-005 referring only to plugin-side configuration (no config file, no env vars, etc.), but that resolution is not stated — the guarantee as written is misleading. The spec should narrow SC-005 to "plugin-side configuration" explicitly and acknowledge CLI installation as a prerequisite outside the 5-minute SC-001 window.
+
+---
+
+### AUDIT-20260623-16 — SC-002 "95% of skill invocations without errors" is unmeasurable as stated
+
+Finding-ID: AUDIT-20260623-16
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — SC-002
+
+SC-002 states: "Plugin successfully delegates 95% of skill invocations to the CLI without errors." No testing methodology, sample population, measurement context, or definition of "error" is provided. A passing implementation could trivially satisfy this by only registering 20 skills and ensuring 19 of them have no error paths exercised. A failing implementation could be reported as passing if the measurement window excludes edge-case invocations. "Without errors" is undefined: does it mean non-zero CLI exit codes? Plugin-side exceptions? User-visible error messages? The 95% threshold implies a tolerated 5% failure rate, but the spec does not state what failure modes are acceptable, which means the 5% cannot be reasoned about at implementation time. This criterion is not independently testable and provides no actionable gate. It should be replaced with a concrete, bounded assertion (e.g., "all CLI delegation paths in the test suite exit without uncaught exceptions") or removed.
+
+---
+
+### AUDIT-20260623-17 — Blocking assumption about opencode's event API has no mitigation
+
+Finding-ID: AUDIT-20260623-17
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    spec.md — Assumptions; US4 AC1
+
+US4 AC1 states: "Given opencode fires a `command.executed` event, When the command starts with `/stack-control:`, Then the plugin routes it to the appropriate skill." The Assumptions section lists: "The opencode plugin system supports the event hooks needed (command.executed, session events)." This assumption is structurally blocking: if opencode's actual event API uses a different name or shape for command events, the entire routing model (US4, FR-008) collapses. No fallback, no verification step, and no reference to opencode's published API is provided. The spec names a specific event string (`command.executed`) as a factual commitment inside an acceptance scenario — an agent building to this will hardcode a listener for exactly this event name. If opencode's plugin documentation uses a different event name (e.g., `command:execute` or `onCommand`), the plugin will silently never route anything. The spec should either reference the opencode plugin API document as the authoritative source for event names (and not pre-commit to a specific name in AC1), or confirm the event name via the opencode API and state it as a verified fact, not an assumption. The current form buries a blocking integration dependency inside "Assumptions" while committing to a specific API surface in the acceptance scenario.
+
+---
+
+### AUDIT-20260623-18 — `/speckit-*` invocation is promised but never mapped
+
+Finding-ID: AUDIT-20260623-18
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:23-25,71-73,112
+
+US1 acceptance scenario 3 promises that users can run `/speckit-*` commands “through the skill” and have them execute in the installation context. But US4 and FR-008 only define routing for commands starting with `/stack-control:`. There is no matching requirement for `/speckit-*` command registration, routing, aliasing, or rejection.
+
+This is a high-blast-radius ambiguity because an unattended builder following the requirements will likely implement only `/stack-control:` dispatch and still believe FR-008 is satisfied, while a user following US1 will expect `/speckit-*` commands to work. The spec should state whether `/speckit-*` commands are first-class opencode commands, aliases under `/stack-control:`, or intentionally unavailable except inside the prose flow of a stack-control skill.
+
+### AUDIT-20260623-19 — Version check is assigned to both plugin and CLI in incompatible ways
+
+Finding-ID: AUDIT-20260623-19
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:77-89,115-116,146
+
+US5 says users can verify plugin/CLI version alignment, FR-011 says the plugin reports its version, and FR-012 says the plugin warns when versions differ. But acceptance scenario 3 says that when the user runs `stackctl --version`, “both versions are displayed.” That assigns plugin-version reporting to the CLI command, while the surrounding requirements frame version reporting as plugin behavior. The assumptions also say users manually ensure alignment with no automated version sync.
+
+The likely intended behavior is clear enough that this is medium rather than high, but an unattended builder could implement only plugin-side warning and never alter `stackctl --version`, leaving AC3 unmet; or alter CLI version output even though the feature is scoped as an opencode plugin. The spec should choose the user-visible version surface: plugin command/query, CLI output, or both.
