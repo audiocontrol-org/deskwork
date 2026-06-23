@@ -2231,3 +2231,79 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:83-96,121-1
 User Story 5 says users “should be able to verify version alignment,” and its independent test is comparing plugin version to CLI version. But FR-011 requires `/stack-control:version` to report only the plugin version, while FR-012 only requires warning on skill invocation when a mismatch is detected. The note reinforces that users must manually compare `/stack-control:version` with `stackctl --version`.
 
 Those promises leave no plugin-level affirmative alignment result. If versions match, the plugin emits nothing; if a builder expands `/stack-control:version` to report both versions, it violates “reports only the plugin version.” The likely implementation is a silent mismatch check that satisfies FR-012 but cannot prove alignment through the plugin surface. Blast radius is medium because manual CLI comparison still exists, but the stated version-sync feature is weaker and less testable than the user story promises.
+
+## 2026-06-23 — audit-barrage lift (20260623T030448731Z-031-opencode-support-after_clarify)
+
+Code-sha: ef65ab5b1fb9b2e910e3cbad375e8a349e164676
+### AUDIT-20260623-123 — Event-listener routing model leaves `/stack-control:version` without an explicit handler path
+
+Finding-ID: AUDIT-20260623-123
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=reachable, fix-debt=no; reachable, high blast radius — NOT calibrated down (real signal preserved, SC-003).
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-008; US-4 scenario 1 and its Note; FR-002 (Key Entities note); FR-011
+
+The spec establishes two routing paths for `/stack-control:` commands. Path A: registered skills (`define`, `extend`, `execute`, `workflow`, `roadmap`) are handled by opencode's command palette (FR-002; US-4 scenario 2 and its Note). Path B: unregistered `/stack-control:` commands fall through to the `command.executed` event listener, which "routes it to the appropriate skill" (US-4 scenario 1 and its Note); truly unknown commands produce a "clear 'unknown stack-control command' error" (FR-008).
+
+`/stack-control:version` is explicitly placed in path B — FR-002 and the Key Entities note state it is "not a registered skill" and "does not appear in opencode's skill registration." So it enters the event listener. But the event listener description says it routes to "the appropriate skill" — and the Key Entities note defines a "Skill" as one of the five registered lifecycle operations; `version` is explicitly excluded from that set. Under the literal reading of US-4 scenario 1 and FR-008, an agent building the event listener has two options: (a) treat `version` as a known skill name, find no registration for it, and emit "unknown stack-control command" — contradicting FR-011; or (b) create a `version` skill entry in the routing table, contradicting the Key Entities note and FR-002. Neither produces the correct behavior (plugin-local version report, FR-011/FR-003).
+
+The intended implementation — a plugin-local handler in the event listener, distinct from both the skill dispatcher and the unknown-command error path — is reachable only by inference across FR-002, FR-003, FR-011, and the Key Entities note. An agent building from the event listener contract (US-4 scenario 1 and FR-008) without reading all four sections in concert will build path B as a skill dispatcher and land on the wrong error behavior. Blast-radius: the version command silently misfires, breaking US-5 scenario 1 and the manual alignment verification workflow. The fix is to add an explicit third branch to FR-008 and US-4 scenario 1: "commands that are routed but not registered (currently: `version`) are handled by plugin-local logic, not by the skill dispatcher."
+
+---
+
+### AUDIT-20260623-124 — FR-012 per-invocation version check creates unacknowledged latency pressure on SC-003
+
+Finding-ID: AUDIT-20260623-124
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-012; SC-003; US-5 Note
+
+FR-012 requires the plugin to "detect version mismatch between plugin and CLI and warn users **when a skill is invoked**." The US-5 Note confirms: "CLI version detection happens silently for mismatch warnings on skill invocation." The natural reading of "when a skill is invoked" is that a version check runs at or before each skill execution — requiring a subprocess call to `stackctl --version` (or equivalent) on every dispatch.
+
+SC-003 requires "skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI." The 2-second window is the entire cost envelope from user keypress to first output. The spec does not state whether the FR-012 detection call is: synchronous or async; per-invocation or once per session (cached); included in or excluded from the SC-003 measurement window. For a local CLI the subprocess cost is likely small, but the spec makes no commitment. An agent implementing FR-012 as a synchronous `stackctl --version` call before every skill execution will compress the SC-003 latency budget by one subprocess invocation per skill call, with no spec guidance on whether caching or async detection is the intended resolution.
+
+This is distinct from the open AUDIT-20260623-122 finding (which addresses whether alignment can be affirmatively verified at all). This finding addresses the performance coupling between the two promises: both can be satisfied, but only if the check frequency or async behavior is constrained — and the spec commits to neither. Blast-radius: an unattended agent implementing the naive synchronous path satisfies FR-012's literal text and may or may not satisfy SC-003 depending on subprocess overhead. No mechanism is over-specified; the spec simply needs to add a frequency or timing qualifier to FR-012 (e.g., "once per session" or "asynchronously after first output") so that the latency budget is not silently at risk.
+
+---
+
+### AUDIT-20260623-125 — SC-001 lacks a reproducible measurement procedure
+
+Finding-ID: AUDIT-20260623-125
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-001
+
+SC-001 states: "Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode." The phrase "first opening opencode" is ambiguous about the precondition state: does the clock start from a machine with no prior opencode installation, an existing opencode install with no prior plugins, or the literal first launch of opencode in that terminal session? The result depends heavily on which interpretation is used — a fresh-install scenario includes opencode download time; an existing-install scenario includes only plugin file copy and restart time.
+
+There is no stated measurement methodology: who times it, from what event to what event, and whether the 5-minute window includes reading the installation instructions. As written, SC-001 is a UX design target — directionally useful, but not autonomously testable by a test suite or verifiable by an agent running a CI check. Blast-radius: an agent building acceptance tests from SC-001 would not know what initial state to set up, and any test written against it would be arbitrary. The criterion is unlikely to cause wrong implementation decisions, but it cannot serve as a verifiable gate. The fix is to define the measurement procedure: starting state (e.g., "opencode installed, no prior stack-control plugin"), clock start (plugin file downloaded or copied), and clock stop (first output from `/stack-control:define`).
+
+### AUDIT-20260623-126 — SC-001 measures a user-install journey the spec has not bounded
+
+Finding-ID: AUDIT-20260623-126
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:37-45,141
+
+SC-001 promises users can install the plugin and invoke `/stack-control:define` “within 5 minutes of first opening opencode.” But the install path is specified only as “copying `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts`” and restarting opencode; the spec never promises where the user gets that file, how it is discoverable from the package or repository, or whether the npm path counts toward the same 5-minute measurement.
+
+This makes the criterion unmeasurable as written. A downstream builder can satisfy FR-009/FR-010 by producing a loadable file and package export, while still leaving SC-001 impossible to test consistently because the clock includes an undefined acquisition/setup path. A reasonable fix would scope SC-001 to a concrete starting state, such as “given the plugin file is available locally” or “given the package is installed,” and make the measured install path match one of the supported installation promises. Blast radius is medium because it weakens the release gate and onboarding claim, but does not by itself break skill execution once installed.
+
+### AUDIT-20260623-127 — Session context is promised, but session-lifecycle behavior is only listed as an unanswered edge case
+
+Finding-ID: AUDIT-20260623-127
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:25-27,103-109,130-133,163,169
+
+US-1 promises `/stack-control:extend` “executes in the stack-control installation context,” and the spec says CLI operations use the active project/workspace cwd. The Key Entities also define `Session` as context used for skill invocation. But the first Edge Case leaves “What happens when the opencode session ends during a long-running stack-control skill?” unanswered, while long-running skills are central to the feature’s stated workflow.
+
+This is not asking for a cancellation mechanism. The missing promise is user-facing: whether the command continues and returns output somewhere, is cancelled, or reports that the session ended. As written, an unattended builder could choose any of those behaviors and still claim the spec leaves it open, producing materially different outcomes for `define`/`execute` runs. Blast radius is medium because the happy path still works, but long-running lifecycle commands are core enough that ambiguous session-end semantics can lose user-visible command results or leave users unsure whether governance work completed.

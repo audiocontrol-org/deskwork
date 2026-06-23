@@ -102,11 +102,11 @@ Note: `/stack-control:version` is plugin-local and does not invoke `stackctl`. C
 
 ### Edge Cases
 
-- What happens when the opencode session ends during a long-running stack-control skill?
-- How does the plugin handle errors from the `stackctl` CLI (non-zero exit codes)?
-- What if the user has multiple opencode sessions running simultaneously?
-- How does the plugin handle network timeouts or file system errors during CLI execution?
-- What happens if `stackctl` CLI is installed globally but not in PATH?
+- What happens when the opencode session ends during a long-running stack-control skill? → The skill continues and returns output when complete; the plugin does not cancel in-progress operations.
+- How does the plugin handle errors from the `stackctl` CLI (non-zero exit codes)? → The plugin captures stderr and returns it to opencode with a clear error message.
+- What if the user has multiple opencode sessions running simultaneously? → Each session operates independently; the plugin maintains no shared state between sessions.
+- How does the plugin handle network timeouts or file system errors during CLI execution? → The plugin reports the error to opencode and does not retry.
+- What happens if `stackctl` CLI is installed globally but not in PATH? → The plugin reports a clear error about missing CLI.
 
 ## Requirements *(mandatory)*
 
@@ -138,7 +138,7 @@ Note: `/stack-control:version` is a routed command, not a registered skill. It i
 
 ### Measurable Outcomes
 
-- **SC-001**: Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode
+- **SC-001**: Users can install the stack-control plugin by copying `opencode-plugin.ts` to `.opencode/plugins/stack-control.ts` and invoke `/stack-control:define` within 5 minutes of first opening opencode
 - **SC-002**: Plugin successfully delegates all five listed happy-path skill invocations to the CLI without errors (`/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)
 - **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI
 - **SC-004**: Plugin works with opencode 1.0 (tested against opencode 1.0; future compatibility depends on opencode's plugin API stability)
