@@ -30,7 +30,7 @@ Note: CLI operations execute with the active project/workspace as the working di
 
 ### User Story 2 - Install stack-control plugin in opencode (Priority: P1)
 
-Opencode users need a straightforward way to install the stack-control plugin. They should be able to use local file installation.
+Opencode users need a straightforward way to install the stack-control plugin. They should be able to copy the plugin file to their opencode plugins directory.
 
 **Why this priority**: Without installation, the feature doesn't exist. This is the entry point for all opencode users.
 
@@ -40,7 +40,7 @@ Opencode users need a straightforward way to install the stack-control plugin. T
 
 1. **Given** user has the stack-control plugin file, **When** they copy it to `.opencode/plugins/stack-control.ts`, **Then** opencode loads the plugin on next start
 2. **Given** opencode loads the stack-control plugin, **When** the plugin initializes, **Then** it exports the plugin function following opencode's plugin API
-3. **Given** plugin is loaded, **When** user types any stack-control skill, **Then** the skill is available in the command menu
+3. **Given** plugin is loaded, **When** user types any stack-control skill, **Then** the skill is available in the command palette
 
 ---
 
@@ -137,7 +137,7 @@ Note: `/stack-control:version` is a routed command, not a registered skill. It i
 
 - **SC-001**: Users can install the stack-control plugin and invoke `/stack-control:define` within 5 minutes of first opening opencode
 - **SC-002**: Plugin successfully delegates all five listed happy-path skill invocations to the CLI without errors (`/stack-control:define`, `/stack-control:extend`, `/stack-control:execute`, `/stack-control:workflow`, `/stack-control:roadmap`)
-- **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI
+- **SC-003**: Skill invocation latency (from typing command to first output) is under 2 seconds for `/stack-control:define` with a local CLI
 - **SC-004**: Plugin works with opencode 1.0 and later (tested against opencode 1.0+; compatibility with future versions depends on opencode's plugin API stability)
 - **SC-005**: Plugin loads successfully in opencode without requiring additional configuration
 

@@ -1861,3 +1861,119 @@ Surface:    plugins/stack-control/specs/031-opencode-support/spec.md:73-78,110-1
 User Story 4 says “Given user types a skill name, When the skill is registered, Then it appears in opencode's command palette” and says the plugin registers lifecycle skills `define`, `extend`, `execute`, `workflow`, `roadmap`. FR-008 and the success criteria, however, consistently describe invocation as `/stack-control:<skill>`. The spec never states whether the command palette entries are registered as bare names (`define`) or namespaced commands (`/stack-control:define` / `stack-control:define`).
 
 Blast radius is high because an unattended builder could reasonably register bare `define`/`execute` commands in the palette while separately routing `/stack-control:` events. That creates a different user-facing command surface than the acceptance scenarios and may collide with other opencode commands. A reasonable fix would make the registered palette command IDs explicit and align them with the slash-command acceptance surface.
+
+## 2026-06-23 — audit-barrage lift (20260623T022910868Z-031-opencode-support-after_clarify)
+
+Code-sha: a03d3d8454781855f97f30e446bbc60343831a78
+### AUDIT-20260623-101 — FR-009 and FR-010 describe incompatible installation paths without a reconciling spec promise
+
+Finding-ID: AUDIT-20260623-101 (claude-01 + codex-02; cross-model)
+Status:     open
+Severity:   medium
+Per-lane:   claude=high, codex=medium
+Decision:   agreement (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-009 vs. FR-010 vs. SC-005
+
+FR-009 states the plugin "MUST load from `.opencode/plugins/stack-control.ts`." FR-010 states the plugin "MUST support npm package installation via export of a default function." SC-005 states the plugin "loads successfully in opencode without requiring additional configuration."
+
+These three requirements are jointly satisfiable only if opencode's plugin system can load npm packages and automatically resolves them at a well-known path — or if npm installation means something like "user installs the npm package, then copies the entrypoint file to `.opencode/plugins/stack-control.ts`." The spec does not commit to either interpretation. The Clarifications section says "`opencode-plugin.ts`" is "for both local copy and npm package entrypoint," which describes the source file, not the installed location.
+
+Blast radius: an unattended builder has two roughly-equally-plausible implementation shapes. Shape A: the npm package delivers a file the user places at `.opencode/plugins/stack-control.ts` (local-copy-assisted npm). Shape B: opencode's plugin API supports npm packages loaded from `node_modules/`, making FR-009's specific path inapplicable to that install path. Shape A violates SC-005 ("without requiring additional configuration" is violated by a manual copy after `npm install`). Shape B creates a situation where FR-009 is only a constraint for one of the two install paths, yet the spec writes it as an unconditional MUST. Without knowing which shape is intended, a builder will implement one and silently violate the other. A reasonable fix is to specify whether npm installation auto-places the file at the FR-009 path (and how), or to declare that FR-009 applies only to the local-file install path.
+
+---
+
+### AUDIT-20260623-102 — FR-012's version-detection failure mode is unspecified, leaving a missing user-facing guarantee
+
+Finding-ID: AUDIT-20260623-102
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-012
+
+FR-012 says: "The plugin MUST detect version mismatch between plugin and CLI and warn users when a skill is invoked." This promise depends on the plugin being able to retrieve the CLI version at invocation time (e.g., by running `stackctl --version` and parsing the output).
+
+The spec makes no promise about what happens when that detection step itself fails — for instance, when `stackctl --version` exits non-zero, produces unrecognizable output, or the invocation takes too long. In that case, the plugin has no version to compare. Two equally-plausible implementations: (a) treat detection failure as "no mismatch, proceed silently" — the safer code path, but it means version mismatches are undetected whenever the version query fails; (b) treat detection failure as "assume mismatch, always warn" — noisier and confusing when the CLI is healthy but the version output format simply changed.
+
+Blast radius: the failure mode is not exotic — it occurs whenever the installed CLI has a different `--version` output format than the plugin expects, which happens on any CLI refactor. An unattended builder picks option (a) as the path of least resistance, shipping a plugin that silently drops the mismatch guarantee in exactly the circumstances where it matters most. A one-line fix in the spec: "If version detection fails, the plugin MUST [warn that version alignment could not be verified | proceed without warning] and MUST NOT block skill execution."
+
+---
+
+### AUDIT-20260623-103 — Mismatch warning is invisible to users who only invoke `/stack-control:version`
+
+Finding-ID: AUDIT-20260623-103
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — FR-002, FR-011, FR-012, Key Entities note
+
+FR-012 fires "when a skill is invoked." FR-002 and the Key Entities section explicitly state that `/stack-control:version` is NOT a registered skill — "it is plugin-local and does not appear in opencode's skill registration." FR-011 says the version command "reports only the plugin version" with no mention of a mismatch warning.
+
+The combined reading: a user who suspects a version problem and runs `/stack-control:version` to investigate will see the plugin version and nothing else — no mismatch warning, because the version command is not a skill and FR-012 does not apply to it. The warning only surfaces when the user then invokes one of the five lifecycle skills. This behavior is internally consistent given the current spec, but it is unintuitive: the command most associated with version checking is the one that provides no mismatch signal.
+
+Blast radius: an unattended builder implementing this literally produces the unintuitive UX described above. The more natural user expectation is that `/stack-control:version` is the place to learn about version alignment issues. The spec should either: (a) explicitly acknowledge this behavior and state it is intentional (the user must invoke a lifecycle skill to see the warning), or (b) extend FR-011 to include a mismatch warning alongside the version output.
+
+---
+
+### AUDIT-20260623-104 — No user-facing guarantee when opencode has no active project/workspace
+
+Finding-ID: AUDIT-20260623-104
+Status:     open
+Severity:   medium
+Per-lane:   claude=medium
+Decision:   single-model (gate-counted medium)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US1 note, US3 acceptance scenario 1, Assumptions (last bullet)
+
+US1's note, US3's acceptance scenario 1, and the Assumptions section all promise: "CLI operations execute with the active project/workspace as the working directory." Stack-control installation discovery is described as starting from that working directory.
+
+None of these sections define what happens when there is no active project or workspace in the opencode session — for example, when opencode is opened to a blank session without a project selected, or when the session's cwd is unavailable. In that case, `stackctl` would be invoked from an undefined or default directory, which may resolve to a different stack-control installation than the user intends, or fail entirely.
+
+Blast radius: this is not a speculative scenario. Opencode users regularly open a session before selecting a project. An unattended builder has no spec-anchored behavior to implement for this case: they might inherit the shell's cwd, use the home directory, throw an error, or silently succeed against the wrong installation. Any of these outcomes can be surprising. The edge cases section lists five scenarios but does not include this one. A reasonable fix is a single sentence: "If no active project or workspace is available, the plugin MUST report a clear error before invoking `stackctl`."
+
+---
+
+### AUDIT-20260623-105 — SC-004 is untestable as stated
+
+Finding-ID: AUDIT-20260623-105
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — SC-004
+
+SC-004 states: "Plugin works with opencode 1.0 and later (tested against opencode 1.0+; compatibility with future versions depends on opencode's plugin API stability)."
+
+The qualifier in parentheses — "compatibility with future versions depends on opencode's plugin API stability" — removes the testable content of "1.0 and later." Future versions cannot be tested at the time of implementation, and the spec acknowledges this. The result is that SC-004 is testable only against opencode 1.0 at release time; the "and later" clause is aspirational and carries no verification path. A success criterion with no verification path cannot function as a gate.
+
+A reasonable fix: replace "works with opencode 1.0 and later" with "tested against opencode 1.0 at release; forward compatibility is contingent on opencode's plugin API stability and is not a release gate." This makes the verifiable claim (tested against 1.0) honest and removes the untestable "and later" from the criterion.
+
+---
+
+### AUDIT-20260623-106 — "Formats" in US3 acceptance scenario 3 is unmet by FR-005's "capture and return" promise
+
+Finding-ID: AUDIT-20260623-106
+Status:     open
+Severity:   low
+Per-lane:   claude=low
+Decision:   single-model (gate-counted low)
+Surface:    plugins/stack-control/specs/031-opencode-support/spec.md — US3 acceptance scenario 3 vs. FR-005
+
+US3 acceptance scenario 3 states: "Given CLI command completes, When output is returned, Then the plugin **formats and returns** it to opencode." FR-005 states: "The plugin MUST **capture CLI output and return it** to opencode."
+
+"Formats" implies some transformation or structuring of the raw CLI output before delivery. FR-005 makes no such promise — "capture and return" describes a pass-through. An unattended builder implementing FR-005 literally would return the raw stdout string, which is consistent with FR-005 but potentially inconsistent with US3's acceptance scenario if "formats" means something observable (e.g., markdown wrapping, structured JSON, or stderr/stdout interleaving).
+
+If "formats" in US3 is intended to mean only "packages for delivery" (i.e., colloquial for "returns"), the spec should use consistent language — FR-005's phrasing is the more precise one and should propagate to the user story. If "formats" means a transformation, that transformation must be described somewhere in the FRs. As written, the delta between the two creates low-grade ambiguity a careful builder would pause over.
+
+### AUDIT-20260623-107 — SC-003 promises a latency guarantee the plugin cannot own as stated
+
+Finding-ID: AUDIT-20260623-107
+Status:     open
+Severity:   medium
+Per-lane:   codex=medium
+Decision:   single-model (gate-counted medium)
+Surface:    `plugins/stack-control/specs/031-opencode-support/spec.md:57-59,102,140`
+
+SC-003 says “Skill invocation latency (from typing command to first output) is under 2 seconds for local CLI” at line 140, while the feature also promises CLI delegation for skill execution at lines 57-59 and explicitly acknowledges long-running stack-control skills at line 102. As written, “first output” can reasonably mean first CLI output, because FR-005/US3 frame returned output as captured CLI output. The plugin cannot guarantee that timing for arbitrary local `stackctl` commands, especially if the CLI performs setup, waits on governance work, or is silent during a long-running operation.
+
+Blast radius is medium: a reasonable builder may infer the intended promise is plugin dispatch overhead and still build the right wrapper, but another unattended builder could add synthetic “starting...” output solely to satisfy SC-003, changing the user-facing output contract without a spec-level decision. A reasonable fix is to restate SC-003 as either plugin dispatch/acknowledgement latency or narrow it to a tested happy-path command whose first output is known to occur within the threshold.
