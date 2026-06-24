@@ -81,6 +81,7 @@ function flagsFromCommand(
       name === 'clear' ||
       name === 'chain' ||
       name === 'analyzeClean' ||
+      name === 'validated' ||
       name === 'cascade'
     ) {
       continue;
@@ -100,6 +101,7 @@ function flagsFromCommand(
     clear: booleanOption(raw.clear, 'clear'),
     chain: booleanOption(raw.chain, 'chain'),
     analyzeClean: booleanOption(raw.analyzeClean, 'analyzeClean'),
+    validated: booleanOption(raw.validated, 'validated'),
     cascade: booleanOption(raw.cascade, 'cascade'),
     positionals,
     values,
@@ -152,6 +154,9 @@ function registerSubaction(parent: Command, name: string): void {
   if (grammar.chain === true) sub.option('--chain', 'wire a depends-on chain over the children');
   if (grammar.analyzeClean === true) {
     sub.option('--analyze-clean', 'record the symmetric analyze-clean marker');
+  }
+  if (grammar.validated === true) {
+    sub.option('--validated', 'record the validated marker (the validating → closed gate)');
   }
   if (grammar.cascade === true) {
     sub.option('--cascade', 'close the whole part-of subtree (transitive close)');

@@ -172,6 +172,8 @@ export interface SubactionGrammar {
   readonly chain?: boolean;
   /** Whether `--analyze-clean` is meaningful (roadmap `approve-design`); absent → not allowed. */
   readonly analyzeClean?: boolean;
+  /** Whether `--validated` is meaningful (roadmap `approve-design`, 032); absent → not allowed. */
+  readonly validated?: boolean;
   /** Whether `--cascade` is meaningful (roadmap `close-related`); absent → not allowed. */
   readonly cascade?: boolean;
   /** Max positionals consumed beyond the subaction token. */
@@ -198,6 +200,7 @@ export function validateSubactionFlags(
     readonly clear?: boolean;
     readonly chain?: boolean;
     readonly analyzeClean?: boolean;
+    readonly validated?: boolean;
     readonly cascade?: boolean;
     readonly positionals: readonly string[];
     readonly values: ReadonlyMap<string, string>;
@@ -222,6 +225,9 @@ export function validateSubactionFlags(
   }
   if (flags.analyzeClean === true && grammar.analyzeClean !== true) {
     failUsage(verb, `--analyze-clean is not valid for '${subaction}'`);
+  }
+  if (flags.validated === true && grammar.validated !== true) {
+    failUsage(verb, `--validated is not valid for '${subaction}'`);
   }
   if (flags.cascade === true && grammar.cascade !== true) {
     failUsage(verb, `--cascade is not valid for '${subaction}'`);
