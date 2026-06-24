@@ -2,32 +2,41 @@
 
 ---
 
-## 2026-06-24: <!-- session title -->
+## 2026-06-24: ship-stage (032) — implementation → 6-round govern → ship → validate → close (full lifecycle, dogfooded on itself)
 
-**Goal:** <!-- compose: what we set out to do -->
+### Feature: multi:feature/ship-stage (specs/032-ship-stage)
+
+**Goal:** Pick up the runnable `032-ship-stage` spec at the implementation handoff (the orchestrator session left it at `implementing`) and drive it through `/stack-control:execute` to graduated — the implementation half of the two-session boundary. It ran the whole distance: implement → govern → ship → validate → close.
 
 **Accomplished:**
-- <!-- compose -->
+- **Implemented all 29 tasks RED-first across 7 phases as ONE unit** (FR-018): split `workflow.ts` (R7); the recorded-status phase model (`status-is` derive, `governing → merging → validating → closed`, `phase:shipped` deleted — clean break, F1); the `/stack-control:ship` weld (`graduate` fires at merge, records `status: shipped`); US2 coherence (compass and close gate read the same recorded status → TASK-445 dissolved by construction); the US3 off-rail backstop (`merge-signal.ts` — git-only default-branch reachability — wired into compass + close + `workflow advance` + the shared precondition, reconcile-exempt, session-skills advisory-only); the US4 adopter-defined `validating` phase gated on the operator-confirm `validated` marker. Full suite 2624 green; `tsc` clean (modulo pre-existing TASK-389).
+- **Whole-feature govern-at-end: 6 cross-model barrage rounds** (codex + claude lanes, healthy every round). **10 findings fixed RED-first** (AUDIT-01/02/03/04/06/07/08/09/11); **AUDIT-10 a chunked-audit false positive** (verified `no-shortcuts-audit.ts` exists). The **backstop-wiring generator (AUDIT-06 → AUDIT-08) was closed STRUCTURALLY** — `computeVerdict`'s backstop args made compile-time-required so the type checker (not the stochastic barrage) enforces "every verdict caller wires the off-rail gate." **AUDIT-05** (FR-013/FR-017 honest-boundary residual) **override-graduated** with a substantive reason; captured **TASK-446** → the filed point-of-invocation-interception follow-on. `terminal-outcome=graduated`.
+- **Shipped on-rail: PR #503 merged** (CI green) → the welded `graduate` recorded `status: shipped` in one operation — the feature dogfooding its own weld, no merged-but-status-in-flight window.
+- **Validated the installed release** (0.55.0 → 0.55.1), **recorded `validated`**, **closed** `multi:feature/ship-stage` to the terminal stage on the released engine; brought the post-ship lifecycle commits to `main` via **PR #504**.
 
 **Didn't Work:**
-- <!-- compose -->
+- **`govern --item` FATAL'd** (`no spec: pointer`): the orchestrator session linked `design:` but not `spec:` on the roadmap node, so `--item` couldn't resolve the feature. Fixed with `workflow link-spec`. Friction captured — `define`/`setup` should link `spec:` at authoring time, or `govern --item` should fall back to the SPECKIT marker.
+- **The validating gate had no RECORD verb** (the operator caught it): 032 added the `validated` close gate but no mechanical way to set the marker — recording it meant hand-editing ROADMAP.md (the improvisation the thesis exists to kill). Fixed in-session (see Course Corrections / TASK-447).
+- **`emitAdvanceClosed` crashed on a bare `--doc` outside an installation** (`resolveInstallation` threw) — surfaced by the 031 close tests; fixed with a robust root resolver (falls back to the doc's dir).
+- **session-end auto-quantitative undercounted** (6 vs the real 27 commits) — the back-merge skewed the journal-anchor boundary; re-derived from `63f53da8..HEAD` and corrected per the AUDIT-04 convention.
+- **Harness `Bash` cwd reset** between tool calls intermittently dropped the working dir to repo root — a harness behavior, not a `stackctl` defect.
 
 **Course Corrections:**
-- <!-- compose -->
+- **[PROCESS]** Operator: recording `validated` should be **mechanical, reduced to a verb/skill** — my having to research how to do it WAS the bug. Added `roadmap approve-design --validated` (mirrors the established `--analyze-clean` selector on the sanctioned marker-writer), wired through both flag builders + grammar + validator + commander option + help surface; `skills/close/SKILL.md` now names it. Point fix, RED-first; captured **TASK-447** (fixed same session, released in 0.55.1).
+- **[PROCESS]** Operator drove ship as merge-when-green (twice): I surfaced the PR/CI and held at the FR-019 gate, merged on the operator's standing "merge when green," then fired the welded `graduate` — never self-confirming CI or merging a pending PR.
+- **[FABRICATION-GUARD]** Caught the session-end auto-quantitative undercount before publishing rather than committing the wrong number.
 
 **Insights:**
-- <!-- compose -->
+- **The structural root-fix beat patching instances at the plateau.** The barrage kept finding "the backstop isn't wired into surface X" (advance, then the shared precondition) — a generator. Making `computeVerdict`'s backstop args compiler-required moved "is the gate wired?" from the stochastic barrage to the deterministic compiler (the stochastic-defense-in-depth rule), and the class stopped re-surfacing. Diminishing-returns plateau diagnosed (HIGH 2/2/2/1/2/2; rounds 5-6 only boundary/false-positive/prose), then override-graduated — per spec-audit-diminishing-returns, don't chase the generator past the plateau.
+- **Dogfooding the feature on its own roadmap item is the highest-signal validation.** Shipping + closing ship-stage *through ship-stage's own machinery* is what exposed the missing `validated`-record verb — a gap no test or barrage caught, only the act of using it.
+- **The weld held end-to-end:** merge → record-shipped atomic (no in-flight window), the validating gate enforced `validated` before close, and the backstop stayed correctly silent (the AUDIT-04 default-branch fix means a feature-branch convergence record isn't mistaken for a merge to trunk).
 
-**Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 6
-  - Merge remote-tracking branch 'origin/main' into feature/stack-control
-  - roadmap(032-ship-stage): close multi:feature/ship-stage (terminal)
-  - roadmap(032-ship-stage): record validated marker (release validated; close gate met)
-  - fix(032-followup): mechanical `validated` marker record path — `roadmap approve-design --validated` + close-skill wiring (TASK-447)
-  - chore: release v0.55.0
-  - Merge pull request #503 from audiocontrol-org/feature/stack-control
-- Files changed: 28
-- Backlog touched: TASK-444, TASK-447
+**Quantitative (re-derived from `63f53da8..HEAD`; the session-end auto-count was skewed by the back-merge boundary — AUDIT-04):**
+- Commits: **27 non-merge + 2 back-merges** in `63f53da8..HEAD`. ~25 are this session's authored work; **2 chores** (`release v0.54.0`/`v0.55.0`) are main's release tail that rode in via the back-merges. By area: 8 fix (audit + crash fixes), 6 audit (mark-fixed), 4 feat (the phase model + US1/US3/US4), 2 roadmap (link-spec, close), 1 each refactor / test / workflow(graduate) / govern(override) / docs.
+- Files changed: 83 (`+2146 / −395`).
+- PRs: #503 (the feature) + #504 (post-ship lifecycle), both merged green.
+- Govern: 6 barrage rounds, 10 findings fixed RED-first, 1 override (AUDIT-05), 1 false-positive (AUDIT-10).
+- Backlog touched: TASK-444, TASK-446 (AUDIT-05 residual), TASK-447 (validated-record gap, fixed).
 
 ## 2026-06-23: ship-stage — orchestrator session: design → runnable spec (4-phase, F1-corrected) via the full front-door lifecycle
 
