@@ -61,17 +61,28 @@ fails loud in the dry-run before anything is written.
    children, the deduped `closeIds`, the `alreadyClosed` ids, and (if any) the
    `unknownIds` that would make the run fail loud. Nothing is written yet.
 
-3. **Confirm.** Decide whether to proceed. There is **no validation criterion**
-   baked into the lifecycle (the stage is install-agnostic — FR-017): whatever you
-   inspect before confirming is your call, not a gate.
+3. **Validate, then record the `validated` marker (the 032 validating→closed gate).**
+   A shipped item is at the `validating` phase; `closed` is gated on the operator-confirm
+   `validated` marker (specs/032). **What** you validate is your judgment — the stage is
+   adopter-defined (FR-015), not a `tasks.md` task:
 
-   - **When self-hosting** (closing a stack-control feature you just shipped), this
-     is the moment to **validate the installed release** — install the published
-     plugin and walk the surfaces the feature touched, so "closed" reflects a
-     release that actually works, not just a green local tree. (Per the project's
-     issue-closure discipline, a fix isn't done until verified in a formally
-     installed release.) This is operator judgment performed here, never modeled as
-     a workflow criterion or a `tasks.md` task.
+   - **When self-hosting** (closing a stack-control feature you just shipped),
+     **validate the installed release** — install the published plugin and walk the
+     surfaces the feature touched, so "closed" reflects a release that actually works,
+     not just a green local tree (the project's issue-closure discipline: a fix isn't
+     done until verified in a formally installed release).
+
+   When the validation passes, record the marker **mechanically** (no hand-edit of
+   ROADMAP.md):
+
+   ```bash
+   stackctl roadmap approve-design <id> --validated --apply
+   ```
+
+   Until this is recorded, `roadmap advance --to closed` (step 4) refuses with the unmet
+   `approval-marker validated` gate — the same gate the compass reports. An adopter who
+   overrides `validating`'s exit criteria in `WORKFLOW.md` records whatever marker their
+   override names instead.
 
 4. **Apply — close + advance, as one action.** On confirmation:
 

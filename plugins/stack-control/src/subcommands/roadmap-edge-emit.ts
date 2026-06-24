@@ -74,13 +74,15 @@ export function emitRemoveNode(flags: Flags, opts: LoadOptions): void {
 }
 
 /**
- * `roadmap approve-design <id> [--analyze-clean] [--clear] [--apply]` (TASK-298) —
- * the sanctioned marker writer. `--analyze-clean` selects the symmetric marker;
- * `--clear` negates (removes the marker).
+ * `roadmap approve-design <id> [--analyze-clean] [--validated] [--clear] [--apply]`
+ * (TASK-298; 032) — the sanctioned node-marker writer. `--analyze-clean` selects the
+ * `analyze-clean` marker; `--validated` selects the `validated` marker (the mechanical
+ * record path the 032 validating→closed gate needs — no hand-edit of ROADMAP.md);
+ * `--clear` negates (removes the marker). Default (no selector) writes `design-approved`.
  */
 export function emitApproveDesign(flags: Flags, opts: LoadOptions): void {
   const id = requireId(flags, 'approve-design');
-  const marker = flags.analyzeClean ? 'analyze-clean' : 'design-approved';
+  const marker = flags.validated ? 'validated' : flags.analyzeClean ? 'analyze-clean' : 'design-approved';
   const value = !flags.clear;
   const result = setMarker(flags.doc, id, marker, value, opts, flags.apply);
   const verb = value ? 'record' : 'clear';

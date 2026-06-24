@@ -58,6 +58,8 @@ export interface Flags {
   readonly clear: boolean;
   readonly chain: boolean;
   readonly analyzeClean: boolean;
+  /** 032 follow-up: `approve-design --validated` records the validating→closed gate marker. */
+  readonly validated: boolean;
   readonly cascade: boolean;
   readonly positionals: readonly string[];
   readonly values: ReadonlyMap<string, string>;
@@ -114,6 +116,7 @@ const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
     apply: true,
     clear: true,
     analyzeClean: true,
+    validated: true,
     positionals: 1,
   },
   // `resolves` (031 US2) records resolved ids onto a node's PROSE `closes:` set
@@ -144,7 +147,7 @@ export function scanFlags(args: readonly string[]): Flags {
     'roadmap',
     args,
     NO_DOC,
-    ['apply', 'clear', 'chain', 'analyze-clean', 'cascade'],
+    ['apply', 'clear', 'chain', 'analyze-clean', 'validated', 'cascade'],
     ALL_VALUE_FLAGS,
     ALL_MULTI_VALUE_FLAGS,
   );
@@ -154,6 +157,7 @@ export function scanFlags(args: readonly string[]): Flags {
     clear: s.booleans.has('clear'),
     chain: s.booleans.has('chain'),
     analyzeClean: s.booleans.has('analyze-clean'),
+    validated: s.booleans.has('validated'),
     cascade: s.booleans.has('cascade'),
     positionals: s.positionals,
     values: s.values,

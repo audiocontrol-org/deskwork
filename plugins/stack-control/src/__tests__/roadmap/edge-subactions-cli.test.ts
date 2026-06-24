@@ -121,6 +121,13 @@ describe('stackctl roadmap edge sub-actions (T071)', () => {
       runCli(['roadmap', 'approve-design', 'design:feature/a', '--analyze-clean', '--doc', docPath, '--apply']).status,
     ).toBe(0);
     expect(loadRoadmap(docPath, ROADMAP_OPTS).byId.get('design:feature/a')!.analyzeClean).toBe(true);
+
+    // 032 follow-up: --validated records the validating→closed gate marker (the mechanical
+    // record path the validating phase needs — no hand-edit of ROADMAP.md).
+    expect(
+      runCli(['roadmap', 'approve-design', 'design:feature/a', '--validated', '--doc', docPath, '--apply']).status,
+    ).toBe(0);
+    expect(loadRoadmap(docPath, ROADMAP_OPTS).byId.get('design:feature/a')!.validated).toBe(true);
   });
 
   it('reconcile --unorphan on a non-orphan → exit 2; bare reconcile stays report-only exit 0', () => {

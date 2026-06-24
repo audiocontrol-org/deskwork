@@ -627,7 +627,8 @@ Tooling-friction routing policy:
 Closing everything CONTAINED in a roadmap item — its resolved backlog ids AND its `part-of` subtree's — should be one mechanical move, not hand-closing each task. Today it isn't, because three gaps stack: (1) `close-related` reads ONLY the node's recorded `closes:` ∪ `ref:` and never infers from prose (023 FR-003, deliberately auditable), so an umbrella that lists its tasks as prose bullets (as govern-030-hardening did) yields "nothing to close"; (2) there is NO verb to POPULATE a node's `closes:` set — `add-edge` refuses it (`closes:` is a prose comma-list of backlog ids, not a unit-reference edge like `depends-on`/`part-of`), and `add`/`cluster` carry no `closes` flag, so the only way to record resolved ids is hand-editing the markdown (≈ the same manual effort as closing them); (3) `close-related` is NOT transitive — it closes the node's own `closes:` but never walks its `part-of` children to close THEIR backlog ids or advance terminal children. (Minor: `advance --to shipped` does not auto-run `close-related`; it is a separate step.) Proposed shape (capture, not yet scoped): a verb to record/back-link a node's resolved backlog ids (e.g. `roadmap resolves <id> --add TASK-…`, and/or have `backlog done`/`promote` back-link the closing task into its parent node's `closes:`); a TRANSITIVE closer (`close-related --cascade`, or `advance --to shipped --cascade`) that walks the `part-of` subtree, closes each node's recorded backlog ids, and optionally advances terminal children — dry-run first, then `--apply`. Source: operator question 2026-06-23 during the govern-030-hardening closeout, where 16 backlog ids were closed by hand because the umbrella recorded them in prose and no transitive closer exists.
 
 ## multi:feature/ship-stage
-- status: planned
+- status: closed
+- validated: yes
 - spec: specs/032-ship-stage
 - analyze-clean: yes
 - part-of: multi:feature/lifecycle-industrialization

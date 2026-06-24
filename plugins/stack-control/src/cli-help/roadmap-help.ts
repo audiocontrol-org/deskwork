@@ -56,7 +56,7 @@ const SUMMARIES: Readonly<Record<string, string>> = {
   'move-edge': 'reparent a typed edge (--field <f> --from <p> --to <p>) in one validated move (dry-run unless --apply)',
   rename: 'rename a node and repoint every dependent edge (dry-run unless --apply)',
   'remove-node': 'remove a node, refusing loud if it is still an edge target (dry-run unless --apply)',
-  'approve-design': 'record the design-approved marker (--analyze-clean for the symmetric one; --clear negates) (dry-run unless --apply)',
+  'approve-design': 'record the design-approved marker (--analyze-clean / --validated for the symmetric ones; --clear negates) (dry-run unless --apply)',
   resolves: 'record resolved backlog ids on a node\'s closes: set (--add/--remove one or more ids; dry-run unless --apply)',
 };
 
@@ -90,6 +90,7 @@ export function flagNamesFor(grammar: SubactionGrammar): readonly string[] {
   if (grammar.clear === true) names.push('--clear');
   if (grammar.chain === true) names.push('--chain');
   if (grammar.analyzeClean === true) names.push('--analyze-clean');
+  if (grammar.validated === true) names.push('--validated');
   if (grammar.cascade === true) names.push('--cascade');
   return names;
 }
@@ -103,6 +104,7 @@ function flagToken(flag: string, grammar: SubactionGrammar): string {
     flag === '--clear' ||
     flag === '--chain' ||
     flag === '--analyze-clean' ||
+    flag === '--validated' ||
     flag === '--cascade'
   ) {
     return flag;
@@ -128,6 +130,7 @@ function flagLine(
   else if (flag === '--clear') desc = 'clear the condition';
   else if (flag === '--chain') desc = 'wire a depends-on chain over the children (in argument order)';
   else if (flag === '--analyze-clean') desc = 'record the symmetric analyze-clean marker';
+  else if (flag === '--validated') desc = 'record the validated marker (the validating → closed gate)';
   else if (flag === '--cascade') desc = 'close the whole part-of subtree (transitive close)';
   else {
     const isStatusFlag =
