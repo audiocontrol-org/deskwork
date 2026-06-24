@@ -628,6 +628,7 @@ Closing everything CONTAINED in a roadmap item — its resolved backlog ids AND 
 
 ## multi:feature/ship-stage
 - status: closed
+- closes: TASK-447
 - validated: yes
 - spec: specs/032-ship-stage
 - analyze-clean: yes
