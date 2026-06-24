@@ -127,3 +127,7 @@
 
 ## session-end 2026-06-23
 - Validating the installed v0.54.0 surfaced that the dw-lifecycle retirement left ~34 skills with unparseable YAML frontmatter (dangling --- opener + a > **RETIRED** notice, no closing fence) → they load with empty metadata and trip the reload "1 error during load". Pre-existing (0.53.2 cache had 34 too); retired plugin; clean fix = give retired skills minimal valid frontmatter or drop the dangling opener.
+
+## session-end 2026-06-24
+- govern --item failed loud ('no spec: pointer') because the orchestrator session linked design: but not spec: on the roadmap node; had to run workflow link-spec first. Consider define/setup linking spec at authoring time, or govern --item resolving the spec dir from the SPECKIT marker as a fallback.
+- dw-lifecycle retirement left 49 of its skills with malformed frontmatter (bare --- + RETIRED blockquote, no name:/description:) -> the recurring 'reload: 1 error during load'. Pre-existing, retired plugin; clean fix is removal under multi:feature/retire-dw-lifecycle, not patching 49 headers.

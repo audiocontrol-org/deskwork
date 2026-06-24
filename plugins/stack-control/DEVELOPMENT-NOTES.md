@@ -2,6 +2,33 @@
 
 ---
 
+## 2026-06-24: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 6
+  - Merge remote-tracking branch 'origin/main' into feature/stack-control
+  - roadmap(032-ship-stage): close multi:feature/ship-stage (terminal)
+  - roadmap(032-ship-stage): record validated marker (release validated; close gate met)
+  - fix(032-followup): mechanical `validated` marker record path — `roadmap approve-design --validated` + close-skill wiring (TASK-447)
+  - chore: release v0.55.0
+  - Merge pull request #503 from audiocontrol-org/feature/stack-control
+- Files changed: 28
+- Backlog touched: TASK-444, TASK-447
+
 ## 2026-06-23: ship-stage — orchestrator session: design → runnable spec (4-phase, F1-corrected) via the full front-door lifecycle
 
 **Goal:** Pick up where the last session left off — the captured `multi:feature/ship-stage` node — and drive it through the stack-control front door from design to a runnable spec. Orchestrator-session work only; implementation is a separate session per the two-session boundary.
