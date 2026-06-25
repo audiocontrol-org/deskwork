@@ -3,9 +3,10 @@ id: TASK-452
 title: >-
   design-to-spec gate: solution-space-alternatives counts bullet lines, not ###
   subsections (silent N-1/N, no hint)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-25 19:02'
+updated_date: '2026-06-25 20:05'
 labels:
   - 'type:imported-issue'
 dependencies: []
@@ -50,3 +51,9 @@ A correctly-structured design record fails the gate for a purely cosmetic reason
 - stack-control 0.53.0 (deskwork plugin cache), `plugins/stack-control/src/workflow/gate-eval.ts`.
 - Surfaced authoring the `design:feature/capture-fidelity` record in `~/work/offing`, 2026-06-23.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closed: Fixed on feature/stack-control-hygiene (commit af9c4a0a): countSolutionSpaceAlternatives now counts ### subsections (precedence over detail bullets, no double-count); describeCriterion + design SKILL.md spell out the rule. RED-first gate-eval.test.ts; workflow suite green. gh-500 stays open pending release verification (operator call).
+<!-- SECTION:NOTES:END -->

@@ -3,9 +3,10 @@ id: TASK-451
 title: >-
   govern start-governing gate (tasks-complete) blocks on manual
   operator-acceptance tasks — inverts audit-before-acceptance
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-25 19:02'
+updated_date: '2026-06-25 20:01'
 labels:
   - 'type:imported-issue'
 dependencies: []
@@ -54,3 +55,9 @@ Give `tasks.md` a first-class way to mark a task as a **manual/operator acceptan
 designated "Acceptance" section the parser skips — so audit-before-live-acceptance is the default and
 authors don't have to hand-roll a non-checkbox bullet to avoid gaming the count.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closed: Fixed on feature/stack-control-hygiene (commit 2cfe8fe4): explicit classifyTasks() — [~]/[-] manual-acceptance markers excluded from the tasks-complete gate (audit-before-acceptance), unrecognized markers no longer silently dropped; documented in execute SKILL.md. RED-first gate-eval.test.ts; full suite 414/2630 green. gh-499/gh-501 stay open pending release verification (operator call).
+<!-- SECTION:NOTES:END -->

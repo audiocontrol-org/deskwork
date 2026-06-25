@@ -3,9 +3,10 @@ id: TASK-448
 title: >-
   stackctl roadmap reconcile --unorphan mints a duplicate node instead of
   reusing the existing correspondence
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-25 19:02'
+updated_date: '2026-06-25 20:30'
 labels:
   - 'type:imported-issue'
 dependencies: []
@@ -78,3 +79,9 @@ duplicate. An agent following the reconcile flow could easily proceed against th
 
 Reconciling spec-010 (faithful-capture-substrate) before `/stack-control:execute`, 2026-06-25.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closed: Fixed on feature/stack-control-hygiene (commit 10100480): reconcile --unorphan now matches an existing node by slug family and attaches the spec (setField) instead of minting a duplicate; refuses zero-write on ambiguous/clobbering matches; mint path preserved when no match. RED-first reconcile-unorphan.test.ts; full suite 415/2645 green. gh-506 open pending release verification.
+<!-- SECTION:NOTES:END -->

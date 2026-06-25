@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-06-21 17:57'
-updated_date: '2026-06-25 19:19'
+updated_date: '2026-06-25 20:24'
 labels:
   - agent-found
   - 'type:gap'
@@ -26,4 +26,6 @@ data-model.md:119 headSha is HEAD at audit time, but FR-009 autonomous apply+com
 
 <!-- SECTION:NOTES:BEGIN -->
 Closed: Duplicate of TASK-450 (same convergence-record headSha fidelity: symbolic HEAD / mid-run HEAD advance). One headSha-resolved-at-audit-time fix closes both.
+
+Closed: Resolved with TASK-450 (commit eddcfdb4): specs/030 data-model.md now documents headSha as the concrete final-HEAD of base..headSha resolved at record-write time, removing the at-audit-time ambiguity. Implementation pins it via resolveHeadSha.
 <!-- SECTION:NOTES:END -->

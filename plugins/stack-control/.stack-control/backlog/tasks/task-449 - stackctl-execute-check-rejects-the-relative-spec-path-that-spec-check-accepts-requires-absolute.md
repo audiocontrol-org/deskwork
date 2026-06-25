@@ -3,9 +3,10 @@ id: TASK-449
 title: >-
   stackctl execute-check rejects the relative --spec path that spec-check
   accepts (requires absolute)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-25 19:02'
+updated_date: '2026-06-25 20:13'
 labels:
   - 'type:imported-issue'
 dependencies: []
@@ -64,3 +65,9 @@ execute skill invokes back-to-back, and the FATAL wording ("spec dir not found")
 
 Driving `/stack-control:execute` on spec-010 (faithful-capture-substrate), 2026-06-25.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closed: Fixed on feature/stack-control-hygiene (commit a301128a): shared resolveSpecDir() — spec-check and execute-check resolve --spec identically; cwd-relative preserved, install-root-relative rescue so specs/NNN works from any subdir. RED-first spec-dir-resolution.test.ts; full suite 415/2637 green. gh-505 stays open pending release verification.
+<!-- SECTION:NOTES:END -->
