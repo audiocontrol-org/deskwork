@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/plugin-design-control",
-  "version": "0.55.1",
+  "version": "0.55.2",
   "private": true,
   "description": "Workspace package for the design-control Claude Code plugin",
   "license": "GPL-3.0-or-later",
