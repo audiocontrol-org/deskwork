@@ -6,8 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-16 23:37'
+updated_date: '2026-06-25 19:22'
 labels:
   - 'type:imported-issue'
+  - promoted
 dependencies: []
 references:
   - gh-470
@@ -196,3 +198,9 @@ These are adjacent but distinct:
 
 Those focus on scoping/fleet/backfill ergonomics. This issue is about the deeper control-loop pathology: the protocol does not mechanically suppress autonomous halting once the burndown is underway.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- **Promoted-to:** roadmap:impl:feature/autonomous-loop
+<!-- SECTION:NOTES:END -->

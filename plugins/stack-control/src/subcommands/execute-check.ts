@@ -10,7 +10,8 @@
 // gating artifact is tasks.md (what /speckit-tasks produces).
 
 import { existsSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { resolveSpecDir } from './spec-dir.js';
 
 // Strict arg parsing (AUDIT-20260605-09): the dispatcher contract is "no flag
 // silently ignored." Accept ONLY `--spec <value>`; reject a missing value,
@@ -46,7 +47,7 @@ function parseArgs(args: string[]): { spec: string } {
 export async function runExecuteCheck(args: string[]): Promise<void> {
   const { spec } = parseArgs(args);
 
-  const specDir = resolve(spec);
+  const specDir = resolveSpecDir(spec);
   if (!existsSync(specDir)) {
     process.stderr.write(`execute-check: FATAL — spec dir ${spec} not found\n`);
     process.exit(1);

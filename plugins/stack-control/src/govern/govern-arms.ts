@@ -26,7 +26,7 @@ import { recordOverrideGraduation } from './override-graduate.js';
 import { resolveConvergenceItem } from './feature-resolution.js';
 import { runCloneDetectionStep } from './clone-step.js';
 import { runConvergenceLoop } from './convergence-loop.js';
-import { resolveImplementExclusion } from './payload-diff-scope.js';
+import { resolveImplementExclusion, resolveHeadSha } from './payload-diff-scope.js';
 import { runEndGovern } from './end-govern-pipeline.js';
 import { makeEndGovernRuntime } from './end-govern-runtime.js';
 import { writeWholeFeatureConvergenceRecord } from './chunk-artifacts.js';
@@ -282,10 +282,16 @@ export async function runImplementArm(ctx: GovernRunContext): Promise<void> {
     stderr: (s) => process.stderr.write(s),
   });
 
-  const { record } = await runEndGovern(
+  const { record: pipelineRecord } = await runEndGovern(
     { installationRoot: repoRoot, item: convergenceItem, base, head: 'HEAD' },
     runtime.deps,
   );
+  // gh-502: the pipeline carries the SYMBOLIC 'HEAD' so its mid-loop re-scope
+  // tracks fix commits that advance HEAD (FR-007). The DURABLE record must instead
+  // pin the CONCRETE head SHA of the range actually governed (base..final-HEAD) —
+  // a committed audit artifact whose job is "what was governed?" must stay
+  // reproducible after the next commit lands. Symmetric with governedShaBase.
+  const record = { ...pipelineRecord, headSha: resolveHeadSha(repoRoot) };
 
   // Persist the ONE whole-feature record the impl graduate gate reads (FR-025).
   // A record-write failure is FATAL — never report graduation the durable gate

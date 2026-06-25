@@ -116,9 +116,9 @@ The single per-feature record the graduate gate evaluates (FR-015, FR-018). **Pe
 | `mode` | `'impl'` | (the spec-mode record is unchanged/separate) |
 | `item` | `string` | the feature/roadmap item id |
 | `governedShaBase` | `string` (sha) | the resolved feature base anchor (029 US5; `--diff-base` override) |
-| `headSha` | `string` (sha) | HEAD at audit time (the `governedSha`..HEAD endpoint) |
+| `headSha` | `string` (sha) | the CONCRETE head SHA of the governed range, resolved at record-write time = the final HEAD after any in-loop fix commits (the `governedShaBase`..`headSha` endpoint). Never the symbolic `HEAD` — the committed record must stay reproducible after the next commit lands (gh-502 / TASK-409). |
 | `chunkIds` | `string[]` | the stable ids of the chunk set governed |
-| `rounds` | `number` | re-audit rounds run (≤ round cap) |
+| `rounds` | `number` | re-audit rounds run in THIS invocation (≤ round cap) — a per-invocation snapshot, not cumulative across re-govern invocations (gh-502) |
 | `liftedFindings` | `Finding[]` | findings STILL open at graduation (lifted to backlog) |
 | `closedInLoopFindings` | `Finding[]` | findings fixed within the loop, closed BEFORE lift (NOT lifted — FR-016) |
 | `seamResultRef` | `SeamResult` ref | the seam pass outcome |

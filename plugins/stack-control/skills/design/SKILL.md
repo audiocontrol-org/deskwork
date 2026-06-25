@@ -82,6 +82,12 @@ overrides on top.
    alternatives, ≥2), **decisions**, **open-questions**, **provenance**. Use the
    Write tool to persist it to disk.
 
+   > **The `≥2 alternatives` gate counts either top-level bullets OR `###`
+   > subsections under `## Solution space` (gh-500).** List the alternatives as
+   > `- …` bullets, or as `### Chosen — …` / `### Rejected — …` subsections —
+   > both satisfy `count-gte solution-space-alternatives 2`. (Pre-fix, only
+   > bullets counted and a subsection-structured record scored 0.)
+
 4. **Record operator approval (the judgment gate, FR-009/D5).** The design is not
    done until the operator records approval — a recorded fact, not a gate-time
    judgment. The operator sets the `design-approved:` marker on the node:

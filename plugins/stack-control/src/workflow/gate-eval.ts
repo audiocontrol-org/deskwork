@@ -70,37 +70,87 @@ function countSolutionSpaceAlternatives(path: string | null): number {
   const lines = readFileSync(path, 'utf8').split('\n');
   let inSection = false;
   let sectionLevel = 0;
-  let count = 0;
+  let bullets = 0;
+  let subheadings = 0;
   for (const line of lines) {
     const h = /^(#{1,6})\s+(.*)$/.exec(line);
-    if (h) {
-      const level = h[1]!.length;
+    if (h !== null) {
+      const level = h[1]?.length ?? 0;
+      const title = h[2] ?? '';
       if (inSection && level <= sectionLevel) break; // section ended
-      if (!inSection && headingSlug(h[2]!) === 'solution-space') {
+      if (!inSection && headingSlug(title) === 'solution-space') {
         inSection = true;
         sectionLevel = level;
+      } else if (inSection && level > sectionLevel) {
+        subheadings++; // a nested `### Chosen …` / `### Rejected …` alternative
       }
       continue;
     }
-    if (inSection && /^\s*[-*]\s+\S/.test(line)) count++;
+    if (inSection && /^\s*[-*]\s+\S/.test(line)) bullets++;
   }
-  return count;
+  // Alternatives may be expressed as nested `###` subsections OR as top-level
+  // bullets. When subsections are present they ARE the alternatives (their
+  // bullets are detail), so count subheadings; otherwise fall back to bullets.
+  // (gh-500: a record structuring alternatives as `### Chosen`/`### Rejected`
+  // no longer scores 0.)
+  return subheadings > 0 ? subheadings : bullets;
 }
 
 /** True when every checkbox in `<specDir>/tasks.md` is checked (and there is at least one). */
+/** Done-marker checkbox states (`- [x]` / `- [X]`). */
+const DONE_MARKERS = new Set(['x', 'X']);
+/**
+ * Manual / operator-acceptance (or deliberately-deferred / superseded) markers
+ * the tasks-complete gate EXCLUDES (gh-499 / gh-501): an "operator live re-bless"
+ * task a coding agent cannot complete in-session must not gate the cross-model
+ * audit — audit-before-acceptance. `[~]` is the documented manual/deferred
+ * marker (already used in-repo, e.g. specs/006 T052); `[-]` is accepted as an
+ * equivalent deferred form.
+ */
+const MANUAL_MARKERS = new Set(['~', '-']);
+
+/** Tally of `tasks.md` checkbox tasks by gate disposition. */
+export interface TaskTally {
+  /** Open-or-done code tasks the gate waits on. */
+  readonly gateable: number;
+  /** Gateable tasks marked done. */
+  readonly done: number;
+  /** Manual / operator-acceptance / deferred tasks the gate excludes. */
+  readonly manual: number;
+}
+
+/**
+ * Classify every checkbox-shaped bullet in a `tasks.md` body. The marker is read
+ * EXPLICITLY (not via a narrow regex that incidentally drops anything it does
+ * not recognize): `[x]`/`[X]` are done, `[~]`/`[-]` are manual-excluded, `[ ]`
+ * is open. Any OTHER single-char marker (a typo like `[?]`) counts as an open
+ * gateable task so a malformed checkbox can never silently satisfy the gate
+ * (no-silent-caps).
+ */
+export function classifyTasks(text: string): TaskTally {
+  let gateable = 0;
+  let done = 0;
+  let manual = 0;
+  for (const line of text.split('\n')) {
+    const m = /^\s*-\s+\[(.)\]/.exec(line);
+    const mark = m?.[1];
+    if (mark === undefined) continue;
+    if (MANUAL_MARKERS.has(mark)) {
+      manual++;
+      continue;
+    }
+    gateable++;
+    if (DONE_MARKERS.has(mark)) done++;
+  }
+  return { gateable, done, manual };
+}
+
 function tasksComplete(specDirPath: string | null): boolean {
   if (specDirPath === null) return false;
   const tasksPath = join(specDirPath, 'tasks.md');
   if (!existsSync(tasksPath)) return false;
-  let total = 0;
-  let done = 0;
-  for (const line of readFileSync(tasksPath, 'utf8').split('\n')) {
-    const m = /^\s*-\s+\[( |x|X)\]/.exec(line);
-    if (!m) continue;
-    total++;
-    if (m[1]!.toLowerCase() === 'x') done++;
-  }
-  return total > 0 && done === total;
+  const { gateable, done } = classifyTasks(readFileSync(tasksPath, 'utf8'));
+  return gateable > 0 && done === gateable;
 }
 
 /** Evaluate one criterion to a definite boolean (FR-008). */
@@ -185,6 +235,11 @@ export function evaluateGate(criteria: readonly Criterion[], ctx: GateContext): 
 /** A human-readable one-line description of a criterion (for query output). */
 export function describeCriterion(c: Criterion): string {
   const param = c.param === undefined ? '' : ` ${c.param}`;
+  // gh-500: the solution-space counter's rule is non-obvious — spell out what it
+  // counts so an author who hits an N−1/N gate doesn't have to read the source.
+  if (c.kind === 'count-gte' && c.target === 'solution-space-alternatives') {
+    return `count-gte solution-space-alternatives${param} (need ≥${c.param} alternatives as bullets or ### subsections under "## Solution space")`;
+  }
   return `${c.kind} ${c.target}${param}`;
 }
 

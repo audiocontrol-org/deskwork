@@ -7,6 +7,10 @@ export default defineConfig({
     // collected so every RED-first test actually runs (Constitution I).
     include: ['src/__tests__/**/*.test.ts', 'tests/**/*.test.ts'],
     globals: false,
+    // Hermetic git harness (TASK-116): neutralize the host global/system git
+    // config so throwaway-repo fixtures never inherit commit.gpgsign=true and
+    // fail in keyless CI. Must run before any fixture spawns git.
+    setupFiles: ['./src/__tests__/_setup-hermetic-git.ts'],
     // Front-door verb tests spawn the stackctl dispatcher as a child
     // process against tmp fixture trees; the default 5000ms per-test
     // budget is tight on slower runners. Mirror dw-lifecycle's 30s.

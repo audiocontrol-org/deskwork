@@ -76,4 +76,65 @@ describe('roadmap.reconcileUnorphan (T073)', () => {
     ).toThrow(DocumentModelError);
     expect(readFileSync(docPath, 'utf8')).toBe(before);
   });
+
+  // gh-506: an existing `*:feature/<slug>` node whose slug matches the orphan
+  // spec's slug (the NNN- numeric prefix stripped) is the real node — attach the
+  // spec to it instead of minting a parallel `impl:feature/<NNN-slug>` duplicate.
+  it('attaches the spec to an existing same-slug node instead of minting a duplicate (gh-506)', () => {
+    const docPath = writeTempRoadmap(['## design:feature/faithful-capture-substrate', '- status: planned']);
+    const orphanRel = writeSpecDir(docPath, '010-faithful-capture-substrate');
+    const baseDir = dirname(docPath);
+    expect(reconcile(docPath, ROADMAP_OPTS, baseDir).orphans).toContain(orphanRel);
+
+    const before = loadRoadmap(docPath, ROADMAP_OPTS).items.length;
+    reconcileUnorphan(docPath, orphanRel, ROADMAP_OPTS, baseDir, true);
+
+    const model = loadRoadmap(docPath, ROADMAP_OPTS);
+    // No duplicate node minted.
+    expect(model.items.length).toBe(before);
+    expect(model.items.find((i) => i.identifier === 'impl:feature/010-faithful-capture-substrate')).toBeUndefined();
+    // The EXISTING design node now carries the spec correspondence.
+    const node = model.items.find((i) => i.identifier === 'design:feature/faithful-capture-substrate');
+    expect(node?.spec?.replace(/\/$/, '')).toBe(orphanRel);
+    expect(reconcile(docPath, ROADMAP_OPTS, baseDir).orphans).not.toContain(orphanRel);
+  });
+
+  it('refuses (zero-write) when MULTIPLE existing nodes plausibly match the orphan slug (gh-506)', () => {
+    const docPath = writeTempRoadmap([
+      '## design:feature/ambig',
+      '- status: planned',
+      '## impl:feature/ambig',
+      '- status: planned',
+    ]);
+    const orphanRel = writeSpecDir(docPath, '011-ambig');
+    const baseDir = dirname(docPath);
+    const before = readFileSync(docPath, 'utf8');
+    expect(() => reconcileUnorphan(docPath, orphanRel, ROADMAP_OPTS, baseDir, true)).toThrow(DocumentModelError);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('refuses (zero-write) when the matching node already corresponds to a DIFFERENT spec (gh-506)', () => {
+    const docPath = writeTempRoadmap([
+      '## design:feature/taken',
+      '- status: planned',
+      '- spec: specs/100-other',
+    ]);
+    writeSpecDir(docPath, '100-other');
+    const orphanRel = writeSpecDir(docPath, '012-taken');
+    const baseDir = dirname(docPath);
+    const before = readFileSync(docPath, 'utf8');
+    expect(() => reconcileUnorphan(docPath, orphanRel, ROADMAP_OPTS, baseDir, true)).toThrow(DocumentModelError);
+    expect(readFileSync(docPath, 'utf8')).toBe(before);
+  });
+
+  it('still mints a new node when NO existing node corresponds to the orphan slug (gh-506)', () => {
+    const docPath = writeTempRoadmap(['## impl:feature/unrelated', '- status: planned']);
+    const orphanRel = writeSpecDir(docPath, '013-brand-new');
+    const baseDir = dirname(docPath);
+    reconcileUnorphan(docPath, orphanRel, ROADMAP_OPTS, baseDir, true);
+    const model = loadRoadmap(docPath, ROADMAP_OPTS);
+    const minted = model.items.find((i) => i.identifier === 'impl:feature/013-brand-new');
+    expect(minted).toBeDefined();
+    expect(minted?.spec?.replace(/\/$/, '')).toBe(orphanRel);
+  });
 });

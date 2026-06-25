@@ -15,7 +15,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { LoadOptions } from '../document-model/document.js';
 import { DocumentModelError } from '../document-model/types.js';
-import { add, type MutationResult } from './mutations.js';
+import { add, setField, type MutationResult } from './mutations.js';
 import { loadRoadmap } from './roadmap-model.js';
 
 export interface StatusDrift {
@@ -182,8 +182,44 @@ export function reconcileUnorphan(
         `refusing to reconcile against a non-orphan`,
     );
   }
-  // `spec:` records the spec DIRECTORY (the project convention, e.g.
-  // `specs/005-document-primitives`), NOT a path to `spec.md` — reconcile
-  // resolves `<spec>/spec.md` itself.
+  // gh-506: before minting, check whether an EXISTING node already corresponds to
+  // this spec by slug family — an orphan `specs/010-faithful-capture-substrate`
+  // and a node `design:feature/faithful-capture-substrate` are the same feature
+  // (the node slug equals the spec slug with the `NNN-` numeric prefix stripped).
+  // Silently minting a parallel `impl:feature/<NNN-slug>` doubles the node count
+  // and leaves the roadmap internally inconsistent. Reuse the existing
+  // correspondence; refuse (never mint a duplicate) when the match is ambiguous.
+  const specSlug = basename(target);
+  const featureSlug = specSlug.replace(/^\d+-/, '');
+  const slugOf = (id: string): string => id.slice(id.lastIndexOf('/') + 1);
+  const matches = loadRoadmap(docPath, opts).items.filter((i) => {
+    const s = slugOf(i.identifier);
+    return s === featureSlug || s === specSlug;
+  });
+  if (matches.length > 1) {
+    throw new DocumentModelError(
+      `reconcile --unorphan: ${matches.length} existing nodes plausibly correspond to '${spec}' ` +
+        `(${matches.map((m) => m.identifier).join(', ')}) — refusing to mint a duplicate. ` +
+        `Attach the spec to the right one with \`workflow link-spec <node> ${spec}\`.`,
+    );
+  }
+  if (matches.length === 1) {
+    const node = matches[0]!;
+    const existingSpec = node.spec === null ? null : normalize(node.spec);
+    if (existingSpec !== null && existingSpec !== target) {
+      throw new DocumentModelError(
+        `reconcile --unorphan: existing node '${node.identifier}' already corresponds to spec ` +
+          `'${node.spec}' (not '${spec}') — refusing to clobber. Relink it deliberately with ` +
+          `\`workflow link-spec\`, or remove the stale pointer first.`,
+      );
+    }
+    // Reuse the existing node's correspondence instead of minting a parallel node
+    // (the `setField` substrate behind `workflow link-spec`). The node's own type
+    // is authoritative, so any `--type` is moot on the reuse path.
+    return setField(docPath, node.identifier, 'spec', target, opts, apply);
+  }
+  // No existing correspondence — mint a new node. `spec:` records the spec
+  // DIRECTORY (the project convention, e.g. `specs/005-document-primitives`), NOT
+  // a path to `spec.md` — reconcile resolves `<spec>/spec.md` itself.
   return add(docPath, { identifier: nodeIdForOrphan(target, typePrefix), spec: target }, opts, apply);
 }

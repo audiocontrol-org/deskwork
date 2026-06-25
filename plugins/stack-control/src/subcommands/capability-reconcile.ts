@@ -110,7 +110,10 @@ export function reconcileVerb(args: readonly string[]): ReconcileVerbResult {
     if (arg === '--json') json = true;
     else if (arg === '--at') {
       const value = args[i + 1];
-      if (value === undefined) {
+      // Reject a missing value AND a following flag (AUDIT-20260618-139): `--at
+      // --json` must not swallow `--json` as the path (→ install root `--json` →
+      // not-found → false "all clean").
+      if (value === undefined || value.startsWith('--')) {
         return { code: 2, stdout: '', stderr: 'capability reconcile: --at requires a value\n' };
       }
       at = value;

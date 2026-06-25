@@ -42,6 +42,10 @@ function readJson(path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 function readJsonVersion(path: string): string {
   const parsed = readJson(path);
   if (typeof parsed.version !== 'string' || parsed.version === '') {
@@ -94,7 +98,7 @@ function readCodexMarketplaceEntry(
     throw new Error(`release-check: missing Codex marketplace entry for plugin '${pluginName}' in ${path}`);
   }
   const source = match.source;
-  if (typeof source !== 'object' || source === null) {
+  if (!isRecord(source)) {
     throw new Error(`release-check: missing source object for Codex marketplace entry '${pluginName}' in ${path}`);
   }
   if (source.source !== 'local' || source.path !== './plugins/stack-control') {

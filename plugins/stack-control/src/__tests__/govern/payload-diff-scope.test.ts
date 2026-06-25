@@ -15,6 +15,7 @@ import {
   scopeCommittedDiff,
   filterDiffScope,
   resolveImplementExclusion,
+  resolveHeadSha,
 } from '../../govern/payload-diff-scope.js';
 
 function git(repo: string, ...args: string[]): string {
@@ -334,6 +335,41 @@ describe('030 — diff-scope exclusion (AUDIT-20260622-02)', () => {
   it('filterDiffScope with no exclusions returns the scope unchanged', () => {
     const scope = { base: 'B', head: 'H', files: ['a.ts'], fileDiffs: new Map([['a.ts', 'x']]) };
     expect(filterDiffScope(scope, [])).toBe(scope);
+  });
+
+  it('resolveImplementExclusion always excludes the harness own govern outputs (gh-502)', () => {
+    // The barrage audits the committed tree, which includes stackctl's OWN
+    // convergence record under .stack-control/govern — auditing it manufactures
+    // findings about the harness's bookkeeping every round (structural
+    // non-convergence). It must be excluded unconditionally, even with no
+    // feature root / caller excludes.
+    const ex = resolveImplementExclusion('/install', '/install/specs/030-feat', [], []);
+    expect(ex.excludeDiffRels).toContain('.stack-control/govern');
+    const exBare = resolveImplementExclusion('/install', undefined, undefined, undefined);
+    expect(exBare.excludeDiffRels).toContain('.stack-control/govern');
+  });
+
+  it('filterDiffScope drops the harness convergence record under .stack-control/govern (gh-502)', () => {
+    const scope = {
+      base: 'B',
+      head: 'H',
+      files: ['src/app.ts', '.stack-control/govern/convergence/multi-feature-x.json'],
+      fileDiffs: new Map([
+        ['src/app.ts', 'a'],
+        ['.stack-control/govern/convergence/multi-feature-x.json', 'b'],
+      ]),
+    };
+    const filtered = filterDiffScope(scope, ['.stack-control/govern']);
+    expect(filtered.files).toEqual(['src/app.ts']);
+  });
+
+  it('resolveHeadSha resolves HEAD to a concrete 40-char SHA, not the symbolic ref (gh-502)', () => {
+    const repo = setup();
+    const sha = resolveHeadSha(repo);
+    expect(sha).toMatch(/^[0-9a-f]{40}$/);
+    expect(sha).toBe(head(repo));
+    expect(sha).not.toBe('HEAD');
+    rmSync(repo, { recursive: true, force: true });
   });
 
   it('resolveImplementExclusion excludes the OWN audit-log, WHOLE other-feature roots, and caller excludePaths (TASK-428)', () => {

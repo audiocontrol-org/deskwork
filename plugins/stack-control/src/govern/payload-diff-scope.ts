@@ -66,6 +66,12 @@ export function resolveImplementExclusion(
   const excludePathRels =
     featureRoot !== undefined ? (excludePaths ?? []).map(relify).filter(inRepo) : [];
   const excludeDiffRels = [
+    // gh-502: the harness's OWN govern outputs (the convergence record under
+    // `.stack-control/govern/`) are committed into the tree the barrage audits.
+    // Auditing them manufactures findings about stackctl's own bookkeeping every
+    // round (structural non-convergence). Always exclude them — this is the
+    // harness's scaffolding, never the feature under audit.
+    GOVERN_OUTPUT_REL,
     // The feature's OWN root: exclude only its audit-log (self-reference generator) —
     // its code is the audit target and must stay in scope.
     ...(featureInside ? [`${featureRel}/audit-log.md`] : []),
@@ -173,6 +179,28 @@ function resolveDefaultBranch(gitRoot: string): string | undefined {
  * documented fallback to HEAD~1 covers the degenerate cases (on the default branch, a
  * detached HEAD, or an unresolvable default branch) where there is no feature span.
  */
+/** Installation-relative path of the harness's own govern outputs (gh-502). */
+export const GOVERN_OUTPUT_REL = '.stack-control/govern';
+
+/**
+ * The concrete commit SHA of HEAD (gh-502). The durable convergence record must
+ * pin the head of the governed range to a reproducible 40-char SHA — symmetric
+ * with the resolved `governedShaBase` — never the symbolic `'HEAD'`, which stops
+ * resolving to the governed commit the moment another commit lands. Fail-loud
+ * (no fallback): a record that cannot pin its head is a broken audit artifact.
+ */
+export function resolveHeadSha(installationRoot: string): string {
+  const gitRoot = gitTry(installationRoot, ['rev-parse', '--show-toplevel']) ?? installationRoot;
+  const sha = gitTry(gitRoot, ['rev-parse', 'HEAD']);
+  if (sha === undefined || sha.trim() === '') {
+    throw new Error(
+      `govern: FATAL — could not resolve HEAD to a concrete SHA for the convergence record ` +
+        `(git rev-parse HEAD failed in ${gitRoot}). The record must pin a reproducible head SHA.`,
+    );
+  }
+  return sha.trim();
+}
+
 export function resolveImplementDiffBase(installationRoot: string, explicit: string | undefined): string {
   if (explicit !== undefined && explicit.trim() !== '') return explicit;
   const gitRoot = gitTry(installationRoot, ['rev-parse', '--show-toplevel']) ?? installationRoot;
