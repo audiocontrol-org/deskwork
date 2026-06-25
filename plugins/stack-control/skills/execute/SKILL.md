@@ -68,6 +68,8 @@ stackctl check-front-door
 
 4. **Govern once, at the end, over the whole committed feature (030 — chunked govern-at-end; non-discretionary).** When every `tasks.md` task is complete and committed (the workflow's `start-governing` gate is `tasks-complete spec`), run the single whole-feature governance pass — a skill-body post-condition, **not** an agent choice (FR-006):
 
+   > **Manual / operator-acceptance tasks use the `- [~]` marker (gh-499 / gh-501).** A task a coding agent cannot complete in-session — e.g. *"operator live re-bless (manual, read-only)"* — is written `- [~]` (or `- [-]`), which the `tasks-complete` gate **excludes**, so the cross-model audit runs **before** the operator spends a live-prod acceptance (audit-before-acceptance). Do **not** leave such a task as `- [ ]` (it would block govern) and do **not** fake it `- [x]`. A normal unchecked `- [ ]` still blocks; an unrecognized marker (a typo'd `[?]`) is counted as open, never silently excluded.
+
    ```bash
    stackctl govern --mode implement          # feature derived from the SPECKIT marker / branch
    # or, when driven by a roadmap item:

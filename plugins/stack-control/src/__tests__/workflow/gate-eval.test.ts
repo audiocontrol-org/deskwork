@@ -5,6 +5,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import {
+  classifyTasks,
   evaluateCriterion,
   evaluateGate,
   type GateContext,
@@ -97,6 +98,45 @@ describe('US1 criterion evaluation — each kind → definite true/false', () =>
     expect(evaluateCriterion({ kind: 'tasks-complete', target: 'spec' }, incomplete)).toBe(false);
     f.writeSpecTasks('specs/022-x', true);
     expect(evaluateCriterion({ kind: 'tasks-complete', target: 'spec' }, incomplete)).toBe(true);
+  });
+
+  // gh-499 / gh-501 (TASK-451): the tasks-complete gate must EXCLUDE manual /
+  // operator-acceptance tasks so the cross-model audit runs BEFORE the operator
+  // spends a live-prod acceptance. The `[~]` (and `[-]`) markers are the
+  // first-class, documented way to mark such a task — and the exclusion must be
+  // intentional, not an accident of a narrow regex.
+  describe('manual-acceptance marker (gh-499/gh-501)', () => {
+    it('classifyTasks splits gateable / done / manual', () => {
+      const t = classifyTasks(
+        ['- [x] T001 code', '- [X] T002 code', '- [ ] T003 code', '- [~] T004 [manual] operator re-bless', '- [-] T005 deferred'].join(
+          '\n',
+        ),
+      );
+      expect(t).toEqual({ gateable: 3, done: 2, manual: 2 });
+    });
+
+    it('a manual [~] task does not block once every code task is done', () => {
+      const f = fixture();
+      f.write('specs/007-x/tasks.md', ['# Tasks', '', '- [x] T001 code', '- [x] T002 code', '- [~] T015 [manual] operator live re-bless', ''].join('\n'));
+      const ctx = ctxFor(f, { specPointer: 'specs/007-x', specDirPath: join(f.root, 'specs/007-x') });
+      expect(evaluateCriterion({ kind: 'tasks-complete', target: 'spec' }, ctx)).toBe(true);
+    });
+
+    it('a plain [ ] task still blocks (the marker is the explicit opt-out)', () => {
+      const f = fixture();
+      f.write('specs/007-y/tasks.md', ['# Tasks', '', '- [x] T001 code', '- [ ] T015 operator live re-bless', ''].join('\n'));
+      const ctx = ctxFor(f, { specPointer: 'specs/007-y', specDirPath: join(f.root, 'specs/007-y') });
+      expect(evaluateCriterion({ kind: 'tasks-complete', target: 'spec' }, ctx)).toBe(false);
+    });
+
+    it('an unrecognized checkbox marker is NOT silently excluded (no-silent-caps)', () => {
+      const f = fixture();
+      // A typo'd `[?]` must count as an open gateable task — never silently drop
+      // out of the count and let an unfinished task satisfy the gate.
+      f.write('specs/007-z/tasks.md', ['# Tasks', '', '- [x] T001 code', '- [?] T002 typo', ''].join('\n'));
+      const ctx = ctxFor(f, { specPointer: 'specs/007-z', specDirPath: join(f.root, 'specs/007-z') });
+      expect(evaluateCriterion({ kind: 'tasks-complete', target: 'spec' }, ctx)).toBe(false);
+    });
   });
 
   it('section-present finds a required design-record heading', () => {

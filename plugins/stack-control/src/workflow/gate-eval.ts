@@ -88,19 +88,60 @@ function countSolutionSpaceAlternatives(path: string | null): number {
 }
 
 /** True when every checkbox in `<specDir>/tasks.md` is checked (and there is at least one). */
+/** Done-marker checkbox states (`- [x]` / `- [X]`). */
+const DONE_MARKERS = new Set(['x', 'X']);
+/**
+ * Manual / operator-acceptance (or deliberately-deferred / superseded) markers
+ * the tasks-complete gate EXCLUDES (gh-499 / gh-501): an "operator live re-bless"
+ * task a coding agent cannot complete in-session must not gate the cross-model
+ * audit — audit-before-acceptance. `[~]` is the documented manual/deferred
+ * marker (already used in-repo, e.g. specs/006 T052); `[-]` is accepted as an
+ * equivalent deferred form.
+ */
+const MANUAL_MARKERS = new Set(['~', '-']);
+
+/** Tally of `tasks.md` checkbox tasks by gate disposition. */
+export interface TaskTally {
+  /** Open-or-done code tasks the gate waits on. */
+  readonly gateable: number;
+  /** Gateable tasks marked done. */
+  readonly done: number;
+  /** Manual / operator-acceptance / deferred tasks the gate excludes. */
+  readonly manual: number;
+}
+
+/**
+ * Classify every checkbox-shaped bullet in a `tasks.md` body. The marker is read
+ * EXPLICITLY (not via a narrow regex that incidentally drops anything it does
+ * not recognize): `[x]`/`[X]` are done, `[~]`/`[-]` are manual-excluded, `[ ]`
+ * is open. Any OTHER single-char marker (a typo like `[?]`) counts as an open
+ * gateable task so a malformed checkbox can never silently satisfy the gate
+ * (no-silent-caps).
+ */
+export function classifyTasks(text: string): TaskTally {
+  let gateable = 0;
+  let done = 0;
+  let manual = 0;
+  for (const line of text.split('\n')) {
+    const m = /^\s*-\s+\[(.)\]/.exec(line);
+    const mark = m?.[1];
+    if (mark === undefined) continue;
+    if (MANUAL_MARKERS.has(mark)) {
+      manual++;
+      continue;
+    }
+    gateable++;
+    if (DONE_MARKERS.has(mark)) done++;
+  }
+  return { gateable, done, manual };
+}
+
 function tasksComplete(specDirPath: string | null): boolean {
   if (specDirPath === null) return false;
   const tasksPath = join(specDirPath, 'tasks.md');
   if (!existsSync(tasksPath)) return false;
-  let total = 0;
-  let done = 0;
-  for (const line of readFileSync(tasksPath, 'utf8').split('\n')) {
-    const m = /^\s*-\s+\[( |x|X)\]/.exec(line);
-    if (!m) continue;
-    total++;
-    if (m[1]!.toLowerCase() === 'x') done++;
-  }
-  return total > 0 && done === total;
+  const { gateable, done } = classifyTasks(readFileSync(tasksPath, 'utf8'));
+  return gateable > 0 && done === gateable;
 }
 
 /** Evaluate one criterion to a definite boolean (FR-008). */
