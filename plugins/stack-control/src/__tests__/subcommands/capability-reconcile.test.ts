@@ -116,6 +116,14 @@ describe('capability reconcile — US3 backstop (026 T022, 030-rewired)', () => 
     expect(reconcileVerb(['--nope']).code).toBe(2);
     expect(reconcileVerb(['--at']).code).toBe(2);
   });
+
+  it('reconcile verb rejects --at <flag> instead of swallowing it (AUDIT-20260618-139)', () => {
+    // `--at --json` must NOT take `--json` as the path (resolving install root
+    // `--json` → not-found → false "all clean", silently swallowing --json).
+    const r = reconcileVerb(['--at', '--json']);
+    expect(r.code).toBe(2);
+    expect(r.stderr).toMatch(/--at requires a value/);
+  });
 });
 
 describe('US3 backstop: a reconcile-flagged feature cannot graduate (026 T024, 030 FR-025)', () => {
