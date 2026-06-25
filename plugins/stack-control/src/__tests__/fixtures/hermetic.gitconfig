@@ -1,0 +1,11 @@
+[user]
+	name = stack-control test
+	email = test@stack-control.invalid
+[commit]
+	gpgsign = false
+[tag]
+	gpgsign = false
+[gpg]
+	format = openpgp
+[init]
+	defaultBranch = main
