@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-06-25: backlog-hygiene — import friction issues, cross-model triage + dedupe, formalize Tier-2 to roadmap
+
+**Goal:** Use the `stack-control-hygiene` branch to start working down the stack-control backlog: import existing friction GitHub issues, triage + dedupe the open pile, and investigate whether it can be organized into burn-down tranches. (Orchestrator/bookkeeping session — no point-fix code written yet.)
+
+**Accomplished:**
+- **Imported friction issues:** `backlog import-github --apply` brought in the 6 open GitHub issues (gh-499..506 → TASK-448..453) as `imported-issue` items; 3 already-present skipped (idempotent; GitHub never mutated).
+- **Triaged all 139→149 open items via 6 parallel sub-agents** (one per theme slice: govern-gates, path-anchoring, audit-fleet, cli-help, capability-mediation, scope/roadmap/misc), each reading task bodies + cross-referencing specs/audit-logs. Synthesis written to `MASTER-tranche-map.md`: ~115 distinct fixes across ~30 tranches in two tiers, with a recommended burn order.
+- **Dedupe — 10 items closed** via `backlog done`: TASK-447 (verified already fixed, commit 76c86be3) + 9 genuine same-defect duplicates (453→451, 409→450, 339→356, 354→324, 340/342→351, 162→163, 106→108, 113→77). Net open backlog **149 → 139**.
+- **Formalized Tier-2 feature-shaped tranches to the roadmap:** recorded promotes TASK-150/424 → `impl:feature/autonomous-loop`, TASK-138 → `design:feature/spec-governance`, TASK-443 → `multi:feature/migrate-audit-barrage`; created new node `design:gap/scope-discovery-v2-expansion` (part-of migrate-scope-discovery) with a description, seeded TASK-6, linked TASK-7/8/9/296 (TASK-10 parked).
+- **Confirmed already-formalized tranches** (no action): anchor-unification (specs/016 + node), TASK-134/135 (release-resolution-cycle / backlog-promotion-mechanization), TASK-47/75/76 (specs/021).
+
+**Didn't Work:**
+- **Bash cwd drifted to the repo root between tool calls**, where 5 nested installations make `session-start`/`backlog --apply` ambiguous (correct ambiguity-guard behavior, not a defect) — had to re-`cd` into / `--at` the `plugins/stack-control` installation.
+- **Two small `stackctl` ergonomic gaps** surfaced (captured as tooling friction): the roadmap reasoner has no single-node `show`/inspect subaction (verifying one node after add/edit needs a full graph dump); and `check-front-door` rejects `--at` unlike its sibling verbs.
+
+**Course Corrections:**
+- None from the operator — the operator's inputs were scope/formalization *choices* (apply cleanup now; formalize Tier-2 first; one umbrella node), not corrections of approach.
+- **[self-correction]** Narrowed the dedup-CLOSE set from the agents' ~16 proposed "collapses" to **9 true same-defect duplicates**, keeping the land-together test-cluster members (help-nondrift, no-backend-writes, mediate-check families) OPEN as tranche members — closing distinct audit findings as duplicates would erase work before its fix lands (preserve-don't-erase).
+
+**Insights:**
+- **Parallel sub-agents over thematic slices is the right shape for triaging a 149-item pile** — descriptive task titles let me pre-bucket cleanly, and bodies (pulled from task files + audit-logs) confirmed real dedup signal (e.g. TASK-453 self-references the recurring tasks-complete-gate defect = TASK-451).
+- **"Collapse" in a triage report ≠ "duplicate."** The dampener/preserve discipline matters: same-file audit findings are tranche members to land together, not dupes to close.
+- **Much of "formalize to roadmap" was reconciliation, not creation** — 13 items were already promoted to existing nodes/specs; only one genuinely-new node was needed. Minting nodes blind is literally TASK-448's bug, so existing-node mapping came first.
+
+**Quantitative:**
+- Commits: **2** — `fd06c59d` (hygiene work: import + dedupe + Tier-2 formalize, 25 files) + `5d92364c` (this session-end journal). Auto-derive reported 1 because the journal commit post-dates the `git log` boundary.
+- Files changed: 25 (work commit).
+- Messages: ~7
+- Corrections: 0 (operator), 1 (self)
+- Backlog: 149 → 139 open; +6 imported, −10 closed (1 fixed + 9 dup), 9 promoted (4 to existing nodes, 5 to the new node).
+- Backlog touched (auto-derived): TASK-10, TASK-134, TASK-138, TASK-150, TASK-424, TASK-443, TASK-447, TASK-448, TASK-47, TASK-6, TASK-7
+- Open findings at session end: 0 audit findings worked this session (triage/bookkeeping only).
+
 ## 2026-06-23: ship-stage — orchestrator session: design → runnable spec (4-phase, F1-corrected) via the full front-door lifecycle
 
 **Goal:** Pick up where the last session left off — the captured `multi:feature/ship-stage` node — and drive it through the stack-control front door from design to a runnable spec. Orchestrator-session work only; implementation is a separate session per the two-session boundary.

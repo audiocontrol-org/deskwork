@@ -127,3 +127,7 @@
 
 ## session-end 2026-06-23
 - Validating the installed v0.54.0 surfaced that the dw-lifecycle retirement left ~34 skills with unparseable YAML frontmatter (dangling --- opener + a > **RETIRED** notice, no closing fence) → they load with empty metadata and trip the reload "1 error during load". Pre-existing (0.53.2 cache had 34 too); retired plugin; clean fix = give retired skills minimal valid frontmatter or drop the dangling opener.
+
+## session-end 2026-06-25
+- roadmap reasoner has no single-node inspect/show subaction (known: next/blocked/blocks/order/graph/add/advance/... but no 'show'); verifying one node after add/edit requires a full graph dump or session-start grep
+- check-front-door rejects '--at <dir>' unlike sibling verbs (session-start/backlog/govern accept it); must cd into the installation dir to run it — anchoring-flag inconsistency
