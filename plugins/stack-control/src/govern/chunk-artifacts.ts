@@ -95,8 +95,20 @@ export interface WholeFeatureConvergenceRecord {
   readonly mode: 'impl';
   readonly item: string;
   readonly governedShaBase: string;
+  /**
+   * The CONCRETE head SHA of the governed range (`governedShaBase..headSha`),
+   * resolved at record-write time — never the symbolic `'HEAD'` (gh-502), so the
+   * record stays reproducible after the next commit lands.
+   */
   readonly headSha: string;
   readonly chunkIds: readonly string[];
+  /**
+   * Audit→fix rounds in THIS govern invocation — a per-invocation snapshot, not a
+   * cumulative count across re-govern invocations (gh-502). A multi-invocation
+   * fix→re-govern loop spans several commits but each invocation records only its
+   * own rounds; consumers treat this record as the latest-state snapshot, not a
+   * running total.
+   */
   readonly rounds: number;
   readonly liftedFindings: readonly Finding[];
   readonly closedInLoopFindings: readonly Finding[];
