@@ -2,6 +2,47 @@
 
 ---
 
+## 2026-06-25: hygiene burndown — issue-backed point-fixes shipped + released as v0.55.2
+
+**Goal:** Pick up the triaged backlog from the orchestrator/bookkeeping session and **burn the issue-backed point-fix tranche** in the agreed order (G1 → P2 → P3 → P4 → P1 → P5), then ship it: PR → merge → `/release` → update + validate the installed plugin → close the friction issues. This is the implementation session for the imported friction issues (gh-499/500/501/502/505/506).
+
+**Accomplished:**
+- **Six tranches, 9 items, RED-first** — every fix wrote a failing test first, then the fix, full suite green per commit (`415 files / 2645 tests` by the end), `tsc --noEmit` clean:
+  - **G1** `37b0b615` (TASK-389: `isRecord` guard restores green typecheck) + `28c62033` (TASK-116: vitest hermetic-git harness — `GIT_CONFIG_GLOBAL/SYSTEM` → checked-in `hermetic.gitconfig`, so throwaway-repo fixtures never inherit `commit.gpgsign` and fail in keyless CI).
+  - **P2** `2cfe8fe4` (TASK-451/453, gh-499/501): first-class `- [~]` manual-acceptance marker the `tasks-complete` gate excludes; unrecognized checkbox markers no longer silently dropped.
+  - **P3** `af9c4a0a` (TASK-452, gh-500): design-to-spec counter counts `###` subsections, not just bullets; failing-criterion line self-explains.
+  - **P4** `a301128a` (TASK-449, gh-505: shared `resolveSpecDir` — spec-check/execute-check resolve `--spec` identically, install-root rescue) + `167a342a` (TASK-188: `reconcile --at <flag>` rejected, not swallowed).
+  - **P1** `eddcfdb4` (TASK-450/409, gh-502 HIGH): convergence record pins a concrete `headSha` (base..final-HEAD) AND `.stack-control/govern` is excluded from the audited diff — root-fixes the self-audit-every-round non-convergence; `rounds` documented per-invocation. Operator chose the full root fix over fidelity-only.
+  - **P5** `10100480` (TASK-448, gh-506): `reconcile --unorphan` reuses an existing same-slug node (attaches the spec via `setField`) instead of minting a duplicate; refuses zero-write on ambiguous/clobbering matches.
+- **Shipped end-to-end:** PR [#508](https://github.com/audiocontrol-org/deskwork/pull/508) → merged green → `/release` cut **v0.55.2** (atomic-push → `publish-npm.yml` OIDC publish → `assert-published` + marketplace install-smoke both green) → `claude plugin marketplace update` + `plugin update stack-control@deskwork` (0.55.1 → 0.55.2) → validated the installed plugin (manifest + bin dispatch `0.55.2`).
+- **Paperwork closed:** the 9 backlog items marked `done` (committed `aeb6ceae`, merged), and the 6 GitHub friction issues closed with per-issue fix-commit + release evidence.
+
+**Didn't Work:**
+- **The compass/close front door does not fit ad-hoc backlog/issue closure.** `stackctl workflow compass`/`/stack-control:close` operate on a *roadmap item* (its `closes:`/`part-of` cascade); this was a backlog burn-down of point-fixes with **no feature node**, so there was no item to orient on. Closure for this shape is `backlog done` + `gh issue close`, not the roadmap compass/close path (captured as tooling friction).
+- **`claude plugin update stack-control` → "not found"** — the install is namespaced; needed `stack-control@deskwork`. And `marketplace update` alone only refreshes the manifest — the plugin cache still needed `plugin update` to pull 0.55.2.
+
+**Course Corrections:**
+- **[PROCESS]** Closure-approach steering: I reached for the `close` skill, the operator redirected to "use the compass," the compass had no item (backlog work ≠ roadmap item), and the operator settled it with "just close the backlog issues." Lesson recorded as friction: recognize point-fix/backlog closure is not a roadmap-compass operation.
+- **[SCOPE]** Offered to update all four lockstep sibling plugins; operator scoped it to "just stack control."
+- No corrections inside the point-fix burndown itself — the burn order and RED-first discipline held.
+
+**Insights:**
+- **The point-fix scoping rule paid off all session** — RED-first → commit → push → ship, no governance/audit-barrage on any of the nine fixes. Heavyweight governance would have been pure friction on one-file bugfixes.
+- **`gh-502` is the instructive one:** the symptom ("govern never converges") was not in the audited *feature* — the harness was auditing its own committed convergence record. The durable fix was *excluding the harness's own outputs* from the payload (root) plus pinning a reproducible `headSha` (fidelity), not chasing the finding. Operator picked the full root fix.
+- **Lifecycle surfaces are item-shaped; not all work is an item.** The friction issues live in the backlog (a slush pile), not the curated roadmap — so their close path is the backlog/GitHub front doors, and the roadmap compass correctly had nothing to say.
+
+**Quantitative:**
+- Commits: **12** — 8 point-fix commits + 1 backlog-status chore (`aeb6ceae`) + the #508 merge (`8e2c2fb9`) + the v0.55.2 release bump (`fd0d4e2a`) + this session-end journal (`f6e54e1d`). Auto-derive reported 11 (the journal commit post-dates the `git log` boundary).
+- Files changed: ~50 (auto-derived over the session range).
+- Messages: ~30.
+- Corrections: 2 (operator) — closure-approach steering [PROCESS], sibling-plugin scope [SCOPE]; 0 self.
+- Backlog: **131 open** (9 items closed this session: the issue-backed set TASK-389/116/451/452/449/188/450/409/448). The gh-backed items' GitHub issues (gh-499/500/501/502/505/506) are now CLOSED (verified shipped in v0.55.2).
+- Release: v0.55.2 published (`@deskwork/{core,cli,studio}@0.55.2`), install-smoke green, plugin validated.
+- Open findings at session end: 0 (point-fix work, no audit-barrage run per the point-fix scoping rule).
+- Backlog touched (auto-derived): TASK-116, TASK-188, TASK-389, TASK-409, TASK-448, TASK-449, TASK-450, TASK-451, TASK-452, TASK-453.
+
+**Next session:** the issue-backed set is exhausted; the remaining backlog (131 open) is the **H-series audit-migrated hygiene tranches** (no gh backing — H7 cheap doc/comment sweep, H3/H4 fleet, H1/H2, … up to K1 end-govern-pipeline decompose) plus TASK-444. `MASTER-tranche-map.md` (session scratchpad, ephemeral) holds the full plan — promote it into the repo if continuing.
+
 ## 2026-06-25: backlog-hygiene — import friction issues, cross-model triage + dedupe, formalize Tier-2 to roadmap
 
 **Goal:** Use the `stack-control-hygiene` branch to start working down the stack-control backlog: import existing friction GitHub issues, triage + dedupe the open pile, and investigate whether it can be organized into burn-down tranches. (Orchestrator/bookkeeping session — no point-fix code written yet.)

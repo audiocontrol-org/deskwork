@@ -131,3 +131,6 @@
 ## session-end 2026-06-25
 - roadmap reasoner has no single-node inspect/show subaction (known: next/blocked/blocks/order/graph/add/advance/... but no 'show'); verifying one node after add/edit requires a full graph dump or session-start grep
 - check-front-door rejects '--at <dir>' unlike sibling verbs (session-start/backlog/govern accept it); must cd into the installation dir to run it — anchoring-flag inconsistency
+
+## session-end 2026-06-25
+- stackctl workflow compass requires a roadmap <item>; a backlog burn-down (point-fixes with no feature node) has no item to orient on, so 'use the compass to close out' has no target — closure for ad-hoc backlog/issue work happens via backlog done + gh issue close, not the roadmap compass/close path.
