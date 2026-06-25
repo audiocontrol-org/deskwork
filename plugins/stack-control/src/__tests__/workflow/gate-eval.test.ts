@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import {
   classifyTasks,
+  describeCriterion,
   evaluateCriterion,
   evaluateGate,
   type GateContext,
@@ -154,6 +155,59 @@ describe('US1 criterion evaluation — each kind → definite true/false', () =>
     const c = ctxFor(f, { designRecordPath: path });
     expect(evaluateCriterion({ kind: 'count-gte', target: 'solution-space-alternatives', param: 2 }, c)).toBe(true);
     expect(evaluateCriterion({ kind: 'count-gte', target: 'solution-space-alternatives', param: 3 }, c)).toBe(false);
+  });
+
+  it('count-gte counts ### subsection alternatives, not just bullets (gh-500)', () => {
+    const f = fixture();
+    // A record that structures its alternatives as `### Chosen`/`### Rejected`
+    // subsections (no top-level bullets) must score its alternatives, not 0.
+    const record = [
+      '# Design record',
+      '',
+      '## Solution space',
+      '',
+      '### Rejected — (A) task DB',
+      'prose about A.',
+      '',
+      '### Chosen — (B) governed markdown',
+      'prose about B.',
+      '',
+      '## Decisions',
+      'we chose B.',
+    ].join('\n');
+    const path = f.write('docs/superpowers/specs/sub-design.md', record);
+    const c = ctxFor(f, { designRecordPath: path });
+    expect(evaluateCriterion({ kind: 'count-gte', target: 'solution-space-alternatives', param: 2 }, c)).toBe(true);
+  });
+
+  it('count-gte uses subsections over their detail bullets (no double-count, gh-500)', () => {
+    const f = fixture();
+    // Two `###` alternatives, each with detail bullets — counts the 2
+    // alternatives, NOT the 4 detail bullets.
+    const record = [
+      '# Design record',
+      '',
+      '## Solution space',
+      '### Rejected — (A)',
+      '- detail a1',
+      '- detail a2',
+      '### Chosen — (B)',
+      '- detail b1',
+      '- detail b2',
+      '',
+      '## Decisions',
+      'B.',
+    ].join('\n');
+    const path = f.write('docs/superpowers/specs/mixed-design.md', record);
+    const c = ctxFor(f, { designRecordPath: path });
+    expect(evaluateCriterion({ kind: 'count-gte', target: 'solution-space-alternatives', param: 2 }, c)).toBe(true);
+    expect(evaluateCriterion({ kind: 'count-gte', target: 'solution-space-alternatives', param: 3 }, c)).toBe(false);
+  });
+
+  it('describeCriterion hints what solution-space-alternatives counts (gh-500)', () => {
+    const d = describeCriterion({ kind: 'count-gte', target: 'solution-space-alternatives', param: 2 });
+    expect(d).toContain('solution-space-alternatives');
+    expect(d).toMatch(/bullets or ###|### subsection/i);
   });
 
   it('file-exists reads whether the resolved artifact exists', () => {

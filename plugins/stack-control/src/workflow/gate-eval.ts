@@ -70,21 +70,30 @@ function countSolutionSpaceAlternatives(path: string | null): number {
   const lines = readFileSync(path, 'utf8').split('\n');
   let inSection = false;
   let sectionLevel = 0;
-  let count = 0;
+  let bullets = 0;
+  let subheadings = 0;
   for (const line of lines) {
     const h = /^(#{1,6})\s+(.*)$/.exec(line);
-    if (h) {
-      const level = h[1]!.length;
+    if (h !== null) {
+      const level = h[1]?.length ?? 0;
+      const title = h[2] ?? '';
       if (inSection && level <= sectionLevel) break; // section ended
-      if (!inSection && headingSlug(h[2]!) === 'solution-space') {
+      if (!inSection && headingSlug(title) === 'solution-space') {
         inSection = true;
         sectionLevel = level;
+      } else if (inSection && level > sectionLevel) {
+        subheadings++; // a nested `### Chosen …` / `### Rejected …` alternative
       }
       continue;
     }
-    if (inSection && /^\s*[-*]\s+\S/.test(line)) count++;
+    if (inSection && /^\s*[-*]\s+\S/.test(line)) bullets++;
   }
-  return count;
+  // Alternatives may be expressed as nested `###` subsections OR as top-level
+  // bullets. When subsections are present they ARE the alternatives (their
+  // bullets are detail), so count subheadings; otherwise fall back to bullets.
+  // (gh-500: a record structuring alternatives as `### Chosen`/`### Rejected`
+  // no longer scores 0.)
+  return subheadings > 0 ? subheadings : bullets;
 }
 
 /** True when every checkbox in `<specDir>/tasks.md` is checked (and there is at least one). */
@@ -226,6 +235,11 @@ export function evaluateGate(criteria: readonly Criterion[], ctx: GateContext): 
 /** A human-readable one-line description of a criterion (for query output). */
 export function describeCriterion(c: Criterion): string {
   const param = c.param === undefined ? '' : ` ${c.param}`;
+  // gh-500: the solution-space counter's rule is non-obvious — spell out what it
+  // counts so an author who hits an N−1/N gate doesn't have to read the source.
+  if (c.kind === 'count-gte' && c.target === 'solution-space-alternatives') {
+    return `count-gte solution-space-alternatives${param} (need ≥${c.param} alternatives as bullets or ### subsections under "## Solution space")`;
+  }
   return `${c.kind} ${c.target}${param}`;
 }
 
