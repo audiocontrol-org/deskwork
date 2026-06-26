@@ -8,7 +8,10 @@
 // given the budget it had.
 
 import { describe, expect, it } from 'vitest';
-import { deriveTimeoutBasis } from '../../../scope-discovery/audit-barrage/timeout-derivation.js';
+import {
+  deriveTimeoutBasis,
+  deriveLivenessWindowSeconds,
+} from '../../../scope-discovery/audit-barrage/timeout-derivation.js';
 import type { ModelConfig } from '../../../scope-discovery/audit-barrage/types.js';
 
 function lane(overrides: Partial<ModelConfig> = {}): ModelConfig {
@@ -93,5 +96,39 @@ describe('fail-loud on an underivable lane (Principle V)', () => {
         1000,
       ),
     ).toThrowError(/claude.*timeout/s);
+  });
+});
+
+// TASK-324 (AUDIT-20260620-11): the silence watchdog window must scale with payload
+// in lockstep with the (already-scaling) kill-cap, so the margin between a valid long
+// thinking pause and a false `killed-no-liveness` does not narrow as payloads grow.
+describe('deriveLivenessWindowSeconds — payload-scaled watchdog window', () => {
+  const WINDOW = 300;
+
+  it('keeps the configured window for a floor-bound (small) payload', () => {
+    // 10 KB: derived 130 s < floor 420 s → effectiveTimeout = floor → scale 1 → unchanged.
+    const basis = deriveTimeoutBasis(lane({ timeoutFloorSeconds: 420 }), 10 * 1024);
+    expect(basis.effectiveTimeoutSeconds).toBe(420);
+    expect(deriveLivenessWindowSeconds(WINDOW, basis)).toBe(300);
+  });
+
+  it('scales the window proportionally to the kill-cap for a large payload', () => {
+    // 80 KB: derived ceil(13*80)=1040 s > floor 420 → scale 1040/420 → window ceil(300*scale).
+    const basis = deriveTimeoutBasis(lane({ timeoutFloorSeconds: 420 }), 80 * 1024);
+    expect(basis.effectiveTimeoutSeconds).toBe(1040);
+    expect(deriveLivenessWindowSeconds(WINDOW, basis)).toBe(Math.ceil(300 * (1040 / 420)));
+    // and it is strictly larger than the configured floor window.
+    expect(deriveLivenessWindowSeconds(WINDOW, basis)).toBeGreaterThan(300);
+  });
+
+  it('never shrinks the window below the configured value', () => {
+    const basis = deriveTimeoutBasis(lane({ timeoutFloorSeconds: 420 }), 1024);
+    expect(deriveLivenessWindowSeconds(WINDOW, basis)).toBeGreaterThanOrEqual(300);
+  });
+
+  it('leaves an operator override window unscaled (operator owns that budget)', () => {
+    const basis = deriveTimeoutBasis(lane({ timeoutSeconds: 500 }), 80 * 1024);
+    expect(basis.mode).toBe('override');
+    expect(deriveLivenessWindowSeconds(WINDOW, basis)).toBe(300);
   });
 });

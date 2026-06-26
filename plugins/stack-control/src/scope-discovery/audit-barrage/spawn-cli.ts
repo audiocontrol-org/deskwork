@@ -68,6 +68,7 @@ import type { Readable, Writable } from 'node:stream';
 import { errorMessage } from '../util/typeguards.js';
 import { createStreamResultExtractor } from './stream-result-extractor.js';
 import { startWatchdog, type Watchdog } from './watchdog.js';
+import { deriveLivenessWindowSeconds } from './timeout-derivation.js';
 import {
   isLaneEnforced,
   type EnforcementState,
@@ -192,6 +193,14 @@ export async function spawnCliAgainstModel(
     );
   }
   const liveness: LivenessState = monitored ? 'monitored' : 'unmonitored';
+  // TASK-324: scale the watchdog window with payload in lockstep with the kill-cap, so a
+  // large payload (long contiguous thinking span on a healthy lane) does not trip a fixed
+  // window and false-kill. Recorded below as the EFFECTIVE window the watchdog actually
+  // used (honest run artifact), not the unscaled config base.
+  const effectiveLivenessWindowSeconds =
+    model.livenessWindowSeconds !== undefined
+      ? deriveLivenessWindowSeconds(model.livenessWindowSeconds, input.timeoutBasis)
+      : undefined;
 
   // Text lanes stream stdout straight to the artifact path. Stream lanes
   // defer the artifact write to settle (result-event extraction) so a
@@ -282,8 +291,8 @@ export async function spawnCliAgainstModel(
         terminalState,
         enforcement,
         liveness,
-        ...(model.livenessWindowSeconds !== undefined
-          ? { livenessWindowSeconds: model.livenessWindowSeconds }
+        ...(effectiveLivenessWindowSeconds !== undefined
+          ? { livenessWindowSeconds: effectiveLivenessWindowSeconds }
           : {}),
         ...(stalenessAtKillMs !== undefined ? { stalenessAtKillMs } : {}),
         timeoutBasis: input.timeoutBasis,
@@ -381,9 +390,9 @@ export async function spawnCliAgainstModel(
 
     // FR-008: arm the watchdog AFTER the pulse handlers exist. A stale
     // pulse kills early and disarms the timeout path.
-    if (monitored && model.livenessWindowSeconds !== undefined) {
+    if (monitored && effectiveLivenessWindowSeconds !== undefined) {
       watchdog = startWatchdog({
-        windowSeconds: model.livenessWindowSeconds,
+        windowSeconds: effectiveLivenessWindowSeconds,
         onStale: (stalenessMs) => {
           if (settled || killReason !== null) return;
           killReason = 'liveness';

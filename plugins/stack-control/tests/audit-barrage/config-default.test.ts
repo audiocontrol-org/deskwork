@@ -97,6 +97,10 @@ describe('shipped audit-barrage template — no-grounding Anthropic lanes (US1)'
         'Glob',
         'Bash',
         'Task',
+        // TASK-321: the web grounding tools the comment names ("…/web") must be
+        // asserted too — an omitted deny lets a future edit drop them silently.
+        'WebFetch',
+        'WebSearch',
       ]) {
         expect(lane.readonlyEnforcement).toContain(tool);
       }
@@ -125,7 +129,10 @@ describe('shipped audit-barrage template — no-grounding Anthropic lanes (US1)'
     for (const name of ['claude', 'sonnet']) {
       const lane = byName(models, name);
       expect(lane.livenessSignal).toBe('stdout');
-      expect(lane.livenessWindowSeconds).toBeGreaterThanOrEqual(240);
+      // TASK-329: pin the calibrated window exactly (300s) rather than a permissive
+      // >= 240 floor that left only 7s over the observed 233s healthy max — a value
+      // that drifts back toward the false-killing 60s window must fail this lock.
+      expect(lane.livenessWindowSeconds).toBe(300);
       const floor = lane.timeoutFloorSeconds;
       if (floor === undefined) throw new Error(`${name} lane missing timeout floor`);
       // Stay under the timeout so liveness still pre-empts a true infinite hang.
@@ -133,11 +140,13 @@ describe('shipped audit-barrage template — no-grounding Anthropic lanes (US1)'
     }
   });
 
-  it('raises the timeout floor above the old 300s for the no-grounding Anthropic lanes (FR-002)', async () => {
+  it('raises the timeout floor to the calibrated 420s for the no-grounding Anthropic lanes (FR-002)', async () => {
     const models = await loadTemplate();
     for (const name of ['claude', 'sonnet']) {
       const lane = byName(models, name);
-      expect(lane.timeoutFloorSeconds).toBeGreaterThan(300);
+      // TASK-330: pin the calibrated floor exactly (420s). The prior `> 300` admitted
+      // anything down to 301 — far below the 420s the calibration settled on.
+      expect(lane.timeoutFloorSeconds).toBe(420);
     }
   });
 

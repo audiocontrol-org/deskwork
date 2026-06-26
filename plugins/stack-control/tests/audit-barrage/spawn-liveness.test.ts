@@ -60,7 +60,10 @@ describe('codex lane reasoning-summary liveness config (US1, FR-003)', () => {
 class FakeChild extends EventEmitter {
   readonly stdout = new PassThrough();
   readonly stderr = new PassThrough();
-  readonly stdin = null;
+  // TASK-328: a writable stdin (not null) so the `{{prompt-stdin}}` codex-shaped lanes
+  // below actually exercise the stdin prompt-delivery path (spawn-cli skips it when
+  // child.stdin === null) instead of silently bypassing the contract they declare.
+  readonly stdin = new PassThrough();
   readonly kills: string[] = [];
   kill(signal?: NodeJS.Signals): boolean {
     this.kills.push(signal ?? 'SIGTERM');
@@ -132,12 +135,51 @@ describe('watchdog honors codex stderr reasoning pulses on a tight window (US1, 
       codexShapedLane({ livenessWindowSeconds: 60, timeoutSeconds: 300 }),
       { mode: 'override', payloadBytes: 1, effectiveTimeoutSeconds: 300 },
     );
-    // No stderr pulse ever; advance well past the window.
-    vi.advanceTimersByTime(90_000);
+    // No stderr pulse ever; advance well past the window. TASK-320: use the ASYNC
+    // timer advance so the assertion is robust even if the watchdog's kill path ever
+    // becomes async — a synchronous `advanceTimersByTime` + sync assert would race it.
+    await vi.advanceTimersByTimeAsync(90_000);
     expect(child.kills).toContain('SIGTERM');
     child.emit('close', null, 'SIGTERM');
     const result = await promise;
     expect(result.terminalState).toBe('killed-no-liveness');
     expect(result.timedOut).toBe(false);
+  });
+
+  // TASK-319/324: RUNTIME proof (not just the pure derivation fn) that a payload-scaled
+  // window actually arms a WIDER watchdog at spawn time — a stdout-pulsed lane silent for
+  // 400s (well past the 300s config base, the value that false-killed) is NOT killed
+  // because the derived basis scales the window in lockstep with the kill-cap.
+  it('a large-payload derived lane tolerates a silence longer than the config window (scaled watchdog)', async () => {
+    vi.useFakeTimers();
+    const child = new FakeChild();
+    // 80 KB derived basis: timeout ceil(13*80)=1040s, scale 1040/420 → window ceil(300*scale).
+    const promise = spawnWithFake(
+      child,
+      codexShapedLane({
+        livenessSignal: 'stdout',
+        livenessWindowSeconds: 300,
+        timeoutFloorSeconds: 420,
+        timeoutSecsPerKb: 13,
+        timeoutSeconds: undefined,
+      }),
+      {
+        mode: 'derived',
+        payloadBytes: 80 * 1024,
+        floorSeconds: 420,
+        secsPerKb: 13,
+        effectiveTimeoutSeconds: 1040,
+      },
+    );
+    // 400s of silence — past the 300s config base window, under the scaled ~743s window
+    // AND under the 1040s kill-cap → the healthy lane must NOT be killed.
+    await vi.advanceTimersByTimeAsync(400_000);
+    expect(child.kills).toEqual([]);
+    child.stdout.write('# report\n\n### X-01 — finding');
+    child.emit('close', 0, null);
+    const result = await promise;
+    expect(result.terminalState).toBe('completed');
+    // The recorded window reflects the EFFECTIVE (scaled) value the watchdog used.
+    expect(result.livenessWindowSeconds).toBeGreaterThan(300);
   });
 });

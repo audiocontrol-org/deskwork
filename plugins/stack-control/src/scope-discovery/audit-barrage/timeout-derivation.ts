@@ -59,3 +59,29 @@ export function deriveTimeoutBasis(
     effectiveTimeoutSeconds: Math.max(floor, derived),
   };
 }
+
+/**
+ * specs/029 US1 (TASK-324 / AUDIT-20260620-11): the per-spawn silence-watchdog window,
+ * scaled with payload size IN LOCKSTEP with the kill-cap derived above.
+ *
+ * The kill-cap (`deriveTimeoutBasis`) already grows with payload (`secs_per_kb`), but the
+ * watchdog window was a FIXED config value. A larger payload makes a healthy no-grounding
+ * model think longer in one contiguous silent span, so a fixed window narrows the margin
+ * between "valid thinking pause" and a false `killed-no-liveness` as payloads grow — the
+ * same regression the 300 s floor replaced at 60 s. Scaling the window by the SAME ratio
+ * the kill-cap scaled (`effectiveTimeout / floor`, ≥ 1) preserves the calibrated margin at
+ * every payload size with NO new calibration constant. A floor-bound (small) payload leaves
+ * the window at its configured value; an operator `override` timeout has no floor to scale
+ * against, so the configured window is kept verbatim (the operator owns that budget).
+ */
+export function deriveLivenessWindowSeconds(
+  configuredWindowSeconds: number,
+  basis: TimeoutBasis,
+): number {
+  const floor = basis.floorSeconds;
+  if (basis.mode !== 'derived' || floor === undefined || floor <= 0) {
+    return configuredWindowSeconds;
+  }
+  const scale = basis.effectiveTimeoutSeconds / floor; // ≥ 1 (effective = max(floor, derived))
+  return Math.ceil(configuredWindowSeconds * scale);
+}
