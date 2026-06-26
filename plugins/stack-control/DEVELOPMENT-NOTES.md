@@ -2,23 +2,39 @@
 
 ---
 
-## 2026-06-26: <!-- session title -->
+## 2026-06-26: H-series hygiene burndown — H7/H6/H3/H4/H1/H2 (7 tranches, 32 items, unreleased)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Resume the stack-control backlog burndown from the 2026-06-25 tranche map (`docs/backlog-tranche-map-2026-06-25.md`). The issue-backed Tier-1 set (G1/P1–P5) shipped last session in v0.55.2; this session burns the **H-series audit-migrated hygiene tranches** (no gh backing) in the recommended order, RED-first, no governance (point fixes), full suite green per commit.
 
 **Accomplished:**
-- <!-- compose -->
+- **First, reconciled branch state.** Fast-forwarded `feature/stack-control-hygiene` to `origin/main` (it was 3 behind: the #508 merge + the v0.55.2 release + last session's journal all landed on main *after* this branch merged). Promoted the ephemeral `MASTER-tranche-map.md` from scratchpad into the repo (`c7a25eed`) so the plan survives.
+- **Seven tranches, ~32 items, RED-first** (full suite `2645 → 2666 tests`, tsc clean per commit):
+  - **H7** `1a8a5273` (7): doc/comment-staleness sweep — TASK-261/262/313/314/325/326/63 (mis-credited comment, stale audit-ID breadcrumb, future date, folded SC entries, deferral marker → closed disposition, "Result→Coverage" reframe of the 017 quickstart + honest T033 rewording).
+  - **H6** `136b1f91` (3): the `capability` verb now advertises its `reconcile` subaction in USAGE + the guard error (front-door convention), removed the `<list>` placeholder, killed the stale "Phase 5 adds reconcile" comment — TASK-167/168/172.
+  - **H3** `c1d380fa` (3): single-sourced `FLEET_FLOOR_SHORTFALL_MARKER` + `classifyBarrageFailure`/`barrageFailureLabel`/`barrageFailureRecovery` across the 3 emit/parse sites; kind-specific recovery advice (shortfall ≠ outage); new contract test — TASK-119/126/127.
+  - **H4** `4c…` (2): **WONTFIX** TASK-113/77 — fleet-knowledge.yaml is already scaffolded (`scaffold.ts`) + setup-verified (`verify.ts:verifyFleetKnowledge`) + comprehensively fail-loud validated at point-of-use (`readFleetKnowledge`, the D6 oracle); phase-checkpoints half moot post-030. A doctor rule would only duplicate existing validation.
+  - **H1** `901321a1` (10): degraded quiet-section contract — `renderQuietSection` JSDoc rewritten to its actual dual (quiet + degraded) role (TASK-342/350/351/340 stale comments), 3 diagnostic/annotation fixes (TASK-355 single-run reason wording vs RAW gate; TASK-336 surface a degraded run alongside a HIGH run; TASK-345 name both zero-byte+nonzero-exit sub-states), 3 test gaps filled (TASK-344/339/356).
+  - **H2** `9303221b` (7): **payload-scaled liveness window** — new `deriveLivenessWindowSeconds()` scales the silence-watchdog in lockstep with the already-scaling kill-cap (no new calibration constant), spawn-cli arms + records the effective window; plus reliability test hardening (TASK-319 runtime proof, 329/330 tightened config floors, 321 WebFetch/WebSearch deny assertions, 328 writable FakeChild.stdin, 320 async timer advance). TASK-354 was already closed last session as a dup of 324.
+- Backlog **131 → 104 open**. Tranche map status kept current as each landed.
 
 **Didn't Work:**
-- <!-- compose -->
+- **My session-start orientation was wrong because I trusted the journal over the branch state.** The local branch's latest journal was the 2026-06-25 *orchestrator/triage* entry, so I reported "next: start G1/P2" — but G1/P1–P5 had already shipped in v0.55.2. The operator corrected me ("last session did a burndown and a release. look at the commit log"). The real latest journal lived on `origin/main` (post-merge), which the stale branch didn't have. Reconciling the commit log + tags first would have caught it.
 
 **Course Corrections:**
-- <!-- compose -->
+- **[PROCESS]** Stale-journal pickup (above) — operator pointed me at the commit log/tags; I reconstructed the true state (burndown shipped, v0.55.2 released) and fast-forwarded before proceeding.
+- **[COMPLEXITY] (self + operator)** H4: I initially framed building a fleet-knowledge *doctor rule* as the fix. The operator pushed back — "do we need the doctor still?… make sure we aren't building something we don't need." Re-verification showed the validation already exists three ways → WONTFIX. Closed 2 items by recognizing the work was done, not by writing code.
+- **[COMPLEXITY] (self)** H2: I over-framed TASK-324 as an *operator-owned calibration* needing target numbers; the operator said "I don't understand the issue." There was a principled default all along (scale the window in lockstep with the kill-cap — zero new constants), so no calibration input was needed. Root-fix-over-menu applies to my own framing.
 
 **Insights:**
-- <!-- compose -->
+- **Re-verify every migrated finding against current source before fixing — source moves.** These findings were 2026-06-14…20; later work (030 chunked payload, 031) had already resolved or mooted parts: H3's "fragile substring" was already a line-anchored marker (residual = single-source it); H4's phase-checkpoints were deleted and setup-verify already existed; H1's behavior was correct (only comments/tests lagged). Several "fixes" were really "recognize it's already handled."
+- **The honest WONTFIX is part of a burndown, not a dodge.** H4 closed real backlog items with a substantive reason; building the redundant doctor rule would have been the worse outcome (a fresh clone in the very code we're cleaning).
+- **A branch can be fully merged yet locally look behind** — the post-merge release + journal land on main, not the feature branch. session-start should reconcile branch vs main/tags, not just read the in-branch journal. (Candidate session-start improvement.)
 
 **Quantitative (auto-derived from git; verify before publishing):**
+- Tests: **2645 → 2666 (+21 net new blocks)** — +2 H6, +6 H3, +8 H1, +5 H2 (re-derived from per-tranche `vitest run` output); H7/H4 added none (doc-only / WONTFIX). `tsc --noEmit` clean every commit.
+- Backlog: **131 → 104 open** (27 net closed: H7=7, H6=3, H3=3, H4=2 WONTFIX, H1=10, H2=7, minus TASK-354 already-closed). No NEW audit-barrage run — point-fix/hygiene scoping, no governance. Open findings worked: 0 (these ARE the migrated backlog, not a fresh barrage). Slush/backlog remaining: 104 open (the H5/H8–H22 + K1 + TASK-444 tranches).
+- Release: none this session — 7 tranches accumulated unreleased on the branch (operator: release timing "I don't care"; chose to keep accumulating). "Fixed" is not "shipped" until a release lands.
+- Messages: ~8 operator turns. Corrections: 1 operator ([PROCESS] stale journal) + 2 [COMPLEXITY] (1 operator-prompted H4, 1 self H2).
 - Commits: 14
   - docs(backlog): update tranche map — H2 done, 104 open
   - chore(backlog): mark H2 items done (TASK-324/329/330/328/320/321/319)
