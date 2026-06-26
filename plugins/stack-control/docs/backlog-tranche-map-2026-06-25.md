@@ -22,7 +22,11 @@ Burn-down plan for the stack-control backlog (the `.stack-control/backlog/` slus
   - **H9** (4) `b76eee6a`: no-backend-writes consolidated onto a shared content-hash, removal-aware snapshot primitive — new `snapshotTree(root, exemptRel)` in `_isolation-harness.ts` (content-sha1, dir-aware); `snapshotOutsideInstallation` delegates to it (all 13 isolation-probe importers gain same-size-edit detection for free); the divergent `listFiles`/`changed` deleted; exit-time marker removal now exercises the removal-aware diff; new `isolation-harness-snapshot.test.ts` pins the deletion + same-size-same-mtime blind spots. TASK-230/234/236/238.
   - **Code review** surfaced + captured **TASK-456** (3 other test files still carry their own `size:mtime` snapshot copies — out-of-scope follow-up sweep); refuted a "same-size edit untested" finding (pinned by the new harness unit test); softened an overstated doc claim.
   - Tests 2705 → **2709**; backlog 89 → **86 open** (4 H9 closed; TASK-456 newly filed; net −3).
-- **Remaining:** **H10** next, then H8 → H11 → H12→H13 → H14→H20→H21→H22 → H17→H18→H19 → H15 → H16 → K1 keystone, + TASK-444 (+ TASK-456 snapshot-copy sweep). Burn order below.
+- **2026-06-26 (cont.) — H10 burned on `feature/stack-control-hygiene`, RED-first, unreleased:**
+  - **H10** (4) `18512631`: rewired the capability-mediation isolation + cross-vendor parity tests to drive the REAL CLI verbs (`front-door`/`mediate-check`/`intercept`) through installation fixtures via `runCli` (now with a stdin `input` option), instead of pure cores / low-level marker writers. A MUTATING identity (`backlog capture`) + the refuse-unmarked/permit-marked + inside-vs-outside contrasts make each assertion load-bearing (proves `--at` resolved a real install, not the FR-020 no-install default-permit). TASK-235/237/240/228.
+  - **Code review** clean — verified each rewired test fails under a real regression (`--at` ignored → permit; marker anchored to cwd → outer-tree leak).
+  - Tests 2709 → **2709** (net rewrite — 2 pure-core tests replaced by 2 real-verb tests); backlog 86 → **82 open** (4 H10 closed).
+- **Remaining:** **H8** next, then H11 → H12→H13 → H14→H20→H21→H22 → H17→H18→H19 → H15 → H16 → K1 keystone, + TASK-444 (+ TASK-456 snapshot-copy sweep). Burn order below.
 
 Triage method: 149 open To-Do items triaged across 6 thematic slices via parallel sub-agents, cross-referenced against task bodies + specs + audit-logs. Re-verify each item's cited symbol/file before fixing — source moves.
 
@@ -59,7 +63,7 @@ AUDIT-MIGRATED hygiene (no gh; clustered by code surface) — **REMAINING:**
 - **H7 cheap doc/comment-staleness sweep** — TASK-261,262,313,314,325,63 — S (zero-risk prose)
 - **H8 capability-mediation parser refactor** — TASK-163(+162) — L
 - ~~**H9 no-backend-writes harness rewrite** — TASK-230(+234,236,238)~~ ✅ `b76eee6a` (consolidated onto shared content-hash `snapshotTree`; TASK-456 follow-up filed for the other size:mtime copies)
-- **H10 mediate-check test-surface rewiring** — TASK-235(+240,237),228 — M
+- ~~**H10 mediate-check test-surface rewiring** — TASK-235(+240,237),228~~ ✅ `18512631` (drive the real front-door/mediate-check/intercept verbs via runCli; load-bearing permit/refuse contrasts)
 - **H11 front-door marker hygiene + linchpin spike** — TASK-164(spike),165,243,239,218,220 — M
 - **H12 fence-grammar CommonMark hardening** — TASK-406(+420),17,402(+404) — M
 - **H13 govern boundary/empty-phase** — TASK-108(+106),410,99,110 — M

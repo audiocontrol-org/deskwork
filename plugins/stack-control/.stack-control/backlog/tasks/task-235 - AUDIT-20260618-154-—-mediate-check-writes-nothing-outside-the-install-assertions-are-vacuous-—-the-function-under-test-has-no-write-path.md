@@ -3,9 +3,10 @@ id: TASK-235
 title: >-
   AUDIT-20260618-154 — mediate-check "writes nothing outside the install"
   assertions are vacuous — the function under test has no write path
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-18 06:14'
+updated_date: '2026-06-26 05:36'
 labels:
   - 'type:migrated-finding'
   - 'feature:026-capability-interface-mediation'
@@ -17,4 +18,8 @@ priority: medium
 ordinal: 235000
 ---
 
+## Implementation Notes
 
+<!-- SECTION:NOTES:BEGIN -->
+Closed: H10: rewired to drive the REAL CLI verbs (front-door/mediate-check/intercept) through installation fixtures via runCli instead of pure cores/low-level writers — refuse-unmarked/permit-marked + inside-vs-outside contrasts make each assertion load-bearing
+<!-- SECTION:NOTES:END -->
