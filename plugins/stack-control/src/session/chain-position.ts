@@ -44,6 +44,23 @@ const ARTIFACT_PATHS: ReadonlyArray<readonly [SpecKitArtifact, string]> = [
   ['tasks', 'tasks.md'],
 ];
 
+/**
+ * The relative path the `ARTIFACT_PATHS` table maps an artifact to — the SINGLE
+ * source every path consumer reads through, so the present-set scan and any
+ * downstream guard (e.g. the fully-implemented `tasks.md` check) can never drift
+ * onto a hand-rebuilt literal that disagrees with the table (AUDIT-20260619-72:
+ * a second `join(featureAbs, 'tasks.md')` independent of the table could read a
+ * different file than `present.has('tasks')` if the table ever changed). Fails
+ * loud on an unmapped artifact rather than returning a silent default.
+ */
+export function artifactRelPath(artifact: SpecKitArtifact): string {
+  const entry = ARTIFACT_PATHS.find(([a]) => a === artifact);
+  if (entry === undefined) {
+    throw new Error(`chain-position: no path mapping for artifact '${artifact}'`);
+  }
+  return entry[1];
+}
+
 /** Read `.specify/feature.json`'s `feature_directory`, or null if absent/unreadable. */
 function readFeatureDir(repoRoot: string): string | null {
   const pointer = join(repoRoot, '.specify', 'feature.json');
@@ -102,7 +119,10 @@ export function inferChainPosition(repoRoot: string): ChainPosition | null {
 
   // A fully-implemented spec is NOT "active work" — reporting it as active with a
   // next /speckit-* step is the TASK-130 bug. Treat it as no-active-spec (FR-006).
-  if (present.has('tasks') && isFullyImplemented(join(featureAbs, 'tasks.md'))) {
+  // The `tasks` path comes from the SAME table that populated `present` (via
+  // artifactRelPath), so the presence check and the freshness read can never
+  // disagree on which file is "tasks" (AUDIT-20260619-72).
+  if (present.has('tasks') && isFullyImplemented(join(featureAbs, artifactRelPath('tasks')))) {
     return null;
   }
 

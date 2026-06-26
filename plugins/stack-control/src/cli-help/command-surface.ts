@@ -75,6 +75,15 @@ export interface CommandDescriptor {
   readonly mediationClass: MediationClass | null;
   /** e.g. check-editor-symmetry → check-module-symmetry; null when not an alias. */
   readonly deprecatedAliasOf: string | null;
+  /**
+   * True when the verb's OWN flat handler renders a richer `--help` (e.g. roadmap's
+   * status vocabulary) and the descriptor-based renderer must NOT intercept it.
+   * The opt-out lives HERE, on the descriptor that defines the verb — not in a
+   * hardcoded denylist in cli.ts — so forgetting to set it defaults to descriptor
+   * help (no silent override of a handler's richer output), and the annotation is
+   * visible alongside the verb (AUDIT-20260619-71).
+   */
+  readonly selfHandlesHelp: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,6 +111,10 @@ export interface VerbMetadata {
   readonly verbMediation?: MediationClass;
   /** Mediation class per sub-action name (multi-action verbs). */
   readonly subActionMediation?: Readonly<Record<string, MediationClass>>;
+  /** When true, the verb's own flat handler renders `--help`; the descriptor-based
+   * renderer must NOT intercept it. Default (undefined/false): descriptor help
+   * (AUDIT-20260619-71). */
+  readonly selfHandlesHelp?: boolean;
   /**
    * When true, the verb's positional arguments are SEMANTICALLY required even
    * though commander declares them optional (`[id]`). roadmap does this on
@@ -228,6 +241,7 @@ function projectCommand(command: Command, meta: VerbMetadata): CommandDescriptor
     flags: isMulti ? [] : universalFlags,
     mediationClass: isMulti ? null : requireVerbMediation(verb, meta),
     deprecatedAliasOf: meta.deprecatedAliasOf,
+    selfHandlesHelp: meta.selfHandlesHelp === true,
   };
 }
 

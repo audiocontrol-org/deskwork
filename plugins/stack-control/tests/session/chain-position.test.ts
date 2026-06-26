@@ -8,7 +8,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { inferChainPosition } from '../../src/session/chain-position.js';
+import { inferChainPosition, artifactRelPath } from '../../src/session/chain-position.js';
 
 let root: string;
 afterEach(() => {
@@ -81,5 +81,29 @@ describe('inferChainPosition', () => {
     root = mkRepo();
     setFeature(root, 'specs/does-not-exist');
     expect(inferChainPosition(root)).toBeNull();
+  });
+
+  // AUDIT-20260619-72 (TASK-309): the fully-implemented suppression reads the
+  // `tasks.md` path from the SAME table that populates `present`, via
+  // artifactRelPath — so the presence check and the freshness read cannot drift
+  // onto different files. This exercises that guard end-to-end (a fully-checked
+  // tasks.md ⇒ no active spec), and pins the resolver as the single source.
+  it('suppresses a fully-implemented spec (all task boxes checked → null)', () => {
+    root = mkRepo();
+    setFeature(root, 'specs/011-x');
+    mkdirSync(join(root, 'specs/011-x'), { recursive: true });
+    writeFileSync(join(root, 'specs/011-x', 'spec.md'), '# stub\n');
+    writeFileSync(join(root, 'specs/011-x', 'plan.md'), '# stub\n');
+    writeFileSync(join(root, 'specs/011-x', 'tasks.md'), '- [x] T001 done\n- [X] T002 done\n');
+    expect(inferChainPosition(root)).toBeNull();
+  });
+
+  it('artifactRelPath is the single source for each artifact path (no drift)', () => {
+    expect(artifactRelPath('tasks')).toBe('tasks.md');
+    expect(artifactRelPath('spec')).toBe('spec.md');
+    expect(artifactRelPath('contracts')).toBe('contracts');
+    // An unmapped artifact fails loud rather than silently returning a default.
+    // @ts-expect-error — exercising the runtime guard with a non-artifact value.
+    expect(() => artifactRelPath('nope')).toThrow(/no path mapping/);
   });
 });

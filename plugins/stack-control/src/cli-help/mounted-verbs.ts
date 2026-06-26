@@ -80,6 +80,9 @@ export const MOUNTED: readonly MountedVerb[] = [
       // roadmap declares `[identifier]` in commander (so requireId owns the
       // error) but every id-taking subaction requires it (AUDIT-BARRAGE-codex-01).
       positionalsRequired: true,
+      // roadmap's own handler renders the status-vocabulary `--help`; the
+      // descriptor renderer must not intercept it (AUDIT-20260619-71 / TASK-308).
+      selfHandlesHelp: true,
     },
   },
   {

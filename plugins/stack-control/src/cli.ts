@@ -159,19 +159,18 @@ function printUsage(stream: NodeJS.WriteStream): void {
   stream.write(`Verbs: ${Object.keys(SUBCOMMANDS).join(', ')}\n`);
 }
 
-/** Verbs whose own handler renders a richer `--help` (e.g. roadmap's status
- * vocabulary). cli.ts does NOT intercept their help; their handler owns it. */
-const SELF_HELP_VERBS: ReadonlySet<string> = new Set(['roadmap']);
-
 /** Route `<verb> [sub] --help` to the descriptor renderer (028 US1 T037; FR-001/
  * 002/003). Returns true (caller exits 0) when help was rendered; false when the
- * verb is self-handling, un-mounted, or no help flag is present — then the flat
- * handler runs unchanged (non-regression for not-yet-migrated verbs). */
+ * verb self-handles its help, is un-mounted, or no help flag is present — then the
+ * flat handler runs unchanged (non-regression for not-yet-migrated verbs). The
+ * self-handling opt-out is declared on the descriptor (`selfHandlesHelp`), not a
+ * hardcoded denylist — forgetting to set it defaults to descriptor help rather
+ * than silently overriding a handler's richer output (AUDIT-20260619-71). */
 function tryRenderVerbHelp(verb: string, args: readonly string[]): boolean {
-  if (SELF_HELP_VERBS.has(verb)) return false;
   if (!args.some((a) => a === '--help' || a === '-h')) return false;
   const descriptor = buildCommandSurface().find((d) => d.verb === verb);
   if (descriptor === undefined) return false;
+  if (descriptor.selfHandlesHelp) return false;
   // The sub-action, if any, is the LEADING token — every skill usage puts it
   // first (`verb <sub> [flags]`). We do NOT scan past flags for a sub-action:
   // that would pick a flag VALUE (e.g. the path in `inbox --doc /p list --help`)

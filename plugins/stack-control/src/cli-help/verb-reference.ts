@@ -32,6 +32,11 @@ export function renderVerbReference(): string {
 
 /** A flag entry in the descriptor artifact (C4). */
 export interface ArtifactFlag {
+  /** Short alias without the dash (e.g. "d" for `-d, --depends-on`), or null when
+   * the flag declares no short form. Carried so the artifact is a TRUE round-trip
+   * of the surface — `flagLine()` renders the alias into the human reference, so a
+   * machine consumer must be able to reconstruct it too (AUDIT-20260619-74). */
+  readonly shortFlag: string | null;
   readonly arg: string | null;
   readonly required: boolean;
   readonly description: string;
@@ -62,7 +67,12 @@ export interface DescriptorArtifact {
 function flagsObject(flags: readonly FlagDescriptor[]): Record<string, ArtifactFlag> {
   const out: Record<string, ArtifactFlag> = {};
   for (const flag of flags) {
-    out[flag.name] = { arg: flag.arg, required: flag.required, description: flag.description };
+    out[flag.name] = {
+      shortFlag: flag.shortFlag,
+      arg: flag.arg,
+      required: flag.required,
+      description: flag.description,
+    };
   }
   return out;
 }
@@ -90,9 +100,11 @@ function commandObject(descriptor: CommandDescriptor): ArtifactCommand {
  * authored (FR-041/052). The round-trip test (C5) asserts it carries exactly the
  * verbs / sub-actions / flags the tree exposes.
  */
-export function emitDescriptorArtifact(): DescriptorArtifact {
+export function emitDescriptorArtifact(
+  surface: readonly CommandDescriptor[] = buildCommandSurface(),
+): DescriptorArtifact {
   const commands: Record<string, ArtifactCommand> = {};
-  for (const descriptor of buildCommandSurface()) {
+  for (const descriptor of surface) {
     commands[descriptor.verb] = commandObject(descriptor);
   }
   return { id: 'stack-control-command-surface-v1', commands };

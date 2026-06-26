@@ -127,3 +127,32 @@ describe('mediationClass declaration (T008/T009 — declared, not inferred)', ()
     expect(() => buildSurfaceFrom([{ build, meta: { deprecatedAliasOf: null } }])).toThrow(/lonely/);
   });
 });
+
+describe('selfHandlesHelp (AUDIT-20260619-71 / TASK-308 — opt-out lives on the descriptor)', () => {
+  it('roadmap declares selfHandlesHelp (its handler renders the status-vocabulary --help)', () => {
+    const roadmap = buildCommandSurface().find((d) => d.verb === 'roadmap');
+    expect(roadmap).toBeDefined();
+    expect(roadmap!.selfHandlesHelp).toBe(true);
+  });
+
+  it('every other mounted verb defaults to descriptor-rendered help (selfHandlesHelp false)', () => {
+    for (const d of buildCommandSurface()) {
+      if (d.verb === 'roadmap') continue;
+      expect(d.selfHandlesHelp, `verb ${d.verb}`).toBe(false);
+    }
+  });
+
+  it('a verb that does NOT declare it defaults to false (forgetting → descriptor help, no silent override)', () => {
+    const build = () => new Command('plainv').description('a fixture verb');
+    const [d] = buildSurfaceFrom([{ build, meta: { deprecatedAliasOf: null, verbMediation: 'read-only' } }]);
+    expect(d!.selfHandlesHelp).toBe(false);
+  });
+
+  it('projects an explicit selfHandlesHelp opt-in from the verb metadata', () => {
+    const build = () => new Command('selfv').description('a self-help fixture verb');
+    const [d] = buildSurfaceFrom([
+      { build, meta: { deprecatedAliasOf: null, verbMediation: 'read-only', selfHandlesHelp: true } },
+    ]);
+    expect(d!.selfHandlesHelp).toBe(true);
+  });
+});
