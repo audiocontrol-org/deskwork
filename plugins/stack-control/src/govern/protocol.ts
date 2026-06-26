@@ -40,7 +40,12 @@ import { negotiateFleet } from './fleet-negotiation.js';
 // GovernTerminalKind, GovernProtocolError, and BarrageVars live in govern-protocol-types.ts
 // (030 T086 — so helper modules share them without a circular import); imported for internal
 // use and re-exported here as protocol.ts's public API.
-import { GovernProtocolError } from './govern-protocol-types.js';
+import {
+  GovernProtocolError,
+  classifyBarrageFailure,
+  barrageFailureLabel,
+  barrageFailureRecovery,
+} from './govern-protocol-types.js';
 import type { GovernTerminalKind, BarrageVars } from './govern-protocol-types.js';
 export { GovernProtocolError };
 export type { GovernTerminalKind, BarrageVars };
@@ -358,22 +363,17 @@ export async function runProtocol(args: RunProtocolArgs): Promise<ProtocolResult
     // stderr names which (OUTAGE summary vs FLOOR SHORTFALL line).
     if (barrage.status !== 0) {
       const barrageNote = barrage.stderr.trim();
-      // T028 (US5): split the bundled terminal into two machine-distinguishable
-      // kinds. A FLOOR SHORTFALL means the barrage produced coverage but fewer
-      // emitting families than the cross-model floor demands (recovery: widen the
-      // fleet / lower --require-models); an OUTAGE means zero covering families
-      // (recovery: the model CLIs are missing/unreachable). Match the barrage's
-      // OWN diagnostic LINE — `audit-barrage: FLOOR SHORTFALL — …` — anchored to a
-      // line start, not a blob substring, so incidental stderr text (echoed
-      // prompts, prior findings, command traces) can't misclassify an outage
-      // (AUDIT-BARRAGE-codex-02).
-      const isFloorShortfall = /^audit-barrage: FLOOR SHORTFALL\b/m.test(barrageNote);
+      // T028 (US5): split the bundled terminal into two machine-distinguishable kinds with
+      // their own recovery, classified from the barrage's OWN marker line via the shared
+      // single-sourced classifier (FLEET_FLOOR_SHORTFALL_MARKER) so the emit + parse sites
+      // can't drift and incidental stderr can't misclassify an outage (TASK-119/126).
+      const kind = classifyBarrageFailure(barrageNote);
       throw new GovernProtocolError(
-        `govern: FATAL — ${isFloorShortfall ? 'fleet-floor shortfall' : 'audit-barrage OUTAGE'} (exit ${barrage.status}). ` +
-          'The work is NOT recorded as governed (FR-005). Check that the configured model-family CLIs are installed and reachable.' +
+        `govern: FATAL — ${barrageFailureLabel(kind)} (exit ${barrage.status}). ` +
+          `The work is NOT recorded as governed (FR-005). ${barrageFailureRecovery(kind)}` +
           (barrageNote.length > 0 ? `\n${barrageNote}` : ''),
         2,
-        isFloorShortfall ? 'fleet-floor-shortfall' : 'barrage-outage',
+        kind,
       );
     }
     const runDir = barrage.stdout.trim();

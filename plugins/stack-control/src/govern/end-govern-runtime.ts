@@ -28,6 +28,11 @@ import {
   selectRequestedLaneCapabilities,
   type BarrageVars,
 } from './protocol.js';
+import {
+  classifyBarrageFailure,
+  barrageFailureLabel,
+  barrageFailureRecovery,
+} from './govern-protocol-types.js';
 import type { LaneCapabilityProfile } from './lane-capabilities.js';
 import { negotiateFleet } from './fleet-negotiation.js';
 import {
@@ -186,14 +191,14 @@ export function makeEndGovernRuntime(cfg: EndGovernRuntimeConfig): EndGovernRunt
       const barrage = spawnText(cfg.barrageBin, barrageArgs);
       if (barrage.status !== 0) {
         const note = barrage.stderr.trim();
-        const isFloorShortfall = /^audit-barrage: FLOOR SHORTFALL\b/m.test(note);
+        const kind = classifyBarrageFailure(note);
         throw new GovernProtocolError(
-          `govern: FATAL — ${isFloorShortfall ? 'fleet-floor shortfall' : 'audit-barrage OUTAGE'} ` +
+          `govern: FATAL — ${barrageFailureLabel(kind)} ` +
             `on chunk ${chunkId} (exit ${barrage.status}). The work is NOT recorded as governed (FR-005). ` +
-            'Check that the configured model-family CLIs are installed and reachable.' +
+            `${barrageFailureRecovery(kind)}` +
             (note.length > 0 ? `\n${note}` : ''),
           2,
-          isFloorShortfall ? 'fleet-floor-shortfall' : 'barrage-outage',
+          kind,
         );
       }
 

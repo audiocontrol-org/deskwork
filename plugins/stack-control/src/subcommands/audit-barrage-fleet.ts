@@ -15,6 +15,7 @@ import {
   type BarrageRun,
   type ModelRunResult,
 } from '../scope-discovery/audit-barrage/types.js';
+import { FLEET_FLOOR_SHORTFALL_MARKER } from '../govern/govern-protocol-types.js';
 
 /**
  * A configured model is ZERO-OUTPUT DEGRADED iff `stdoutBytes === 0` —
@@ -160,7 +161,7 @@ export function renderFleetWarnings(
         causes.push(`non-emitting: ${nonEmitting}`);
       }
       lines.push(
-        `audit-barrage: FLOOR SHORTFALL — required ${floor.effectiveFloor} emitting model(s), got ${floor.emitting} (${causes.join('; ')})`,
+        `${FLEET_FLOOR_SHORTFALL_MARKER} — required ${floor.effectiveFloor} emitting model(s), got ${floor.emitting} (${causes.join('; ')})`,
       );
     }
   }
