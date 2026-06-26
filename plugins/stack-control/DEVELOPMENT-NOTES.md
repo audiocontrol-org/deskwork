@@ -53,6 +53,11 @@
 - Files changed: 55
 - Backlog touched: TASK-113, TASK-119, TASK-126, TASK-127, TASK-167, TASK-168, TASK-172, TASK-261, TASK-262, TASK-313, TASK-314, TASK-319, TASK-320, TASK-321, TASK-324, TASK-325, TASK-326, TASK-328, TASK-329, TASK-330, TASK-336, TASK-339, TASK-340, TASK-342, TASK-344, TASK-345, TASK-350, TASK-351, TASK-354, TASK-355, TASK-63
 
+**Addendum — post-session code review (operator-requested):** per the point-fix scoping rule the burndown ran NO audit-barrage governance (deterministic floor only: tsc + suite green per commit). On the operator's prompt I instead ran the built-in `/code-review` (3 finder angles + verify) over the branch diff. It converged on the one substantive new function, H2's `deriveLivenessWindowSeconds`, and surfaced two edges:
+- **Fixed now (`a8b774df`, RED-first):** the scaled window could exceed the kill-cap. The loader does NOT enforce `window < floor`, so a config with `window >= floor` would scale the silence-window past the hard timeout → the liveness watchdog becomes dead code (FR-008 early-kill lost). Added a `Math.min(scaled, effectiveTimeoutSeconds)` clamp + regression test. A real latent bug in code written this session — the deterministic floor was green but didn't cover it.
+- **Tracked (TASK-454) + honest KNOWN-LIMITATION comment:** a monitored operator-OVERRIDE lane on a large payload still false-kills at the fixed window (override has no floor to scale; needs its own basis). NOT a regression — the override path always used the fixed window; the H2 fix only covered the derived path.
+- Suite after the fix: **2667 tests green**, tsc clean. Lesson: a lighter-weight reviewer's-eye pass earns its keep even on point-fixes a green floor already passed.
+
 ## 2026-06-25: hygiene burndown — issue-backed point-fixes shipped + released as v0.55.2
 
 **Goal:** Pick up the triaged backlog from the orchestrator/bookkeeping session and **burn the issue-backed point-fix tranche** in the agreed order (G1 → P2 → P3 → P4 → P1 → P5), then ship it: PR → merge → `/release` → update + validate the installed plugin → close the friction issues. This is the implementation session for the imported friction issues (gh-499/500/501/502/505/506).
