@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-06-26: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 14
+  - docs(backlog): update tranche map — H2 done, 104 open
+  - chore(backlog): mark H2 items done (TASK-324/329/330/328/320/321/319)
+  - fix(audit-barrage): H2 — payload-scaled liveness window + reliability test hardening
+  - docs(backlog): update tranche map — H7/H6/H3/H4/H1 done, 131→111 open
+  - chore(backlog): mark H1 items done (10 — TASK-351/340/342/350/344/356/339/345/336/355)
+  - fix(govern): H1 — degraded quiet-section contract: stale comments, diagnostics, test gaps
+  - chore(backlog): WONTFIX H4 fleet-knowledge doctor (TASK-113/77) — already addressed by setup-verify + readFleetKnowledge oracle
+  - chore(backlog): mark H3 items done (TASK-119/126/127)
+  - fix(govern): single-source the barrage floor-shortfall marker + kind-specific recovery
+  - chore(backlog): mark H6 items done (TASK-167/168/172)
+  - fix(capability): advertise the reconcile subaction on the verb's own help surface
+  - chore(backlog): mark H7 sweep items done (TASK-261/262/313/314/325/326/63)
+  - docs(hygiene): H7 doc/comment-staleness sweep — TASK-261/262/313/314/325/326/63
+  - docs(backlog): promote the 2026-06-25 tranche map into the repo
+- Files changed: 55
+- Backlog touched: TASK-113, TASK-119, TASK-126, TASK-127, TASK-167, TASK-168, TASK-172, TASK-261, TASK-262, TASK-313, TASK-314, TASK-319, TASK-320, TASK-321, TASK-324, TASK-325, TASK-326, TASK-328, TASK-329, TASK-330, TASK-336, TASK-339, TASK-340, TASK-342, TASK-344, TASK-345, TASK-350, TASK-351, TASK-354, TASK-355, TASK-63
+
 ## 2026-06-25: hygiene burndown — issue-backed point-fixes shipped + released as v0.55.2
 
 **Goal:** Pick up the triaged backlog from the orchestrator/bookkeeping session and **burn the issue-backed point-fix tranche** in the agreed order (G1 → P2 → P3 → P4 → P1 → P5), then ship it: PR → merge → `/release` → update + validate the installed plugin → close the friction issues. This is the implementation session for the imported friction issues (gh-499/500/501/502/505/506).
