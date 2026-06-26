@@ -387,8 +387,9 @@ export async function runAuditBarrageLift(
   // specs/029 US2 (FR-007): when this findings-section is recorded over a
   // DEGRADED fleet (a surviving lane found something while others were killed),
   // stamp the `Fleet: DEGRADED` marker so the dampener never counts this run as
-  // quiet (the degraded+0-findings branch above already records nothing; this
-  // covers degraded+findings, where 0 HIGH+ from the survivors is not clean).
+  // quiet (the degraded+0-findings branch above already records a DEGRADED-marked
+  // section; this covers degraded+findings, where 0 HIGH+ from the survivors is
+  // not clean).
   const { section, assignedIds } = renderSection(
     liftableFindings,
     opts.date,

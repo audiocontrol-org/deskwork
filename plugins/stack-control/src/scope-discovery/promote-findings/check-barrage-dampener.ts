@@ -400,8 +400,11 @@ export function checkBarrageDampener(
         );
       }
       if (singleRunCleanEngages && mostRecent !== undefined) {
+        // The single-run rule gates on RAW counts (rawHighPlusCount/rawMediumCount),
+        // NOT the jitter-tolerant newHighPlusCount — its reason must say so, not borrow
+        // the N-quiet rule's "NEW-or-persistent" basis (TASK-355).
         parts.push(
-          `the most recent run (${mostRecent.runDirBasename}) surfaced 0 NEW-or-persistent HIGH+ AND 0 MEDIUM findings (single-run rule)`,
+          `the most recent run (${mostRecent.runDirBasename}) surfaced 0 HIGH+ AND 0 MEDIUM findings (raw — single-run rule)`,
         );
       }
       return (
@@ -415,10 +418,20 @@ export function checkBarrageDampener(
     const notQuiet = recentRunCounts.filter((r) => r.newHighPlusCount > 0);
     const firstNotQuiet = notQuiet[0];
     if (firstNotQuiet !== undefined) {
+      // TASK-336: a degraded run in the same window is its OWN blocker (FR-007). Don't
+      // let the HIGH-run message silence it — name both so re-running with a healthy
+      // fleet is visibly still required even after the HIGH findings are cleared.
+      const degradedAlso = recentRunCounts.filter((r) => r.degraded);
+      const degradedNote =
+        degradedAlso[0] !== undefined
+          ? ` Additionally, ${degradedAlso.length} of those run(s) ran over a DEGRADED fleet ` +
+            `(most recent: ${degradedAlso[0].runDirBasename}) — 0 HIGH+ over killed/timed-out ` +
+            `lanes is not a clean signal either (FR-007).`
+          : '';
       return (
         `Not dampened: ${notQuiet.length} of the last ${recentRunCounts.length} ` +
         `runs surfaced NEW-or-persistent HIGH+ findings (most recent: ` +
-        `${firstNotQuiet.runDirBasename} → ${firstNotQuiet.newHighPlusCount} HIGH+).`
+        `${firstNotQuiet.runDirBasename} → ${firstNotQuiet.newHighPlusCount} HIGH+).${degradedNote}`
       );
     }
     // specs/029 US2 (FR-007): a degraded run blocks dampening even at 0 HIGH+.

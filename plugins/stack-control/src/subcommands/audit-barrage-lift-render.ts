@@ -93,15 +93,19 @@ function renderEntry(finding: ExtractedFinding, date: string, nn: number): strin
 }
 
 /**
- * A clean-run lift section — header + an explicit 0-findings body — recorded when
- * a HEALTHY-fleet barrage surfaces nothing (claude-20260612-r3). The convergence
- * dampener counts lift SECTIONS, so a clean run that leaves no section is invisible
- * to its consecutive-quiet / single-run-clean rules — the prior HIGH section would
- * stay in the window forever and the gate could never reach OPEN after genuinely
- * clean runs. This section matches the dampener's header regex and carries ZERO
- * `Severity:` lines, so the dampener counts it as a quiet run (0 HIGH+, 0 MEDIUM).
- * (Degraded clean runs are NOT recorded — FR-007: absence over killed lanes is not
- * a clean signal; that branch is gated in the lift, not here.)
+ * The 0-finding lift section. Despite the name, it renders BOTH no-finding outcomes
+ * (TASK-350) — the dampener counts lift SECTIONS, so a 0-finding run that leaves no
+ * section is invisible to its consecutive-quiet / single-run-clean rules (the prior
+ * HIGH section would stay in the window forever and the gate could never reach OPEN
+ * after genuinely clean runs):
+ *
+ *   - HEALTHY fleet → a true QUIET section: header + an explicit 0-findings body, ZERO
+ *     `Severity:` lines, so the dampener counts it as a quiet run (claude-20260612-r3).
+ *   - DEGRADED fleet (`fleet.produced < fleet.configured`) → a section carrying the
+ *     `Fleet: DEGRADED` marker (FR-007). It is STILL recorded here — so it becomes the
+ *     dampener's most-recent run and BLOCKS convergence — because absence of HIGH over
+ *     killed/timed-out lanes is NOT a clean signal. (Earlier comments here wrongly said
+ *     degraded clean runs were not recorded / were gated in the lift — TASK-342/351.)
  */
 export function renderQuietSection(
   date: string,
