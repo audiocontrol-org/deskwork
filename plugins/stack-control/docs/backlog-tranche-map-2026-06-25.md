@@ -5,7 +5,14 @@ Burn-down plan for the stack-control backlog (the `.stack-control/backlog/` slus
 ## Status (updated as tranches land)
 
 - **2026-06-25 — issue-backed Tier-1 SHIPPED in v0.55.2** (PR #508): G1 + P1–P5, 9 items, RED-first, no governance. TASK-389/116/451/453/452/449/188/450/409/448 closed; gh-499/500/501/502/505/506 closed with release evidence. Backlog 139 → 131 open.
-- **Remaining:** the **H-series** audit-migrated hygiene tranches (no gh backing) + TASK-444 + the K1 keystone. Burn order below, resuming at **H7**.
+- **2026-06-25 (cont.) — H7/H6/H3/H4/H1 burned on `feature/stack-control-hygiene`, RED-first, unreleased:**
+  - **H7** (7) doc/comment sweep — `1a8a5273`.
+  - **H6** (3) capability reconcile/usage help — `136b1f91`.
+  - **H3** (3) fleet floor-vs-outage single-sourced marker + recovery + contract test — `c1d380fa`.
+  - **H4** (2) — **WONTFIX** (`TASK-113/77`): fleet-knowledge already scaffolded + setup-verified + fail-loud point-of-use validated; phase-checkpoints moot post-030; a doctor rule would only duplicate. — `4c…`.
+  - **H1** (10) degraded quiet-section contract: stale comments/JSDoc + 3 diagnostic/annotation fixes + 3 test gaps — `901321a1`.
+  - Backlog 131 → **111 open**.
+- **Remaining:** **H2** next (liveness/timeout — note TASK-324/354 carry an operator-owned calibration decision), then H5 → H9→H10 → H8 → … → K1 keystone, + TASK-444. Burn order below.
 
 Triage method: 149 open To-Do items triaged across 6 thematic slices via parallel sub-agents, cross-referenced against task bodies + specs + audit-logs. Re-verify each item's cited symbol/file before fixing — source moves.
 
