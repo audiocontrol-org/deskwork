@@ -19,12 +19,13 @@
 //     outside the outer tree by construction.
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   readdirSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -173,22 +174,29 @@ export function makeMarkerlessFixture(): NestedFixture {
   };
 }
 
-/** One file's identity in a snapshot: `${size}:${mtimeMs}`. */
+/** One file's identity in a snapshot: a sha1 of its CONTENT (dirs are `'dir'`). */
 export type Snapshot = Map<string, string>;
 
 /**
- * Snapshot the outer tree (path + size + mtime per file), excluding the
- * installation subtree, `.git/`, and the caller's per-row exemptions
- * (relative paths; a listed dir excludes its whole subtree).
+ * Snapshot a directory tree by CONTENT — `relpath -> sha1(content)` per file
+ * (and `relpath/ -> 'dir'` per directory), excluding `.git/` and the caller's
+ * exemptions (relative paths; a listed dir excludes its whole subtree).
+ *
+ * Content-hash (not `size:mtime`) is the robust basis for a "this verb wrote
+ * nothing here" guard: it catches a same-size in-place edit (AUDIT-20260618-149/
+ * 153) that size+mtime can miss, and it ignores mtime-only churn (e.g. a read
+ * verb that re-stats a file without changing its bytes). Removals are surfaced by
+ * `diffSnapshots`, not here. This is the snapshot primitive the isolation harness
+ * exposes — `snapshotOutsideInstallation` delegates to it, and the FR-018 backend-write
+ * guard reuses it instead of a divergent local copy (AUDIT-20260618-157). (A few other
+ * test files still carry their own `size:mtime` snapshot helpers — tracked for a follow-up
+ * consolidation sweep, not folded in here.)
  */
-export function snapshotOutsideInstallation(
-  fixture: NestedFixture,
-  exemptRel: readonly string[] = [],
-): Snapshot {
-  const excluded = new Set([fixture.installationRel, '.git', ...exemptRel]);
+export function snapshotTree(root: string, exemptRel: readonly string[] = []): Snapshot {
+  const excluded = new Set(['.git', ...exemptRel]);
   const snapshot: Snapshot = new Map();
   const walk = (rel: string): void => {
-    const abs = rel === '' ? fixture.outerRoot : join(fixture.outerRoot, rel);
+    const abs = rel === '' ? root : join(root, rel);
     for (const entry of readdirSync(abs, { withFileTypes: true })) {
       const childRel = rel === '' ? entry.name : `${rel}/${entry.name}`;
       if (excluded.has(childRel)) continue;
@@ -197,12 +205,24 @@ export function snapshotOutsideInstallation(
         walk(childRel);
         continue;
       }
-      const st = statSync(join(fixture.outerRoot, childRel));
-      snapshot.set(childRel, `${st.size}:${st.mtimeMs}`);
+      const hash = createHash('sha1').update(readFileSync(join(root, childRel))).digest('hex');
+      snapshot.set(childRel, hash);
     }
   };
   walk('');
   return snapshot;
+}
+
+/**
+ * Snapshot the outer tree by content, excluding the installation subtree,
+ * `.git/`, and the caller's per-row exemptions (a listed dir excludes its whole
+ * subtree). Thin wrapper over {@link snapshotTree}.
+ */
+export function snapshotOutsideInstallation(
+  fixture: NestedFixture,
+  exemptRel: readonly string[] = [],
+): Snapshot {
+  return snapshotTree(fixture.outerRoot, [fixture.installationRel, ...exemptRel]);
 }
 
 /**
