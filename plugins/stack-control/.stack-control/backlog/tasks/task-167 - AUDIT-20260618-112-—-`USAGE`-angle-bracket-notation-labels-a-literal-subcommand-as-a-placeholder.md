@@ -3,9 +3,10 @@ id: TASK-167
 title: >-
   AUDIT-20260618-112 — `USAGE` angle-bracket notation labels a literal
   subcommand as a placeholder
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-18 05:07'
+updated_date: '2026-06-26 00:19'
 labels:
   - 'type:migrated-finding'
   - 'feature:026-capability-interface-mediation'
@@ -17,4 +18,8 @@ priority: low
 ordinal: 167000
 ---
 
+## Implementation Notes
 
+<!-- SECTION:NOTES:BEGIN -->
+Closed: Fixed in 136b1f91 (H6 capability reconcile/usage help)
+<!-- SECTION:NOTES:END -->
