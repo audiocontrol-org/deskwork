@@ -2,6 +2,31 @@
 
 ---
 
+## 2026-06-26: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 4
+  - test(cli-help): H5 code-review — make CommandDescriptor fixtures carry the new required selfHandlesHelp field
+  - docs(backlog): mark H5 done (17 items) — tranche map + backlog status; 88 open
+  - test(roadmap): H5 — help-surface / help-nondrift / parser-adapter assertion hardening
+  - fix(cli-help): H5 production — descriptor-driven self-help, artifact short flags, single-sourced chain path
+- Files changed: 34
+- Backlog touched: TASK-268, TASK-269, TASK-271, TASK-274, TASK-275, TASK-276, TASK-280, TASK-281, TASK-282, TASK-284, TASK-285, TASK-302, TASK-308, TASK-309, TASK-311, TASK-455
+
 ## 2026-06-26: H-series hygiene burndown — H7/H6/H3/H4/H1/H2 (7 tranches, 32 items, unreleased)
 
 **Goal:** Resume the stack-control backlog burndown from the 2026-06-25 tranche map (`docs/backlog-tranche-map-2026-06-25.md`). The issue-backed Tier-1 set (G1/P1–P5) shipped last session in v0.55.2; this session burns the **H-series audit-migrated hygiene tranches** (no gh backing) in the recommended order, RED-first, no governance (point fixes), full suite green per commit.

@@ -134,3 +134,6 @@
 
 ## session-end 2026-06-25
 - stackctl workflow compass requires a roadmap <item>; a backlog burn-down (point-fixes with no feature node) has no item to orient on, so 'use the compass to close out' has no target — closure for ad-hoc backlog/issue work happens via backlog done + gh issue close, not the roadmap compass/close path.
+
+## session-end 2026-06-26
+- backlog capture rejects --apply ('--apply is not valid for capture') — minor surprise since sibling verbs (done/promote) are dry-run-by-default and require --apply; capture is write-by-default. Not a defect, but the asymmetry cost one round-trip.
