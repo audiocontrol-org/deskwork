@@ -2,30 +2,42 @@
 
 ---
 
-## 2026-06-26: <!-- session title -->
+## 2026-06-26: H5 hygiene burndown — help-nondrift + descriptor test hardening (17 items, unreleased) + standing code-review
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up the H-series backlog burndown from the 2026-06-25 tranche map. Last session burned H7/H6/H3/H4/H1/H2; this session burns **H5** (help-nondrift + descriptor test hardening — the L tranche), RED-first, no governance (point fixes), full suite green per commit.
 
 **Accomplished:**
-- <!-- compose -->
+- **H5 in two work commits + one review commit, RED-first** (full suite `2667 → 2705`, tsc clean per commit; re-verified every finding against current source first — these were 2026-06-19, and 028/030/031 had moved line numbers):
+  - **H5 production** (3) `3f84f610`: TASK-308 a `selfHandlesHelp` field on `CommandDescriptor`/`VerbMetadata` replaces the hardcoded `SELF_HELP_VERBS` denylist in cli.ts (clean break — Set deleted; forgetting the field defaults to descriptor help, no silent override); TASK-311 the descriptor artifact now carries `shortFlag` (was dropped from `ArtifactFlag`/`flagsObject` while the human reference rendered it) + an optional-surface seam for non-null round-trip coverage; TASK-309 `inferChainPosition` single-sources the `tasks.md` path via a new `artifactRelPath()` so the present-set scan and the fully-implemented guard can't drift onto different files (+ suppression-path behavioral coverage).
+  - **H5 test-hardening** (14) `83ead572`: parser-adapter error shapes (268 re-add a concrete-member `reconcile` check to break the single-sourced-list tautology; 271 re-pin the `roadmap:` prefix; 269 export+single-source `unknownSubactionFlagMessage` at both prod sites + the test); help-surface structural per-row summary assertion (274/287) + an explicit advance status-vocabulary contract (284 — re-verified: advance accepts the FULL governed vocabulary, no per-subaction subset mechanism exists, so the global-vocab assertion is correct by design); help-nondrift robustness (275 mkdtemp cleanup, 276/283 tightened `shownFlags` anchor + crafted-snippet unit tests, 281 a new check (3b) per-boolean-flag acceptance probe + a completeness guard, 282 positive reconcile exit-2 reason + hardened discriminator, 285 phantom-entry guard, 280/286 honest spot-check titles/comment).
+- **Code review run as a standing step** (`95d801da`): per operator direction, `/code-review` now runs as a matter of course on point fixes / burn-downs. The review caught a real gap — 5 typed `CommandDescriptor` fixtures omitted the newly-required `selfHandlesHelp` field, invisible to `tsc` because the test trees are excluded from its `include`. Fixed all 5; the broader "test trees are untyped (~73 latent type errors)" gap captured as **TASK-455** for the operator to scope.
+- **Backlog 105 → 88 open** (17 H5 items closed). **TASK-302 left OPEN** — re-verified still blocked on T013 (roadmap value-flags still carry empty commander descriptions; extending `assertSurfaceComplete` would throw for every roadmap flag). Tranche map kept current.
 
 **Didn't Work:**
-- <!-- compose -->
+- **"tsc clean per commit" was a weaker claim than I thought.** The test trees (`src/__tests__/**` excluded; top-level `tests/` never in `include`) are not type-checked at all — vitest's esbuild strips types. My green-`tsc` signal only ever covered non-test `src/`. The code review (not the floor) is what caught the unfaithful fixtures; a manual test-tsconfig then surfaced ~73 pre-existing latent type errors. Captured as TASK-455.
 
 **Course Corrections:**
-- <!-- compose -->
+- **[PROCESS]** Operator: *"did you do a code review?"* then *"we should do code reviews as a matter of course on point fixes and burn-downs."* I had skipped it (point-fix scoping → no governance). Codified the correction in `.claude/rules/agent-discipline.md`: the lightweight built-in `/code-review` is a standing point-fix/burn-down step (RED-first → code review → commit → push), explicitly NOT part of the skipped audit-barrage governance — and it earns its keep (it caught the fixture gap a green floor passed). No corrections inside the H5 burndown itself.
 
 **Insights:**
-- <!-- compose -->
+- **The code review is the point-fix analogue of audit-barrage's stochastic defense-in-depth** — scaled down to the built-in reviewer, sitting on top of the deterministic floor, never skipped. The H5 fixture gap (and last session's H2 liveness clamp) are the proof: the green floor passed both; the reviewer's-eye pass caught both.
+- **Re-verify, recognize-it's-handled.** TASK-284 was a hypothetical against an architecture with no per-subaction status subset — the honest fix was an explicit contract + comment, not a fabricated "derive from subset." TASK-302 stayed open by recognizing its T013 precondition still isn't met. Same discipline as last session's H4 WONTFIX.
+- **A completeness guard pays for itself while you write it.** The check (3b) completeness assertion (TASK-281) immediately surfaced that reconcile's `--unorphan`/`--type` value flags were unexercised — caught and fixed in the same change.
 
 **Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 4
+- Tests: **2667 → 2705 (+38 net new blocks)** — +8 production (chain-position +2, roundtrip +2, command-surface +4), +30 test-hardening (mostly the per-(sub × boolean-flag) check (3b) probes). Re-derived from `vitest run` output. `tsc --noEmit` clean (non-test `src/`) every commit; test trees are NOT tsc-checked (TASK-455).
+- Backlog: **105 → 88 open** (17 H5 items closed: 268/269/271/274/275/276/280/281/282/283/284/285/287/308/309/311 + 285; TASK-302 deferred, blocked on T013; TASK-455 newly filed). No audit-barrage run — point-fix scoping, no governance. The lightweight `/code-review` WAS run (new standing step).
+- Release: none — H5 accumulates unreleased on the branch alongside the prior 7 H-tranches (operator: release timing "I don't care").
+- Messages: ~5 operator turns. Corrections: 1 ([PROCESS] run code review as a matter of course).
+- Commits: 4 work/review + this session-end record.
   - test(cli-help): H5 code-review — make CommandDescriptor fixtures carry the new required selfHandlesHelp field
   - docs(backlog): mark H5 done (17 items) — tranche map + backlog status; 88 open
   - test(roadmap): H5 — help-surface / help-nondrift / parser-adapter assertion hardening
   - fix(cli-help): H5 production — descriptor-driven self-help, artifact short flags, single-sourced chain path
 - Files changed: 34
 - Backlog touched: TASK-268, TASK-269, TASK-271, TASK-274, TASK-275, TASK-276, TASK-280, TASK-281, TASK-282, TASK-284, TASK-285, TASK-302, TASK-308, TASK-309, TASK-311, TASK-455
+
+**Next session:** resume the burndown at **H9 → H10** (no-backend-writes harness rewrite + mediate-check test rewiring — both M), then H8 → H11 → H12→H13 → H14→H20→H21→H22 → H17→H18→H19 → H15 → H16 → K1 keystone, + TASK-444. Burn order in `docs/backlog-tranche-map-2026-06-25.md`. Open carry: TASK-302 (blocked on T013), TASK-455 (untyped test trees — operator to scope).
 
 ## 2026-06-26: H-series hygiene burndown — H7/H6/H3/H4/H1/H2 (7 tranches, 32 items, unreleased)
 
