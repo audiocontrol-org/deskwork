@@ -80,7 +80,7 @@ function sub(name: string, positionals: readonly string[] = []): SubActionDescri
 }
 
 function multiVerb(verb: string, subs: readonly SubActionDescriptor[]): CommandDescriptor {
-  return { verb, description: `${verb} desc`, subActions: subs, flags: [], mediationClass: null, deprecatedAliasOf: null };
+  return { verb, description: `${verb} desc`, subActions: subs, flags: [], mediationClass: null, deprecatedAliasOf: null, selfHandlesHelp: false };
 }
 
 function singleVerb(verb: string): CommandDescriptor {
@@ -91,6 +91,7 @@ function singleVerb(verb: string): CommandDescriptor {
     flags: [],
     mediationClass: 'read-only',
     deprecatedAliasOf: null,
+    selfHandlesHelp: false,
   };
 }
 

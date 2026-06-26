@@ -74,7 +74,7 @@ describe('buildCommandSurface (T004 — commander-tree walk → CommandDescripto
 describe('assertSurfaceComplete (T006/T007 — completeness guard)', () => {
   it('throws when a verb has an empty description', () => {
     const bad: CommandDescriptor[] = [
-      { verb: 'x', description: '  ', subActions: [], flags: [], mediationClass: 'read-only', deprecatedAliasOf: null },
+      { verb: 'x', description: '  ', subActions: [], flags: [], mediationClass: 'read-only', deprecatedAliasOf: null, selfHandlesHelp: false },
     ];
     expect(() => assertSurfaceComplete(bad)).toThrow(/x/);
   });
@@ -88,6 +88,7 @@ describe('assertSurfaceComplete (T006/T007 — completeness guard)', () => {
         flags: [],
         mediationClass: null,
         deprecatedAliasOf: null,
+        selfHandlesHelp: false,
       },
     ];
     expect(() => assertSurfaceComplete(bad)).toThrow(/x\/s|s\b/);

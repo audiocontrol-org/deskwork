@@ -94,6 +94,7 @@ describe('buildFrontedOperationsRegistry — derivation (028 T099; R1/R2)', () =
       flags: [],
       mediationClass: 'read-only',
       deprecatedAliasOf: null,
+      selfHandlesHelp: false,
     };
     const before = buildFrontedOperationsRegistry({ surface: liveSurface });
     const after = buildFrontedOperationsRegistry({
