@@ -19,17 +19,32 @@ import { roadmapStatusVocabulary } from '../../src/cli-help/roadmap-help.js';
 
 const SUBACTIONS = Object.keys(SUBACTION_SPECS);
 
+/** The summary text rendered on a subaction's own help row, or null if no row for
+ * `sub` carries trailing content. A row is `  <name>  <summary>` — the name at
+ * line-start (after indent) followed by ≥2 spaces then non-empty text. The `\s{2,}`
+ * gap means `add` does NOT match the `add-edge` row (after `add` comes `-`, not a
+ * space), so prefix-overlapping names are disambiguated. */
+function summaryRowFor(helpText: string, sub: string): string | null {
+  const escaped = sub.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = new RegExp(`^\\s+${escaped}\\s{2,}(\\S.*)$`, 'm').exec(helpText);
+  return m ? m[1]!.trim() : null;
+}
+
 describe('027 T007 — roadmap --help lists every subaction + summary (exit 0)', () => {
   for (const flag of ['--help', '-h'] as const) {
-    it(`${flag} prints every subaction with a summary and exits 0`, () => {
+    it(`${flag} prints a per-subaction summary row for EVERY subaction and exits 0`, () => {
       const r = runCli(['roadmap', flag]);
       expect(r.status).toBe(0);
+      // Structural (AUDIT-20260619-13/-26 / TASK-274/287): assert ONE summary row
+      // per SUBACTION_SPECS key with non-empty trailing text — not broad substring
+      // checks against two hand-picked prose fragments (which pass even if most
+      // subactions are merely listed in a usage enum with no individual summary,
+      // and break when either fragment is reworded during normal maintenance).
       for (const sub of SUBACTIONS) {
-        expect(r.stdout).toContain(sub);
+        const summary = summaryRowFor(r.stdout, sub);
+        expect(summary, `summary row for '${sub}'`).not.toBeNull();
+        expect(summary!.length, `summary for '${sub}' is non-empty`).toBeGreaterThan(0);
       }
-      // A summary is present (at least one descriptive line beyond the names).
-      expect(r.stdout).toMatch(/list the ready/);
-      expect(r.stdout).toMatch(/dry-run unless --apply/);
     });
   }
 });
@@ -47,7 +62,15 @@ describe('027 T007 — roadmap (no subaction) prints the COMPLETE set (exit 2)',
 });
 
 describe('027 T007 — advance/add --help surface the status vocabulary (CHK014)', () => {
-  it('advance --help shows every status from the governed grammar (exit 0)', () => {
+  // AUDIT-20260619-23 (TASK-284): the worry is that advance --help could advertise
+  // statuses advance cannot accept. By construction it cannot: the `--to` vocabulary
+  // advance accepts and the vocabulary its help advertises are the SAME governed set
+  // (roadmapStatusVocabulary, sourced from the grammar — there is no per-subaction
+  // status SUBSET mechanism; advance is a general status setter). The test asserts
+  // that single source appears, so the help cannot drift to advertise a status the
+  // grammar does not define. If a subset is ever introduced, this is the test to
+  // re-derive from the advance-specific accepted set.
+  it('advance --help shows every status from the governed grammar (advance accepts the full set) (exit 0)', () => {
     const vocab = roadmapStatusVocabulary();
     expect(vocab.length).toBeGreaterThan(0);
     const r = runCli(['roadmap', 'advance', '--help']);

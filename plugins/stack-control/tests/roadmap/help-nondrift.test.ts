@@ -19,8 +19,8 @@
 // gap the cross-model audit-barrage flagged (check (3) was hand-coded for only
 // `advance`/`add`, so 10 of 12 subactions had no flag-acceptance coverage).
 
-import { describe, it, expect } from 'vitest';
-import { copyFileSync, mkdtempSync } from 'node:fs';
+import { describe, it, expect, afterEach } from 'vitest';
+import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCli } from '../../src/__tests__/_run-helpers.js';
@@ -28,8 +28,20 @@ import { SUBACTION_SPECS } from '../../src/subcommands/roadmap.js';
 import { flagNamesFor } from '../../src/cli-help/roadmap-help.js';
 import { fixturePath } from './helpers.js';
 
+// AUDIT-20260619-14 (TASK-275): `mkdtempSync` creates a fresh /tmp dir per call;
+// without cleanup the `roadmap-help-nondrift-*` dirs accumulate indefinitely
+// (slow disk-fill on shared CI runners). Track every dir this file creates and
+// remove them after each test.
+const createdDirs: string[] = [];
+afterEach(() => {
+  while (createdDirs.length > 0) {
+    rmSync(createdDirs.pop()!, { recursive: true, force: true });
+  }
+});
+
 function tmpChain(): string {
   const dir = mkdtempSync(join(tmpdir(), 'roadmap-help-nondrift-'));
+  createdDirs.push(dir);
   const docPath = join(dir, 'ROADMAP.md');
   copyFileSync(fixturePath('chain'), docPath);
   return docPath;
@@ -54,10 +66,21 @@ function tmpChain(): string {
  * thing that would catch it — but check (2) would pass on an empty set). The
  * optional `(?:-[A-Za-z], )?` prefix makes the gate measure the declared surface
  * under BOTH formatter styles while keeping prose flags excluded.
+ *
+ * Anchor (AUDIT-20260619-15/-22 / TASK-276/283): the match additionally requires a
+ * flag-TABLE continuation right after the `--long` token — either a value
+ * placeholder (` <…>` / ` […]`) OR a ≥2-space description-column gutter (the
+ * `${token.padEnd(col)}  ${desc}` shape roadmap-help renders). This is the
+ * structural feature that distinguishes a flag-table row from a bare `--token` that
+ * merely STARTS a line — e.g. an indented vocabulary enumeration (`    --planned`
+ * under a "valid values:" header) — which the prior line-start-only anchor would
+ * have miscounted as a "shown" flag, spuriously failing check (2). The
+ * `shownFlags is anchored to flag-TABLE rows` describe block below pins this against
+ * crafted multi-style snippets so the regex stays calibrated as the formatter evolves.
  */
 function shownFlags(helpText: string): Set<string> {
   const found = new Set<string>();
-  for (const m of helpText.matchAll(/^[ \t]*(?:-[A-Za-z], )?(--[a-z][a-z0-9-]*)/gm)) {
+  for (const m of helpText.matchAll(/^[ \t]*(?:-[A-Za-z], )?(--[a-z][a-z0-9-]*)(?= [<[]| {2,})/gm)) {
     found.add(m[1]!);
   }
   return found;
@@ -107,6 +130,11 @@ describe('027 T006 — roadmap per-subaction help is non-drift vs the parser (CH
 interface ValidInvocation {
   readonly argv: readonly string[];
   readonly expectExit0: boolean;
+  /** For an `expectExit0: false` subaction, the POSITIVE exit-2 reason (a
+   * doc-resolution / validation phrase) proving the non-zero exit is NOT a flag
+   * rejection — stronger than merely negating an incomplete unknown-flag pattern
+   * (AUDIT-20260619-21 / TASK-282). Required when `expectExit0` is false. */
+  readonly failureReason?: RegExp;
 }
 
 const VALID_INVOCATION: Readonly<Record<string, ValidInvocation>> = {
@@ -116,9 +144,17 @@ const VALID_INVOCATION: Readonly<Record<string, ValidInvocation>> = {
   graph: { argv: [], expectExit0: true },
   // reconcile resolves spec paths against a `specs/` glob-parent dir; a bare tmp
   // chain copy has none, so it exits 2 (DocumentModelError) — NOT a flag
-  // rejection. The flag-acceptance half of check (3) still holds (no `--`-flag is
-  // unknown); the bogus-flag half still asserts exit-2 `unknown flag`.
-  reconcile: { argv: [], expectExit0: false },
+  // rejection. Its value flags (--unorphan/--type) ARE exercised here: they parse
+  // fine and the run still reaches the same doc-resolution failure (verified), so
+  // the flag-acceptance half of check (3) covers them while `expectExit0` stays
+  // false. The `failureReason` pins the doc-resolution phrase POSITIVELY (TASK-282)
+  // so the exit-2 cannot be silently a flag rejection masquerading as a resolution
+  // error, and the completeness guard sees --unorphan/--type exercised (TASK-281).
+  reconcile: {
+    argv: ['--unorphan', 'specs/x', '--type', 'feature'],
+    expectExit0: false,
+    failureReason: /glob-parent 'specs\//,
+  },
   blocks: { argv: ['design:feature/a'], expectExit0: true },
   add: {
     argv: [
@@ -211,8 +247,37 @@ function invocationFor(sub: string): ValidInvocation {
   return entry;
 }
 
+/** Whether stderr is an unknown-flag / unknown-subaction rejection. Case-insensitive
+ * with a word boundary (not a fixed trailing-space substring) so a re-capitalized or
+ * re-spaced diagnostic doesn't make this silently return false and mask a real flag
+ * rejection (AUDIT-20260619-21 / TASK-282). */
 function isUnknownFlagOrSubaction(stderr: string): boolean {
-  return /unknown flag /.test(stderr) || /unknown subaction /.test(stderr);
+  return /unknown (flag|subaction)\b/i.test(stderr);
+}
+
+/** The BOOLEAN flags a subaction's grammar declares — `flagNamesFor` minus `--doc`
+ * and the value/multi-value flags. Derived from the grammar so a newly-declared
+ * boolean flag is covered automatically (AUDIT-20260619-20 / TASK-281: `--apply` /
+ * `--clear` were listed in help but the acceptance check never exercised them). */
+function booleanFlagsFor(sub: string): readonly string[] {
+  const grammar = SUBACTION_SPECS[sub]!;
+  const valueLongs = new Set<string>([
+    '--doc',
+    ...grammar.valueFlags.map((f) => `--${f}`),
+    ...(grammar.multiValueFlags ?? []).map((f) => `--${f}`),
+  ]);
+  return flagNamesFor(grammar).filter((f) => !valueLongs.has(f));
+}
+
+/** The leading positional tokens of a fixture invocation (the id, before any flag).
+ * A minimal boolean-flag probe reuses these so the parser reaches flag validation. */
+function leadingPositionals(argv: readonly string[]): readonly string[] {
+  const out: string[] = [];
+  for (const tok of argv) {
+    if (tok.startsWith('-')) break;
+    out.push(tok);
+  }
+  return out;
 }
 
 describe('027 T006 — check (3): every shown flag is accepted; an unshown flag is rejected', () => {
@@ -222,12 +287,20 @@ describe('027 T006 — check (3): every shown flag is accepted; an unshown flag 
     it(`${sub}: the minimal valid invocation is accepted (no unknown-flag rejection)`, () => {
       const docPath = tmpChain();
       const r = runCli(['roadmap', sub, ...invocation.argv, '--doc', docPath]);
-      // Every flag the grammar declares (and thus the help shows) is passed in the
-      // fixture invocation; a parse-time unknown-flag rejection would prove drift.
+      // Every value-flag the grammar declares (and thus the help shows) is passed in
+      // the fixture invocation; a parse-time unknown-flag rejection would prove drift.
       expect(isUnknownFlagOrSubaction(r.stderr)).toBe(false);
       if (invocation.expectExit0) {
         // exit 0 dry-run proves every declared flag was accepted AND validated.
         expect(r.status).toBe(0);
+      } else {
+        // The weak-gate subaction exits 2 for a reason UNRELATED to flag acceptance;
+        // assert that reason POSITIVELY (TASK-282) rather than only negating an
+        // unknown-flag pattern, so a flag rejection can't slip through as a "doc
+        // resolution" failure.
+        expect(r.status).toBe(2);
+        expect(invocation.failureReason, `expectExit0:false '${sub}' must declare a failureReason`).toBeDefined();
+        expect(r.stderr).toMatch(invocation.failureReason!);
       }
     });
 
@@ -245,7 +318,80 @@ describe('027 T006 — check (3): every shown flag is accepted; an unshown flag 
   }
 });
 
-describe('027 T006 — anchored flag-acceptance spot checks (advance + add)', () => {
+// ── check (3b): boolean-flag acceptance ──────────────────────────────────────
+// check (3)'s minimal invocation exercises every VALUE flag, but the BOOLEAN flags
+// a subaction declares (`--apply`, and the mutually-exclusive markers `--clear` /
+// `--chain` / `--analyze-clean` / `--validated` / `--cascade`) can't all share one
+// argv, so several were listed in help yet never exercised for acceptance
+// (AUDIT-20260619-20 / TASK-281). Probe each declared boolean flag on its own: the
+// parser must ACCEPT it (no unknown-flag) — a downstream missing-required-value or
+// validation error is fine, it still proves the flag parsed.
+describe('027 T006 — check (3b): every declared boolean flag is accepted by the parser', () => {
+  for (const sub of SUBACTIONS) {
+    const positionals = leadingPositionals(invocationFor(sub).argv);
+    for (const boolFlag of booleanFlagsFor(sub)) {
+      it(`${sub}: declares ${boolFlag} and the parser accepts it (not an unknown-flag rejection)`, () => {
+        const docPath = tmpChain();
+        const r = runCli(['roadmap', sub, ...positionals, boolFlag, '--doc', docPath]);
+        expect(isUnknownFlagOrSubaction(r.stderr)).toBe(false);
+      });
+    }
+  }
+});
+
+describe('027 T006 — fixture completeness guards (no silently-unexercised flag)', () => {
+  it('every declared flag is exercised by check (3) value-argv or check (3b) boolean-probe', () => {
+    for (const sub of SUBACTIONS) {
+      const declared = flagNamesFor(SUBACTION_SPECS[sub]!).filter((f) => f !== '--doc');
+      const argvFlags = new Set(invocationFor(sub).argv.filter((t) => t.startsWith('--')));
+      const boolFlags = new Set(booleanFlagsFor(sub));
+      for (const flag of declared) {
+        const exercised = argvFlags.has(flag) || boolFlags.has(flag);
+        expect(exercised, `${sub}: declared flag ${flag} is exercised by the fixture argv or a boolean probe`).toBe(true);
+      }
+    }
+  });
+
+  // AUDIT-20260619-24 (TASK-285): `invocationFor` fails loud on a MISSING fixture;
+  // this is the symmetric guard against a PHANTOM fixture — a VALID_INVOCATION key
+  // for a subaction that no longer exists accumulates as a dead entry no loop
+  // exercises. Both directions are now enforced.
+  it('VALID_INVOCATION has no phantom entry for a removed subaction', () => {
+    for (const key of Object.keys(VALID_INVOCATION)) {
+      expect(SUBACTIONS, `VALID_INVOCATION key '${key}' is not a registered subaction`).toContain(key);
+    }
+  });
+});
+
+// AUDIT-20260619-15/-22 (TASK-276/283): pin `shownFlags` against crafted help-table
+// snippets — both the styles it MUST capture and the line-start `--token` shapes it
+// MUST exclude — so the regex stays calibrated as the formatter evolves.
+describe('027 T006 — shownFlags is anchored to flag-TABLE rows, not bare line-start --tokens', () => {
+  it('captures a plain `--long <arg>` row', () => {
+    expect([...shownFlags('  --doc <path>  the doc')]).toEqual(['--doc']);
+  });
+  it('captures a `-x, --long <arg>` two-column row', () => {
+    expect([...shownFlags('  -t, --to <status>  the target')]).toEqual(['--to']);
+  });
+  it('captures a boolean flag row (padded, no placeholder, ≥2-space gutter)', () => {
+    expect([...shownFlags('  --apply       write the change')]).toEqual(['--apply']);
+  });
+  it('EXCLUDES an indented vocabulary enumeration of --tokens (the AUDIT-15 false-positive)', () => {
+    expect([...shownFlags('valid values:\n    --planned\n    --in-flight\n')]).toEqual([]);
+  });
+  it('EXCLUDES a flag mentioned inline in prose, captures only the real row', () => {
+    expect([...shownFlags('run with --apply to write the change')]).toEqual([]);
+    expect([...shownFlags('  --to <status>  to (one of: planned, in-flight)')]).toEqual(['--to']);
+  });
+});
+
+// Anchored spot-checks: readable, hand-written EXAMPLES of the contract the
+// mechanical check (3)/(3b) loops enforce across every subaction. They are
+// illustrative, NOT the coverage source — full per-subaction acceptance lives in
+// check (3) (value flags) + check (3b) (boolean flags), and the completeness guard
+// proves no declared flag is unexercised (AUDIT-20260619-19/-25 / TASK-280/286: the
+// prior titles/comment overstated these as the acceptance coverage).
+describe('027 T006 — anchored flag-acceptance spot checks (advance + add, illustrative)', () => {
   it('advance: an undeclared --bogus is rejected (not in help) → exit 2', () => {
     const grammar = SUBACTION_SPECS.advance!;
     expect(flagNamesFor(grammar)).not.toContain('--bogus');
@@ -264,14 +410,16 @@ describe('027 T006 — anchored flag-acceptance spot checks (advance + add)', ()
     expect(r.status).toBe(0);
   });
 
-  it('add: the shown value-flags are all accepted by the parser', () => {
+  it('add: the three illustrated value-flags are shown AND accepted (full coverage is check (3)/(3b))', () => {
     const docPath = tmpChain();
     const help = runCli(['roadmap', 'add', '--help']);
     const shown = shownFlags(help.stdout);
-    // Assert the shown set and the exercised set are consistent: every flag we
-    // assert is shown is ALSO passed to the parser below (cross-model codex-02 +
-    // claude-04 — the prior version asserted --part-of was shown but never passed
-    // it, so the "is it accepted?" half of check (3) never exercised --part-of).
+    // The three flags asserted-shown here are also passed to the parser below. The
+    // REMAINING add flags (--depends-on, --deferred-until, --spec, --ref, --apply)
+    // are NOT a coverage gap: check (3) exercises every value flag via
+    // VALID_INVOCATION.add and check (3b) exercises --apply — do not delete those
+    // fixtures under the impression this illustrative spot-check covers them
+    // (AUDIT-20260619-25 / TASK-286).
     expect(shown.has('--status')).toBe(true);
     expect(shown.has('--scope')).toBe(true);
     expect(shown.has('--part-of')).toBe(true);

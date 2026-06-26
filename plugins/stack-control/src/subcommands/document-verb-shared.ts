@@ -47,6 +47,16 @@ export function failUsage(verb: string, message: string): never {
   process.exit(2);
 }
 
+/** The canonical unknown-subaction-flag diagnostic (the text after the `<verb>: `
+ * prefix). Single-sourced so the parser and its contract tests assert one builder
+ * rather than hand-copied literals that drift when the wording changes
+ * (AUDIT-20260619-06: a sibling test pinned this format as a literal while the
+ * adjacent hunk single-sourced the known-subaction list). `name` is the flag's
+ * bare long name (no dashes), e.g. `bogus` → `unknown flag --bogus for 'advance'`. */
+export function unknownSubactionFlagMessage(subaction: string, name: string): string {
+  return `unknown flag --${name} for '${subaction}'`;
+}
+
 /** Result of the generic subaction-verb flag scan. */
 export interface ScannedFlags {
   readonly doc: string;
@@ -210,11 +220,11 @@ export function validateSubactionFlags(
   if (grammar === undefined) return;
   const allowed = new Set(grammar.valueFlags);
   for (const name of flags.values.keys()) {
-    if (!allowed.has(name)) failUsage(verb, `unknown flag --${name} for '${subaction}'`);
+    if (!allowed.has(name)) failUsage(verb, unknownSubactionFlagMessage(subaction, name));
   }
   const allowedMulti = new Set(grammar.multiValueFlags ?? []);
   for (const name of flags.multiValues?.keys() ?? []) {
-    if (!allowedMulti.has(name)) failUsage(verb, `unknown flag --${name} for '${subaction}'`);
+    if (!allowedMulti.has(name)) failUsage(verb, unknownSubactionFlagMessage(subaction, name));
   }
   if (flags.apply && !grammar.apply) failUsage(verb, `--apply is not valid for '${subaction}'`);
   if (flags.clear === true && grammar.clear !== true) {

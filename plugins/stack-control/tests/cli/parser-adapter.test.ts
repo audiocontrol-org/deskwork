@@ -24,6 +24,7 @@ import {
 } from '../../src/cli-help/command-adapter.js';
 import { buildRoadmapCommand } from '../../src/subcommands/roadmap-command.js';
 import { KNOWN_SUBACTIONS } from '../../src/subcommands/roadmap.js';
+import { unknownSubactionFlagMessage } from '../../src/subcommands/document-verb-shared.js';
 import { runCli } from '../../src/__tests__/_run-helpers.js';
 import { fixturePath } from '../roadmap/helpers.js';
 
@@ -128,6 +129,13 @@ describe('027 T003 — mounted roadmap command preserves error shapes (contract 
     // arbitrary member (AUDIT-BARRAGE claude-03/codex-01 — avoid coupling to
     // 'reconcile' alone).
     expect(r.stderr).toContain(`(known: ${KNOWN_SUBACTIONS})`);
+    // Belt-and-suspenders (AUDIT-20260619-05 / TASK-268): the single-sourced check
+    // above is tautological for the LIST CONTENTS — a typo dropping a real
+    // subaction from KNOWN_SUBACTIONS changes both sides in lockstep and still
+    // passes. Independently pin one concrete real member so a missing-subaction
+    // regression in the operator-facing discovery list is caught here.
+    expect(KNOWN_SUBACTIONS).toContain('reconcile');
+    expect(r.stderr).toContain('reconcile');
     expect(r.stderr).not.toContain('unknown command'); // commander's shape must not leak
   });
 
@@ -135,10 +143,12 @@ describe('027 T003 — mounted roadmap command preserves error shapes (contract 
     const docPath = tmpChain();
     const r = runCli(['roadmap', 'advance', 'impl:feature/b', '--bogus', 'x', '--to', 'in-flight', '--doc', docPath, '--apply']);
     expect(r.status).toBe(2);
-    // Pin the discriminating flat-dispatcher diagnostic, not just the prefix
-    // (AUDIT-BARRAGE-claude-02 — the weak contains('roadmap:')+contains('bogus')
-    // would pass against a generic/echoed error).
-    expect(r.stderr).toContain("unknown flag --bogus for 'advance'");
+    // Pin the FULL prefixed diagnostic the test name promises (AUDIT-20260619-08 /
+    // TASK-271 — the prior assertion dropped the `roadmap:` prefix while the name
+    // still claimed to verify "the roadmap: message shape"), single-sourced from
+    // the production builder rather than a hand-copied literal (AUDIT-20260619-06 /
+    // TASK-269 — harmonizes with the known-list single-sourcing in the hunk above).
+    expect(r.stderr).toContain(`roadmap: ${unknownSubactionFlagMessage('advance', 'bogus')}`);
     expect(r.stderr).not.toContain('unknown option'); // commander's shape must not leak
   });
 
