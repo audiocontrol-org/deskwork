@@ -13,7 +13,12 @@ Burn-down plan for the stack-control backlog (the `.stack-control/backlog/` slus
   - **H1** (10) degraded quiet-section contract: stale comments/JSDoc + 3 diagnostic/annotation fixes + 3 test gaps — `901321a1`.
   - **H2** (7) payload-scaled liveness window (deriveLivenessWindowSeconds, lockstep with kill-cap) + reliability test hardening — `9303221b`. TASK-354 was already closed (dup of 324).
   - Backlog 131 → **104 open**.
-- **Remaining:** **H5** next (help-nondrift + descriptor test hardening — L), then H9→H10 → H8 → H11 → H12→H13 → H14→H20→H21→H22 → H17→H18→H19 → H15 → H16 → K1 keystone, + TASK-444. Burn order below.
+- **2026-06-26 (cont.) — H5 burned on `feature/stack-control-hygiene`, RED-first, unreleased:**
+  - **H5 production** (3) `3f84f610`: TASK-308 selfHandlesHelp descriptor field replaces the SELF_HELP_VERBS denylist (clean break); TASK-311 descriptor artifact carries `shortFlag`; TASK-309 inferChainPosition single-sources the `tasks.md` path via `artifactRelPath` (+ suppression-path coverage).
+  - **H5 test-hardening** (14) `83ead572`: parser-adapter error shapes (268 concrete-member, 271 `roadmap:` prefix, 269 single-sourced `unknownSubactionFlagMessage`); help-surface structural per-row summary (274/287) + explicit advance status-vocabulary contract (284); help-nondrift robustness (275 mkdtemp cleanup, 276/283 tightened+unit-tested `shownFlags` anchor, 281 check (3b) boolean-flag acceptance + completeness guard, 282 positive reconcile exit-2 reason, 285 phantom-entry guard, 280/286 honest spot-check titles/comment).
+  - **TASK-302 left OPEN** — re-verified still blocked on T013 (roadmap value-flags still carry empty commander descriptions; extending assertSurfaceComplete would throw for every roadmap flag). Correctly scoped into T013 (028 feature work), not this hygiene burn.
+  - Tests 2645 → **2705**; backlog 105 → **88 open** (17 H5 items closed; 302 deferred).
+- **Remaining:** **H9→H10** next, then H8 → H11 → H12→H13 → H14→H20→H21→H22 → H17→H18→H19 → H15 → H16 → K1 keystone, + TASK-444. Burn order below.
 
 Triage method: 149 open To-Do items triaged across 6 thematic slices via parallel sub-agents, cross-referenced against task bodies + specs + audit-logs. Re-verify each item's cited symbol/file before fixing — source moves.
 
@@ -45,7 +50,7 @@ AUDIT-MIGRATED hygiene (no gh; clustered by code surface) — **REMAINING:**
 - **H2 liveness/timeout payload-scaling + config assertions** — TASK-324(+354),329,330,328,319,320,321 — M
 - **H3 fleet floor-vs-outage split** — TASK-119,126,127 — S
 - **H4 fleet-knowledge schema/doctor** — TASK-77(+113) — S
-- **H5 help-nondrift + descriptor test hardening** — TASK-276(+283),280(+281,286),268(+282,269,271),274,275,284,285,287,302,308,309,311 — L
+- ~~**H5 help-nondrift + descriptor test hardening** — TASK-276(+283),280(+281,286),268(+282,269,271),274,275,284,285,287,308,309,311~~ ✅ `3f84f610`+`83ead572` (TASK-302 still OPEN — blocked on T013)
 - **H6 capability.ts reconcile/usage help** — TASK-167(+168,172) — S
 - **H7 cheap doc/comment-staleness sweep** — TASK-261,262,313,314,325,63 — S (zero-risk prose)
 - **H8 capability-mediation parser refactor** — TASK-163(+162) — L
