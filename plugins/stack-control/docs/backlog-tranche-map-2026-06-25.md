@@ -11,8 +11,9 @@ Burn-down plan for the stack-control backlog (the `.stack-control/backlog/` slus
   - **H3** (3) fleet floor-vs-outage single-sourced marker + recovery + contract test — `c1d380fa`.
   - **H4** (2) — **WONTFIX** (`TASK-113/77`): fleet-knowledge already scaffolded + setup-verified + fail-loud point-of-use validated; phase-checkpoints moot post-030; a doctor rule would only duplicate. — `4c…`.
   - **H1** (10) degraded quiet-section contract: stale comments/JSDoc + 3 diagnostic/annotation fixes + 3 test gaps — `901321a1`.
-  - Backlog 131 → **111 open**.
-- **Remaining:** **H2** next (liveness/timeout — note TASK-324/354 carry an operator-owned calibration decision), then H5 → H9→H10 → H8 → … → K1 keystone, + TASK-444. Burn order below.
+  - **H2** (7) payload-scaled liveness window (deriveLivenessWindowSeconds, lockstep with kill-cap) + reliability test hardening — `9303221b`. TASK-354 was already closed (dup of 324).
+  - Backlog 131 → **104 open**.
+- **Remaining:** **H5** next (help-nondrift + descriptor test hardening — L), then H9→H10 → H8 → H11 → H12→H13 → H14→H20→H21→H22 → H17→H18→H19 → H15 → H16 → K1 keystone, + TASK-444. Burn order below.
 
 Triage method: 149 open To-Do items triaged across 6 thematic slices via parallel sub-agents, cross-referenced against task bodies + specs + audit-logs. Re-verify each item's cited symbol/file before fixing — source moves.
 
