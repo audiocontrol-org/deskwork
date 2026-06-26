@@ -152,7 +152,7 @@ description: "Task list for portability — portable stack-control workflow acro
 
 **Purpose**: Final documentation, verification, and regression cleanup across all stories.
 
-- [X] T033 [P] Run the quickstart scenarios in `specs/017-portability/quickstart.md` and record results.
+- [X] T033 [P] Map each quickstart scenario in `specs/017-portability/quickstart.md` to its covering automated suite(s) (coverage mapping, not manual end-to-end execution — see the quickstart header note). Genuine manual-execution evidence is out of scope here and is recorded by running a scenario as written and replacing its `Coverage:` line.
 - [X] T034 [P] Update `CLAUDE.md` managed plan pointer and any active portability references once implementation planning is complete.
 - [X] T035 Review remaining Claude-only wording, host-coupled release/backlog references, or stale deprecated-workflow references in stack-control docs and remove or scope them deliberately.
 

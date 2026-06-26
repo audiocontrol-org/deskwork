@@ -7,8 +7,9 @@
 // commander's `any` into `unknown` (a widening that needs NO cast), and every
 // field is then narrowed through a typed `OptionReader`. A shape mismatch FAILS
 // LOUD with no silent coercion (Principle V); the ONE intentional default is
-// `booleanOption` mapping an absent flag to `false` (commander's boolean
-// convention) — documented on the reader, not a hidden fallback. A verb reads
+// `booleanOption` mapping an absent flag to `false` (commander leaves an absent
+// boolean `undefined`; this reader maps that to `false`) — documented on the
+// reader, not a hidden fallback. A verb reads
 // its parsed flags through these scalar readers into its own typed options
 // object, so handler code never touches `any`.
 //
@@ -40,8 +41,8 @@ export class CommandAdapterError extends Error {
  *
  * `optsWithGlobals()` (not `opts()`) so a parent/global flag — e.g. a universal
  * `--doc` a verb exposes on its parent command — is included in the full parsed
- * set rather than silently dropped as absent (AUDIT-BARRAGE-codex-02). For a
- * command with no parent globals it is identical to `opts()`.
+ * set rather than silently dropped as absent. For a command with no parent
+ * globals it is identical to `opts()`.
  */
 export function rawOpts(command: Command): Record<string, unknown> {
   const opts: Record<string, unknown> = command.optsWithGlobals();
