@@ -10,9 +10,9 @@
 
 import { dirname } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { activeCapabilities, enterFrontDoor, exitFrontDoor } from '../../capability/marker.js';
-import { mediateCheck } from '../../subcommands/mediate-check.js';
+import { enterFrontDoor, exitFrontDoor } from '../../capability/marker.js';
 import { diffSnapshots, snapshotTree } from '../_isolation-harness.js';
+import { runCli } from '../_run-helpers.js';
 import { FRONT_DOOR_STATE_REL, makeCapabilityFixture } from '../fixtures/capability-fixtures.js';
 
 /** The allowed write zone per FR-018: `<installation>/.stack-control/state/**` — the parent of
@@ -30,20 +30,29 @@ function isUnderStateRoot(entry: string): boolean {
 }
 
 describe('FR-018: mediation never writes to backend artifacts (026 T032)', () => {
-  it('mediate-check is pure-read — it reads a PRESENT marker (permits) yet changes nothing on disk', () => {
+  it('the mediate-check VERB is read-only — it resolves+reads a PRESENT marker (permits) yet writes nothing', () => {
     const fx = makeCapabilityFixture();
     try {
-      enterFrontDoor(fx.root, 's', 'backlog'); // a real marker exists, so the read path returns it
+      // Drive the REAL verb (not the pure core with an injected read-only resolver, which had
+      // no write path and so could never fail this — AUDIT-20260618-154). Its production
+      // resolver (findInstallation → activeCapabilities) DOES touch disk to read, so a
+      // "writes nothing" assertion over it is non-vacuous. Mark first so a MUTATING op permits.
+      const enter = runCli(
+        ['front-door', 'enter', '--capability', 'backlog', '--session', 's', '--at', fx.root],
+        { cwd: fx.root },
+      );
+      expect(enter.status, enter.stderr).toBe(0);
       const before = snapshotTree(fx.root); // snapshot AFTER the marker is written
-      const r = mediateCheck(['--surface', 'bash', '--identity', 'backlog list', '--session', 's'], {
-        resolveActive: (_at, session) => activeCapabilities(fx.root, session),
-      });
-      expect(r.code).toBe(0); // it READ the present marker → permit (proves the read path ran)
+      const r = runCli(
+        ['mediate-check', '--surface', 'bash', '--identity', 'backlog capture --type bug', '--session', 's', '--at', fx.root],
+        { cwd: fx.root },
+      );
+      expect(r.status, r.stderr).toBe(0); // permit — the real resolver READ the marker it found
       expect(diffSnapshots(before, snapshotTree(fx.root))).toEqual([]); // ...and created/modified/removed nothing
     } finally {
       fx.cleanup();
     }
-  });
+  }, 30_000);
 
   it('front-door enter/exit touches ONLY .stack-control/state/** — including the exit-time deletion', () => {
     const fx = makeCapabilityFixture();

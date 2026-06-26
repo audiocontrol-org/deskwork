@@ -32,7 +32,7 @@ export function resolveTsx(): string {
 
 export function runCli(
   args: string[],
-  opts?: { cwd?: string; env?: Record<string, string> },
+  opts?: { cwd?: string; env?: Record<string, string>; input?: string },
 ): SpawnSyncReturns<string> {
   return spawnSync(resolveTsx(), [CLI, ...args], {
     encoding: 'utf8',
@@ -40,5 +40,8 @@ export function runCli(
     // Merge over the inherited env when provided (e.g. STACKCTL_BACKLOG_DIR);
     // undefined → spawnSync inherits process.env unchanged (existing callers).
     env: opts?.env ? { ...process.env, ...opts.env } : undefined,
+    // Feed stdin when provided — the PreToolUse `intercept` verb reads its hook
+    // payload from stdin; undefined leaves stdin inherited (existing callers).
+    ...(opts?.input !== undefined ? { input: opts.input } : {}),
   });
 }

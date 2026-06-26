@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { decideMediation } from '../../capability/mediate.js';
 import { CAPABILITY_REGISTRY } from '../../capability/registry.js';
-import { interceptDecision } from '../../capability/intercept.js';
-import { mediateCheck } from '../../subcommands/mediate-check.js';
+import { runCli } from '../_run-helpers.js';
+import { makeCapabilityFixture } from '../fixtures/capability-fixtures.js';
 
 const CAP_DIR = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', 'capability');
 const CORE = ['mediate.ts', 'identity.ts', 'registry.ts', 'intercept.ts'];
@@ -49,36 +49,63 @@ describe('capability-not-vendor purity (026 T026, FR-006)', () => {
 });
 
 describe('cross-vendor parity (026 T028, SC-005)', () => {
-  // Each adapter's REAL entry path for a raw `backlog list`: the Claude adapter via
-  // interceptDecision (the PreToolUse hook core), the Codex adapter via the
-  // `stackctl mediate-check` VERB it invokes per the contract (interceptor-hook.md §
-  // Codex adapter — Bash-only, D8). Both must yield the same verdict + exit-code mapping.
-  // (The concrete Codex hook-registration config is the T027 live integration gate.)
-  it('the same raw Bash backend call refuses identically across the two adapter entry paths', () => {
-    // Use a MUTATING sub-action (`backlog capture`): mediation gates it, so the no-marker
-    // case refuses on both live paths. (`backlog list` is read-only and FR-050-exempt now —
-    // it would permit on both paths; covered by read-only-exemption-live.test.ts.)
-    const claude = interceptDecision(
-      { tool_name: 'Bash', tool_input: { command: 'backlog capture --type bug' }, session_id: 's', cwd: '/x' },
-      { resolveActive: () => new Set() },
-    );
-    const codex = mediateCheck(['--surface', 'bash', '--identity', 'backlog capture --type bug', '--session', 's'], {
-      resolveActive: () => new Set(),
-    });
-    expect(claude.verdict).toBe('refuse');
-    expect(codex.code).toBe(1); // refuse → exit 1
-    expect(codex.stderr).toContain(claude.reason); // identical registry-sourced redirect
-  });
+  // Each adapter's REAL CLI verb entry, driven as a subprocess against the SAME installation:
+  //   * Claude — `stackctl intercept`, reading a raw PreToolUse payload from stdin (the verb
+  //     bin/intercept dispatches to). Always exits 0; a refusal is the deny JSON on stdout.
+  //   * Codex — `stackctl mediate-check`, the argv verb its hook invokes per the contract
+  //     (interceptor-hook.md § Codex adapter — Bash-only, D8). Permit→exit 0, refuse→exit 1.
+  // Both must yield the same verdict + the same registry-sourced redirect reason. This drives
+  // the real verb boundaries (payload/argv parse + exit-code mapping), not the pure cores the
+  // prior test called directly (AUDIT-20260618-147). The payload→argv normalization a Codex
+  // hook config performs is the external T027 live-integration gate, outside this unit.
+  const CMD = 'backlog capture --type bug'; // MUTATING → mediation gates it, so the marker is load-bearing
 
-  it('a marked call permits identically across the two adapter entry paths', () => {
-    const claude = interceptDecision(
-      { tool_name: 'Bash', tool_input: { command: 'backlog list' }, session_id: 's', cwd: '/x' },
-      { resolveActive: () => new Set(['backlog']) },
-    );
-    const codex = mediateCheck(['--surface', 'bash', '--identity', 'backlog list', '--session', 's'], {
-      resolveActive: () => new Set(['backlog']),
-    });
-    expect(claude.verdict).toBe('permit');
-    expect(codex.code).toBe(0); // permit → exit 0
-  });
+  it('the same raw Bash backend call refuses identically across both adapters\' real verb entries', () => {
+    const fx = makeCapabilityFixture(); // a real installation, NO marker → both must refuse
+    try {
+      const claude = runCli(['intercept'], {
+        cwd: fx.root,
+        input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: CMD }, session_id: 'sess', cwd: fx.root }),
+      });
+      const codex = runCli(
+        ['mediate-check', '--surface', 'bash', '--identity', CMD, '--session', 'sess', '--json'],
+        { cwd: fx.root },
+      );
+      expect(claude.status, claude.stderr).toBe(0); // PreToolUse denies via stdout JSON, not exit code
+      const deny = JSON.parse(claude.stdout).hookSpecificOutput;
+      expect(deny.permissionDecision).toBe('deny');
+      expect(codex.status, codex.stderr).toBe(1); // refuse → exit 1
+      const codexDecision = JSON.parse(codex.stdout);
+      expect(codexDecision.verdict).toBe('refuse');
+      expect(deny.permissionDecisionReason).toBe(codexDecision.reason); // identical registry-sourced redirect
+    } finally {
+      fx.cleanup();
+    }
+  }, 30_000);
+
+  it('a marked call permits identically across both adapters\' real verb entries', () => {
+    const fx = makeCapabilityFixture();
+    try {
+      // Mark the session for the `backlog` capability via the real front-door verb.
+      const enter = runCli(
+        ['front-door', 'enter', '--capability', 'backlog', '--session', 'sess', '--at', fx.root],
+        { cwd: fx.root },
+      );
+      expect(enter.status, enter.stderr).toBe(0);
+      const claude = runCli(['intercept'], {
+        cwd: fx.root,
+        input: JSON.stringify({ tool_name: 'Bash', tool_input: { command: CMD }, session_id: 'sess', cwd: fx.root }),
+      });
+      const codex = runCli(
+        ['mediate-check', '--surface', 'bash', '--identity', CMD, '--session', 'sess', '--json'],
+        { cwd: fx.root },
+      );
+      expect(claude.status, claude.stderr).toBe(0);
+      expect(claude.stdout.trim()).toBe(''); // permit → no deny output
+      expect(codex.status, codex.stderr).toBe(0); // permit → exit 0
+      expect(JSON.parse(codex.stdout).verdict).toBe('permit');
+    } finally {
+      fx.cleanup();
+    }
+  }, 30_000);
 });
