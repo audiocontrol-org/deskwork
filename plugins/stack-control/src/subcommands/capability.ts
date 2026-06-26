@@ -2,12 +2,17 @@
 // discovery: surfaces each capability's interface, mediated identities, and policies
 // from the ONE registry (FR-012) — the capability API IS this listing, and a new backend
 // is a registry entry, not new adapter code. Pure core (`capability`) returns a result
-// (hermetically testable); `runCapabilityCli` does the process I/O + exit. (Phase 5 adds
-// the `reconcile` subaction in its own module to keep this file's phase scope stable.)
+// (hermetically testable); `runCapabilityCli` does the process I/O + exit. The sibling
+// `reconcile` subaction (US3 backstop) lives in its own module (`capability-reconcile.ts`)
+// and is dispatched by `cli.ts`; this USAGE advertises it so the verb's own help surface
+// stays complete.
 
 import { CAPABILITY_REGISTRY, redirectFor, type Capability } from '../capability/registry.js';
 
-const USAGE = 'usage: stackctl capability <list> [--json]';
+// Enumerated-subaction usage (matching the front-door convention) — advertises BOTH the
+// `list` discovery verb and the `reconcile` backstop so neither is invisible from this
+// surface (the only place the error output appears, via `usageErr`).
+const USAGE = 'usage: stackctl capability <list [--json] | reconcile [--at <dir>] [--json]>';
 
 export interface CapabilityResult {
   readonly code: 0 | 2;
@@ -39,7 +44,10 @@ function renderHuman(cap: Capability): string {
  *  (it IS the API spec, FR-012); the default is a human-readable table. */
 export function capability(args: readonly string[]): CapabilityResult {
   const sub = args[0];
-  if (sub !== 'list') return usageErr(`subaction must be 'list' (got '${sub ?? ''}')`);
+  // `reconcile` is a real sibling subaction routed by cli.ts before this core is reached;
+  // the error names both so a bare/typo invocation discovers it (it never claims `list` is
+  // the only one). The USAGE string appended by usageErr enumerates the full set.
+  if (sub !== 'list') return usageErr(`unknown subaction '${sub ?? ''}' (expected 'list' or 'reconcile')`);
 
   let json = false;
   for (let i = 1; i < args.length; i++) {

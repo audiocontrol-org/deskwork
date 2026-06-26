@@ -48,4 +48,22 @@ describe('capability list (026 T019)', () => {
     expect(capability(['list', '--nope']).code).toBe(2);
     expect(capability([]).code).toBe(2);
   });
+
+  // H6 — TASK-167/172: the verb's own usage surface must advertise BOTH subactions
+  // (`list` AND the US3 `reconcile` backstop), so an agent doing unattended discovery
+  // via the error output never concludes `list` is the only subaction.
+  it('surfaces both subactions (list AND reconcile) on a bare or unknown invocation', () => {
+    for (const args of [[], ['bogus']]) {
+      const r = capability(args);
+      expect(r.code).toBe(2);
+      expect(r.stderr).toContain('list');
+      expect(r.stderr).toContain('reconcile');
+    }
+  });
+
+  // H6 — TASK-167: the literal subaction keyword must not be rendered as a single
+  // angle-bracket placeholder (`<list>`), which reads as "supply a value here".
+  it('does not render the literal `list` subaction as a placeholder', () => {
+    expect(capability([]).stderr).not.toContain('<list>');
+  });
 });
