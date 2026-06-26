@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-06-20 08:27'
-updated_date: '2026-06-25 19:19'
+updated_date: '2026-06-26 01:56'
 labels:
   - 'type:migrated-finding'
   - 'feature:029-govern-operability'
@@ -22,4 +22,6 @@ ordinal: 339000
 
 <!-- SECTION:NOTES:BEGIN -->
 Closed: Duplicate of TASK-356 (one renderQuietSection render->parse integration test; 356 is the cross-model version carrying the concrete assertion).
+
+Closed: Fixed in 901321a1 (H1 degraded quiet-section contract)
 <!-- SECTION:NOTES:END -->

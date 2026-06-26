@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-06-20 08:27'
-updated_date: '2026-06-25 19:19'
+updated_date: '2026-06-26 01:56'
 labels:
   - 'type:migrated-finding'
   - 'feature:029-govern-operability'
@@ -22,4 +22,6 @@ ordinal: 340000
 
 <!-- SECTION:NOTES:BEGIN -->
 Closed: Duplicate of TASK-351 (one stale-comment/JSDoc sync across audit-barrage-lift-render + audit-barrage-lift; 351 names both surfaces).
+
+Closed: Fixed in 901321a1 (H1 degraded quiet-section contract)
 <!-- SECTION:NOTES:END -->
