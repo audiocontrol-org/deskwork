@@ -18,7 +18,11 @@ Burn-down plan for the stack-control backlog (the `.stack-control/backlog/` slus
   - **H5 test-hardening** (14) `83ead572`: parser-adapter error shapes (268 concrete-member, 271 `roadmap:` prefix, 269 single-sourced `unknownSubactionFlagMessage`); help-surface structural per-row summary (274/287) + explicit advance status-vocabulary contract (284); help-nondrift robustness (275 mkdtemp cleanup, 276/283 tightened+unit-tested `shownFlags` anchor, 281 check (3b) boolean-flag acceptance + completeness guard, 282 positive reconcile exit-2 reason, 285 phantom-entry guard, 280/286 honest spot-check titles/comment).
   - **TASK-302 left OPEN** — re-verified still blocked on T013 (roadmap value-flags still carry empty commander descriptions; extending assertSurfaceComplete would throw for every roadmap flag). Correctly scoped into T013 (028 feature work), not this hygiene burn.
   - Tests 2645 → **2705**; backlog 105 → **88 open** (17 H5 items closed; 302 deferred).
-- **Remaining:** **H9→H10** next, then H8 → H11 → H12→H13 → H14→H20→H21→H22 → H17→H18→H19 → H15 → H16 → K1 keystone, + TASK-444. Burn order below.
+- **2026-06-26 (cont.) — H9 burned on `feature/stack-control-hygiene`, RED-first, unreleased:**
+  - **H9** (4) `b76eee6a`: no-backend-writes consolidated onto a shared content-hash, removal-aware snapshot primitive — new `snapshotTree(root, exemptRel)` in `_isolation-harness.ts` (content-sha1, dir-aware); `snapshotOutsideInstallation` delegates to it (all 13 isolation-probe importers gain same-size-edit detection for free); the divergent `listFiles`/`changed` deleted; exit-time marker removal now exercises the removal-aware diff; new `isolation-harness-snapshot.test.ts` pins the deletion + same-size-same-mtime blind spots. TASK-230/234/236/238.
+  - **Code review** surfaced + captured **TASK-456** (3 other test files still carry their own `size:mtime` snapshot copies — out-of-scope follow-up sweep); refuted a "same-size edit untested" finding (pinned by the new harness unit test); softened an overstated doc claim.
+  - Tests 2705 → **2709**; backlog 89 → **86 open** (4 H9 closed; TASK-456 newly filed; net −3).
+- **Remaining:** **H10** next, then H8 → H11 → H12→H13 → H14→H20→H21→H22 → H17→H18→H19 → H15 → H16 → K1 keystone, + TASK-444 (+ TASK-456 snapshot-copy sweep). Burn order below.
 
 Triage method: 149 open To-Do items triaged across 6 thematic slices via parallel sub-agents, cross-referenced against task bodies + specs + audit-logs. Re-verify each item's cited symbol/file before fixing — source moves.
 
@@ -54,7 +58,7 @@ AUDIT-MIGRATED hygiene (no gh; clustered by code surface) — **REMAINING:**
 - **H6 capability.ts reconcile/usage help** — TASK-167(+168,172) — S
 - **H7 cheap doc/comment-staleness sweep** — TASK-261,262,313,314,325,63 — S (zero-risk prose)
 - **H8 capability-mediation parser refactor** — TASK-163(+162) — L
-- **H9 no-backend-writes harness rewrite** — TASK-230(+234,236,238) — M
+- ~~**H9 no-backend-writes harness rewrite** — TASK-230(+234,236,238)~~ ✅ `b76eee6a` (consolidated onto shared content-hash `snapshotTree`; TASK-456 follow-up filed for the other size:mtime copies)
 - **H10 mediate-check test-surface rewiring** — TASK-235(+240,237),228 — M
 - **H11 front-door marker hygiene + linchpin spike** — TASK-164(spike),165,243,239,218,220 — M
 - **H12 fence-grammar CommonMark hardening** — TASK-406(+420),17,402(+404) — M
