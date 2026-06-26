@@ -126,6 +126,14 @@ describe('deriveLivenessWindowSeconds — payload-scaled watchdog window', () =>
     expect(deriveLivenessWindowSeconds(WINDOW, basis)).toBeGreaterThanOrEqual(300);
   });
 
+  it('never lets the scaled window exceed the kill-cap (the watchdog must still pre-empt a hang)', () => {
+    // Code review: the loader does NOT enforce window < floor, so a config whose base
+    // window is >= floor would, after scaling, push the window past the kill-cap and the
+    // liveness watchdog could never fire before the hard timeout (FR-008 lost). Clamp it.
+    const basis = deriveTimeoutBasis(lane({ timeoutFloorSeconds: 420 }), 80 * 1024); // effective 1040
+    expect(deriveLivenessWindowSeconds(500, basis)).toBeLessThanOrEqual(basis.effectiveTimeoutSeconds);
+  });
+
   it('leaves an operator override window unscaled (operator owns that budget)', () => {
     const basis = deriveTimeoutBasis(lane({ timeoutSeconds: 500 }), 80 * 1024);
     expect(basis.mode).toBe('override');

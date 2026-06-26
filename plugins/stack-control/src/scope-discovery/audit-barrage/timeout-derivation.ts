@@ -71,8 +71,17 @@ export function deriveTimeoutBasis(
  * same regression the 300 s floor replaced at 60 s. Scaling the window by the SAME ratio
  * the kill-cap scaled (`effectiveTimeout / floor`, ≥ 1) preserves the calibrated margin at
  * every payload size with NO new calibration constant. A floor-bound (small) payload leaves
- * the window at its configured value; an operator `override` timeout has no floor to scale
- * against, so the configured window is kept verbatim (the operator owns that budget).
+ * the window at its configured value.
+ *
+ * Two edges (code review):
+ *  - An operator `override` timeout has no floor to scale against, so the configured window
+ *    is kept verbatim. KNOWN LIMITATION (TASK-454): a monitored override lane on a large
+ *    payload can still false-kill at the fixed window — the override sets the kill-cap, not
+ *    the silence detector. A proper override-window scale needs its own basis; tracked, not
+ *    silently fixed here.
+ *  - The scaled window is CLAMPED to the kill-cap. The loader does not enforce
+ *    `window < floor`, so without the clamp a config with `window >= floor` would scale the
+ *    window past the timeout and the watchdog could never pre-empt a true hang (FR-008 lost).
  */
 export function deriveLivenessWindowSeconds(
   configuredWindowSeconds: number,
@@ -83,5 +92,7 @@ export function deriveLivenessWindowSeconds(
     return configuredWindowSeconds;
   }
   const scale = basis.effectiveTimeoutSeconds / floor; // ≥ 1 (effective = max(floor, derived))
-  return Math.ceil(configuredWindowSeconds * scale);
+  const scaled = Math.ceil(configuredWindowSeconds * scale);
+  // Never exceed the kill-cap — a window past the timeout makes the watchdog dead code.
+  return Math.min(scaled, basis.effectiveTimeoutSeconds);
 }
