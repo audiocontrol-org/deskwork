@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-06-14 18:32'
-updated_date: '2026-06-25 19:19'
+updated_date: '2026-06-26 01:46'
 labels:
   - 'type:migrated-finding'
   - 'feature:audit-protocol-friction-burndown'
@@ -28,4 +28,6 @@ Re-scoped 2026-06-22: phase-checkpoints artifact cited in original finding was d
 
 <!-- SECTION:NOTES:BEGIN -->
 Closed: Duplicate of TASK-77 (same fleet-knowledge.yaml missing doctor/schema/migration surface; TASK-77 names 113 as the dup candidate).
+
+Closed: WONTFIX (already-addressed): fleet-knowledge.yaml is scaffolded + setup-verified (scaffold.ts / verify.ts:verifyFleetKnowledge) and comprehensively fail-loud-validated at point-of-use in readFleetKnowledge (D6 oracle). Phase-checkpoints half moot post-030. A separate doctor rule would only duplicate existing validation; no migration needed (stale shape fails loud).
 <!-- SECTION:NOTES:END -->
