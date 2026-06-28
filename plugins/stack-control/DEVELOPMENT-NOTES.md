@@ -2,6 +2,60 @@
 
 ---
 
+## 2026-06-28: author 033 model-sized-dispatch spec via extend; pivot to adopt-superpowers
+
+**Goal:** Orchestrator session. Drive `specs/033-model-sized-dispatch` through the
+`/stack-control:extend` front door to a runnable state (spec → plan → tasks), starting from the
+already-authored spec + checklists.
+
+**Accomplished:**
+- Resolved the extend flow front-to-back: front-door completeness gate → `spec-check` → set the
+  `spec-definition` front-door marker → `/speckit-plan` → `/speckit-tasks` → marker exit clean.
+  Final state `spec=yes plan=yes tasks=yes`, **execute-check runnable**.
+- **Investigated the superpowers execution skills** (`subagent-driven-development`,
+  `dispatching-parallel-agents`, `executing-plans`, v6.0.3) on operator request and produced a
+  fit assessment against 033's requirements.
+- **Reshaped 033 on two operator decisions** (adopt superpowers' stance as-is; backend-agnostic
+  thin tier layer) — rewrote spec.md (3 user stories, 13 FRs, 6 SCs) and fully realigned plan.md,
+  research.md (7 decisions), data-model.md, contracts (slimmed to `resolve-tiers-verb` +
+  `tier-map-config`; deleted the engine/graph/workflow-driver contracts), quickstart.md, and a
+  29-task TDD-first tasks.md that dogfoods its own `[tier:]` convention.
+- Committed the spec authoring (`03be3877`); left implementation to a separate worktree/session
+  per the orchestrator boundary.
+
+**Didn't Work:**
+- **session-end push failed (exit 3)** — the journal committed locally (`be37ca53`) but `git push`
+  failed; record is safe, push retried separately. (Captured as friction below.)
+
+**Course Corrections:**
+- **[SCOPE]** The operator opened the superpowers question (*"if it meets our needs, we might just
+  want to use it"*) mid-Phase-1 of the plan. Pausing to investigate before finishing the build
+  plan was correct — the answer (superpowers is judgment-driven prose, no mechanical engine, and
+  deliberately serial) drove a major scope decision that collapsed 033 from a from-scratch DAG/tier
+  engine to a thin declarative-tier layer. Two `AskUserQuestion` rounds settled the direction
+  rather than guessing.
+
+**Insights:**
+- **Superpowers validated the *idea*, not a drop-in.** Its SDD "Model Selection" section is exactly
+  033's right-sizing thesis — but as advice a judgment-driven controller follows, not a mechanism.
+  033's durable contribution is making that advice **declarative + fail-loud** (the `[tier:]` tag +
+  `tier_map` + `resolve-tiers` gate). That framing is squarely the stack-control thesis: mechanize
+  what a tool leaves to agent diligence.
+- **Superpowers' serial-to-avoid-conflicts design is an implicit warning** about 033's original
+  shared-tree parallelism — which is *why* the mechanical wave engine rightly stays in specs/002.
+  "Adopt the stance as-is" sidesteps the risk by deferring scheduling to controller judgment.
+- The extend front door + per-step `spec-check` made the mid-flow spec rewrite clean: edit spec →
+  re-plan → re-tasks, each verified, no drift.
+
+**Quantitative (auto-derived from git; reconciled):**
+- Commits: **2** — `03be3877` (033 spec authoring, 10 files) + `be37ca53` (this session-end
+  journal). Auto-derive reported 1 (the journal commit post-dates the `git log` boundary).
+- Files changed: 10 (spec authoring) + the journal.
+- Corrections: 1 operator-initiated scope pivot (superpowers investigation → adopt-superpowers); 0 self.
+- Backlog touched: none (no backlog items referenced this session).
+- Spec state at close: `spec=yes plan=yes tasks=yes`, execute-check runnable; no implementation
+  (orchestrator session).
+
 ## 2026-06-25: hygiene burndown — issue-backed point-fixes shipped + released as v0.55.2
 
 **Goal:** Pick up the triaged backlog from the orchestrator/bookkeeping session and **burn the issue-backed point-fix tranche** in the agreed order (G1 → P2 → P3 → P4 → P1 → P5), then ship it: PR → merge → `/release` → update + validate the installed plugin → close the friction issues. This is the implementation session for the imported friction issues (gh-499/500/501/502/505/506).
