@@ -8,8 +8,9 @@
 import { readFileSync } from 'node:fs';
 import { parse as parseYaml } from 'yaml';
 import { errorMessage, isPlainObject } from '../scope-discovery/util/typeguards.js';
+import { ACCEPTED_MODELS_LABEL, isAcceptedModel } from '../execute/accepted-models.js';
 import { InstallationError } from './errors.js';
-import type { InstallationConfig, InstallationPaths } from './types.js';
+import type { InstallationConfig, InstallationPaths, TierMap } from './types.js';
 
 const FEATURE_PLACEHOLDER = '{feature}';
 
@@ -21,7 +22,7 @@ const FEATURE_PLACEHOLDER = '{feature}';
 const SUPPORTED_VERSIONS: ReadonlySet<number> = new Set([1]);
 
 /** Known top-level keys (wire/snake form). Anything else fails loud. */
-const KNOWN_TOP_LEVEL = new Set(['version', 'base_dir', 'paths']);
+const KNOWN_TOP_LEVEL = new Set(['version', 'base_dir', 'paths', 'tier_map']);
 
 /** Known `paths.*` keys (wire/snake form) → in-memory camelCase key. */
 const PATHS_KEY_MAP: ReadonlyMap<string, keyof InstallationPaths> = new Map([
@@ -80,7 +81,42 @@ export function parseInstallationConfig(body: string, sourceLabel: string): Inst
     config.paths = parsePaths(parsed['paths'], sourceLabel);
   }
 
+  if (parsed['tier_map'] !== undefined) {
+    config.tierMap = parseTierMap(parsed['tier_map'], sourceLabel);
+  }
+
   return config;
+}
+
+/**
+ * Parse + validate the additive `tier_map` section (033), mirroring `parsePaths`:
+ * fail-loud, no silent ignore. Per contracts/tier-map-config.md — keys are
+ * operator-chosen tier labels, values are model keywords in the dispatch surface's
+ * accepted-model set (Principle V / FR-007 / FR-008). The value-membership check
+ * consults the accepted-model capability constant (D4) — the one model-vocabulary
+ * source — so a different host's set requires no edit here.
+ */
+function parseTierMap(raw: unknown, sourceLabel: string): TierMap {
+  if (!isPlainObject(raw)) {
+    throw fail(sourceLabel, 'tier_map must be a mapping');
+  }
+  const out: Record<string, string> = {};
+  for (const [label, value] of Object.entries(raw)) {
+    if (label.length === 0) {
+      throw fail(sourceLabel, 'tier_map has an empty tier label');
+    }
+    if (typeof value !== 'string' || value.length === 0) {
+      throw fail(sourceLabel, `tier_map[${label}] must be a non-empty model keyword (got ${describe(value)})`);
+    }
+    if (!isAcceptedModel(value)) {
+      throw fail(
+        sourceLabel,
+        `tier_map[${label}] = '${value}' is not an accepted model (${ACCEPTED_MODELS_LABEL})`,
+      );
+    }
+    out[label] = value;
+  }
+  return out;
 }
 
 function parsePaths(raw: unknown, sourceLabel: string): InstallationPaths {

@@ -22,8 +22,8 @@ Do **NOT** build a dependency-DAG scheduler, cycle detector, wave engine, Execut
 **Goal**: fixtures + scaffolding for the TDD floor.
 **Independent test**: the fixtures load; the test dir is wired into vitest.
 
-- [ ] T001 [P] [tier:fast] Create test-fixtures scaffolding: a sample tiered `tasks.md`, a valid `tier_map` config, and an out-of-range/malformed `tier_map` config — under `src/__tests__/execute/fixtures/`
-- [ ] T002 [P] [tier:fast] Create the `src/execute/` module dir and `src/__tests__/execute/` test dir wired into the existing vitest config
+- [x] T001 [P] [tier:fast] Create test-fixtures scaffolding: a sample tiered `tasks.md`, a valid `tier_map` config, and an out-of-range/malformed `tier_map` config — under `src/__tests__/execute/fixtures/`
+- [x] T002 [P] [tier:fast] Create the `src/execute/` module dir and `src/__tests__/execute/` test dir wired into the existing vitest config
 
 **Checkpoint**: fixtures present; empty test dir runs clean.
 
@@ -34,12 +34,12 @@ Do **NOT** build a dependency-DAG scheduler, cycle detector, wave engine, Execut
 **Goal**: the `tier_map` config surface + the accepted-model capability constant exist and are fail-loud. BLOCKS tier resolution.
 **Independent test**: config-loader parses a valid `tier_map` and rejects malformed/out-of-range maps; the accepted-model constant is the single source of the host model vocabulary.
 
-- [ ] T003 [P] [tier:balanced] RED test: config-loader parses a valid `tier_map` (snake→camel `tierMap`) and surfaces it on `InstallationConfig` — in `src/__tests__/config/tier-map.test.ts` (FR-007, contracts/tier-map-config.md)
-- [ ] T004 [P] [tier:fast] RED test: config-loader rejects a non-mapping `tier_map`, an empty tier label, a non-string value, and a value outside the accepted-model set — same file (FR-008, Principle V)
-- [ ] T005 [tier:fast] RED test: accepted-model-set constant contains exactly the Claude Code subagent models and is consulted by validators — in `src/__tests__/execute/accepted-models.test.ts` (research D4)
-- [ ] T006 [tier:fast] Add `TierMap` type + `tierMap?` to `InstallationConfig` — in `src/config/types.ts` (data-model.md)
-- [ ] T007 [tier:balanced] Extend `src/config/config-loader.ts`: add `tier_map` to `KNOWN_TOP_LEVEL` + a `parseTierMap` helper (mirror `parsePaths`, fail-loud, model-set check) — makes T003/T004 GREEN
-- [ ] T008 [tier:fast] Add the accepted-model-set capability constant — in `src/execute/accepted-models.ts` — makes T005 GREEN
+- [x] T003 [P] [tier:balanced] RED test: config-loader parses a valid `tier_map` (snake→camel `tierMap`) and surfaces it on `InstallationConfig` — in `src/__tests__/config/tier-map.test.ts` (FR-007, contracts/tier-map-config.md)
+- [x] T004 [P] [tier:fast] RED test: config-loader rejects a non-mapping `tier_map`, an empty tier label, a non-string value, and a value outside the accepted-model set — same file (FR-008, Principle V)
+- [x] T005 [tier:fast] RED test: accepted-model-set constant contains exactly the Claude Code subagent models and is consulted by validators — in `src/__tests__/execute/accepted-models.test.ts` (research D4)
+- [x] T006 [tier:fast] Add `TierMap` type + `tierMap?` to `InstallationConfig` — in `src/config/types.ts` (data-model.md)
+- [x] T007 [tier:balanced] Extend `src/config/config-loader.ts`: add `tier_map` to `KNOWN_TOP_LEVEL` + a `parseTierMap` helper (mirror `parsePaths`, fail-loud, model-set check) — makes T003/T004 GREEN
+- [x] T008 [tier:fast] Add the accepted-model-set capability constant — in `src/execute/accepted-models.ts` — makes T005 GREEN
 
 **Checkpoint**: `tier_map` loads + validates fail-loud; accepted-model set is the one model-vocabulary source.
 
