@@ -2,6 +2,64 @@
 
 ---
 
+## 2026-06-28: bring 033 model-sized-dispatch on-rail via the design front door (off-rail → execute-ready)
+
+### Feature: model-sized-dispatch
+### Worktree: model-sized-dispatch (implementation session)
+
+**Goal:** Implementation session. Operator asked to "use the stack control front door" to execute
+`specs/033-model-sized-dispatch`. Drive the feature to a runnable/execute-ready state through the
+sanctioned front door.
+
+**Accomplished:**
+- **Diagnosed off-rail.** `/stack-control:execute`'s compass precondition refused (verdict
+  `off-rail`): `specs/033-model-sized-dispatch` was an **orphan spec dir** — fully authored
+  (spec/plan/tasks/contracts/checklists) but with **no roadmap node**. `roadmap reconcile`
+  confirmed it independently. The lifecycle had run inverted (spec authored before node/design).
+- **Walked it on-rail through the front door** (operator chose the design front door):
+  - **captured** `impl:feature/model-sized-dispatch` (`roadmap add`).
+  - **designing** — `/stack-control:design`: drove `superpowers:brainstorming` bent by the
+    stack-control house rules (capture-over-yagni, ≥2 alternatives, handoff-to-define,
+    anchored record). Wrote the design record retroactively capturing the operator's 2026-06-28
+    decisions (adopt-superpowers stance + thin declarative tier layer; 3 alternatives incl. 2
+    rejected). Operator **approved** → `design-approved` marker; **design-to-spec gate 7/7 met**.
+  - **specifying** — linked the existing spec (`workflow link-spec`); **orphan resolved (0)**.
+  - **implementing** — ran `/speckit-analyze` through the **mediated `extend` front door**
+    (spec-definition marker bracket). Analyze **clean** (0 CRITICAL / 0 HIGH, 100% FR+SC
+    coverage). Captured the two findings into the spec (capture-don't-cut): **U1** cross-host
+    explicit-model dispatch portability (Codex per-dispatch model selection unverified) as a new
+    Assumption; **C1** tier vocabulary "recommended, not canonical." Recorded `analyze-clean`.
+- **Execute compass now exit 0 (on-course).** Stopped at the execute gate per operator ("not
+  yet"). Served the design record over Tailscale (`python -m http.server`, bound 0.0.0.0) for
+  phone review; shut down after approval.
+
+**Didn't Work:**
+- Nothing broke. One genuine friction (captured below): the compass `off-rail` verdict's hint is
+  misleading.
+
+**Course Corrections:**
+- **[PROCESS]** Loaded `/stack-control:execute` first; it correctly refused off-rail. Pivoted to
+  capture → design rather than forcing execution. The compass gate did its job.
+- **[PROCESS]** Attempted a raw `/speckit-analyze`; the **026 PreToolUse interceptor refused it**
+  (analyze is mediated by the `spec-definition` capability) and redirected to `define`/`extend`.
+  Drove it through `/stack-control:extend` with the front-door marker bracket — mediation working
+  exactly as designed.
+
+**Insights:**
+- The front door's compass gates **cleanly corrected an inverted lifecycle** (spec-before-node):
+  off-rail refusal → capture → retroactive design record → orphan-resolve → analyze. No spec was
+  re-authored; the design record captured the design level the lifecycle had skipped.
+- **Capture-don't-cut earned its keep**: analyze surfaced a real knowably-implied edge (cross-host
+  per-dispatch model selection) that got folded into the spec as an open assumption rather than
+  silently deferred.
+
+**Quantitative (hand-reconciled — session-end ran before the lifecycle commit existed):**
+- Commits: 2 (`docs(033)` on-rail lifecycle + this `docs(session)` record)
+- Files changed: 6 (ROADMAP.md; spec.md; tasks.md; new design record; DEVELOPMENT-NOTES.md;
+  tooling-feedback.md)
+- Backlog touched: none
+- Corrections: 2 ([PROCESS] ×2 — both self-caught via tool gates, not operator)
+
 ## 2026-06-28: author 033 model-sized-dispatch spec via extend; pivot to adopt-superpowers
 
 **Goal:** Orchestrator session. Drive `specs/033-model-sized-dispatch` through the
