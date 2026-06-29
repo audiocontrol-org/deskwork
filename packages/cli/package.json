@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/cli",
-  "version": "0.55.2",
+  "version": "0.56.0",
   "type": "module",
   "description": "Editorial calendar + review CLI for the deskwork plugin",
   "homepage": "https://github.com/audiocontrol-org/deskwork#readme",
@@ -35,7 +35,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@deskwork/core": "0.55.2"
+    "@deskwork/core": "0.56.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
