@@ -13,6 +13,7 @@ import { renderSubActionHelp, renderVerbHelp } from './cli-help/render-help.js';
 import { setInstallationNoticeVerb } from './config/installation.js';
 import { runVersion } from './subcommands/version.js';
 import { runExecuteCheck } from './subcommands/execute-check.js';
+import { runResolveTiers } from './subcommands/resolve-tiers.js';
 import { runSpeckitGuard } from './subcommands/speckit-guard.js';
 import { runNoShortcutsAudit } from './subcommands/no-shortcuts-audit.js';
 import { runSpecCheck } from './subcommands/spec-check.js';
@@ -70,6 +71,9 @@ type Subcommand = (args: string[]) => Promise<void>;
 const SUBCOMMANDS: Record<string, Subcommand> = {
   version: runVersion,
   'execute-check': runExecuteCheck,
+  // Declarative per-task model-tier resolution (033 model-sized-dispatch) — the
+  // read-only, fail-loud pre-dispatch gate the /stack-control:execute skill runs first.
+  'resolve-tiers': runResolveTiers,
   // Speckit wrapper refusal/redirect (025 US4) — portable, cross-vendor.
   'speckit-guard': runSpeckitGuard,
   // No agent-offered shortcuts audit (025 US5) — phrase scan over shipped prompt surfaces.

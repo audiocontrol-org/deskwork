@@ -135,6 +135,9 @@ const INTERNAL_VERBS: ReadonlySet<string> = new Set([
   'execute-check',
   'front-door',
   'no-shortcuts-audit',
+  // 033: read-only computation fronted by the /stack-control:execute skill (like
+  // execute-check) — no standalone /stack-control:resolve-tiers skill by design.
+  'resolve-tiers',
   'release-check',
   'release-helper',
   'slush-findings',

@@ -50,13 +50,13 @@ Do **NOT** build a dependency-DAG scheduler, cycle detector, wave engine, Execut
 **Goal**: a valid tiered `tasks.md` + tier map resolves to a per-task `{id, tierLabel, model}` table via `stackctl resolve-tiers`. Closes the MVP.
 **Independent test**: `resolve-tiers --spec <fixture>` on a valid plan exits 0 and emits a `TierResolution` whose every task's `model` equals `tier_map[task.tierLabel]` and ∈ the accepted-model set (SC-001, quickstart Scenario 1).
 
-- [ ] T009 [P] [US1] [tier:balanced] RED test: `tasks-tier-parser` extracts `id`, `[tier:]` label, `body`, `done` from real `tasks.md` lines; ignores `[P]`/`[USn]`/phase headers; collects parse errors (dup id, missing id/body, empty `[tier:]`) — in `src/__tests__/execute/tasks-tier-parser.test.ts` (data-model.md TieredTask)
-- [ ] T010 [US1] [tier:balanced] Implement `tasks-tier-parser` — in `src/execute/tasks-tier-parser.ts` — makes T009 GREEN
-- [ ] T011 [P] [US1] [tier:balanced] RED test: `tier-resolution` resolves a label→model via the map + accepted-model set (happy path), returning `ResolvedModel` — in `src/__tests__/execute/tier-resolution.test.ts` (data-model.md TierResolution)
-- [ ] T012 [US1] [tier:balanced] Implement `tier-resolution` (pure `resolve(label?, map, accepted) → ResolvedModel | TierError`; collect-all entry point) — in `src/execute/tier-resolution.ts` — makes T011 GREEN
-- [ ] T013 [P] [US1] [tier:balanced] RED test: `resolve-tiers --spec <fixture>` on a valid plan exits 0, emits `TierResolution` JSON, every `model === tier_map[tierLabel]` (SC-001); strict arg parse rejects unknown flag/positional (exit 2) — in `src/__tests__/execute/resolve-tiers.test.ts` (contracts/resolve-tiers-verb.md)
-- [ ] T014 [US1] [tier:balanced] Implement the `resolve-tiers` verb (resolve installation+map, read tasks.md, parse, resolve, emit) — in `src/subcommands/resolve-tiers.ts` — makes T013 GREEN
-- [ ] T015 [US1] [tier:fast] Register `resolve-tiers` in `src/cli.ts` `SUBCOMMANDS` + a `--help` descriptor (keep `check-front-door` green)
+- [x] T009 [P] [US1] [tier:balanced] RED test: `tasks-tier-parser` extracts `id`, `[tier:]` label, `body`, `done` from real `tasks.md` lines; ignores `[P]`/`[USn]`/phase headers; collects parse errors (dup id, missing id/body, empty `[tier:]`) — in `src/__tests__/execute/tasks-tier-parser.test.ts` (data-model.md TieredTask)
+- [x] T010 [US1] [tier:balanced] Implement `tasks-tier-parser` — in `src/execute/tasks-tier-parser.ts` — makes T009 GREEN
+- [x] T011 [P] [US1] [tier:balanced] RED test: `tier-resolution` resolves a label→model via the map + accepted-model set (happy path), returning `ResolvedModel` — in `src/__tests__/execute/tier-resolution.test.ts` (data-model.md TierResolution)
+- [x] T012 [US1] [tier:balanced] Implement `tier-resolution` (pure `resolve(label?, map, accepted) → ResolvedModel | TierError`; collect-all entry point) — in `src/execute/tier-resolution.ts` — makes T011 GREEN
+- [x] T013 [P] [US1] [tier:balanced] RED test: `resolve-tiers --spec <fixture>` on a valid plan exits 0, emits `TierResolution` JSON, every `model === tier_map[tierLabel]` (SC-001); strict arg parse rejects unknown flag/positional (exit 2) — in `src/__tests__/execute/resolve-tiers.test.ts` (contracts/resolve-tiers-verb.md)
+- [x] T014 [US1] [tier:balanced] Implement the `resolve-tiers` verb (resolve installation+map, read tasks.md, parse, resolve, emit) — in `src/subcommands/resolve-tiers.ts` — makes T013 GREEN
+- [x] T015 [US1] [tier:fast] Register `resolve-tiers` in `src/cli.ts` `SUBCOMMANDS` + a `--help` descriptor (keep `check-front-door` green)
 
 **Checkpoint**: MVP — a valid tiered plan resolves end-to-end via the CLI; tiers drive models data-drivenly (SC-003 falls out — change the tag/map, re-run, model changes).
 
@@ -67,11 +67,11 @@ Do **NOT** build a dependency-DAG scheduler, cycle detector, wave engine, Execut
 **Goal**: every tier error (no tier, unknown tier, absent map for a tiered task) is named and reported together; no partial resolution; nothing dispatched.
 **Independent test**: `resolve-tiers` on a plan with mixed errors exits 1, stderr lists every error, stdout emits no resolution (SC-002, quickstart Scenarios 2–4).
 
-- [ ] T016 [P] [US2] [tier:fast] RED test: a no-tier task → `task <id> has no model tier declared`, exit 1, no resolution on stdout — `resolve-tiers.test.ts` (FR-004)
-- [ ] T017 [P] [US2] [tier:fast] RED test: an unknown-tier task → `task <id> declares unknown tier <label>`, exit 1 (FR-005)
-- [ ] T018 [P] [US2] [tier:fast] RED test: multiple distinct errors are ALL printed before exit (no first-error abort), zero tasks emitted (FR-006)
-- [ ] T019 [P] [US2] [tier:fast] RED test: a tiered task with no `tier_map` configured → `no tier_map configured; cannot resolve tier '<label>' for task <id>`, exit 1 (FR-008)
-- [ ] T020 [US2] [tier:powerful] Implement the collect-all fail-loud paths in `tier-resolution` + `resolve-tiers` (gather every TierError, exit 1, emit no partial) — makes T016–T019 GREEN
+- [x] T016 [P] [US2] [tier:fast] RED test: a no-tier task → `task <id> has no model tier declared`, exit 1, no resolution on stdout — `resolve-tiers.test.ts` (FR-004)
+- [x] T017 [P] [US2] [tier:fast] RED test: an unknown-tier task → `task <id> declares unknown tier <label>`, exit 1 (FR-005)
+- [x] T018 [P] [US2] [tier:fast] RED test: multiple distinct errors are ALL printed before exit (no first-error abort), zero tasks emitted (FR-006)
+- [x] T019 [P] [US2] [tier:fast] RED test: a tiered task with no `tier_map` configured → `no tier_map configured; cannot resolve tier '<label>' for task <id>`, exit 1 (FR-008)
+- [x] T020 [US2] [tier:powerful] Implement the collect-all fail-loud paths in `tier-resolution` + `resolve-tiers` (gather every TierError, exit 1, emit no partial) — makes T016–T019 GREEN
 
 **Checkpoint**: the pre-dispatch gate is fully fail-loud and complete-error-set (SC-002).
 
