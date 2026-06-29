@@ -71,11 +71,20 @@ describe('interceptor-loaded (028 T116; T7 / FR-035 / SC-007)', () => {
     expect(existsSync(INTERCEPT), 'bin/intercept must exist').toBe(true);
   });
 
-  it('registration: plugin.json auto-discovers hooks/hooks.json (manifest wiring)', () => {
+  it('registration: plugin.json does NOT redundantly reference the auto-loaded hooks/hooks.json', () => {
+    // Claude Code auto-loads the standard hooks/hooks.json from the plugin root. A
+    // manifest.hooks reference to that SAME file double-registers it → a "Duplicate
+    // hooks file detected" load error (regressed when CC began auto-loading; the
+    // manifest key was added under AUDIT-20260618-73 before that, when it was required).
+    // manifest.hooks must only reference ADDITIONAL hook files — none here — so the key
+    // must be ABSENT. The auto-load still wires the interceptor (the firing tests below
+    // exercise bin/intercept directly and are unaffected).
     const manifest: unknown = JSON.parse(readFileSync(PLUGIN_JSON, 'utf8'));
     expect(typeof manifest).toBe('object');
     const hooksRef = prop(manifest, 'hooks');
-    expect(hooksRef, 'plugin.json must reference hooks/hooks.json').toBe('./hooks/hooks.json');
+    expect(hooksRef, 'plugin.json must NOT reference the auto-loaded hooks/hooks.json').not.toBe(
+      './hooks/hooks.json',
+    );
   });
 
   it('firing: a fronted backend (Bash `backlog capture`) with NO marker emits deny', () => {
