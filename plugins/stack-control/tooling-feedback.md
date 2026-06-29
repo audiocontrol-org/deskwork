@@ -134,3 +134,6 @@
 
 ## session-end 2026-06-25
 - stackctl workflow compass requires a roadmap <item>; a backlog burn-down (point-fixes with no feature node) has no item to orient on, so 'use the compass to close out' has no target — closure for ad-hoc backlog/issue work happens via backlog done + gh issue close, not the roadmap compass/close path.
+
+## session-end 2026-06-29
+- compass 'off-rail' verdict prints '(off-rail; the front door creates the node)', but the design/execute compass preconditions REFUSE off-rail and direct to 'capture it first' — no front door creates the node. An off-rail spec needs a manual 'roadmap add' capture before /stack-control:design. The hint is misleading; either fix the message or have the design front door auto-capture the node on entry.

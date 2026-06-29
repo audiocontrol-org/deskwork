@@ -1,0 +1,4 @@
+version: 1
+tier_map:
+  fast: haiku
+  powerful: gpt-9000

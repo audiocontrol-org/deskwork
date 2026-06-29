@@ -2,6 +2,118 @@
 
 ---
 
+## 2026-06-28: bring 033 model-sized-dispatch on-rail via the design front door (off-rail → execute-ready)
+
+### Feature: model-sized-dispatch
+### Worktree: model-sized-dispatch (implementation session)
+
+**Goal:** Implementation session. Operator asked to "use the stack control front door" to execute
+`specs/033-model-sized-dispatch`. Drive the feature to a runnable/execute-ready state through the
+sanctioned front door.
+
+**Accomplished:**
+- **Diagnosed off-rail.** `/stack-control:execute`'s compass precondition refused (verdict
+  `off-rail`): `specs/033-model-sized-dispatch` was an **orphan spec dir** — fully authored
+  (spec/plan/tasks/contracts/checklists) but with **no roadmap node**. `roadmap reconcile`
+  confirmed it independently. The lifecycle had run inverted (spec authored before node/design).
+- **Walked it on-rail through the front door** (operator chose the design front door):
+  - **captured** `impl:feature/model-sized-dispatch` (`roadmap add`).
+  - **designing** — `/stack-control:design`: drove `superpowers:brainstorming` bent by the
+    stack-control house rules (capture-over-yagni, ≥2 alternatives, handoff-to-define,
+    anchored record). Wrote the design record retroactively capturing the operator's 2026-06-28
+    decisions (adopt-superpowers stance + thin declarative tier layer; 3 alternatives incl. 2
+    rejected). Operator **approved** → `design-approved` marker; **design-to-spec gate 7/7 met**.
+  - **specifying** — linked the existing spec (`workflow link-spec`); **orphan resolved (0)**.
+  - **implementing** — ran `/speckit-analyze` through the **mediated `extend` front door**
+    (spec-definition marker bracket). Analyze **clean** (0 CRITICAL / 0 HIGH, 100% FR+SC
+    coverage). Captured the two findings into the spec (capture-don't-cut): **U1** cross-host
+    explicit-model dispatch portability (Codex per-dispatch model selection unverified) as a new
+    Assumption; **C1** tier vocabulary "recommended, not canonical." Recorded `analyze-clean`.
+- **Execute compass now exit 0 (on-course).** Stopped at the execute gate per operator ("not
+  yet"). Served the design record over Tailscale (`python -m http.server`, bound 0.0.0.0) for
+  phone review; shut down after approval.
+
+**Didn't Work:**
+- Nothing broke. One genuine friction (captured below): the compass `off-rail` verdict's hint is
+  misleading.
+
+**Course Corrections:**
+- **[PROCESS]** Loaded `/stack-control:execute` first; it correctly refused off-rail. Pivoted to
+  capture → design rather than forcing execution. The compass gate did its job.
+- **[PROCESS]** Attempted a raw `/speckit-analyze`; the **026 PreToolUse interceptor refused it**
+  (analyze is mediated by the `spec-definition` capability) and redirected to `define`/`extend`.
+  Drove it through `/stack-control:extend` with the front-door marker bracket — mediation working
+  exactly as designed.
+
+**Insights:**
+- The front door's compass gates **cleanly corrected an inverted lifecycle** (spec-before-node):
+  off-rail refusal → capture → retroactive design record → orphan-resolve → analyze. No spec was
+  re-authored; the design record captured the design level the lifecycle had skipped.
+- **Capture-don't-cut earned its keep**: analyze surfaced a real knowably-implied edge (cross-host
+  per-dispatch model selection) that got folded into the spec as an open assumption rather than
+  silently deferred.
+
+**Quantitative (hand-reconciled — session-end ran before the lifecycle commit existed):**
+- Commits: 2 (`docs(033)` on-rail lifecycle + this `docs(session)` record)
+- Files changed: 6 (ROADMAP.md; spec.md; tasks.md; new design record; DEVELOPMENT-NOTES.md;
+  tooling-feedback.md)
+- Backlog touched: none
+- Corrections: 2 ([PROCESS] ×2 — both self-caught via tool gates, not operator)
+
+## 2026-06-28: author 033 model-sized-dispatch spec via extend; pivot to adopt-superpowers
+
+**Goal:** Orchestrator session. Drive `specs/033-model-sized-dispatch` through the
+`/stack-control:extend` front door to a runnable state (spec → plan → tasks), starting from the
+already-authored spec + checklists.
+
+**Accomplished:**
+- Resolved the extend flow front-to-back: front-door completeness gate → `spec-check` → set the
+  `spec-definition` front-door marker → `/speckit-plan` → `/speckit-tasks` → marker exit clean.
+  Final state `spec=yes plan=yes tasks=yes`, **execute-check runnable**.
+- **Investigated the superpowers execution skills** (`subagent-driven-development`,
+  `dispatching-parallel-agents`, `executing-plans`, v6.0.3) on operator request and produced a
+  fit assessment against 033's requirements.
+- **Reshaped 033 on two operator decisions** (adopt superpowers' stance as-is; backend-agnostic
+  thin tier layer) — rewrote spec.md (3 user stories, 13 FRs, 6 SCs) and fully realigned plan.md,
+  research.md (7 decisions), data-model.md, contracts (slimmed to `resolve-tiers-verb` +
+  `tier-map-config`; deleted the engine/graph/workflow-driver contracts), quickstart.md, and a
+  29-task TDD-first tasks.md that dogfoods its own `[tier:]` convention.
+- Committed the spec authoring (`03be3877`); left implementation to a separate worktree/session
+  per the orchestrator boundary.
+
+**Didn't Work:**
+- **session-end push failed (exit 3)** — the journal committed locally (`be37ca53`) but `git push`
+  failed; record is safe, push retried separately. (Captured as friction below.)
+
+**Course Corrections:**
+- **[SCOPE]** The operator opened the superpowers question (*"if it meets our needs, we might just
+  want to use it"*) mid-Phase-1 of the plan. Pausing to investigate before finishing the build
+  plan was correct — the answer (superpowers is judgment-driven prose, no mechanical engine, and
+  deliberately serial) drove a major scope decision that collapsed 033 from a from-scratch DAG/tier
+  engine to a thin declarative-tier layer. Two `AskUserQuestion` rounds settled the direction
+  rather than guessing.
+
+**Insights:**
+- **Superpowers validated the *idea*, not a drop-in.** Its SDD "Model Selection" section is exactly
+  033's right-sizing thesis — but as advice a judgment-driven controller follows, not a mechanism.
+  033's durable contribution is making that advice **declarative + fail-loud** (the `[tier:]` tag +
+  `tier_map` + `resolve-tiers` gate). That framing is squarely the stack-control thesis: mechanize
+  what a tool leaves to agent diligence.
+- **Superpowers' serial-to-avoid-conflicts design is an implicit warning** about 033's original
+  shared-tree parallelism — which is *why* the mechanical wave engine rightly stays in specs/002.
+  "Adopt the stance as-is" sidesteps the risk by deferring scheduling to controller judgment.
+- The extend front door + per-step `spec-check` made the mid-flow spec rewrite clean: edit spec →
+  re-plan → re-tasks, each verified, no drift.
+
+**Quantitative (auto-derived from git; reconciled):**
+- Commits: **2** — `03be3877` (033 spec authoring, 10 files) + `be37ca53` (this session-end
+  journal). Auto-derive reported 1 (the journal commit post-dates the `git log` boundary).
+- Files changed: 10 (spec authoring) + the journal.
+- Corrections: 1 operator-initiated scope pivot (superpowers investigation → adopt-superpowers); 0 self.
+- Backlog touched: none (no backlog items referenced this session).
+- Spec state at close: `spec=yes plan=yes tasks=yes`, execute-check runnable; no implementation
+  (orchestrator session).
+
 ## 2026-06-25: hygiene burndown — issue-backed point-fixes shipped + released as v0.55.2
 
 **Goal:** Pick up the triaged backlog from the orchestrator/bookkeeping session and **burn the issue-backed point-fix tranche** in the agreed order (G1 → P2 → P3 → P4 → P1 → P5), then ship it: PR → merge → `/release` → update + validate the installed plugin → close the friction issues. This is the implementation session for the imported friction issues (gh-499/500/501/502/505/506).
@@ -2715,3 +2827,4 @@ workflow-mechanization centerpiece) and capture it durably as a design record.
 - Backlog: 11 → **21 items** (10 imported); spec 012 authored + runnable.
 - Tooling friction captured this session: **3** in `tooling-feedback.md` (import-all, TF-09 prereq, filename length) + the session-end boundary bug noted above.
 workflow(graduate): multi:feature/ship-stage merging -> validating
+workflow(graduate): impl:feature/model-sized-dispatch merging -> validating

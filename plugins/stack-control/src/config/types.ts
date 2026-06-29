@@ -50,6 +50,15 @@ export interface InstallationPaths {
   readonly cloneScope?: string;
 }
 
+/**
+ * Operator-configured tier label → model keyword map (033 model-sized-dispatch).
+ * Keys are free semantic tier labels (`fast`, `balanced`, `powerful`, …) declared
+ * by a task's `[tier:<label>]` tag — NEVER a model identifier (Principle III).
+ * Values are model keywords in the dispatch surface's accepted-model set (D4).
+ * Wire form is `tier_map`; in-memory is `tierMap`.
+ */
+export type TierMap = Readonly<Record<string, string>>;
+
 /** Parsed + validated `.stack-control/config.yaml` (in-memory, camelCase). */
 export interface InstallationConfig {
   /** Schema version — required positive integer; an unknown version fails loud. */
@@ -57,6 +66,9 @@ export interface InstallationConfig {
   /** Base for internal stores (backlog, program audit log); default `.stack-control`. */
   readonly baseDir?: string;
   readonly paths?: InstallationPaths;
+  /** Operator tier→model map (033). Optional; absent is not a load error (it
+   *  becomes a per-task `resolve-tiers` error only when a task declares a tier). */
+  readonly tierMap?: TierMap;
 }
 
 /** Each working-file key resolved to an absolute path (post-precedence). */

@@ -1,1 +1,7 @@
 version: 1
+# Dogfood tier_map (033 model-sized dispatch) — resolves this installation's own tiered
+# tasks.md. Recommended default vocabulary (see templates/tier-map.example.yaml); operator-open.
+tier_map:
+  fast: haiku
+  balanced: sonnet
+  powerful: opus

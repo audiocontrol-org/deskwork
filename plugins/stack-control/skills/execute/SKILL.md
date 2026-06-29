@@ -1,11 +1,11 @@
 ---
 name: execute
-description: "Run a Spec Kit spec via native /speckit-implement in-session, with deskwork governance firing automatically afterward (cross-model audit-barrage + finding lift)"
+description: "Run a Spec Kit spec by dispatching each task to a fresh, right-sized subagent at the model its declared [tier:] resolves to (model-sized dispatch), with deskwork governance firing automatically afterward (cross-model audit-barrage + finding lift)"
 ---
 
 # /stack-control:execute
 
-Run a Spec Kit spec through **native** `/speckit-implement` — driven by the in-session agent — and let the rehomed **deskwork-governance** extension fire automatically on `after_implement`. This is the execution touch point of the stack-control front door (Feature 1, US1). It does not reimplement Spec Kit's executor and it does not manually invoke governance; it gates, drives, and reports.
+Run a Spec Kit spec by **dispatching each `tasks.md` task to a fresh subagent**, in-session, at the explicit model its declared `[tier:<label>]` resolves to (model-sized dispatch, 033) — then let the rehomed **deskwork-governance** extension fire automatically over the committed feature. This is the execution touch point of the stack-control front door (Feature 1, US1). It adopts the proven subagent-driven-development discipline (fresh per-task subagent, isolated brief, test-first, task review, durable ledger) and adds a declarative, operator-controlled model-tier layer on top; it does not reimplement Spec Kit's executor and it does not manually invoke governance; it gates, resolves, dispatches, and reports.
 
 > Per `.claude/rules/enforcement-lives-in-skills.md`: the discipline lives in this skill body + the `stackctl` verb it calls, never in a git hook. The skill travels with the plugin install.
 
@@ -60,7 +60,26 @@ stackctl check-front-door
    - Exit `0` (`runnable`) → continue to step 3.
    - Exit non-zero → **STOP.** Surface the `stackctl` stderr **verbatim** (it names the missing artifact, e.g. `tasks.md missing; spec not runnable (run /speckit-tasks first)`). Do not start native execution, do not fabricate a run, do not paper over the gap (FR-008, Principle V). The recovery is to author the spec to runnable via `/stack-control:extend` (or `/speckit-tasks`), then re-run execute.
 
-3. **Drive native `/speckit-implement` over the spec, in-session (030 — govern-at-end).** Walk the `tasks.md` tasks **in order** via native `/speckit-implement`, in this session, with this agent. **Do NOT shell out to a headless/batch CLI** to invoke the agent (FR-006; the durability motivation behind Principle IX). Native execution does the work; stack-control does not walk the tasks itself. **Governance does NOT fire per phase** — the per-phase `--phase` checkpoint apparatus is retired (030); govern runs once at the end of `implementing`, in step 4, over the committed whole-feature diff.
+3. **Resolve tiers, then dispatch each task to a fresh, right-sized subagent (033 — model-sized dispatch; 030 — govern-at-end).** Do NOT walk the tasks serially inline and do NOT shell out to a headless/batch CLI (FR-006; the durability motivation behind Principle IX). Instead:
+
+   **3a — Resolve tiers FIRST (the pre-dispatch gate).** Run:
+
+   ```bash
+   stackctl resolve-tiers --spec <spec-dir>
+   ```
+
+   - Exit `0` → it emits a `TierResolution` JSON `{ specDir, tasks: [{ id, tierLabel, model }] }`. Build the `id → model` map from it.
+   - Exit non-zero → **STOP. Dispatch nothing.** Surface the **complete** tier-error set verbatim (every `has no model tier declared` / `declares unknown tier` / `no tier_map configured` error). Resolution is all-or-nothing — no partial dispatch (FR-006 / SC-002). The recovery is to fix the plan's `[tier:<label>]` tags or the installation's `tier_map` in `.stack-control/config.yaml`, then re-run execute. **Never** dispatch an unresolved task at the session's inherited default model to "keep moving" (Principle V — the silent-default gap this feature exists to close).
+
+   **3b — Dispatch per the adopted subagent-driven-development discipline, at the EXPLICIT resolved model.** For each task (in the order chosen in 3e, skipping ids the ledger already records complete — 3d), dispatch a **fresh subagent with an isolated, task-scoped brief** — the task's `body` plus the files/contracts it names, NOT this session's accumulated history (FR-009) — invoked **explicitly at the model the task's tier resolved to in 3a**, never an inherited session default (FR-002, SC-001). The subagent works **test-first** (RED→GREEN), self-reviews, and commits its own work. (Cross-host portability, spec assumption U1: this assumes the host exposes a per-dispatch model-selection surface — Claude Code's Agent/Task dispatch does. If a host cannot select a model per dispatch, this step MUST **fail loud** naming the missing host capability — never silently inherit the session default; Principle V.)
+
+   **3c — Task-review loop.** After a subagent returns, review its work (a fresh reviewer subagent, or the controller). On findings, dispatch a fix subagent and re-review; only a **clean** review ledgers the task complete (the adopted discipline's gate).
+
+   **3d — Durable ledger (resume safety + observability).** Record each completed task in the execution ledger under `<installation>/.stack-control/execute/<feature>.ledger.jsonl` — its `id`, declared `tierLabel`, resolved `model`, `commitRange`, and `reviewClean` verdict. On a **resumed/compacted** run, skip every id already in the ledger (SC-005); the declared tier + resolved model stay observable afterward (FR-010/011, SC-004). The ledger is anchored in the installation working-file set (installation-anchor invariant).
+
+   **3e — Ordering / parallelism is controller judgment (adopted stance — NO mechanical scheduler).** Dispatch genuinely-independent tasks (`[P]`) in parallel and run dependent tasks in plan order — this is the controller's call per the adopted superpowers stance, NOT a mechanism this feature enforces (FR-012). Never dispatch multiple implementation subagents that write the same files concurrently (the conflict superpowers goes serial to avoid). The mechanical dependency-DAG + worktree-isolated parallel engine remains `impl:feature/execution-engine` (specs/002), out of scope here.
+
+   This discipline is applied by stack-control **itself** — it does NOT require the superpowers plugin to be installed; behavior is identical whether or not it is (FR-013 / SC-006). **Governance does NOT fire per phase** — the per-phase `--phase` checkpoint apparatus is retired (030); govern runs once at the end of `implementing`, in step 4, over the committed whole-feature diff.
 
    At each implementation boundary, **commit, then push — mechanically (025 US3):** **commit the work** (it lands locally first, so completed work is never lost — FR-009), then **push** to the branch's remote (FR-010). This is automatic boundary behavior, not something the operator has to ask for. If the **push fails** (offline / auth / pre-push hook), surface the failure loud — the local commit is intact and pushes on retry; **never** continue silently and **never** use `--no-verify` (fix the hook, don't bypass it; FR-011/SC-007).
 
@@ -116,12 +135,15 @@ cross that boundary.
 
 ## Postcondition
 
-Native execution ran over the spec, and once every task was complete and committed,
+Tiers resolved cleanly (or the run STOPPED with the complete tier-error set and dispatched
+nothing — SC-002), each task ran in a fresh subagent at its explicit resolved model with a
+durable ledger entry, and once every task was complete and committed,
 `stackctl govern --mode implement` governed the **whole committed feature in one chunked
 pass** (the payload streamed across the fleet under the envelope, so size never FATALs); the
 graduate gate reads the converged whole-feature record that pass wrote. On any blocked path,
-you surfaced a descriptive error naming the missing piece (runnable spec / governance
-capability) — never a faked or partial run (SC-006).
+you surfaced a descriptive error naming the missing piece (runnable spec / unresolved tier /
+missing host model-selection capability / governance capability) — never a faked or partial
+run (SC-006).
 
 ## Honest boundary (FR-017)
 
@@ -137,6 +159,8 @@ The cross-vendor point-of-invocation interception of a raw backend call is a fil
 
 - It does not author or repair the spec (use `/stack-control:define` / `/stack-control:extend`).
 - It does not reimplement `/speckit-implement`.
+- It does not build a dependency-DAG scheduler, cycle detector, or wave engine (FR-012) — ordering/parallelism is controller judgment under the adopted stance; the mechanical parallel+worktree engine is `impl:feature/execution-engine` (specs/002).
+- It does not hardcode model identifiers — tiers are operator data in `tier_map`, resolved by `stackctl resolve-tiers` (Principle III / FR-007).
 - It does not run `audit-barrage` directly — `stackctl govern --mode implement` owns the one whole-feature chunked govern-at-end pass (SC-002).
 - It does not offer to skip/defer/shortcut any step (US5), and it does not lower the fleet floor or `--override` to bypass a failed govern.
 - It does not branch on which tool authored the spec (Principle III — capability, not provider identity).
@@ -160,7 +184,7 @@ backend drive:**
    calls**, so a `$TOKEN` shell variable will NOT survive between them — carry the LITERAL
    token value yourself.
 
-2. Drive the backend (native `/speckit-implement`), then govern the whole feature at the end.
+2. Drive the execution (the per-task subagent dispatch of step 3 — the sanctioned spec-execution backend), then govern the whole feature at the end. The marker bracket still wraps the execution even though the dispatch is per-task subagents rather than a single monolithic backend call — a stray RAW `/speckit-implement` outside this skill stays refused.
 
 3. **ALWAYS `exit` — on success AND on a failed/aborted drive** — passing the LITERAL token
    value from step 1 (not a shell variable, which is gone by now; `exit` rejects an empty

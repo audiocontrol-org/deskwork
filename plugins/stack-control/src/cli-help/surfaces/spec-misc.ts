@@ -85,4 +85,17 @@ export const SPEC_MISC_VERBS: readonly MountedVerb[] = [
       }),
     meta: { deprecatedAliasOf: null, verbMediation: 'read-only' },
   },
+  {
+    build: () =>
+      buildFlatSurfaceCommand({
+        verb: 'resolve-tiers',
+        description:
+          'Resolve each task\'s [tier:<label>] in a spec\'s tasks.md to a concrete model via the installation\'s tier_map; read-only, fail-loud — emits a per-task {id,tierLabel,model} resolution or the complete tier-error set (033 model-sized-dispatch).',
+        flags: [
+          { name: 'spec', arg: 'dir', description: 'path to the Spec Kit spec directory (must contain tasks.md; required)' },
+          { name: 'json', description: 'emit the TierResolution as JSON (default)' },
+        ],
+      }),
+    meta: { deprecatedAliasOf: null, verbMediation: 'read-only' },
+  },
 ];

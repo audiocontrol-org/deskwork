@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "mode": "impl",
+  "item": "impl:feature/model-sized-dispatch",
+  "governedShaBase": "override-short-circuit",
+  "headSha": "override-short-circuit",
+  "chunkIds": [],
+  "rounds": 0,
+  "liftedFindings": [],
+  "closedInLoopFindings": [],
+  "seamResult": {
+    "boundaryPairs": [],
+    "findings": [],
+    "suppressedCompatible": 0
+  },
+  "splitClusterRefs": [],
+  "outcome": "override-eligible",
+  "anchorRoot": "/Users/orion/work/deskwork-work/model-sized-dispatch/plugins/stack-control",
+  "override": true,
+  "overrideReason": "AUDIT-20260629-01 (claude HIGH) FIXED in 073d4c9c — empty [tier:] double-error, verified by RED-first parser + resolve-tiers tests and the full suite (deterministic floor). AUDIT-20260629-02 (codex HIGH) is the spec's documented MVP scope boundary, not a defect: assumption U1 (cross-host per-dispatch model-selection portability resolved when the Codex port is actually exercised) + research D4 (a second host contributes its accepted-model set behind the same capability seam against a concrete instance, not speculatively; Principle II). The code faithfully implements FR-008/D4 load-time rejection against the Claude Code subagent set. Follow-up backlogged as TASK-454. Operator decision 2026-06-29: override and graduate, keeping the U1 deferral."
+}

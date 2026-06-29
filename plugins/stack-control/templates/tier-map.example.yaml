@@ -1,0 +1,20 @@
+# Recommended default tier_map (033 model-sized dispatch) — a STARTER, NOT canonical.
+#
+# Copy this `tier_map:` block into your installation's `.stack-control/config.yaml`.
+# Keys are operator-chosen SEMANTIC tier labels (free strings) that tasks reference via
+# `[tier:<label>]` in tasks.md — NEVER model identifiers. Values are model keywords in the
+# dispatch surface's accepted-model set (Claude Code subagent surface: haiku|sonnet|opus|fable).
+#
+# The label set is OPERATOR-OPEN: this default vocabulary is harvested from superpowers'
+# subagent-driven-development complexity taxonomy (mechanical -> cheap, integration -> standard,
+# architecture -> most-capable), but you may rename/remap/extend it freely (FR-007). It is a
+# recommendation the doc presents as a starting point, not a closed enum.
+#
+# A task's tier is resolved at `stackctl resolve-tiers` time; a missing/unknown tier (or a
+# value outside the accepted-model set) fails loud BEFORE any subagent is dispatched — never
+# silently defaulted to the session model (Principle V).
+
+tier_map:
+  fast: haiku       # mechanical single-file tasks (RED tests, checkbox flips, small edits)
+  balanced: sonnet  # multi-file integration (wire a verb, extend a loader, parser work)
+  powerful: opus    # design / architecture / careful-judgment (skill rewrites, fail-loud cores)
