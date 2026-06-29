@@ -237,3 +237,12 @@ is what closes the silent-default gap superpowers' prose leaves to controller di
   forbids by default).
 - Per-task worktree isolation, batch-CLI backends, cross-vendor multi-backend fan-out, and any
   mechanical scheduler remain out of scope (specs/002).
+- **Cross-host explicit-model dispatch portability** (open question): FR-002 (explicit model on
+  dispatch) and FR-009 (fresh per-task subagent) assume the host exposes a **per-dispatch
+  model-selection surface**. Claude Code provides this (the Agent/Task dispatch accepts an
+  explicit model); whether Codex (the other stated portability target) exposes an equivalent
+  per-subagent model-selection surface is **not yet established** — resolve it when the Codex
+  port is actually exercised. The `stackctl resolve-tiers` verb (the testable core) is
+  host-agnostic; only the dispatch step (skill prose) depends on the host surface. If a host
+  cannot select a model per dispatch, the dispatch step MUST fail loud naming the missing host
+  capability (Principle V), never silently inherit the session default.

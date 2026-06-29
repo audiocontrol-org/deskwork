@@ -643,3 +643,10 @@ A single mediated ship waypoint that makes recording status:shipped non-optional
 - part-of: design:feature/migrate-scope-discovery
 Second-wave scope-discovery expansion beyond the migrated v1: additional discovery-agent classes (TASK-6: dom-visual-walker, a11y-audit, vestigial-copy-audit, component-roster), cross-language scanner packs (TASK-7: .go/.py/.rs/.kt/.java via the customize seam), language-aware clone detection in the govern clone-step (TASK-296), and aggregation/reporting surfaces (TASK-8: studio clones-backlog table; TASK-9: cross-repo rollup over scope-export). TASK-10 (plugin-extension intercept to auto-wrap every Agent dispatch) stays parked on upstream Claude Code support. Seeded from backlog TASK-6.
 
+## impl:feature/model-sized-dispatch
+- status: in-flight
+- analyze-clean: yes
+- spec: specs/033-model-sized-dispatch
+- design-approved: yes
+- design: docs/superpowers/specs/2026-06-28-model-sized-dispatch-design.md
+
