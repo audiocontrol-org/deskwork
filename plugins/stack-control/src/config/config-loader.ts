@@ -71,7 +71,9 @@ export function parseInstallationConfig(body: string, sourceLabel: string): Inst
   }
 
   const version = requireSupportedVersion(parsed['version'], sourceLabel);
-  const config: { version: number; baseDir?: string; paths?: InstallationPaths } = { version };
+  const config: { version: number; baseDir?: string; paths?: InstallationPaths; tierMap?: TierMap } = {
+    version,
+  };
 
   if (parsed['base_dir'] !== undefined) {
     config.baseDir = requireNonEmptyString(parsed['base_dir'], 'base_dir', sourceLabel);

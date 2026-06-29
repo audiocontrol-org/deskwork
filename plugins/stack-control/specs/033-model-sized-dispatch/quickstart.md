@@ -91,6 +91,25 @@ Validated by reading the rewritten `skills/execute/SKILL.md` and the durable led
 
 ---
 
+## Validation record (T028 — run against the source engine `./bin/stackctl`)
+
+All six scenarios were exercised during implementation; **none deviated** from the expected
+behavior above:
+
+- **Scenario 1 / SC-001 / SC-003** — `resolve-tiers` on the dogfood `tier_map` resolved
+  `fast→haiku`, `balanced→sonnet`, `powerful→opus` (exit 0); changing a task's `[tier:]`
+  re-resolved to the new model with no code change.
+- **Scenario 2 / FR-004** — a no-tier task → exit 1, `task T002 has no model tier declared`, empty stdout.
+- **Scenario 3 / FR-005/006** — unknown-tier + no-tier reported together (complete set, no first-error abort).
+- **Scenario 4 / FR-007/008** — out-of-range map value → loud config error (`is not an accepted model`).
+- **Scenario 5 / FR-013/SC-006** — feature source carries no `superpowers` import (grep-clean; `self-contained.test.ts`).
+- **Scenario 6 / FR-009/010/011, SC-004/005** — the rewritten `skills/execute/SKILL.md` dispatch
+  step + the durable ledger (`ledger.test.ts`) satisfy explicit-model dispatch, resume safety, and
+  observability.
+
+The mechanical equivalents are pinned as automated tests (`src/__tests__/execute/*`,
+`src/__tests__/config/tier-map.test.ts`) so the scenarios cannot silently regress.
+
 ## Out of scope (do NOT validate here — specs/002)
 
 Mechanical dependency-DAG scheduling, cycle detection, wave timing, per-task worktree isolation,

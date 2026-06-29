@@ -13,10 +13,18 @@ description: "Task list template for feature implementation"
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
-## Format: `[ID] [P?] [Story] Description`
+## Format: `[ID] [P?] [Story] [tier:?] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
+- **[tier:&lt;label&gt;]** (optional, 033 model-sized dispatch): the semantic model tier this
+  task should be dispatched at — a label (never a model identifier), resolved to a concrete
+  model by the installation's `tier_map` (`.stack-control/config.yaml`) at `stackctl resolve-tiers`
+  time. The **recommended default vocabulary** (a starter, NOT canonical — rename/remap freely):
+  `fast` = mechanical single-file work, `balanced` = multi-file integration, `powerful` =
+  design/architecture/careful-judgment. When `/stack-control:execute` dispatches a task's
+  subagent, it uses the tier's resolved model explicitly. A missing/unknown tier fails loud
+  before any dispatch (it is not silently defaulted).
 - Include exact file paths in descriptions
 
 ## Path Conventions

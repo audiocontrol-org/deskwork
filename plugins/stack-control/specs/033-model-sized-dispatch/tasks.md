@@ -97,10 +97,10 @@ Do **NOT** build a dependency-DAG scheduler, cycle detector, wave engine, Execut
 **Goal**: docs, dogfood config, and the full validation sweep.
 **Independent test**: quickstart scenarios pass; vitest green; cap/typing clean.
 
-- [ ] T026 [P] [tier:fast] Document the recommended default `tier_map` (`fast`/`balanced`/`powerful`) and the `[tier:<label>]` convention — in a template config + a note in `.specify/templates/tasks-template.md` Format section (FR-007, research D3). The default vocabulary is **recommended, NOT canonical** — the label set stays operator-open (spec Assumptions / open-question b); the doc presents it as a starting point, not a closed enum.
-- [ ] T027 [P] [tier:fast] Add a dogfood `tier_map` to the installation `.stack-control/config.yaml` so this very `tasks.md` resolves (optional demonstration)
-- [ ] T028 [tier:balanced] Run all quickstart Scenarios 1–6 against `./bin/stackctl` (source engine); record results in `specs/033-model-sized-dispatch/quickstart.md` Assumptions if any deviate
-- [ ] T029 [P] [tier:fast] Verify every new file is under the 300–500-line cap, strict-typed (no `any`/`as`/`!`), relative `.js` imports; run full `npx vitest`
+- [x] T026 [P] [tier:fast] Document the recommended default `tier_map` (`fast`/`balanced`/`powerful`) and the `[tier:<label>]` convention — in a template config + a note in `.specify/templates/tasks-template.md` Format section (FR-007, research D3). The default vocabulary is **recommended, NOT canonical** — the label set stays operator-open (spec Assumptions / open-question b); the doc presents it as a starting point, not a closed enum.
+- [x] T027 [P] [tier:fast] Add a dogfood `tier_map` to the installation `.stack-control/config.yaml` so this very `tasks.md` resolves (optional demonstration)
+- [x] T028 [tier:balanced] Run all quickstart Scenarios 1–6 against `./bin/stackctl` (source engine); record results in `specs/033-model-sized-dispatch/quickstart.md` Assumptions if any deviate
+- [x] T029 [P] [tier:fast] Verify every new file is under the 300–500-line cap, strict-typed (no `any`/`as`/`!`), relative `.js` imports; run full `npx vitest`
 
 **Checkpoint**: feature complete; all six Success Criteria demonstrably met.
 
