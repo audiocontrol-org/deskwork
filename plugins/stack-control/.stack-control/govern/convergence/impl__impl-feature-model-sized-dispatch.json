@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "mode": "impl",
+  "item": "impl:feature/model-sized-dispatch",
+  "governedShaBase": "bed4dd2fee850dc126da1f4722dcc86218170ab7",
+  "headSha": "50de9fd2703912fdc2360e9b187fb6ad6904b802",
+  "chunkIds": [
+    "2d4296a7eb8e690f"
+  ],
+  "rounds": 1,
+  "liftedFindings": [
+    {
+      "id": "2d4296a7eb8e690f::AUDIT-BARRAGE-claude-01",
+      "title": "Empty `[tier:]` tag generates double error: parse error + resolution error for the same task",
+      "severity": "high"
+    },
+    {
+      "id": "2d4296a7eb8e690f::AUDIT-BARRAGE-codex-01",
+      "title": "Codex-only model allowlist makes the host-agnostic tier map unusable on non-Claude hosts",
+      "severity": "high"
+    }
+  ],
+  "closedInLoopFindings": [],
+  "seamResult": {
+    "boundaryPairs": [],
+    "findings": [],
+    "suppressedCompatible": 0
+  },
+  "splitClusterRefs": [],
+  "outcome": "override-eligible",
+  "anchorRoot": "/Users/orion/work/deskwork-work/model-sized-dispatch/plugins/stack-control"
+}

@@ -117,6 +117,14 @@ describe('stackctl resolve-tiers (033)', () => {
     expect(r.stdout.trim()).toBe(''); // no partial resolution
   });
 
+  it('an empty [tier:] task reports exactly ONE error (empty-tier), not also no-tier (AUDIT-20260629-01)', () => {
+    const { specDir } = makeInstall({ tasks: '- [ ] T001 [tier:] x — in src/a.ts\n' });
+    const r = runCli(['resolve-tiers', '--spec', specDir], { cwd: work });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/empty \[tier:\] tag/);
+    expect(r.stderr).not.toMatch(/has no model tier declared/);
+  });
+
   it('T019: a tiered task with no tier_map configured → named error, exit 1 (FR-008)', () => {
     const { specDir } = makeInstall({ config: 'version: 1\n', tasks: '- [ ] T001 [tier:fast] x — in src/a.ts\n' });
     const r = runCli(['resolve-tiers', '--spec', specDir], { cwd: work });

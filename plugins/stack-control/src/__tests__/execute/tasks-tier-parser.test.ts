@@ -70,6 +70,18 @@ describe('tasks-tier-parser (033 T009)', () => {
     expect(errors.length).toBeGreaterThanOrEqual(4);
   });
 
+  it('excludes an empty-[tier:] task from tasks[] and reports it exactly once (AUDIT-20260629-01)', () => {
+    // A malformed `[tier:]` declaration is a parse error; the task must be EXCLUDED from
+    // tasks[] (like missing-id/missing-body) so resolution does not ALSO emit a no-tier
+    // error for the same task — one problem, one error.
+    const md = '- [ ] T004 [tier:] empty tier tag — in src/d.ts\n';
+    const { tasks, errors } = parseTieredTasks(md);
+    expect(tasks.find((t) => t.id === 'T004')).toBeUndefined();
+    const t004 = errors.filter((e) => e.message.includes('T004'));
+    expect(t004).toHaveLength(1);
+    expect(t004[0]?.category).toBe('empty-tier');
+  });
+
   it('parses the canonical valid fixture (3 tasks, correct tiers + done flags)', () => {
     const md = readFileSync(join(FIXTURES, 'valid-tasks.md'), 'utf8');
     const { tasks, errors } = parseTieredTasks(md);

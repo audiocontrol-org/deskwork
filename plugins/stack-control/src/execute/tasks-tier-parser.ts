@@ -78,15 +78,19 @@ export function parseTieredTasks(content: string): ParseResult {
 
     // Tier tag: present-but-empty is a parse error; present-with-value sets the label;
     // absent leaves tierLabel undefined (a resolution-time error, not a parse error).
+    // An empty `[tier:]` is a MALFORMED declaration, so — like missing-id/missing-body —
+    // the task is EXCLUDED from tasks[] (the `continue` below). Without it the task would
+    // also generate a downstream `no-tier` resolution error: two errors for one problem
+    // (AUDIT-20260629-01).
     let tierLabel: string | undefined;
     const tierMatch = TIER_TAG.exec(afterId);
     if (tierMatch !== null) {
       const value = (tierMatch[1] ?? '').trim();
       if (value.length === 0) {
         errors.push({ category: 'empty-tier', message: `task ${id} has an empty [tier:] tag (line ${lineNumber})`, lineNumber });
-      } else {
-        tierLabel = value;
+        continue;
       }
+      tierLabel = value;
     }
 
     const body = afterId.replace(STRIP_TAGS, '').replace(/\s{2,}/g, ' ').trim();
