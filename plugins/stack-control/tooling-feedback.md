@@ -137,3 +137,6 @@
 
 ## session-end 2026-06-29
 - compass 'off-rail' verdict prints '(off-rail; the front door creates the node)', but the design/execute compass preconditions REFUSE off-rail and direct to 'capture it first' — no front door creates the node. An off-rail spec needs a manual 'roadmap add' capture before /stack-control:design. The hint is misleading; either fix the message or have the design front door auto-capture the node on entry.
+
+## session-end 2026-06-29
+- CI publish-npm/check 'test' job intermittently red on a vitest-worker timeout ('Timeout calling onTaskUpdate') under load — 2680/2682 pass but the run exits non-zero, producing a false-red merge gate (hit on PR #516; cleared on re-run). Recurring; consider raising vitest pool/teardown timeout or sharding the suite in CI.
