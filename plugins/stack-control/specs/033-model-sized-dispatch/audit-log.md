@@ -10,10 +10,11 @@ targetVersion: ""
 ### AUDIT-20260629-01 — Empty `[tier:]` tag generates double error: parse error + resolution error for the same task
 
 Finding-ID: AUDIT-20260629-01
-Status:     open
+Status:     fixed-073d4c9c
 Severity:   high
 Per-lane:   claude=high
 Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Resolution: RED-first fix in 073d4c9c — `tasks-tier-parser.ts` now `continue`s after the empty-tier parse error (mirroring missing-id/missing-body), excluding the malformed task from `tasks[]` so resolution emits exactly one error. Pinned by new parser + resolve-tiers tests.
 Surface:    src/execute/tasks-tier-parser.ts:63–98 + src/subcommands/resolve-tiers.ts:72–84
 
 In `tasks-tier-parser.ts`, when a task has `[tier:]` (present but empty), the parser pushes a `ParseError` of category `empty-tier` but does **not** `continue` — the task is still pushed to `tasks[]` with `tierLabel: undefined`. Compare the `missing-body` case two lines later (lines 78–81), which uses `continue` to exclude the task. The empty-tier case has no such guard.
