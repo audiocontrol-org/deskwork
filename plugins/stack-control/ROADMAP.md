@@ -651,3 +651,6 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 - design-approved: yes
 - design: docs/superpowers/specs/2026-06-28-model-sized-dispatch-design.md
 
+## impl:feature/governance-code-scope
+- status: planned
+
