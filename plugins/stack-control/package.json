@@ -17,12 +17,14 @@
     "jscpd": "^4.0.0",
     "markdown-it": "^14.1.0",
     "peggy": "^5.0.0",
+    "picomatch": "^2.3.2",
     "tsx": "^4.21.0",
     "yaml": "^2.8.0"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.0",
     "@types/node": "^22.0.0",
+    "@types/picomatch": "^2.3.3",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },
