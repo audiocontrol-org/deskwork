@@ -59,6 +59,18 @@ export interface CodeScopeExclusionSummary {
   readonly excludedCount: number;
   /** True when an active filter reduced a non-empty scope to empty (FR-011). */
   readonly emptiedScope: boolean;
+  /**
+   * True ONLY when the emptying was genuinely documentation-only under the BUILT-IN
+   * default classification — every removed file `isDefaultDocumentationFile`
+   * (AUDIT-20260705-01). This is the ONLY signal the runtime seam may use to
+   * graduate an emptied scope without a barrage: an over-broad operator custom
+   * `exclude` (e.g. `["src/**"]`) that empties the scope by removing real CODE
+   * yields `emptiedScope: true` but `emptiedByDocumentationOnly: false`, so it
+   * stays subject to the empty-scope FATAL rather than silently graduating
+   * unaudited code. `emptiedScope && !emptiedByDocumentationOnly` names exactly
+   * that dangerous case.
+   */
+  readonly emptiedByDocumentationOnly: boolean;
 }
 
 /** Render an offending runtime value for a fail-loud error message (no cast, no throw). */
@@ -171,9 +183,27 @@ export function applyCodeScope(scope: DiffScope, policy: CodeScopePolicy): DiffS
 }
 
 /**
+ * Classify a path against the BUILT-IN default policy (AUDIT-20260705-01): true iff
+ * the file is documentation the default code-only filter would drop — it matches ANY
+ * `DEFAULT_EXCLUDE` glob AND matches NO `DEFAULT_INCLUDE` glob (include wins). This is
+ * evaluated against the DEFAULTS, never a custom policy's lists, so it answers a fixed
+ * question — "is this file documentation by deskwork's own definition?" — independent
+ * of whatever exclude/include an operator supplied. Note SKILL.md, CLAUDE.md, WORKFLOW.md,
+ * AGENTS.md, and the `.claude/rules` markdown corpus are runtime-defining markdown
+ * (re-included by `DEFAULT_INCLUDE`) and are therefore NOT documentation.
+ */
+export function isDefaultDocumentationFile(file: string): boolean {
+  const isDefaultExcluded = compileMatcher(DEFAULT_EXCLUDE);
+  const isDefaultIncluded = compileMatcher(DEFAULT_INCLUDE);
+  return isDefaultExcluded(file) && !isDefaultIncluded(file);
+}
+
+/**
  * Summarize a filter application for observability (FR-014). Reports counts only —
- * never the excluded path list. `emptiedScope` marks the documentation-only change
- * that an active filter reduces to nothing to govern (FR-011).
+ * never the excluded path list. `emptiedScope` marks that an active filter reduced a
+ * non-empty scope to empty (FR-011); `emptiedByDocumentationOnly` narrows that to the
+ * SAFE case where every removed file is default documentation (AUDIT-20260705-01) — the
+ * only emptying the runtime may graduate without a barrage.
  */
 export function summarizeCodeScope(
   before: DiffScope,
@@ -182,5 +212,9 @@ export function summarizeCodeScope(
 ): CodeScopeExclusionSummary {
   const excludedCount = before.files.length - after.files.length;
   const emptiedScope = policy.active && before.files.length > 0 && after.files.length === 0;
-  return { active: policy.active, excludedCount, emptiedScope };
+  const survivors = new Set(after.files);
+  const removed = before.files.filter((file) => !survivors.has(file));
+  const emptiedByDocumentationOnly =
+    emptiedScope && removed.every((file) => isDefaultDocumentationFile(file));
+  return { active: policy.active, excludedCount, emptiedScope, emptiedByDocumentationOnly };
 }
