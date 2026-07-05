@@ -29,6 +29,7 @@ import { runConvergenceLoop } from './convergence-loop.js';
 import { resolveImplementExclusion, resolveHeadSha } from './payload-diff-scope.js';
 import { runEndGovern } from './end-govern-pipeline.js';
 import { makeEndGovernRuntime } from './end-govern-runtime.js';
+import { resolveCodeScopePolicy } from './code-scope.js';
 import { writeWholeFeatureConvergenceRecord } from './chunk-artifacts.js';
 import { liftEndGovernFindingsOnce } from './lift-once.js';
 import { renderEndGovernNotDoneMessage } from './end-govern-message.js';
@@ -264,6 +265,11 @@ export async function runImplementArm(ctx: GovernRunContext): Promise<void> {
     excludeRoots,
     excludePaths,
   );
+  // 034 FR-002/FR-006: resolve the code-scope policy ONCE from installation config
+  // (defaults when `govern` is absent) and thread it into the runtime so the
+  // scopeDiff seam applies the SAME code-only filter on the initial scope and the
+  // mid-fix re-scope (T008/T009).
+  const codeScopePolicy = resolveCodeScopePolicy(installation.config.govern);
 
   const runtime = makeEndGovernRuntime({
     barrageBin,
@@ -272,6 +278,7 @@ export async function runImplementArm(ctx: GovernRunContext): Promise<void> {
     checkpoint: flags.checkpoint ?? 'after_implement',
     varsBase,
     excludeDiffPaths: excludeDiffRels,
+    codeScopePolicy,
     laneCapabilities,
     models: requestedModels,
     requireModels,

@@ -25,6 +25,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeEndGovernRuntime } from '../../govern/end-govern-runtime.js';
 import { filterDiffScope, scopeCommittedDiff } from '../../govern/payload-diff-scope.js';
+import { resolveCodeScopePolicy } from '../../govern/code-scope.js';
 import type { LaneCapabilityProfile } from '../../govern/lane-capabilities.js';
 
 function viableLane(): LaneCapabilityProfile {
@@ -97,6 +98,7 @@ function makeRuntime(repo: string, base: string) {
       artifact_framing: 'F',
     },
     excludeDiffPaths: [],
+    codeScopePolicy: resolveCodeScopePolicy(undefined),
     laneCapabilities: [viableLane()],
     requireModels: 1,
     envelope: 100_000,

@@ -40,6 +40,7 @@ import {
 } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
 import { SEVERITY_RANK } from '../scope-discovery/promote-findings/cluster-severity.js';
 import { scopeCommittedDiff, filterDiffScope } from './payload-diff-scope.js';
+import type { CodeScopePolicy } from './code-scope.js';
 
 /** Configuration for one chunked end-govern run's barrage-backed runtime. */
 export interface EndGovernRuntimeConfig {
@@ -74,6 +75,13 @@ export interface EndGovernRuntimeConfig {
    * path silently folded in (AUDIT-20260622-02).
    */
   readonly excludeDiffPaths: readonly string[];
+  /**
+   * The resolved code-scope policy (034 FR-002/FR-006): the caller resolves this
+   * once from installation config (`resolveCodeScopePolicy`) and passes it through
+   * — this runtime never re-defaults it, so `resolveCodeScopePolicy` stays the
+   * single source of defaults (T008).
+   */
+  readonly codeScopePolicy: CodeScopePolicy;
   readonly base: string;
   readonly head: string;
   readonly stderr: (s: string) => void;
