@@ -266,7 +266,16 @@ export function makeEndGovernRuntime(cfg: EndGovernRuntimeConfig): EndGovernRunt
     scopeDiff: (installationRoot, base, head) => {
       const before = filterDiffScope(scopeCommittedDiff(installationRoot, base, head), cfg.excludeDiffPaths);
       const after = applyCodeScope(before, cfg.codeScopePolicy);
-      const { emptiedScope } = summarizeCodeScope(before, after, cfg.codeScopePolicy);
+      const { active, excludedCount, emptiedScope } = summarizeCodeScope(before, after, cfg.codeScopePolicy);
+      // FR-014/SC-007: a concise, path-free summary of code-scope filtering — the
+      // count only, never the excluded file list.
+      if (emptiedScope) {
+        cfg.stderr('govern: nothing to govern — no code in scope (documentation-only change).\n');
+      } else if (active && excludedCount > 0) {
+        cfg.stderr(
+          `govern: code-only scoping active — excluded ${excludedCount} documentation file(s) from the audit payload.\n`,
+        );
+      }
       return emptiedScope ? { ...after, emptiedByCodeScope: true } : after;
     },
     resolveEnvelope: () => cfg.envelope,
