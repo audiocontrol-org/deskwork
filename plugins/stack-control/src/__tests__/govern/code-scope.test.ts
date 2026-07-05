@@ -9,6 +9,7 @@ import {
   applyCodeScope,
   DEFAULT_EXCLUDE,
   DEFAULT_INCLUDE,
+  isDefaultDocumentationFile,
   resolveCodeScopePolicy,
   summarizeCodeScope,
   type CodeScopePolicy,
@@ -158,5 +159,50 @@ describe('034 T003 — summarizeCodeScope observability (C8/FR-014)', () => {
     expect(summary.active).toBe(true);
     expect(summary.emptiedScope).toBe(true);
     expect(summary.excludedCount).toBeGreaterThan(0);
+  });
+});
+
+describe('034 T023 (AUDIT-20260705-01) — isDefaultDocumentationFile classifies against the BUILT-IN defaults', () => {
+  it('a plain markdown doc is default documentation', () => {
+    expect(isDefaultDocumentationFile('docs/PRD.md')).toBe(true);
+  });
+
+  it('a source file is NOT default documentation', () => {
+    expect(isDefaultDocumentationFile('src/foo.ts')).toBe(false);
+  });
+
+  it('SKILL.md is runtime code (re-included by DEFAULT_INCLUDE), NOT documentation', () => {
+    expect(isDefaultDocumentationFile('x/SKILL.md')).toBe(false);
+  });
+});
+
+describe('034 T023 (AUDIT-20260705-01) — summarizeCodeScope.emptiedByDocumentationOnly', () => {
+  it('true when a DEFAULT-policy all-docs diff empties (genuinely documentation-only)', () => {
+    const policy = resolveCodeScopePolicy(undefined);
+    const before = makeScope([
+      ['docs/PRD.md', '+# PRD\n'],
+      ['README.md', '+readme\n'],
+    ]);
+    const after = applyCodeScope(before, policy);
+    const summary = summarizeCodeScope(before, after, policy);
+
+    expect(summary.emptiedScope).toBe(true);
+    expect(summary.emptiedByDocumentationOnly).toBe(true);
+  });
+
+  it('false when an over-broad custom exclude ("src/**") empties a CODE-only diff', () => {
+    // The removed files are .ts source — NOT default documentation. A custom
+    // policy emptying the scope by removing real CODE must NOT be classified as a
+    // documentation-only emptying (that would silently graduate unaudited code).
+    const policy = resolveCodeScopePolicy({ codeOnly: true, codeScope: { exclude: ['src/**'], include: [] } });
+    const before = makeScope([
+      ['src/foo.ts', '+export const foo = 1;\n'],
+      ['src/bar.ts', '+export const bar = 2;\n'],
+    ]);
+    const after = applyCodeScope(before, policy);
+    const summary = summarizeCodeScope(before, after, policy);
+
+    expect(summary.emptiedScope).toBe(true);
+    expect(summary.emptiedByDocumentationOnly).toBe(false);
   });
 });

@@ -27,11 +27,15 @@
 // throw instead of succeeding. T013 greens this.
 
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runEndGovern, type EndGovernDeps } from '../../govern/end-govern-pipeline.js';
 import { isImplFeatureConverged, writeWholeFeatureConvergenceRecord } from '../../govern/chunk-artifacts.js';
+import { makeEndGovernRuntime } from '../../govern/end-govern-runtime.js';
+import { resolveCodeScopePolicy, type CodeScopePolicy } from '../../govern/code-scope.js';
+import type { LaneCapabilityProfile } from '../../govern/lane-capabilities.js';
 import type { DiffScope } from '../../govern/payload-diff-scope.js';
 
 /** The 034 FR-011 signal: `scopeDiff`'s return, augmented with the code-scope-emptied
@@ -107,5 +111,135 @@ describe('034 T012 (US3/FR-011) — empty code-scope graduates as a success, not
         baseDeps({}),
       ),
     ).rejects.toThrow(/empty|no.*file|no.*chunk/i);
+  });
+});
+
+// --- T023 (AUDIT-20260705-01): the empty-scope SUCCESS must be driven by the REAL
+// runtime seam (makeEndGovernRuntime.deps.scopeDiff), which decides emptiedByCodeScope
+// from the actual removed files — not by a hand-injected flag. An over-broad operator
+// custom exclude that empties the scope by removing real CODE must NOT graduate: it
+// must fall through to the AUDIT-20260622-23 empty-scope FATAL. Only a genuinely
+// documentation-only emptying (default classification) is the success path.
+
+function viableLane(): LaneCapabilityProfile {
+  return {
+    name: 'model-claude',
+    model: 'claude',
+    binary: 'claude',
+    availability: 'available',
+    outputMode: 'text',
+    enforcement: 'enforced',
+    liveness: 'monitored',
+    envelope: { maxPromptBytes: 100_000, source: 'fleet-knowledge' },
+    timeoutBasis: { mode: 'override', timeoutSeconds: 300 },
+  };
+}
+
+/** A real on-disk git repo: seed commit, then one commit whose files are all under
+ * the given subdir with the given extension (code-only, or docs-only). */
+function gitRepoWithCommit(
+  prefix: string,
+  files: ReadonlyArray<readonly [string, string]>,
+): { repo: string; base: string; head: string } {
+  const repo = mkdtempSync(join(tmpdir(), prefix));
+  const g = (...a: string[]): void => {
+    const r = spawnSync(
+      'git',
+      ['-C', repo, '-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...a],
+      { encoding: 'utf8' },
+    );
+    if (r.status !== 0) throw new Error(`git ${a.join(' ')} failed: ${r.stderr}`);
+  };
+  g('init', '-q');
+  writeFileSync(join(repo, '.gitkeep'), '');
+  g('add', '-A');
+  g('commit', '-q', '--no-gpg-sign', '-m', 'seed');
+  const base = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+
+  for (const [rel, body] of files) {
+    const abs = join(repo, rel);
+    mkdirSync(join(abs, '..'), { recursive: true });
+    writeFileSync(abs, body);
+  }
+  g('add', '-A');
+  g('commit', '-q', '--no-gpg-sign', '-m', 'change');
+  const head = spawnSync('git', ['-C', repo, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+
+  return { repo, base, head };
+}
+
+function makeRuntime(repo: string, base: string, head: string, codeScopePolicy: CodeScopePolicy) {
+  return makeEndGovernRuntime({
+    barrageBin: '/bin/true',
+    installationRoot: repo,
+    slug: 'feat',
+    checkpoint: 'after_implement',
+    varsBase: {
+      feature_slug: 'feat',
+      audit_log_excerpt: '',
+      commit_subjects: '',
+      audit_lens: 'L',
+      artifact_framing: 'F',
+    },
+    excludeDiffPaths: [],
+    codeScopePolicy,
+    laneCapabilities: [viableLane()],
+    requireModels: 1,
+    envelope: 100_000,
+    planContext: 'ctx',
+    base,
+    head,
+    stderr: () => {},
+  });
+}
+
+describe('034 T023 (AUDIT-20260705-01) — over-broad custom exclude that empties CODE must NOT silently graduate', () => {
+  it('bug: a custom exclude ["src/**"] emptying a code-only diff FATALs (refuses to graduate), never converges', async () => {
+    const { repo, base, head } = gitRepoWithCommit('code-scope-empty-bug-', [
+      ['src/foo.ts', 'export const foo = 1;\n'],
+      ['src/bar.ts', 'export const bar = 2;\n'],
+    ]);
+    try {
+      const policy = resolveCodeScopePolicy({ codeOnly: true, codeScope: { exclude: ['src/**'], include: [] } });
+      const runtime = makeRuntime(repo, base, head, policy);
+
+      // Sanity: the seam really does empty the scope for this fixture.
+      const scope = runtime.deps.scopeDiff(repo, base, head);
+      expect(scope.files.length).toBe(0);
+      // The removed files were CODE, not documentation — so the seam must NOT flag it
+      // as a documentation-only emptying (the flag that graduates without a barrage).
+      expect(scope.emptiedByCodeScope).not.toBe(true);
+
+      // The pipeline must therefore hit the empty-scope FATAL, never a converged record.
+      await expect(
+        runEndGovern({ installationRoot: repo, item: 'multi:feature/code-emptied', base, head }, runtime.deps),
+      ).rejects.toThrow(/empty scope/i);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('regression: a genuinely documentation-only diff (default policy) STILL graduates as "nothing to govern"', async () => {
+    const { repo, base, head } = gitRepoWithCommit('code-scope-empty-docs-', [
+      ['docs/PRD.md', '# PRD\n'],
+      ['docs/DESIGN.md', '# Design\n'],
+    ]);
+    try {
+      const policy = resolveCodeScopePolicy(undefined);
+      const runtime = makeRuntime(repo, base, head, policy);
+
+      const scope = runtime.deps.scopeDiff(repo, base, head);
+      expect(scope.files.length).toBe(0);
+      expect(scope.emptiedByCodeScope).toBe(true);
+
+      const result = await runEndGovern(
+        { installationRoot: repo, item: 'multi:feature/docs-only-real', base, head },
+        runtime.deps,
+      );
+      expect(result.record.outcome).toBe('converged');
+      expect(result.reason).toMatch(/no code in scope/i);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });
