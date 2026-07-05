@@ -59,6 +59,24 @@ export interface InstallationPaths {
  */
 export type TierMap = Readonly<Record<string, string>>;
 
+/**
+ * Code scope configuration for govern operations (034 governance-code-scope).
+ * Defines include/exclude patterns for scoping audit to specific code paths.
+ */
+export interface GovernCodeScopeConfig {
+  readonly exclude: readonly string[];
+  readonly include: readonly string[];
+}
+
+/**
+ * Govern mode configuration (034 governance-code-scope).
+ * Controls audit behavior for code-only mode and code-scope filtering.
+ */
+export interface GovernConfig {
+  readonly codeOnly: boolean;
+  readonly codeScope: GovernCodeScopeConfig;
+}
+
 /** Parsed + validated `.stack-control/config.yaml` (in-memory, camelCase). */
 export interface InstallationConfig {
   /** Schema version — required positive integer; an unknown version fails loud. */
@@ -69,6 +87,8 @@ export interface InstallationConfig {
   /** Operator tier→model map (033). Optional; absent is not a load error (it
    *  becomes a per-task `resolve-tiers` error only when a task declares a tier). */
   readonly tierMap?: TierMap;
+  /** Govern mode configuration (034). Optional; absent is not a load error. */
+  readonly govern?: GovernConfig;
 }
 
 /** Each working-file key resolved to an absolute path (post-precedence). */
