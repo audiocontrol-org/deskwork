@@ -653,4 +653,5 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 
 ## impl:feature/governance-code-scope
 - status: planned
+- design: docs/superpowers/specs/2026-07-04-governance-code-scope-design.md
 
