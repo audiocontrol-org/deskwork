@@ -40,7 +40,7 @@ import {
 } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
 import { SEVERITY_RANK } from '../scope-discovery/promote-findings/cluster-severity.js';
 import { scopeCommittedDiff, filterDiffScope } from './payload-diff-scope.js';
-import { applyCodeScope, type CodeScopePolicy } from './code-scope.js';
+import { applyCodeScope, summarizeCodeScope, type CodeScopePolicy } from './code-scope.js';
 
 /** Configuration for one chunked end-govern run's barrage-backed runtime. */
 export interface EndGovernRuntimeConfig {
@@ -254,11 +254,21 @@ export function makeEndGovernRuntime(cfg: EndGovernRuntimeConfig): EndGovernRunt
     // filter applies AFTER the excludeDiffPaths scoping — this closure serves
     // BOTH the pipeline's initial scope call and its mid-fix re-scope call
     // (end-govern-pipeline.ts), so both inherit the same code-scope policy.
-    scopeDiff: (installationRoot, base, head) =>
-      applyCodeScope(
-        filterDiffScope(scopeCommittedDiff(installationRoot, base, head), cfg.excludeDiffPaths),
-        cfg.codeScopePolicy,
-      ),
+    //
+    // FR-011 (US3): also thread the "did code-only filtering EMPTY a non-empty
+    // scope" signal so the pipeline can tell a documentation-only change (success)
+    // apart from a genuinely empty diff (still FATAL). `summarizeCodeScope` already
+    // computes this from the before/after file counts; the tag is added ONLY when
+    // true, so the untagged/inactive-policy case stays byte-identical to `after`
+    // (no extra key) — preserving the existing identity guarantee (SC-004,
+    // code-scope-toggle.test.ts) that `code_only:false` returns exactly
+    // `filterDiffScope(scopeCommittedDiff(...), excludeDiffPaths)`.
+    scopeDiff: (installationRoot, base, head) => {
+      const before = filterDiffScope(scopeCommittedDiff(installationRoot, base, head), cfg.excludeDiffPaths);
+      const after = applyCodeScope(before, cfg.codeScopePolicy);
+      const { emptiedScope } = summarizeCodeScope(before, after, cfg.codeScopePolicy);
+      return emptiedScope ? { ...after, emptiedByCodeScope: true } : after;
+    },
     resolveEnvelope: () => cfg.envelope,
     auditChunk,
     planContext: () => cfg.planContext,
