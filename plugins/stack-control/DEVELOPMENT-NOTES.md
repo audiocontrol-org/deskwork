@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-07-05: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 12
+  - roadmap(governance-code-scope): record analyze-clean marker + link spec:034
+  - tasks(034): close analyze coverage gaps (SC-002 byte-reduction, FR-012 spec-mode guard)
+  - tasks(034): TDD-first, user-story-phased task list (20 tasks)
+  - checklist(034): requirements-quality checklist (25 items)
+  - plan(034-governance-code-scope): impl plan + research/data-model/contracts/quickstart
+  - spec(034): clarify exclusion observability (concise summary)
+  - spec(034-governance-code-scope): author feature spec via define front door
+  - roadmap(governance-code-scope): record operator design-approved marker
+  - design(governance-code-scope): design record + set design: pointer
+  - roadmap(impl:feature/governance-code-scope): add planned item
+  - Merge pull request #517 from audiocontrol-org/chore/close-model-sized-dispatch-paperwork
+  - chore(roadmap): close impl:feature/model-sized-dispatch (validated in installed 0.56.1)
+- Files changed: 13
+- Backlog touched: (none)
+
 ## 2026-06-29: model-sized-dispatch — execute → ship 0.56.0 → hooks-fix 0.56.1 → close
 
 **Goal:** Implementation session. Take `specs/033-model-sized-dispatch` through the
