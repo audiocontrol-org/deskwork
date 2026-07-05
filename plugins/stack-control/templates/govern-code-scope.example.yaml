@@ -1,0 +1,69 @@
+# Implement-mode governance code-scope policy (034 governance-code-scope)
+#
+# Copy this `govern:` block into your installation's `.stack-control/config.yaml`.
+#
+# WHAT THIS DOES:
+# When you run `stackctl govern --mode implement` (implement-mode governance), the
+# audit-barrage receives only CODE in its payload, excluding DOCUMENTATION. This
+# reduces both the false-positive noise (auditors no longer ring on doc wording)
+# and the payload byte size (important for smaller fleet models).
+#
+# GOVERNING RULE (load-bearing):
+# Code is anything that defines the runtime environment. Documentation is
+# meta-information about the code that does not affect the runtime environment.
+# Therefore:
+# - SKILL.md skill bodies, WORKFLOW.md, .claude/rules/**/*.md, CLAUDE.md, AGENTS.md
+#   are CODE — they shape agent/system runtime behavior.
+# - PRDs, spec.md, plan.md, journals, DEVELOPMENT-NOTES.md, design records, READMEs
+#   are DOCUMENTATION — reviewed by the operator, not by the audit-barrage.
+#
+# ALL FIELDS ARE OPTIONAL. Absence of a `govern` block applies the full defaults below.
+#
+# SEMANTICS:
+# - code_only: boolean (default true). When true, the filter excludes documentation.
+#   When false, the filter is an identity no-op and the barrage audits the whole diff.
+# - code_scope.exclude: glob list. Files matching any glob are EXCLUDED, unless they
+#   also match an INCLUDE glob (include wins). When you supply a custom exclude list,
+#   it REPLACES the default [**/*.md, **/*.markdown] — does not merge.
+# - code_scope.include: glob list. Files matching any glob are KEPT, even if they
+#   match an exclude glob (include always wins). When you supply a custom include list,
+#   it REPLACES the default below — does not merge.
+# - Glob matching applies at the repository ROOT as well as in nested directories.
+#
+# EXAMPLE — to rescue a markdown test fixture (§3 quickstart):
+# If a .md file is used as test data (not documentation), add it to the include list.
+# Supplied lists replace defaults, so when you customize include, re-include the
+# runtime-defining markdown you still want (SKILL.md, WORKFLOW.md, etc.). See the
+# fixture-rescue example commented out below.
+
+govern:
+  code_only: true                # false ⇒ audit the whole diff (identity; pre-034 behavior)
+  code_scope:
+    exclude:                     # REPLACES the default when present
+      - "**/*.md"
+      - "**/*.markdown"
+    include:                     # REPLACES the default when present; include wins over exclude
+      - "**/SKILL.md"
+      - "**/WORKFLOW.md"
+      - "**/.claude/rules/**/*.md"
+      - "**/CLAUDE.md"
+      - "CLAUDE.md"
+      - "**/AGENTS.md"
+      - "AGENTS.md"
+
+# FIXTURE-RESCUE EXAMPLE: if a markdown file at test/fixtures/**/*.md is test data
+# that the barrage should audit, customize the include list to add it:
+#
+#   govern:
+#     code_only: true
+#     code_scope:
+#       exclude: ["**/*.md", "**/*.markdown"]  # Same as default
+#       include:                               # Re-include the defaults PLUS the fixture
+#         - "**/SKILL.md"
+#         - "**/WORKFLOW.md"
+#         - "**/.claude/rules/**/*.md"
+#         - "**/CLAUDE.md"
+#         - "CLAUDE.md"
+#         - "**/AGENTS.md"
+#         - "AGENTS.md"
+#         - "test/fixtures/**/*.md"           # ADD your fixture glob here
