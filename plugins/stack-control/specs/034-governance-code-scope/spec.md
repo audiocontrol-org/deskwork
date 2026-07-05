@@ -59,7 +59,7 @@ An operator wants to adjust which files count as code versus documentation for a
 
 **Acceptance Scenarios**:
 
-1. **Given** no `govern` block in config, **When** implement-mode governance runs, **Then** the default policy applies (code-only ON; `**/*.md`,`**/*.markdown` excluded; `**/SKILL.md`,`**/WORKFLOW.md`,`**/.claude/rules/**/*.md`,`CLAUDE.md`,`AGENTS.md` re-included).
+1. **Given** no `govern` block in config, **When** implement-mode governance runs, **Then** the default policy applies (code-only ON; `**/*.md`,`**/*.markdown` excluded; the full FR-006 default include re-included: `**/SKILL.md`,`**/WORKFLOW.md`,`**/.claude/rules/**/*.md`,`**/CLAUDE.md`,`CLAUDE.md`,`**/AGENTS.md`,`AGENTS.md`).
 2. **Given** `govern.code_only: false`, **When** governance runs, **Then** the code-only filter is an identity no-op and the payload is exactly today's whole-diff payload.
 3. **Given** a file that matches both an `exclude` glob and an `include` glob, **When** the filter runs, **Then** the file is **kept** (include wins).
 4. **Given** an operator supplies a custom `exclude` or `include` list, **When** the policy resolves, **Then** the supplied list **replaces** the corresponding default (not merged), so the effective lists are fully readable from the config file.
