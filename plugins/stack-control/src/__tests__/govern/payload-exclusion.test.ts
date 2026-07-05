@@ -32,7 +32,7 @@ describe('payload excludes the feature own audit-log (SC-005, self-reference rem
       '# Audit log\n\nSELF-REFERENTIAL-FINDING-PROSE that the barrage must NOT re-audit.\n',
       'utf8',
     );
-    const { vars } = buildImplementVars(repo, 'feat', 'HEAD', undefined);
+    const { vars } = buildImplementVars(repo, 'feat', 'HEAD', undefined, false);
     expect(vars.audit_log_excerpt).toBe('');
     // The self-referential prose is nowhere in the assembled payload vars.
     expect(JSON.stringify(vars)).not.toContain('SELF-REFERENTIAL-FINDING-PROSE');

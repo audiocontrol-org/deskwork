@@ -128,7 +128,7 @@ describe('implement-mode audit lens (regression — unchanged behavior)', () => 
   it('implement-mode BarrageVars.audit_lens === CODE_AUDIT_LENS', () => {
     const repo = tmpRepo();
     try {
-      const built = buildImplementVars(repo, 'demo', 'HEAD', undefined);
+      const built = buildImplementVars(repo, 'demo', 'HEAD', undefined, false);
       expect(built.vars.audit_lens).toBe(CODE_AUDIT_LENS);
       expect(built.vars.artifact_framing).toBe(CODE_ARTIFACT_FRAMING);
     } finally {
@@ -143,7 +143,7 @@ describe('implement-mode audit lens (regression — unchanged behavior)', () => 
   it('implement framing is always the generic CODE_ARTIFACT_FRAMING (030 FR-017: per-phase retired)', () => {
     const repo = tmpRepo();
     try {
-      const built = buildImplementVars(repo, 'demo', 'HEAD', undefined);
+      const built = buildImplementVars(repo, 'demo', 'HEAD', undefined, false);
       expect(built.vars.artifact_framing).toBe(CODE_ARTIFACT_FRAMING);
     } finally {
       rmSync(repo, { recursive: true, force: true });
