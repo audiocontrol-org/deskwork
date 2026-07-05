@@ -103,14 +103,14 @@ export function resolveCodeScopePolicy(govern: GovernConfig | undefined): CodeSc
   let exclude: readonly string[] = DEFAULT_EXCLUDE;
   let include: readonly string[] = DEFAULT_INCLUDE;
 
-  const rawCodeScope: unknown = govern.codeScope;
-  if (rawCodeScope !== undefined) {
+  const codeScope = govern.codeScope;
+  if (codeScope !== undefined) {
+    const rawCodeScope: unknown = codeScope;
     if (typeof rawCodeScope !== 'object' || rawCodeScope === null || Array.isArray(rawCodeScope)) {
       throw new Error(
         `govern: code_scope must be a mapping with optional exclude/include arrays; got ${describeValue(rawCodeScope)}.`,
       );
     }
-    const codeScope = govern.codeScope;
 
     const rawExclude: unknown = codeScope.exclude;
     if (rawExclude !== undefined) {
