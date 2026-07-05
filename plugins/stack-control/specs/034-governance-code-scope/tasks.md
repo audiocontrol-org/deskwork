@@ -100,6 +100,13 @@
 - **US2**: `code_only:false` → today's payload exactly; `include` glob rescues a matching `.md`; malformed config throws.
 - **US3**: docs-only diff → "nothing to govern" success, graduation permitted.
 
+## Phase 7: Audit-finding fix (AUDIT-20260705-01 — scoped into workplan, TDD-first)
+
+**Finding (HIGH, codex, step-4 govern):** the US3 empty-scope success (T013) treats ANY `emptiedByCodeScope` as a "nothing to govern" convergence, but does not prove the removed files were documentation. An over-broad operator `code_scope.exclude` (e.g. `["src/**"]`, `["**/*"]`) drops real CODE, empties the scope, and graduates `outcome: 'converged'` WITHOUT firing the barrage — bypassing the empty-scope FATAL guard for exactly the over-broad-exclusion class. This contradicts US3's stated intent ("a **documentation-only** change graduates cleanly"). Fix: narrow the success to genuinely docs-only.
+
+- [ ] T023 [tier:powerful] RED: write a test proving the bug — a custom policy `code_scope.exclude: ["src/**"]` (or `["**/*.ts"]`) over a CODE-only diff empties the scope, and the pipeline must NOT return the "nothing to govern" success (it must stay the FATAL empty-scope guard / refuse to graduate). Add to `code-scope-empty.test.ts` (+ a `code-scope.test.ts` unit for the new `isDefaultDocumentationFile` / `summarizeCodeScope.emptiedByDocumentationOnly` signal). Also assert the DEFAULT-policy docs-only case STILL succeeds (T012/T013 regression guard). Tests fail (flag currently set on any emptied scope). (AUDIT-20260705-01; FR-011 intent)
+- [ ] T024 [tier:powerful] Implement the guard in `src/govern/code-scope.ts` + `src/govern/end-govern-runtime.ts`: add `isDefaultDocumentationFile(file)` (matches a DEFAULT_EXCLUDE glob AND no DEFAULT_INCLUDE glob — the built-in documentation classification); extend `summarizeCodeScope` with `emptiedByDocumentationOnly` (= emptiedScope AND every removed file is default-documentation). The seam sets `emptiedByCodeScope` (and emits the "nothing to govern" reason) ONLY on `emptiedByDocumentationOnly`; an emptied scope that removed non-doc code no longer sets the flag → falls through to the existing empty-scope FATAL. Green T023; whole suite + tsc green; files under cap. (AUDIT-20260705-01; FR-011 intent)
+
 ## Out of Scope (no tasks)
 
 - Reframing/retiring `multi:gap/govern-doc-aware-audit-lens` (operator-owned roadmap disposition).
