@@ -88,6 +88,14 @@ export function makeFixFanout(opts: { concurrency: number; runFix: FixRunner; ca
 export interface EndGovernResult {
   readonly record: WholeFeatureConvergenceRecord;
   readonly chunks: readonly Chunk[];
+  /**
+   * Present on the 034 FR-011 "nothing to govern — no code in scope" success (US3):
+   * an ACTIVE code-only policy reduced a non-empty pre-filter diff to empty (a
+   * documentation-only change). Absent on every other outcome — this is an
+   * explanatory note, not part of the persisted convergence-record contract the
+   * graduate gate reads (that gate reads only `record.outcome`/`record.override`).
+   */
+  readonly reason?: string;
 }
 
 /** Run the chunked end-govern pipeline to a single whole-feature convergence record. */
