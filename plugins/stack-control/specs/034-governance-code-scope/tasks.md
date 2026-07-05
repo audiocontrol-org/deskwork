@@ -69,6 +69,8 @@
 - [ ] T018 [P] Update the config docs / a `.stack-control/config.yaml` example (and any govern SKILL/help text) to document the `govern` block, defaults, include-wins, and the fixture-rescue example from quickstart §3. (Spec §US2; quickstart)
 - [ ] T019 Run the quickstart validation live: `./bin/stackctl govern --mode implement` over a mixed diff (payload code-only + summary), a `code_only:false` diff (identity), and a docs-only diff ("nothing to govern" success). Record evidence in `quickstart.md`. (SC-001..006)
 - [ ] T020 [P] Final gate: `npx tsc --noEmit` clean + `npx vitest` green across the new suites; confirm `code-scope.ts` under the file-size cap. (Constitution I, VI)
+- [ ] T021 [US1] RED→assert: in `code-scope-integration.test.ts`, assert the **byte reduction** — for a doc-heavy `DiffScope`, the assembled payload's total byte size with `code_only` ON is less than with OFF by (at least) the excluded documentation's size. Closes the SC-002 measurement gap (analyze C2). (SC-002)
+- [ ] T022 Guard test: assert **spec-mode governance is unaffected** by the `govern` code-scope block — the spec-mode payload/file-set is byte-identical with the block present vs absent (the filter never touches the spec arm). Add to an existing spec-mode test (e.g. `govern-audit-lens`/spec-arm suite). Closes the FR-012 boundary-guard gap (analyze C1). (FR-012)
 
 ---
 
