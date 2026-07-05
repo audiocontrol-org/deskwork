@@ -24,6 +24,12 @@ Consequences specific to stack-control:
 
 The feature is therefore "exclude documentation," not "exclude markdown." File extension is only the cheap first cut; the runtime-vs-meta boundary is encoded by an operator-tunable include/exclude policy.
 
+## Clarifications
+
+### Session 2026-07-04
+
+- Q: When code-only scoping excludes documentation from the payload, what should the govern run surface about the exclusion? → A: A concise summary — the count of excluded documentation files plus that code-only scoping is active; on an empty code scope, the "nothing to govern — no code in scope" reason. Not the full path list (too noisy on doc-heavy diffs); not silent (the operator must be able to notice scoping fired and catch a mis-scoped `include`).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Implement-time governance audits only code (Priority: P1)
@@ -104,6 +110,7 @@ An operator runs implement-mode governance on a feature whose entire diff is doc
 - **FR-011**: When code-only filtering removes the entire scope (a documentation-only diff), governance MUST report a "nothing to govern — no code in scope" success rather than a fatal empty-scope error, and this success MUST satisfy the graduation precondition.
 - **FR-012**: The feature MUST affect only implement-mode governance. Spec-mode governance MUST be unchanged, and the code-only filter MUST NOT be applied to the spec-mode payload.
 - **FR-013**: The code-scope filter MUST be a deterministic, pure transform over the file set (decidable, order-independent) so that it is verifiable on the compiler/test floor rather than relying on the stochastic audit layer.
+- **FR-014**: When code-only scoping is active and excludes one or more files, the govern run MUST surface a concise summary — the count of excluded documentation files and that code-only scoping is active. It MUST NOT emit the full excluded-path list. When code-only filtering empties the scope, the summary MUST state the "nothing to govern — no code in scope" reason (the FR-011 success). When no files are excluded, no exclusion summary is required.
 
 ### Key Entities
 
@@ -121,6 +128,7 @@ An operator runs implement-mode governance on a feature whose entire diff is doc
 - **SC-004**: Setting `code_only: false` reproduces today's payload exactly (byte-identical file set and diffs) — verifiable by a before/after equality check.
 - **SC-005**: A documentation-only feature diff completes governance with a success outcome and permits graduation in 100% of cases, with zero fatal empty-scope errors — verifiable by running governance on a docs-only diff.
 - **SC-006**: A code-only governance run's audit prompt contains no instruction to review documentation — verifiable by inspecting the rendered lens.
+- **SC-007**: When documentation is excluded, the govern run reports the count of excluded files and that code-only scoping is active (and, for an empty code scope, the "nothing to govern" reason), with no full excluded-path list — verifiable by inspecting the run output.
 
 ## Assumptions
 
