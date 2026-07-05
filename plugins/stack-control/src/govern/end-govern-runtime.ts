@@ -40,7 +40,7 @@ import {
 } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
 import { SEVERITY_RANK } from '../scope-discovery/promote-findings/cluster-severity.js';
 import { scopeCommittedDiff, filterDiffScope } from './payload-diff-scope.js';
-import type { CodeScopePolicy } from './code-scope.js';
+import { applyCodeScope, type CodeScopePolicy } from './code-scope.js';
 
 /** Configuration for one chunked end-govern run's barrage-backed runtime. */
 export interface EndGovernRuntimeConfig {
@@ -250,8 +250,15 @@ export function makeEndGovernRuntime(cfg: EndGovernRuntimeConfig): EndGovernRunt
   };
 
   const deps: EndGovernDeps = {
+    // 034 FR-001/FR-002: applyCodeScope is composed OUTERMOST so the code-only
+    // filter applies AFTER the excludeDiffPaths scoping — this closure serves
+    // BOTH the pipeline's initial scope call and its mid-fix re-scope call
+    // (end-govern-pipeline.ts), so both inherit the same code-scope policy.
     scopeDiff: (installationRoot, base, head) =>
-      filterDiffScope(scopeCommittedDiff(installationRoot, base, head), cfg.excludeDiffPaths),
+      applyCodeScope(
+        filterDiffScope(scopeCommittedDiff(installationRoot, base, head), cfg.excludeDiffPaths),
+        cfg.codeScopePolicy,
+      ),
     resolveEnvelope: () => cfg.envelope,
     auditChunk,
     planContext: () => cfg.planContext,
