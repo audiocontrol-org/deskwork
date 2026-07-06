@@ -49,3 +49,28 @@ Runnable validation that implement-mode governance audits code and excludes docu
 - The five scenarios above observed on a live govern run against a mixed / docs-only / toggled diff.
 
 See [contracts/code-scope.md](./contracts/code-scope.md) for the behavioral contract table and [data-model.md](./data-model.md) for the types.
+
+## Live validation evidence (T019 — step-4 whole-feature govern, 2026-07-05)
+
+`/stack-control:execute` step-4 governance (`stackctl govern --mode implement`) was run
+over this feature's own real diff (merge-base `main`..HEAD — mixed `.ts` code + `.md` docs).
+Observed live, on the real payload:
+
+- **Code-only scoping active (SC-001, SC-007):** `govern: code-only scoping active — excluded
+  13 documentation file(s) from the audit payload.` — the concise summary fired with the count
+  and "code-only scoping active", **no per-file path list**; the barrage audited only the `.ts`
+  code (spec/plan/tasks/research/data-model/quickstart/contracts/design-record/journal `.md`
+  files were excluded).
+- **Fleet:** configured 2, produced 2 (`codex`, `claude`), both enforced + monitored.
+- **Round 1:** 1 HIGH finding (AUDIT-20260705-01 — empty-scope success could graduate
+  over-broad-exclude code unaudited). Fixed TDD-first (T023 RED → T024 fix: the
+  `emptiedByDocumentationOnly` guard). Re-govern confirmed it was **not re-raised**.
+- **Round 2:** 1 HIGH finding (AUDIT-20260705-02 — package-lock/deps). Verified **false
+  positive** (single-model; `picomatch` correctly in the workspace lockfile entry; `npm ci
+  --dry-run` succeeds). Dispositioned via operator-confirmed `GOVERN_OVERRIDE`.
+- **Outcome:** `terminal-outcome=graduated`; convergence record written with `override: true`.
+
+The identity (`code_only: false`, SC-004) and docs-only success (SC-005) behaviors are proven
+on the deterministic test floor (`code-scope-toggle.test.ts`, `code-scope-empty.test.ts`) —
+per the audit-barrage-is-stochastic-defense-in-depth rule, a wasteful live barrage purely to
+re-show a decidable behavior is avoided.
