@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "mode": "impl",
+  "item": "impl:feature/governance-code-scope",
+  "governedShaBase": "override-short-circuit",
+  "headSha": "override-short-circuit",
+  "chunkIds": [],
+  "rounds": 0,
+  "liftedFindings": [],
+  "closedInLoopFindings": [],
+  "seamResult": {
+    "boundaryPairs": [],
+    "findings": [],
+    "suppressedCompatible": 0
+  },
+  "splitClusterRefs": [],
+  "outcome": "override-eligible",
+  "anchorRoot": "/Users/orion/work/deskwork-work/governance-code-scope/plugins/stack-control",
+  "override": true,
+  "overrideReason": "Both HIGH findings from the step-4 barrage are dispositioned. AUDIT-20260705-01 (empty-scope success could graduate over-broad-exclude code unaudited) fixed TDD-first in T023 RED 33795617 + T024 fix 35a003b1 (emptiedByDocumentationOnly guard); re-govern confirmed it is not re-raised. AUDIT-20260705-02 is a verified single-model false positive: picomatch is correctly recorded in the workspace lockfile entry packages[plugins/stack-control] (picomatch ^2.3.2 + @types/picomatch ^2.3.3) and npm ci --dry-run succeeds with no mismatch; the finding assumed a single-package layout but this is an npm-workspaces monorepo. Deterministic floor green: tsc clean, 2728 tests pass."
+}
