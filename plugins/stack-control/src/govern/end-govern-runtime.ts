@@ -40,6 +40,7 @@ import {
 } from '../scope-discovery/promote-findings/extract-barrage-findings.js';
 import { SEVERITY_RANK } from '../scope-discovery/promote-findings/cluster-severity.js';
 import { scopeCommittedDiff, filterDiffScope } from './payload-diff-scope.js';
+import { applyCodeScope, summarizeCodeScope, type CodeScopePolicy } from './code-scope.js';
 
 /** Configuration for one chunked end-govern run's barrage-backed runtime. */
 export interface EndGovernRuntimeConfig {
@@ -74,6 +75,13 @@ export interface EndGovernRuntimeConfig {
    * path silently folded in (AUDIT-20260622-02).
    */
   readonly excludeDiffPaths: readonly string[];
+  /**
+   * The resolved code-scope policy (034 FR-002/FR-006): the caller resolves this
+   * once from installation config (`resolveCodeScopePolicy`) and passes it through
+   * — this runtime never re-defaults it, so `resolveCodeScopePolicy` stays the
+   * single source of defaults (T008).
+   */
+  readonly codeScopePolicy: CodeScopePolicy;
   readonly base: string;
   readonly head: string;
   readonly stderr: (s: string) => void;
@@ -242,8 +250,54 @@ export function makeEndGovernRuntime(cfg: EndGovernRuntimeConfig): EndGovernRunt
   };
 
   const deps: EndGovernDeps = {
-    scopeDiff: (installationRoot, base, head) =>
-      filterDiffScope(scopeCommittedDiff(installationRoot, base, head), cfg.excludeDiffPaths),
+    // 034 FR-001/FR-002: applyCodeScope is composed OUTERMOST so the code-only
+    // filter applies AFTER the excludeDiffPaths scoping — this closure serves
+    // BOTH the pipeline's initial scope call and its mid-fix re-scope call
+    // (end-govern-pipeline.ts), so both inherit the same code-scope policy.
+    //
+    // FR-011 (US3): also thread the "did code-only filtering EMPTY a non-empty
+    // scope" signal so the pipeline can tell a documentation-only change (success)
+    // apart from a genuinely empty diff (still FATAL). `summarizeCodeScope` already
+    // computes this from the before/after file counts; the tag is added ONLY when
+    // true, so the untagged/inactive-policy case stays byte-identical to `after`
+    // (no extra key) — preserving the existing identity guarantee (SC-004,
+    // code-scope-toggle.test.ts) that `code_only:false` returns exactly
+    // `filterDiffScope(scopeCommittedDiff(...), excludeDiffPaths)`.
+    scopeDiff: (installationRoot, base, head) => {
+      const before = filterDiffScope(scopeCommittedDiff(installationRoot, base, head), cfg.excludeDiffPaths);
+      const after = applyCodeScope(before, cfg.codeScopePolicy);
+      const { active, excludedCount, emptiedScope, emptiedByDocumentationOnly } = summarizeCodeScope(
+        before,
+        after,
+        cfg.codeScopePolicy,
+      );
+      // FR-014/SC-007: a concise, path-free summary of code-scope filtering — the
+      // count only, never the excluded file list.
+      //
+      // AUDIT-20260705-01: graduate an emptied scope as a "nothing to govern" success
+      // ONLY when the emptying is genuinely documentation-only under the BUILT-IN
+      // default classification (`emptiedByDocumentationOnly`) — NOT merely because an
+      // ACTIVE policy emptied the scope. An over-broad operator custom exclude (e.g.
+      // `code_scope.exclude: ["src/**"]`) that removes real CODE also empties the scope
+      // (`emptiedScope`), but flagging it here would silently graduate UNAUDITED code
+      // past the US3 empty-scope FATAL. So the flag — which the pipeline treats as a
+      // successful convergence — is set only on the docs-only emptying; a code-emptying
+      // custom policy is left UNFLAGGED so it falls through to the pipeline's fail-loud
+      // empty-scope guard (AUDIT-20260622-23).
+      if (emptiedByDocumentationOnly) {
+        cfg.stderr('govern: nothing to govern — no code in scope (documentation-only change).\n');
+      } else if (emptiedScope) {
+        cfg.stderr(
+          'govern: code-only scoping emptied the audit scope by removing NON-documentation file(s) under a ' +
+            'custom policy — refusing to graduate unaudited code (empty-scope guard applies).\n',
+        );
+      } else if (active && excludedCount > 0) {
+        cfg.stderr(
+          `govern: code-only scoping active — excluded ${excludedCount} documentation file(s) from the audit payload.\n`,
+        );
+      }
+      return emptiedByDocumentationOnly ? { ...after, emptiedByCodeScope: true } : after;
+    },
     resolveEnvelope: () => cfg.envelope,
     auditChunk,
     planContext: () => cfg.planContext,

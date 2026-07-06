@@ -29,6 +29,7 @@ import { runConvergenceLoop } from './convergence-loop.js';
 import { resolveImplementExclusion, resolveHeadSha } from './payload-diff-scope.js';
 import { runEndGovern } from './end-govern-pipeline.js';
 import { makeEndGovernRuntime } from './end-govern-runtime.js';
+import { resolveCodeScopePolicy } from './code-scope.js';
 import { writeWholeFeatureConvergenceRecord } from './chunk-artifacts.js';
 import { liftEndGovernFindingsOnce } from './lift-once.js';
 import { renderEndGovernNotDoneMessage } from './end-govern-message.js';
@@ -243,6 +244,13 @@ export async function runImplementArm(ctx: GovernRunContext): Promise<void> {
 
   const base = flags.diffBase ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
   const envelope = Math.min(...laneCapabilities.map((lane) => lane.envelope.maxPromptBytes));
+  // 034 FR-002/FR-006: resolve the code-scope policy ONCE from installation config
+  // (defaults when `govern` is absent) and thread it into the runtime so the
+  // scopeDiff seam applies the SAME code-only filter on the initial scope and the
+  // mid-fix re-scope (T008/T009). Resolved BEFORE buildImplementVars so its
+  // `.active` flag can also drive the audit-lens variant (FR-010) — the same
+  // policy resolution backs both the payload filter and the prompt lens.
+  const codeScopePolicy = resolveCodeScopePolicy(installation.config.govern);
   // Reuse buildImplementVars for the audit lens / framing / commit-subjects /
   // workplan summary; the assembled whole `diff` is DISCARDED — the pipeline
   // re-scopes per chunk (scopeCommittedDiff + partitionDiff), rendering the
@@ -252,7 +260,7 @@ export async function runImplementArm(ctx: GovernRunContext): Promise<void> {
   // summary) can never describe a different range than the chunks audited.
   // (flags.diffBase is already resolved to `base` at the top of runGovern via
   // resolveImplementDiffBase, so this is also the single base-resolution site.)
-  const { vars } = buildImplementVars(repoRoot, slug, base, flags.checkpoint);
+  const { vars } = buildImplementVars(repoRoot, slug, base, flags.checkpoint, codeScopePolicy.active);
   const { diff: _discardedWholeDiff, workplan_summary: planContext, ...varsBase } = vars;
   void _discardedWholeDiff;
   // AUDIT-20260622-02: thread the SAME resolved exclusion set buildImplementVars
@@ -272,6 +280,7 @@ export async function runImplementArm(ctx: GovernRunContext): Promise<void> {
     checkpoint: flags.checkpoint ?? 'after_implement',
     varsBase,
     excludeDiffPaths: excludeDiffRels,
+    codeScopePolicy,
     laneCapabilities,
     models: requestedModels,
     requireModels,

@@ -56,9 +56,22 @@ export interface FixRoundResult {
 /** The injected FIX step: fix a round's per-chunk findings autonomously, returning the round result. */
 export type ApplyFixes = (chunkFindings: readonly ChunkFindings[], round: number) => Promise<FixRoundResult>;
 
+/**
+ * `scopeDiff`'s return, augmented with the 034 FR-011 code-scope-emptied signal:
+ * `true` when an ACTIVE code-only policy reduced a non-empty pre-filter diff to
+ * empty (a documentation-only change). The runtime seam (`end-govern-runtime.ts`)
+ * computes this from `code-scope.ts`'s `summarizeCodeScope` (before/after file
+ * counts) and threads it through — the pipeline stays ignorant of code-scope
+ * internals, it just reads the one boolean. Absent/`false` on every other scope
+ * (including a GENUINELY empty diff — AUDIT-20260622-23's guard still applies there).
+ */
+export type ScopeDiffResult = DiffScope & {
+  readonly emptiedByCodeScope?: boolean;
+};
+
 /** Injected collaborators — stubbed in tests, real machinery at the CLI. */
 export interface EndGovernDeps {
-  readonly scopeDiff: (installationRoot: string, base: string, head: string) => DiffScope;
+  readonly scopeDiff: (installationRoot: string, base: string, head: string) => ScopeDiffResult;
   readonly resolveEnvelope: () => number;
   readonly auditChunk: (payload: string, chunkId: string) => Promise<ChunkAuditResult>;
   readonly planContext: () => string;
@@ -88,6 +101,14 @@ export function makeFixFanout(opts: { concurrency: number; runFix: FixRunner; ca
 export interface EndGovernResult {
   readonly record: WholeFeatureConvergenceRecord;
   readonly chunks: readonly Chunk[];
+  /**
+   * Present on the 034 FR-011 "nothing to govern — no code in scope" success (US3):
+   * an ACTIVE code-only policy reduced a non-empty pre-filter diff to empty (a
+   * documentation-only change). Absent on every other outcome — this is an
+   * explanatory note, not part of the persisted convergence-record contract the
+   * graduate gate reads (that gate reads only `record.outcome`/`record.override`).
+   */
+  readonly reason?: string;
 }
 
 /** Run the chunked end-govern pipeline to a single whole-feature convergence record. */
@@ -103,6 +124,34 @@ export async function runEndGovern(input: EndGovernInput, deps: EndGovernDeps): 
   // bad diff base, an over-broad exclusion filter, or a feature with no scoped files
   // is a defect to surface, never a silent clean pass.
   if (scope.files.length === 0 || partition.chunks.length === 0) {
+    // 034 US3/FR-011: an ACTIVE code-only policy that reduced a REAL, non-empty
+    // diff to empty (a documentation-only change) is a legitimate "nothing to
+    // govern" success, never the fail-loud guard below — documentation review is
+    // the operator's responsibility, not the barrage's. This is the ONLY case that
+    // takes the success path; a GENUINELY empty diff (no `emptiedByCodeScope`
+    // signal) still FATALs unchanged, so AUDIT-20260622-23's protection stands.
+    if (scope.emptiedByCodeScope === true) {
+      const reason =
+        `govern: nothing to govern — no code in scope for '${input.item}' over ${input.base}..${input.head} ` +
+        `(code-only scoping excluded every changed file; documentation review is the operator's ` +
+        `responsibility, not the barrage's). Graduating without a barrage run (FR-011).`;
+      const record: WholeFeatureConvergenceRecord = {
+        version: 1,
+        mode: 'impl',
+        item: input.item,
+        governedShaBase: input.base,
+        headSha: input.head,
+        chunkIds: [],
+        rounds: 0,
+        liftedFindings: [],
+        closedInLoopFindings: [],
+        seamResult: { boundaryPairs: [], findings: [], suppressedCompatible: 0 },
+        splitClusterRefs: [],
+        outcome: 'converged',
+        anchorRoot: input.installationRoot,
+      };
+      return { record, chunks: [], reason };
+    }
     throw new Error(
       `govern: FATAL — end-govern found an EMPTY scope for '${input.item}' over ${input.base}..${input.head} ` +
         `(${scope.files.length} scoped file(s) → ${partition.chunks.length} chunk(s)). No barrage fired, so the ` +

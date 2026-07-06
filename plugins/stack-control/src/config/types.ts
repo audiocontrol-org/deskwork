@@ -59,6 +59,32 @@ export interface InstallationPaths {
  */
 export type TierMap = Readonly<Record<string, string>>;
 
+/**
+ * Code scope configuration for govern operations (034 governance-code-scope).
+ * Defines include/exclude patterns for scoping audit to specific code paths.
+ * Per contracts/code-scope.md Contract 1, EVERY field is optional — the operator
+ * may supply just one of `exclude`/`include`; the loader carries through exactly
+ * what was present (no defaulting), and `resolveCodeScopePolicy` fills the rest
+ * (data-model.md § GovernConfig Derivation).
+ */
+export interface GovernCodeScopeConfig {
+  readonly exclude?: readonly string[];
+  readonly include?: readonly string[];
+}
+
+/**
+ * Govern mode configuration (034 governance-code-scope).
+ * Controls audit behavior for code-only mode and code-scope filtering.
+ * Both fields optional (Contract 1 "All fields optional") — absent `govern`
+ * (the whole block) leaves `InstallationConfig.govern` `undefined`, and absent
+ * sub-fields within a present block stay `undefined` too; `resolveCodeScopePolicy`
+ * (src/govern/code-scope.ts) is the sole place defaults get applied.
+ */
+export interface GovernConfig {
+  readonly codeOnly?: boolean;
+  readonly codeScope?: GovernCodeScopeConfig;
+}
+
 /** Parsed + validated `.stack-control/config.yaml` (in-memory, camelCase). */
 export interface InstallationConfig {
   /** Schema version — required positive integer; an unknown version fails loud. */
@@ -69,6 +95,8 @@ export interface InstallationConfig {
   /** Operator tier→model map (033). Optional; absent is not a load error (it
    *  becomes a per-task `resolve-tiers` error only when a task declares a tier). */
   readonly tierMap?: TierMap;
+  /** Govern mode configuration (034). Optional; absent is not a load error. */
+  readonly govern?: GovernConfig;
 }
 
 /** Each working-file key resolved to an absolute path (post-precedence). */

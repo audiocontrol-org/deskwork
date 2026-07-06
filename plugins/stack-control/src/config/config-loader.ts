@@ -10,7 +10,7 @@ import { parse as parseYaml } from 'yaml';
 import { errorMessage, isPlainObject } from '../scope-discovery/util/typeguards.js';
 import { ACCEPTED_MODELS_LABEL, isAcceptedModel } from '../execute/accepted-models.js';
 import { InstallationError } from './errors.js';
-import type { InstallationConfig, InstallationPaths, TierMap } from './types.js';
+import type { GovernCodeScopeConfig, GovernConfig, InstallationConfig, InstallationPaths, TierMap } from './types.js';
 
 const FEATURE_PLACEHOLDER = '{feature}';
 
@@ -22,7 +22,13 @@ const FEATURE_PLACEHOLDER = '{feature}';
 const SUPPORTED_VERSIONS: ReadonlySet<number> = new Set([1]);
 
 /** Known top-level keys (wire/snake form). Anything else fails loud. */
-const KNOWN_TOP_LEVEL = new Set(['version', 'base_dir', 'paths', 'tier_map']);
+const KNOWN_TOP_LEVEL = new Set(['version', 'base_dir', 'paths', 'tier_map', 'govern']);
+
+/** Known `govern.*` keys (wire/snake form). Anything else fails loud. */
+const GOVERN_KEYS = new Set(['code_only', 'code_scope']);
+
+/** Known `govern.code_scope.*` keys (wire/snake form). Anything else fails loud. */
+const CODE_SCOPE_KEYS = new Set(['exclude', 'include']);
 
 /** Known `paths.*` keys (wire/snake form) → in-memory camelCase key. */
 const PATHS_KEY_MAP: ReadonlyMap<string, keyof InstallationPaths> = new Map([
@@ -71,7 +77,13 @@ export function parseInstallationConfig(body: string, sourceLabel: string): Inst
   }
 
   const version = requireSupportedVersion(parsed['version'], sourceLabel);
-  const config: { version: number; baseDir?: string; paths?: InstallationPaths; tierMap?: TierMap } = {
+  const config: {
+    version: number;
+    baseDir?: string;
+    paths?: InstallationPaths;
+    tierMap?: TierMap;
+    govern?: GovernConfig;
+  } = {
     version,
   };
 
@@ -85,6 +97,10 @@ export function parseInstallationConfig(body: string, sourceLabel: string): Inst
 
   if (parsed['tier_map'] !== undefined) {
     config.tierMap = parseTierMap(parsed['tier_map'], sourceLabel);
+  }
+
+  if (parsed['govern'] !== undefined) {
+    config.govern = parseGovern(parsed['govern'], sourceLabel);
   }
 
   return config;
@@ -143,6 +159,57 @@ function parsePaths(raw: unknown, sourceLabel: string): InstallationPaths {
   return out;
 }
 
+/**
+ * Parse + validate the additive `govern` section (034), mirroring `parsePaths`:
+ * fail-loud, no silent ignore. Per contracts/code-scope.md Contract 1, EVERY field
+ * is optional — this only carries through what the operator actually wrote; it
+ * never fills in a default for an absent sub-field. `resolveCodeScopePolicy`
+ * (src/govern/code-scope.ts) is the sole place defaults are applied.
+ */
+function parseGovern(raw: unknown, sourceLabel: string): GovernConfig {
+  if (!isPlainObject(raw)) {
+    throw fail(sourceLabel, 'govern must be a mapping');
+  }
+  for (const key of Object.keys(raw)) {
+    if (!GOVERN_KEYS.has(key)) {
+      throw fail(sourceLabel, `unknown govern.${key} key (no silent ignore)`);
+    }
+  }
+  const govern: { codeOnly?: boolean; codeScope?: GovernCodeScopeConfig } = {};
+
+  if (raw['code_only'] !== undefined) {
+    govern.codeOnly = requireBoolean(raw['code_only'], 'govern.code_only', sourceLabel);
+  }
+
+  if (raw['code_scope'] !== undefined) {
+    govern.codeScope = parseCodeScope(raw['code_scope'], sourceLabel);
+  }
+
+  return govern;
+}
+
+function parseCodeScope(raw: unknown, sourceLabel: string): GovernCodeScopeConfig {
+  if (!isPlainObject(raw)) {
+    throw fail(sourceLabel, 'govern.code_scope must be a mapping');
+  }
+  for (const key of Object.keys(raw)) {
+    if (!CODE_SCOPE_KEYS.has(key)) {
+      throw fail(sourceLabel, `unknown govern.code_scope.${key} key (no silent ignore)`);
+    }
+  }
+  const codeScope: { exclude?: readonly string[]; include?: readonly string[] } = {};
+
+  if (raw['exclude'] !== undefined) {
+    codeScope.exclude = requireStringArray(raw['exclude'], 'govern.code_scope.exclude', sourceLabel);
+  }
+
+  if (raw['include'] !== undefined) {
+    codeScope.include = requireStringArray(raw['include'], 'govern.code_scope.include', sourceLabel);
+  }
+
+  return codeScope;
+}
+
 function requireSupportedVersion(value: unknown, sourceLabel: string): number {
   const version = requirePositiveInteger(value, 'version', sourceLabel);
   if (!SUPPORTED_VERSIONS.has(version)) {
@@ -165,6 +232,20 @@ function requirePositiveInteger(value: unknown, field: string, sourceLabel: stri
 function requireNonEmptyString(value: unknown, field: string, sourceLabel: string): string {
   if (typeof value !== 'string' || value.length === 0) {
     throw fail(sourceLabel, `${field} must be a non-empty string (got ${describe(value)})`);
+  }
+  return value;
+}
+
+function requireBoolean(value: unknown, field: string, sourceLabel: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw fail(sourceLabel, `${field} must be a boolean (got ${describe(value)})`);
+  }
+  return value;
+}
+
+function requireStringArray(value: unknown, field: string, sourceLabel: string): readonly string[] {
+  if (!Array.isArray(value) || !value.every((entry) => typeof entry === 'string')) {
+    throw fail(sourceLabel, `${field} must be an array of strings (got ${describe(value)})`);
   }
   return value;
 }

@@ -12,6 +12,7 @@ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeEndGovernRuntime } from '../../govern/end-govern-runtime.js';
+import { resolveCodeScopePolicy } from '../../govern/code-scope.js';
 import type { LaneCapabilityProfile } from '../../govern/lane-capabilities.js';
 
 /**
@@ -96,6 +97,7 @@ function makeRuntime() {
       artifact_framing: 'CODE_FRAMING',
     },
     excludeDiffPaths: [],
+    codeScopePolicy: resolveCodeScopePolicy(undefined),
     laneCapabilities: [viableLane()],
     requireModels: 1,
     envelope: 100_000,
@@ -206,6 +208,7 @@ describe('030 — runtime scopeDiff honors excludeDiffPaths (AUDIT-20260622-02)'
           artifact_framing: 'F',
         },
         excludeDiffPaths: ['specs/030/audit-log.md'],
+        codeScopePolicy: resolveCodeScopePolicy(undefined),
         laneCapabilities: [viableLane()],
         requireModels: 1,
         envelope: 100_000,

@@ -2,6 +2,52 @@
 
 ---
 
+## 2026-07-05: governance-code-scope — design → define (spec authored to runnable)
+
+### Feature: impl:feature/governance-code-scope
+### Worktree: governance-code-scope (branch feature/governance-code-scope)
+
+**Goal:** Orchestrator/authoring session. Pick up the roadmap item for this branch and take it through the stack-control front door from a bare placeholder to a runnable spec: `/stack-control:design` → `/stack-control:define` (the full Spec Kit chain specify → clarify → plan → checklist → tasks → analyze). Stop at the two-session boundary — implementation is a separate session.
+
+**Accomplished:**
+- **Scoped the feature with the operator** (interactive design dialogue): restrict implement-time governance (the whole-feature end-govern audit `/stack-control:execute` fires) to **code**, excluding documentation, because the barrage rings on doc trivia and large docs blow out smaller models' context windows. Governing rule the operator supplied: **code = anything that defines the runtime environment; documentation = meta-info about the code that doesn't affect runtime** → a `SKILL.md` body is code; PRDs/specs/journals are docs; docs are operator-reviewed, never a barrage concern.
+- **Design record** (`docs/superpowers/specs/2026-07-04-governance-code-scope-design.md`), operator-approved; gate 7/7; `design-approved` marker recorded.
+- **Recon** (Explore subagent) mapped the single implement-mode payload seam — `scopeDiff` at `end-govern-runtime.ts:245` (`filterDiffScope(scopeCommittedDiff(...))`), zero extension-awareness today, `--phase` retired (030), the `CODE_AUDIT_LENS:18` doc-drift bullet, the empty-scope FATAL, config home `InstallationConfig`.
+- **Authored `specs/034-governance-code-scope/`** to runnable via the full chain: spec (14 FR / 7 SC / 3 user stories), clarify (1 Q → concise exclusion summary, FR-014/SC-007), plan + research (picomatch decision) + data-model + contracts + quickstart, requirements-quality checklist (25 items), tasks (22, TDD-first, MVP = T001–T009), analyze (0 critical/high; 2 mediums folded into T021/T022).
+- **Item is execute-ready:** `spec=yes plan=yes tasks=yes`; spec pointer linked; `analyze-clean` recorded; phase advanced planned → designing → specifying → **implementing**. Everything committed + pushed on `feature/governance-code-scope`.
+
+**Didn't Work:**
+- **Multi-domain resolution failed-closed from the repo root.** With 5 stack-control domains in the monorepo, `session-start` exited 1, `check-front-door` reported 21 phantom `roadmap/*`-help gaps, and the **026 PreToolUse interceptor fail-closed on `/speckit-clarify`** ("multiple stack-control installation domains found … failing closed"). Fixed mid-chain with `config-domain use plugins/stack-control --scope branch` + `--at` flags. Captured as tooling friction.
+- **Spec Kit `git.feature` before_specify hook silently no-op'd branch creation** — `has_git()` is false at the relocated `.specify` root (no adjacent `.git`), TASK-46. Benign here (kept us on the feature branch) but the hook quietly skips in the monorepo layout.
+- **Shell cwd drifted to the repo root** between some Bash calls, causing `./bin/stackctl` / `.specify/scripts` not-found until re-anchored. Self-inflicted; resolved by `cd`-ing explicitly each call.
+
+**Course Corrections:**
+- [PROCESS] Initial `session-start` + "pick up the roadmap item" found no matching roadmap node — the branch's placeholder commit lived only on `origin`. Operator: "get the latest from origin and check again." A `git fetch` surfaced `impl:feature/governance-code-scope`. Lesson: fetch before concluding a branch has no roadmap item.
+- [PROCESS] The `git.feature` hook wanted to fork a `034-` branch off the operator's `feature/governance-code-scope`. Ran it pinned to the existing branch (`GIT_BRANCH_NAME` + `--allow-existing-branch`) so it was faithfully executed without fragmenting the one-branch-per-feature setup.
+- [SCOPE] Operator refined the code/doc boundary twice mid-dialogue ("a skill body IS code"; "add include and exclude options") — captured both into the include/exclude glob policy rather than the flat `.md` exclusion I first proposed.
+
+**Insights:**
+- The operator's runtime-vs-meta definition is the load-bearing decision — it dissolves the "SKILL.md is markdown but is it docs?" tension and makes the include list (skill bodies, WORKFLOW, rules) principled rather than ad-hoc. Extension is only the cheap first cut.
+- Including large rule files in the default `include` does **not** reintroduce the context-window blowout: the payload is diff-scoped, so a rule file only appears when a feature actually changed it — and then governing it is correct.
+- The whole design→define arc rode on stack-control + speckit skills; the 026 capability mediation (front-door marker bracketing the `/speckit-*` drives) worked once the domain was pinned.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 12 total in the boundary window; **~10 authored this session** (design record → analyze-clean marker + this journal). The window's merge-base fallback also swept in `6f201271` (the operator's placeholder commit, pulled from origin) and 2 pre-session baseline commits (#517 merge, model-sized-dispatch close) that are not this session's work.
+  - roadmap(governance-code-scope): record analyze-clean marker + link spec:034
+  - tasks(034): close analyze coverage gaps (SC-002 byte-reduction, FR-012 spec-mode guard)
+  - tasks(034): TDD-first, user-story-phased task list (20 tasks)
+  - checklist(034): requirements-quality checklist (25 items)
+  - plan(034-governance-code-scope): impl plan + research/data-model/contracts/quickstart
+  - spec(034): clarify exclusion observability (concise summary)
+  - spec(034-governance-code-scope): author feature spec via define front door
+  - roadmap(governance-code-scope): record operator design-approved marker
+  - design(governance-code-scope): design record + set design: pointer
+  - roadmap(impl:feature/governance-code-scope): add planned item
+  - Merge pull request #517 from audiocontrol-org/chore/close-model-sized-dispatch-paperwork
+  - chore(roadmap): close impl:feature/model-sized-dispatch (validated in installed 0.56.1)
+- Files changed: 13
+- Backlog touched: (none)
+
 ## 2026-06-29: model-sized-dispatch — execute → ship 0.56.0 → hooks-fix 0.56.1 → close
 
 **Goal:** Implementation session. Take `specs/033-model-sized-dispatch` through the

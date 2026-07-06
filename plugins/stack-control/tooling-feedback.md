@@ -140,3 +140,7 @@
 
 ## session-end 2026-06-29
 - CI publish-npm/check 'test' job intermittently red on a vitest-worker timeout ('Timeout calling onTaskUpdate') under load — 2680/2682 pass but the run exits non-zero, producing a false-red merge gate (hit on PR #516; cleared on re-run). Recurring; consider raising vitest pool/teardown timeout or sharding the suite in CI.
+
+## session-end 2026-07-05
+- Multi-domain ambiguity: from the repo root (5 stack-control domains) session-start exited 1, check-front-door reported 21 phantom roadmap/*-help gaps, and the 026 PreToolUse interceptor fail-closed on /speckit-clarify. Required 'config-domain use plugins/stack-control --scope branch' mid-chain plus --at flags. Candidate GitHub issue: interceptor/session verbs should resolve the pinned/nearest domain more gracefully or emit a one-line fix hint earlier.
+- Spec Kit git.feature before_specify hook skipped branch creation because has_git() is false at the relocated .specify root (plugins/stack-control has no adjacent .git) — TASK-46. Benign here (kept us on feature/governance-code-scope) but the hook silently no-ops branch creation in the monorepo layout.

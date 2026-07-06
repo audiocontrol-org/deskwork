@@ -17,7 +17,11 @@ import {
   selectRequestedLaneCapabilities,
   type BarrageVars,
 } from './protocol.js';
-import { CODE_AUDIT_LENS, CODE_ARTIFACT_FRAMING } from './audit-constants.js';
+import {
+  CODE_AUDIT_LENS,
+  CODE_AUDIT_LENS_CODE_ONLY,
+  CODE_ARTIFACT_FRAMING,
+} from './audit-constants.js';
 import {
   assembleSpecPayload,
   SPEC_AUDIT_LENS,
@@ -242,6 +246,7 @@ export function buildImplementVars(
   slug: string,
   diffBaseFlag: string | undefined,
   checkpointFlag: string | undefined,
+  codeOnly: boolean,
 ): { vars: BarrageVars; checkpoint: string; skippedOutOfScope: readonly string[] } {
   const base = diffBaseFlag ?? pick(undefined, process.env.GOVERN_DIFF_BASE) ?? 'HEAD~1';
   // 030 (FR-024): the implement arm drives the end-govern pipeline, which re-scopes the
@@ -257,7 +262,7 @@ export function buildImplementVars(
     diff: '',
     audit_log_excerpt: '',
     commit_subjects: implementCommitSubjects(repoRoot, base),
-    audit_lens: CODE_AUDIT_LENS,
+    audit_lens: codeOnly ? CODE_AUDIT_LENS_CODE_ONLY : CODE_AUDIT_LENS,
     // 030 (FR-017): per-phase is retired — the whole-feature audit always uses the
     // generic framing. (The per-phase out-of-window note would be false here and
     // could suppress a real missing-impl HIGH.)
