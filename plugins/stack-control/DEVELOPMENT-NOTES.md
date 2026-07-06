@@ -2947,3 +2947,4 @@ workflow-mechanization centerpiece) and capture it durably as a design record.
 - Tooling friction captured this session: **3** in `tooling-feedback.md` (import-all, TF-09 prereq, filename length) + the session-end boundary bug noted above.
 workflow(graduate): multi:feature/ship-stage merging -> validating
 workflow(graduate): impl:feature/model-sized-dispatch merging -> validating
+workflow(graduate): impl:feature/governance-code-scope merging -> validating
