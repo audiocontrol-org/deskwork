@@ -95,6 +95,52 @@ stackctl check-front-door
 
 2. **Drive native `/speckit-specify`** via the in-session agent to create the new spec. Honor Spec Kit's prescribed order (Principle VIII — Faithful Tool Adoption): `specify → clarify → plan → checklist → tasks → analyze`. Do not skip or off-road; let each `/speckit-*` step run in order as the spec matures.
 
+   ### Inject the model-tier requirement at the tasks-authoring seam (035 FR-002)
+
+   When the chain reaches the **tasks-authoring** step — the `/speckit-tasks` drive
+   inside the front-door marker bracket below — inject the single-source model-tier
+   requirement so generated tasks are **born** with a `[tier:<label>]` per task.
+   This MIRRORS how `/stack-control:design` step 2 injects the house-rules block
+   (`src/workflow/house-rules.ts`, `renderHouseRules()`) at its design seam — same
+   shape, a different single source:
+
+   - **Read this installation's vocabulary.** Before driving `/speckit-tasks`, run
+     the read verb (already inside the marker bracket the tasks step uses):
+
+     ```bash
+     stackctl tier-vocab --json
+     ```
+
+     It emits the installation's `TierVocab` (or `{configured:false, configPath}`
+     when no `tier_map` is set).
+
+   - **Inject the block.** Render `renderTierRequirement(vocab)` from the single
+     source `src/workflow/tier-requirement.ts` — passing the `tier-vocab` JSON — and
+     inject that markdown block into the `/speckit-tasks` conversation, exactly as
+     `renderHouseRules()` is injected at the design seam. The block instructs the
+     generator to tag every task with `[tier:<label>]` alongside the existing `[P]`
+     and `[US n]` tags, and (when configured) names THIS installation's concrete
+     labels so the generator proposes only real `tier_map` labels.
+
+   - **Absent vocabulary → `[tier:UNSET]` + loud advisory (FR-009, non-blocking).**
+     When `tier-vocab` reports `configured:false` (no `tier_map`), the rendered
+     block instructs emitting `[tier:UNSET]` on every task plus a loud advisory
+     naming the missing `tier_map` and the config path to fix it. Generation is
+     **not** blocked here — the existing `resolve-tiers` floor rejects `UNSET`
+     fail-loud at execute, so the gap surfaces again there until the `tier_map` is
+     added.
+
+   - **Operator override / non-clobber (FR-007).** This injection only shapes a
+     **fresh** generation. A tasks.md the operator has already reviewed or edited is
+     **not** clobbered — regeneration is operator-initiated. The tier tags the
+     operator set by hand win; the seam never silently rewrites a reviewed file.
+
+   - **Capability, not vendor (Principle III / FR-002).** Do **NOT** branch on which
+     backend authors tasks. The block is injected identically regardless of the
+     tasks backend's identity — any backend that authors `tasks.md` receives the
+     same single-source requirement. The tier requirement is a capability-level
+     opinion, never a per-tool code path.
+
 3. **Resolve and state the spec dir.** `/speckit-specify` numbers the new spec dir (`specs/NNN-<slug>/`). Resolve it before you reference it anywhere below. Note: this program runs on one long-lived branch (`feature/pluggable-lifecycle-providers`) with numbered spec dirs, so Spec Kit's `check-prerequisites.sh` rejects the branch name (TF-09) — the active spec dir is resolved via the `<!-- SPECKIT START -->…<!-- SPECKIT END -->` marker in `CLAUDE.md`, not via the branch. State which spec dir you created before proceeding (matching `extend`'s resolve-then-report ordering).
 
 4. **Confirm artifact state as it advances.** After each authoring step that adds an artifact, run `stackctl spec-check` against the dir you resolved in step 3:
