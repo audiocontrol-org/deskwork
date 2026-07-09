@@ -2,6 +2,59 @@
 
 ---
 
+## 2026-07-09: model-tier-task-annotation — full lifecycle to `closed` + CI publish root-fix (v0.58.1)
+
+> Session-close record for the whole remote-control session (it began 2026-07-08 and ran past midnight into 2026-07-09). The mid-session 2026-07-08 entry below captures the execute-phase detail; this entry is the end-to-end summary + the ship/release/close half.
+
+**Goal:** Drive `impl:feature/model-tier-task-annotation` through the *entire* stack-control lifecycle in one session — design → define → execute → govern → ship → release → validate → close — via `/remote-control`.
+
+**Accomplished:**
+- **Full lifecycle, item now `closed`:** design (approved, 7/7) → define (spec → clarify → plan → checklist → tasks → analyze, `analyze-clean`) → execute (24 tasks, model-sized dispatch, 2779 tests green) → govern (cross-model barrage converged, 0 findings, graduated) → ship (PR #523 merged, `status: shipped` on main) → release (**v0.58.1** on npm, OIDC + provenance, marketplace-smoked) → validate (installed v0.58.1 exercised: `tier-vocab`, seam wiring, single source, front-door parity all ✓) → close (`validated: yes`, terminal).
+- **The feature:** `/stack-control:define`'s tasks step injects a single-sourced `renderTierRequirement` block (keyed off the installation's real `tier_map` via the new `stackctl tier-vocab` verb, deterministic `MODEL_CAPABILITY_RANK` binding) → `tasks.md` is born tier-complete; the fail-loud `resolve-tiers` floor is preserved as the deterministic backstop.
+- **Incidental CI root-fix shipped in v0.58.1:** the publish workflow's `npm install -g npm@latest` was pinned to `npm@11` (see below).
+
+**Didn't Work:**
+- **v0.58.0 publish failed on a latent CI bug.** The workflow's unpinned `npm install -g npm@latest` pulled npm@12 (engine floor node ≥22) onto a node-20 runner → EBADENGINE, workflow died at 14s *before* publishing (run 29032426165). Nothing published at 0.58.0. Root-fixed by pinning `npm@11` (OIDC-capable, node-20-compatible) and re-released as v0.58.1 through the fixed CI. **v0.58.0 is an inert orphaned tag** (no npm artifacts; documented in the v0.58.1 release notes).
+- **PR CI first went red on a flake.** A vitest `[vitest-worker]: Timeout calling "onTaskUpdate"` (worker↔main RPC timeout) with **0 assertion failures** — a slow/contended-runner symptom, amplified by the subprocess-spawning `runCli` tests. A clean re-run passed the same commit; no code change needed.
+
+**Course Corrections:**
+- [PROCESS] The `@/` import alias is NOT configured in this plugin's tsconfig — subagents correctly used relative `.js` imports matching `house-rules.ts` (match surrounding code / Constitution VIII over the global `@/` rule).
+- [PROCESS] Serial subagent dispatch in the single shared worktree (concurrent committers race the git index); the mechanical worktree-isolated parallel engine remains `impl:feature/execution-engine`.
+- [PROCESS] `graduate` (`status: shipped`) and `close` (`status: closed`) were recorded on **main**, not the merged-and-closed feature branch — a trunk-level roadmap fact must land where every reader looks (the split-state the 032 weld prevents). Each main-push was operator-confirmed.
+- [PROCESS] Chose to re-release as **v0.58.1 through the fixed CI** (clean OIDC + provenance) over `make publish` of 0.58.0 (token-auth workaround, no provenance) — root-fix + ship-through-the-fix over a one-off workaround.
+
+**Insights:**
+- **Dogfooding the exact friction while fixing it** is the strongest signal: this feature's own `tasks.md` was the *last* hand-backfilled one for a define-authored spec — the shipped seam makes the next born tier-complete.
+- The CI publish break was **latent infra drift** (an unpinned `@latest` crossing a node-major boundary) that only surfaces at release; pinning the major is the durable fix and it now protects every future release.
+- **T015** (the agent-driven seam end-to-end) was honestly marked `[~]` operator-acceptance rather than faked green — a code-path assertion can't exercise LLM-driven SKILL.md prose; it validates naturally the first time a new define-authored feature is born tier-complete.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 22
+  - workflow(close): impl:feature/model-tier-task-annotation validating -> closed
+  - chore: release v0.58.1
+  - ci(publish): pin npm@11 — fix node-20 EBADENGINE from npm@latest drift
+  - chore: release v0.58.0
+  - workflow(graduate): impl:feature/model-tier-task-annotation merging -> validating
+  - Merge pull request #523 from audiocontrol-org/feature/model-tier-task-annotation
+  - govern(035): whole-feature convergence record — graduated (0 new findings)
+  - chore(035): mark tasks complete, execution ledger, dogfood journal note (T022-T024)
+  - feat(035): exemplify [tier:] in tasks-template + drift guard vs single source (T020/T021)
+  - test(035): floor-preserved + non-default-vocab + override behavior guards (T013/T014/T016/T017/T018/T019)
+  - feat(035): inject tier-requirement at the define tasks seam (T011/T012)
+  - feat(035): stackctl tier-vocab read verb + CLI registration (T001/T005/T009/T010)
+  - feat(035): tier-requirement single source — bucketBindings + renderTierRequirement (T003/T004/T007/T008)
+  - feat(035): MODEL_CAPABILITY_RANK + rankOf in accepted-models (T002/T006)
+  - analyze(035): record analyze-clean + capture F1 no-map-vs-unknown-tier nuance
+  - tasks(035): dependency-ordered, tier-annotated tasks.md (runnable)
+  - checklist(035): requirements-quality checklist for tier annotation
+  - plan(035): author plan + research + data-model + contracts + quickstart
+  - spec(035): clarify — resolve both NEEDS CLARIFICATION markers + scope
+  - spec(035): author model-tier-task-annotation spec + link node pointer
+  - design(impl:feature/model-tier-task-annotation): record design-approved + advance to in-flight
+  - design(impl:feature/model-tier-task-annotation): open designing phase + design record
+- Files changed: 54
+- Backlog touched: (none)
+
 ## 2026-07-08: model-tier-task-annotation — design → define → execute (full lifecycle in one remote-control session)
 
 ### Feature: impl:feature/model-tier-task-annotation
