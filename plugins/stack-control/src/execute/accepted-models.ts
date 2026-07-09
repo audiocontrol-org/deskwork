@@ -22,3 +22,33 @@ export const ACCEPTED_MODELS_LABEL = 'haiku|sonnet|opus|fable';
 export function isAcceptedModel(value: string): boolean {
   return ACCEPTED_MODELS.has(value);
 }
+
+// 035 T002/T006 — declared capability ranking (data-model.md D3, FR-004a).
+//
+// A DECLARED deterministic ordering, capability-ascending (index 0 = least
+// capable). This is NOT an absolute-capability claim about `fable` relative
+// to `opus` — it is a fixed, documented tie-break so bucket-binding (cheapest
+// / mid / most-capable) is total and deterministic for any tier_map. Most
+// tier_maps bind only haiku/sonnet/opus, so fable's exact rank rarely binds
+// a bucket in practice, but it must still be defined for determinism.
+//
+// Membership MUST equal ACCEPTED_MODELS exactly (enforced by a RED test) so
+// the two never drift.
+export const MODEL_CAPABILITY_RANK: readonly string[] = ['haiku', 'sonnet', 'opus', 'fable'];
+
+/**
+ * The 0-based index of `model` in `MODEL_CAPABILITY_RANK`.
+ *
+ * A model absent from the ranking is a programming error — it would already
+ * have failed `ACCEPTED_MODELS` validation upstream — so this fails loud
+ * (Principle V) rather than silently placing it.
+ */
+export function rankOf(model: string): number {
+  const rank = MODEL_CAPABILITY_RANK.indexOf(model);
+  if (rank === -1) {
+    throw new Error(
+      `rankOf: "${model}" is not an accepted model (${ACCEPTED_MODELS_LABEL}); it has no capability rank`,
+    );
+  }
+  return rank;
+}

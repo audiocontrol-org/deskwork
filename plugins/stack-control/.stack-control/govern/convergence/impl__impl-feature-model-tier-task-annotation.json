@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "mode": "impl",
+  "item": "impl:feature/model-tier-task-annotation",
+  "governedShaBase": "9faa7c9dc9681f51b9d6802b75c6f9804a39b649",
+  "headSha": "6cefd60331b2e2b607d440e4e1187a143339a660",
+  "chunkIds": [
+    "8458dd2aead46616"
+  ],
+  "rounds": 1,
+  "liftedFindings": [],
+  "closedInLoopFindings": [],
+  "seamResult": {
+    "boundaryPairs": [],
+    "findings": [],
+    "suppressedCompatible": 0
+  },
+  "splitClusterRefs": [],
+  "outcome": "converged",
+  "anchorRoot": "/Users/orion/work/deskwork-work/model-tier-task-annotation/plugins/stack-control"
+}

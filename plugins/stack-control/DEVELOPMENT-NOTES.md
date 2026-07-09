@@ -2,6 +2,34 @@
 
 ---
 
+## 2026-07-08: model-tier-task-annotation — design → define → execute (full lifecycle in one remote-control session)
+
+### Feature: impl:feature/model-tier-task-annotation
+### Worktree: model-tier-task-annotation (branch feature/model-tier-task-annotation)
+
+**Goal:** Take the roadmap placeholder `impl:feature/model-tier-task-annotation` through the entire stack-control front door — `/stack-control:design` → `/stack-control:define` (full Spec Kit chain) → `/stack-control:execute` (model-sized dispatch + whole-feature governance) — driven remotely via `/remote-control`.
+
+**The feature:** `/speckit-tasks` is tier-blind, so every generated `tasks.md` is born untagged and trips execute's fail-loud `resolve-tiers` `no-tier` gate — the orchestrator backfills tiers by hand at execute time. This feature injects the tier requirement at the `/stack-control:define` tasks seam (mirroring the design frontend's house-rules injection), keyed off the installation's real `tier_map` via a new `stackctl tier-vocab` read verb, with an explicit `MODEL_CAPABILITY_RANK` driving deterministic cheapest/mid/most-capable binding. The existing `resolve-tiers` floor stays the deterministic backstop (stochastic generator proposes; deterministic floor guarantees).
+
+**Dogfood signal (deliberate, the point of the feature):** the tier-annotation auto-injection this feature builds does not exist yet, so THIS feature's own `tasks.md` had to be **hand-annotated** with `[tier:]` per the 033 requirement so `/stack-control:execute` could dispatch it. That manual backfill IS exactly the friction this feature removes — experienced first-hand while implementing the fix. Once shipped and the seam is wired, the next feature's `tasks.md` will be born tier-complete.
+
+**Accomplished (execute run — model-sized dispatch, verified):**
+- Implemented in fresh per-task subagents dispatched at each task's resolved model (dogfood `tier_map` fast→haiku / balanced→sonnet / powerful→opus): `MODEL_CAPABILITY_RANK`+`rankOf` (sonnet, `11319052`); the single-source `tier-requirement.ts` — `bucketBindings` + `renderTierRequirement` + shared canonical constants (opus, `869983e5`); the `stackctl tier-vocab` read verb + CLI registration (opus, `5b10aa00`); the define-seam injection wiring (opus, `c6f23565`); floor-preserved + non-default-vocab + override behavior guards (sonnet, `c20b27f7`); template exemplification + drift guard (sonnet, `443ccd7d`).
+- Test-first throughout (RED→GREEN per unit); durable ledger at `.stack-control/execute/035-model-tier-task-annotation.ledger.jsonl` (24 task ids, declared tier + resolved model recorded).
+- **Full suite green: 437 files / 2779 tests pass; `tsc --noEmit` clean; `check-front-door` OK (65 ops); `resolve-tiers` exit 0 on our own tasks.md.** Analyze F1 (no-map vs unknown-tier for the absent-map `[tier:UNSET]` case) confirmed by a dedicated guard test.
+
+**Course Corrections:**
+- [PROCESS] The `@/` import alias is NOT configured in this plugin's tsconfig — subagents correctly used relative `.js` imports matching `house-rules.ts`, not the global `@/` convention. Matching surrounding code (Constitution VIII) over the global rule.
+- [PROCESS] Single shared worktree ⇒ subagents dispatched serially (git index races preclude concurrent committers); the mechanical worktree-isolated parallel engine remains `impl:feature/execution-engine`.
+
+**Pending:** whole-feature `stackctl govern --mode implement` (step 4) — the cross-model audit-barrage over the committed diff — then ship.
+
+**Insights:**
+- Dogfooding the exact friction while fixing it is the strongest signal: the hand-backfill of this tasks.md is the last time (once shipped) that step should ever be manual for a define-authored spec.
+- The stochastic-generator / deterministic-floor split (renderTierRequirement proposes; resolve-tiers guarantees) kept the no-silent-default invariant intact while removing the friction — the feature adds no new default, per Principle V.
+
+---
+
 ## 2026-07-05: governance-code-scope — design → define (spec authored to runnable)
 
 ### Feature: impl:feature/governance-code-scope
