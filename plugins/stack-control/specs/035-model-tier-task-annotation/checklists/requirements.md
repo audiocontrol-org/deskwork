@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,9 +31,9 @@
 
 ## Notes
 
-- Two [NEEDS CLARIFICATION] markers remain by design, both genuinely scope-impacting and slated for `/speckit-clarify`:
-  1. Behavior when the installation has no configured `tier_map` (FR-009 / Edge Cases).
-  2. How the cheapest/mid/most-capable heuristic binds to a `tier_map` with a non-three-label or non-ordinal vocabulary (FR-010 / Edge Cases).
-- These are left as markers rather than guessed because each has multiple reasonable interpretations with materially different scope, and no single default is clearly correct. Resolving them is the job of the next step.
+- Both [NEEDS CLARIFICATION] markers were resolved by `/speckit-clarify` (Session 2026-07-08), recorded in the spec's `## Clarifications` section:
+  1. No-`tier_map` behavior → loud advisory + explicit `[tier:UNSET]` sentinel rejected by the resolve-tiers floor (FR-009).
+  2. Heuristic binding to non-default vocabularies → rank by resolved-model capability, cheapest→min / mid→median / most-capable→max (FR-004a / FR-010).
+  3. Scope of the optional FRs → all in, single-sourced (FR-011 template exemplification + FR-012 single-source both in scope).
 - This is a developer-tooling feature, so some references to named surfaces (`resolve-tiers`, `tier_map`, `[tier:]` syntax) are unavoidable context; they describe the existing contract the feature must satisfy, not new implementation choices. Requirements remain outcome-testable.
-- Items marked incomplete require spec updates before `/speckit-plan`; the two open markers are expected to be resolved by `/speckit-clarify`.
+- Checklist fully passing (16/16). Ready for `/speckit-plan`.

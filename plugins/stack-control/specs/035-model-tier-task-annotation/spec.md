@@ -10,6 +10,14 @@
 
 **Design record**: `docs/superpowers/specs/2026-07-08-model-tier-task-annotation-design.md` (operator-approved 2026-07-08). **Roadmap item**: `impl:feature/model-tier-task-annotation`.
 
+## Clarifications
+
+### Session 2026-07-08
+
+- Q: When an installation has no configured `tier_map`, what should the tasks-authoring step do? → A: Print a loud advisory naming the missing `tier_map` and the config path, and emit each task with an explicit unresolved sentinel `[tier:UNSET]` that the existing `resolve-tiers` floor rejects at execute — no invented label, no silent default, generation not blocked.
+- Q: How should the cheapest/mid/most-capable heuristic bind to a `tier_map` whose vocabulary isn't the default three labels? → A: Rank the installation's `tier_map` labels by the capability order of the accepted model each resolves to, then map the buckets onto that ranking — cheapest→min, most-capable→max, mid→median. Deterministic for any label count or naming.
+- Q: Should the optional template exemplification (FR-011) and single-sourcing of the tier requirement (FR-012) be built in this feature, or deferred? → A: All in — build the define-seam injection AND the `tasks-template.md` exemplification, both derived from one single-sourced rendered block, so the seam and template cannot drift.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - tasks.md is born tier-complete (Priority: P1)
@@ -75,8 +83,8 @@ The existing `resolve-tiers` fail-loud gate remains the deterministic backstop: 
 
 ### Edge Cases
 
-- **`tier_map` absent or empty on the installation.** What does the tasks step do when there is no `tier_map` to draw labels from? It must not invent labels or silently default. [NEEDS CLARIFICATION: when the installation has no `tier_map` configured, should the tasks step (a) emit tasks with a placeholder/`[NEEDS TIER]` marker + a loud advisory to configure `tier_map`, (b) refuse the tasks step until a `tier_map` exists, or (c) fall through to the existing resolve-tiers `no-map` error at execute time?]
-- **`tier_map` with other than three labels, or non-ordinal labels.** The heuristic names three semantic buckets (cheapest / mid / most-capable). [NEEDS CLARIFICATION: how does the cheapest/mid/most-capable heuristic bind to a `tier_map` with two labels, four+ labels, or labels with no obvious ordinal ranking? Candidate: rank labels by the ordered capability of the accepted model each resolves to, then bucket against that ranking.]
+- **`tier_map` absent or empty on the installation.** The tasks step prints a loud advisory naming the missing `tier_map` and the config path to fix it, and emits each task with an explicit unresolved sentinel `[tier:UNSET]`. It does not invent a label or silently default; the existing `resolve-tiers` floor rejects `UNSET` (not a `tier_map` key) at execute, so the gap is surfaced at the tasks phase and again, fail-loud, at execute. Generation is not blocked (spec iteration can continue before the map is configured).
+- **`tier_map` with other than three labels, or non-ordinal labels.** The heuristic's three semantic buckets (cheapest / mid / most-capable) bind by **ranking the installation's `tier_map` labels by the capability order of the accepted model each resolves to**, then mapping cheapest→the min-capability label, most-capable→the max-capability label, and mid→the median label. This is deterministic for any label count or naming; a two-label map collapses mid onto the nearer bucket (defined at plan time), and ties in resolved-model capability are broken deterministically (defined at plan time).
 - **A task genuinely spanning tiers** (a large task that is part-mechanical, part-architectural). The generator proposes a single tier; the operator override (US3) is the escape hatch. No task may be left multi-tiered or untagged.
 - **Operator re-runs the tasks step after editing tiers.** Regeneration must not silently clobber reviewed tiers without the operator knowing (see US3 scenario 2).
 - **A task carrying sibling tags** (`[P]`, `[US<n>]`) alongside `[tier:]` — the tier tag must coexist with the sibling tags the parser already recognizes and strips.
@@ -90,14 +98,15 @@ The existing `resolve-tiers` fail-loud gate remains the deterministic backstop: 
 - **FR-002**: The tier requirement MUST be **injected at the `/stack-control:define` tasks seam** — mirroring how `/stack-control:design` injects house-rules into its backend — rather than by editing the vendored `/speckit-tasks` backend files (capability, not vendor — Constitution Principle III).
 - **FR-003**: The injected requirement MUST be keyed off the **enclosing installation's actual `tier_map` labels**, read at authoring time through a `stackctl` read surface; proposed labels MUST be members of that `tier_map`. The system MUST NOT propose from a hardcoded label set.
 - **FR-004**: The injected requirement MUST carry a stated per-task tier **heuristic**: mechanical / RED-test / doc-only work → the cheapest tier; standard implementation → the mid tier; cross-cutting, architectural, ambiguous, or high-blast-radius work → the most-capable tier. The heuristic is guidance the generator applies, not a hard rule.
+- **FR-004a**: The heuristic's cheapest / mid / most-capable buckets MUST bind to the installation's actual labels by **ranking the `tier_map` labels by the capability order of the accepted model each resolves to**, then mapping cheapest→min, most-capable→max, mid→median of that ranking. The binding MUST be deterministic for any label count or naming (including two-label and four+-label maps, and ties in resolved-model capability).
 - **FR-005**: The generated `tasks.md` MUST be tier-complete — every task line carries a resolvable `[tier:<label>]` — as the common-case outcome of the tasks step.
 - **FR-006**: The system MUST preserve the existing `resolve-tiers` fail-loud completeness gate **unchanged**: any task lacking a resolvable tier causes `execute` to refuse and dispatch nothing, with a named error (`no-tier` / `unknown-tier`), no silent default (Constitution Principle V).
 - **FR-007**: The system MUST preserve operator override — proposed tiers are editable in the `/stack-control:define` tasks review before execute, and a reviewed/edited `tasks.md` is not clobbered by generation without the operator's action.
 - **FR-008**: The injected `[tier:]` tag MUST be syntactically compatible with the existing parser (`- [ ] T### [P?] [US?] [tier:<label>] <description>`) so that `resolve-tiers` accepts generated tasks without parser changes.
-- **FR-009**: The system MUST define behavior when the installation has **no configured `tier_map`** (see the Edge Cases clarification) — it MUST NOT invent labels or introduce a silent default.
-- **FR-010**: The system MUST define how the heuristic binds to a `tier_map` whose label count/ordinality differs from the three-bucket default (see the Edge Cases clarification).
-- **FR-011** *(optional secondary — scope TBD by operator)*: The system MAY exemplify `[tier:]` in the plugin's `tasks-template.md` sample task lines and Format section, so that **direct/native** `/speckit-tasks` use (outside the front door) also models the tag. This is a mitigation, not the load-bearing mechanism, and does not replace FR-002.
-- **FR-012** *(open — scope TBD)*: The injected tier requirement SHOULD be single-sourced (one rendered block, e.g. a `renderTierRequirement()` à la `renderHouseRules()`) so the `define` seam and any secondary exemplification (FR-011) derive from one definition and cannot drift.
+- **FR-009**: When the installation has **no configured `tier_map`**, the tasks step MUST print a loud advisory naming the missing `tier_map` and the config path to fix it, and MUST emit each task with an explicit unresolved sentinel `[tier:UNSET]`. It MUST NOT invent a label or introduce a silent default; the existing `resolve-tiers` floor rejects `UNSET` at execute (fail-loud). Generation MUST NOT be blocked in this state.
+- **FR-010**: The heuristic MUST bind to a `tier_map` whose label count/ordinality differs from the three-bucket default per FR-004a (rank by resolved-model capability; cheapest→min, most-capable→max, mid→median), deterministically.
+- **FR-011**: The system MUST exemplify `[tier:]` in the plugin's `tasks-template.md` sample task lines and Format section, so that **direct/native** `/speckit-tasks` use (outside the front door) also models the tag. This complements — does not replace — the load-bearing seam injection (FR-002).
+- **FR-012**: The injected tier requirement MUST be **single-sourced** — one rendered block (e.g. a `renderTierRequirement()` à la `renderHouseRules()`) — from which BOTH the `define` seam injection (FR-002) and the `tasks-template.md` exemplification (FR-011) derive, so the two surfaces cannot drift.
 
 ### Key Entities *(include if feature involves data)*
 
