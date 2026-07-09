@@ -138,6 +138,9 @@ const INTERNAL_VERBS: ReadonlySet<string> = new Set([
   // 033: read-only computation fronted by the /stack-control:execute skill (like
   // execute-check) — no standalone /stack-control:resolve-tiers skill by design.
   'resolve-tiers',
+  // 035: read-only computation fronted by the /stack-control:define skill — no
+  // standalone /stack-control:tier-vocab skill by design (mirrors resolve-tiers).
+  'tier-vocab',
   'release-check',
   'release-helper',
   'slush-findings',

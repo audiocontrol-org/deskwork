@@ -98,4 +98,16 @@ export const SPEC_MISC_VERBS: readonly MountedVerb[] = [
       }),
     meta: { deprecatedAliasOf: null, verbMediation: 'read-only' },
   },
+  {
+    build: () =>
+      buildFlatSurfaceCommand({
+        verb: 'tier-vocab',
+        description:
+          'Report the enclosing installation\'s tier vocabulary and derived {cheapest,mid,mostCapable} bucket bindings from its tier_map; installation-scoped, read-only, fail-loud — emits a TierVocab (configured) or {configured:false} advisory (absent) (035 model-tier-task-annotation).',
+        flags: [
+          { name: 'json', description: 'emit the TierVocab as JSON (default + only output mode today)' },
+        ],
+      }),
+    meta: { deprecatedAliasOf: null, verbMediation: 'read-only' },
+  },
 ];
