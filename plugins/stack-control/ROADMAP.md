@@ -658,3 +658,6 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 - design-approved: yes
 - design: docs/superpowers/specs/2026-07-04-governance-code-scope-design.md
 
+## impl:feature/model-tier-task-annotation
+- status: planned
+
