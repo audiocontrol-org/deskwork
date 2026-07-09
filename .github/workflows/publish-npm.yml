@@ -54,8 +54,16 @@ jobs:
       # 2026-05-29 — the publish step failed AFTER the provenance
       # attestation succeeded, confirming provenance + trusted-publishing
       # are separate OIDC flows with separate minimum npm versions.
+      #
+      # Pin to npm@11 (NOT npm@latest): npm@12 raised its engine floor to
+      # node >=22, so on this node-20 runner `npm install -g npm@latest`
+      # fails EBADENGINE and the workflow dies before publishing (v0.58.0
+      # release attempt, run 29032426165, 2026-07-09). npm 11.x supports
+      # node ^20.17 || >=22 AND satisfies the 11.5.1+ OIDC requirement, so
+      # pinning the major both fixes the break and prevents future
+      # latest-drift across a node-incompatible major boundary.
       - name: Upgrade npm to support trusted publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Install workspaces
         run: npm ci
