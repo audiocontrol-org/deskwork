@@ -660,6 +660,7 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 
 ## impl:feature/model-tier-task-annotation
 - status: in-flight
+- spec: specs/035-model-tier-task-annotation
 - design-approved: yes
 - design: docs/superpowers/specs/2026-07-08-model-tier-task-annotation-design.md
 
