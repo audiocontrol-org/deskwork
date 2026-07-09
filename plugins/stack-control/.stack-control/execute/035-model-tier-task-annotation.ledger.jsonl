@@ -1,0 +1,23 @@
+{"id":"T002","tierLabel":"fast","model":"haiku","commitRange":"11319052","reviewClean":true,"note":"paired with T006"}
+{"id":"T006","tierLabel":"balanced","model":"sonnet","commitRange":"11319052","reviewClean":true}
+{"id":"T003","tierLabel":"fast","model":"haiku","commitRange":"869983e5","reviewClean":true}
+{"id":"T004","tierLabel":"fast","model":"haiku","commitRange":"869983e5","reviewClean":true}
+{"id":"T007","tierLabel":"powerful","model":"opus","commitRange":"869983e5","reviewClean":true}
+{"id":"T008","tierLabel":"powerful","model":"opus","commitRange":"869983e5","reviewClean":true}
+{"id":"T001","tierLabel":"fast","model":"haiku","commitRange":"5b10aa00","reviewClean":true,"note":"fixtures in-test per resolve-tiers convention"}
+{"id":"T005","tierLabel":"fast","model":"haiku","commitRange":"5b10aa00","reviewClean":true}
+{"id":"T009","tierLabel":"balanced","model":"sonnet","commitRange":"5b10aa00","reviewClean":true}
+{"id":"T010","tierLabel":"powerful","model":"opus","commitRange":"5b10aa00","reviewClean":true}
+{"id":"T011","tierLabel":"fast","model":"haiku","commitRange":"c6f23565","reviewClean":true}
+{"id":"T012","tierLabel":"powerful","model":"opus","commitRange":"c6f23565","reviewClean":true}
+{"id":"T013","tierLabel":"fast","model":"haiku","commitRange":"c20b27f7","reviewClean":true}
+{"id":"T014","tierLabel":"fast","model":"haiku","commitRange":"c20b27f7","reviewClean":true}
+{"id":"T016","tierLabel":"fast","model":"haiku","commitRange":"c20b27f7","reviewClean":true}
+{"id":"T017","tierLabel":"balanced","model":"sonnet","commitRange":"c20b27f7","reviewClean":true}
+{"id":"T018","tierLabel":"fast","model":"haiku","commitRange":"c20b27f7","reviewClean":true}
+{"id":"T019","tierLabel":"balanced","model":"sonnet","commitRange":"c20b27f7","reviewClean":true}
+{"id":"T020","tierLabel":"fast","model":"haiku","commitRange":"443ccd7d","reviewClean":true}
+{"id":"T021","tierLabel":"balanced","model":"sonnet","commitRange":"443ccd7d","reviewClean":true}
+{"id":"T022","tierLabel":"balanced","model":"sonnet","commitRange":"443ccd7d","reviewClean":true,"note":"controller-verified check-front-door"}
+{"id":"T023","tierLabel":"balanced","model":"sonnet","commitRange":"443ccd7d","reviewClean":true,"note":"controller-verified full suite 2779 pass + tsc + quickstart"}
+{"id":"T024","tierLabel":"fast","model":"haiku","commitRange":"pending","reviewClean":true,"note":"journal dogfood note"}
