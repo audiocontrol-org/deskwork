@@ -74,6 +74,15 @@ import {
   runSpecArm,
   type GovernRunContext,
 } from '../govern/govern-arms.js';
+import {
+  BACKGROUND_SUBDIR,
+  readBackgroundStatus,
+  resolveHandleDir,
+  runBackgroundLaunch,
+  runBackgroundRunner,
+  type BackgroundHandle,
+} from '../govern/background.js';
+import type { GovernFlags } from '../govern/govern-vars.js';
 
 export async function runGovern(args: string[]): Promise<void> {
   const parsed = parseFlags(args);
@@ -90,6 +99,25 @@ export async function runGovern(args: string[]): Promise<void> {
     process.exit(2);
   }
   const flags = parsed.flags;
+
+  // impl:fix/audit-barrage-cc-timeout — background roles are dispatched BEFORE
+  // the --mode-required gate: the runner + status roles do not take --mode.
+  //
+  // Runner role (`--__bg-run <dir>`): the detached child forked by the launcher
+  // below. It runs the REAL govern to completion and records the exit code in
+  // the handle's result.json. Never a direct operator invocation.
+  if (flags.bgRun !== undefined) {
+    runBackgroundRunner(flags.bgRun);
+    return;
+  }
+  // Status role (`--status [--handle <id>]`): report a background run and relay
+  // its eventual gate verdict (running → EX_TEMPFAIL 75; completed → the govern
+  // exit code; crashed → fatal 2).
+  if (flags.status) {
+    runGovernStatus(flags);
+    return;
+  }
+
   if (flags.mode === undefined) {
     process.stderr.write(`govern: --mode <implement|spec> is required\n${USAGE}\n`);
     emitTerminalOutcome('usage');
@@ -157,6 +185,19 @@ export async function runGovern(args: string[]): Promise<void> {
     process.stderr.write(`govern: FATAL — ${errorMessage(err)}\n`);
     emitTerminalOutcome('fatal');
     process.exit(2);
+  }
+
+  // impl:fix/audit-barrage-cc-timeout — launcher role (`--background`): fork a
+  // DETACHED runner into its own session (survives a harness kill of THIS
+  // process group) and return immediately with a handle, decoupling the govern
+  // run's 10+ min wall-clock from the foreground Bash-tool timeout ceiling. The
+  // gate verdict lands in the handle's result.json; poll it with `--status`.
+  // Reached AFTER --mode validation so `--background` without --mode fails fast.
+  if (flags.background) {
+    const governArgs = args.filter((a) => a !== '--background');
+    const handle = runBackgroundLaunch(governArgs, installation.root, { cwd: process.cwd() });
+    process.stdout.write(renderLaunchMessage(handle, installation.root));
+    return;
   }
 
   try {
@@ -330,4 +371,50 @@ export async function runGovern(args: string[]): Promise<void> {
     emitTerminalOutcome('fatal');
     process.exit(2);
   }
+}
+
+/**
+ * `--status` role. Resolves the enclosing installation, finds the handle
+ * (explicit `--handle`, else the newest run), reads its state, and exits with
+ * the classification's exit code so a poll loop can branch on it directly
+ * (EX_TEMPFAIL 75 while running; the govern exit code once complete).
+ */
+function runGovernStatus(flags: GovernFlags): void {
+  let installation: Installation;
+  try {
+    installation = resolveInstallation(flags.at ?? process.cwd());
+  } catch (err) {
+    process.stderr.write(`govern --status: FATAL — ${errorMessage(err)}\n`);
+    process.exit(2);
+  }
+  const handleDir = resolveHandleDir(installation.root, flags.handle);
+  if (handleDir === undefined) {
+    const store = join(installation.root, '.stack-control', BACKGROUND_SUBDIR);
+    process.stderr.write(
+      `govern --status: no background run found` +
+        (flags.handle !== undefined ? ` for handle '${flags.handle}'` : '') +
+        ` under ${store}\n`,
+    );
+    process.exit(2);
+  }
+  const report = readBackgroundStatus(handleDir);
+  process.stdout.write(
+    flags.json ? `${JSON.stringify(report, null, 2)}\n` : `${report.text}\n`,
+  );
+  process.exit(report.classification.exitCode);
+}
+
+/** Operator-facing message printed after a `--background` launch returns. */
+function renderLaunchMessage(handle: BackgroundHandle, installationRoot: string): string {
+  const pollCmd = `stackctl govern --status --handle ${handle.handle} --at ${installationRoot}`;
+  return (
+    [
+      `govern: launched in the background (detached) — handle ${handle.handle}`,
+      `  pid:  ${handle.pid}`,
+      `  log:  ${handle.logPath}`,
+      `  poll: ${pollCmd}`,
+      `  The run is decoupled from the foreground Bash-tool timeout; poll --status`,
+      `  until it reports 'completed' (exit 0 may-graduate / 1 refused / 2 fatal).`,
+    ].join('\n') + '\n'
+  );
 }

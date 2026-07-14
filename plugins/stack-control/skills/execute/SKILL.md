@@ -89,13 +89,17 @@ stackctl check-front-door
 
    > **Manual / operator-acceptance tasks use the `- [~]` marker (gh-499 / gh-501).** A task a coding agent cannot complete in-session — e.g. *"operator live re-bless (manual, read-only)"* — is written `- [~]` (or `- [-]`), which the `tasks-complete` gate **excludes**, so the cross-model audit runs **before** the operator spends a live-prod acceptance (audit-before-acceptance). Do **not** leave such a task as `- [ ]` (it would block govern) and do **not** fake it `- [x]`. A normal unchecked `- [ ]` still blocks; an unrecognized marker (a typo'd `[?]`) is counted as open, never silently excluded.
 
+   **Launch govern in the BACKGROUND and poll — never as a blocking foreground call (impl:fix/audit-barrage-cc-timeout).** A whole-feature govern pass (frontier-model barrage rounds × chunked payloads × convergence loops) routinely runs 10+ minutes, which exceeds the Claude Code Bash-tool timeout ceiling (max 600s) — a foreground `stackctl govern` gets **killed mid-run**. `--background` forks the run into its own detached session and returns immediately with a handle; poll `--status` until it reports `completed`:
+
    ```bash
-   stackctl govern --mode implement          # feature derived from the SPECKIT marker / branch
+   stackctl govern --mode implement --background          # feature derived from the SPECKIT marker / branch
    # or, when driven by a roadmap item:
-   stackctl govern --mode implement --item <id>
+   stackctl govern --mode implement --item <id> --background
+   # → prints a handle; then poll (exit 75 = still running, poll again):
+   stackctl govern --status                               # newest run; add --handle <id> to target one
    ```
 
-   This scopes the cross-model `audit-barrage` to the **whole-feature committed diff**, **chunking it into bite-sized sub-payloads** that each fit under the model-fleet envelope, parallelizing audit + fix across the fleet, and reconciling **once** at the end. Because the payload is chunked, a large feature **never FATALs on size** — 030 retires the per-phase `boundary-too-large` regime that the old per-phase split existed to avoid. This skill never runs `audit-barrage` directly (SC-002); `stackctl govern` owns it.
+   Poll `--status` on an interval until the exit code is no longer `75` (EX_TEMPFAIL = "still running"): `0` = may-graduate, `1` = REFUSED, `2` = fatal/crashed. When running inside Claude Code, launch the `--background` command with the Bash tool's `run_in_background` so the launch call itself never blocks a turn. This scopes the cross-model `audit-barrage` to the **whole-feature committed diff**, **chunking it into bite-sized sub-payloads** that each fit under the model-fleet envelope, parallelizing audit + fix across the fleet, and reconciling **once** at the end. Because the payload is chunked, a large feature **never FATALs on size** — 030 retires the per-phase `boundary-too-large` regime that the old per-phase split existed to avoid. This skill never runs `audit-barrage` directly (SC-002); `stackctl govern` owns it.
 
 5. **Confirm and report.** Report:
    - the spec dir that was executed,
