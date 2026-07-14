@@ -240,32 +240,87 @@ function realRunGovernForeground(input: {
  * exit code in `result.json`. Runs BLOCKING on purpose — the runner is
  * detached from the launcher, so nothing external kills it. A signal-killed
  * govern child records a NON-ZERO exit, never 0.
+ *
+ * AUDIT-20260714-01: the runner is spawned with `stdio: 'ignore'` (its stderr
+ * is `/dev/null`), so a glue-code exception here — corrupt/missing handle.json,
+ * a bad bin path, a future bug in the runner — would otherwise be completely
+ * invisible, and `--status` would report `died` with no explanation, defeating
+ * the very visibility this feature exists to provide. So the whole body is
+ * wrapped: any failure is PERSISTED to `runner-error.log` under the handle dir
+ * and recorded as a fatal `result.json` (exit 2), turning a silent `died` into
+ * a `completed` status with an on-disk cause.
  */
 export function runBackgroundRunner(handleDir: string, deps: RunnerDeps = {}): BackgroundResult {
   const now = (deps.now ?? (() => new Date()))();
   const governCmd = deps.governCmd ?? [defaultStackctlBin(), 'govern'];
   const runGovernForeground = deps.runGovernForeground ?? realRunGovernForeground;
 
-  const handle = readHandle(handleDir);
-  if (handle === null) {
-    throw new Error(`govern --__bg-run: no handle.json under '${handleDir}'`);
+  try {
+    const handle = readHandle(handleDir);
+    if (handle === null) {
+      throw new Error(`govern --__bg-run: no handle.json under '${handleDir}'`);
+    }
+
+    const { status, signal } = runGovernForeground({
+      cmd: governCmd,
+      governArgs: handle.governArgs,
+      cwd: handle.cwd,
+      logPath: handle.logPath,
+    });
+
+    const exitCode = status !== null ? status : signal !== null ? 137 : 1;
+    const result: BackgroundResult = {
+      exitCode,
+      ...(signal !== null ? { signal } : {}),
+      finishedAt: now.toISOString(),
+    };
+    writeResult(handleDir, result);
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
+    persistRunnerError(handleDir, message);
+    const result: BackgroundResult = { exitCode: 2, finishedAt: now.toISOString() };
+    // Best-effort — if the handle dir itself is unwritable there is nothing more
+    // the runner can do, but it must not crash on top of the original failure.
+    try {
+      writeResult(handleDir, result);
+    } catch {
+      /* handle dir unwritable; the throw is already the diagnostic */
+    }
+    return result;
   }
+}
 
-  const { status, signal } = runGovernForeground({
-    cmd: governCmd,
-    governArgs: handle.governArgs,
-    cwd: handle.cwd,
-    logPath: handle.logPath,
-  });
-
-  const exitCode = status !== null ? status : signal !== null ? 137 : 1;
-  const result: BackgroundResult = {
-    exitCode,
-    ...(signal !== null ? { signal } : {}),
-    finishedAt: now.toISOString(),
-  };
+function writeResult(handleDir: string, result: BackgroundResult): void {
   writeFileSync(join(handleDir, 'result.json'), `${JSON.stringify(result, null, 2)}\n`, 'utf8');
-  return result;
+}
+
+/**
+ * Persist a runner glue-code failure to `runner-error.log` under the handle dir
+ * (and append it to `govern.log` if one exists) so a `--status` query has an
+ * on-disk cause. Best-effort: swallows its own IO errors — a failure to write
+ * the diagnostic must not mask the original failure.
+ */
+function persistRunnerError(handleDir: string, message: string): void {
+  const body = `govern --__bg-run: runner failed\n${message}\n`;
+  try {
+    writeFileSync(join(handleDir, 'runner-error.log'), body, 'utf8');
+  } catch {
+    /* nothing more we can do */
+  }
+  try {
+    const handle = readHandle(handleDir);
+    if (handle !== null && existsSync(handle.logPath)) {
+      const fd = openSync(handle.logPath, 'a');
+      try {
+        writeFileSync(fd, `\n${body}`);
+      } finally {
+        closeSync(fd);
+      }
+    }
+  } catch {
+    /* govern.log unavailable — runner-error.log already carries the cause */
+  }
 }
 
 // ---- status ----

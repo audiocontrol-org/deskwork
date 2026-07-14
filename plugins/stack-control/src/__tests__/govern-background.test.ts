@@ -144,6 +144,27 @@ describe('runBackgroundRunner', () => {
     expect(persisted.exitCode).toBe(1);
   });
 
+  it('records a runner glue failure ON DISK instead of throwing into the void (AUDIT-20260714-01)', () => {
+    // The runner is spawned with stdio:'ignore' (stderr → /dev/null), so a
+    // glue-code exception (corrupt/missing handle.json, bad bin path) would be
+    // invisible and `--status` would report `died` with no explanation. The
+    // runner must persist the diagnostic and record a fatal result instead.
+    const orphan = join(root, '.stack-control', BACKGROUND_SUBDIR, 'orphan');
+    mkdirSync(orphan, { recursive: true }); // dir exists, but NO handle.json
+    const result = runBackgroundRunner(orphan, {
+      runGovernForeground: () => {
+        throw new Error('runGovernForeground must not be reached when the handle is unreadable');
+      },
+    });
+    expect(result.exitCode).toBe(2);
+    // A completed result.json (so --status reports `completed` exit 2, not `died`).
+    expect(existsSync(join(orphan, 'result.json'))).toBe(true);
+    // A diagnostic on disk explaining WHY.
+    const errLog = join(orphan, 'runner-error.log');
+    expect(existsSync(errLog)).toBe(true);
+    expect(readFileSync(errLog, 'utf8')).toContain('handle.json');
+  });
+
   it('records a signal-killed govern child as a non-zero exit (never 0)', () => {
     const handle = runBackgroundLaunch(['--mode', 'implement'], root, {
       cwd: root,
