@@ -666,3 +666,6 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 - design-approved: yes
 - design: docs/superpowers/specs/2026-07-08-model-tier-task-annotation-design.md
 
+## impl:fix/audit-barrage-cc-timeout
+- status: planned
+

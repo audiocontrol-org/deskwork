@@ -74,6 +74,13 @@ export const USAGE = [
   '                            is what protocol runs exist for; specs/014 US1).',
   '  --no-slush                Disable the slush step (address every finding).',
   '  --json                    Emit the gate verdict JSON only.',
+  '  --background              Detach the run into its own session and return',
+  '                            immediately with a handle — decouples a 10+ min',
+  '                            govern pass from the foreground Bash-tool timeout.',
+  '                            The gate verdict lands in the handle; poll --status.',
+  '  --status [--handle <id>]  Report a background run and relay its gate verdict',
+  '                            (running: exit 75 EX_TEMPFAIL; completed: the govern',
+  '                            exit code; crashed: 2). Default handle: newest run.',
   '  implement: --diff-base <ref>   Diff base for the whole committed feature diff (default: merge-base with the repo default branch; HEAD~1 if none).',
   '  spec:      --spec-path <p>      Spec under audit (else CLAUDE.md SPECKIT marker).',
   '             --plan-path <p>      Fold the plan (the after_plan checkpoint).',
@@ -99,6 +106,18 @@ export interface GovernFlags {
   planPath?: string;
   checkpoint?: string;
   help: boolean;
+  /**
+   * impl:fix/audit-barrage-cc-timeout — detach govern into its own session and
+   * return immediately with a handle (so a long govern run outlives the Claude
+   * Code Bash-tool timeout that would otherwise kill a foreground invocation).
+   */
+  background: boolean;
+  /** Report a background run's state + relay its eventual gate verdict. */
+  status: boolean;
+  /** Target a specific background run for `--status` (default: newest). */
+  handle?: string;
+  /** Internal runner role (`--__bg-run <dir>`): run the real govern, record result. */
+  bgRun?: string;
 }
 
 const VALUED = new Set([
@@ -113,18 +132,28 @@ const VALUED = new Set([
   '--spec-path',
   '--plan-path',
   '--checkpoint',
+  '--handle',
+  '--__bg-run',
 ]);
 
 export function parseFlags(
   argv: readonly string[],
 ): { ok: true; flags: GovernFlags } | { ok: false; error: string } {
-  const flags: GovernFlags = { noSlush: false, json: false, help: false };
+  const flags: GovernFlags = {
+    noSlush: false,
+    json: false,
+    help: false,
+    background: false,
+    status: false,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const tok = argv[i];
     if (tok === undefined) continue;
     if (tok === '--help' || tok === '-h') { flags.help = true; continue; }
     if (tok === '--no-slush') { flags.noSlush = true; continue; }
     if (tok === '--json') { flags.json = true; continue; }
+    if (tok === '--background') { flags.background = true; continue; }
+    if (tok === '--status') { flags.status = true; continue; }
     if (VALUED.has(tok)) {
       const value = argv[i + 1];
       // An empty-string value IS allowed (e.g. --feature "" must reach the
@@ -148,6 +177,8 @@ export function parseFlags(
       else if (tok === '--spec-path') flags.specPath = value;
       else if (tok === '--plan-path') flags.planPath = value;
       else if (tok === '--checkpoint') flags.checkpoint = value;
+      else if (tok === '--handle') flags.handle = value;
+      else if (tok === '--__bg-run') flags.bgRun = value;
       continue;
     }
     return { ok: false, error: `unknown flag: ${tok}` };
