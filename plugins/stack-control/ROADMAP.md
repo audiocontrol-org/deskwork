@@ -669,3 +669,6 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 ## impl:fix/audit-barrage-cc-timeout
 - status: planned
 
+## design:feature/fleet-control-plane
+- status: planned
+
