@@ -671,4 +671,5 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 
 ## design:feature/fleet-control-plane
 - status: planned
+- design: docs/superpowers/specs/2026-07-16-fleet-control-plane-design.md
 
