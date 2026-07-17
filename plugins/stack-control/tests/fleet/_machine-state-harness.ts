@@ -50,13 +50,16 @@
 // imports only node builtins + vitest, so the question is moot here.
 
 import { afterAll, afterEach, beforeEach } from 'vitest';
-import { createHash } from 'node:crypto';
+// storeKey is single-sourced from locate.ts (the authoritative store-location
+// module). The harness redirects the store that locate.ts resolves, so its key
+// MUST be locate's key, byte-for-byte — importing it makes divergence impossible
+// rather than merely test-detectable.
+import { storeKey } from '../../src/machine-state/locate.js';
 import {
   existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
-  realpathSync,
   rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -102,11 +105,9 @@ export interface MachineStateRedirect extends MachineStateStore {
   dispose(): void;
 }
 
-/** `sha256(realpath.native(installationRoot))[0:16]` — the store key (PT-001). */
-export function storeKey(installationRoot: string): string {
-  const native = realpathSync.native(installationRoot);
-  return createHash('sha256').update(native).digest('hex').slice(0, 16);
-}
+// storeKey is imported from locate.ts (above) and re-exported so existing
+// harness consumers keep importing it from here.
+export { storeKey };
 
 // A too-deep runtime dir makes the socket path exceed macOS's 103-byte sun_path
 // limit and produces confusing failures in later transport tests. /tmp is short
