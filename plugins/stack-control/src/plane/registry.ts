@@ -58,6 +58,7 @@
  * `.js` imports under node16 resolution (no `@/` alias — this plugin has none).
  */
 
+import type { CommandKind } from '../fleet/command.js';
 import type { ExecutionStatus, StatusAxes } from '../fleet/status.js';
 import type { EventClassification, EventEnvelope, EventType } from '../fleet/types.js';
 
@@ -114,8 +115,12 @@ export interface RunProgress {
 /**
  * A command an operator may issue against a run (C6, FR-050). The set a given
  * run OFFERS is derived from its `executionStatus`.
+ *
+ * Alias of the canonical `CommandKind` union defined in `../fleet/command.js`
+ * (T067 DRY unification) — the command state-machine module owns the one
+ * definition; this projection re-exports it under the fleet-view name.
  */
-export type FleetCommandKind = 'pause' | 'resume' | 'cancel' | 'config-push' | 'reconcile';
+export type FleetCommandKind = CommandKind;
 
 /**
  * The client-visible projection of ONE commandable run (data-model.md § Fleet

@@ -21,6 +21,9 @@
 
 import type { FleetCommandKind, FleetEntry, FleetRegistry, RunProgress, TimingsRecord } from '../registry.js';
 import type { StatusAxes } from '../../fleet/status.js';
+import type { AcceptCommandInput, CommandRecord, CommandStore } from '../commands/store.js';
+import type { CommandDispatch, HeldCommand } from '../commands/dispatch.js';
+import { dispatchFanOut } from '../commands/dispatch.js';
 
 // ---------------------------------------------------------------------------
 // C2 — Snapshot (T053, GET /v1/fleet).
@@ -227,5 +230,146 @@ export function perRunDetail(entry: FleetEntry): PerRunResponse {
       firstObserved: entry.firstObserved,
       lastObserved: entry.lastObserved,
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// C6 — Commands (T071): issue, status by commandId, fleet-wide issue.
+//   - POST /v1/runs/{runId}/commands  → issueCommand
+//   - GET  /v1/commands/{commandId}   → commandStatus
+//   - POST /v1/fleet/commands         → issueFleetCommand
+// ---------------------------------------------------------------------------
+//
+// The operator promise (plane-client-api.md C6, FR-059): "the operator can
+// always tell what happened to a command they issued. 'Sent' is never
+// reported as 'applied.'" These three functions are the data layer that
+// promise rests on — pure and dependency-injected (a `CommandStore`, T069,
+// and a `CommandDispatch`, T070, are passed in, never constructed here), so
+// server.ts's issueRunCommand / commandStatus / issueFleetCommand handlers
+// (T051) can call straight through without this module knowing anything
+// about `node:http`, mirroring how fleetSnapshot/perRunDetail above stay
+// below the transport layer.
+
+/**
+ * The result of issuing a single command (`POST /v1/runs/{runId}/commands`,
+ * C6). `state` is pinned to the literal `'accepted'` — issuing a command can
+ * NEVER report `applied` here; that would be exactly the honesty violation
+ * FR-059 names ("sent" reported as "applied"). Reaching `applied` (or any
+ * later state) is only ever observable afterward, through
+ * {@link commandStatus}.
+ */
+export interface CommandIssueResult {
+  readonly commandId: string;
+  readonly state: 'accepted';
+}
+
+/**
+ * Durably accept `input` (FR-056: durable-before-returned) and hold it for
+ * delivery (C7). By the time this promise resolves, the `accepted` it
+ * reports is not a lie a plane restart can erase — `store.accept()` already
+ * fsyncs before resolving. This function never advances the command past
+ * `accepted`; delivery, application, and every later transition are the
+ * sidecar's and the dispatch layer's concern, observed later through
+ * `commandStatus`.
+ */
+export async function issueCommand(
+  store: CommandStore,
+  dispatch: CommandDispatch,
+  input: AcceptCommandInput,
+): Promise<CommandIssueResult> {
+  const { commandId, state } = await store.accept(input);
+  const held: HeldCommand = {
+    commandId,
+    kind: input.kind,
+    installationId: input.installationId,
+    runId: input.runId,
+    expiresAt: null,
+  };
+  dispatch.hold(held);
+  return { commandId, state };
+}
+
+/**
+ * The full queryable lifecycle state for one command (`GET
+ * /v1/commands/{commandId}`, C6: "every command's full lifecycle is
+ * queryable by commandId"). `found` is always present so a caller never has
+ * to infer "not found" from `command`'s absence under a narrowed union — an
+ * unknown `commandId` is a CLEAN, typed result, never a throw (a throwing
+ * lookup would leak "unknown command" as a transport-layer 500 instead of
+ * an honest, queryable not-found).
+ */
+export interface CommandStatusResult {
+  readonly commandId: string;
+  readonly found: boolean;
+  readonly command: CommandRecord | undefined;
+}
+
+/**
+ * Look up the durable record for `commandId` (C6). Synchronous: the durable
+ * store's `get()` already resolves from its in-memory index (recovered from
+ * disk at store construction, FR-056), so there is nothing to await here.
+ */
+export function commandStatus(store: CommandStore, commandId: string): CommandStatusResult {
+  const record = store.get(commandId);
+  return { commandId, found: record !== undefined, command: record };
+}
+
+/**
+ * The result of a fleet-wide command issue (`POST /v1/fleet/commands`,
+ * FR-062: "fan-out is never atomic"). `targets` / `accepted` / `unavailable`
+ * partition every requested target so per-instance state is individually
+ * observable — this type deliberately carries NO single collapsed
+ * success/failure field, so a caller cannot construct an atomic verdict
+ * from it even by mistake.
+ */
+export interface FleetCommandResult {
+  readonly commandId: string;
+  readonly targets: readonly string[];
+  readonly accepted: readonly string[];
+  readonly unavailable: readonly string[];
+}
+
+/**
+ * Durably accept one fleet-wide command, then fan it out to `targets` via
+ * {@link dispatchFanOut} (FR-062). One durable record backs the whole
+ * fleet-wide action — `store.accept()` is called exactly once, matching
+ * `AcceptCommandInput`'s single-installationId shape (the caller supplies
+ * whatever `installationId` best names the fleet-wide scope of the action;
+ * per-target identity lives in `targets`, not in the durable record).
+ * `isReachable` is the injected reachability predicate the caller (server.ts,
+ * backed by the live registry) supplies, so partitioning is testable without
+ * a live sidecar fleet. Every reachable target is durably held for delivery
+ * under the same `commandId`; an unreachable one is reported in
+ * `unavailable` and held nowhere — never a thrown all-or-nothing error, even
+ * when every target is unavailable (FR-062).
+ */
+export async function issueFleetCommand(
+  store: CommandStore,
+  dispatch: CommandDispatch,
+  input: AcceptCommandInput,
+  targets: readonly string[],
+  isReachable: (target: string) => boolean,
+): Promise<FleetCommandResult> {
+  const { commandId } = await store.accept(input);
+  const fanOut = dispatchFanOut({
+    commandId,
+    kind: input.kind,
+    targets: [...targets],
+    isReachable,
+  });
+  for (const target of fanOut.accepted) {
+    dispatch.hold({
+      commandId,
+      kind: input.kind,
+      installationId: target,
+      runId: input.runId,
+      expiresAt: null,
+    });
+  }
+  return {
+    commandId,
+    targets: fanOut.targets,
+    accepted: fanOut.accepted,
+    unavailable: fanOut.unavailable,
   };
 }
