@@ -2,21 +2,34 @@
 
 ---
 
-## 2026-07-17: <!-- session title -->
+## 2026-07-17: fleet-control-plane — execute Phases 4–7 + US1 tail (46→107/139, model-sized dispatch)
 
-**Goal:** <!-- compose: what we set out to do -->
+### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)
+
+**Goal:** Resume the `/stack-control:execute` burndown from the prior session's 46/139 checkpoint. Continue the same discipline — a fresh subagent per `tasks.md` task at its declared `[tier:]` model, RED-first, per-task controller review, central race-free commits at each phase boundary, ledger + push — through as many phases as could be done at review quality that stays sharp.
 
 **Accomplished:**
-- <!-- compose -->
+- Closed **Phase 3 (US1)** (T044 CLI emit wiring, T138 supervised sidecar) and completed **Phases 4–7 in full**: US2 aggregation (registry / node:http server / ingest / snapshot+deltas+per-run-detail / structured errors / artifact-refs), US3 commands (state machine / supersession / durable store / dispatch+fanout+reconcile+config-push / endpoints / cooperative-cancel primitive), US4 trust-and-failure (liveness closure≠death / reconciliation window→0 false deaths / crash-safe WAL / drain+drop policy / redact-before-spool pipeline / two-hop health / delivery semantics / dedupe-is-optional), US5 history (B2 S3-compat adapter / immutable archive writer / revisioned derived artifacts / cache-first CDN reader / listing backstop / history+timings endpoints / Cloudflare config).
+- **61 tasks (46→107/139)**, 5 phase-boundary commits + 3 backlog commits, all pushed; the fleet suite grew 230→**522 tests, green + tsc clean at every boundary**. Front-door marker bracketed each resumed drive (entered/exited cleanly per checkpoint — no leak).
+- Captured 3 latent integration gaps to the backlog rather than paper over them: **TASK-457** (registry consumes envelope-only events, so per-run detail can't carry snapshot-derived facets until their producers land), **TASK-458** (`CommandDispatch.held` keyed by `commandId` alone drops all-but-last target for fleet-wide replay-on-reconnect), **TASK-459** (no producer writes the finalized run-history `summary.json`, so history/timings serve honestly-absent data).
 
 **Didn't Work:**
-- <!-- compose -->
+- A `fast`-tier subagent (T044) shipped a green, confident telemetry-emit wiring that emitted an **invalid** event — `installationId: ''` behind a `// TODO: load from machine-state (T024, out of scope)` comment, except T024 was already done and `validateEnvelope` rejects an empty id. The "TODO" pointed at completed work; the emitted event would never validate. Caught in review, re-dispatched with the real `mintOrReadInstallationId` + durable high-water sequence.
+- A RED-test subagent (T046) unilaterally added a `@/` path alias to `tsconfig`+`vitest.config` and created mis-shaped stub `src/` files to make its test load — diverging from the 1748:0-relative-import codebase and pre-empting the impl task's surface. Reverted the config, deleted the stubs, re-dispatched aligned to the registry-based model.
+- A RED-test subagent (T048) used a **type-only import** of the not-yet-existing module; esbuild elides it and tsc excludes the tests dir, so the "RED" test passed false-green (5/5) with no implementation. Re-dispatched as a value-import behavioral RED.
 
 **Course Corrections:**
-- <!-- compose -->
+- [QUALITY] Controller review remained the load-bearing step: beyond the three above, it caught a forbidden `as Record<...>` cast mislabeled as "matches event.ts" (T055 — event.ts actually uses a type guard), and accepted a genuine T052-contract refinement (finalized-run late-event split: strictly-newer stays `late`/durable, reordered-no-newer becomes `accepted`) only after tracing it against the must-stay-green T052 suite. Green + articulate ≠ correct.
+- [PROCESS] Batched RED tests into per-phase clusters sharing one controller-authored canonical model (command model for Phase 5, liveness/spool/health concepts for Phase 6, storage-layout for Phase 7) to prevent the cross-cluster divergence that bit Phase 4 (`CommandKind` reconciled to one canonical home in `command.ts`, with `registry.ts`'s `FleetCommandKind` DRY-aliased to it).
+- [PROCESS] A brief that said add an "inline note" for an untested primitive (T088 idle-exit) produced an untested primitive; the controller wrote the missing test rather than let it ship. Recorded as friction: impl briefs must say "write a test", not "note".
+- [CHECKPOINT] Stopped twice at clean pushed boundaries (after Phase 5, after Phase 7) rather than grind the hardest remaining work — Phase 8's silently-failing SSE keepalive, Phase 9's isolation-probe + dogfood loop, and the whole-feature govern — through a context-exhausted tail. The ledger makes resume exact.
 
 **Insights:**
-- <!-- compose -->
+- The recurring failure mode across tiers is **confident wrongness that compiles and passes**: an invalid-but-green telemetry event, a false-green type-only RED, a cast mislabeled as matching a sibling. None were caught by tsc or the subagent's own tests; all were caught by an independent controller read before the ledger entry. In model-sized dispatch the review loop *is* the correctness mechanism.
+- Subagents, when briefed to, made honest no-fabrication calls that are exactly right: T050/T054 omitted per-run facets the envelope-only registry can't carry (→ TASK-457) instead of inventing them; T101 represented all four history phase durations as absent because no producer exists (→ TASK-459) instead of fabricating zeros; T096's B2 adapter failed loud on list-truncation-without-token instead of silently capping. The discipline holds when the brief names it.
+- Combining tightly-coupled same-file tasks into one dispatch (T053+T054 in `api.ts`, T069+T070+T073 as the command backend, T082+T083+T088 as the liveness core) avoided cross-dispatch file races and interface-handoff churn — a better fit than strict one-subagent-per-task when tasks share a file and a tier.
+
+**Quantitative reconciliation:** 8 commits this session as auto-derived (5 phase `feat` + 3 backlog `chore`); the 61 tasks collapse into the 5 phase commits (RED+GREEN pairs and combined same-file dispatches land as single boundary commits). Ledger 46→107 entries (local resume artifact, intentionally untracked — the session-end warning about it is expected). Remaining: Phase 8 (T103–T119), Phase 9 (T120–T134), then the whole-feature `govern` pass.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 8
