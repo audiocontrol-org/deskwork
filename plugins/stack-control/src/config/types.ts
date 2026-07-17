@@ -85,6 +85,30 @@ export interface GovernConfig {
   readonly codeScope?: GovernCodeScopeConfig;
 }
 
+/**
+ * Plane (control plane) configuration (036 fleet-control-plane).
+ * Defines the location of the fleet control plane this installation
+ * reports into. All fields optional — absent is not a load error.
+ *
+ * Authentication uses a bearer token persisted in machine-local state,
+ * never in this installation config (per sidecar-plane-protocol C6 / FR-075…077).
+ */
+export interface PlaneConfig {
+  /**
+   * The control plane's HTTP service URL (e.g. https://plane.example.com).
+   * Deployment location is deliberately not a design input — the plane is just
+   * an HTTP service at this URL (spec § Assumptions, plan.md § Target Platform).
+   * The `STACKCTL_CP_URL` environment variable is the spec's name for this
+   * value; the precedence between env and config is the config loader's
+   * concern, not this type's.
+   *
+   * Behavior when NO url resolves (neither env nor config) is not settled by
+   * the spec and is deliberately not asserted here — the task that implements
+   * resolution owns that decision.
+   */
+  readonly url?: string;
+}
+
 /** Parsed + validated `.stack-control/config.yaml` (in-memory, camelCase). */
 export interface InstallationConfig {
   /** Schema version — required positive integer; an unknown version fails loud. */
@@ -97,6 +121,8 @@ export interface InstallationConfig {
   readonly tierMap?: TierMap;
   /** Govern mode configuration (034). Optional; absent is not a load error. */
   readonly govern?: GovernConfig;
+  /** Plane configuration (036). Optional; absent is not a load error. */
+  readonly plane?: PlaneConfig;
 }
 
 /** Each working-file key resolved to an absolute path (post-precedence). */
