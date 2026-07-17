@@ -62,6 +62,9 @@
 - [ ] T020 [tier:powerful] Implement sequencing + gap classification in `src/fleet/sequence.ts`. **Gap classification never reads the object store** — classification makes the durable set sparse by design, so absence-of-object ≠ absence-of-event (R-04). Cross-cutting.
 - [ ] T021 [P] [tier:fast] RED: `tests/fleet/redact.test.ts` — deny-by-default policy; absolute paths, usernames, home segments, hostnames redacted; commit messages and error content length-capped (PT-008).
 - [ ] T022 [tier:balanced] Implement redaction in `src/fleet/redact.ts`.
+- [ ] T135 [P] [tier:fast] **RED: event classification — `tests/fleet/classification.test.ts`** (FR-015/016). Every event classifies as **live-only** (never durably stored — heartbeats belong here), **aggregated**, or **durable** (its own immutable object). Assert **classification, not emission, decides cost**: a high-frequency short-verb stream mints **zero** durable objects. *(Added by /speckit-analyze finding C1 — this requirement had no task. Note the word collision that hid it: T019/T020 are **gap** classification, an unrelated concept.)*
+- [ ] T136 [tier:powerful] **Implement event classification in `src/fleet/classification.ts`** (FR-015/016). The **seam must exist from the start** so adding rollup machinery later changes no contract — rollup itself is not built until volume justifies it. Without this, "every invocation telemeters" silently becomes "every event becomes a cloud object", and an operator with shell completions or an automation loop mints objects at a rate nobody asked for. Consumed by the sidecar pipeline (T086). Cross-cutting: it governs the whole storage economy.
+- [ ] T137 [P] [tier:fast] **RED: metadata is never identity — `tests/fleet/metadata-not-identity.test.ts`** (FR-036). `hostname`, `platform`, runtime versions, `repositoryRemote`, `workspacePath` are metadata attached to the installation; assert no identity or lookup path consumes them, and that grouping by `repositoryRemote` never confers identity. *(Added by /speckit-analyze finding C4.)*
 
 ### Machine-local state (the declared installation-anchor exception)
 
@@ -102,6 +105,7 @@
 - [ ] T042 [US1] [tier:balanced] Implement detached spawn in `src/sidecar/spawn.ts`: `detached` + `stdio:'ignore'` + `unref()` + **`windowsHide: true`**. **`windowsHide` is mandatory, not cosmetic** — a detached Windows child otherwise gets a console window that cannot be disabled; every canonical snippet omits it because none are about daemons.
 - [ ] T043 [US1] [tier:balanced] Implement stale-socket recovery in `src/sidecar/server.ts` using `ProcessProbe` (PID + start-time), then unlink and re-bind.
 - [ ] T044 [US1] [tier:fast] Wire telemetry emission into the CLI dispatcher in `src/cli.ts` — **every invocation emits** (FR-012), and none may block.
+- [ ] T138 [US1] [tier:balanced] **Support running the sidecar under external supervision** (FR-009) — a supervised long-lived process (launchd/systemd) as an alternative to auto-spawn, **without changing the local socket contract**. Auto-spawn exists because a forgotten daemon is a silent gap that erodes trust in the fleet view; supervision exists for operators who want a predictable lifecycle. Both must reach the same contract. *(Added by /speckit-analyze finding C2 — this requirement had no task.)*
 
 **Checkpoint** — US1 integrated. *Not a ship point.*
 
@@ -181,6 +185,7 @@
 - [ ] T079 [P] [US4] [tier:balanced] RED: `tests/fleet/dedupe-reorder.test.ts` — duplicate + reordered delivery ⇒ correct state; registry **never walks backward** (SC-015).
 - [ ] T080 [P] [US4] [tier:balanced] **RED: `SIGKILL` mid-spool loses no records** — `tests/fleet/wal-crash.test.ts`. *The original "must not exit holding an un-flushed spool" phrasing could not pass this by construction — `SIGKILL` runs no code* (R-03).
 - [ ] T081 [P] [US4] [tier:fast] RED: `tests/fleet/delivery-semantics.test.ts` — at-least-once / idempotent / effectively-once documented and pinned; **never exactly-once** (FR-043).
+- [ ] T139 [P] [US4] [tier:balanced] **RED: ingestion stays correct with the dedupe set ABSENT** — `tests/fleet/dedupe-is-optional.test.ts` (FR-042a). Disable dedupe entirely, replay duplicates, assert the registry is still correct — because FR-042's no-regress rule plus deterministic object naming (FR-063) and byte-identity (FR-049) carry correctness on their own. *(Added by /speckit-analyze finding C3: FR-042a asserts dedupe is an optimization, but T052 implements it and T079 tests it PRESENT — nothing tested the claim itself. Pinning it stops the next engineer agonizing over the dedupe window's TTL as though correctness depended on it.)*
 
 ### Implementation
 
@@ -325,17 +330,23 @@ Phase 1 (Setup)
 | Phase | Tasks | Count |
 |---|---|---|
 | 1 — Setup | T001–T003 | 3 |
-| 2 — Foundational | T004–T030 | 27 |
-| 3 — US1 fail-open (P1) | T031–T044 | 14 |
+| 2 — Foundational | T004–T030, T135–T137 | 30 |
+| 3 — US1 fail-open (P1) | T031–T044, T138 | 15 |
 | 4 — US2 aggregation (P2) | T045–T055 | 11 |
 | 5 — US3 commands (P3) | T056–T073 | 18 |
-| 6 — US4 trust/failure (P4) | T074–T088 | 15 |
+| 6 — US4 trust/failure (P4) | T074–T088, T139 | 16 |
 | 7 — US5 history (P5) | T089–T102 | 14 |
 | 8 — US6 hostile network (P6) | T103–T119 | 17 |
 | 9 — Front door / isolation / dogfood / polish | T120–T134 | 15 |
-| **Total** | | **134** |
+| **Total** | | **139** |
 
-**Tier distribution** (re-derived from the file, not estimated): `fast` **53** · `balanced` **64** · `powerful` **17** = 134. Every task carries exactly one tier tag; all labels resolve against this installation's `tier_map`.
+### Note on T135–T139: document order is execution order
+
+These five were added by `/speckit-analyze` (findings C1–C4) to close **real coverage gaps** — requirements with zero tasks. They are placed in their **correct phase**, so their IDs are **not** monotonic with document order.
+
+That is deliberate. Task IDs are **stable identifiers**, not a sort key: **document order is execution order**. Renumbering to restore monotonicity would rewrite 134 IDs and break the cross-references in § Dependencies (T009, T089, T108, T125, T126) — churn with a real chance of introducing exactly the kind of error the renumber was meant to tidy. The tier parser accepts `T\d+` only, so letter suffixes (`T019a`) would fail to parse and were not an option.
+
+**Tier distribution** (re-derived from the file after the analyze additions, not estimated): `fast` **55** · `balanced` **66** · `powerful` **18** = 139. Every task carries exactly one tier tag; `resolve-tiers` resolves all 139 against this installation's `tier_map`, and emits them in **document order** (verified: `… T022 T135 T136 T137 T023 …`), which is what makes the non-monotonic IDs safe.
 
 The `powerful` tier is reserved for genuinely cross-cutting or high-blast-radius work — the fail-open emit client (every invocation runs it), the liveness interpretation (the design's primary risk), the WAL, the durable command store, the live registry, the machine-state locator, the sequencing/gap classifier, the isolation probe extension, the dogfood drive, and the head-of-line test that gates the transport topology.
 
