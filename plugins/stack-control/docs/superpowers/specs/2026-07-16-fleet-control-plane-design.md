@@ -52,7 +52,9 @@ The sidecar holds an SSE stream to receive commands and POSTs telemetry upstream
 
 **Why chosen — and note this is not the original justification.** The load-bearing argument is **NAT traversal**: hosts are behind NAT and firewalls, so the plane can *never* dial a sidecar. Every connection must be sidecar-outbound and held open. That is a hard constraint, not a preference. Secondary: SSE is plain HTTP and traverses hostile proxies that block WebSocket upgrades; it has native reconnect with `Last-Event-ID` replay, which composes directly with buffered commands. The original record justified SSE on traffic shape — true but not decisive, and it never stated the constraint that actually forces the choice.
 
-**Conditional:** the connection economics assume HTTP/2 end-to-end, so the SSE stream and telemetry POSTs multiplex over one TCP connection. Without HTTP/2 the two-connection cost is real.
+**Conditional, but not a correctness dependency.** The connection economics assume HTTP/2 end-to-end, so the SSE stream and telemetry POSTs multiplex over one TCP connection. Without HTTP/2 the two-connection cost is real — but the system must still *function* over HTTP/1.1 using two connections. Absence of HTTP/2 is a cost, never a protocol failure.
+
+**"Native reconnect" is a browser property and does not come for free here.** `Last-Event-ID` is part of the SSE protocol, but the automatic reconnect semantics people associate with SSE belong to the browser's `EventSource`. The sidecar is a Node client: it must implement the SSE client, the reconnect policy, and cursor advancement explicitly. This record previously cited native reconnect as an advantage of SSE; outside a browser, that advantage is work, not a gift.
 
 ### Sidecar↔plane transport — Rejected: WebSocket
 
@@ -118,17 +120,25 @@ Immutable per-event objects in B2; a Cloudflare Worker fronts reads.
 
 **Why rejected:** walks straight into the read caps the CDN exists to absorb.
 
-### Read path — Chosen: browser reads Cloudflare directly
+### Read path — Chosen: the plane is the only reader
 
-Historical views are fetched by the dashboard from the Worker; live state arrives over SSE from the plane.
+The dashboard reads everything from the plane. The plane reads history through the CDN using **canned, low-cardinality queries**, and derives the dashboard-visible artifacts from that data. The browser never talks to the CDN.
 
-**Why chosen:** preserves browser cache stacked on edge cache — the strongest available protection for the read caps that justify the CDN. Putting the plane in the read path discards browser caching and re-amplifies reads.
+**Why chosen:** the CDN sits in front of **B2**, so it shields B2's read caps from whoever the reader is — the reader's identity is irrelevant to the shield. Once that is seen clearly, every argument for putting the browser on that hop collapses, and the costs of doing so are pure loss:
 
-**Accepted cost:** the dashboard trusts a second endpoint, so the Worker's `/query` contract genuinely faces the browser and needs an origin policy, a versioning story, and CORS.
+- **Cache keys stay low-cardinality.** The plane owns the query shapes, so reads are canned and reusable and the edge cache actually hits. Arbitrary browser-driven ranges, filters, and pagination would generate a near-unique key per request, degrading the edge cache to nothing and defeating the read-cap protection that justifies the CDN in the first place.
+- **There is no browser-held credential, because there is no browser→CDN path.** Any secret available to browser JavaScript is exfiltratable by the user, extensions, XSS, or devtools — so a durable browser credential was never achievable, and the short-lived-grant machinery needed to work around that is now unnecessary.
+- **The CDN contract stops being public.** It is an interface between two things we control, not a browser-facing API needing an origin policy, CORS, and a public versioning story.
+- **One dashboard backend.**
+- **It answers who precomputes aggregates:** the plane does, and caches the derived artifacts. A cold cache re-reads through the CDN, which is cached, which does not touch B2.
 
-### Read path — Rejected: plane proxies Worker reads
+**Accepted cost:** the plane is in the history read path and must cache derived artifacts to avoid re-reading per request. This is cheap — the plane is our own infrastructure and is not the capped resource; B2 is.
 
-**Why rejected:** tidier contract, but it puts the plane in every history read and discards browser caching, weakening the exact mechanism the CDN provides. *The design review recommended this; it was overruled because the review did not have the read-cap cost model.*
+### Read path — Rejected: browser reads the CDN directly
+
+Historical views fetched by the dashboard straight from the edge; live state over SSE from the plane.
+
+**Why rejected:** preserves browser cache on top of edge cache, but buys it with high-cardinality cache keys (which defeat the edge cache the CDN exists to provide), an impossible browser-credential problem, a public CDN contract, and a second endpoint for the dashboard to trust. *This record chose this option in a previous pass, on the reasoning that proxying "discards browser caching and re-amplifies reads." That reasoning was wrong: it mislocated the CDN as sitting on the browser hop rather than in front of B2. The first design review recommended proxying and was overruled on this mistaken basis; the review's recommendation was correct.*
 
 ### Command delivery — Chosen: buffered with visible expiry
 
@@ -152,11 +162,35 @@ Naming: **sidecar**, not "agent". Two reasons, and both matter. It is the establ
 
 The sidecar owns: the authenticated session to the plane, the command stream, the local socket, the spool and retry, credential custody, clock-skew estimation, and sequence assignment. The CLI owns none of it.
 
-### Local socket closure is the liveness primitive
+### Local socket closure is the liveness primitive — but it proves disconnection, not death
 
-When a run's process dies, the OS closes its socket to the sidecar immediately. **A closed socket with no preceding `invocation-end` event is a crash** — known in milliseconds, with no heartbeat, no TTL, and no timeout.
+When a run's process dies, the OS closes its socket to the sidecar immediately. This is the liveness primitive: no heartbeat, no TTL, no timeout, and the signal arrives in milliseconds.
 
-This is why the original 60s stale TTL does not get fixed so much as it stops existing for local liveness. The TTL was trying to infer process death across a network from the absence of transition telemetry, which is why any task longer than a minute would have read as stale on a perfectly healthy fleet. Death detection belongs where the OS already answers it for free.
+**What it proves is narrower than it first appears.** A closed socket with no preceding `invocation-end` event means **abnormal disconnection**, not conclusively a crash. The same observation is produced by SIGKILL, machine shutdown, a local socket failure, a protocol-version restart, a process detaching — and, decisively, **by the sidecar itself restarting, which closes every socket at once while no run has died at all.** A sidecar that concluded "all my runs crashed" on restart would be maximally wrong at the worst possible moment.
+
+So the recorded state is `abnormally-disconnected` with termination reason unknown, and the sidecar opens a bounded reconciliation window in which runs may reconnect and re-announce themselves. A run that reconnects was never dead; a run that does not is presumed gone when the window closes.
+
+This still retires the original 60s stale TTL, which tried to infer process death across a network from the absence of transition telemetry — which is why any task longer than a minute would have read as stale on a healthy fleet. Local liveness belongs where the OS answers it. It is the *interpretation* of that answer that must stay honest about what it knows.
+
+### The sidecar is subordinate: runs survive its restart
+
+The sidecar removed WAN failure from the CLI path but introduced a local dependency for commandability and durable telemetry. That dependency is **subordinate to execution, never above it**:
+
+- A running stackctl process **continues executing** if its sidecar connection dies. It never blocks on reconnection.
+- It retries the local connection without blocking, and resumes telemetry and commandability when the sidecar returns.
+- While disconnected it is **temporarily uncommandable**, which the fleet view must show honestly rather than presenting it as healthy.
+
+**Long-running commandable runs carry a small bounded in-memory buffer** so a sidecar restart does not punch a hole in the event stream. This is deliberately scoped: short verbs get **no** buffer and simply drop on a sidecar-unavailable socket, because a 200ms process exits long before a sidecar returns and buffering would be ceremony. Long-term durability remains the sidecar's job; the buffer covers only the restart gap.
+
+### Delivery is at-least-once — say so plainly
+
+The combination of local spooling, retries, deduplication, immutable objects, and assigned sequence invites an exactly-once reading. It is not:
+
+- **transmission:** at-least-once
+- **ingestion:** idempotent
+- **registry application:** effectively-once
+
+Durable storage may transiently contain duplicate attempts unless object naming makes duplication impossible. Stating this here prevents tests and operator expectations from later assuming a guarantee the system does not offer.
 
 ### Two heartbeats, unrelated, both required
 
@@ -169,13 +203,17 @@ Run liveness needs neither — the local socket answers it. Intervals and thresh
 
 | Identifier | Lifetime |
 |---|---|
-| `installationId` | A stack-control installation. **Globally unique, minted once at sidecar first-start and persisted.** Not derived from a path. |
+| `installationId` | A stack-control installation. **Globally unique, minted once at sidecar first-start and persisted machine-locally.** Not derived from a path. |
 | `invocationId` | One stackctl process invocation; generated fresh at process start. |
 | `runId` | One execution run within an invocation. |
 
-Hostname, platform, and runtime versions are **metadata attached to the installation**, not identity.
+Hostname, platform, and runtime versions are **metadata attached to the installation**, not identity. So are `repositoryRemote` and `workspacePath` — the dashboard will want to group installations that correspond to the same repository, and grouping metadata must never be mistaken for authoritative identity.
 
 The original `instanceId` (worktree path + session ID, hashed) failed twice over: it conflated a workspace with a process invocation, and — fatally for a global fleet — a path-derived identifier collides across hosts, since two machines with the same checkout at the same path produce the same hash. Minting the identifier rather than deriving it removes the collision at its root and makes a separate host-identity dimension unnecessary.
+
+**Minting is not sufficient on its own — where the identifier lives is load-bearing.** `.stack-control/` is version-controlled; the roadmap, backlog, and workflow documents live there and are committed. Persisting `installationId` anywhere inside version-controlled or copyable installation content would ship one identifier to every clone — reintroducing, one layer down, exactly the collision that minting exists to prevent.
+
+Therefore: **`installationId` is machine-local runtime identity. It is persisted outside version-controlled installation content, is never committed, and is never intentionally copied.** An installation directory that arrives on another host by clone or copy must **re-mint**; identity does not travel with the tree.
 
 ### Liveness and execution state are separate axes
 
@@ -193,6 +231,12 @@ Every command carries a plane-generated `commandId` and an explicit state machin
 
 The promise: **the operator can always tell what happened to a command they issued.** "Sent" is never presented as "applied". `pause` is cooperative and its requested/applied distinction is visible.
 
+**`accepted` survives plane restart.** This is a design-level decision, not a plan-level one, because it fixes what the word *means*. An in-memory pending-command registry plus an undefined restart behavior would let a `cancel` accepted a second before restart vanish silently — which makes the promise above false in exactly the case that matters most. So the plane durably records a command before returning `accepted`, and the durable record is authoritative across restart. The persistence mechanism is plan-time; the guarantee is not.
+
+**Supersession rules are command-specific, never generic.** `resume` supersedes a pending un-applied `pause`; a newer `config-push` supersedes an older un-applied revision; two `cancel`s deduplicate rather than queueing; whether `reconcile` requests coalesce is its own question. "Superseded" is a valid terminal state, but there is no universal rule for when it applies.
+
+**Stream replay position is not command status.** `Last-Event-ID` tracks which command *frames the stream delivered* — it says nothing about whether a run received or applied anything. The sidecar's replay cursor and the command lifecycle are separate state with separate advancement rules; conflating them would let a delivered-but-unapplied command look complete.
+
 Envelope schema, transition table, and expiry constants are plan-time contracts pinned by RED tests.
 
 ### Telemetry shape — event envelope plus snapshot; histories are not resent
@@ -201,11 +245,32 @@ Telemetry separates an **event envelope** (identity, `eventId`, `sequence`, sche
 
 Histories are never resent. `execution.history[]` and `governance.history[]` on every event is quadratic in run length.
 
-### The sidecar is the sequencer
+### The sidecar is the sequencer — and there are two sequences, not one
 
-All of an installation's telemetry passes through one sidecar, which makes it the natural point to assign monotonic sequence. Every event carries a globally unique `eventId` and a monotonic `sequence`. The plane deduplicates by `eventId`, never regresses live registry state from an older sequence, stores late events durably, and surfaces sequence gaps diagnostically.
+All of an installation's telemetry passes through one sidecar, which makes it the natural sequencing point. Every event carries a globally unique `eventId` and **two** monotonic sequences:
 
-Without this the dashboard can walk backward from `task-complete` to `task-start` on reordered delivery — likely once retries exist.
+- **`installationSequence`** — the sidecar's outbound emission order. Used for transport diagnostics, gap detection, and spool restoration.
+- **`invocationSequence`** — per-invocation order. This is the one with domain meaning.
+
+They are not interchangeable. An installation-wide sequence interleaves every concurrent invocation and every short verb into one counter, so it defines *emission order at the sidecar*, **not causal ordering across simultaneous runs**. Using it for domain ordering would imply relationships between concurrent runs that do not exist.
+
+The plane deduplicates by `eventId`, never regresses live registry state from an older sequence, stores late events durably, and surfaces sequence gaps diagnostically. Without this the dashboard can walk backward from `task-complete` to `task-start` on reordered delivery — likely once retries exist.
+
+### Redaction happens before the spool, not after
+
+The sidecar is the redaction boundary — it is the last hop under the operator's control before telemetry leaves the host. **Ordering within the sidecar is load-bearing:** redacting after spooling would leave raw paths, usernames, and error content persisted on local disk, which defeats the point.
+
+The pipeline is: receive local raw event → validate local protocol → normalize and redact → assign durable `eventId` and sequence → write spool record → transmit.
+
+This ordering also yields a useful invariant: **the spooled object is identical to the object eventually transmitted and stored.** Nothing is redacted in flight, so a spooled record can be replayed byte-for-byte after a restart.
+
+### Everything emits locally; not everything becomes a cloud object
+
+"Every invocation telemeters" is a statement about the *local* hop. It is not a commitment that every event becomes an immutable B2 object — an operator with shell completions, status checks, editor integrations, or automation loops would otherwise mint cloud objects at a rate nobody asked for.
+
+The sidecar classifies each event: **live-only** (never durably stored — heartbeats belong here), **aggregated** (rolled into a summary rather than stored individually), or **durable** (its own immutable object). The classification, not the emission, decides cost.
+
+Boundedness principles that follow, with values pinned at plan time: a maximum event size; a spool size cap with a defined drop policy naming what is discarded first; and the sidecar's reserved right to coalesce or sample. Rollup *machinery* is not built until volume justifies it, but the classification seam exists from the start so adding it later changes no contract.
 
 ### Storage layout — immutable per-event objects
 
@@ -217,9 +282,16 @@ The original `events.jsonl` was a defect: object storage does not append, so eve
 
 Live runs are served from the plane's in-memory registry. B2/CF serves only *completed* runs, which are immutable by definition. Cloud reads are confined to exactly the data that caches perfectly.
 
-### Durability is the sidecar's job, and failure is observable
+### Durability is the sidecar's job, and failure is observable at both hops
 
-The sidecar spools locally and retries with bounded backoff; the plane tracks and surfaces store health (healthy / degraded / disabled, pending and failed write counts, last success, last failure, last error). A silently dropped write lets an operator believe history is complete when it is not — the same class of lie the command-expiry decision rejects. A dead-letter processing UI is deferred; silent failure is not.
+The sidecar spools locally and retries with bounded backoff. A silently dropped write lets an operator believe history is complete when it is not — the same class of lie the command-expiry decision rejects. A dead-letter processing UI is deferred; silent failure is not.
+
+**There are two durability queues and they fail for unrelated reasons**, so one "store degraded" indicator would be ambiguous exactly when it matters:
+
+- **Uplink health** (sidecar → plane): this host cannot reach the plane. Sidecar spool depth is the signal.
+- **Archive health** (plane → B2): the plane cannot persist. Pending and failed write counts are the signal.
+
+Both are surfaced independently — healthy / degraded / disabled, with pending counts, last success, last failure, and last error. "Degraded" must always answer *which hop*.
 
 ### The CLI fails open, instantly
 
@@ -241,7 +313,7 @@ The plane aggregates state and issues commands. It does not become the execution
 
 ### Dashboard
 
-Live updates over SSE from the plane; historical views read directly from the Worker. Initial state via REST snapshot, then **deltas** (instance upserted/removed, command updated, store health) — never a full registry push per telemetry event.
+Everything comes from the plane — live state and history alike. Live updates over SSE; initial state via REST snapshot, then **deltas** (instance upserted/removed, command updated, store health) — never a full registry push per telemetry event. Historical views are served from artifacts the plane derived and cached.
 
 Fleet table: one row per commandable run — instance, compass, status, progress, model, git, reconciliation, actions. Instance detail drawer, tabbed: overview, artifacts, execution, governance, timings, reconciliation.
 
@@ -252,11 +324,14 @@ Fleet-wide actions are **fan-out, not atomic**, and are presented as such: the r
 - **Local socket transport and portability.** Unix domain socket (filesystem permissions provide local authorization for free) versus localhost TCP (needs a token and port allocation). Windows needs named pipes. Discovery path for the socket — under the installation root, or a well-known per-user location — is unsettled.
 - **Sidecar spawn race and singleton guard.** Two concurrent invocations finding no sidecar must not both spawn one. The lock mechanism, and its behavior on a stale lock from a crashed sidecar, are undefined.
 - **Sidecar idle lifetime.** Does an auto-spawned sidecar exit after idle, and if so does the next invocation pay a spawn cost? Interacts with spool durability — a sidecar that exits with a non-empty spool must not lose it.
-- **Cloudflare Worker `/query` contract.** Browser-facing, so its request/response schema, versioning, and origin/auth policy are a public interface. Blocks every historical view.
-- **Worker read auth.** History is now globally reachable. How the Worker authenticates a read, and how that credential reaches the browser without being exfiltratable, is undesigned.
-- **Plane restart.** The in-memory registry and pending-command queue vanish. What happens to live sessions, their SSE streams, and buffered-but-undelivered commands?
+- **CDN read mechanism.** The design fixes that the plane is the only reader and that its queries are canned and cacheable. *How* the shield is built — an edge Worker doing listing and range logic, or CF as a pull-through cache with immutable period manifests making listing unnecessary — is a plan-time choice to settle against real numbers. Listing is an uncacheable B2 transaction, which is the constraint any mechanism must answer. Deciding this in prose now would be false precision.
+- **Derived-artifact staleness and backfill.** The plane derives and caches dashboard artifacts. What invalidates a derived artifact, what happens when a late event arrives after derivation, and how a bad artifact is rebuilt are undefined.
+- **Plane restart, beyond commands.** Command acceptance now survives restart by decision. The in-memory *registry* still vanishes: what happens to live sessions and their SSE streams on restart, and how relays re-announce, is undefined.
 - **Telemetry redaction and retention.** Absolute paths, usernames, branch names, commit messages, artifact paths, and error content leave the host for a cloud store. Even single-operator, this needs a redaction boundary, field length caps, a path policy, and a retention policy. The sidecar is the natural place to enforce it — it is the last hop under the operator's control.
 - **Artifact reference semantics.** Whether artifacts are filesystem paths, repo-relative paths, URLs, or opaque identifiers is unspecified. Browsers largely will not open `file://` from an HTTP page, and with a *remote* dashboard the paths refer to a filesystem the browser cannot reach at all — so "quick-access links" likely means copy-path, or something richer.
+- **Reconciliation window length.** How long the sidecar waits for an abnormally-disconnected run to reconnect before presuming it gone, and what the fleet view shows during the window.
+- **Sidecar spawn race and stale locks.** Two concurrent invocations finding no sidecar must not both spawn one. The lock mechanism, and its behavior against a stale lock left by a crashed sidecar, are undefined.
+- **Sidecar idle lifetime versus spool durability.** If an auto-spawned sidecar idle-exits, it must not exit holding an un-flushed spool. The interaction between idle-exit and spool drain is undefined.
 - **`cancel` semantics.** Does cancel interrupt the current task or wait for the task boundary? Are child processes terminated, with what signal? What cleanup is guaranteed? Is the invocation ended or only the run? Can cancellation time out? A future `terminate` (forceful) is named to keep `cancel` (cooperative) unambiguous, even if only `cancel` ships.
 - **`config-push` safety.** Needs config schema version, validation, an allowed-key set, apply-timing, persistence after invocation end, and revision/compare-and-set semantics to avoid lost updates.
 - **`reconcile` is long-running.** A single acknowledgement cannot represent it; needs its own received/started/completed/failed lifecycle with results linked by `commandId`.
@@ -293,7 +368,21 @@ Two defects the review missed were caught independently:
 1. **Every invocation opening a command channel** — the original core sentence attached a command channel to 200ms read-only verbs. The review built a command state machine on top of this without noticing the channel was attached to the wrong thing.
 2. **Emitter behavior against an unreachable plane was unspecified** — fully dissolved by the sidecar.
 
-The SSE choice **survived both passes but on entirely different grounds than originally recorded**: the load-bearing argument is NAT traversal (the plane can never dial a sidecar behind a firewall), not traffic shape, and it is now conditional on HTTP/2 for connection economics.
+The SSE choice **survived both passes but on entirely different grounds than originally recorded**: the load-bearing argument is NAT traversal (the plane can never dial a sidecar behind a firewall), not traffic shape.
+
+**Amendment pass 3 — second design review, and an operator correction that reversed the read path.**
+
+The second review's decisive catches, all adopted: `installationId` persisted inside copyable installation content would ship one identity to every clone, reintroducing the collision minting exists to prevent; socket closure proves abnormal *disconnection*, not death — and a sidecar restart closes every socket while nothing has died; sidecar-restart continuity was missing entirely; the exactly-once temptation needed naming; `accepted` could not survive plane restart while the record promised the operator always knows a command's fate; redaction must precede spooling or raw data persists on disk; one installation-wide sequence conflates transport order with causal order; store health needs an uplink/archive split; SSE reconnect is not free outside a browser; `Last-Event-ID` is a stream cursor, not command status; supersession rules cannot be generic; and "everything telemeters" must not mean "every event becomes a cloud object".
+
+The review's framing — *approve at design level, with issues to become contracts in `/define`* — was not adopted, for the same reason as pass 1: four of the issues it raised are **decisions**, not downstream contracts, and it elevated them as needing answers before `/define` itself. There is no approved-with-asterisks state; this was an amendment pass.
+
+Two review positions were **refined rather than adopted wholesale**: the invocation-side buffer is scoped to long-running commandable runs only (a 200ms verb exits long before a sidecar returns, so buffering it is ceremony), and the immutable-resource discipline was noted to carry a real cost — cross-run aggregates require someone to precompute them, which the read-path reversal then assigned to the plane.
+
+**The read path was reversed by operator correction, and this record's previous reasoning was wrong.** The dashboard does not read the CDN; the plane is the only reader, running canned cacheable queries and deriving dashboard artifacts. The prior pass had chosen browser-direct reads on the reasoning that proxying "discards browser caching and re-amplifies reads" — which **mislocated the CDN as sitting on the browser hop rather than in front of B2.** The CDN shields B2's read caps from *whoever reads*; the reader's identity never mattered. This was the second instance of the same category error in this design's history: the first draft asked "why a CDN for a localhost dashboard," treating a CDN as user-facing edge delivery rather than a read-amplification shield in front of an expensive origin.
+
+The reversal resolved the second review's sharpest finding (high-cardinality cache keys defeating the edge cache) and dissolved another (a browser-held credential is exfiltratable by construction) — both by construction rather than by mechanism. It also vindicates the **first** review's proxy recommendation, which this record had overruled on the mistaken basis above.
+
+A further correction rejected an attempt to settle **whether the Worker survives** as a design decision: with the plane as sole reader, the shield's mechanism is a plan-time choice against real numbers, and forcing it in prose is false precision — the same failure this record criticizes the reviews for.
 
 Per the house rules, mechanism was deliberately kept out: command envelope schemas, route namespacing and versioning, heartbeat and backoff constants, socket protocol framing, and retry policy are plan-time contracts pinned by RED tests. Prose cannot carry a write protocol; attempting it is the spec-audit generator this project has a written rule against.
 
