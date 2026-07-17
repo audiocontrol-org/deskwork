@@ -264,10 +264,25 @@ export function runSseClient(opts: SseClientOptions): SseClientHandle {
   });
 
   const run = async (): Promise<void> => {
-    const conn = await opts.transport.connect({
-      url: opts.url,
-      headers: opts.headers ?? {},
-    });
+    let conn: SseConnection;
+    try {
+      conn = await opts.transport.connect({
+        url: opts.url,
+        headers: opts.headers ?? {},
+      });
+    } catch {
+      // The connect attempt itself rejected — an UNREACHABLE plane (DNS
+      // failure, connection refused, TLS error, a blocked/invalid URL). That is
+      // a reestablish-class end (§ C4), handled with backoff by the reconnect
+      // driver — NEVER an unhandled promise rejection. The sidecar must tolerate
+      // an unreachable plane and keep spooling (quickstart Scenario 1: "Plane
+      // unreachable ⇒ sidecar spools"; the interactive path is never informed).
+      // A caller-triggered stop() during the connect is filtered by the guard.
+      if (!stopped) {
+        fireClosed('stream-ended');
+      }
+      return;
+    }
     connection = conn;
     if (stopped) {
       conn.close();
