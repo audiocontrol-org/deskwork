@@ -670,3 +670,9 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 - design-approved: yes
 - design: docs/superpowers/specs/2026-07-16-fleet-control-plane-design.md
 
+## design:feature/fleet-dashboard
+- status: planned
+- depends-on: design:feature/fleet-control-plane
+- ref: docs/superpowers/specs/2026-07-16-fleet-control-plane-design.md
+The operator-facing dashboard over the fleet plane: fleet table of commandable runs, tabbed instance drawer, live deltas, historical views. Cut from `design:feature/fleet-control-plane`'s scope by operator decision 2026-07-16 — get the plumbing right before slapping a frontend on it; pick this up once the plane is shipped and producing real fleet state for the dashboard to be *about*. The design record referenced above sketches the surface (table columns, drawer tabs, delta-not-full-push, plane-as-only-reader); it is a starting point, not a finished frontend design, so this item re-enters at `design`. Supersedes the removed `multi:feature/control-plane-frontend` (2026-06-07), which predated the fleet-plane design and was retired as the weaker idea.
+
