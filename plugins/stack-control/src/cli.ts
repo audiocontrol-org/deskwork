@@ -80,6 +80,8 @@ import { runIntercept } from './subcommands/intercept.js';
 import { runCapabilityCli } from './subcommands/capability.js';
 import { runReconcileCli } from './subcommands/capability-reconcile.js';
 import { runCheckFrontDoorCli } from './subcommands/check-front-door.js';
+import { runPlane } from './subcommands/plane.js';
+import { runSidecar } from './subcommands/sidecar.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -175,6 +177,13 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // Front-door regression guard (028 US4): the four-assertion check over the
   // fronted-operations registry. Self-documenting (mounted on the command surface).
   'check-front-door': runCheckFrontDoorCli,
+  // Fleet control plane (036): `provision-token` (PT-015) + `serve` (T124, the
+  // runnable PLANE daemon the dogfood drives).
+  plane: runPlane,
+  // Fleet control plane (036): the runnable SIDECAR daemon — `sidecar run`
+  // elects, receives+spools local telemetry, uplinks to the plane, consumes
+  // commands over SSE, and heartbeats session liveness.
+  sidecar: runSidecar,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

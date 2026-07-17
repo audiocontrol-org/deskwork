@@ -52,7 +52,21 @@ import {
   parseCliToSidecarFrame,
   serializeFrame,
   splitFrameLines,
+  type CliToSidecarFrame,
 } from '../telemetry/protocol.js';
+
+/**
+ * An additive, OPTIONAL seam (specs/036 sidecar-daemon): fired for every
+ * successfully-parsed NON-`hello` frame the winner receives on the local
+ * socket (`event`, `register-run`, `end-invocation`). The elected sidecar's
+ * hello handshake (C3/C6) is unchanged and never routes through here — this
+ * seam is purely for a caller (the daemon, `daemon.ts`) to route received
+ * telemetry/run frames into the pipeline + command routing WITHOUT this
+ * module reimplementing any of that. When no handler is supplied, the server
+ * behaves EXACTLY as before (answers `hello`, ignores everything else), so
+ * every existing election test stays green.
+ */
+export type ReceivedFrameHandler = (frame: CliToSidecarFrame) => void;
 
 // ---------------------------------------------------------------------------
 // Owner registry — where the socket's owning process identity is recorded so
@@ -178,6 +192,11 @@ export interface ElectionConfig {
   /** Bounded stale-recovery re-bind attempts before conceding to persistent
    * contention (and losing silently). Defaults to 3. */
   readonly maxRecoveryAttempts?: number;
+  /** OPTIONAL, ADDITIVE (specs/036 sidecar-daemon): a handler fired for every
+   * successfully-parsed NON-`hello` frame the winner receives. Absent ⇒ the
+   * server ignores non-hello frames exactly as before. See
+   * {@link ReceivedFrameHandler}. */
+  readonly onFrame?: ReceivedFrameHandler;
 }
 
 type BindResult =
@@ -249,6 +268,7 @@ function makeSidecarServer(
   socketPath: string,
   ownerRegistry: OwnerRegistry,
   localVersion: number,
+  onFrame: ReceivedFrameHandler | undefined,
 ): SidecarServer {
   const openSockets = new Set<Socket>();
 
@@ -262,8 +282,22 @@ function makeSidecarServer(
       buffered = remainder;
       for (const line of complete) {
         const parsed = parseCliToSidecarFrame(line);
-        if (parsed.ok && parsed.frame.kind === 'hello') {
+        if (!parsed.ok) {
+          continue;
+        }
+        if (parsed.frame.kind === 'hello') {
           socket.write(serializeFrame(buildHelloAckFrame(parsed.frame, localVersion)));
+          continue;
+        }
+        // Additive seam: route every non-hello frame to the caller (daemon).
+        // A handler throwing must NEVER take the sidecar down (a peer/data
+        // fault is never fatal to election correctness, C5) — swallow per-frame.
+        if (onFrame !== undefined) {
+          try {
+            onFrame(parsed.frame);
+          } catch {
+            /* the caller's frame handler is best-effort; never crash the sidecar. */
+          }
         }
       }
     });
@@ -325,7 +359,13 @@ export async function electSidecar(config: ElectionConfig): Promise<ElectionOutc
     const bind = await tryBind(config.socketPath);
     if (bind.kind === 'bound') {
       config.ownerRegistry.write(config.selfIdentity);
-      const server = makeSidecarServer(bind.server, config.socketPath, config.ownerRegistry, localVersion);
+      const server = makeSidecarServer(
+        bind.server,
+        config.socketPath,
+        config.ownerRegistry,
+        localVersion,
+        config.onFrame,
+      );
       return { kind: 'won', server, socketPath: config.socketPath };
     }
 
@@ -388,7 +428,10 @@ export async function electSidecar(config: ElectionConfig): Promise<ElectionOutc
  * `createSystemStartTimeSource` fails loud — callers there must build their
  * own `ProcessProbe` and call `electSidecar` directly.
  */
-export async function electSidecarForInstallation(installationRoot: string): Promise<ElectionOutcome> {
+export async function electSidecarForInstallation(
+  installationRoot: string,
+  onFrame?: ReceivedFrameHandler,
+): Promise<ElectionOutcome> {
   const located = locateMachineState(installationRoot);
   const probe = new ProcessProbe(createSystemStartTimeSource());
   const selfIdentity = probe.capture(process.pid);
@@ -404,5 +447,6 @@ export async function electSidecarForInstallation(installationRoot: string): Pro
     probe,
     selfIdentity,
     ownerRegistry: createFileOwnerRegistry(`${located.socketPath}.owner`),
+    onFrame,
   });
 }

@@ -114,6 +114,22 @@ const ROUTE_TABLE: readonly RouteDefinition[] = [
   { method: 'GET', pattern: '/v1/health/store', handler: 'storeHealth' },
 ];
 
+/**
+ * An additional route mounted alongside the nine consumer routes, carrying
+ * its handler INLINE rather than by a `PlaneRouteHandlers` key. This is the
+ * seam the plane RUNTIME (T124, src/plane/runtime.ts) uses to mount the
+ * three SIDECAR-FACING routes (POST /v1/ingest, GET /v1/sidecar/stream, POST
+ * /v1/sidecar/liveness — contracts/sidecar-plane-protocol.md C1/C3/C7) that
+ * are NOT part of the consumer contract's route table, WITHOUT duplicating
+ * this module's dispatch/matching machinery: extra routes compile and match
+ * through exactly the same path (`compilePattern`) the built-in table does.
+ */
+export interface ExtraRoute {
+  readonly method: HttpMethod;
+  readonly pattern: string;
+  readonly handler: RouteHandler;
+}
+
 // ---------------------------------------------------------------------------
 // Pattern compilation — `:param` segments to capture groups, no dependency.
 // ---------------------------------------------------------------------------
@@ -126,13 +142,29 @@ interface CompiledRoute {
   readonly handlerKey: keyof PlaneRouteHandlers;
 }
 
+/**
+ * A route whose handler is fully resolved to a `RouteHandler` — either a
+ * built-in table route (handler looked up from `PlaneRouteHandlers` at
+ * factory time) or an {@link ExtraRoute} (handler carried inline). Dispatch
+ * operates over these uniformly, so the sidecar routes and the consumer
+ * routes share ONE matcher.
+ */
+interface ResolvedRoute {
+  readonly method: HttpMethod;
+  readonly pattern: string;
+  readonly paramNames: readonly string[];
+  readonly regex: RegExp;
+  readonly handler: RouteHandler;
+}
+
 function escapeLiteralSegment(segment: string): string {
   return segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function compileRoute(def: RouteDefinition): CompiledRoute {
+/** Compile a `:param`-bearing pattern into its param names + match regex. */
+function compilePattern(pattern: string): { paramNames: readonly string[]; regex: RegExp } {
   const paramNames: string[] = [];
-  const segments = def.pattern.split('/').filter((segment) => segment.length > 0);
+  const segments = pattern.split('/').filter((segment) => segment.length > 0);
   const regexParts = segments.map((segment) => {
     if (segment.startsWith(':')) {
       paramNames.push(segment.slice(1));
@@ -141,6 +173,11 @@ function compileRoute(def: RouteDefinition): CompiledRoute {
     return escapeLiteralSegment(segment);
   });
   const regex = new RegExp(`^/${regexParts.join('/')}$`);
+  return { paramNames, regex };
+}
+
+function compileRoute(def: RouteDefinition): CompiledRoute {
+  const { paramNames, regex } = compilePattern(def.pattern);
   return {
     method: def.method,
     pattern: def.pattern,
@@ -152,7 +189,37 @@ function compileRoute(def: RouteDefinition): CompiledRoute {
 
 const COMPILED_ROUTES: readonly CompiledRoute[] = ROUTE_TABLE.map(compileRoute);
 
-function extractParams(route: CompiledRoute, pathname: string): Record<string, string> {
+/**
+ * Resolve the built-in table (handlers looked up by key) plus any extra
+ * inline-handler routes into one uniform, matchable list. Extra routes are
+ * appended AFTER the built-ins; they never shadow a built-in pattern (the
+ * runtime mounts only new sidecar paths, disjoint from the consumer table).
+ */
+function resolveRoutes(
+  handlers: PlaneRouteHandlers,
+  extraRoutes: readonly ExtraRoute[],
+): readonly ResolvedRoute[] {
+  const builtins: ResolvedRoute[] = COMPILED_ROUTES.map((route) => ({
+    method: route.method,
+    pattern: route.pattern,
+    paramNames: route.paramNames,
+    regex: route.regex,
+    handler: handlers[route.handlerKey],
+  }));
+  const extras: ResolvedRoute[] = extraRoutes.map((route) => {
+    const { paramNames, regex } = compilePattern(route.pattern);
+    return {
+      method: route.method,
+      pattern: route.pattern,
+      paramNames,
+      regex,
+      handler: route.handler,
+    };
+  });
+  return [...builtins, ...extras];
+}
+
+function extractParams(route: ResolvedRoute, pathname: string): Record<string, string> {
   const match = route.regex.exec(pathname);
   if (match === null) {
     throw new Error(
@@ -205,7 +272,7 @@ function parseRequestUrl(req: IncomingMessage): URL | undefined {
 // ---------------------------------------------------------------------------
 
 async function dispatch(
-  handlers: PlaneRouteHandlers,
+  routes: readonly ResolvedRoute[],
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
@@ -228,7 +295,7 @@ async function dispatch(
     return;
   }
 
-  const pathMatches = COMPILED_ROUTES.filter((route) => route.regex.test(url.pathname));
+  const pathMatches = routes.filter((route) => route.regex.test(url.pathname));
   if (pathMatches.length === 0) {
     respondError(res, 404, `no route matches ${url.pathname}`);
     return;
@@ -243,7 +310,7 @@ async function dispatch(
   }
 
   const params = extractParams(exact, url.pathname);
-  const handler = handlers[exact.handlerKey];
+  const handler = exact.handler;
   const ctx: RouteContext = { req, res, params, url };
 
   try {
@@ -265,10 +332,21 @@ async function dispatch(
  * only wires request dispatch, matching `createServer`'s own contract so
  * this composes with the rest of the plane's process lifecycle (T124)
  * without this module knowing anything about ports, hosts, or supervision.
+ *
+ * `extraRoutes` (default `[]`) mounts additional inline-handler routes
+ * alongside the nine consumer routes through the SAME matcher — the plane
+ * runtime (T124) passes the three sidecar-facing routes here so the
+ * single-arg callers (server.ts's own tests, T053/T054) keep working
+ * unchanged while the runtime gets one server that serves both surfaces
+ * without a duplicated router.
  */
-export function createPlaneServer(handlers: PlaneRouteHandlers): Server {
+export function createPlaneServer(
+  handlers: PlaneRouteHandlers,
+  extraRoutes: readonly ExtraRoute[] = [],
+): Server {
+  const routes = resolveRoutes(handlers, extraRoutes);
   return createServer((req, res) => {
-    dispatch(handlers, req, res).catch((error: unknown) => {
+    dispatch(routes, req, res).catch((error: unknown) => {
       // dispatch() itself catches handler errors; this only guards against
       // a rejection escaping dispatch() before a response was ever sent
       // (e.g. a synchronous throw resolving in the async wrapper before
