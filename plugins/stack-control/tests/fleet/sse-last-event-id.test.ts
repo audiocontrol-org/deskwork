@@ -28,43 +28,11 @@
 
 import { describe, expect, it } from 'vitest';
 import type { SseConnectRequest, SseConnection, SseTransport } from '../../src/sidecar/uplink/transport.js';
+import { buildReconnectHeaders, createEventIdBuffer } from '../../src/sidecar/uplink/reconnect.js';
 
-/**
- * Tracks the Last-Event-ID buffer per SSE client rules.
- *
- * `current()`: returns the last seen event id, or undefined if none seen.
- * `observe(event)`: updates the buffer when event.id is present; persists
- *   across events that omit id.
- */
-export interface EventIdBuffer {
-  current(): string | undefined;
-  observe(event: { readonly id?: string }): void;
-}
-
-/**
- * Creates a new EventIdBuffer. Each reconnection gets its own buffer (or
- * reuses the buffer across attempts — that is a reconnect.ts detail, not
- * this module's).
- */
-export function createEventIdBuffer(): EventIdBuffer {
-  throw new Error('createEventIdBuffer not implemented (T113)');
-}
-
-/**
- * Builds request headers for a reconnect, injecting Last-Event-ID when the
- * buffer is non-empty.
- *
- * @param base Base headers to include (e.g. authorization, user-agent).
- * @param lastEventId The last-event-id buffer's current() value, or undefined.
- * @returns A new headers object with Last-Event-ID injected iff lastEventId
- *   is non-empty; base headers always included.
- */
-export function buildReconnectHeaders(
-  base: Readonly<Record<string, string>>,
-  lastEventId: string | undefined,
-): Record<string, string> {
-  throw new Error('buildReconnectHeaders not implemented (T113)');
-}
+// EventIdBuffer, createEventIdBuffer, and buildReconnectHeaders are pinned
+// (and now implemented) in src/sidecar/uplink/reconnect.ts (T113); this test
+// imports the real module rather than redeclaring the API shape locally.
 
 describe('SSE Last-Event-ID handling (T105 — C4 wire contract)', () => {
   describe('EventIdBuffer', () => {

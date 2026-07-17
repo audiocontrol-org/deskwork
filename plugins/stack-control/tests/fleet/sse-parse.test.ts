@@ -205,8 +205,11 @@ describe('SseDecoder (T103 — SSE frame decoding, chunk-boundary resilience)', 
 
     const secondChunk = decoder.push(encode(':later comment\n\n'));
     expect(secondChunk).toHaveLength(0);
-    // Only the comment from the second chunk, since callback was registered after the first
-    expect(comments).toEqual([':later comment\n']);
+    // Only the comment from the second chunk, since callback was registered after the first.
+    // Comment text is stripped of its leading ':' (and optional space) — consistent with the
+    // rest of this suite (`:keepalive\n\n` => 'keepalive'). Length 1 pins the no-double-fire
+    // contract; the value pins the strip contract.
+    expect(comments).toEqual(['later comment']);
   });
 
   it('frame without blank-line terminator waits for next chunk', () => {
