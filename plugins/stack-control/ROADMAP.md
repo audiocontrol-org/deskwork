@@ -81,11 +81,6 @@ The differentiator: worktree-isolated, capability-selected, cross-backend parall
 - spec: specs/001-speckit-backhalf-slice
 Governance as a Spec Kit after_implement extension: the deskwork-governance cross-model audit-barrage hook. Rehomed into the front door.
 
-## multi:feature/control-plane-frontend
-- status: planned
-- depends-on: multi:feature/front-door, impl:feature/execution-engine
-Fuller control-plane frontend: spec→implementation negotiation, scope/barrage surfaces, engine-run surfaces. Design surfaces lead; engine-run surfaces follow the engine.
-
 ## multi:feature/front-door
 - status: shipped
 - spec: specs/003-stack-control-front-door
@@ -671,6 +666,7 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 
 ## design:feature/fleet-control-plane
 - status: planned
+- spec: specs/036-fleet-control-plane
 - design-approved: yes
 - design: docs/superpowers/specs/2026-07-16-fleet-control-plane-design.md
 
