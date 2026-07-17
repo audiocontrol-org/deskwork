@@ -2,6 +2,53 @@
 
 ---
 
+## 2026-07-17: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 26
+  - feat(036-fleet-control-plane): T031+T032+T039 fail-open emit client (C1/SC-001/002)
+  - feat(036-fleet-control-plane): T035+T036+T041+T043 sidecar bind-wins election + stale recovery (C6/PT-002)
+  - feat(036-fleet-control-plane): T042 detached sidecar spawn (C6)
+  - feat(036-fleet-control-plane): T037+T040 bounded buffer with short/long asymmetry (FR-007/C4)
+  - feat(036-fleet-control-plane): T033+T034+T038 local wire protocol + version handshake
+  - feat(036-fleet-control-plane): T027+T028 installationSequence high-water mark (R-02)
+  - feat(036-fleet-control-plane): T025+T026+T029+T030 installationId mint/read/reattach
+  - feat(036-fleet-control-plane): T023+T024 machine-state store location (PT-001)
+  - feat(036-fleet-control-plane): T135+T136 event classification seam (FR-015/016)
+  - feat(036-fleet-control-plane): T019+T020 two sequences + gap classification (R-04)
+  - test(036-fleet-control-plane): T137 metadata-is-never-identity guard (FR-036)
+  - feat(036-fleet-control-plane): T021+T022 deny-by-default telemetry redaction (PT-008)
+  - feat(036-fleet-control-plane): T017+T018 three status axes, never collapsed
+  - feat(036-fleet-control-plane): T014+T015+T016 event envelope construct/validate + ordering guard
+  - test(036-fleet-control-plane): T011 real socket/process fixture (spawn/SIGKILL/stale/PID-reuse)
+  - test(036-fleet-control-plane): T010 cruel in-process SSE/HTTP server fixture
+  - feat(036-fleet-control-plane): T008 vendor-free object-store port (RED-first)
+  - feat(036-fleet-control-plane): T007 SseTransport DI seam (RED-first)
+  - feat(036-fleet-control-plane): T006 ProcessProbe PID+start-time liveness (RED-first)
+  - feat(036-fleet-control-plane): T004+T005 injectable Clock seam (RED-first)
+  - feat(036-fleet-control-plane): T012+T013 identity + envelope types (RED-first)
+  - test(036-fleet-control-plane): T009 machine-local store redirect harness
+  - feat(036-fleet-control-plane): T003 add plane settings to installation config type
+  - feat(036-fleet-control-plane): T001 (cont) declare the deps in the installation manifest
+  - feat(036-fleet-control-plane): T001 add eventsource-parser + uuidv7 deps
+  - roadmap(fleet-control-plane): record analyze-clean marker (speckit-analyze ran; 4 coverage gaps closed in 3a6b5e76)
+- Files changed: 51
+- Backlog touched: (none)
+
 ## 2026-07-17: fleet-control-plane — design → define, full authoring chain to `analyze`
 
 ### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)
