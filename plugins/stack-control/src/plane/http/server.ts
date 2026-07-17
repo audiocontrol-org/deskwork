@@ -1,0 +1,283 @@
+/**
+ * specs/036-fleet-control-plane — T051 (impl), pairs with the RED test
+ * tests/fleet/plane-server.test.ts.
+ *
+ * THE `node:http` SERVER + ROUTER (contracts/plane-client-api.md § Route
+ * shape, C1/C7). No web framework — this repo carries ZERO network
+ * dependencies today (package.json `dependencies`) and this file must not
+ * change that. Only `node:http` is imported.
+ *
+ * SCOPE: this module owns wire-level dispatch ONLY — matching a request's
+ * method + path against the contract's route table, extracting path
+ * params, and handing off to an INJECTED handler. It does not know how to
+ * build a snapshot, project a delta, or read the registry; those
+ * projections are `src/plane/http/api.ts`'s job (T053/T054, a separate
+ * concurrent task — deliberately not created here). `createPlaneServer`
+ * takes a `PlaneRouteHandlers` map so this file is fully testable before
+ * `api.ts` exists (inject fake handlers) and so T053/T054/T124 have a
+ * single, named seam to fill in later — mount the real projections,
+ * nothing about routing changes.
+ *
+ * Route shape lifted verbatim from contracts/plane-client-api.md § Route
+ * shape (path-only, versioned, low-cardinality per FR-069 — no route here
+ * accepts a query shape that shards the cache key; that constraint is
+ * enforced by never routing on the query string, only the path).
+ *
+ * No `any`, no `as`, no `@ts-ignore` (Principle VI). This file has no
+ * relative imports (self-contained), so the repo's `.js`-suffixed relative-
+ * import convention does not apply here.
+ */
+
+import { createServer } from 'node:http';
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
+
+// ---------------------------------------------------------------------------
+// The handler seam.
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything a route handler needs, already resolved by the router: the raw
+ * request/response pair (a streaming handler — e.g. the SSE delta route —
+ * writes multiple chunks over time and holds `res` open; a JSON handler
+ * writes once and calls `res.end()`), the path params extracted from the
+ * matched route pattern (e.g. `{ runId: '...' }` for `/v1/runs/:runId`),
+ * and the parsed request URL (so a handler can read search params without
+ * re-parsing `req.url` itself — though per FR-069 no route's SEMANTICS may
+ * key off the query string).
+ */
+export interface RouteContext {
+  readonly req: IncomingMessage;
+  readonly res: ServerResponse;
+  readonly params: Readonly<Record<string, string>>;
+  readonly url: URL;
+}
+
+/**
+ * A route handler owns writing the response (status, headers, body) and
+ * ending or holding open `ctx.res` as appropriate for its route. Returning
+ * (or resolving) without having called `res.end()` is only valid for a
+ * deliberately-streaming route (e.g. SSE) that intends to keep the
+ * connection open past this call.
+ */
+export type RouteHandler = (ctx: RouteContext) => void | Promise<void>;
+
+/**
+ * One named handler per contract route (contracts/plane-client-api.md §
+ * Route shape). Named by PURPOSE, not by HTTP verb+path, so a caller
+ * (T053/T054/T124) wires real projections against stable names rather than
+ * re-deriving route shape from strings.
+ */
+export interface PlaneRouteHandlers {
+  /** `GET /v1/fleet` — snapshot of current fleet state (C2). */
+  readonly fleetSnapshot: RouteHandler;
+  /** `GET /v1/fleet/stream` — live deltas over SSE (C2). */
+  readonly fleetStream: RouteHandler;
+  /** `GET /v1/runs/{runId}` — per-run detail (C5). */
+  readonly runDetail: RouteHandler;
+  /** `GET /v1/runs/{runId}/history` — historical view (C7). */
+  readonly runHistory: RouteHandler;
+  /** `GET /v1/runs/{runId}/timings` — per-run phase durations (C7). */
+  readonly runTimings: RouteHandler;
+  /** `POST /v1/runs/{runId}/commands` — issue a command against one run (C6). */
+  readonly issueRunCommand: RouteHandler;
+  /** `GET /v1/commands/{commandId}` — command lifecycle status (C6). */
+  readonly commandStatus: RouteHandler;
+  /** `POST /v1/fleet/commands` — fan-out command, never atomic (C6). */
+  readonly issueFleetCommand: RouteHandler;
+  /** `GET /v1/health/store` — durable-store health. */
+  readonly storeHealth: RouteHandler;
+}
+
+// ---------------------------------------------------------------------------
+// The route table — contracts/plane-client-api.md § Route shape, verbatim.
+// ---------------------------------------------------------------------------
+
+type HttpMethod = 'GET' | 'POST';
+
+interface RouteDefinition {
+  readonly method: HttpMethod;
+  /** `:name` segments become path params; every other segment matches
+   * literally. */
+  readonly pattern: string;
+  readonly handler: keyof PlaneRouteHandlers;
+}
+
+const ROUTE_TABLE: readonly RouteDefinition[] = [
+  { method: 'GET', pattern: '/v1/fleet', handler: 'fleetSnapshot' },
+  { method: 'GET', pattern: '/v1/fleet/stream', handler: 'fleetStream' },
+  { method: 'GET', pattern: '/v1/runs/:runId', handler: 'runDetail' },
+  { method: 'GET', pattern: '/v1/runs/:runId/history', handler: 'runHistory' },
+  { method: 'GET', pattern: '/v1/runs/:runId/timings', handler: 'runTimings' },
+  { method: 'POST', pattern: '/v1/runs/:runId/commands', handler: 'issueRunCommand' },
+  { method: 'GET', pattern: '/v1/commands/:commandId', handler: 'commandStatus' },
+  { method: 'POST', pattern: '/v1/fleet/commands', handler: 'issueFleetCommand' },
+  { method: 'GET', pattern: '/v1/health/store', handler: 'storeHealth' },
+];
+
+// ---------------------------------------------------------------------------
+// Pattern compilation — `:param` segments to capture groups, no dependency.
+// ---------------------------------------------------------------------------
+
+interface CompiledRoute {
+  readonly method: HttpMethod;
+  readonly pattern: string;
+  readonly paramNames: readonly string[];
+  readonly regex: RegExp;
+  readonly handlerKey: keyof PlaneRouteHandlers;
+}
+
+function escapeLiteralSegment(segment: string): string {
+  return segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function compileRoute(def: RouteDefinition): CompiledRoute {
+  const paramNames: string[] = [];
+  const segments = def.pattern.split('/').filter((segment) => segment.length > 0);
+  const regexParts = segments.map((segment) => {
+    if (segment.startsWith(':')) {
+      paramNames.push(segment.slice(1));
+      return '([^/]+)';
+    }
+    return escapeLiteralSegment(segment);
+  });
+  const regex = new RegExp(`^/${regexParts.join('/')}$`);
+  return {
+    method: def.method,
+    pattern: def.pattern,
+    paramNames,
+    regex,
+    handlerKey: def.handler,
+  };
+}
+
+const COMPILED_ROUTES: readonly CompiledRoute[] = ROUTE_TABLE.map(compileRoute);
+
+function extractParams(route: CompiledRoute, pathname: string): Record<string, string> {
+  const match = route.regex.exec(pathname);
+  if (match === null) {
+    throw new Error(
+      `extractParams: pathname ${JSON.stringify(pathname)} does not match route ` +
+        `${JSON.stringify(route.pattern)} — caller must only extract params after a ` +
+        'positive regex.test() match.',
+    );
+  }
+  const params: Record<string, string> = {};
+  route.paramNames.forEach((name, index) => {
+    // Capture group index 0 is the whole match; groups start at 1.
+    const value = match[index + 1];
+    if (value === undefined) {
+      throw new Error(
+        `extractParams: route ${JSON.stringify(route.pattern)} declares param ` +
+          `${JSON.stringify(name)} but the match produced no capture at index ${index}.`,
+      );
+    }
+    params[name] = value;
+  });
+  return params;
+}
+
+// ---------------------------------------------------------------------------
+// Response helpers.
+// ---------------------------------------------------------------------------
+
+function respondError(res: ServerResponse, status: number, message: string): void {
+  if (res.headersSent) {
+    res.destroy(new Error(message));
+    return;
+  }
+  res.writeHead(status, { 'content-type': 'application/json' });
+  res.end(JSON.stringify({ error: message }));
+}
+
+function parseRequestUrl(req: IncomingMessage): URL | undefined {
+  if (req.url === undefined) {
+    return undefined;
+  }
+  try {
+    return new URL(req.url, 'http://plane.invalid');
+  } catch {
+    return undefined;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dispatch.
+// ---------------------------------------------------------------------------
+
+async function dispatch(
+  handlers: PlaneRouteHandlers,
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
+  const method = req.method;
+  if (method === undefined) {
+    respondError(res, 400, 'request carries no HTTP method');
+    return;
+  }
+  if (method !== 'GET' && method !== 'POST') {
+    // Every contract route is GET or POST (§ Route shape); anything else
+    // cannot match any pattern's method, so treat it as a 405 uniformly
+    // rather than falling through to per-route matching.
+    respondError(res, 405, `method ${method} is not used by any route on this server`);
+    return;
+  }
+
+  const url = parseRequestUrl(req);
+  if (url === undefined) {
+    respondError(res, 400, `malformed request URL: ${JSON.stringify(req.url)}`);
+    return;
+  }
+
+  const pathMatches = COMPILED_ROUTES.filter((route) => route.regex.test(url.pathname));
+  if (pathMatches.length === 0) {
+    respondError(res, 404, `no route matches ${url.pathname}`);
+    return;
+  }
+
+  const exact = pathMatches.find((route) => route.method === method);
+  if (exact === undefined) {
+    const allowed = [...new Set(pathMatches.map((route) => route.method))];
+    res.setHeader('allow', allowed.join(', '));
+    respondError(res, 405, `method ${method} not allowed on ${url.pathname}`);
+    return;
+  }
+
+  const params = extractParams(exact, url.pathname);
+  const handler = handlers[exact.handlerKey];
+  const ctx: RouteContext = { req, res, params, url };
+
+  try {
+    await handler(ctx);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    respondError(res, 500, message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The factory.
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a `node:http` server that dispatches every contract route
+ * (contracts/plane-client-api.md § Route shape) to the corresponding
+ * injected handler. The caller owns `listen()`/`close()` — this factory
+ * only wires request dispatch, matching `createServer`'s own contract so
+ * this composes with the rest of the plane's process lifecycle (T124)
+ * without this module knowing anything about ports, hosts, or supervision.
+ */
+export function createPlaneServer(handlers: PlaneRouteHandlers): Server {
+  return createServer((req, res) => {
+    dispatch(handlers, req, res).catch((error: unknown) => {
+      // dispatch() itself catches handler errors; this only guards against
+      // a rejection escaping dispatch() before a response was ever sent
+      // (e.g. a synchronous throw resolving in the async wrapper before
+      // headers were written). Destroy the connection rather than hang.
+      if (!res.headersSent) {
+        respondError(res, 500, error instanceof Error ? error.message : String(error));
+        return;
+      }
+      res.destroy(error instanceof Error ? error : new Error(String(error)));
+    });
+  });
+}

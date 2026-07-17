@@ -83,3 +83,117 @@ export interface EventEnvelope {
   readonly monotonicOffsetMs: number;
   readonly classification: EventClassification;
 }
+
+/**
+ * Structured error per data-model.md § Structured error (FR-046): a
+ * bounded shape carrying error context in the fleet payload. **NOT** an
+ * unbounded generic field; details are fetched on demand, never carried
+ * inline.
+ *
+ * Field-by-field provenance (data-model.md):
+ * - `code`        error code identifier (e.g. 'TASK_PARSE_ERROR')
+ * - `message`     human-readable error message
+ * - `task`        the roadmap feature/phase/task id where the error occurred
+ * - `timestamp`   ISO-8601 timestamp when the error was recorded
+ * - `recoverable` whether the operation can be retried
+ *
+ * This is a BOUNDED shape by contract — no open `details` field, no
+ * unbounded generics. Error details are fetched via a separate path.
+ */
+export interface StructuredError {
+  readonly code: string;
+  readonly message: string;
+  readonly task: string;
+  readonly timestamp: string;
+  readonly recoverable: boolean;
+}
+
+/**
+ * Validate an unknown value as a `StructuredError`, rejecting missing or
+ * wrong-typed fields with a descriptive error (fail loud, per the
+ * project's no-silent-coercion rule). Returns a freshly-built, correctly
+ * typed error object — never a cast of the input.
+ *
+ * The validator enforces the BOUNDED shape contract (FR-046): no
+ * unbounded `details` field, no generic slots.
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function validateStructuredError(value: unknown): StructuredError {
+  if (!isPlainObject(value)) {
+    throw new Error(
+      `StructuredError: expected an object, got ${
+        value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value
+      }`,
+    );
+  }
+
+  // `value` is narrowed to Record<string, unknown> by the type guard — no cast.
+  const record: Record<string, unknown> = value;
+
+  // code: non-empty string
+  const code = record.code;
+  if (typeof code !== 'string' || code.length === 0) {
+    throw new Error(
+      `StructuredError.code: expected a non-empty string, got ${
+        code === null ? 'null' : Array.isArray(code) ? 'array' : typeof code
+      }`,
+    );
+  }
+
+  // message: non-empty string
+  const message = record.message;
+  if (typeof message !== 'string' || message.length === 0) {
+    throw new Error(
+      `StructuredError.message: expected a non-empty string, got ${
+        message === null ? 'null' : Array.isArray(message) ? 'array' : typeof message
+      }`,
+    );
+  }
+
+  // task: non-empty string
+  const task = record.task;
+  if (typeof task !== 'string' || task.length === 0) {
+    throw new Error(
+      `StructuredError.task: expected a non-empty string, got ${
+        task === null ? 'null' : Array.isArray(task) ? 'array' : typeof task
+      }`,
+    );
+  }
+
+  // timestamp: ISO-8601 string
+  const timestamp = record.timestamp;
+  if (typeof timestamp !== 'string' || timestamp.length === 0) {
+    throw new Error(
+      `StructuredError.timestamp: expected a non-empty string, got ${
+        timestamp === null ? 'null' : Array.isArray(timestamp) ? 'array' : typeof timestamp
+      }`,
+    );
+  }
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(
+      `StructuredError.timestamp: expected an ISO-8601 timestamp, got ${JSON.stringify(timestamp)}`,
+    );
+  }
+
+  // recoverable: boolean
+  const recoverable = record.recoverable;
+  if (typeof recoverable !== 'boolean') {
+    throw new Error(
+      `StructuredError.recoverable: expected a boolean, got ${
+        recoverable === null ? 'null' : Array.isArray(recoverable) ? 'array' : typeof recoverable
+      }`,
+    );
+  }
+
+  return {
+    code,
+    message,
+    task,
+    timestamp,
+    recoverable,
+  };
+}
