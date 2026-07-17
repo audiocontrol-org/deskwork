@@ -32,6 +32,12 @@ What is therefore out of scope here, and belongs to `design:feature/fleet-dashbo
 
 **The control plane must never degrade the tool it observes.** stackctl verbs run constantly and interactively. An unreachable, slow, or broken control plane must not slow, block, or fail any stackctl invocation. Observation is strictly subordinate to the thing observed. Where any requirement below appears to trade against this constraint, this constraint wins.
 
+## Clarifications
+
+### Session 2026-07-16
+
+- Q: The design record makes authentication mandatory but never states what the credential is, and the mechanism appears in neither its open questions nor this spec's Plan-Time Contracts — so it was an omission rather than a deliberate plan-time deferral. What authenticates a sidecar to the plane, and how does a new host get a credential? → A: A long-lived bearer token minted per installation, provisioned into the sidecar's machine-local config alongside `installationId`. Rejected: a fleet-wide shared secret (no per-installation revocation), mTLS client certificates (buys per-client identity the single-operator tenancy explicitly does not need, at the cost of certificate lifecycle), and a join-code enrollment handshake (better new-host UX, more machinery than a single-operator fleet warrants).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Emit telemetry without ever taxing the CLI (Priority: P1)
@@ -279,8 +285,9 @@ The fleet spans hosts behind NAT and firewalls in arbitrary network conditions. 
 ### Functional Requirements — Security and tenancy
 
 - **FR-075**: Transport encryption and authentication MUST be mandatory, because the plane is network-exposed by construction.
-- **FR-076**: Authentication MUST prove a sidecar belongs to the operator and MUST keep strangers out.
-- **FR-077**: Credentials MUST be held by the sidecar and MUST NEVER be held by individual CLI invocations.
+- **FR-076**: Authentication MUST prove a sidecar belongs to the operator and MUST keep strangers out. The credential MUST be a long-lived bearer token minted **per installation** — not one secret shared fleet-wide — so that a single host's credential can be revoked without disrupting the rest of the fleet.
+- **FR-077**: Credentials MUST be held by the sidecar and MUST NEVER be held by individual CLI invocations. The token MUST be persisted **machine-locally**, alongside `installationId`, and inherits that identifier's custody rules exactly (FR-032/FR-033): outside version-controlled or copyable installation content, never committed, never intentionally copied. An installation tree arriving on another host by clone or copy MUST NOT carry a usable credential with it.
+- **FR-088**: A new host MUST be able to obtain a credential and join the fleet, and the operator MUST be able to revoke a single installation's token without re-crediting the others. A revoked or unknown token MUST be refused (FR-076) and MUST NOT degrade into anonymous or partial access.
 - **FR-078**: Tenancy MUST be single-operator — one operator across many hosts — with no cross-tenant isolation, no per-instance permissions, and no per-operator scoping of history reads. Nothing in the design may foreclose a later multi-operator model.
 
 ### Functional Requirements — Authority boundary
@@ -340,7 +347,7 @@ The fleet spans hosts behind NAT and firewalls in arbitrary network conditions. 
 
 These are **not** scope cuts and **not** open scope questions. Each is a decision the design record deliberately deferred to plan time because prose cannot carry a write protocol, and each MUST be settled during `/speckit-plan` and pinned by RED tests before implementation. Attempting to fix them in prose here would be the false precision this project has a written rule against (`.claude/rules/spec-audit-diminishing-returns.md`). They are carried forward in full; none may be dropped.
 
-- **PT-001 — Local socket transport, discovery, and identity lookup.** Unix domain socket (filesystem permissions give local authorization free) versus localhost TCP (needs token and port allocation); Windows named pipes. Discovery MUST define the machine-local mapping from an installation root to its persisted `installationId` and its sidecar endpoint — because identity lives outside the installation tree, finding the socket and resolving identity are the same lookup and MUST be solved together.
+- **PT-001 — Local socket transport, discovery, and machine-local state lookup.** Unix domain socket (filesystem permissions give local authorization free) versus localhost TCP (needs token and port allocation); Windows named pipes. Discovery MUST define the machine-local mapping from an installation root to its persisted `installationId`, its **plane bearer token** (FR-076/FR-077), and its sidecar endpoint — because identity and credential both live outside the installation tree, finding the socket and resolving them are the same lookup and MUST be solved together. The credential's at-rest protection on that store is part of this contract.
 - **PT-002 — Sidecar spawn race and stale locks.** The lock mechanism and its behavior against a stale lock left by a crashed sidecar.
 - **PT-003 — Sidecar idle lifetime versus spool durability.** Whether an auto-spawned sidecar exits after idle and whether the next invocation pays a spawn cost. It MUST NOT exit holding an un-flushed spool; the interaction between idle-exit and spool drain MUST be defined.
 - **PT-004 — Delivery-layer read mechanism.** An edge worker doing listing and range logic, versus a pull-through cache with immutable period manifests making listing unnecessary. Listing is an uncacheable transaction against the capped store, which is the constraint any mechanism must answer. To be settled against real numbers.
@@ -353,7 +360,8 @@ These are **not** scope cuts and **not** open scope questions. Each is a decisio
 - **PT-011 — `cancel` semantics.** Whether cancel interrupts the current task or waits for a task boundary; whether child processes are terminated and with what signal; what cleanup is guaranteed; whether the invocation ends or only the run; whether cancellation can time out. A future forceful `terminate` is named to keep cooperative `cancel` unambiguous, even if only `cancel` ships.
 - **PT-012 — Completed-instance retention in the live registry.** How long completed/failed/cancelled runs remain in "Recent", and whether "recent" is scoped to invocation or installation. Independent of durable retention.
 - **PT-013 — Clock semantics.** Wall-clock timestamps, monotonic process durations, and plane-side receive time coexist across many hosts. Which is authoritative for which purpose; cross-host ordering MUST NOT rely on wall-clock alone. The sidecar estimates skew once per session.
-- **PT-014 — Constants and protocol contracts.** Command envelope schema, command transition table, expiry constants, heartbeat intervals and thresholds, backoff and retry policy, socket protocol framing, route namespacing and versioning, maximum event size, and spool cap with drop policy. All pinned by RED tests.
+- **PT-014 — Constants and protocol contracts.** Command envelope schema, command transition table, expiry constants, heartbeat intervals and thresholds, backoff and retry policy, socket protocol framing, route namespacing and versioning, maximum event size, spool cap with drop policy, the long-running run's in-memory buffer bound (FR-007), and the bearer token's lifetime and rotation policy — "long-lived" (FR-076) fixes the shape, not the number. All pinned by RED tests.
+- **PT-015 — Credential provisioning transport.** FR-088 fixes the *guarantees* — a new host can join, a single installation's token is revocable without re-crediting the fleet, and a revoked token is refused rather than downgraded. How the token physically reaches a new host (manual placement, an operator-run verb, a join exchange) is a plan-time choice against the real enrollment experience; the operator-facing story is a single-operator one and MUST NOT be over-built.
 
 ## Assumptions
 

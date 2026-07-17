@@ -33,6 +33,12 @@
 
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`.
 
+### Clarify pass (2026-07-16) — 16/16 → 16/16, no state changes
+
+One question asked, one answered; no regressions. The scan found most taxonomy categories Clear — expected for a design record that survived three amendment passes, with the operator's scoping pass absorbing the rest. The single genuine gap was **the authentication mechanism**: the design record decides *that* auth is mandatory but never states what the credential is, and the mechanism appears in neither its ~20 open questions nor PT-001…PT-014 — an omission rather than a deliberate plan-time deferral, which is why it was raised here rather than left to plan. Resolved as a per-installation long-lived bearer token stored machine-local alongside `installationId` (FR-076, FR-077, FR-088; PT-001 and PT-014 amended; PT-015 added for the provisioning transport).
+
+Deliberately NOT asked: fleet-scale sizing. It is the only other candidate the scan surfaced, and single-operator tenancy (FR-078) already bounds the fleet to tens of hosts, at which the plane's in-memory registry is uncontroversial — a question there would not change implementation or validation. Per the operator's instruction, no questions were manufactured to fill the 5-question quota.
+
 ### Validation notes (iteration 1)
 
 **On "no implementation details".** This spec names some concrete technical choices — server-sent events, HTTP POST, a Unix-socket-versus-TCP question, an object-path layout. These are **not** leaked implementation detail: they are *settled architectural decisions* carried forward verbatim from the approved design record (`design-approved: yes` on the roadmap node), where each was chosen against recorded rejected alternatives. Re-deriving or generalizing them here would discard approved decisions. Vendor identities from the design record (B2, Cloudflare) are deliberately generalized in Success Criteria to "capped durable store" / "content-delivery layer" so the criteria stay technology-agnostic and verifiable without naming a vendor.
