@@ -2,6 +2,47 @@
 
 ---
 
+## 2026-07-17: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 20
+  - tasks(fleet-control-plane): close 4 coverage gaps found by analyze
+  - tasks(fleet-control-plane): 134 tier-annotated tasks, RED-first throughout
+  - checklist(fleet-control-plane): correctness + honesty-under-failure; fix 4 real conflicts it caught
+  - plan(fleet-control-plane): Phase 0 research + Phase 1 design artifacts
+  - spec(fleet-control-plane): clarify — auth mechanism is a per-installation bearer token
+  - spec(fleet-control-plane): operator scope pass — cut the dashboard UI, keep the plane's API
+  - roadmap(fleet-dashboard): record the dashboard as its own item, blocked on the plane
+  - chore(backlog): capture TASK-455 — git.feature hook misdetects a worktree as a non-repo
+  - spec(fleet-control-plane): author specs/036 from the approved design record
+  - roadmap(fleet-control-plane): record design-approved marker
+  - design(fleet-control-plane): editorial cleanup — no architectural change
+  - design(fleet-control-plane): reverse read path; plane is the only CDN reader
+  - design(fleet-control-plane): rework design record — sidecar comms, global plane
+  - design(fleet-control-plane): design record for fleet control plane feature
+  - roadmap(design:feature/fleet-control-plane): add planned item
+  - chore: release v0.58.2
+  - Merge pull request #524 from audiocontrol-org/feature/audit-barrage-cc-timeout
+  - fix(govern): persist detached-runner glue failures — AUDIT-20260714-01
+  - fix(govern): detached background launch + status — decouple from CC Bash timeout
+  - roadmap(impl:fix/audit-barrage-cc-timeout): add planned item
+- Files changed: 43
+- Backlog touched: TASK-244, TASK-455
+
 ## 2026-07-09: model-tier-task-annotation — full lifecycle to `closed` + CI publish root-fix (v0.58.1)
 
 > Session-close record for the whole remote-control session (it began 2026-07-08 and ran past midnight into 2026-07-09). The mid-session 2026-07-08 entry below captures the execute-phase detail; this entry is the end-to-end summary + the ship/release/close half.
