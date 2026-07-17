@@ -2,46 +2,60 @@
 
 ---
 
-## 2026-07-17: <!-- session title -->
+## 2026-07-17: fleet-control-plane — design → define, full authoring chain to `analyze`
 
-**Goal:** <!-- compose: what we set out to do -->
+### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)
+
+**Goal:** Take the approved fleet-control-plane design record through `/stack-control:define` and the full Spec Kit authoring chain — specify → clarify → plan → checklist → tasks → analyze — leaving a runnable spec for a separate implementation session. Authoring only; no implementation.
 
 **Accomplished:**
-- <!-- compose -->
+- **Full chain, in order, no steps skipped:** `specify` → `clarify` (1 question) → `plan` (Phase 0 research + Phase 1 artifacts) → `checklist` → `tasks` (139) → `analyze`. Every backend drive bracketed by the `spec-definition` front-door marker; `check-front-door` clean (65 ops) throughout. Node now carries `spec: specs/036-fleet-control-plane` via `workflow link-spec` (the TASK-244 class — a node without a spec pointer can't be resolved by `govern --item`/`reconcile`).
+- **Artifacts:** `spec.md` (89 FRs, 18 SCs, 6 stories, 15 plan-time contracts), `research.md`, `plan.md`, `data-model.md`, `quickstart.md`, `contracts/{local-socket-protocol,sidecar-plane-protocol,plane-client-api}.md`, `checklists/{requirements,correctness}.md`, `tasks.md`.
+- **Phase 0 research via 4 parallel agents** (SSE/transport, CDN/storage, IPC/spawn, clocks/IDs), each instructed to verify against primary sources rather than memory. **All 15 PT contracts settled.** The architecture survived intact — and B2 survived *on the merits*, not just procedurally: R2 prices `ListObjects` at $4.50/M where B2 gives listing free, at ~2.2× the storage cost.
+- **Research found 4 real defects in specified mechanism** (R-01…R-04), all cheap now and expensive later: the object key had **two** independent defects (forecloses sequence probing; doesn't sort — `10-` before `2-`); `installationSequence` across sidecar restart was an unaddressed hole that would make the plane reject its own fleet's telemetry; the un-flushed-spool promise was **unachievable by any shutdown sequence**; gap detection couldn't read the object store because classification makes the durable set sparse by design.
+- **Operator scope pass:** dashboard UI cut from scope, recorded as `design:feature/fleet-dashboard` (hard `depends-on` this feature). `multi:feature/control-plane-frontend` (2026-06-07) removed — predated this design, nothing depended on it, "a much weaker idea than what we've designed now."
+- **Clarify found one genuine gap:** the design record made auth mandatory but never said what the credential *is* — and it was in neither the record's open questions nor the PT list, so it was an omission, not a deliberate deferral. Settled as a per-installation bearer token that inherits `installationId`'s machine-local custody rules exactly.
+- **Two constitution violations declared, not finessed:** the CLI's fail-open silence (Principle V) and machine-local state outside the installation tree (installation-anchor invariant). Both justified and bounded in `plan.md` § Complexity Tracking.
 
 **Didn't Work:**
-- <!-- compose -->
+- **I proposed "correcting" the approved design record's B2 read-cap premise, off a single vendor page — and was wrong.** Backblaze's public pricing page renders "Cost: Free" for transaction Classes A/B/C. The research agent concluded the cost premise was obsolete; I independently fetched the same page and reached the same conclusion, then brought it to the operator as a finding. The operator has hit Class B caps in production recently. Corroborating them over the page: Backblaze's own help centre still documents the older 2,500/day model — **the vendor's own surfaces contradict each other** — and the agent had explicitly flagged that it could not date any transition and that the finding needed an invoice before being load-bearing. It wasn't confirmed; it was refuted. Pinned in `research.md` with an explicit *do not re-derive this from a pricing page*, because that page has now produced this exact false positive from two independent agents and will do it again.
+- **I published a wrong tier count, twice.** Claimed `fast 57 · balanced 60`; actual was `fast 53 · balanced 64`. Caught by my own validator, re-derived from the file. Then after the analyze additions, re-derived again (`fast 55 · balanced 66 · powerful 18` = 139).
+- **The auto-derived session boundary over-counted** (below).
 
 **Course Corrections:**
-- <!-- compose -->
+- **[PROCESS]** Offered the operator a rigid multiple-choice menu (`AskUserQuestion`) for the scope-boundary decision; operator: *"let's talk this through instead of offering me a terse set of rigid options."* The conversation that followed surfaced something the menu would have buried — that "control plane" means two different things in the two roadmap items (the older lineage calls the *stackctl front door* the control plane), so part of the apparent overlap was the word colliding with itself.
+- **[PROCESS]** Kept doing bookkeeping on a `DESIGN-INBOX.md` entry orphaned by the node removal; operator: *"stop worrying about the inbox—it's a red herring. the inbox is for ideas, not committed features."*
+- **[PROCESS]** Operator asked to keep the UI in the spec as a later phase so part of the spec could execute with the UI unimplemented. Pushed back once with reasoning — it would pull the dashboard's *design* forward (the exact work they deferred), it's the shape the design record explicitly rejected, and a spec with a knowingly-unexecuted phase never reaches done. Operator: *"never mind. it's fine the way it is."*
+- **[FABRICATION]** The B2 premise (above). The failure wasn't reading the page — it was bringing it as a *finding* with more confidence than a single self-contradicting vendor source could carry.
 
 **Insights:**
-- <!-- compose -->
+- **Two independent agents, different lenses, converged on the same object key.** The CDN agent found it forecloses sequence probing; the clocks agent — knowing nothing of the CDN work — found it doesn't sort. Neither knew of the other. That's the cross-perspective agreement the audit-barrage doctrine treats as the high-confidence signal, arriving unprompted from ordinary research.
+- **The checklist caught drift the moment it was written.** Authoring the Amendment Coverage category *was* running it: R-01…R-04 had landed in `research.md`/`data-model.md` while `spec.md` still carried the superseded text. `analyze` would have found it later; the checklist found it first. Amendments now cite their research finding **inline**, so the reasoning travels with the requirement instead of living in a file nobody opens.
+- **`analyze` found a gap that hid behind a word collision.** FR-015/016 (event classification — the requirement that *"classification, not emission, decides cost"*) had **zero tasks**. A keyword scan sees "classification" in T019/T020 and moves on — but those are *gap* classification, unrelated. Without it, "every invocation telemeters" silently becomes "every event becomes a cloud object." Only checking requirements against what tasks actually *do* catches that.
+- **The research repeatedly falsified the *reasoning* while the *decisions* held.** That is the case for deferring mechanism to plan-time rather than settling it in prose — and the vindication of the project's rule against forcing write protocols into a spec.
+- **Several findings were "a promise the system cannot keep."** The un-flushed-spool guarantee is unachievable (`SIGKILL` runs no code; Windows has no real `SIGTERM`). Inverting it to a crash-safe WAL made it *testable* — the original phrasing could not pass its own test by construction.
+- **A silent pass can be worse than a failure.** The isolation probe only snapshots the fixture's outer repo, so the declared machine-local exception would pass — for the wrong reason. Scheduled T126 to make the exception able to fail.
 
-**Quantitative (auto-derived from git; verify before publishing):**
-- Commits: 20
-  - tasks(fleet-control-plane): close 4 coverage gaps found by analyze
-  - tasks(fleet-control-plane): 134 tier-annotated tasks, RED-first throughout
-  - checklist(fleet-control-plane): correctness + honesty-under-failure; fix 4 real conflicts it caught
-  - plan(fleet-control-plane): Phase 0 research + Phase 1 design artifacts
-  - spec(fleet-control-plane): clarify — auth mechanism is a per-installation bearer token
-  - spec(fleet-control-plane): operator scope pass — cut the dashboard UI, keep the plane's API
-  - roadmap(fleet-dashboard): record the dashboard as its own item, blocked on the plane
-  - chore(backlog): capture TASK-455 — git.feature hook misdetects a worktree as a non-repo
-  - spec(fleet-control-plane): author specs/036 from the approved design record
-  - roadmap(fleet-control-plane): record design-approved marker
-  - design(fleet-control-plane): editorial cleanup — no architectural change
-  - design(fleet-control-plane): reverse read path; plane is the only CDN reader
-  - design(fleet-control-plane): rework design record — sidecar comms, global plane
-  - design(fleet-control-plane): design record for fleet control plane feature
-  - roadmap(design:feature/fleet-control-plane): add planned item
-  - chore: release v0.58.2
-  - Merge pull request #524 from audiocontrol-org/feature/audit-barrage-cc-timeout
-  - fix(govern): persist detached-runner glue failures — AUDIT-20260714-01
-  - fix(govern): detached background launch + status — decouple from CC Bash timeout
-  - roadmap(impl:fix/audit-barrage-cc-timeout): add planned item
-- Files changed: 43
-- Backlog touched: TASK-244, TASK-455
+**Quantitative (auto-derived boundary CORRECTED — see note):**
+- Commits: **10** (incl. this session-end record) — `8465ff53..81cfe7f8`
+  - `docs(session): session-end record`
+  - `tasks(fleet-control-plane): close 4 coverage gaps found by analyze`
+  - `tasks(fleet-control-plane): 134 tier-annotated tasks, RED-first throughout`
+  - `checklist(fleet-control-plane): correctness + honesty-under-failure; fix 4 real conflicts it caught`
+  - `plan(fleet-control-plane): Phase 0 research + Phase 1 design artifacts`
+  - `spec(fleet-control-plane): clarify — auth mechanism is a per-installation bearer token`
+  - `spec(fleet-control-plane): operator scope pass — cut the dashboard UI, keep the plane's API`
+  - `roadmap(fleet-dashboard): record the dashboard as its own item, blocked on the plane`
+  - `chore(backlog): capture TASK-455 — git.feature hook misdetects a worktree as a non-repo`
+  - `spec(fleet-control-plane): author specs/036 from the approved design record`
+- Files changed: **17**
+- Tasks authored: 139 (fast 55 · balanced 66 · powerful 18; re-derived from the file, `resolve-tiers` resolves all 139)
+- Corrections: 4 (3 × [PROCESS], 1 × [FABRICATION])
+- Backlog: **TASK-455 opened** (new). **TASK-244 is a false positive** — it is already `[Done]`; the commit cited "the TASK-244 class" as a *reference to a bug class*, not work performed on it. No status transition is warranted; recording this so the evidence isn't mistaken for progress.
+
+> **Boundary note (per the AUDIT-04 quantitative discipline).** `stackctl session-end` auto-derived **20 commits / 43 files** from its merge-base boundary. That is wrong for this session: the branch already carried three prior sessions' work (the four `design(fleet-control-plane)` commits, `chore: release v0.58.2`, the PR #524 merge, and the audit-barrage-cc-timeout fixes). Re-derived against the true session start (`3ae9ac9b`, the design-approved marker that was HEAD at boot): **10 commits / 17 files**. The verb's own header says "verify before publishing" — this is that verification. Captured as tooling friction: the merge-base heuristic silently over-attributes on a long-lived feature branch that spans sessions.
+
+**Next:** the compass reads `ahead` for `execute` — `implementing` is the legitimate next phase but its exit gate (`analyze-clean` node marker) is unmet. Record the marker, then run `/stack-control:execute` **in a separate implementation session** (the orchestrator session does not implement).
 
 ## 2026-07-09: model-tier-task-annotation — full lifecycle to `closed` + CI publish root-fix (v0.58.1)
 
