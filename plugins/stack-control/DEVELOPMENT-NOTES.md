@@ -2,21 +2,34 @@
 
 ---
 
-## 2026-07-17: <!-- session title -->
+## 2026-07-17: fleet-control-plane — execute Phases 1–3 core (46/139 tasks, model-sized dispatch)
 
-**Goal:** <!-- compose: what we set out to do -->
+### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)
+
+**Goal:** Begin implementation of the fleet-control-plane spec via `/stack-control:execute` — dispatch each `tasks.md` task to a fresh subagent at its declared `[tier:]` model, RED-first, with per-task controller review and central (race-free) commits. This session was the implementation session (separate from the earlier orchestrator session that authored the spec).
 
 **Accomplished:**
-- <!-- compose -->
+- Recorded the missing `analyze-clean` marker (via `roadmap approve-design --analyze-clean`) that the node needed to derive to `implementing` — `session-start`'s "next: /speckit-analyze" was a structural artifact (analyze leaves no on-disk signal), not a real gap; commit `3a6b5e76` was the evidence analyze had run.
+- Drove `/stack-control:execute` through the gate chain (compass `behind`/allowed, front-door complete at 65 ops, spec runnable, all 139 tiers resolved: 55 fast / 66 balanced / 18 powerful) and bracketed the drive in the 026 front-door marker (entered at start, exited cleanly at the checkpoint — no leak).
+- Completed **Phase 1 (setup) + Phase 2 (foundational) in full, and ~90% of Phase 3 (US1 fail-open)** — 46/139 tasks, 26 commits, all pushed, 230 fleet tests green + tsc clean at every commit. Landed: all DI seams (Clock, ProcessProbe, SseTransport, storage port), the machine-state redirect harness + two "cruel" fixtures, the shared domain (event/status/sequence/redact/classification), machine-state (locate/identity/highwater), and the US1 fail-open telemetry core (wire protocol + handshake, bounded buffer, detached spawn, bind-wins election + stale recovery, and the fail-open emit client proven at 0.028ms overhead with no hang against a stalled peer).
 
 **Didn't Work:**
-- <!-- compose -->
+- First `session-start` report parroted the verb's "next: /speckit-analyze" without checking it against git history; the operator corrected it. Root cause is real and worth a fix: chain-position inference can't distinguish "analyze not run" from "analyze ran clean" because analyze leaves no artifact — the same line prints forever.
+- The first opus dispatch (T009) died on a 529 Overloaded mid-read before writing anything; clean retry succeeded. No partial state to clean up.
+- My first T001 commit ran `git add` from the repo root and captured only the root lockfile, not the installation `package.json`; the commit claimed more than it contained. Landed a completing commit rather than force-amending (force-push is operator-authorized only).
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Answered a status question ("analyze has already been run") by first correcting my own inference, then recording *why* the verb can't detect it — rather than re-running analyze.
+- [PROCESS] Switched parallel-batch subagents to implement-and-report-only, with the controller doing all commits serially — concurrent subagent `git commit` would race the index. Preserved the commit-at-boundary discipline (controller executes it).
+- [QUALITY] Per-task review caught and fixed real defects before commit: stale dependency majors from model recall (T001: esp `^1.1.0`→`^3.1.0`, uuidv7 `^0.1.0`→`^1.2.1` — a real API break), an invented behavioral promise in a doc comment (T003), an `as` cast (T011), three `expect(true).toBe(true)` tautology "tests" the sub-agent labeled "structured placeholders" (T137 — the IOU anti-pattern), and a byte-identical `storeKey` clone I single-sourced into `locate.ts` (T024).
+- [CHECKPOINT] Paused at 46/139 before T044 (wires into the live `src/cli.ts` dispatcher) rather than grind into degraded review quality from a large context; exited the front-door marker cleanly. The ledger makes resume exact (skips completed tasks).
 
 **Insights:**
-- <!-- compose -->
+- The controller-review loop is where quality lives in model-sized dispatch: several subagents produced confident, green, well-argued work that was still wrong (stale deps that compiled, tautology tests that passed, a comment that decided an unspecified design question). Green + articulate ≠ correct — independent review before the ledger entry is load-bearing.
+- Two subagents made genuinely good calls under pressure worth remembering: T006 left Windows `ProcessProbe` unimplemented and fail-loud rather than fabricating an unverifiable syscall path, and the identity subagent fixed its own test rather than loosen a safety guard when its reattach impl correctly refused to clobber.
+- Two design decisions are flagged in commit bodies for the eventual whole-feature govern pass to scrutinize: the `OwnerRegistry` introduced in bind-wins election (stale recovery needs the prior owner's PID+start-time, but the socket file carries none and SO_PEERCRED only works on a live socket), and the event-type vocabulary the classification seam defines as a contract for the US1–US6 emission tasks.
+
+**Quantitative reconciliation:** 26 commits this session. The first (`roadmap(...): record analyze-clean marker`) is the pre-execution gate fix; the remaining 25 are the 46 tasks' implementation (RED+GREEN pairs and multi-task modules collapse into single commits). Feature branch `feature/fleet-control-plane`, all pushed. Remaining: T044 + T138 to close Phase 3, then Phases 4–9 (93 tasks) and the whole-feature `govern` pass.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 26
