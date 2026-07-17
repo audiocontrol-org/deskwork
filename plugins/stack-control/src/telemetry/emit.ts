@@ -1,0 +1,353 @@
+/**
+ * specs/036-fleet-control-plane — T039 (impl), pairs with T031's
+ * `tests/fleet/fail-open.test.ts` and T032's `tests/fleet/fail-open-hang.test.ts`.
+ *
+ * THE HIGHEST-RISK FILE IN THE FEATURE: every `stackctl` invocation runs this
+ * code. Its ONE job is to emit telemetry to the local sidecar WITHOUT EVER
+ * degrading the tool it observes.
+ *
+ * THE CONSTRAINT THAT DOMINATES EVERYTHING (spec § "The constraint that
+ * dominates every other"; plan.md § Complexity Tracking — the DECLARED,
+ * bounded Principle-V violation): telemetry is NOT the verb's functionality.
+ * The verb's contract — its output, exit code, and wall-clock — is UNCHANGED
+ * whether or not anyone is observing. So when the sidecar is unreachable this
+ * client SILENTLY continues; it does NOT raise a descriptive error (that would
+ * convert an observability outage into a total tool outage, exactly the harm
+ * forbidden). This silence is correct ONLY here, ONLY for the telemetry path.
+ *
+ * THE ASYNC MODEL — how every rule below is guaranteed by construction:
+ *
+ *   - `emit()` is SYNCHRONOUS and returns `void`. There is no Promise a caller
+ *     could `await`, so the mistake C1 forbids (blocking the invocation on
+ *     socket state) is UNWRITABLE by callers, not merely undocumented —
+ *     mirroring `spawnDetachedSidecar`'s `void` fire-and-forget shape.
+ *   - The client NEVER awaits a connect, a write flush, or a peer reply. The
+ *     socket lifecycle is entirely event-driven (`connect` / `data` / `error`
+ *     / `close`); `emit()` inspects the CURRENT connection state and either
+ *     writes now (connected) or holds-per-C4 (not connected) — it never blocks
+ *     to change that state.
+ *   - CONNECT FAILS INSTANTLY on absence: `createConnection` to a missing UDS
+ *     inode (ENOENT) or a listener-less one (ECONNREFUSED) fires `error` on the
+ *     next tick — never a hang. The `error` handler swallows it (fail-open) and
+ *     routes future events to the buffer + triggers a spawn seam for NEXT time.
+ *   - A STALLED PEER CANNOT BLOCK: we never read-then-wait. On `connect` we
+ *     write `hello` + drain the buffer, all fire-and-forget. A peer that
+ *     accepts then goes silent forever holds an open socket — but the socket is
+ *     `unref()`d, so it NEVER keeps the process alive nor delays its exit, and
+ *     nothing in `emit()` is waiting on a reply (T032).
+ *   - The client talks ONLY to the LOCAL socket, NEVER the WAN/plane. There is
+ *     no timeout constant because there is no wait (contracts/local-socket-
+ *     protocol.md § C1: "A timeout implies waiting; the CLI never waits").
+ *
+ * BUFFERING ASYMMETRY (C4/FR-007) is delegated WHOLESALE to `buffer.ts`
+ * (T040): a `'short-verb'` buffer DROPS on a not-connected socket; a
+ * `'long-run'` buffer holds a bounded FIFO to cover a sidecar restart gap.
+ * This client only decides WHEN to push (whenever it cannot write right now)
+ * and drains on (re)connect — it does not re-implement the drop-vs-bound
+ * policy.
+ *
+ * EVERY FAILURE PATH IS SILENT + NON-BLOCKING: `emit`, the socket handlers,
+ * the write path, the spawn seam, and the response reader are each wrapped so
+ * that no throw and no rejected promise can ever reach the invocation.
+ *
+ * SCOPE (per the task pairing): the emit client ONLY. It does NOT wire itself
+ * into the CLI dispatcher (`src/cli.ts`, T044), does NOT implement the sidecar
+ * listener / spool / plane, and does NOT decide the spawn command/args (that is
+ * the dispatcher's knowledge — see the `onSocketUnavailable` seam). It IMPORTS
+ * the protocol (T038), the buffer (T040), and `locateMachineState` (T024, via
+ * `resolveLocalSocketPath`); it re-implements none of them.
+ *
+ * No `any`, no `as`, no `@ts-ignore` (Constitution Principle VI). Relative
+ * `.js` imports under node16 resolution (no `@/` alias configured for this
+ * plugin). File under the 300-500 line cap.
+ */
+
+import { createConnection, type Socket } from 'node:net';
+import type { TelemetryEvent } from '../fleet/event.js';
+import { locateMachineState } from '../machine-state/locate.js';
+import { createEventBuffer, type CallerKind, type EventBuffer } from './buffer.js';
+import {
+  LOCAL_PROTOCOL_VERSION,
+  buildEventFrame,
+  buildHelloFrame,
+  interpretHelloAck,
+  parseSidecarToCliFrame,
+  serializeFrame,
+  splitFrameLines,
+  type ProtocolFrame,
+} from './protocol.js';
+
+/**
+ * The connection's observable lifecycle. Exposed on `EmitClient.state` for
+ * tests + diagnostics; the invocation never branches on it.
+ *
+ *   idle        — constructed, no connect attempt in flight yet.
+ *   connecting  — a `createConnection` is in flight; `connect`/`error` pending.
+ *   connected   — the local socket is open; events are written immediately.
+ *   unavailable — the last attempt failed / the socket dropped; events are
+ *                 held per the C4 buffer policy and a reconnect is armed.
+ *   closed      — `close()` was called; a terminal, do-nothing state.
+ */
+export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'unavailable' | 'closed';
+
+/** Configuration for one emit client. A single `stackctl` process is a single
+ * `CallerKind` (a short verb OR a long commandable run), so the kind is fixed
+ * at construction — never a per-`emit` argument. */
+export interface EmitClientConfig {
+  /** The resolved LOCAL socket path (UDS) / named pipe. Comes FROM
+   * `locateMachineState` (see `resolveLocalSocketPath`) — never re-derived. */
+  readonly socketPath: string;
+  /** Selects the C4 buffering asymmetry (short-verb drops; long-run buffers). */
+  readonly callerKind: CallerKind;
+  /** This build's local protocol version (C3). Defaults to
+   * `LOCAL_PROTOCOL_VERSION`. */
+  readonly localVersion?: number;
+  /**
+   * FIRE-AND-FORGET seam invoked when the local socket is found unavailable,
+   * so a sidecar is spawned for SUBSEQUENT invocations (C1 row 1 / C6). The
+   * client NEVER awaits it and swallows any throw. Left as a seam (default
+   * no-op) rather than calling `spawnDetachedSidecar` directly because the
+   * sidecar's command + args are the DISPATCHER's knowledge (T044), and the
+   * advisory debounce that decides WHETHER to spawn belongs there too
+   * (spawn.ts's own doc comment). This keeps process-launch policy out of the
+   * hot path every invocation runs.
+   */
+  readonly onSocketUnavailable?: () => void;
+  /** Optional override of the long-run buffer's bounded capacity (defaults to
+   * `INVOCATION_BUFFER_BOUND`). Ignored for `'short-verb'`. */
+  readonly bufferCapacity?: number;
+}
+
+/** The emit client surface. `emit` is the ONLY method an invocation calls; the
+ * rest are for diagnostics/tests and clean shutdown. */
+export interface EmitClient {
+  /** Emit one telemetry event. SYNCHRONOUS, `void`, never throws, never
+   * blocks — see the module doc's async-model section. */
+  emit(event: TelemetryEvent): void;
+  /** The C4 buffer backing this client (short-verb drop vs long-run bound). */
+  readonly buffer: EventBuffer;
+  /** The current connection state — observability only; the invocation never
+   * branches on it. */
+  readonly state: ConnectionState;
+  /** Idempotent teardown: destroys any open socket and stops reconnecting.
+   * Telemetry-only — never something an invocation must call for correctness. */
+  close(): void;
+}
+
+class FailOpenEmitClient implements EmitClient {
+  readonly buffer: EventBuffer;
+  private readonly localVersion: number;
+  private socket: Socket | undefined;
+  private stateValue: ConnectionState = 'idle';
+  private readBuffer = '';
+
+  constructor(private readonly config: EmitClientConfig) {
+    this.localVersion = config.localVersion ?? LOCAL_PROTOCOL_VERSION;
+    this.buffer =
+      config.callerKind === 'short-verb'
+        ? createEventBuffer('short-verb')
+        : createEventBuffer('long-run', config.bufferCapacity);
+    // Start connecting eagerly so a live sidecar is usually already reachable
+    // by the time the first `emit()` fires (the short verb's event then takes
+    // the immediate-write path rather than the drop path). Never blocks.
+    this.beginConnect();
+  }
+
+  get state(): ConnectionState {
+    return this.stateValue;
+  }
+
+  emit(event: TelemetryEvent): void {
+    // The whole contract in one method: never throw, never await, never block.
+    try {
+      if (this.stateValue === 'connected' && this.socket !== undefined) {
+        // Deliverable NOW — write fire-and-forget (no flush wait, no ack wait).
+        this.writeFrame(buildEventFrame(event));
+        return;
+      }
+      if (this.stateValue === 'closed') {
+        return;
+      }
+      // Not deliverable right now — hold per the C4 asymmetry (short-verb
+      // drops, long-run buffers), and make sure a (re)connect is armed so a
+      // live sidecar eventually drains the buffer.
+      this.buffer.push(event);
+      if (this.stateValue === 'idle' || this.stateValue === 'unavailable') {
+        this.beginConnect();
+      }
+    } catch {
+      // Fail-open: NOTHING about telemetry may surface to the invocation.
+    }
+  }
+
+  close(): void {
+    this.stateValue = 'closed';
+    this.destroySocket();
+  }
+
+  // --- connection lifecycle (all event-driven; nothing here is awaited) -----
+
+  private beginConnect(): void {
+    if (
+      this.stateValue === 'connecting' ||
+      this.stateValue === 'connected' ||
+      this.stateValue === 'closed'
+    ) {
+      return;
+    }
+    this.stateValue = 'connecting';
+    let socket: Socket;
+    try {
+      // For a UDS path this returns immediately and defers the actual connect;
+      // absence surfaces as an async `error` (ENOENT/ECONNREFUSED), never a
+      // synchronous throw — but guard anyway (fail-open).
+      socket = createConnection(this.config.socketPath);
+    } catch {
+      this.markUnavailable();
+      return;
+    }
+    this.socket = socket;
+    // CRUCIAL: the telemetry socket must NEVER keep the process alive nor delay
+    // its exit. `unref()` removes it from the event loop's liveness count, so a
+    // connected-but-stalled peer cannot hang the CLI (T032).
+    socket.unref();
+    socket.setEncoding('utf8');
+    socket.once('connect', () => this.onConnect());
+    socket.on('data', (chunk: string) => this.onData(chunk));
+    // Attaching an `error` handler is mandatory: an unhandled socket `error`
+    // would crash the process. Swallowing it IS the fail-open behavior.
+    socket.on('error', () => this.markUnavailable());
+    socket.on('close', () => this.onClose());
+  }
+
+  private onConnect(): void {
+    if (this.stateValue === 'closed') {
+      return;
+    }
+    this.stateValue = 'connected';
+    // Handshake: send `hello` first (C3). We do NOT await the `hello-ack`;
+    // `onData` handles a version mismatch out of band as a restart signal.
+    this.writeRaw(serializeFrame(buildHelloFrame(this.localVersion)));
+    // Deliver anything held during the connect/reconnect gap. For a short-verb
+    // buffer this drains to `[]` (it dropped); for a long-run buffer it flushes
+    // the FIFO the restart gap accumulated (C4).
+    for (const held of this.buffer.drain()) {
+      this.writeFrame(buildEventFrame(held));
+    }
+  }
+
+  private onData(chunk: string): void {
+    // Reading responses must never surface to the invocation either.
+    try {
+      this.readBuffer += chunk;
+      const { complete, remainder } = splitFrameLines(this.readBuffer);
+      this.readBuffer = remainder;
+      for (const line of complete) {
+        const parsed = parseSidecarToCliFrame(line);
+        if (!parsed.ok || parsed.frame.kind !== 'hello-ack') {
+          continue;
+        }
+        const outcome = interpretHelloAck(parsed.frame, this.localVersion);
+        if (outcome.kind === 'mismatch') {
+          // C3 defined restart path: an upgraded CLI met a stale sidecar. Drop
+          // this connection and trigger a spawn for next time — fire-and-forget,
+          // the invocation is NEVER failed.
+          this.markUnavailable();
+          return;
+        }
+      }
+    } catch {
+      /* fail-open: a malformed reply must never take down the CLI. */
+    }
+  }
+
+  private onClose(): void {
+    if (this.stateValue === 'closed' || this.stateValue === 'unavailable') {
+      return;
+    }
+    // The sidecar closed the socket (died / restarted). Not an error by itself
+    // (C5) — subsequent emits will hold per C4 and re-arm a connect.
+    this.stateValue = 'unavailable';
+    this.socket = undefined;
+    this.readBuffer = '';
+  }
+
+  private markUnavailable(): void {
+    // Idempotent across the many ways a socket can fail (connect error, write
+    // error, mismatch, close) so the spawn seam fires at most once per episode.
+    if (this.stateValue === 'closed' || this.stateValue === 'unavailable') {
+      return;
+    }
+    this.stateValue = 'unavailable';
+    this.destroySocket();
+    // Spawn a sidecar for SUBSEQUENT invocations — fire-and-forget, never
+    // awaited, any throw swallowed.
+    try {
+      this.config.onSocketUnavailable?.();
+    } catch {
+      /* fail-open: the spawn seam is best-effort and must not surface. */
+    }
+  }
+
+  // --- write path (fire-and-forget; a write failure is just "unavailable") ---
+
+  private writeFrame(frame: ProtocolFrame): void {
+    try {
+      this.writeRaw(serializeFrame(frame));
+    } catch {
+      /* fail-open */
+    }
+  }
+
+  private writeRaw(data: string): void {
+    const socket = this.socket;
+    if (socket === undefined || socket.destroyed) {
+      return;
+    }
+    try {
+      // Fire-and-forget: we pass no flush callback and never await drain. If the
+      // kernel buffer is full the bytes queue; if the process exits first they
+      // are dropped — wall-clock dominates delivery, by design.
+      socket.write(data);
+    } catch {
+      this.markUnavailable();
+    }
+  }
+
+  private destroySocket(): void {
+    const socket = this.socket;
+    this.socket = undefined;
+    this.readBuffer = '';
+    if (socket === undefined) {
+      return;
+    }
+    // Remove our listeners BEFORE destroying so our own `close`/`error` handlers
+    // don't re-enter the state machine during teardown.
+    socket.removeAllListeners();
+    try {
+      socket.destroy();
+    } catch {
+      /* already gone — nothing to do. */
+    }
+  }
+}
+
+/** Create a fail-open emit client for an already-resolved local socket path.
+ * Begins connecting eagerly; the returned client's `emit` is safe to call
+ * immediately (it holds/drops per C4 until the connection is up). */
+export function createEmitClient(config: EmitClientConfig): EmitClient {
+  return new FailOpenEmitClient(config);
+}
+
+/**
+ * Resolve the LOCAL socket path for `installationRoot` via
+ * `locateMachineState` (T024) — the single source of truth for the store
+ * location; never re-derived here. Side effect: `locateMachineState` also
+ * ensures the 0700 socket parent dir exists, which is harmless + idempotent
+ * (a sidecar this CLI later spawns binds there). The DISPATCHER (T044) calls
+ * this ONCE at startup and passes the result to `createEmitClient`, so the
+ * per-`emit` hot path never touches the filesystem.
+ */
+export function resolveLocalSocketPath(installationRoot: string): string {
+  return locateMachineState(installationRoot).socketPath;
+}
