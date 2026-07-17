@@ -2,6 +2,35 @@
 
 ---
 
+## 2026-07-17: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 8
+  - chore(036-fleet-control-plane): backlog TASK-459 — run-history summary.json producer gap
+  - feat(036-fleet-control-plane): Phase 7 US5 — serve history without amplifying the capped store (T089-T102)
+  - feat(036-fleet-control-plane): Phase 6 US4 — trust what the fleet says, incl. about failure (T074-T088, T139)
+  - chore(036-fleet-control-plane): backlog TASK-458 — fleet-wide command replay held-map keying gap
+  - feat(036-fleet-control-plane): Phase 5 US3 — commands, the operator-promise surface (T056-T073)
+  - chore(036-fleet-control-plane): backlog TASK-457 — registry drops snapshot payload, per-run facets deferred
+  - feat(036-fleet-control-plane): Phase 4 US2 — live fleet aggregation over the plane API (T045-T055)
+  - feat(036-fleet-control-plane): T044 CLI emit wiring + T138 supervised sidecar (US1)
+- Files changed: 75
+- Backlog touched: TASK-457, TASK-458, TASK-459
+
 ## 2026-07-17: fleet-control-plane — execute Phases 1–3 core (46/139 tasks, model-sized dispatch)
 
 ### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)
