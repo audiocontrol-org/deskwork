@@ -33,18 +33,33 @@
  * this order:
  *
  *   1. **Finalized run** — once a run has emitted a terminal lifecycle
- *      event (`run.completed` / `run.failed` / `run.cancelled`), every
- *      FURTHER event for that run is LATE by definition (it arrived after
- *      the run already looks final), regardless of its own sequence value.
- *      Late events are handed to `DurableEventStore`, never applied to
- *      advance state, and never silently discarded (FR-042).
+ *      event (`run.completed` / `run.failed` / `run.cancelled`), a FURTHER
+ *      event for that run splits on whether it carries genuinely NEW
+ *      information:
+ *        - `invocationSequence` STRICTLY NEWER than what was applied by the
+ *          time the run finalized: LATE (it arrived after the run already
+ *          looks final AND was never previously observed) — handed to
+ *          `DurableEventStore`, never applied to advance state, never
+ *          silently discarded (FR-042).
+ *        - `invocationSequence` no newer than what was already applied:
+ *          ALREADY-SUPERSEDED — a reordered/duplicate delivery of something
+ *          that occurred before the point this run is known to have
+ *          reached. It is `accepted` (not late-stored, not discarded) since
+ *          it cannot regress anything — `src/plane/registry.ts`'s own
+ *          `applyRunEvent` no-regress guard independently prevents an older
+ *          sequence from ever moving derived `executionStatus` backward —
+ *          and its OTHER data (e.g. a `run.progress` tick's contribution to
+ *          `progressEventCount`) is still legitimate to fold in (SC-015:
+ *          duplicate + reordered delivery must land on the correct final
+ *          state, not merely fail to regress it).
  *
  *   2. **Not-yet-finalized run** — an event whose `invocationSequence` is
  *      not STRICTLY newer than the run's applied high-water mark never
  *      advances state (mirrors `src/plane/registry.ts`'s `applyRunEvent`
- *      no-regress guard, FR-040/FR-042/SC-015). It is accepted as a
- *      legitimate reordered/duplicate delivery, just STALE relative to
- *      what is already applied — not an error, not late-stored.
+ *      no-regress guard, FR-040/FR-042/SC-015). It is `stale` — a
+ *      legitimate reordered/duplicate delivery, just not yet part of a
+ *      known-final story, so (unlike the finalized case above) it is not
+ *      folded in — not an error, not late-stored.
  *
  * Non-run events (`runId === null` — short verbs, heartbeats, FR-013/014)
  * carry no run state to regress; only dedupe applies to them.
@@ -110,15 +125,42 @@ interface RunIngestState {
  * `createIngestState()` — one instance per plane process (or per test);
  * `ingestEvent` mutates it in place across calls, mirroring how a real
  * HTTP router accumulates state across POSTs.
+ *
+ * `dedupeEnabled` records whether `ingestEvent` should consult/populate
+ * `seenEventIds` at all (FR-042a — see `IngestStateOptions` below).
+ * `seenEventIds` is still always PRESENT (never `undefined`) so a caller
+ * with `dedupeEnabled: false` isn't forced into an optional-field dance —
+ * it's simply never read or written by `ingestEvent` in that mode.
  */
 export interface IngestState {
   readonly seenEventIds: Set<string>;
   readonly runs: Map<string, RunIngestState>;
+  readonly dedupeEnabled: boolean;
+}
+
+/**
+ * Options for `createIngestState`. `dedupe` defaults to `true` — every
+ * existing zero-arg caller (including this module's own T052 suite) keeps
+ * today's always-dedupe behavior unchanged.
+ *
+ * FR-042a: eventId dedupe is an OPTIMIZATION, not a correctness mechanism.
+ * FR-042's no-regress rule (below) plus deterministic object naming
+ * (FR-063) and byte-identity (FR-049) make ingestion correct with the
+ * dedupe set entirely absent — `dedupe: false` exists so that claim is
+ * provable, not just asserted (tests/fleet/dedupe-is-optional.test.ts,
+ * T139).
+ */
+export interface IngestStateOptions {
+  readonly dedupe?: boolean;
 }
 
 /** Construct a fresh, empty `IngestState`. */
-export function createIngestState(): IngestState {
-  return { seenEventIds: new Set(), runs: new Map() };
+export function createIngestState(options: IngestStateOptions = {}): IngestState {
+  return {
+    seenEventIds: new Set(),
+    runs: new Map(),
+    dedupeEnabled: options.dedupe ?? true,
+  };
 }
 
 /**
@@ -162,11 +204,18 @@ export async function ingestEvent(
   const { envelope } = telemetryEvent;
 
   // Idempotent ingestion (FR-042/FR-043): a re-delivered eventId is a
-  // no-op, applied at most once.
-  if (state.seenEventIds.has(envelope.eventId)) {
-    return { kind: 'duplicate', eventId: envelope.eventId };
+  // no-op, applied at most once. FR-042a: this short-circuit is an
+  // OPTIMIZATION, not the correctness mechanism — with `dedupeEnabled:
+  // false` it is skipped entirely, and the no-regress guard below (for run
+  // events) or the absence of any guard (for non-run events, whose "only
+  // guard" comment further down remains literally true when dedupe is on)
+  // is left to determine the outcome on its own.
+  if (state.dedupeEnabled) {
+    if (state.seenEventIds.has(envelope.eventId)) {
+      return { kind: 'duplicate', eventId: envelope.eventId };
+    }
+    state.seenEventIds.add(envelope.eventId);
   }
-  state.seenEventIds.add(envelope.eventId);
 
   const classified = toClassifiedEvent(telemetryEvent);
 
@@ -180,11 +229,29 @@ export async function ingestEvent(
   const runState = state.runs.get(runId);
 
   if (runState !== undefined && runState.finalized) {
-    // The run already reached a terminal lifecycle event. Every further
-    // event for it is LATE (data-model.md § Storage layout) — hand off to
-    // the durable store; never applied to advance state, never discarded.
-    await deps.durableStore.storeLateEvent(telemetryEvent);
-    return { kind: 'late', event: classified };
+    if (envelope.invocationSequence > runState.latestInvocationSequence) {
+      // Genuinely NEW information: a sequence never before observed,
+      // arriving after the run already reached a terminal lifecycle event
+      // (data-model.md § Storage layout). Hand off to the durable store;
+      // never applied to advance state (there is no live view left to
+      // advance), never discarded.
+      await deps.durableStore.storeLateEvent(telemetryEvent);
+      return { kind: 'late', event: classified };
+    }
+    // A sequence no newer than what was already applied by the time the
+    // run finalized is ALREADY-SUPERSEDED information — a reordered or
+    // duplicate delivery of something that occurred before the point this
+    // run is known to have reached, not new information the finalized view
+    // is missing. It cannot regress anything (the derived executionStatus
+    // no-regress guard lives independently in `src/plane/registry.ts`'s
+    // `applyRunEvent`, which never lets an older sequence move status
+    // backward), so it is safe to hand off as ordinary `accepted` data —
+    // e.g. a reordered `run.progress` tick still counts toward
+    // `progressEventCount` even though it arrived after the run's
+    // `run.completed` (SC-015: duplicate + reordered delivery must still
+    // land on the correct final state). Run bookkeeping (`latestInvocation
+    // Sequence` / `finalized`) is intentionally left untouched here.
+    return { kind: 'accepted', event: classified };
   }
 
   if (
