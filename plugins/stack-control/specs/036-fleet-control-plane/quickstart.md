@@ -71,6 +71,53 @@ If a scenario below cannot be driven from a terminal, that is a **defect in the 
 7. Probe a sequence that does not exist yet, then write it. → The **404 is not cached**; the new event is seen immediately. *The one deliberate no-cache decision in an otherwise cache-forever design.*
 8. `GET /v1/runs/{runId}/timings` → design / spec / execution / governance durations.
 
+### Cloudflare configuration (enables Scenario 5's cache validation)
+
+The delivery layer (Cloudflare in front of Backblaze B2) requires five specific settings. Without them, the architecture's read-cost shield does not function, though correct data will still serve — the failure is invisible.
+
+#### 1. Cache Rule for `.json` files
+
+**The critical setting — without this, CDN hit rate is zero.**
+
+Cloudflare does not cache `.json` files by default; `.json` is absent from the default cached-by-default content types. Every object in this design is `.json` (events, manifests, derived artifacts). On a stock Cloudflare setup, the cache hit rate measures **zero** — the origin B2 bucket sees every request — while data correctness remains unaffected, so the failure never surfaces without instrumentation. This is the one finding that justified the full plan-time research pass.
+
+**Required:** Add an explicit Cache Rule (Cloudflare → Rules → Cache Rules or equivalent) that matches `Path contains: .json` and sets `Cache eligibility: Eligible for cache`. This restores the read-amplification shield that justifies the CDN's presence. Validate by measuring the actual cache hit rate (Cloudflare Analytics → Caching) rather than inferring from correct responses; you are looking for a high cache-hit percentage on `.json` objects.
+
+#### 2. Transform Rule (security control — not optional)
+
+**This is a security boundary, not a convenience.**
+
+The delivery layer uses a Cloudflare custom domain pointing at a Backblaze B2 origin. Without a Transform Rule, the hostname becomes an **open proxy to every other bucket on that B2 origin** — any request can be rewritten to target any path on the origin. This is a critical authorization bypass.
+
+**Required:** Add a Transform Rule (Cloudflare → Rules → Transform Rules or equivalent) that **appends `/file/<bucket>` to the request path**. Specifically:
+- **On request Path:** Rewrite to `concat("/file/<bucket>", http.request.uri.path)`
+- Where `<bucket>` is the literal B2 bucket name configured for this deployment
+
+This pinning ensures the request can only access the named bucket, not arbitrary buckets on the shared B2 origin. Every request now includes the bucket namespace in the origin path, defeating cross-bucket traversal. Verify by confirming that a direct request to `https://<custom-domain>/runs/...` (missing the bucket-pinning prefix) either 404s or is rewritten to include the bucket prefix.
+
+#### 3. Full (strict) TLS
+
+**Required:** Enable TLS mode `Full (strict)` (Cloudflare → SSL/TLS → Overview or equivalent). This validates the SSL certificate of the origin (the B2 custom-domain endpoint) and prevents man-in-the-middle attacks between Cloudflare and the origin. Set Minimum TLS Version to `1.2` or higher to enforce modern cryptography.
+
+#### 4. Smart Tiered Cache
+
+**Recommended:** Enable Smart Tiered Cache (Cloudflare → Caching → Cache Rules or Settings, depending on your Cloudflare plan). This feature extends cache capacity by tiering hot content at Cloudflare's edge while less-frequently accessed content is served from regional tiers — improving hit rates and origin load at scale without manual configuration. For fleet history workloads (finalized runs with immutable payloads), this amplifies the read-cost reduction the CDN provides.
+
+#### 5. Cache-Control behavior and the probe-path no-cache carve-out
+
+**How immutability and the special case compose.**
+
+Every object stored in B2 carries the HTTP header `Cache-Control: public, max-age=31536000, immutable` — a one-year cache, marked immutable to signal the content will never change. This is the load-bearing contract: staleness becomes unrepresentable rather than operationally managed. No purge, no invalidation. A new revision is a new URL with a new key, so old URLs serve forever without risk of staleness.
+
+**One exception:** sequence probing (discovering which events have landed) terminates on HTTP 404 — a request for a sequence number that does not yet exist. Cloudflare caches 404 responses with a short but nonzero TTL by default. A cached "this sequence does not exist" response would block the plane from seeing a newly-arrived event with that sequence number, stalling discovery for the duration of the 404's cache TTL. This is a correctness bug.
+
+**Required:** Configure a **second Cache Rule that overrides the default for probe-path 404s:**
+- **On request Path:** Match `Path contains: /` (or the specific sequence-probe endpoint pattern, if narrower)
+- **Status Code:** `404`
+- **Cache Status:** `Bypass cache` (do not cache 404s on this path)
+
+This carve-out ensures that a newly-arrived event is visible on the next probe, not hidden behind a stale-404 window. Everything else on the delivery layer caches for one year; this path does not cache 404s. Measure by probing a non-existent sequence, then writing the event and probing again — the event must be visible immediately (latency only for the B2 round-trip), not delayed by the 404 cache window.
+
 ## Scenario 6 — Hostile network (US6, SC-011/012/013/014)
 
 1. Run a sidecar behind NAT with **no inbound reachability**. → Session establishes — every connection is sidecar-outbound.

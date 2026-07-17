@@ -26,6 +26,23 @@ import type { CommandDispatch, HeldCommand } from '../commands/dispatch.js';
 import { dispatchFanOut } from '../commands/dispatch.js';
 
 // ---------------------------------------------------------------------------
+// C7 — History + timings (T101, GET /v1/runs/{runId}/history and
+// GET /v1/runs/{runId}/timings). Implemented in history-api.ts (kept
+// separate to hold this file under the project's 300-500 line file cap);
+// re-exported here so every api.ts consumer keeps a single import surface.
+// ---------------------------------------------------------------------------
+
+export type {
+  PhaseDuration,
+  RunHistoryObjectKeyInput,
+  RunHistoryRecord,
+  RunHistoryResult,
+  RunPhaseDurations,
+  RunTimings,
+} from './history-api.js';
+export { runHistory, runHistoryObjectKey, runTimings } from './history-api.js';
+
+// ---------------------------------------------------------------------------
 // C2 — Snapshot (T053, GET /v1/fleet).
 // ---------------------------------------------------------------------------
 
