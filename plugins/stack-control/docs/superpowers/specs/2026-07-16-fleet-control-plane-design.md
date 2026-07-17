@@ -4,11 +4,12 @@
 **Date**: 2026-07-16
 **Approval**: recorded as the `design-approved:` marker on the roadmap node — never as prose in this file. If the marker is absent, this design is not approved, whatever any line here says.
 
-> **Revision note.** This record has been through two amendment passes since the original
-> draft: a third-party design review, and an operator correction that inverted a
-> foundational assumption (the plane is global and multi-host, not localhost). Decisions
+> **Revision note.** This record has been through three amendment passes since the original
+> draft: two third-party design reviews, and operator corrections that twice inverted a
+> foundational assumption — first that the plane is global and multi-host rather than
+> localhost, then that the plane is the only CDN reader rather than the browser. Decisions
 > that did not survive, and the reasons, are recorded in *Provenance* rather than quietly
-> dropped.
+> dropped; a superseded ruling there always points forward to the pass that reversed it.
 
 ## Problem domain
 
@@ -274,13 +275,21 @@ Boundedness principles that follow, with values pinned at plan time: a maximum e
 
 ### Storage layout — immutable per-event objects
 
-`{bucket}/runs/{installationId}/{runId}/events/{sequence}-{eventId}.json` plus a finalized `summary.json` written once at run end.
+`{bucket}/runs/{installationId}/{runId}/events/{invocationSequence}-{eventId}.json` plus a finalized `summary.json` written once at run end.
+
+**The sequence in the path is `invocationSequence`, named explicitly** — with two sequences in the model, a bare `sequence` is ambiguous, and the installation-wide one would interleave concurrent runs into a shared counter that carries no meaning inside a run-scoped directory.
 
 The original `events.jsonl` was a defect: object storage does not append, so every event required a read-modify-write of the whole object.
 
 ### Read confinement — live runs never touch B2
 
-Live runs are served from the plane's in-memory registry. B2/CF serves only *completed* runs, which are immutable by definition. Cloud reads are confined to exactly the data that caches perfectly.
+Live runs are served from the plane's in-memory registry. Cloud reads are confined to **finalized run artifacts**.
+
+**The immutability claim must be stated exactly, because the late-event model bounds it.** A completed run is not absolutely immutable — late telemetry can still arrive after finalization, and the design accepts late events rather than discarding them. What holds is narrower and is what the CDN actually requires:
+
+> **Published event objects are never mutated.** A late event does not rewrite a stored object; it lands as a new object and triggers a new *derived-artifact revision* or an explicit correction path.
+
+So the objects the cache holds are write-once and safe to cache indefinitely, while the derived artifacts above them carry revisions. That is enough for the CDN, and it is all the late-event model permits. Claiming completed runs are immutable *by definition* would overstate the guarantee and contradict this record's own open question about late arrivals.
 
 ### Durability is the sidecar's job, and failure is observable at both hops
 
@@ -321,17 +330,16 @@ Fleet-wide actions are **fan-out, not atomic**, and are presented as such: the r
 
 ## Open questions
 
-- **Local socket transport and portability.** Unix domain socket (filesystem permissions provide local authorization for free) versus localhost TCP (needs a token and port allocation). Windows needs named pipes. Discovery path for the socket — under the installation root, or a well-known per-user location — is unsettled.
-- **Sidecar spawn race and singleton guard.** Two concurrent invocations finding no sidecar must not both spawn one. The lock mechanism, and its behavior on a stale lock from a crashed sidecar, are undefined.
-- **Sidecar idle lifetime.** Does an auto-spawned sidecar exit after idle, and if so does the next invocation pay a spawn cost? Interacts with spool durability — a sidecar that exits with a non-empty spool must not lose it.
+- **Local socket transport, discovery, and identity lookup.** Unix domain socket (filesystem permissions provide local authorization for free) versus localhost TCP (needs a token and port allocation); Windows needs named pipes. Beyond the socket's location, discovery must define the **machine-local mapping from an installation root to its persisted `installationId` and its sidecar endpoint** — because identity is deliberately stored outside the installation tree, finding the socket and resolving the identity are the same lookup and must be solved together, not separately.
+- **Sidecar spawn race and stale locks.** Two concurrent invocations finding no sidecar must not both spawn one. The lock mechanism, and its behavior against a stale lock left by a crashed sidecar, are undefined.
+- **Sidecar idle lifetime versus spool durability.** Does an auto-spawned sidecar exit after idle, and does the next invocation then pay a spawn cost? Whatever the answer, it must not exit holding an un-flushed spool — the interaction between idle-exit and spool drain is undefined.
 - **CDN read mechanism.** The design fixes that the plane is the only reader and that its queries are canned and cacheable. *How* the shield is built — an edge Worker doing listing and range logic, or CF as a pull-through cache with immutable period manifests making listing unnecessary — is a plan-time choice to settle against real numbers. Listing is an uncacheable B2 transaction, which is the constraint any mechanism must answer. Deciding this in prose now would be false precision.
-- **Derived-artifact staleness and backfill.** The plane derives and caches dashboard artifacts. What invalidates a derived artifact, what happens when a late event arrives after derivation, and how a bad artifact is rebuilt are undefined.
+- **Derived-artifact staleness, revision, and backfill.** The plane derives and caches dashboard artifacts. What invalidates one, how a late event triggers a new revision, how a revision is addressed so the CDN does not serve a stale one, and how a bad artifact is rebuilt are all undefined. This is the mechanism behind the bounded-immutability invariant above and must not weaken it.
+- **`runId` uniqueness scope, and invocation linkage in the storage path.** The storage layout keys on `{installationId}/{runId}` and omits `invocationId`, while the identity model places a run *within* an invocation. That is only sound if `runId` is globally unique on its own; if it is unique only within its invocation, the path collides. Either `runId` is minted globally unique and invocation linkage lives in the event data, or the path must carry `invocationId`. Related: whether a single invocation may contain multiple runs, which also decides whether a run-scoped sequence would be cleaner than `invocationSequence` in the object name.
 - **Plane restart, beyond commands.** Command acceptance now survives restart by decision. The in-memory *registry* still vanishes: what happens to live sessions and their SSE streams on restart, and how relays re-announce, is undefined.
 - **Telemetry redaction and retention.** Absolute paths, usernames, branch names, commit messages, artifact paths, and error content leave the host for a cloud store. Even single-operator, this needs a redaction boundary, field length caps, a path policy, and a retention policy. The sidecar is the natural place to enforce it — it is the last hop under the operator's control.
 - **Artifact reference semantics.** Whether artifacts are filesystem paths, repo-relative paths, URLs, or opaque identifiers is unspecified. Browsers largely will not open `file://` from an HTTP page, and with a *remote* dashboard the paths refer to a filesystem the browser cannot reach at all — so "quick-access links" likely means copy-path, or something richer.
 - **Reconciliation window length.** How long the sidecar waits for an abnormally-disconnected run to reconnect before presuming it gone, and what the fleet view shows during the window.
-- **Sidecar spawn race and stale locks.** Two concurrent invocations finding no sidecar must not both spawn one. The lock mechanism, and its behavior against a stale lock left by a crashed sidecar, are undefined.
-- **Sidecar idle lifetime versus spool durability.** If an auto-spawned sidecar idle-exits, it must not exit holding an un-flushed spool. The interaction between idle-exit and spool drain is undefined.
 - **`cancel` semantics.** Does cancel interrupt the current task or wait for the task boundary? Are child processes terminated, with what signal? What cleanup is guaranteed? Is the invocation ended or only the run? Can cancellation time out? A future `terminate` (forceful) is named to keep `cancel` (cooperative) unambiguous, even if only `cancel` ships.
 - **`config-push` safety.** Needs config schema version, validation, an allowed-key set, apply-timing, persistence after invocation end, and revision/compare-and-set semantics to avoid lost updates.
 - **`reconcile` is long-running.** A single acknowledgement cannot represent it; needs its own received/started/completed/failed lifecycle with results linked by `commandId`.
@@ -347,7 +355,7 @@ Originally designed in-session via `superpowers:brainstorming`, driven through t
 
 **Amendment pass 1 — third-party design review.** The review returned "approve with required revisions". Decisive catches, all adopted: `events.jsonl` in object storage is a defect (no append); the 60s stale TTL contradicts transition-only telemetry; per-event histories are quadratic; `instanceId` conflates workspace with invocation; ordering and deduplication were absent; `live | stale | complete` conflates transport health with execution state; command delivery had no lifecycle, acknowledgement, or replay semantics.
 
-One review recommendation was **overruled**: proxying history reads through the plane. The review lacked the B2 read-cap cost model that justifies the CDN; proxying discards browser caching and re-amplifies reads against the exact limit the CDN exists to absorb.
+One review recommendation was **initially overruled**: proxying history reads through the plane. The stated reason was that the review lacked the B2 read-cap cost model, and that proxying would discard browser caching and re-amplify reads. **That ruling was itself reversed in amendment pass 3**, once the CDN's role was correctly understood as shielding B2 regardless of the reader's identity — the review's recommendation was right, and the overrule rested on a mislocation of the CDN in the topology. See pass 3 below.
 
 The review's proposed **four-phase delivery** was adopted as *task ordering within a single feature delivery* and rejected as *four separately-shipped features*, per the project's no-partial-delivery rule: partial implementations get abandoned and later work coral-reefs around the stump.
 
