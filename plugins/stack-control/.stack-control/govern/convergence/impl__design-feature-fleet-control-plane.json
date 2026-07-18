@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "mode": "impl",
+  "item": "design:feature/fleet-control-plane",
+  "governedShaBase": "48c3206f2a24bab05fdb45869296b3b00d949c12",
+  "headSha": "6d3a47cba44eb8d0e7c145b73c1c12736ceb9a0a",
+  "chunkIds": [
+    "428610a7dfb2b99d",
+    "7458fa1d3e42496b",
+    "aabeb6ae2ba1ef0b",
+    "d452c806bc925cf5",
+    "ee46052a42555fb5",
+    "f5317a02f6ff349c",
+    "f5704c2503e5b711"
+  ],
+  "rounds": 1,
+  "liftedFindings": [
+    {
+      "id": "428610a7dfb2b99d::AUDIT-BARRAGE-claude-01",
+      "title": "cli-emits.test.ts asserts nothing about the actual `cli.ts` dispatcher it claims to verify",
+      "severity": "high"
+    },
+    {
+      "id": "428610a7dfb2b99d::AUDIT-BARRAGE-codex-01",
+      "title": "Buffered events are dropped on protocol-version mismatch",
+      "severity": "high"
+    },
+    {
+      "id": "428610a7dfb2b99d::AUDIT-BARRAGE-codex-02",
+      "title": "CLI telemetry wiring tests do not exercise CLI telemetry wiring",
+      "severity": "high"
+    },
+    {
+      "id": "7458fa1d3e42496b::AUDIT-BARRAGE-claude-01",
+      "title": "dedupe-reorder.test.ts asserts `progressEventCount: 2` for events that no-regress must reject as stale/late",
+      "severity": "high"
+    },
+    {
+      "id": "7458fa1d3e42496b::AUDIT-BARRAGE-codex-01",
+      "title": "Command idempotence test encodes rejection, not harmless replay",
+      "severity": "high"
+    },
+    {
+      "id": "7458fa1d3e42496b::AUDIT-BARRAGE-codex-04",
+      "title": "Credential import-graph guard only scans one direct source file",
+      "severity": "high"
+    },
+    {
+      "id": "aabeb6ae2ba1ef0b::AUDIT-BARRAGE-claude-01",
+      "title": "installationSequence high-water mark has a read-modify-write race across concurrent CLI invocations",
+      "severity": "high"
+    },
+    {
+      "id": "aabeb6ae2ba1ef0b::AUDIT-BARRAGE-claude-02",
+      "title": "Handler failure skips telemetry emission entirely and leaks the emit-client socket",
+      "severity": "high"
+    },
+    {
+      "id": "aabeb6ae2ba1ef0b::AUDIT-BARRAGE-claude-03",
+      "title": "Command expiry is never plumbed through the HTTP command-issue API — held commands can never expire, only grow unbounded",
+      "severity": "high"
+    },
+    {
+      "id": "aabeb6ae2ba1ef0b::AUDIT-BARRAGE-codex-01",
+      "title": "Fleet-wide commands overwrite all but one accepted target",
+      "severity": "high"
+    },
+    {
+      "id": "aabeb6ae2ba1ef0b::AUDIT-BARRAGE-codex-02",
+      "title": "Ingest trusts wire-provided event classification instead of enforcing the catalog",
+      "severity": "high"
+    },
+    {
+      "id": "d452c806bc925cf5::AUDIT-BARRAGE-codex-01",
+      "title": "Spool-redaction test bypasses the pipeline it claims to verify",
+      "severity": "high"
+    },
+    {
+      "id": "ee46052a42555fb5::AUDIT-BARRAGE-claude-01",
+      "title": "History/timings endpoints permanently non-functional — fully-built archival read path never wired into the runtime",
+      "severity": "high"
+    },
+    {
+      "id": "ee46052a42555fb5::AUDIT-BARRAGE-claude-02",
+      "title": "Plane's live fleet state is unbounded, in-memory-only, and unrecoverable across a restart",
+      "severity": "high"
+    },
+    {
+      "id": "ee46052a42555fb5::AUDIT-BARRAGE-codex-01",
+      "title": "Runtime history endpoints never call the implemented CDN-backed reader",
+      "severity": "blocking"
+    },
+    {
+      "id": "ee46052a42555fb5::AUDIT-BARRAGE-codex-02",
+      "title": "Run-scoped commands are held for the caller token, not the run owner",
+      "severity": "high"
+    },
+    {
+      "id": "ee46052a42555fb5::AUDIT-BARRAGE-codex-04",
+      "title": "Production sidecar consumes command frames without delivering or acknowledging them",
+      "severity": "high"
+    },
+    {
+      "id": "f5704c2503e5b711::AUDIT-BARRAGE-claude-01+AUDIT-BARRAGE-codex-02",
+      "title": "Placeholder test asserts nothing about the claimed behavior — deferral phrase left in test body",
+      "severity": "high"
+    }
+  ],
+  "closedInLoopFindings": [],
+  "seamResult": {
+    "boundaryPairs": [
+      {
+        "a": "428610a7dfb2b99d",
+        "b": "7458fa1d3e42496b"
+      },
+      {
+        "a": "428610a7dfb2b99d",
+        "b": "aabeb6ae2ba1ef0b"
+      },
+      {
+        "a": "428610a7dfb2b99d",
+        "b": "d452c806bc925cf5"
+      },
+      {
+        "a": "428610a7dfb2b99d",
+        "b": "ee46052a42555fb5"
+      },
+      {
+        "a": "428610a7dfb2b99d",
+        "b": "f5317a02f6ff349c"
+      },
+      {
+        "a": "428610a7dfb2b99d",
+        "b": "f5704c2503e5b711"
+      },
+      {
+        "a": "7458fa1d3e42496b",
+        "b": "aabeb6ae2ba1ef0b"
+      },
+      {
+        "a": "7458fa1d3e42496b",
+        "b": "d452c806bc925cf5"
+      },
+      {
+        "a": "7458fa1d3e42496b",
+        "b": "ee46052a42555fb5"
+      },
+      {
+        "a": "7458fa1d3e42496b",
+        "b": "f5317a02f6ff349c"
+      },
+      {
+        "a": "7458fa1d3e42496b",
+        "b": "f5704c2503e5b711"
+      },
+      {
+        "a": "aabeb6ae2ba1ef0b",
+        "b": "d452c806bc925cf5"
+      },
+      {
+        "a": "aabeb6ae2ba1ef0b",
+        "b": "ee46052a42555fb5"
+      },
+      {
+        "a": "aabeb6ae2ba1ef0b",
+        "b": "f5317a02f6ff349c"
+      },
+      {
+        "a": "aabeb6ae2ba1ef0b",
+        "b": "f5704c2503e5b711"
+      },
+      {
+        "a": "d452c806bc925cf5",
+        "b": "ee46052a42555fb5"
+      },
+      {
+        "a": "d452c806bc925cf5",
+        "b": "f5317a02f6ff349c"
+      },
+      {
+        "a": "d452c806bc925cf5",
+        "b": "f5704c2503e5b711"
+      },
+      {
+        "a": "ee46052a42555fb5",
+        "b": "f5317a02f6ff349c"
+      },
+      {
+        "a": "ee46052a42555fb5",
+        "b": "f5704c2503e5b711"
+      },
+      {
+        "a": "f5317a02f6ff349c",
+        "b": "f5704c2503e5b711"
+      }
+    ],
+    "findings": [],
+    "suppressedCompatible": 0
+  },
+  "splitClusterRefs": [
+    "78ab26710d2c4ed8"
+  ],
+  "outcome": "override-eligible",
+  "anchorRoot": "/Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control"
+}
