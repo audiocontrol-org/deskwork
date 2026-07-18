@@ -26,6 +26,15 @@ The new work is therefore the producers that emit real lifecycle telemetry, an i
 
 This feature reuses feature 036's transport wholesale (named above) and **inverts its model**: where 036 made the run the root object and the fleet a table of runs, this makes the **instance** the root and 036's runs a **facet** of an instance (see the runs-as-facet requirement, FR-025). The two are one continuous body of work on the same plane, not competing designs.
 
+## Clarifications
+
+### Session 2026-07-18
+
+- Q: On phase **re-entry** (e.g. a redesign returns an item to `designing`), does `phaseDurations` sum all spans or keep only the latest? → A: **Cumulative** — the total time spent in each phase across all spans (re-entries add to the phase's total). See FR-018.
+- Q: What `currentBearing` does an instance show once its session has ended or it is idle? → A: The **last observed bearing persists** — session end does not clear it. The fleet shows what the instance was last doing; only a newer `phase.entered` / `session.started` changes it. See FR-016c.
+- Q: A `/stack-control:session-start` while a session is already open on the instance? → A: **Supersede** — the new session becomes current and the prior open session is marked ended/abandoned. No nesting, no queue. See FR-009a.
+- Q: Concrete durations/counts — the liveness window, the reconciliation grace, the heartbeat interval, the `recentActivity` cap `N`, and how long historical (disconnected/`gone`) instances are retained? → A: **Plan-time contracts**, pinned by RED tests in `plan.md` (following 036's constants-pinned-by-tests pattern), not fixed in this spec. The spec fixes the *behavior*; the numbers are settled at plan time.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### How to read the priorities
@@ -83,7 +92,7 @@ An operator asks what an instance's current compass bearing is (which lifecycle 
 - **Same-machine, two worktrees** at different paths → two distinct instances (different `path`).
 - **Worktree moved or renamed** → a new instance identity; prior history remains under the old `host:path` (a moved worktree is a new location — defensible, documented).
 - **Hostname drift** (DHCP/VM rename) → a new instance identity. A configured stable host-id override is a recorded open question, not built here.
-- **A second `/stack-control:session-start` while a session is open** → supersede the open session and mark the prior one abandoned (leaning supersede; recorded as an open question for the plan).
+- **A second `/stack-control:session-start` while a session is open** → supersede: the new session becomes current and the prior open session is recorded ended/abandoned (FR-009a).
 - **Plane restart with live instances** → instances re-announce; lifetime counters rehydrate from the durable event log; no false "gone" conclusion from the bounce alone.
 - **Late or reordered events** → registry never regresses an instance to an earlier state (the 036 no-regress/effectively-once ingest contract is reused).
 - **Emission when the sidecar or plane is unreachable** → the invocation is unaffected; telemetry is spooled or dropped per the existing fail-open rules; the CLI is never informed.
@@ -106,6 +115,7 @@ An operator asks what an instance's current compass bearing is (which lifecycle 
 - **FR-007**: `/stack-control:session-start` MUST mint a session id, persist a machine-local `current-session` record for the instance, and emit a `session.started` event; `/stack-control:session-end` MUST emit `session.ended` and clear the record.
 - **FR-008**: Invocations and runs occurring during an open session MUST be attributed to that session's id (read from the machine-local `current-session` record).
 - **FR-009**: An **unclosed session MUST be a first-class observable state** ("open since X"), never an error; emitting session telemetry MUST NOT block or gate the session-start/session-end skills (fail-open, consistent with the session-skills-never-block rule).
+- **FR-009a**: A `session.started` while a session is already open on the same instance MUST **supersede** it — the new session becomes current and the prior open session is recorded as ended/abandoned. Sessions do not nest or queue.
 
 **Telemetry the plane collects**
 
@@ -120,9 +130,10 @@ An operator asks what an instance's current compass bearing is (which lifecycle 
 - **FR-015**: The plane MUST maintain an **instance registry** — a **materialized projection**, not a source of truth. The durable event log is the authoritative record of facts; the registry is a derived view that folds the event stream (plus live signals) into one `InstanceState` per instance, and MUST rehydrate from the durable event log on restart so a bounce does not reset lifetime state. Every `InstanceState` field is a projection of underlying events, never an independently-authoritative value.
 - **FR-016**: `InstanceState` MUST expose: `id` (the Instance Identity), `host`, `path`; the two independent status axes `connection` and `liveness` (FR-016a) and `lastHeartbeatAt`; `currentSession` (`{sessionId, startedAt}` or none); `currentBearing` (`{phase, item}`); `lastActivityAt` and `lastActivity`; `sessionsStarted` and `sessionsEnded`; `firstSeenAt` and `firstSessionAt`; `phaseDurations` (design/spec/execution/governance); and `recentActivity` (FR-016b).
 - **FR-016a**: `connection` and `liveness` are **two independent axes** and MUST be defined precisely (they can diverge — e.g. an open uplink to a hung instance is `attached` + `stale`). `connection` is whether the instance's sidecar currently has an open uplink to the plane: `attached` | `disconnected`. `liveness` is how recently the plane last received any signal from the instance: `live` (within the liveness window) | `stale` (past the window but within the reconciliation grace) | `gone` (past the reconciliation grace). Neither axis is derived from the other.
-- **FR-016b**: `recentActivity` is a **bounded, newest-first list of the instance's most recent events, capped at a fixed N** — a best-effort convenience view, explicitly **not** a complete or authoritative history (full history is not this field's job). Entries beyond the cap are evicted; on rehydrate it is rebuilt from the retained window.
+- **FR-016b**: `recentActivity` is a **bounded, newest-first list of the instance's most recent events, capped at a fixed N** (the value of `N` is a plan-time contract) — a best-effort convenience view, explicitly **not** a complete or authoritative history (full history is not this field's job). Entries beyond the cap are evicted; on rehydrate it is rebuilt from the retained window.
+- **FR-016c**: `currentBearing` MUST reflect the **last observed** phase/item and MUST **persist through session end and instance idleness** — it is never cleared to empty by a session ending, so an idle instance shows what it was last doing. Only a newer `phase.entered` or `session.started` changes it.
 - **FR-017**: `InstanceState` MUST NOT carry a `waiting`/`blocked` field in this feature — the telemetry to populate it is undefined and a null field would mislead. It is recorded as an open question only.
-- **FR-018**: A phase duration that has not been observed MUST be reported as **absent**, never fabricated as zero.
+- **FR-018**: A phase duration that has not been observed MUST be reported as **absent**, never fabricated as zero. A phase's duration MUST be **cumulative across re-entries** — the total time spent in that phase over all spans (a redesign that re-enters `designing` adds to the design total).
 - **FR-019**: The instance registry MUST NOT regress an instance to an earlier state on duplicate or reordered event delivery (reusing 036's no-regress / effectively-once ingest contract).
 
 **The query API (read-only)**
@@ -184,7 +195,6 @@ An operator asks what an instance's current compass bearing is (which lifecycle 
 
 - **Waiting/blocked signal**: what states count as waiting (operator input, a gate, a command, idle-vs-stuck)? Telemetry undefined; the field is omitted until it can be sourced honestly.
 - **Reconciliation-state producer** (roadmap/backlog drift per instance) — its own producer; the 036 FR-086 analog, not built here.
-- **Concurrent/nested sessions** on one instance — supersede vs. warn (leaning supersede).
 - **Hostname drift** — a configured stable host-id override if it bites.
 - **Multi-operator path leakage** — identity may need a hash/opaque handle when the fleet serves more than one operator.
 - **Storage-layout / token-map re-key** — 036's `runs/{installationId}/…` layout and token map to `host:path`, or an internal `host:path`↔`installationId` mapping.
