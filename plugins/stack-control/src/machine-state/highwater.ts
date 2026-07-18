@@ -44,15 +44,15 @@
 
 import {
   closeSync,
+  fsyncSync,
   openSync,
   readFileSync,
   renameSync,
   statSync,
   unlinkSync,
-  writeFileSync,
   writeSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { MachineStateLocation } from './locate.js';
 
 /** The durable mark file's name inside the located durable dir. */
@@ -226,12 +226,65 @@ export function readHighWaterMark(location: MachineStateLocation): number {
   return parseHighWaterMarkFile(raw, path);
 }
 
-/** Write the mark file atomically: write to a sibling temp file, then rename over the target. */
-function writeHighWaterMarkAtomic(path: string, value: number): void {
+/**
+ * The filesystem operations the durable atomic write depends on, injected so the
+ * fsync ordering is OBSERVABLE in tests (AUDIT-20260718-30). NOT a mock seam:
+ * `REAL_FS_OPS` — the default every production caller gets — is the real
+ * `node:fs`; a test may pass ops that RECORD the call order while still
+ * delegating to real `node:fs` (`node:fs`'s exports are non-configurable and
+ * cannot be spied, and a userspace crash cannot distinguish an fsync from its
+ * absence, so the ordering is the only observable durability property).
+ */
+export interface HighWaterFsOps {
+  readonly openSync: (path: string, flags: string) => number;
+  readonly writeSync: (fd: number, data: string) => number;
+  readonly fsyncSync: (fd: number) => void;
+  readonly closeSync: (fd: number) => void;
+  readonly renameSync: (from: string, to: string) => void;
+}
+
+/** The real `node:fs`-backed ops — the production default. */
+const REAL_FS_OPS: HighWaterFsOps = {
+  openSync: (path, flags) => openSync(path, flags),
+  writeSync: (fd, data) => writeSync(fd, data),
+  fsyncSync: (fd) => fsyncSync(fd),
+  closeSync: (fd) => closeSync(fd),
+  renameSync: (from, to) => renameSync(from, to),
+};
+
+/**
+ * Write the mark file atomically AND crash-safely (AUDIT-20260718-30): write the
+ * payload through an fd, `fsync` the fd so the bytes are on stable storage, rename
+ * the temp file over the target, then `fsync` the CONTAINING DIRECTORY so the
+ * rename metadata (what makes the new mark discoverable) is itself durable. This
+ * matches `src/plane/commands/store.ts`'s `persistRecord` — without the directory
+ * fsync, a crash after `reserveNextSequence` returns a value but before the rename
+ * commits can roll the high-water mark back and let a restarted sidecar re-hand a
+ * DUPLICATE `installationSequence` (R-02/FR-039). Exported so tests can inject
+ * recording ops to structurally verify the fd+fsync+rename+dir-fsync sequence.
+ */
+export function writeHighWaterMarkAtomic(
+  path: string,
+  value: number,
+  ops: HighWaterFsOps = REAL_FS_OPS,
+): void {
   const payload: HighWaterMarkFile = { installationSequence: value };
   const tmpPath = `${path}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  writeFileSync(tmpPath, JSON.stringify(payload), 'utf8');
-  renameSync(tmpPath, path);
+  const bytes = `${JSON.stringify(payload)}\n`;
+  const fileFd = ops.openSync(tmpPath, 'w');
+  try {
+    ops.writeSync(fileFd, bytes);
+    ops.fsyncSync(fileFd);
+  } finally {
+    ops.closeSync(fileFd);
+  }
+  ops.renameSync(tmpPath, path);
+  const dirFd = ops.openSync(dirname(path), 'r');
+  try {
+    ops.fsyncSync(dirFd);
+  } finally {
+    ops.closeSync(dirFd);
+  }
 }
 
 /**
@@ -391,15 +444,21 @@ function acquireSequenceLock(lockPath: string): () => void {
  * duplicate. This is the single primitive callers use in place of the racy
  * `advanceHighWaterMark(location, readHighWaterMark(location) + 1)` two-step.
  *
- * The reserved value is persisted as the new durable high-water mark before it
- * is returned, so a crash after reservation never re-hands the same value.
+ * The reserved value is persisted as the new durable high-water mark — written
+ * crash-safely (fd+fsync+rename+dir-fsync, AUDIT-20260718-30) — BEFORE it is
+ * returned, so a crash after reservation never re-hands the same value. `ops`
+ * defaults to real `node:fs`; tests inject recording ops to verify the fsync
+ * happens before the reserved value is handed out.
  */
-export function reserveNextSequence(location: MachineStateLocation): number {
+export function reserveNextSequence(
+  location: MachineStateLocation,
+  ops: HighWaterFsOps = REAL_FS_OPS,
+): number {
   const release = acquireSequenceLock(highWaterMarkLockPath(location));
   try {
     const next = readHighWaterMark(location) + 1;
     const path = highWaterMarkPath(location);
-    writeHighWaterMarkAtomic(path, next);
+    writeHighWaterMarkAtomic(path, next, ops);
     return next;
   } finally {
     release();

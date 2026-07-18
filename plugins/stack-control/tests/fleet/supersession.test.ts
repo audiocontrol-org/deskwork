@@ -23,7 +23,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { supersedes, type Command, type CommandKind } from '../../src/fleet/supersession.js';
-import type { CommandState } from '../../src/fleet/command.js';
+import { nextCommandState, type CommandState } from '../../src/fleet/command.js';
 import { mintUuidV7 } from '../../src/fleet/types.js';
 
 function makeCommand(kind: CommandKind, opts?: { revision?: number; state?: CommandState }): Command {
@@ -113,5 +113,44 @@ describe('supersedes (T061, data-model § Supersession — per-command, never ge
     // superseding pause at all.
     const unappliedPause = makeCommand('pause');
     expect(supersedes(unappliedPause, resume)).toBe(true);
+  });
+
+  // AUDIT-20260718-27: supersedes()'s only guard is isTerminalCommandState,
+  // so it treats `delivered` and `received` config-push commands as eligible
+  // for supersession just like `accepted` ones (data-model.md § Supersession,
+  // FR-060 -- "un-applied" spans all three live states). This must agree with
+  // command.ts's TRANSITIONS table: a caller that gets supersedes()===true
+  // for a `delivered`/`received` command and then validates the transition
+  // via nextCommandState before persisting must NOT throw. This test ties
+  // both modules together so a future edit to either one that reintroduces
+  // the contradiction fails here, not just in command-machine.test.ts.
+  describe('cross-module agreement with command.ts (AUDIT-20260718-27)', () => {
+    it('a newer config-push supersedes a `delivered` older one, AND the delivered → superseded transition is legal', () => {
+      const olderConfig = makeCommand('config-push', { revision: 1, state: 'delivered' });
+      const newerConfig = makeCommand('config-push', { revision: 2 });
+
+      expect(supersedes(olderConfig, newerConfig)).toBe(true);
+      expect(() => nextCommandState('delivered', 'supersede')).not.toThrow();
+      expect(nextCommandState('delivered', 'supersede')).toBe('superseded');
+    });
+
+    it('a newer config-push supersedes a `received` older one, AND the received → superseded transition is legal', () => {
+      const olderConfig = makeCommand('config-push', { revision: 1, state: 'received' });
+      const newerConfig = makeCommand('config-push', { revision: 2 });
+
+      expect(supersedes(olderConfig, newerConfig)).toBe(true);
+      expect(() => nextCommandState('received', 'supersede')).not.toThrow();
+      expect(nextCommandState('received', 'supersede')).toBe('superseded');
+    });
+
+    it('an `applied` (terminal) config-push is NOT superseded — the applied boundary still holds regardless of the delivered/received fix', () => {
+      const appliedConfig = makeCommand('config-push', { revision: 1, state: 'applied' });
+      const newerConfig = makeCommand('config-push', { revision: 2 });
+
+      expect(supersedes(appliedConfig, newerConfig)).toBe(false);
+      // The state machine agrees from the other direction too: `applied` is
+      // terminal, so `supersede` is illegal from it regardless of this fix.
+      expect(() => nextCommandState('applied', 'supersede')).toThrow();
+    });
   });
 });

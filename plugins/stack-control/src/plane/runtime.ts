@@ -8,16 +8,11 @@
  * reinvent domain logic:
  *
  *   - buildRegistry (registry.ts)         — the live, derived fleet view.
- *   - fleetSnapshot / computeFleetDeltas /
- *     perRunDetail / commandStatus /
- *     issueCommand / issueFleetCommand
- *     (http/api.ts)                        — the pure C2/C5/C6 projections.
- *   - ingestEvent / rehydrateIngestState
- *     (http/ingest.ts)                     — the telemetry acceptance boundary,
- *                                            rehydrated from the durable event
- *                                            log on boot (AUDIT-20260717-14).
- *   - createCommandStore / createCommandDispatch
- *     (commands/*)                         — durable command custody + delivery.
+ *   - fleetSnapshot / computeFleetDeltas / perRunDetail / commandStatus /
+ *     issueCommand / issueFleetCommand (http/api.ts) — pure C2/C5/C6 projections.
+ *   - ingestEvent / rehydrateIngestState (http/ingest.ts) — the telemetry
+ *     acceptance boundary, rehydrated from the durable log on boot (AUDIT-…-14).
+ *   - createCommandStore / createCommandDispatch (commands/*) — command custody.
  *   - createCommandStreamHandler (http/stream.ts) — SSE-out + 15s keepalive.
  *   - createTokenRegistry / parseBearer (http/auth.ts) — bearer auth (C6).
  *   - createPlaneServer (http/server.ts)   — the node:http router.
@@ -35,17 +30,16 @@
  *
  * AUTH (contracts/sidecar-plane-protocol.md C6, FR-088): EVERY route requires
  * a valid bearer; a missing/unknown/revoked token is refused 401 with the
- * distinct reason surfaced — a revoked token is NEVER downgraded to unknown
- * or anonymous. For the single-operator dogfood model (FR-078) the consumer
- * routes require the same bearer as the sidecar routes.
+ * distinct reason surfaced — a revoked token is NEVER downgraded. For the
+ * single-operator dogfood model (FR-078) the consumer routes require the same
+ * bearer as the sidecar routes.
  *
  * CADENCE SEAM: the SSE keepalive `IntervalScheduler` is injected so a test
- * proves the 15s cadence WITHOUT a real wait (mirrors stream.ts / the
- * Clock-DI convention). Production defaults to NODE_INTERVAL_SCHEDULER.
+ * proves the 15s cadence WITHOUT a real wait. Production defaults to
+ * NODE_INTERVAL_SCHEDULER.
  *
  * No `any`, no `as`, no `@ts-ignore` (Principle VI). Relative `.js` imports
- * under node16 resolution (no `@/` alias — this plugin has none). Real
- * `node:fs`/`node:http` — never a mocked transport or filesystem.
+ * under node16 resolution. Real `node:fs`/`node:http` — never a mocked transport.
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -66,6 +60,7 @@ import {
   ingestEvent,
   rehydrateIngestState,
   type DurableEventStore,
+  type IngestOutcome,
   type IngestState,
 } from './http/ingest.js';
 import { createEventLog, type EventLog } from './event-log.js';
@@ -140,10 +135,9 @@ export interface PlaneRuntimeOptions {
    * Injected durable accepted-event log (test seam, mirrors `scheduler` /
    * `cdnReader`). Defaults to a real file-backed {@link createEventLog} under
    * `commandStoreDir`. Injectable so a test can prove the ingest handler admits
-   * an event to live state and answers 200 ONLY AFTER the durable append
-   * succeeds (AUDIT-20260718-06) — a failing append must yield a non-2xx and
-   * leave the registry untouched, never a 200 the sidecar treats as delivered
-   * over an event the plane never durably recorded.
+   * an event and answers 200 ONLY AFTER the durable append succeeds
+   * (AUDIT-20260718-06/-37) — a failing append must yield a non-2xx, leave the
+   * registry untouched, and roll the ingest bookkeeping back so a retry re-accepts.
    */
   readonly eventLog?: EventLog;
 }
@@ -406,31 +400,62 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
   };
 
   // --- sidecar-facing handlers (C1/C3/C7) --------------------------------
+  // Undo an accepted event's ingest-state mutation to its pre-image so a retry
+  // of an event whose durable append FAILED is re-accepted, never deduped/staled
+  // into a 200 for an event the plane never durably recorded (AUDIT-20260718-37).
+  // `ingestEvent` always installs a FRESH `RunIngestState` via `runs.set` (never
+  // mutates one in place), so the shallow snapshot's references are faithful.
+  function rollbackAcceptedIngest(runsBefore: IngestState['runs'], event: ClassifiedEvent): void {
+    ingestState.seenEventIds.delete(event.envelope.eventId);
+    const { runId } = event.envelope;
+    if (runId === null) {
+      return;
+    }
+    const prior = runsBefore.get(runId);
+    if (prior === undefined) {
+      ingestState.runs.delete(runId);
+    } else {
+      ingestState.runs.set(runId, prior);
+    }
+  }
+
   const ingestHandler: RouteHandler = async (ctx) => {
+    // Pre-image captured BEFORE `ingestEvent` mutates the bookkeeping — the
+    // rollback anchor for a failed durable append (AUDIT-20260718-37).
+    const runsBefore: IngestState['runs'] = new Map(ingestState.runs);
+    let outcome: IngestOutcome;
     try {
       const body = await readJsonBody(ctx.req);
-      const outcome = await ingestEvent(ingestState, { durableStore }, body);
-      if (outcome.kind === 'accepted') {
-        // Durability BEFORE the 200 and BEFORE admitting the event to live
-        // state (AUDIT-20260718-06). `eventLog.append` is synchronous and
-        // fsynced (event-log.ts), so by the time it returns the event is on
-        // disk. Only then do we admit it to the in-memory registry and answer
-        // 200: if the append throws, the catch below answers a non-2xx and the
-        // event is NOT in `events`, so the sidecar (seeing a non-2xx) will
-        // resend — a crash can never leave the sidecar believing an event was
-        // delivered that the plane never durably recorded.
-        eventLog.append(outcome.event);
-        events.push(outcome.event);
-      }
-      uplinkSignals.lastSuccess = new Date().toISOString();
-      respondJson(ctx.res, 200, outcome);
+      outcome = await ingestEvent(ingestState, { durableStore }, body);
     } catch (error) {
-      // Fail loud, but as an honest 400 (malformed body) — never a silent
-      // drop, never a 200 that hides the rejection.
-      uplinkSignals.lastFailure = new Date().toISOString();
-      uplinkSignals.lastError = error instanceof Error ? error.message : String(error);
-      respondJson(ctx.res, 400, { error: uplinkSignals.lastError });
+      // A body rejected AT THE BOUNDARY (malformed JSON / failed validation) is
+      // CLIENT input error — an honest 400 that must NOT move the uplink health
+      // needle, or one caller sending garbage makes /v1/health/store cry wolf to
+      // every subsequent caller (AUDIT-20260718-26). Only failures DOWNSTREAM of
+      // successful validation (the append below) degrade the uplink hop.
+      respondJson(ctx.res, 400, { error: error instanceof Error ? error.message : String(error) });
+      return;
     }
+    if (outcome.kind === 'accepted') {
+      try {
+        // Durable append is the FIRST irreversible step for an accepted event
+        // (AUDIT-20260718-06/-37): synchronous + fsynced (event-log.ts). Only
+        // after it returns do we admit the event and let the mutation stand.
+        eventLog.append(outcome.event);
+      } catch (error) {
+        // Genuine downstream transport/storage failure (post-validation): roll
+        // the bookkeeping back so the retry re-accepts, degrade the UPLINK hop
+        // honestly, answer non-2xx so the sidecar resends.
+        rollbackAcceptedIngest(runsBefore, outcome.event);
+        uplinkSignals.lastFailure = new Date().toISOString();
+        uplinkSignals.lastError = error instanceof Error ? error.message : String(error);
+        respondJson(ctx.res, 500, { error: uplinkSignals.lastError });
+        return;
+      }
+      events.push(outcome.event);
+    }
+    uplinkSignals.lastSuccess = new Date().toISOString();
+    respondJson(ctx.res, 200, outcome);
   };
 
   const sidecarStreamHandler: RouteHandler = createCommandStreamHandler({

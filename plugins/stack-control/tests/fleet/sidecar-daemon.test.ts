@@ -46,6 +46,7 @@ import { mintOrReadInstallationId } from '../../src/machine-state/identity.js';
 import { openTokenCustody } from '../../src/machine-state/token.js';
 import { mintUuidV7 } from '../../src/fleet/types.js';
 import type { TelemetryEvent } from '../../src/fleet/event.js';
+import type { Clock } from '../../src/fleet/clock.js';
 import { buildEventFrame, serializeFrame } from '../../src/telemetry/protocol.js';
 import { runSidecarDaemon } from '../../src/sidecar/daemon.js';
 
@@ -68,10 +69,97 @@ class FakeScheduler implements IntervalScheduler {
   }
 }
 
+/** Explicitly-advanced clock so the drain loop's backoff gating is under the
+ * test's control (never a real wall-clock wait). The daemon gates each drain
+ * pass on `clock.monotonicNowMs() < nextDrainAllowedMs`, so freezing then
+ * jumping the clock makes the retry-after-backoff behavior deterministic. */
+class FakeClock implements Clock {
+  private mono = 0;
+  private wallMs = Date.parse('2026-07-18T00:00:00.000Z');
+  nowIso(): string {
+    return new Date(this.wallMs).toISOString();
+  }
+  monotonicNowMs(): number {
+    return this.mono;
+  }
+  advance(ms: number): void {
+    this.mono += ms;
+    this.wallMs += ms;
+  }
+}
+
 interface RunningPlane {
   readonly server: Server;
   readonly baseUrl: string;
   readonly dir: string;
+}
+
+/** A REAL in-process `node:http` plane whose `/v1/ingest` REJECTS every record
+ * with 401 (a bearer-auth failure — a fact about credentials, NOT the payload)
+ * until `accept` is flipped to true, after which it 200-ingests and records the
+ * runId. Models the AUDIT-20260718-36 window: a valid sidecar's token is
+ * transiently refused (plane restarted with a mismatched `--token`, a startup
+ * race, an operator credential rotation), then accepted once auth is restored.
+ * The spooled records must be RETAINED across that window, never dropped. */
+interface AuthGateStubPlane {
+  readonly server: Server;
+  readonly baseUrl: string;
+  readonly ingested: string[];
+  accept: boolean;
+}
+
+async function startStubPlaneAuthGate(): Promise<AuthGateStubPlane> {
+  const state: { accept: boolean } = { accept: false };
+  const ingested: string[] = [];
+  const server = createHttpServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/v1/ingest') {
+      let raw = '';
+      req.setEncoding('utf8');
+      req.on('data', (chunk: string) => {
+        raw += chunk;
+      });
+      req.on('end', () => {
+        if (!state.accept) {
+          // Auth failure: the token is (transiently) refused. This is NOT a
+          // fact about the payload — the SAME record would succeed once auth is
+          // restored, so the sidecar MUST retain (not drop) it.
+          res.writeHead(401, { 'content-type': 'text/plain' });
+          res.end('unauthorized: token not accepted (yet)');
+          return;
+        }
+        const runId = runIdFromIngestBody(raw);
+        if (runId !== undefined) ingested.push(runId);
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end('{}');
+      });
+      return;
+    }
+    // Liveness + SSE stream + anything else: benign non-stream 200.
+    res.writeHead(200, { 'content-type': 'text/plain' });
+    res.end('');
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.removeListener('error', reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  if (address === null || typeof address === 'string') {
+    throw new Error('startStubPlaneAuthGate: expected a bound TCP AddressInfo');
+  }
+  return {
+    server,
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    ingested,
+    get accept(): boolean {
+      return state.accept;
+    },
+    set accept(value: boolean) {
+      state.accept = value;
+    },
+  };
 }
 
 async function startPlane(installationId: string): Promise<RunningPlane> {
@@ -244,6 +332,7 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
 
   let plane: RunningPlane | undefined;
   let stub: StubPlane | undefined;
+  let authStub: AuthGateStubPlane | undefined;
   let daemon: { started: Promise<unknown>; stop(): Promise<void> } | undefined;
   let client: Socket | undefined;
 
@@ -270,6 +359,13 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
         server.close((error) => (error ? reject(error) : resolve()));
       });
       stub = undefined;
+    }
+    if (authStub !== undefined) {
+      const { server } = authStub;
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+      authStub = undefined;
     }
   });
 
@@ -457,6 +553,86 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
       4000,
       'the sidecar to observably record the undelivered cancel command',
     );
+
+    rmSync(installationRoot, { recursive: true, force: true });
+  });
+
+  it('AUDIT-20260718-36: an auth failure (401) RETAINS spooled records — they transmit once auth is restored, never dropped', async () => {
+    const installationRoot = mkdtempSync(join(tmpdir(), 'scf-sidecar-daemon-root-'));
+    const installationId = mintOrReadInstallationId(installationRoot);
+    const location = locateMachineState(installationRoot);
+    openTokenCustody(location.durableDir).write(TOKEN);
+
+    // Pre-spool two records into the sidecar's WAL BEFORE the daemon starts.
+    const walDir = join(location.durableDir, 'spool');
+    const pipeline = createPipeline(walDir);
+    await pipeline.receive({
+      installationId,
+      invocationId: 'inv-authloss',
+      runId: 'authloss-a',
+      type: 'run.started',
+      classification: 'durable',
+    });
+    await pipeline.receive({
+      installationId,
+      invocationId: 'inv-authloss',
+      runId: 'authloss-b',
+      type: 'run.completed',
+      classification: 'durable',
+    });
+
+    // The plane refuses the bearer token (401) until we flip `accept`.
+    authStub = await startStubPlaneAuthGate();
+
+    // Inject a FakeClock so the drain loop's post-failure backoff gating is
+    // deterministic: while the clock is frozen at 0, exactly ONE drain pass
+    // runs (it 401s, backs off, sets nextDrainAllowedMs > 0); every subsequent
+    // pass is gated off until we JUMP the clock past the backoff after flipping
+    // auth on. No real wall-clock wait, no flaky timing.
+    const clock = new FakeClock();
+
+    const dropped: Array<{ sequence: number; status: number }> = [];
+    const handle = runSidecarDaemon({
+      installationRoot,
+      planeUrl: authStub.baseUrl,
+      clock,
+      drainIntervalMs: 5,
+      livenessIntervalMs: 5,
+      onDroppedRecord: (info) => dropped.push({ sequence: info.sequence, status: info.status }),
+    });
+    daemon = handle;
+    const start = await handle.started;
+    expect(start.kind).toBe('won');
+
+    // Let several real drain ticks fire while the clock is frozen. An auth
+    // failure must NOT be treated as a permanent drop: `dropped` stays empty.
+    // (Pre-fix, `isPermanentRejection(401)` was true, so the drain skipped-and-
+    // recorded BOTH records here — dropped.length === 2 — and advanced the
+    // cursor past them, losing them irrecoverably.)
+    await sleep(120);
+    expect(dropped).toEqual([]);
+    expect(authStub.ingested).toEqual([]);
+
+    // Auth is restored (token provisioned / rotated / plane finished booting).
+    authStub.accept = true;
+    // Jump the clock well past any accumulated backoff so the next real drain
+    // tick is allowed to run and retry the SAME retained records.
+    clock.advance(600_000);
+
+    // Both records — retained across the auth-failure window — now transmit.
+    // Pre-fix, the cursor had already advanced past them, so they were never
+    // replayed and this would time out (irrecoverable telemetry loss).
+    await pollUntil(
+      async () =>
+        authStub !== undefined &&
+        authStub.ingested.includes('authloss-a') &&
+        authStub.ingested.includes('authloss-b'),
+      6000,
+      'both records to transmit once auth is restored (retained, not dropped)',
+    );
+
+    // No record was ever recorded as a permanent drop during the auth window.
+    expect(dropped).toEqual([]);
 
     rmSync(installationRoot, { recursive: true, force: true });
   });

@@ -53,6 +53,8 @@ import type { Server } from 'node:http';
 import { useMachineStateStore } from './_machine-state-harness.js';
 import { makeTelemetryEvent } from './_local-socket-peer.js';
 import { createPlaneRuntime } from '../../src/plane/runtime.js';
+import type { EventLog } from '../../src/plane/event-log.js';
+import type { ClassifiedEvent } from '../../src/plane/registry.js';
 import type { IntervalScheduler } from '../../src/plane/http/stream.js';
 import { runSidecarDaemon, type SidecarDaemonHandle } from '../../src/sidecar/daemon.js';
 import { locateMachineState } from '../../src/machine-state/locate.js';
@@ -147,6 +149,25 @@ function entryRunId(entry: unknown): unknown {
   return typeof entry === 'object' && entry !== null ? (entry as { runId?: unknown }).runId : undefined;
 }
 
+/** Narrow one hop of a `/v1/health/store` body without `as` — the plane is a
+ * real HTTP peer whose body we do not trust structurally (`Reflect.get` keeps
+ * every access `unknown`, never `any`). */
+function hopOf(body: unknown, hop: 'uplink' | 'archive'): { status: string; lastError: string | null } {
+  if (typeof body !== 'object' || body === null || !(hop in body)) {
+    throw new Error(`store health missing the ${hop} hop: ${JSON.stringify(body)}`);
+  }
+  const hopValue: unknown = Reflect.get(body, hop);
+  if (typeof hopValue !== 'object' || hopValue === null || !('status' in hopValue)) {
+    throw new Error(`store health ${hop} hop malformed: ${JSON.stringify(body)}`);
+  }
+  const status: unknown = Reflect.get(hopValue, 'status');
+  if (typeof status !== 'string') {
+    throw new Error(`store health ${hop}.status is not a string: ${JSON.stringify(body)}`);
+  }
+  const lastErrorRaw: unknown = 'lastError' in hopValue ? Reflect.get(hopValue, 'lastError') : null;
+  return { status, lastError: typeof lastErrorRaw === 'string' ? lastErrorRaw : null };
+}
+
 describe('dogfood loop — terminal-drivable quickstart scenarios (T128, FR-087/SC-018)', () => {
   const store = useMachineStateStore();
 
@@ -170,13 +191,18 @@ describe('dogfood loop — terminal-drivable quickstart scenarios (T128, FR-087/
     for (const root of tmpRoots.splice(0)) rmSync(root, { recursive: true, force: true });
   });
 
-  async function startPlane(installationId: string, revoked?: ReadonlySet<string>): Promise<RunningPlane> {
+  async function startPlane(
+    installationId: string,
+    revoked?: ReadonlySet<string>,
+    eventLog?: EventLog,
+  ): Promise<RunningPlane> {
     const dir = mkdtempSync(join(tmpdir(), 'scf-dogfood-plane-'));
     const runtime = createPlaneRuntime({
       acceptedTokens: new Map([[TOKEN, installationId]]),
       revokedTokens: revoked,
       commandStoreDir: dir,
       scheduler: new FakeScheduler(),
+      eventLog,
     });
     const server = runtime.createServer();
     await new Promise<void>((resolve, reject) => {
@@ -349,7 +375,7 @@ describe('dogfood loop — terminal-drivable quickstart scenarios (T128, FR-087/
   });
 
   // --- Scenario 4 (US4) — trust, including about failure -------------------
-  it('Scenario 4: a socket close is abnormally-disconnected (never a death verdict); a severed uplink degrades the uplink hop, naming it', async () => {
+  it('Scenario 4: a socket close is abnormally-disconnected (never a death verdict); a GENUINE downstream failure degrades the uplink hop (naming it), a malformed-body 400 does NOT (AUDIT-20260718-26)', async () => {
     // (a) THE HONESTY INVARIANT — a closed socket yields a CONNECTION-axis
     // verdict, never a death/crashed verdict (SC-004, FR-026). Pure + always
     // terminal-drivable.
@@ -359,33 +385,71 @@ describe('dogfood loop — terminal-drivable quickstart scenarios (T128, FR-087/
     const DEATH = ['crashed', 'dead', 'died', 'failed', 'killed', 'terminated'];
     expect(DEATH).not.toContain(verdict.connectionStatus);
 
-    // (b) A severed uplink degrades the UPLINK hop, naming THAT hop (FR-074, C9).
-    // Drive it against the real plane: a malformed ingest is an uplink-hop
-    // failure; the two-hop health endpoint then reports uplink degraded with the
-    // error, while the archive hop is reported independently.
+    // (b) A GENUINE downstream failure (a real store/transport error DOWNSTREAM
+    // of successful schema validation) degrades the UPLINK hop, naming THAT hop
+    // (FR-074, C9). Simulate it with a flaky durable log whose FIRST append
+    // throws — NOT a malformed request. A malformed request is a boundary 400
+    // that must NOT touch the uplink needle (proven in (d)).
+    let failNextAppend = true;
+    const flakyLog: EventLog = {
+      replayed: [],
+      append(_event: ClassifiedEvent): void {
+        if (failNextAppend) {
+          failNextAppend = false;
+          throw new Error('simulated downstream durable-store failure');
+        }
+      },
+    };
     const { installationId } = provisionInstallation();
-    const plane = await startPlane(installationId);
+    const plane = await startPlane(installationId, undefined, flakyLog);
 
-    const badIngest = await fetch(`${plane.baseUrl}/v1/ingest`, {
+    // A WELL-FORMED event whose durable append fails downstream ⇒ non-2xx.
+    const failedIngest = await fetch(`${plane.baseUrl}/v1/ingest`, {
       method: 'POST',
       headers: { ...bearer(TOKEN), 'content-type': 'application/json' },
-      body: JSON.stringify({ not: 'a valid telemetry event' }),
+      body: JSON.stringify(makeEvent(installationId, 'run-uplink-fail', 'run.started')),
     });
-    expect(badIngest.status).toBe(400);
+    expect(failedIngest.status).not.toBe(200);
 
-    const health = await fetch(`${plane.baseUrl}/v1/health/store`, { headers: bearer(TOKEN) });
-    expect(health.status).toBe(200);
-    const healthBody: unknown = await health.json();
-    if (typeof healthBody !== 'object' || healthBody === null || !('uplink' in healthBody)) {
-      throw new Error(`store health missing the uplink hop: ${JSON.stringify(healthBody)}`);
-    }
-    const { uplink } = healthBody as { uplink: { status: string; lastError: string | null } };
+    const degradedBody: unknown = await (
+      await fetch(`${plane.baseUrl}/v1/health/store`, { headers: bearer(TOKEN) })
+    ).json();
+    const uplink = hopOf(degradedBody, 'uplink');
     // "Degraded" always answers WHICH hop — the uplink hop names its own failure.
     expect(uplink.status).toBe('degraded');
     expect(typeof uplink.lastError).toBe('string');
     expect((uplink.lastError ?? '').length).toBeGreaterThan(0);
     // The archive hop is surfaced independently (never collapsed into one).
-    expect(healthBody).toMatchObject({ archive: { status: expect.any(String) } });
+    expect(hopOf(degradedBody, 'archive').status.length).toBeGreaterThan(0);
+
+    // (c) NOT a sticky, unbounded false-positive: a subsequent SUCCESSFUL ingest
+    // (append no longer throws) clears the degraded verdict — the hop recovers.
+    await sleep(2); // ensure lastSuccess is strictly newer than lastFailure
+    const okIngest = await fetch(`${plane.baseUrl}/v1/ingest`, {
+      method: 'POST',
+      headers: { ...bearer(TOKEN), 'content-type': 'application/json' },
+      body: JSON.stringify(makeEvent(installationId, 'run-uplink-ok', 'run.started')),
+    });
+    expect(okIngest.status).toBe(200);
+    const recoveredBody: unknown = await (
+      await fetch(`${plane.baseUrl}/v1/health/store`, { headers: bearer(TOKEN) })
+    ).json();
+    expect(hopOf(recoveredBody, 'uplink').status).not.toBe('degraded');
+
+    // (d) A plain MALFORMED-BODY 400 must NOT degrade uplink health — a client
+    // input error rejected at the boundary is not evidence the uplink
+    // infrastructure is broken (AUDIT-20260718-26). Fresh, healthy plane.
+    const healthyPlane = await startPlane(installationId);
+    const badIngest = await fetch(`${healthyPlane.baseUrl}/v1/ingest`, {
+      method: 'POST',
+      headers: { ...bearer(TOKEN), 'content-type': 'application/json' },
+      body: JSON.stringify({ not: 'a valid telemetry event' }),
+    });
+    expect(badIngest.status).toBe(400);
+    const afterBadBody: unknown = await (
+      await fetch(`${healthyPlane.baseUrl}/v1/health/store`, { headers: bearer(TOKEN) })
+    ).json();
+    expect(hopOf(afterBadBody, 'uplink').status).not.toBe('degraded');
   });
 
   // --- Scenario 6 (US6) — hostile network ----------------------------------

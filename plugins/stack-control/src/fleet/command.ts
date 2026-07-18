@@ -15,15 +15,25 @@
 //                  ┌──────────────► rejected   (terminal)
 //                  │
 //  accepted ──► delivered ──► received ──► applied   (terminal)
-//     │  │          │             │
-//     │  │          │             └──────► failed    (terminal)
-//     │  │          │
-//     │  │          └─────────────────────► expired   (terminal)
-//     │  └────────────────────────────────► expired   (terminal, never-delivered TTL)
-//     └───────────────────────────────────► superseded (terminal)
+//     │  │          │  │          │  │
+//     │  │          │  │          │  └──────► superseded (terminal)
+//     │  │          │  │          └─────────► failed    (terminal)
+//     │  │          │  └────────────────────► superseded (terminal)
+//     │  │          └───────────────────────► expired   (terminal)
+//     │  └──────────────────────────────────► expired   (terminal, never-delivered TTL)
+//     └─────────────────────────────────────► superseded (terminal)
 //
 // Terminal states (no transition out): applied, rejected, failed, expired,
 // superseded. `accepted`, `delivered`, `received` are the live states.
+//
+// `supersede` is legal from ALL THREE live states (accepted, delivered,
+// received) — not just `accepted`. data-model.md § Supersession scopes
+// supersession to "un-applied" (FR-060), which spans all three; the
+// state-machine table must agree with `src/fleet/supersession.ts`'s
+// `supersedes()` (whose only guard is `isTerminalCommandState`), or a caller
+// that validates a supersedes()===true decision via nextCommandState before
+// persisting it would throw on a `delivered`/`received` command even though
+// supersedes() already said the supersession was legal (AUDIT-20260718-27).
 //
 // Idempotence (FR-054) is enforced STRUCTURALLY by the terminal guard: a
 // re-delivered already-applied command cannot re-transition — the terminal
@@ -121,9 +131,24 @@ const TRANSITIONS: Readonly<Record<CommandState, Partial<Record<CommandEvent, Co
     receive: 'received',
     fail: 'failed',
     expire: 'expired',
+    // A `delivered` command is still un-applied (data-model.md § Supersession,
+    // FR-060: "a newer revision supersedes an older un-applied one" spans
+    // accepted/delivered/received). supersession.ts's supersedes() has no
+    // guard narrower than isTerminalCommandState, so it can legally say a
+    // delivered command is superseded (e.g. a second config-push races the
+    // first while it is in flight to the sidecar) — this transition must
+    // agree, or a caller validating via nextCommandState before persisting
+    // throws even though supersedes() already returned true
+    // (AUDIT-20260718-27).
+    supersede: 'superseded',
   },
   received: {
     apply: 'applied',
+    // Same un-applied-scope argument as `delivered` above (AUDIT-20260718-27)
+    // — `received` (delivered to the run, waiting to be applied) is still
+    // un-applied per data-model.md § Supersession, so a racing newer command
+    // can legally supersede it too.
+    supersede: 'superseded',
   },
   // Terminal — no outgoing edges. Any event throws (idempotence guard).
   applied: {},

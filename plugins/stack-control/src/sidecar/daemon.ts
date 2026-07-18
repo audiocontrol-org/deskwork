@@ -164,14 +164,25 @@ export interface SidecarDaemonHandle {
  * Distinguish a PERMANENT ingest rejection (skip-and-record, per FR-017) from a
  * TRANSIENT one (back off, retry the same record). A 4xx names a request the
  * plane will reject identically on every byte-identical replay (malformed
- * payload, classification-downgrade guard) — permanent. The two 4xx statuses
- * that are genuinely retryable are excluded: 408 (Request Timeout) and 429 (Too
- * Many Requests) are transient. Everything else (5xx, network errors handled
- * upstream of this call) is transient too. (AUDIT-20260718-05.)
+ * payload, classification-downgrade guard) — permanent. The 4xx statuses that
+ * are genuinely retryable are excluded:
+ *  - 408 (Request Timeout) and 429 (Too Many Requests) — transient.
+ *  - 401 (Unauthorized) / 403 (Forbidden) — an AUTH failure is a fact about the
+ *    bearer token, NOT the payload: the SAME record would transmit once the
+ *    token is provisioned / rotated / un-revoked, or once the plane finishes
+ *    booting its token registry. Dropping the spooled records on a transient
+ *    auth window (a plane restarted with a mismatched `--token`, a startup
+ *    race, an operator credential rotation) is irrecoverable telemetry loss and
+ *    violates the at-least-once/"spool now, transmit when the plane is
+ *    reachable" posture (FR-049). So 401/403 RETAIN — back off and retry the
+ *    same record — exactly like 408/429 (AUDIT-20260718-36).
+ * Everything else (5xx, network errors handled upstream of this call) is
+ * transient too. (AUDIT-20260718-05.)
  */
 function isPermanentRejection(status: number): boolean {
   if (status < 400 || status >= 500) return false;
   if (status === 408 || status === 429) return false;
+  if (status === 401 || status === 403) return false;
   return true;
 }
 

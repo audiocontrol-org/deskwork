@@ -178,4 +178,58 @@ describe('ingest is durable BEFORE it 200s (AUDIT-20260718-06)', () => {
     if (!Array.isArray(entries)) throw new Error('expected entries array');
     expect(entries).toHaveLength(1);
   });
+
+  it('a retry after a durable-append FAILURE is re-accepted and durably appended, never deduped-and-dropped (AUDIT-20260718-37)', async () => {
+    // REGRESSION over the incomplete AUDIT-...-06 fix: `ingestEvent` MUTATES the
+    // ingest state (marks the eventId SEEN, advances the per-run no-regress
+    // high-water) as part of deciding the outcome, BEFORE the durable append
+    // runs. So if the first append throws (→ non-2xx), the sidecar retries the
+    // SAME event — but pre-fix the eventId is already in `seenEventIds` (and the
+    // run high-water advanced), so the retry is classified `duplicate`/`stale`,
+    // answered 200, and NEVER durably appended → the event is lost forever, the
+    // exact durable class this subsystem exists to protect.
+    //
+    // A flaky log fails the FIRST append then succeeds — modelling a transient
+    // downstream store failure that a retry recovers from.
+    let failNextAppend = true;
+    const appended: ClassifiedEvent[] = [];
+    const flakyLog: EventLog = {
+      replayed: [],
+      append(event: ClassifiedEvent): void {
+        if (failNextAppend) {
+          failNextAppend = false;
+          throw new Error('simulated durable-append failure (first attempt only)');
+        }
+        appended.push(event);
+      },
+    };
+    const plane = await startPlane(flakyLog);
+
+    // The IDENTICAL event, sent twice — a sidecar retry re-sends the same bytes
+    // (same eventId). Building the body once guarantees byte-identity.
+    const body = runStartedBody('run-retry-durability');
+
+    const first = await fetch(`${plane.baseUrl}/v1/ingest`, { method: 'POST', headers: bearer(), body });
+    expect(first.status).not.toBe(200);
+    expect(appended).toHaveLength(0);
+
+    // Retry the SAME event: append now succeeds. Post-fix, the rolled-back ingest
+    // state re-accepts it and appends durably; pre-fix it is deduped-and-dropped.
+    const retry = await fetch(`${plane.baseUrl}/v1/ingest`, { method: 'POST', headers: bearer(), body });
+    expect(retry.status).toBe(200);
+    expect(appended).toHaveLength(1);
+    expect(appended[0]?.envelope.runId).toBe('run-retry-durability');
+
+    // And it is visible in the live registry — admitted only AFTER durable append.
+    const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    const snapshot: unknown = await fleet.json();
+    if (typeof snapshot !== 'object' || snapshot === null || !('entries' in snapshot)) {
+      throw new Error(`expected a FleetSnapshot, got ${JSON.stringify(snapshot)}`);
+    }
+    const entries: unknown = Reflect.get(snapshot, 'entries');
+    if (!Array.isArray(entries)) throw new Error('expected entries array');
+    expect(entries).toHaveLength(1);
+  });
 });

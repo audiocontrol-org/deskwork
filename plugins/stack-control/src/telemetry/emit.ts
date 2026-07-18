@@ -287,13 +287,9 @@ class FailOpenEmitClient implements EmitClient {
           // them so a compatible sidecar (spawned for next time) still gets them,
           // instead of dropping them on the floor (AUDIT-20260717-02). Then drop
           // this connection and trigger the spawn — fire-and-forget, the
-          // invocation is NEVER failed.
+          // invocation is NEVER failed. `markUnavailable()` arms the reconnect
+          // that drains the retained events (AUDIT-20260718-11/-32).
           this.markUnavailable();
-          // Arm a reconnect so retained events DRAIN to the restarted/upgraded
-          // compatible sidecar — otherwise they sit until another emit() arrives,
-          // which for a long-run command that already emitted its FINAL event is
-          // never (AUDIT-20260718-11).
-          this.armReconnect();
           return;
         }
         // A matching `hello-ack`: the provisional events reached a compatible
@@ -388,6 +384,11 @@ class FailOpenEmitClient implements EmitClient {
     } catch {
       /* fail-open: the spawn seam is best-effort and must not surface. */
     }
+    // Arm the reconnect from the SINGLE choke point every failure path funnels
+    // through (AUDIT-20260718-32): the later `'close'` → `onClose()` can't arm the
+    // `createConnection`/`'error'`/`writeRaw()` paths (this set `unavailable`, which
+    // `onClose()` short-circuits on), stranding retained events (AUDIT-20260718-11).
+    this.armReconnect();
   }
 
   // --- write path (fire-and-forget; a write failure is just "unavailable") ---

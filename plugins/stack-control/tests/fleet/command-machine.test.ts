@@ -87,6 +87,26 @@ describe('command state machine transitions (T056, FR-050)', () => {
     expect(next).toBe('applied');
   });
 
+  // AUDIT-20260718-27: supersession.ts's supersedes() treats ANY non-terminal
+  // existing command as eligible for supersession (its only guard is
+  // isTerminalCommandState), which per data-model.md § Supersession spans
+  // `accepted`, `delivered`, AND `received` ("a newer revision supersedes an
+  // older un-applied one" -- FR-060). The state machine must agree: a
+  // `delivered` or `received` command superseded by a racing newer command
+  // (e.g. a second config-push arriving while the first is in flight to the
+  // sidecar) must be able to legally transition via 'supersede', or a caller
+  // that validates via nextCommandState before persisting throws even though
+  // supersedes() already said true.
+  it('accepts legal transition delivered → superseded (AUDIT-20260718-27, agrees with supersedes())', () => {
+    const next = nextCommandState('delivered', 'supersede');
+    expect(next).toBe('superseded');
+  });
+
+  it('accepts legal transition received → superseded (AUDIT-20260718-27, agrees with supersedes())', () => {
+    const next = nextCommandState('received', 'supersede');
+    expect(next).toBe('superseded');
+  });
+
   it('rejects illegal transition accepted → applied (skip intermediate)', () => {
     expect(() => nextCommandState('accepted', 'apply')).toThrow();
   });

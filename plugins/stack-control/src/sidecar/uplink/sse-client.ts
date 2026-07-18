@@ -246,6 +246,14 @@ export function runSseClient(opts: SseClientOptions): SseClientHandle {
       if (clock.monotonicNowMs() - lastFrameMono >= readIdleMs) {
         fired = true;
         clearWatchdog();
+        // Tear down the stalled connection the moment the watchdog fires
+        // (AUDIT-20260718-31 / -33). Without this, the underlying transport
+        // (e.g. the `fetch` request in FetchSseTransport) is left open: a
+        // slow-but-not-dead peer or a buffering proxy that later resumes
+        // sending would wake the `for await` loop below and deliver DUPLICATE
+        // events alongside the fresh connection the reconnect driver already
+        // started — plus leak the socket. Mirrors what `stop()` does.
+        connection?.close();
         opts.onReadIdleTimeout();
         fireClosed('idle-timeout');
       }
@@ -258,7 +266,10 @@ export function runSseClient(opts: SseClientOptions): SseClientHandle {
   decoder.onComment(() => {
     // Comment (keepalive) frames re-arm the watchdog exactly like data frames,
     // without ever surfacing as an event. THIS is the highest-value behavior.
-    if (!stopped) {
+    // Once the watchdog has already `fired` (or we `stopped`), the connection
+    // is abandoned — a late keepalive must not re-arm a torn-down watchdog
+    // (AUDIT-20260718-31 / -33).
+    if (!stopped && !fired) {
       rearm();
     }
   });
@@ -300,11 +311,21 @@ export function runSseClient(opts: SseClientOptions): SseClientHandle {
 
     try {
       for await (const chunk of conn.chunks) {
-        if (stopped) {
+        // HARD GUARD (AUDIT-20260718-31 / -33): once the read-idle watchdog has
+        // `fired` (or the caller `stopped` us), this connection is abandoned —
+        // a late chunk from it must NEVER be dispatched as an event. The
+        // watchdog closes the connection, but a chunk already in flight (or one
+        // a fake/buffering transport still yields) must be dropped here so it
+        // can never resurrect as a duplicate `onEvent` alongside the fresh
+        // reconnected stream.
+        if (stopped || fired) {
           break;
         }
         const events = decoder.push(chunk);
         for (const event of events) {
+          if (stopped || fired) {
+            break;
+          }
           rearm();
           opts.onEvent({ id: event.id, event: event.event, data: event.data });
         }
