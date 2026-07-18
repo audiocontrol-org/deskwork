@@ -858,3 +858,249 @@ Surface:    tests/fleet/no-creds-in-cli.test.ts:71-89
 The hardened credential-boundary guard claims it walks “every relative `.js`/`.ts` import” from `src/telemetry/emit.ts`, but `RELATIVE_IMPORT_RE` only matches `from ...`, `require(...)`, and dynamic `import(...)`. It does not match valid bare side-effect imports like `import '../machine-state/token.js';`. That means a credential module could still load into the CLI emit process through a side-effect import and the test at lines 168-187 would pass.
 
 Blast radius is high because this test is meant to close a prior credential-custody finding. A downstream agent could rely on it as proof that the emit graph is credential-free while an actual static import channel remains unchecked. The self-check at lines 136-165 only exercises `import { ... } from`, so it does not prove the missing channel is covered. A reasonable fix is to include bare static imports in the parser and add a self-check fixture with `import './token-like.js';`.
+
+## 2026-07-18 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260718-42 — event-log.ts's crash-recovery replay can leave a corrupting non-newline-terminated tail on disk, defeating the very crash-safety fix it implements
+
+Finding-ID: AUDIT-20260718-42
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/plane/event-log.ts (`replayLog`, lines ~90-130 of the new file)
+
+`replayLog`'s trailing-line handling has three branches for the last line: empty (skip), non-empty-and-parses (push, **no truncation**), non-empty-and-fails-to-parse (truncate to `goodPrefixBytes`). The comment for the "parses fine" branch states: *"A well-formed final line with no trailing newline is not the crash shape (no truncation needed) — nothing further to do."* That assumption is wrong: a torn write can be cut short by exactly the final `\n` byte, leaving the JSON body fully intact (and therefore parseable) but the file not newline-terminated. Since `appendDurably` always opens in append mode (`openSync(path, 'a')`) and writes `${JSON.stringify(event)}\n` with no separator logic of its own, the *next* successful append will land directly after the un-terminated bytes, producing one concatenated, unparseable line (`{...lastGoodRecord}{...newRecord}\n`).
+
+The consequence compounds on the *following* restart: if that concatenated line is now the file's last line, `parseLine` throws on it, and the recovery path (`truncateSync(path, goodPrefixBytes)`) discards the **entire concatenated line** — including the second record, which was itself written and fsynced cleanly and had nothing wrong with it. So a narrow but realistic crash timing (torn write missing only the trailing byte) leads to silent, permanent loss of a fully-durable, already-fsynced event on a subsequent restart — precisely the class of defect this file's own header says AUDIT-20260718-16 was written to eliminate.
+
+Contrast with the sibling crash-safe log in this same diff, `src/sidecar/spool/wal.ts`'s `readDurableRecords`: it unconditionally drops the last segment whenever the file doesn't end in `\n`, regardless of whether that segment happens to parse. That simpler, more conservative rule doesn't have this hole. `event-log.ts` should do the same — or at minimum, when the last line lacks a trailing newline (parses or not), `truncateSync` it back to `goodPrefixBytes` (or re-append the missing `\n`) so the file is always newline-terminated before the next `append()` runs.
+
+### AUDIT-20260718-43 — Accepted event log can lose its first file after a crash
+
+Finding-ID: AUDIT-20260718-43
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/plane/event-log.ts:165-169
+
+`appendDurably()` opens the log with `'a'`, writes the JSONL record, and `fsyncSync`s only the file descriptor. When this call creates `accepted-events.log` for the first time, the directory entry itself is not fsynced. A crash after the HTTP ingest handler returns 200 can therefore lose the newly-created log file even though the feature now treats `eventLog.append()` as the “durable before admitted” boundary.
+
+The blast radius is high because this reopens the exact plane-restart visibility failure the event log was added to close: a sidecar can receive 200, advance its drain cursor, and then the plane can restart without the accepted event log existing. The WAL implementation in `src/sidecar/spool/wal.ts:216-222` already shows the expected pattern: fsync the containing directory when creating the log file. `createEventLog` should do the same for `accepted-events.log` before any accepted event can be acknowledged as durable.
+
+### AUDIT-20260718-44 — Pipeline sequence recovery races duplicate sequence numbers
+
+Finding-ID: AUDIT-20260718-44
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/sidecar/pipeline.ts:310-373
+
+`ensureSequencesRecovered()` is not serialized. Two concurrent `receive()` calls on a fresh pipeline can both enter while `nextInstallationSequence === null`, both await `wal.replay()`, and then each set `nextInstallationSequence = maxSequence + 1`. The first call can take sequence 1, then the second resumes, resets the counter back to 1, and also takes sequence 1. The same interleaving can duplicate per-invocation `invocationSequence` because recovery seeds `invocationSequences` before `nextInvocationSequence()` runs.
+
+The blast radius is high because sequence identity is load-bearing for FR-039/FR-040 and for the plane’s no-regress logic. A sidecar receiving multiple local socket frames close together can emit duplicate installation and invocation sequences, making later events look stale or unordered even though they were produced locally in order. A reasonable fix is to memoize the recovery promise, or serialize the whole recover-and-assign block behind a small mutex so only one `receive()` can initialize and consume counters at a time.
+
+### AUDIT-20260718-45 — Ingest and liveness trust caller-claimed installation IDs after auth
+
+Finding-ID: AUDIT-20260718-45
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/plane/runtime.ts:221-232, src/plane/runtime.ts:422-429, src/plane/runtime-http.ts:146-158
+
+`withAuth()` resolves the bearer token to an installation id and stores it in `authedInstallation`, but the sidecar-facing ingest handler passes the request body directly to `ingestEvent()` without checking that `body.envelope.installationId` matches the authenticated installation. The liveness handler has the same shape: `assertSessionLiveness()` validates that the body contains an `installationId`, but nothing compares it to `requireAuthedInstallation(ctx.req)`.
+
+The blast radius is high because per-installation bearer tokens are meant to bind credentials to one host. As written, any valid installation token can submit telemetry or liveness for another installation by changing the JSON body, poisoning the registry and host-health surfaces under another identity. The runtime should enforce authenticated installation equality at the HTTP boundary before calling `ingestEvent()` or accepting a liveness heartbeat, returning 401/403 or 400 on mismatch.
+
+### AUDIT-20260718-46 — Command expiry is transitioned only as a side effect of `replayOnReconnect`, so a command for an installation that never reconnects never visibly expires
+
+Finding-ID: AUDIT-20260718-46
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    tests/fleet/command-expiry-plumbing.test.ts:1-133, tests/fleet/command-endpoints.test.ts:1-156
+
+`command-expiry-plumbing.test.ts` only observes the durable state flip to `'expired'` after calling `dispatch.replayOnReconnect(installationId)` with an advanced clock:
+
+```js
+clockMs = base + 2000;
+const afterExpiry = dispatch.replayOnReconnect(installationId);
+expect(afterExpiry.some((h) => h.commandId === commandId)).toBe(false);
+expect(store.get(commandId)?.state).toBe('expired');
+```
+
+`replayOnReconnect` is documented (in `command-blip.test.ts`'s header comment) as a read-oriented query: "Returns the commands that MUST be (re)delivered on this connection." Its name and doc strongly imply it fires only when a sidecar actually reconnects. But per this test, the durable expiry transition is a *mutating side effect* of that call — there is no test anywhere in this diff (including `command-endpoints.test.ts`'s `commandStatus` tests) that proves `store.get`/`commandStatus` independently detects and reports expiry when `replayOnReconnect` has never been invoked for that installation.
+
+The operator-facing consequence: FR-055 promises expiry is "a visible terminal state" that "announces itself rather than vanishing," and `plane-client-api.md` C6 promises "the operator can always tell what happened to a command they issued." But a command issued for an installation that is dead, decommissioned, or simply never reconnects (exactly the case a TTL/expiry exists to handle) will sit in the durable store reporting `state: 'accepted'` forever — `commandStatus`/`GET /v1/commands/:id` never independently checks `expiresAt` against the current time. The fix is either (a) `commandStatus`/`store.get` compute expiry lazily on read (comparing `expiresAt` to `now()`) independent of `replayOnReconnect`, or (b) a periodic sweep transitions expired commands — and a test proving `commandStatus` alone (no reconnect) reflects the expired state.
+
+### AUDIT-20260718-47 — `config-push.test.ts`'s "missing schemaVersion" test literal violates the documented `ConfigPushPayload` parameter type
+
+Finding-ID: AUDIT-20260718-47
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/fleet/config-push.test.ts:1-45, tests/fleet/config-push.test.ts:56-72
+
+The file's header documents `applyConfigPush`'s signature as `applyConfigPush(payload: ConfigPushPayload, current: ConfigPushState | undefined, allowedKeys: readonly string[]): ConfigPushApplyResult`, where `ConfigPushPayload` requires `schemaVersion: number` as a non-optional field. The "rejects a payload missing a schema version" test then constructs and passes an object literal that omits `schemaVersion` entirely:
+
+```js
+const pushWithoutVersion = {
+  revision: 1,
+  config: { logLevel: 'info' },
+};
+
+const result = applyConfigPush(pushWithoutVersion, undefined, ALLOWED_KEYS);
+```
+
+Under TypeScript strict mode with no `any`/`as`/`@ts-ignore` (mandated project-wide), this is a structural-assignability failure independent of "fresh literal" excess-property checking: `pushWithoutVersion`'s inferred type lacks a required property of `ConfigPushPayload`, so `tsc --noEmit` should reject this call outright ("Property 'schemaVersion' is missing in type ... but required in type 'ConfigPushPayload'"). If the actual `src/plane/commands/dispatch.ts` implementation matches the documented signature verbatim, this test file does not compile and blocks the build. If instead the real implementation loosened the parameter type (e.g. to `unknown`, matching the pattern `validateEnvelope(value: unknown)` uses elsewhere in this diff for the same "validate malformed input" purpose), then the header's documented signature is stale and misleads any future reader relying on it as the contract. Either way this is worth resolving: confirm the real parameter type of `applyConfigPush` and either fix the test literal (e.g. build it via `Record<string, unknown>` typing) or correct the header comment to match.
+
+### AUDIT-20260718-48 — Command/cursor independence test is tautological
+
+Finding-ID: AUDIT-20260718-48
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/fleet/command-vs-cursor.test.ts:49-93
+
+This test claims to pin FR-058, but it never exercises any production cursor, stream, command store, API, or state-transition behavior. The assertions only mutate local variables (`commandState`, `cursorPosition`) and then verify those local variables still hold assigned values. A production implementation could still infer `applied` from `Last-Event-ID` advancement, and this file would remain green.
+
+Blast radius is high because this is exactly the kind of quiet false coverage an unattended implementer would trust: the file name and comments say the invariant is covered, but the test does not bind any implementation surface. A useful test needs to drive the real command-status read path with an advanced stream cursor and assert the command remains `delivered`/`received` until an actual command ack changes it.
+
+### AUDIT-20260718-49 — CommandDispatch.acknowledge never durably persists the sidecar's ack
+
+Finding-ID: AUDIT-20260718-49
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/plane/commands/dispatch.ts:104-116 (interface doc) and the `createCommandDispatch` implementation's `acknowledge` method (~line 260-268), cross-referenced against src/plane/commands/store.ts:69-84 (`transition`) and its own header comment (AUDIT-20260718-17).
+
+`CommandDispatch.acknowledge(commandId, installationId, state)` is documented as "the sidecar for `installationId` acknowledged a command's delivery/application state" — the ingestion point for `applied` / `rejected` / `failed` / `expired` / `superseded` acks (C7, FR-059). Its implementation only touches the in-memory `terminallyAcknowledged` and `held` maps:
+
+```ts
+acknowledge(commandId: string, installationId: string, state: CommandState): void {
+  if (isTerminalAck(state)) {
+    const key = heldKey(commandId, installationId);
+    terminallyAcknowledged.set(key, state);
+    held.delete(key);
+  }
+},
+```
+
+It never calls `store.transition(commandId, state)`. `store.ts`'s `transition()` method exists specifically to solve this problem — its own doc comment (AUDIT-20260718-17) says: "without this op `commandStatus()` (→ `GET /v1/commands/:id`) would report `accepted` forever, even after the sidecar acknowledges `applied`/`failed`/`expired`/`superseded`." That is exactly the bug that `acknowledge()`, the actual ack-ingestion surface, still exhibits: a durable `CommandRecord.state` is set to `'accepted'` at `accept()` time and is never advanced by any code path shown here except the expiry branch of `replayOnReconnect`. Any reader of the durable store (a restarted plane, or an HTTP endpoint that queries `store.get()`/`store.list()` rather than the ephemeral dispatch buffer) will see every applied/rejected/failed/superseded command permanently reported as `accepted` — directly violating the module's stated FR-059 promise ("`Sent` is never reported as `applied`" — here the reverse: `applied` is reported as `accepted`). The fix is for `acknowledge()` to call `store.transition(commandId, state)` for every state it records (or at minimum every terminal one), matching the durable-setter's own stated purpose.
+
+### AUDIT-20260718-50 — Acknowledged command states are not persisted
+
+Finding-ID: AUDIT-20260718-50
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/plane/commands/dispatch.ts:202-210; src/plane/http/api.ts:321-334; src/plane/commands/store.ts:91-104
+
+`CommandDispatch.acknowledge()` is the exposed dispatch-layer API for sidecar delivery/application acknowledgement, but on terminal states it only records an in-memory target acknowledgement and deletes the hold (`dispatch.ts:202-210`). It never calls `store.transition()`. The operator-facing `commandStatus()` reads only the durable store (`api.ts:332-334`), and the store’s own contract says that without `transition()` the status would report `accepted` forever after sidecar acknowledgements (`store.ts:91-104`).
+
+Blast radius is high because a consumer can deliver and apply a command, call the acknowledgement API, and still see `accepted` through `GET /v1/commands/:id`. That directly violates the “operator can always tell what happened” command contract. The fix should make the acknowledgement path durably transition the command state, with the same state-machine validation used elsewhere, while preserving the per-target fan-out semantics noted above.
+
+### AUDIT-20260718-51 — `let dir: string` compared against `undefined` fails TypeScript strict-mode compilation
+
+Finding-ID: AUDIT-20260718-51
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    tests/fleet/wal-crash.test.ts:66-71
+
+```ts
+describe('crash-safe WAL spool: SIGKILL mid-spool loses no records (T080, R-03)', () => {
+  let dir: string;
+
+  afterEach(() => {
+    if (dir !== undefined) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+```
+
+`dir` is annotated as the non-nullable type `string`, never `string | undefined`. Under `strictNullChecks` (which this project mandates — "TypeScript strict mode", CLAUDE.md), `undefined` is not part of the `string` type. TypeScript's control-flow "definite assignment" analysis does not cross function boundaries, so it can't widen `dir`'s type inside the `afterEach` closure to account for the possibility it hasn't been assigned yet at that point — the read there is checked against the plain declared type `string`. Comparing a value of type `string` against the literal type `undefined` with `!==`/`===` is exactly the shape TypeScript flags as `TS2367: This condition will always return true since the types 'string' and 'undefined' have no overlap.` (the mirror pattern, `function f(x: string) { if (x === undefined) ... }`, is the textbook trigger for this diagnostic).
+
+If this package's build/CI pipeline runs `tsc --noEmit` (implied by the project's blanket "strict TypeScript, no `any`/`as`/`@ts-ignore`" rule) this file fails to typecheck, which would block whatever gate depends on a clean typecheck. Even if `vitest` itself only transpiles (strips types via esbuild) without type-checking and so the tests still *run*, the file is left in a state that contradicts the project's own strict-mode guarantee and will show as a red squiggle / CI typecheck failure for the next contributor. The fix is either `let dir: string | undefined;` or initializing `dir` before the describe body's `it()`s run (e.g. `let dir = '';`) so the comparison is meaningful, or dropping the guard entirely since every `it()` in the file assigns `dir` as its first statement, making the `afterEach` unconditional cleanup with a non-null assertion (`rmSync(dir!, ...)`) unnecessary noise — but the non-null assertion would itself violate the "no `as`/no unsafe casts" convention, so the cleanest fix is the union type.
+
+### AUDIT-20260718-52 — WAL crash tests model a crash with a still-live writer
+
+Finding-ID: AUDIT-20260718-52
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    tests/fleet/wal-crash.test.ts:83-96, tests/fleet/wal-crash.test.ts:107-119
+
+The test says it simulates `SIGKILL` by abandoning `beforeCrash`/`first` without `close()`, then opens a new WAL handle over the same directory. In the actual test process, the old handle is still alive, with its file descriptors, locks, buffers, and timers still present. That is not the same state as a killed sidecar process, where the OS has closed the process’s descriptors before restart. This can reject a correct WAL design that uses an exclusive live-writer lock, or push an unattended implementer toward supporting concurrent live handles when the contract is crash recovery after process death.
+
+The blast radius is high because this is a load-bearing RED test for crash durability. A consumer acting on it as written may implement the WAL around the test’s artificial same-process multi-handle behavior instead of the actual failure mode. A reasonable fix is to make the pre-crash appends happen in a child process that is killed, then reopen from the parent, or introduce a narrow crash-test seam that releases OS resources without writing graceful-close metadata while still preserving the “no graceful flush” condition.
+
+### AUDIT-20260718-53 — `.ts` extension in dynamic imports breaks node16-resolution type-checking
+
+Finding-ID: AUDIT-20260718-53
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/fleet/no-creds-in-cli.test.ts:196, 206, 216, 240
+
+Four dynamic imports in this file resolve `src/machine-state/token.ts` with a literal `.ts` extension:
+
+```ts
+const { TOKEN_FILE_MODE } = await import(
+  '../../src/machine-state/token.ts'
+);
+```
+
+(repeated for `openTokenCustody` in the next three tests). Every other file in this chunk — and this file's own top-of-file convention comment ("Relative `.js` imports under node16") — uses `.js` specifiers for relative imports, matching the project's stated node16 module resolution. Under TypeScript's `node16`/`nodenext` module resolution, an import specifier that ends in `.ts` is a compile error (TS2691: "An import path cannot end with a '.ts' extension. Consider importing '.js' instead.") unless the rare `allowImportingTsExtensions` compiler flag is set (which itself requires `noEmit`/`emitDeclarationOnly`, unlikely for a package this monorepo publishes via `tsc`).
+
+Practical consequence: Vitest's esbuild/vite-node transform does not enforce TS's specifier rules, so `npm test` will pass fine — but a `tsc --noEmit` typecheck pass (the deterministic floor per `.claude/rules/audit-barrage-is-stochastic-defense-in-depth.md`) will fail on this file specifically, in a way `npm test` cannot surface. That is a green-tests/red-typecheck split, which is exactly the class of bug the compiler layer is supposed to catch cleanly — but only if this file is included in the typecheck. Fix: change all four specifiers to `.ts` → `.js` to match the rest of the codebase.
+
+### AUDIT-20260718-54 — Import-graph walker misses bare side-effect imports (`import './x.js';`)
+
+Finding-ID: AUDIT-20260718-54 (claude-03 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=low, codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=reachable, fix-debt=no; reachable, high blast radius — NOT calibrated down (real signal preserved, SC-003).
+Surface:    tests/fleet/no-creds-in-cli.test.ts:53 (`RELATIVE_IMPORT_RE`)
+
+`RELATIVE_IMPORT_RE` is `/(?:from\s+|require\(\s*|import\(\s*)['"](\.\.?\/[^'"]+)['"]/g` — it only matches a relative specifier when preceded by `from `, `require(`, or `import(`. A bare side-effect import with no bindings and no `from` clause — `import './helper.js';` — matches none of those three prefixes (it's `import` followed directly by whitespace and the string, not `import(`), so the walker silently fails to add that edge to the reachable-module set.
+
+This is the credential-boundary guard for T110/SC-011 ("no credentials in CLI"), and its own docstring claims to prove the token module is unreachable "ANYWHERE on its static import graph." That claim is not quite true: if any module transitively reachable from `src/telemetry/emit.ts` used a bare side-effect import to reach a module that itself (directly or transitively) imports `token.ts`, this walker would not detect it and the test would give a false "clean" result. Current risk is low since no bare side-effect imports appear to be in use in this codebase's style, but the walker's completeness claim doesn't hold in general. Fix: extend the regex to also match `import\s+['"](\.\.?\/[^'"]+)['"]` (no `from`/binding clause).
+
+### AUDIT-20260718-55 — History API pins an unrevisioned summary key that contradicts the archive invariant
+
+Finding-ID: AUDIT-20260718-55
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    tests/fleet/history-timings.test.ts:95-106 and tests/fleet/late-event.test.ts:5-11,112-143
+
+`history-timings.test.ts` requires `runHistoryObjectKey()` to return `runs/{installationId}/{runId}/summary.json`, explicitly calling it a “revision-free key” at lines 95-99. In the same chunk, `late-event.test.ts` states the archive invariant that derived artifacts are revisioned and the “revision lives in the key” at lines 5-11, then asserts revision 1 and revision 2 are written to distinct derived keys at lines 112-143.
+
+That is a direct contract split for the archived-history read path. An implementation following the history test will naturally build `/history` and `/timings` around a mutable-looking `summary.json`, undermining the late-event/immutable-derived-artifact model. Blast radius is high because an unattended implementation agent can satisfy the route tests while violating the archive revision invariant, causing stale or overwritten historical summaries after late events. The fix should make `runHistoryObjectKey` resolve the current revisioned derived artifact through the plane’s index/manifest mechanism, or explicitly define why `summary.json` is immutable and how late-event revisions are exposed without rewriting it.
+
+### AUDIT-20260718-56 — ReconnectBackoff's attempt counter and healthy-reset are never wired into the reconnect driver — backoff permanently pins at the 30s cap after a handful of reconnects
+
+Finding-ID: AUDIT-20260718-56 (claude-01 + claude-02 + codex-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    src/sidecar/uplink/reconnect.ts:273-291 (attempt/scheduleReconnect), src/sidecar/uplink/reconnect.ts:187-191 (noteHealthyFor, dead), src/sidecar/uplink/reconnect.ts:176-178 (reseedBaseFromServerRetry, dead)
+
+`runReconnectingSseClient` declares `let attempt = 0;` (line 273) and only ever *increments* it in `scheduleReconnect` (line 283, `attempt += 1;`) — nothing in the file ever resets `attempt` back to 0. `ReconnectBackoff.nextDelayMs(attempt)` computes `base * 2 ** attempt` capped at 30s (line 167), so once the sidecar has reconnected roughly 5 times over its lifetime (`1000 * 2^5 = 32000 > 30000`), every subsequent reconnect — even a single-second network blip after days of otherwise-healthy streaming — immediately waits the maximum ~30s (jittered) delay instead of the intended fast 1s retry. The class's own `noteHealthyFor(elapsedMs)` method (lines 187-191) exists precisely to implement the documented "reset after 60s healthy" behavior pinned in both this file's header comment (line 19) and `contracts/sidecar-plane-protocol.md` § C4, but it is never called anywhere in `runReconnectingSseClient` — there is no code path that measures a connection's healthy duration and reports it to the backoff instance. The `backoff` variable is captured only in this function's closure and is never exposed on `ReconnectingSseClientHandle`, so no other file (e.g. a future `daemon.ts` caller) can reach it either — this is a self-contained, permanent gap in the driver this file implements.
+
+Concretely: a long-running sidecar that experiences a plane deploy/restart (a burst of 5+ reconnects in quick succession) will, from that point forward for the rest of its process lifetime, treat every future reconnect — no matter how transient — as if it were the 5th+ consecutive failure, always waiting up to 30s to re-establish. This directly undermines the buffer-asymmetry design (`src/telemetry/buffer.ts`'s `INVOCATION_BUFFER_BOUND`, sized "generously above a plausible worst-case event count" for gaps "on the order of tens of seconds") by making 30s-class gaps the *routine* case instead of the rare one. Fix: track a "connected since" timestamp (via the injected `Clock`) from the moment `runSseClient`'s connection is established, and either reset `attempt = 0` directly on a successful reconnect/first-event, and/or call `backoff.noteHealthyFor(elapsedMs)` periodically while connected.

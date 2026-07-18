@@ -3,102 +3,92 @@
   "mode": "impl",
   "item": "design:feature/fleet-control-plane",
   "governedShaBase": "48c3206f2a24bab05fdb45869296b3b00d949c12",
-  "headSha": "3105da319df4f70c998a94bf527cbb2e7cfb5e61",
+  "headSha": "10ef61be633d43419a6b1f8c0399a07054c4c6f1",
   "chunkIds": [
-    "001908480e24002c",
-    "13e60787d3f1cf70",
-    "16875c557f699768",
-    "4a6ecdc417e8a307",
-    "511b3486f6899c93",
-    "670d27e781215294",
-    "d9401a3cb4e1add4",
-    "f5317a02f6ff349c"
+    "168f9dc29665fa8a",
+    "471bb84d68a34507",
+    "740a1bcd955d2cb8",
+    "934a721e139e2864",
+    "aafe45055419f7cd",
+    "d3da673df3c3479e",
+    "f5317a02f6ff349c",
+    "fac3b79c76189fc8"
   ],
   "rounds": 1,
   "liftedFindings": [
     {
-      "id": "001908480e24002c::AUDIT-BARRAGE-claude-01+AUDIT-BARRAGE-codex-01",
-      "title": "command-vs-cursor.test.ts asserts FR-058 without ever exercising real implementation code",
+      "id": "168f9dc29665fa8a::AUDIT-BARRAGE-claude-01",
+      "title": "event-log.ts's crash-recovery replay can leave a corrupting non-newline-terminated tail on disk, defeating the very crash-safety fix it implements",
       "severity": "high"
     },
     {
-      "id": "001908480e24002c::AUDIT-BARRAGE-claude-02",
-      "title": "A single malformed /v1/ingest request flips the shared uplink health status to \"degraded\"",
+      "id": "168f9dc29665fa8a::AUDIT-BARRAGE-codex-01",
+      "title": "Accepted event log can lose its first file after a crash",
       "severity": "high"
     },
     {
-      "id": "13e60787d3f1cf70::AUDIT-BARRAGE-claude-01",
-      "title": "Command supersession contradicts the command state machine for `delivered`/`received` commands",
+      "id": "168f9dc29665fa8a::AUDIT-BARRAGE-codex-02",
+      "title": "Pipeline sequence recovery races duplicate sequence numbers",
       "severity": "high"
     },
     {
-      "id": "13e60787d3f1cf70::AUDIT-BARRAGE-claude-02",
-      "title": "`src/plane/commands/dispatch.ts` is unreadable in this diff (shown as binary), hiding the exact logic that reconciles the supersession/transition mismatch",
+      "id": "168f9dc29665fa8a::AUDIT-BARRAGE-codex-03",
+      "title": "Ingest and liveness trust caller-claimed installation IDs after auth",
       "severity": "high"
     },
     {
-      "id": "13e60787d3f1cf70::AUDIT-BARRAGE-codex-01",
-      "title": "Command acknowledgements never reach or persist in the plane",
+      "id": "471bb84d68a34507::AUDIT-BARRAGE-claude-01",
+      "title": "Command expiry is transitioned only as a side effect of `replayOnReconnect`, so a command for an installation that never reconnects never visibly expires",
       "severity": "high"
     },
     {
-      "id": "13e60787d3f1cf70::AUDIT-BARRAGE-codex-02",
-      "title": "High-water reservations are not crash-durable",
+      "id": "471bb84d68a34507::AUDIT-BARRAGE-claude-02",
+      "title": "`config-push.test.ts`'s \"missing schemaVersion\" test literal violates the documented `ConfigPushPayload` parameter type",
       "severity": "high"
     },
     {
-      "id": "16875c557f699768::AUDIT-BARRAGE-claude-01",
-      "title": "The read-idle watchdog never closes the stalled connection — a \"timed-out\" SSE stream can resurrect and deliver duplicate events",
+      "id": "471bb84d68a34507::AUDIT-BARRAGE-codex-01",
+      "title": "Command/cursor independence test is tautological",
       "severity": "high"
     },
     {
-      "id": "16875c557f699768::AUDIT-BARRAGE-claude-02",
-      "title": "`armReconnect()` is only wired into one of four `markUnavailable()` call sites — the AUDIT-20260718-11 fix silently drops the final buffered event on 3 of 4 failure paths",
+      "id": "740a1bcd955d2cb8::AUDIT-BARRAGE-claude-01",
+      "title": "CommandDispatch.acknowledge never durably persists the sidecar's ack",
       "severity": "high"
     },
     {
-      "id": "16875c557f699768::AUDIT-BARRAGE-codex-01",
-      "title": "Read-idle timeout leaves the stale SSE socket alive",
+      "id": "740a1bcd955d2cb8::AUDIT-BARRAGE-codex-02",
+      "title": "Acknowledged command states are not persisted",
       "severity": "high"
     },
     {
-      "id": "16875c557f699768::AUDIT-BARRAGE-codex-02",
-      "title": "`sidecar run` ignores configured plane URL",
+      "id": "934a721e139e2864::AUDIT-BARRAGE-claude-01",
+      "title": "`let dir: string` compared against `undefined` fails TypeScript strict-mode compilation",
       "severity": "high"
     },
     {
-      "id": "16875c557f699768::AUDIT-BARRAGE-codex-03",
-      "title": "`plane serve` can authenticate only one installation token",
+      "id": "934a721e139e2864::AUDIT-BARRAGE-codex-01",
+      "title": "WAL crash tests model a crash with a still-live writer",
       "severity": "high"
     },
     {
-      "id": "4a6ecdc417e8a307::AUDIT-BARRAGE-claude-01+AUDIT-BARRAGE-codex-02",
-      "title": "`isPermanentRejection` classifies auth failures (401/403) as permanent, causing irrecoverable telemetry loss",
+      "id": "aafe45055419f7cd::AUDIT-BARRAGE-claude-01",
+      "title": "`.ts` extension in dynamic imports breaks node16-resolution type-checking",
       "severity": "high"
     },
     {
-      "id": "4a6ecdc417e8a307::AUDIT-BARRAGE-codex-01",
-      "title": "Accepted events can be lost when the durable append fails",
-      "severity": "blocking"
-    },
-    {
-      "id": "511b3486f6899c93::AUDIT-BARRAGE-claude-01",
-      "title": "Missing coverage for the actual highest-risk crash scenario: torn/partial writes mid-append",
+      "id": "aafe45055419f7cd::AUDIT-BARRAGE-claude-03+AUDIT-BARRAGE-codex-02",
+      "title": "Import-graph walker misses bare side-effect imports (`import './x.js';`)",
       "severity": "high"
     },
     {
-      "id": "511b3486f6899c93::AUDIT-BARRAGE-codex-01",
-      "title": "WAL crash test models process death with concurrent live handles",
+      "id": "aafe45055419f7cd::AUDIT-BARRAGE-codex-01",
+      "title": "History API pins an unrevisioned summary key that contradicts the archive invariant",
       "severity": "high"
     },
     {
-      "id": "670d27e781215294::AUDIT-BARRAGE-claude-01",
-      "title": "manifest-reconcile.test.ts never exercises a multi-revision manifest — could silently repeat the R-01 sort-order defect the manifest mechanism exists to avoid",
-      "severity": "high"
-    },
-    {
-      "id": "670d27e781215294::AUDIT-BARRAGE-codex-01",
-      "title": "Static import walker misses bare side-effect imports",
+      "id": "fac3b79c76189fc8::AUDIT-BARRAGE-claude-01+AUDIT-BARRAGE-claude-02+AUDIT-BARRAGE-codex-01+AUDIT-BARRAGE-codex-02",
+      "title": "ReconnectBackoff's attempt counter and healthy-reset are never wired into the reconnect driver — backoff permanently pins at the 30s cap after a handful of reconnects",
       "severity": "high"
     }
   ],
@@ -106,123 +96,123 @@
   "seamResult": {
     "boundaryPairs": [
       {
-        "a": "001908480e24002c",
-        "b": "13e60787d3f1cf70"
+        "a": "168f9dc29665fa8a",
+        "b": "471bb84d68a34507"
       },
       {
-        "a": "001908480e24002c",
-        "b": "16875c557f699768"
+        "a": "168f9dc29665fa8a",
+        "b": "740a1bcd955d2cb8"
       },
       {
-        "a": "001908480e24002c",
-        "b": "4a6ecdc417e8a307"
+        "a": "168f9dc29665fa8a",
+        "b": "934a721e139e2864"
       },
       {
-        "a": "001908480e24002c",
-        "b": "511b3486f6899c93"
+        "a": "168f9dc29665fa8a",
+        "b": "aafe45055419f7cd"
       },
       {
-        "a": "001908480e24002c",
-        "b": "670d27e781215294"
+        "a": "168f9dc29665fa8a",
+        "b": "d3da673df3c3479e"
       },
       {
-        "a": "001908480e24002c",
-        "b": "d9401a3cb4e1add4"
-      },
-      {
-        "a": "001908480e24002c",
+        "a": "168f9dc29665fa8a",
         "b": "f5317a02f6ff349c"
       },
       {
-        "a": "13e60787d3f1cf70",
-        "b": "16875c557f699768"
+        "a": "168f9dc29665fa8a",
+        "b": "fac3b79c76189fc8"
       },
       {
-        "a": "13e60787d3f1cf70",
-        "b": "4a6ecdc417e8a307"
+        "a": "471bb84d68a34507",
+        "b": "740a1bcd955d2cb8"
       },
       {
-        "a": "13e60787d3f1cf70",
-        "b": "511b3486f6899c93"
+        "a": "471bb84d68a34507",
+        "b": "934a721e139e2864"
       },
       {
-        "a": "13e60787d3f1cf70",
-        "b": "670d27e781215294"
+        "a": "471bb84d68a34507",
+        "b": "aafe45055419f7cd"
       },
       {
-        "a": "13e60787d3f1cf70",
-        "b": "d9401a3cb4e1add4"
+        "a": "471bb84d68a34507",
+        "b": "d3da673df3c3479e"
       },
       {
-        "a": "13e60787d3f1cf70",
+        "a": "471bb84d68a34507",
         "b": "f5317a02f6ff349c"
       },
       {
-        "a": "16875c557f699768",
-        "b": "4a6ecdc417e8a307"
+        "a": "471bb84d68a34507",
+        "b": "fac3b79c76189fc8"
       },
       {
-        "a": "16875c557f699768",
-        "b": "511b3486f6899c93"
+        "a": "740a1bcd955d2cb8",
+        "b": "934a721e139e2864"
       },
       {
-        "a": "16875c557f699768",
-        "b": "670d27e781215294"
+        "a": "740a1bcd955d2cb8",
+        "b": "aafe45055419f7cd"
       },
       {
-        "a": "16875c557f699768",
-        "b": "d9401a3cb4e1add4"
+        "a": "740a1bcd955d2cb8",
+        "b": "d3da673df3c3479e"
       },
       {
-        "a": "16875c557f699768",
+        "a": "740a1bcd955d2cb8",
         "b": "f5317a02f6ff349c"
       },
       {
-        "a": "4a6ecdc417e8a307",
-        "b": "511b3486f6899c93"
+        "a": "740a1bcd955d2cb8",
+        "b": "fac3b79c76189fc8"
       },
       {
-        "a": "4a6ecdc417e8a307",
-        "b": "670d27e781215294"
+        "a": "934a721e139e2864",
+        "b": "aafe45055419f7cd"
       },
       {
-        "a": "4a6ecdc417e8a307",
-        "b": "d9401a3cb4e1add4"
+        "a": "934a721e139e2864",
+        "b": "d3da673df3c3479e"
       },
       {
-        "a": "4a6ecdc417e8a307",
+        "a": "934a721e139e2864",
         "b": "f5317a02f6ff349c"
       },
       {
-        "a": "511b3486f6899c93",
-        "b": "670d27e781215294"
+        "a": "934a721e139e2864",
+        "b": "fac3b79c76189fc8"
       },
       {
-        "a": "511b3486f6899c93",
-        "b": "d9401a3cb4e1add4"
+        "a": "aafe45055419f7cd",
+        "b": "d3da673df3c3479e"
       },
       {
-        "a": "511b3486f6899c93",
+        "a": "aafe45055419f7cd",
         "b": "f5317a02f6ff349c"
       },
       {
-        "a": "670d27e781215294",
-        "b": "d9401a3cb4e1add4"
+        "a": "aafe45055419f7cd",
+        "b": "fac3b79c76189fc8"
       },
       {
-        "a": "670d27e781215294",
+        "a": "d3da673df3c3479e",
         "b": "f5317a02f6ff349c"
       },
       {
-        "a": "d9401a3cb4e1add4",
-        "b": "f5317a02f6ff349c"
+        "a": "d3da673df3c3479e",
+        "b": "fac3b79c76189fc8"
+      },
+      {
+        "a": "f5317a02f6ff349c",
+        "b": "fac3b79c76189fc8"
       }
     ],
     "findings": [],
     "suppressedCompatible": 0
   },
   "splitClusterRefs": [
-    "14f0008129dadba3"
+    "d7b9fb04ac149e3c"
   ],
   "outcome": "override-eligible",
   "anchorRoot": "/Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control"
