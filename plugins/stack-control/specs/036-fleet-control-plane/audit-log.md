@@ -606,3 +606,255 @@ Surface:    tests/fleet/manifest-reconcile.test.ts:125-137
 The test states reconciliation is a backstop that “diffs stored objects against a manifest,” but the present-manifest case only verifies that any manifest object suppresses all orphan reporting. It seeds a manifest containing exactly the event keys and then asserts `orphanedEventKeys` is empty, but it never covers the more important partial-manifest case: event objects exist, a manifest exists, and the manifest omits some event keys.
 
 That omission matters because a truncated or stale manifest is also a lie of omission. Acting on this surface as written lets reconciliation declare the run clean solely because `manifest-1.json` exists, even when listed event objects are absent from the manifest. A reasonable fix is to parse the manifest in the test fixture and assert listed event keys minus manifest event keys are reported as orphaned or otherwise discrepant.
+
+## 2026-07-18 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260718-25 — command-vs-cursor.test.ts asserts FR-058 without ever exercising real implementation code
+
+Finding-ID: AUDIT-20260718-25 (claude-01 + codex-01; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    tests/fleet/command-vs-cursor.test.ts:1-109
+
+Every `it()` block in this file manipulates plain local variables (`let commandState: CommandState = 'delivered'`, `let cursorPosition: string = 'event-100'`) and asserts trivial facts about those local variables — it never calls into any real "cursor vs command state" implementation from `src/`. The only real import, `nextCommandState`, is invoked exactly once, inside a top-level guard clause (`if (typeof nextCommandState !== 'function') throw ...`) whose sole purpose is to force RED at module load if the module is missing — it is never called from inside any test body to prove the independence claim against actual code.
+
+The file's own describe block claims to pin "command state vs cursor position are independent (T060, FR-058)" — a real, load-bearing contract about how the plane's ingest/dispatch layer must NOT infer command application from SSE stream cursor advancement. But nothing here touches `src/plane/http/ingest.ts`, `src/plane/commands/dispatch.ts`, or any SSE cursor-tracking code. A future regression that actually conflates `Last-Event-ID` with command application state in the real implementation would sail through this suite green, because the suite only proves that two independently-declared `let` variables in the test file itself don't alias each other — a tautology. This is exactly the "tests that don't test the contract they claim to test" anti-pattern the review checklist calls out, and it's a false-confidence generator for a genuinely important honesty invariant (FR-058) — a maintainer citing "T060 passes" as evidence the contract holds would be wrong. Fix: either delete this file (if FR-058 is meant to be covered by the real ingest/dispatch integration tests elsewhere in this chunk) or rewrite it to drive the actual cursor-tracking and command-status code paths with a real or realistic fake SSE/command flow.
+
+### AUDIT-20260718-26 — A single malformed /v1/ingest request flips the shared uplink health status to "degraded"
+
+Finding-ID: AUDIT-20260718-26
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/fleet/dogfood.test.ts:349-373 (Scenario 4b, "a severed uplink degrades the uplink hop")
+
+The test sends one intentionally malformed POST to `/v1/ingest` (`{ not: 'a valid telemetry event' }`), gets back a `400`, then queries `/v1/health/store` and asserts `uplink.status === 'degraded'` with a non-empty `lastError`. The test's own comment frames this as proof that "a severed uplink degrades the uplink hop" — but what it actually demonstrates is that ordinary client-side input validation failures (a 400, which is the CORRECT and complete response to a bad request) also corrupt the plane's shared health-reporting surface. Nothing in the flow simulates an actual network partition or storage failure; a single caller sending garbage JSON is sufficient to make `/v1/health/store` report the installation's uplink as unhealthy to every subsequent caller of that endpoint.
+
+This conflates two very different failure classes under one status field: "the uplink transport/infrastructure is broken" (the thing FR-074/C9 promises to honestly report) versus "some client sent a malformed payload" (routine, expected, already handled correctly by the 400 response). The operational blast radius: any misbehaving script, buggy retry, or malicious/careless caller can make the fleet's health dashboard cry wolf about uplink degradation, eroding trust in the exact honesty-under-failure signal this feature exists to provide (per US4 / SC-004-style guarantees elsewhere in this feature). The test doesn't assert the degraded status ever clears, so it's also unclear whether this is a sticky, unbounded false-positive. The health/uplink-degradation logic in `src/plane/health.ts` (not in this chunk) should be checked: a 400 rejected-at-the-boundary request must not be treated as evidence of uplink infrastructure failure; only failures downstream of successful schema validation (actual transport/storage errors) should move the health needle.
+
+### AUDIT-20260718-27 — Command supersession contradicts the command state machine for `delivered`/`received` commands
+
+Finding-ID: AUDIT-20260718-27
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/fleet/command.ts:83-107 (TRANSITIONS table) vs src/fleet/supersession.ts:39-108 (supersedes())
+
+`src/fleet/supersession.ts`'s `supersedes()` treats any **non-terminal** existing command as eligible for supersession — the only guard is `isTerminalCommandState(existing.state)` (supersession.ts:44-46), and `accepted`, `delivered`, and `received` are all non-terminal per `command.ts`'s own `TRANSITIONS` table. This matches the stated spec (data-model.md § Supersession, quoted in the module header): "config-push: a newer revision supersedes an older un-applied one" — "un-applied" spans `accepted`, `delivered`, and `received`, not just `accepted`.
+
+However, `command.ts`'s `TRANSITIONS` table (command.ts:83-107) only permits the `supersede` event from the `accepted` state:
+```
+accepted:  { deliver, reject, supersede, expire }
+delivered: { receive, fail, expire }        // no supersede
+received:  { apply }                         // no supersede
+```
+If a caller (per `src/plane/commands/store.ts`'s own contract at store.ts:73-76 — "the caller... validates legality via `nextCommandState` before calling") correctly determines via `supersedes()` that a `delivered` or `received` command should be superseded (e.g. a second `config-push` with a higher revision arrives while the first is in flight to the sidecar — an entirely ordinary race, not an edge case), and then calls `nextCommandState(existing.state, 'supersede')` to validate the transition before persisting it, that call throws `"illegal transition — event 'supersede' is not permitted from state 'delivered'"`. This is a genuine contradiction between two modules in the same commit that are supposed to agree on when supersession is legal. A fix should either add `supersede` transitions for `delivered`/`received` in `command.ts`'s table (to match the spec's "un-applied" scope), or narrow `supersedes()`'s guard to `existing.state === 'accepted'` if supersession really is meant to be accepted-only (in which case the FR-057/data-model.md language needs updating too, and the currently-undelivered commands would silently proceed to apply against stale config).
+
+### AUDIT-20260718-28 — `src/plane/commands/dispatch.ts` is unreadable in this diff (shown as binary), hiding the exact logic that reconciles the supersession/transition mismatch
+
+Finding-ID: AUDIT-20260718-28
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/plane/commands/dispatch.ts (entire file — diff renders as "Binary files /dev/null and b/src/plane/commands/dispatch.ts differ")
+
+The diff for `src/plane/commands/dispatch.ts` — the file the ledger (T070) describes as "dispatch: hold/replay-on-reconnect, fanout non-atomic" and the file that is architecturally the one place `supersedes()` and `nextCommandState()` (see finding -01) would have to be reconciled — renders as a binary diff rather than text. This means this audit (and any cross-model sibling relying on the same diff payload) cannot verify: (a) whether the `delivered`/`received` supersede gap in finding -01 is actually hit at runtime, (b) whether dispatch.ts bypasses `nextCommandState` validation entirely for supersession (itself a discipline concern, since `store.ts`'s `transition()` explicitly relies on the caller doing that validation), or (c) any other correctness property of the command-dispatch hot path.
+
+A TypeScript source file rendering as "binary" in a git diff is itself worth investigating independently of the supersession question — it usually indicates an embedded null byte, a stray control character, a BOM, or a mixed-encoding artifact in the file. Given the project's own gates report `tsc --noEmit` clean and the full test suite green (T132/T134 in the ledger), the file evidently parses and executes correctly, so this is most likely a tooling/diff-generation artifact rather than actual file corruption — but that can't be confirmed from the material provided, and either way it's a blind spot in this governance pass over exactly the surface most relevant to finding -01. Recommend re-running this audit chunk with dispatch.ts's actual text content included, and separately checking why git considers the file binary.
+
+### AUDIT-20260718-29 — Command acknowledgements never reach or persist in the plane
+
+Finding-ID: AUDIT-20260718-29
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/sidecar/daemon.ts:371-395; src/plane/runtime.ts:466-469; src/plane/commands/dispatch.ts:202-210
+
+The sidecar consumes `event: command` frames and either calls `onCommand` or records the command as undelivered, but it never sends a received/applied/failed acknowledgement back to the plane. The runtime mounts only `/v1/ingest`, `/v1/sidecar/stream`, and `/v1/sidecar/liveness`, so there is also no sidecar-facing acknowledgement route. `CommandDispatch.acknowledge()` exists, but no production path calls it, and it only clears in-memory hold state without persisting `CommandStore.transition()`.
+
+Blast radius is high: shipped as written, an operator can issue a command and see `accepted`, and the sidecar can receive it, but the plane cannot learn or durably report what happened next. Commands remain replayable across reconnects unless a test manually calls `acknowledge()`, and `GET /v1/commands/:id` stays stale except for expiry. A fix should add a real sidecar-to-plane command outcome path and have it validate transitions, call both dispatch acknowledgement and durable store transition, and cover restart visibility.
+
+### AUDIT-20260718-30 — High-water reservations are not crash-durable
+
+Finding-ID: AUDIT-20260718-30
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/machine-state/highwater.ts:229-233; src/machine-state/highwater.ts:390-403
+
+`writeHighWaterMarkAtomic()` writes JSON with `writeFileSync()` and renames the temp file over the durable mark, but it never fsyncs the temp file or the containing directory. `reserveNextSequence()` then returns the reserved sequence after that non-fsynced write. A crash after the caller emits an event but before the filesystem commits the rename can roll the high-water mark back, allowing the restarted sidecar to reserve and emit a duplicate `installationSequence`.
+
+Blast radius is high because this file is the single durability boundary for FR-039/R-02 sequencing. The comments promise the reserved value is persisted before return, but the implementation does not provide the same crash-safety discipline used in `commands/store.ts`. A fix should write through an fd, fsync it, rename, and fsync the durable directory before returning the reserved sequence.
+
+### AUDIT-20260718-31 — The read-idle watchdog never closes the stalled connection — a "timed-out" SSE stream can resurrect and deliver duplicate events
+
+Finding-ID: AUDIT-20260718-31
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=unstated, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    src/sidecar/uplink/sse-client.ts:243-260 (`startWatchdog`), :279-303 (`run`'s for-await loop)
+
+`startWatchdog()`'s `setInterval` callback, on detecting `readIdleMs` elapsed, does:
+```js
+fired = true;
+clearWatchdog();
+opts.onReadIdleTimeout();
+fireClosed('idle-timeout');
+```
+It never calls `connection?.close()`. Meanwhile the `for await (const chunk of conn.chunks)` loop in `run()` is still awaiting the next chunk from the transport and has no dependency on `fired` or `stopped` being set by the watchdog — it only checks `stopped` (set solely by the public `stop()` method). So when the watchdog fires, the underlying transport connection (e.g. the `fetch` request in `FetchSseTransport`) is left open. If the "dead" peer later resumes sending data (a slow-but-not-actually-dead link, or a proxy that buffers), the for-await loop wakes up, calls `rearm()` and `opts.onEvent(...)` for every subsequent frame — even though the caller was already told via `onReadIdleTimeout`/`onClosed('idle-timeout')` that this connection ended and, per the documented C4 reconnect contract, has presumably already started a fresh connection with backoff.
+
+The consequence: two live connections deliver the same logical event stream, producing duplicate `onEvent` callbacks (duplicate telemetry ingested by the plane) and a leaked socket/fetch request that is never torn down — exactly the failure category Phase 8 US6 ("hostile-network uplink") exists to harden against. The fix is for the watchdog's fire handler to call `connection?.close()` (mirroring what `stop()` does) so the abandoned connection is actually torn down and its `for await` loop unwinds via the `AbortError`-swallowing catch already in place.
+
+### AUDIT-20260718-32 — `armReconnect()` is only wired into one of four `markUnavailable()` call sites — the AUDIT-20260718-11 fix silently drops the final buffered event on 3 of 4 failure paths
+
+Finding-ID: AUDIT-20260718-32
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    src/telemetry/emit.ts:227-233 (`beginConnect` catch), :246 (socket `'error'` handler), :383-390 (`writeRaw` catch), vs :302-309 (`onData`'s mismatch branch, correctly wired) and :319-332 (`onClose`)
+
+`markUnavailable()` is called from four places: (1) `beginConnect()`'s synchronous `createConnection` catch, (2) the socket `'error'` listener, (3) `writeRaw()`'s catch, and (4) `onData()`'s version-mismatch branch. Only site (4) follows `markUnavailable()` with an explicit `this.armReconnect()` call (line 309, with a comment explicitly citing AUDIT-20260718-11's rationale: "otherwise they sit until another emit() arrives, which for a long-run command that already emitted its FINAL event is never"). Sites (1)-(3) rely on the subsequent socket `'close'` event to reach `onClose()`, which calls `armReconnect()` — but `onClose()` opens with:
+```js
+if (this.stateValue === 'closed' || this.stateValue === 'unavailable') { return; }
+```
+Since `markUnavailable()` already set `stateValue = 'unavailable'` synchronously before the socket's `'close'` event can fire (Node emits `'error'` strictly before `'close'`), `onClose()`'s guard always short-circuits for these three paths, so `armReconnect()` is never invoked.
+
+Practical effect: for a `'long-run'` caller (`execute`/`govern`), if the sidecar connection fails via a connect error (sidecar not yet up), a mid-stream socket error, or a write error — rather than a version mismatch or a clean post-connect stream end — any event buffered at that moment is retained in `EventBuffer` but no background reconnect is armed. If no further `emit()` call happens (the exact "last event before `close()`" scenario the AUDIT-20260718-11 comment names as the motivating case), `close()` runs immediately afterward, `flushAndDestroySocket()` sees `this.socket === undefined` (already cleared by `destroySocket()`) and no-ops, and the buffered final event is silently dropped — precisely the defect AUDIT-20260718-11 claims to have fixed, just reachable via three of its four trigger paths. Per the round-0 self-red-team driver, this fix diff should be treated as a fresh surface: it resolved the one path it was tested against (mismatch) while leaving the more common paths (plain connect/write failure) unfixed. Fix: call `this.armReconnect()` at the end of `markUnavailable()` itself (once, guarded the same way it already avoids double-invocation), rather than only at call site (4).
+
+### AUDIT-20260718-33 — Read-idle timeout leaves the stale SSE socket alive
+
+Finding-ID: AUDIT-20260718-33
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/sidecar/uplink/sse-client.ts:222-237, src/sidecar/uplink/sse-client.ts:287-293
+
+The watchdog fires `onReadIdleTimeout()` and `onClosed('idle-timeout')`, but it does not close the active `SseConnection`, mark the client stopped, or otherwise break the `for await (const chunk of conn.chunks)` loop. A stalled TCP/SSE connection can therefore remain open indefinitely after the reconnect driver has been told to establish a replacement. If bytes eventually arrive on the old stream, the loop can still call `opts.onEvent(...)` because `stopped` remains false.
+
+Blast radius is high: under hostile-network behavior, one timed-out stream can leak sockets and continue delivering stale commands/events after a replacement connection exists. A reasonable correction is to close the current connection and prevent later event delivery when the idle timeout fires.
+
+### AUDIT-20260718-34 — `sidecar run` ignores configured plane URL
+
+Finding-ID: AUDIT-20260718-34
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/sidecar.ts:10-16, src/subcommands/sidecar.ts:80-84
+
+The front door only passes `--plane-url` into `runSidecarDaemon`; otherwise the daemon falls back to `STACKCTL_CP_URL`. The file explicitly states config-file `plane.url` is not parsed, so an installation with a configured plane URL but no env var or flag cannot use the canonical `sidecar run` path.
+
+Blast radius is high because this is operator-facing configuration: the feature already added plane settings to installation config, but the runnable sidecar path does not honor them. The correction should make config parsing and precedence executable, with `--plane-url` overriding env/config and env overriding config.
+
+### AUDIT-20260718-35 — `plane serve` can authenticate only one installation token
+
+Finding-ID: AUDIT-20260718-35
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    src/subcommands/plane.ts:175-197
+
+`plane serve` accepts a single `--token` and maps it to `mintOrReadInstallationId(process.cwd())` via `acceptedTokens: new Map([[token, installationId]])`. That means the runnable plane cannot accept distinct tokens for multiple installations. If every sidecar shares that one token, their auth resolves to the plane host’s installation ID; if each sidecar uses its own provisioned token, all but one are refused.
+
+Blast radius is high because this breaks the “fleet” control plane at the authentication boundary. The runtime already accepts a token-to-installation map; the CLI should load that map from an operator-controlled registry instead of collapsing the served fleet to one token and one installation ID.
+
+### AUDIT-20260718-36 — `isPermanentRejection` classifies auth failures (401/403) as permanent, causing irrecoverable telemetry loss
+
+Finding-ID: AUDIT-20260718-36 (claude-01 + codex-02; cross-model)
+Status:     open
+Severity:   high
+Per-lane:   claude=high, codex=high
+Decision:   agreement (gate-counted high)
+Surface:    src/sidecar/daemon.ts — `isPermanentRejection` (~line 165) and its use in `drainTick`
+
+```ts
+function isPermanentRejection(status: number): boolean {
+  if (status < 400 || status >= 500) return false;
+  if (status === 408 || status === 429) return false;
+  return true;
+}
+```
+
+`isPermanentRejection` classifies every 4xx status except 408/429 as permanent, and `drainTick` acts on that: for a permanent rejection it calls `recordDroppedRecord(...)` and advances `drainCursor` past the record, permanently discarding it from the WAL's replay set (`drainWal.replay()` will still return it on the next tick, but `record.sequence <= drainCursor` causes it to be skipped forever). This means a bearer-token auth failure — `401` (missing/unknown token) or `403`, per `src/plane/http/auth.ts`'s `AuthOutcome` reasons `'missing' | 'unknown' | 'revoked'` returned by the plane's `withAuth` guard (`src/plane/runtime.ts`) — is treated exactly like a genuinely-malformed, byte-identical-will-always-fail payload (the classification-downgrade guard in `src/plane/http/ingest.ts` is the documented motivating case for "permanent").
+
+But an auth failure is not a fact about the payload — it's a fact about credentials. The module's own reasoning for permanence ("the payload replays byte-identical so it is skipped rather than retried") does not apply: retrying the *same* record after the token is corrected (operator fixes a plane restart's `--token` seed mismatch, rotates a revoked token, or the plane finishes booting its token registry) would succeed. As written, any window where the plane briefly rejects a valid sidecar's bearer (plane restarted with a different `--token` argument, a race during plane startup, an operator credential rotation) causes every currently-spooled WAL record to be silently discarded (logged to stderr only) rather than retried — a direct violation of the feature's own at-least-once/durability promise (FR-049, the "spool now, transmit when the plane is reachable" posture documented in this same file's header). The fix is to treat 401/403 as transient (back off and retry, mirroring 408/429) rather than lumping them into the byte-identical-payload-rejection bucket.
+
+### AUDIT-20260718-37 — Accepted events can be lost when the durable append fails
+
+Finding-ID: AUDIT-20260718-37
+Status:     open
+Severity:   blocking
+Per-lane:   codex=blocking
+Decision:   single-model (gate-counted blocking)
+Surface:    src/plane/runtime.ts:414-433, src/plane/http/ingest.ts:270-350
+
+`ingestHandler` calls `ingestEvent(...)` before `eventLog.append(...)`, but `ingestEvent` mutates `ingestState` as part of deciding the outcome: it records the `eventId` in `seenEventIds` and advances per-run high-water/finalization state. If `eventLog.append(outcome.event)` then throws, the handler returns 400 and does not push to `events`, but the in-memory ingest state has already marked the event as seen/applied.
+
+On retry, the same event can be classified as `duplicate` or `stale`, the handler responds 200 for that non-accepted outcome, and the event is still never appended to the durable log or admitted to the live registry. That directly breaks the comment and contract in `runtime.ts:419-428` that durability happens before the 200 and before live admission. Blast radius is blocking because a sidecar can be told an event was not accepted, retry it, then receive a 200 for an event the plane never durably recorded.
+
+A reasonable fix is to separate ingest decision from ingest-state mutation, or make accepted-state mutation commit only after `eventLog.append` succeeds. The durable append must be the first irreversible step for accepted events.
+
+### AUDIT-20260718-38 — Missing coverage for the actual highest-risk crash scenario: torn/partial writes mid-append
+
+Finding-ID: AUDIT-20260718-38
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/fleet/wal-crash.test.ts:52-124
+
+Both `it()` blocks in this file only simulate a "crash" *after* every `append()` call has already resolved (`await beforeCrash.append(...)` completes for all three records before the handle is abandoned; same pattern in the second test). Per the file's own contract comment, the WAL's whole reason for existing is fsync-before-ack durability under a `SIGKILL`, which — per R-03/PT-003 as cited in the header comment — can interrupt a process at *any* point, including mid-write-syscall, mid-fsync, or mid-frame (e.g., a length-prefixed or newline-delimited record only partially flushed to disk). This file, despite being named `wal-crash.test.ts` and carrying the crash-safety contract in its header, never exercises that scenario: it never kills the process (or aborts a write) while an `append()` is in flight, so replay-after-torn-write behavior (does `replay()` skip the truncated trailing record cleanly, or does it throw/corrupt subsequent records?) is completely unspecified and unverified.
+
+The blast radius: an implementer (or an unattended agent building `src/sidecar/spool/wal.ts` from this test alone) will reasonably conclude "crash safety is proven" once these two tests pass, because the file's name and header comment claim exactly that. In production, a real `SIGKILL` arriving mid-write (not just between two completed appends) is the actual common case the WAL exists to survive, and it is untested. A reasonable fix is to add a case that truncates the on-disk WAL file/segment by some number of trailing bytes (simulating a torn write) before opening a fresh handle, and assert `replay()` either recovers all fully-written prior records and cleanly drops the trailing partial one, or documents/asserts the specific error behavior — rather than leaving this the one truly unverified path in a "-crash" test suite.
+
+### AUDIT-20260718-39 — WAL crash test models process death with concurrent live handles
+
+Finding-ID: AUDIT-20260718-39
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/fleet/wal-crash.test.ts:83-93, tests/fleet/wal-crash.test.ts:108-116
+
+The test claims to model `SIGKILL`, but it leaves the pre-crash `WalHandle` alive in the same process and immediately opens another handle over the same directory. A real `SIGKILL` releases process file descriptors and advisory locks; this test instead requires the WAL implementation to tolerate two simultaneously live handles for one spool directory.
+
+That is a meaningful contract distortion. A correct WAL may reasonably use an exclusive lock or single-writer invariant to prevent concurrent sidecars from corrupting the spool. Acting on this test as written could push an unattended implementer to weaken that invariant just to satisfy the test. The blast radius is high because the test can reject a safer implementation or encourage multi-writer behavior on a persistence surface.
+
+A better test shape would run the writer in a child process and kill it, or use an implementation-supported crash-test hook that simulates process termination while releasing OS resources before reopening the WAL.
+
+### AUDIT-20260718-40 — manifest-reconcile.test.ts never exercises a multi-revision manifest — could silently repeat the R-01 sort-order defect the manifest mechanism exists to avoid
+
+Finding-ID: AUDIT-20260718-40
+Status:     open
+Severity:   high
+Per-lane:   claude=high
+Decision:   adjudicated (gate-counted high) — blast-radius=high, reachability=unstated, fix-debt=no; no down-calibration signal — high retained.
+Surface:    tests/fleet/manifest-reconcile.test.ts:1-194 (specifically the hardcoded key `runs/${installationId}/${runId}/manifest-1.json` at lines ~140, ~152, ~176)
+
+Every test case in this file seeds at most **one** manifest object, always at the literal, hand-typed key `manifest-1.json`. There is no exported/tested key-construction helper for manifests analogous to `eventObjectKey` (pinned by `tests/fleet/object-key.test.ts`) or `derivedObjectKey` (pinned by `tests/fleet/late-event.test.ts`) — both of which this same feature already had to FIX once for exactly this class of bug: research.md's R-01 documents that an *unpadded* sequence number in an object key "does not sort" (`10-` sorts before `2-` lexicographically), and the fix was to zero-pad. The manifest key is also described as revision-numbered ("data-model.md § Derived artifact: revision lives in the key"), and per the AUDIT-20260718-24 fix comment in this very file, manifests must reflect the *latest* content-complete state of a run (they are declared to be rewritten as new events are archived, since objects are never mutated per FR-066).
+
+If the real manifest key format is `manifest-{revision}.json` with an **unpadded** revision (mirroring the test's own `manifest-1.json` literal), and `reconcileRun` must find "the latest" manifest via a bucket `listObjects` + string sort (the same mechanism `eventObjectKey` needed zero-padding to fix), then once a run accumulates more than 9 manifest revisions, reconciliation could pick the wrong (stale, incomplete) manifest as "the" manifest, under-report orphaned events, and silently declare a run's history complete when it isn't — exactly the "lie of omission" this whole mechanism (R-04/PT-004) was built to catch. None of the four test cases here ever seed more than one manifest revision, so this defect class — already proven to occur once in this same feature — has zero coverage on the reconciliation backstop specifically. A reasonable fix is to add a case with ≥10 manifest revisions (crossing the digit-count boundary, exactly as `tests/fleet/object-key.test.ts` does for event keys) and assert `reconcileRun` selects the correct latest one.
+
+### AUDIT-20260718-41 — Static import walker misses bare side-effect imports
+
+Finding-ID: AUDIT-20260718-41
+Status:     open
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    tests/fleet/no-creds-in-cli.test.ts:71-89
+
+The hardened credential-boundary guard claims it walks “every relative `.js`/`.ts` import” from `src/telemetry/emit.ts`, but `RELATIVE_IMPORT_RE` only matches `from ...`, `require(...)`, and dynamic `import(...)`. It does not match valid bare side-effect imports like `import '../machine-state/token.js';`. That means a credential module could still load into the CLI emit process through a side-effect import and the test at lines 168-187 would pass.
+
+Blast radius is high because this test is meant to close a prior credential-custody finding. A downstream agent could rely on it as proof that the emit graph is credential-free while an actual static import channel remains unchecked. The self-check at lines 136-165 only exercises `import { ... } from`, so it does not prove the missing channel is covered. A reasonable fix is to include bare static imports in the parser and add a self-check fixture with `import './token-like.js';`.
