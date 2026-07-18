@@ -105,5 +105,20 @@ describe('command idempotence — re-delivery is harmless (T062, FR-054)', () =>
     // not weaken the state machine's real protocol guard) — e.g. apply from
     // 'accepted' skips delivered/received.
     expect(() => nextCommandState('accepted', 'apply')).toThrow();
+
+    // AUDIT-20260718-21: pin the "illegal transitions still throw under replay"
+    // claim against `observeCommandReplay` ITSELF, not just `nextCommandState`.
+    // From a LIVE (non-terminal) state, an illegal event must throw — otherwise
+    // a blanket try/catch that swallowed everything and returned the input state
+    // (a natural over-generalization of "replay is harmless") would pass this
+    // whole file while silently no-op'ing a real out-of-order live command.
+    // `apply` from 'accepted' skips delivered/received:
+    expect(() => observeCommandReplay('accepted', 'apply')).toThrow();
+    // `receive` from 'accepted' skips delivered:
+    expect(() => observeCommandReplay('accepted', 'receive')).toThrow();
+    // `apply` from 'delivered' skips received:
+    expect(() => observeCommandReplay('delivered', 'apply')).toThrow();
+    // `deliver` again from 'received' is not a legal live edge:
+    expect(() => observeCommandReplay('received', 'deliver')).toThrow();
   });
 });

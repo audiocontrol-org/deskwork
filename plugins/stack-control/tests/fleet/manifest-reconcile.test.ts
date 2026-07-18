@@ -15,7 +15,7 @@
  *   never mutated and never purged; the port itself (`src/storage/port.ts`,
  *   T008) has no delete method at all — "never deletes" is partly
  *   structural (the capability doesn't exist to call) and this test
- *   additionally proves reconciliation is READ-ONLY (it never even PUTs).
+ *   additionally proves reconciliation is READ-ONLY (it never PUTs).
  *
  * Manifest writes happen STRICTLY AFTER event PUTs ack (T097). If the
  * manifest write itself is lost (process dies between the last event PUT
@@ -25,6 +25,13 @@
  * notice. This test proves the LISTING backstop is the one thing that
  * catches it: given event objects on disk and NO manifest, reconciliation
  * (by listing the bucket) rediscovers the orphaned event objects.
+ *
+ * AUDIT-20260718-24: manifest PRESENCE alone is not proof of a complete
+ * record — a truncated or stale manifest write is its own lie of
+ * omission. The backstop must genuinely diff what the manifest DECLARES
+ * (its `eventKeys` field) against what listing actually finds on disk;
+ * this file also covers that partial-manifest case, distinct from the
+ * total-loss (no manifest at all) case above.
  *
  * RED: `src/plane/archive/reconcile.ts` does not exist yet — the VALUE
  * import below fails at module-load (module-not-found), the correct
@@ -122,10 +129,11 @@ describe('manifest-reconcile backstop (T095, research § R-04/PT-004)', () => {
     expect([...report.orphanedEventKeys].sort()).toEqual([...eventKeys].sort());
   });
 
-  it('a PRESENT manifest means nothing is orphaned — the backstop only signals when the write was actually lost', async () => {
+  it('a PRESENT and COMPLETE manifest means nothing is orphaned — the backstop diffs manifest CONTENTS against the listed events, and a full manifest diffs clean', async () => {
     const store = new RecordingObjectStore();
     const eventKeys = await seedEventsWithoutManifest(store);
-    // The manifest write that DID succeed this time.
+    // The manifest write that DID succeed this time, and DOES declare
+    // every event key that was actually written.
     await store.putObject({
       key: `runs/${installationId}/${runId}/manifest-1.json`,
       body: encoder.encode(JSON.stringify({ revision: 1, eventKeys })),
@@ -137,7 +145,38 @@ describe('manifest-reconcile backstop (T095, research § R-04/PT-004)', () => {
     expect(report.orphanedEventKeys).toEqual([]);
   });
 
-  it('the backstop is READ-ONLY and off the hot path: it lists, but never GETs a body and never PUTs — it never deletes (the port has no delete method to call)', async () => {
+  it('a manifest that OMITS some event keys reports exactly those omitted keys as orphaned — mere PRESENCE of a manifest is not enough; the backstop must diff its declared contents (AUDIT-20260718-24)', async () => {
+    const store = new RecordingObjectStore();
+    const eventKeys = await seedEventsWithoutManifest(store);
+    const [firstEventKey, secondEventKey, thirdEventKey] = eventKeys;
+
+    // A truncated/stale manifest write: the manifest object EXISTS, but it
+    // only declares two of the three event keys that were actually
+    // archived. This is the "lie of omission" AUDIT-20260718-24 names —
+    // acting on manifest PRESENCE alone would wrongly call this run fully
+    // documented. Genuine content-diffing must catch the gap.
+    await store.putObject({
+      key: `runs/${installationId}/${runId}/manifest-1.json`,
+      body: encoder.encode(
+        JSON.stringify({ revision: 1, eventKeys: [firstEventKey, secondEventKey] }),
+      ),
+    });
+    store.resetCounts();
+
+    const report = await reconcileRun({ store }, { installationId, runId });
+
+    expect(report.manifestFound).toBe(true);
+    expect(report.orphanedEventKeys).toEqual([thirdEventKey]);
+    // Mechanical evidence this is a real content diff, not a presence
+    // check: reconciliation reads the (single, small) manifest body to
+    // learn what it declares — one GET, for the manifest only — but still
+    // never GETs an event body and never PUTs anything.
+    expect(store.listCalls).toBeGreaterThanOrEqual(1);
+    expect(store.getCalls).toBe(1);
+    expect(store.putCalls).toBe(0);
+  });
+
+  it('the backstop is READ-ONLY and off the hot path when the manifest write was lost: it lists, but never GETs a body (there is no manifest to read) and never PUTs — it never deletes (the port has no delete method to call)', async () => {
     const store = new RecordingObjectStore();
     await seedEventsWithoutManifest(store);
     store.resetCounts(); // isolate reconcileRun's OWN calls from setup writes

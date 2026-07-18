@@ -78,7 +78,7 @@ describe('fleet-wide command holds every reachable target independently (AUDIT-2
     }
   });
 
-  it('a terminal ack on a fleet target does not resurrect it, and the other target still replays', async () => {
+  it('a terminal ack on ONE fleet target settles only that target — the other still replays (AUDIT-20260718-18/-20/-22, FR-062)', async () => {
     const dir = makeStoreDir();
     try {
       const store = createCommandStore(dir);
@@ -90,21 +90,38 @@ describe('fleet-wide command holds every reachable target independently (AUDIT-2
       const result = await issueFleetCommand(
         store,
         dispatch,
-        { kind: 'pause', installationId: 'fleet', runId: null },
+        { kind: 'cancel', installationId: 'fleet', runId: null },
         [targetA, targetB],
         () => true,
       );
 
-      // Acknowledge the command terminally. The remaining still-held targets
-      // for this commandId end (a single ack reaches the command's terminal
-      // state); neither target replays a terminal command.
-      dispatch.acknowledge(result.commandId, 'applied');
+      // Both targets hold the fan-out command before any ack.
+      expect(dispatch.replayOnReconnect(targetA).some((h) => h.commandId === result.commandId)).toBe(
+        true,
+      );
+      expect(dispatch.replayOnReconnect(targetB).some((h) => h.commandId === result.commandId)).toBe(
+        true,
+      );
+
+      // Target A acknowledges terminally. Fan-out is NEVER atomic (FR-062): A's
+      // ack settles ONLY A's hold. B — still offline, having never received the
+      // cancel — MUST still replay it on its own reconnect. Before the
+      // target-scoped ack (AUDIT-20260718-18/-22) A's ack silently cleared B's
+      // hold too, so B would never receive the cancel (the worst failure the
+      // design names for a `cancel`).
+      dispatch.acknowledge(result.commandId, targetA, 'applied');
+
       expect(dispatch.replayOnReconnect(targetA).some((h) => h.commandId === result.commandId)).toBe(
         false,
       );
       expect(dispatch.replayOnReconnect(targetB).some((h) => h.commandId === result.commandId)).toBe(
-        false,
+        true,
       );
+      // B's still-live hold carries B's OWN installationId — independent state.
+      expect(
+        dispatch.replayOnReconnect(targetB).find((h) => h.commandId === result.commandId)
+          ?.installationId,
+      ).toBe(targetB);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

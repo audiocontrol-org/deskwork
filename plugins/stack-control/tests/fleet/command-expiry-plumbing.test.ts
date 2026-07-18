@@ -63,13 +63,23 @@ describe('command expiry is plumbed end-to-end (AUDIT-20260717-09, FR-055/C7)', 
       // The TTL actually reached the held delivery state (not dropped to null).
       expect(beforeExpiry.find((h) => h.commandId === commandId)?.expiresAt).toBe(expiresAt);
 
+      // Before expiry the durable status is still `accepted`.
+      expect(store.get(commandId)?.state).toBe('accepted');
+
       // Advance the clock past the TTL.
       clockMs = base + 2000;
 
-      // After expiry: the command is a visible terminal 'expired' — no longer
-      // replayed on reconnect. This is what keeps held state bounded.
+      // After expiry: the command is a VISIBLE terminal 'expired' — no longer
+      // replayed on reconnect. This keeps held state bounded.
       const afterExpiry = dispatch.replayOnReconnect(installationId);
       expect(afterExpiry.some((h) => h.commandId === commandId)).toBe(false);
+
+      // AUDIT-20260718-23: "not replayed" is not enough — the durable/queryable
+      // status must ANNOUNCE the expiry, not silently stay `accepted`. This
+      // command was accepted with a TTL and never delivered; on expiry its
+      // durable record transitions to `expired` so `commandStatus` /
+      // `GET /v1/commands/:id` report the terminal state honestly.
+      expect(store.get(commandId)?.state).toBe('expired');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

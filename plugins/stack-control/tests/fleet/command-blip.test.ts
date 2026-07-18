@@ -58,7 +58,7 @@
 //      * A command acknowledged as a terminal state (`applied`, `failed`,
 //      * `rejected`, `expired`, `superseded`) is no longer held — it must
 //      * not be replayed on a LATER reconnect. */
-//     acknowledge(commandId: string, state: CommandState): void;
+//     acknowledge(commandId: string, installationId: string, state: CommandState): void;
 //   }
 //
 //   export function createCommandDispatch(store: CommandStore): CommandDispatch;
@@ -159,7 +159,7 @@ describe('command dispatch: cancel during a network blip is applied on reconnect
       dispatch.onDisconnect(installationId);
       const firstReplay = dispatch.replayOnReconnect(installationId);
       expect(firstReplay.some((held) => held.commandId === commandId)).toBe(true);
-      dispatch.acknowledge(commandId, 'applied');
+      dispatch.acknowledge(commandId, installationId, 'applied');
 
       // A SECOND blip + reconnect for the same installation must NOT
       // replay the now-applied cancel — an already-terminal command

@@ -15,51 +15,38 @@
  * convert an observability outage into a total tool outage, exactly the harm
  * forbidden). This silence is correct ONLY here, ONLY for the telemetry path.
  *
- * THE ASYNC MODEL — how every rule below is guaranteed by construction:
+ * THE ASYNC MODEL — how every rule is guaranteed by construction:
  *
  *   - `emit()` is SYNCHRONOUS and returns `void`. There is no Promise a caller
  *     could `await`, so the mistake C1 forbids (blocking the invocation on
- *     socket state) is UNWRITABLE by callers, not merely undocumented —
- *     mirroring `spawnDetachedSidecar`'s `void` fire-and-forget shape.
- *   - The client NEVER awaits a connect, a write flush, or a peer reply. The
- *     socket lifecycle is entirely event-driven (`connect` / `data` / `error`
- *     / `close`); `emit()` inspects the CURRENT connection state and either
- *     writes now (connected) or holds-per-C4 (not connected) — it never blocks
- *     to change that state.
- *   - CONNECT FAILS INSTANTLY on absence: `createConnection` to a missing UDS
- *     inode (ENOENT) or a listener-less one (ECONNREFUSED) fires `error` on the
- *     next tick — never a hang. The `error` handler swallows it (fail-open) and
- *     routes future events to the buffer + triggers a spawn seam for NEXT time.
- *   - A STALLED PEER CANNOT BLOCK: we never read-then-wait. On `connect` we
- *     write `hello` + drain the buffer, all fire-and-forget. A peer that
- *     accepts then goes silent forever holds an open socket — but the socket is
- *     `unref()`d, so it NEVER keeps the process alive nor delays its exit, and
- *     nothing in `emit()` is waiting on a reply (T032).
- *   - The client talks ONLY to the LOCAL socket, NEVER the WAN/plane. There is
- *     no timeout constant because there is no wait (contracts/local-socket-
- *     protocol.md § C1: "A timeout implies waiting; the CLI never waits").
+ *     socket state) is UNWRITABLE, mirroring `spawnDetachedSidecar`'s `void`.
+ *   - The client NEVER awaits a connect, write flush, or peer reply. The socket
+ *     lifecycle is entirely event-driven (`connect`/`data`/`error`/`close`);
+ *     `emit()` inspects the CURRENT state and either writes now (connected) or
+ *     holds-per-C4 (not connected) — it never blocks to change that state.
+ *   - CONNECT FAILS INSTANTLY on absence: `createConnection` to a missing/
+ *     listener-less UDS fires `error` on the next tick (ENOENT/ECONNREFUSED),
+ *     never a hang. The `error` handler swallows it (fail-open), buffers future
+ *     events, and triggers a spawn seam for NEXT time.
+ *   - A STALLED PEER CANNOT BLOCK: nothing reads-then-waits. On `connect` we
+ *     write `hello` + drain the buffer, fire-and-forget. The socket is
+ *     `unref()`d, so a silent peer never keeps the process alive (T032).
+ *   - The client talks ONLY to the LOCAL socket, NEVER the WAN/plane. Its only
+ *     timers (`RECONNECT_DELAY_MS`, `CLOSE_FLUSH_GRACE_MS`) are `unref()`d
+ *     background schedules — never a synchronous wait the invocation blocks on.
  *
- * BUFFERING ASYMMETRY (C4/FR-007) is delegated WHOLESALE to `buffer.ts`
- * (T040): a `'short-verb'` buffer DROPS on a not-connected socket; a
- * `'long-run'` buffer holds a bounded FIFO to cover a sidecar restart gap.
- * This client only decides WHEN to push (whenever it cannot write right now)
- * and drains on (re)connect — it does not re-implement the drop-vs-bound
- * policy.
+ * BUFFERING ASYMMETRY (C4/FR-007) is delegated WHOLESALE to `buffer.ts` (T040):
+ * a `'short-verb'` buffer DROPS on a not-connected socket; a `'long-run'` buffer
+ * holds a bounded FIFO across a restart gap. This client only decides WHEN to
+ * push and drains on (re)connect — it does not re-implement the drop-vs-bound
+ * policy. EVERY failure path is silent + non-blocking.
  *
- * EVERY FAILURE PATH IS SILENT + NON-BLOCKING: `emit`, the socket handlers,
- * the write path, the spawn seam, and the response reader are each wrapped so
- * that no throw and no rejected promise can ever reach the invocation.
+ * SCOPE: the emit client ONLY — not the CLI dispatcher (T044), the sidecar
+ * listener/spool/plane, nor the spawn command (the `onSocketUnavailable` seam).
+ * It imports the protocol (T038), buffer (T040), and `locateMachineState` (T024).
  *
- * SCOPE (per the task pairing): the emit client ONLY. It does NOT wire itself
- * into the CLI dispatcher (`src/cli.ts`, T044), does NOT implement the sidecar
- * listener / spool / plane, and does NOT decide the spawn command/args (that is
- * the dispatcher's knowledge — see the `onSocketUnavailable` seam). It IMPORTS
- * the protocol (T038), the buffer (T040), and `locateMachineState` (T024, via
- * `resolveLocalSocketPath`); it re-implements none of them.
- *
- * No `any`, no `as`, no `@ts-ignore` (Constitution Principle VI). Relative
- * `.js` imports under node16 resolution (no `@/` alias configured for this
- * plugin). File under the 300-500 line cap.
+ * No `any`, no `as`, no `@ts-ignore` (Constitution Principle VI). Relative `.js`
+ * imports under node16 resolution. File under the 500-line cap.
  */
 
 import { createConnection, type Socket } from 'node:net';
@@ -89,6 +76,17 @@ import {
  *   closed      — `close()` was called; a terminal, do-nothing state.
  */
 export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'unavailable' | 'closed';
+
+/** Delay before an armed background reconnect fires after a connection carrying
+ * retained events was torn down (AUDIT-20260718-11) — small enough to drain
+ * promptly to a restarted sidecar, bounded so a persistently-incompatible peer
+ * is retried at a rate rather than a tight spin. `unref()`d. */
+const RECONNECT_DELAY_MS = 25;
+
+/** Cap on how long `close()`'s flush lingers before a force-destroy
+ * (AUDIT-20260718-09) — generous vs a real local flush (never truncates it),
+ * bounding only a never-draining peer's fd linger. `unref()`d. */
+const CLOSE_FLUSH_GRACE_MS = 1_000;
 
 /** Configuration for one emit client. A single `stackctl` process is a single
  * `CallerKind` (a short verb OR a long commandable run), so the kind is fixed
@@ -153,6 +151,10 @@ class FailOpenEmitClient implements EmitClient {
    * a matching `hello-ack` confirms delivery to a compatible peer.
    */
   private unconfirmed: TelemetryEvent[] = [];
+  /** A background reconnect armed after a connection carrying retained events was
+   * torn down (AUDIT-20260718-11), draining them to a compatible sidecar without
+   * another `emit()`. `unref()`d; cleared on (re)connect and `close()`. */
+  private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly config: EmitClientConfig) {
     this.localVersion = config.localVersion ?? LOCAL_PROTOCOL_VERSION;
@@ -202,7 +204,12 @@ class FailOpenEmitClient implements EmitClient {
 
   close(): void {
     this.stateValue = 'closed';
-    this.destroySocket();
+    this.clearReconnect();
+    // FLUSH pending writes before the socket goes away (AUDIT-20260718-09): the
+    // caller (`invocation-telemetry.ts`) emits its ONLY event then calls close()
+    // in the same synchronous tick, so a bare `destroy()` here would discard that
+    // event's still-buffered bytes and silently violate FR-012.
+    this.flushAndDestroySocket();
   }
 
   // --- connection lifecycle (all event-driven; nothing here is awaited) -----
@@ -245,6 +252,7 @@ class FailOpenEmitClient implements EmitClient {
       return;
     }
     this.stateValue = 'connected';
+    this.clearReconnect();
     this.handshakeConfirmed = false;
     this.unconfirmed = [];
     // Handshake: send `hello` first (C3). We do NOT await the `hello-ack`;
@@ -281,6 +289,11 @@ class FailOpenEmitClient implements EmitClient {
           // this connection and trigger the spawn — fire-and-forget, the
           // invocation is NEVER failed.
           this.markUnavailable();
+          // Arm a reconnect so retained events DRAIN to the restarted/upgraded
+          // compatible sidecar — otherwise they sit until another emit() arrives,
+          // which for a long-run command that already emitted its FINAL event is
+          // never (AUDIT-20260718-11).
+          this.armReconnect();
           return;
         }
         // A matching `hello-ack`: the provisional events reached a compatible
@@ -305,6 +318,40 @@ class FailOpenEmitClient implements EmitClient {
     this.stateValue = 'unavailable';
     this.socket = undefined;
     this.readBuffer = '';
+    // The sidecar restarted — arm a reconnect so retained long-run events drain
+    // to its successor without waiting for another emit() (AUDIT-20260718-11).
+    this.armReconnect();
+  }
+
+  /**
+   * Schedule a single background reconnect (AUDIT-20260718-11). Gated to fire only
+   * while `unavailable`, only when the buffer holds retained events (a short-verb
+   * buffer drops, so this no-ops for short verbs and never hammers an absent
+   * sidecar with nothing buffered), and at most one timer in flight. `unref()`d.
+   */
+  private armReconnect(): void {
+    if (this.stateValue !== 'unavailable') {
+      return;
+    }
+    if (this.buffer.size === 0 || this.reconnectTimer !== undefined) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      this.reconnectTimer = undefined;
+      if (this.stateValue === 'unavailable' && this.buffer.size > 0) {
+        this.beginConnect();
+      }
+    }, RECONNECT_DELAY_MS);
+    timer.unref();
+    this.reconnectTimer = timer;
+  }
+
+  /** Cancel any armed reconnect (on (re)connect or on close). */
+  private clearReconnect(): void {
+    if (this.reconnectTimer !== undefined) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
   }
 
   /**
@@ -383,6 +430,51 @@ class FailOpenEmitClient implements EmitClient {
     } catch {
       /* already gone — nothing to do. */
     }
+  }
+
+  /**
+   * Teardown for the DELIBERATE `close()` path (AUDIT-20260718-09). A clean close
+   * may have a freshly `emit()`ed frame still in Node's internal write queue;
+   * `socket.end()` FLUSHES that queue then sends FIN, whereas `destroy()` (the
+   * failure-path teardown) would abandon it — silently dropping the invocation's
+   * only event. Non-blocking: `end()` returns immediately; the socket is `unref()`d.
+   */
+  private flushAndDestroySocket(): void {
+    const socket = this.socket;
+    this.socket = undefined;
+    this.readBuffer = '';
+    if (socket === undefined) {
+      return;
+    }
+    // Drop our state-machine handlers so teardown can't re-enter the machine,
+    // but keep a bare error swallower so a flush-time EPIPE/ECONNRESET (peer went
+    // away mid-flush) can't crash the process via an unhandled 'error'.
+    socket.removeAllListeners();
+    socket.on('error', () => {
+      /* fail-open during teardown — a flush error must never surface. */
+    });
+    try {
+      // Flush any buffered writes, then FIN. `unref()`d already, so this never
+      // keeps the process alive nor delays its exit.
+      socket.end();
+    } catch {
+      try {
+        socket.destroy();
+      } catch {
+        /* already gone. */
+      }
+      return;
+    }
+    // Cap the linger: if the peer never drains our flush, force the socket down
+    // after a generous grace (never truncates a real local flush). `unref()`d.
+    const killer = setTimeout(() => {
+      try {
+        socket.destroy();
+      } catch {
+        /* already gone. */
+      }
+    }, CLOSE_FLUSH_GRACE_MS);
+    killer.unref();
   }
 }
 

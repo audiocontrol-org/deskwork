@@ -133,6 +133,24 @@ export interface SidecarDaemonOptions {
   /** Best-effort observer for non-fatal background errors (drain/liveness
    * failures, malformed command frames). Telemetry never crashes the daemon. */
   readonly onError?: (error: unknown) => void;
+  /** Observable record for a spool record the plane PERMANENTLY rejected (a 4xx
+   * from `/v1/ingest`, e.g. the classification-downgrade guard) — the drain
+   * loop skips-and-advances past it so the records spooled AFTER it are not
+   * head-of-line-blocked forever (AUDIT-20260718-05, FR-017 defined-drop
+   * discipline). Absent ⇒ a default recorder logs the drop to stderr, so the
+   * production default path is never silent. */
+  readonly onDroppedRecord?: (info: DroppedSpoolRecord) => void;
+}
+
+/** What the drain loop discarded and WHY when the plane permanently rejects a
+ * spool record (FR-017 — the drop policy names what is discarded). */
+export interface DroppedSpoolRecord {
+  /** The WAL sequence of the permanently-rejected record. */
+  readonly sequence: number;
+  /** The 4xx HTTP status the plane returned for it. */
+  readonly status: number;
+  /** Human-readable reason the record was dropped rather than retried. */
+  readonly reason: string;
 }
 
 /** The daemon handle: `started` settles once the election resolves; `stop`
@@ -140,6 +158,21 @@ export interface SidecarDaemonOptions {
 export interface SidecarDaemonHandle {
   readonly started: Promise<SidecarDaemonStart>;
   stop(): Promise<void>;
+}
+
+/**
+ * Distinguish a PERMANENT ingest rejection (skip-and-record, per FR-017) from a
+ * TRANSIENT one (back off, retry the same record). A 4xx names a request the
+ * plane will reject identically on every byte-identical replay (malformed
+ * payload, classification-downgrade guard) — permanent. The two 4xx statuses
+ * that are genuinely retryable are excluded: 408 (Request Timeout) and 429 (Too
+ * Many Requests) are transient. Everything else (5xx, network errors handled
+ * upstream of this call) is transient too. (AUDIT-20260718-05.)
+ */
+function isPermanentRejection(status: number): boolean {
+  if (status < 400 || status >= 500) return false;
+  if (status === 408 || status === 429) return false;
+  return true;
 }
 
 const DEFAULT_DRAIN_INTERVAL_MS = 1000;
@@ -162,6 +195,20 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
   const transport: SseTransport = options.transport ?? new FetchSseTransport();
   const poster: TelemetryPoster = options.poster ?? createTelemetryPoster();
   const onError = options.onError ?? ((): void => undefined);
+  // A spool record the plane PERMANENTLY rejects is skipped-and-recorded, never
+  // retried forever (AUDIT-20260718-05). With no injected sink, the default
+  // recorder writes the drop to stderr so the production path is loud, not
+  // silent (mirrors `recordUndeliveredCommand`, and FR-017's "name what is
+  // discarded" discipline).
+  const recordDroppedRecord =
+    options.onDroppedRecord ??
+    ((info: DroppedSpoolRecord): void => {
+      process.stderr.write(
+        `stackctl sidecar: the plane PERMANENTLY rejected spool record ` +
+          `#${info.sequence} (HTTP ${info.status}) — RECORDED AS DROPPED and skipped so ` +
+          `records spooled after it can still transmit (FR-017): ${info.reason}\n`,
+      );
+    });
   // When no local-run delivery sink is wired, a received command must still be
   // OBSERVABLE (AUDIT-20260717-17) — never silently `?.()`-dropped. The default
   // recorder writes a "received but not delivered" line to stderr so the
@@ -255,10 +302,25 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
         }
         if (status >= 200 && status < 300) {
           drainCursor = record.sequence;
+        } else if (isPermanentRejection(status)) {
+          // PERMANENT rejection (a 4xx from the ingest boundary — e.g. the
+          // classification-downgrade guard). The payload replays byte-identical
+          // (FR-049), so retrying it would 4xx forever and head-of-line-block
+          // every record spooled after it (AUDIT-20260718-05). Skip-and-advance
+          // past it, RECORDING the drop per FR-017's defined-drop discipline —
+          // this is progress, not a failed pass, so do NOT back off or break.
+          recordDroppedRecord({
+            sequence: record.sequence,
+            status,
+            reason:
+              `the plane permanently rejected this record with HTTP ${status}; it replays ` +
+              'byte-identical so it is skipped rather than retried, unblocking later records',
+          });
+          drainCursor = record.sequence;
         } else {
-          // A non-2xx (e.g. 401/400) is a transient-from-here failure: leave the
-          // cursor, back off, retry next pass. Never advance past an unaccepted
-          // record (at-least-once, never at-most-once).
+          // TRANSIENT failure (5xx / 429 / 408 / other): the same record may
+          // succeed later. Leave the cursor, back off, retry it next pass.
+          // Never advance past an unaccepted record (at-least-once).
           failed = true;
           break;
         }

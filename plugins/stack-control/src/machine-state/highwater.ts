@@ -71,16 +71,28 @@ const HIGHWATER_LOCK_FILENAME = 'installation-sequence-highwater.lock';
 const LOCK_STALE_MS = 5_000;
 
 /**
- * Hard ceiling on how long `reserveNextSequence` will contend for the lock before
- * failing loud. The caller on the telemetry hot path (`invocation-telemetry.ts`)
- * wraps this in a fail-open try/catch, so a timeout drops one event rather than
- * ever blocking or corrupting the invocation — but a real ceiling still exists so
- * a pathological contention storm cannot hang.
+ * TINY fail-open budget for how long `reserveNextSequence` will contend for the
+ * lock before giving up (AUDIT-20260718-15). The reservation runs on the
+ * telemetry hot path that EVERY `stackctl` invocation executes, under this repo's
+ * own parallel dispatch (many concurrent `stackctl` subcommands share ONE
+ * per-installation lock). The dominating invariant is "emission never BLOCKS the
+ * invocation" — so on contention we fail open FAST rather than block.
+ *
+ * The real critical section is a couple of synchronous fs ops (single-digit ms),
+ * so a few hundred ms is orders of magnitude above legitimate multi-process
+ * contention yet far below a perceptible stall: legitimately-contended concurrent
+ * reservations still each acquire well inside this budget (proven by
+ * sequence-race.test.ts's distinctness guarantee), while a genuinely STUCK holder
+ * makes us fail open in well under a second instead of the old multi-second block.
+ * A fail-open drops this one event's sequence — the caller
+ * (`invocation-telemetry.ts`) wraps the throw in a fail-open try/catch and skips
+ * the emit; telemetry is best-effort and the invocation is never degraded.
  */
-const LOCK_ACQUIRE_TIMEOUT_MS = 10_000;
+const LOCK_ACQUIRE_TIMEOUT_MS = 250;
 
-/** The poll interval while another process holds the lock. */
-const LOCK_POLL_MS = 15;
+/** The poll interval while another process holds the lock. Kept small so the
+ * bounded budget above resolves legitimate brief contention promptly. */
+const LOCK_POLL_MS = 3;
 
 /**
  * The legitimate initial high-water mark for an installation that has never
@@ -274,8 +286,12 @@ export function advanceHighWaterMark(location: MachineStateLocation, next: numbe
 // THIS instead of the two-call read-then-advance pattern.
 // ---------------------------------------------------------------------------
 
-/** The cross-process lockfile path guarding a reservation for a located store. */
-function highWaterMarkLockPath(location: MachineStateLocation): string {
+/**
+ * The cross-process lockfile path guarding a reservation for a located store.
+ * Exported (like `highWaterMarkPath`) so tests that need to hold the lock
+ * deliberately target the exact path this module uses — never a re-derived guess.
+ */
+export function highWaterMarkLockPath(location: MachineStateLocation): string {
   return join(location.durableDir, HIGHWATER_LOCK_FILENAME);
 }
 
@@ -290,7 +306,10 @@ function sleepSyncMs(ms: number): void {
  * Acquire the cross-process reservation lock via exclusive create. Returns a
  * release function that removes the lockfile. Steals a lock older than
  * `LOCK_STALE_MS` (a crashed holder in the never-reboot-cleared durable dir);
- * fails loud if the lock cannot be acquired within `LOCK_ACQUIRE_TIMEOUT_MS`.
+ * FAILS OPEN FAST (throws) if the lock cannot be acquired within the tiny
+ * `LOCK_ACQUIRE_TIMEOUT_MS` budget, so the telemetry hot path is never blocked
+ * for a meaningful time (AUDIT-20260718-15). The caller treats the throw as
+ * "skip this event's reservation", never as a fatal invocation error.
  */
 function acquireSequenceLock(lockPath: string): () => void {
   const start = Date.now();
@@ -329,9 +348,10 @@ function acquireSequenceLock(lockPath: string): () => void {
       }
       if (Date.now() - start > LOCK_ACQUIRE_TIMEOUT_MS) {
         throw new Error(
-          `timed out after ${LOCK_ACQUIRE_TIMEOUT_MS}ms acquiring the ` +
+          `failing open after ${LOCK_ACQUIRE_TIMEOUT_MS}ms contending for the ` +
             `installationSequence reservation lock at ${lockPath}. Another process is ` +
-            'holding it far longer than a reservation should take (R-02/FR-039).',
+            'holding it longer than the tiny fail-open budget allows; per AUDIT-20260718-15 ' +
+            'the reservation drops this one event rather than blocking the invocation (R-02/FR-039).',
         );
       }
       sleepSyncMs(LOCK_POLL_MS);

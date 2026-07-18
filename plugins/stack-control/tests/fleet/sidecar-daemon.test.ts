@@ -36,7 +36,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
-import type { Server } from 'node:http';
+import { createServer as createHttpServer, type Server } from 'node:http';
+import { createPipeline } from '../../src/sidecar/pipeline.js';
 import { useMachineStateStore } from './_machine-state-harness.js';
 import { createPlaneRuntime } from '../../src/plane/runtime.js';
 import type { IntervalScheduler } from '../../src/plane/http/stream.js';
@@ -97,6 +98,77 @@ async function startPlane(installationId: string): Promise<RunningPlane> {
 
 function bearer(token: string): Record<string, string> {
   return { authorization: `Bearer ${token}` };
+}
+
+/** A REAL in-process `node:http` plane that permanently 400s the ingest POST
+ * for a specific run (the "poison pill") and 200s every other route (ingest,
+ * liveness, the SSE stream). Records the runIds it 200-ingested so the test can
+ * prove the records spooled AFTER the poison one still transmit. Per AUDIT-05's
+ * own suggestion: "mock the plane to 400 that record via a real in-process
+ * server" — this is a real http server + real sockets, not a stubbed transport. */
+interface StubPlane {
+  readonly server: Server;
+  readonly baseUrl: string;
+  readonly ingested: string[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function runIdFromIngestBody(raw: string): string | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(parsed) || !isRecord(parsed.envelope)) return undefined;
+  const runId = parsed.envelope.runId;
+  return typeof runId === 'string' ? runId : undefined;
+}
+
+async function startStubPlaneRejectingPoison(poisonRunId: string): Promise<StubPlane> {
+  const ingested: string[] = [];
+  const server = createHttpServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/v1/ingest') {
+      let raw = '';
+      req.setEncoding('utf8');
+      req.on('data', (chunk: string) => {
+        raw += chunk;
+      });
+      req.on('end', () => {
+        const runId = runIdFromIngestBody(raw);
+        if (runId === poisonRunId) {
+          // A permanent, byte-identical-on-replay rejection (the shape the
+          // ingest classification-downgrade guard produces).
+          res.writeHead(400, { 'content-type': 'text/plain' });
+          res.end('permanent rejection: classification downgrade');
+          return;
+        }
+        if (runId !== undefined) ingested.push(runId);
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end('{}');
+      });
+      return;
+    }
+    // Liveness + SSE stream + anything else: benign. The daemon's SSE reconnect
+    // loop tolerates a non-stream 200 (retries under backoff, harmless in-test).
+    res.writeHead(200, { 'content-type': 'text/plain' });
+    res.end('');
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.removeListener('error', reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  if (address === null || typeof address === 'string') {
+    throw new Error('startStubPlaneRejectingPoison: expected a bound TCP AddressInfo');
+  }
+  return { server, baseUrl: `http://127.0.0.1:${address.port}`, ingested };
 }
 
 function makeTelemetryEvent(installationId: string, runId: string, type: string): TelemetryEvent {
@@ -171,6 +243,7 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
   const store = useMachineStateStore();
 
   let plane: RunningPlane | undefined;
+  let stub: StubPlane | undefined;
   let daemon: { started: Promise<unknown>; stop(): Promise<void> } | undefined;
   let client: Socket | undefined;
 
@@ -190,6 +263,13 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
       });
       rmSync(dir, { recursive: true, force: true });
       plane = undefined;
+    }
+    if (stub !== undefined) {
+      const { server } = stub;
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+      stub = undefined;
     }
   });
 
@@ -256,6 +336,76 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
 
     // Teardown is exercised by afterEach: daemon.stop() must leave no live
     // timers/sockets/listeners so the test process exits.
+    rmSync(installationRoot, { recursive: true, force: true });
+  });
+
+  it('AUDIT-20260718-05: a permanently-rejected (4xx) spool record does NOT head-of-line-block the records spooled after it', async () => {
+    const installationRoot = mkdtempSync(join(tmpdir(), 'scf-sidecar-daemon-root-'));
+    const installationId = mintOrReadInstallationId(installationRoot);
+    const location = locateMachineState(installationRoot);
+    openTokenCustody(location.durableDir).write(TOKEN);
+
+    // Pre-spool three records into the sidecar's WAL BEFORE the daemon starts:
+    // a 'before' record, a 'poison' record the plane permanently 400s, and an
+    // 'after' record. Pre-fix, the drain loop breaks on the poison record's
+    // non-2xx and never advances past it, so 'after' is never transmitted.
+    const walDir = join(location.durableDir, 'spool');
+    const pipeline = createPipeline(walDir);
+    await pipeline.receive({
+      installationId,
+      invocationId: 'inv-poison',
+      runId: 'before',
+      type: 'run.started',
+      classification: 'durable',
+    });
+    await pipeline.receive({
+      installationId,
+      invocationId: 'inv-poison',
+      runId: 'poison',
+      type: 'run.progress',
+      classification: 'durable',
+    });
+    await pipeline.receive({
+      installationId,
+      invocationId: 'inv-poison',
+      runId: 'after',
+      type: 'run.completed',
+      classification: 'durable',
+    });
+
+    stub = await startStubPlaneRejectingPoison('poison');
+
+    const dropped: Array<{ sequence: number; status: number }> = [];
+    const handle = runSidecarDaemon({
+      installationRoot,
+      planeUrl: stub.baseUrl,
+      drainIntervalMs: 5,
+      livenessIntervalMs: 5,
+      onDroppedRecord: (info) => dropped.push({ sequence: info.sequence, status: info.status }),
+    });
+    daemon = handle;
+    const start = await handle.started;
+    expect(start.kind).toBe('won');
+
+    // The records BEFORE and AFTER the poison pill BOTH reach the plane — the
+    // poison record did not block the head of the line indefinitely.
+    await pollUntil(
+      async () => stub !== undefined && stub.ingested.includes('before') && stub.ingested.includes('after'),
+      4000,
+      "the 'before' AND 'after' records to reach the plane past the poison record",
+    );
+
+    // The poison record was RECORDED as a permanent drop (not retried forever,
+    // not silently swallowed).
+    await pollUntil(
+      async () => dropped.some((d) => d.status === 400),
+      4000,
+      'the poison record to be recorded as a permanent (4xx) drop',
+    );
+
+    // The plane NEVER 200-ingested the poison record (it stayed rejected).
+    expect(stub.ingested).not.toContain('poison');
+
     rmSync(installationRoot, { recursive: true, force: true });
   });
 

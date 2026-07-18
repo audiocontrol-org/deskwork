@@ -29,6 +29,15 @@ describe('command expiry is a visible terminal state (T059, FR-055)', () => {
     expect(next).toBe('expired');
   });
 
+  it('accepts transition accepted → expired via the expire event (never-delivered TTL)', () => {
+    // AUDIT-20260718-23: a held command can expire while still `accepted` — its
+    // TTL elapsed before any sidecar reconnect ever delivered it. Expiry is a
+    // visible terminal state for that never-delivered case too, so this
+    // transition is legal (not silent loss with the status stuck at `accepted`).
+    const next = nextCommandState('accepted', 'expire');
+    expect(next).toBe('expired');
+  });
+
   it('rejects any transition out of expired (terminal)', () => {
     expect(() => nextCommandState('expired', 'deliver')).toThrow();
     expect(() => nextCommandState('expired', 'receive')).toThrow();
@@ -39,9 +48,11 @@ describe('command expiry is a visible terminal state (T059, FR-055)', () => {
     expect(() => nextCommandState('expired', 'supersede')).toThrow();
   });
 
-  it('does not permit expiry from non-delivered states', () => {
-    // Only delivered → expired is legal; expiry is not reachable from other states
-    expect(() => nextCommandState('accepted', 'expire')).toThrow();
+  it('does not permit expiry from states past acceptance/delivery', () => {
+    // Expiry is legal only from the two states where a held command still awaits
+    // delivery+ack: `accepted` (never delivered) and `delivered` (in flight).
+    // Once the run has RECEIVED or APPLIED it, or it already reached another
+    // terminal, `expire` is illegal (AUDIT-20260718-23).
     expect(() => nextCommandState('received', 'expire')).toThrow();
     expect(() => nextCommandState('applied', 'expire')).toThrow();
     expect(() => nextCommandState('rejected', 'expire')).toThrow();

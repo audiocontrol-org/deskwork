@@ -14,7 +14,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { RouteContext } from './http/server.js';
 import type { CommandKind } from '../fleet/command.js';
-import { buildRegistry, type ClassifiedEvent } from './registry.js';
+import { buildRegistry, type ClassifiedEvent, type FleetEntry } from './registry.js';
+import { computeFleetDeltas, type FleetDelta } from './http/api.js';
 
 /** Write a JSON body with an explicit status. */
 export function respondJson(res: ServerResponse, status: number, body: unknown): void {
@@ -102,6 +103,44 @@ export function parseTargets(body: unknown): string[] {
     throw new Error('fleet command "targets" must be an array of installation-id strings.');
   }
   return targets.filter((t): t is string => typeof t === 'string');
+}
+
+/**
+ * The result of computing one fleet-stream SSE tick. `next` is the fresh
+ * registry snapshot to carry forward; `deltas` is what changed since
+ * `previous`. `error`, when present, means `buildRegistry` threw for this tick
+ * (e.g. a poison event whose `type` `requireRunStatus` rejects) — the caller
+ * skips the tick and keeps serving, never crashing.
+ */
+export interface FleetTickResult {
+  readonly next: readonly FleetEntry[];
+  readonly deltas: readonly FleetDelta[];
+  readonly error?: unknown;
+}
+
+/**
+ * Compute one fleet-stream tick, GUARDED (AUDIT-20260718-04). `buildRegistry`
+ * hard-throws (`requireRunStatus`) for any run-scoped event whose `type` is not
+ * a known lifecycle key. In the fleet-stream handler that computation runs
+ * inside a bare `setInterval` callback: an uncaught throw there is an uncaught
+ * exception that by default TERMINATES the Node process — taking down every
+ * consumer and sidecar route, not just the one stream. Because the shared,
+ * append-only `events` array is re-folded on every tick for every connected
+ * client, a single anomalous event would poison every subsequent tick. This
+ * wrapper contains the blast radius: on error it preserves `previous` and
+ * returns the error for the caller to log-and-skip, so a bad event can never
+ * crash the plane.
+ */
+export function computeFleetTickGuarded(
+  events: ClassifiedEvent[],
+  previous: readonly FleetEntry[],
+): FleetTickResult {
+  try {
+    const next = buildRegistry(events).entries();
+    return { next, deltas: computeFleetDeltas(previous, next) };
+  } catch (error) {
+    return { next: previous, deltas: [], error };
+  }
 }
 
 /** Validate a session-liveness heartbeat body (C3). */

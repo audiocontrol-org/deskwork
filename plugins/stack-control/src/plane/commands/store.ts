@@ -88,6 +88,20 @@ export interface CommandStore {
     readonly commandId: string;
     readonly state: 'accepted';
   }>;
+  /**
+   * Durably persist a later lifecycle `state` for an already-accepted command
+   * (FR-059, AUDIT-20260718-17). `accept()` only ever records `accepted`;
+   * without this op `commandStatus()` (→ `GET /v1/commands/:id`) would report
+   * `accepted` forever, even after the sidecar acknowledges `applied` / `failed`
+   * / `expired` / `superseded`. The updated record is written to disk (fsynced,
+   * atomic-rename) BEFORE this returns and re-indexed, so a subsequent `get()`
+   * — and a fresh store over the same dir — observes the new state. Throws
+   * (fail loud) on an unknown `commandId`: a transition of a command the store
+   * never accepted is a real defect, never a silent create. This is a durable
+   * SETTER, not the `command.ts` state-machine — the caller (the ack/expiry
+   * ingestion path) validates legality via `nextCommandState` before calling.
+   */
+  transition(commandId: string, state: CommandState): CommandRecord;
   /** The durable record for `commandId`, or undefined if unknown. */
   get(commandId: string): CommandRecord | undefined;
   /** Every durable record currently known to the store. */
@@ -292,6 +306,20 @@ export function createCommandStore(dir: string): CommandStore {
       persistRecord(dir, record);
       index.set(commandId, record);
       return Promise.resolve({ commandId, state: 'accepted' });
+    },
+    transition(commandId: string, state: CommandState): CommandRecord {
+      const existing = index.get(commandId);
+      if (existing === undefined) {
+        throw new Error(
+          `createCommandStore.transition: command '${commandId}' is unknown; ` +
+            'a durable state transition requires an already-accepted record (FR-056).',
+        );
+      }
+      const updated: CommandRecord = { ...existing, state };
+      // Durable BEFORE we return — same fsync+atomic-rename contract as accept.
+      persistRecord(dir, updated);
+      index.set(commandId, updated);
+      return updated;
     },
     get(commandId: string): CommandRecord | undefined {
       return index.get(commandId);

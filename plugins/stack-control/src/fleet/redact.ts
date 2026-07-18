@@ -175,7 +175,14 @@ function redactPath(value: string, context: RedactionContext): string | undefine
   if (rel.startsWith('..') || isAbsolute(rel)) {
     return undefined;
   }
-  return rel;
+  // Scrub the installation-relative form too (AUDIT-20260718-14): a segment of
+  // `rel` (a directory/file named after the operator's username, or a hostname
+  // baked into a build-output path) can still carry PII. This honors the
+  // `scrubSubstrings` contract — "applied on top of the path policy's own
+  // absolute-path handling" — on the most common path shape (absolute-inside-
+  // installation), not just the already-relative early-return branch above
+  // (PT-008 deny-by-default, FR-047/048).
+  return scrubSubstrings(rel, context);
 }
 
 /**

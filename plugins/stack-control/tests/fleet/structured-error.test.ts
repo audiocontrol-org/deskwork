@@ -176,16 +176,26 @@ describe('StructuredError (T055, data-model § Structured error FR-046)', () => 
     expect(_).toBeDefined();
   });
 
-  it('rejects extra fields that are not part of the bounded shape', () => {
-    // Per FR-046: details are fetched on demand, never inline. An attempt
-    // to smuggle details into the StructuredError should be rejected.
+  it('strips extra fields that are not part of the bounded shape (AUDIT-20260718-01)', () => {
+    // Per FR-046: details are fetched on demand, never inline. The
+    // validator accepts an input carrying an extra `details` key (objects
+    // can have extra keys), but MUST NOT let it leak into the returned
+    // object — the bounded shape is the contract. This runtime assertion
+    // is the actual regression guard: a validator that returns the input
+    // by reference (or spreads unknown keys through) would leak `details`
+    // into the fleet payload, which is exactly the FR-046 regression this
+    // test exists to catch.
     const literal = wellFormedError() as Record<string, unknown>;
     literal.details = { nested: 'error info' };
-    // The validator should accept it (objects can have extra keys),
-    // but the returned type should not carry the details field.
     const error = validateStructuredError(literal);
-    // TypeScript narrowing check: if details were in the type, this
-    // would not type-check.
+
+    expect(Object.prototype.hasOwnProperty.call(error, 'details')).toBe(false);
+    expect(Object.keys(error).sort()).toEqual(
+      ['code', 'message', 'recoverable', 'task', 'timestamp'].sort(),
+    );
+
+    // TypeScript narrowing check: if `details` were part of the static
+    // type, this assignment would fail to compile.
     const _: StructuredError = error;
     expect(_ satisfies StructuredError).toBeDefined();
   });

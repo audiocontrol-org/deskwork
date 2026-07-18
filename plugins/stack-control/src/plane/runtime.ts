@@ -51,10 +51,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
-import { buildRegistry, type ClassifiedEvent } from './registry.js';
+import { buildRegistry, type ClassifiedEvent, type FleetEntry } from './registry.js';
 import {
   commandStatus,
-  computeFleetDeltas,
   fleetSnapshot,
   issueCommand,
   issueFleetCommand,
@@ -72,6 +71,7 @@ import {
 import { createEventLog, type EventLog } from './event-log.js';
 import {
   assertSessionLiveness,
+  computeFleetTickGuarded,
   installationIdForRun,
   parseCommandKind,
   parseTargets,
@@ -136,6 +136,16 @@ export interface PlaneRuntimeOptions {
    * and the object-store adapter; the read wiring is live here regardless.
    */
   readonly cdnReader?: CdnReader;
+  /**
+   * Injected durable accepted-event log (test seam, mirrors `scheduler` /
+   * `cdnReader`). Defaults to a real file-backed {@link createEventLog} under
+   * `commandStoreDir`. Injectable so a test can prove the ingest handler admits
+   * an event to live state and answers 200 ONLY AFTER the durable append
+   * succeeds (AUDIT-20260718-06) — a failing append must yield a non-2xx and
+   * leave the registry untouched, never a 200 the sidecar treats as delivered
+   * over an event the plane never durably recorded.
+   */
+  readonly eventLog?: EventLog;
 }
 
 export interface PlaneRuntime {
@@ -178,7 +188,8 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
   // a plane restart over the same durable dir rehydrates the live registry and
   // the ingest no-regress/dedupe bookkeeping, so fleet visibility survives a
   // bounce (the ingesting sidecars won't re-send already-200'd events).
-  const eventLog: EventLog = createEventLog(join(options.commandStoreDir, 'accepted-events'));
+  const eventLog: EventLog =
+    options.eventLog ?? createEventLog(join(options.commandStoreDir, 'accepted-events'));
   const events: ClassifiedEvent[] = [...eventLog.replayed];
   const ingestState: IngestState = rehydrateIngestState(events);
   const commandStore: CommandStore = createCommandStore(options.commandStoreDir);
@@ -233,6 +244,17 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
     res.write(`event: fleet-delta\ndata: ${JSON.stringify(delta)}\n\n`);
   }
 
+  function logFleetTickError(error: unknown): void {
+    // A poison event must never crash the process (AUDIT-20260718-04). Skip the
+    // tick, keep the stream alive, and leave a diagnostic so the bad event is
+    // discoverable — the honest "visible, not silent" posture.
+    process.stderr.write(
+      `plane fleet-stream: skipping tick after buildRegistry error: ${
+        error instanceof Error ? error.message : String(error)
+      }\n`,
+    );
+  }
+
   const fleetStreamHandler: RouteHandler = (ctx: RouteContext): void => {
     ctx.res.writeHead(200, {
       'content-type': 'text/event-stream',
@@ -240,16 +262,31 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
       connection: 'keep-alive',
     });
     ctx.res.flushHeaders();
-    let last = buildRegistry(events).entries();
-    for (const delta of computeFleetDeltas([], last)) {
-      writeFleetDelta(ctx.res, delta);
-    }
-    const timer = scheduler.setInterval(() => {
-      const next = buildRegistry(events).entries();
-      for (const delta of computeFleetDeltas(last, next)) {
+    let last: readonly FleetEntry[] = [];
+    const initial = computeFleetTickGuarded(events, last);
+    if (initial.error === undefined) {
+      for (const delta of initial.deltas) {
         writeFleetDelta(ctx.res, delta);
       }
-      last = next;
+      last = initial.next;
+    } else {
+      logFleetTickError(initial.error);
+    }
+    const timer = scheduler.setInterval(() => {
+      // GUARDED: the tick body ran a bare `buildRegistry(...)` with no
+      // try/catch — any throw here is an UNCAUGHT exception in a setInterval
+      // callback, which by default terminates the whole Node process (every
+      // route down), not just this stream. `computeFleetTickGuarded` contains
+      // the throw so a bad event only skips a tick (AUDIT-20260718-04).
+      const tick = computeFleetTickGuarded(events, last);
+      if (tick.error === undefined) {
+        for (const delta of tick.deltas) {
+          writeFleetDelta(ctx.res, delta);
+        }
+        last = tick.next;
+      } else {
+        logFleetTickError(tick.error);
+      }
       // § C3 transport keepalive comment — proves nothing about health.
       ctx.res.write(':keepalive\n\n');
     }, KEEPALIVE_INTERVAL_MS);
@@ -374,10 +411,16 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
       const body = await readJsonBody(ctx.req);
       const outcome = await ingestEvent(ingestState, { durableStore }, body);
       if (outcome.kind === 'accepted') {
-        events.push(outcome.event);
-        // Durably record every accepted event so a plane restart recovers the
-        // live registry (AUDIT-20260717-14).
+        // Durability BEFORE the 200 and BEFORE admitting the event to live
+        // state (AUDIT-20260718-06). `eventLog.append` is synchronous and
+        // fsynced (event-log.ts), so by the time it returns the event is on
+        // disk. Only then do we admit it to the in-memory registry and answer
+        // 200: if the append throws, the catch below answers a non-2xx and the
+        // event is NOT in `events`, so the sidecar (seeing a non-2xx) will
+        // resend — a crash can never leave the sidecar believing an event was
+        // delivered that the plane never durably recorded.
         eventLog.append(outcome.event);
+        events.push(outcome.event);
       }
       uplinkSignals.lastSuccess = new Date().toISOString();
       respondJson(ctx.res, 200, outcome);

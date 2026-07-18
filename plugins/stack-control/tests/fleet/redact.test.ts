@@ -78,6 +78,33 @@ describe('redactEvent (T021, PT-008 deny-by-default field policy)', () => {
     expect(output.file).not.toContain('/Users/testuser');
   });
 
+  it('AUDIT-20260718-14: an absolute path INSIDE the installation whose relative form contains PII segments is SCRUBBED, not returned verbatim', () => {
+    // The common case: an absolute `path`-policy field under the installation
+    // root whose relative form still embeds sensitive substrings — a build
+    // directory named after the operator's username, a hostname baked into an
+    // output path. Pre-fix, `redactPath` returned the computed `rel` verbatim
+    // (no scrubSubstrings), leaking the username/hostname the module's own
+    // doc-comment promises to scrub "everywhere except branch" (PT-008,
+    // FR-047/048).
+    const allowlist: FieldAllowlist = { buildOutput: 'path' };
+    const output = redactEvent(
+      { buildOutput: '/Users/testuser/work/project/builds/testuser/test-host.local/out.js' },
+      allowlist,
+      CTX,
+    );
+    // The username and hostname segments must NOT survive verbatim.
+    expect(output.buildOutput).not.toContain('testuser');
+    expect(output.buildOutput).not.toContain('test-host.local');
+    // They were REDACTED (not silently dropped) — markers present.
+    expect(output.buildOutput).toContain('<redacted-user>');
+    expect(output.buildOutput).toContain('<redacted-host>');
+    // Non-sensitive relative structure survives, and it stays installation-
+    // relative (the absolute prefix is gone).
+    expect(output.buildOutput).toContain('builds');
+    expect(output.buildOutput).toContain('out.js');
+    expect(output.buildOutput).not.toContain('/Users');
+  });
+
   it('absolute path OUTSIDE installationRoot is DROPPED, not leaked', () => {
     const allowlist: FieldAllowlist = { file: 'path' };
     const output = redactEvent(

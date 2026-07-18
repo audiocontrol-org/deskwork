@@ -163,6 +163,43 @@ function describeType(value: unknown): string {
   return typeof value;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Recover the `(invocationId, invocationSequence)` pair a spooled WAL record
+ * carries in its JSON payload (AUDIT-20260718-07). The payload is exactly what
+ * `receive()` wrote: `JSON.stringify({ envelope, snapshot })`. Returns `null`
+ * for anything that does not parse into a well-formed envelope carrying both
+ * fields — recovery seeds a high-water mark, so an unreadable record simply
+ * does not contribute (never a throw that would brick pipeline construction).
+ */
+function recoverInvocationFromPayload(
+  payload: string,
+): { readonly invocationId: string; readonly invocationSequence: number } | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) return null;
+  const envelope = parsed.envelope;
+  if (!isRecord(envelope)) return null;
+  const invocationId = envelope.invocationId;
+  const invocationSequence = envelope.invocationSequence;
+  if (typeof invocationId !== 'string' || invocationId.length === 0) return null;
+  if (
+    typeof invocationSequence !== 'number' ||
+    !Number.isInteger(invocationSequence) ||
+    invocationSequence < 1
+  ) {
+    return null;
+  }
+  return { invocationId, invocationSequence };
+}
+
 function requireNonEmptyString(value: unknown, label: string): string {
   if (typeof value !== 'string' || value.length === 0) {
     throw new Error(
@@ -270,13 +307,29 @@ export function createPipeline(walDir: string, options?: PipelineOptions): Sidec
     return next;
   }
 
-  async function ensureInstallationSequenceRecovered(wal: WalHandle): Promise<void> {
+  async function ensureSequencesRecovered(wal: WalHandle): Promise<void> {
     if (nextInstallationSequence !== null) return;
-    // Recover durably: the WAL's own replay reflects every record ever
-    // appended (including across a prior process's restart), so the next
-    // value continues from there rather than resetting to 1.
+    // Recover durably from ONE WAL replay: the WAL reflects every record ever
+    // appended (including across a prior process's restart). Both counters
+    // continue from there rather than resetting to 1.
     const existing = await wal.replay();
-    const maxSequence = existing.reduce((max, record) => Math.max(max, record.sequence), 0);
+    let maxSequence = 0;
+    for (const record of existing) {
+      // installationSequence (FR-039): the WAL's own monotonic sequence.
+      if (record.sequence > maxSequence) maxSequence = record.sequence;
+      // invocationSequence (FR-040, AUDIT-20260718-07): the per-invocation
+      // domain-ordering counter lives INSIDE the spooled payload. Seed the map
+      // from the max seen per invocationId so a post-restart event for an
+      // in-flight invocation continues (does not regress below the plane's
+      // already-applied high-water mark and get silently dropped as stale).
+      const recovered = recoverInvocationFromPayload(record.payload);
+      if (recovered !== null) {
+        const current = invocationSequences.get(recovered.invocationId) ?? 0;
+        if (recovered.invocationSequence > current) {
+          invocationSequences.set(recovered.invocationId, recovered.invocationSequence);
+        }
+      }
+    }
     nextInstallationSequence = maxSequence + 1;
   }
 
@@ -315,7 +368,7 @@ export function createPipeline(walDir: string, options?: PipelineOptions): Sidec
       // 3. assign eventId + sequence. `constructEnvelope` mints `eventId`
       // internally (mintUuidV7) — never passed in, per its own contract.
       const wal = await getWal();
-      await ensureInstallationSequenceRecovered(wal);
+      await ensureSequencesRecovered(wal);
       const installationSequence = takeInstallationSequence();
       const invocationSequence = nextInvocationSequence(raw.invocationId);
 

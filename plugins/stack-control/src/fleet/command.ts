@@ -15,11 +15,12 @@
 //                  ┌──────────────► rejected   (terminal)
 //                  │
 //  accepted ──► delivered ──► received ──► applied   (terminal)
-//     │             │             │
-//     │             │             └──────► failed    (terminal)
-//     │             │
-//     │             └────────────────────► expired   (terminal)
-//     └──────────────────────────────────► superseded (terminal)
+//     │  │          │             │
+//     │  │          │             └──────► failed    (terminal)
+//     │  │          │
+//     │  │          └─────────────────────► expired   (terminal)
+//     │  └────────────────────────────────► expired   (terminal, never-delivered TTL)
+//     └───────────────────────────────────► superseded (terminal)
 //
 // Terminal states (no transition out): applied, rejected, failed, expired,
 // superseded. `accepted`, `delivered`, `received` are the live states.
@@ -110,6 +111,11 @@ const TRANSITIONS: Readonly<Record<CommandState, Partial<Record<CommandEvent, Co
     deliver: 'delivered',
     reject: 'rejected',
     supersede: 'superseded',
+    // A held command can expire while still ACCEPTED — never delivered (its TTL
+    // elapsed before any sidecar reconnect). Expiry is a visible terminal state
+    // for that never-delivered case too, not silent loss (FR-055,
+    // AUDIT-20260718-23).
+    expire: 'expired',
   },
   delivered: {
     receive: 'received',

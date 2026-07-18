@@ -27,12 +27,164 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import type { Clock } from '../../src/fleet/clock.js';
 import type { SseConnectRequest, SseConnection, SseTransport } from '../../src/sidecar/uplink/transport.js';
-import { buildReconnectHeaders, createEventIdBuffer } from '../../src/sidecar/uplink/reconnect.js';
+import {
+  buildReconnectHeaders,
+  createEventIdBuffer,
+  runReconnectingSseClient,
+} from '../../src/sidecar/uplink/reconnect.js';
 
 // EventIdBuffer, createEventIdBuffer, and buildReconnectHeaders are pinned
 // (and now implemented) in src/sidecar/uplink/reconnect.ts (T113); this test
 // imports the real module rather than redeclaring the API shape locally.
+
+// --- AUDIT-20260718-03 driver harness --------------------------------------
+//
+// The tests above prove the HELPERS (`EventIdBuffer`, `buildReconnectHeaders`)
+// are correct in isolation and that a hand-composed call sequence produces the
+// right headers. Neither proves the production reconnect DRIVER
+// (`runReconnectingSseClient`) actually wires those helpers into its real
+// connect attempts. The harness below drives the driver itself over a fake
+// transport that records every connect() request, forces a reestablish, and
+// asserts the SECOND real connect's headers carry `Last-Event-ID` — the wire
+// contract this file exists to pin, not just helper composability.
+
+/** Explicitly-advanced clock (mirrors tests/fleet/reconnect-loop.test.ts). */
+class DriverFakeClock implements Clock {
+  private mono: number;
+  private wallMs: number;
+
+  constructor(startMono: number, startWallMs: number) {
+    this.mono = startMono;
+    this.wallMs = startWallMs;
+  }
+
+  nowIso(): string {
+    return new Date(this.wallMs).toISOString();
+  }
+
+  monotonicNowMs(): number {
+    return this.mono;
+  }
+}
+
+/** A single push-controlled fake connection — the TEST decides when bytes
+ * arrive and when the stream ends, never real network timing. */
+class DriverFakeConnection implements SseConnection {
+  readonly status = 200;
+  readonly headers: ReadonlyMap<string, string> = new Map([['content-type', 'text/event-stream']]);
+  readonly chunks: AsyncIterable<Uint8Array>;
+  private readonly queue: Uint8Array[] = [];
+  private readonly waiters: Array<(value: IteratorResult<Uint8Array>) => void> = [];
+  private ended = false;
+
+  constructor() {
+    this.chunks = {
+      [Symbol.asyncIterator]: () => ({
+        next: (): Promise<IteratorResult<Uint8Array>> => {
+          const queued = this.queue.shift();
+          if (queued !== undefined) {
+            return Promise.resolve({ value: queued, done: false });
+          }
+          if (this.ended) {
+            return Promise.resolve({ value: undefined, done: true });
+          }
+          return new Promise((resolve) => this.waiters.push(resolve));
+        },
+      }),
+    };
+  }
+
+  pushRaw(text: string): void {
+    const chunk = new TextEncoder().encode(text);
+    const waiter = this.waiters.shift();
+    if (waiter) {
+      waiter({ value: chunk, done: false });
+    } else {
+      this.queue.push(chunk);
+    }
+  }
+
+  /** Server closes the stream cleanly ⇒ reestablish-class close upstream. */
+  end(): void {
+    this.ended = true;
+    for (const waiter of this.waiters.splice(0)) {
+      waiter({ value: undefined, done: true });
+    }
+  }
+
+  close(): void {
+    this.end();
+  }
+}
+
+/** Records each connect() request and hands out a fresh connection per call. */
+class DriverRecordingTransport implements SseTransport {
+  readonly requests: SseConnectRequest[] = [];
+  readonly connections: DriverFakeConnection[] = [];
+
+  async connect(request: SseConnectRequest): Promise<SseConnection> {
+    this.requests.push(request);
+    const conn = new DriverFakeConnection();
+    this.connections.push(conn);
+    return conn;
+  }
+}
+
+/** Injected timer seam: fires on the test's command, never a real wait. */
+class DriverFakeTimer {
+  private pending: Array<{ cb: () => void; cancelled: boolean }> = [];
+
+  readonly setTimer = (_delayMs: number, cb: () => void): (() => void) => {
+    const entry = { cb, cancelled: false };
+    this.pending.push(entry);
+    return () => {
+      entry.cancelled = true;
+    };
+  };
+
+  fireNext(): void {
+    for (;;) {
+      const entry = this.pending.shift();
+      if (entry === undefined) {
+        throw new Error('DriverFakeTimer.fireNext: no pending timer to fire');
+      }
+      if (!entry.cancelled) {
+        entry.cb();
+        return;
+      }
+    }
+  }
+
+  liveCount(): number {
+    return this.pending.filter((e) => !e.cancelled).length;
+  }
+}
+
+function driverSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function driverWaitUntil(
+  predicate: () => boolean,
+  timeoutMs = 1000,
+  stepMs = 5,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (predicate()) {
+      return;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(`driverWaitUntil: predicate not satisfied within ${timeoutMs}ms`);
+    }
+    await driverSleep(stepMs);
+  }
+}
+
+const DRIVER_DATA_FRAME = (id: string): string =>
+  `id: ${id}\nevent: invocation.started\ndata: {"n":${id}}\n\n`;
 
 describe('SSE Last-Event-ID handling (T105 — C4 wire contract)', () => {
   describe('EventIdBuffer', () => {
@@ -225,6 +377,53 @@ describe('SSE Last-Event-ID handling (T105 — C4 wire contract)', () => {
       headers = buildReconnectHeaders({}, buffer.current());
       await transport.connect({ url: 'https://plane.example/stream', headers });
       expect(capturedRequests[2]!.headers['Last-Event-ID']).toBe('2');
+    });
+  });
+
+  describe('AUDIT-20260718-03: production driver wires Last-Event-ID into real reconnects', () => {
+    it('sends Last-Event-ID as a request HEADER (never a query param) on the driver’s second real connect', async () => {
+      const clock = new DriverFakeClock(1_000, Date.parse('2026-07-18T00:00:00.000Z'));
+      const transport = new DriverRecordingTransport();
+      const timer = new DriverFakeTimer();
+
+      const handle = runReconnectingSseClient({
+        transport,
+        clock,
+        url: 'https://plane.example/stream',
+        headers: { authorization: 'bearer tok' },
+        setTimer: timer.setTimer,
+      });
+
+      try {
+        // First real connect: no cursor observed yet, so no Last-Event-ID.
+        await driverWaitUntil(() => transport.connections.length === 1);
+        expect(transport.requests[0]!.headers['Last-Event-ID']).toBeUndefined();
+
+        // The server delivers an event carrying id "evt-42" — the driver's
+        // internal EventIdBuffer must observe it (the test never calls
+        // buffer.observe()/buildReconnectHeaders() itself; only the
+        // driver's own wiring can make the assertion below pass).
+        transport.connections[0]!.pushRaw(DRIVER_DATA_FRAME('evt-42'));
+
+        // Force a reestablish: the server ends the stream cleanly.
+        transport.connections[0]!.end();
+        await driverWaitUntil(() => timer.liveCount() === 1);
+        timer.fireNext();
+
+        // The driver's SECOND real connect() must carry Last-Event-ID as a
+        // request header, sourced from the event the FIRST connection
+        // delivered — proving the driver (not the test) wired the cursor
+        // into the reconnect headers. It must never appear in the URL.
+        await driverWaitUntil(() => transport.connections.length === 2);
+        const secondReq = transport.requests[1]!;
+        expect(secondReq.headers['Last-Event-ID']).toBe('evt-42');
+        expect(secondReq.headers['authorization']).toBe('bearer tok');
+        expect(secondReq.url).toBe('https://plane.example/stream');
+        expect(secondReq.url).not.toContain('?');
+        expect(secondReq.url).not.toContain('evt-42');
+      } finally {
+        handle.stop();
+      }
     });
   });
 });
