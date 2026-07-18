@@ -2,6 +2,57 @@
 
 ---
 
+## 2026-07-18: fleet-control-plane — finish the burndown (107→139), build the daemons, 4-round govern to override-graduation
+
+### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)
+
+**Goal:** Resume `/stack-control:execute` from the 107/139 checkpoint; finish Phase 8 (US6 hostile-network uplink) + Phase 9 (front door, isolation, dogfood, polish); then run the whole-feature `govern` pass to graduation.
+
+**Accomplished:**
+- **Phase 8 (US6, T103–T119):** RED suite + the SSE client, reconnect driver, telemetry-POST dispatcher, plane bearer-auth, machine-local token custody, session-liveness, and the `plane provision-token` verb — the complete sidecar↔plane uplink over a NAT-bound, network-exposed transport.
+- **Runnable daemons (operator-approved scope the task list never broke out):** `plane serve` (live registry + the 9 consumer routes + the 3 sidecar-facing routes — telemetry ingest / command SSE / liveness — + bearer auth) and the `sidecar run` daemon (bind-wins election → local-socket receive → redact-and-spool → uplink → command-consume → session-liveness). Fronted both verbs (`check-front-door` 65→68).
+- **Dogfood (T128, the primary verification):** drove Scenarios 1–4 & 6 end-to-end against the *real* daemons — all pass — and it caught a real Scenario-1 crash (an unhandled connect rejection on an unreachable plane), fixed + regression-locked. S5 scoped out (external Cloudflare/B2; T129 `[~]`).
+- **Isolation + polish:** the isolation probe now *bounds* the machine-local exception (T126); `$HOME`-redirect audit (T127), line-cap/type-safety (T131/132/133), full suite T134. **All 139 tasks complete** (ledger 139/139).
+- **Governed to graduation** via a 4-round cross-model `govern` cycle + a substantive operator-approved override.
+
+**Didn't Work (the govern story):**
+- The whole-feature govern — the **first ever run against 036** — refused **four rounds: 18 → 24 → 17 → 15 findings**. Round 2 *grew* because my round-1 fixes added new code that got audited (and some fixes were regressions). The pattern held every round: each fix pass resolved the prior findings but introduced ~N/2 new fix-debt the next round surfaced — the thesis's "hyperintelligent toddler adds new edges."
+- The barrage found **real, load-bearing bugs the compiler + 3500 passing tests missed**: a plane-crashing unguarded SSE tick (blocking), a fail-open regression *I* introduced (a 10s lockfile block on the hot path), a durability-ordering loss (ACK-before-durable; dedupe-state committed before the durable append), a PII redaction leak on the common path, an **auth-bypass** (one installation spoofing another's `installationId` after auth), a reconcile that never diffed manifest contents, and a stray **NUL byte** (a held-map key separator) that made git treat `dispatch.ts` as binary and silently blinded the auditor to the whole file.
+- Two round-4 "compile-error" findings were **barrage false-positives** — `tsc` was clean, and the compiler is the authority (per `audit-barrage-is-stochastic-defense-in-depth`).
+
+**Course Corrections:**
+- [PROCESS] After each round I **verified findings against the actual code before fixing** — separating real defects (fixed RED-first) from false-positives (dismissed on `tsc` authority) from folded/known-gaps. Two I first judged "overstated" (crash-durability, watchdog-resurrection) turned out real on close reading; the barrage's signal was better than my quick take.
+- [PROCESS] The **operator owned each escalating scope/plateau decision** — build-the-daemons, fix-must-fix-and-re-govern, fix-security+crash-safety-then-override — surfaced as a fork rather than decided unilaterally. The "are these well-founded or nitpicking?" question was the right gate.
+- [QUALITY] **Every harmful finding across all four rounds was fixed RED-first** (a test reproducing the defect before the fix), with the full suite green at each commit.
+- [DISCIPLINE] Captured **11 follow-ups to the backlog (TASK-459…469)** rather than paper over — folded production command-delivery/ack wiring, config `plane.url`, narrow crash edges, and the `runtime.ts` 500-line split — each override-accepted residual item documented.
+
+**Insights:**
+- The cross-model barrage's value is **highest on a large, never-governed feature**: the stochastic layer caught crash/auth-bypass/durability-loss defects the deterministic floor (compiler + 3505 green tests) could not — exactly its design intent.
+- But the fix-loop has a **real, compounding cost**: converging to zero would take many rounds because each pass seeds fresh fix-debt. The **diminishing-returns plateau** — slow decrease, large fix-debt fraction, root issues resurfacing under new IDs, and altitude dropping to compiler-decidable false-positives — is the signal to **override, not grind**. Round 4 was that signal.
+- "The auditor couldn't read the file" is not always noise: a stray NUL byte was a **real encoding defect** blinding the differ to `dispatch.ts` entirely — worth treating as a defect, not dismissing.
+
+**Quantitative reconciliation (per AUDIT-03/04 conventions):** 15 commits — 5 `feat`/`test` (Phase 8 RED+impl, daemons+front-door, dogfood+isolation), 4 `fix` (govern rounds 2–4 + round-4 security/crash-safety), 6 `chore` (ledger/tasks-complete, 4× govern-lift, override record). 100 files changed. Ledger 107→139 (139/139, `[~]` T129). Govern: **4 rounds 18→24→17→15, graduated via substantive override**. Open findings at session end are the **override-accepted residual** — not "0 open": 2 compiler-confirmed false-positives, 3 folded known-gaps (in TASK-460/461/462/464/465, real-but-scoped), 4 weak-test coverage gaps, and 3 captured narrow edges (TASK-466/467/468). The *harmful* set (blocking crash, auth-bypass, durability loss, fail-open regression, PII leak, NUL-byte, command-lifecycle) was fixed RED-first; no unfixed HIGH behavioral defect remains open. Remaining lifecycle step: ship (PR + merge, operator-owned).
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 15
+  - chore(036-fleet-control-plane): govern graduated via substantive override — feature governed (see convergence record + audit-log)
+  - fix(036-fleet-control-plane): fix round-4 security + crash-safety findings (RED-first)
+  - chore(036-fleet-control-plane): re-govern round-4 refused — lift 15 findings (18->24->17->15, plateau)
+  - fix(036-fleet-control-plane): resolve round-3 verified-harmful govern findings (RED-first)
+  - chore(036-fleet-control-plane): re-govern round-3 refused — lift 17 findings to audit-log (18->24->17 converging)
+  - fix(036-fleet-control-plane): resolve round-2 govern findings (21 must-fix, RED-first)
+  - chore(036-fleet-control-plane): re-govern refused — lift round-2 findings (24) to audit-log
+  - fix(036-fleet-control-plane): resolve all 18 whole-feature govern findings (RED-first)
+  - chore(036-fleet-control-plane): govern refused — lift 18 whole-feature findings to audit-log + convergence record
+  - chore(036-fleet-control-plane): mark tasks complete (137 done, T129 [~] scoped out) + ledger T126-T134
+  - feat(036-fleet-control-plane): dogfood loop + isolation bound + Scenario-1 crash fix (T126, T128, T130)
+  - chore(036-fleet-control-plane): ledger T120-T125 + backlog TASK-460..463 (found-mid-build gaps)
+  - feat(036-fleet-control-plane): runnable plane + sidecar daemons + front door (T120-T125)
+  - feat(036-fleet-control-plane): Phase 8 US6 — hostile-network uplink (T112-T119)
+  - test(036-fleet-control-plane): Phase 8 US6 RED — hostile-network uplink suite (T103-T111)
+- Files changed: 100
+- Backlog touched: TASK-459, TASK-460, TASK-461, TASK-465, TASK-466, TASK-467, TASK-468, TASK-469
+
 ## 2026-07-17: fleet-control-plane — execute Phases 4–7 + US1 tail (46→107/139, model-sized dispatch)
 
 ### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)
