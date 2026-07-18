@@ -149,6 +149,24 @@ async function fleetHasRun(baseUrl: string, runId: string): Promise<boolean> {
   );
 }
 
+/** Announce a run to the plane so it is observed (owner known) before it can
+ * be commanded. Per AUDIT-20260717-16 the plane rejects (404) a command to a
+ * run it has never seen — it needs the run OWNER's installationId to route the
+ * held command, so a run must be observed first. The C7 replay-on-connect
+ * scenario applies to runs the plane already knows; this ingest establishes
+ * that. `classification: 'durable'` is never a downgrade, so ingest accepts it
+ * (AUDIT-20260717-11). */
+async function announceRun(baseUrl: string, event: TelemetryEvent): Promise<void> {
+  const res = await fetch(`${baseUrl}/v1/ingest`, {
+    method: 'POST',
+    headers: { ...bearer(TOKEN), 'content-type': 'application/json' },
+    body: JSON.stringify(event),
+  });
+  if (res.status !== 200) {
+    throw new Error(`announceRun: expected 200 from /v1/ingest, got ${res.status}`);
+  }
+}
+
 describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', () => {
   const store = useMachineStateStore();
 
@@ -185,6 +203,10 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
 
     plane = await startPlane(installationId);
     const { baseUrl } = plane;
+
+    // (AUDIT-16) The run must be OBSERVED before it can be commanded — announce
+    // run-cmd so the plane knows its owner and can route the held command.
+    await announceRun(baseUrl, makeTelemetryEvent(installationId, 'run-cmd', 'run.started'));
 
     // (C1/C7) Issue a command BEFORE the sidecar connects, so replay-on-connect
     // delivers it the moment the daemon's SSE stream opens.
@@ -234,6 +256,58 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
 
     // Teardown is exercised by afterEach: daemon.stop() must leave no live
     // timers/sockets/listeners so the test process exits.
+    rmSync(installationRoot, { recursive: true, force: true });
+  });
+
+  it('does NOT silently drop a plane command when no local-run sink is wired — it is observably recorded as UNDELIVERED (AUDIT-20260717-17)', async () => {
+    const installationRoot = mkdtempSync(join(tmpdir(), 'scf-sidecar-daemon-root-'));
+    const installationId = mintOrReadInstallationId(installationRoot);
+    const location = locateMachineState(installationRoot);
+    openTokenCustody(location.durableDir).write(TOKEN);
+
+    plane = await startPlane(installationId);
+    const { baseUrl } = plane;
+
+    // (AUDIT-16) Announce run-cmd first so the plane can route the command to
+    // its owner; a command to an unobserved run is (correctly) rejected 404.
+    await announceRun(baseUrl, makeTelemetryEvent(installationId, 'run-cmd', 'run.started'));
+
+    // Issue a command BEFORE the sidecar connects, so replay-on-connect
+    // delivers it the moment the daemon's SSE stream opens.
+    const issue = await fetch(`${baseUrl}/v1/runs/run-cmd/commands`, {
+      method: 'POST',
+      headers: { ...bearer(TOKEN), 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'cancel' }),
+    });
+    expect(issue.status).toBe(200);
+
+    // Run the daemon the way PRODUCTION does: NO `onCommand` local-run sink.
+    // The pre-fix daemon `?.()`-drops the command silently. The fix must make
+    // the received-but-undelivered command OBSERVABLE — captured here via the
+    // injected undelivered sink.
+    const undelivered: unknown[] = [];
+    daemon = runSidecarDaemon({
+      installationRoot,
+      planeUrl: baseUrl,
+      drainIntervalMs: 5,
+      livenessIntervalMs: 5,
+      onUndeliveredCommand: (command) => undelivered.push(command),
+    });
+
+    const start = (await daemon.started) as { kind: string };
+    expect(start.kind).toBe('won');
+
+    // The plane-issued command reached the sidecar and was RECORDED as
+    // undelivered (not silently dropped) even though no local-run sink exists.
+    await pollUntil(
+      async () =>
+        undelivered.some(
+          (c) => typeof c === 'object' && c !== null && (c as { kind?: unknown }).kind === 'cancel',
+        ),
+      4000,
+      'the sidecar to observably record the undelivered cancel command',
+    );
+
     rmSync(installationRoot, { recursive: true, force: true });
   });
 });

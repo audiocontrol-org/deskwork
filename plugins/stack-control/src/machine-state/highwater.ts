@@ -42,12 +42,45 @@
  * never cast — mirrors src/fleet/event.ts's validation style.
  */
 
-import { readFileSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+  writeSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import type { MachineStateLocation } from './locate.js';
 
 /** The durable mark file's name inside the located durable dir. */
 const HIGHWATER_FILENAME = 'installation-sequence-highwater.json';
+
+/** The cross-process lockfile name guarding the reserve read-increment-write. */
+const HIGHWATER_LOCK_FILENAME = 'installation-sequence-highwater.lock';
+
+/**
+ * A held lock older than this is treated as STALE and stolen (AUDIT-20260717-07).
+ * The durable dir is NOT reboot-cleared, so a process that crashes while holding
+ * the lock would otherwise wedge sequencing forever. A reserve is a couple of
+ * synchronous fs ops (single-digit ms); 5s is orders of magnitude above the real
+ * critical section, so a lock older than that can only be an abandoned one.
+ */
+const LOCK_STALE_MS = 5_000;
+
+/**
+ * Hard ceiling on how long `reserveNextSequence` will contend for the lock before
+ * failing loud. The caller on the telemetry hot path (`invocation-telemetry.ts`)
+ * wraps this in a fail-open try/catch, so a timeout drops one event rather than
+ * ever blocking or corrupting the invocation — but a real ceiling still exists so
+ * a pathological contention storm cannot hang.
+ */
+const LOCK_ACQUIRE_TIMEOUT_MS = 10_000;
+
+/** The poll interval while another process holds the lock. */
+const LOCK_POLL_MS = 15;
 
 /**
  * The legitimate initial high-water mark for an installation that has never
@@ -93,6 +126,14 @@ function isEnoent(err: unknown): boolean {
     return false;
   }
   return err.code === 'ENOENT';
+}
+
+/** Detect Node's EEXIST error code without an `as` cast. */
+function isEexist(err: unknown): boolean {
+  if (!(err instanceof Error) || !('code' in err)) {
+    return false;
+  }
+  return err.code === 'EEXIST';
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -212,4 +253,135 @@ export function advanceHighWaterMark(location: MachineStateLocation, next: numbe
   const path = highWaterMarkPath(location);
   writeHighWaterMarkAtomic(path, target);
   return target;
+}
+
+// ---------------------------------------------------------------------------
+// AUDIT-20260717-07 — ATOMIC next-sequence reservation.
+//
+// `installationSequence` is FR-039's single per-installation counter, and the
+// CLI dispatcher wires telemetry into EVERY `stackctl` invocation while this
+// project's own execution model dispatches many `stackctl` subcommands in
+// parallel — so concurrent same-installation invocations are a common runtime
+// shape, not an edge case. The previous caller pattern
+// `advanceHighWaterMark(location, readHighWaterMark(location) + 1)` is a
+// read-then-write TOCTOU: two concurrent processes both read N, both write N+1,
+// and both emit the SAME sequence for two distinct invocations — directly
+// corrupting the gap classification this feature exists to provide.
+//
+// The fix is a single ATOMIC primitive that reserves and returns the next value
+// under a cross-process exclusive-create lockfile (`open(O_CREAT|O_EXCL)` retry
+// loop), so the read-increment-write is serialized across processes. Callers use
+// THIS instead of the two-call read-then-advance pattern.
+// ---------------------------------------------------------------------------
+
+/** The cross-process lockfile path guarding a reservation for a located store. */
+function highWaterMarkLockPath(location: MachineStateLocation): string {
+  return join(location.durableDir, HIGHWATER_LOCK_FILENAME);
+}
+
+/** Synchronous sleep without burning CPU — waits on an isolated SAB word that
+ * is never signalled, so the wait always runs the full `ms` (or the platform's
+ * minimum). Used only inside the lock-contention poll loop. */
+function sleepSyncMs(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Acquire the cross-process reservation lock via exclusive create. Returns a
+ * release function that removes the lockfile. Steals a lock older than
+ * `LOCK_STALE_MS` (a crashed holder in the never-reboot-cleared durable dir);
+ * fails loud if the lock cannot be acquired within `LOCK_ACQUIRE_TIMEOUT_MS`.
+ */
+function acquireSequenceLock(lockPath: string): () => void {
+  const start = Date.now();
+  for (;;) {
+    let fd: number;
+    try {
+      // 'wx' === O_CREAT | O_EXCL | O_WRONLY: creation is the atomic arbiter —
+      // exactly one contender wins the create; everyone else gets EEXIST.
+      fd = openSync(lockPath, 'wx');
+    } catch (err) {
+      if (!isEexist(err)) {
+        throw new Error(
+          `cannot acquire the installationSequence reservation lock at ${lockPath}: ` +
+            `${errorMessage(err)}.`,
+        );
+      }
+      // Held by someone else. Steal it if it is stale (a crashed holder).
+      try {
+        const heldMs = Date.now() - statSync(lockPath).mtimeMs;
+        if (heldMs > LOCK_STALE_MS) {
+          try {
+            unlinkSync(lockPath);
+          } catch {
+            /* another contender stole it first — just retry the create. */
+          }
+          continue;
+        }
+      } catch (statErr) {
+        // The lock vanished between the failed create and the stat (the holder
+        // released it) — retry the create immediately.
+        if (isEnoent(statErr)) continue;
+        throw new Error(
+          `cannot inspect the installationSequence reservation lock at ${lockPath}: ` +
+            `${errorMessage(statErr)}.`,
+        );
+      }
+      if (Date.now() - start > LOCK_ACQUIRE_TIMEOUT_MS) {
+        throw new Error(
+          `timed out after ${LOCK_ACQUIRE_TIMEOUT_MS}ms acquiring the ` +
+            `installationSequence reservation lock at ${lockPath}. Another process is ` +
+            'holding it far longer than a reservation should take (R-02/FR-039).',
+        );
+      }
+      sleepSyncMs(LOCK_POLL_MS);
+      continue;
+    }
+    // Won the create. Record the holder pid for diagnostics, then release the fd
+    // (the file's existence — not the open handle — is the lock).
+    try {
+      writeSync(fd, `${process.pid}\n`);
+    } catch {
+      /* diagnostics only; a write failure does not invalidate the lock. */
+    } finally {
+      try {
+        closeSync(fd);
+      } catch {
+        /* nothing actionable. */
+      }
+    }
+    let released = false;
+    return (): void => {
+      if (released) return;
+      released = true;
+      try {
+        unlinkSync(lockPath);
+      } catch {
+        /* already gone (e.g. stolen as stale) — release is idempotent. */
+      }
+    };
+  }
+}
+
+/**
+ * ATOMICALLY reserve and return the next `installationSequence` value for a
+ * located machine state (AUDIT-20260717-07). Serializes the read-increment-write
+ * across concurrent processes with an exclusive-create lockfile, so N concurrent
+ * reservations against ONE store return N DISTINCT, contiguous values — never a
+ * duplicate. This is the single primitive callers use in place of the racy
+ * `advanceHighWaterMark(location, readHighWaterMark(location) + 1)` two-step.
+ *
+ * The reserved value is persisted as the new durable high-water mark before it
+ * is returned, so a crash after reservation never re-hands the same value.
+ */
+export function reserveNextSequence(location: MachineStateLocation): number {
+  const release = acquireSequenceLock(highWaterMarkLockPath(location));
+  try {
+    const next = readHighWaterMark(location) + 1;
+    const path = highWaterMarkPath(location);
+    writeHighWaterMarkAtomic(path, next);
+    return next;
+  } finally {
+    release();
+  }
 }

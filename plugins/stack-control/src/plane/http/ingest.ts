@@ -74,7 +74,22 @@
  */
 
 import { validateTelemetryEvent, type TelemetryEvent } from '../../fleet/event.js';
+import { classifyEvent } from '../../fleet/classification.js';
+import type { EventClassification } from '../../fleet/types.js';
 import type { ClassifiedEvent } from '../registry.js';
+
+/**
+ * Durability ordering of the three storage classes (AUDIT-20260717-11).
+ * Higher rank = more durable / longer-retained. Used at the ingest boundary
+ * to refuse a wire classification that UNDER-states the catalog's decision —
+ * the data-losing direction (a durable lifecycle event mislabeled to a
+ * cheaper class would silently drop the history/retention FR-015 pins).
+ */
+const CLASSIFICATION_DURABILITY_RANK: Readonly<Record<EventClassification, number>> = {
+  'live-only': 0,
+  aggregated: 1,
+  durable: 2,
+};
 
 /**
  * Run-lifecycle event types that FINALIZE a run (data-model.md § Command
@@ -154,6 +169,32 @@ export interface IngestStateOptions {
   readonly dedupe?: boolean;
 }
 
+/**
+ * Upper bound on the dedupe set's size (AUDIT-20260717-14). `eventId` dedupe
+ * is an OPTIMIZATION, not a correctness mechanism (FR-042a) — the no-regress
+ * guard below and `buildRegistry`'s own independent `eventId` dedupe both hold
+ * regardless — so capping the set with FIFO eviction bounds a long-running
+ * plane's memory without weakening any invariant. Sized generously for the
+ * single-operator scale FR-078 targets.
+ */
+const MAX_SEEN_EVENT_IDS = 100_000;
+
+/**
+ * Add an `eventId` to the dedupe set, evicting the oldest entry once the set
+ * exceeds {@link MAX_SEEN_EVENT_IDS}. `Set` preserves insertion order, so the
+ * first key is the oldest — dropping it is a FIFO eviction that keeps the set
+ * bounded. Safe because dedupe is an optimization (see the constant's note).
+ */
+function rememberEventId(seenEventIds: Set<string>, eventId: string): void {
+  seenEventIds.add(eventId);
+  if (seenEventIds.size > MAX_SEEN_EVENT_IDS) {
+    const oldest = seenEventIds.values().next().value;
+    if (oldest !== undefined) {
+      seenEventIds.delete(oldest);
+    }
+  }
+}
+
 /** Construct a fresh, empty `IngestState`. */
 export function createIngestState(options: IngestStateOptions = {}): IngestState {
   return {
@@ -161,6 +202,37 @@ export function createIngestState(options: IngestStateOptions = {}): IngestState
     runs: new Map(),
     dedupeEnabled: options.dedupe ?? true,
   };
+}
+
+/**
+ * Rebuild an `IngestState` from a replayed stream of previously-ACCEPTED
+ * classified events (AUDIT-20260717-14) — the persisted event log a restarting
+ * plane recovers via `createEventLog`. Reconstructs the dedupe set and the
+ * per-run no-regress/finalization bookkeeping so continued ingestion after a
+ * restart dedupes and no-regresses exactly as it would have before the bounce.
+ *
+ * Accepted run events are monotonically advancing by construction (the first
+ * event for a run, then only STRICTLY-newer ones — stale/superseded and late
+ * events are never `accepted`, so never in this log), so "highest sequence
+ * wins, finalized = that event's terminality" faithfully reproduces the state.
+ */
+export function rehydrateIngestState(events: readonly ClassifiedEvent[]): IngestState {
+  const state = createIngestState();
+  for (const event of events) {
+    const { envelope } = event;
+    rememberEventId(state.seenEventIds, envelope.eventId);
+    if (envelope.runId === null) {
+      continue;
+    }
+    const existing = state.runs.get(envelope.runId);
+    if (existing === undefined || envelope.invocationSequence > existing.latestInvocationSequence) {
+      state.runs.set(envelope.runId, {
+        latestInvocationSequence: envelope.invocationSequence,
+        finalized: RUN_TERMINAL_EVENT_TYPES.has(envelope.type),
+      });
+    }
+  }
+  return state;
 }
 
 /**
@@ -203,6 +275,30 @@ export async function ingestEvent(
   const telemetryEvent = validateTelemetryEvent(raw);
   const { envelope } = telemetryEvent;
 
+  // Enforce the classification catalog at the boundary (AUDIT-20260717-11).
+  // `classifyEvent` is the single source of truth for an event type's storage
+  // class; it throws (fail loud) on an unregistered type. A wire classification
+  // that UNDER-states that decision (a downgrade — e.g. `run.started`, a
+  // durable historical-record event, mislabeled `live-only`) is REFUSED here so
+  // a malformed/buggy sidecar cannot strip a lifecycle event of the
+  // durability/retention FR-015 makes load-bearing. (An over-classification is
+  // a lesser cost-only concern and is not rejected — the derived registry never
+  // mints storage from the wire class on this path.)
+  const catalogClassification = classifyEvent(envelope.type);
+  if (
+    CLASSIFICATION_DURABILITY_RANK[envelope.classification] <
+    CLASSIFICATION_DURABILITY_RANK[catalogClassification]
+  ) {
+    throw new Error(
+      `ingestEvent: event type ${JSON.stringify(envelope.type)} is classified ` +
+        `${JSON.stringify(catalogClassification)} by the catalog, but the wire envelope ` +
+        `carries the weaker classification ${JSON.stringify(envelope.classification)} — refusing ` +
+        'this DOWNGRADE, which would drop the event below its catalog durability/retention ' +
+        '(FR-015, AUDIT-20260717-11). Classification is a deterministic property of the event ' +
+        'type; a sidecar may not under-state it.',
+    );
+  }
+
   // Idempotent ingestion (FR-042/FR-043): a re-delivered eventId is a
   // no-op, applied at most once. FR-042a: this short-circuit is an
   // OPTIMIZATION, not the correctness mechanism — with `dedupeEnabled:
@@ -214,7 +310,7 @@ export async function ingestEvent(
     if (state.seenEventIds.has(envelope.eventId)) {
       return { kind: 'duplicate', eventId: envelope.eventId };
     }
-    state.seenEventIds.add(envelope.eventId);
+    rememberEventId(state.seenEventIds, envelope.eventId);
   }
 
   const classified = toClassifiedEvent(telemetryEvent);
@@ -242,16 +338,15 @@ export async function ingestEvent(
     // run finalized is ALREADY-SUPERSEDED information — a reordered or
     // duplicate delivery of something that occurred before the point this
     // run is known to have reached, not new information the finalized view
-    // is missing. It cannot regress anything (the derived executionStatus
-    // no-regress guard lives independently in `src/plane/registry.ts`'s
-    // `applyRunEvent`, which never lets an older sequence move status
-    // backward), so it is safe to hand off as ordinary `accepted` data —
-    // e.g. a reordered `run.progress` tick still counts toward
-    // `progressEventCount` even though it arrived after the run's
-    // `run.completed` (SC-015: duplicate + reordered delivery must still
-    // land on the correct final state). Run bookkeeping (`latestInvocation
-    // Sequence` / `finalized`) is intentionally left untouched here.
-    return { kind: 'accepted', event: classified };
+    // is missing. It is STALE: it cannot advance the run and must not be
+    // folded into the live registry (AUDIT-20260717-04 — a stale/reordered
+    // `run.progress` tick delivered after the run's `run.completed` must NOT
+    // increment `progressEventCount`; the registry's own no-regress counting
+    // guard enforces the same, but classifying it `stale` here also keeps the
+    // superseded event out of the accepted/persisted event log entirely). Run
+    // bookkeeping (`latestInvocationSequence` / `finalized`) is intentionally
+    // left untouched.
+    return { kind: 'stale', event: classified };
   }
 
   if (

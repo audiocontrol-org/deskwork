@@ -47,18 +47,30 @@ export interface AcceptCommandInput {
   readonly kind: CommandKind;
   readonly installationId: string;
   readonly runId: string | null;
+  /**
+   * When this command expires (ISO-8601 instant), or `null`/absent for a
+   * command that never expires. Threaded into the delivery buffer's
+   * `HeldCommand.expiresAt` so `isExpired` can transition a never-acknowledged
+   * command to the visible terminal `expired` state (FR-055, C7 "held until
+   * delivered-and-acknowledged, expired, or superseded") — without it the
+   * dispatch layer's expiry check has no real value to honor and held commands
+   * grow unbounded (AUDIT-20260717-09).
+   */
+  readonly expiresAt?: string | null;
   readonly payload?: Readonly<Record<string, unknown>>;
 }
 
 /**
  * A durably-recorded command. Extends the accept input with the store-assigned
  * identity, lifecycle state, and ISO-8601 accept timestamp. This is the shape
- * persisted to disk and recovered on restart.
+ * persisted to disk and recovered on restart. `expiresAt` is normalized to a
+ * concrete `string | null` (never absent) on the durable record.
  */
 export interface CommandRecord extends AcceptCommandInput {
   readonly commandId: string;
   readonly state: CommandState;
   readonly acceptedAt: string;
+  readonly expiresAt: string | null;
 }
 
 /**
@@ -97,7 +109,7 @@ function parseRecord(raw: unknown, sourcePath: string): CommandRecord {
     );
   }
   const record: Record<string, unknown> = { ...raw };
-  const { commandId, kind, installationId, runId, state, acceptedAt, payload } = record;
+  const { commandId, kind, installationId, runId, state, acceptedAt, payload, expiresAt } = record;
   if (typeof commandId !== 'string' || commandId.length === 0) {
     throw new Error(`createCommandStore: durable record at ${sourcePath} has no commandId.`);
   }
@@ -122,6 +134,11 @@ function parseRecord(raw: unknown, sourcePath: string): CommandRecord {
       `createCommandStore: durable record at ${sourcePath} has no acceptedAt.`,
     );
   }
+  if (expiresAt !== undefined && expiresAt !== null && typeof expiresAt !== 'string') {
+    throw new Error(
+      `createCommandStore: durable record at ${sourcePath} has an invalid expiresAt.`,
+    );
+  }
   const parsedKind: CommandKind = toCommandKind(kind, sourcePath);
   const parsedState: CommandState = toCommandState(state, sourcePath);
   const base: CommandRecord = {
@@ -131,6 +148,7 @@ function parseRecord(raw: unknown, sourcePath: string): CommandRecord {
     runId,
     state: parsedState,
     acceptedAt,
+    expiresAt: typeof expiresAt === 'string' ? expiresAt : null,
   };
   if (payload === undefined) {
     return base;
@@ -247,6 +265,7 @@ export function createCommandStore(dir: string): CommandStore {
         );
       }
       const commandId = mintUuidV7();
+      const expiresAt: string | null = input.expiresAt ?? null;
       const record: CommandRecord =
         input.payload === undefined
           ? {
@@ -256,6 +275,7 @@ export function createCommandStore(dir: string): CommandStore {
               runId: input.runId,
               state: 'accepted',
               acceptedAt: new Date().toISOString(),
+              expiresAt,
             }
           : {
               commandId,
@@ -264,6 +284,7 @@ export function createCommandStore(dir: string): CommandStore {
               runId: input.runId,
               state: 'accepted',
               acceptedAt: new Date().toISOString(),
+              expiresAt,
               payload: { ...input.payload },
             };
       // Durable BEFORE we resolve — the fsynced write completes synchronously

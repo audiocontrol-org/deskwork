@@ -16,15 +16,7 @@
 import { buildCommandSurface } from './cli-help/command-surface.js';
 import { renderSubActionHelp, renderVerbHelp } from './cli-help/render-help.js';
 import { setInstallationNoticeVerb } from './config/installation.js';
-import { createEmitClient, resolveLocalSocketPath } from './telemetry/emit.js';
-import { constructEnvelope } from './fleet/event.js';
-import { classifyEvent } from './fleet/classification.js';
-import { mintUuidV7 } from './fleet/types.js';
-import { SystemClock } from './fleet/clock.js';
-import { mintOrReadInstallationId } from './machine-state/identity.js';
-import { locateMachineState } from './machine-state/locate.js';
-import { readHighWaterMark, advanceHighWaterMark } from './machine-state/highwater.js';
-import type { TelemetryEvent } from './fleet/event.js';
+import { runInvocationWithTelemetry } from './telemetry/invocation-telemetry.js';
 import { runVersion } from './subcommands/version.js';
 import { runExecuteCheck } from './subcommands/execute-check.js';
 import { runResolveTiers } from './subcommands/resolve-tiers.js';
@@ -255,58 +247,11 @@ async function main(): Promise<void> {
   // dispatched verb as its prefix (specs/installation-isolation US5).
   setInstallationNoticeVerb(verb);
 
-  // T044: Create emit client and wire telemetry (fail-open, never blocks).
-  // The emit client is created once per invocation and emits an
-  // invocation.completed event after the verb handler completes (FR-012).
-  const clock = new SystemClock();
-  const originMonotonicMs = clock.monotonicNowMs();
-  const invocationId = mintUuidV7();
-  let emitClient: ReturnType<typeof createEmitClient> | undefined;
-  try {
-    const socketPath = resolveLocalSocketPath(process.cwd());
-    emitClient = createEmitClient({
-      socketPath,
-      callerKind: 'short-verb',
-    });
-  } catch {
-    // Failed to resolve socket path — fail-open, continue without emit.
-    // (This is extremely unlikely in practice, but we never let telemetry
-    // infrastructure affect the invocation.)
-  }
-
-  await handler(args);
-
-  // Emit invocation.completed event (best-effort, never blocks/throws).
-  if (emitClient !== undefined) {
-    try {
-      const installationRoot = process.cwd();
-      const installationId = mintOrReadInstallationId(installationRoot);
-      const location = locateMachineState(installationRoot);
-      const installationSequence = advanceHighWaterMark(
-        location,
-        readHighWaterMark(location) + 1,
-      );
-
-      const event: TelemetryEvent = {
-        envelope: constructEnvelope(clock, originMonotonicMs, {
-          installationId,
-          invocationId,
-          runId: null, // short verbs are never commandable runs (FR-013)
-          installationSequence,
-          invocationSequence: 0, // sole event of this invocation
-          schemaVersion: 1,
-          type: 'invocation.completed',
-          classification: classifyEvent('invocation.completed'),
-        }),
-        snapshot: {},
-      };
-      emitClient.emit(event);
-    } catch {
-      // Fail-open: nothing about event construction can surface.
-    } finally {
-      emitClient.close();
-    }
-  }
+  // T044: run the handler wrapped in telemetry (fail-open, never blocks). The
+  // wrapper emits exactly one invocation.completed event (FR-012) and closes
+  // the emit client even when the handler throws, then re-throws the handler's
+  // original error unchanged so exit behavior is preserved (AUDIT-20260717-08).
+  await runInvocationWithTelemetry(handler, args);
 }
 
 main().catch((err: unknown) => {

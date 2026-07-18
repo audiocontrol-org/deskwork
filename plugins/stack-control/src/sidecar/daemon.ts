@@ -37,12 +37,15 @@
  * five identity/classification fields off `frame.event.envelope` and hand them
  * to the pipeline — which spools a fresh, sidecar-sequenced, REDACTED event.
  * The inbound frame's own `eventId`/sequences are deliberately discarded (the
- * sidecar is the authoritative durable outbound counter, FR-039), and the
- * inbound `snapshot` is NOT threaded through — `RawInvocationEvent` carries no
- * snapshot field today (a documented pipeline limitation, pipeline.ts's
- * NORMALIZE+REDACT note); when it grows one, only the pipeline changes. What
- * matters for FR-048 is preserved: redaction still runs inside `receive()`
- * BEFORE the WAL append.
+ * sidecar is the authoritative durable outbound counter, FR-039). The pipeline
+ * CAN now carry a redactable snapshot (pipeline.ts's `RawSnapshot`,
+ * AUDIT-20260717-12), but the daemon does NOT yet thread the inbound
+ * `frame.event.snapshot` through, because the local-socket `event` frame
+ * carries no per-field `FieldAllowlist` — with none, deny-by-default would drop
+ * every snapshot field anyway. Threading it needs the local-socket protocol to
+ * carry a field policy (out of scope here); until then the daemon spools
+ * identity-only. What matters for FR-048 is preserved either way: redaction
+ * still runs inside `receive()` BEFORE the WAL append.
  *
  * PLANE-URL / TOKEN RESOLUTION: the uplink is ACTIVE only when BOTH a plane URL
  * (explicit option ?? `STACKCTL_CP_URL`) AND a provisioned bearer token
@@ -114,11 +117,19 @@ export interface SidecarDaemonOptions {
   readonly transport?: SseTransport;
   /** Injected telemetry/liveness POST seam (default real fetch-backed poster). */
   readonly poster?: TelemetryPoster;
-  /** Fired for each command delivered over the plane's SSE stream. Consuming a
-   * command is this daemon's job (goal #3); delivering it onward to a local
-   * run over the socket (`register-run`/`command` frames) is a separate,
-   * not-yet-wired concern (flagged). */
+  /** The LOCAL-RUN delivery sink: fired for each command delivered over the
+   * plane's SSE stream so the daemon can route it onward to the target run.
+   * When this is provided, the daemon considers the command DELIVERED. Full
+   * command→local-run fan-in over the socket (`register-run`/`command` frames)
+   * is a larger tracked concern (TASK-461). */
   readonly onCommand?: (command: unknown) => void;
+  /** Observable record for a command that arrived over SSE but had NO local-run
+   * delivery sink (`onCommand` absent). The daemon MUST NOT silently discard a
+   * received command (AUDIT-20260717-17): with no sink, each command is
+   * recorded here as UNDELIVERED. Absent ⇒ a default recorder logs the
+   * undelivered command to stderr, so the production default path is never
+   * silent. */
+  readonly onUndeliveredCommand?: (command: unknown) => void;
   /** Best-effort observer for non-fatal background errors (drain/liveness
    * failures, malformed command frames). Telemetry never crashes the daemon. */
   readonly onError?: (error: unknown) => void;
@@ -151,6 +162,18 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
   const transport: SseTransport = options.transport ?? new FetchSseTransport();
   const poster: TelemetryPoster = options.poster ?? createTelemetryPoster();
   const onError = options.onError ?? ((): void => undefined);
+  // When no local-run delivery sink is wired, a received command must still be
+  // OBSERVABLE (AUDIT-20260717-17) — never silently `?.()`-dropped. The default
+  // recorder writes a "received but not delivered" line to stderr so the
+  // production default path (no injected sink) is loud, not silent.
+  const recordUndeliveredCommand =
+    options.onUndeliveredCommand ??
+    ((command: unknown): void => {
+      process.stderr.write(
+        `stackctl sidecar: received a plane command with no local-run delivery sink — ` +
+          `RECORDED AS UNDELIVERED (not routed to a run): ${JSON.stringify(command)}\n`,
+      );
+    });
 
   const location = locateMachineState(options.installationRoot);
   const installationId = mintOrReadInstallationId(options.installationRoot);
@@ -181,8 +204,10 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
       void ingestFrame(frame).catch((error: unknown) => onError(error));
     }
     // `register-run` / `end-invocation` are received but not yet routed to a
-    // local run's command delivery — a separate, not-yet-wired concern (goal
-    // scope is receive+spool+uplink+consume, not local command fan-in).
+    // local run's command delivery — the command→local-run fan-in is a larger
+    // tracked concern (TASK-461). Until it lands, a plane command with no
+    // `onCommand` sink is recorded as UNDELIVERED (see the SSE handler), never
+    // silently dropped (AUDIT-20260717-17).
   };
 
   // --- background state (populated only on a won election) -------------------
@@ -290,10 +315,21 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
       headers: bearerHeaders,
       onEvent: (e) => {
         if (e.event !== 'command') return;
+        let command: unknown;
         try {
-          options.onCommand?.(JSON.parse(e.data));
+          command = JSON.parse(e.data);
         } catch (error) {
+          // A malformed command frame is a non-fatal background error.
           onError(error);
+          return;
+        }
+        // Deliver to the local-run sink when one is wired; otherwise the
+        // command cannot reach a run — record it OBSERVABLY as undelivered
+        // rather than silently dropping it (AUDIT-20260717-17).
+        if (options.onCommand !== undefined) {
+          options.onCommand(command);
+        } else {
+          recordUndeliveredCommand(command);
         }
       },
     });

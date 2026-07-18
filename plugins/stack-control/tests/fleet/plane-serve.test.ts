@@ -251,6 +251,15 @@ describe('plane serve — assembled runtime end-to-end (T124, plane-client-api.m
     active = await startPlane();
     const { baseUrl } = active;
 
+    // A run must be OBSERVED before it can be commanded (AUDIT-20260717-16): the
+    // command is held for the run's owner, resolved from the live registry, so
+    // the plane refuses a command against a run it has never seen.
+    await fetch(`${baseUrl}/v1/ingest`, {
+      method: 'POST',
+      headers: { ...bearer(TOKEN), 'content-type': 'application/json' },
+      body: JSON.stringify(makeRawEvent({ runId: 'run-1', type: 'run.started', invocationSequence: 1 })),
+    });
+
     const issue = await fetch(`${baseUrl}/v1/runs/run-1/commands`, {
       method: 'POST',
       headers: { ...bearer(TOKEN), 'content-type': 'application/json' },

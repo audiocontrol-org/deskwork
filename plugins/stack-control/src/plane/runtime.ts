@@ -12,8 +12,10 @@
  *     perRunDetail / commandStatus /
  *     issueCommand / issueFleetCommand
  *     (http/api.ts)                        — the pure C2/C5/C6 projections.
- *   - ingestEvent / createIngestState
- *     (http/ingest.ts)                     — the telemetry acceptance boundary.
+ *   - ingestEvent / rehydrateIngestState
+ *     (http/ingest.ts)                     — the telemetry acceptance boundary,
+ *                                            rehydrated from the durable event
+ *                                            log on boot (AUDIT-20260717-14).
  *   - createCommandStore / createCommandDispatch
  *     (commands/*)                         — durable command custody + delivery.
  *   - createCommandStreamHandler (http/stream.ts) — SSE-out + 15s keepalive.
@@ -57,14 +59,27 @@ import {
   issueCommand,
   issueFleetCommand,
   perRunDetail,
+  runHistory,
+  runTimings,
   type FleetDelta,
 } from './http/api.js';
 import {
-  createIngestState,
   ingestEvent,
+  rehydrateIngestState,
   type DurableEventStore,
   type IngestState,
 } from './http/ingest.js';
+import { createEventLog, type EventLog } from './event-log.js';
+import {
+  assertSessionLiveness,
+  installationIdForRun,
+  parseCommandKind,
+  parseTargets,
+  readJsonBody,
+  requireParam,
+  respondJson,
+} from './runtime-http.js';
+import type { CdnReader } from '../storage/cdn-reader.js';
 import { createCommandStore, type CommandStore } from './commands/store.js';
 import { createCommandDispatch, type CommandDispatch } from './commands/dispatch.js';
 import {
@@ -87,7 +102,6 @@ import {
   type RouteHandler,
 } from './http/server.js';
 import type { TelemetryEvent } from '../fleet/event.js';
-import type { CommandKind } from '../fleet/command.js';
 
 // ---------------------------------------------------------------------------
 // Options + public surface.
@@ -110,100 +124,24 @@ export interface PlaneRuntimeOptions {
   /** Injected SSE keepalive scheduler (test seam). Defaults to
    * {@link NODE_INTERVAL_SCHEDULER}. */
   readonly scheduler?: IntervalScheduler;
+  /**
+   * Injected CDN-fronted archive reader (C7, AUDIT-20260717-13/-15). When
+   * provided, the `GET /v1/runs/:id/history` and `/timings` routes serve the
+   * finalized run's archived `summary.json` through it (the ONLY sanctioned
+   * durable-store read seam). When absent, those routes honestly report "no
+   * archive reader configured" (found: false / undefined phases) rather than
+   * fabricating a history. Injectable so tests exercise the READ path with a
+   * fake reader — no real B2 credentials. Production wiring of a real
+   * CDN-backed reader awaits the archival `summary.json` producer (TASK-459)
+   * and the object-store adapter; the read wiring is live here regardless.
+   */
+  readonly cdnReader?: CdnReader;
 }
 
 export interface PlaneRuntime {
   /** Build the wired `node:http` server (consumer + sidecar routes, all
    * bearer-gated). The caller owns `listen()`/`close()`. */
   createServer(): Server;
-}
-
-// ---------------------------------------------------------------------------
-// Small HTTP helpers (no framework — node:http only).
-// ---------------------------------------------------------------------------
-
-function respondJson(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { 'content-type': 'application/json' });
-  res.end(JSON.stringify(body));
-}
-
-function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => {
-      chunks.push(chunk);
-    });
-    req.on('end', () => {
-      const text = Buffer.concat(chunks).toString('utf8');
-      if (text.trim() === '') {
-        resolve(undefined);
-        return;
-      }
-      try {
-        resolve(JSON.parse(text));
-      } catch (error) {
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
-    });
-    req.on('error', (error) => reject(error));
-  });
-}
-
-const COMMAND_KINDS: readonly CommandKind[] = ['pause', 'resume', 'cancel', 'config-push', 'reconcile'];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** A path param the route pattern guarantees is present. The router only
- * invokes a handler after a positive regex match, so a `:name` segment
- * always resolved — this guard turns `noUncheckedIndexedAccess`'s
- * `string | undefined` into the `string` the route already promises, failing
- * loud (never a silent empty) if the invariant were ever violated. */
-function requireParam(ctx: RouteContext, name: string): string {
-  const value = ctx.params[name];
-  if (value === undefined) {
-    throw new Error(`plane runtime: route matched but path param ${JSON.stringify(name)} is missing.`);
-  }
-  return value;
-}
-
-function parseCommandKind(body: unknown): CommandKind {
-  if (!isRecord(body)) {
-    throw new Error('command request body must be a JSON object carrying a "kind".');
-  }
-  const { kind } = body;
-  const match = COMMAND_KINDS.find((candidate) => candidate === kind);
-  if (match === undefined) {
-    throw new Error(
-      `command "kind" must be one of ${COMMAND_KINDS.join(', ')}; got ${JSON.stringify(kind)}.`,
-    );
-  }
-  return match;
-}
-
-function parseTargets(body: unknown): string[] {
-  if (!isRecord(body)) {
-    throw new Error('fleet command body must be a JSON object.');
-  }
-  const { targets } = body;
-  if (!Array.isArray(targets) || targets.some((t) => typeof t !== 'string')) {
-    throw new Error('fleet command "targets" must be an array of installation-id strings.');
-  }
-  return targets.filter((t): t is string => typeof t === 'string');
-}
-
-function assertSessionLiveness(body: unknown): void {
-  if (
-    !isRecord(body) ||
-    body.kind !== 'session-liveness' ||
-    typeof body.installationId !== 'string' ||
-    typeof body.emittedAt !== 'string'
-  ) {
-    throw new Error(
-      'session-liveness heartbeat must carry { kind: "session-liveness", installationId, emittedAt }.',
-    );
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -236,8 +174,13 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
   });
 
   // --- live state ---------------------------------------------------------
-  const events: ClassifiedEvent[] = [];
-  const ingestState: IngestState = createIngestState();
+  // The accepted-event log is durable + replayed on boot (AUDIT-20260717-14):
+  // a plane restart over the same durable dir rehydrates the live registry and
+  // the ingest no-regress/dedupe bookkeeping, so fleet visibility survives a
+  // bounce (the ingesting sidecars won't re-send already-200'd events).
+  const eventLog: EventLog = createEventLog(join(options.commandStoreDir, 'accepted-events'));
+  const events: ClassifiedEvent[] = [...eventLog.replayed];
+  const ingestState: IngestState = rehydrateIngestState(events);
   const commandStore: CommandStore = createCommandStore(options.commandStoreDir);
   const commandDispatch: CommandDispatch = createCommandDispatch(commandStore);
 
@@ -329,29 +272,69 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
       }
       respondJson(ctx.res, 200, perRunDetail(entry));
     },
-    runHistory: (ctx) => {
-      // History reads through the CDN-fronted archive (C7). The archival
-      // producer that writes the finalized `summary.json` is a separate
-      // durable-store task; until it is wired here, this endpoint honestly
-      // reports "no archived history yet" rather than fabricating one.
-      respondJson(ctx.res, 200, { found: false, runId: ctx.params.runId });
+    runHistory: async (ctx) => {
+      // History reads the finalized run's archived `summary.json` through the
+      // injected CdnReader — the ONLY sanctioned durable-store read seam (C7,
+      // AUDIT-20260717-13/-15). The run's installationId is resolved from the
+      // live registry (the object key is per-installation).
+      const runId = requireParam(ctx, 'runId');
+      if (options.cdnReader === undefined) {
+        respondJson(ctx.res, 200, { found: false, runId });
+        return;
+      }
+      const installationId = installationIdForRun(events, runId);
+      if (installationId === undefined) {
+        respondJson(ctx.res, 200, { found: false, runId });
+        return;
+      }
+      try {
+        const result = await runHistory(options.cdnReader, installationId, runId);
+        respondJson(ctx.res, 200, result);
+      } catch (error) {
+        respondJson(ctx.res, 400, { error: error instanceof Error ? error.message : String(error) });
+      }
     },
-    runTimings: (ctx) => {
-      respondJson(ctx.res, 200, {
-        runId: ctx.params.runId,
+    runTimings: async (ctx) => {
+      const runId = requireParam(ctx, 'runId');
+      const absent = {
+        runId,
         phases: { design: undefined, spec: undefined, execution: undefined, governance: undefined },
-      });
+      };
+      if (options.cdnReader === undefined) {
+        respondJson(ctx.res, 200, absent);
+        return;
+      }
+      const installationId = installationIdForRun(events, runId);
+      if (installationId === undefined) {
+        respondJson(ctx.res, 200, absent);
+        return;
+      }
+      try {
+        const result = await runTimings(options.cdnReader, installationId, runId);
+        respondJson(ctx.res, 200, result);
+      } catch (error) {
+        respondJson(ctx.res, 400, { error: error instanceof Error ? error.message : String(error) });
+      }
     },
     issueRunCommand: async (ctx) => {
-      let body: unknown;
       try {
-        body = await readJsonBody(ctx.req);
+        const body = await readJsonBody(ctx.req);
         const kind = parseCommandKind(body);
-        const installationId = requireAuthedInstallation(ctx.req);
+        const runId = requireParam(ctx, 'runId');
+        // Resolve the run's OWNER from the live registry (AUDIT-20260717-16).
+        // The held command must target the installation that owns `runId`, NOT
+        // whichever bearer the caller authenticated with — otherwise
+        // `replayOnReconnect` delivers it to the wrong sidecar. An unknown run
+        // is rejected (the plane cannot command a run it has never observed).
+        const entry = buildRegistry(events).entries().find((candidate) => candidate.runId === runId);
+        if (entry === undefined) {
+          respondJson(ctx.res, 404, { error: 'run not found', runId });
+          return;
+        }
         const result = await issueCommand(commandStore, commandDispatch, {
           kind,
-          installationId,
-          runId: requireParam(ctx, 'runId'),
+          installationId: entry.installationId,
+          runId,
         });
         respondJson(ctx.res, 200, result);
       } catch (error) {
@@ -392,6 +375,9 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
       const outcome = await ingestEvent(ingestState, { durableStore }, body);
       if (outcome.kind === 'accepted') {
         events.push(outcome.event);
+        // Durably record every accepted event so a plane restart recovers the
+        // live registry (AUDIT-20260717-14).
+        eventLog.append(outcome.event);
       }
       uplinkSignals.lastSuccess = new Date().toISOString();
       respondJson(ctx.res, 200, outcome);

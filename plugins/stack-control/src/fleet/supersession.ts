@@ -18,6 +18,7 @@
 // `.js` imports under node16 resolution (no `@/` alias — this plugin has none).
 // No fallbacks / no silent defaults — an invalid case throws (fail loud).
 
+import { isTerminalCommandState } from './command.js';
 import type { Command, CommandKind } from './command.js';
 
 // Re-export canonical types so the test's import path works.
@@ -39,6 +40,15 @@ export type { Command, CommandKind } from './command.js';
  * reconcile never participates in supersession (return false).
  */
 export function supersedes(existing: Command, incoming: Command): boolean {
+  // Supersession is scoped to a still-UN-APPLIED existing command
+  // (data-model.md § Supersession — "while un-applied", FR-057). Once the
+  // existing command has reached a terminal state (applied / rejected /
+  // failed / expired / superseded) it is settled — a later command cannot
+  // supersede it, because doing so would erase a real, honest terminal state.
+  if (existing.state !== undefined && isTerminalCommandState(existing.state)) {
+    return false;
+  }
+
   // reconcile has its own long-running lifecycle (received → started →
   // completed/failed) and does not participate in simple supersession (FR-061).
   if (existing.kind === 'reconcile' || incoming.kind === 'reconcile') {

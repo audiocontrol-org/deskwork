@@ -57,14 +57,16 @@
  *     picks the WAL because it already durably counts exactly the thing
  *     this pipeline is doing: spooling).
  *
- * NORMALIZE+REDACT: `RawInvocationEvent` (this module's input shape) carries
- * only identity + type + classification — no free-text/path/commit-message/
- * error fields yet reach this seam. Redaction is still performed as a
- * structural pipeline stage (calling `redactEvent` from
- * `src/fleet/redact.ts` with the current, empty snapshot payload) so the
- * ORDERING invariant holds today and needs no rework when a later task
- * extends `RawInvocationEvent` with real snapshot content — only the
- * allowlist passed to `redactEvent` would need to grow.
+ * NORMALIZE+REDACT (AUDIT-20260717-12): `RawInvocationEvent` now carries an
+ * OPTIONAL `snapshot` — raw, un-redacted free-text/path/commit-message/error
+ * content plus its per-field `FieldAllowlist`. When present, `receive()`
+ * redacts it (via `redactEvent` from `src/fleet/redact.ts`) BEFORE the WAL
+ * append, so the bytes on disk are ALREADY the redacted bytes (FR-047/048,
+ * SC-013). When absent, the redacted snapshot is `{}` — the redaction STAGE
+ * still runs (over an empty payload) so the ORDERING invariant holds
+ * identically on both paths. The `RedactionContext` is an injected DI seam
+ * (default `createSystemRedactionContext(walDir)`) so a test can drive a
+ * deterministic context rather than the real machine's home/user/hostname.
  *
  * No `any`, no `as`, no `@ts-ignore` (Constitution Principle VI). Relative
  * `.js` imports under node16 resolution (no `@/` alias configured in this
@@ -73,12 +75,13 @@
  */
 
 import { SystemClock, type Clock } from '../fleet/clock.js';
-import { constructEnvelope, type TelemetryEvent } from '../fleet/event.js';
+import { constructEnvelope, type SnapshotPayload, type TelemetryEvent } from '../fleet/event.js';
 import type { EventClassification, EventType } from '../fleet/types.js';
 import {
   createSystemRedactionContext,
   redactEvent,
   type FieldAllowlist,
+  type RedactionContext,
 } from '../fleet/redact.js';
 import { openWal, type WalHandle } from './spool/wal.js';
 
@@ -102,6 +105,34 @@ export interface RawInvocationEvent {
   readonly runId: string | null;
   readonly type: EventType;
   readonly classification: EventClassification;
+  /**
+   * Optional raw, UN-redacted snapshot content plus the per-field policy the
+   * pipeline redacts it under. Present ⇒ `receive()` runs `redactEvent` over
+   * `content`/`allowlist` and spools the REDACTED result BEFORE the WAL append
+   * (FR-047/048, AUDIT-20260717-12). Absent ⇒ the spooled snapshot is `{}`.
+   */
+  readonly snapshot?: RawSnapshot;
+}
+
+/**
+ * A raw snapshot as handed to the pipeline: the un-redacted content and the
+ * `FieldAllowlist` describing each field's redaction policy (deny-by-default —
+ * a field absent from `allowlist` never reaches disk). The pipeline never
+ * spools `content` directly; only `redactEvent(content, allowlist, ctx)`.
+ */
+export interface RawSnapshot {
+  readonly content: SnapshotPayload;
+  readonly allowlist: FieldAllowlist;
+}
+
+/** Options for {@link createPipeline}. */
+export interface PipelineOptions {
+  /**
+   * The redaction context used for every `receive()` on this pipeline. Default
+   * `createSystemRedactionContext(walDir)` (the real machine). Injected so a
+   * test drives a deterministic context (Constitution Principle VI).
+   */
+  readonly redactionContext?: RedactionContext;
 }
 
 /**
@@ -179,13 +210,13 @@ function validateAndNormalize(raw: RawInvocationEvent): RawInvocationEvent {
 }
 
 /**
- * The redaction allowlist for this seam's current scope. Empty today
- * because `RawInvocationEvent` carries no free-text/path fields — see the
- * module header's NORMALIZE+REDACT note. A future task that threads real
- * snapshot content through `RawInvocationEvent` grows this allowlist; it
- * does not change the pipeline's ordering.
+ * The redaction allowlist used when an event carries NO snapshot. Empty
+ * because there is nothing to allow — deny-by-default over an empty payload
+ * yields `{}`. An event that DOES carry snapshot content supplies its own
+ * `FieldAllowlist` on `raw.snapshot.allowlist`.
  */
-const SNAPSHOT_REDACTION_ALLOWLIST: FieldAllowlist = {};
+const EMPTY_SNAPSHOT_ALLOWLIST: FieldAllowlist = {};
+const EMPTY_SNAPSHOT_CONTENT: SnapshotPayload = {};
 
 /**
  * Construct + open (or reuse) the WAL for `walDir`, lazily and at most
@@ -207,8 +238,12 @@ function createWalOpener(walDir: string): () => Promise<WalHandle> {
  * the crash-safe WAL spool (T084) is opened against. One pipeline instance
  * owns one WAL; every `receive()` call spools exactly one record to it.
  */
-export function createPipeline(walDir: string): SidecarPipeline {
+export function createPipeline(walDir: string, options?: PipelineOptions): SidecarPipeline {
   const clock: Clock = new SystemClock();
+  // The redaction context is resolved ONCE per pipeline instance (default: the
+  // real machine). Injected in tests for determinism.
+  const redactionContext: RedactionContext =
+    options?.redactionContext ?? createSystemRedactionContext(walDir);
   // A single monotonic origin for this pipeline instance's whole lifetime
   // (Clock's contract: "two same-process readings" — see clock.ts). Every
   // event's `monotonicOffsetMs` is relative to this origin.
@@ -264,13 +299,17 @@ export function createPipeline(walDir: string): SidecarPipeline {
       const raw = validateAndNormalize(rawInput);
 
       // 2. normalize+redact — BEFORE spooling (FR-048/049, module header).
-      // No free-text fields exist on RawInvocationEvent today; this call is
-      // still made so the pipeline STAGE exists at the correct position for
-      // when one does — its (currently empty) output IS the snapshot.
+      // If the event carries snapshot content, redact it under its own
+      // allowlist; otherwise redact an empty payload (still runs the stage at
+      // the correct position, yielding `{}`). The redacted output IS the
+      // snapshot that reaches disk — raw content NEVER does (AUDIT-20260717-12).
+      const rawSnapshot = rawInput.snapshot;
+      const snapshotContent = rawSnapshot?.content ?? EMPTY_SNAPSHOT_CONTENT;
+      const snapshotAllowlist = rawSnapshot?.allowlist ?? EMPTY_SNAPSHOT_ALLOWLIST;
       const snapshot: Readonly<Record<string, unknown>> = redactEvent(
-        {},
-        SNAPSHOT_REDACTION_ALLOWLIST,
-        createSystemRedactionContext(walDir),
+        snapshotContent,
+        snapshotAllowlist,
+        redactionContext,
       );
 
       // 3. assign eventId + sequence. `constructEnvelope` mints `eventId`

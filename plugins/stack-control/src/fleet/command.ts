@@ -87,6 +87,14 @@ export interface Command {
   readonly commandId: string;
   readonly kind: CommandKind;
   readonly revision?: number;
+  /**
+   * The command's current lifecycle state, when known to the caller. Optional
+   * because the state-machine core (`nextCommandState`) is stateless and most
+   * command *values* carry only identity + kind; supersession (FR-057), which
+   * is scoped to a still-*un-applied* command, reads it when present. Absent
+   * means "state unknown here — treat as un-applied for supersession."
+   */
+  readonly state?: CommandState;
 }
 
 /**
@@ -143,6 +151,38 @@ export function nextCommandState(current: CommandState, event: CommandEvent): Co
     );
   }
   return next;
+}
+
+/**
+ * True when `state` is terminal — no outgoing transition exists (`applied`,
+ * `rejected`, `failed`, `expired`, `superseded`). Derived from the same
+ * {@link TRANSITIONS} table the machine advances over, so terminality is
+ * defined in exactly one place (a terminal state is one whose outgoing-edge
+ * record is empty), never re-listed and drifting.
+ */
+export function isTerminalCommandState(state: CommandState): boolean {
+  return Object.keys(TRANSITIONS[state]).length === 0;
+}
+
+/**
+ * Observe a (re)delivery/(re)application of a command idempotently (FR-054 —
+ * "delivery is at-least-once"). Unlike {@link nextCommandState}, replaying an
+ * event onto an ALREADY-TERMINAL command is HARMLESS: it returns the existing
+ * terminal state unchanged — no state bounce, no side effect, and NO throw.
+ * This is the seam the at-least-once replay path (C7 "replays unexpired
+ * commands on reconnect") relies on: a sidecar that receives the same command
+ * twice observes the same settled state, not a false command failure.
+ *
+ * From a LIVE (non-terminal) state the event is still validated by
+ * {@link nextCommandState}, so a genuinely illegal *live* transition (e.g.
+ * `accepted` --apply--> skipping `delivered`/`received`) still throws — that is
+ * a real protocol error, not a benign replay.
+ */
+export function observeCommandReplay(current: CommandState, event: CommandEvent): CommandState {
+  if (isTerminalCommandState(current)) {
+    return current;
+  }
+  return nextCommandState(current, event);
 }
 
 /**

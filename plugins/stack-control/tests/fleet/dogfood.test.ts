@@ -290,6 +290,16 @@ describe('dogfood loop — terminal-drivable quickstart scenarios (T128, FR-087/
     const { installationRoot, installationId } = provisionInstallation();
     const plane = await startPlane(installationId);
 
+    // A run must be OBSERVED before it can be commanded (AUDIT-20260717-16): the
+    // command is held for the run's OWNER, resolved from the live registry. So
+    // ingest run-cmd (owned by THIS installation) first — then the command
+    // targets this daemon's installation and replays to its sidecar on connect.
+    await fetch(`${plane.baseUrl}/v1/ingest`, {
+      method: 'POST',
+      headers: { ...bearer(TOKEN), 'content-type': 'application/json' },
+      body: JSON.stringify(makeEvent(installationId, 'run-cmd', 'run.started')),
+    });
+
     // Issue the command BEFORE the sidecar connects → replay-on-connect delivers
     // it the moment the daemon's SSE stream opens.
     const issue = await fetch(`${plane.baseUrl}/v1/runs/run-cmd/commands`, {

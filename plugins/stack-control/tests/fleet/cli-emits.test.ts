@@ -1,135 +1,171 @@
-// specs/036-fleet-control-plane — T044 (RED), pairs with T039/T040/T041.
+// specs/036-fleet-control-plane — T044 / AUDIT-20260717-01 + -03 (rewritten to
+// actually exercise the CLI telemetry-emit path) + AUDIT-20260717-08 (handler
+// failure still emits + closes the socket).
 //
-// THE CONSTRAINT THAT DOMINATES THE FEATURE: the control plane must NEVER
-// degrade the tool it observes. Telemetry is not the verb's functionality — the
-// verb's contract (output, exit code, wall-clock) is UNCHANGED whether or not
-// anyone is observing. When no sidecar is reachable the CLI's local connect
-// fails IMMEDIATELY and the invocation continues unaffected.
+// THE PRIOR DEFECT (AUDIT-01/-03): this file CLAIMED to prove cli.ts wires a
+// real installationId + a monotonic installationSequence into the emitted
+// envelope and that dispatcher output/exit is unchanged when the sidecar is
+// absent — but its tests hand-built envelopes and never drove cli.ts, so a
+// regression to a hardcoded `installationSequence: 1` (or no CLI telemetry path
+// at all) would have shipped green. These tests now drive the REAL path:
+//   - a REAL dispatched short verb through the CLI entry surface (subprocess),
+//   - the REAL emit wrapper `runInvocationWithTelemetry` (extracted from cli.ts;
+//     cli.ts calls it verbatim) against a live UDS peer.
 //
-// This test proves (T044 spec):
-//   1. Dispatching a verb through cli.ts invokes emit exactly once per
-//      invocation (FR-012).
-//   2. An unavailable emit target does NOT change the dispatcher's output,
-//      exit code, or add measurable latency (fail-open SC-001/002).
-//   3. A LIVE sidecar actually receives the event frame (fail-open is
-//      best-effort delivery, not "never send").
-//   4. The emitted event carries a REAL, non-empty installationId sourced from
-//      machine-state identity (T024/T025/T026).
-//   5. installationSequence strictly increases across successive invocations
-//      (durable monotonic counter per installation, T028).
+// AUDIT-08: a handler that throws must STILL emit invocation.completed and close
+// the emit client, and must re-throw the original error unchanged.
 //
-// Real UDS sockets + real temp dirs. Real invocation of the dispatcher.
-// Relative `.js` imports under node16 (no `@/` alias configured).
+// Real UDS peer + real temp dirs + real subprocess CLI. Relative `.js` imports.
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { useMachineStateStore, assertTripwireEmpty } from './_machine-state-harness.js';
-import { startLocalSocketPeer, type LocalSocketPeer } from './_local-socket-peer.js';
+import { join } from 'node:path';
+import { useMachineStateStore } from './_machine-state-harness.js';
+import { startLocalSocketPeer, waitUntil, type LocalSocketPeer } from './_local-socket-peer.js';
+import { runCli } from '../../src/__tests__/_run-helpers.js';
+import { readPluginVersion } from '../../src/subcommands/version.js';
+import {
+  runInvocationWithTelemetry,
+  type InvocationTelemetryOptions,
+} from '../../src/telemetry/invocation-telemetry.js';
+import { createEmitClient, type EmitClient } from '../../src/telemetry/emit.js';
 import { mintOrReadInstallationId } from '../../src/machine-state/identity.js';
-import { createServer, type Server, type Socket } from 'node:net';
-import { constructEnvelope, validateEnvelope, type EnvelopeInput } from '../../src/fleet/event.js';
-import { SystemClock } from '../../src/fleet/clock.js';
-import { classifyEvent } from '../../src/fleet/classification.js';
+import { locateMachineState } from '../../src/machine-state/locate.js';
+import { readHighWaterMark } from '../../src/machine-state/highwater.js';
 
+const IS_WIN = process.platform === 'win32';
+
+function shortTmpBase(): string {
+  return IS_WIN ? tmpdir() : '/tmp';
+}
+
+const roots: string[] = [];
 const peers: LocalSocketPeer[] = [];
+
+/** A real installation-root dir (locate.ts's realpath.native requires it). */
+function makeInstallationRoot(): string {
+  const root = mkdtempSync(join(shortTmpBase(), 'scf-cliemit-inst-'));
+  roots.push(root);
+  return root;
+}
+
+const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 15));
+
+/** Parse the `event` frames the peer has received so far. */
+function eventFrames(peer: LocalSocketPeer): Array<{
+  event: { envelope: { type: string; installationId: string; installationSequence: number } };
+}> {
+  return peer.receivedLines
+    .map((line) => JSON.parse(line))
+    .filter((f): f is { event: { envelope: { type: string; installationId: string; installationSequence: number } } } =>
+      f !== null && typeof f === 'object' && f.kind === 'event',
+    );
+}
 
 afterEach(async () => {
   for (const peer of peers.splice(0)) await peer.close();
-  assertTripwireEmpty();
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
 describe('cli.ts telemetry wiring (T044, FR-012, SC-001/002)', () => {
   const store = useMachineStateStore();
 
-  it('RED: unfixed code produces envelope with EMPTY installationId — fails validation', () => {
-    const mstore = store();
+  it('AUDIT-01/03: a REAL dispatched short verb (sidecar absent) leaves stdout+exit unchanged AND advances the durable installationSequence (not hardcoded 1)', () => {
+    const root = makeInstallationRoot();
+    const location = locateMachineState(root);
+    // First-ever: no sequence emitted yet.
+    expect(readHighWaterMark(location)).toBe(0);
 
-    // Simulate what the OLD cli.ts did: construct an envelope with empty
-    // installationId and hardcoded sequence=1, as per the former TODO code.
-    const clock = new SystemClock();
-    const originMonotonicMs = clock.monotonicNowMs();
+    const expectedStdout = `${readPluginVersion()}\n`;
 
-    const buggyInput: EnvelopeInput = {
-      installationId: '', // EMPTY — the defect
-      invocationId: '00000000-0000-0000-0000-000000000000',
-      runId: null,
-      installationSequence: 1, // HARDCODED, not durable
-      invocationSequence: 1,
-      schemaVersion: 1,
-      type: 'invocation.completed',
-      classification: classifyEvent('invocation.completed'),
+    // A real subprocess CLI dispatch, sidecar absent (no peer bound at the
+    // resolved socket) → emit fails open. Output + exit are the verb's contract.
+    const r1 = runCli(['version'], { cwd: root, env: store().env });
+    expect(r1.status).toBe(0);
+    expect(r1.stdout).toBe(expectedStdout);
+    // The real telemetry path ran and reserved sequence 1 — a regression that
+    // hardcoded `installationSequence: 1` (or dropped the CLI telemetry path)
+    // would leave this at 0. This is the assertion the old tests lacked.
+    expect(readHighWaterMark(location)).toBe(1);
+
+    // A second invocation ADVANCES the counter — proves monotonic, not fixed.
+    const r2 = runCli(['version'], { cwd: root, env: store().env });
+    expect(r2.status).toBe(0);
+    expect(r2.stdout).toBe(expectedStdout);
+    expect(readHighWaterMark(location)).toBe(2);
+  });
+
+  it('AUDIT-01/03: a dispatched invocation emits EXACTLY ONE invocation.completed carrying the real minted installationId + an advancing sequence', async () => {
+    const peer = await startLocalSocketPeer('ack');
+    peers.push(peer);
+    const root = makeInstallationRoot();
+    const opts: InvocationTelemetryOptions = {
+      installationRoot: root,
+      socketPath: peer.socketPath,
     };
 
-    // The buggy code would build an envelope with these values.
-    const buggyEnvelope = constructEnvelope(clock, originMonotonicMs, buggyInput);
+    // First invocation.
+    await runInvocationWithTelemetry(async () => {
+      await tick();
+    }, [], opts);
+    await waitUntil(() => eventFrames(peer).length >= 1);
 
-    // Verify the defect: installationId is empty
-    expect(buggyEnvelope.installationId).toBe('');
+    const expectedId = mintOrReadInstallationId(root);
+    let frames = eventFrames(peer);
+    expect(frames).toHaveLength(1); // EXACTLY one event per invocation (FR-012)
+    expect(frames[0].event.envelope.type).toBe('invocation.completed');
+    expect(frames[0].event.envelope.installationId).toBe(expectedId);
+    expect(frames[0].event.envelope.installationId).not.toBe('');
+    expect(frames[0].event.envelope.installationSequence).toBe(1);
 
-    // Verify validateEnvelope REJECTS this invalid envelope.
-    // The validator requires installationId to be non-empty (src/fleet/event.ts:138).
-    expect(() => {
-      validateEnvelope(buggyEnvelope);
-    }).toThrow(/non-empty string/);
+    // Second invocation: a NEW event, sequence advances, id is stable (mint-once).
+    await runInvocationWithTelemetry(async () => {
+      await tick();
+    }, [], opts);
+    await waitUntil(() => eventFrames(peer).length >= 2);
 
-    // This test documents the RED condition: empty installationId envelopes
-    // fail validation and are useless.
+    frames = eventFrames(peer);
+    expect(frames).toHaveLength(2);
+    expect(frames.map((f) => f.event.envelope.installationSequence).sort()).toEqual([1, 2]);
+    for (const f of frames) {
+      expect(f.event.envelope.installationId).toBe(expectedId);
+      expect(f.event.envelope.type).toBe('invocation.completed');
+    }
   });
 
-  it('GREEN: fixed cli.ts produces envelope with REAL installationId + MONOTONIC sequence', () => {
-    const mstore = store();
+  it('AUDIT-08: a handler that THROWS still emits invocation.completed, closes the socket, and re-throws the original error', async () => {
+    const peer = await startLocalSocketPeer('ack');
+    peers.push(peer);
+    const root = makeInstallationRoot();
 
-    // After the fix, cli.ts will:
-    // 1. Read real installationId via mintOrReadInstallationId(root)
-    // 2. Read+advance real installationSequence via high-water mark
-    const installationRoot = mstore.root;
-    const expectedInstallationId = mintOrReadInstallationId(installationRoot);
-
-    const clock = new SystemClock();
-    const originMonotonicMs = clock.monotonicNowMs();
-
-    // Simulate the FIXED code:
-    const fixedInput: EnvelopeInput = {
-      installationId: expectedInstallationId, // REAL, from machine-state
-      invocationId: '00000000-0000-0000-0000-000000000000',
-      runId: null,
-      installationSequence: 1, // REAL, from high-water mark (at least 1)
-      invocationSequence: 0, // sole event of this invocation
-      schemaVersion: 1,
-      type: 'invocation.completed',
-      classification: classifyEvent('invocation.completed'),
+    // Capture the emit client so we can assert it was closed even on the throw.
+    let captured: EmitClient | undefined;
+    const createEmit: typeof createEmitClient = (cfg) => {
+      captured = createEmitClient(cfg);
+      return captured;
     };
 
-    // The fixed code builds an envelope with real values.
-    const fixedEnvelope = constructEnvelope(clock, originMonotonicMs, fixedInput);
+    const boom = new Error('boom-AUDIT-08');
+    await expect(
+      runInvocationWithTelemetry(
+        async () => {
+          await tick();
+          throw boom;
+        },
+        [],
+        { installationRoot: root, socketPath: peer.socketPath, createEmit },
+      ),
+    ).rejects.toBe(boom); // original error preserved
 
-    // Verify the fix: installationId is non-empty and correct
-    expect(fixedEnvelope.installationId).not.toBe('');
-    expect(fixedEnvelope.installationId).toBe(expectedInstallationId);
+    // FR-012: the failing invocation STILL emitted — the case a fleet monitor
+    // most wants to see. Pre-fix, the emit block was skipped on a throw.
+    await waitUntil(() => eventFrames(peer).length >= 1);
+    const frames = eventFrames(peer);
+    expect(frames).toHaveLength(1);
+    expect(frames[0].event.envelope.type).toBe('invocation.completed');
 
-    // Verify validateEnvelope ACCEPTS this valid envelope.
-    const validated = validateEnvelope(fixedEnvelope);
-    expect(validated.installationId).toBe(expectedInstallationId);
-    expect(validated.installationSequence).toBe(1);
-    expect(validated.invocationSequence).toBe(0);
-  });
-
-  it('an unavailable emit target does NOT change dispatcher output/exit code', async () => {
-    // An absent socket (no listener) — the emit client will fail-open.
-    // The dispatcher's behavior (output, exit code) must be UNCHANGED.
-    // The redirected socketPath points to a nonexistent socket, so emit will
-    // drop silently per C4/FR-007 (short-verb buffering asymmetry).
-    const redirectedStore = store();
-    expect(redirectedStore.runtimeDir).toBeTruthy();
-  });
-
-  it('emit adds no measurable latency vs a telemetry-disabled baseline', async () => {
-    // Measure the wall-clock cost of constructing an emit client to an
-    // unavailable socket (the ENOENT "no sidecar" case). The cost must stay
-    // below the fail-open latency budget (same measurement as T031 SC-001).
-    const redirectedStore = store();
-    expect(redirectedStore.runtimeDir).toBeTruthy();
+    // The emit client was closed even though the handler threw (no leaked socket).
+    expect(captured?.state).toBe('closed');
   });
 });

@@ -300,7 +300,10 @@ export async function issueCommand(
     kind: input.kind,
     installationId: input.installationId,
     runId: input.runId,
-    expiresAt: null,
+    // Thread the caller's TTL through to the delivery buffer so `isExpired`
+    // can honor it (FR-055). `null`/absent means "never expires"
+    // (AUDIT-20260717-09).
+    expiresAt: input.expiresAt ?? null,
   };
   dispatch.hold(held);
   return { commandId, state };
@@ -380,7 +383,8 @@ export async function issueFleetCommand(
       kind: input.kind,
       installationId: target,
       runId: input.runId,
-      expiresAt: null,
+      // Same TTL applies to every fanned-out target hold (FR-055/FR-062).
+      expiresAt: input.expiresAt ?? null,
     });
   }
   return {

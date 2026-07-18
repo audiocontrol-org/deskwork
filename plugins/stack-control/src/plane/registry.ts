@@ -267,7 +267,15 @@ function applyRunEvent(acc: RunAccumulator, event: ClassifiedEvent): void {
     acc.statusSequence = sequence;
   }
 
-  if (event.type === 'run.progress') {
+  // No-regress applies to COUNTING too (AUDIT-20260717-04): a `run.progress`
+  // tick only counts when it carries a STRICTLY-newer sequence than the run's
+  // applied high-water mark. A stale/reordered progress delivery (an older
+  // sequence than one already applied — e.g. a tick that arrives after a
+  // higher-sequence `run.completed` already advanced the run) must NOT
+  // increment the counter; counting it would reintroduce exactly the
+  // over-count the no-regress invariant exists to prevent (FR-042/SC-015).
+  // Checked BEFORE `latestInvocationSequence` is advanced below.
+  if (event.type === 'run.progress' && sequence > acc.latestInvocationSequence) {
     acc.progressEventCount += 1;
   }
 

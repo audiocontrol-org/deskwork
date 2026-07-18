@@ -178,10 +178,15 @@ describe('sidecar pipeline -> plane ingest -> registry: duplicate + reordered de
     if (finalEntry === undefined) throw new Error('unreachable');
 
     expect(finalEntry.statusAxes.executionStatus).toBe('completed');
-    // Effectively-once: exactly 2 DISTINCT run.progress events were ever
-    // emitted by the sidecar; duplicate delivery of progress2 must not
-    // double-count it.
-    expect(finalEntry.progress.progressEventCount).toBe(2);
+    // No-regress applies to COUNTING too (AUDIT-20260717-04). In THIS delivery
+    // order both progress ticks (seq 2 and 3) arrive AFTER `completed` (seq 4)
+    // has already advanced the run's high-water mark to 4 — so each is a
+    // stale/superseded delivery under the same no-regress contract
+    // `ingest.test.ts` case (c) pins. A stale progress event must NEVER
+    // increment `progressEventCount` (counting it would reintroduce exactly the
+    // over-count no-regress exists to prevent). The correct final count for
+    // this reordered delivery is therefore 0, not 2.
+    expect(finalEntry.progress.progressEventCount).toBe(0);
     expect(finalEntry.progress.latestInvocationSequence).toBe(completed.envelope.invocationSequence);
     expect(finalEntry.availableActions).toEqual([]); // completed run offers no actions
   });

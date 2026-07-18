@@ -34,6 +34,7 @@ import type { Clock } from '../../src/fleet/clock.js';
 import { constructEnvelope, type EnvelopeInput, type TelemetryEvent } from '../../src/fleet/event.js';
 import { mintInstallationId, mintUuidV7 } from '../../src/fleet/types.js';
 import {
+  LOCAL_PROTOCOL_VERSION,
   buildHelloAckFrame,
   parseCliToSidecarFrame,
   serializeFrame,
@@ -41,8 +42,16 @@ import {
   type HelloFrame,
 } from '../../src/telemetry/protocol.js';
 
-/** How the peer behaves for every connection it accepts. */
-export type PeerMode = 'ack' | 'stall';
+/** How the peer behaves for every connection it accepts.
+ *   - 'ack':      well-behaved sidecar — answers `hello` with a MATCHING `hello-ack`.
+ *   - 'stall':    accepts, then goes silent forever (the T032 cruelty).
+ *   - 'mismatch': answers `hello` with a version-MISMATCHED `hello-ack`, driving
+ *                 the C3 restart path — used by the AUDIT-20260717-02 retention test. */
+export type PeerMode = 'ack' | 'stall' | 'mismatch';
+
+/** A sidecar protocol version deliberately different from the CLI's local one,
+ * so its `hello-ack` is interpreted as a mismatch (C3). */
+const MISMATCH_PROTOCOL_VERSION = LOCAL_PROTOCOL_VERSION + 1000;
 
 /** A running real-UDS peer plus everything a test needs to drive + inspect it. */
 export interface LocalSocketPeer {
@@ -138,7 +147,9 @@ export async function startLocalSocketPeer(mode: PeerMode): Promise<LocalSocketP
       // write, no end(), no close. The cruelty T032 exists to survive.
       return;
     }
-    // 'ack' mode: read frames, record them, answer a hello with a hello-ack.
+    // 'ack' / 'mismatch' mode: read frames, record them, answer a hello with a
+    // hello-ack. 'ack' matches the CLI's version; 'mismatch' answers with a
+    // deliberately-different sidecar version so the CLI sees a C3 mismatch.
     let buffered = '';
     socket.on('data', (chunk: string) => {
       buffered += chunk;
@@ -149,7 +160,8 @@ export async function startLocalSocketPeer(mode: PeerMode): Promise<LocalSocketP
         const parsed = parseCliToSidecarFrame(line);
         if (parsed.ok && parsed.frame.kind === 'hello') {
           const hello: HelloFrame = parsed.frame;
-          socket.write(serializeFrame(buildHelloAckFrame(hello)));
+          const ackVersion = mode === 'mismatch' ? MISMATCH_PROTOCOL_VERSION : LOCAL_PROTOCOL_VERSION;
+          socket.write(serializeFrame(buildHelloAckFrame(hello, ackVersion)));
         }
       }
     });

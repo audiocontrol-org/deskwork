@@ -23,13 +23,14 @@
 
 import { describe, expect, it } from 'vitest';
 import { supersedes, type Command, type CommandKind } from '../../src/fleet/supersession.js';
+import type { CommandState } from '../../src/fleet/command.js';
 import { mintUuidV7 } from '../../src/fleet/types.js';
 
-function makeCommand(kind: CommandKind, opts?: { revision?: number; state?: string }): Command {
-  const base: Command = {
-    commandId: mintUuidV7(),
-    kind,
-  };
+function makeCommand(kind: CommandKind, opts?: { revision?: number; state?: CommandState }): Command {
+  const base: Command =
+    opts?.state !== undefined
+      ? { commandId: mintUuidV7(), kind, state: opts.state }
+      : { commandId: mintUuidV7(), kind };
   if (kind === 'config-push' && opts?.revision !== undefined) {
     return { ...base, revision: opts.revision };
   }
@@ -98,13 +99,19 @@ describe('supersedes (T061, data-model § Supersession — per-command, never ge
   });
 
   it('a `resume` does NOT supersede a `pause` when the pause is already applied (terminal)', () => {
-    // The spec says "while un-applied" — once applied, resume cannot supersede it.
-    // If the state machine encodes this, a test confirms the boundary.
-    const pause = makeCommand('pause');
+    // data-model.md § Supersession scopes pause/resume supersession to "while
+    // un-applied" (FR-057). The applied boundary is load-bearing: an
+    // already-applied pause is settled and a later resume must NOT supersede it
+    // (superseding a done command would erase a real, honest terminal state).
+    const appliedPause = makeCommand('pause', { state: 'applied' });
     const resume = makeCommand('resume');
 
-    // This assumes the Command type can express applied state; if it does,
-    // a third test would verify applied pause is not superseded. Placeholder here.
-    expect(typeof supersedes).toBe('function');
+    expect(supersedes(appliedPause, resume)).toBe(false);
+
+    // Control: the SAME resume DOES supersede an un-applied pause — so the
+    // false above is caused by the applied boundary, not by resume never
+    // superseding pause at all.
+    const unappliedPause = makeCommand('pause');
+    expect(supersedes(unappliedPause, resume)).toBe(true);
   });
 });

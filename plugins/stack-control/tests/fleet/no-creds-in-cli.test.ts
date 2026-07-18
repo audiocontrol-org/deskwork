@@ -1,4 +1,4 @@
-// specs/036-fleet-control-plane — T110 (RED)
+// specs/036-fleet-control-plane — T110 (RED), hardened per AUDIT-20260717-06
 // contracts/sidecar-plane-protocol.md § C6: "Credentials live in the sidecar
 // only — never in a CLI process, never on the local socket."
 //
@@ -9,12 +9,38 @@
 // NOT load, hold, or touch bearer credentials — they live machine-local in
 // the sidecar's custody only.
 //
-// Assertions (RED phase, unfixed code):
-//   1. The CLI emit path imports src/telemetry/emit.js — assert that its
-//      source file does NOT import from src/machine-state/token.js (the module
-//      that T118 will build). Structural guard: token is not on the CLI's graph.
-//   2. TOKEN_FILE_MODE === 0o600 — the sidecar-local token file mode.
-//   3. TokenCustody.read() returns the token from a real machine-state dir
+// AUDIT-20260717-06 (fix): the original guard here only read
+// src/telemetry/emit.ts and regex-checked THAT ONE FILE for a direct
+// reference to the token module. It would have PASSED even if emit.ts
+// imported some helper that itself (or transitively) imported
+// src/machine-state/token.ts — the credential module would still load into
+// every CLI process. The fix below walks the STATIC MODULE IMPORT GRAPH
+// transitively from the emit path's entry file, following every relative
+// `.js`/`.ts` import, and fails if ANY reachable module resolves to
+// src/machine-state/token.ts. A same-file self-check (below) proves the
+// walker itself can catch a transitive (2-hop) leak — not just a direct one
+// — so the strengthened guard has teeth, not just a wider vacuous scope.
+//
+// SCOPE NOTE: the walk starts at src/telemetry/emit.ts (the entry the
+// finding names), not the whole of src/cli.ts. src/cli.ts statically
+// imports EVERY subcommand module for its dispatch table, including
+// src/subcommands/plane.ts — which LEGITIMATELY imports token.ts for the
+// operator-run `plane provision-token` verb (T119; that verb's entire job
+// is to provision the credential). Walking from cli.ts's full static
+// import list would flag that legitimate, unrelated verb as a false
+// positive. The concern this test guards — SC-011, "the telemetry emit
+// path never touches credentials" — is specifically about the emit path,
+// which is why the finding itself named src/telemetry/emit.ts as the walk
+// root.
+//
+// Assertions:
+//   1. Every module transitively reachable (via static relative imports)
+//      from src/telemetry/emit.ts is NOT src/machine-state/token.ts.
+//   2. Self-check: the same graph-walker, run against an in-test fixture
+//      graph where A -> B -> token-like-module, DOES flag the transitive
+//      leak — proving the walker's transitivity is real, not vacuous.
+//   3. TOKEN_FILE_MODE === 0o600 — the sidecar-local token file mode.
+//   4. TokenCustody.read() returns the token from a real machine-state dir
 //      (0o600 file in a real temp dir, no mocked fs).
 //
 // The assumed API (design for T118 impl to conform to):
@@ -26,9 +52,73 @@
 // no `@ts-ignore`.
 
 import { describe, expect, it, afterEach } from 'vitest';
-import { readFileSync, writeFileSync, rmSync, mkdtempSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, rmSync, mkdtempSync, existsSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+
+/**
+ * Matches a relative import/require/dynamic-import specifier:
+ *   import X from './y.js'
+ *   import type { X } from '../y.js'
+ *   export { X } from './y.js'
+ *   export * from './y.js'
+ *   require('./y.js')
+ *   import('./y.js')
+ * Bare/package specifiers (no leading `./` or `../`) are deliberately
+ * excluded — they resolve into node_modules, which cannot reach our own
+ * source tree, so following them would only add noise to the walk.
+ */
+const RELATIVE_IMPORT_RE = /(?:from\s+|require\(\s*|import\(\s*)['"](\.\.?\/[^'"]+)['"]/g;
+
+/**
+ * Resolve a relative import specifier (as written in source, e.g. './foo.js'
+ * or '../bar') against the importing file's directory, into a real path on
+ * disk. Source files are `.ts` but node16-resolution specifiers say `.js`
+ * (or, in this codebase's dynamic-import test helpers, sometimes bear `.ts`
+ * directly) — try both, plus an `index.ts` directory-import fallback.
+ */
+function resolveRelativeImport(fromFile: string, specifier: string): string | undefined {
+  const dir = dirname(fromFile);
+  const withoutExt = specifier.replace(/\.(js|ts|tsx)$/, '');
+  const candidates = [
+    resolve(dir, `${withoutExt}.ts`),
+    resolve(dir, `${withoutExt}.tsx`),
+    resolve(dir, withoutExt, 'index.ts'),
+    resolve(dir, specifier),
+  ];
+  return candidates.find((candidate) => existsSync(candidate));
+}
+
+/**
+ * Walk the static module import graph transitively, starting at
+ * `entryFile`, following only relative `.js`/`.ts` specifiers. Returns the
+ * set of every real file path reachable (including the entry file itself).
+ * This is the mechanism AUDIT-20260717-06 requires in place of a single-file
+ * regex check: a module is "on the graph" if it is reachable through ANY
+ * chain of static imports, not only a direct one.
+ */
+function collectReachableModules(entryFile: string): Set<string> {
+  const visited = new Set<string>();
+  const stack = [entryFile];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === undefined || visited.has(current)) continue;
+    visited.add(current);
+
+    const source = readFileSync(current, 'utf8');
+    for (const match of source.matchAll(RELATIVE_IMPORT_RE)) {
+      const specifier = match[1];
+      if (specifier === undefined) continue;
+      const resolved = resolveRelativeImport(current, specifier);
+      if (resolved !== undefined && !visited.has(resolved)) {
+        stack.push(resolved);
+      }
+    }
+  }
+
+  return visited;
+}
 
 describe('no credentials in CLI process (T110, C6, SC-011)', () => {
   let tempDir: string | undefined;
@@ -43,31 +133,57 @@ describe('no credentials in CLI process (T110, C6, SC-011)', () => {
     }
   });
 
-  it('CLI emit path (src/telemetry/emit.ts) does NOT import token-custody module — structural guard against CLI holding credentials', () => {
-    // Read the actual emit.ts source to verify it does not import from the
-    // token-custody module (src/machine-state/token.ts). This is a structural
-    // guarantee that the bearer token is not on the CLI's import graph.
-    const emitSourcePath = join(
-      __dirname,
-      '../../src/telemetry/emit.ts',
+  it('AUDIT-20260717-06 self-check: the graph-walker catches a TRANSITIVE leak (A -> B -> token-like), not just a direct one', () => {
+    // Build a tiny fixture graph on disk: fixtureA imports fixtureB, and
+    // fixtureB (NOT fixtureA directly) imports a stand-in "token" module.
+    // If the walker only checked direct imports of the entry file (the
+    // bug AUDIT-20260717-06 identifies), this would NOT be flagged. A
+    // correct transitive walker must still find it.
+    tempDir = mkdtempSync(join(tmpdir(), 'test-import-graph-'));
+
+    const tokenLikePath = join(tempDir, 'token-like.ts');
+    const fixtureBPath = join(tempDir, 'fixture-b.ts');
+    const fixtureAPath = join(tempDir, 'fixture-a.ts');
+
+    writeFileSync(tokenLikePath, 'export const CREDENTIAL = "shh";\n', 'utf8');
+    writeFileSync(
+      fixtureBPath,
+      "import { CREDENTIAL } from './token-like.js';\nexport const reexported = CREDENTIAL;\n",
+      'utf8',
+    );
+    writeFileSync(
+      fixtureAPath,
+      "import { reexported } from './fixture-b.js';\nexport const value = reexported;\n",
+      'utf8',
     );
 
-    // In the RED phase, emit.ts exists but token.ts does not.
-    // After T118 lands, token.ts will exist; the assertion still holds:
-    // emit.ts must never import from it.
-    const emitSource = readFileSync(emitSourcePath, 'utf8');
+    const reachable = collectReachableModules(fixtureAPath);
 
-    // Assert no import/require of the token module.
-    expect(emitSource).not.toMatch(/from\s+['"].*machine-state\/token/);
-    expect(emitSource).not.toMatch(/require\(['"].*machine-state\/token/);
+    // The walker must have followed fixtureA -> fixtureB -> token-like, two
+    // hops deep, proving transitivity actually works.
+    expect(reachable.has(fixtureBPath)).toBe(true);
+    expect(reachable.has(tokenLikePath)).toBe(true);
+  });
 
-    // Additional safety: assert no reference to "token" that suggests credential
-    // handling (this is less strict than the import check, but catches sneakier
-    // patterns like dynamic requires or manual credential passing).
-    // We allow the word "token" in comments/strings, so we're looking for
-    // patterns that suggest CODE using a token, not just mentioning it.
-    // This is a secondary check; the primary guard is the import assertion.
-    expect(emitSource).not.toMatch(/TokenCustody|openTokenCustody|TOKEN_FILE_MODE/);
+  it('CLI emit path (src/telemetry/emit.ts) does NOT transitively reach the token-custody module anywhere on its static import graph', () => {
+    const emitSourcePath = resolve(__dirname, '../../src/telemetry/emit.ts');
+    const tokenModulePath = resolve(__dirname, '../../src/machine-state/token.ts');
+
+    const reachable = collectReachableModules(emitSourcePath);
+
+    // Structural guard: the token-custody module must not appear ANYWHERE
+    // in the transitive graph reachable from the emit path's entry file —
+    // not as a direct import, and not N hops away through a helper.
+    expect(reachable.has(tokenModulePath)).toBe(false);
+
+    // Belt-and-suspenders: also confirm none of the reachable files
+    // reference the token module's known exports by name (catches a
+    // same-directory copy/paste of the credential-reading logic that
+    // wouldn't show up as an import of token.ts itself).
+    for (const file of reachable) {
+      const source = readFileSync(file, 'utf8');
+      expect(source).not.toMatch(/TokenCustody|openTokenCustody|TOKEN_FILE_MODE/);
+    }
   });
 
   it('TOKEN_FILE_MODE is 0o600 — the machine-local durable token file mode', async () => {
