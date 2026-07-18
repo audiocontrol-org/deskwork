@@ -10,11 +10,11 @@
 
 ## Context
 
-Feature 036 (Fleet Control Plane) shipped a **run-centric** model: the fleet is a table of commandable `execute`/`govern` runs, and the plane's registry builds rows only from `run.*` events. A live dogfood on 2026-07-18 established that 036's plane-internal machinery is real, correct, and tested, but **no real producer exists** — real verbs never populate the fleet, phase-duration and history surfaces serve absent data, and 036's mandated end-to-end verification was signed off against **synthetic events POSTed to the ingest endpoint, not real runs** (see `TASK-470`, `TASK-471`, and the gap audits). So 036 is not delivered against its own spec.
+Feature 036 (Fleet Control Plane) built the plane's transport — sidecar election, the crash-safe spool WAL, the uplink, the HTTP plane scaffolding, the fail-open emission path, the event classification seam, and bearer auth — under a **run-centric** model: the fleet is a table of commandable `execute`/`govern` runs, and the registry builds rows only from `run.*` events. That transport is real and tested, and is reused wholesale here. Two limits of the *model* motivate this feature: the producers that would emit real lifecycle telemetry were never wired (so real activity does not populate the plane), and — more fundamentally — the run is the wrong root object.
 
-The reframe that motivates this feature (operator, 2026-07-18): **"Control starts at observability. You cannot control something you cannot observe."** The unit worth observing is not a run — it is the **instance**: every connected sidecar/worktree and its live state. Runs are one facet of an instance's activity, not the center. The immediate goal is not to answer every possible question — it is to **start collecting real telemetry** so we can reason about what is answerable now and what data is still missing.
+The reframe that motivates this feature: **"Control starts at observability. You cannot control something you cannot observe."** The unit worth observing is not a run — it is the **instance**: every connected sidecar/worktree and its live state. Runs are one facet of an instance's activity, not the center. The immediate goal is not to answer every possible question — it is to **start collecting real telemetry** so we can reason about what is answerable now and what data is still missing.
 
-This feature builds the instance-centric model **on top of 036's existing, tested plumbing** — sidecar election, the crash-safe spool WAL, the uplink, the HTTP plane scaffolding, the fail-open emission path, the event classification seam, and bearer auth are reused unchanged. The new work is the producers 036 never built, an instance-registry projection, and a read-only query API.
+The new work is therefore the producers that emit real lifecycle telemetry, an instance-registry projection, and a read-only query API — all built on the reused transport.
 
 ### Scope boundary — observability, not control
 
@@ -22,9 +22,9 @@ This feature builds the instance-centric model **on top of 036's existing, teste
 
 **Out of scope, by explicit decision — a named follow-on, not a dropped requirement:** *issuing commands or control* against instances (pause/cancel/reconcile/config-push and any state-changing action on an observed instance). Control is built on top of observability once we can see. Nothing here forecloses it; the identity, event, and registry model are shaped so control layers on cleanly.
 
-### Relationship to 036
+### Relationship to the prior fleet control plane (036)
 
-036's roadmap node is still `status: planned`; only its govern *convergence record* graduated, over code that does not satisfy its own spec. This feature is the corrected architecture. Its reusable plane/sidecar internals carry forward unchanged; 036's run-centric model becomes a **facet** of the instance view (see FR on runs-as-facet). Implementing this supersedes 036's stale convergence record on re-govern.
+This feature reuses feature 036's transport wholesale (named above) and **inverts its model**: where 036 made the run the root object and the fleet a table of runs, this makes the **instance** the root and 036's runs a **facet** of an instance (see the runs-as-facet requirement, FR-025). The two are one continuous body of work on the same plane, not competing designs.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -94,10 +94,10 @@ An operator asks what an instance's current compass bearing is (which lifecycle 
 
 **Identity**
 
-- **FR-001**: The system MUST identify an instance as `host:path` — the machine hostname plus the canonicalized (`realpath`) installation-root path.
-- **FR-002**: The instance identity MUST be **derived at runtime, never minted and never persisted as a value in the version-controlled tree**, so it cannot become branch-global or produce a merge conflict.
-- **FR-003**: The instance identity MUST be **stable across sidecar restarts** (recomputed identically from host + path), so an instance's history accumulates across restarts, idle-exits, and reboots; a restart is a liveness event on the instance's timeline, not a new instance.
-- **FR-004**: The same checkout path on two different machines MUST resolve to two distinct instances (the `host` component disambiguates) — zero identity collision.
+- **FR-001**: The system MUST identify each instance by a stable **Instance Identity** — a git-safe, collision-free, human-legible identifier. Its **current derivation** is `host:path` (the machine hostname plus the canonicalized (`realpath`) installation-root path); the derivation MAY later evolve (e.g. a configured stable host-id) without changing the identity's required properties in FR-002–FR-004. The conceptual model depends on the properties, not on the derivation.
+- **FR-002**: The Instance Identity MUST be **derived at runtime, never minted and never persisted as a value in the version-controlled tree**, so it cannot become branch-global or produce a merge conflict.
+- **FR-003**: The Instance Identity MUST be **stable across sidecar restarts** (recomputed identically from its inputs), so an instance's history accumulates across restarts, idle-exits, and reboots; a restart is a liveness event on the instance's timeline, not a new instance.
+- **FR-004**: The same checkout path on two different machines MUST resolve to two distinct instances (under the current derivation, the `host` component disambiguates) — zero identity collision.
 
 **The event / identity hierarchy**
 
@@ -117,8 +117,10 @@ An operator asks what an instance's current compass bearing is (which lifecycle 
 
 **The instance registry & the state it exposes**
 
-- **FR-015**: The plane MUST maintain an **instance registry** that folds the event stream into one `InstanceState` per instance, and MUST rehydrate it from the durable event log on restart so a bounce does not reset lifetime state.
-- **FR-016**: `InstanceState` MUST expose: `id` (`host:path`), `host`, `path`; `connection` (uplinked / disconnected) and `liveness` (live / stale) and `lastHeartbeatAt`; `currentSession` (`{sessionId, startedAt}` or none); `currentBearing` (`{phase, item}`); `lastActivityAt` and `lastActivity`; `sessionsStarted` and `sessionsEnded`; `firstSeenAt` and `firstSessionAt`; `phaseDurations` (design/spec/execution/governance); and `recentActivity` (a bounded recent-event list).
+- **FR-015**: The plane MUST maintain an **instance registry** — a **materialized projection**, not a source of truth. The durable event log is the authoritative record of facts; the registry is a derived view that folds the event stream (plus live signals) into one `InstanceState` per instance, and MUST rehydrate from the durable event log on restart so a bounce does not reset lifetime state. Every `InstanceState` field is a projection of underlying events, never an independently-authoritative value.
+- **FR-016**: `InstanceState` MUST expose: `id` (the Instance Identity), `host`, `path`; the two independent status axes `connection` and `liveness` (FR-016a) and `lastHeartbeatAt`; `currentSession` (`{sessionId, startedAt}` or none); `currentBearing` (`{phase, item}`); `lastActivityAt` and `lastActivity`; `sessionsStarted` and `sessionsEnded`; `firstSeenAt` and `firstSessionAt`; `phaseDurations` (design/spec/execution/governance); and `recentActivity` (FR-016b).
+- **FR-016a**: `connection` and `liveness` are **two independent axes** and MUST be defined precisely (they can diverge — e.g. an open uplink to a hung instance is `attached` + `stale`). `connection` is whether the instance's sidecar currently has an open uplink to the plane: `attached` | `disconnected`. `liveness` is how recently the plane last received any signal from the instance: `live` (within the liveness window) | `stale` (past the window but within the reconciliation grace) | `gone` (past the reconciliation grace). Neither axis is derived from the other.
+- **FR-016b**: `recentActivity` is a **bounded, newest-first list of the instance's most recent events, capped at a fixed N** — a best-effort convenience view, explicitly **not** a complete or authoritative history (full history is not this field's job). Entries beyond the cap are evicted; on rehydrate it is rebuilt from the retained window.
 - **FR-017**: `InstanceState` MUST NOT carry a `waiting`/`blocked` field in this feature — the telemetry to populate it is undefined and a null field would mislead. It is recorded as an open question only.
 - **FR-018**: A phase duration that has not been observed MUST be reported as **absent**, never fabricated as zero.
 - **FR-019**: The instance registry MUST NOT regress an instance to an earlier state on duplicate or reordered event delivery (reusing 036's no-regress / effectively-once ingest contract).
@@ -138,16 +140,16 @@ An operator asks what an instance's current compass bearing is (which lifecycle 
 
 **Verification discipline (first-class, non-negotiable — Principle I)**
 
-- **FR-027**: The feature MUST be verified by dogfooding **real producers end-to-end** — a real `/stack-control:session-start`, real `stackctl` verbs, a real phase transition, then `GET /v1/instances` showing a real instance with real state — and MUST NOT be considered delivered on the basis of synthetic events injected at the ingest endpoint. A green automated test suite is the floor, not the proof. (This is the exact discipline 036 violated.)
+- **FR-027**: Verification MUST include real end-to-end telemetry produced by production producers (a real `/stack-control:session-start`, real `stackctl` verbs, a real phase transition, then `GET /v1/instances` showing a real instance with real state). Synthetic event injection is insufficient for feature acceptance; a green automated test suite is the floor, not the proof.
 
 ### Key Entities
 
-- **Instance**: A connected sidecar/worktree, identified by `host:path` (derived, machine-local). The top-level observable unit. Carries the folded `InstanceState`.
+- **Instance**: A connected sidecar/worktree, identified by its **Instance Identity** (FR-001; currently derived as `host:path`, machine-local). The top-level observable unit. Carries the folded `InstanceState`.
 - **Session**: The span from `/stack-control:session-start` to `/stack-control:session-end`, with a stack-control-minted session id; many over an instance's life; may be open (unclosed) as a first-class state.
 - **Invocation / Run**: One `stackctl` process (invocation) or an `execute`/`govern` run (the commandable subset, observed here) within a session.
-- **Event**: A telemetry record classified live-only / aggregated / durable (reusing 036's classification seam). Types: `invocation.completed` (aggregated, now retained per instance), `session.started`/`session.ended` (durable), `phase.entered` (durable, carries bearing), `session.heartbeat` (live-only).
-- **InstanceState**: The plane-computed projection of one instance's live + historical state (fields per FR-016).
-- **Instance Registry**: The plane's fold of the event stream into `InstanceState` per instance; rehydrated from the durable event log on restart.
+- **Event**: A telemetry record — the unit of **fact** — classified live-only / aggregated / durable (reusing 036's classification seam). Types: `invocation.completed` (aggregated, now retained per instance), `session.started`/`session.ended` (durable), `phase.entered` (durable, carries bearing), `session.heartbeat` (live-only). The durable event log is the authoritative record; everything below is derived from it.
+- **InstanceState**: A **materialized projection** of one instance's live + historical state (fields per FR-016), derived from the event log + live signals — never an independently-authoritative value.
+- **Instance Registry**: The materialized projection (FR-015) that folds the event stream (plus live signals) into `InstanceState` per instance; rehydrated from the durable event log on restart. A **derived view, not the source of truth** — the event log is.
 
 ## Success Criteria *(mandatory)*
 
